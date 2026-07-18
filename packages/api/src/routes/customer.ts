@@ -248,7 +248,7 @@ router.delete('/pets/:id', async (req: AuthRequest, res: Response) => {
 router.get('/tags', async (req: AuthRequest, res: Response) => {
   try {
     const tags = await Tag.find({ ownerId: req.user!.id })
-      .populate('petId', 'name species breed')
+      .populate('petId', 'name petType species breed secondaryBreed color pattern photos photoUrl status')
       .sort({ createdAt: -1 });
     res.json({ success: true, data: tags });
   } catch (error) {

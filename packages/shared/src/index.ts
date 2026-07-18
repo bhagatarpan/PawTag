@@ -103,6 +103,13 @@ export interface EmergencyContact {
   relationship: string;
 }
 
+export interface PetPhoto {
+  url: string;
+  caption?: string;
+  isMain: boolean;
+  addedAt: string;
+}
+
 export interface Pet {
   _id: string;
   ownerId: string;
@@ -110,12 +117,14 @@ export interface Pet {
   petType: string;          // Dog, Cat, Rabbit, Hamster, Guinea Pig, Bird
   species: string;          // kept for backward compat
   breed: string;
+  secondaryBreed?: string;  // when breed is "Mixed Breed"
   gender: 'male' | 'female' | 'unknown';
   dateOfBirth?: string;
   weight?: number;
   color: string;
   pattern?: string;
-  photoUrl?: string;
+  photos: PetPhoto[];       // up to 5 photos
+  photoUrl?: string;        // kept for backward compat (legacy single photo)
   medicalAlerts?: string;
   microchipId?: string;
   status: PetStatus;

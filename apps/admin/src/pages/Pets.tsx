@@ -317,6 +317,7 @@ export default function Pets() {
         <table className="w-full text-sm">
           <thead className="bg-gray-50">
             <tr>
+              <th className="text-left px-4 py-3 font-medium text-gray-500 w-12">Photo</th>
               <th className="text-left px-4 py-3 font-medium text-gray-500">Name</th>
               <th className="text-left px-4 py-3 font-medium text-gray-500">Type</th>
               <th className="text-left px-4 py-3 font-medium text-gray-500">Breed</th>
@@ -330,38 +331,58 @@ export default function Pets() {
           </thead>
           <tbody className="divide-y divide-gray-200">
             {loading ? (
-              <tr><td colSpan={9} className="px-5 py-8 text-center text-gray-500">Loading...</td></tr>
+              <tr><td colSpan={10} className="px-5 py-8 text-center text-gray-500">Loading...</td></tr>
             ) : data?.items.length === 0 ? (
-              <tr><td colSpan={9} className="px-5 py-8 text-center text-gray-500">No pets found matching your filters</td></tr>
+              <tr><td colSpan={10} className="px-5 py-8 text-center text-gray-500">No pets found matching your filters</td></tr>
             ) : (
-              data?.items.map((pet: any) => (
-                <tr key={pet._id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 font-medium">{pet.name}</td>
-                  <td className="px-4 py-3 text-gray-600">{pet.petType}</td>
-                  <td className="px-4 py-3 text-gray-600">{pet.breed}</td>
-                  <td className="px-4 py-3 text-gray-600">{pet.color}</td>
-                  <td className="px-4 py-3 text-gray-500 text-xs">{pet.pattern || '—'}</td>
-                  <td className="px-4 py-3 text-gray-600">{pet.ownerId?.fullName || 'N/A'}</td>
-                  <td className="px-4 py-3 text-gray-500 text-xs">
-                    <div>{pet.ownerId?.email || ''}</div>
-                    <div>{pet.ownerId?.phoneNumber || ''}</div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${
-                      pet.status === 'safe' ? 'bg-green-100 text-green-700' :
-                      pet.status === 'lost' ? 'bg-red-100 text-red-700' :
-                      'bg-yellow-100 text-yellow-700'
-                    }`}>
-                      {pet.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <button onClick={() => deletePet(pet._id)} className="text-red-500 hover:text-red-700 text-xs flex items-center gap-1">
-                      <Trash2 size={12} /> Delete
-                    </button>
-                  </td>
-                </tr>
-              ))
+              data?.items.map((pet: any) => {
+                const mainPhoto = pet.photos?.length > 0
+                  ? (pet.photos.find((p: any) => p.isMain) || pet.photos[0])?.url
+                  : pet.photoUrl;
+                const breedDisplay = pet.breed === 'Mixed Breed' && pet.secondaryBreed
+                  ? `Mixed (${pet.secondaryBreed})`
+                  : pet.breed;
+                return (
+                  <tr key={pet._id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3">
+                      {mainPhoto ? (
+                        <img src={mainPhoto} alt="" className="w-9 h-9 rounded-full object-cover border" onError={(e) => { (e.target as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36"><rect width="36" height="36" fill="%23f3f4f6" rx="18"/><text x="18" y="21" text-anchor="middle" fill="%239ca3af" font-size="10">?</text></svg>'; }} />
+                      ) : (
+                        <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 text-xs">?</div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 font-medium">
+                      {pet.name}
+                      {pet.photos && pet.photos.length > 1 && (
+                        <span className="text-gray-400 text-xs ml-1">({pet.photos.length} photos)</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-gray-600">{pet.petType}</td>
+                    <td className="px-4 py-3 text-gray-600">{breedDisplay}</td>
+                    <td className="px-4 py-3 text-gray-600">{pet.color}</td>
+                    <td className="px-4 py-3 text-gray-500 text-xs">{pet.pattern || '—'}</td>
+                    <td className="px-4 py-3 text-gray-600">{pet.ownerId?.fullName || 'N/A'}</td>
+                    <td className="px-4 py-3 text-gray-500 text-xs">
+                      <div>{pet.ownerId?.email || ''}</div>
+                      <div>{pet.ownerId?.phoneNumber || ''}</div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${
+                        pet.status === 'safe' ? 'bg-green-100 text-green-700' :
+                        pet.status === 'lost' ? 'bg-red-100 text-red-700' :
+                        'bg-yellow-100 text-yellow-700'
+                      }`}>
+                        {pet.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <button onClick={() => deletePet(pet._id)} className="text-red-500 hover:text-red-700 text-xs flex items-center gap-1">
+                        <Trash2 size={12} /> Delete
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>

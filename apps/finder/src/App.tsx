@@ -1,7 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useParams, Routes, Route, Navigate } from 'react-router-dom';
 import axios from 'axios';
-import { PawPrint, Phone, MapPin, AlertTriangle, Loader2, CheckCircle } from 'lucide-react';
+import { PawPrint, Phone, MapPin, AlertTriangle, Loader2, CheckCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+
+interface PetPhoto {
+  url: string;
+  caption?: string;
+  isMain: boolean;
+}
 
 interface FinderData {
   pet: {
@@ -9,8 +15,10 @@ interface FinderData {
     petType?: string;
     species: string;
     breed: string;
+    secondaryBreed?: string;
     color: string;
     pattern?: string;
+    photos: PetPhoto[];
     photoUrl?: string;
     medicalAlerts?: string;
     status: string;
@@ -28,6 +36,7 @@ function FinderPage() {
   const [notified, setNotified] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [locationShared, setLocationShared] = useState(false);
+  const [photoIdx, setPhotoIdx] = useState(0);
 
   const apiBase = import.meta.env.VITE_API_URL || '/api';
 
@@ -67,6 +76,23 @@ function FinderPage() {
     );
   };
 
+  // Resolve photos and main photo
+  const petPhotos: PetPhoto[] = data?.pet?.photos || [];
+  const hasPhotos = petPhotos.length > 0;
+  const mainPhoto = hasPhotos
+    ? (petPhotos.find((p) => p.isMain) || petPhotos[0])
+    : null;
+  const displayPhotoUrl = mainPhoto?.url || data?.pet?.photoUrl;
+  const currentPhoto = hasPhotos ? petPhotos[photoIdx] : null;
+
+  const formatBreed = () => {
+    if (!data) return '';
+    if (data.pet.breed === 'Mixed Breed' && data.pet.secondaryBreed) {
+      return `Mixed Breed (${data.pet.secondaryBreed})`;
+    }
+    return data.pet.breed;
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -99,12 +125,47 @@ function FinderPage() {
         </div>
 
         <div className="bg-white rounded-xl shadow-md overflow-hidden">
-          {data.pet.photoUrl && (
-            <img src={data.pet.photoUrl} alt={data.pet.name} className="w-full h-56 object-cover" />
+          {/* Photo section */}
+          {displayPhotoUrl && (
+            <div className="relative">
+              <img
+                src={displayPhotoUrl}
+                alt={data.pet.name}
+                className="w-full h-56 object-cover"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+              />
+              {/* Photo navigation */}
+              {hasPhotos && petPhotos.length > 1 && (
+                <>
+                  <button
+                    onClick={() => setPhotoIdx((i) => (i === 0 ? petPhotos.length - 1 : i - 1))}
+                    className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white rounded-full p-1 transition-colors"
+                  >
+                    <ChevronLeft size={20} />
+                  </button>
+                  <button
+                    onClick={() => setPhotoIdx((i) => (i === petPhotos.length - 1 ? 0 : i + 1))}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white rounded-full p-1 transition-colors"
+                  >
+                    <ChevronRight size={20} />
+                  </button>
+                  <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5">
+                    {petPhotos.map((_, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setPhotoIdx(i)}
+                        className={`w-2 h-2 rounded-full transition-colors ${i === photoIdx ? 'bg-white' : 'bg-white/50'}`}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
           )}
+
           <div className="p-6">
             <h2 className="text-xl font-bold mb-1">{data.pet.name}</h2>
-            <p className="text-gray-600 mb-4">{data.pet.petType || data.pet.species} — {data.pet.breed} ({data.pet.color}{data.pet.pattern ? `, ${data.pet.pattern}` : ''})</p>
+            <p className="text-gray-600 mb-4">{data.pet.petType || data.pet.species} — {formatBreed()} ({data.pet.color}{data.pet.pattern ? `, ${data.pet.pattern}` : ''})</p>
 
             {data.pet.medicalAlerts && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4 flex items-start gap-2">

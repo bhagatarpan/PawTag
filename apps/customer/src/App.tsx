@@ -1,7 +1,7 @@
 import { Routes, Route, Navigate, Link, useNavigate } from 'react-router-dom';
 import { useState, useEffect, FormEvent, createContext, useContext, ReactNode } from 'react';
 import api from './lib/api';
-import { PawPrint, LogOut, Bell, Plus, AlertTriangle, CheckCircle } from 'lucide-react';
+import { PawPrint, LogOut, Bell, Plus, AlertTriangle, CheckCircle, Camera, Star, X, ImageIcon } from 'lucide-react';
 
 // --- Pet attribute options (mirrors shared/src/constants.ts) ---
 const PET_TYPES = ['Dog', 'Cat', 'Rabbit', 'Hamster', 'Guinea Pig', 'Bird'] as const;
@@ -79,6 +79,110 @@ const PET_BREEDS: Record<string, string[]> = {
   ],
 };
 
+// --- Photo Manager Component ---
+interface PhotoItem { url: string; caption?: string; isMain: boolean; }
+
+function PhotoManager({ photos, onChange }: { photos: PhotoItem[]; onChange: (photos: PhotoItem[]) => void }) {
+  const [urlInput, setUrlInput] = useState('');
+  const [captionInput, setCaptionInput] = useState('');
+  const [error, setError] = useState('');
+
+  const addPhoto = () => {
+    if (!urlInput.trim()) return;
+    if (photos.length >= 5) { setError('Maximum 5 photos allowed'); return; }
+    if (!/^https?:\/\/.+\.(jpg|jpeg|png|gif|webp|avif)(\?.*)?$/i.test(urlInput.trim())) {
+      setError('Please enter a valid image URL (jpg, png, gif, webp)');
+      return;
+    }
+    setError('');
+    const isFirst = photos.length === 0;
+    onChange([...photos, { url: urlInput.trim(), caption: captionInput.trim() || undefined, isMain: isFirst }]);
+    setUrlInput('');
+    setCaptionInput('');
+  };
+
+  const removePhoto = (idx: number) => {
+    const updated = photos.filter((_, i) => i !== idx);
+    if (updated.length > 0 && !updated.some((p) => p.isMain)) {
+      updated[0].isMain = true;
+    }
+    onChange(updated);
+  };
+
+  const setMain = (idx: number) => {
+    onChange(photos.map((p, i) => ({ ...p, isMain: i === idx })));
+  };
+
+  const mainPhoto = photos.find((p) => p.isMain);
+
+  return (
+    <div className="space-y-3">
+      <label className="block text-xs text-gray-500 font-medium">Pet Photos (up to 5)</label>
+
+      {/* Main photo preview */}
+      {mainPhoto && (
+        <div className="relative w-full h-48 rounded-lg overflow-hidden border-2 border-primary-300 bg-gray-100">
+          <img src={mainPhoto.url} alt="Main photo" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+          <span className="absolute top-2 left-2 bg-primary-600 text-white text-xs px-2 py-0.5 rounded-full flex items-center gap-1"><Star size={10} fill="currentColor" /> Main Photo</span>
+        </div>
+      )}
+
+      {/* Photo grid */}
+      {photos.length > 0 && (
+        <div className="grid grid-cols-5 gap-2">
+          {photos.map((photo, idx) => (
+            <div key={idx} className={`relative group rounded-lg overflow-hidden border-2 ${photo.isMain ? 'border-primary-500' : 'border-gray-200'} aspect-square`}>
+              <img src={photo.url} alt={photo.caption || `Photo ${idx + 1}`} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect width="80" height="80" fill="%23f3f4f6"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="%239ca3af" font-size="10">Error</text></svg>'; }} />
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100">
+                {!photo.isMain && (
+                  <button type="button" onClick={() => setMain(idx)} className="bg-white/90 rounded-full p-1 hover:bg-yellow-400" title="Set as main photo">
+                    <Star size={12} />
+                  </button>
+                )}
+                <button type="button" onClick={() => removePhoto(idx)} className="bg-white/90 rounded-full p-1 hover:bg-red-500 hover:text-white" title="Remove photo">
+                  <X size={12} />
+                </button>
+              </div>
+              {photo.isMain && <span className="absolute top-1 right-1"><Star size={10} className="text-yellow-500" fill="currentColor" /></span>}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Add photo form */}
+      {photos.length < 5 && (
+        <div className="flex gap-2 items-end">
+          <div className="flex-1">
+            <input
+              type="url"
+              placeholder="Paste image URL (jpg, png, webp...)"
+              value={urlInput}
+              onChange={(e) => { setUrlInput(e.target.value); setError(''); }}
+              className="w-full border rounded-md px-3 py-2 text-sm"
+            />
+          </div>
+          <div className="w-40">
+            <input
+              type="text"
+              placeholder="Caption (optional)"
+              value={captionInput}
+              onChange={(e) => setCaptionInput(e.target.value)}
+              className="w-full border rounded-md px-3 py-2 text-sm"
+            />
+          </div>
+          <button type="button" onClick={addPhoto} className="bg-gray-100 border rounded-md px-3 py-2 text-sm hover:bg-gray-200 flex items-center gap-1">
+            <Camera size={14} /> Add
+          </button>
+        </div>
+      )}
+      {error && <p className="text-xs text-red-500">{error}</p>}
+      {photos.length === 0 && (
+        <p className="text-xs text-gray-400 flex items-center gap-1"><ImageIcon size={12} /> No photos yet. Add a photo URL above.</p>
+      )}
+    </div>
+  );
+}
+
 // --- Auth Context ---
 const AuthCtx = createContext<{ user: any; login: (e: string, p: string) => Promise<void>; logout: () => void } | null>(null);
 
@@ -138,22 +242,29 @@ function Dashboard() {
   const [pets, setPets] = useState<any[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
-    name: '', petType: 'Dog', breed: '', color: '', pattern: '', medicalAlerts: '',
+    name: '', petType: 'Dog', breed: '', secondaryBreed: '', color: '', pattern: '', medicalAlerts: '',
   });
+  const [photos, setPhotos] = useState<PhotoItem[]>([]);
 
   const refreshPets = () => api.get('/customer/pets').then((r) => setPets(r.data.data)).catch(console.error);
   useEffect(() => { refreshPets(); }, []);
 
-  // Reset dependent fields when pet type changes
   const handleTypeChange = (type: string) => {
-    setForm({ ...form, petType: type, breed: '', color: '', pattern: '' });
+    setForm({ ...form, petType: type, breed: '', secondaryBreed: '', color: '', pattern: '' });
+  };
+
+  const handleBreedChange = (breed: string) => {
+    setForm({ ...form, breed, secondaryBreed: breed !== 'Mixed Breed' ? '' : form.secondaryBreed });
   };
 
   const addPet = async (e: FormEvent) => {
     e.preventDefault();
-    await api.post('/customer/pets', { ...form, species: form.petType });
+    const payload: any = { ...form, species: form.petType, photos };
+    if (form.breed !== 'Mixed Breed') delete payload.secondaryBreed;
+    await api.post('/customer/pets', payload);
     setShowForm(false);
-    setForm({ name: '', petType: 'Dog', breed: '', color: '', pattern: '', medicalAlerts: '' });
+    setForm({ name: '', petType: 'Dog', breed: '', secondaryBreed: '', color: '', pattern: '', medicalAlerts: '' });
+    setPhotos([]);
     refreshPets();
   };
 
@@ -164,6 +275,23 @@ function Dashboard() {
   const availableColors = form.petType ? PET_COLORS[form.petType] || [] : [];
   const availablePatterns = form.petType ? PET_PATTERNS[form.petType] || [] : [];
   const availableBreeds = form.petType ? PET_BREEDS[form.petType] || [] : [];
+  const isMixedBreed = form.breed === 'Mixed Breed';
+
+  // Helper to get main photo URL from a pet
+  const getMainPhoto = (pet: any): string | null => {
+    if (pet.photos && pet.photos.length > 0) {
+      const main = pet.photos.find((p: any) => p.isMain);
+      return main ? main.url : pet.photos[0].url;
+    }
+    return pet.photoUrl || null;
+  };
+
+  const formatBreed = (pet: any) => {
+    if (pet.breed === 'Mixed Breed' && pet.secondaryBreed) {
+      return `Mixed Breed (${pet.secondaryBreed})`;
+    }
+    return pet.breed;
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -194,11 +322,25 @@ function Dashboard() {
               </div>
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Breed *</label>
-                <select value={form.breed} onChange={(e) => setForm({ ...form, breed: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm" required>
+                <select value={form.breed} onChange={(e) => handleBreedChange(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" required>
                   <option value="">Select breed...</option>
                   {availableBreeds.map((b) => <option key={b} value={b}>{b}</option>)}
                 </select>
               </div>
+              {isMixedBreed && (
+                <>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Main Breed *</label>
+                    <select value={form.secondaryBreed} onChange={(e) => setForm({ ...form, secondaryBreed: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm" required>
+                      <option value="">Select main breed...</option>
+                      {availableBreeds.filter((b) => b !== 'Mixed Breed').map((b) => <option key={b} value={b}>{b}</option>)}
+                    </select>
+                  </div>
+                  <div className="col-span-2 bg-blue-50 border border-blue-200 rounded-md px-3 py-2 text-xs text-blue-700">
+                    Your pet is a Mixed Breed. Selected main breed: <strong>{form.secondaryBreed || '—'}</strong>
+                  </div>
+                </>
+              )}
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Color *</label>
                 <select value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm" required>
@@ -215,9 +357,15 @@ function Dashboard() {
               </div>
               <input placeholder="Medical Alerts" value={form.medicalAlerts} onChange={(e) => setForm({ ...form, medicalAlerts: e.target.value })} className="border rounded-md px-3 py-2 text-sm" />
             </div>
+
+            {/* Photo Manager */}
+            <div className="border-t pt-4">
+              <PhotoManager photos={photos} onChange={setPhotos} />
+            </div>
+
             <div className="flex gap-2">
               <button type="submit" className="bg-primary-600 text-white px-4 py-2 rounded-md text-sm hover:bg-primary-700">Save</button>
-              <button type="button" onClick={() => setShowForm(false)} className="border px-4 py-2 rounded-md text-sm">Cancel</button>
+              <button type="button" onClick={() => { setShowForm(false); setPhotos([]); }} className="border px-4 py-2 rounded-md text-sm">Cancel</button>
             </div>
           </form>
         )}
@@ -226,29 +374,43 @@ function Dashboard() {
           <div className="text-center py-12 text-gray-500">No pets yet. Add your first pet above.</div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {pets.map((pet) => (
-              <div key={pet._id} className="bg-white rounded-lg border p-5">
-                <div className="flex justify-between items-start mb-3">
-                  <div>
-                    <h3 className="text-lg font-semibold">{pet.name}</h3>
-                    <p className="text-sm text-gray-600">{pet.petType || pet.species} — {pet.breed}</p>
-                    <p className="text-sm text-gray-500">Color: {pet.color}{pet.pattern ? ` | Pattern: ${pet.pattern}` : ''}</p>
-                    {pet.medicalAlerts && <p className="text-sm text-red-600 mt-1 flex items-center gap-1"><AlertTriangle size={14} /> {pet.medicalAlerts}</p>}
-                  </div>
-                  <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${pet.status === 'safe' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                    {pet.status}
-                  </span>
-                </div>
-                <div className="flex gap-2 pt-3 border-t">
-                  {pet.status === 'safe' ? (
-                    <button onClick={() => markLost(pet._id)} className="text-red-600 hover:text-red-800 text-sm font-medium">Mark as Lost</button>
-                  ) : (
-                    <button onClick={() => markFound(pet._id)} className="text-green-600 hover:text-green-800 text-sm font-medium flex items-center gap-1"><CheckCircle size={14} /> Mark as Found</button>
+            {pets.map((pet) => {
+              const mainPhoto = getMainPhoto(pet);
+              return (
+                <div key={pet._id} className="bg-white rounded-lg border overflow-hidden">
+                  {/* Photo header */}
+                  {mainPhoto && (
+                    <div className="h-40 bg-gray-100 relative">
+                      <img src={mainPhoto} alt={pet.name} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                    </div>
                   )}
-                  <button onClick={() => deletePet(pet._id)} className="text-gray-400 hover:text-red-600 text-sm ml-auto">Delete</button>
+                  <div className="p-5">
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <h3 className="text-lg font-semibold">{pet.name}</h3>
+                        <p className="text-sm text-gray-600">{pet.petType || pet.species} — {formatBreed(pet)}</p>
+                        <p className="text-sm text-gray-500">Color: {pet.color}{pet.pattern ? ` | Pattern: ${pet.pattern}` : ''}</p>
+                        {pet.photos && pet.photos.length > 1 && (
+                          <p className="text-xs text-gray-400 mt-1">{pet.photos.length} photos</p>
+                        )}
+                        {pet.medicalAlerts && <p className="text-sm text-red-600 mt-1 flex items-center gap-1"><AlertTriangle size={14} /> {pet.medicalAlerts}</p>}
+                      </div>
+                      <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${pet.status === 'safe' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                        {pet.status}
+                      </span>
+                    </div>
+                    <div className="flex gap-2 pt-3 border-t">
+                      {pet.status === 'safe' ? (
+                        <button onClick={() => markLost(pet._id)} className="text-red-600 hover:text-red-800 text-sm font-medium">Mark as Lost</button>
+                      ) : (
+                        <button onClick={() => markFound(pet._id)} className="text-green-600 hover:text-green-800 text-sm font-medium flex items-center gap-1"><CheckCircle size={14} /> Mark as Found</button>
+                      )}
+                      <button onClick={() => deletePet(pet._id)} className="text-gray-400 hover:text-red-600 text-sm ml-auto">Delete</button>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
