@@ -5,7 +5,60 @@ const router = Router();
 
 // No auth required — this is the public finder portal
 
-// GET /api/finder/:tagId — Get pet info by tag ID
+/**
+ * @swagger
+ * /api/finder/{tagId}:
+ *   get:
+ *     summary: Get pet info by tag ID
+ *     tags: [Finder]
+ *     parameters:
+ *       - in: path
+ *         name: tagId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The tag identifier
+ *     responses:
+ *       200:
+ *         description: Pet and owner information
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     pet:
+ *                       type: object
+ *                       properties:
+ *                         name:
+ *                           type: string
+ *                         species:
+ *                           type: string
+ *                         breed:
+ *                           type: string
+ *                         color:
+ *                           type: string
+ *                         photoUrl:
+ *                           type: string
+ *                         medicalAlerts:
+ *                           type: string
+ *                         status:
+ *                           type: string
+ *                     tagId:
+ *                       type: string
+ *                     ownerName:
+ *                       type: string
+ *                     ownerPhone:
+ *                       type: string
+ *       404:
+ *         description: Tag not found
+ *       500:
+ *         description: Failed to load pet info
+ */
 router.get('/:tagId', async (req: Request, res: Response) => {
   try {
     const tag = await Tag.findOne({ tagId: req.params.tagId })
@@ -54,7 +107,39 @@ router.get('/:tagId', async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/finder/:tagId/notify — Notify owner that pet was found
+/**
+ * @swagger
+ * /api/finder/{tagId}/notify:
+ *   post:
+ *     summary: Notify owner that pet was found
+ *     tags: [Finder]
+ *     parameters:
+ *       - in: path
+ *         name: tagId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The tag identifier
+ *     responses:
+ *       200:
+ *         description: Owner has been notified
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     message:
+ *                       type: string
+ *       404:
+ *         description: Tag not found
+ *       500:
+ *         description: Failed to notify owner
+ */
 router.post('/:tagId/notify', async (req: Request, res: Response) => {
   try {
     const tag = await Tag.findOne({ tagId: req.params.tagId });
@@ -79,7 +164,59 @@ router.post('/:tagId/notify', async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/finder/:tagId/share-location — Finder shares their GPS location
+/**
+ * @swagger
+ * /api/finder/{tagId}/share-location:
+ *   post:
+ *     summary: Finder shares their GPS location with the pet owner
+ *     tags: [Finder]
+ *     parameters:
+ *       - in: path
+ *         name: tagId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The tag identifier
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - latitude
+ *               - longitude
+ *             properties:
+ *               latitude:
+ *                 type: number
+ *                 format: double
+ *                 description: GPS latitude coordinate
+ *               longitude:
+ *                 type: number
+ *                 format: double
+ *                 description: GPS longitude coordinate
+ *     responses:
+ *       200:
+ *         description: Location shared with owner
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     message:
+ *                       type: string
+ *       400:
+ *         description: Location coordinates required
+ *       404:
+ *         description: Tag not found
+ *       500:
+ *         description: Failed to share location
+ */
 router.post('/:tagId/share-location', async (req: Request, res: Response) => {
   try {
     const { latitude, longitude } = req.body;
@@ -122,7 +259,29 @@ router.post('/:tagId/share-location', async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/finder/public/products — Public product listing (for shop)
+/**
+ * @swagger
+ * /api/finder/shop/products:
+ *   get:
+ *     summary: List active products (public shop)
+ *     tags: [Finder]
+ *     responses:
+ *       200:
+ *         description: List of active products
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Product'
+ *       500:
+ *         description: Failed to fetch products
+ */
 router.get('/shop/products', async (_req: Request, res: Response) => {
   try {
     const { Product } = require('@pawtag/db');
@@ -133,7 +292,36 @@ router.get('/shop/products', async (_req: Request, res: Response) => {
   }
 });
 
-// GET /api/finder/public/content/:slug — Public page content
+/**
+ * @swagger
+ * /api/finder/content/{slug}:
+ *   get:
+ *     summary: Get published page content by slug
+ *     tags: [Finder]
+ *     parameters:
+ *       - in: path
+ *         name: slug
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Content page slug
+ *     responses:
+ *       200:
+ *         description: Published content page
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   $ref: '#/components/schemas/SiteContent'
+ *       404:
+ *         description: Page not found
+ *       500:
+ *         description: Failed to fetch content
+ */
 router.get('/content/:slug', async (req: Request, res: Response) => {
   try {
     const { SiteContent } = require('@pawtag/db');

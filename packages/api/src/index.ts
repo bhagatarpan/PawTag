@@ -6,10 +6,12 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
+import swaggerUi from 'swagger-ui-express';
 
 import { config } from './config';
 import { connectDatabase } from '@pawtag/db';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
+import { swaggerSpec } from './swagger';
 
 import authRoutes from './routes/auth';
 import adminRoutes from './routes/admin';
@@ -39,6 +41,16 @@ const authLimiter = rateLimit({
   message: { success: false, error: 'Too many auth attempts, please try again later' },
 });
 app.use('/api/auth', authLimiter);
+
+// --- Swagger API Docs ---
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  customCss: '.swagger-ui .topbar { display: none }',
+  customSiteTitle: 'PawTag API Docs',
+}));
+app.get('/api/docs.json', (_req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.send(swaggerSpec);
+});
 
 // --- Health Check ---
 app.get('/health', (_req, res) => {

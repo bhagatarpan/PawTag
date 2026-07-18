@@ -44,3 +44,17 @@ build/
 *.tgz
 .cache/
 .turbo/
+
+# TypeScript build info
+*.tsbuildinfo
+
+# Old exploration directories (not part of monorepo)
+backend/
+frontend/
+
+# One-off utility scripts (contain hardcoded values)
+packages/api/seed-admin.js
+packages/api/seed-test.js
+packages/api/create-tags.js
+packages/api/fix-ownership.js
+packages/api/promote-admin.js

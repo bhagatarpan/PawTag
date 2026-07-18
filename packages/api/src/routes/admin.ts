@@ -32,6 +32,23 @@ const router = Router();
 router.use(authenticate, authorize('super_admin', 'admin', 'support'));
 
 // --- Dashboard Stats ---
+/**
+ * @swagger
+ * /api/admin/dashboard:
+ *   get:
+ *     tags: [Admin - Dashboard]
+ *     summary: Get dashboard statistics
+ *     description: Returns key metrics: total users, pets, tags, orders, revenue, lost pets, recent scans.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Dashboard stats
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Insufficient permissions
+ */
 router.get('/dashboard', async (_req: AuthRequest, res: Response) => {
   try {
     const [totalUsers, totalPets, totalTags, totalOrders, lostPets, recentScans] =
@@ -72,6 +89,49 @@ router.get('/dashboard', async (_req: AuthRequest, res: Response) => {
 });
 
 // --- User Management ---
+/**
+ * @swagger
+ * /api/admin/users:
+ *   get:
+ *     tags: [Admin - Users]
+ *     summary: Get all users with pagination and filtering
+ *     description: Returns a paginated list of users with optional search, role, and status filters.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *         description: Items per page
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search by fullName or email
+ *       - in: query
+ *         name: role
+ *         schema:
+ *           type: string
+ *         description: Filter by user role
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *         description: Filter by user status
+ *     responses:
+ *       200:
+ *         description: Paginated list of users
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Insufficient permissions
+ */
 router.get('/users', async (req, res: Response) => {
   try {
     const { page = 1, limit = 20, search, role, status } = req.query;
@@ -101,6 +161,32 @@ router.get('/users', async (req, res: Response) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/admin/users/{id}:
+ *   get:
+ *     tags: [Admin - Users]
+ *     summary: Get a user by ID
+ *     description: Returns a single user by their ID without the password hash.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: User ID
+ *     responses:
+ *       200:
+ *         description: User details
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Insufficient permissions
+ *       404:
+ *         description: User not found
+ */
 router.get('/users/:id', async (req, res: Response) => {
   try {
     const user = await User.findById(req.params.id).select('-passwordHash');
@@ -111,6 +197,44 @@ router.get('/users/:id', async (req, res: Response) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/admin/users/{id}/role:
+ *   put:
+ *     tags: [Admin - Users]
+ *     summary: Update a user's role
+ *     description: Updates the role of a user and logs the change in the audit log.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: User ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               role:
+ *                 type: string
+ *                 description: New user role
+ *             required:
+ *               - role
+ *     responses:
+ *       200:
+ *         description: Updated user
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Insufficient permissions
+ *       404:
+ *         description: User not found
+ */
 router.put('/users/:id/role', validate(updateUserRoleSchema), async (req: AuthRequest, res: Response) => {
   try {
     const user = await User.findByIdAndUpdate(req.params.id, { role: req.body.role }, { new: true }).select('-passwordHash');
@@ -130,6 +254,44 @@ router.put('/users/:id/role', validate(updateUserRoleSchema), async (req: AuthRe
   }
 });
 
+/**
+ * @swagger
+ * /api/admin/users/{id}/status:
+ *   put:
+ *     tags: [Admin - Users]
+ *     summary: Update a user's status
+ *     description: Updates the status of a user and logs the change in the audit log.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: User ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 description: New user status
+ *             required:
+ *               - status
+ *     responses:
+ *       200:
+ *         description: Updated user
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Insufficient permissions
+ *       404:
+ *         description: User not found
+ */
 router.put('/users/:id/status', validate(updateUserStatusSchema), async (req: AuthRequest, res: Response) => {
   try {
     const user = await User.findByIdAndUpdate(req.params.id, { status: req.body.status }, { new: true }).select('-passwordHash');
@@ -150,10 +312,82 @@ router.put('/users/:id/status', validate(updateUserStatusSchema), async (req: Au
 });
 
 // --- Pet Management ---
+/**
+ * @swagger
+ * /api/admin/pets:
+ *   get:
+ *     tags: [Admin - Pets]
+ *     summary: Get all pets with advanced filtering
+ *     description: Returns a paginated list of pets with filtering by pet name, breed, status, owner name, email, or phone.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *         description: Items per page
+ *       - in: query
+ *         name: petName
+ *         schema:
+ *           type: string
+ *         description: Filter by pet name (partial match)
+ *       - in: query
+ *         name: petBreed
+ *         schema:
+ *           type: string
+ *         description: Filter by pet breed (partial match)
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [safe, lost, found]
+ *         description: Filter by pet status
+ *       - in: query
+ *         name: ownerName
+ *         schema:
+ *           type: string
+ *         description: Filter by owner name (partial match)
+ *       - in: query
+ *         name: ownerEmail
+ *         schema:
+ *           type: string
+ *         description: Filter by owner email (partial match)
+ *       - in: query
+ *         name: ownerPhone
+ *         schema:
+ *           type: string
+ *         description: Filter by owner phone (partial match)
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: General search across pet name and breed
+ *     responses:
+ *       200:
+ *         description: Paginated list of pets
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Insufficient permissions
+ */
 router.get('/pets', async (req, res: Response) => {
   try {
-    const { page = 1, limit = 20, search, status, ownerId } = req.query;
+    const { page = 1, limit = 20, search, status, petName, petBreed, ownerName, ownerEmail, ownerPhone } = req.query;
     const query: any = {};
+
+    // Pet-level filters
+    if (petName) {
+      query.name = { $regex: petName, $options: 'i' };
+    }
+    if (petBreed) {
+      query.breed = { $regex: petBreed, $options: 'i' };
+    }
     if (search) {
       query.$or = [
         { name: { $regex: search, $options: 'i' } },
@@ -161,11 +395,28 @@ router.get('/pets', async (req, res: Response) => {
       ];
     }
     if (status) query.status = status;
-    if (ownerId) query.ownerId = ownerId;
+
+    // Owner-level filters — look up matching user IDs first
+    const ownerFilters: any = {};
+    if (ownerName) {
+      ownerFilters.fullName = { $regex: ownerName, $options: 'i' };
+    }
+    if (ownerEmail) {
+      ownerFilters.email = { $regex: ownerEmail, $options: 'i' };
+    }
+    if (ownerPhone) {
+      ownerFilters.phoneNumber = { $regex: ownerPhone, $options: 'i' };
+    }
+
+    if (Object.keys(ownerFilters).length > 0) {
+      const matchingUsers = await User.find(ownerFilters).select('_id');
+      const userIds = matchingUsers.map((u) => u._id);
+      query.ownerId = { $in: userIds };
+    }
 
     const total = await Pet.countDocuments(query);
     const pets = await Pet.find(query)
-      .populate('ownerId', 'fullName email')
+      .populate('ownerId', 'fullName email phoneNumber')
       .sort({ createdAt: -1 })
       .skip((Number(page) - 1) * Number(limit))
       .limit(Number(limit));
@@ -179,6 +430,44 @@ router.get('/pets', async (req, res: Response) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/admin/pets/{id}/status:
+ *   put:
+ *     tags: [Admin - Pets]
+ *     summary: Update a pet's status
+ *     description: Updates the status of a pet and logs the change in the audit log.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Pet ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 description: New pet status
+ *             required:
+ *               - status
+ *     responses:
+ *       200:
+ *         description: Updated pet
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Insufficient permissions
+ *       404:
+ *         description: Pet not found
+ */
 router.put('/pets/:id/status', async (req: AuthRequest, res: Response) => {
   try {
     const pet = await Pet.findByIdAndUpdate(req.params.id, { status: req.body.status }, { new: true });
@@ -198,6 +487,32 @@ router.put('/pets/:id/status', async (req: AuthRequest, res: Response) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/admin/pets/{id}:
+ *   delete:
+ *     tags: [Admin - Pets]
+ *     summary: Delete a pet
+ *     description: Deletes a pet by ID and logs the action in the audit log.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Pet ID
+ *     responses:
+ *       200:
+ *         description: Pet deleted
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Insufficient permissions
+ *       404:
+ *         description: Pet not found
+ */
 router.delete('/pets/:id', async (req: AuthRequest, res: Response) => {
   try {
     const pet = await Pet.findByIdAndDelete(req.params.id);
@@ -217,6 +532,44 @@ router.delete('/pets/:id', async (req: AuthRequest, res: Response) => {
 });
 
 // --- Tag Management ---
+/**
+ * @swagger
+ * /api/admin/tags:
+ *   get:
+ *     tags: [Admin - Tags]
+ *     summary: Get all tags with pagination and filtering
+ *     description: Returns a paginated list of tags with optional search and status filters.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *         description: Items per page
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search by tagId
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *         description: Filter by tag status
+ *     responses:
+ *       200:
+ *         description: Paginated list of tags
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Insufficient permissions
+ */
 router.get('/tags', async (req, res: Response) => {
   try {
     const { page = 1, limit = 20, search, status } = req.query;
@@ -242,6 +595,49 @@ router.get('/tags', async (req, res: Response) => {
 });
 
 // --- Product Management ---
+/**
+ * @swagger
+ * /api/admin/products:
+ *   get:
+ *     tags: [Admin - Products]
+ *     summary: Get all products with pagination and filtering
+ *     description: Returns a paginated list of products with optional search, category, and active status filters.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *         description: Items per page
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search by name or SKU
+ *       - in: query
+ *         name: category
+ *         schema:
+ *           type: string
+ *         description: Filter by category
+ *       - in: query
+ *         name: isActive
+ *         schema:
+ *           type: string
+ *         description: Filter by active status (true/false)
+ *     responses:
+ *       200:
+ *         description: Paginated list of products
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Insufficient permissions
+ */
 router.get('/products', async (req, res: Response) => {
   try {
     const { page = 1, limit = 20, search, category, isActive } = req.query;
@@ -270,6 +666,32 @@ router.get('/products', async (req, res: Response) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/admin/products/{id}:
+ *   get:
+ *     tags: [Admin - Products]
+ *     summary: Get a product by ID
+ *     description: Returns a single product by its ID.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Product ID
+ *     responses:
+ *       200:
+ *         description: Product details
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Insufficient permissions
+ *       404:
+ *         description: Product not found
+ */
 router.get('/products/:id', async (req, res: Response) => {
   try {
     const product = await Product.findById(req.params.id);
@@ -280,6 +702,46 @@ router.get('/products/:id', async (req, res: Response) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/admin/products:
+ *   post:
+ *     tags: [Admin - Products]
+ *     summary: Create a new product
+ *     description: Creates a new product and logs the action in the audit log.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               sku:
+ *                 type: string
+ *               price:
+ *                 type: number
+ *               category:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               isActive:
+ *                 type: boolean
+ *             required:
+ *               - name
+ *               - sku
+ *               - price
+ *     responses:
+ *       201:
+ *         description: Product created
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Insufficient permissions
+ */
 router.post('/products', validate(createProductSchema), async (req: AuthRequest, res: Response) => {
   try {
     const product = await Product.create(req.body);
@@ -297,6 +759,51 @@ router.post('/products', validate(createProductSchema), async (req: AuthRequest,
   }
 });
 
+/**
+ * @swagger
+ * /api/admin/products/{id}:
+ *   put:
+ *     tags: [Admin - Products]
+ *     summary: Update a product
+ *     description: Updates a product by ID and logs the action in the audit log.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Product ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               sku:
+ *                 type: string
+ *               price:
+ *                 type: number
+ *               category:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               isActive:
+ *                 type: boolean
+ *     responses:
+ *       200:
+ *         description: Updated product
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Insufficient permissions
+ *       404:
+ *         description: Product not found
+ */
 router.put('/products/:id', validate(updateProductSchema), async (req: AuthRequest, res: Response) => {
   try {
     const product = await Product.findByIdAndUpdate(req.params.id, req.body, { new: true });
@@ -315,6 +822,32 @@ router.put('/products/:id', validate(updateProductSchema), async (req: AuthReque
   }
 });
 
+/**
+ * @swagger
+ * /api/admin/products/{id}:
+ *   delete:
+ *     tags: [Admin - Products]
+ *     summary: Delete a product
+ *     description: Deletes a product by ID and logs the action in the audit log.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Product ID
+ *     responses:
+ *       200:
+ *         description: Product deleted
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Insufficient permissions
+ *       404:
+ *         description: Product not found
+ */
 router.delete('/products/:id', async (req: AuthRequest, res: Response) => {
   try {
     const product = await Product.findByIdAndDelete(req.params.id);
@@ -334,6 +867,44 @@ router.delete('/products/:id', async (req: AuthRequest, res: Response) => {
 });
 
 // --- Order Management ---
+/**
+ * @swagger
+ * /api/admin/orders:
+ *   get:
+ *     tags: [Admin - Orders]
+ *     summary: Get all orders with pagination and filtering
+ *     description: Returns a paginated list of orders with optional status and search filters.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *         description: Items per page
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *         description: Filter by order status
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search by order number
+ *     responses:
+ *       200:
+ *         description: Paginated list of orders
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Insufficient permissions
+ */
 router.get('/orders', async (req, res: Response) => {
   try {
     const { page = 1, limit = 20, status, search } = req.query;
@@ -357,6 +928,47 @@ router.get('/orders', async (req, res: Response) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/admin/orders/{id}/status:
+ *   put:
+ *     tags: [Admin - Orders]
+ *     summary: Update an order's status
+ *     description: Updates the status of an order and logs the change in the audit log.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Order ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 description: New order status
+ *               trackingNumber:
+ *                 type: string
+ *                 description: Optional tracking number
+ *             required:
+ *               - status
+ *     responses:
+ *       200:
+ *         description: Updated order
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Insufficient permissions
+ *       404:
+ *         description: Order not found
+ */
 router.put('/orders/:id/status', async (req: AuthRequest, res: Response) => {
   try {
     const { status, trackingNumber } = req.body;
@@ -381,6 +993,34 @@ router.put('/orders/:id/status', async (req: AuthRequest, res: Response) => {
 });
 
 // --- Site Content Management ---
+/**
+ * @swagger
+ * /api/admin/content:
+ *   get:
+ *     tags: [Admin - Content]
+ *     summary: Get all site content with filtering
+ *     description: Returns a list of site content with optional status and search filters.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *         description: Filter by content status
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search by title or slug
+ *     responses:
+ *       200:
+ *         description: List of site content
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Insufficient permissions
+ */
 router.get('/content', async (req, res: Response) => {
   try {
     const { status, search } = req.query;
@@ -403,6 +1043,32 @@ router.get('/content', async (req, res: Response) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/admin/content/{id}:
+ *   get:
+ *     tags: [Admin - Content]
+ *     summary: Get site content by ID
+ *     description: Returns a single site content document by its ID.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Content ID
+ *     responses:
+ *       200:
+ *         description: Content details
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Insufficient permissions
+ *       404:
+ *         description: Content not found
+ */
 router.get('/content/:id', async (req, res: Response) => {
   try {
     const content = await SiteContent.findById(req.params.id);
@@ -413,6 +1079,41 @@ router.get('/content/:id', async (req, res: Response) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/admin/content:
+ *   post:
+ *     tags: [Admin - Content]
+ *     summary: Create new site content
+ *     description: Creates a new site content document with the creator's user ID.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *               slug:
+ *                 type: string
+ *               body:
+ *                 type: string
+ *               status:
+ *                 type: string
+ *             required:
+ *               - title
+ *               - slug
+ *     responses:
+ *       201:
+ *         description: Content created
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Insufficient permissions
+ */
 router.post('/content', validate(createContentSchema), async (req: AuthRequest, res: Response) => {
   try {
     const content = await SiteContent.create({ ...req.body, createdBy: req.user!.id });
@@ -422,6 +1123,47 @@ router.post('/content', validate(createContentSchema), async (req: AuthRequest, 
   }
 });
 
+/**
+ * @swagger
+ * /api/admin/content/{id}:
+ *   put:
+ *     tags: [Admin - Content]
+ *     summary: Update site content
+ *     description: Updates a site content document by ID. Auto-sets publishedAt when status changes to published.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Content ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *               slug:
+ *                 type: string
+ *               body:
+ *                 type: string
+ *               status:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Updated content
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Insufficient permissions
+ *       404:
+ *         description: Content not found
+ */
 router.put('/content/:id', validate(updateContentSchema), async (req: AuthRequest, res: Response) => {
   try {
     const update = { ...req.body };
@@ -436,6 +1178,30 @@ router.put('/content/:id', validate(updateContentSchema), async (req: AuthReques
   }
 });
 
+/**
+ * @swagger
+ * /api/admin/content/{id}:
+ *   delete:
+ *     tags: [Admin - Content]
+ *     summary: Delete site content
+ *     description: Deletes a site content document by ID.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Content ID
+ *     responses:
+ *       200:
+ *         description: Content deleted
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Insufficient permissions
+ */
 router.delete('/content/:id', async (req: AuthRequest, res: Response) => {
   try {
     await SiteContent.findByIdAndDelete(req.params.id);
@@ -446,6 +1212,29 @@ router.delete('/content/:id', async (req: AuthRequest, res: Response) => {
 });
 
 // --- Settings Management ---
+/**
+ * @swagger
+ * /api/admin/settings:
+ *   get:
+ *     tags: [Admin - Settings]
+ *     summary: Get all settings with optional category filter
+ *     description: Returns a list of system settings, optionally filtered by category.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: category
+ *         schema:
+ *           type: string
+ *         description: Filter by setting category
+ *     responses:
+ *       200:
+ *         description: List of settings
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Insufficient permissions
+ */
 router.get('/settings', async (req, res: Response) => {
   try {
     const { category } = req.query;
@@ -459,6 +1248,44 @@ router.get('/settings', async (req, res: Response) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/admin/settings/{key}:
+ *   put:
+ *     tags: [Admin - Settings]
+ *     summary: Update a setting by key
+ *     description: Updates an existing setting's value by its key.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: key
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Setting key
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               value:
+ *                 type: string
+ *                 description: New setting value
+ *             required:
+ *               - value
+ *     responses:
+ *       200:
+ *         description: Updated setting
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Insufficient permissions
+ *       404:
+ *         description: Setting not found
+ */
 router.put('/settings/:key', async (req: AuthRequest, res: Response) => {
   try {
     const setting = await Setting.findOneAndUpdate(
@@ -473,6 +1300,41 @@ router.put('/settings/:key', async (req: AuthRequest, res: Response) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/admin/settings:
+ *   post:
+ *     tags: [Admin - Settings]
+ *     summary: Create a new setting
+ *     description: Creates a new system setting.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               key:
+ *                 type: string
+ *               value:
+ *                 type: string
+ *               category:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *             required:
+ *               - key
+ *               - value
+ *     responses:
+ *       201:
+ *         description: Setting created
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Insufficient permissions
+ */
 router.post('/settings', validate(createSettingSchema), async (req: AuthRequest, res: Response) => {
   try {
     const setting = await Setting.create({ ...req.body, updatedBy: req.user!.id });
@@ -483,6 +1345,23 @@ router.post('/settings', validate(createSettingSchema), async (req: AuthRequest,
 });
 
 // --- Feature Flags ---
+/**
+ * @swagger
+ * /api/admin/feature-flags:
+ *   get:
+ *     tags: [Admin - Feature Flags]
+ *     summary: Get all feature flags
+ *     description: Returns a list of all feature flags sorted by key.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of feature flags
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Insufficient permissions
+ */
 router.get('/feature-flags', async (_req, res: Response) => {
   try {
     const flags = await FeatureFlag.find().sort({ key: 1 });
@@ -492,6 +1371,38 @@ router.get('/feature-flags', async (_req, res: Response) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/admin/feature-flags:
+ *   post:
+ *     tags: [Admin - Feature Flags]
+ *     summary: Create a new feature flag
+ *     description: Creates a new feature flag.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               key:
+ *                 type: string
+ *               enabled:
+ *                 type: boolean
+ *               description:
+ *                 type: string
+ *             required:
+ *               - key
+ *     responses:
+ *       201:
+ *         description: Feature flag created
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Insufficient permissions
+ */
 router.post('/feature-flags', validate(createFeatureFlagSchema), async (req: AuthRequest, res: Response) => {
   try {
     const flag = await FeatureFlag.create(req.body);
@@ -501,6 +1412,43 @@ router.post('/feature-flags', validate(createFeatureFlagSchema), async (req: Aut
   }
 });
 
+/**
+ * @swagger
+ * /api/admin/feature-flags/{key}:
+ *   put:
+ *     tags: [Admin - Feature Flags]
+ *     summary: Update a feature flag by key
+ *     description: Updates an existing feature flag by its key.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: key
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Feature flag key
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               enabled:
+ *                 type: boolean
+ *               description:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Updated feature flag
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Insufficient permissions
+ *       404:
+ *         description: Feature flag not found
+ */
 router.put('/feature-flags/:key', async (req: AuthRequest, res: Response) => {
   try {
     const flag = await FeatureFlag.findOneAndUpdate({ key: req.params.key }, req.body, { new: true });
@@ -511,6 +1459,30 @@ router.put('/feature-flags/:key', async (req: AuthRequest, res: Response) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/admin/feature-flags/{key}:
+ *   delete:
+ *     tags: [Admin - Feature Flags]
+ *     summary: Delete a feature flag by key
+ *     description: Deletes a feature flag by its key.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: key
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Feature flag key
+ *     responses:
+ *       200:
+ *         description: Feature flag deleted
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Insufficient permissions
+ */
 router.delete('/feature-flags/:key', async (req: AuthRequest, res: Response) => {
   try {
     await FeatureFlag.findOneAndDelete({ key: req.params.key });
@@ -521,6 +1493,44 @@ router.delete('/feature-flags/:key', async (req: AuthRequest, res: Response) => 
 });
 
 // --- Audit Logs ---
+/**
+ * @swagger
+ * /api/admin/audit-logs:
+ *   get:
+ *     tags: [Admin - Audit Logs]
+ *     summary: Get all audit logs with pagination and filtering
+ *     description: Returns a paginated list of audit logs with optional entity and user filters.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *         description: Items per page
+ *       - in: query
+ *         name: entity
+ *         schema:
+ *           type: string
+ *         description: Filter by entity type
+ *       - in: query
+ *         name: userId
+ *         schema:
+ *           type: string
+ *         description: Filter by user ID
+ *     responses:
+ *       200:
+ *         description: Paginated list of audit logs
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Insufficient permissions
+ */
 router.get('/audit-logs', async (req, res: Response) => {
   try {
     const { page = 1, limit = 50, entity, userId } = req.query;
@@ -545,6 +1555,34 @@ router.get('/audit-logs', async (req, res: Response) => {
 });
 
 // --- Finder Scans ---
+/**
+ * @swagger
+ * /api/admin/finder-scans:
+ *   get:
+ *     tags: [Admin - Finder Scans]
+ *     summary: Get all finder scans with pagination
+ *     description: Returns a paginated list of all finder scan events.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *         description: Items per page
+ *     responses:
+ *       200:
+ *         description: Paginated list of finder scans
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Insufficient permissions
+ */
 router.get('/finder-scans', async (req, res: Response) => {
   try {
     const { page = 1, limit = 20 } = req.query;
@@ -566,6 +1604,39 @@ router.get('/finder-scans', async (req, res: Response) => {
 });
 
 // --- Location Events ---
+/**
+ * @swagger
+ * /api/admin/location-events:
+ *   get:
+ *     tags: [Admin - Location Events]
+ *     summary: Get all location events with pagination and filtering
+ *     description: Returns a paginated list of location events with optional pet filter.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *         description: Items per page
+ *       - in: query
+ *         name: petId
+ *         schema:
+ *           type: string
+ *         description: Filter by pet ID
+ *     responses:
+ *       200:
+ *         description: Paginated list of location events
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Insufficient permissions
+ */
 router.get('/location-events', async (req, res: Response) => {
   try {
     const { page = 1, limit = 50, petId } = req.query;

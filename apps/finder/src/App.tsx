@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Routes, Route, Navigate } from 'react-router-dom';
 import axios from 'axios';
 import { PawPrint, Phone, MapPin, AlertTriangle, Loader2, CheckCircle } from 'lucide-react';
 
@@ -18,7 +18,7 @@ interface FinderData {
   ownerPhone?: string;
 }
 
-export default function App() {
+function FinderPage() {
   const { tagId } = useParams<{ tagId: string }>();
   const [data, setData] = useState<FinderData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -151,5 +151,22 @@ export default function App() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <Routes>
+      <Route path="/:tagId" element={<FinderPage />} />
+      <Route path="*" element={
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center">
+            <PawPrint size={48} className="text-primary-600 mx-auto mb-4" />
+            <h1 className="text-xl font-bold mb-2">PawTag Finder</h1>
+            <p className="text-gray-500">Scan a QR code to view a lost pet's information.</p>
+          </div>
+        </div>
+      } />
+    </Routes>
   );
 }
