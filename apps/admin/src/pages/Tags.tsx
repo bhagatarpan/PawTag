@@ -111,10 +111,7 @@ export default function Tags() {
   const apiBase = import.meta.env.VITE_API_URL || '/api';
 
   const downloadQR = async (tagId: string) => {
-    const token = localStorage.getItem('admin_token');
-    const res = await fetch(`${apiBase}/admin/tags/${tagId}/qr?size=400`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const res = await fetch(`${apiBase}/tags/${tagId}/qr?size=400`);
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -125,8 +122,7 @@ export default function Tags() {
   };
 
   const openSticker = (tagId: string) => {
-    const token = localStorage.getItem('admin_token');
-    window.open(`${apiBase}/admin/tags/${tagId}/sticker`, '_blank');
+    window.open(`${apiBase}/tags/${tagId}/sticker`, '_blank');
   };
 
   const printBulkQR = () => {
