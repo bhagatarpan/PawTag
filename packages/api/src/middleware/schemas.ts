@@ -42,7 +42,7 @@ export const updateProfileSchema = z.object({
 });
 
 const petPhotoSchema = z.object({
-  url: z.string().url('Valid photo URL is required'),
+  url: z.string().min(1, 'Photo URL is required'),
   caption: z.string().optional(),
   isMain: z.boolean().optional(),
   addedAt: z.string().optional(),

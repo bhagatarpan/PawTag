@@ -102,7 +102,7 @@ router.post('/pet-photo', authenticate, (req: AuthRequest, res: Response) => {
       return;
     }
 
-    const photoUrl = `/api/uploads/pets/${req.file.filename}`;
+    const photoUrl = `${req.protocol}://${req.get('host')}/api/uploads/pets/${req.file.filename}`;
     res.json({
       success: true,
       data: { url: photoUrl, filename: req.file.filename },
