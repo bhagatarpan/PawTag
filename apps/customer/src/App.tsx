@@ -3,6 +3,82 @@ import { useState, useEffect, FormEvent, createContext, useContext, ReactNode } 
 import api from './lib/api';
 import { PawPrint, LogOut, Bell, Plus, AlertTriangle, CheckCircle } from 'lucide-react';
 
+// --- Pet attribute options (mirrors shared/src/constants.ts) ---
+const PET_TYPES = ['Dog', 'Cat', 'Rabbit', 'Hamster', 'Guinea Pig', 'Bird'] as const;
+
+const PET_COLORS: Record<string, string[]> = {
+  Dog: ['Black', 'White', 'Brown', 'Cream', 'Golden', 'Red', 'Blue (Gray)', 'Fawn', 'Brindle', 'Merle', 'Sable', 'Chocolate', 'Liver', 'Tan', 'Silver'],
+  Cat: ['Black', 'White', 'Gray', 'Blue', 'Orange (Ginger)', 'Cream', 'Brown', 'Chocolate', 'Lilac', 'Cinnamon', 'Fawn'],
+  Rabbit: ['White', 'Black', 'Blue', 'Chocolate', 'Lilac', 'Chestnut', 'Chinchilla', 'Sable', 'Tortoise', 'Agouti'],
+  Hamster: ['Golden', 'White', 'Black', 'Gray', 'Cream', 'Cinnamon', 'Sable', 'Silver'],
+  'Guinea Pig': ['White', 'Black', 'Brown', 'Red', 'Cream', 'Buff', 'Chocolate', 'Lilac', 'Slate'],
+  Bird: ['Green', 'Blue', 'Yellow', 'White', 'Gray', 'Black', 'Red', 'Violet', 'Turquoise', 'Lutino', 'Albino'],
+};
+
+const PET_PATTERNS: Record<string, string[]> = {
+  Dog: ['Solid', 'Merle', 'Brindle', 'Sable', 'Tan Points', 'Tricolor', 'Piebald', 'Tuxedo', 'Harlequin', 'Spotted', 'Roan'],
+  Cat: ['Solid', 'Tabby', 'Calico', 'Tortoiseshell', 'Bicolor', 'Tricolor', 'Colorpoint', 'Ticked', 'Spotted', 'Mackerel', 'Classic Tabby'],
+  Rabbit: ['Solid', 'Broken', 'Dutch', 'Himalayan', 'Otter', 'Chinchilla', 'Fox', 'Steel', 'Butterfly', 'Magpie'],
+  Hamster: ['Solid', 'Banded', 'Sanded', 'Ticked', 'Agouti', 'Spotted'],
+  'Guinea Pig': ['Solid', 'Roan', 'Dalmatian', 'Brindle', 'Himalayan', 'Dutch', 'Orange', 'Ticked', 'Agouti'],
+  Bird: ['Solid', 'Pied', 'Lutino', 'Albino', 'Opaline', 'Spangle', 'Clearwing', 'Crested', 'Dominant Pied'],
+};
+
+const PET_BREEDS: Record<string, string[]> = {
+  Dog: [
+    'Mixed Breed', 'Labrador Retriever', 'German Shepherd', 'Golden Retriever', 'French Bulldog',
+    'Bulldog', 'Poodle', 'Beagle', 'Rottweiler', 'Dachshund', 'German Shorthaired Pointer',
+    'Pembroke Welsh Corgi', 'Australian Shepherd', 'Yorkshire Terrier', 'Cavalier King Charles Spaniel',
+    'Doberman Pinscher', 'Boxer', 'Miniature Schnauzer', 'Cocker Spaniel', 'Shih Tzu',
+    'Border Collie', 'Belgian Malinois', 'Alaskan Malamute', 'Siberian Husky',
+    'Bernese Mountain Dog', 'Great Dane', 'Saint Bernard', 'Old English Sheepdog',
+    'Samoyed', 'Akita', 'Mastiff', 'Newfoundland',
+    'West Highland White Terrier', 'Scottish Terrier', 'Bull Terrier', 'Jack Russell Terrier',
+    'Staffordshire Bull Terrier', 'Airedale Terrier',
+    'Chihuahua', 'Pomeranian', 'Maltese', 'Pug', 'Papillon',
+    'Italian Greyhound', 'Chinese Crested',
+    'Basset Hound', 'Bloodhound', 'Greyhound', 'Whippet',
+    'Rhodesian Ridgeback', 'Afghan Hound', 'Basenji',
+    'Shiba Inu', 'Shar Pei', 'Chow Chow', 'Lhasa Apso',
+    'Sheltie', 'Collie', 'Dalmatian', 'Weimaraner',
+    'Vizsla', 'Brittany Spaniel', 'Setter (Irish)', 'Setter (English)',
+    'Pointer', 'Havanese', 'Bichon Frise', 'Maltepoo',
+    'Goldendoodle', 'Labradoodle', 'Cockapoo', 'Pomsky',
+  ],
+  Cat: [
+    'Mixed Breed', 'Domestic Shorthair', 'Domestic Longhair', 'Ragdoll', 'Maine Coon',
+    'Persian', 'British Shorthair', 'Bengal', 'Abyssinian',
+    'Siamese', 'Russian Blue', 'Scottish Fold', 'Sphynx',
+    'Birman', 'Norwegian Forest Cat', 'Ragamuffin', 'Himalayan',
+    'American Shorthair', 'Exotic Shorthair', 'Oriental Shorthair',
+    'Tonkinese', 'Burmese', 'Cornish Rex', 'Devon Rex', 'Selkirk Rex',
+    'Somali', 'Balinese', 'Chartreux', 'Korat',
+    'LaPerm', 'Manx', 'Munchkin', 'Singapura',
+    'Snowshoe', 'Turkish Angora', 'Turkish Van',
+  ],
+  Rabbit: [
+    'Mixed Breed', 'Holland Lop', 'Mini Lop', 'English Lop', 'French Lop',
+    'Netherland Dwarf', 'Mini Rex', 'Standard Rex', 'Velveteen Lop',
+    'Himalayan', 'Dutch', 'English Spot', 'Checkered Giant',
+    'Flemish Giant', 'Lionhead', 'Angora', 'Jersey Wooly',
+    'Californian', 'New Zealand', 'American', 'Chinchilla',
+    'Argente', 'Belgian Hare', 'English Angora', 'French Angora',
+  ],
+  Hamster: ['Syrian (Golden)', 'Dwarf Campbell', 'Dwarf Winter White', 'Roborovski', 'Chinese'],
+  'Guinea Pig': [
+    'American', 'Peruvian', 'Silkie (Sheltie)', 'Teddy',
+    'Texel', 'Rex', 'American Crested', 'Peruvian Crested',
+    'Skinny Pig', 'Baldwin', 'Sheba', 'White Crested', 'Merino', 'Lunkarya',
+  ],
+  Bird: [
+    'Budgerigar (Budgie)', 'Cockatiel', 'Lovebird', 'African Grey',
+    'Amazon Parrot', 'Macaw', 'Cockatoo', 'Conure',
+    'Canary', 'Finch', 'Parrotlet', 'Quaker Parrot',
+    'Ringneck Dove', 'Pionus', 'Caique', 'Lorikeet',
+    'Mynah', 'Bourke\'s Parakeet', 'Lineolated Parakeet',
+  ],
+};
+
 // --- Auth Context ---
 const AuthCtx = createContext<{ user: any; login: (e: string, p: string) => Promise<void>; logout: () => void } | null>(null);
 
@@ -61,21 +137,33 @@ function Dashboard() {
   const { user, logout } = useAuth();
   const [pets, setPets] = useState<any[]>([]);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ name: '', species: 'Dog', breed: '', color: '', medicalAlerts: '' });
+  const [form, setForm] = useState({
+    name: '', petType: 'Dog', breed: '', color: '', pattern: '', medicalAlerts: '',
+  });
 
-  useEffect(() => { api.get('/customer/pets').then((r) => setPets(r.data.data)).catch(console.error); }, []);
+  const refreshPets = () => api.get('/customer/pets').then((r) => setPets(r.data.data)).catch(console.error);
+  useEffect(() => { refreshPets(); }, []);
+
+  // Reset dependent fields when pet type changes
+  const handleTypeChange = (type: string) => {
+    setForm({ ...form, petType: type, breed: '', color: '', pattern: '' });
+  };
 
   const addPet = async (e: FormEvent) => {
     e.preventDefault();
-    await api.post('/customer/pets', form);
+    await api.post('/customer/pets', { ...form, species: form.petType });
     setShowForm(false);
-    setForm({ name: '', species: 'Dog', breed: '', color: '', medicalAlerts: '' });
-    api.get('/customer/pets').then((r) => setPets(r.data.data));
+    setForm({ name: '', petType: 'Dog', breed: '', color: '', pattern: '', medicalAlerts: '' });
+    refreshPets();
   };
 
-  const markLost = async (id: string) => { await api.post(`/customer/pets/${id}/mark-lost`); api.get('/customer/pets').then((r) => setPets(r.data.data)); };
-  const markFound = async (id: string) => { await api.post(`/customer/pets/${id}/mark-found`); api.get('/customer/pets').then((r) => setPets(r.data.data)); };
-  const deletePet = async (id: string) => { if (confirm('Delete this pet?')) { await api.delete(`/customer/pets/${id}`); api.get('/customer/pets').then((r) => setPets(r.data.data)); } };
+  const markLost = async (id: string) => { await api.post(`/customer/pets/${id}/mark-lost`); refreshPets(); };
+  const markFound = async (id: string) => { await api.post(`/customer/pets/${id}/mark-found`); refreshPets(); };
+  const deletePet = async (id: string) => { if (confirm('Delete this pet?')) { await api.delete(`/customer/pets/${id}`); refreshPets(); } };
+
+  const availableColors = form.petType ? PET_COLORS[form.petType] || [] : [];
+  const availablePatterns = form.petType ? PET_PATTERNS[form.petType] || [] : [];
+  const availableBreeds = form.petType ? PET_BREEDS[form.petType] || [] : [];
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -98,8 +186,33 @@ function Dashboard() {
           <form onSubmit={addPet} className="bg-white rounded-lg border p-6 mb-6 space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <input placeholder="Pet Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="border rounded-md px-3 py-2 text-sm" required />
-              <input placeholder="Breed" value={form.breed} onChange={(e) => setForm({ ...form, breed: e.target.value })} className="border rounded-md px-3 py-2 text-sm" required />
-              <input placeholder="Color" value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} className="border rounded-md px-3 py-2 text-sm" required />
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Pet Type *</label>
+                <select value={form.petType} onChange={(e) => handleTypeChange(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" required>
+                  {PET_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Breed *</label>
+                <select value={form.breed} onChange={(e) => setForm({ ...form, breed: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm" required>
+                  <option value="">Select breed...</option>
+                  {availableBreeds.map((b) => <option key={b} value={b}>{b}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Color *</label>
+                <select value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm" required>
+                  <option value="">Select color...</option>
+                  {availableColors.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Pattern</label>
+                <select value={form.pattern} onChange={(e) => setForm({ ...form, pattern: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm">
+                  <option value="">Select pattern...</option>
+                  {availablePatterns.map((p) => <option key={p} value={p}>{p}</option>)}
+                </select>
+              </div>
               <input placeholder="Medical Alerts" value={form.medicalAlerts} onChange={(e) => setForm({ ...form, medicalAlerts: e.target.value })} className="border rounded-md px-3 py-2 text-sm" />
             </div>
             <div className="flex gap-2">
@@ -118,8 +231,8 @@ function Dashboard() {
                 <div className="flex justify-between items-start mb-3">
                   <div>
                     <h3 className="text-lg font-semibold">{pet.name}</h3>
-                    <p className="text-sm text-gray-600">{pet.species} - {pet.breed}</p>
-                    <p className="text-sm text-gray-500">Color: {pet.color}</p>
+                    <p className="text-sm text-gray-600">{pet.petType || pet.species} — {pet.breed}</p>
+                    <p className="text-sm text-gray-500">Color: {pet.color}{pet.pattern ? ` | Pattern: ${pet.pattern}` : ''}</p>
                     {pet.medicalAlerts && <p className="text-sm text-red-600 mt-1 flex items-center gap-1"><AlertTriangle size={14} /> {pet.medicalAlerts}</p>}
                   </div>
                   <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${pet.status === 'safe' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>

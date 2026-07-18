@@ -6,9 +6,11 @@ import { PawPrint, Phone, MapPin, AlertTriangle, Loader2, CheckCircle } from 'lu
 interface FinderData {
   pet: {
     name: string;
+    petType?: string;
     species: string;
     breed: string;
     color: string;
+    pattern?: string;
     photoUrl?: string;
     medicalAlerts?: string;
     status: string;
@@ -102,7 +104,7 @@ function FinderPage() {
           )}
           <div className="p-6">
             <h2 className="text-xl font-bold mb-1">{data.pet.name}</h2>
-            <p className="text-gray-600 mb-4">{data.pet.species} - {data.pet.breed} ({data.pet.color})</p>
+            <p className="text-gray-600 mb-4">{data.pet.petType || data.pet.species} — {data.pet.breed} ({data.pet.color}{data.pet.pattern ? `, ${data.pet.pattern}` : ''})</p>
 
             {data.pet.medicalAlerts && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4 flex items-start gap-2">

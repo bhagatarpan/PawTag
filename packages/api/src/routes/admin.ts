@@ -318,7 +318,7 @@ router.put('/users/:id/status', validate(updateUserStatusSchema), async (req: Au
  *   get:
  *     tags: [Admin - Pets]
  *     summary: Get all pets with advanced filtering
- *     description: Returns a paginated list of pets with filtering by pet name, breed, status, owner name, email, or phone.
+ *     description: Returns a paginated list of pets with filtering by type, breed, color, pattern, status, and owner info.
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -333,6 +333,12 @@ router.put('/users/:id/status', validate(updateUserStatusSchema), async (req: Au
  *           type: integer
  *         description: Items per page
  *       - in: query
+ *         name: petType
+ *         schema:
+ *           type: string
+ *           enum: [Dog, Cat, Rabbit, Hamster, Guinea Pig, Bird]
+ *         description: Filter by pet type
+ *       - in: query
  *         name: petName
  *         schema:
  *           type: string
@@ -342,6 +348,16 @@ router.put('/users/:id/status', validate(updateUserStatusSchema), async (req: Au
  *         schema:
  *           type: string
  *         description: Filter by pet breed (partial match)
+ *       - in: query
+ *         name: petColor
+ *         schema:
+ *           type: string
+ *         description: Filter by pet color (partial match)
+ *       - in: query
+ *         name: petPattern
+ *         schema:
+ *           type: string
+ *         description: Filter by pet pattern (partial match)
  *       - in: query
  *         name: status
  *         schema:
@@ -378,16 +394,15 @@ router.put('/users/:id/status', validate(updateUserStatusSchema), async (req: Au
  */
 router.get('/pets', async (req, res: Response) => {
   try {
-    const { page = 1, limit = 20, search, status, petName, petBreed, ownerName, ownerEmail, ownerPhone } = req.query;
+    const { page = 1, limit = 20, search, status, petType, petName, petBreed, petColor, petPattern, ownerName, ownerEmail, ownerPhone } = req.query;
     const query: any = {};
 
     // Pet-level filters
-    if (petName) {
-      query.name = { $regex: petName, $options: 'i' };
-    }
-    if (petBreed) {
-      query.breed = { $regex: petBreed, $options: 'i' };
-    }
+    if (petType) query.petType = petType;
+    if (petName) query.name = { $regex: petName, $options: 'i' };
+    if (petBreed) query.breed = { $regex: petBreed, $options: 'i' };
+    if (petColor) query.color = { $regex: petColor, $options: 'i' };
+    if (petPattern) query.pattern = { $regex: petPattern, $options: 'i' };
     if (search) {
       query.$or = [
         { name: { $regex: search, $options: 'i' } },

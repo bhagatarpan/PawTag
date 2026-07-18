@@ -2,6 +2,8 @@
 // PawTag Shared Types
 // ============================================================
 
+export * from './constants';
+
 // --- Enums & Constants ---
 
 export enum UserRole {
@@ -105,12 +107,14 @@ export interface Pet {
   _id: string;
   ownerId: string;
   name: string;
-  species: string;
+  petType: string;          // Dog, Cat, Rabbit, Hamster, Guinea Pig, Bird
+  species: string;          // kept for backward compat
   breed: string;
   gender: 'male' | 'female' | 'unknown';
   dateOfBirth?: string;
   weight?: number;
   color: string;
+  pattern?: string;
   photoUrl?: string;
   medicalAlerts?: string;
   microchipId?: string;

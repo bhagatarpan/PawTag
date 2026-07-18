@@ -43,12 +43,14 @@ export const updateProfileSchema = z.object({
 
 export const createPetSchema = z.object({
   name: z.string().min(1, 'Pet name is required'),
+  petType: z.enum(['Dog', 'Cat', 'Rabbit', 'Hamster', 'Guinea Pig', 'Bird']).optional(),
   species: z.string().min(1, 'Species is required'),
   breed: z.string().min(1, 'Breed is required'),
   gender: z.enum(['male', 'female', 'unknown']).optional(),
   dateOfBirth: z.string().optional(),
   weight: z.number().positive().optional(),
   color: z.string().min(1, 'Color is required'),
+  pattern: z.string().optional(),
   photoUrl: z.string().url().optional(),
   medicalAlerts: z.string().optional(),
   microchipId: z.string().optional(),
