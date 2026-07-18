@@ -18,6 +18,9 @@ interface FinderData {
     secondaryBreed?: string;
     color: string;
     pattern?: string;
+    gender?: string;
+    age?: number;
+    favouriteFood?: string;
     photos: PetPhoto[];
     photoUrl?: string;
     medicalAlerts?: string;
@@ -165,7 +168,12 @@ function FinderPage() {
 
           <div className="p-6">
             <h2 className="text-xl font-bold mb-1">{data.pet.name}</h2>
-            <p className="text-gray-600 mb-4">{data.pet.petType || data.pet.species} — {formatBreed()} ({data.pet.color}{data.pet.pattern ? `, ${data.pet.pattern}` : ''})</p>
+            <p className="text-gray-600 mb-2">{data.pet.petType || data.pet.species} — {formatBreed()} ({data.pet.color}{data.pet.pattern ? `, ${data.pet.pattern}` : ''})</p>
+            <div className="flex flex-wrap gap-2 mb-4 text-sm text-gray-500">
+              {data.pet.gender && data.pet.gender !== 'unknown' && <span>Gender: {data.pet.gender === 'male' ? 'Male' : 'Female'}</span>}
+              {data.pet.age != null && <span>Age: {data.pet.age} yrs</span>}
+              {data.pet.favouriteFood && <span>Fav Food: {data.pet.favouriteFood}</span>}
+            </div>
 
             {data.pet.medicalAlerts && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4 flex items-start gap-2">

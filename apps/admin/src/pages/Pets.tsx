@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import api, { PaginatedData } from '../lib/api';
-import { Search, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
+import { Search, ChevronDown, ChevronUp, Trash2, Plus, Edit2, Save, X, Camera, Star, ImageIcon } from 'lucide-react';
 
-// --- Pet attribute options (mirrors shared/src/constants.ts) ---
+// --- Pet attribute options ---
 const PET_TYPES = ['Dog', 'Cat', 'Rabbit', 'Hamster', 'Guinea Pig', 'Bird'] as const;
+const PET_GENDERS = [{ value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }, { value: 'unknown', label: 'Unknown' }];
 
 const PET_COLORS: Record<string, string[]> = {
   Dog: ['Black', 'White', 'Brown', 'Cream', 'Golden', 'Red', 'Blue (Gray)', 'Fawn', 'Brindle', 'Merle', 'Sable', 'Chocolate', 'Liver', 'Tan', 'Silver'],
@@ -13,7 +14,6 @@ const PET_COLORS: Record<string, string[]> = {
   'Guinea Pig': ['White', 'Black', 'Brown', 'Red', 'Cream', 'Buff', 'Chocolate', 'Lilac', 'Slate'],
   Bird: ['Green', 'Blue', 'Yellow', 'White', 'Gray', 'Black', 'Red', 'Violet', 'Turquoise', 'Lutino', 'Albino'],
 };
-
 const PET_PATTERNS: Record<string, string[]> = {
   Dog: ['Solid', 'Merle', 'Brindle', 'Sable', 'Tan Points', 'Tricolor', 'Piebald', 'Tuxedo', 'Harlequin', 'Spotted', 'Roan'],
   Cat: ['Solid', 'Tabby', 'Calico', 'Tortoiseshell', 'Bicolor', 'Tricolor', 'Colorpoint', 'Ticked', 'Spotted', 'Mackerel', 'Classic Tabby'],
@@ -22,67 +22,82 @@ const PET_PATTERNS: Record<string, string[]> = {
   'Guinea Pig': ['Solid', 'Roan', 'Dalmatian', 'Brindle', 'Himalayan', 'Dutch', 'Orange', 'Ticked', 'Agouti'],
   Bird: ['Solid', 'Pied', 'Lutino', 'Albino', 'Opaline', 'Spangle', 'Clearwing', 'Crested', 'Dominant Pied'],
 };
-
 const PET_BREEDS: Record<string, string[]> = {
-  Dog: [
-    'Mixed Breed', 'Labrador Retriever', 'German Shepherd', 'Golden Retriever', 'French Bulldog',
-    'Bulldog', 'Poodle', 'Beagle', 'Rottweiler', 'Dachshund', 'German Shorthaired Pointer',
-    'Pembroke Welsh Corgi', 'Australian Shepherd', 'Yorkshire Terrier', 'Cavalier King Charles Spaniel',
-    'Doberman Pinscher', 'Boxer', 'Miniature Schnauzer', 'Cocker Spaniel', 'Shih Tzu',
-    'Border Collie', 'Belgian Malinois', 'Alaskan Malamute', 'Siberian Husky',
-    'Bernese Mountain Dog', 'Great Dane', 'Saint Bernard', 'Old English Sheepdog',
-    'Samoyed', 'Akita', 'Mastiff', 'Newfoundland',
-    'West Highland White Terrier', 'Scottish Terrier', 'Bull Terrier', 'Jack Russell Terrier',
-    'Staffordshire Bull Terrier', 'Airedale Terrier',
-    'Chihuahua', 'Pomeranian', 'Maltese', 'Pug', 'Papillon',
-    'Italian Greyhound', 'Chinese Crested',
-    'Basset Hound', 'Bloodhound', 'Greyhound', 'Whippet',
-    'Rhodesian Ridgeback', 'Afghan Hound', 'Basenji',
-    'Shiba Inu', 'Shar Pei', 'Chow Chow', 'Lhasa Apso',
-    'Sheltie', 'Collie', 'Dalmatian', 'Weimaraner',
-    'Vizsla', 'Brittany Spaniel', 'Setter (Irish)', 'Setter (English)',
-    'Pointer', 'Havanese', 'Bichon Frise', 'Maltepoo',
-    'Goldendoodle', 'Labradoodle', 'Cockapoo', 'Pomsky',
-  ],
-  Cat: [
-    'Mixed Breed', 'Domestic Shorthair', 'Domestic Longhair', 'Ragdoll', 'Maine Coon',
-    'Persian', 'British Shorthair', 'Bengal', 'Abyssinian',
-    'Siamese', 'Russian Blue', 'Scottish Fold', 'Sphynx',
-    'Birman', 'Norwegian Forest Cat', 'Ragamuffin', 'Himalayan',
-    'American Shorthair', 'Exotic Shorthair', 'Oriental Shorthair',
-    'Tonkinese', 'Burmese', 'Cornish Rex', 'Devon Rex', 'Selkirk Rex',
-    'Somali', 'Balinese', 'Chartreux', 'Korat',
-    'LaPerm', 'Manx', 'Munchkin', 'Singapura',
-    'Snowshoe', 'Turkish Angora', 'Turkish Van',
-  ],
-  Rabbit: [
-    'Mixed Breed', 'Holland Lop', 'Mini Lop', 'English Lop', 'French Lop',
-    'Netherland Dwarf', 'Mini Rex', 'Standard Rex', 'Velveteen Lop',
-    'Himalayan', 'Dutch', 'English Spot', 'Checkered Giant',
-    'Flemish Giant', 'Lionhead', 'Angora', 'Jersey Wooly',
-    'Californian', 'New Zealand', 'American', 'Chinchilla',
-    'Argente', 'Belgian Hare', 'English Angora', 'French Angora',
-  ],
+  Dog: ['Mixed Breed', 'Labrador Retriever', 'German Shepherd', 'Golden Retriever', 'French Bulldog', 'Bulldog', 'Poodle', 'Beagle', 'Rottweiler', 'Dachshund', 'German Shorthaired Pointer', 'Pembroke Welsh Corgi', 'Australian Shepherd', 'Yorkshire Terrier', 'Cavalier King Charles Spaniel', 'Doberman Pinscher', 'Boxer', 'Miniature Schnauzer', 'Cocker Spaniel', 'Shih Tzu', 'Border Collie', 'Belgian Malinois', 'Siberian Husky', 'Bernese Mountain Dog', 'Great Dane', 'Chihuahua', 'Pomeranian', 'Maltese', 'Pug', 'Shiba Inu', 'Shar Pei', 'Dalmatian', 'Goldendoodle', 'Labradoodle', 'Pomsky'],
+  Cat: ['Mixed Breed', 'Domestic Shorthair', 'Domestic Longhair', 'Ragdoll', 'Maine Coon', 'Persian', 'British Shorthair', 'Bengal', 'Abyssinian', 'Siamese', 'Russian Blue', 'Scottish Fold', 'Sphynx', 'Birman', 'Norwegian Forest Cat', 'Ragamuffin', 'Himalayan', 'Cornish Rex', 'Devon Rex', 'Manx', 'Munchkin', 'Turkish Van'],
+  Rabbit: ['Mixed Breed', 'Holland Lop', 'Mini Lop', 'English Lop', 'French Lop', 'Netherland Dwarf', 'Mini Rex', 'Standard Rex', 'Lionhead', 'Angora', 'Flemish Giant', 'Dutch', 'English Spot', 'Californian', 'New Zealand'],
   Hamster: ['Syrian (Golden)', 'Dwarf Campbell', 'Dwarf Winter White', 'Roborovski', 'Chinese'],
-  'Guinea Pig': [
-    'American', 'Peruvian', 'Silkie (Sheltie)', 'Teddy',
-    'Texel', 'Rex', 'American Crested', 'Peruvian Crested',
-    'Skinny Pig', 'Baldwin', 'Sheba', 'White Crested', 'Merino', 'Lunkarya',
-  ],
-  Bird: [
-    'Budgerigar (Budgie)', 'Cockatiel', 'Lovebird', 'African Grey',
-    'Amazon Parrot', 'Macaw', 'Cockatoo', 'Conure',
-    'Canary', 'Finch', 'Parrotlet', 'Quaker Parrot',
-    'Ringneck Dove', 'Pionus', 'Caique', 'Lorikeet',
-    'Mynah', 'Bourke\'s Parakeet', 'Lineolated Parakeet',
-  ],
+  'Guinea Pig': ['American', 'Peruvian', 'Silkie (Sheltie)', 'Teddy', 'Texel', 'Rex', 'American Crested', 'Skinny Pig', 'Sheba'],
+  Bird: ['Budgerigar (Budgie)', 'Cockatiel', 'Lovebird', 'African Grey', 'Amazon Parrot', 'Macaw', 'Cockatoo', 'Conure', 'Canary', 'Finch', 'Parrotlet', 'Quaker Parrot'],
 };
+
+const emptyForm = {
+  name: '', petType: 'Dog', breed: '', secondaryBreed: 'Unknown', color: '', pattern: '',
+  gender: 'unknown', dateOfBirth: '', favouriteFood: '', medicalAlerts: '', ownerId: '',
+};
+
+interface PhotoItem { url: string; caption?: string; isMain: boolean; }
+
+function PhotoManager({ photos, onChange }: { photos: PhotoItem[]; onChange: (p: PhotoItem[]) => void }) {
+  const [urlInput, setUrlInput] = useState('');
+  const [captionInput, setCaptionInput] = useState('');
+  const [error, setError] = useState('');
+  const addPhoto = () => {
+    if (!urlInput.trim() || photos.length >= 5) { setError(photos.length >= 5 ? 'Max 5 photos' : 'URL required'); return; }
+    if (!/^https?:\/\/.+\.(jpg|jpeg|png|gif|webp|avif)(\?.*)?$/i.test(urlInput.trim())) { setError('Invalid image URL'); return; }
+    setError('');
+    onChange([...photos, { url: urlInput.trim(), caption: captionInput.trim() || undefined, isMain: photos.length === 0 }]);
+    setUrlInput(''); setCaptionInput('');
+  };
+  const removePhoto = (idx: number) => {
+    const updated = photos.filter((_, i) => i !== idx);
+    if (updated.length > 0 && !updated.some((p) => p.isMain)) updated[0].isMain = true;
+    onChange(updated);
+  };
+  const mainPhoto = photos.find((p) => p.isMain);
+  return (
+    <div className="space-y-2">
+      {mainPhoto && (
+        <div className="relative w-full h-32 rounded overflow-hidden border bg-gray-100">
+          <img src={mainPhoto.url} alt="Main" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+          <span className="absolute top-1 left-1 bg-primary-600 text-white text-xs px-1.5 py-0.5 rounded flex items-center gap-0.5"><Star size={8} fill="currentColor" /> Main</span>
+        </div>
+      )}
+      {photos.length > 0 && (
+        <div className="grid grid-cols-5 gap-1.5">
+          {photos.map((photo, idx) => (
+            <div key={idx} className={`relative group rounded overflow-hidden border-2 ${photo.isMain ? 'border-primary-500' : 'border-gray-200'} aspect-square`}>
+              <img src={photo.url} alt="" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 flex items-center justify-center gap-0.5 opacity-0 group-hover:opacity-100">
+                {!photo.isMain && <button type="button" onClick={() => onChange(photos.map((p, i) => ({ ...p, isMain: i === idx })))} className="bg-white/90 rounded-full p-0.5 hover:bg-yellow-400"><Star size={10} /></button>}
+                <button type="button" onClick={() => removePhoto(idx)} className="bg-white/90 rounded-full p-0.5 hover:bg-red-500 hover:text-white"><X size={10} /></button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {photos.length < 5 && (
+        <div className="flex gap-1.5 items-end">
+          <input type="url" placeholder="Image URL" value={urlInput} onChange={(e) => { setUrlInput(e.target.value); setError(''); }} className="flex-1 border rounded px-2 py-1.5 text-xs" />
+          <input type="text" placeholder="Caption" value={captionInput} onChange={(e) => setCaptionInput(e.target.value)} className="w-24 border rounded px-2 py-1.5 text-xs" />
+          <button type="button" onClick={addPhoto} className="bg-gray-100 border rounded px-2 py-1.5 text-xs hover:bg-gray-200"><Camera size={10} /></button>
+        </div>
+      )}
+      {error && <p className="text-xs text-red-500">{error}</p>}
+    </div>
+  );
+}
 
 export default function Pets() {
   const [data, setData] = useState<PaginatedData<any> | null>(null);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [showFilters, setShowFilters] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [editingPet, setEditingPet] = useState<any>(null);
+  const [form, setForm] = useState(emptyForm);
+  const [photos, setPhotos] = useState<PhotoItem[]>([]);
+  const [owners, setOwners] = useState<any[]>([]);
 
   // Filter states
   const [petType, setPetType] = useState('');
@@ -94,14 +109,6 @@ export default function Pets() {
   const [ownerName, setOwnerName] = useState('');
   const [ownerEmail, setOwnerEmail] = useState('');
   const [ownerPhone, setOwnerPhone] = useState('');
-
-  // Reset dependent filters when pet type changes
-  const handleTypeChange = (type: string) => {
-    setPetType(type);
-    setPetBreed('');
-    setPetColor('');
-    setPetPattern('');
-  };
 
   const buildParams = () => {
     const params: any = { page, limit: 20 };
@@ -119,276 +126,241 @@ export default function Pets() {
 
   const fetchPets = () => {
     setLoading(true);
-    api
-      .get('/admin/pets', { params: buildParams() })
-      .then((res) => setData(res.data.data))
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    api.get('/admin/pets', { params: buildParams() }).then((res) => setData(res.data.data)).catch(console.error).finally(() => setLoading(false));
   };
+  const fetchOwners = () => api.get('/admin/users', { params: { role: 'customer', limit: 200 } }).then((r) => setOwners(r.data.data.items)).catch(console.error);
 
   useEffect(() => { fetchPets(); }, [page, statusFilter]);
+  useEffect(() => { fetchOwners(); }, []);
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    setPage(1);
-    fetchPets();
-  };
-
-  const clearFilters = () => {
-    setPetType('');
-    setPetName('');
-    setPetBreed('');
-    setPetColor('');
-    setPetPattern('');
-    setStatusFilter('');
-    setOwnerName('');
-    setOwnerEmail('');
-    setOwnerPhone('');
-    setPage(1);
-  };
-
+  const handleSearch = (e: React.FormEvent) => { e.preventDefault(); setPage(1); fetchPets(); };
+  const clearFilters = () => { setPetType(''); setPetName(''); setPetBreed(''); setPetColor(''); setPetPattern(''); setStatusFilter(''); setOwnerName(''); setOwnerEmail(''); setOwnerPhone(''); setPage(1); };
   const hasActiveFilters = petType || petName || petBreed || petColor || petPattern || statusFilter || ownerName || ownerEmail || ownerPhone;
 
-  const deletePet = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this pet?')) return;
-    await api.delete(`/admin/pets/${id}`);
-    fetchPets();
+  const handleTypeChange = (type: string) => { setForm({ ...form, petType: type, breed: '', secondaryBreed: 'Unknown', color: '', pattern: '' }); };
+  const handleBreedChange = (breed: string) => { setForm({ ...form, breed, secondaryBreed: breed !== 'Mixed Breed' ? 'Unknown' : '' }); };
+
+  const startAdd = () => { setEditingPet(null); setForm(emptyForm); setPhotos([]); setShowForm(true); };
+  const startEdit = (pet: any) => {
+    setEditingPet(pet);
+    setForm({
+      name: pet.name, petType: pet.petType || 'Dog', breed: pet.breed || '', secondaryBreed: pet.secondaryBreed || 'Unknown',
+      color: pet.color || '', pattern: pet.pattern || '', gender: pet.gender || 'unknown',
+      dateOfBirth: pet.dateOfBirth ? pet.dateOfBirth.split('T')[0] : '', favouriteFood: pet.favouriteFood || '',
+      medicalAlerts: pet.medicalAlerts || '', ownerId: pet.ownerId?._id || pet.ownerId || '',
+    });
+    setPhotos(pet.photos || []);
+    setShowForm(true);
+  };
+  const cancelForm = () => { setShowForm(false); setEditingPet(null); setForm(emptyForm); setPhotos([]); };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const payload: any = { ...form, species: form.petType, photos };
+    if (form.breed !== 'Mixed Breed') payload.secondaryBreed = 'Unknown';
+    if (editingPet) {
+      await api.put(`/admin/pets/${editingPet._id}`, payload);
+    } else {
+      await api.post('/admin/pets', payload);
+    }
+    cancelForm(); fetchPets();
   };
 
-  // Dynamic options based on selected pet type
-  const availableColors = petType ? PET_COLORS[petType] || [] : [];
-  const availablePatterns = petType ? PET_PATTERNS[petType] || [] : [];
-  const availableBreeds = petType ? PET_BREEDS[petType] || [] : [];
+  const deletePet = async (id: string) => { if (!confirm('Delete this pet?')) return; await api.delete(`/admin/pets/${id}`); fetchPets(); };
+
+  const availableColors = form.petType ? PET_COLORS[form.petType] || [] : [];
+  const availablePatterns = form.petType ? PET_PATTERNS[form.petType] || [] : [];
+  const availableBreeds = form.petType ? PET_BREEDS[form.petType] || [] : [];
+  const isMixedBreed = form.breed === 'Mixed Breed';
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Pet Management</h1>
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold">Pet Management</h1>
+        <button onClick={startAdd} className="bg-primary-600 text-white px-4 py-2 rounded-md text-sm flex items-center gap-1.5 hover:bg-primary-700">
+          <Plus size={14} /> Add Pet
+        </button>
+      </div>
 
-      {/* Filter Section */}
+      {/* Create/Edit Form */}
+      {showForm && (
+        <form onSubmit={handleSubmit} className="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
+          <div className="flex justify-between items-center">
+            <h2 className="text-lg font-semibold">{editingPet ? `Edit ${editingPet.name}` : 'Register New Pet'}</h2>
+            <button type="button" onClick={cancelForm} className="text-gray-400 hover:text-red-500"><X size={18} /></button>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Owner *</label>
+              <select value={form.ownerId} onChange={(e) => setForm({ ...form, ownerId: e.target.value })} className="w-full border rounded-md px-2 py-1.5 text-sm" required>
+                <option value="">Select owner...</option>
+                {owners.map((o: any) => <option key={o._id} value={o._id}>{o.fullName} ({o.email})</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Pet Name *</label>
+              <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full border rounded-md px-2 py-1.5 text-sm" required disabled={!!editingPet} />
+              {editingPet && <p className="text-xs text-gray-400">Name immutable</p>}
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Pet Type *</label>
+              <select value={form.petType} onChange={(e) => handleTypeChange(e.target.value)} className="w-full border rounded-md px-2 py-1.5 text-sm" required>
+                {PET_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Breed *</label>
+              <select value={form.breed} onChange={(e) => handleBreedChange(e.target.value)} className="w-full border rounded-md px-2 py-1.5 text-sm" required>
+                <option value="">Select...</option>
+                {availableBreeds.map((b) => <option key={b} value={b}>{b}</option>)}
+              </select>
+            </div>
+            {isMixedBreed && (
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Secondary Breed</label>
+                <select value={form.secondaryBreed} onChange={(e) => setForm({ ...form, secondaryBreed: e.target.value })} className="w-full border rounded-md px-2 py-1.5 text-sm">
+                  <option value="Unknown">Unknown</option>
+                  {availableBreeds.filter((b) => b !== 'Mixed Breed').map((b) => <option key={b} value={b}>{b}</option>)}
+                </select>
+              </div>
+            )}
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Color *</label>
+              <select value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} className="w-full border rounded-md px-2 py-1.5 text-sm" required>
+                <option value="">Select...</option>
+                {availableColors.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Pattern</label>
+              <select value={form.pattern} onChange={(e) => setForm({ ...form, pattern: e.target.value })} className="w-full border rounded-md px-2 py-1.5 text-sm">
+                <option value="">Select...</option>
+                {availablePatterns.map((p) => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Gender</label>
+              <select value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })} className="w-full border rounded-md px-2 py-1.5 text-sm">
+                {PET_GENDERS.map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Birthday</label>
+              <input type="date" value={form.dateOfBirth} onChange={(e) => setForm({ ...form, dateOfBirth: e.target.value })} className="w-full border rounded-md px-2 py-1.5 text-sm" />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Favourite Food</label>
+              <input value={form.favouriteFood} onChange={(e) => setForm({ ...form, favouriteFood: e.target.value })} className="w-full border rounded-md px-2 py-1.5 text-sm" placeholder="Chicken, Salmon..." />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Medical Alerts</label>
+              <input value={form.medicalAlerts} onChange={(e) => setForm({ ...form, medicalAlerts: e.target.value })} className="w-full border rounded-md px-2 py-1.5 text-sm" placeholder="Allergies..." />
+            </div>
+          </div>
+          <div className="border-t pt-3">
+            <label className="block text-xs text-gray-500 mb-1 font-medium">Pet Photos (up to 5)</label>
+            <PhotoManager photos={photos} onChange={setPhotos} />
+          </div>
+          <div className="flex gap-2">
+            <button type="submit" className="bg-primary-600 text-white px-4 py-2 rounded-md text-sm hover:bg-primary-700 flex items-center gap-1"><Save size={14} /> {editingPet ? 'Update' : 'Create'}</button>
+            <button type="button" onClick={cancelForm} className="border px-4 py-2 rounded-md text-sm">Cancel</button>
+          </div>
+        </form>
+      )}
+
+      {/* Filters */}
       <div className="bg-white rounded-lg border border-gray-200 p-4">
         <form onSubmit={handleSearch}>
-          {/* Primary filters row */}
           <div className="flex gap-3 items-end flex-wrap">
-            <div className="w-44">
+            <div className="w-40">
               <label className="block text-xs font-medium text-gray-500 mb-1">Pet Type</label>
-              <select
-                value={petType}
-                onChange={(e) => handleTypeChange(e.target.value)}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
-              >
+              <select value={petType} onChange={(e) => setPetType(e.target.value)} className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm">
                 <option value="">All Types</option>
                 {PET_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
-            <div className="flex-1 min-w-[180px] max-w-xs">
+            <div className="flex-1 min-w-[160px] max-w-xs">
               <label className="block text-xs font-medium text-gray-500 mb-1">Pet Name</label>
-              <input
-                type="text"
-                placeholder="e.g. Bella"
-                value={petName}
-                onChange={(e) => setPetName(e.target.value)}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-              />
+              <input type="text" placeholder="Search name..." value={petName} onChange={(e) => setPetName(e.target.value)} className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm" />
             </div>
-            <div className="w-48">
+            <div className="w-44">
               <label className="block text-xs font-medium text-gray-500 mb-1">Breed</label>
-              <select
-                value={petBreed}
-                onChange={(e) => setPetBreed(e.target.value)}
-                disabled={!petType}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm disabled:opacity-50"
-              >
-                <option value="">{petType ? 'All Breeds' : 'Select type first'}</option>
-                {availableBreeds.map((b) => <option key={b} value={b}>{b}</option>)}
+              <select value={petBreed} onChange={(e) => setPetBreed(e.target.value)} disabled={!petType} className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm disabled:opacity-50">
+                <option value="">{petType ? 'All Breeds' : 'Select type'}</option>
+                {(PET_BREEDS[petType] || []).map((b) => <option key={b} value={b}>{b}</option>)}
               </select>
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Status</label>
-              <select
-                value={statusFilter}
-                onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-                className="border border-gray-300 rounded-md px-3 py-2 text-sm"
-              >
-                <option value="">All Status</option>
-                <option value="safe">Safe</option>
-                <option value="lost">Lost</option>
-                <option value="found">Found</option>
+              <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }} className="border border-gray-300 rounded-md px-2 py-1.5 text-sm">
+                <option value="">All</option><option value="safe">Safe</option><option value="lost">Lost</option><option value="found">Found</option>
               </select>
             </div>
-            <button type="submit" className="bg-primary-600 text-white px-4 py-2 rounded-md text-sm hover:bg-primary-700 flex items-center gap-1.5">
-              <Search size={14} /> Search
-            </button>
-            {hasActiveFilters && (
-              <button type="button" onClick={clearFilters} className="text-gray-500 hover:text-red-600 text-sm px-3 py-2">
-                Clear All
-              </button>
-            )}
+            <button type="submit" className="bg-primary-600 text-white px-3 py-1.5 rounded-md text-sm hover:bg-primary-700 flex items-center gap-1"><Search size={12} /> Search</button>
+            {hasActiveFilters && <button type="button" onClick={clearFilters} className="text-gray-500 hover:text-red-600 text-sm px-2">Clear</button>}
           </div>
-
-          {/* Advanced filters toggle */}
-          <button
-            type="button"
-            onClick={() => setShowFilters(!showFilters)}
-            className="mt-3 text-sm text-primary-600 hover:text-primary-800 flex items-center gap-1"
-          >
-            {showFilters ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-            {showFilters ? 'Hide' : 'Show'} More Filters
+          <button type="button" onClick={() => setShowFilters(!showFilters)} className="mt-2 text-xs text-primary-600 hover:text-primary-800 flex items-center gap-1">
+            {showFilters ? <ChevronUp size={12} /> : <ChevronDown size={12} />} Owner Filters
           </button>
-
-          {/* Advanced filters */}
           {showFilters && (
-            <div className="mt-3 grid grid-cols-1 md:grid-cols-4 gap-3 pt-3 border-t border-gray-100">
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Color</label>
-                <select
-                  value={petColor}
-                  onChange={(e) => setPetColor(e.target.value)}
-                  disabled={!petType}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm disabled:opacity-50"
-                >
-                  <option value="">{petType ? 'All Colors' : 'Select type first'}</option>
-                  {availableColors.map((c) => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Pattern</label>
-                <select
-                  value={petPattern}
-                  onChange={(e) => setPetPattern(e.target.value)}
-                  disabled={!petType}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm disabled:opacity-50"
-                >
-                  <option value="">{petType ? 'All Patterns' : 'Select type first'}</option>
-                  {availablePatterns.map((p) => <option key={p} value={p}>{p}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Owner Name</label>
-                <input
-                  type="text"
-                  placeholder="e.g. John Smith"
-                  value={ownerName}
-                  onChange={(e) => setOwnerName(e.target.value)}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Owner Email</label>
-                <input
-                  type="text"
-                  placeholder="e.g. john@example.com"
-                  value={ownerEmail}
-                  onChange={(e) => setOwnerEmail(e.target.value)}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Owner Phone</label>
-                <input
-                  type="text"
-                  placeholder="e.g. +6421"
-                  value={ownerPhone}
-                  onChange={(e) => setOwnerPhone(e.target.value)}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                />
-              </div>
+            <div className="mt-2 grid grid-cols-3 gap-2 pt-2 border-t border-gray-100">
+              <input placeholder="Owner name" value={ownerName} onChange={(e) => setOwnerName(e.target.value)} className="border rounded-md px-2 py-1.5 text-sm" />
+              <input placeholder="Owner email" value={ownerEmail} onChange={(e) => setOwnerEmail(e.target.value)} className="border rounded-md px-2 py-1.5 text-sm" />
+              <input placeholder="Owner phone" value={ownerPhone} onChange={(e) => setOwnerPhone(e.target.value)} className="border rounded-md px-2 py-1.5 text-sm" />
             </div>
           )}
         </form>
       </div>
 
-      {/* Active filter badges */}
-      {hasActiveFilters && (
-        <div className="flex flex-wrap gap-2">
-          {petType && <span className="bg-indigo-100 text-indigo-700 text-xs px-2.5 py-1 rounded-full">Type: {petType}</span>}
-          {petName && <span className="bg-blue-100 text-blue-700 text-xs px-2.5 py-1 rounded-full">Name: {petName}</span>}
-          {petBreed && <span className="bg-blue-100 text-blue-700 text-xs px-2.5 py-1 rounded-full">Breed: {petBreed}</span>}
-          {petColor && <span className="bg-amber-100 text-amber-700 text-xs px-2.5 py-1 rounded-full">Color: {petColor}</span>}
-          {petPattern && <span className="bg-amber-100 text-amber-700 text-xs px-2.5 py-1 rounded-full">Pattern: {petPattern}</span>}
-          {statusFilter && <span className="bg-blue-100 text-blue-700 text-xs px-2.5 py-1 rounded-full">Status: {statusFilter}</span>}
-          {ownerName && <span className="bg-purple-100 text-purple-700 text-xs px-2.5 py-1 rounded-full">Owner: {ownerName}</span>}
-          {ownerEmail && <span className="bg-purple-100 text-purple-700 text-xs px-2.5 py-1 rounded-full">Email: {ownerEmail}</span>}
-          {ownerPhone && <span className="bg-purple-100 text-purple-700 text-xs px-2.5 py-1 rounded-full">Phone: {ownerPhone}</span>}
-        </div>
-      )}
-
-      {/* Results table */}
+      {/* Table */}
       <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-gray-50">
             <tr>
-              <th className="text-left px-4 py-3 font-medium text-gray-500 w-12">Photo</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-500">Name</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-500">Type</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-500">Breed</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-500">Color</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-500">Pattern</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-500">Owner</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-500">Contact</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-500">Status</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-500">Actions</th>
+              <th className="text-left px-3 py-2.5 font-medium text-gray-500 w-10">Photo</th>
+              <th className="text-left px-3 py-2.5 font-medium text-gray-500">Name</th>
+              <th className="text-left px-3 py-2.5 font-medium text-gray-500">Type</th>
+              <th className="text-left px-3 py-2.5 font-medium text-gray-500">Breed</th>
+              <th className="text-left px-3 py-2.5 font-medium text-gray-500">Color</th>
+              <th className="text-left px-3 py-2.5 font-medium text-gray-500">Gender</th>
+              <th className="text-left px-3 py-2.5 font-medium text-gray-500">Owner</th>
+              <th className="text-left px-3 py-2.5 font-medium text-gray-500">Status</th>
+              <th className="text-left px-3 py-2.5 font-medium text-gray-500">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
             {loading ? (
-              <tr><td colSpan={10} className="px-5 py-8 text-center text-gray-500">Loading...</td></tr>
+              <tr><td colSpan={9} className="px-4 py-6 text-center text-gray-500">Loading...</td></tr>
             ) : data?.items.length === 0 ? (
-              <tr><td colSpan={10} className="px-5 py-8 text-center text-gray-500">No pets found matching your filters</td></tr>
-            ) : (
-              data?.items.map((pet: any) => {
-                const mainPhoto = pet.photos?.length > 0
-                  ? (pet.photos.find((p: any) => p.isMain) || pet.photos[0])?.url
-                  : pet.photoUrl;
-                const breedDisplay = pet.breed === 'Mixed Breed' && pet.secondaryBreed
-                  ? `Mixed (${pet.secondaryBreed})`
-                  : pet.breed;
-                return (
-                  <tr key={pet._id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3">
-                      {mainPhoto ? (
-                        <img src={mainPhoto} alt="" className="w-9 h-9 rounded-full object-cover border" onError={(e) => { (e.target as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36"><rect width="36" height="36" fill="%23f3f4f6" rx="18"/><text x="18" y="21" text-anchor="middle" fill="%239ca3af" font-size="10">?</text></svg>'; }} />
-                      ) : (
-                        <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 text-xs">?</div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 font-medium">
-                      {pet.name}
-                      {pet.photos && pet.photos.length > 1 && (
-                        <span className="text-gray-400 text-xs ml-1">({pet.photos.length} photos)</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-gray-600">{pet.petType}</td>
-                    <td className="px-4 py-3 text-gray-600">{breedDisplay}</td>
-                    <td className="px-4 py-3 text-gray-600">{pet.color}</td>
-                    <td className="px-4 py-3 text-gray-500 text-xs">{pet.pattern || '—'}</td>
-                    <td className="px-4 py-3 text-gray-600">{pet.ownerId?.fullName || 'N/A'}</td>
-                    <td className="px-4 py-3 text-gray-500 text-xs">
-                      <div>{pet.ownerId?.email || ''}</div>
-                      <div>{pet.ownerId?.phoneNumber || ''}</div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${
-                        pet.status === 'safe' ? 'bg-green-100 text-green-700' :
-                        pet.status === 'lost' ? 'bg-red-100 text-red-700' :
-                        'bg-yellow-100 text-yellow-700'
-                      }`}>
-                        {pet.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <button onClick={() => deletePet(pet._id)} className="text-red-500 hover:text-red-700 text-xs flex items-center gap-1">
-                        <Trash2 size={12} /> Delete
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
+              <tr><td colSpan={9} className="px-4 py-6 text-center text-gray-500">No pets found</td></tr>
+            ) : data?.items.map((pet: any) => {
+              const mainPhoto = pet.photos?.length > 0 ? (pet.photos.find((p: any) => p.isMain) || pet.photos[0])?.url : pet.photoUrl;
+              const breedDisplay = pet.breed === 'Mixed Breed' && pet.secondaryBreed && pet.secondaryBreed !== 'Unknown' ? `Mixed (${pet.secondaryBreed})` : pet.breed;
+              const genderLabel = pet.gender === 'male' ? 'Male' : pet.gender === 'female' ? 'Female' : 'Unknown';
+              return (
+                <tr key={pet._id} className="hover:bg-gray-50">
+                  <td className="px-3 py-2">
+                    {mainPhoto ? <img src={mainPhoto} alt="" className="w-8 h-8 rounded-full object-cover border" onError={(e) => { (e.target as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><rect width="32" height="32" fill="%23f3f4f6" rx="16"/><text x="16" y="19" text-anchor="middle" fill="%239ca3af" font-size="9">?</text></svg>'; }} />
+                      : <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 text-xs">?</div>}
+                  </td>
+                  <td className="px-3 py-2 font-medium">{pet.name}{pet.photos?.length > 1 && <span className="text-gray-400 text-xs ml-1">({pet.photos.length})</span>}</td>
+                  <td className="px-3 py-2 text-gray-600">{pet.petType}</td>
+                  <td className="px-3 py-2 text-gray-600">{breedDisplay}</td>
+                  <td className="px-3 py-2 text-gray-600">{pet.color}</td>
+                  <td className="px-3 py-2 text-gray-500 text-xs">{genderLabel}</td>
+                  <td className="px-3 py-2 text-gray-600 text-xs">{pet.ownerId?.fullName || 'N/A'}</td>
+                  <td className="px-3 py-2"><span className={`px-1.5 py-0.5 text-xs rounded-full ${pet.status === 'safe' ? 'bg-green-100 text-green-700' : pet.status === 'lost' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>{pet.status}</span></td>
+                  <td className="px-3 py-2 flex gap-1">
+                    <button onClick={() => startEdit(pet)} className="text-primary-500 hover:text-primary-700 p-1"><Edit2 size={13} /></button>
+                    <button onClick={() => deletePet(pet._id)} className="text-red-500 hover:text-red-700 p-1"><Trash2 size={13} /></button>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
 
-      {/* Pagination */}
       {data && data.totalPages > 1 && (
         <div className="flex justify-between items-center text-sm">
           <span className="text-gray-500">{data.total} total pets</span>

@@ -120,9 +120,11 @@ export interface Pet {
   secondaryBreed?: string;  // when breed is "Mixed Breed"
   gender: 'male' | 'female' | 'unknown';
   dateOfBirth?: string;
+  age?: number;             // computed or manually entered (in years)
   weight?: number;
   color: string;
   pattern?: string;
+  favouriteFood?: string;
   photos: PetPhoto[];       // up to 5 photos
   photoUrl?: string;        // kept for backward compat (legacy single photo)
   medicalAlerts?: string;

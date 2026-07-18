@@ -56,9 +56,11 @@ export const createPetSchema = z.object({
   secondaryBreed: z.string().optional(),
   gender: z.enum(['male', 'female', 'unknown']).optional(),
   dateOfBirth: z.string().optional(),
+  age: z.number().min(0).max(30).optional(),
   weight: z.number().positive().optional(),
   color: z.string().min(1, 'Color is required'),
   pattern: z.string().optional(),
+  favouriteFood: z.string().optional(),
   photos: z.array(petPhotoSchema).max(5, 'Maximum 5 photos allowed').optional(),
   photoUrl: z.string().url().optional(),
   medicalAlerts: z.string().optional(),
@@ -67,7 +69,26 @@ export const createPetSchema = z.object({
   notes: z.string().optional(),
 });
 
-export const updatePetSchema = createPetSchema.partial();
+export const updatePetSchema = z.object({
+  name: z.string().min(1).optional(),
+  petType: z.enum(['Dog', 'Cat', 'Rabbit', 'Hamster', 'Guinea Pig', 'Bird']).optional(),
+  species: z.string().min(1).optional(),
+  breed: z.string().min(1).optional(),
+  secondaryBreed: z.string().optional(),
+  gender: z.enum(['male', 'female', 'unknown']).optional(),
+  dateOfBirth: z.string().optional(),
+  age: z.number().min(0).max(30).optional(),
+  weight: z.number().positive().optional(),
+  color: z.string().min(1).optional(),
+  pattern: z.string().optional(),
+  favouriteFood: z.string().optional(),
+  photos: z.array(petPhotoSchema).max(5, 'Maximum 5 photos allowed').optional(),
+  photoUrl: z.string().url().optional(),
+  medicalAlerts: z.string().optional(),
+  microchipId: z.string().optional(),
+  isNeutered: z.boolean().optional(),
+  notes: z.string().optional(),
+});
 
 export const createProductSchema = z.object({
   name: z.string().min(1),

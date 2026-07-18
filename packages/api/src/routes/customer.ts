@@ -162,10 +162,12 @@ router.post('/pets', validate(createPetSchema), async (req: AuthRequest, res: Re
  */
 router.put('/pets/:id', validate(updatePetSchema), async (req: AuthRequest, res: Response) => {
   try {
+    // Owner cannot change pet name — only admin can
+    const { name, ...updateData } = req.body;
     const pet = await Pet.findOneAndUpdate(
       { _id: req.params.id, ownerId: req.user!.id },
-      req.body,
-      { new: true },
+      updateData,
+      { new: true, runValidators: true },
     );
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
     res.json({ success: true, data: pet });

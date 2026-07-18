@@ -1,7 +1,7 @@
-import { Routes, Route, Navigate, Link, useNavigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { useState, useEffect, FormEvent, createContext, useContext, ReactNode } from 'react';
 import api from './lib/api';
-import { PawPrint, LogOut, Bell, Plus, AlertTriangle, CheckCircle, Camera, Star, X, ImageIcon } from 'lucide-react';
+import { PawPrint, LogOut, Plus, AlertTriangle, CheckCircle, Camera, Star, X, ImageIcon, Edit2, Save } from 'lucide-react';
 
 // --- Pet attribute options (mirrors shared/src/constants.ts) ---
 const PET_TYPES = ['Dog', 'Cat', 'Rabbit', 'Hamster', 'Guinea Pig', 'Bird'] as const;
@@ -79,6 +79,18 @@ const PET_BREEDS: Record<string, string[]> = {
   ],
 };
 
+const PET_GENDERS = [
+  { value: 'male', label: 'Male' },
+  { value: 'female', label: 'Female' },
+  { value: 'unknown', label: 'Unknown' },
+];
+
+// --- Empty form state ---
+const emptyForm = {
+  name: '', petType: 'Dog', breed: '', secondaryBreed: '', color: '', pattern: '',
+  gender: 'unknown', dateOfBirth: '', favouriteFood: '', medicalAlerts: '',
+};
+
 // --- Photo Manager Component ---
 interface PhotoItem { url: string; caption?: string; isMain: boolean; }
 
@@ -119,7 +131,6 @@ function PhotoManager({ photos, onChange }: { photos: PhotoItem[]; onChange: (ph
     <div className="space-y-3">
       <label className="block text-xs text-gray-500 font-medium">Pet Photos (up to 5)</label>
 
-      {/* Main photo preview */}
       {mainPhoto && (
         <div className="relative w-full h-48 rounded-lg overflow-hidden border-2 border-primary-300 bg-gray-100">
           <img src={mainPhoto.url} alt="Main photo" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
@@ -127,7 +138,6 @@ function PhotoManager({ photos, onChange }: { photos: PhotoItem[]; onChange: (ph
         </div>
       )}
 
-      {/* Photo grid */}
       {photos.length > 0 && (
         <div className="grid grid-cols-5 gap-2">
           {photos.map((photo, idx) => (
@@ -149,26 +159,13 @@ function PhotoManager({ photos, onChange }: { photos: PhotoItem[]; onChange: (ph
         </div>
       )}
 
-      {/* Add photo form */}
       {photos.length < 5 && (
         <div className="flex gap-2 items-end">
           <div className="flex-1">
-            <input
-              type="url"
-              placeholder="Paste image URL (jpg, png, webp...)"
-              value={urlInput}
-              onChange={(e) => { setUrlInput(e.target.value); setError(''); }}
-              className="w-full border rounded-md px-3 py-2 text-sm"
-            />
+            <input type="url" placeholder="Paste image URL (jpg, png, webp...)" value={urlInput} onChange={(e) => { setUrlInput(e.target.value); setError(''); }} className="w-full border rounded-md px-3 py-2 text-sm" />
           </div>
           <div className="w-40">
-            <input
-              type="text"
-              placeholder="Caption (optional)"
-              value={captionInput}
-              onChange={(e) => setCaptionInput(e.target.value)}
-              className="w-full border rounded-md px-3 py-2 text-sm"
-            />
+            <input type="text" placeholder="Caption (optional)" value={captionInput} onChange={(e) => setCaptionInput(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" />
           </div>
           <button type="button" onClick={addPhoto} className="bg-gray-100 border rounded-md px-3 py-2 text-sm hover:bg-gray-200 flex items-center gap-1">
             <Camera size={14} /> Add
@@ -176,9 +173,7 @@ function PhotoManager({ photos, onChange }: { photos: PhotoItem[]; onChange: (ph
         </div>
       )}
       {error && <p className="text-xs text-red-500">{error}</p>}
-      {photos.length === 0 && (
-        <p className="text-xs text-gray-400 flex items-center gap-1"><ImageIcon size={12} /> No photos yet. Add a photo URL above.</p>
-      )}
+      {photos.length === 0 && <p className="text-xs text-gray-400 flex items-center gap-1"><ImageIcon size={12} /> No photos yet.</p>}
     </div>
   );
 }
@@ -189,26 +184,19 @@ const AuthCtx = createContext<{ user: any; login: (e: string, p: string) => Prom
 function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<any>(null);
   const nav = useNavigate();
-
   useEffect(() => {
     const token = localStorage.getItem('customer_token');
-    if (token) {
-      api.get('/auth/me').then((r) => setUser(r.data.data)).catch(() => localStorage.removeItem('customer_token'));
-    }
+    if (token) api.get('/auth/me').then((r) => setUser(r.data.data)).catch(() => localStorage.removeItem('customer_token'));
   }, []);
-
   const login = async (email: string, password: string) => {
     const res = await api.post('/auth/login', { email, password });
     localStorage.setItem('customer_token', res.data.data.token);
     setUser(res.data.data.user);
     nav('/');
   };
-
   const logout = () => { localStorage.removeItem('customer_token'); setUser(null); nav('/login'); };
-
   return <AuthCtx.Provider value={{ user, login, logout }}>{children}</AuthCtx.Provider>;
 }
-
 function useAuth() { return useContext(AuthCtx)!; }
 
 // --- Login ---
@@ -217,7 +205,6 @@ function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-
   return (
     <div className="min-h-screen flex items-center justify-center">
       <div className="w-full max-w-md bg-white rounded-lg shadow-md p-8">
@@ -241,30 +228,71 @@ function Dashboard() {
   const { user, logout } = useAuth();
   const [pets, setPets] = useState<any[]>([]);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({
-    name: '', petType: 'Dog', breed: '', secondaryBreed: '', color: '', pattern: '', medicalAlerts: '',
-  });
+  const [editingPet, setEditingPet] = useState<any>(null);
+  const [form, setForm] = useState(emptyForm);
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
 
   const refreshPets = () => api.get('/customer/pets').then((r) => setPets(r.data.data)).catch(console.error);
   useEffect(() => { refreshPets(); }, []);
+
+  const availableColors = form.petType ? PET_COLORS[form.petType] || [] : [];
+  const availablePatterns = form.petType ? PET_PATTERNS[form.petType] || [] : [];
+  const availableBreeds = form.petType ? PET_BREEDS[form.petType] || [] : [];
+  const isMixedBreed = form.breed === 'Mixed Breed';
 
   const handleTypeChange = (type: string) => {
     setForm({ ...form, petType: type, breed: '', secondaryBreed: '', color: '', pattern: '' });
   };
 
   const handleBreedChange = (breed: string) => {
-    setForm({ ...form, breed, secondaryBreed: breed !== 'Mixed Breed' ? '' : form.secondaryBreed });
+    setForm({ ...form, breed, secondaryBreed: breed !== 'Mixed Breed' ? 'Unknown' : '' });
   };
 
-  const addPet = async (e: FormEvent) => {
+  const startEdit = (pet: any) => {
+    setEditingPet(pet);
+    setForm({
+      name: pet.name,
+      petType: pet.petType || pet.species || 'Dog',
+      breed: pet.breed || '',
+      secondaryBreed: pet.secondaryBreed || 'Unknown',
+      color: pet.color || '',
+      pattern: pet.pattern || '',
+      gender: pet.gender || 'unknown',
+      dateOfBirth: pet.dateOfBirth ? pet.dateOfBirth.split('T')[0] : '',
+      favouriteFood: pet.favouriteFood || '',
+      medicalAlerts: pet.medicalAlerts || '',
+    });
+    setPhotos(pet.photos || []);
+    setShowForm(true);
+  };
+
+  const startAdd = () => {
+    setEditingPet(null);
+    setForm(emptyForm);
+    setPhotos([]);
+    setShowForm(true);
+  };
+
+  const cancelForm = () => {
+    setShowForm(false);
+    setEditingPet(null);
+    setForm(emptyForm);
+    setPhotos([]);
+  };
+
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     const payload: any = { ...form, species: form.petType, photos };
-    if (form.breed !== 'Mixed Breed') delete payload.secondaryBreed;
-    await api.post('/customer/pets', payload);
-    setShowForm(false);
-    setForm({ name: '', petType: 'Dog', breed: '', secondaryBreed: '', color: '', pattern: '', medicalAlerts: '' });
-    setPhotos([]);
+    if (form.breed !== 'Mixed Breed') payload.secondaryBreed = 'Unknown';
+
+    if (editingPet) {
+      // Update — name is excluded by API, but we send the rest
+      await api.put(`/customer/pets/${editingPet._id}`, payload);
+    } else {
+      // Create
+      await api.post('/customer/pets', payload);
+    }
+    cancelForm();
     refreshPets();
   };
 
@@ -272,12 +300,6 @@ function Dashboard() {
   const markFound = async (id: string) => { await api.post(`/customer/pets/${id}/mark-found`); refreshPets(); };
   const deletePet = async (id: string) => { if (confirm('Delete this pet?')) { await api.delete(`/customer/pets/${id}`); refreshPets(); } };
 
-  const availableColors = form.petType ? PET_COLORS[form.petType] || [] : [];
-  const availablePatterns = form.petType ? PET_PATTERNS[form.petType] || [] : [];
-  const availableBreeds = form.petType ? PET_BREEDS[form.petType] || [] : [];
-  const isMixedBreed = form.breed === 'Mixed Breed';
-
-  // Helper to get main photo URL from a pet
   const getMainPhoto = (pet: any): string | null => {
     if (pet.photos && pet.photos.length > 0) {
       const main = pet.photos.find((p: any) => p.isMain);
@@ -287,11 +309,14 @@ function Dashboard() {
   };
 
   const formatBreed = (pet: any) => {
-    if (pet.breed === 'Mixed Breed' && pet.secondaryBreed) {
-      return `Mixed Breed (${pet.secondaryBreed})`;
+    if (pet.breed === 'Mixed Breed' && pet.secondaryBreed && pet.secondaryBreed !== 'Unknown') {
+      return `Mixed (${pet.secondaryBreed})`;
     }
+    if (pet.breed === 'Mixed Breed') return 'Mixed Breed';
     return pet.breed;
   };
+
+  const genderLabel = (g: string) => g === 'male' ? 'Male' : g === 'female' ? 'Female' : 'Unknown';
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -305,15 +330,27 @@ function Dashboard() {
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold">My Pets</h1>
-          <button onClick={() => setShowForm(!showForm)} className="bg-primary-600 text-white px-4 py-2 rounded-md text-sm flex items-center gap-2 hover:bg-primary-700">
+          <button onClick={startAdd} className="bg-primary-600 text-white px-4 py-2 rounded-md text-sm flex items-center gap-2 hover:bg-primary-700">
             <Plus size={16} /> Add Pet
           </button>
         </div>
 
         {showForm && (
-          <form onSubmit={addPet} className="bg-white rounded-lg border p-6 mb-6 space-y-4">
+          <form onSubmit={handleSubmit} className="bg-white rounded-lg border p-6 mb-6 space-y-4">
+            <h2 className="text-lg font-semibold">{editingPet ? `Edit ${editingPet.name}` : 'Add New Pet'}</h2>
             <div className="grid grid-cols-2 gap-4">
-              <input placeholder="Pet Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="border rounded-md px-3 py-2 text-sm" required />
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Pet Name *</label>
+                <input
+                  placeholder="Pet Name"
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  className="w-full border rounded-md px-3 py-2 text-sm"
+                  required
+                  disabled={!!editingPet}
+                />
+                {editingPet && <p className="text-xs text-gray-400 mt-1">Name cannot be changed after creation</p>}
+              </div>
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Pet Type *</label>
                 <select value={form.petType} onChange={(e) => handleTypeChange(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" required>
@@ -328,18 +365,14 @@ function Dashboard() {
                 </select>
               </div>
               {isMixedBreed && (
-                <>
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Main Breed *</label>
-                    <select value={form.secondaryBreed} onChange={(e) => setForm({ ...form, secondaryBreed: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm" required>
-                      <option value="">Select main breed...</option>
-                      {availableBreeds.filter((b) => b !== 'Mixed Breed').map((b) => <option key={b} value={b}>{b}</option>)}
-                    </select>
-                  </div>
-                  <div className="col-span-2 bg-blue-50 border border-blue-200 rounded-md px-3 py-2 text-xs text-blue-700">
-                    Your pet is a Mixed Breed. Selected main breed: <strong>{form.secondaryBreed || '—'}</strong>
-                  </div>
-                </>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Secondary Breed *</label>
+                  <select value={form.secondaryBreed} onChange={(e) => setForm({ ...form, secondaryBreed: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm" required>
+                    <option value="">Select secondary breed...</option>
+                    <option value="Unknown">Unknown</option>
+                    {availableBreeds.filter((b) => b !== 'Mixed Breed').map((b) => <option key={b} value={b}>{b}</option>)}
+                  </select>
+                </div>
               )}
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Color *</label>
@@ -355,7 +388,24 @@ function Dashboard() {
                   {availablePatterns.map((p) => <option key={p} value={p}>{p}</option>)}
                 </select>
               </div>
-              <input placeholder="Medical Alerts" value={form.medicalAlerts} onChange={(e) => setForm({ ...form, medicalAlerts: e.target.value })} className="border rounded-md px-3 py-2 text-sm" />
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Gender</label>
+                <select value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm">
+                  {PET_GENDERS.map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Birthday</label>
+                <input type="date" value={form.dateOfBirth} onChange={(e) => setForm({ ...form, dateOfBirth: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Favourite Food</label>
+                <input placeholder="e.g. Chicken, Salmon..." value={form.favouriteFood} onChange={(e) => setForm({ ...form, favouriteFood: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Medical Alerts</label>
+                <input placeholder="Allergies, conditions..." value={form.medicalAlerts} onChange={(e) => setForm({ ...form, medicalAlerts: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm" />
+              </div>
             </div>
 
             {/* Photo Manager */}
@@ -364,8 +414,10 @@ function Dashboard() {
             </div>
 
             <div className="flex gap-2">
-              <button type="submit" className="bg-primary-600 text-white px-4 py-2 rounded-md text-sm hover:bg-primary-700">Save</button>
-              <button type="button" onClick={() => { setShowForm(false); setPhotos([]); }} className="border px-4 py-2 rounded-md text-sm">Cancel</button>
+              <button type="submit" className="bg-primary-600 text-white px-4 py-2 rounded-md text-sm hover:bg-primary-700 flex items-center gap-1">
+                <Save size={14} /> {editingPet ? 'Update Pet' : 'Save Pet'}
+              </button>
+              <button type="button" onClick={cancelForm} className="border px-4 py-2 rounded-md text-sm">Cancel</button>
             </div>
           </form>
         )}
@@ -378,7 +430,6 @@ function Dashboard() {
               const mainPhoto = getMainPhoto(pet);
               return (
                 <div key={pet._id} className="bg-white rounded-lg border overflow-hidden">
-                  {/* Photo header */}
                   {mainPhoto && (
                     <div className="h-40 bg-gray-100 relative">
                       <img src={mainPhoto} alt={pet.name} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
@@ -386,20 +437,21 @@ function Dashboard() {
                   )}
                   <div className="p-5">
                     <div className="flex justify-between items-start mb-3">
-                      <div>
+                      <div className="flex-1">
                         <h3 className="text-lg font-semibold">{pet.name}</h3>
                         <p className="text-sm text-gray-600">{pet.petType || pet.species} — {formatBreed(pet)}</p>
                         <p className="text-sm text-gray-500">Color: {pet.color}{pet.pattern ? ` | Pattern: ${pet.pattern}` : ''}</p>
-                        {pet.photos && pet.photos.length > 1 && (
-                          <p className="text-xs text-gray-400 mt-1">{pet.photos.length} photos</p>
-                        )}
+                        <p className="text-sm text-gray-500">Gender: {genderLabel(pet.gender)}{pet.age != null ? ` | Age: ${pet.age} yrs` : ''}</p>
+                        {pet.favouriteFood && <p className="text-sm text-gray-500">Fav Food: {pet.favouriteFood}</p>}
+                        {pet.photos && pet.photos.length > 1 && <p className="text-xs text-gray-400 mt-1">{pet.photos.length} photos</p>}
                         {pet.medicalAlerts && <p className="text-sm text-red-600 mt-1 flex items-center gap-1"><AlertTriangle size={14} /> {pet.medicalAlerts}</p>}
                       </div>
                       <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${pet.status === 'safe' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                         {pet.status}
                       </span>
                     </div>
-                    <div className="flex gap-2 pt-3 border-t">
+                    <div className="flex gap-2 pt-3 border-t flex-wrap">
+                      <button onClick={() => startEdit(pet)} className="text-primary-600 hover:text-primary-800 text-sm font-medium flex items-center gap-1"><Edit2 size={12} /> Edit</button>
                       {pet.status === 'safe' ? (
                         <button onClick={() => markLost(pet._id)} className="text-red-600 hover:text-red-800 text-sm font-medium">Mark as Lost</button>
                       ) : (

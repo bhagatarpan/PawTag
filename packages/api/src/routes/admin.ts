@@ -5,6 +5,8 @@ import { validate } from '../middleware/validation';
 import {
   updateUserRoleSchema,
   updateUserStatusSchema,
+  createPetSchema,
+  updatePetSchema,
   createProductSchema,
   updateProductSchema,
   createContentSchema,
@@ -308,6 +310,242 @@ router.put('/users/:id/status', validate(updateUserStatusSchema), async (req: Au
     res.json({ success: true, data: user });
   } catch (error) {
     res.status(500).json({ success: false, error: 'Failed to update status' });
+  }
+});
+
+// --- Admin: Register Owner on Behalf ---
+/**
+ * @swagger
+ * /api/admin/owners/register:
+ *   post:
+ *     tags: [Admin - Users]
+ *     summary: Register a new owner on behalf of a customer
+ *     description: Admin creates an owner account for customers who cannot do it themselves (e.g. elderly owners).
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email, password, fullName]
+ *             properties:
+ *               email:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *               fullName:
+ *                 type: string
+ *               phoneNumber:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Owner created successfully
+ *       400:
+ *         description: Email already exists
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Insufficient permissions
+ */
+router.post('/owners/register', async (req: AuthRequest, res: Response) => {
+  try {
+    const { email, password, fullName, phoneNumber } = req.body;
+    if (!email || !password || !fullName) {
+      res.status(400).json({ success: false, error: 'email, password, and fullName are required' });
+      return;
+    }
+    const existing = await User.findOne({ email: email.toLowerCase() });
+    if (existing) {
+      res.status(400).json({ success: false, error: 'Email already registered' });
+      return;
+    }
+    const bcrypt = await import('bcryptjs');
+    const passwordHash = await bcrypt.default.hash(password, 12);
+    const user = await User.create({
+      email: email.toLowerCase(),
+      passwordHash,
+      fullName,
+      phoneNumber: phoneNumber || '',
+      role: 'customer',
+      status: 'active',
+      emailVerified: true,
+      phoneVerified: false,
+    });
+
+    await AuditLog.create({
+      userId: req.user!.id,
+      action: 'create',
+      entity: 'User',
+      entityId: user._id.toString(),
+      changes: { email, fullName, role: 'customer', note: 'Admin registered owner on behalf' },
+    });
+
+    const { passwordHash: _, ...safeUser } = user.toObject();
+    res.status(201).json({ success: true, data: safeUser });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to register owner' });
+  }
+});
+
+// --- Admin: Create Pet for Any Owner ---
+/**
+ * @swagger
+ * /api/admin/pets:
+ *   post:
+ *     tags: [Admin - Pets]
+ *     summary: Create a pet for any owner (admin god-mode)
+ *     description: Admin creates a pet record on behalf of an owner.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/CreatePetInput'
+ *     responses:
+ *       201:
+ *         description: Pet created successfully
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Insufficient permissions
+ */
+router.post('/pets', async (req: AuthRequest, res: Response) => {
+  try {
+    // Admin creates pet for any owner — ownerId is required
+    const { ownerId, ...petData } = req.body;
+    if (!ownerId) {
+      res.status(400).json({ success: false, error: 'ownerId is required' });
+      return;
+    }
+    const owner = await User.findById(ownerId);
+    if (!owner) {
+      res.status(400).json({ success: false, error: 'Owner not found' });
+      return;
+    }
+    // Validate pet data (skip ownerId)
+    const parsed = createPetSchema.safeParse(petData);
+    if (!parsed.success) {
+      const errors = parsed.error.issues.map((i) => ({ field: i.path.join('.'), message: i.message }));
+      res.status(400).json({ success: false, error: 'Validation failed', details: errors });
+      return;
+    }
+    const pet = await Pet.create({ ...parsed.data, ownerId });
+
+    await AuditLog.create({
+      userId: req.user!.id,
+      action: 'create',
+      entity: 'Pet',
+      entityId: pet._id.toString(),
+      changes: { name: pet.name, petType: pet.petType, ownerId },
+    });
+
+    res.status(201).json({ success: true, data: pet });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to create pet' });
+  }
+});
+
+// --- Admin: Update Any Pet ---
+/**
+ * @swagger
+ * /api/admin/pets/{id}:
+ *   put:
+ *     tags: [Admin - Pets]
+ *     summary: Update any pet (admin god-mode)
+ *     description: Admin can update any pet record including name, breed, photos, status, etc.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Pet ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/CreatePetInput'
+ *     responses:
+ *       200:
+ *         description: Pet updated successfully
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Insufficient permissions
+ *       404:
+ *         description: Pet not found
+ */
+router.put('/pets/:id', validate(updatePetSchema), async (req: AuthRequest, res: Response) => {
+  try {
+    const pet = await Pet.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+    if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
+
+    await AuditLog.create({
+      userId: req.user!.id,
+      action: 'update',
+      entity: 'Pet',
+      entityId: pet._id.toString(),
+      changes: req.body,
+    });
+
+    res.json({ success: true, data: pet });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to update pet' });
+  }
+});
+
+// --- Admin: Delete Any Pet ---
+/**
+ * @swagger
+ * /api/admin/pets/{id}:
+ *   delete:
+ *     tags: [Admin - Pets]
+ *     summary: Delete any pet (admin god-mode)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Pet deleted
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Insufficient permissions
+ *       404:
+ *         description: Pet not found
+ */
+router.delete('/pets/:id', async (req: AuthRequest, res: Response) => {
+  try {
+    const pet = await Pet.findByIdAndDelete(req.params.id);
+    if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
+
+    await AuditLog.create({
+      userId: req.user!.id,
+      action: 'delete',
+      entity: 'Pet',
+      entityId: req.params.id,
+      changes: { name: pet.name, ownerId: pet.ownerId.toString() },
+    });
+
+    res.json({ success: true, data: { message: 'Pet deleted' } });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to delete pet' });
   }
 });
 
