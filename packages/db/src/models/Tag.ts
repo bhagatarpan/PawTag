@@ -13,6 +13,7 @@ export interface ITagDocument extends Document {
     accuracy?: number;
     source: 'gps' | 'qr_scan' | 'manual';
   };
+  deletedAt?: Date;
 }
 
 const TagSchema = new Schema<ITagDocument>(
@@ -29,11 +30,13 @@ const TagSchema = new Schema<ITagDocument>(
       accuracy: Number,
       source: { type: String, enum: ['gps', 'qr_scan', 'manual'] },
     },
+    deletedAt: { type: Date, default: null },
   },
   { timestamps: true },
 );
 
 TagSchema.index({ ownerId: 1 });
 TagSchema.index({ petId: 1 });
+TagSchema.index({ deletedAt: 1 });
 
 export const Tag = mongoose.model<ITagDocument>('Tag', TagSchema);

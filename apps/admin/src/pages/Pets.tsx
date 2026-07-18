@@ -339,7 +339,7 @@ export default function Pets() {
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Status</label>
               <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }} className="border border-gray-300 rounded-md px-2 py-1.5 text-sm">
-                <option value="">All</option><option value="safe">Safe</option><option value="lost">Lost</option><option value="found">Found</option>
+                <option value="">All</option><option value="safe">Safe</option><option value="lost">Lost</option><option value="found">Found</option><option value="died">Died</option><option value="stolen">Stolen</option>
               </select>
             </div>
             <button type="submit" className="bg-primary-600 text-white px-3 py-1.5 rounded-md text-sm hover:bg-primary-700 flex items-center gap-1"><Search size={12} /> Search</button>
@@ -373,6 +373,7 @@ export default function Pets() {
               <th className="text-left px-3 py-2.5 font-medium text-gray-500">Gender</th>
               <th className="text-left px-3 py-2.5 font-medium text-gray-500">Owner</th>
               <th className="text-left px-3 py-2.5 font-medium text-gray-500">Status</th>
+              <th className="text-left px-3 py-2.5 font-medium text-gray-500">Lost#</th>
               <th className="text-left px-3 py-2.5 font-medium text-gray-500">Actions</th>
             </tr>
           </thead>
@@ -392,7 +393,7 @@ export default function Pets() {
                       : <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 text-xs">?</div>}
                   </td>
                   <td className="px-3 py-2 text-xs font-mono text-gray-500">{pet.petId || '—'}</td>
-                  <td className="px-3 py-2 font-medium">{pet.name}{pet.photos?.length > 1 && <span className="text-gray-400 text-xs ml-1">({pet.photos.length})</span>}</td>
+                  <td className="px-3 py-2 font-medium text-sm">{pet.name}{pet.photos?.length > 1 && <span className="text-gray-400 text-xs ml-1">({pet.photos.length})</span>}</td>
                   <td className="px-3 py-2">
                     {pet.linkedTag ? (
                       <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs font-mono rounded bg-primary-50 text-primary-700 border border-primary-200">
@@ -401,27 +402,48 @@ export default function Pets() {
                       </span>
                     ) : <span className="text-gray-300 text-xs">No tag</span>}
                   </td>
-                  <td className="px-3 py-2 text-gray-600">{pet.petType}</td>
-                  <td className="px-3 py-2 text-gray-600">{breedDisplay}</td>
-                  <td className="px-3 py-2 text-gray-600">{pet.color}</td>
-                  <td className="px-3 py-2 text-gray-500 text-xs">{genderLabel}</td>
-                  <td className="px-3 py-2 text-gray-600 text-xs">{pet.ownerId?.fullName || 'N/A'}</td>
+                  <td className="px-3 py-2 text-sm text-gray-600">{pet.petType}</td>
+                  <td className="px-3 py-2 text-sm text-gray-600">{breedDisplay}</td>
+                  <td className="px-3 py-2 text-sm text-gray-600">{pet.color}</td>
+                  <td className="px-3 py-2 text-sm text-gray-500">{genderLabel}</td>
+                  <td className="px-3 py-2 text-sm text-gray-600">{pet.ownerId?.fullName || 'N/A'}</td>
                   <td className="px-3 py-2">
-                    <span className={`px-1.5 py-0.5 text-xs rounded-full font-medium ${pet.status === 'safe' ? 'bg-green-100 text-green-700' : pet.status === 'lost' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>{pet.status}</span>
+                    <span className={`px-2 py-1 text-sm rounded-full font-medium ${
+                      pet.status === 'safe' ? 'bg-green-100 text-green-700' :
+                      pet.status === 'lost' ? 'bg-red-100 text-red-700' :
+                      pet.status === 'found' ? 'bg-yellow-100 text-yellow-700' :
+                      pet.status === 'died' ? 'bg-gray-100 text-gray-700' :
+                      pet.status === 'stolen' ? 'bg-purple-100 text-purple-700' :
+                      'bg-gray-100 text-gray-700'
+                    }`}>{pet.status}</span>
                   </td>
                   <td className="px-3 py-2">
-                    <div className="flex gap-1 items-center flex-wrap">
-                      <button onClick={() => startEdit(pet)} className="text-primary-500 hover:text-primary-700 p-1" title="Edit"><Edit2 size={13} /></button>
+                    <span className={`text-sm font-medium px-2 py-1 rounded-full ${
+                      (pet.lostCount || 0) === 0 ? 'bg-green-100 text-green-700' :
+                      (pet.lostCount || 0) <= 2 ? 'bg-amber-100 text-amber-700' :
+                      (pet.lostCount || 0) <= 4 ? 'bg-orange-100 text-orange-700' :
+                      'bg-red-100 text-red-700'
+                    }`}>{pet.lostCount || 0}</span>
+                  </td>
+                  <td className="px-3 py-2">
+                    <div className="flex gap-1.5 items-center flex-wrap">
+                      <button onClick={() => startEdit(pet)} className="text-primary-500 hover:text-primary-700 p-1.5 rounded hover:bg-primary-50" title="Edit"><Edit2 size={15} /></button>
                       {pet.status !== 'lost' && (
-                        <button onClick={async () => { await api.put(`/admin/pets/${pet._id}/status`, { status: 'lost' }); fetchPets(); }} className="text-red-600 hover:text-red-800 text-xs px-1.5 py-0.5 rounded border border-red-200 hover:bg-red-50" title="Mark Lost">Lost</button>
+                        <button onClick={async () => { await api.put(`/admin/pets/${pet._id}/status`, { status: 'lost' }); fetchPets(); }} className="bg-red-50 text-red-700 hover:bg-red-100 text-xs px-2 py-1 rounded border border-red-200 font-medium" title="Mark Lost">Lost</button>
                       )}
                       {pet.status !== 'found' && (
-                        <button onClick={async () => { await api.put(`/admin/pets/${pet._id}/status`, { status: 'found' }); fetchPets(); }} className="text-amber-600 hover:text-amber-800 text-xs px-1.5 py-0.5 rounded border border-amber-200 hover:bg-amber-50" title="Mark Found">Found</button>
+                        <button onClick={async () => { await api.put(`/admin/pets/${pet._id}/status`, { status: 'found' }); fetchPets(); }} className="bg-amber-50 text-amber-700 hover:bg-amber-100 text-xs px-2 py-1 rounded border border-amber-200 font-medium" title="Mark Found">Found</button>
                       )}
                       {pet.status !== 'safe' && (
-                        <button onClick={async () => { await api.put(`/admin/pets/${pet._id}/status`, { status: 'safe' }); fetchPets(); }} className="text-green-600 hover:text-green-800 text-xs px-1.5 py-0.5 rounded border border-green-200 hover:bg-green-50" title="Mark Safe">Safe</button>
+                        <button onClick={async () => { await api.put(`/admin/pets/${pet._id}/status`, { status: 'safe' }); fetchPets(); }} className="bg-green-50 text-green-700 hover:bg-green-100 text-xs px-2 py-1 rounded border border-green-200 font-medium" title="Mark Safe">Safe</button>
                       )}
-                      <button onClick={() => deletePet(pet._id)} className="text-red-400 hover:text-red-600 p-1" title="Delete"><Trash2 size={13} /></button>
+                      {pet.status !== 'died' && (
+                        <button onClick={async () => { await api.put(`/admin/pets/${pet._id}/status`, { status: 'died' }); fetchPets(); }} className="bg-gray-100 text-gray-700 hover:bg-gray-200 text-xs px-2 py-1 rounded border border-gray-300 font-medium" title="Mark Died">Died</button>
+                      )}
+                      {pet.status !== 'stolen' && (
+                        <button onClick={async () => { await api.put(`/admin/pets/${pet._id}/status`, { status: 'stolen' }); fetchPets(); }} className="bg-purple-50 text-purple-700 hover:bg-purple-100 text-xs px-2 py-1 rounded border border-purple-200 font-medium" title="Mark Stolen">Stolen</button>
+                      )}
+                      <button onClick={() => deletePet(pet._id)} className="text-red-400 hover:text-red-600 p-1.5 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} /></button>
                     </div>
                   </td>
                 </tr>

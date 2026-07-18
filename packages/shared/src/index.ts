@@ -24,6 +24,8 @@ export enum PetStatus {
   SAFE = 'safe',
   LOST = 'lost',
   FOUND = 'found',
+  DIED = 'died',
+  STOLEN = 'stolen',
 }
 
 export enum OrderStatus {

@@ -22,6 +22,7 @@ import adminRoutes from './routes/admin';
 import customerRoutes from './routes/customer';
 import finderRoutes from './routes/finder';
 import uploadRoutes from './routes/upload';
+import { startReminderService } from './services/reminder.service';
 
 const app = express();
 
@@ -118,6 +119,9 @@ async function start() {
   try {
     await connectDatabase(config.dbUrl);
     console.log('Database connected');
+
+    // Start 24-hour reminder service
+    startReminderService();
 
     app.listen(config.port, () => {
       console.log(`PawTag API running on port ${config.port}`);

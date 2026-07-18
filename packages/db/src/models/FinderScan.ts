@@ -12,6 +12,9 @@ export interface IFinderScanDocument extends Document {
   action: 'viewed' | 'notified_owner' | 'shared_location';
   notifiedAt?: Date;
   contactAttempted: boolean;
+  finderPhone?: string;
+  finderEmail?: string;
+  finderName?: string;
 }
 
 const FinderScanSchema = new Schema<IFinderScanDocument>(
@@ -31,6 +34,9 @@ const FinderScanSchema = new Schema<IFinderScanDocument>(
     },
     notifiedAt: { type: Date },
     contactAttempted: { type: Boolean, default: false },
+    finderPhone: { type: String },
+    finderEmail: { type: String },
+    finderName: { type: String },
   },
   { timestamps: true },
 );

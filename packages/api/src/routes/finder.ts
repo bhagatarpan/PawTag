@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { Tag, FinderScan, LocationEvent } from '@pawtag/db';
+import { Tag, FinderScan, LocationEvent, Pet, Notification, User } from '@pawtag/db';
 
 const router = Router();
 
@@ -61,8 +61,8 @@ const router = Router();
  */
 router.get('/:tagId', async (req: Request, res: Response) => {
   try {
-    const tag = await Tag.findOne({ tagId: req.params.tagId })
-      .populate({ path: 'petId', select: '-__v' })
+    const tag = await Tag.findOne({ tagId: req.params.tagId, deletedAt: null })
+      .populate({ path: 'petId', match: { deletedAt: null }, select: '-__v' })
       .populate({ path: 'ownerId', select: 'fullName phone' });
 
     if (!tag) {
@@ -150,25 +150,114 @@ router.get('/:tagId', async (req: Request, res: Response) => {
  */
 router.post('/:tagId/notify', async (req: Request, res: Response) => {
   try {
-    const tag = await Tag.findOne({ tagId: req.params.tagId });
+    const { finderPhone, finderEmail, finderName } = req.body;
+
+    if (!finderPhone && !finderEmail) {
+      res.status(400).json({ success: false, error: 'Please provide at least a phone number or email so the owner can contact you.' });
+      return;
+    }
+
+    const tag = await Tag.findOne({ tagId: req.params.tagId, deletedAt: null })
+      .populate({ path: 'petId', match: { deletedAt: null } })
+      .populate({ path: 'ownerId', select: 'fullName email phone' });
+
     if (!tag) {
       res.status(404).json({ success: false, error: 'Tag not found' });
       return;
     }
 
+    const pet = tag.petId as any;
+    const owner = tag.ownerId as any;
+
+    // Update scan record with finder contact details
     const scan = await FinderScan.findOne({ tagId: tag._id }).sort({ createdAt: -1 });
     if (scan) {
       scan.action = 'notified_owner';
       scan.notifiedAt = new Date();
       scan.contactAttempted = true;
+      scan.finderPhone = finderPhone || undefined;
+      scan.finderEmail = finderEmail || undefined;
+      scan.finderName = finderName || undefined;
       await scan.save();
     }
 
-    // TODO: Send notification to owner (email, push, SMS)
+    // Auto-mark pet as found
+    if (pet && pet.status === 'lost') {
+      pet.status = 'found';
+      pet.foundByFinderAt = new Date();
+      await pet.save();
+      await Tag.updateMany({ petId: pet._id, deletedAt: null }, { status: 'active' });
+    }
 
-    res.json({ success: true, data: { message: 'Owner has been notified' } });
+    // Build contact info string for notification
+    const contactParts: string[] = [];
+    if (finderName) contactParts.push(`Name: ${finderName}`);
+    if (finderPhone) contactParts.push(`Phone: ${finderPhone}`);
+    if (finderEmail) contactParts.push(`Email: ${finderEmail}`);
+    const contactInfo = contactParts.join(' | ');
+
+    // Create notification to owner
+    if (owner) {
+      await Notification.create({
+        userId: owner._id,
+        type: 'pet_found',
+        title: `Your pet ${pet?.name || 'Unknown'} has been found!`,
+        message: `A kind person found your pet ${pet?.name || ''} (${pet?.petId || ''}). They left their contact details so you can reach them. ${contactInfo}`,
+        priority: 'high',
+        data: {
+          petId: pet?._id,
+          petName: pet?.name,
+          petPetId: pet?.petId,
+          tagId: tag.tagId,
+          finderPhone: finderPhone || null,
+          finderEmail: finderEmail || null,
+          finderName: finderName || null,
+          foundAt: new Date().toISOString(),
+        },
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        message: 'Owner has been notified successfully! Thank you for helping reunite this pet with its owner.',
+        petFound: pet?.status === 'found',
+      },
+    });
   } catch (error) {
     res.status(500).json({ success: false, error: 'Failed to notify owner' });
+  }
+});
+
+// --- Found Timer (public) ---
+router.get('/:tagId/found-timer', async (req: Request, res: Response) => {
+  try {
+    const tag = await Tag.findOne({ tagId: req.params.tagId, deletedAt: null })
+      .populate({ path: 'petId', match: { deletedAt: null }, select: 'name petId status foundByFinderAt' });
+
+    if (!tag) { res.status(404).json({ success: false, error: 'Tag not found' }); return; }
+
+    const pet = tag.petId as any;
+    if (!pet || pet.status !== 'found' || !pet.foundByFinderAt) {
+      res.json({ success: true, data: { active: false } });
+      return;
+    }
+
+    const scan = await FinderScan.findOne({ petId: pet._id, action: 'notified_owner' }).sort({ notifiedAt: -1 });
+
+    res.json({
+      success: true,
+      data: {
+        active: true,
+        foundAt: pet.foundByFinderAt,
+        elapsed: Date.now() - new Date(pet.foundByFinderAt).getTime(),
+        finderPhone: scan?.finderPhone || null,
+        finderEmail: scan?.finderEmail || null,
+        finderName: scan?.finderName || null,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to fetch found timer' });
   }
 });
 

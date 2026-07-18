@@ -26,9 +26,12 @@ export interface IPetDocument extends Document {
   photoUrl?: string;
   medicalAlerts?: string;
   microchipId?: string;
-  status: 'safe' | 'lost' | 'found';
+  status: 'safe' | 'lost' | 'found' | 'died' | 'stolen';
   isNeutered: boolean;
   notes?: string;
+  lostCount: number;
+  foundByFinderAt?: Date;
+  deletedAt?: Date;
 }
 
 const PetPhotoSchema = new Schema<IPetPhoto>(
@@ -65,9 +68,12 @@ const PetSchema = new Schema<IPetDocument>(
     photoUrl: { type: String },
     medicalAlerts: { type: String },
     microchipId: { type: String },
-    status: { type: String, enum: ['safe', 'lost', 'found'], default: 'safe' },
+    status: { type: String, enum: ['safe', 'lost', 'found', 'died', 'stolen'], default: 'safe' },
     isNeutered: { type: Boolean, default: false },
     notes: { type: String },
+    lostCount: { type: Number, default: 0, min: 0 },
+    foundByFinderAt: { type: Date },
+    deletedAt: { type: Date, default: null },
   },
   { timestamps: true },
 );
@@ -76,16 +82,6 @@ PetSchema.pre('save', function (next) {
   if (this.breed === 'Mixed Breed' && !this.secondaryBreed) {
     this.secondaryBreed = 'Unknown';
   }
-  if (this.dateOfBirth) {
-    const now = new Date();
-    const birth = new Date(this.dateOfBirth);
-    let computedAge = now.getFullYear() - birth.getFullYear();
-    const monthDiff = now.getMonth() - birth.getMonth();
-    if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < birth.getDate())) {
-      computedAge--;
-    }
-    this.age = Math.max(0, computedAge);
-  }
   next();
 });
 
@@ -93,6 +89,7 @@ PetSchema.index({ ownerId: 1 });
 PetSchema.index({ status: 1 });
 PetSchema.index({ petType: 1 });
 PetSchema.index({ petId: 1 }, { unique: true });
+PetSchema.index({ deletedAt: 1 });
 
 export const Pet = mongoose.model<IPetDocument>('Pet', PetSchema);
 

@@ -12,6 +12,7 @@ import Content from './pages/Content';
 import Settings from './pages/Settings';
 import FeatureFlags from './pages/FeatureFlags';
 import AuditLogs from './pages/AuditLogs';
+import Statistics from './pages/Statistics';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
@@ -107,6 +108,14 @@ export default function App() {
         element={
           <ProtectedRoute>
             <AuditLogs />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/statistics"
+        element={
+          <ProtectedRoute>
+            <Statistics />
           </ProtectedRoute>
         }
       />

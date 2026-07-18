@@ -4,7 +4,7 @@ export const registerSchema = z.object({
   email: z.string().email('Invalid email address'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
   fullName: z.string().min(2, 'Full name is required'),
-  phoneNumber: z.string().optional(),
+  phoneNumber: z.string().min(1, 'Phone number is required'),
 });
 
 export const loginSchema = z.object({
@@ -17,10 +17,19 @@ export const verifyOtpSchema = z.object({
   otp: z.string().length(6, 'OTP must be 6 digits'),
 });
 
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, 'Current password is required'),
+  newPassword: z.string().min(8, 'New password must be at least 8 characters'),
+});
+
+export const adminResetPasswordSchema = z.object({
+  newPassword: z.string().min(8, 'Password must be at least 8 characters'),
+});
+
 export const updateProfileSchema = z.object({
   fullName: z.string().min(2).optional(),
   email: z.string().email().optional(),
-  phoneNumber: z.string().optional(),
+  phoneNumber: z.string().min(1, 'Phone number is required').optional(),
   address: z
     .object({
       line1: z.string().min(1).optional(),

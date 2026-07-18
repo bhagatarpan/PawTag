@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { AuthRequest, authenticate } from '../middleware/auth';
 import { validate } from '../middleware/validation';
-import { registerSchema, loginSchema, verifyOtpSchema, updateProfileSchema } from '../middleware/schemas';
+import { registerSchema, loginSchema, verifyOtpSchema, updateProfileSchema, changePasswordSchema } from '../middleware/schemas';
 import { hashPassword, verifyPassword, generateToken, generateOtp } from '../services/auth.service';
 import { User } from '@pawtag/db';
 
@@ -307,6 +307,24 @@ router.put('/profile', authenticate, validate(updateProfileSchema), async (req: 
     res.json({ success: true, data: user });
   } catch (error) {
     res.status(500).json({ success: false, error: 'Update failed' });
+  }
+});
+
+// POST /api/auth/change-password
+router.post('/change-password', authenticate, validate(changePasswordSchema), async (req: AuthRequest, res: Response) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const user = await User.findById(req.user!.id);
+    if (!user) { res.status(404).json({ success: false, error: 'User not found' }); return; }
+
+    const valid = await verifyPassword(currentPassword, user.passwordHash);
+    if (!valid) { res.status(401).json({ success: false, error: 'Current password is incorrect' }); return; }
+
+    user.passwordHash = await hashPassword(newPassword);
+    await user.save();
+    res.json({ success: true, data: { message: 'Password changed successfully' } });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to change password' });
   }
 });
 

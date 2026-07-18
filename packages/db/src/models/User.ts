@@ -4,7 +4,7 @@ export interface IUserDocument extends Document {
   email: string;
   passwordHash: string;
   fullName: string;
-  phoneNumber?: string;
+  phoneNumber: string;
   role: 'super_admin' | 'admin' | 'support' | 'customer';
   status: 'active' | 'inactive' | 'suspended' | 'pending_verification';
   emailVerified: boolean;
@@ -24,6 +24,8 @@ export interface IUserDocument extends Document {
     email?: string;
     relationship: string;
   };
+  responsibilityScore: number;
+  deletedAt?: Date;
 }
 
 const UserSchema = new Schema<IUserDocument>(
@@ -31,7 +33,7 @@ const UserSchema = new Schema<IUserDocument>(
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     passwordHash: { type: String, required: true },
     fullName: { type: String, required: true, trim: true },
-    phoneNumber: { type: String, sparse: true },
+    phoneNumber: { type: String, required: true },
     role: {
       type: String,
       enum: ['super_admin', 'admin', 'support', 'customer'],
@@ -59,6 +61,8 @@ const UserSchema = new Schema<IUserDocument>(
       email: String,
       relationship: String,
     },
+    responsibilityScore: { type: Number, default: 0, min: 0 },
+    deletedAt: { type: Date, default: null },
   },
   { timestamps: true },
 );
@@ -66,5 +70,6 @@ const UserSchema = new Schema<IUserDocument>(
 UserSchema.index({ email: 1 });
 UserSchema.index({ role: 1 });
 UserSchema.index({ status: 1 });
+UserSchema.index({ deletedAt: 1 });
 
 export const User = mongoose.model<IUserDocument>('User', UserSchema);

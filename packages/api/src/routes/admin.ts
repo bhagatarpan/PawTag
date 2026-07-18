@@ -6,6 +6,7 @@ import { validate } from '../middleware/validation';
 import {
   updateUserRoleSchema,
   updateUserStatusSchema,
+  adminResetPasswordSchema,
   createPetSchema,
   updatePetSchema,
   createProductSchema,
@@ -31,6 +32,7 @@ import {
   AuditLog,
   generatePetId,
 } from '@pawtag/db';
+import { hashPassword } from '../services/auth.service';
 
 const router = Router();
 
@@ -94,6 +96,133 @@ router.get('/dashboard', async (_req: AuthRequest, res: Response) => {
   }
 });
 
+// --- Comprehensive Lost/Found Statistics ---
+router.get('/stats/lost-found', async (_req: AuthRequest, res: Response) => {
+  try {
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+    const [
+      totalPets,
+      totalLost,
+      totalFound,
+      totalSafe,
+      lostLast30d,
+      lostLast7d,
+      foundByFinder,
+      foundByOwner,
+      avgTimeToFind,
+      petsWithMultipleLosses,
+      topLostPetTypes,
+      lostByDayOfWeek,
+      currentlyWaiting,
+      ownersWithHighScore,
+    ] = await Promise.all([
+      Pet.countDocuments({ deletedAt: null }),
+      Pet.countDocuments({ status: 'lost', deletedAt: null }),
+      Pet.countDocuments({ status: 'found', deletedAt: null }),
+      Pet.countDocuments({ status: 'safe', deletedAt: null }),
+      Pet.countDocuments({ lostCount: { $gte: 1 }, updatedAt: { $gte: thirtyDaysAgo }, deletedAt: null }),
+      Pet.countDocuments({ lostCount: { $gte: 1 }, updatedAt: { $gte: sevenDaysAgo }, deletedAt: null }),
+      Pet.countDocuments({ foundByFinderAt: { $ne: null }, deletedAt: null }),
+      Pet.countDocuments({ status: 'safe', lostCount: { $gte: 1 }, foundByFinderAt: null, deletedAt: null }),
+      Pet.aggregate([
+        { $match: { foundByFinderAt: { $ne: null }, status: 'safe', deletedAt: null } },
+        {
+          $project: {
+            diff: { $subtract: ['$foundByFinderAt', '$updatedAt'] },
+          },
+        },
+        { $group: { _id: null, avg: { $avg: '$diff' } } },
+      ]),
+      Pet.countDocuments({ lostCount: { $gte: 2 }, deletedAt: null }),
+      Pet.aggregate([
+        { $match: { lostCount: { $gte: 1 }, deletedAt: null } },
+        { $group: { _id: '$petType', count: { $sum: 1 }, totalLost: { $sum: '$lostCount' } } },
+        { $sort: { totalLost: -1 } },
+        { $limit: 10 },
+      ]),
+      Pet.aggregate([
+        { $match: { lostCount: { $gte: 1 }, deletedAt: null } },
+        {
+          $project: {
+            dayOfWeek: { $dayOfWeek: '$createdAt' },
+          },
+        },
+        { $group: { _id: '$dayOfWeek', count: { $sum: 1 } } },
+        { $sort: { _id: 1 } },
+      ]),
+      Pet.countDocuments({ status: 'found', foundByFinderAt: { $ne: null }, deletedAt: null }),
+      User.countDocuments({ responsibilityScore: { $gte: 5 }, deletedAt: null }),
+    ]);
+
+    const avgHours = avgTimeToFind[0]?.avg
+      ? Math.round(avgTimeToFind[0].avg / (1000 * 60 * 60))
+      : 0;
+
+    // Owner responsibility distribution
+    const responsibilityDistribution = await User.aggregate([
+      { $match: { role: 'customer', deletedAt: null } },
+      {
+        $bucket: {
+          groupBy: '$responsibilityScore',
+          boundaries: [0, 1, 3, 5, 10, 100],
+          default: '10+',
+          output: { count: { $sum: 1 } },
+        },
+      },
+    ]);
+
+    // Monthly lost/found trend (last 6 months)
+    const sixMonthsAgo = new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000);
+    const monthlyTrend = await Pet.aggregate([
+      { $match: { createdAt: { $gte: sixMonthsAgo }, deletedAt: null } },
+      {
+        $group: {
+          _id: { $dateToString: { format: '%Y-%m', date: '$createdAt' } },
+          total: { $sum: 1 },
+          lost: { $sum: { $cond: [{ $eq: ['$status', 'lost'] }, 1, 0] } },
+          foundByFinder: { $sum: { $cond: [{ $ne: ['$foundByFinderAt', null] }, 1, 0] } },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        overview: {
+          totalPets,
+          totalLost,
+          totalFound,
+          totalSafe,
+          foundByFinder,
+          foundByOwner,
+          lostLast30d,
+          lostLast7d,
+          currentlyWaiting: currentlyWaiting,
+          petsWithMultipleLosses,
+          ownersWithHighScore,
+        },
+        performance: {
+          avgTimeToFindHours: avgHours,
+          finderReuniteRate: totalPets > 0 ? Math.round((foundByFinder / Math.max(totalLost + foundByFinder + totalSafe, 1)) * 100) : 0,
+        },
+        breakdown: {
+          topLostPetTypes,
+          lostByDayOfWeek,
+          responsibilityDistribution,
+          monthlyTrend,
+        },
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to load statistics' });
+  }
+});
+
 // --- User Management ---
 /**
  * @swagger
@@ -141,11 +270,12 @@ router.get('/dashboard', async (_req: AuthRequest, res: Response) => {
 router.get('/users', async (req, res: Response) => {
   try {
     const { page = 1, limit = 20, search, role, status } = req.query;
-    const query: any = {};
+    const query: any = { deletedAt: null };
     if (search) {
       query.$or = [
         { fullName: { $regex: search, $options: 'i' } },
         { email: { $regex: search, $options: 'i' } },
+        { phoneNumber: { $regex: search, $options: 'i' } },
       ];
     }
     if (role) query.role = role;
@@ -195,7 +325,7 @@ router.get('/users', async (req, res: Response) => {
  */
 router.get('/users/:id', async (req, res: Response) => {
   try {
-    const user = await User.findById(req.params.id).select('-passwordHash');
+    const user = await User.findOne({ _id: req.params.id, deletedAt: null }).select('-passwordHash');
     if (!user) { res.status(404).json({ success: false, error: 'User not found' }); return; }
     res.json({ success: true, data: user });
   } catch (error) {
@@ -243,15 +373,19 @@ router.get('/users/:id', async (req, res: Response) => {
  */
 router.put('/users/:id/role', validate(updateUserRoleSchema), async (req: AuthRequest, res: Response) => {
   try {
-    const user = await User.findByIdAndUpdate(req.params.id, { role: req.body.role }, { new: true }).select('-passwordHash');
+    const user = await User.findOne({ _id: req.params.id, deletedAt: null });
     if (!user) { res.status(404).json({ success: false, error: 'User not found' }); return; }
+
+    const oldRole = user.role;
+    user.role = req.body.role as any;
+    await user.save();
 
     await AuditLog.create({
       userId: req.user!.id,
       action: 'update_role',
       entity: 'User',
       entityId: req.params.id,
-      changes: { role: { old: 'unknown', new: req.body.role } },
+      changes: { role: { old: oldRole, new: req.body.role } },
     });
 
     res.json({ success: true, data: user });
@@ -300,20 +434,118 @@ router.put('/users/:id/role', validate(updateUserRoleSchema), async (req: AuthRe
  */
 router.put('/users/:id/status', validate(updateUserStatusSchema), async (req: AuthRequest, res: Response) => {
   try {
-    const user = await User.findByIdAndUpdate(req.params.id, { status: req.body.status }, { new: true }).select('-passwordHash');
+    const user = await User.findOne({ _id: req.params.id, deletedAt: null });
     if (!user) { res.status(404).json({ success: false, error: 'User not found' }); return; }
+
+    const oldStatus = user.status;
+    user.status = req.body.status as any;
+    await user.save();
 
     await AuditLog.create({
       userId: req.user!.id,
       action: 'update_status',
       entity: 'User',
       entityId: req.params.id,
-      changes: { status: { old: 'unknown', new: req.body.status } },
+      changes: { status: { old: oldStatus, new: req.body.status } },
     });
 
     res.json({ success: true, data: user });
   } catch (error) {
     res.status(500).json({ success: false, error: 'Failed to update status' });
+  }
+});
+
+// POST /api/admin/users/:id/reset-password
+router.post('/users/:id/reset-password', validate(adminResetPasswordSchema), async (req: AuthRequest, res: Response) => {
+  try {
+    const user = await User.findOne({ _id: req.params.id, deletedAt: null });
+    if (!user) { res.status(404).json({ success: false, error: 'User not found' }); return; }
+
+    user.passwordHash = await hashPassword(req.body.newPassword);
+    await user.save();
+
+    await AuditLog.create({
+      userId: req.user!.id,
+      action: 'reset_password',
+      entity: 'User',
+      entityId: req.params.id,
+      changes: { note: 'Admin reset password' },
+    });
+
+    res.json({ success: true, data: { message: 'Password reset successfully' } });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to reset password' });
+  }
+});
+
+// PUT /api/admin/users/:id/lock
+router.put('/users/:id/lock', async (req: AuthRequest, res: Response) => {
+  try {
+    const user = await User.findOne({ _id: req.params.id, deletedAt: null });
+    if (!user) { res.status(404).json({ success: false, error: 'User not found' }); return; }
+
+    const oldStatus = user.status;
+    user.status = 'suspended';
+    await user.save();
+
+    await AuditLog.create({
+      userId: req.user!.id,
+      action: 'lock_account',
+      entity: 'User',
+      entityId: req.params.id,
+      changes: { status: { old: oldStatus, new: 'suspended' } },
+    });
+
+    res.json({ success: true, data: { message: 'Account locked' } });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to lock account' });
+  }
+});
+
+// PUT /api/admin/users/:id/unlock
+router.put('/users/:id/unlock', async (req: AuthRequest, res: Response) => {
+  try {
+    const user = await User.findOne({ _id: req.params.id, deletedAt: null });
+    if (!user) { res.status(404).json({ success: false, error: 'User not found' }); return; }
+
+    const oldStatus = user.status;
+    user.status = 'active';
+    await user.save();
+
+    await AuditLog.create({
+      userId: req.user!.id,
+      action: 'unlock_account',
+      entity: 'User',
+      entityId: req.params.id,
+      changes: { status: { old: oldStatus, new: 'active' } },
+    });
+
+    res.json({ success: true, data: { message: 'Account unlocked' } });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to unlock account' });
+  }
+});
+
+// DELETE /api/admin/users/:id (soft delete)
+router.delete('/users/:id', async (req: AuthRequest, res: Response) => {
+  try {
+    const user = await User.findOne({ _id: req.params.id, deletedAt: null });
+    if (!user) { res.status(404).json({ success: false, error: 'User not found' }); return; }
+
+    user.deletedAt = new Date();
+    await user.save();
+
+    await AuditLog.create({
+      userId: req.user!.id,
+      action: 'soft_delete',
+      entity: 'User',
+      entityId: req.params.id,
+      changes: { email: user.email, name: user.fullName, note: 'Soft deleted' },
+    });
+
+    res.json({ success: true, data: { message: 'User deleted' } });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to delete user' });
   }
 });
 
@@ -356,13 +588,13 @@ router.put('/users/:id/status', validate(updateUserStatusSchema), async (req: Au
 router.post('/owners/register', async (req: AuthRequest, res: Response) => {
   try {
     const { email, password, fullName, phoneNumber } = req.body;
-    if (!email || !password || !fullName) {
-      res.status(400).json({ success: false, error: 'email, password, and fullName are required' });
+    if (!email || !password || !fullName || !phoneNumber) {
+      res.status(400).json({ success: false, error: 'email, password, fullName, and phoneNumber are required' });
       return;
     }
-    const existing = await User.findOne({ email: email.toLowerCase() });
+    const existing = await User.findOne({ $or: [{ email: email.toLowerCase() }, { phoneNumber }], deletedAt: null });
     if (existing) {
-      res.status(400).json({ success: false, error: 'Email already registered' });
+      res.status(400).json({ success: false, error: 'Email or phone already registered' });
       return;
     }
     const bcrypt = await import('bcryptjs');
@@ -371,7 +603,7 @@ router.post('/owners/register', async (req: AuthRequest, res: Response) => {
       email: email.toLowerCase(),
       passwordHash,
       fullName,
-      phoneNumber: phoneNumber || '',
+      phoneNumber,
       role: 'customer',
       status: 'active',
       emailVerified: true,
@@ -498,8 +730,11 @@ router.post('/pets', async (req: AuthRequest, res: Response) => {
  */
 router.put('/pets/:id', validate(updatePetSchema), async (req: AuthRequest, res: Response) => {
   try {
-    const pet = await Pet.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+    const pet = await Pet.findOne({ _id: req.params.id, deletedAt: null });
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
+
+    Object.assign(pet, req.body);
+    await pet.save();
 
     await AuditLog.create({
       userId: req.user!.id,
@@ -542,15 +777,18 @@ router.put('/pets/:id', validate(updatePetSchema), async (req: AuthRequest, res:
  */
 router.delete('/pets/:id', async (req: AuthRequest, res: Response) => {
   try {
-    const pet = await Pet.findByIdAndDelete(req.params.id);
+    const pet = await Pet.findOne({ _id: req.params.id, deletedAt: null });
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
+
+    pet.deletedAt = new Date();
+    await pet.save();
 
     await AuditLog.create({
       userId: req.user!.id,
-      action: 'delete',
+      action: 'soft_delete',
       entity: 'Pet',
       entityId: req.params.id,
-      changes: { name: pet.name, ownerId: pet.ownerId.toString() },
+      changes: { name: pet.name, petId: pet.petId, ownerId: pet.ownerId.toString(), note: 'Soft deleted' },
     });
 
     res.json({ success: true, data: { message: 'Pet deleted' } });
@@ -643,7 +881,7 @@ router.delete('/pets/:id', async (req: AuthRequest, res: Response) => {
 router.get('/pets', async (req, res: Response) => {
   try {
     const { page = 1, limit = 20, search, status, petType, petName, petBreed, petColor, petPattern, ownerName, ownerEmail, ownerPhone } = req.query;
-    const query: any = {};
+    const query: any = { deletedAt: null };
 
     // Pet-level filters
     if (petType) query.petType = petType;
@@ -655,12 +893,13 @@ router.get('/pets', async (req, res: Response) => {
       query.$or = [
         { name: { $regex: search, $options: 'i' } },
         { breed: { $regex: search, $options: 'i' } },
+        { petId: { $regex: search, $options: 'i' } },
       ];
     }
     if (status) query.status = status;
 
     // Owner-level filters — look up matching user IDs first
-    const ownerFilters: any = {};
+    const ownerFilters: any = { deletedAt: null };
     if (ownerName) {
       ownerFilters.fullName = { $regex: ownerName, $options: 'i' };
     }
@@ -671,7 +910,7 @@ router.get('/pets', async (req, res: Response) => {
       ownerFilters.phoneNumber = { $regex: ownerPhone, $options: 'i' };
     }
 
-    if (Object.keys(ownerFilters).length > 0) {
+    if (Object.keys(ownerFilters).length > 1) {
       const matchingUsers = await User.find(ownerFilters).select('_id');
       const userIds = matchingUsers.map((u) => u._id);
       query.ownerId = { $in: userIds };
@@ -686,7 +925,7 @@ router.get('/pets', async (req, res: Response) => {
 
     // Attach linked tag info for each pet
     const petIds = pets.map((p) => p._id);
-    const tags = await Tag.find({ petId: { $in: petIds } }).select('tagId petId status');
+    const tags = await Tag.find({ petId: { $in: petIds }, deletedAt: null }).select('tagId petId status');
     const tagMap = new Map(tags.map((t) => [t.petId.toString(), t]));
     const petsWithTag = pets.map((pet) => ({
       ...pet.toObject(),
@@ -845,7 +1084,7 @@ router.delete('/pets/:id', async (req: AuthRequest, res: Response) => {
 router.get('/tags', async (req, res: Response) => {
   try {
     const { page = 1, limit = 20, search, status } = req.query;
-    const query: any = {};
+    const query: any = { deletedAt: null };
     if (search) query.tagId = { $regex: search, $options: 'i' };
     if (status) query.status = status;
 
@@ -910,13 +1149,13 @@ router.post('/tags', validate(createTagSchema), async (req: AuthRequest, res: Re
   try {
     const { petId, ownerId, tagId: customTagId, status } = req.body;
 
-    const pet = await Pet.findById(petId);
+    const pet = await Pet.findOne({ _id: petId, deletedAt: null });
     if (!pet) { res.status(400).json({ success: false, error: 'Pet not found' }); return; }
 
-    const owner = await User.findById(ownerId);
+    const owner = await User.findOne({ _id: ownerId, deletedAt: null });
     if (!owner) { res.status(400).json({ success: false, error: 'Owner not found' }); return; }
 
-    const existingTag = await Tag.findOne({ petId });
+    const existingTag = await Tag.findOne({ petId, deletedAt: null });
     if (existingTag) {
       res.status(400).json({ success: false, error: `This pet already has a tag (${existingTag.tagId}). Each pet can only have one tag.` });
       return;
@@ -963,7 +1202,7 @@ router.post('/tags', validate(createTagSchema), async (req: AuthRequest, res: Re
  */
 router.get('/tags/:id', async (req: AuthRequest, res: Response) => {
   try {
-    const tag = await Tag.findById(req.params.id)
+    const tag = await Tag.findOne({ _id: req.params.id, deletedAt: null })
       .populate('petId', 'name petId petType breed color pattern photos photoUrl status')
       .populate('ownerId', 'fullName email phoneNumber');
     if (!tag) { res.status(404).json({ success: false, error: 'Tag not found' }); return; }
@@ -1010,13 +1249,13 @@ router.get('/tags/:id', async (req: AuthRequest, res: Response) => {
  */
 router.put('/tags/:id', validate(updateTagSchema), async (req: AuthRequest, res: Response) => {
   try {
-    const tag = await Tag.findById(req.params.id);
+    const tag = await Tag.findOne({ _id: req.params.id, deletedAt: null });
     if (!tag) { res.status(404).json({ success: false, error: 'Tag not found' }); return; }
 
     if (req.body.petId && req.body.petId !== tag.petId.toString()) {
-      const newPet = await Pet.findById(req.body.petId);
+      const newPet = await Pet.findOne({ _id: req.body.petId, deletedAt: null });
       if (!newPet) { res.status(400).json({ success: false, error: 'Pet not found' }); return; }
-      const existingTagOnNewPet = await Tag.findOne({ petId: req.body.petId, _id: { $ne: tag._id } });
+      const existingTagOnNewPet = await Tag.findOne({ petId: req.body.petId, _id: { $ne: tag._id }, deletedAt: null });
       if (existingTagOnNewPet) {
         res.status(400).json({ success: false, error: `Pet already has a tag (${existingTagOnNewPet.tagId}). Each pet can only have one tag.` });
         return;
@@ -1032,7 +1271,9 @@ router.put('/tags/:id', validate(updateTagSchema), async (req: AuthRequest, res:
       }
     }
 
-    const updated = await Tag.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true })
+    Object.assign(tag, req.body);
+    await tag.save();
+    const updated = await Tag.findById(tag._id)
       .populate('petId', 'name petId petType breed color')
       .populate('ownerId', 'fullName email');
 
@@ -1063,9 +1304,13 @@ router.put('/tags/:id', validate(updateTagSchema), async (req: AuthRequest, res:
  */
 router.delete('/tags/:id', async (req: AuthRequest, res: Response) => {
   try {
-    const tag = await Tag.findByIdAndDelete(req.params.id);
+    const tag = await Tag.findOne({ _id: req.params.id, deletedAt: null });
     if (!tag) { res.status(404).json({ success: false, error: 'Tag not found' }); return; }
-    await AuditLog.create({ userId: req.user!.id, action: 'delete', entity: 'Tag', entityId: req.params.id, changes: { tagId: tag.tagId } });
+
+    tag.deletedAt = new Date();
+    await tag.save();
+
+    await AuditLog.create({ userId: req.user!.id, action: 'soft_delete', entity: 'Tag', entityId: req.params.id, changes: { tagId: tag.tagId, note: 'Soft deleted' } });
     res.json({ success: true, data: { message: 'Tag deleted' } });
   } catch (error) { res.status(500).json({ success: false, error: 'Failed to delete tag' }); }
 });

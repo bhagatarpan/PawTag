@@ -1,7 +1,7 @@
 import { Routes, Route, Navigate, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useState, useEffect, FormEvent, createContext, useContext, ReactNode, useRef } from 'react';
 import api from './lib/api';
-import { PawPrint, LogOut, Plus, AlertTriangle, CheckCircle, Camera, Star, X, ImageIcon, Edit2, Save, Upload, ShieldAlert, ShieldCheck, User, ShoppingBag, Bell, Settings, Home, ChevronRight, Mail, Phone, MapPin, Lock, Package } from 'lucide-react';
+import { PawPrint, LogOut, Plus, AlertTriangle, CheckCircle, Camera, Star, X, ImageIcon, Edit2, Save, Upload, ShieldAlert, ShieldCheck, User, ShoppingBag, Bell, Settings, Home, ChevronRight, Mail, Phone, MapPin, Lock, Package, Clock, Skull, EyeOff } from 'lucide-react';
 
 // --- Pet attribute options (mirrors shared/src/constants.ts) ---
 const PET_TYPES = ['Dog', 'Cat', 'Rabbit', 'Hamster', 'Guinea Pig', 'Bird'] as const;
@@ -87,7 +87,7 @@ const PET_GENDERS = [
 
 const emptyForm = {
   name: '', petType: 'Dog', breed: '', secondaryBreed: '', color: '', pattern: '',
-  gender: 'unknown', dateOfBirth: '', favouriteFood: '', medicalAlerts: '',
+  gender: 'unknown', dateOfBirth: '', age: '', favouriteFood: '', medicalAlerts: '',
 };
 
 // --- Photo Manager Component ---
@@ -255,6 +255,16 @@ const NAV_ITEMS = [
 function Sidebar() {
   const { user, logout } = useAuth();
   const location = useLocation();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    api.get('/customer/notifications/unread-count').then((r) => setUnreadCount(r.data.data.count)).catch(() => {});
+    const interval = setInterval(() => {
+      api.get('/customer/notifications/unread-count').then((r) => setUnreadCount(r.data.data.count)).catch(() => {});
+    }, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <div className="w-64 bg-white border-r min-h-screen flex flex-col">
       <div className="p-4 border-b">
@@ -263,9 +273,16 @@ function Sidebar() {
       <nav className="flex-1 p-3 space-y-1">
         {NAV_ITEMS.map(({ path, label, icon: Icon }) => {
           const active = location.pathname === path;
+          const isNotif = path === '/notifications';
           return (
             <Link key={path} to={path} className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${active ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}>
-              <Icon size={18} /> {label}
+              <div className="relative">
+                <Icon size={18} />
+                {isNotif && unreadCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">{unreadCount > 99 ? '99+' : unreadCount}</span>
+                )}
+              </div>
+              {label}
             </Link>
           );
         })}
@@ -303,9 +320,43 @@ function PetsPage() {
   const [editingPet, setEditingPet] = useState<any>(null);
   const [form, setForm] = useState(emptyForm);
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
+  const [foundTimers, setFoundTimers] = useState<Record<string, string>>({});
+  const [timeToFoundMsg, setTimeToFoundMsg] = useState('');
 
   const refreshPets = () => api.get('/customer/pets').then((r) => setPets(r.data.data)).catch(console.error);
   useEffect(() => { refreshPets(); }, []);
+
+  // Load found timers for pets in 'found' status
+  useEffect(() => {
+    const foundPets = pets.filter((p) => p.status === 'found');
+    foundPets.forEach((pet) => {
+      api.get(`/customer/pets/${pet._id}/found-timer`).then((r) => {
+        if (r.data.data.active) {
+          setFoundTimers((prev) => ({ ...prev, [pet._id]: r.data.data }));
+        }
+      }).catch(() => {});
+    });
+  }, [pets]);
+
+  // Update timer displays
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setFoundTimers((prev) => {
+        const updated = { ...prev };
+        Object.keys(updated).forEach((petId) => {
+          const timerData = updated[petId] as any;
+          if (timerData?.foundAt) {
+            const elapsed = Date.now() - new Date(timerData.foundAt).getTime();
+            const hours = Math.floor(elapsed / (1000 * 60 * 60));
+            const mins = Math.floor((elapsed % (1000 * 60 * 60)) / (1000 * 60));
+            updated[petId] = { ...timerData, display: `${hours}h ${mins}m` };
+          }
+        });
+        return updated;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const availableColors = form.petType ? PET_COLORS[form.petType] || [] : [];
   const availablePatterns = form.petType ? PET_PATTERNS[form.petType] || [] : [];
@@ -317,7 +368,7 @@ function PetsPage() {
 
   const startEdit = (pet: any) => {
     setEditingPet(pet);
-    setForm({ name: pet.name, petType: pet.petType || 'Dog', breed: pet.breed || '', secondaryBreed: pet.secondaryBreed || 'Unknown', color: pet.color || '', pattern: pet.pattern || '', gender: pet.gender || 'unknown', dateOfBirth: pet.dateOfBirth ? pet.dateOfBirth.split('T')[0] : '', favouriteFood: pet.favouriteFood || '', medicalAlerts: pet.medicalAlerts || '' });
+    setForm({ name: pet.name, petType: pet.petType || 'Dog', breed: pet.breed || '', secondaryBreed: pet.secondaryBreed || 'Unknown', color: pet.color || '', pattern: pet.pattern || '', gender: pet.gender || 'unknown', dateOfBirth: pet.dateOfBirth ? pet.dateOfBirth.split('T')[0] : '', age: pet.age != null ? String(pet.age) : '', favouriteFood: pet.favouriteFood || '', medicalAlerts: pet.medicalAlerts || '' });
     setPhotos(pet.photos || []);
     setShowForm(true);
   };
@@ -335,7 +386,23 @@ function PetsPage() {
   };
 
   const markLost = async (id: string) => { await api.post(`/customer/pets/${id}/mark-lost`); refreshPets(); };
-  const markFound = async (id: string) => { await api.post(`/customer/pets/${id}/mark-found`); refreshPets(); };
+  const markFound = async (id: string) => {
+    const res = await api.post(`/customer/pets/${id}/mark-found`);
+    const timeMs = res.data.data.timeToFoundMs;
+    if (timeMs) {
+      const hours = Math.floor(timeMs / (1000 * 60 * 60));
+      const mins = Math.floor((timeMs % (1000 * 60 * 60)) / (1000 * 60));
+      const secs = Math.floor((timeMs % (1000 * 60)) / 1000);
+      setTimeToFoundMsg(`Pet reunited in ${hours}h ${mins}m ${secs}s`);
+      setTimeout(() => setTimeToFoundMsg(''), 8000);
+    }
+    refreshPets();
+  };
+  const markTerminal = async (id: string, reason: string) => {
+    if (!confirm(`Mark pet as ${reason}? This action cannot be undone from the portal.`)) return;
+    await api.post(`/customer/pets/${id}/mark-terminal`, { reason });
+    refreshPets();
+  };
   const deletePet = async (id: string) => { if (confirm('Delete this pet?')) { await api.delete(`/customer/pets/${id}`); refreshPets(); } };
 
   const getMainPhoto = (pet: any): string | null => {
@@ -370,6 +437,7 @@ function PetsPage() {
             <div><label className="block text-xs text-gray-500 mb-1">Pattern</label><select value={form.pattern} onChange={(e) => setForm({ ...form, pattern: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm"><option value="">Select pattern...</option>{availablePatterns.map((p) => <option key={p} value={p}>{p}</option>)}</select></div>
             <div><label className="block text-xs text-gray-500 mb-1">Gender</label><select value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm">{PET_GENDERS.map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}</select></div>
             <div><label className="block text-xs text-gray-500 mb-1">Birthday</label><input type="date" value={form.dateOfBirth} onChange={(e) => setForm({ ...form, dateOfBirth: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm" /></div>
+            <div><label className="block text-xs text-gray-500 mb-1">Age (years)</label><input type="number" min="0" max="30" step="0.5" value={form.age} onChange={(e) => setForm({ ...form, age: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm" placeholder="e.g. 3" /></div>
             <div><label className="block text-xs text-gray-500 mb-1">Favourite Food</label><input placeholder="e.g. Chicken, Salmon..." value={form.favouriteFood} onChange={(e) => setForm({ ...form, favouriteFood: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm" /></div>
             <div><label className="block text-xs text-gray-500 mb-1">Medical Alerts</label><input placeholder="Allergies, conditions..." value={form.medicalAlerts} onChange={(e) => setForm({ ...form, medicalAlerts: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm" /></div>
           </div>
@@ -384,39 +452,76 @@ function PetsPage() {
       {pets.length === 0 ? (
         <div className="text-center py-12 text-gray-500">No pets yet. Add your first pet above.</div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-4">
+          {timeToFoundMsg && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center gap-3">
+              <CheckCircle size={20} className="text-green-600" />
+              <p className="text-green-800 font-medium">{timeToFoundMsg}</p>
+            </div>
+          )}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {pets.map((pet) => {
             const mainPhoto = getMainPhoto(pet);
             return (
               <div key={pet._id} className={`bg-white rounded-lg border overflow-hidden ${pet.status === 'lost' ? 'border-red-300 ring-2 ring-red-200' : pet.status === 'found' ? 'border-amber-300 ring-2 ring-amber-200' : ''}`}>
-                {pet.status === 'lost' && <div className="bg-red-600 text-white px-4 py-2.5 flex items-center gap-2"><ShieldAlert size={20} /><span className="font-extrabold text-sm tracking-wide">LOST PET</span><span className="ml-auto text-xs text-red-200">Not seen since</span></div>}
-                {pet.status === 'found' && <div className="bg-amber-500 text-white px-4 py-2.5 flex items-center gap-2"><ShieldCheck size={20} /><span className="font-bold text-sm tracking-wide">FOUND — Needs owner pickup</span></div>}
-                {pet.status === 'safe' && <div className="bg-green-500 text-white px-4 py-2 flex items-center gap-2"><ShieldCheck size={16} /><span className="font-semibold text-xs">Safe</span></div>}
+                {pet.status === 'lost' && <div className="bg-red-600 text-white px-4 py-3 flex items-center gap-2"><ShieldAlert size={24} /><span className="font-extrabold text-base tracking-wide">LOST PET</span>{pet.lostCount > 0 && <span className="ml-auto bg-red-800 text-red-100 text-sm px-2 py-0.5 rounded-full">Lost {pet.lostCount}x</span>}</div>}
+                {pet.status === 'found' && (
+                  <div className="bg-amber-500 text-white px-4 py-3">
+                    <div className="flex items-center gap-2"><ShieldCheck size={24} /><span className="font-bold text-base tracking-wide">FOUND — Needs owner pickup</span></div>
+                    {(foundTimers[pet._id] as any)?.display && (
+                      <div className="flex items-center gap-1.5 mt-1 text-amber-100 text-sm">
+                        <Clock size={14} />
+                        <span className="font-mono">{(foundTimers[pet._id] as any).display}</span>
+                        <span>since found</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {pet.status === 'safe' && <div className="bg-green-500 text-white px-4 py-2.5 flex items-center gap-2"><ShieldCheck size={20} /><span className="font-semibold text-sm">Safe</span>{pet.lostCount > 0 && <span className="ml-auto bg-green-700 text-green-100 text-sm px-2 py-0.5 rounded-full">Lost {pet.lostCount}x</span>}</div>}
+                {pet.status === 'died' && <div className="bg-gray-600 text-white px-4 py-2.5 flex items-center gap-2"><Skull size={20} /><span className="font-semibold text-sm">Deceased</span></div>}
+                {pet.status === 'stolen' && <div className="bg-purple-600 text-white px-4 py-2.5 flex items-center gap-2"><EyeOff size={20} /><span className="font-semibold text-sm">Stolen — Report to police</span></div>}
                 {mainPhoto && <div className="h-40 bg-gray-100 relative"><img src={mainPhoto} alt={pet.name} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} /></div>}
                 <div className="p-5">
                   <div className="flex justify-between items-start mb-3">
                     <div className="flex-1">
-                      <h3 className="text-lg font-semibold">{pet.name}</h3>
-                      {pet.petId && <p className="text-xs text-gray-400 font-mono">ID: {pet.petId}</p>}
-                      {pet.linkedTag && <p className="text-xs text-primary-600 font-mono mt-0.5">Tag: {pet.linkedTag.tagId}<span className={`ml-1.5 inline-block w-1.5 h-1.5 rounded-full ${pet.linkedTag.status === 'active' ? 'bg-green-500' : pet.linkedTag.status === 'lost' ? 'bg-red-500' : 'bg-gray-400'}`} /><span className="ml-1 text-gray-400 font-sans">({pet.linkedTag.status})</span></p>}
-                      {!pet.linkedTag && <p className="text-xs text-gray-300 mt-0.5">No tag linked</p>}
-                      <p className="text-sm text-gray-600">{pet.petType || pet.species} — {formatBreed(pet)}</p>
-                      <p className="text-sm text-gray-500">Color: {pet.color}{pet.pattern ? ` | Pattern: ${pet.pattern}` : ''}</p>
-                      <p className="text-sm text-gray-500">Gender: {genderLabel(pet.gender)}{pet.age != null ? ` | Age: ${pet.age} yrs` : ''}</p>
-                      {pet.favouriteFood && <p className="text-sm text-gray-500">Fav Food: {pet.favouriteFood}</p>}
-                      {pet.photos?.length > 1 && <p className="text-xs text-gray-400 mt-1">{pet.photos.length} photos</p>}
-                      {pet.medicalAlerts && <p className="text-sm text-red-600 mt-1 flex items-center gap-1"><AlertTriangle size={14} /> {pet.medicalAlerts}</p>}
+                      <h3 className="text-xl font-bold">{pet.name}</h3>
+                      {pet.petId && <p className="text-sm text-gray-400 font-mono">ID: {pet.petId}</p>}
+                      {pet.linkedTag && <p className="text-sm text-primary-600 font-mono mt-0.5">Tag: {pet.linkedTag.tagId}<span className={`ml-1.5 inline-block w-2 h-2 rounded-full ${pet.linkedTag.status === 'active' ? 'bg-green-500' : pet.linkedTag.status === 'lost' ? 'bg-red-500' : 'bg-gray-400'}`} /><span className="ml-1 text-gray-400 font-sans">({pet.linkedTag.status})</span></p>}
+                      {!pet.linkedTag && <p className="text-sm text-gray-300 mt-0.5">No tag linked</p>}
+                      <p className="text-base text-gray-600 mt-1">{pet.petType || pet.species} — {formatBreed(pet)}</p>
+                      <p className="text-base text-gray-500">Color: {pet.color}{pet.pattern ? ` | Pattern: ${pet.pattern}` : ''}</p>
+                      <p className="text-base text-gray-500">Gender: {genderLabel(pet.gender)}{pet.age != null ? ` | Age: ${pet.age} yrs` : ''}</p>
+                      {pet.favouriteFood && <p className="text-base text-gray-500">Fav Food: {pet.favouriteFood}</p>}
+                      {pet.photos?.length > 1 && <p className="text-sm text-gray-400 mt-1">{pet.photos.length} photos</p>}
+                      {pet.medicalAlerts && <p className="text-base text-red-600 mt-1 flex items-center gap-1"><AlertTriangle size={16} /> {pet.medicalAlerts}</p>}
                     </div>
                   </div>
                   <div className="flex gap-2 pt-3 border-t flex-wrap">
-                    <button onClick={() => startEdit(pet)} className="text-primary-600 hover:text-primary-800 text-sm font-medium flex items-center gap-1"><Edit2 size={12} /> Edit</button>
-                    {pet.status === 'safe' ? <button onClick={() => markLost(pet._id)} className="text-red-600 hover:text-red-800 text-sm font-medium">Mark as Lost</button> : <button onClick={() => markFound(pet._id)} className="text-green-600 hover:text-green-800 text-sm font-medium flex items-center gap-1"><CheckCircle size={14} /> Mark as Found</button>}
-                    <button onClick={() => deletePet(pet._id)} className="text-gray-400 hover:text-red-600 text-sm ml-auto">Delete</button>
+                    <button onClick={() => startEdit(pet)} className="bg-primary-50 text-primary-700 hover:bg-primary-100 px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-1.5 border border-primary-200"><Edit2 size={14} /> Edit</button>
+                    {pet.status === 'safe' ? (
+                      <button onClick={() => markLost(pet._id)} className="bg-red-50 text-red-700 hover:bg-red-100 px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-1.5 border border-red-200">
+                        <ShieldAlert size={14} /> Mark as Lost
+                      </button>
+                    ) : pet.status === 'lost' || pet.status === 'found' ? (
+                      <>
+                        <button onClick={() => markFound(pet._id)} className="bg-green-50 text-green-700 hover:bg-green-100 px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-1.5 border border-green-200">
+                          <CheckCircle size={14} /> Mark as Found
+                        </button>
+                        <button onClick={() => markTerminal(pet._id, 'stolen')} className="bg-purple-50 text-purple-700 hover:bg-purple-100 px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-1.5 border border-purple-200">
+                          <EyeOff size={14} /> Stolen
+                        </button>
+                        <button onClick={() => markTerminal(pet._id, 'died')} className="bg-gray-100 text-gray-700 hover:bg-gray-200 px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-1.5 border border-gray-300">
+                          <Skull size={14} /> Died
+                        </button>
+                      </>
+                    ) : null}
+                    <button onClick={() => deletePet(pet._id)} className="text-gray-400 hover:text-red-600 text-sm ml-auto px-3 py-1.5">Delete</button>
                   </div>
                 </div>
               </div>
             );
           })}
+          </div>
         </div>
       )}
     </div>
@@ -430,6 +535,7 @@ function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
+  const [responsibility, setResponsibility] = useState<any>(null);
 
   useEffect(() => {
     if (user) {
@@ -441,6 +547,7 @@ function ProfilePage() {
         emergencyContact: { name: user.emergencyContact?.name || '', phone: user.emergencyContact?.phone || '', email: user.emergencyContact?.email || '', relationship: user.emergencyContact?.relationship || '' },
       });
     }
+    api.get('/customer/responsibility').then((r) => setResponsibility(r.data.data)).catch(() => {});
   }, [user]);
 
   const handleSave = async (e: FormEvent) => {
@@ -458,6 +565,28 @@ function ProfilePage() {
   return (
     <div>
       <h1 className="text-2xl font-bold mb-6">Profile & Personal Details</h1>
+
+      {/* Responsibility Score */}
+      {responsibility && (
+        <div className={`rounded-lg border p-4 mb-6 flex items-center gap-4 ${
+          responsibility.color === 'green' ? 'bg-green-50 border-green-200' :
+          responsibility.color === 'amber' ? 'bg-amber-50 border-amber-200' :
+          responsibility.color === 'orange' ? 'bg-orange-50 border-orange-200' :
+          'bg-red-50 border-red-200'
+        }`}>
+          <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg ${
+            responsibility.color === 'green' ? 'bg-green-500' :
+            responsibility.color === 'amber' ? 'bg-amber-500' :
+            responsibility.color === 'orange' ? 'bg-orange-500' :
+            'bg-red-500'
+          }`}>{responsibility.score}</div>
+          <div>
+            <p className="font-semibold">{responsibility.rating}</p>
+            <p className="text-sm text-gray-600">Pet Responsibility Score — {responsibility.pets?.length || 0} pets registered</p>
+          </div>
+        </div>
+      )}
+
       {msg && <div className="bg-green-50 text-green-700 text-sm p-3 rounded mb-4">{msg}</div>}
       {error && <div className="bg-red-50 text-red-600 text-sm p-3 rounded mb-4">{error}</div>}
       <form onSubmit={handleSave} className="space-y-6">
@@ -497,7 +626,48 @@ function ProfilePage() {
 
         <button type="submit" disabled={saving} className="bg-primary-600 text-white px-6 py-2.5 rounded-md text-sm font-medium hover:bg-primary-700 flex items-center gap-2 disabled:opacity-50"><Save size={14} /> {saving ? 'Saving...' : 'Save Profile'}</button>
       </form>
+
+      {/* Change Password */}
+      <ChangePasswordForm />
     </div>
+  );
+}
+
+function ChangePasswordForm() {
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState('');
+  const [error, setError] = useState('');
+
+  const handleChangePassword = async (e: FormEvent) => {
+    e.preventDefault();
+    setMsg(''); setError('');
+    if (newPassword !== confirmPassword) { setError('New passwords do not match'); return; }
+    if (newPassword.length < 8) { setError('Password must be at least 8 characters'); return; }
+    setSaving(true);
+    try {
+      await api.post('/auth/change-password', { currentPassword, newPassword });
+      setMsg('Password changed successfully');
+      setCurrentPassword(''); setNewPassword(''); setConfirmPassword('');
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to change password');
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <form onSubmit={handleChangePassword} className="bg-white rounded-lg border p-6 space-y-4 mt-6">
+      <h2 className="text-lg font-semibold flex items-center gap-2"><Lock size={18} /> Change Password</h2>
+      {msg && <div className="bg-green-50 text-green-700 text-sm p-3 rounded">{msg}</div>}
+      {error && <div className="bg-red-50 text-red-600 text-sm p-3 rounded">{error}</div>}
+      <div className="grid grid-cols-1 gap-4 max-w-md">
+        <div><label className="block text-xs text-gray-500 mb-1">Current Password</label><input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" required /></div>
+        <div><label className="block text-xs text-gray-500 mb-1">New Password</label><input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" required minLength={8} /></div>
+        <div><label className="block text-xs text-gray-500 mb-1">Confirm New Password</label><input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" required minLength={8} /></div>
+      </div>
+      <button type="submit" disabled={saving} className="bg-primary-600 text-white px-6 py-2.5 rounded-md text-sm font-medium hover:bg-primary-700 flex items-center gap-2 disabled:opacity-50"><Lock size={14} /> {saving ? 'Changing...' : 'Change Password'}</button>
+    </form>
   );
 }
 
@@ -559,21 +729,78 @@ function OrdersPage() {
 function NotificationsPage() {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [timers, setTimers] = useState<Record<string, string>>({});
 
   useEffect(() => { api.get('/customer/notifications').then((r) => setNotifications(r.data.data)).catch(console.error).finally(() => setLoading(false)); }, []);
+
+  // Update timers for found notifications
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const newTimers: Record<string, string> = {};
+      notifications.forEach((n) => {
+        if ((n.type === 'pet_found' || n.type === 'finder_reminder') && n.data?.foundAt && !n.read) {
+          const elapsed = Date.now() - new Date(n.data.foundAt).getTime();
+          if (elapsed > 0) {
+            const hours = Math.floor(elapsed / (1000 * 60 * 60));
+            const mins = Math.floor((elapsed % (1000 * 60 * 60)) / (1000 * 60));
+            newTimers[n._id] = `${hours}h ${mins}m`;
+          }
+        }
+      });
+      setTimers(newTimers);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [notifications]);
 
   const markRead = async (id: string) => {
     await api.put(`/customer/notifications/${id}/read`);
     setNotifications((prev) => prev.map((n) => n._id === id ? { ...n, read: true } : n));
   };
 
+  const markAllRead = async () => {
+    await api.put('/customer/notifications/mark-all-read');
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  };
+
+  const clearRead = async () => {
+    const res = await api.delete('/customer/notifications/clear-read');
+    setNotifications((prev) => prev.filter((n) => !n.read));
+  };
+
   const unreadCount = notifications.filter((n) => !n.read).length;
+  const readCount = notifications.filter((n) => n.read).length;
+
+  const notifIcon = (type: string, read: boolean) => {
+    const cls = read ? 'text-gray-400' : '';
+    switch (type) {
+      case 'pet_lost': return <AlertTriangle size={18} className={read ? 'text-gray-400' : 'text-red-500'} />;
+      case 'pet_found': return <CheckCircle size={18} className={read ? 'text-green-400' : 'text-green-500'} />;
+      case 'finder_reminder': return <Bell size={18} className={read ? 'text-gray-400' : 'text-orange-500'} />;
+      case 'finder_scan': return <Phone size={18} className={read ? 'text-gray-400' : 'text-blue-500'} />;
+      default: return <Bell size={18} className="text-gray-400" />;
+    }
+  };
+
+  const notifBorder = (n: any) => {
+    if (!n.read) {
+      if (n.type === 'pet_found' || n.type === 'finder_reminder') return 'border-l-4 border-l-green-500';
+      if (n.priority === 'high') return 'border-l-4 border-l-red-500';
+      return 'border-primary-200 bg-primary-50/30';
+    }
+    // Read found notifications → green tint
+    if (n.type === 'pet_found') return 'border-l-4 border-l-green-300 bg-green-50/30';
+    return '';
+  };
 
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Notifications</h1>
-        {unreadCount > 0 && <span className="bg-red-100 text-red-700 text-xs font-medium px-2.5 py-1 rounded-full">{unreadCount} unread</span>}
+        <div className="flex items-center gap-2">
+          {unreadCount > 0 && <button onClick={markAllRead} className="text-sm text-primary-600 hover:text-primary-800">Mark all read</button>}
+          {readCount > 0 && <button onClick={clearRead} className="text-sm text-gray-500 hover:text-red-600 flex items-center gap-1"><X size={14} /> Clear read ({readCount})</button>}
+          {unreadCount > 0 && <span className="bg-red-100 text-red-700 text-xs font-medium px-2.5 py-1 rounded-full">{unreadCount} unread</span>}
+        </div>
       </div>
       {loading ? <p className="text-gray-500">Loading...</p> : notifications.length === 0 ? (
         <div className="bg-white rounded-lg border p-8 text-center">
@@ -583,12 +810,46 @@ function NotificationsPage() {
       ) : (
         <div className="space-y-2">
           {notifications.map((n) => (
-            <div key={n._id} className={`bg-white rounded-lg border p-4 flex items-start gap-3 ${!n.read ? 'border-primary-200 bg-primary-50/30' : ''}`}>
-              <div className={`w-2 h-2 rounded-full mt-2 shrink-0 ${!n.read ? 'bg-primary-500' : 'bg-gray-300'}`} />
+            <div key={n._id} className={`bg-white rounded-lg border p-4 flex items-start gap-3 ${notifBorder(n)}`}>
+              <div className="mt-1 shrink-0">{notifIcon(n.type, n.read)}</div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium">{n.title || 'Notification'}</p>
-                <p className="text-sm text-gray-600 mt-0.5">{n.message}</p>
-                <p className="text-xs text-gray-400 mt-1">{new Date(n.createdAt).toLocaleString()}</p>
+                <div className="flex items-center gap-2">
+                  <p className={`text-sm font-medium ${n.read ? 'text-gray-500' : ''}`}>{n.title || 'Notification'}</p>
+                  {n.priority === 'high' && !n.read && <span className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-medium">HIGH</span>}
+                  {n.read && <span className="text-xs text-green-600 bg-green-50 px-1.5 py-0.5 rounded">Read</span>}
+                </div>
+                <p className={`text-sm mt-0.5 whitespace-pre-line ${n.read ? 'text-gray-400' : 'text-gray-600'}`}>{n.message}</p>
+
+                {/* Timer for unread found notifications */}
+                {(n.type === 'pet_found' || n.type === 'finder_reminder') && timers[n._id] && !n.read && (
+                  <div className="mt-2 bg-blue-50 border border-blue-200 rounded-md p-2 inline-flex items-center gap-2">
+                    <Clock size={14} className="text-blue-600" />
+                    <span className="text-sm font-mono font-semibold text-blue-700">{timers[n._id]}</span>
+                    <span className="text-xs text-blue-500">since found</span>
+                  </div>
+                )}
+
+                {/* Time-to-found for read found notifications */}
+                {(n.type === 'pet_found') && n.read && n.data?.foundAt && (
+                  <div className="mt-2 bg-green-50 border border-green-200 rounded-md p-2 inline-flex items-center gap-2">
+                    <CheckCircle size={14} className="text-green-600" />
+                    <span className="text-sm text-green-700">Pet reunited</span>
+                  </div>
+                )}
+
+                {/* Call-to-action buttons for finder contact */}
+                {!n.read && n.data?.finderPhone && (
+                  <a href={`tel:${n.data.finderPhone}`} className="mt-2 inline-flex items-center gap-1.5 bg-green-600 text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-green-700">
+                    <Phone size={14} /> Call Finder: {n.data.finderPhone}
+                  </a>
+                )}
+                {!n.read && n.data?.finderEmail && (
+                  <a href={`mailto:${n.data.finderEmail}`} className="mt-2 ml-2 inline-flex items-center gap-1.5 bg-blue-600 text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-blue-700">
+                    <Mail size={14} /> Email Finder: {n.data.finderEmail}
+                  </a>
+                )}
+
+                <p className="text-xs text-gray-400 mt-2">{new Date(n.createdAt).toLocaleString()}</p>
               </div>
               {!n.read && <button onClick={() => markRead(n._id)} className="text-xs text-primary-600 hover:text-primary-800 shrink-0">Mark read</button>}
             </div>

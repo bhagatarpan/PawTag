@@ -37,6 +37,7 @@ export interface IOrderDocument extends Document {
   };
   trackingNumber?: string;
   notes?: string;
+  deletedAt?: Date;
 }
 
 const OrderSchema = new Schema<IOrderDocument>(
@@ -84,6 +85,7 @@ const OrderSchema = new Schema<IOrderDocument>(
     },
     trackingNumber: String,
     notes: String,
+    deletedAt: { type: Date, default: null },
   },
   { timestamps: true },
 );
@@ -91,5 +93,6 @@ const OrderSchema = new Schema<IOrderDocument>(
 OrderSchema.index({ userId: 1 });
 OrderSchema.index({ status: 1 });
 OrderSchema.index({ createdAt: -1 });
+OrderSchema.index({ deletedAt: 1 });
 
 export const Order = mongoose.model<IOrderDocument>('Order', OrderSchema);

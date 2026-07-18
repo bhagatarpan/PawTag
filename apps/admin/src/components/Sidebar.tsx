@@ -10,6 +10,7 @@ import {
   Settings,
   Flag,
   ScrollText,
+  BarChart3,
 } from 'lucide-react';
 
 const links = [
@@ -19,6 +20,7 @@ const links = [
   { to: '/tags', label: 'Tags', icon: QrCode },
   { to: '/products', label: 'Products', icon: ShoppingBag },
   { to: '/orders', label: 'Orders', icon: FileText },
+  { to: '/statistics', label: 'Statistics', icon: BarChart3 },
   { to: '/content', label: 'Content', icon: Newspaper },
   { to: '/settings', label: 'Settings', icon: Settings },
   { to: '/feature-flags', label: 'Feature Flags', icon: Flag },

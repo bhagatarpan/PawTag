@@ -2,7 +2,7 @@ import { Router, Response } from 'express';
 import { AuthRequest, authenticate } from '../middleware/auth';
 import { validate } from '../middleware/validation';
 import { createPetSchema, updatePetSchema } from '../middleware/schemas';
-import { Pet, Tag, Order, LocationEvent, Notification, generatePetId } from '@pawtag/db';
+import { Pet, Tag, Order, LocationEvent, Notification, FinderScan, User, generatePetId } from '@pawtag/db';
 
 const router = Router();
 router.use(authenticate);
@@ -35,10 +35,9 @@ router.use(authenticate);
  */
 router.get('/pets', async (req: AuthRequest, res: Response) => {
   try {
-    const pets = await Pet.find({ ownerId: req.user!.id }).sort({ createdAt: -1 });
-    // Attach linked tag info (read-only) for each pet
+    const pets = await Pet.find({ ownerId: req.user!.id, deletedAt: null }).sort({ createdAt: -1 });
     const petIds = pets.map((p) => p._id);
-    const tags = await Tag.find({ petId: { $in: petIds } }).select('tagId petId status');
+    const tags = await Tag.find({ petId: { $in: petIds }, deletedAt: null }).select('tagId petId status');
     const tagMap = new Map(tags.map((t) => [t.petId.toString(), t]));
     const petsWithTag = pets.map((pet) => ({
       ...pet.toObject(),
@@ -84,7 +83,7 @@ router.get('/pets', async (req: AuthRequest, res: Response) => {
  */
 router.get('/pets/:id', async (req: AuthRequest, res: Response) => {
   try {
-    const pet = await Pet.findOne({ _id: req.params.id, ownerId: req.user!.id });
+    const pet = await Pet.findOne({ _id: req.params.id, ownerId: req.user!.id, deletedAt: null });
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
     res.json({ success: true, data: pet });
   } catch (error) {
@@ -176,14 +175,12 @@ router.post('/pets', validate(createPetSchema), async (req: AuthRequest, res: Re
  */
 router.put('/pets/:id', validate(updatePetSchema), async (req: AuthRequest, res: Response) => {
   try {
-    // Owner cannot change pet name — only admin can
     const { name, ...updateData } = req.body;
-    const pet = await Pet.findOneAndUpdate(
-      { _id: req.params.id, ownerId: req.user!.id },
-      updateData,
-      { new: true, runValidators: true },
-    );
+    const pet = await Pet.findOne({ _id: req.params.id, ownerId: req.user!.id, deletedAt: null });
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
+
+    Object.assign(pet, updateData);
+    await pet.save();
     res.json({ success: true, data: pet });
   } catch (error) {
     res.status(500).json({ success: false, error: 'Failed to update pet' });
@@ -227,8 +224,12 @@ router.put('/pets/:id', validate(updatePetSchema), async (req: AuthRequest, res:
  */
 router.delete('/pets/:id', async (req: AuthRequest, res: Response) => {
   try {
-    const pet = await Pet.findOneAndDelete({ _id: req.params.id, ownerId: req.user!.id });
+    const pet = await Pet.findOne({ _id: req.params.id, ownerId: req.user!.id, deletedAt: null });
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
+
+    pet.deletedAt = new Date();
+    await pet.save();
+
     res.json({ success: true, data: { message: 'Pet deleted' } });
   } catch (error) {
     res.status(500).json({ success: false, error: 'Failed to delete pet' });
@@ -263,7 +264,7 @@ router.delete('/pets/:id', async (req: AuthRequest, res: Response) => {
  */
 router.get('/tags', async (req: AuthRequest, res: Response) => {
   try {
-    const tags = await Tag.find({ ownerId: req.user!.id })
+    const tags = await Tag.find({ ownerId: req.user!.id, deletedAt: null })
       .populate('petId', 'name petType species breed secondaryBreed color pattern photos photoUrl status')
       .sort({ createdAt: -1 });
     res.json({ success: true, data: tags });
@@ -307,15 +308,20 @@ router.get('/tags', async (req: AuthRequest, res: Response) => {
  */
 router.post('/pets/:id/mark-lost', async (req: AuthRequest, res: Response) => {
   try {
-    const pet = await Pet.findOneAndUpdate(
-      { _id: req.params.id, ownerId: req.user!.id },
-      { status: 'lost' },
-      { new: true },
-    );
+    const pet = await Pet.findOne({ _id: req.params.id, ownerId: req.user!.id, deletedAt: null });
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
 
-    // Update associated tags
-    await Tag.updateMany({ petId: pet._id }, { status: 'lost' });
+    pet.status = 'lost';
+    pet.lostCount = (pet.lostCount || 0) + 1;
+    pet.foundByFinderAt = undefined;
+    await pet.save();
+
+    // Update owner responsibility score
+    const allPets = await Pet.find({ ownerId: req.user!.id, deletedAt: null }).select('lostCount');
+    const totalLostCount = allPets.reduce((sum, p) => sum + (p.lostCount || 0), 0);
+    await User.findByIdAndUpdate(req.user!.id, { responsibilityScore: totalLostCount });
+
+    await Tag.updateMany({ petId: pet._id, deletedAt: null }, { status: 'lost' });
 
     res.json({ success: true, data: pet });
   } catch (error) {
@@ -357,16 +363,33 @@ router.post('/pets/:id/mark-lost', async (req: AuthRequest, res: Response) => {
  */
 router.post('/pets/:id/mark-found', async (req: AuthRequest, res: Response) => {
   try {
-    const pet = await Pet.findOneAndUpdate(
-      { _id: req.params.id, ownerId: req.user!.id },
-      { status: 'safe' },
-      { new: true },
-    );
+    const pet = await Pet.findOne({ _id: req.params.id, ownerId: req.user!.id, deletedAt: null });
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
 
-    await Tag.updateMany({ petId: pet._id }, { status: 'active' });
+    // Calculate time-to-found if pet was found by finder
+    let timeToFoundMs: number | null = null;
+    if (pet.foundByFinderAt) {
+      timeToFoundMs = Date.now() - new Date(pet.foundByFinderAt).getTime();
+    }
 
-    res.json({ success: true, data: pet });
+    pet.status = 'safe';
+    pet.foundByFinderAt = undefined;
+    await pet.save();
+
+    // Auto-mark related finder notifications as read
+    await Notification.updateMany(
+      { userId: req.user!.id, 'data.petId': pet._id.toString(), type: { $in: ['pet_found', 'finder_reminder'] } },
+      { read: true },
+    );
+
+    // Update owner responsibility score
+    const allPets = await Pet.find({ ownerId: req.user!.id, deletedAt: null }).select('lostCount');
+    const totalLostCount = allPets.reduce((sum, p) => sum + (p.lostCount || 0), 0);
+    await User.findByIdAndUpdate(req.user!.id, { responsibilityScore: totalLostCount });
+
+    await Tag.updateMany({ petId: pet._id, deletedAt: null }, { status: 'active' });
+
+    res.json({ success: true, data: { ...pet.toObject(), timeToFoundMs } });
   } catch (error) {
     res.status(500).json({ success: false, error: 'Failed to mark pet as found' });
   }
@@ -575,6 +598,131 @@ router.put('/notifications/:id/read', async (req: AuthRequest, res: Response) =>
     res.json({ success: true, data: { message: 'Notification marked as read' } });
   } catch (error) {
     res.status(500).json({ success: false, error: 'Failed to update notification' });
+  }
+});
+
+// --- Found Timer ---
+router.get('/pets/:id/found-timer', async (req: AuthRequest, res: Response) => {
+  try {
+    const pet = await Pet.findOne({ _id: req.params.id, ownerId: req.user!.id, deletedAt: null });
+    if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
+
+    if (pet.status !== 'found' || !pet.foundByFinderAt) {
+      res.json({ success: true, data: { active: false } });
+      return;
+    }
+
+    const scan = await FinderScan.findOne({ petId: pet._id, action: 'notified_owner' })
+      .sort({ notifiedAt: -1 });
+
+    res.json({
+      success: true,
+      data: {
+        active: true,
+        foundAt: pet.foundByFinderAt,
+        elapsed: Date.now() - new Date(pet.foundByFinderAt).getTime(),
+        finderPhone: scan?.finderPhone || null,
+        finderEmail: scan?.finderEmail || null,
+        finderName: scan?.finderName || null,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to fetch found timer' });
+  }
+});
+
+// --- Owner Responsibility Score ---
+router.get('/responsibility', async (req: AuthRequest, res: Response) => {
+  try {
+    const user = await User.findById(req.user!.id).select('responsibilityScore fullName');
+    if (!user) { res.status(404).json({ success: false, error: 'User not found' }); return; }
+
+    const pets = await Pet.find({ ownerId: req.user!.id, deletedAt: null }).select('name petId lostCount status');
+    const totalLostCount = pets.reduce((sum, p) => sum + (p.lostCount || 0), 0);
+
+    let rating: string;
+    let color: string;
+    if (totalLostCount === 0) { rating = 'Super Awesome Parent'; color = 'green'; }
+    else if (totalLostCount <= 2) { rating = 'Good Parent'; color = 'amber'; }
+    else if (totalLostCount <= 4) { rating = 'Needs Improvement'; color = 'orange'; }
+    else { rating = 'At Risk'; color = 'red'; }
+
+    res.json({
+      success: true,
+      data: {
+        score: totalLostCount,
+        rating,
+        color,
+        pets: pets.map((p) => ({
+          name: p.name,
+          petId: p.petId,
+          lostCount: p.lostCount || 0,
+          status: p.status,
+        })),
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to fetch responsibility score' });
+  }
+});
+
+// --- Mark Pet as Died/Stolen ---
+router.post('/pets/:id/mark-terminal', async (req: AuthRequest, res: Response) => {
+  try {
+    const { reason } = req.body; // 'died' or 'stolen'
+    if (!reason || !['died', 'stolen'].includes(reason)) {
+      res.status(400).json({ success: false, error: 'Reason must be "died" or "stolen"' });
+      return;
+    }
+
+    const pet = await Pet.findOne({ _id: req.params.id, ownerId: req.user!.id, deletedAt: null });
+    if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
+
+    pet.status = reason as any;
+    pet.foundByFinderAt = undefined;
+    await pet.save();
+
+    // Auto-mark related finder notifications as read
+    await Notification.updateMany(
+      { userId: req.user!.id, 'data.petId': pet._id.toString(), type: { $in: ['pet_found', 'finder_reminder'] } },
+      { read: true },
+    );
+
+    await Tag.updateMany({ petId: pet._id, deletedAt: null }, { status: 'inactive' });
+
+    res.json({ success: true, data: pet });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to update pet status' });
+  }
+});
+
+// --- Clear Read Notifications ---
+router.delete('/notifications/clear-read', async (req: AuthRequest, res: Response) => {
+  try {
+    const result = await Notification.deleteMany({ userId: req.user!.id, read: true });
+    res.json({ success: true, data: { deletedCount: result.deletedCount } });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to clear notifications' });
+  }
+});
+
+// --- Mark All Notifications Read ---
+router.put('/notifications/mark-all-read', async (req: AuthRequest, res: Response) => {
+  try {
+    await Notification.updateMany({ userId: req.user!.id, read: false }, { read: true });
+    res.json({ success: true, data: { message: 'All notifications marked as read' } });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to mark notifications' });
+  }
+});
+
+// --- Unread Notification Count ---
+router.get('/notifications/unread-count', async (req: AuthRequest, res: Response) => {
+  try {
+    const count = await Notification.countDocuments({ userId: req.user!.id, read: false });
+    res.json({ success: true, data: { count } });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to get unread count' });
   }
 });
 
