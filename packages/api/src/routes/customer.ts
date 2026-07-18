@@ -666,12 +666,12 @@ router.get('/responsibility', async (req: AuthRequest, res: Response) => {
   }
 });
 
-// --- Mark Pet as Died/Stolen ---
+// --- Mark Pet as Terminal (deceased/stolen/transferred/donated/sold) ---
 router.post('/pets/:id/mark-terminal', async (req: AuthRequest, res: Response) => {
   try {
-    const { reason } = req.body; // 'died' or 'stolen'
-    if (!reason || !['died', 'stolen'].includes(reason)) {
-      res.status(400).json({ success: false, error: 'Reason must be "died" or "stolen"' });
+    const { reason } = req.body;
+    if (!reason || !['deceased', 'stolen', 'transferred', 'donated', 'sold'].includes(reason)) {
+      res.status(400).json({ success: false, error: 'Reason must be "deceased", "stolen", "transferred", "donated", or "sold"' });
       return;
     }
 
@@ -723,6 +723,439 @@ router.get('/notifications/unread-count', async (req: AuthRequest, res: Response
     res.json({ success: true, data: { count } });
   } catch (error) {
     res.status(500).json({ success: false, error: 'Failed to get unread count' });
+  }
+});
+
+// ============================================================
+// HEALTH RECORDS
+// ============================================================
+
+// Helper: verify pet ownership
+async function getOwnedPet(petId: string, userId: string) {
+  return Pet.findOne({ _id: petId, ownerId: userId, deletedAt: null });
+}
+
+// --- Vaccinations ---
+router.get('/pets/:id/vaccinations', async (req: AuthRequest, res: Response) => {
+  try {
+    const pet = await getOwnedPet(req.params.id, req.user!.id);
+    if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
+    res.json({ success: true, data: pet.vaccinations || [] });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to fetch vaccinations' });
+  }
+});
+
+router.post('/pets/:id/vaccinations', async (req: AuthRequest, res: Response) => {
+  try {
+    const pet = await getOwnedPet(req.params.id, req.user!.id);
+    if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
+    pet.vaccinations.push(req.body);
+    await pet.save();
+    res.status(201).json({ success: true, data: pet.vaccinations[pet.vaccinations.length - 1] });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to add vaccination' });
+  }
+});
+
+router.put('/pets/:id/vaccinations/:vaxId', async (req: AuthRequest, res: Response) => {
+  try {
+    const pet = await getOwnedPet(req.params.id, req.user!.id);
+    if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
+    const vax = (pet.vaccinations as any).id(req.params.vaxId);
+    if (!vax) { res.status(404).json({ success: false, error: 'Vaccination not found' }); return; }
+    Object.assign(vax, req.body);
+    await pet.save();
+    res.json({ success: true, data: vax });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to update vaccination' });
+  }
+});
+
+router.delete('/pets/:id/vaccinations/:vaxId', async (req: AuthRequest, res: Response) => {
+  try {
+    const pet = await getOwnedPet(req.params.id, req.user!.id);
+    if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
+    const vax = (pet.vaccinations as any).id(req.params.vaxId);
+    if (!vax) { res.status(404).json({ success: false, error: 'Vaccination not found' }); return; }
+    vax.deleteOne();
+    await pet.save();
+    res.json({ success: true, data: { message: 'Vaccination deleted' } });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to delete vaccination' });
+  }
+});
+
+// --- Microchips ---
+router.get('/pets/:id/microchips', async (req: AuthRequest, res: Response) => {
+  try {
+    const pet = await getOwnedPet(req.params.id, req.user!.id);
+    if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
+    res.json({ success: true, data: pet.microchips || [] });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to fetch microchips' });
+  }
+});
+
+router.post('/pets/:id/microchips', async (req: AuthRequest, res: Response) => {
+  try {
+    const pet = await getOwnedPet(req.params.id, req.user!.id);
+    if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
+    pet.microchips.push(req.body);
+    await pet.save();
+    res.status(201).json({ success: true, data: pet.microchips[pet.microchips.length - 1] });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to add microchip' });
+  }
+});
+
+router.put('/pets/:id/microchips/:chipId', async (req: AuthRequest, res: Response) => {
+  try {
+    const pet = await getOwnedPet(req.params.id, req.user!.id);
+    if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
+    const chip = (pet.microchips as any).id(req.params.chipId);
+    if (!chip) { res.status(404).json({ success: false, error: 'Microchip not found' }); return; }
+    Object.assign(chip, req.body);
+    await pet.save();
+    res.json({ success: true, data: chip });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to update microchip' });
+  }
+});
+
+router.delete('/pets/:id/microchips/:chipId', async (req: AuthRequest, res: Response) => {
+  try {
+    const pet = await getOwnedPet(req.params.id, req.user!.id);
+    if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
+    const chip = (pet.microchips as any).id(req.params.chipId);
+    if (!chip) { res.status(404).json({ success: false, error: 'Microchip not found' }); return; }
+    chip.deleteOne();
+    await pet.save();
+    res.json({ success: true, data: { message: 'Microchip deleted' } });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to delete microchip' });
+  }
+});
+
+// --- Medications ---
+router.get('/pets/:id/medications', async (req: AuthRequest, res: Response) => {
+  try {
+    const pet = await getOwnedPet(req.params.id, req.user!.id);
+    if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
+    res.json({ success: true, data: pet.medications || [] });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to fetch medications' });
+  }
+});
+
+router.post('/pets/:id/medications', async (req: AuthRequest, res: Response) => {
+  try {
+    const pet = await getOwnedPet(req.params.id, req.user!.id);
+    if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
+    pet.medications.push(req.body);
+    await pet.save();
+    res.status(201).json({ success: true, data: pet.medications[pet.medications.length - 1] });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to add medication' });
+  }
+});
+
+router.put('/pets/:id/medications/:medId', async (req: AuthRequest, res: Response) => {
+  try {
+    const pet = await getOwnedPet(req.params.id, req.user!.id);
+    if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
+    const med = (pet.medications as any).id(req.params.medId);
+    if (!med) { res.status(404).json({ success: false, error: 'Medication not found' }); return; }
+    Object.assign(med, req.body);
+    await pet.save();
+    res.json({ success: true, data: med });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to update medication' });
+  }
+});
+
+router.delete('/pets/:id/medications/:medId', async (req: AuthRequest, res: Response) => {
+  try {
+    const pet = await getOwnedPet(req.params.id, req.user!.id);
+    if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
+    const med = (pet.medications as any).id(req.params.medId);
+    if (!med) { res.status(404).json({ success: false, error: 'Medication not found' }); return; }
+    med.deleteOne();
+    await pet.save();
+    res.json({ success: true, data: { message: 'Medication deleted' } });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to delete medication' });
+  }
+});
+
+// --- Allergies ---
+router.get('/pets/:id/allergies', async (req: AuthRequest, res: Response) => {
+  try {
+    const pet = await getOwnedPet(req.params.id, req.user!.id);
+    if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
+    res.json({ success: true, data: pet.allergies || [] });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to fetch allergies' });
+  }
+});
+
+router.post('/pets/:id/allergies', async (req: AuthRequest, res: Response) => {
+  try {
+    const pet = await getOwnedPet(req.params.id, req.user!.id);
+    if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
+    pet.allergies.push(req.body);
+    await pet.save();
+    res.status(201).json({ success: true, data: pet.allergies[pet.allergies.length - 1] });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to add allergy' });
+  }
+});
+
+router.put('/pets/:id/allergies/:allergyId', async (req: AuthRequest, res: Response) => {
+  try {
+    const pet = await getOwnedPet(req.params.id, req.user!.id);
+    if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
+    const allergy = (pet.allergies as any).id(req.params.allergyId);
+    if (!allergy) { res.status(404).json({ success: false, error: 'Allergy not found' }); return; }
+    Object.assign(allergy, req.body);
+    await pet.save();
+    res.json({ success: true, data: allergy });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to update allergy' });
+  }
+});
+
+router.delete('/pets/:id/allergies/:allergyId', async (req: AuthRequest, res: Response) => {
+  try {
+    const pet = await getOwnedPet(req.params.id, req.user!.id);
+    if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
+    const allergy = (pet.allergies as any).id(req.params.allergyId);
+    if (!allergy) { res.status(404).json({ success: false, error: 'Allergy not found' }); return; }
+    allergy.deleteOne();
+    await pet.save();
+    res.json({ success: true, data: { message: 'Allergy deleted' } });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to delete allergy' });
+  }
+});
+
+// --- Vet Details ---
+router.get('/pets/:id/vet-details', async (req: AuthRequest, res: Response) => {
+  try {
+    const pet = await getOwnedPet(req.params.id, req.user!.id);
+    if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
+    res.json({ success: true, data: pet.vetDetails || [] });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to fetch vet details' });
+  }
+});
+
+router.post('/pets/:id/vet-details', async (req: AuthRequest, res: Response) => {
+  try {
+    const pet = await getOwnedPet(req.params.id, req.user!.id);
+    if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
+    if (req.body.isPrimary) {
+      for (const vd of pet.vetDetails) { vd.isPrimary = false; }
+    }
+    pet.vetDetails.push(req.body);
+    await pet.save();
+    res.status(201).json({ success: true, data: pet.vetDetails[pet.vetDetails.length - 1] });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to add vet detail' });
+  }
+});
+
+router.put('/pets/:id/vet-details/:vetId', async (req: AuthRequest, res: Response) => {
+  try {
+    const pet = await getOwnedPet(req.params.id, req.user!.id);
+    if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
+    const vet = (pet.vetDetails as any).id(req.params.vetId);
+    if (!vet) { res.status(404).json({ success: false, error: 'Vet detail not found' }); return; }
+    if (req.body.isPrimary) {
+      for (const vd of pet.vetDetails) { vd.isPrimary = false; }
+    }
+    Object.assign(vet, req.body);
+    await pet.save();
+    res.json({ success: true, data: vet });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to update vet detail' });
+  }
+});
+
+router.delete('/pets/:id/vet-details/:vetId', async (req: AuthRequest, res: Response) => {
+  try {
+    const pet = await getOwnedPet(req.params.id, req.user!.id);
+    if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
+    const vet = (pet.vetDetails as any).id(req.params.vetId);
+    if (!vet) { res.status(404).json({ success: false, error: 'Vet detail not found' }); return; }
+    vet.deleteOne();
+    await pet.save();
+    res.json({ success: true, data: { message: 'Vet detail deleted' } });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to delete vet detail' });
+  }
+});
+
+// --- Surgeries ---
+router.get('/pets/:id/surgeries', async (req: AuthRequest, res: Response) => {
+  try {
+    const pet = await getOwnedPet(req.params.id, req.user!.id);
+    if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
+    res.json({ success: true, data: pet.surgeries || [] });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to fetch surgeries' });
+  }
+});
+
+router.post('/pets/:id/surgeries', async (req: AuthRequest, res: Response) => {
+  try {
+    const pet = await getOwnedPet(req.params.id, req.user!.id);
+    if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
+    pet.surgeries.push(req.body);
+    await pet.save();
+    res.status(201).json({ success: true, data: pet.surgeries[pet.surgeries.length - 1] });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to add surgery' });
+  }
+});
+
+router.put('/pets/:id/surgeries/:surgId', async (req: AuthRequest, res: Response) => {
+  try {
+    const pet = await getOwnedPet(req.params.id, req.user!.id);
+    if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
+    const surg = (pet.surgeries as any).id(req.params.surgId);
+    if (!surg) { res.status(404).json({ success: false, error: 'Surgery not found' }); return; }
+    Object.assign(surg, req.body);
+    await pet.save();
+    res.json({ success: true, data: surg });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to update surgery' });
+  }
+});
+
+router.delete('/pets/:id/surgeries/:surgId', async (req: AuthRequest, res: Response) => {
+  try {
+    const pet = await getOwnedPet(req.params.id, req.user!.id);
+    if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
+    const surg = (pet.surgeries as any).id(req.params.surgId);
+    if (!surg) { res.status(404).json({ success: false, error: 'Surgery not found' }); return; }
+    surg.deleteOne();
+    await pet.save();
+    res.json({ success: true, data: { message: 'Surgery deleted' } });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to delete surgery' });
+  }
+});
+
+// --- Weight History ---
+router.get('/pets/:id/weight-history', async (req: AuthRequest, res: Response) => {
+  try {
+    const pet = await getOwnedPet(req.params.id, req.user!.id);
+    if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
+    res.json({ success: true, data: (pet.weightHistory || []).sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime()) });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to fetch weight history' });
+  }
+});
+
+router.post('/pets/:id/weight-history', async (req: AuthRequest, res: Response) => {
+  try {
+    const pet = await getOwnedPet(req.params.id, req.user!.id);
+    if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
+    pet.weightHistory.push(req.body);
+    pet.weight = req.body.weight;
+    await pet.save();
+    res.status(201).json({ success: true, data: pet.weightHistory[pet.weightHistory.length - 1] });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to add weight record' });
+  }
+});
+
+router.delete('/pets/:id/weight-history/:wid', async (req: AuthRequest, res: Response) => {
+  try {
+    const pet = await getOwnedPet(req.params.id, req.user!.id);
+    if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
+    const rec = (pet.weightHistory as any).id(req.params.wid);
+    if (!rec) { res.status(404).json({ success: false, error: 'Weight record not found' }); return; }
+    rec.deleteOne();
+    await pet.save();
+    res.json({ success: true, data: { message: 'Weight record deleted' } });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to delete weight record' });
+  }
+});
+
+// --- Health Conditions ---
+router.get('/pets/:id/health-conditions', async (req: AuthRequest, res: Response) => {
+  try {
+    const pet = await getOwnedPet(req.params.id, req.user!.id);
+    if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
+    res.json({ success: true, data: pet.healthConditions || [] });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to fetch health conditions' });
+  }
+});
+
+router.post('/pets/:id/health-conditions', async (req: AuthRequest, res: Response) => {
+  try {
+    const pet = await getOwnedPet(req.params.id, req.user!.id);
+    if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
+    pet.healthConditions.push(req.body);
+    await pet.save();
+    res.status(201).json({ success: true, data: pet.healthConditions[pet.healthConditions.length - 1] });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to add health condition' });
+  }
+});
+
+router.put('/pets/:id/health-conditions/:condId', async (req: AuthRequest, res: Response) => {
+  try {
+    const pet = await getOwnedPet(req.params.id, req.user!.id);
+    if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
+    const cond = (pet.healthConditions as any).id(req.params.condId);
+    if (!cond) { res.status(404).json({ success: false, error: 'Health condition not found' }); return; }
+    Object.assign(cond, req.body);
+    await pet.save();
+    res.json({ success: true, data: cond });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to update health condition' });
+  }
+});
+
+router.delete('/pets/:id/health-conditions/:condId', async (req: AuthRequest, res: Response) => {
+  try {
+    const pet = await getOwnedPet(req.params.id, req.user!.id);
+    if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
+    const cond = (pet.healthConditions as any).id(req.params.condId);
+    if (!cond) { res.status(404).json({ success: false, error: 'Health condition not found' }); return; }
+    cond.deleteOne();
+    await pet.save();
+    res.json({ success: true, data: { message: 'Health condition deleted' } });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to delete health condition' });
+  }
+});
+
+// --- Desexing ---
+router.get('/pets/:id/desexing', async (req: AuthRequest, res: Response) => {
+  try {
+    const pet = await getOwnedPet(req.params.id, req.user!.id);
+    if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
+    res.json({ success: true, data: pet.desexing || { isDesexed: false } });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to fetch desexing info' });
+  }
+});
+
+router.put('/pets/:id/desexing', async (req: AuthRequest, res: Response) => {
+  try {
+    const pet = await getOwnedPet(req.params.id, req.user!.id);
+    if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
+    pet.desexing = req.body;
+    await pet.save();
+    res.json({ success: true, data: pet.desexing });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to update desexing info' });
   }
 });
 

@@ -1,7 +1,8 @@
 import { Routes, Route, Navigate, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useState, useEffect, FormEvent, createContext, useContext, ReactNode, useRef } from 'react';
 import api from './lib/api';
-import { PawPrint, LogOut, Plus, AlertTriangle, CheckCircle, Camera, Star, X, ImageIcon, Edit2, Save, Upload, ShieldAlert, ShieldCheck, User, ShoppingBag, Bell, Settings, Home, ChevronRight, Mail, Phone, MapPin, Lock, Package, Clock, Skull, EyeOff } from 'lucide-react';
+import { PawPrint, LogOut, Plus, AlertTriangle, CheckCircle, Camera, Star, X, ImageIcon, Edit2, Save, Upload, ShieldAlert, ShieldCheck, User, ShoppingBag, Bell, Settings, Home, ChevronRight, Mail, Phone, MapPin, Lock, Package, Clock, Skull, EyeOff, Activity } from 'lucide-react';
+import HealthRecords from './pages/HealthRecords';
 
 // --- Pet attribute options (mirrors shared/src/constants.ts) ---
 const PET_TYPES = ['Dog', 'Cat', 'Rabbit', 'Hamster', 'Guinea Pig', 'Bird'] as const;
@@ -322,6 +323,7 @@ function PetsPage() {
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
   const [foundTimers, setFoundTimers] = useState<Record<string, string>>({});
   const [timeToFoundMsg, setTimeToFoundMsg] = useState('');
+  const [healthPet, setHealthPet] = useState<any>(null);
 
   const refreshPets = () => api.get('/customer/pets').then((r) => setPets(r.data.data)).catch(console.error);
   useEffect(() => { refreshPets(); }, []);
@@ -478,8 +480,11 @@ function PetsPage() {
                   </div>
                 )}
                 {pet.status === 'safe' && <div className="bg-green-500 text-white px-4 py-2.5 flex items-center gap-2"><ShieldCheck size={20} /><span className="font-semibold text-sm">Safe</span>{pet.lostCount > 0 && <span className="ml-auto bg-green-700 text-green-100 text-sm px-2 py-0.5 rounded-full">Lost {pet.lostCount}x</span>}</div>}
-                {pet.status === 'died' && <div className="bg-gray-600 text-white px-4 py-2.5 flex items-center gap-2"><Skull size={20} /><span className="font-semibold text-sm">Deceased</span></div>}
+                {pet.status === 'deceased' && <div className="bg-gray-600 text-white px-4 py-2.5 flex items-center gap-2"><Skull size={20} /><span className="font-semibold text-sm">Deceased</span></div>}
                 {pet.status === 'stolen' && <div className="bg-purple-600 text-white px-4 py-2.5 flex items-center gap-2"><EyeOff size={20} /><span className="font-semibold text-sm">Stolen — Report to police</span></div>}
+                {pet.status === 'transferred' && <div className="bg-blue-600 text-white px-4 py-2.5 flex items-center gap-2"><ChevronRight size={20} /><span className="font-semibold text-sm">Transferred</span></div>}
+                {pet.status === 'donated' && <div className="bg-teal-600 text-white px-4 py-2.5 flex items-center gap-2"><Star size={20} /><span className="font-semibold text-sm">Donated</span></div>}
+                {pet.status === 'sold' && <div className="bg-amber-600 text-white px-4 py-2.5 flex items-center gap-2"><ShoppingBag size={20} /><span className="font-semibold text-sm">Sold</span></div>}
                 {mainPhoto && <div className="h-40 bg-gray-100 relative"><img src={mainPhoto} alt={pet.name} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} /></div>}
                 <div className="p-5">
                   <div className="flex justify-between items-start mb-3">
@@ -498,6 +503,7 @@ function PetsPage() {
                   </div>
                   <div className="flex gap-2 pt-3 border-t flex-wrap">
                     <button onClick={() => startEdit(pet)} className="bg-primary-50 text-primary-700 hover:bg-primary-100 px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-1.5 border border-primary-200"><Edit2 size={14} /> Edit</button>
+                    <button onClick={() => setHealthPet(pet)} className="bg-blue-50 text-blue-700 hover:bg-blue-100 px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-1.5 border border-blue-200"><Activity size={14} /> Health Records</button>
                     {pet.status === 'safe' ? (
                       <button onClick={() => markLost(pet._id)} className="bg-red-50 text-red-700 hover:bg-red-100 px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-1.5 border border-red-200">
                         <ShieldAlert size={14} /> Mark as Lost
@@ -510,8 +516,17 @@ function PetsPage() {
                         <button onClick={() => markTerminal(pet._id, 'stolen')} className="bg-purple-50 text-purple-700 hover:bg-purple-100 px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-1.5 border border-purple-200">
                           <EyeOff size={14} /> Stolen
                         </button>
-                        <button onClick={() => markTerminal(pet._id, 'died')} className="bg-gray-100 text-gray-700 hover:bg-gray-200 px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-1.5 border border-gray-300">
-                          <Skull size={14} /> Died
+                        <button onClick={() => markTerminal(pet._id, 'deceased')} className="bg-gray-100 text-gray-700 hover:bg-gray-200 px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-1.5 border border-gray-300">
+                          <Skull size={14} /> Deceased
+                        </button>
+                        <button onClick={() => markTerminal(pet._id, 'transferred')} className="bg-blue-50 text-blue-700 hover:bg-blue-100 px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-1.5 border border-blue-200">
+                          <ChevronRight size={14} /> Transferred
+                        </button>
+                        <button onClick={() => markTerminal(pet._id, 'donated')} className="bg-teal-50 text-teal-700 hover:bg-teal-100 px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-1.5 border border-teal-200">
+                          <Star size={14} /> Donated
+                        </button>
+                        <button onClick={() => markTerminal(pet._id, 'sold')} className="bg-amber-50 text-amber-700 hover:bg-amber-100 px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-1.5 border border-amber-200">
+                          <ShoppingBag size={14} /> Sold
                         </button>
                       </>
                     ) : null}
@@ -524,6 +539,7 @@ function PetsPage() {
           </div>
         </div>
       )}
+      {healthPet && <HealthRecords pet={healthPet} onClose={() => setHealthPet(null)} />}
     </div>
   );
 }

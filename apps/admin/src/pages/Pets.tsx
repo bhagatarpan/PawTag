@@ -339,7 +339,7 @@ export default function Pets() {
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Status</label>
               <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }} className="border border-gray-300 rounded-md px-2 py-1.5 text-sm">
-                <option value="">All</option><option value="safe">Safe</option><option value="lost">Lost</option><option value="found">Found</option><option value="died">Died</option><option value="stolen">Stolen</option>
+                <option value="">All</option><option value="safe">Safe</option><option value="lost">Lost</option><option value="found">Found</option><option value="deceased">Deceased</option><option value="stolen">Stolen</option><option value="transferred">Transferred</option><option value="donated">Donated</option><option value="sold">Sold</option>
               </select>
             </div>
             <button type="submit" className="bg-primary-600 text-white px-3 py-1.5 rounded-md text-sm hover:bg-primary-700 flex items-center gap-1"><Search size={12} /> Search</button>
@@ -412,8 +412,11 @@ export default function Pets() {
                       pet.status === 'safe' ? 'bg-green-100 text-green-700' :
                       pet.status === 'lost' ? 'bg-red-100 text-red-700' :
                       pet.status === 'found' ? 'bg-yellow-100 text-yellow-700' :
-                      pet.status === 'died' ? 'bg-gray-100 text-gray-700' :
+                      pet.status === 'deceased' ? 'bg-gray-100 text-gray-700' :
                       pet.status === 'stolen' ? 'bg-purple-100 text-purple-700' :
+                      pet.status === 'transferred' ? 'bg-blue-100 text-blue-700' :
+                      pet.status === 'donated' ? 'bg-teal-100 text-teal-700' :
+                      pet.status === 'sold' ? 'bg-amber-100 text-amber-700' :
                       'bg-gray-100 text-gray-700'
                     }`}>{pet.status}</span>
                   </td>
@@ -437,11 +440,20 @@ export default function Pets() {
                       {pet.status !== 'safe' && (
                         <button onClick={async () => { await api.put(`/admin/pets/${pet._id}/status`, { status: 'safe' }); fetchPets(); }} className="bg-green-50 text-green-700 hover:bg-green-100 text-xs px-2 py-1 rounded border border-green-200 font-medium" title="Mark Safe">Safe</button>
                       )}
-                      {pet.status !== 'died' && (
-                        <button onClick={async () => { await api.put(`/admin/pets/${pet._id}/status`, { status: 'died' }); fetchPets(); }} className="bg-gray-100 text-gray-700 hover:bg-gray-200 text-xs px-2 py-1 rounded border border-gray-300 font-medium" title="Mark Died">Died</button>
+                      {pet.status !== 'deceased' && (
+                        <button onClick={async () => { await api.put(`/admin/pets/${pet._id}/status`, { status: 'deceased' }); fetchPets(); }} className="bg-gray-100 text-gray-700 hover:bg-gray-200 text-xs px-2 py-1 rounded border border-gray-300 font-medium" title="Mark Deceased">Deceased</button>
                       )}
                       {pet.status !== 'stolen' && (
                         <button onClick={async () => { await api.put(`/admin/pets/${pet._id}/status`, { status: 'stolen' }); fetchPets(); }} className="bg-purple-50 text-purple-700 hover:bg-purple-100 text-xs px-2 py-1 rounded border border-purple-200 font-medium" title="Mark Stolen">Stolen</button>
+                      )}
+                      {pet.status !== 'transferred' && (
+                        <button onClick={async () => { await api.put(`/admin/pets/${pet._id}/status`, { status: 'transferred' }); fetchPets(); }} className="bg-blue-50 text-blue-700 hover:bg-blue-100 text-xs px-2 py-1 rounded border border-blue-200 font-medium" title="Mark Transferred">Transferred</button>
+                      )}
+                      {pet.status !== 'donated' && (
+                        <button onClick={async () => { await api.put(`/admin/pets/${pet._id}/status`, { status: 'donated' }); fetchPets(); }} className="bg-teal-50 text-teal-700 hover:bg-teal-100 text-xs px-2 py-1 rounded border border-teal-200 font-medium" title="Mark Donated">Donated</button>
+                      )}
+                      {pet.status !== 'sold' && (
+                        <button onClick={async () => { await api.put(`/admin/pets/${pet._id}/status`, { status: 'sold' }); fetchPets(); }} className="bg-amber-50 text-amber-700 hover:bg-amber-100 text-xs px-2 py-1 rounded border border-amber-200 font-medium" title="Mark Sold">Sold</button>
                       )}
                       <button onClick={() => deletePet(pet._id)} className="text-red-400 hover:text-red-600 p-1.5 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} /></button>
                     </div>

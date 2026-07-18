@@ -24,8 +24,11 @@ export enum PetStatus {
   SAFE = 'safe',
   LOST = 'lost',
   FOUND = 'found',
-  DIED = 'died',
+  DECEASED = 'deceased',
   STOLEN = 'stolen',
+  TRANSFERRED = 'transferred',
+  DONATED = 'donated',
+  SOLD = 'sold',
 }
 
 export enum OrderStatus {
@@ -112,6 +115,90 @@ export interface PetPhoto {
   addedAt: string;
 }
 
+// --- Health Record Types ---
+
+export interface Vaccination {
+  vaccine: string;
+  vaccineType: 'core' | 'non-core' | 'other';
+  dateGiven: string;
+  nextDueDate?: string;
+  vetClinic?: string;
+  batchLotNumber?: string;
+  veterinarian?: string;
+  notes?: string;
+}
+
+export interface PetMicrochip {
+  chipNumber: string;
+  brand?: string;
+  implantDate?: string;
+  implantLocation?: string;
+  implantedBy?: string;
+  notes?: string;
+}
+
+export interface Medication {
+  name: string;
+  dosage?: string;
+  frequency?: string;
+  startDate?: string;
+  endDate?: string;
+  prescribedBy?: string;
+  reason?: string;
+  notes?: string;
+}
+
+export interface Allergy {
+  allergen: string;
+  severity: 'mild' | 'moderate' | 'severe';
+  reaction?: string;
+  diagnosedBy?: string;
+  notes?: string;
+}
+
+export interface VetDetail {
+  clinicName: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  veterinarian?: string;
+  isPrimary: boolean;
+  notes?: string;
+}
+
+export interface Surgery {
+  procedure: string;
+  date: string;
+  performedBy?: string;
+  clinic?: string;
+  reason?: string;
+  recoveryNotes?: string;
+  notes?: string;
+}
+
+export interface WeightRecord {
+  weight: number;
+  date: string;
+  notes?: string;
+}
+
+export interface HealthCondition {
+  condition: string;
+  severity: 'mild' | 'moderate' | 'severe' | 'chronic';
+  diagnosedDate?: string;
+  diagnosedBy?: string;
+  treatment?: string;
+  notes?: string;
+}
+
+export interface Desexing {
+  isDesexed: boolean;
+  date?: string;
+  performedBy?: string;
+  clinic?: string;
+  notes?: string;
+}
+
 export interface Pet {
   _id: string;
   petId: string;            // auto-generated: XX-6digits+gender+breed+color
@@ -135,6 +222,19 @@ export interface Pet {
   status: PetStatus;
   isNeutered: boolean;
   notes?: string;
+  lostCount?: number;
+  foundByFinderAt?: string;
+  deletedAt?: string;
+  // Health records
+  vaccinations: Vaccination[];
+  microchips: PetMicrochip[];
+  medications: Medication[];
+  allergies: Allergy[];
+  vetDetails: VetDetail[];
+  surgeries: Surgery[];
+  weightHistory: WeightRecord[];
+  healthConditions: HealthCondition[];
+  desexing: Desexing;
   createdAt: string;
   updatedAt: string;
 }
