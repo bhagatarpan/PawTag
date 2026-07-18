@@ -1,7 +1,7 @@
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { useState, useEffect, FormEvent, createContext, useContext, ReactNode, useRef } from 'react';
 import api from './lib/api';
-import { PawPrint, LogOut, Plus, AlertTriangle, CheckCircle, Camera, Star, X, ImageIcon, Edit2, Save, Upload } from 'lucide-react';
+import { PawPrint, LogOut, Plus, AlertTriangle, CheckCircle, Camera, Star, X, ImageIcon, Edit2, Save, Upload, ShieldAlert, ShieldCheck } from 'lucide-react';
 
 // --- Pet attribute options (mirrors shared/src/constants.ts) ---
 const PET_TYPES = ['Dog', 'Cat', 'Rabbit', 'Hamster', 'Guinea Pig', 'Bird'] as const;
@@ -468,7 +468,27 @@ function Dashboard() {
             {pets.map((pet) => {
               const mainPhoto = getMainPhoto(pet);
               return (
-                <div key={pet._id} className="bg-white rounded-lg border overflow-hidden">
+                <div key={pet._id} className={`bg-white rounded-lg border overflow-hidden ${pet.status === 'lost' ? 'border-red-300 ring-2 ring-red-200' : pet.status === 'found' ? 'border-amber-300 ring-2 ring-amber-200' : ''}`}>
+                  {/* Status Banner */}
+                  {pet.status === 'lost' && (
+                    <div className="bg-red-600 text-white px-4 py-2.5 flex items-center gap-2">
+                      <ShieldAlert size={20} />
+                      <span className="font-extrabold text-sm tracking-wide">LOST PET</span>
+                      <span className="ml-auto text-xs text-red-200">Not seen since</span>
+                    </div>
+                  )}
+                  {pet.status === 'found' && (
+                    <div className="bg-amber-500 text-white px-4 py-2.5 flex items-center gap-2">
+                      <ShieldCheck size={20} />
+                      <span className="font-bold text-sm tracking-wide">FOUND — Needs owner pickup</span>
+                    </div>
+                  )}
+                  {pet.status === 'safe' && (
+                    <div className="bg-green-500 text-white px-4 py-2 flex items-center gap-2">
+                      <ShieldCheck size={16} />
+                      <span className="font-semibold text-xs">Safe</span>
+                    </div>
+                  )}
                   {mainPhoto && (
                     <div className="h-40 bg-gray-100 relative">
                       <img src={mainPhoto} alt={pet.name} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
@@ -494,9 +514,6 @@ function Dashboard() {
                         {pet.photos && pet.photos.length > 1 && <p className="text-xs text-gray-400 mt-1">{pet.photos.length} photos</p>}
                         {pet.medicalAlerts && <p className="text-sm text-red-600 mt-1 flex items-center gap-1"><AlertTriangle size={14} /> {pet.medicalAlerts}</p>}
                       </div>
-                      <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${pet.status === 'safe' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                        {pet.status}
-                      </span>
                     </div>
                     <div className="flex gap-2 pt-3 border-t flex-wrap">
                       <button onClick={() => startEdit(pet)} className="text-primary-600 hover:text-primary-800 text-sm font-medium flex items-center gap-1"><Edit2 size={12} /> Edit</button>

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Routes, Route, Navigate } from 'react-router-dom';
 import axios from 'axios';
-import { PawPrint, Phone, MapPin, AlertTriangle, Loader2, CheckCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { PawPrint, Phone, MapPin, AlertTriangle, Loader2, CheckCircle, ChevronLeft, ChevronRight, ShieldAlert, ShieldCheck } from 'lucide-react';
 
 interface PetPhoto {
   url: string;
@@ -121,18 +121,41 @@ function FinderPage() {
   if (!data) return null;
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
+    <div className={`min-h-screen py-8 px-4 ${data.pet.status === 'lost' ? 'bg-red-50' : data.pet.status === 'found' ? 'bg-amber-50' : 'bg-gray-50'}`}>
       <div className="max-w-md mx-auto">
-        <div className="text-center mb-6">
-          <PawPrint size={40} className="text-primary-600 mx-auto mb-2" />
-          <h1 className="text-2xl font-bold">Lost Pet Found!</h1>
-          <p className="text-sm text-gray-500">Tag: {data.tagId}
+
+        {/* BIG STATUS BANNER */}
+        {data.pet.status === 'lost' && (
+          <div className="bg-red-600 text-white rounded-xl p-6 mb-6 text-center shadow-lg animate-pulse">
+            <ShieldAlert size={48} className="mx-auto mb-2" />
+            <h1 className="text-3xl font-extrabold tracking-wide">THIS PET IS LOST</h1>
+            <p className="text-red-100 text-sm mt-2">If you know this pet, please contact the owner immediately or use the options below.</p>
+          </div>
+        )}
+        {data.pet.status === 'found' && (
+          <div className="bg-amber-500 text-white rounded-xl p-6 mb-6 text-center shadow-lg">
+            <ShieldCheck size={48} className="mx-auto mb-2" />
+            <h1 className="text-3xl font-extrabold tracking-wide">PET FOUND</h1>
+            <p className="text-amber-100 text-sm mt-2">This pet has been reported as found. Please help reunite it with its owner.</p>
+          </div>
+        )}
+        {data.pet.status === 'safe' && (
+          <div className="bg-green-600 text-white rounded-xl p-6 mb-6 text-center shadow-lg">
+            <ShieldCheck size={48} className="mx-auto mb-2" />
+            <h1 className="text-2xl font-bold">Pet Information</h1>
+            <p className="text-green-100 text-sm mt-1">This pet is safe and with its owner.</p>
+          </div>
+        )}
+
+        <div className="text-center mb-4">
+          <PawPrint size={28} className="text-primary-600 mx-auto mb-1" />
+          <p className="text-sm text-gray-500">Tag: <span className="font-mono font-medium">{data.tagId}</span>
             {data.tagStatus && (
-              <span className={`ml-2 inline-block px-1.5 py-0.5 text-xs rounded-full ${
+              <span className={`ml-2 inline-block px-2 py-0.5 text-xs font-bold rounded-full ${
                 data.tagStatus === 'active' ? 'bg-green-100 text-green-700' :
-                data.tagStatus === 'lost' ? 'bg-red-100 text-red-700' :
-                'bg-gray-100 text-gray-700'
-              }`}>{data.tagStatus}</span>
+                data.tagStatus === 'lost' ? 'bg-red-200 text-red-800' :
+                'bg-gray-200 text-gray-700'
+              }`}>{data.tagStatus.toUpperCase()}</span>
             )}
           </p>
         </div>
