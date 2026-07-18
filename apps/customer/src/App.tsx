@@ -1,7 +1,7 @@
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
-import { useState, useEffect, FormEvent, createContext, useContext, ReactNode } from 'react';
+import { useState, useEffect, FormEvent, createContext, useContext, ReactNode, useRef } from 'react';
 import api from './lib/api';
-import { PawPrint, LogOut, Plus, AlertTriangle, CheckCircle, Camera, Star, X, ImageIcon, Edit2, Save } from 'lucide-react';
+import { PawPrint, LogOut, Plus, AlertTriangle, CheckCircle, Camera, Star, X, ImageIcon, Edit2, Save, Upload } from 'lucide-react';
 
 // --- Pet attribute options (mirrors shared/src/constants.ts) ---
 const PET_TYPES = ['Dog', 'Cat', 'Rabbit', 'Hamster', 'Guinea Pig', 'Bird'] as const;
@@ -98,19 +98,49 @@ function PhotoManager({ photos, onChange }: { photos: PhotoItem[]; onChange: (ph
   const [urlInput, setUrlInput] = useState('');
   const [captionInput, setCaptionInput] = useState('');
   const [error, setError] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const addPhoto = () => {
-    if (!urlInput.trim()) return;
+  const addPhoto = (url: string, caption?: string) => {
+    if (!url.trim()) return;
     if (photos.length >= 5) { setError('Maximum 5 photos allowed'); return; }
-    if (!/^https?:\/\/.+\.(jpg|jpeg|png|gif|webp|avif)(\?.*)?$/i.test(urlInput.trim())) {
-      setError('Please enter a valid image URL (jpg, png, gif, webp)');
-      return;
-    }
     setError('');
     const isFirst = photos.length === 0;
-    onChange([...photos, { url: urlInput.trim(), caption: captionInput.trim() || undefined, isMain: isFirst }]);
+    onChange([...photos, { url: url.trim(), caption: caption?.trim() || undefined, isMain: isFirst }]);
+  };
+
+  const handleAddUrl = () => {
+    if (!urlInput.trim()) return;
+    addPhoto(urlInput, captionInput);
     setUrlInput('');
     setCaptionInput('');
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (photos.length >= 5) { setError('Maximum 5 photos allowed'); return; }
+
+    const allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/avif'];
+    if (!allowed.includes(file.type)) { setError('Only jpg, png, gif, webp images are allowed'); return; }
+    if (file.size > 5 * 1024 * 1024) { setError('File too large. Maximum size is 5MB.'); return; }
+
+    setUploading(true);
+    setError('');
+    try {
+      const formData = new FormData();
+      formData.append('photo', file);
+      const res = await api.post('/upload/pet-photo', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      addPhoto(res.data.data.url, captionInput || undefined);
+      setCaptionInput('');
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Upload failed');
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
   const removePhoto = (idx: number) => {
@@ -160,20 +190,29 @@ function PhotoManager({ photos, onChange }: { photos: PhotoItem[]; onChange: (ph
       )}
 
       {photos.length < 5 && (
-        <div className="flex gap-2 items-end">
-          <div className="flex-1">
-            <input type="url" placeholder="Paste image URL (jpg, png, webp...)" value={urlInput} onChange={(e) => { setUrlInput(e.target.value); setError(''); }} className="w-full border rounded-md px-3 py-2 text-sm" />
+        <div className="space-y-2">
+          <div className="flex gap-2 items-end">
+            <div className="flex-1">
+              <input type="url" placeholder="Paste image URL (jpg, png, webp...)" value={urlInput} onChange={(e) => { setUrlInput(e.target.value); setError(''); }} className="w-full border rounded-md px-3 py-2 text-sm" />
+            </div>
+            <div className="w-40">
+              <input type="text" placeholder="Caption (optional)" value={captionInput} onChange={(e) => setCaptionInput(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" />
+            </div>
+            <button type="button" onClick={handleAddUrl} disabled={!urlInput.trim()} className="bg-gray-100 border rounded-md px-3 py-2 text-sm hover:bg-gray-200 flex items-center gap-1 disabled:opacity-50">
+              <Camera size={14} /> Add URL
+            </button>
           </div>
-          <div className="w-40">
-            <input type="text" placeholder="Caption (optional)" value={captionInput} onChange={(e) => setCaptionInput(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" />
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-400">or</span>
+            <input ref={fileInputRef} type="file" accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,image/avif" onChange={handleFileUpload} className="hidden" />
+            <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading} className="bg-primary-50 border border-primary-200 rounded-md px-3 py-2 text-sm text-primary-700 hover:bg-primary-100 flex items-center gap-1 disabled:opacity-50">
+              <Upload size={14} /> {uploading ? 'Uploading...' : 'Upload from Device'}
+            </button>
           </div>
-          <button type="button" onClick={addPhoto} className="bg-gray-100 border rounded-md px-3 py-2 text-sm hover:bg-gray-200 flex items-center gap-1">
-            <Camera size={14} /> Add
-          </button>
         </div>
       )}
       {error && <p className="text-xs text-red-500">{error}</p>}
-      {photos.length === 0 && <p className="text-xs text-gray-400 flex items-center gap-1"><ImageIcon size={12} /> No photos yet.</p>}
+      {photos.length === 0 && <p className="text-xs text-gray-400 flex items-center gap-1"><ImageIcon size={12} /> No photos yet. Add via URL or upload from your device.</p>}
     </div>
   );
 }
@@ -439,6 +478,7 @@ function Dashboard() {
                     <div className="flex justify-between items-start mb-3">
                       <div className="flex-1">
                         <h3 className="text-lg font-semibold">{pet.name}</h3>
+                        {pet.petId && <p className="text-xs text-gray-400 font-mono">ID: {pet.petId}</p>}
                         <p className="text-sm text-gray-600">{pet.petType || pet.species} — {formatBreed(pet)}</p>
                         <p className="text-sm text-gray-500">Color: {pet.color}{pet.pattern ? ` | Pattern: ${pet.pattern}` : ''}</p>
                         <p className="text-sm text-gray-500">Gender: {genderLabel(pet.gender)}{pet.age != null ? ` | Age: ${pet.age} yrs` : ''}</p>

@@ -7,6 +7,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 import swaggerUi from 'swagger-ui-express';
+import path from 'path';
 
 import { config } from './config';
 import { connectDatabase } from '@pawtag/db';
@@ -17,6 +18,7 @@ import authRoutes from './routes/auth';
 import adminRoutes from './routes/admin';
 import customerRoutes from './routes/customer';
 import finderRoutes from './routes/finder';
+import uploadRoutes from './routes/upload';
 
 const app = express();
 
@@ -62,6 +64,10 @@ app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/customer', customerRoutes);
 app.use('/api/finder', finderRoutes);
+app.use('/api/upload', uploadRoutes);
+
+// Serve uploaded files as static assets
+app.use('/api/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // --- Error Handling ---
 app.use(notFoundHandler);

@@ -26,6 +26,7 @@ import {
   Setting,
   FeatureFlag,
   AuditLog,
+  generatePetId,
 } from '@pawtag/db';
 
 const router = Router();
@@ -435,7 +436,13 @@ router.post('/pets', async (req: AuthRequest, res: Response) => {
       res.status(400).json({ success: false, error: 'Validation failed', details: errors });
       return;
     }
-    const pet = await Pet.create({ ...parsed.data, ownerId });
+    const petId = await generatePetId(
+      parsed.data.name,
+      parsed.data.gender || 'unknown',
+      parsed.data.breed,
+      parsed.data.color,
+    );
+    const pet = await Pet.create({ ...parsed.data, ownerId, petId });
 
     await AuditLog.create({
       userId: req.user!.id,

@@ -8,21 +8,22 @@ export interface IPetPhoto {
 }
 
 export interface IPetDocument extends Document {
+  petId: string;
   ownerId: mongoose.Types.ObjectId;
   name: string;
-  petType: string;          // Dog, Cat, Rabbit, Hamster, Guinea Pig, Bird
-  species: string;          // kept for backward compat — defaults to petType
+  petType: string;
+  species: string;
   breed: string;
-  secondaryBreed?: string;  // when breed is "Mixed Breed"
+  secondaryBreed?: string;
   gender: 'male' | 'female' | 'unknown';
   dateOfBirth?: Date;
-  age?: number;             // in years (computed or manual)
+  age?: number;
   weight?: number;
   color: string;
   pattern?: string;
   favouriteFood?: string;
-  photos: IPetPhoto[];      // up to 5 photos
-  photoUrl?: string;        // kept for backward compat (legacy single photo)
+  photos: IPetPhoto[];
+  photoUrl?: string;
   medicalAlerts?: string;
   microchipId?: string;
   status: 'safe' | 'lost' | 'found';
@@ -42,6 +43,7 @@ const PetPhotoSchema = new Schema<IPetPhoto>(
 
 const PetSchema = new Schema<IPetDocument>(
   {
+    petId: { type: String, unique: true, index: true },
     ownerId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     name: { type: String, required: true, trim: true },
     petType: {
@@ -60,7 +62,7 @@ const PetSchema = new Schema<IPetDocument>(
     pattern: { type: String, trim: true },
     favouriteFood: { type: String, trim: true },
     photos: { type: [PetPhotoSchema], default: [], validate: { validator: (v: IPetPhoto[]) => v.length <= 5, message: 'A pet can have at most 5 photos' } },
-    photoUrl: { type: String },  // legacy field for backward compat
+    photoUrl: { type: String },
     medicalAlerts: { type: String },
     microchipId: { type: String },
     status: { type: String, enum: ['safe', 'lost', 'found'], default: 'safe' },
@@ -70,12 +72,10 @@ const PetSchema = new Schema<IPetDocument>(
   { timestamps: true },
 );
 
-// Auto-set secondaryBreed to 'Unknown' when breed is Mixed Breed and secondaryBreed is empty
 PetSchema.pre('save', function (next) {
   if (this.breed === 'Mixed Breed' && !this.secondaryBreed) {
     this.secondaryBreed = 'Unknown';
   }
-  // Compute age from dateOfBirth if provided
   if (this.dateOfBirth) {
     const now = new Date();
     const birth = new Date(this.dateOfBirth);
@@ -92,5 +92,26 @@ PetSchema.pre('save', function (next) {
 PetSchema.index({ ownerId: 1 });
 PetSchema.index({ status: 1 });
 PetSchema.index({ petType: 1 });
+PetSchema.index({ petId: 1 }, { unique: true });
 
 export const Pet = mongoose.model<IPetDocument>('Pet', PetSchema);
+
+// --- Pet ID Generation ---
+// Called from route handlers, not from hooks, to avoid Mongoose async hook issues.
+// Format: XX-NNNNNNXYZ
+export async function generatePetId(name: string, gender: string, breed: string, color: string): Promise<string> {
+  const prefix = name.substring(0, 2).toUpperCase();
+  const genderCode = (gender === 'female' ? 'F' : gender === 'male' ? 'M' : 'U').toUpperCase();
+  const breedCode = breed.charAt(0).toUpperCase();
+  const colorCode = color.charAt(0).toUpperCase();
+  const suffix = `${genderCode}${breedCode}${colorCode}`;
+
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const digits = Math.floor(100000 + Math.random() * 900000).toString();
+    const candidate = `${prefix}-${digits}${suffix}`;
+    const exists = await Pet.findOne({ petId: candidate }).lean();
+    if (!exists) return candidate;
+  }
+  const ts = Date.now().toString().slice(-6);
+  return `${prefix}-${ts}${suffix}`;
+}

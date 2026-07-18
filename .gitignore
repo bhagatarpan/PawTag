@@ -45,6 +45,9 @@ build/
 .cache/
 .turbo/
 
+# Uploaded files
+uploads/
+
 # TypeScript build info
 *.tsbuildinfo
 

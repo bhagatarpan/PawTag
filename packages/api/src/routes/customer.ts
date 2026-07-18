@@ -2,7 +2,7 @@ import { Router, Response } from 'express';
 import { AuthRequest, authenticate } from '../middleware/auth';
 import { validate } from '../middleware/validation';
 import { createPetSchema, updatePetSchema } from '../middleware/schemas';
-import { Pet, Tag, Order, LocationEvent, Notification } from '@pawtag/db';
+import { Pet, Tag, Order, LocationEvent, Notification, generatePetId } from '@pawtag/db';
 
 const router = Router();
 router.use(authenticate);
@@ -115,7 +115,13 @@ router.get('/pets/:id', async (req: AuthRequest, res: Response) => {
  */
 router.post('/pets', validate(createPetSchema), async (req: AuthRequest, res: Response) => {
   try {
-    const pet = await Pet.create({ ...req.body, ownerId: req.user!.id });
+    const petId = await generatePetId(
+      req.body.name,
+      req.body.gender || 'unknown',
+      req.body.breed,
+      req.body.color,
+    );
+    const pet = await Pet.create({ ...req.body, ownerId: req.user!.id, petId });
     res.status(201).json({ success: true, data: pet });
   } catch (error) {
     res.status(500).json({ success: false, error: 'Failed to create pet' });

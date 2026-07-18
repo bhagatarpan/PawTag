@@ -112,6 +112,7 @@ export interface PetPhoto {
 
 export interface Pet {
   _id: string;
+  petId: string;            // auto-generated: XX-6digits+gender+breed+color
   ownerId: string;
   name: string;
   petType: string;          // Dog, Cat, Rabbit, Hamster, Guinea Pig, Bird

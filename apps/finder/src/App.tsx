@@ -12,6 +12,7 @@ interface PetPhoto {
 interface FinderData {
   pet: {
     name: string;
+    petId?: string;
     petType?: string;
     species: string;
     breed: string;
@@ -168,6 +169,7 @@ function FinderPage() {
 
           <div className="p-6">
             <h2 className="text-xl font-bold mb-1">{data.pet.name}</h2>
+            {data.pet.petId && <p className="text-xs font-mono text-gray-400 mb-1">ID: {data.pet.petId}</p>}
             <p className="text-gray-600 mb-2">{data.pet.petType || data.pet.species} — {formatBreed()} ({data.pet.color}{data.pet.pattern ? `, ${data.pet.pattern}` : ''})</p>
             <div className="flex flex-wrap gap-2 mb-4 text-sm text-gray-500">
               {data.pet.gender && data.pet.gender !== 'unknown' && <span>Gender: {data.pet.gender === 'male' ? 'Male' : 'Female'}</span>}

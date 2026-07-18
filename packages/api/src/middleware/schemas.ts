@@ -70,6 +70,7 @@ export const createPetSchema = z.object({
 });
 
 export const updatePetSchema = z.object({
+  petId: z.string().optional(),
   name: z.string().min(1).optional(),
   petType: z.enum(['Dog', 'Cat', 'Rabbit', 'Hamster', 'Guinea Pig', 'Bird']).optional(),
   species: z.string().min(1).optional(),

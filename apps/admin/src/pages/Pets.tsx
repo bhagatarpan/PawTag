@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import api, { PaginatedData } from '../lib/api';
-import { Search, ChevronDown, ChevronUp, Trash2, Plus, Edit2, Save, X, Camera, Star, ImageIcon } from 'lucide-react';
+import { Search, ChevronDown, ChevronUp, Trash2, Plus, Edit2, Save, X, Camera, Star, ImageIcon, Upload } from 'lucide-react';
 
 // --- Pet attribute options ---
 const PET_TYPES = ['Dog', 'Cat', 'Rabbit', 'Hamster', 'Guinea Pig', 'Bird'] as const;
@@ -42,13 +42,49 @@ function PhotoManager({ photos, onChange }: { photos: PhotoItem[]; onChange: (p:
   const [urlInput, setUrlInput] = useState('');
   const [captionInput, setCaptionInput] = useState('');
   const [error, setError] = useState('');
-  const addPhoto = () => {
-    if (!urlInput.trim() || photos.length >= 5) { setError(photos.length >= 5 ? 'Max 5 photos' : 'URL required'); return; }
-    if (!/^https?:\/\/.+\.(jpg|jpeg|png|gif|webp|avif)(\?.*)?$/i.test(urlInput.trim())) { setError('Invalid image URL'); return; }
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const addPhoto = (url: string, caption?: string) => {
+    if (!url.trim() || photos.length >= 5) { setError(photos.length >= 5 ? 'Max 5 photos' : 'URL required'); return; }
     setError('');
-    onChange([...photos, { url: urlInput.trim(), caption: captionInput.trim() || undefined, isMain: photos.length === 0 }]);
+    onChange([...photos, { url: url.trim(), caption: caption?.trim() || undefined, isMain: photos.length === 0 }]);
     setUrlInput(''); setCaptionInput('');
   };
+
+  const handleAddUrl = () => {
+    if (!urlInput.trim()) return;
+    addPhoto(urlInput, captionInput);
+    setUrlInput(''); setCaptionInput('');
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (photos.length >= 5) { setError('Max 5 photos'); return; }
+
+    const allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/avif'];
+    if (!allowed.includes(file.type)) { setError('Only jpg, png, gif, webp images allowed'); return; }
+    if (file.size > 5 * 1024 * 1024) { setError('File too large. Max 5MB.'); return; }
+
+    setUploading(true);
+    setError('');
+    try {
+      const formData = new FormData();
+      formData.append('photo', file);
+      const res = await api.post('/upload/pet-photo', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      addPhoto(res.data.data.url, captionInput || undefined);
+      setCaptionInput('');
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Upload failed');
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
   const removePhoto = (idx: number) => {
     const updated = photos.filter((_, i) => i !== idx);
     if (updated.length > 0 && !updated.some((p) => p.isMain)) updated[0].isMain = true;
@@ -77,10 +113,19 @@ function PhotoManager({ photos, onChange }: { photos: PhotoItem[]; onChange: (p:
         </div>
       )}
       {photos.length < 5 && (
-        <div className="flex gap-1.5 items-end">
-          <input type="url" placeholder="Image URL" value={urlInput} onChange={(e) => { setUrlInput(e.target.value); setError(''); }} className="flex-1 border rounded px-2 py-1.5 text-xs" />
-          <input type="text" placeholder="Caption" value={captionInput} onChange={(e) => setCaptionInput(e.target.value)} className="w-24 border rounded px-2 py-1.5 text-xs" />
-          <button type="button" onClick={addPhoto} className="bg-gray-100 border rounded px-2 py-1.5 text-xs hover:bg-gray-200"><Camera size={10} /></button>
+        <div className="space-y-1.5">
+          <div className="flex gap-1.5 items-end">
+            <input type="url" placeholder="Image URL" value={urlInput} onChange={(e) => { setUrlInput(e.target.value); setError(''); }} className="flex-1 border rounded px-2 py-1.5 text-xs" />
+            <input type="text" placeholder="Caption" value={captionInput} onChange={(e) => setCaptionInput(e.target.value)} className="w-24 border rounded px-2 py-1.5 text-xs" />
+            <button type="button" onClick={handleAddUrl} disabled={!urlInput.trim()} className="bg-gray-100 border rounded px-2 py-1.5 text-xs hover:bg-gray-200 disabled:opacity-50"><Camera size={10} /></button>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-400">or</span>
+            <input ref={fileInputRef} type="file" accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,image/avif" onChange={handleFileUpload} className="hidden" />
+            <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading} className="bg-primary-50 border border-primary-200 rounded px-2 py-1.5 text-xs text-primary-700 hover:bg-primary-100 flex items-center gap-1 disabled:opacity-50">
+              <Upload size={10} /> {uploading ? 'Uploading...' : 'Upload from Device'}
+            </button>
+          </div>
         </div>
       )}
       {error && <p className="text-xs text-red-500">{error}</p>}
@@ -187,6 +232,7 @@ export default function Pets() {
         <form onSubmit={handleSubmit} className="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
           <div className="flex justify-between items-center">
             <h2 className="text-lg font-semibold">{editingPet ? `Edit ${editingPet.name}` : 'Register New Pet'}</h2>
+            {editingPet?.petId && <span className="text-xs font-mono text-gray-400">ID: {editingPet.petId}</span>}
             <button type="button" onClick={cancelForm} className="text-gray-400 hover:text-red-500"><X size={18} /></button>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -318,6 +364,7 @@ export default function Pets() {
           <thead className="bg-gray-50">
             <tr>
               <th className="text-left px-3 py-2.5 font-medium text-gray-500 w-10">Photo</th>
+              <th className="text-left px-3 py-2.5 font-medium text-gray-500">Pet ID</th>
               <th className="text-left px-3 py-2.5 font-medium text-gray-500">Name</th>
               <th className="text-left px-3 py-2.5 font-medium text-gray-500">Type</th>
               <th className="text-left px-3 py-2.5 font-medium text-gray-500">Breed</th>
@@ -330,9 +377,9 @@ export default function Pets() {
           </thead>
           <tbody className="divide-y divide-gray-200">
             {loading ? (
-              <tr><td colSpan={9} className="px-4 py-6 text-center text-gray-500">Loading...</td></tr>
+              <tr><td colSpan={10} className="px-4 py-6 text-center text-gray-500">Loading...</td></tr>
             ) : data?.items.length === 0 ? (
-              <tr><td colSpan={9} className="px-4 py-6 text-center text-gray-500">No pets found</td></tr>
+              <tr><td colSpan={10} className="px-4 py-6 text-center text-gray-500">No pets found</td></tr>
             ) : data?.items.map((pet: any) => {
               const mainPhoto = pet.photos?.length > 0 ? (pet.photos.find((p: any) => p.isMain) || pet.photos[0])?.url : pet.photoUrl;
               const breedDisplay = pet.breed === 'Mixed Breed' && pet.secondaryBreed && pet.secondaryBreed !== 'Unknown' ? `Mixed (${pet.secondaryBreed})` : pet.breed;
@@ -343,6 +390,7 @@ export default function Pets() {
                     {mainPhoto ? <img src={mainPhoto} alt="" className="w-8 h-8 rounded-full object-cover border" onError={(e) => { (e.target as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><rect width="32" height="32" fill="%23f3f4f6" rx="16"/><text x="16" y="19" text-anchor="middle" fill="%239ca3af" font-size="9">?</text></svg>'; }} />
                       : <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 text-xs">?</div>}
                   </td>
+                  <td className="px-3 py-2 text-xs font-mono text-gray-500">{pet.petId || '—'}</td>
                   <td className="px-3 py-2 font-medium">{pet.name}{pet.photos?.length > 1 && <span className="text-gray-400 text-xs ml-1">({pet.photos.length})</span>}</td>
                   <td className="px-3 py-2 text-gray-600">{pet.petType}</td>
                   <td className="px-3 py-2 text-gray-600">{breedDisplay}</td>
