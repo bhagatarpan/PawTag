@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import api, { PaginatedData } from '../lib/api';
-import { Search, Trash2, Plus, Edit2, Save, X, Tag as TagIcon, QrCode, Printer } from 'lucide-react';
+import { Search, Trash2, Plus, Edit2, Save, X, Tag as TagIcon, QrCode, Printer, Download } from 'lucide-react';
 
 interface TagItem {
   _id: string;
@@ -26,6 +26,9 @@ export default function Tags() {
   const [pets, setPets] = useState<any[]>([]);
   const [owners, setOwners] = useState<any[]>([]);
   const [error, setError] = useState('');
+  const [qrModal, setQrModal] = useState<{ tagId: string; petName?: string; petId?: string } | null>(null);
+  const [qrImageUrl, setQrImageUrl] = useState('');
+  const qrCanvasRef = useRef<HTMLCanvasElement>(null);
 
   const fetchTags = () => {
     setLoading(true);
@@ -110,6 +113,12 @@ export default function Tags() {
 
   const apiBase = import.meta.env.VITE_API_URL || '/api';
 
+  const openQRModal = async (tag: TagItem) => {
+    const url = `${apiBase}/tags/${tag.tagId}/qr?size=400`;
+    setQrImageUrl(url);
+    setQrModal({ tagId: tag.tagId, petName: tag.petId?.name, petId: tag.petId?.petId });
+  };
+
   const downloadQR = async (tagId: string) => {
     const res = await fetch(`${apiBase}/tags/${tagId}/qr?size=400`);
     const blob = await res.blob();
@@ -119,6 +128,15 @@ export default function Tags() {
     a.download = `qr-${tagId}.png`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const printQR = () => {
+    if (!qrModal) return;
+    const win = window.open('', '_blank');
+    if (!win) return;
+    win.document.write(`<!DOCTYPE html><html><head><title>QR - ${qrModal.tagId}</title><style>body{display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0;font-family:sans-serif}.card{text-align:center;border:2px solid #e5e7eb;border-radius:12px;padding:24px;box-shadow:0 2px 8px rgba(0,0,0,.08)}img{width:250px;height:250px}.tag{font-size:20px;font-weight:700;font-family:monospace;margin-top:8px}.pet{font-size:14px;color:#666;margin-top:4px}@media print{body{background:white}.card{box-shadow:none}}</style></head><body><div class="card"><img src="${qrImageUrl}" /><div class="tag">${qrModal.tagId}</div>${qrModal.petName ? `<div class="pet">${qrModal.petName}${qrModal.petId ? ` (${qrModal.petId})` : ''}</div>` : ''}</div></body></html>`);
+    win.document.close();
+    win.print();
   };
 
   const openSticker = (tagId: string) => {
@@ -294,7 +312,7 @@ export default function Tags() {
                   <td className="px-4 py-3">
                     <div className="flex gap-1 items-center">
                       <button onClick={() => startEdit(tag)} className="text-primary-500 hover:text-primary-700 p-1" title="Edit"><Edit2 size={13} /></button>
-                      <button onClick={() => downloadQR(tag.tagId)} className="text-blue-500 hover:text-blue-700 p-1" title="Download QR Code"><QrCode size={13} /></button>
+                      <button onClick={() => openQRModal(tag)} className="text-blue-500 hover:text-blue-700 p-1" title="View QR Code"><QrCode size={13} /></button>
                       <button onClick={() => openSticker(tag.tagId)} className="text-purple-500 hover:text-purple-700 p-1" title="Print Sticker"><Printer size={13} /></button>
                       {tag.status !== 'active' && (
                         <button onClick={() => updateStatus(tag._id, 'active')} className="text-green-500 hover:text-green-700 text-xs px-1.5 py-0.5 rounded hover:bg-green-50" title="Activate">Activate</button>
@@ -322,6 +340,35 @@ export default function Tags() {
             <button disabled={page <= 1} onClick={() => setPage(page - 1)} className="px-3 py-1 border rounded disabled:opacity-50">Prev</button>
             <span className="px-3 py-1">Page {page} of {data.totalPages}</span>
             <button disabled={page >= data.totalPages} onClick={() => setPage(page + 1)} className="px-3 py-1 border rounded disabled:opacity-50">Next</button>
+          </div>
+        </div>
+      )}
+
+      {/* QR Modal */}
+      {qrModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setQrModal(null)}>
+          <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6 relative" onClick={(e) => e.stopPropagation()}>
+            <button onClick={() => setQrModal(null)} className="absolute top-3 right-3 text-gray-400 hover:text-gray-600"><X size={18} /></button>
+            <div className="text-center">
+              <h3 className="text-lg font-semibold mb-1">QR Code</h3>
+              <p className="text-sm text-gray-500 font-mono mb-4">{qrModal.tagId}</p>
+              {qrModal.petName && <p className="text-sm text-gray-600 mb-1">{qrModal.petName}{qrModal.petId ? ` (${qrModal.petId})` : ''}</p>}
+              <div className="flex justify-center my-4">
+                <img src={qrImageUrl} alt={`QR ${qrModal.tagId}`} className="w-64 h-64 rounded-lg border" />
+              </div>
+              <p className="text-xs text-gray-400 mb-4">Scan to view pet info on Finder</p>
+              <div className="flex gap-2 justify-center">
+                <button onClick={() => downloadQR(qrModal.tagId)} className="bg-primary-600 text-white px-4 py-2 rounded-md text-sm flex items-center gap-1.5 hover:bg-primary-700">
+                  <Download size={14} /> Download
+                </button>
+                <button onClick={printQR} className="border border-primary-300 text-primary-700 px-4 py-2 rounded-md text-sm flex items-center gap-1.5 hover:bg-primary-50">
+                  <Printer size={14} /> Print
+                </button>
+                <button onClick={() => window.open(`${apiBase}/tags/${qrModal.tagId}/sticker`, '_blank')} className="border border-gray-300 text-gray-700 px-4 py-2 rounded-md text-sm flex items-center gap-1.5 hover:bg-gray-50">
+                  Sticker
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
