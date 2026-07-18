@@ -1,4 +1,5 @@
 import { Router, Response } from 'express';
+import QRCode from 'qrcode';
 import { AuthRequest, authenticate } from '../middleware/auth';
 import { authorize } from '../middleware/rbac';
 import { validate } from '../middleware/validation';
@@ -1067,6 +1068,219 @@ router.delete('/tags/:id', async (req: AuthRequest, res: Response) => {
     await AuditLog.create({ userId: req.user!.id, action: 'delete', entity: 'Tag', entityId: req.params.id, changes: { tagId: tag.tagId } });
     res.json({ success: true, data: { message: 'Tag deleted' } });
   } catch (error) { res.status(500).json({ success: false, error: 'Failed to delete tag' }); }
+});
+
+// --- QR Code Generation ---
+
+const FINDER_BASE_URL = process.env.FINDER_URL || 'http://localhost:3003';
+
+/**
+ * @swagger
+ * /api/admin/tags/{id}/qr:
+ *   get:
+ *     tags: [Admin - Tags]
+ *     summary: Generate QR code image for a tag
+ *     description: Returns a PNG image of the QR code. The QR encodes the finder URL (e.g. http://localhost:3003/PT-123456).
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: size
+ *         schema:
+ *           type: integer
+ *           default: 300
+ *         description: Image size in pixels
+ *     responses:
+ *       200:
+ *         description: QR code PNG image
+ *         content:
+ *           image/png:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *       404:
+ *         description: Tag not found
+ */
+router.get('/tags/:id/qr', async (req: AuthRequest, res: Response) => {
+  try {
+    const tag = await Tag.findById(req.params.id);
+    if (!tag) { res.status(404).json({ success: false, error: 'Tag not found' }); return; }
+
+    const size = Math.min(Math.max(Number(req.query.size) || 300, 100), 1000);
+    const url = `${FINDER_BASE_URL}/${tag.tagId}`;
+    const qrBuffer = await QRCode.toBuffer(url, { width: size, margin: 2, color: { dark: '#000000', light: '#ffffff' } });
+
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Content-Disposition', `inline; filename="qr-${tag.tagId}.png"`);
+    res.send(qrBuffer);
+  } catch (error) { res.status(500).json({ success: false, error: 'Failed to generate QR code' }); }
+});
+
+/**
+ * @swagger
+ * /api/admin/tags/{id}/sticker:
+ *   get:
+ *     tags: [Admin - Tags]
+ *     summary: Generate a printable sticker page for a tag
+ *     description: Returns an HTML page with QR code, tagId, petId, and petName — ready for printing as a sticker.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Sticker HTML page
+ *         content:
+ *           text/html:
+ *             schema:
+ *               type: string
+ *       404:
+ *         description: Tag not found
+ */
+router.get('/tags/:id/sticker', async (req: AuthRequest, res: Response) => {
+  try {
+    const tag = await Tag.findById(req.params.id)
+      .populate('petId', 'name petId petType breed color')
+      .populate('ownerId', 'fullName');
+    if (!tag) { res.status(404).json({ success: false, error: 'Tag not found' }); return; }
+
+    const pet = tag.petId as any;
+    const url = `${FINDER_BASE_URL}/${tag.tagId}`;
+    const qrDataUrl = await QRCode.toDataURL(url, { width: 250, margin: 1, color: { dark: '#000000', light: '#ffffff' } });
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PawTag Sticker - ${tag.tagId}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; background: #f5f5f5; }
+    .sticker { background: white; border: 2px solid #e5e7eb; border-radius: 12px; padding: 24px; width: 320px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    .qr { margin: 12px auto; }
+    .qr img { width: 200px; height: 200px; }
+    .tag-id { font-size: 22px; font-weight: 700; color: #111; font-family: monospace; letter-spacing: 1px; margin: 8px 0 4px; }
+    .pet-name { font-size: 18px; font-weight: 600; color: #374151; margin: 4px 0; }
+    .pet-id { font-size: 13px; color: #6b7280; font-family: monospace; }
+    .pet-details { font-size: 12px; color: #9ca3af; margin-top: 4px; }
+    .branding { font-size: 10px; color: #d1d5db; margin-top: 12px; border-top: 1px solid #f3f4f6; padding-top: 8px; }
+    .scan-hint { font-size: 11px; color: #9ca3af; margin-top: 8px; }
+    @media print {
+      body { background: white; }
+      .sticker { border: 1px solid #ccc; box-shadow: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="sticker">
+    <img src="${qrDataUrl}" alt="QR Code" class="qr" />
+    <div class="tag-id">${tag.tagId}</div>
+    <div class="pet-name">${pet.name}</div>
+    <div class="pet-id">${pet.petId || ''}</div>
+    <div class="pet-details">${pet.petType || ''} &middot; ${pet.breed || ''} &middot; ${pet.color || ''}</div>
+    <div class="scan-hint">Scan to view pet info</div>
+    <div class="branding">PawTag &mdash; Reuniting lost pets with their families</div>
+  </div>
+</body>
+</html>`;
+
+    res.setHeader('Content-Type', 'text/html');
+    res.send(html);
+  } catch (error) { res.status(500).json({ success: false, error: 'Failed to generate sticker' }); }
+});
+
+/**
+ * @swagger
+ * /api/admin/tags/qr-bulk:
+ *   post:
+ *     tags: [Admin - Tags]
+ *     summary: Generate QR codes for multiple tags at once
+ *     description: Returns an HTML page with all QR stickers in a grid, ready for printing.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               tagIds:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 description: Array of tag Mongo IDs to generate QR codes for
+ *     responses:
+ *       200:
+ *         description: HTML page with all QR stickers
+ */
+router.post('/tags/qr-bulk', async (req: AuthRequest, res: Response) => {
+  try {
+    const { tagIds } = req.body;
+    if (!tagIds || !Array.isArray(tagIds) || tagIds.length === 0) {
+      res.status(400).json({ success: false, error: 'tagIds array is required' });
+      return;
+    }
+
+    const tags = await Tag.find({ _id: { $in: tagIds } })
+      .populate('petId', 'name petId petType breed color');
+
+    const stickers = await Promise.all(tags.map(async (tag) => {
+      const pet = tag.petId as any;
+      const url = `${FINDER_BASE_URL}/${tag.tagId}`;
+      const qrDataUrl = await QRCode.toDataURL(url, { width: 180, margin: 1 });
+      return { tag, pet, qrDataUrl };
+    }));
+
+    const stickerCards = stickers.map(({ tag, pet, qrDataUrl }) => `
+      <div class="sticker">
+        <img src="${qrDataUrl}" alt="QR" class="qr" />
+        <div class="tag-id">${tag.tagId}</div>
+        <div class="pet-name">${pet?.name || 'Unknown'}</div>
+        <div class="pet-id">${pet?.petId || ''}</div>
+        <div class="pet-details">${pet?.petType || ''} &middot; ${pet?.breed || ''} &middot; ${pet?.color || ''}</div>
+      </div>
+    `).join('\n');
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PawTag QR Stickers (${stickers.length})</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 20px; }
+    h1 { font-size: 18px; color: #374151; margin-bottom: 16px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+    .sticker { background: white; border: 2px solid #e5e7eb; border-radius: 12px; padding: 20px; text-align: center; page-break-inside: avoid; }
+    .qr { margin: 8px auto; }
+    .qr img { width: 180px; height: 180px; }
+    .tag-id { font-size: 20px; font-weight: 700; color: #111; font-family: monospace; letter-spacing: 1px; margin: 6px 0 4px; }
+    .pet-name { font-size: 16px; font-weight: 600; color: #374151; }
+    .pet-id { font-size: 12px; color: #6b7280; font-family: monospace; }
+    .pet-details { font-size: 11px; color: #9ca3af; margin-top: 2px; }
+    @media print { body { padding: 0; } .grid { gap: 12px; } }
+  </style>
+</head>
+<body>
+  <h1>PawTag QR Stickers (${stickers.length} tags)</h1>
+  <div class="grid">${stickerCards}</div>
+  <script>window.onload = () => window.print();</script>
+</body>
+</html>`;
+
+    res.setHeader('Content-Type', 'text/html');
+    res.send(html);
+  } catch (error) { res.status(500).json({ success: false, error: 'Failed to generate bulk QR codes' }); }
 });
 
 // --- Product Management ---

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import api, { PaginatedData } from '../lib/api';
-import { Search, ChevronDown, ChevronUp, Trash2, Plus, Edit2, Save, X, Tag as TagIcon, Link2 } from 'lucide-react';
+import { Search, Trash2, Plus, Edit2, Save, X, Tag as TagIcon, QrCode, Printer } from 'lucide-react';
 
 interface TagItem {
   _id: string;
@@ -108,15 +108,70 @@ export default function Tags() {
     }
   };
 
+  const apiBase = import.meta.env.VITE_API_URL || '/api';
+
+  const downloadQR = async (tagId: string) => {
+    const token = localStorage.getItem('admin_token');
+    const res = await fetch(`${apiBase}/admin/tags/${tagId}/qr?size=400`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `qr-${tagId}.png`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const openSticker = (tagId: string) => {
+    const token = localStorage.getItem('admin_token');
+    window.open(`${apiBase}/admin/tags/${tagId}/sticker`, '_blank');
+  };
+
+  const printBulkQR = () => {
+    if (!data?.items.length) return;
+    const token = localStorage.getItem('admin_token');
+    const tagIds = data.items.map((t) => t._id);
+    // Open a new window with POST to bulk QR endpoint
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = `${apiBase}/admin/tags/qr-bulk`;
+    form.target = '_blank';
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'tagIds';
+    input.value = JSON.stringify(tagIds);
+    form.appendChild(input);
+    // Also add auth header via a hidden field won't work for auth, so use fetch instead
+    form.remove();
+    // Use fetch + blob approach
+    fetch(`${apiBase}/admin/tags/qr-bulk`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ tagIds }),
+    }).then((res) => res.text()).then((html) => {
+      const w = window.open('', '_blank');
+      if (w) { w.document.write(html); w.document.close(); }
+    });
+  };
+
   const statusColor = (s: string) => s === 'active' ? 'bg-green-100 text-green-700' : s === 'lost' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700';
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Tag Management</h1>
-        <button onClick={startAdd} className="bg-primary-600 text-white px-4 py-2 rounded-md text-sm flex items-center gap-1.5 hover:bg-primary-700">
-          <Plus size={14} /> Create Tag
-        </button>
+        <div className="flex gap-2">
+          {data && data.items.length > 0 && (
+            <button onClick={printBulkQR} className="border border-primary-300 text-primary-700 px-4 py-2 rounded-md text-sm flex items-center gap-1.5 hover:bg-primary-50">
+              <Printer size={14} /> Print All QR
+            </button>
+          )}
+          <button onClick={startAdd} className="bg-primary-600 text-white px-4 py-2 rounded-md text-sm flex items-center gap-1.5 hover:bg-primary-700">
+            <Plus size={14} /> Create Tag
+          </button>
+        </div>
       </div>
 
       {/* Create/Edit Form */}
@@ -243,6 +298,8 @@ export default function Tags() {
                   <td className="px-4 py-3">
                     <div className="flex gap-1 items-center">
                       <button onClick={() => startEdit(tag)} className="text-primary-500 hover:text-primary-700 p-1" title="Edit"><Edit2 size={13} /></button>
+                      <button onClick={() => downloadQR(tag.tagId)} className="text-blue-500 hover:text-blue-700 p-1" title="Download QR Code"><QrCode size={13} /></button>
+                      <button onClick={() => openSticker(tag.tagId)} className="text-purple-500 hover:text-purple-700 p-1" title="Print Sticker"><Printer size={13} /></button>
                       {tag.status !== 'active' && (
                         <button onClick={() => updateStatus(tag._id, 'active')} className="text-green-500 hover:text-green-700 text-xs px-1.5 py-0.5 rounded hover:bg-green-50" title="Activate">Activate</button>
                       )}
