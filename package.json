@@ -1,0 +1,26 @@
+{
+  "name": "pawtag",
+  "private": true,
+  "version": "0.1.0",
+  "description": "PawTag - Pet Recovery Platform",
+  "scripts": {
+    "dev:api": "pnpm --filter @pawtag/api dev",
+    "dev:admin": "pnpm --filter @pawtag/admin dev",
+    "dev:web": "pnpm --filter @pawtag/web dev",
+    "dev:customer": "pnpm --filter @pawtag/customer dev",
+    "dev:finder": "pnpm --filter @pawtag/finder dev",
+    "dev:all": "pnpm run --parallel dev:api dev:admin dev:web dev:customer dev:finder",
+    "build": "pnpm run --parallel build:api build:admin build:web build:customer build:finder",
+    "build:api": "pnpm --filter @pawtag/api build",
+    "build:admin": "pnpm --filter @pawtag/admin build",
+    "build:web": "pnpm --filter @pawtag/web build",
+    "build:customer": "pnpm --filter @pawtag/customer build",
+    "build:finder": "pnpm --filter @pawtag/finder build",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "clean": "pnpm -r exec rm -rf node_modules dist .turbo"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

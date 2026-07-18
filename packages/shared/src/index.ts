@@ -1,0 +1,354 @@
+// ============================================================
+// PawTag Shared Types
+// ============================================================
+
+// --- Enums & Constants ---
+
+export enum UserRole {
+  SUPER_ADMIN = 'super_admin',
+  ADMIN = 'admin',
+  SUPPORT = 'support',
+  CUSTOMER = 'customer',
+}
+
+export enum UserStatus {
+  ACTIVE = 'active',
+  INACTIVE = 'inactive',
+  SUSPENDED = 'suspended',
+  PENDING_VERIFICATION = 'pending_verification',
+}
+
+export enum PetStatus {
+  SAFE = 'safe',
+  LOST = 'lost',
+  FOUND = 'found',
+}
+
+export enum OrderStatus {
+  PENDING = 'pending',
+  PAID = 'paid',
+  SHIPPED = 'shipped',
+  DELIVERED = 'delivered',
+  CANCELLED = 'cancelled',
+  REFUNDED = 'refunded',
+}
+
+export enum PaymentStatus {
+  PENDING = 'pending',
+  COMPLETED = 'completed',
+  FAILED = 'failed',
+  REFUNDED = 'refunded',
+}
+
+export enum TagStatus {
+  ACTIVE = 'active',
+  INACTIVE = 'inactive',
+  LOST = 'lost',
+}
+
+export enum NotificationType {
+  PET_LOST = 'pet_lost',
+  PET_FOUND = 'pet_found',
+  FINDER_SCAN = 'finder_scan',
+  ORDER_UPDATE = 'order_update',
+  SYSTEM = 'system',
+}
+
+export enum FinderAction {
+  VIEWED = 'viewed',
+  NOTIFIED_OWNER = 'notified_owner',
+  SHARED_LOCATION = 'shared_location',
+}
+
+export enum ContentStatus {
+  DRAFT = 'draft',
+  PUBLISHED = 'published',
+  ARCHIVED = 'archived',
+}
+
+// --- Core Models ---
+
+export interface User {
+  _id: string;
+  email: string;
+  passwordHash: string;
+  fullName: string;
+  phoneNumber?: string;
+  role: UserRole;
+  status: UserStatus;
+  emailVerified: boolean;
+  phoneVerified: boolean;
+  profilePicture?: string;
+  address?: Address;
+  emergencyContact?: EmergencyContact;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Address {
+  line1: string;
+  line2?: string;
+  city: string;
+  state: string;
+  zip: string;
+  country: string;
+}
+
+export interface EmergencyContact {
+  name: string;
+  phone: string;
+  email?: string;
+  relationship: string;
+}
+
+export interface Pet {
+  _id: string;
+  ownerId: string;
+  name: string;
+  species: string;
+  breed: string;
+  gender: 'male' | 'female' | 'unknown';
+  dateOfBirth?: string;
+  weight?: number;
+  color: string;
+  photoUrl?: string;
+  medicalAlerts?: string;
+  microchipId?: string;
+  status: PetStatus;
+  isNeutered: boolean;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Tag {
+  _id: string;
+  tagId: string;          // Human-readable ID like PT-123456
+  petId: string;
+  ownerId: string;
+  status: TagStatus;
+  qrCodeUrl?: string;
+  lastScannedAt?: string;
+  lastScanLocation?: GeoLocation;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GeoLocation {
+  latitude: number;
+  longitude: number;
+  accuracy?: number;
+  source: 'gps' | 'qr_scan' | 'manual';
+}
+
+export interface LocationEvent {
+  _id: string;
+  tagId: string;
+  petId: string;
+  ownerId: string;
+  timestamp: string;
+  location: GeoLocation;
+  finderId?: string;
+  notes?: string;
+}
+
+export interface Product {
+  _id: string;
+  name: string;
+  description: string;
+  shortDescription?: string;
+  price: number;
+  currency: string;
+  images: string[];
+  category: string;
+  tags: string[];
+  isActive: boolean;
+  stock: number;
+  sku: string;
+  weight?: number;
+  dimensions?: ProductDimensions;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProductDimensions {
+  length: number;
+  width: number;
+  height: number;
+  unit: 'cm' | 'in';
+}
+
+export interface Order {
+  _id: string;
+  orderNumber: string;    // Human-readable order number
+  userId: string;
+  items: OrderItem[];
+  status: OrderStatus;
+  payment: PaymentInfo;
+  shippingAddress: Address;
+  billingAddress?: Address;
+  trackingNumber?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OrderItem {
+  productId: string;
+  productName: string;
+  quantity: number;
+  unitPrice: number;
+  totalPrice: number;
+}
+
+export interface PaymentInfo {
+  method: 'card' | 'paypal' | 'bank_transfer';
+  status: PaymentStatus;
+  transactionId?: string;
+  amount: number;
+  currency: string;
+  paidAt?: string;
+}
+
+export interface FinderScan {
+  _id: string;
+  tagId: string;
+  petId: string;
+  scannedBy?: string;     // IP or user agent if anonymous
+  deviceInfo: string;
+  location?: GeoLocation;
+  action: FinderAction;
+  notifiedAt?: string;
+  contactAttempted: boolean;
+  createdAt: string;
+}
+
+export interface Notification {
+  _id: string;
+  userId: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  data?: Record<string, unknown>;
+  read: boolean;
+  createdAt: string;
+}
+
+export interface SiteContent {
+  _id: string;
+  slug: string;
+  title: string;
+  body: string;
+  status: ContentStatus;
+  metaTitle?: string;
+  metaDescription?: string;
+  createdBy: string;
+  publishedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Setting {
+  _id: string;
+  key: string;
+  value: string;
+  category: string;
+  description?: string;
+  updatedBy: string;
+  updatedAt: string;
+}
+
+export interface FeatureFlag {
+  _id: string;
+  key: string;
+  name: string;
+  description?: string;
+  isEnabled: boolean;
+  allowedRoles?: UserRole[];
+  percentage?: number;     // Rollout percentage
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AuditLog {
+  _id: string;
+  userId: string;
+  action: string;
+  entity: string;
+  entityId: string;
+  changes?: Record<string, { old: unknown; new: unknown }>;
+  ipAddress?: string;
+  userAgent?: string;
+  createdAt: string;
+}
+
+// --- API Types ---
+
+export interface ApiResponse<T = unknown> {
+  success: boolean;
+  data?: T;
+  message?: string;
+  error?: string;
+}
+
+export interface PaginatedResponse<T> {
+  items: T[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface PaginationQuery {
+  page?: number;
+  limit?: number;
+  sort?: string;
+  order?: 'asc' | 'desc';
+  search?: string;
+}
+
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface LoginResponse {
+  token: string;
+  user: Omit<User, 'passwordHash'>;
+}
+
+export interface RegisterRequest {
+  email: string;
+  password: string;
+  fullName: string;
+  phoneNumber?: string;
+}
+
+export interface VerifyOtpRequest {
+  email: string;
+  otp: string;
+}
+
+// --- Finder Portal Types ---
+
+export interface FinderPortalData {
+  pet: Pet;
+  tag: Tag;
+  ownerName: string;
+  ownerPhone?: string;
+  ownerEmail?: string;
+  emergencyContacts?: EmergencyContact[];
+}
+
+// --- Admin Dashboard Types ---
+
+export interface AdminDashboardStats {
+  totalUsers: number;
+  totalPets: number;
+  totalTags: number;
+  totalOrders: number;
+  totalRevenue: number;
+  lostPets: number;
+  recentScans: number;
+  recentOrders: Order[];
+}
