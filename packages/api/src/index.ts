@@ -25,8 +25,17 @@ import uploadRoutes from './routes/upload';
 
 const app = express();
 
+// --- Serve uploads BEFORE Helmet (no CSP/CORP restrictions on images) ---
+app.use('/api/uploads', express.static(path.join(__dirname, '../uploads')));
+
 // --- Security & Middleware ---
-app.use(helmet());
+const cspDirectives = helmet.contentSecurityPolicy.getDefaultDirectives();
+cspDirectives['img-src'] = ["'self'", 'data:', 'http://localhost:*', 'https:'];
+
+app.use(helmet({
+  crossOriginResourcePolicy: false,
+  contentSecurityPolicy: { directives: cspDirectives },
+}));
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: '10mb' }));
 app.use(morgan('dev'));
@@ -99,9 +108,6 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/customer', customerRoutes);
 app.use('/api/finder', finderRoutes);
 app.use('/api/upload', uploadRoutes);
-
-// Serve uploaded files as static assets
-app.use('/api/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // --- Error Handling ---
 app.use(notFoundHandler);
