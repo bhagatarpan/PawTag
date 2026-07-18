@@ -479,6 +479,14 @@ function Dashboard() {
                       <div className="flex-1">
                         <h3 className="text-lg font-semibold">{pet.name}</h3>
                         {pet.petId && <p className="text-xs text-gray-400 font-mono">ID: {pet.petId}</p>}
+                        {pet.linkedTag && (
+                          <p className="text-xs text-primary-600 font-mono mt-0.5">
+                            Tag: {pet.linkedTag.tagId}
+                            <span className={`ml-1.5 inline-block w-1.5 h-1.5 rounded-full ${pet.linkedTag.status === 'active' ? 'bg-green-500' : pet.linkedTag.status === 'lost' ? 'bg-red-500' : 'bg-gray-400'}`} />
+                            <span className="ml-1 text-gray-400 font-sans">({pet.linkedTag.status})</span>
+                          </p>
+                        )}
+                        {!pet.linkedTag && <p className="text-xs text-gray-300 mt-0.5">No tag linked</p>}
                         <p className="text-sm text-gray-600">{pet.petType || pet.species} — {formatBreed(pet)}</p>
                         <p className="text-sm text-gray-500">Color: {pet.color}{pet.pattern ? ` | Pattern: ${pet.pattern}` : ''}</p>
                         <p className="text-sm text-gray-500">Gender: {genderLabel(pet.gender)}{pet.age != null ? ` | Age: ${pet.age} yrs` : ''}</p>

@@ -28,6 +28,7 @@ interface FinderData {
     status: string;
   };
   tagId: string;
+  tagStatus?: string;
   ownerName: string;
   ownerPhone?: string;
 }
@@ -125,7 +126,15 @@ function FinderPage() {
         <div className="text-center mb-6">
           <PawPrint size={40} className="text-primary-600 mx-auto mb-2" />
           <h1 className="text-2xl font-bold">Lost Pet Found!</h1>
-          <p className="text-sm text-gray-500">Tag: {data.tagId}</p>
+          <p className="text-sm text-gray-500">Tag: {data.tagId}
+            {data.tagStatus && (
+              <span className={`ml-2 inline-block px-1.5 py-0.5 text-xs rounded-full ${
+                data.tagStatus === 'active' ? 'bg-green-100 text-green-700' :
+                data.tagStatus === 'lost' ? 'bg-red-100 text-red-700' :
+                'bg-gray-100 text-gray-700'
+              }`}>{data.tagStatus}</span>
+            )}
+          </p>
         </div>
 
         <div className="bg-white rounded-xl shadow-md overflow-hidden">

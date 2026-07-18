@@ -13,6 +13,8 @@ import {
   updateContentSchema,
   createSettingSchema,
   createFeatureFlagSchema,
+  createTagSchema,
+  updateTagSchema,
 } from '../middleware/schemas';
 import {
   User,
@@ -681,9 +683,18 @@ router.get('/pets', async (req, res: Response) => {
       .skip((Number(page) - 1) * Number(limit))
       .limit(Number(limit));
 
+    // Attach linked tag info for each pet
+    const petIds = pets.map((p) => p._id);
+    const tags = await Tag.find({ petId: { $in: petIds } }).select('tagId petId status');
+    const tagMap = new Map(tags.map((t) => [t.petId.toString(), t]));
+    const petsWithTag = pets.map((pet) => ({
+      ...pet.toObject(),
+      linkedTag: tagMap.get(pet._id.toString()) || null,
+    }));
+
     res.json({
       success: true,
-      data: { items: pets, total, page: Number(page), limit: Number(limit), totalPages: Math.ceil(total / Number(limit)) },
+      data: { items: petsWithTag, total, page: Number(page), limit: Number(limit), totalPages: Math.ceil(total / Number(limit)) },
     });
   } catch (error) {
     res.status(500).json({ success: false, error: 'Failed to fetch pets' });
@@ -839,7 +850,7 @@ router.get('/tags', async (req, res: Response) => {
 
     const total = await Tag.countDocuments(query);
     const tags = await Tag.find(query)
-      .populate('petId', 'name species breed')
+      .populate('petId', 'name petId petType breed color status')
       .populate('ownerId', 'fullName email')
       .sort({ createdAt: -1 })
       .skip((Number(page) - 1) * Number(limit))
@@ -852,6 +863,210 @@ router.get('/tags', async (req, res: Response) => {
   } catch (error) {
     res.status(500).json({ success: false, error: 'Failed to fetch tags' });
   }
+});
+
+// --- Tag CRUD ---
+
+function generateTagId(): string {
+  const digits = Math.floor(100000 + Math.random() * 900000).toString();
+  return `PT-${digits}`;
+}
+
+/**
+ * @swagger
+ * /api/admin/tags:
+ *   post:
+ *     tags: [Admin - Tags]
+ *     summary: Create a new tag and link it to a pet
+ *     description: Creates a tag. Enforces one-tag-per-pet rule. tagId is auto-generated if not provided.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [petId, ownerId]
+ *             properties:
+ *               petId:
+ *                 type: string
+ *               ownerId:
+ *                 type: string
+ *               tagId:
+ *                 type: string
+ *                 description: "Format: PT-NNNNNN. Auto-generated if omitted."
+ *               status:
+ *                 type: string
+ *                 enum: [active, inactive, lost]
+ *     responses:
+ *       201:
+ *         description: Tag created
+ *       400:
+ *         description: Validation error or pet already has a tag
+ */
+router.post('/tags', validate(createTagSchema), async (req: AuthRequest, res: Response) => {
+  try {
+    const { petId, ownerId, tagId: customTagId, status } = req.body;
+
+    const pet = await Pet.findById(petId);
+    if (!pet) { res.status(400).json({ success: false, error: 'Pet not found' }); return; }
+
+    const owner = await User.findById(ownerId);
+    if (!owner) { res.status(400).json({ success: false, error: 'Owner not found' }); return; }
+
+    const existingTag = await Tag.findOne({ petId });
+    if (existingTag) {
+      res.status(400).json({ success: false, error: `This pet already has a tag (${existingTag.tagId}). Each pet can only have one tag.` });
+      return;
+    }
+
+    let tagId = customTagId;
+    if (!tagId) {
+      let attempts = 0;
+      do { tagId = generateTagId(); attempts++; } while (await Tag.findOne({ tagId }) && attempts < 10);
+    } else {
+      if (!/^PT-\d{6}$/.test(tagId)) { res.status(400).json({ success: false, error: 'Tag ID must be in format PT-NNNNNN' }); return; }
+      if (await Tag.findOne({ tagId })) { res.status(400).json({ success: false, error: 'Tag ID already exists' }); return; }
+    }
+
+    const tag = await Tag.create({ tagId, petId, ownerId, status: status || 'active' });
+    const populated = await Tag.findById(tag._id)
+      .populate('petId', 'name petId petType breed color')
+      .populate('ownerId', 'fullName email');
+
+    await AuditLog.create({ userId: req.user!.id, action: 'create', entity: 'Tag', entityId: tag._id.toString(), changes: { tagId, petId, ownerId } });
+    res.status(201).json({ success: true, data: populated });
+  } catch (error) { res.status(500).json({ success: false, error: 'Failed to create tag' }); }
+});
+
+/**
+ * @swagger
+ * /api/admin/tags/{id}:
+ *   get:
+ *     tags: [Admin - Tags]
+ *     summary: Get a single tag by ID
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Tag details
+ *       404:
+ *         description: Tag not found
+ */
+router.get('/tags/:id', async (req: AuthRequest, res: Response) => {
+  try {
+    const tag = await Tag.findById(req.params.id)
+      .populate('petId', 'name petId petType breed color pattern photos photoUrl status')
+      .populate('ownerId', 'fullName email phoneNumber');
+    if (!tag) { res.status(404).json({ success: false, error: 'Tag not found' }); return; }
+    res.json({ success: true, data: tag });
+  } catch (error) { res.status(500).json({ success: false, error: 'Failed to fetch tag' }); }
+});
+
+/**
+ * @swagger
+ * /api/admin/tags/{id}:
+ *   put:
+ *     tags: [Admin - Tags]
+ *     summary: Update a tag (admin god-mode)
+ *     description: Admin can change pet link, owner, or status. Enforces one-tag-per-pet when changing petId.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               petId:
+ *                 type: string
+ *               ownerId:
+ *                 type: string
+ *               status:
+ *                 type: string
+ *                 enum: [active, inactive, lost]
+ *     responses:
+ *       200:
+ *         description: Tag updated
+ *       400:
+ *         description: Validation error or pet already has a tag
+ *       404:
+ *         description: Tag not found
+ */
+router.put('/tags/:id', validate(updateTagSchema), async (req: AuthRequest, res: Response) => {
+  try {
+    const tag = await Tag.findById(req.params.id);
+    if (!tag) { res.status(404).json({ success: false, error: 'Tag not found' }); return; }
+
+    if (req.body.petId && req.body.petId !== tag.petId.toString()) {
+      const newPet = await Pet.findById(req.body.petId);
+      if (!newPet) { res.status(400).json({ success: false, error: 'Pet not found' }); return; }
+      const existingTagOnNewPet = await Tag.findOne({ petId: req.body.petId, _id: { $ne: tag._id } });
+      if (existingTagOnNewPet) {
+        res.status(400).json({ success: false, error: `Pet already has a tag (${existingTagOnNewPet.tagId}). Each pet can only have one tag.` });
+        return;
+      }
+    }
+
+    const oldValues: any = {};
+    const newValues: any = {};
+    for (const key of ['petId', 'ownerId', 'status']) {
+      if (req.body[key] !== undefined) {
+        oldValues[key] = tag.get(key);
+        newValues[key] = req.body[key];
+      }
+    }
+
+    const updated = await Tag.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true })
+      .populate('petId', 'name petId petType breed color')
+      .populate('ownerId', 'fullName email');
+
+    await AuditLog.create({ userId: req.user!.id, action: 'update', entity: 'Tag', entityId: tag._id.toString(), changes: { old: oldValues, new: newValues } });
+    res.json({ success: true, data: updated });
+  } catch (error) { res.status(500).json({ success: false, error: 'Failed to update tag' }); }
+});
+
+/**
+ * @swagger
+ * /api/admin/tags/{id}:
+ *   delete:
+ *     tags: [Admin - Tags]
+ *     summary: Delete a tag
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Tag deleted
+ *       404:
+ *         description: Tag not found
+ */
+router.delete('/tags/:id', async (req: AuthRequest, res: Response) => {
+  try {
+    const tag = await Tag.findByIdAndDelete(req.params.id);
+    if (!tag) { res.status(404).json({ success: false, error: 'Tag not found' }); return; }
+    await AuditLog.create({ userId: req.user!.id, action: 'delete', entity: 'Tag', entityId: req.params.id, changes: { tagId: tag.tagId } });
+    res.json({ success: true, data: { message: 'Tag deleted' } });
+  } catch (error) { res.status(500).json({ success: false, error: 'Failed to delete tag' }); }
 });
 
 // --- Product Management ---

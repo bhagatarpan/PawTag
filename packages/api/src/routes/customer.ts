@@ -36,7 +36,15 @@ router.use(authenticate);
 router.get('/pets', async (req: AuthRequest, res: Response) => {
   try {
     const pets = await Pet.find({ ownerId: req.user!.id }).sort({ createdAt: -1 });
-    res.json({ success: true, data: pets });
+    // Attach linked tag info (read-only) for each pet
+    const petIds = pets.map((p) => p._id);
+    const tags = await Tag.find({ petId: { $in: petIds } }).select('tagId petId status');
+    const tagMap = new Map(tags.map((t) => [t.petId.toString(), t]));
+    const petsWithTag = pets.map((pet) => ({
+      ...pet.toObject(),
+      linkedTag: tagMap.get(pet._id.toString()) || null,
+    }));
+    res.json({ success: true, data: petsWithTag });
   } catch (error) {
     res.status(500).json({ success: false, error: 'Failed to fetch pets' });
   }

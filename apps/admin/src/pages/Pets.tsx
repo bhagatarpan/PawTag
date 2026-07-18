@@ -366,6 +366,7 @@ export default function Pets() {
               <th className="text-left px-3 py-2.5 font-medium text-gray-500 w-10">Photo</th>
               <th className="text-left px-3 py-2.5 font-medium text-gray-500">Pet ID</th>
               <th className="text-left px-3 py-2.5 font-medium text-gray-500">Name</th>
+              <th className="text-left px-3 py-2.5 font-medium text-gray-500">Tag</th>
               <th className="text-left px-3 py-2.5 font-medium text-gray-500">Type</th>
               <th className="text-left px-3 py-2.5 font-medium text-gray-500">Breed</th>
               <th className="text-left px-3 py-2.5 font-medium text-gray-500">Color</th>
@@ -377,9 +378,9 @@ export default function Pets() {
           </thead>
           <tbody className="divide-y divide-gray-200">
             {loading ? (
-              <tr><td colSpan={10} className="px-4 py-6 text-center text-gray-500">Loading...</td></tr>
+              <tr><td colSpan={11} className="px-4 py-6 text-center text-gray-500">Loading...</td></tr>
             ) : data?.items.length === 0 ? (
-              <tr><td colSpan={10} className="px-4 py-6 text-center text-gray-500">No pets found</td></tr>
+              <tr><td colSpan={11} className="px-4 py-6 text-center text-gray-500">No pets found</td></tr>
             ) : data?.items.map((pet: any) => {
               const mainPhoto = pet.photos?.length > 0 ? (pet.photos.find((p: any) => p.isMain) || pet.photos[0])?.url : pet.photoUrl;
               const breedDisplay = pet.breed === 'Mixed Breed' && pet.secondaryBreed && pet.secondaryBreed !== 'Unknown' ? `Mixed (${pet.secondaryBreed})` : pet.breed;
@@ -392,6 +393,14 @@ export default function Pets() {
                   </td>
                   <td className="px-3 py-2 text-xs font-mono text-gray-500">{pet.petId || '—'}</td>
                   <td className="px-3 py-2 font-medium">{pet.name}{pet.photos?.length > 1 && <span className="text-gray-400 text-xs ml-1">({pet.photos.length})</span>}</td>
+                  <td className="px-3 py-2">
+                    {pet.linkedTag ? (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs font-mono rounded bg-primary-50 text-primary-700 border border-primary-200">
+                        {pet.linkedTag.tagId}
+                        <span className={`w-1.5 h-1.5 rounded-full ${pet.linkedTag.status === 'active' ? 'bg-green-500' : pet.linkedTag.status === 'lost' ? 'bg-red-500' : 'bg-gray-400'}`} />
+                      </span>
+                    ) : <span className="text-gray-300 text-xs">No tag</span>}
+                  </td>
                   <td className="px-3 py-2 text-gray-600">{pet.petType}</td>
                   <td className="px-3 py-2 text-gray-600">{breedDisplay}</td>
                   <td className="px-3 py-2 text-gray-600">{pet.color}</td>
