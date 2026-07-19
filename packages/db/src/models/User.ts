@@ -5,7 +5,8 @@ export interface IUserDocument extends Document {
   passwordHash: string;
   fullName: string;
   phoneNumber: string;
-  role: 'super_admin' | 'admin' | 'support' | 'customer';
+  role: string; // Legacy single-role field — kept for backward compatibility
+  roles: mongoose.Types.ObjectId[]; // References to Role collection (new RBAC)
   status: 'active' | 'inactive' | 'suspended' | 'pending_verification';
   emailVerified: boolean;
   phoneVerified: boolean;
@@ -34,11 +35,8 @@ const UserSchema = new Schema<IUserDocument>(
     passwordHash: { type: String, required: true },
     fullName: { type: String, required: true, trim: true },
     phoneNumber: { type: String, required: true },
-    role: {
-      type: String,
-      enum: ['super_admin', 'admin', 'support', 'customer'],
-      default: 'customer',
-    },
+    role: { type: String, default: 'customer', lowercase: true }, // Legacy compatibility
+    roles: [{ type: Schema.Types.ObjectId, ref: 'Role' }],
     status: {
       type: String,
       enum: ['active', 'inactive', 'suspended', 'pending_verification'],
@@ -68,7 +66,7 @@ const UserSchema = new Schema<IUserDocument>(
 );
 
 UserSchema.index({ email: 1 });
-UserSchema.index({ role: 1 });
+UserSchema.index({ roles: 1 });
 UserSchema.index({ status: 1 });
 UserSchema.index({ deletedAt: 1 });
 

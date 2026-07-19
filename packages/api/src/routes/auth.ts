@@ -3,7 +3,7 @@ import { AuthRequest, authenticate } from '../middleware/auth';
 import { validate } from '../middleware/validation';
 import { registerSchema, loginSchema, verifyOtpSchema, updateProfileSchema, changePasswordSchema } from '../middleware/schemas';
 import { hashPassword, verifyPassword, generateToken, generateOtp } from '../services/auth.service';
-import { User } from '@pawtag/db';
+import { User, Role, UserRole } from '@pawtag/db';
 
 const router = Router();
 
@@ -37,7 +37,7 @@ router.post('/register', validate(registerSchema), async (req, res: Response) =>
     }
 
     const passwordHash = await hashPassword(password);
-    await User.create({
+    const user = await User.create({
       email,
       passwordHash,
       fullName,
@@ -45,6 +45,16 @@ router.post('/register', validate(registerSchema), async (req, res: Response) =>
       role: 'customer',
       status: 'pending_verification',
     });
+
+    // Assign PET_OWNER RBAC role to new customer
+    const petOwnerRole = await Role.findOne({ name: 'PET_OWNER' });
+    if (petOwnerRole) {
+      await UserRole.create({
+        userId: user._id,
+        roleId: petOwnerRole._id,
+        isActive: true,
+      });
+    }
 
     // TODO: Send OTP email/SMS
     const otp = generateOtp();

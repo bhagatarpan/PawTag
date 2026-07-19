@@ -19,6 +19,7 @@ import { Tag } from '@pawtag/db';
 
 import authRoutes from './routes/auth';
 import adminRoutes from './routes/admin';
+import rbacRoutes from './routes/rbac';
 import customerRoutes from './routes/customer';
 import finderRoutes from './routes/finder';
 import uploadRoutes from './routes/upload';
@@ -106,6 +107,7 @@ app.get('/api/tags/:tagId/sticker', async (req, res) => {
 // --- API Routes ---
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/admin/rbac', rbacRoutes);
 app.use('/api/customer', customerRoutes);
 app.use('/api/finder', finderRoutes);
 app.use('/api/upload', uploadRoutes);

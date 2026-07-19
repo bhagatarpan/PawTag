@@ -13,6 +13,10 @@ import Settings from './pages/Settings';
 import FeatureFlags from './pages/FeatureFlags';
 import AuditLogs from './pages/AuditLogs';
 import Statistics from './pages/Statistics';
+import RbacRoles from './pages/RbacRoles';
+import RbacPermissions from './pages/RbacPermissions';
+import RbacPermissionGroups from './pages/RbacPermissionGroups';
+import RbacScopes from './pages/RbacScopes';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
@@ -119,6 +123,10 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+      <Route path="/rbac/roles" element={<ProtectedRoute><RbacRoles /></ProtectedRoute>} />
+      <Route path="/rbac/permissions" element={<ProtectedRoute><RbacPermissions /></ProtectedRoute>} />
+      <Route path="/rbac/permission-groups" element={<ProtectedRoute><RbacPermissionGroups /></ProtectedRoute>} />
+      <Route path="/rbac/scopes" element={<ProtectedRoute><RbacScopes /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import QRCode from 'qrcode';
 import { AuthRequest, authenticate } from '../middleware/auth';
-import { authorize } from '../middleware/rbac';
+import { requirePermission } from '../middleware/permission';
 import { validate } from '../middleware/validation';
 import {
   updateUserRoleSchema,
@@ -36,8 +36,8 @@ import { hashPassword } from '../services/auth.service';
 
 const router = Router();
 
-// All admin routes require authentication + admin role
-router.use(authenticate, authorize('super_admin', 'admin', 'support'));
+// All admin routes require authentication
+router.use(authenticate);
 
 // --- Dashboard Stats ---
 /**
@@ -46,7 +46,7 @@ router.use(authenticate, authorize('super_admin', 'admin', 'support'));
  *   get:
  *     tags: [Admin - Dashboard]
  *     summary: Get dashboard statistics
- *     description: Returns key metrics: total users, pets, tags, orders, revenue, lost pets, recent scans.
+ *     description: 'Returns key metrics: total users, pets, tags, orders, revenue, lost pets, recent scans.'
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -57,7 +57,7 @@ router.use(authenticate, authorize('super_admin', 'admin', 'support'));
  *       403:
  *         description: Insufficient permissions
  */
-router.get('/dashboard', async (_req: AuthRequest, res: Response) => {
+router.get('/dashboard', requirePermission('dashboard.read'), async (_req: AuthRequest, res: Response) => {
   try {
     const [totalUsers, totalPets, totalTags, totalOrders, lostPets, recentScans] =
       await Promise.all([
@@ -97,7 +97,7 @@ router.get('/dashboard', async (_req: AuthRequest, res: Response) => {
 });
 
 // --- Comprehensive Lost/Found Statistics ---
-router.get('/stats/lost-found', async (_req: AuthRequest, res: Response) => {
+router.get('/stats/lost-found', requirePermission('stats.read'), async (_req: AuthRequest, res: Response) => {
   try {
     const now = new Date();
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -267,7 +267,7 @@ router.get('/stats/lost-found', async (_req: AuthRequest, res: Response) => {
  *       403:
  *         description: Insufficient permissions
  */
-router.get('/users', async (req, res: Response) => {
+router.get('/users', requirePermission('user.read'), async (req, res: Response) => {
   try {
     const { page = 1, limit = 20, search, role, status } = req.query;
     const query: any = { deletedAt: null };
@@ -323,7 +323,7 @@ router.get('/users', async (req, res: Response) => {
  *       404:
  *         description: User not found
  */
-router.get('/users/:id', async (req, res: Response) => {
+router.get('/users/:id', requirePermission('user.read'), async (req, res: Response) => {
   try {
     const user = await User.findOne({ _id: req.params.id, deletedAt: null }).select('-passwordHash');
     if (!user) { res.status(404).json({ success: false, error: 'User not found' }); return; }
@@ -371,7 +371,7 @@ router.get('/users/:id', async (req, res: Response) => {
  *       404:
  *         description: User not found
  */
-router.put('/users/:id/role', validate(updateUserRoleSchema), async (req: AuthRequest, res: Response) => {
+router.put('/users/:id/role', requirePermission('user.assign_role'), validate(updateUserRoleSchema), async (req: AuthRequest, res: Response) => {
   try {
     const user = await User.findOne({ _id: req.params.id, deletedAt: null });
     if (!user) { res.status(404).json({ success: false, error: 'User not found' }); return; }
@@ -432,7 +432,7 @@ router.put('/users/:id/role', validate(updateUserRoleSchema), async (req: AuthRe
  *       404:
  *         description: User not found
  */
-router.put('/users/:id/status', validate(updateUserStatusSchema), async (req: AuthRequest, res: Response) => {
+router.put('/users/:id/status', requirePermission('user.update'), validate(updateUserStatusSchema), async (req: AuthRequest, res: Response) => {
   try {
     const user = await User.findOne({ _id: req.params.id, deletedAt: null });
     if (!user) { res.status(404).json({ success: false, error: 'User not found' }); return; }
@@ -456,7 +456,7 @@ router.put('/users/:id/status', validate(updateUserStatusSchema), async (req: Au
 });
 
 // POST /api/admin/users/:id/reset-password
-router.post('/users/:id/reset-password', validate(adminResetPasswordSchema), async (req: AuthRequest, res: Response) => {
+router.post('/users/:id/reset-password', requirePermission('user.reset_password'), validate(adminResetPasswordSchema), async (req: AuthRequest, res: Response) => {
   try {
     const user = await User.findOne({ _id: req.params.id, deletedAt: null });
     if (!user) { res.status(404).json({ success: false, error: 'User not found' }); return; }
@@ -479,7 +479,7 @@ router.post('/users/:id/reset-password', validate(adminResetPasswordSchema), asy
 });
 
 // PUT /api/admin/users/:id/lock
-router.put('/users/:id/lock', async (req: AuthRequest, res: Response) => {
+router.put('/users/:id/lock', requirePermission('user.deactivate'), async (req: AuthRequest, res: Response) => {
   try {
     const user = await User.findOne({ _id: req.params.id, deletedAt: null });
     if (!user) { res.status(404).json({ success: false, error: 'User not found' }); return; }
@@ -503,7 +503,7 @@ router.put('/users/:id/lock', async (req: AuthRequest, res: Response) => {
 });
 
 // PUT /api/admin/users/:id/unlock
-router.put('/users/:id/unlock', async (req: AuthRequest, res: Response) => {
+router.put('/users/:id/unlock', requirePermission('user.activate'), async (req: AuthRequest, res: Response) => {
   try {
     const user = await User.findOne({ _id: req.params.id, deletedAt: null });
     if (!user) { res.status(404).json({ success: false, error: 'User not found' }); return; }
@@ -527,7 +527,7 @@ router.put('/users/:id/unlock', async (req: AuthRequest, res: Response) => {
 });
 
 // DELETE /api/admin/users/:id (soft delete)
-router.delete('/users/:id', async (req: AuthRequest, res: Response) => {
+router.delete('/users/:id', requirePermission('user.delete'), async (req: AuthRequest, res: Response) => {
   try {
     const user = await User.findOne({ _id: req.params.id, deletedAt: null });
     if (!user) { res.status(404).json({ success: false, error: 'User not found' }); return; }
@@ -585,7 +585,7 @@ router.delete('/users/:id', async (req: AuthRequest, res: Response) => {
  *       403:
  *         description: Insufficient permissions
  */
-router.post('/owners/register', async (req: AuthRequest, res: Response) => {
+router.post('/owners/register', requirePermission('user.create'), async (req: AuthRequest, res: Response) => {
   try {
     const { email, password, fullName, phoneNumber } = req.body;
     if (!email || !password || !fullName || !phoneNumber) {
@@ -651,7 +651,7 @@ router.post('/owners/register', async (req: AuthRequest, res: Response) => {
  *       403:
  *         description: Insufficient permissions
  */
-router.post('/pets', async (req: AuthRequest, res: Response) => {
+router.post('/pets', requirePermission('pet.create'), async (req: AuthRequest, res: Response) => {
   try {
     // Admin creates pet for any owner — ownerId is required
     const { ownerId, ...petData } = req.body;
@@ -728,7 +728,7 @@ router.post('/pets', async (req: AuthRequest, res: Response) => {
  *       404:
  *         description: Pet not found
  */
-router.put('/pets/:id', validate(updatePetSchema), async (req: AuthRequest, res: Response) => {
+router.put('/pets/:id', requirePermission('pet.update'), validate(updatePetSchema), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await Pet.findOne({ _id: req.params.id, deletedAt: null });
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -775,7 +775,7 @@ router.put('/pets/:id', validate(updatePetSchema), async (req: AuthRequest, res:
  *       404:
  *         description: Pet not found
  */
-router.delete('/pets/:id', async (req: AuthRequest, res: Response) => {
+router.delete('/pets/:id', requirePermission('pet.delete'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await Pet.findOne({ _id: req.params.id, deletedAt: null });
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -878,7 +878,7 @@ router.delete('/pets/:id', async (req: AuthRequest, res: Response) => {
  *       403:
  *         description: Insufficient permissions
  */
-router.get('/pets', async (req, res: Response) => {
+router.get('/pets', requirePermission('pet.read'), async (req, res: Response) => {
   try {
     const { page = 1, limit = 20, search, status, petType, petName, petBreed, petColor, petPattern, ownerName, ownerEmail, ownerPhone } = req.query;
     const query: any = { deletedAt: null };
@@ -979,7 +979,7 @@ router.get('/pets', async (req, res: Response) => {
  *       404:
  *         description: Pet not found
  */
-router.put('/pets/:id/status', async (req: AuthRequest, res: Response) => {
+router.put('/pets/:id/status', requirePermission('pet.update'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await Pet.findByIdAndUpdate(req.params.id, { status: req.body.status }, { new: true });
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -1024,7 +1024,7 @@ router.put('/pets/:id/status', async (req: AuthRequest, res: Response) => {
  *       404:
  *         description: Pet not found
  */
-router.delete('/pets/:id', async (req: AuthRequest, res: Response) => {
+router.delete('/pets/:id', requirePermission('pet.delete'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await Pet.findByIdAndDelete(req.params.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -1081,7 +1081,7 @@ router.delete('/pets/:id', async (req: AuthRequest, res: Response) => {
  *       403:
  *         description: Insufficient permissions
  */
-router.get('/tags', async (req, res: Response) => {
+router.get('/tags', requirePermission('tag.read'), async (req, res: Response) => {
   try {
     const { page = 1, limit = 20, search, status } = req.query;
     const query: any = { deletedAt: null };
@@ -1145,7 +1145,7 @@ function generateTagId(): string {
  *       400:
  *         description: Validation error or pet already has a tag
  */
-router.post('/tags', validate(createTagSchema), async (req: AuthRequest, res: Response) => {
+router.post('/tags', requirePermission('tag.create'), validate(createTagSchema), async (req: AuthRequest, res: Response) => {
   try {
     const { petId, ownerId, tagId: customTagId, status } = req.body;
 
@@ -1200,7 +1200,7 @@ router.post('/tags', validate(createTagSchema), async (req: AuthRequest, res: Re
  *       404:
  *         description: Tag not found
  */
-router.get('/tags/:id', async (req: AuthRequest, res: Response) => {
+router.get('/tags/:id', requirePermission('tag.read'), async (req: AuthRequest, res: Response) => {
   try {
     const tag = await Tag.findOne({ _id: req.params.id, deletedAt: null })
       .populate('petId', 'name petId petType breed color pattern photos photoUrl status')
@@ -1247,7 +1247,7 @@ router.get('/tags/:id', async (req: AuthRequest, res: Response) => {
  *       404:
  *         description: Tag not found
  */
-router.put('/tags/:id', validate(updateTagSchema), async (req: AuthRequest, res: Response) => {
+router.put('/tags/:id', requirePermission('tag.update'), validate(updateTagSchema), async (req: AuthRequest, res: Response) => {
   try {
     const tag = await Tag.findOne({ _id: req.params.id, deletedAt: null });
     if (!tag) { res.status(404).json({ success: false, error: 'Tag not found' }); return; }
@@ -1302,7 +1302,7 @@ router.put('/tags/:id', validate(updateTagSchema), async (req: AuthRequest, res:
  *       404:
  *         description: Tag not found
  */
-router.delete('/tags/:id', async (req: AuthRequest, res: Response) => {
+router.delete('/tags/:id', requirePermission('tag.delete'), async (req: AuthRequest, res: Response) => {
   try {
     const tag = await Tag.findOne({ _id: req.params.id, deletedAt: null });
     if (!tag) { res.status(404).json({ success: false, error: 'Tag not found' }); return; }
@@ -1325,7 +1325,7 @@ const FINDER_BASE_URL = process.env.FINDER_URL || 'http://localhost:3003';
  *   get:
  *     tags: [Admin - Tags]
  *     summary: Generate QR code image for a tag
- *     description: Returns a PNG image of the QR code. The QR encodes the finder URL (e.g. http://localhost:3003/PT-123456).
+ *     description: 'Returns a PNG image of the QR code. The QR encodes the finder URL (e.g. http://localhost:3003/PT-123456).'
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -1351,7 +1351,7 @@ const FINDER_BASE_URL = process.env.FINDER_URL || 'http://localhost:3003';
  *       404:
  *         description: Tag not found
  */
-router.get('/tags/:id/qr', async (req: AuthRequest, res: Response) => {
+router.get('/tags/:id/qr', requirePermission('tag.generate_qr'), async (req: AuthRequest, res: Response) => {
   try {
     const tag = await Tag.findById(req.params.id);
     if (!tag) { res.status(404).json({ success: false, error: 'Tag not found' }); return; }
@@ -1391,7 +1391,7 @@ router.get('/tags/:id/qr', async (req: AuthRequest, res: Response) => {
  *       404:
  *         description: Tag not found
  */
-router.get('/tags/:id/sticker', async (req: AuthRequest, res: Response) => {
+router.get('/tags/:id/sticker', requirePermission('tag.generate_sticker'), async (req: AuthRequest, res: Response) => {
   try {
     const tag = await Tag.findById(req.params.id)
       .populate('petId', 'name petId petType breed color')
@@ -1468,7 +1468,7 @@ router.get('/tags/:id/sticker', async (req: AuthRequest, res: Response) => {
  *       200:
  *         description: HTML page with all QR stickers
  */
-router.post('/tags/qr-bulk', async (req: AuthRequest, res: Response) => {
+router.post('/tags/qr-bulk', requirePermission('tag.generate_qr'), async (req: AuthRequest, res: Response) => {
   try {
     const { tagIds } = req.body;
     if (!tagIds || !Array.isArray(tagIds) || tagIds.length === 0) {
@@ -1572,7 +1572,7 @@ router.post('/tags/qr-bulk', async (req: AuthRequest, res: Response) => {
  *       403:
  *         description: Insufficient permissions
  */
-router.get('/products', async (req, res: Response) => {
+router.get('/products', requirePermission('product.read'), async (req, res: Response) => {
   try {
     const { page = 1, limit = 20, search, category, isActive } = req.query;
     const query: any = {};
@@ -1626,7 +1626,7 @@ router.get('/products', async (req, res: Response) => {
  *       404:
  *         description: Product not found
  */
-router.get('/products/:id', async (req, res: Response) => {
+router.get('/products/:id', requirePermission('product.read'), async (req, res: Response) => {
   try {
     const product = await Product.findById(req.params.id);
     if (!product) { res.status(404).json({ success: false, error: 'Product not found' }); return; }
@@ -1676,7 +1676,7 @@ router.get('/products/:id', async (req, res: Response) => {
  *       403:
  *         description: Insufficient permissions
  */
-router.post('/products', validate(createProductSchema), async (req: AuthRequest, res: Response) => {
+router.post('/products', requirePermission('product.create'), validate(createProductSchema), async (req: AuthRequest, res: Response) => {
   try {
     const product = await Product.create(req.body);
 
@@ -1738,7 +1738,7 @@ router.post('/products', validate(createProductSchema), async (req: AuthRequest,
  *       404:
  *         description: Product not found
  */
-router.put('/products/:id', validate(updateProductSchema), async (req: AuthRequest, res: Response) => {
+router.put('/products/:id', requirePermission('product.update'), validate(updateProductSchema), async (req: AuthRequest, res: Response) => {
   try {
     const product = await Product.findByIdAndUpdate(req.params.id, req.body, { new: true });
     if (!product) { res.status(404).json({ success: false, error: 'Product not found' }); return; }
@@ -1782,7 +1782,7 @@ router.put('/products/:id', validate(updateProductSchema), async (req: AuthReque
  *       404:
  *         description: Product not found
  */
-router.delete('/products/:id', async (req: AuthRequest, res: Response) => {
+router.delete('/products/:id', requirePermission('product.delete'), async (req: AuthRequest, res: Response) => {
   try {
     const product = await Product.findByIdAndDelete(req.params.id);
     if (!product) { res.status(404).json({ success: false, error: 'Product not found' }); return; }
@@ -1839,7 +1839,7 @@ router.delete('/products/:id', async (req: AuthRequest, res: Response) => {
  *       403:
  *         description: Insufficient permissions
  */
-router.get('/orders', async (req, res: Response) => {
+router.get('/orders', requirePermission('order.read'), async (req, res: Response) => {
   try {
     const { page = 1, limit = 20, status, search } = req.query;
     const query: any = {};
@@ -1903,7 +1903,7 @@ router.get('/orders', async (req, res: Response) => {
  *       404:
  *         description: Order not found
  */
-router.put('/orders/:id/status', async (req: AuthRequest, res: Response) => {
+router.put('/orders/:id/status', requirePermission('order.update'), async (req: AuthRequest, res: Response) => {
   try {
     const { status, trackingNumber } = req.body;
     const update: any = { status };
@@ -1955,7 +1955,7 @@ router.put('/orders/:id/status', async (req: AuthRequest, res: Response) => {
  *       403:
  *         description: Insufficient permissions
  */
-router.get('/content', async (req, res: Response) => {
+router.get('/content', requirePermission('content.read'), async (req, res: Response) => {
   try {
     const { status, search } = req.query;
     const query: any = {};
@@ -2003,7 +2003,7 @@ router.get('/content', async (req, res: Response) => {
  *       404:
  *         description: Content not found
  */
-router.get('/content/:id', async (req, res: Response) => {
+router.get('/content/:id', requirePermission('content.read'), async (req, res: Response) => {
   try {
     const content = await SiteContent.findById(req.params.id);
     if (!content) { res.status(404).json({ success: false, error: 'Content not found' }); return; }
@@ -2048,7 +2048,7 @@ router.get('/content/:id', async (req, res: Response) => {
  *       403:
  *         description: Insufficient permissions
  */
-router.post('/content', validate(createContentSchema), async (req: AuthRequest, res: Response) => {
+router.post('/content', requirePermission('content.create'), validate(createContentSchema), async (req: AuthRequest, res: Response) => {
   try {
     const content = await SiteContent.create({ ...req.body, createdBy: req.user!.id });
     res.status(201).json({ success: true, data: content });
@@ -2098,7 +2098,7 @@ router.post('/content', validate(createContentSchema), async (req: AuthRequest, 
  *       404:
  *         description: Content not found
  */
-router.put('/content/:id', validate(updateContentSchema), async (req: AuthRequest, res: Response) => {
+router.put('/content/:id', requirePermission('content.update'), validate(updateContentSchema), async (req: AuthRequest, res: Response) => {
   try {
     const update = { ...req.body };
     if (update.status === 'published' && !update.publishedAt) {
@@ -2136,7 +2136,7 @@ router.put('/content/:id', validate(updateContentSchema), async (req: AuthReques
  *       403:
  *         description: Insufficient permissions
  */
-router.delete('/content/:id', async (req: AuthRequest, res: Response) => {
+router.delete('/content/:id', requirePermission('content.delete'), async (req: AuthRequest, res: Response) => {
   try {
     await SiteContent.findByIdAndDelete(req.params.id);
     res.json({ success: true, data: { message: 'Content deleted' } });
@@ -2169,7 +2169,7 @@ router.delete('/content/:id', async (req: AuthRequest, res: Response) => {
  *       403:
  *         description: Insufficient permissions
  */
-router.get('/settings', async (req, res: Response) => {
+router.get('/settings', requirePermission('setting.read'), async (req, res: Response) => {
   try {
     const { category } = req.query;
     const query: any = {};
@@ -2220,7 +2220,7 @@ router.get('/settings', async (req, res: Response) => {
  *       404:
  *         description: Setting not found
  */
-router.put('/settings/:key', async (req: AuthRequest, res: Response) => {
+router.put('/settings/:key', requirePermission('setting.update'), async (req: AuthRequest, res: Response) => {
   try {
     const setting = await Setting.findOneAndUpdate(
       { key: req.params.key },
@@ -2269,7 +2269,7 @@ router.put('/settings/:key', async (req: AuthRequest, res: Response) => {
  *       403:
  *         description: Insufficient permissions
  */
-router.post('/settings', validate(createSettingSchema), async (req: AuthRequest, res: Response) => {
+router.post('/settings', requirePermission('setting.create'), validate(createSettingSchema), async (req: AuthRequest, res: Response) => {
   try {
     const setting = await Setting.create({ ...req.body, updatedBy: req.user!.id });
     res.status(201).json({ success: true, data: setting });
@@ -2296,7 +2296,7 @@ router.post('/settings', validate(createSettingSchema), async (req: AuthRequest,
  *       403:
  *         description: Insufficient permissions
  */
-router.get('/feature-flags', async (_req, res: Response) => {
+router.get('/feature-flags', requirePermission('feature_flag.read'), async (_req, res: Response) => {
   try {
     const flags = await FeatureFlag.find().sort({ key: 1 });
     res.json({ success: true, data: flags });
@@ -2337,7 +2337,7 @@ router.get('/feature-flags', async (_req, res: Response) => {
  *       403:
  *         description: Insufficient permissions
  */
-router.post('/feature-flags', validate(createFeatureFlagSchema), async (req: AuthRequest, res: Response) => {
+router.post('/feature-flags', requirePermission('feature_flag.create'), validate(createFeatureFlagSchema), async (req: AuthRequest, res: Response) => {
   try {
     const flag = await FeatureFlag.create(req.body);
     res.status(201).json({ success: true, data: flag });
@@ -2383,7 +2383,7 @@ router.post('/feature-flags', validate(createFeatureFlagSchema), async (req: Aut
  *       404:
  *         description: Feature flag not found
  */
-router.put('/feature-flags/:key', async (req: AuthRequest, res: Response) => {
+router.put('/feature-flags/:key', requirePermission('feature_flag.update'), async (req: AuthRequest, res: Response) => {
   try {
     const flag = await FeatureFlag.findOneAndUpdate({ key: req.params.key }, req.body, { new: true });
     if (!flag) { res.status(404).json({ success: false, error: 'Feature flag not found' }); return; }
@@ -2417,7 +2417,7 @@ router.put('/feature-flags/:key', async (req: AuthRequest, res: Response) => {
  *       403:
  *         description: Insufficient permissions
  */
-router.delete('/feature-flags/:key', async (req: AuthRequest, res: Response) => {
+router.delete('/feature-flags/:key', requirePermission('feature_flag.delete'), async (req: AuthRequest, res: Response) => {
   try {
     await FeatureFlag.findOneAndDelete({ key: req.params.key });
     res.json({ success: true, data: { message: 'Feature flag deleted' } });
@@ -2465,7 +2465,7 @@ router.delete('/feature-flags/:key', async (req: AuthRequest, res: Response) => 
  *       403:
  *         description: Insufficient permissions
  */
-router.get('/audit-logs', async (req, res: Response) => {
+router.get('/audit-logs', requirePermission('audit_log.read'), async (req, res: Response) => {
   try {
     const { page = 1, limit = 50, entity, userId } = req.query;
     const query: any = {};
@@ -2517,7 +2517,7 @@ router.get('/audit-logs', async (req, res: Response) => {
  *       403:
  *         description: Insufficient permissions
  */
-router.get('/finder-scans', async (req, res: Response) => {
+router.get('/finder-scans', requirePermission('finder_scan.read'), async (req, res: Response) => {
   try {
     const { page = 1, limit = 20 } = req.query;
     const total = await FinderScan.countDocuments();
@@ -2571,7 +2571,7 @@ router.get('/finder-scans', async (req, res: Response) => {
  *       403:
  *         description: Insufficient permissions
  */
-router.get('/location-events', async (req, res: Response) => {
+router.get('/location-events', requirePermission('location_event.read'), async (req, res: Response) => {
   try {
     const { page = 1, limit = 50, petId } = req.query;
     const query: any = {};

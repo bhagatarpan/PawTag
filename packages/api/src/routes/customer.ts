@@ -1,5 +1,6 @@
 import { Router, Response } from 'express';
 import { AuthRequest, authenticate } from '../middleware/auth';
+import { requirePermission } from '../middleware/permission';
 import { validate } from '../middleware/validation';
 import { createPetSchema, updatePetSchema } from '../middleware/schemas';
 import { Pet, Tag, Order, LocationEvent, Notification, FinderScan, User, generatePetId } from '@pawtag/db';
@@ -33,7 +34,7 @@ router.use(authenticate);
  *       500:
  *         description: Failed to fetch pets
  */
-router.get('/pets', async (req: AuthRequest, res: Response) => {
+router.get('/pets', requirePermission('pet.read'), async (req: AuthRequest, res: Response) => {
   try {
     const pets = await Pet.find({ ownerId: req.user!.id, deletedAt: null }).sort({ createdAt: -1 });
     const petIds = pets.map((p) => p._id);
@@ -81,7 +82,7 @@ router.get('/pets', async (req: AuthRequest, res: Response) => {
  *       500:
  *         description: Failed to fetch pet
  */
-router.get('/pets/:id', async (req: AuthRequest, res: Response) => {
+router.get('/pets/:id', requirePermission('pet.read'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await Pet.findOne({ _id: req.params.id, ownerId: req.user!.id, deletedAt: null });
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -120,7 +121,7 @@ router.get('/pets/:id', async (req: AuthRequest, res: Response) => {
  *       500:
  *         description: Failed to create pet
  */
-router.post('/pets', validate(createPetSchema), async (req: AuthRequest, res: Response) => {
+router.post('/pets', requirePermission('pet.create'), validate(createPetSchema), async (req: AuthRequest, res: Response) => {
   try {
     const petId = await generatePetId(
       req.body.name,
@@ -173,7 +174,7 @@ router.post('/pets', validate(createPetSchema), async (req: AuthRequest, res: Re
  *       500:
  *         description: Failed to update pet
  */
-router.put('/pets/:id', validate(updatePetSchema), async (req: AuthRequest, res: Response) => {
+router.put('/pets/:id', requirePermission('pet.update'), validate(updatePetSchema), async (req: AuthRequest, res: Response) => {
   try {
     const { name, ...updateData } = req.body;
     const pet = await Pet.findOne({ _id: req.params.id, ownerId: req.user!.id, deletedAt: null });
@@ -222,7 +223,7 @@ router.put('/pets/:id', validate(updatePetSchema), async (req: AuthRequest, res:
  *       500:
  *         description: Failed to delete pet
  */
-router.delete('/pets/:id', async (req: AuthRequest, res: Response) => {
+router.delete('/pets/:id', requirePermission('pet.delete'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await Pet.findOne({ _id: req.params.id, ownerId: req.user!.id, deletedAt: null });
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -262,7 +263,7 @@ router.delete('/pets/:id', async (req: AuthRequest, res: Response) => {
  *       500:
  *         description: Failed to fetch tags
  */
-router.get('/tags', async (req: AuthRequest, res: Response) => {
+router.get('/tags', requirePermission('tag.read'), async (req: AuthRequest, res: Response) => {
   try {
     const tags = await Tag.find({ ownerId: req.user!.id, deletedAt: null })
       .populate('petId', 'name petType species breed secondaryBreed color pattern photos photoUrl status')
@@ -306,7 +307,7 @@ router.get('/tags', async (req: AuthRequest, res: Response) => {
  *       500:
  *         description: Failed to mark pet as lost
  */
-router.post('/pets/:id/mark-lost', async (req: AuthRequest, res: Response) => {
+router.post('/pets/:id/mark-lost', requirePermission('pet.update'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await Pet.findOne({ _id: req.params.id, ownerId: req.user!.id, deletedAt: null });
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -361,7 +362,7 @@ router.post('/pets/:id/mark-lost', async (req: AuthRequest, res: Response) => {
  *       500:
  *         description: Failed to mark pet as found
  */
-router.post('/pets/:id/mark-found', async (req: AuthRequest, res: Response) => {
+router.post('/pets/:id/mark-found', requirePermission('pet.update'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await Pet.findOne({ _id: req.params.id, ownerId: req.user!.id, deletedAt: null });
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -430,7 +431,7 @@ router.post('/pets/:id/mark-found', async (req: AuthRequest, res: Response) => {
  *       500:
  *         description: Failed to fetch locations
  */
-router.get('/pets/:id/locations', async (req: AuthRequest, res: Response) => {
+router.get('/pets/:id/locations', requirePermission('pet.read'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await Pet.findOne({ _id: req.params.id, ownerId: req.user!.id });
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -468,7 +469,7 @@ router.get('/pets/:id/locations', async (req: AuthRequest, res: Response) => {
  *       500:
  *         description: Failed to fetch orders
  */
-router.get('/orders', async (req: AuthRequest, res: Response) => {
+router.get('/orders', requirePermission('order.read'), async (req: AuthRequest, res: Response) => {
   try {
     const orders = await Order.find({ userId: req.user!.id }).sort({ createdAt: -1 });
     res.json({ success: true, data: orders });
@@ -509,7 +510,7 @@ router.get('/orders', async (req: AuthRequest, res: Response) => {
  *       500:
  *         description: Failed to fetch order
  */
-router.get('/orders/:id', async (req: AuthRequest, res: Response) => {
+router.get('/orders/:id', requirePermission('order.read'), async (req: AuthRequest, res: Response) => {
   try {
     const order = await Order.findOne({ _id: req.params.id, userId: req.user!.id });
     if (!order) { res.status(404).json({ success: false, error: 'Order not found' }); return; }
@@ -545,7 +546,7 @@ router.get('/orders/:id', async (req: AuthRequest, res: Response) => {
  *       500:
  *         description: Failed to fetch notifications
  */
-router.get('/notifications', async (req: AuthRequest, res: Response) => {
+router.get('/notifications', requirePermission('notification.read'), async (req: AuthRequest, res: Response) => {
   try {
     const notifications = await Notification.find({ userId: req.user!.id })
       .sort({ createdAt: -1 })
@@ -589,7 +590,7 @@ router.get('/notifications', async (req: AuthRequest, res: Response) => {
  *       500:
  *         description: Failed to update notification
  */
-router.put('/notifications/:id/read', async (req: AuthRequest, res: Response) => {
+router.put('/notifications/:id/read', requirePermission('notification.update'), async (req: AuthRequest, res: Response) => {
   try {
     await Notification.findOneAndUpdate(
       { _id: req.params.id, userId: req.user!.id },
@@ -602,7 +603,7 @@ router.put('/notifications/:id/read', async (req: AuthRequest, res: Response) =>
 });
 
 // --- Found Timer ---
-router.get('/pets/:id/found-timer', async (req: AuthRequest, res: Response) => {
+router.get('/pets/:id/found-timer', requirePermission('pet.read'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await Pet.findOne({ _id: req.params.id, ownerId: req.user!.id, deletedAt: null });
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -632,7 +633,7 @@ router.get('/pets/:id/found-timer', async (req: AuthRequest, res: Response) => {
 });
 
 // --- Owner Responsibility Score ---
-router.get('/responsibility', async (req: AuthRequest, res: Response) => {
+router.get('/responsibility', requirePermission('customer.read'), async (req: AuthRequest, res: Response) => {
   try {
     const user = await User.findById(req.user!.id).select('responsibilityScore fullName');
     if (!user) { res.status(404).json({ success: false, error: 'User not found' }); return; }
@@ -667,7 +668,7 @@ router.get('/responsibility', async (req: AuthRequest, res: Response) => {
 });
 
 // --- Mark Pet as Terminal (deceased/stolen/transferred/donated/sold) ---
-router.post('/pets/:id/mark-terminal', async (req: AuthRequest, res: Response) => {
+router.post('/pets/:id/mark-terminal', requirePermission('pet.update'), async (req: AuthRequest, res: Response) => {
   try {
     const { reason } = req.body;
     if (!reason || !['deceased', 'stolen', 'transferred', 'donated', 'sold'].includes(reason)) {
@@ -697,7 +698,7 @@ router.post('/pets/:id/mark-terminal', async (req: AuthRequest, res: Response) =
 });
 
 // --- Clear Read Notifications ---
-router.delete('/notifications/clear-read', async (req: AuthRequest, res: Response) => {
+router.delete('/notifications/clear-read', requirePermission('notification.delete'), async (req: AuthRequest, res: Response) => {
   try {
     const result = await Notification.deleteMany({ userId: req.user!.id, read: true });
     res.json({ success: true, data: { deletedCount: result.deletedCount } });
@@ -707,7 +708,7 @@ router.delete('/notifications/clear-read', async (req: AuthRequest, res: Respons
 });
 
 // --- Mark All Notifications Read ---
-router.put('/notifications/mark-all-read', async (req: AuthRequest, res: Response) => {
+router.put('/notifications/mark-all-read', requirePermission('notification.update'), async (req: AuthRequest, res: Response) => {
   try {
     await Notification.updateMany({ userId: req.user!.id, read: false }, { read: true });
     res.json({ success: true, data: { message: 'All notifications marked as read' } });
@@ -717,7 +718,7 @@ router.put('/notifications/mark-all-read', async (req: AuthRequest, res: Respons
 });
 
 // --- Unread Notification Count ---
-router.get('/notifications/unread-count', async (req: AuthRequest, res: Response) => {
+router.get('/notifications/unread-count', requirePermission('notification.read'), async (req: AuthRequest, res: Response) => {
   try {
     const count = await Notification.countDocuments({ userId: req.user!.id, read: false });
     res.json({ success: true, data: { count } });
@@ -736,7 +737,7 @@ async function getOwnedPet(petId: string, userId: string) {
 }
 
 // --- Vaccinations ---
-router.get('/pets/:id/vaccinations', async (req: AuthRequest, res: Response) => {
+router.get('/pets/:id/vaccinations', requirePermission('vaccination.read'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -746,7 +747,7 @@ router.get('/pets/:id/vaccinations', async (req: AuthRequest, res: Response) => 
   }
 });
 
-router.post('/pets/:id/vaccinations', async (req: AuthRequest, res: Response) => {
+router.post('/pets/:id/vaccinations', requirePermission('vaccination.create'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -758,7 +759,7 @@ router.post('/pets/:id/vaccinations', async (req: AuthRequest, res: Response) =>
   }
 });
 
-router.put('/pets/:id/vaccinations/:vaxId', async (req: AuthRequest, res: Response) => {
+router.put('/pets/:id/vaccinations/:vaxId', requirePermission('vaccination.update'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -772,7 +773,7 @@ router.put('/pets/:id/vaccinations/:vaxId', async (req: AuthRequest, res: Respon
   }
 });
 
-router.delete('/pets/:id/vaccinations/:vaxId', async (req: AuthRequest, res: Response) => {
+router.delete('/pets/:id/vaccinations/:vaxId', requirePermission('vaccination.delete'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -787,7 +788,7 @@ router.delete('/pets/:id/vaccinations/:vaxId', async (req: AuthRequest, res: Res
 });
 
 // --- Microchips ---
-router.get('/pets/:id/microchips', async (req: AuthRequest, res: Response) => {
+router.get('/pets/:id/microchips', requirePermission('microchip.read'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -797,7 +798,7 @@ router.get('/pets/:id/microchips', async (req: AuthRequest, res: Response) => {
   }
 });
 
-router.post('/pets/:id/microchips', async (req: AuthRequest, res: Response) => {
+router.post('/pets/:id/microchips', requirePermission('microchip.create'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -809,7 +810,7 @@ router.post('/pets/:id/microchips', async (req: AuthRequest, res: Response) => {
   }
 });
 
-router.put('/pets/:id/microchips/:chipId', async (req: AuthRequest, res: Response) => {
+router.put('/pets/:id/microchips/:chipId', requirePermission('microchip.update'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -823,7 +824,7 @@ router.put('/pets/:id/microchips/:chipId', async (req: AuthRequest, res: Respons
   }
 });
 
-router.delete('/pets/:id/microchips/:chipId', async (req: AuthRequest, res: Response) => {
+router.delete('/pets/:id/microchips/:chipId', requirePermission('microchip.delete'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -838,7 +839,7 @@ router.delete('/pets/:id/microchips/:chipId', async (req: AuthRequest, res: Resp
 });
 
 // --- Medications ---
-router.get('/pets/:id/medications', async (req: AuthRequest, res: Response) => {
+router.get('/pets/:id/medications', requirePermission('medication.read'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -848,7 +849,7 @@ router.get('/pets/:id/medications', async (req: AuthRequest, res: Response) => {
   }
 });
 
-router.post('/pets/:id/medications', async (req: AuthRequest, res: Response) => {
+router.post('/pets/:id/medications', requirePermission('medication.create'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -860,7 +861,7 @@ router.post('/pets/:id/medications', async (req: AuthRequest, res: Response) => 
   }
 });
 
-router.put('/pets/:id/medications/:medId', async (req: AuthRequest, res: Response) => {
+router.put('/pets/:id/medications/:medId', requirePermission('medication.update'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -874,7 +875,7 @@ router.put('/pets/:id/medications/:medId', async (req: AuthRequest, res: Respons
   }
 });
 
-router.delete('/pets/:id/medications/:medId', async (req: AuthRequest, res: Response) => {
+router.delete('/pets/:id/medications/:medId', requirePermission('medication.delete'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -889,7 +890,7 @@ router.delete('/pets/:id/medications/:medId', async (req: AuthRequest, res: Resp
 });
 
 // --- Allergies ---
-router.get('/pets/:id/allergies', async (req: AuthRequest, res: Response) => {
+router.get('/pets/:id/allergies', requirePermission('allergy.read'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -899,7 +900,7 @@ router.get('/pets/:id/allergies', async (req: AuthRequest, res: Response) => {
   }
 });
 
-router.post('/pets/:id/allergies', async (req: AuthRequest, res: Response) => {
+router.post('/pets/:id/allergies', requirePermission('allergy.create'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -911,7 +912,7 @@ router.post('/pets/:id/allergies', async (req: AuthRequest, res: Response) => {
   }
 });
 
-router.put('/pets/:id/allergies/:allergyId', async (req: AuthRequest, res: Response) => {
+router.put('/pets/:id/allergies/:allergyId', requirePermission('allergy.update'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -925,7 +926,7 @@ router.put('/pets/:id/allergies/:allergyId', async (req: AuthRequest, res: Respo
   }
 });
 
-router.delete('/pets/:id/allergies/:allergyId', async (req: AuthRequest, res: Response) => {
+router.delete('/pets/:id/allergies/:allergyId', requirePermission('allergy.delete'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -940,7 +941,7 @@ router.delete('/pets/:id/allergies/:allergyId', async (req: AuthRequest, res: Re
 });
 
 // --- Vet Details ---
-router.get('/pets/:id/vet-details', async (req: AuthRequest, res: Response) => {
+router.get('/pets/:id/vet-details', requirePermission('vet_visit.read'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -950,7 +951,7 @@ router.get('/pets/:id/vet-details', async (req: AuthRequest, res: Response) => {
   }
 });
 
-router.post('/pets/:id/vet-details', async (req: AuthRequest, res: Response) => {
+router.post('/pets/:id/vet-details', requirePermission('vet_visit.create'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -965,7 +966,7 @@ router.post('/pets/:id/vet-details', async (req: AuthRequest, res: Response) => 
   }
 });
 
-router.put('/pets/:id/vet-details/:vetId', async (req: AuthRequest, res: Response) => {
+router.put('/pets/:id/vet-details/:vetId', requirePermission('vet_visit.update'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -982,7 +983,7 @@ router.put('/pets/:id/vet-details/:vetId', async (req: AuthRequest, res: Respons
   }
 });
 
-router.delete('/pets/:id/vet-details/:vetId', async (req: AuthRequest, res: Response) => {
+router.delete('/pets/:id/vet-details/:vetId', requirePermission('vet_visit.delete'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -997,7 +998,7 @@ router.delete('/pets/:id/vet-details/:vetId', async (req: AuthRequest, res: Resp
 });
 
 // --- Surgeries ---
-router.get('/pets/:id/surgeries', async (req: AuthRequest, res: Response) => {
+router.get('/pets/:id/surgeries', requirePermission('surgery.read'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -1007,7 +1008,7 @@ router.get('/pets/:id/surgeries', async (req: AuthRequest, res: Response) => {
   }
 });
 
-router.post('/pets/:id/surgeries', async (req: AuthRequest, res: Response) => {
+router.post('/pets/:id/surgeries', requirePermission('surgery.create'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -1019,7 +1020,7 @@ router.post('/pets/:id/surgeries', async (req: AuthRequest, res: Response) => {
   }
 });
 
-router.put('/pets/:id/surgeries/:surgId', async (req: AuthRequest, res: Response) => {
+router.put('/pets/:id/surgeries/:surgId', requirePermission('surgery.update'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -1033,7 +1034,7 @@ router.put('/pets/:id/surgeries/:surgId', async (req: AuthRequest, res: Response
   }
 });
 
-router.delete('/pets/:id/surgeries/:surgId', async (req: AuthRequest, res: Response) => {
+router.delete('/pets/:id/surgeries/:surgId', requirePermission('surgery.delete'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -1048,7 +1049,7 @@ router.delete('/pets/:id/surgeries/:surgId', async (req: AuthRequest, res: Respo
 });
 
 // --- Weight History ---
-router.get('/pets/:id/weight-history', async (req: AuthRequest, res: Response) => {
+router.get('/pets/:id/weight-history', requirePermission('weight.read'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -1058,7 +1059,7 @@ router.get('/pets/:id/weight-history', async (req: AuthRequest, res: Response) =
   }
 });
 
-router.post('/pets/:id/weight-history', async (req: AuthRequest, res: Response) => {
+router.post('/pets/:id/weight-history', requirePermission('weight.create'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -1071,7 +1072,7 @@ router.post('/pets/:id/weight-history', async (req: AuthRequest, res: Response) 
   }
 });
 
-router.delete('/pets/:id/weight-history/:wid', async (req: AuthRequest, res: Response) => {
+router.delete('/pets/:id/weight-history/:wid', requirePermission('weight.delete'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -1086,7 +1087,7 @@ router.delete('/pets/:id/weight-history/:wid', async (req: AuthRequest, res: Res
 });
 
 // --- Health Conditions ---
-router.get('/pets/:id/health-conditions', async (req: AuthRequest, res: Response) => {
+router.get('/pets/:id/health-conditions', requirePermission('medical_record.read'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -1096,7 +1097,7 @@ router.get('/pets/:id/health-conditions', async (req: AuthRequest, res: Response
   }
 });
 
-router.post('/pets/:id/health-conditions', async (req: AuthRequest, res: Response) => {
+router.post('/pets/:id/health-conditions', requirePermission('medical_record.create'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -1108,7 +1109,7 @@ router.post('/pets/:id/health-conditions', async (req: AuthRequest, res: Respons
   }
 });
 
-router.put('/pets/:id/health-conditions/:condId', async (req: AuthRequest, res: Response) => {
+router.put('/pets/:id/health-conditions/:condId', requirePermission('medical_record.update'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -1122,7 +1123,7 @@ router.put('/pets/:id/health-conditions/:condId', async (req: AuthRequest, res: 
   }
 });
 
-router.delete('/pets/:id/health-conditions/:condId', async (req: AuthRequest, res: Response) => {
+router.delete('/pets/:id/health-conditions/:condId', requirePermission('medical_record.delete'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -1137,7 +1138,7 @@ router.delete('/pets/:id/health-conditions/:condId', async (req: AuthRequest, re
 });
 
 // --- Desexing ---
-router.get('/pets/:id/desexing', async (req: AuthRequest, res: Response) => {
+router.get('/pets/:id/desexing', requirePermission('desexing.read'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -1147,7 +1148,7 @@ router.get('/pets/:id/desexing', async (req: AuthRequest, res: Response) => {
   }
 });
 
-router.put('/pets/:id/desexing', async (req: AuthRequest, res: Response) => {
+router.put('/pets/:id/desexing', requirePermission('desexing.update'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }

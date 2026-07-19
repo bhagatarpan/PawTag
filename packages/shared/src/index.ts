@@ -400,6 +400,84 @@ export interface AuditLog {
   createdAt: string;
 }
 
+// --- RBAC Types ---
+
+export interface RoleType {
+  _id: string;
+  name: string;
+  displayName: string;
+  description?: string;
+  roleType: 'system' | 'custom';
+  isSystemRole: boolean;
+  isSuperAdmin: boolean;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PermissionGroupType {
+  _id: string;
+  name: string;
+  displayName: string;
+  description?: string;
+  icon?: string;
+  sortOrder: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PermissionType {
+  _id: string;
+  name: string;
+  displayName: string;
+  description?: string;
+  resource: string;
+  action: string;
+  permissionGroupId: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PermissionScopeType {
+  _id: string;
+  code: string;
+  name: string;
+  description?: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UserRoleAssignment {
+  _id: string;
+  userId: string;
+  roleId: string;
+  assignedAt: string;
+  assignedBy: string;
+  expiresAt?: string;
+  isActive: boolean;
+  role?: RoleType;
+}
+
+export interface RolePermissionAssignment {
+  _id: string;
+  roleId: string;
+  permissionId: string;
+  scopeId?: string;
+  createdAt: string;
+  permission?: PermissionType;
+  scope?: PermissionScopeType;
+}
+
+export interface EffectivePermission {
+  permission: PermissionType;
+  scope?: PermissionScopeType;
+  permissionGroup: PermissionGroupType;
+  role: RoleType;
+}
+
 // --- API Types ---
 
 export interface ApiResponse<T = unknown> {
