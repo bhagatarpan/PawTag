@@ -237,12 +237,10 @@ export default function RbacRoles() {
                 <td className="px-5 py-3 text-right">
                   <div className="flex items-center justify-end gap-1">
                     <button onClick={() => openPermManager(role)} title="Manage permissions" className="p-1.5 rounded hover:bg-blue-100 text-blue-600"><Shield size={14} /></button>
+                    <button onClick={() => { setEditingRole(role); setForm({ name: role.name, displayName: role.displayName, description: role.description || '' }); }} title="Edit role" className="p-1.5 rounded hover:bg-yellow-100 text-yellow-600"><Save size={14} /></button>
+                    <button onClick={() => cloneRole(role._id)} title="Clone role" className="p-1.5 rounded hover:bg-green-100 text-green-600"><Copy size={14} /></button>
                     {!role.isSystemRole && (
-                      <>
-                        <button onClick={() => { setEditingRole(role); setForm({ name: role.name, displayName: role.displayName, description: role.description || '' }); }} title="Edit role" className="p-1.5 rounded hover:bg-yellow-100 text-yellow-600"><Save size={14} /></button>
-                        <button onClick={() => cloneRole(role._id)} title="Clone role" className="p-1.5 rounded hover:bg-green-100 text-green-600"><Copy size={14} /></button>
-                        <button onClick={() => deleteRole(role)} title="Delete role" className="p-1.5 rounded hover:bg-red-100 text-red-500"><Trash2 size={14} /></button>
-                      </>
+                      <button onClick={() => deleteRole(role)} title="Delete role" className="p-1.5 rounded hover:bg-red-100 text-red-500"><Trash2 size={14} /></button>
                     )}
                   </div>
                 </td>
@@ -332,6 +330,15 @@ export default function RbacRoles() {
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-semibold">Edit Role: {editingRole.displayName}</h3>
               <button onClick={() => setEditingRole(null)} className="text-gray-400 hover:text-red-500"><X size={18} /></button>
+            </div>
+            {editingRole.isSystemRole && (
+              <div className="bg-blue-50 text-blue-700 text-xs p-2 rounded">
+                System role — name cannot be changed.
+              </div>
+            )}
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Name</label>
+              <input value={form.name} disabled className="w-full border rounded-md px-3 py-2 text-sm font-mono bg-gray-50 text-gray-500" />
             </div>
             <div>
               <label className="block text-xs text-gray-500 mb-1">Display Name</label>

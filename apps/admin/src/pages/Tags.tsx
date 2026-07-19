@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import api, { PaginatedData } from '../lib/api';
 import { Search, Trash2, Plus, Edit2, Save, X, Tag as TagIcon, QrCode, Printer, Download } from 'lucide-react';
 
@@ -28,7 +28,6 @@ export default function Tags() {
   const [error, setError] = useState('');
   const [qrModal, setQrModal] = useState<{ tagId: string; petName?: string; petId?: string } | null>(null);
   const [qrImageUrl, setQrImageUrl] = useState('');
-  const qrCanvasRef = useRef<HTMLCanvasElement>(null);
 
   const fetchTags = () => {
     setLoading(true);

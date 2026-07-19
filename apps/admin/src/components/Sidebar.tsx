@@ -47,7 +47,7 @@ const adminLinks: SidebarLink[] = [
 ];
 
 export default function Sidebar() {
-  const { hasPermission, user } = useAuth();
+  const { hasPermission } = useAuth();
 
   const filteredMainLinks = mainLinks.filter(
     (link) => !link.permission || hasPermission(link.permission),

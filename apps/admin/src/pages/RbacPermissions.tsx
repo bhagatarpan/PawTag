@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import api from '../lib/api';
-import { Key, Plus, X, Save, Trash2, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Plus, X, Save, Trash2, ToggleLeft, ToggleRight } from 'lucide-react';
 
 interface PermissionGroup {
   _id: string;
@@ -78,7 +78,12 @@ export default function RbacPermissions() {
     }
   };
 
-  const groupName = (id: string) => groups.find((g) => g._id === id)?.displayName || id;
+  const groupName = (groupRef: any): string => {
+    if (!groupRef) return '—';
+    const groupId = typeof groupRef === 'string' ? groupRef : groupRef?._id;
+    if (!groupId) return '—';
+    return groups.find((g) => g._id === groupId)?.displayName || (typeof groupRef === 'string' ? groupRef : groupRef?.name || groupId);
+  };
 
   return (
     <div className="space-y-6">

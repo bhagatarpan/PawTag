@@ -1,4 +1,4 @@
-import { User, Role, UserRole, RolePermission, Permission, PermissionScope } from '@pawtag/db';
+import { Role, UserRole, RolePermission, Permission } from '@pawtag/db';
 
 interface PermissionCheckResult {
   allowed: boolean;
@@ -130,13 +130,4 @@ export async function getEffectivePermissions(
   };
 }
 
-export async function requirePermission(
-  userId: string,
-  permissionName: string,
-  scopeCode?: string,
-): Promise<void> {
-  const result = await userHasPermission(userId, permissionName, scopeCode);
-  if (!result.allowed) {
-    throw new Error('Insufficient permissions');
-  }
-}
+

@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { Tag, FinderScan, LocationEvent, Pet, Notification, User } from '@pawtag/db';
+import { Tag, FinderScan, LocationEvent, Notification } from '@pawtag/db';
 
 const router = Router();
 
@@ -110,7 +110,7 @@ router.get('/:tagId', async (req: Request, res: Response) => {
         ownerPhone: owner.phone,
       },
     });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to load pet info' });
   }
 });
@@ -224,7 +224,7 @@ router.post('/:tagId/notify', async (req: Request, res: Response) => {
         petFound: pet?.status === 'found',
       },
     });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to notify owner' });
   }
 });
@@ -256,7 +256,7 @@ router.get('/:tagId/found-timer', async (req: Request, res: Response) => {
         finderName: scan?.finderName || null,
       },
     });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch found timer' });
   }
 });
@@ -351,7 +351,7 @@ router.post('/:tagId/share-location', async (req: Request, res: Response) => {
     }
 
     res.json({ success: true, data: { message: 'Location shared with owner' } });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to share location' });
   }
 });
@@ -384,7 +384,7 @@ router.get('/shop/products', async (_req: Request, res: Response) => {
     const { Product } = require('@pawtag/db');
     const products = await Product.find({ isActive: true }).sort({ name: 1 });
     res.json({ success: true, data: products });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch products' });
   }
 });
@@ -428,7 +428,7 @@ router.get('/content/:slug', async (req: Request, res: Response) => {
       return;
     }
     res.json({ success: true, data: content });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch content' });
   }
 });

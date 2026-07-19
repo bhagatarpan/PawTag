@@ -86,7 +86,7 @@ app.get('/api/tags/:tagId/qr', async (req, res) => {
     res.setHeader('Content-Type', 'image/png');
     res.setHeader('Content-Disposition', `inline; filename="qr-${tag.tagId}.png"`);
     res.send(qrBuffer);
-  } catch (error) { res.status(500).json({ success: false, error: 'Failed to generate QR code' }); }
+  } catch { res.status(500).json({ success: false, error: 'Failed to generate QR code' }); }
 });
 
 app.get('/api/tags/:tagId/sticker', async (req, res) => {
@@ -101,7 +101,7 @@ app.get('/api/tags/:tagId/sticker', async (req, res) => {
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>PawTag Sticker - ${tag.tagId}</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#f5f5f5}.sticker{background:white;border:2px solid #e5e7eb;border-radius:12px;padding:24px;width:320px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.08)}.qr{margin:12px auto}.qr img{width:200px;height:200px}.tag-id{font-size:22px;font-weight:700;color:#111;font-family:monospace;letter-spacing:1px;margin:8px 0 4px}.pet-name{font-size:18px;font-weight:600;color:#374151;margin:4px 0}.pet-id{font-size:13px;color:#6b7280;font-family:monospace}.pet-details{font-size:12px;color:#9ca3af;margin-top:4px}.branding{font-size:10px;color:#d1d5db;margin-top:12px;border-top:1px solid #f3f4f6;padding-top:8px}.scan-hint{font-size:11px;color:#9ca3af;margin-top:8px}@media print{body{background:white}.sticker{border:1px solid #ccc;box-shadow:none}}</style></head><body><div class="sticker"><img src="${qrDataUrl}" alt="QR Code" class="qr"/><div class="tag-id">${tag.tagId}</div><div class="pet-name">${pet.name}</div><div class="pet-id">${pet.petId || ''}</div><div class="pet-details">${pet.petType || ''} &middot; ${pet.breed || ''} &middot; ${pet.color || ''}</div><div class="scan-hint">Scan to view pet info</div><div class="branding">PawTag &mdash; Reuniting lost pets with their families</div></div></body></html>`;
     res.setHeader('Content-Type', 'text/html');
     res.send(html);
-  } catch (error) { res.status(500).json({ success: false, error: 'Failed to generate sticker' }); }
+  } catch { res.status(500).json({ success: false, error: 'Failed to generate sticker' }); }
 });
 
 // --- API Routes ---

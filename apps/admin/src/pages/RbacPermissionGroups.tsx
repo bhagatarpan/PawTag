@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import api from '../lib/api';
-import { FolderTree, Plus, X, Save, Trash2, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Plus, X, Save, Trash2, ToggleLeft, ToggleRight } from 'lucide-react';
 
 interface PermissionGroup {
   _id: string;

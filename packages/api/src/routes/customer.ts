@@ -45,7 +45,7 @@ router.get('/pets', requirePermission('pet.read'), async (req: AuthRequest, res:
       linkedTag: tagMap.get(pet._id.toString()) || null,
     }));
     res.json({ success: true, data: petsWithTag });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch pets' });
   }
 });
@@ -87,7 +87,7 @@ router.get('/pets/:id', requirePermission('pet.read'), async (req: AuthRequest, 
     const pet = await Pet.findOne({ _id: req.params.id, ownerId: req.user!.id, deletedAt: null });
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
     res.json({ success: true, data: pet });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch pet' });
   }
 });
@@ -131,7 +131,7 @@ router.post('/pets', requirePermission('pet.create'), validate(createPetSchema),
     );
     const pet = await Pet.create({ ...req.body, ownerId: req.user!.id, petId });
     res.status(201).json({ success: true, data: pet });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to create pet' });
   }
 });
@@ -176,14 +176,14 @@ router.post('/pets', requirePermission('pet.create'), validate(createPetSchema),
  */
 router.put('/pets/:id', requirePermission('pet.update'), validate(updatePetSchema), async (req: AuthRequest, res: Response) => {
   try {
-    const { name, ...updateData } = req.body;
+    const { name: _name, ...updateData } = req.body;
     const pet = await Pet.findOne({ _id: req.params.id, ownerId: req.user!.id, deletedAt: null });
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
 
     Object.assign(pet, updateData);
     await pet.save();
     res.json({ success: true, data: pet });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to update pet' });
   }
 });
@@ -232,7 +232,7 @@ router.delete('/pets/:id', requirePermission('pet.delete'), async (req: AuthRequ
     await pet.save();
 
     res.json({ success: true, data: { message: 'Pet deleted' } });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to delete pet' });
   }
 });
@@ -269,7 +269,7 @@ router.get('/tags', requirePermission('tag.read'), async (req: AuthRequest, res:
       .populate('petId', 'name petType species breed secondaryBreed color pattern photos photoUrl status')
       .sort({ createdAt: -1 });
     res.json({ success: true, data: tags });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch tags' });
   }
 });
@@ -325,7 +325,7 @@ router.post('/pets/:id/mark-lost', requirePermission('pet.update'), async (req: 
     await Tag.updateMany({ petId: pet._id, deletedAt: null }, { status: 'lost' });
 
     res.json({ success: true, data: pet });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to mark pet as lost' });
   }
 });
@@ -391,7 +391,7 @@ router.post('/pets/:id/mark-found', requirePermission('pet.update'), async (req:
     await Tag.updateMany({ petId: pet._id, deletedAt: null }, { status: 'active' });
 
     res.json({ success: true, data: { ...pet.toObject(), timeToFoundMs } });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to mark pet as found' });
   }
 });
@@ -438,7 +438,7 @@ router.get('/pets/:id/locations', requirePermission('pet.read'), async (req: Aut
 
     const locations = await LocationEvent.find({ petId: pet._id }).sort({ timestamp: -1 });
     res.json({ success: true, data: locations });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch locations' });
   }
 });
@@ -473,7 +473,7 @@ router.get('/orders', requirePermission('order.read'), async (req: AuthRequest, 
   try {
     const orders = await Order.find({ userId: req.user!.id }).sort({ createdAt: -1 });
     res.json({ success: true, data: orders });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch orders' });
   }
 });
@@ -515,7 +515,7 @@ router.get('/orders/:id', requirePermission('order.read'), async (req: AuthReque
     const order = await Order.findOne({ _id: req.params.id, userId: req.user!.id });
     if (!order) { res.status(404).json({ success: false, error: 'Order not found' }); return; }
     res.json({ success: true, data: order });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch order' });
   }
 });
@@ -552,7 +552,7 @@ router.get('/notifications', requirePermission('notification.read'), async (req:
       .sort({ createdAt: -1 })
       .limit(50);
     res.json({ success: true, data: notifications });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch notifications' });
   }
 });
@@ -597,7 +597,7 @@ router.put('/notifications/:id/read', requirePermission('notification.update'), 
       { read: true },
     );
     res.json({ success: true, data: { message: 'Notification marked as read' } });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to update notification' });
   }
 });
@@ -627,7 +627,7 @@ router.get('/pets/:id/found-timer', requirePermission('pet.read'), async (req: A
         finderName: scan?.finderName || null,
       },
     });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch found timer' });
   }
 });
@@ -662,7 +662,7 @@ router.get('/responsibility', requirePermission('customer.read'), async (req: Au
         })),
       },
     });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch responsibility score' });
   }
 });
@@ -692,7 +692,7 @@ router.post('/pets/:id/mark-terminal', requirePermission('pet.update'), async (r
     await Tag.updateMany({ petId: pet._id, deletedAt: null }, { status: 'inactive' });
 
     res.json({ success: true, data: pet });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to update pet status' });
   }
 });
@@ -702,7 +702,7 @@ router.delete('/notifications/clear-read', requirePermission('notification.delet
   try {
     const result = await Notification.deleteMany({ userId: req.user!.id, read: true });
     res.json({ success: true, data: { deletedCount: result.deletedCount } });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to clear notifications' });
   }
 });
@@ -712,7 +712,7 @@ router.put('/notifications/mark-all-read', requirePermission('notification.updat
   try {
     await Notification.updateMany({ userId: req.user!.id, read: false }, { read: true });
     res.json({ success: true, data: { message: 'All notifications marked as read' } });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to mark notifications' });
   }
 });
@@ -722,7 +722,7 @@ router.get('/notifications/unread-count', requirePermission('notification.read')
   try {
     const count = await Notification.countDocuments({ userId: req.user!.id, read: false });
     res.json({ success: true, data: { count } });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to get unread count' });
   }
 });
@@ -742,7 +742,7 @@ router.get('/pets/:id/vaccinations', requirePermission('vaccination.read'), asyn
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
     res.json({ success: true, data: pet.vaccinations || [] });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch vaccinations' });
   }
 });
@@ -754,7 +754,7 @@ router.post('/pets/:id/vaccinations', requirePermission('vaccination.create'), a
     pet.vaccinations.push(req.body);
     await pet.save();
     res.status(201).json({ success: true, data: pet.vaccinations[pet.vaccinations.length - 1] });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to add vaccination' });
   }
 });
@@ -768,7 +768,7 @@ router.put('/pets/:id/vaccinations/:vaxId', requirePermission('vaccination.updat
     Object.assign(vax, req.body);
     await pet.save();
     res.json({ success: true, data: vax });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to update vaccination' });
   }
 });
@@ -782,7 +782,7 @@ router.delete('/pets/:id/vaccinations/:vaxId', requirePermission('vaccination.de
     vax.deleteOne();
     await pet.save();
     res.json({ success: true, data: { message: 'Vaccination deleted' } });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to delete vaccination' });
   }
 });
@@ -793,7 +793,7 @@ router.get('/pets/:id/microchips', requirePermission('microchip.read'), async (r
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
     res.json({ success: true, data: pet.microchips || [] });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch microchips' });
   }
 });
@@ -805,7 +805,7 @@ router.post('/pets/:id/microchips', requirePermission('microchip.create'), async
     pet.microchips.push(req.body);
     await pet.save();
     res.status(201).json({ success: true, data: pet.microchips[pet.microchips.length - 1] });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to add microchip' });
   }
 });
@@ -819,7 +819,7 @@ router.put('/pets/:id/microchips/:chipId', requirePermission('microchip.update')
     Object.assign(chip, req.body);
     await pet.save();
     res.json({ success: true, data: chip });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to update microchip' });
   }
 });
@@ -833,7 +833,7 @@ router.delete('/pets/:id/microchips/:chipId', requirePermission('microchip.delet
     chip.deleteOne();
     await pet.save();
     res.json({ success: true, data: { message: 'Microchip deleted' } });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to delete microchip' });
   }
 });
@@ -844,7 +844,7 @@ router.get('/pets/:id/medications', requirePermission('medication.read'), async 
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
     res.json({ success: true, data: pet.medications || [] });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch medications' });
   }
 });
@@ -856,7 +856,7 @@ router.post('/pets/:id/medications', requirePermission('medication.create'), asy
     pet.medications.push(req.body);
     await pet.save();
     res.status(201).json({ success: true, data: pet.medications[pet.medications.length - 1] });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to add medication' });
   }
 });
@@ -870,7 +870,7 @@ router.put('/pets/:id/medications/:medId', requirePermission('medication.update'
     Object.assign(med, req.body);
     await pet.save();
     res.json({ success: true, data: med });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to update medication' });
   }
 });
@@ -884,7 +884,7 @@ router.delete('/pets/:id/medications/:medId', requirePermission('medication.dele
     med.deleteOne();
     await pet.save();
     res.json({ success: true, data: { message: 'Medication deleted' } });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to delete medication' });
   }
 });
@@ -895,7 +895,7 @@ router.get('/pets/:id/allergies', requirePermission('allergy.read'), async (req:
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
     res.json({ success: true, data: pet.allergies || [] });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch allergies' });
   }
 });
@@ -907,7 +907,7 @@ router.post('/pets/:id/allergies', requirePermission('allergy.create'), async (r
     pet.allergies.push(req.body);
     await pet.save();
     res.status(201).json({ success: true, data: pet.allergies[pet.allergies.length - 1] });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to add allergy' });
   }
 });
@@ -921,7 +921,7 @@ router.put('/pets/:id/allergies/:allergyId', requirePermission('allergy.update')
     Object.assign(allergy, req.body);
     await pet.save();
     res.json({ success: true, data: allergy });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to update allergy' });
   }
 });
@@ -935,7 +935,7 @@ router.delete('/pets/:id/allergies/:allergyId', requirePermission('allergy.delet
     allergy.deleteOne();
     await pet.save();
     res.json({ success: true, data: { message: 'Allergy deleted' } });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to delete allergy' });
   }
 });
@@ -946,7 +946,7 @@ router.get('/pets/:id/vet-details', requirePermission('vet_visit.read'), async (
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
     res.json({ success: true, data: pet.vetDetails || [] });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch vet details' });
   }
 });
@@ -961,7 +961,7 @@ router.post('/pets/:id/vet-details', requirePermission('vet_visit.create'), asyn
     pet.vetDetails.push(req.body);
     await pet.save();
     res.status(201).json({ success: true, data: pet.vetDetails[pet.vetDetails.length - 1] });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to add vet detail' });
   }
 });
@@ -978,7 +978,7 @@ router.put('/pets/:id/vet-details/:vetId', requirePermission('vet_visit.update')
     Object.assign(vet, req.body);
     await pet.save();
     res.json({ success: true, data: vet });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to update vet detail' });
   }
 });
@@ -992,7 +992,7 @@ router.delete('/pets/:id/vet-details/:vetId', requirePermission('vet_visit.delet
     vet.deleteOne();
     await pet.save();
     res.json({ success: true, data: { message: 'Vet detail deleted' } });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to delete vet detail' });
   }
 });
@@ -1003,7 +1003,7 @@ router.get('/pets/:id/surgeries', requirePermission('surgery.read'), async (req:
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
     res.json({ success: true, data: pet.surgeries || [] });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch surgeries' });
   }
 });
@@ -1015,7 +1015,7 @@ router.post('/pets/:id/surgeries', requirePermission('surgery.create'), async (r
     pet.surgeries.push(req.body);
     await pet.save();
     res.status(201).json({ success: true, data: pet.surgeries[pet.surgeries.length - 1] });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to add surgery' });
   }
 });
@@ -1029,7 +1029,7 @@ router.put('/pets/:id/surgeries/:surgId', requirePermission('surgery.update'), a
     Object.assign(surg, req.body);
     await pet.save();
     res.json({ success: true, data: surg });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to update surgery' });
   }
 });
@@ -1043,7 +1043,7 @@ router.delete('/pets/:id/surgeries/:surgId', requirePermission('surgery.delete')
     surg.deleteOne();
     await pet.save();
     res.json({ success: true, data: { message: 'Surgery deleted' } });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to delete surgery' });
   }
 });
@@ -1054,7 +1054,7 @@ router.get('/pets/:id/weight-history', requirePermission('weight.read'), async (
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
     res.json({ success: true, data: (pet.weightHistory || []).sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime()) });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch weight history' });
   }
 });
@@ -1067,7 +1067,7 @@ router.post('/pets/:id/weight-history', requirePermission('weight.create'), asyn
     pet.weight = req.body.weight;
     await pet.save();
     res.status(201).json({ success: true, data: pet.weightHistory[pet.weightHistory.length - 1] });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to add weight record' });
   }
 });
@@ -1081,7 +1081,7 @@ router.delete('/pets/:id/weight-history/:wid', requirePermission('weight.delete'
     rec.deleteOne();
     await pet.save();
     res.json({ success: true, data: { message: 'Weight record deleted' } });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to delete weight record' });
   }
 });
@@ -1092,7 +1092,7 @@ router.get('/pets/:id/health-conditions', requirePermission('medical_record.read
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
     res.json({ success: true, data: pet.healthConditions || [] });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch health conditions' });
   }
 });
@@ -1104,7 +1104,7 @@ router.post('/pets/:id/health-conditions', requirePermission('medical_record.cre
     pet.healthConditions.push(req.body);
     await pet.save();
     res.status(201).json({ success: true, data: pet.healthConditions[pet.healthConditions.length - 1] });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to add health condition' });
   }
 });
@@ -1118,7 +1118,7 @@ router.put('/pets/:id/health-conditions/:condId', requirePermission('medical_rec
     Object.assign(cond, req.body);
     await pet.save();
     res.json({ success: true, data: cond });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to update health condition' });
   }
 });
@@ -1132,7 +1132,7 @@ router.delete('/pets/:id/health-conditions/:condId', requirePermission('medical_
     cond.deleteOne();
     await pet.save();
     res.json({ success: true, data: { message: 'Health condition deleted' } });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to delete health condition' });
   }
 });
@@ -1143,7 +1143,7 @@ router.get('/pets/:id/desexing', requirePermission('desexing.read'), async (req:
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
     res.json({ success: true, data: pet.desexing || { isDesexed: false } });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch desexing info' });
   }
 });
@@ -1155,7 +1155,7 @@ router.put('/pets/:id/desexing', requirePermission('desexing.update'), async (re
     pet.desexing = req.body;
     await pet.save();
     res.json({ success: true, data: pet.desexing });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to update desexing info' });
   }
 });

@@ -1,4 +1,4 @@
-import { Pet, Notification, Tag, User } from '@pawtag/db';
+import { Pet, Notification } from '@pawtag/db';
 
 const REMINDER_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const REMINDER_CHECK_INTERVAL_MS = 60 * 60 * 1000; // Check every hour

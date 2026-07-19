@@ -124,34 +124,6 @@ export const createProductSchema = z.object({
 
 export const updateProductSchema = createProductSchema.partial();
 
-export const createOrderSchema = z.object({
-  items: z.array(
-    z.object({
-      productId: z.string(),
-      quantity: z.number().int().positive(),
-    }),
-  ).min(1),
-  shippingAddress: z.object({
-    line1: z.string().min(1),
-    line2: z.string().optional(),
-    city: z.string().min(1),
-    state: z.string().min(1),
-    zip: z.string().min(1),
-    country: z.string().min(1),
-  }),
-  billingAddress: z
-    .object({
-      line1: z.string().min(1),
-      line2: z.string().optional(),
-      city: z.string().min(1),
-      state: z.string().min(1),
-      zip: z.string().min(1),
-      country: z.string().min(1),
-    })
-    .optional(),
-  notes: z.string().optional(),
-});
-
 export const createContentSchema = z.object({
   slug: z.string().min(1),
   title: z.string().min(1),
@@ -177,10 +149,6 @@ export const createFeatureFlagSchema = z.object({
   isEnabled: z.boolean().optional(),
   allowedRoles: z.array(z.string()).optional(),
   percentage: z.number().min(0).max(100).optional(),
-});
-
-export const updateUserRoleSchema = z.object({
-  role: z.enum(['super_admin', 'admin', 'support', 'customer']),
 });
 
 export const updateUserStatusSchema = z.object({

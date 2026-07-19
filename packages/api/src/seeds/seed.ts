@@ -120,6 +120,7 @@ async function seed() {
 
       // Order Management
       { name: 'order.read', displayName: 'Read Orders', description: 'View order details and lists', resource: 'order', action: 'read', groupIndex: groupDefs.findIndex(g => g.name === 'REPORTS') },
+      { name: 'order.create', displayName: 'Create Orders', description: 'Create new orders', resource: 'order', action: 'create', groupIndex: groupDefs.findIndex(g => g.name === 'REPORTS') },
       { name: 'order.update', displayName: 'Update Orders', description: 'Update order status and details', resource: 'order', action: 'update', groupIndex: groupDefs.findIndex(g => g.name === 'REPORTS') },
 
       // Settings Management
@@ -340,6 +341,7 @@ async function seed() {
       { name: 'ADMIN', displayName: 'Admin', description: 'Manage platform and business operations', roleType: 'system', isSystemRole: true, isSuperAdmin: false },
       { name: 'CUSTOMER_SERVICE', displayName: 'Customer Service', description: 'Manage customer support operations', roleType: 'system', isSystemRole: true, isSuperAdmin: false },
       { name: 'PET_OWNER', displayName: 'Pet Owner', description: 'Manage own pets and data', roleType: 'system', isSystemRole: true, isSuperAdmin: false },
+      { name: 'CUSTOMER', displayName: 'Customer', description: 'Site visitor who becomes a customer — manages own pets, browses shop, and places orders', roleType: 'system', isSystemRole: true, isSuperAdmin: false },
       { name: 'WEBSITE_EDITOR', displayName: 'Website Editor', description: 'Manage public website content', roleType: 'system', isSystemRole: true, isSuperAdmin: false },
     ];
 
@@ -489,6 +491,64 @@ async function seed() {
         { permissionName: 'health_document.upload', scopeCode: 'OWN' },
         { permissionName: 'health_document.download', scopeCode: 'OWN' },
         { permissionName: 'order.read', scopeCode: 'OWN' },
+        { permissionName: 'notification.read', scopeCode: 'OWN' },
+        { permissionName: 'notification.update', scopeCode: 'OWN' },
+      ],
+
+      CUSTOMER: [
+        // Profile (own)
+        { permissionName: 'customer.read', scopeCode: 'OWN' },
+        { permissionName: 'customer.update', scopeCode: 'OWN' },
+        // Pets (own) — full CRUD
+        { permissionName: 'pet.read', scopeCode: 'OWN' },
+        { permissionName: 'pet.create', scopeCode: 'OWN' },
+        { permissionName: 'pet.update', scopeCode: 'OWN' },
+        { permissionName: 'pet.delete', scopeCode: 'OWN' },
+        // Tags (own)
+        { permissionName: 'tag.read', scopeCode: 'OWN' },
+        // Health Records (own)
+        { permissionName: 'medical_record.read', scopeCode: 'OWN' },
+        { permissionName: 'medical_record.create', scopeCode: 'OWN' },
+        { permissionName: 'medical_record.update', scopeCode: 'OWN' },
+        // Vaccinations (own)
+        { permissionName: 'vaccination.read', scopeCode: 'OWN' },
+        { permissionName: 'vaccination.create', scopeCode: 'OWN' },
+        { permissionName: 'vaccination.update', scopeCode: 'OWN' },
+        // Medications (own)
+        { permissionName: 'medication.read', scopeCode: 'OWN' },
+        { permissionName: 'medication.create', scopeCode: 'OWN' },
+        { permissionName: 'medication.update', scopeCode: 'OWN' },
+        // Allergies (own)
+        { permissionName: 'allergy.read', scopeCode: 'OWN' },
+        { permissionName: 'allergy.create', scopeCode: 'OWN' },
+        { permissionName: 'allergy.update', scopeCode: 'OWN' },
+        // Vet Visits (own)
+        { permissionName: 'vet_visit.read', scopeCode: 'OWN' },
+        { permissionName: 'vet_visit.create', scopeCode: 'OWN' },
+        { permissionName: 'vet_visit.update', scopeCode: 'OWN' },
+        // Surgeries (own)
+        { permissionName: 'surgery.read', scopeCode: 'OWN' },
+        // Desexing (own)
+        { permissionName: 'desexing.read', scopeCode: 'OWN' },
+        // Microchips (own)
+        { permissionName: 'microchip.read', scopeCode: 'OWN' },
+        // Weight (own)
+        { permissionName: 'weight.read', scopeCode: 'OWN' },
+        { permissionName: 'weight.create', scopeCode: 'OWN' },
+        // Health Documents (own)
+        { permissionName: 'health_document.read', scopeCode: 'OWN' },
+        { permissionName: 'health_document.upload', scopeCode: 'OWN' },
+        { permissionName: 'health_document.download', scopeCode: 'OWN' },
+        // Products — browse shop
+        { permissionName: 'product.read' },
+        // Orders (own)
+        { permissionName: 'order.read', scopeCode: 'OWN' },
+        { permissionName: 'order.create', scopeCode: 'OWN' },
+        { permissionName: 'order.update', scopeCode: 'OWN' },
+        // Finder — scan tags when finding pets
+        { permissionName: 'finder_scan.read' },
+        { permissionName: 'location_event.read' },
+        // Notifications (own)
         { permissionName: 'notification.read', scopeCode: 'OWN' },
         { permissionName: 'notification.update', scopeCode: 'OWN' },
       ],

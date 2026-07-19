@@ -1,6 +1,6 @@
-import { useEffect, useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import api, { PaginatedData } from '../lib/api';
-import { Search, ChevronDown, ChevronUp, Trash2, Plus, Edit2, Save, X, Camera, Star, ImageIcon, Upload } from 'lucide-react';
+import { Search, ChevronDown, ChevronUp, Trash2, Plus, Edit2, Save, X, Camera, Star, Upload } from 'lucide-react';
 
 // --- Pet attribute options ---
 const PET_TYPES = ['Dog', 'Cat', 'Rabbit', 'Hamster', 'Guinea Pig', 'Bird'] as const;

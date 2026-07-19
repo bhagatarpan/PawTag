@@ -7,6 +7,7 @@ interface User {
   fullName: string;
   role: string;
   status: string;
+  rbacRoles?: Array<{ name: string; displayName: string; isSuperAdmin: boolean }>;
 }
 
 interface EffectivePermission {
@@ -41,7 +42,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .get('/auth/me')
         .then((res) => {
           const u = res.data.data;
-          if (u.role === 'customer') {
+          const isAdmin = u.rbacRoles?.some((r: any) =>
+            ['SUPER_ADMIN', 'ADMIN', 'CUSTOMER_SERVICE', 'WEBSITE_EDITOR'].includes(r.name)
+          );
+          if (!isAdmin) {
             localStorage.removeItem('admin_token');
             setToken(null);
             setUser(null);
@@ -75,7 +79,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     const res = await api.post('/auth/login', { email, password });
     const { token: newToken, user: userData } = res.data.data;
-    if (userData.role === 'customer') {
+    const isAdmin = userData.rbacRoles?.some((r: any) =>
+      ['SUPER_ADMIN', 'ADMIN', 'CUSTOMER_SERVICE', 'WEBSITE_EDITOR'].includes(r.name)
+    );
+    if (!isAdmin) {
       throw new Error('Access denied. Admin accounts only.');
     }
     localStorage.setItem('admin_token', newToken);

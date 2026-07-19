@@ -1,4 +1,4 @@
-import { useState, useEffect, FormEvent } from 'react';
+import { useState, FormEvent } from 'react';
 import api from '../lib/api';
 import { X, Plus, Trash2, Syringe, Cpu, Pill, AlertTriangle, Stethoscope, Scissors, Weight, Heart, Activity } from 'lucide-react';
 
@@ -148,7 +148,7 @@ function getDefaults(tab: string) {
 }
 
 function ListSection({ tab, items, petType, onAdd, onEdit, onDelete, severityColor }: any) {
-  const vaccineOptions = getVaccineOptions(petType);
+  const _vaccineOptions = getVaccineOptions(petType);
   return (
     <div>
       <div className="flex justify-between items-center mb-4">
@@ -345,7 +345,7 @@ function FormSection({ tab, petType, editing, onChange, onSave, onCancel, saving
   );
 }
 
-function DesexingSection({ desexing, onEdit, onSave, saving }: any) {
+function DesexingSection({ desexing, onEdit, _onSave, _saving }: any) {
   if (!desexing.isDesexed) {
     return (
       <div className="text-center py-8">

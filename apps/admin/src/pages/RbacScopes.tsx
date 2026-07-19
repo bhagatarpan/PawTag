@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import api from '../lib/api';
-import { Target, Plus, X, Save, Trash2 } from 'lucide-react';
+import { Plus, X, Save, Trash2 } from 'lucide-react';
 
 interface Scope {
   _id: string;

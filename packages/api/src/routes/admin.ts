@@ -4,7 +4,6 @@ import { AuthRequest, authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
 import { validate } from '../middleware/validation';
 import {
-  updateUserRoleSchema,
   updateUserStatusSchema,
   adminResetPasswordSchema,
   createPetSchema,
@@ -31,6 +30,8 @@ import {
   FeatureFlag,
   AuditLog,
   generatePetId,
+  UserRole,
+  Role,
 } from '@pawtag/db';
 import { hashPassword } from '../services/auth.service';
 
@@ -91,7 +92,7 @@ router.get('/dashboard', requirePermission('dashboard.read'), async (_req: AuthR
         recentOrders,
       },
     });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to load dashboard' });
   }
 });
@@ -102,7 +103,7 @@ router.get('/stats/lost-found', requirePermission('stats.read'), async (_req: Au
     const now = new Date();
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000); // eslint-disable-line @typescript-eslint/no-unused-vars
 
     const [
       totalPets,
@@ -218,7 +219,7 @@ router.get('/stats/lost-found', requirePermission('stats.read'), async (_req: Au
         },
       },
     });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to load statistics' });
   }
 });
@@ -269,7 +270,7 @@ router.get('/stats/lost-found', requirePermission('stats.read'), async (_req: Au
  */
 router.get('/users', requirePermission('user.read'), async (req, res: Response) => {
   try {
-    const { page = 1, limit = 20, search, role, status } = req.query;
+    const { page = 1, limit = 20, search, roleId, status } = req.query;
     const query: any = { deletedAt: null };
     if (search) {
       query.$or = [
@@ -278,8 +279,14 @@ router.get('/users', requirePermission('user.read'), async (req, res: Response) 
         { phoneNumber: { $regex: search, $options: 'i' } },
       ];
     }
-    if (role) query.role = role;
     if (status) query.status = status;
+
+    // If filtering by RBAC role, find matching user IDs first
+    if (roleId) {
+      const matchingUserRoles = await UserRole.find({ roleId, isActive: true }).select('userId');
+      const userIds = matchingUserRoles.map((ur) => ur.userId);
+      query._id = { $in: userIds };
+    }
 
     const total = await User.countDocuments(query);
     const users = await User.find(query)
@@ -288,11 +295,27 @@ router.get('/users', requirePermission('user.read'), async (req, res: Response) 
       .skip((Number(page) - 1) * Number(limit))
       .limit(Number(limit));
 
+    // Populate RBAC roles for each user
+    const userIds = users.map((u) => u._id);
+    const userRoles = await UserRole.find({ userId: { $in: userIds }, isActive: true })
+      .populate('roleId', 'name displayName isSuperAdmin')
+      .populate('assignedBy', 'fullName email');
+    const rolesByUser = new Map<string, any[]>();
+    for (const ur of userRoles) {
+      const uid = ur.userId.toString();
+      if (!rolesByUser.has(uid)) rolesByUser.set(uid, []);
+      rolesByUser.get(uid)!.push(ur);
+    }
+    const usersWithRoles = users.map((u) => ({
+      ...u.toObject(),
+      rbacRoles: rolesByUser.get(u._id.toString()) || [],
+    }));
+
     res.json({
       success: true,
-      data: { items: users, total, page: Number(page), limit: Number(limit), totalPages: Math.ceil(total / Number(limit)) },
+      data: { items: usersWithRoles, total, page: Number(page), limit: Number(limit), totalPages: Math.ceil(total / Number(limit)) },
     });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch users' });
   }
 });
@@ -328,7 +351,7 @@ router.get('/users/:id', requirePermission('user.read'), async (req, res: Respon
     const user = await User.findOne({ _id: req.params.id, deletedAt: null }).select('-passwordHash');
     if (!user) { res.status(404).json({ success: false, error: 'User not found' }); return; }
     res.json({ success: true, data: user });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch user' });
   }
 });
@@ -371,13 +394,47 @@ router.get('/users/:id', requirePermission('user.read'), async (req, res: Respon
  *       404:
  *         description: User not found
  */
-router.put('/users/:id/role', requirePermission('user.assign_role'), validate(updateUserRoleSchema), async (req: AuthRequest, res: Response) => {
+router.put('/users/:id/role', requirePermission('user.assign_role'), async (req: AuthRequest, res: Response) => {
   try {
+    const { roleId } = req.body;
+    if (!roleId) { res.status(400).json({ success: false, error: 'roleId is required' }); return; }
+
     const user = await User.findOne({ _id: req.params.id, deletedAt: null });
     if (!user) { res.status(404).json({ success: false, error: 'User not found' }); return; }
 
-    const oldRole = user.role;
-    user.role = req.body.role as any;
+    const role = await Role.findById(roleId);
+    if (!role) { res.status(404).json({ success: false, error: 'Role not found' }); return; }
+
+    // Deactivate all existing active role assignments for this user
+    await UserRole.updateMany(
+      { userId: user._id, isActive: true },
+      { isActive: false },
+    );
+
+    // Assign the new role
+    const existing = await UserRole.findOne({ userId: user._id, roleId });
+    if (existing) {
+      existing.isActive = true;
+      (existing as any).assignedBy = req.user!.id;
+      await existing.save();
+    } else {
+      await UserRole.create({
+        userId: user._id,
+        roleId,
+        assignedBy: req.user!.id,
+      });
+    }
+
+    // Keep legacy role field in sync for backward compatibility
+    const roleLower = role.name.toLowerCase();
+    const legacyMap: Record<string, string> = {
+      'super_admin': 'super_admin',
+      'admin': 'admin',
+      'customer_service': 'support',
+      'pet_owner': 'customer',
+      'website_editor': 'admin',
+    };
+    user.role = (legacyMap[roleLower] || 'customer') as any;
     await user.save();
 
     await AuditLog.create({
@@ -385,11 +442,11 @@ router.put('/users/:id/role', requirePermission('user.assign_role'), validate(up
       action: 'update_role',
       entity: 'User',
       entityId: req.params.id,
-      changes: { role: { old: oldRole, new: req.body.role } },
+      changes: { roleId, roleName: role.name },
     });
 
     res.json({ success: true, data: user });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to update role' });
   }
 });
@@ -450,7 +507,7 @@ router.put('/users/:id/status', requirePermission('user.update'), validate(updat
     });
 
     res.json({ success: true, data: user });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to update status' });
   }
 });
@@ -473,7 +530,7 @@ router.post('/users/:id/reset-password', requirePermission('user.reset_password'
     });
 
     res.json({ success: true, data: { message: 'Password reset successfully' } });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to reset password' });
   }
 });
@@ -497,7 +554,7 @@ router.put('/users/:id/lock', requirePermission('user.deactivate'), async (req: 
     });
 
     res.json({ success: true, data: { message: 'Account locked' } });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to lock account' });
   }
 });
@@ -521,7 +578,7 @@ router.put('/users/:id/unlock', requirePermission('user.activate'), async (req: 
     });
 
     res.json({ success: true, data: { message: 'Account unlocked' } });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to unlock account' });
   }
 });
@@ -544,7 +601,7 @@ router.delete('/users/:id', requirePermission('user.delete'), async (req: AuthRe
     });
 
     res.json({ success: true, data: { message: 'User deleted' } });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to delete user' });
   }
 });
@@ -587,7 +644,7 @@ router.delete('/users/:id', requirePermission('user.delete'), async (req: AuthRe
  */
 router.post('/owners/register', requirePermission('user.create'), async (req: AuthRequest, res: Response) => {
   try {
-    const { email, password, fullName, phoneNumber } = req.body;
+    const { email, password, fullName, phoneNumber, roleId } = req.body;
     if (!email || !password || !fullName || !phoneNumber) {
       res.status(400).json({ success: false, error: 'email, password, fullName, and phoneNumber are required' });
       return;
@@ -597,6 +654,29 @@ router.post('/owners/register', requirePermission('user.create'), async (req: Au
       res.status(400).json({ success: false, error: 'Email or phone already registered' });
       return;
     }
+
+    // Determine which RBAC role to assign
+    let assignedRole = null;
+    if (roleId) {
+      assignedRole = await Role.findById(roleId);
+      if (!assignedRole) {
+        res.status(400).json({ success: false, error: 'Role not found' });
+        return;
+      }
+    } else {
+      assignedRole = await Role.findOne({ name: 'CUSTOMER' });
+    }
+
+    // Map RBAC role name to legacy role field
+    const legacyMap: Record<string, string> = {
+      'super_admin': 'super_admin',
+      'admin': 'admin',
+      'customer_service': 'support',
+      'pet_owner': 'customer',
+      'customer': 'customer',
+      'website_editor': 'admin',
+    };
+
     const bcrypt = await import('bcryptjs');
     const passwordHash = await bcrypt.default.hash(password, 12);
     const user = await User.create({
@@ -604,24 +684,33 @@ router.post('/owners/register', requirePermission('user.create'), async (req: Au
       passwordHash,
       fullName,
       phoneNumber,
-      role: 'customer',
+      role: (legacyMap[assignedRole?.name?.toLowerCase() || ''] || 'customer') as any,
       status: 'active',
       emailVerified: true,
       phoneVerified: false,
     });
+
+    // Assign RBAC role
+    if (assignedRole) {
+      await UserRole.create({
+        userId: user._id,
+        roleId: assignedRole._id,
+        assignedBy: req.user!.id,
+      });
+    }
 
     await AuditLog.create({
       userId: req.user!.id,
       action: 'create',
       entity: 'User',
       entityId: user._id.toString(),
-      changes: { email, fullName, role: 'customer', note: 'Admin registered owner on behalf' },
+      changes: { email, fullName, roleId: assignedRole?._id, roleName: assignedRole?.name, note: 'Admin registered user' },
     });
 
-    const { passwordHash: _, ...safeUser } = user.toObject();
+    const { passwordHash: _passwordHash, ...safeUser } = user.toObject();
     res.status(201).json({ success: true, data: safeUser });
-  } catch (error) {
-    res.status(500).json({ success: false, error: 'Failed to register owner' });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to register user' });
   }
 });
 
@@ -688,7 +777,7 @@ router.post('/pets', requirePermission('pet.create'), async (req: AuthRequest, r
     });
 
     res.status(201).json({ success: true, data: pet });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to create pet' });
   }
 });
@@ -745,7 +834,7 @@ router.put('/pets/:id', requirePermission('pet.update'), validate(updatePetSchem
     });
 
     res.json({ success: true, data: pet });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to update pet' });
   }
 });
@@ -792,7 +881,7 @@ router.delete('/pets/:id', requirePermission('pet.delete'), async (req: AuthRequ
     });
 
     res.json({ success: true, data: { message: 'Pet deleted' } });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to delete pet' });
   }
 });
@@ -936,7 +1025,7 @@ router.get('/pets', requirePermission('pet.read'), async (req, res: Response) =>
       success: true,
       data: { items: petsWithTag, total, page: Number(page), limit: Number(limit), totalPages: Math.ceil(total / Number(limit)) },
     });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch pets' });
   }
 });
@@ -993,52 +1082,8 @@ router.put('/pets/:id/status', requirePermission('pet.update'), async (req: Auth
     });
 
     res.json({ success: true, data: pet });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to update pet status' });
-  }
-});
-
-/**
- * @swagger
- * /api/admin/pets/{id}:
- *   delete:
- *     tags: [Admin - Pets]
- *     summary: Delete a pet
- *     description: Deletes a pet by ID and logs the action in the audit log.
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: Pet ID
- *     responses:
- *       200:
- *         description: Pet deleted
- *       401:
- *         description: Not authenticated
- *       403:
- *         description: Insufficient permissions
- *       404:
- *         description: Pet not found
- */
-router.delete('/pets/:id', requirePermission('pet.delete'), async (req: AuthRequest, res: Response) => {
-  try {
-    const pet = await Pet.findByIdAndDelete(req.params.id);
-    if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
-
-    await AuditLog.create({
-      userId: req.user!.id,
-      action: 'delete',
-      entity: 'Pet',
-      entityId: req.params.id,
-    });
-
-    res.json({ success: true, data: { message: 'Pet deleted' } });
-  } catch (error) {
-    res.status(500).json({ success: false, error: 'Failed to delete pet' });
   }
 });
 
@@ -1100,7 +1145,7 @@ router.get('/tags', requirePermission('tag.read'), async (req, res: Response) =>
       success: true,
       data: { items: tags, total, page: Number(page), limit: Number(limit), totalPages: Math.ceil(total / Number(limit)) },
     });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch tags' });
   }
 });
@@ -1177,7 +1222,7 @@ router.post('/tags', requirePermission('tag.create'), validate(createTagSchema),
 
     await AuditLog.create({ userId: req.user!.id, action: 'create', entity: 'Tag', entityId: tag._id.toString(), changes: { tagId, petId, ownerId } });
     res.status(201).json({ success: true, data: populated });
-  } catch (error) { res.status(500).json({ success: false, error: 'Failed to create tag' }); }
+  } catch { res.status(500).json({ success: false, error: 'Failed to create tag' }); }
 });
 
 /**
@@ -1207,7 +1252,7 @@ router.get('/tags/:id', requirePermission('tag.read'), async (req: AuthRequest, 
       .populate('ownerId', 'fullName email phoneNumber');
     if (!tag) { res.status(404).json({ success: false, error: 'Tag not found' }); return; }
     res.json({ success: true, data: tag });
-  } catch (error) { res.status(500).json({ success: false, error: 'Failed to fetch tag' }); }
+  } catch { res.status(500).json({ success: false, error: 'Failed to fetch tag' }); }
 });
 
 /**
@@ -1279,7 +1324,7 @@ router.put('/tags/:id', requirePermission('tag.update'), validate(updateTagSchem
 
     await AuditLog.create({ userId: req.user!.id, action: 'update', entity: 'Tag', entityId: tag._id.toString(), changes: { old: oldValues, new: newValues } });
     res.json({ success: true, data: updated });
-  } catch (error) { res.status(500).json({ success: false, error: 'Failed to update tag' }); }
+  } catch { res.status(500).json({ success: false, error: 'Failed to update tag' }); }
 });
 
 /**
@@ -1312,7 +1357,7 @@ router.delete('/tags/:id', requirePermission('tag.delete'), async (req: AuthRequ
 
     await AuditLog.create({ userId: req.user!.id, action: 'soft_delete', entity: 'Tag', entityId: req.params.id, changes: { tagId: tag.tagId, note: 'Soft deleted' } });
     res.json({ success: true, data: { message: 'Tag deleted' } });
-  } catch (error) { res.status(500).json({ success: false, error: 'Failed to delete tag' }); }
+  } catch { res.status(500).json({ success: false, error: 'Failed to delete tag' }); }
 });
 
 // --- QR Code Generation ---
@@ -1363,7 +1408,7 @@ router.get('/tags/:id/qr', requirePermission('tag.generate_qr'), async (req: Aut
     res.setHeader('Content-Type', 'image/png');
     res.setHeader('Content-Disposition', `inline; filename="qr-${tag.tagId}.png"`);
     res.send(qrBuffer);
-  } catch (error) { res.status(500).json({ success: false, error: 'Failed to generate QR code' }); }
+  } catch { res.status(500).json({ success: false, error: 'Failed to generate QR code' }); }
 });
 
 /**
@@ -1440,7 +1485,7 @@ router.get('/tags/:id/sticker', requirePermission('tag.generate_sticker'), async
 
     res.setHeader('Content-Type', 'text/html');
     res.send(html);
-  } catch (error) { res.status(500).json({ success: false, error: 'Failed to generate sticker' }); }
+  } catch { res.status(500).json({ success: false, error: 'Failed to generate sticker' }); }
 });
 
 /**
@@ -1525,7 +1570,7 @@ router.post('/tags/qr-bulk', requirePermission('tag.generate_qr'), async (req: A
 
     res.setHeader('Content-Type', 'text/html');
     res.send(html);
-  } catch (error) { res.status(500).json({ success: false, error: 'Failed to generate bulk QR codes' }); }
+  } catch { res.status(500).json({ success: false, error: 'Failed to generate bulk QR codes' }); }
 });
 
 // --- Product Management ---
@@ -1595,7 +1640,7 @@ router.get('/products', requirePermission('product.read'), async (req, res: Resp
       success: true,
       data: { items: products, total, page: Number(page), limit: Number(limit), totalPages: Math.ceil(total / Number(limit)) },
     });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch products' });
   }
 });
@@ -1631,7 +1676,7 @@ router.get('/products/:id', requirePermission('product.read'), async (req, res: 
     const product = await Product.findById(req.params.id);
     if (!product) { res.status(404).json({ success: false, error: 'Product not found' }); return; }
     res.json({ success: true, data: product });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch product' });
   }
 });
@@ -1688,7 +1733,7 @@ router.post('/products', requirePermission('product.create'), validate(createPro
     });
 
     res.status(201).json({ success: true, data: product });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to create product' });
   }
 });
@@ -1751,7 +1796,7 @@ router.put('/products/:id', requirePermission('product.update'), validate(update
     });
 
     res.json({ success: true, data: product });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to update product' });
   }
 });
@@ -1795,7 +1840,7 @@ router.delete('/products/:id', requirePermission('product.delete'), async (req: 
     });
 
     res.json({ success: true, data: { message: 'Product deleted' } });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to delete product' });
   }
 });
@@ -1857,7 +1902,7 @@ router.get('/orders', requirePermission('order.read'), async (req, res: Response
       success: true,
       data: { items: orders, total, page: Number(page), limit: Number(limit), totalPages: Math.ceil(total / Number(limit)) },
     });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch orders' });
   }
 });
@@ -1921,7 +1966,7 @@ router.put('/orders/:id/status', requirePermission('order.update'), async (req: 
     });
 
     res.json({ success: true, data: order });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to update order' });
   }
 });
@@ -1972,7 +2017,7 @@ router.get('/content', requirePermission('content.read'), async (req, res: Respo
       .sort({ updatedAt: -1 });
 
     res.json({ success: true, data: content });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch content' });
   }
 });
@@ -2008,7 +2053,7 @@ router.get('/content/:id', requirePermission('content.read'), async (req, res: R
     const content = await SiteContent.findById(req.params.id);
     if (!content) { res.status(404).json({ success: false, error: 'Content not found' }); return; }
     res.json({ success: true, data: content });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch content' });
   }
 });
@@ -2052,7 +2097,7 @@ router.post('/content', requirePermission('content.create'), validate(createCont
   try {
     const content = await SiteContent.create({ ...req.body, createdBy: req.user!.id });
     res.status(201).json({ success: true, data: content });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to create content' });
   }
 });
@@ -2107,7 +2152,7 @@ router.put('/content/:id', requirePermission('content.update'), validate(updateC
     const content = await SiteContent.findByIdAndUpdate(req.params.id, update, { new: true });
     if (!content) { res.status(404).json({ success: false, error: 'Content not found' }); return; }
     res.json({ success: true, data: content });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to update content' });
   }
 });
@@ -2140,7 +2185,7 @@ router.delete('/content/:id', requirePermission('content.delete'), async (req: A
   try {
     await SiteContent.findByIdAndDelete(req.params.id);
     res.json({ success: true, data: { message: 'Content deleted' } });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to delete content' });
   }
 });
@@ -2177,7 +2222,7 @@ router.get('/settings', requirePermission('setting.read'), async (req, res: Resp
 
     const settings = await Setting.find(query).sort({ category: 1, key: 1 });
     res.json({ success: true, data: settings });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch settings' });
   }
 });
@@ -2229,7 +2274,7 @@ router.put('/settings/:key', requirePermission('setting.update'), async (req: Au
     );
     if (!setting) { res.status(404).json({ success: false, error: 'Setting not found' }); return; }
     res.json({ success: true, data: setting });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to update setting' });
   }
 });
@@ -2273,7 +2318,7 @@ router.post('/settings', requirePermission('setting.create'), validate(createSet
   try {
     const setting = await Setting.create({ ...req.body, updatedBy: req.user!.id });
     res.status(201).json({ success: true, data: setting });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to create setting' });
   }
 });
@@ -2300,7 +2345,7 @@ router.get('/feature-flags', requirePermission('feature_flag.read'), async (_req
   try {
     const flags = await FeatureFlag.find().sort({ key: 1 });
     res.json({ success: true, data: flags });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch feature flags' });
   }
 });
@@ -2341,7 +2386,7 @@ router.post('/feature-flags', requirePermission('feature_flag.create'), validate
   try {
     const flag = await FeatureFlag.create(req.body);
     res.status(201).json({ success: true, data: flag });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to create feature flag' });
   }
 });
@@ -2388,7 +2433,7 @@ router.put('/feature-flags/:key', requirePermission('feature_flag.update'), asyn
     const flag = await FeatureFlag.findOneAndUpdate({ key: req.params.key }, req.body, { new: true });
     if (!flag) { res.status(404).json({ success: false, error: 'Feature flag not found' }); return; }
     res.json({ success: true, data: flag });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to update feature flag' });
   }
 });
@@ -2421,7 +2466,7 @@ router.delete('/feature-flags/:key', requirePermission('feature_flag.delete'), a
   try {
     await FeatureFlag.findOneAndDelete({ key: req.params.key });
     res.json({ success: true, data: { message: 'Feature flag deleted' } });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to delete feature flag' });
   }
 });
@@ -2483,7 +2528,7 @@ router.get('/audit-logs', requirePermission('audit_log.read'), async (req, res: 
       success: true,
       data: { items: logs, total, page: Number(page), limit: Number(limit), totalPages: Math.ceil(total / Number(limit)) },
     });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch audit logs' });
   }
 });
@@ -2532,7 +2577,7 @@ router.get('/finder-scans', requirePermission('finder_scan.read'), async (req, r
       success: true,
       data: { items: scans, total, page: Number(page), limit: Number(limit), totalPages: Math.ceil(total / Number(limit)) },
     });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch finder scans' });
   }
 });
@@ -2588,7 +2633,7 @@ router.get('/location-events', requirePermission('location_event.read'), async (
       success: true,
       data: { items: events, total, page: Number(page), limit: Number(limit), totalPages: Math.ceil(total / Number(limit)) },
     });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch location events' });
   }
 });

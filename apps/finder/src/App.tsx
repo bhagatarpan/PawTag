@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, Routes, Route, Navigate } from 'react-router-dom';
+import { useParams, Routes, Route } from 'react-router-dom';
 import axios from 'axios';
 import { PawPrint, Phone, MapPin, AlertTriangle, Loader2, CheckCircle, ChevronLeft, ChevronRight, ShieldAlert, ShieldCheck, Clock, Mail, User } from 'lucide-react';
 
@@ -139,7 +139,7 @@ function FinderPage() {
     ? (petPhotos.find((p) => p.isMain) || petPhotos[0])
     : null;
   const displayPhotoUrl = mainPhoto?.url || data?.pet?.photoUrl;
-  const currentPhoto = hasPhotos ? petPhotos[photoIdx] : null;
+  const _currentPhoto = hasPhotos ? petPhotos[photoIdx] : null;
 
   const formatBreed = () => {
     if (!data) return '';

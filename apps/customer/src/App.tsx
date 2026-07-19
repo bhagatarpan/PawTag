@@ -1,7 +1,7 @@
 import { Routes, Route, Navigate, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useState, useEffect, FormEvent, createContext, useContext, ReactNode, useRef } from 'react';
 import api from './lib/api';
-import { PawPrint, LogOut, Plus, AlertTriangle, CheckCircle, Camera, Star, X, ImageIcon, Edit2, Save, Upload, ShieldAlert, ShieldCheck, User, ShoppingBag, Bell, Settings, Home, ChevronRight, Mail, Phone, MapPin, Lock, Package, Clock, Skull, EyeOff, Activity } from 'lucide-react';
+import { PawPrint, LogOut, Plus, AlertTriangle, CheckCircle, Camera, Star, X, Edit2, Save, Upload, ShieldAlert, ShieldCheck, User, ShoppingBag, Bell, Settings, ChevronRight, Mail, Phone, MapPin, Lock, Clock, Skull, EyeOff, Activity } from 'lucide-react';
 import HealthRecords from './pages/HealthRecords';
 
 // --- Pet attribute options (mirrors shared/src/constants.ts) ---
@@ -779,7 +779,7 @@ function NotificationsPage() {
   };
 
   const clearRead = async () => {
-    const res = await api.delete('/customer/notifications/clear-read');
+    const _res = await api.delete('/customer/notifications/clear-read');
     setNotifications((prev) => prev.filter((n) => !n.read));
   };
 
@@ -787,7 +787,7 @@ function NotificationsPage() {
   const readCount = notifications.filter((n) => n.read).length;
 
   const notifIcon = (type: string, read: boolean) => {
-    const cls = read ? 'text-gray-400' : '';
+    const _cls = read ? 'text-gray-400' : '';
     switch (type) {
       case 'pet_lost': return <AlertTriangle size={18} className={read ? 'text-gray-400' : 'text-red-500'} />;
       case 'pet_found': return <CheckCircle size={18} className={read ? 'text-green-400' : 'text-green-500'} />;

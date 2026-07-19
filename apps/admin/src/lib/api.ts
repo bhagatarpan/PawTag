@@ -25,13 +25,6 @@ api.interceptors.response.use(
 
 export default api;
 
-export interface ApiResponse<T> {
-  success: boolean;
-  data?: T;
-  error?: string;
-  message?: string;
-}
-
 export interface PaginatedData<T> {
   items: T[];
   total: number;

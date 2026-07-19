@@ -17,8 +17,8 @@ interface Product {
 export default function Products() {
   const [data, setData] = useState<PaginatedData<Product> | null>(null);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
+  const [search] = useState('');
+  const [page] = useState(1);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
   const [form, setForm] = useState({

@@ -14,7 +14,7 @@ export default function Layout({ children }: { children: ReactNode }) {
           <div className="flex items-center gap-4">
             <span className="text-sm text-gray-600">{user?.fullName}</span>
             <span className="text-xs bg-primary-100 text-primary-700 px-2 py-0.5 rounded-full">
-              {permissions.length > 0 ? `${permissions.length} permissions` : user?.role?.replace('_', ' ')}
+              {permissions.length > 0 ? `${permissions.length} permissions` : user?.rbacRoles?.[0]?.displayName || user?.role?.replace('_', ' ')}
             </span>
             <button
               onClick={logout}

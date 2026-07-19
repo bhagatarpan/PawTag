@@ -46,12 +46,12 @@ router.post('/register', validate(registerSchema), async (req, res: Response) =>
       status: 'pending_verification',
     });
 
-    // Assign PET_OWNER RBAC role to new customer
-    const petOwnerRole = await Role.findOne({ name: 'PET_OWNER' });
-    if (petOwnerRole) {
+    // Assign CUSTOMER RBAC role to new registrant
+    const customerRole = await Role.findOne({ name: 'CUSTOMER' });
+    if (customerRole) {
       await UserRole.create({
         userId: user._id,
-        roleId: petOwnerRole._id,
+        roleId: customerRole._id,
         isActive: true,
       });
     }
@@ -122,6 +122,11 @@ router.post('/login', validate(loginSchema), async (req, res: Response) => {
 
     const token = generateToken({ id: user._id.toString(), email: user.email, role: user.role });
 
+    // Fetch RBAC roles
+    const userRoles = await UserRole.find({ userId: user._id, isActive: true })
+      .populate('roleId', 'name displayName isSuperAdmin');
+    const rbacRoles = userRoles.map((ur) => ur.roleId);
+
     res.json({
       success: true,
       data: {
@@ -132,6 +137,7 @@ router.post('/login', validate(loginSchema), async (req, res: Response) => {
           fullName: user.fullName,
           role: user.role,
           status: user.status,
+          rbacRoles,
         },
       },
     });
@@ -226,7 +232,7 @@ router.post('/forgot-password', async (req, res: Response) => {
     }
     // TODO: Send reset email with token
     res.json({ success: true, data: { message: 'If an account exists, a reset email has been sent.' } });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Request failed' });
   }
 });
@@ -262,8 +268,16 @@ router.get('/me', authenticate, async (req: AuthRequest, res: Response) => {
       res.status(404).json({ success: false, error: 'User not found' });
       return;
     }
-    res.json({ success: true, data: user });
-  } catch (error) {
+    const userData = user.toObject() as any;
+    userData.id = userData._id;
+
+    // Include RBAC roles
+    const userRoles = await UserRole.find({ userId: user._id, isActive: true })
+      .populate('roleId', 'name displayName isSuperAdmin');
+    userData.rbacRoles = userRoles.map((ur) => ur.roleId);
+
+    res.json({ success: true, data: userData });
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to get user' });
   }
 });
@@ -315,7 +329,7 @@ router.put('/profile', authenticate, validate(updateProfileSchema), async (req: 
       return;
     }
     res.json({ success: true, data: user });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Update failed' });
   }
 });
@@ -333,7 +347,7 @@ router.post('/change-password', authenticate, validate(changePasswordSchema), as
     user.passwordHash = await hashPassword(newPassword);
     await user.save();
     res.json({ success: true, data: { message: 'Password changed successfully' } });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to change password' });
   }
 });

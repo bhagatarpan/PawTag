@@ -1,5 +1,4 @@
 import { Router, Response } from 'express';
-import mongoose from 'mongoose';
 import { AuthRequest, authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
 import { validate } from '../middleware/validation';
@@ -38,7 +37,7 @@ router.get('/permission-groups', requirePermission('permission_group.read'), asy
   try {
     const groups = await PermissionGroup.find().sort({ sortOrder: 1, name: 1 });
     res.json({ success: true, data: groups });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch permission groups' });
   }
 });
@@ -48,7 +47,7 @@ router.get('/permission-groups/:id', requirePermission('permission_group.read'),
     const group = await PermissionGroup.findById(req.params.id);
     if (!group) { res.status(404).json({ success: false, error: 'Permission group not found' }); return; }
     res.json({ success: true, data: group });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch permission group' });
   }
 });
@@ -91,7 +90,7 @@ router.delete('/permission-groups/:id', requirePermission('permission_group.dele
     if (!group) { res.status(404).json({ success: false, error: 'Permission group not found' }); return; }
     await AuditLog.create({ userId: req.user!.id, action: 'delete', entity: 'PermissionGroup', entityId: req.params.id });
     res.json({ success: true, data: { message: 'Permission group deleted' } });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to delete permission group' });
   }
 });
@@ -120,7 +119,7 @@ router.get('/permissions', requirePermission('permission.read'), async (req: Aut
       .populate('permissionGroupId', 'name displayName')
       .sort({ resource: 1, action: 1 });
     res.json({ success: true, data: perms });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch permissions' });
   }
 });
@@ -130,7 +129,7 @@ router.get('/permissions/:id', requirePermission('permission.read'), async (req:
     const perm = await Permission.findById(req.params.id).populate('permissionGroupId', 'name displayName');
     if (!perm) { res.status(404).json({ success: false, error: 'Permission not found' }); return; }
     res.json({ success: true, data: perm });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch permission' });
   }
 });
@@ -173,7 +172,7 @@ router.delete('/permissions/:id', requirePermission('permission.delete'), async 
   try {
     const rpCount = await RolePermission.countDocuments({ permissionId: req.params.id });
     if (rpCount > 0) {
-      const perm = await Permission.findById(req.params.id);
+      const _perm = await Permission.findById(req.params.id);
       await Permission.findByIdAndUpdate(req.params.id, { isActive: false, updatedBy: req.user!.id });
       await AuditLog.create({ userId: req.user!.id, action: 'deactivate', entity: 'Permission', entityId: req.params.id, changes: { note: `Deactivated instead of deleted — used by ${rpCount} role(s)` } });
       res.json({ success: true, data: { message: `Permission deactivated (currently used by ${rpCount} role(s))` } });
@@ -183,7 +182,7 @@ router.delete('/permissions/:id', requirePermission('permission.delete'), async 
     if (!perm) { res.status(404).json({ success: false, error: 'Permission not found' }); return; }
     await AuditLog.create({ userId: req.user!.id, action: 'delete', entity: 'Permission', entityId: req.params.id });
     res.json({ success: true, data: { message: 'Permission deleted' } });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to delete permission' });
   }
 });
@@ -210,7 +209,7 @@ router.get('/roles', requirePermission('role.read'), async (_req: AuthRequest, r
   try {
     const roles = await Role.find().sort({ isSuperAdmin: -1, name: 1 });
     res.json({ success: true, data: roles });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch roles' });
   }
 });
@@ -220,7 +219,7 @@ router.get('/roles/:id', requirePermission('role.read'), async (req: AuthRequest
     const role = await Role.findById(req.params.id);
     if (!role) { res.status(404).json({ success: false, error: 'Role not found' }); return; }
     res.json({ success: true, data: role });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch role' });
   }
 });
@@ -248,7 +247,7 @@ router.put('/roles/:id', requirePermission('role.update'), validate(updateRoleSc
     await role.save();
     await AuditLog.create({ userId: req.user!.id, action: 'update', entity: 'Role', entityId: role._id.toString(), changes: req.body });
     res.json({ success: true, data: role });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to update role' });
   }
 });
@@ -266,7 +265,7 @@ router.delete('/roles/:id', requirePermission('role.delete'), async (req: AuthRe
     await Role.findByIdAndDelete(req.params.id);
     await AuditLog.create({ userId: req.user!.id, action: 'delete', entity: 'Role', entityId: req.params.id, changes: { name: role.name } });
     res.json({ success: true, data: { message: 'Role deleted' } });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to delete role' });
   }
 });
@@ -320,7 +319,7 @@ router.get('/roles/:id/permissions', requirePermission('role.read'), async (req:
       .populate('permissionId')
       .populate('scopeId');
     res.json({ success: true, data: rolePerms });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch role permissions' });
   }
 });
@@ -356,7 +355,7 @@ router.post('/roles/:id/permissions', requirePermission('role.assign_permission'
     const populated = await RolePermission.findById(rp._id).populate('permissionId').populate('scopeId');
     await AuditLog.create({ userId: req.user!.id, action: 'assign_permission', entity: 'RolePermission', entityId: rp._id.toString(), changes: { roleId: req.params.id, permissionId: req.body.permissionId } });
     res.status(201).json({ success: true, data: populated });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to assign permission' });
   }
 });
@@ -368,7 +367,7 @@ router.delete('/roles/:roleId/permissions/:permId', requirePermission('role.remo
     const rpId = (rp as any)._id?.toString?.() || rp.toString();
     await AuditLog.create({ userId: req.user!.id, action: 'remove_permission', entity: 'RolePermission', entityId: rpId, changes: { roleId: req.params.roleId, permissionId: req.params.permId } });
     res.json({ success: true, data: { message: 'Permission removed from role' } });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to remove permission' });
   }
 });
@@ -389,7 +388,7 @@ router.get('/scopes', requirePermission('permission.read'), async (_req: AuthReq
   try {
     const scopes = await PermissionScope.find().sort({ code: 1 });
     res.json({ success: true, data: scopes });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch scopes' });
   }
 });
@@ -426,7 +425,7 @@ router.delete('/scopes/:id', requirePermission('permission.delete'), async (req:
     const scope = await PermissionScope.findByIdAndDelete(req.params.id);
     if (!scope) { res.status(404).json({ success: false, error: 'Scope not found' }); return; }
     res.json({ success: true, data: { message: 'Scope deleted' } });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to delete scope' });
   }
 });
@@ -446,7 +445,7 @@ router.get('/users/:userId/roles', requirePermission('user.read'), async (req: A
       .populate('assignedBy', 'fullName email')
       .sort({ assignedAt: -1 });
     res.json({ success: true, data: assignments });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch user roles' });
   }
 });
@@ -502,7 +501,7 @@ router.delete('/users/:userId/roles/:roleId', requirePermission('user.remove_rol
     if (!ur) { res.status(404).json({ success: false, error: 'Role assignment not found' }); return; }
     await AuditLog.create({ userId: req.user!.id, action: 'remove_role', entity: 'UserRole', entityId: ur._id.toString(), changes: { userId: req.params.userId, roleId: req.params.roleId } });
     res.json({ success: true, data: { message: 'Role removed from user' } });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to remove role' });
   }
 });
@@ -515,7 +514,7 @@ router.get('/users/:userId/effective-permissions', requirePermission('user.read'
   try {
     const result = await getEffectivePermissions(req.params.userId);
     res.json({ success: true, data: result });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch effective permissions' });
   }
 });
@@ -529,7 +528,7 @@ router.get('/check/:permissionName', async (req: AuthRequest, res: Response) => 
     const { userHasPermission } = await import('../services/authorization.service');
     const result = await userHasPermission(req.user!.id, req.params.permissionName, req.query.scope as string | undefined);
     res.json({ success: true, data: result });
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Failed to check permission' });
   }
 });
