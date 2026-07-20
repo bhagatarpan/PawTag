@@ -341,7 +341,7 @@ export default function MyPets() {
                 {pet.status === 'transferred' && <div className="bg-blue-600 text-white px-4 py-2.5 flex items-center gap-2"><ChevronRight size={20} /><span className="font-semibold text-sm">Transferred</span></div>}
                 {pet.status === 'donated' && <div className="bg-teal-600 text-white px-4 py-2.5 flex items-center gap-2"><Star size={20} /><span className="font-semibold text-sm">Donated</span></div>}
                 {pet.status === 'sold' && <div className="bg-amber-600 text-white px-4 py-2.5 flex items-center gap-2"><ShoppingBag size={20} /><span className="font-semibold text-sm">Sold</span></div>}
-                {mainPhoto && <div className="h-40 bg-gray-100 relative"><img src={mainPhoto} alt={pet.name} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} /></div>}
+                {mainPhoto ? <div className="h-40 bg-gray-100 relative"><img src={mainPhoto} alt={pet.name} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} /></div> : <div className="h-40 bg-gradient-to-br from-teal-50 to-teal-100 flex flex-col items-center justify-center gap-2"><PawPrint size={36} className="text-teal-300" /><p className="text-xs text-teal-400 font-medium">Add a photo of {pet.name}</p></div>}
                 <div className="p-5">
                   <div className="flex justify-between items-start mb-3">
                     <div className="flex-1">
