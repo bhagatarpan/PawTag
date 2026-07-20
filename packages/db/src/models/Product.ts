@@ -1,5 +1,14 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
+export interface IProductVariant {
+  name: string;
+  sku: string;
+  price: number;
+  stock: number;
+  image?: string;
+  attributes: Record<string, string>;
+}
+
 export interface IProductDocument extends Document {
   name: string;
   description: string;
@@ -19,7 +28,19 @@ export interface IProductDocument extends Document {
     height: number;
     unit: 'cm' | 'in';
   };
+  variants: IProductVariant[];
+  customizable: boolean;
+  customizationPrice: number;
 }
+
+const ProductVariantSchema = new Schema<IProductVariant>({
+  name: { type: String, required: true },
+  sku: { type: String, required: true },
+  price: { type: Number, min: 0 },
+  stock: { type: Number, default: 0, min: 0 },
+  image: { type: String },
+  attributes: { type: Map, of: String },
+}, { _id: false });
 
 const ProductSchema = new Schema<IProductDocument>(
   {
@@ -41,6 +62,9 @@ const ProductSchema = new Schema<IProductDocument>(
       height: Number,
       unit: { type: String, enum: ['cm', 'in'] },
     },
+    variants: [ProductVariantSchema],
+    customizable: { type: Boolean, default: false },
+    customizationPrice: { type: Number, default: 0, min: 0 },
   },
   { timestamps: true },
 );

@@ -443,6 +443,130 @@ router.get('/pets/:id/locations', requirePermission('pet.read'), async (req: Aut
   }
 });
 
+// --- Cart (server-side persistence for logged-in users) ---
+
+router.get('/cart', requirePermission('order.create'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { Cart } = require('@pawtag/db');
+    let cart = await Cart.findOne({ userId: req.user!.id });
+    if (!cart) {
+      cart = await Cart.create({ userId: req.user!.id, items: [] });
+    }
+    res.json({ success: true, data: cart });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to fetch cart' });
+  }
+});
+
+router.post('/cart/items', requirePermission('order.create'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { Cart, Product } = require('@pawtag/db');
+    const { productId, quantity = 1, variantName, petName } = req.body;
+
+    const product = await Product.findById(productId);
+    if (!product || !product.isActive) {
+      res.status(404).json({ success: false, error: 'Product not found' });
+      return;
+    }
+
+    let cart = await Cart.findOne({ userId: req.user!.id });
+    if (!cart) {
+      cart = await Cart.create({ userId: req.user!.id, items: [] });
+    }
+
+    let unitPrice = product.price;
+    let selectedSku = product.sku;
+    if (variantName && product.variants?.length) {
+      const variant = product.variants.find((v: any) => v.name === variantName);
+      if (variant) {
+        unitPrice = variant.price || product.price;
+        selectedSku = variant.sku;
+      }
+    }
+
+    let customizationTotal = 0;
+    if (petName && product.customizable) {
+      customizationTotal = product.customizationPrice || 0;
+    }
+
+    const existingItemIndex = cart.items.findIndex(
+      (item: any) => item.productId.toString() === productId && item.variantName === variantName && item.petName === petName
+    );
+
+    if (existingItemIndex >= 0) {
+      cart.items[existingItemIndex].quantity += quantity;
+    } else {
+      cart.items.push({
+        productId,
+        productName: product.name,
+        variantName: variantName || undefined,
+        sku: selectedSku,
+        unitPrice,
+        customizationTotal,
+        quantity,
+        petName: petName || undefined,
+        image: product.images?.[0] || variantName && product.variants?.find((v: any) => v.name === variantName)?.image,
+      });
+    }
+
+    cart.updatedAt = new Date();
+    await cart.save();
+
+    res.json({ success: true, data: cart });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to add item to cart' });
+  }
+});
+
+router.put('/cart/items/:itemId', requirePermission('order.create'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { Cart } = require('@pawtag/db');
+    const { quantity } = req.body;
+    const cart = await Cart.findOne({ userId: req.user!.id });
+    if (!cart) { res.status(404).json({ success: false, error: 'Cart not found' }); return; }
+
+    const item = cart.items.id(req.params.itemId);
+    if (!item) { res.status(404).json({ success: false, error: 'Item not found' }); return; }
+
+    if (quantity <= 0) {
+      item.deleteOne();
+    } else {
+      item.quantity = quantity;
+    }
+
+    cart.updatedAt = new Date();
+    await cart.save();
+    res.json({ success: true, data: cart });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to update cart item' });
+  }
+});
+
+router.delete('/cart/items/:itemId', requirePermission('order.create'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { Cart } = require('@pawtag/db');
+    const cart = await Cart.findOne({ userId: req.user!.id });
+    if (!cart) { res.status(404).json({ success: false, error: 'Cart not found' }); return; }
+
+    cart.items = cart.items.filter((item: any) => item._id.toString() !== req.params.itemId);
+    cart.updatedAt = new Date();
+    await cart.save();
+    res.json({ success: true, data: cart });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to remove cart item' });
+  }
+});
+
+router.delete('/cart', requirePermission('order.create'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { Cart } = require('@pawtag/db');
+    await Cart.findOneAndDelete({ userId: req.user!.id });
+    res.json({ success: true, data: { message: 'Cart cleared' } });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to clear cart' });
+  }
+});
+
 // --- Orders ---
 /**
  * @swagger
@@ -517,6 +641,145 @@ router.get('/orders/:id', requirePermission('order.read'), async (req: AuthReque
     res.json({ success: true, data: order });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch order' });
+  }
+});
+
+router.post('/orders', requirePermission('order.create'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { Cart, Order, Product, User } = require('@pawtag/db');
+    const { shippingAddress, paymentMethod = 'card' } = req.body;
+
+    if (!shippingAddress?.line1 || !shippingAddress?.city || !shippingAddress?.state || !shippingAddress?.zip) {
+      res.status(400).json({ success: false, error: 'Shipping address is required (line1, city, state, zip)' });
+      return;
+    }
+
+    // Get user's cart
+    const cart = await Cart.findOne({ userId: req.user!.id });
+    if (!cart || cart.items.length === 0) {
+      res.status(400).json({ success: false, error: 'Cart is empty' });
+      return;
+    }
+
+    // Get user info for email
+    const user = await User.findById(req.user!.id);
+
+    // Validate stock and calculate totals
+    const orderItems = [];
+    let totalAmount = 0;
+
+    for (const cartItem of cart.items) {
+      const product = await Product.findById(cartItem.productId);
+      if (!product || !product.isActive) {
+        res.status(400).json({ success: false, error: `Product "${cartItem.productName}" is no longer available` });
+        return;
+      }
+
+      if (cartItem.variantName && product.variants?.length) {
+        const variant = product.variants.find((v: any) => v.name === cartItem.variantName);
+        if (!variant || variant.stock < cartItem.quantity) {
+          res.status(400).json({ success: false, error: `Insufficient stock for "${cartItem.productName} - ${cartItem.variantName}"` });
+          return;
+        }
+      } else if (product.stock < cartItem.quantity) {
+        res.status(400).json({ success: false, error: `Insufficient stock for "${cartItem.productName}"` });
+        return;
+      }
+
+      const itemTotal = (cartItem.unitPrice + (cartItem.customizationTotal || 0)) * cartItem.quantity;
+      totalAmount += itemTotal;
+
+      orderItems.push({
+        productId: cartItem.productId,
+        productName: cartItem.productName,
+        quantity: cartItem.quantity,
+        unitPrice: cartItem.unitPrice,
+        totalPrice: itemTotal,
+        variantName: cartItem.variantName,
+        petName: cartItem.petName,
+        customizationTotal: cartItem.customizationTotal || 0,
+      });
+
+      if (cartItem.variantName && product.variants?.length) {
+        const variant = product.variants.find((v: any) => v.name === cartItem.variantName);
+        if (variant) variant.stock -= cartItem.quantity;
+      } else {
+        product.stock -= cartItem.quantity;
+      }
+      await product.save();
+    }
+
+    // Generate order number
+    const orderCount = await Order.countDocuments();
+    const orderNumber = `PT-${String(orderCount + 1).padStart(6, '0')}`;
+
+    // Process payment via Stripe
+    const { createPaymentIntent } = require('../services/stripe.service');
+    const paymentResult = await createPaymentIntent({
+      amount: totalAmount,
+      currency: 'NZD',
+      orderId: orderNumber,
+      customerEmail: user?.email || '',
+      metadata: { orderNumber, userId: req.user!.id },
+    });
+
+    if (!paymentResult.success) {
+      res.status(402).json({ success: false, error: paymentResult.error || 'Payment failed' });
+      return;
+    }
+
+    // Create order with payment info
+    const order = await Order.create({
+      orderNumber,
+      userId: req.user!.id,
+      items: orderItems,
+      status: paymentMethod === 'card' ? 'paid' : 'pending',
+      payment: {
+        method: paymentMethod,
+        status: 'completed',
+        transactionId: paymentResult.paymentIntentId,
+        amount: totalAmount,
+        currency: 'NZD',
+        paidAt: new Date(),
+      },
+      shippingAddress: {
+        line1: shippingAddress.line1,
+        line2: shippingAddress.line2,
+        city: shippingAddress.city,
+        state: shippingAddress.state,
+        zip: shippingAddress.zip,
+        country: shippingAddress.country || 'NZ',
+      },
+    });
+
+    // Clear cart
+    await Cart.findOneAndDelete({ userId: req.user!.id });
+
+    // Send confirmation email (non-blocking)
+    const { sendOrderConfirmation } = require('../services/email.service');
+    sendOrderConfirmation({
+      to: user?.email,
+      customerName: user?.fullName || 'Customer',
+      orderNumber,
+      items: orderItems.map((item: any) => ({
+        productName: item.productName,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        variantName: item.variantName,
+        petName: item.petName,
+      })),
+      total: totalAmount,
+      shippingAddress: {
+        line1: shippingAddress.line1,
+        city: shippingAddress.city,
+        state: shippingAddress.state,
+        zip: shippingAddress.zip,
+      },
+    }).catch((err: any) => console.error('Email send error:', err));
+
+    res.status(201).json({ success: true, data: order });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to create order' });
   }
 });
 

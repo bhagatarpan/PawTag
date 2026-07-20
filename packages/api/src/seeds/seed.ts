@@ -650,6 +650,55 @@ async function seed() {
       }
     }
 
+    // ── 7. Bootstrap Test Customer ──
+    console.log('\n--- Bootstrapping Test Customer ---');
+    const testCustomerEmail = 'john@example.com';
+    const testCustomerPassword = 'TestPass123!';
+
+    let testCustomer = await User.findOne({ email: testCustomerEmail }).session(session);
+
+    if (!testCustomer) {
+      const passwordHash = await bcrypt.hash(testCustomerPassword, 12);
+      testCustomer = (await User.create([{
+        email: testCustomerEmail,
+        passwordHash,
+        fullName: 'John Smith',
+        phoneNumber: '+64211234567',
+        role: 'customer',
+        status: 'active',
+        emailVerified: true,
+        phoneVerified: false,
+      }], { session }))[0];
+      console.log(`  Created test customer: ${testCustomerEmail}`);
+    } else {
+      console.log(`  Test customer already exists: ${testCustomerEmail}`);
+    }
+
+    // Assign CUSTOMER role to test customer
+    const customerRoleId = roleMap['CUSTOMER'];
+    if (customerRoleId && testCustomer) {
+      const existingCustomerRole = await UserRole.findOne({
+        userId: testCustomer._id,
+        roleId: customerRoleId,
+      }).session(session);
+
+      if (!existingCustomerRole) {
+        await UserRole.create([{
+          userId: testCustomer._id,
+          roleId: customerRoleId,
+          assignedBy: adminUser._id,
+          isActive: true,
+        }], { session });
+        console.log('  Assigned CUSTOMER role to test customer');
+      } else if (!existingCustomerRole.isActive) {
+        existingCustomerRole.isActive = true;
+        await existingCustomerRole.save({ session });
+        console.log('  Reactivated CUSTOMER role for test customer');
+      } else {
+        console.log('  CUSTOMER role already assigned to test customer');
+      }
+    }
+
     await session.commitTransaction();
     console.log('\n✅ Seed completed successfully!\n');
 

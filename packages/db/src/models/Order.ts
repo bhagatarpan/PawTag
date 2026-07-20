@@ -3,13 +3,16 @@ import mongoose, { Schema, Document } from 'mongoose';
 export interface IOrderDocument extends Document {
   orderNumber: string;
   userId: mongoose.Types.ObjectId;
-  items: {
+  items: Array<{
     productId: mongoose.Types.ObjectId;
     productName: string;
+    variantName?: string;
+    petName?: string;
     quantity: number;
     unitPrice: number;
     totalPrice: number;
-  }[];
+    customizationTotal?: number;
+  }>;
   status: 'pending' | 'paid' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
   payment: {
     method: 'card' | 'paypal' | 'bank_transfer';
@@ -48,9 +51,12 @@ const OrderSchema = new Schema<IOrderDocument>(
       {
         productId: { type: Schema.Types.ObjectId, ref: 'Product', required: true },
         productName: { type: String, required: true },
+        variantName: { type: String },
+        petName: { type: String },
         quantity: { type: Number, required: true, min: 1 },
         unitPrice: { type: Number, required: true },
         totalPrice: { type: Number, required: true },
+        customizationTotal: { type: Number, default: 0 },
       },
     ],
     status: {
