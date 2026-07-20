@@ -69,7 +69,12 @@ router.post('/register', validate(registerSchema), async (req, res: Response) =>
 
     const customerRole = await Role.findOne({ name: 'CUSTOMER' });
     if (customerRole) {
-      await UserRole.create({ userId: user._id, roleId: customerRole._id, isActive: true });
+      await UserRole.create({
+        userId: user._id,
+        roleId: customerRole._id,
+        assignedBy: user._id,
+        isActive: true,
+      });
     }
 
     const emailToken = generateSecureToken();
