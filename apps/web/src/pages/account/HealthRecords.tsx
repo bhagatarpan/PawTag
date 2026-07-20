@@ -40,6 +40,7 @@ export default function HealthRecords({ pet, onClose }: { pet: Pet; onClose: () 
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showSaved, setShowSaved] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   const fetchData = async (section: string) => {
     try {
@@ -51,7 +52,7 @@ export default function HealthRecords({ pet, onClose }: { pet: Pet; onClose: () 
   };
 
   const handleSave = async (e: FormEvent) => {
-    e.preventDefault(); setSaving(true);
+    e.preventDefault(); setSaving(true); setSaveError('');
     try {
       const isDesexing = tab === 'desexing';
       const apiSection = tab === 'vetDetails' ? 'vet-details' : tab === 'healthConditions' ? 'health-conditions' : tab === 'weightHistory' ? 'weight-history' : tab;
@@ -64,15 +65,17 @@ export default function HealthRecords({ pet, onClose }: { pet: Pet; onClose: () 
       }
       await fetchData(isDesexing ? 'desexing' : tab);
       setShowForm(false); setEditing(null); setShowSaved(true);
-    } catch {}
+    } catch (err: any) { setSaveError(err.response?.data?.error || 'Failed to save record'); }
     setSaving(false);
   };
 
   const handleDelete = async (section: string, id: string) => {
     if (!confirm('Delete this record?')) return;
-    const apiSection = section === 'vetDetails' ? 'vet-details' : section === 'healthConditions' ? 'health-conditions' : section === 'weightHistory' ? 'weight-history' : section;
-    await api.delete(`/customer/pets/${pet._id}/${apiSection}/${id}`);
-    await fetchData(section);
+    try {
+      const apiSection = section === 'vetDetails' ? 'vet-details' : section === 'healthConditions' ? 'health-conditions' : section === 'weightHistory' ? 'weight-history' : section;
+      await api.delete(`/customer/pets/${pet._id}/${apiSection}/${id}`);
+      await fetchData(section);
+    } catch (err: any) { setSaveError(err.response?.data?.error || 'Failed to delete record'); }
   };
 
   const severityColor = (s: string) => s === 'severe' || s === 'chronic' ? 'bg-red-100 text-red-700' : s === 'moderate' ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700';
@@ -93,8 +96,9 @@ export default function HealthRecords({ pet, onClose }: { pet: Pet; onClose: () 
           ))}
         </div>
         <div className="flex-1 overflow-y-auto p-6">
+          {saveError && <div className="bg-red-50 text-red-600 text-sm p-3 rounded mb-4">{saveError}</div>}
           {tab === 'desexing' ? (
-            <DesexingSection desexing={desexing} onEdit={() => { setEditing({ ...desexing }); setShowForm(true); }} onSave={async (val: any) => { setSaving(true); await api.put(`/customer/pets/${pet._id}/desexing`, val); setDesexing(val); setSaving(false); }} saving={saving} />
+            <DesexingSection desexing={desexing} onEdit={() => { setEditing({ ...desexing }); setShowForm(true); }} onSave={async (val: any) => { setSaving(true); setSaveError(''); try { await api.put(`/customer/pets/${pet._id}/desexing`, val); setDesexing(val); setShowSaved(true); } catch (err: any) { setSaveError(err.response?.data?.error || 'Failed to save'); } setSaving(false); }} saving={saving} />
           ) : showForm ? (
             <FormSection tab={tab} petType={pet.petType} editing={editing} onChange={setEditing} onSave={handleSave} onCancel={() => { setShowForm(false); setEditing(null); }} saving={saving} />
           ) : (

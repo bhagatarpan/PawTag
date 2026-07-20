@@ -246,24 +246,26 @@ export default function MyPets() {
     }
   };
 
-  const markLost = async (id: string) => { await api.post(`/customer/pets/${id}/mark-lost`); refreshPets(); };
+  const markLost = async (id: string) => { try { await api.post(`/customer/pets/${id}/mark-lost`); refreshPets(); } catch {} };
   const markFound = async (id: string) => {
-    const res = await api.post(`/customer/pets/${id}/mark-found`);
-    const timeMs = res.data.data.timeToFoundMs;
-    if (timeMs) {
-      const hours = Math.floor(timeMs / (1000 * 60 * 60));
-      const mins = Math.floor((timeMs % (1000 * 60 * 60)) / (1000 * 60));
-      const secs = Math.floor((timeMs % (1000 * 60)) / 1000);
-      setTimeToFoundMsg(`Pet reunited in ${hours}h ${mins}m ${secs}s`);
-      setTimeout(() => setTimeToFoundMsg(''), 8000);
-    }
-    refreshPets();
+    try {
+      const res = await api.post(`/customer/pets/${id}/mark-found`);
+      const timeMs = res.data.data.timeToFoundMs;
+      if (timeMs) {
+        const hours = Math.floor(timeMs / (1000 * 60 * 60));
+        const mins = Math.floor((timeMs % (1000 * 60 * 60)) / (1000 * 60));
+        const secs = Math.floor((timeMs % (1000 * 60)) / 1000);
+        setTimeToFoundMsg(`Pet reunited in ${hours}h ${mins}m ${secs}s`);
+        setTimeout(() => setTimeToFoundMsg(''), 8000);
+      }
+      refreshPets();
+    } catch {}
   };
   const markTerminal = async (id: string, reason: string) => {
     if (!confirm(`Mark pet as ${reason}? This action cannot be undone from the portal.`)) return;
-    await api.post(`/customer/pets/${id}/mark-terminal`, { reason }); refreshPets();
+    try { await api.post(`/customer/pets/${id}/mark-terminal`, { reason }); refreshPets(); } catch {}
   };
-  const deletePet = async (id: string) => { if (confirm('Delete this pet?')) { await api.delete(`/customer/pets/${id}`); refreshPets(); } };
+  const deletePet = async (id: string) => { if (confirm('Delete this pet?')) { try { await api.delete(`/customer/pets/${id}`); refreshPets(); } catch {} } };
 
   const getMainPhoto = (pet: any): string | null => {
     if (pet.photos?.length > 0) { const m = pet.photos.find((p: any) => p.isMain); return m ? m.url : pet.photos[0].url; }

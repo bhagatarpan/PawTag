@@ -28,10 +28,12 @@ export default function Profile() {
     try {
       const payload: any = { fullName: form.fullName, email: form.email };
       if (form.phoneNumber) payload.phoneNumber = form.phoneNumber;
-      const addr = { line1: form.address.line1, line2: form.address.line2, city: form.address.city, state: form.address.state, zip: form.address.zip, country: form.address.country };
-      if (Object.values(addr).some((v) => v)) payload.address = addr;
-      const ec = { name: form.emergencyContact.name, phone: form.emergencyContact.phone, email: form.emergencyContact.email, relationship: form.emergencyContact.relationship };
-      if (Object.values(ec).some((v) => v)) payload.emergencyContact = ec;
+      const addrRaw: Record<string, string> = { line1: form.address.line1, line2: form.address.line2, city: form.address.city, state: form.address.state, zip: form.address.zip, country: form.address.country };
+      const addr = Object.fromEntries(Object.entries(addrRaw).filter(([_, v]) => v !== ''));
+      if (Object.keys(addr).length > 0) payload.address = addr;
+      const ecRaw: Record<string, string> = { name: form.emergencyContact.name, phone: form.emergencyContact.phone, email: form.emergencyContact.email, relationship: form.emergencyContact.relationship };
+      const ec = Object.fromEntries(Object.entries(ecRaw).filter(([_, v]) => v !== ''));
+      if (Object.keys(ec).length > 0) payload.emergencyContact = ec;
       await api.put('/auth/profile', payload); setShowSaved(true); refreshUser();
     }
     catch (err: any) { setError(err.response?.data?.error || 'Update failed'); }

@@ -27,9 +27,9 @@ export default function Notifications() {
     return () => clearInterval(interval);
   }, [notifications]);
 
-  const markRead = async (id: string) => { await api.put(`/customer/notifications/${id}/read`); setNotifications((prev) => prev.map((n) => n._id === id ? { ...n, read: true } : n)); };
-  const markAllRead = async () => { await api.put('/customer/notifications/mark-all-read'); setNotifications((prev) => prev.map((n) => ({ ...n, read: true }))); };
-  const clearRead = async () => { await api.delete('/customer/notifications/clear-read'); setNotifications((prev) => prev.filter((n) => !n.read)); };
+  const markRead = async (id: string) => { try { await api.put(`/customer/notifications/${id}/read`); setNotifications((prev) => prev.map((n) => n._id === id ? { ...n, read: true } : n)); } catch {} };
+  const markAllRead = async () => { try { await api.put('/customer/notifications/mark-all-read'); setNotifications((prev) => prev.map((n) => ({ ...n, read: true }))); } catch {} };
+  const clearRead = async () => { try { await api.delete('/customer/notifications/clear-read'); setNotifications((prev) => prev.filter((n) => !n.read)); } catch {} };
 
   const unreadCount = notifications.filter((n) => !n.read).length;
   const readCount = notifications.filter((n) => n.read).length;
