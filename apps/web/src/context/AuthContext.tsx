@@ -31,7 +31,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string): Promise<User> => {
     const res = await api.post('/auth/login', { email, password });
-    const { token: newToken, user: userData } = res.data.data;
+    const data = res.data;
+
+    if (data.code === 'REQUIRES_VERIFICATION') {
+      const error: any = new Error(data.error);
+      error.code = data.code;
+      error.data = data.data;
+      throw error;
+    }
+
+    const { token: newToken, user: userData } = data.data;
     localStorage.setItem('pawtag_token', newToken);
     setToken(newToken);
     setUser(userData);

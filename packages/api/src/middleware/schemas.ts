@@ -3,8 +3,13 @@ import { z } from 'zod';
 export const registerSchema = z.object({
   email: z.string().email('Invalid email address'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
+  confirmPassword: z.string().min(1, 'Please confirm your password'),
   fullName: z.string().min(2, 'Full name is required'),
   phoneNumber: z.string().min(1, 'Phone number is required'),
+  acceptTerms: z.literal(true, { errorMap: () => ({ message: 'You must accept the terms and conditions' }) }),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: 'Passwords do not match',
+  path: ['confirmPassword'],
 });
 
 export const loginSchema = z.object({
@@ -12,9 +17,28 @@ export const loginSchema = z.object({
   password: z.string().min(1, 'Password is required'),
 });
 
-export const verifyOtpSchema = z.object({
+export const verifyEmailSchema = z.object({
+  token: z.string().min(1, 'Verification token is required'),
+});
+
+export const resendEmailVerificationSchema = z.object({
   email: z.string().email('Invalid email address'),
+});
+
+export const sendPhoneOtpSchema = z.object({
+  phoneNumber: z.string().min(1, 'Phone number is required'),
+});
+
+export const verifyPhoneSchema = z.object({
   otp: z.string().length(6, 'OTP must be 6 digits'),
+});
+
+export const resendPhoneOtpSchema = z.object({
+  phoneNumber: z.string().min(1, 'Phone number is required'),
+});
+
+export const verificationStatusSchema = z.object({
+  email: z.string().email().optional(),
 });
 
 export const changePasswordSchema = z.object({

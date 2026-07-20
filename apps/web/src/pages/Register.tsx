@@ -4,7 +4,7 @@ import { PawPrint, Mail, Lock, User, Phone, Eye, EyeOff, CheckCircle } from 'luc
 import api from '../lib/api';
 
 export default function Register() {
-  const [form, setForm] = useState({ fullName: '', email: '', phoneNumber: '', password: '', confirmPassword: '' });
+  const [form, setForm] = useState({ fullName: '', email: '', phoneNumber: '', password: '', confirmPassword: '', acceptTerms: false });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -23,6 +23,10 @@ export default function Register() {
       setError('Password must be at least 8 characters');
       return;
     }
+    if (!form.acceptTerms) {
+      setError('You must accept the terms and conditions');
+      return;
+    }
 
     setLoading(true);
     try {
@@ -31,6 +35,8 @@ export default function Register() {
         email: form.email,
         phoneNumber: form.phoneNumber,
         password: form.password,
+        confirmPassword: form.confirmPassword,
+        acceptTerms: form.acceptTerms,
       });
       setSuccess(true);
     } catch (err: any) {
@@ -48,9 +54,20 @@ export default function Register() {
             <CheckCircle className="h-10 w-10 text-green-600" />
           </div>
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Account Created!</h1>
-          <p className="text-gray-500 mb-6">Please check your email to verify your account before signing in.</p>
-          <button onClick={() => navigate('/login')} className="w-full py-3 bg-teal-600 text-white rounded-lg font-semibold hover:bg-teal-700 transition-all">
-            Go to Sign In
+          <p className="text-gray-500 mb-6">
+            Your account has been created. Please verify your email address and mobile number to activate your account.
+          </p>
+          <button
+            onClick={() => navigate('/verify-account')}
+            className="w-full py-3 bg-teal-600 text-white rounded-lg font-semibold hover:bg-teal-700 transition-all"
+          >
+            Verify My Account
+          </button>
+          <button
+            onClick={() => navigate('/login')}
+            className="w-full mt-3 py-3 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-all"
+          >
+            Sign In Instead
           </button>
         </div>
       </div>
@@ -119,6 +136,22 @@ export default function Register() {
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
                 <input type="password" required value={form.confirmPassword} onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })} className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-teal-500 focus:border-teal-500" placeholder="Re-enter password" />
               </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <input
+                type="checkbox"
+                id="acceptTerms"
+                checked={form.acceptTerms}
+                onChange={(e) => setForm({ ...form, acceptTerms: e.target.checked })}
+                className="mt-1 h-4 w-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500"
+              />
+              <label htmlFor="acceptTerms" className="text-sm text-gray-600">
+                I agree to the{' '}
+                <span className="text-teal-600 font-medium cursor-pointer">Terms of Service</span>
+                {' '}and{' '}
+                <span className="text-teal-600 font-medium cursor-pointer">Privacy Policy</span>
+              </label>
             </div>
 
             <button type="submit" disabled={loading} className="w-full py-3 bg-teal-600 text-white rounded-lg font-semibold hover:bg-teal-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all">

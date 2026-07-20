@@ -3,6 +3,7 @@ export { connectDatabase, disconnectDatabase, mongoose } from './connection';
 export { User, type IUserDocument } from './models/User';
 export { Pet, type IPetDocument, generatePetId } from './models/Pet';
 export { Tag, type ITagDocument } from './models/Tag';
+export { VerificationToken, type IVerificationTokenDocument } from './models/VerificationToken';
 export { Product, type IProductDocument } from './models/Product';
 export { Cart, type ICartDocument } from './models/Cart';
 export { Order, type IOrderDocument } from './models/Order';

@@ -9,7 +9,9 @@ export interface IUserDocument extends Document {
   roles: mongoose.Types.ObjectId[]; // References to Role collection (new RBAC)
   status: 'active' | 'inactive' | 'suspended' | 'pending_verification';
   emailVerified: boolean;
+  emailVerifiedAt?: Date;
   phoneVerified: boolean;
+  phoneVerifiedAt?: Date;
   profilePicture?: string;
   address?: {
     line1: string;
@@ -43,7 +45,9 @@ const UserSchema = new Schema<IUserDocument>(
       default: 'pending_verification',
     },
     emailVerified: { type: Boolean, default: false },
+    emailVerifiedAt: { type: Date },
     phoneVerified: { type: Boolean, default: false },
+    phoneVerifiedAt: { type: Date },
     profilePicture: { type: String },
     address: {
       line1: String,

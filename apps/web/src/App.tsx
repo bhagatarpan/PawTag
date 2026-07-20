@@ -10,6 +10,8 @@ import ProductDetail from './pages/ProductDetail';
 import Checkout from './pages/Checkout';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import VerifyAccount from './pages/VerifyAccount';
+import VerifyEmail from './pages/VerifyEmail';
 import About from './pages/About';
 import MyPets from './pages/account/MyPets';
 import Profile from './pages/account/Profile';
@@ -33,6 +35,8 @@ export default function App() {
       <Route path="/checkout" element={<div className="min-h-screen flex flex-col"><Navbar /><main className="flex-1"><Checkout /></main><Footer /><EmergencyLostPet /></div>} />
       <Route path="/login" element={<div className="min-h-screen flex flex-col"><Navbar /><main className="flex-1"><Login /></main><Footer /></div>} />
       <Route path="/register" element={<div className="min-h-screen flex flex-col"><Navbar /><main className="flex-1"><Register /></main><Footer /></div>} />
+      <Route path="/verify-account" element={<VerifyAccount />} />
+      <Route path="/verify-email" element={<VerifyEmail />} />
       <Route path="/about" element={<div className="min-h-screen flex flex-col"><Navbar /><main className="flex-1"><About /></main><Footer /><EmergencyLostPet /></div>} />
 
       {/* Account routes — no public Navbar/Footer, uses AccountLayout sidebar */}

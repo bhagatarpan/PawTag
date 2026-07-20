@@ -31,6 +31,11 @@ export default function Login() {
         navigate('/account');
       }
     } catch (err: any) {
+      const responseCode = err.response?.data?.code;
+      if (responseCode === 'REQUIRES_VERIFICATION') {
+        navigate('/verify-account');
+        return;
+      }
       setError(err.response?.data?.error || 'Invalid email or password');
     } finally {
       setLoading(false);
