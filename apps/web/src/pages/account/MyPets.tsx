@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, FormEvent } from 'react';
 import { PawPrint, Plus, AlertTriangle, CheckCircle, Star, X, Edit2, Save, Upload, ShieldAlert, ShieldCheck, ShoppingBag, ChevronRight, Skull, EyeOff, Clock, Activity, Camera } from 'lucide-react';
 import api from '../../lib/api';
 import HealthRecords from './HealthRecords';
+import SaveToast from '../../components/SaveToast';
 
 const PET_TYPES = ['Dog', 'Cat', 'Rabbit', 'Hamster', 'Guinea Pig', 'Bird'] as const;
 
@@ -181,6 +182,7 @@ export default function MyPets() {
   const [foundTimers, setFoundTimers] = useState<Record<string, string>>({});
   const [timeToFoundMsg, setTimeToFoundMsg] = useState('');
   const [healthPet, setHealthPet] = useState<any>(null);
+  const [showSaved, setShowSaved] = useState(false);
 
   const refreshPets = () => api.get('/customer/pets').then((r) => setPets(r.data.data)).catch(console.error);
   useEffect(() => { refreshPets(); }, []);
@@ -238,7 +240,7 @@ export default function MyPets() {
     if (form.age !== '') payload.age = parseFloat(form.age);
     try {
       if (editingPet) { await api.put(`/customer/pets/${editingPet._id}`, payload); } else { await api.post('/customer/pets', payload); }
-      cancelForm(); refreshPets();
+      cancelForm(); refreshPets(); setShowSaved(true);
     } catch (err: any) {
       alert(err.response?.data?.error || 'Failed to save pet');
     }
@@ -282,6 +284,7 @@ export default function MyPets() {
         <h1 className="text-2xl font-bold">My Pets</h1>
         <button onClick={startAdd} className="bg-teal-600 text-white px-4 py-2 rounded-md text-sm flex items-center gap-2 hover:bg-teal-700"><Plus size={16} /> Add Pet</button>
       </div>
+      {showSaved && <SaveToast message="Pet saved successfully" onDone={() => setShowSaved(false)} />}
 
       {showForm && (
         <form onSubmit={handleSubmit} className="bg-white rounded-lg border p-6 mb-6 space-y-4">

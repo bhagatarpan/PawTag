@@ -1,6 +1,7 @@
 import { useState, FormEvent } from 'react';
 import api from '../../lib/api';
 import { X, Plus, Trash2, Syringe, Cpu, Pill, AlertTriangle, Stethoscope, Scissors, Weight, Heart, Activity, Edit2 } from 'lucide-react';
+import SaveToast from '../../components/SaveToast';
 
 const CORE_DOG_VACCINES = ['Canine Distemper (CDV)', 'Canine Parvovirus (CPV-2)', 'Canine Adenovirus (CAV-2)'];
 const NON_CORE_DOG_VACCINES = ['Leptospirosis', 'Canine Influenza', 'Bordetella (Kennel Cough)', 'Canine Parainfluenza'];
@@ -38,6 +39,7 @@ export default function HealthRecords({ pet, onClose }: { pet: Pet; onClose: () 
   const [editing, setEditing] = useState<any>(null);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [showSaved, setShowSaved] = useState(false);
 
   const fetchData = async (section: string) => {
     try {
@@ -61,7 +63,7 @@ export default function HealthRecords({ pet, onClose }: { pet: Pet; onClose: () 
         else await api.post(`/customer/pets/${pet._id}/${apiSection}`, editing);
       }
       await fetchData(isDesexing ? 'desexing' : tab);
-      setShowForm(false); setEditing(null);
+      setShowForm(false); setEditing(null); setShowSaved(true);
     } catch {}
     setSaving(false);
   };
@@ -77,6 +79,7 @@ export default function HealthRecords({ pet, onClose }: { pet: Pet; onClose: () 
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      {showSaved && <SaveToast message="Record saved successfully" onDone={() => setShowSaved(false)} />}
       <div className="bg-white rounded-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between border-b px-6 py-4">
           <div><h2 className="text-xl font-bold">{pet.name} — Health Records</h2><p className="text-sm text-gray-500">{pet.petType} · {pet.breed}</p></div>

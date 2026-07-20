@@ -2,13 +2,14 @@ import { useState, useEffect, FormEvent } from 'react';
 import { User, MapPin, Phone, Lock, Save } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../lib/api';
+import SaveToast from '../../components/SaveToast';
 
 export default function Profile() {
   const { user, refreshUser } = useAuth();
   const [form, setForm] = useState({ fullName: '', email: '', phoneNumber: '', address: { line1: '', line2: '', city: '', state: '', zip: '', country: '' }, emergencyContact: { name: '', phone: '', email: '', relationship: '' } });
   const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
+  const [showSaved, setShowSaved] = useState(false);
   const [responsibility, setResponsibility] = useState<any>(null);
 
   useEffect(() => {
@@ -23,8 +24,8 @@ export default function Profile() {
   }, [user]);
 
   const handleSave = async (e: FormEvent) => {
-    e.preventDefault(); setSaving(true); setMsg(''); setError('');
-    try { await api.put('/auth/profile', form); setMsg('Profile updated successfully'); refreshUser(); }
+    e.preventDefault(); setSaving(true); setError('');
+    try { await api.put('/auth/profile', form); setShowSaved(true); refreshUser(); }
     catch (err: any) { setError(err.response?.data?.error || 'Update failed'); }
     finally { setSaving(false); }
   };
@@ -38,7 +39,7 @@ export default function Profile() {
           <div><p className="font-semibold">{responsibility.rating}</p><p className="text-sm text-gray-600">Pet Responsibility Score — {responsibility.pets?.length || 0} pets registered</p></div>
         </div>
       )}
-      {msg && <div className="bg-green-50 text-green-700 text-sm p-3 rounded mb-4">{msg}</div>}
+      {showSaved && <SaveToast message="Profile updated successfully" onDone={() => setShowSaved(false)} />}
       {error && <div className="bg-red-50 text-red-600 text-sm p-3 rounded mb-4">{error}</div>}
       <form onSubmit={handleSave} className="space-y-6">
         <div className="bg-white rounded-lg border p-6 space-y-4">
@@ -81,15 +82,15 @@ function ChangePasswordForm() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState('');
+  const [showSaved, setShowSaved] = useState(false);
   const [error, setError] = useState('');
 
   const handleChangePassword = async (e: FormEvent) => {
-    e.preventDefault(); setMsg(''); setError('');
+    e.preventDefault(); setError('');
     if (newPassword !== confirmPassword) { setError('New passwords do not match'); return; }
     if (newPassword.length < 8) { setError('Password must be at least 8 characters'); return; }
     setSaving(true);
-    try { await api.post('/auth/change-password', { currentPassword, newPassword }); setMsg('Password changed successfully'); setCurrentPassword(''); setNewPassword(''); setConfirmPassword(''); }
+    try { await api.post('/auth/change-password', { currentPassword, newPassword }); setShowSaved(true); setCurrentPassword(''); setNewPassword(''); setConfirmPassword(''); }
     catch (err: any) { setError(err.response?.data?.error || 'Failed to change password'); }
     finally { setSaving(false); }
   };
@@ -97,7 +98,7 @@ function ChangePasswordForm() {
   return (
     <form onSubmit={handleChangePassword} className="bg-white rounded-lg border p-6 space-y-4 mt-6">
       <h2 className="text-lg font-semibold flex items-center gap-2"><Lock size={18} /> Change Password</h2>
-      {msg && <div className="bg-green-50 text-green-700 text-sm p-3 rounded">{msg}</div>}
+      {showSaved && <SaveToast message="Password changed successfully" onDone={() => setShowSaved(false)} />}
       {error && <div className="bg-red-50 text-red-600 text-sm p-3 rounded">{error}</div>}
       <div className="grid grid-cols-1 gap-4 max-w-md">
         <div><label className="block text-xs text-gray-500 mb-1">Current Password</label><input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" required /></div>

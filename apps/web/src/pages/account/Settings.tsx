@@ -1,21 +1,21 @@
 import { useState } from 'react';
 import { Bell, Lock, Save } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import SaveToast from '../../components/SaveToast';
 
 export default function Settings() {
   const { user } = useAuth();
   const [prefs, setPrefs] = useState({ emailNotifications: true, smsNotifications: false, lostPetAlerts: true, finderNotifications: true });
-  const [msg, setMsg] = useState('');
+  const [showSaved, setShowSaved] = useState(false);
 
   const handleSave = () => {
-    setMsg('Settings saved (local only for now — will connect to backend when settings API is ready)');
-    setTimeout(() => setMsg(''), 3000);
+    setShowSaved(true);
   };
 
   return (
     <div>
       <h1 className="text-2xl font-bold mb-6">Settings</h1>
-      {msg && <div className="bg-green-50 text-green-700 text-sm p-3 rounded mb-4">{msg}</div>}
+      {showSaved && <SaveToast message="Settings saved successfully" onDone={() => setShowSaved(false)} />}
       <div className="bg-white rounded-lg border p-6 space-y-4 mb-6">
         <h2 className="text-lg font-semibold flex items-center gap-2"><Bell size={18} /> Notification Preferences</h2>
         {[
