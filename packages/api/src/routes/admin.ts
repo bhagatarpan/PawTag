@@ -1136,7 +1136,7 @@ router.get('/tags', requirePermission('tag.read'), async (req, res: Response) =>
     const total = await Tag.countDocuments(query);
     const tags = await Tag.find(query)
       .populate('petId', 'name petId petType breed color status')
-      .populate('ownerId', 'fullName email')
+      .populate('ownerId', 'fullName email phoneNumber')
       .sort({ createdAt: -1 })
       .skip((Number(page) - 1) * Number(limit))
       .limit(Number(limit));

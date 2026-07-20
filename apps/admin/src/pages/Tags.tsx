@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import api, { PaginatedData } from '../lib/api';
 import { Search, Trash2, Plus, Edit2, Save, X, Tag as TagIcon, QrCode, Printer, Download } from 'lucide-react';
 
@@ -6,13 +6,86 @@ interface TagItem {
   _id: string;
   tagId: string;
   petId: { _id: string; name: string; petId: string; petType: string; breed: string; color: string; status: string } | null;
-  ownerId: { _id: string; fullName: string; email: string } | null;
+  ownerId: { _id: string; fullName: string; email: string; phoneNumber?: string } | null;
   status: 'active' | 'inactive' | 'lost';
   lastScannedAt?: string;
   createdAt: string;
 }
 
 const emptyForm = { petId: '', ownerId: '', tagId: '', status: 'active' as string };
+
+function OwnerSearch({ owners, value, onSelect, required }: { owners: any[]; value: string; onSelect: (id: string) => void; required?: boolean }) {
+  const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
+  const [highlighted, setHighlighted] = useState(-1);
+  const ref = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const selected = owners.find((o) => o._id === value);
+
+  const filtered = query.trim()
+    ? owners.filter((o) => {
+        const q = query.toLowerCase();
+        return (o.fullName || '').toLowerCase().includes(q) || (o.email || '').toLowerCase().includes(q) || (o.phoneNumber || '').toLowerCase().includes(q);
+      })
+    : owners;
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); setHighlighted((prev) => Math.min(prev + 1, filtered.length - 1)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setHighlighted((prev) => Math.max(prev - 1, 0)); }
+    else if (e.key === 'Enter' && highlighted >= 0) { e.preventDefault(); onSelect(filtered[highlighted]._id); setQuery(''); setOpen(false); setHighlighted(-1); }
+    else if (e.key === 'Escape') { setOpen(false); }
+  };
+
+  return (
+    <div className="relative" ref={ref}>
+      {selected && !open ? (
+        <div className="w-full border rounded-md px-3 py-2 text-sm flex items-center justify-between bg-white cursor-pointer hover:border-gray-400" onClick={() => { setOpen(true); setQuery(''); setHighlighted(-1); }}>
+          <span className="truncate">{selected.fullName} <span className="text-gray-400">({selected.email}){selected.phoneNumber ? ` · ${selected.phoneNumber}` : ''}</span></span>
+          <button type="button" onClick={(e) => { e.stopPropagation(); onSelect(''); }} className="text-gray-400 hover:text-red-500 ml-1 shrink-0"><X size={14} /></button>
+        </div>
+      ) : (
+        <input
+          ref={inputRef}
+          type="text"
+          value={query}
+          onChange={(e) => { setQuery(e.target.value); setOpen(true); setHighlighted(-1); }}
+          onFocus={() => { setOpen(true); setHighlighted(-1); }}
+          onKeyDown={handleKeyDown}
+          placeholder="Search by name, email, or phone..."
+          className="w-full border rounded-md px-3 py-2 text-sm"
+          required={required && !value}
+          autoFocus
+        />
+      )}
+      {open && filtered.length > 0 && (
+        <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+          {filtered.slice(0, 20).map((o, i) => (
+            <button
+              key={o._id}
+              type="button"
+              onClick={() => { onSelect(o._id); setQuery(''); setOpen(false); setHighlighted(-1); }}
+              onMouseEnter={() => setHighlighted(i)}
+              className={`w-full text-left px-3 py-2 text-sm flex flex-col ${i === highlighted ? 'bg-primary-50' : 'hover:bg-gray-50'}`}
+            >
+              <span className="font-medium">{o.fullName}</span>
+              <span className="text-xs text-gray-500">{o.email}{o.phoneNumber ? ` · ${o.phoneNumber}` : ''}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      {open && query && filtered.length === 0 && (
+        <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-sm text-gray-500">No matching owners</div>
+      )}
+    </div>
+  );
+}
 
 export default function Tags() {
   const [data, setData] = useState<PaginatedData<TagItem> | null>(null);
@@ -228,10 +301,7 @@ export default function Tags() {
             </div>
             <div>
               <label className="block text-xs text-gray-500 mb-1">Owner *</label>
-              <select value={form.ownerId} onChange={(e) => setForm({ ...form, ownerId: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm" required>
-                <option value="">Select owner...</option>
-                {owners.map((o: any) => <option key={o._id} value={o._id}>{o.fullName} ({o.email})</option>)}
-              </select>
+              <OwnerSearch owners={owners} value={form.ownerId} onSelect={(id) => setForm({ ...form, ownerId: id })} required />
             </div>
           </div>
           <div className="flex gap-2">
@@ -273,6 +343,8 @@ export default function Tags() {
               <th className="text-left px-4 py-3 font-medium text-gray-500">Tag ID</th>
               <th className="text-left px-4 py-3 font-medium text-gray-500">Pet</th>
               <th className="text-left px-4 py-3 font-medium text-gray-500">Owner</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-500">Phone</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-500">Email</th>
               <th className="text-left px-4 py-3 font-medium text-gray-500">Status</th>
               <th className="text-left px-4 py-3 font-medium text-gray-500">Last Scanned</th>
               <th className="text-left px-4 py-3 font-medium text-gray-500">Actions</th>
@@ -280,9 +352,9 @@ export default function Tags() {
           </thead>
           <tbody className="divide-y divide-gray-200">
             {loading ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">Loading...</td></tr>
+              <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-500">Loading...</td></tr>
             ) : data?.items.length === 0 ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">No tags found</td></tr>
+              <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-500">No tags found</td></tr>
             ) : (
               data?.items.map((tag) => (
                 <tr key={tag._id} className="hover:bg-gray-50">
@@ -300,6 +372,8 @@ export default function Tags() {
                     ) : <span className="text-gray-400">Unlinked</span>}
                   </td>
                   <td className="px-4 py-3 text-gray-600">{tag.ownerId?.fullName || 'N/A'}</td>
+                  <td className="px-4 py-3 text-gray-500 text-xs">{tag.ownerId?.phoneNumber || '—'}</td>
+                  <td className="px-4 py-3 text-gray-500 text-xs">{tag.ownerId?.email || '—'}</td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${statusColor(tag.status)}`}>
                       {tag.status}
