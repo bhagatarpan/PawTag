@@ -233,10 +233,15 @@ export default function MyPets() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    const payload: any = { ...form, species: form.petType, photos };
-    if (form.breed !== 'Mixed Breed') payload.secondaryBreed = 'Unknown';
-    if (editingPet) { await api.put(`/customer/pets/${editingPet._id}`, payload); } else { await api.post('/customer/pets', payload); }
-    cancelForm(); refreshPets();
+    const payload: any = { species: form.petType, photos, name: form.name, petType: form.petType, breed: form.breed, secondaryBreed: form.breed === 'Mixed Breed' ? form.secondaryBreed : 'Unknown', color: form.color, pattern: form.pattern, gender: form.gender, favouriteFood: form.favouriteFood, medicalAlerts: form.medicalAlerts };
+    if (form.dateOfBirth) payload.dateOfBirth = form.dateOfBirth;
+    if (form.age !== '') payload.age = parseFloat(form.age);
+    try {
+      if (editingPet) { await api.put(`/customer/pets/${editingPet._id}`, payload); } else { await api.post('/customer/pets', payload); }
+      cancelForm(); refreshPets();
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Failed to save pet');
+    }
   };
 
   const markLost = async (id: string) => { await api.post(`/customer/pets/${id}/mark-lost`); refreshPets(); };
