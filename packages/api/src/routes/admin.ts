@@ -1128,10 +1128,11 @@ router.put('/pets/:id/status', requirePermission('pet.update'), async (req: Auth
  */
 router.get('/tags', requirePermission('tag.read'), async (req, res: Response) => {
   try {
-    const { page = 1, limit = 20, search, status } = req.query;
+    const { page = 1, limit = 20, search, status, tagType } = req.query;
     const query: any = { deletedAt: null };
     if (search) query.tagId = { $regex: search, $options: 'i' };
     if (status) query.status = status;
+    if (tagType) query.tagType = tagType;
 
     const total = await Tag.countDocuments(query);
     const tags = await Tag.find(query)
@@ -1192,7 +1193,7 @@ function generateTagId(): string {
  */
 router.post('/tags', requirePermission('tag.create'), validate(createTagSchema), async (req: AuthRequest, res: Response) => {
   try {
-    const { petId, ownerId, tagId: customTagId, status } = req.body;
+    const { petId, ownerId, tagId: customTagId, tagType = 'qr', status } = req.body;
 
     const pet = await Pet.findOne({ _id: petId, deletedAt: null });
     if (!pet) { res.status(400).json({ success: false, error: 'Pet not found' }); return; }
@@ -1215,12 +1216,16 @@ router.post('/tags', requirePermission('tag.create'), validate(createTagSchema),
       if (await Tag.findOne({ tagId })) { res.status(400).json({ success: false, error: 'Tag ID already exists' }); return; }
     }
 
-    const tag = await Tag.create({ tagId, petId, ownerId, status: status || 'active' });
+    const finderUrl = `${req.protocol}://${req.get('host')}/finder/${tagId}`;
+    const tagData: any = { tagId, tagType, petId, ownerId, status: status || 'active' };
+    if (tagType === 'nfc') tagData.nfcUrl = finderUrl;
+
+    const tag = await Tag.create(tagData);
     const populated = await Tag.findById(tag._id)
       .populate('petId', 'name petId petType breed color')
-      .populate('ownerId', 'fullName email');
+      .populate('ownerId', 'fullName email phoneNumber');
 
-    await AuditLog.create({ userId: req.user!.id, action: 'create', entity: 'Tag', entityId: tag._id.toString(), changes: { tagId, petId, ownerId } });
+    await AuditLog.create({ userId: req.user!.id, action: 'create', entity: 'Tag', entityId: tag._id.toString(), changes: { tagId, tagType, petId, ownerId } });
     res.status(201).json({ success: true, data: populated });
   } catch { res.status(500).json({ success: false, error: 'Failed to create tag' }); }
 });
@@ -1309,11 +1314,19 @@ router.put('/tags/:id', requirePermission('tag.update'), validate(updateTagSchem
 
     const oldValues: any = {};
     const newValues: any = {};
-    for (const key of ['petId', 'ownerId', 'status']) {
+    for (const key of ['petId', 'ownerId', 'status', 'tagType']) {
       if (req.body[key] !== undefined) {
         oldValues[key] = tag.get(key);
         newValues[key] = req.body[key];
       }
+    }
+
+    if (req.body.tagType === 'nfc' && !tag.nfcUrl) {
+      const finderUrl = `${req.protocol}://${req.get('host')}/finder/${tag.tagId}`;
+      req.body.nfcUrl = finderUrl;
+    }
+    if (req.body.tagType === 'qr') {
+      req.body.nfcUrl = undefined;
     }
 
     Object.assign(tag, req.body);

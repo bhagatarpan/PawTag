@@ -352,7 +352,7 @@ export default function MyPets() {
                     <div className="flex-1">
                       <h3 className="text-xl font-bold">{pet.name}</h3>
                       {pet.petId && <p className="text-sm text-gray-400 font-mono">ID: {pet.petId}</p>}
-                      {pet.linkedTag && <p className="text-sm text-teal-600 font-mono mt-0.5">Tag: {pet.linkedTag.tagId}<span className={`ml-1.5 inline-block w-2 h-2 rounded-full ${pet.linkedTag.status === 'active' ? 'bg-green-500' : pet.linkedTag.status === 'lost' ? 'bg-red-500' : 'bg-gray-400'}`} /><span className="ml-1 text-gray-400 font-sans">({pet.linkedTag.status})</span></p>}
+                      {pet.linkedTag && <p className="text-sm text-teal-600 font-mono mt-0.5">Tag: {pet.linkedTag.tagId} <span className="text-[10px] uppercase bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded font-sans font-medium">{pet.linkedTag.tagType || 'qr'}</span><span className={`ml-1.5 inline-block w-2 h-2 rounded-full ${pet.linkedTag.status === 'active' ? 'bg-green-500' : pet.linkedTag.status === 'lost' ? 'bg-red-500' : 'bg-gray-400'}`} /><span className="ml-1 text-gray-400 font-sans">({pet.linkedTag.status})</span></p>}
                       {!pet.linkedTag && <p className="text-sm text-gray-300 mt-0.5">No tag linked</p>}
                       <p className="text-base text-gray-600 mt-1">{pet.petType || pet.species} — {formatBreed(pet)}</p>
                       <p className="text-base text-gray-500">Color: {pet.color}{pet.pattern ? ` | Pattern: ${pet.pattern}` : ''}</p>

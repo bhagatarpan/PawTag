@@ -1,10 +1,11 @@
 import { useEffect, useState, useRef } from 'react';
 import api, { PaginatedData } from '../lib/api';
-import { Search, Trash2, Plus, Edit2, Save, X, Tag as TagIcon, QrCode, Printer, Download } from 'lucide-react';
+import { Search, Trash2, Plus, Edit2, Save, X, Tag as TagIcon, QrCode, Printer, Download, Copy } from 'lucide-react';
 
 interface TagItem {
   _id: string;
   tagId: string;
+  tagType?: string;
   petId: { _id: string; name: string; petId: string; petType: string; breed: string; color: string; status: string } | null;
   ownerId: { _id: string; fullName: string; email: string; phoneNumber?: string } | null;
   status: 'active' | 'inactive' | 'lost';
@@ -12,7 +13,7 @@ interface TagItem {
   createdAt: string;
 }
 
-const emptyForm = { petId: '', ownerId: '', tagId: '', status: 'active' as string };
+const emptyForm = { petId: '', ownerId: '', tagId: '', tagType: 'qr' as string, status: 'active' as string };
 
 function OwnerSearch({ owners, value, onSelect, required }: { owners: any[]; value: string; onSelect: (id: string) => void; required?: boolean }) {
   const [query, setQuery] = useState('');
@@ -102,6 +103,7 @@ export default function Tags() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
   const [page, setPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
   const [editingTag, setEditingTag] = useState<TagItem | null>(null);
@@ -109,7 +111,7 @@ export default function Tags() {
   const [pets, setPets] = useState<any[]>([]);
   const [owners, setOwners] = useState<any[]>([]);
   const [error, setError] = useState('');
-  const [qrModal, setQrModal] = useState<{ tagId: string; petName?: string; petId?: string } | null>(null);
+  const [qrModal, setQrModal] = useState<{ tagId: string; petName?: string; petId?: string; tagType?: string } | null>(null);
   const [qrImageUrl, setQrImageUrl] = useState('');
 
   const fetchTags = () => {
@@ -117,13 +119,14 @@ export default function Tags() {
     const params: any = { page, limit: 20 };
     if (search) params.search = search;
     if (statusFilter) params.status = statusFilter;
+    if (typeFilter) params.tagType = typeFilter;
     api.get('/admin/tags', { params }).then((res) => setData(res.data.data)).catch(console.error).finally(() => setLoading(false));
   };
 
   const fetchPets = () => api.get('/admin/pets', { params: { limit: 200 } }).then((r) => setPets(r.data.data.items)).catch(console.error);
   const fetchOwners = () => api.get('/admin/users', { params: { role: 'customer', limit: 200 } }).then((r) => setOwners(r.data.data.items)).catch(console.error);
 
-  useEffect(() => { fetchTags(); }, [page, statusFilter]);
+  useEffect(() => { fetchTags(); }, [page, statusFilter, typeFilter]);
   useEffect(() => { fetchPets(); fetchOwners(); }, []);
 
   const handleSearch = (e: React.FormEvent) => { e.preventDefault(); setPage(1); fetchTags(); };
@@ -141,6 +144,7 @@ export default function Tags() {
       petId: tag.petId?._id || '',
       ownerId: tag.ownerId?._id || '',
       tagId: tag.tagId,
+      tagType: tag.tagType || 'qr',
       status: tag.status,
     });
     setError('');
@@ -157,6 +161,7 @@ export default function Tags() {
         await api.put(`/admin/tags/${editingTag._id}`, {
           petId: form.petId || undefined,
           ownerId: form.ownerId || undefined,
+          tagType: form.tagType,
           status: form.status,
         });
       } else {
@@ -164,6 +169,7 @@ export default function Tags() {
           petId: form.petId,
           ownerId: form.ownerId,
           tagId: form.tagId || undefined,
+          tagType: form.tagType,
           status: form.status,
         });
       }
@@ -198,7 +204,7 @@ export default function Tags() {
   const openQRModal = async (tag: TagItem) => {
     const url = `${apiBase}/tags/${tag.tagId}/qr?size=400`;
     setQrImageUrl(url);
-    setQrModal({ tagId: tag.tagId, petName: tag.petId?.name, petId: tag.petId?.petId });
+    setQrModal({ tagId: tag.tagId, petName: tag.petId?.name, petId: tag.petId?.petId, tagType: tag.tagType });
   };
 
   const downloadQR = async (tagId: string) => {
@@ -219,6 +225,11 @@ export default function Tags() {
     win.document.write(`<!DOCTYPE html><html><head><title>QR - ${qrModal.tagId}</title><style>body{display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0;font-family:sans-serif}.card{text-align:center;border:2px solid #e5e7eb;border-radius:12px;padding:24px;box-shadow:0 2px 8px rgba(0,0,0,.08)}img{width:250px;height:250px}.tag{font-size:20px;font-weight:700;font-family:monospace;margin-top:8px}.pet{font-size:14px;color:#666;margin-top:4px}@media print{body{background:white}.card{box-shadow:none}}</style></head><body><div class="card"><img src="${qrImageUrl}" /><div class="tag">${qrModal.tagId}</div>${qrModal.petName ? `<div class="pet">${qrModal.petName}${qrModal.petId ? ` (${qrModal.petId})` : ''}</div>` : ''}</div></body></html>`);
     win.document.close();
     win.print();
+  };
+
+  const copyNfcUrl = (tagId: string) => {
+    const url = `${apiBase.replace('/api', '')}/finder/${tagId}`;
+    navigator.clipboard.writeText(url);
   };
 
   const openSticker = (tagId: string) => {
@@ -293,6 +304,14 @@ export default function Tags() {
               </div>
             )}
             <div>
+              <label className="block text-xs text-gray-500 mb-1">Tag Type *</label>
+              <select value={form.tagType} onChange={(e) => setForm({ ...form, tagType: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm" disabled={!!editingTag}>
+                <option value="qr">QR Code</option>
+                <option value="nfc">NFC Tag</option>
+              </select>
+              {editingTag && <p className="text-xs text-gray-400 mt-1">Tag type cannot be changed after creation</p>}
+            </div>
+            <div>
               <label className="block text-xs text-gray-500 mb-1">Status</label>
               <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm">
                 <option value="active">Active</option>
@@ -343,6 +362,15 @@ export default function Tags() {
           <option value="inactive">Inactive</option>
           <option value="lost">Lost</option>
         </select>
+        <select
+          value={typeFilter}
+          onChange={(e) => { setTypeFilter(e.target.value); setPage(1); }}
+          className="border border-gray-300 rounded-md px-3 py-2 text-sm"
+        >
+          <option value="">All Types</option>
+          <option value="qr">QR Code</option>
+          <option value="nfc">NFC Tag</option>
+        </select>
       </div>
 
       {/* Table */}
@@ -351,6 +379,7 @@ export default function Tags() {
           <thead className="bg-gray-50">
             <tr>
               <th className="text-left px-4 py-3 font-medium text-gray-500">Tag ID</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-500">Type</th>
               <th className="text-left px-4 py-3 font-medium text-gray-500">Pet</th>
               <th className="text-left px-4 py-3 font-medium text-gray-500">Owner</th>
               <th className="text-left px-4 py-3 font-medium text-gray-500">Phone</th>
@@ -362,15 +391,20 @@ export default function Tags() {
           </thead>
           <tbody className="divide-y divide-gray-200">
             {loading ? (
-              <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-500">Loading...</td></tr>
+              <tr><td colSpan={9} className="px-4 py-8 text-center text-gray-500">Loading...</td></tr>
             ) : data?.items.length === 0 ? (
-              <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-500">No tags found</td></tr>
+              <tr><td colSpan={9} className="px-4 py-8 text-center text-gray-500">No tags found</td></tr>
             ) : (
               data?.items.map((tag) => (
                 <tr key={tag._id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-mono font-medium flex items-center gap-1.5">
                     <TagIcon size={14} className="text-primary-500" />
                     {tag.tagId}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${tag.tagType === 'nfc' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+                      {tag.tagType === 'nfc' ? 'NFC' : 'QR'}
+                    </span>
                   </td>
                   <td className="px-4 py-3">
                     {tag.petId ? (
@@ -395,7 +429,7 @@ export default function Tags() {
                   <td className="px-4 py-3">
                     <div className="flex gap-1 items-center">
                       <button onClick={() => startEdit(tag)} className="text-primary-500 hover:text-primary-700 p-1" title="Edit"><Edit2 size={13} /></button>
-                      <button onClick={() => openQRModal(tag)} className="text-blue-500 hover:text-blue-700 p-1" title="View QR Code"><QrCode size={13} /></button>
+                      <button onClick={() => openQRModal(tag)} className="text-blue-500 hover:text-blue-700 p-1" title={tag.tagType === 'nfc' ? 'View NFC Info' : 'View QR Code'}><QrCode size={13} /></button>
                       <button onClick={() => openSticker(tag.tagId)} className="text-purple-500 hover:text-purple-700 p-1" title="Print Sticker"><Printer size={13} /></button>
                       {tag.status !== 'active' && (
                         <button onClick={() => updateStatus(tag._id, 'active')} className="text-green-500 hover:text-green-700 text-xs px-1.5 py-0.5 rounded hover:bg-green-50" title="Activate">Activate</button>
@@ -433,20 +467,34 @@ export default function Tags() {
           <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6 relative" onClick={(e) => e.stopPropagation()}>
             <button onClick={() => setQrModal(null)} className="absolute top-3 right-3 text-gray-400 hover:text-gray-600"><X size={18} /></button>
             <div className="text-center">
-              <h3 className="text-lg font-semibold mb-1">QR Code</h3>
+              <h3 className="text-lg font-semibold mb-1">{qrModal.tagType === 'nfc' ? 'NFC Tag' : 'QR Code'}</h3>
               <p className="text-sm text-gray-500 font-mono mb-4">{qrModal.tagId}</p>
               {qrModal.petName && <p className="text-sm text-gray-600 mb-1">{qrModal.petName}{qrModal.petId ? ` (${qrModal.petId})` : ''}</p>}
-              <div className="flex justify-center my-4">
-                <img src={qrImageUrl} alt={`QR ${qrModal.tagId}`} className="w-64 h-64 rounded-lg border" />
-              </div>
-              <p className="text-xs text-gray-400 mb-4">Scan to view pet info on Finder</p>
+              {qrModal.tagType === 'nfc' ? (
+                <div className="my-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm text-blue-700 font-medium mb-2">NFC URL to encode:</p>
+                  <p className="text-xs text-blue-600 font-mono break-all bg-white p-2 rounded border border-blue-100">{`${apiBase.replace('/api', '')}/finder/${qrModal.tagId}`}</p>
+                  <p className="text-xs text-gray-500 mt-2">Write this URL to the NFC tag using an NFC writer app.</p>
+                </div>
+              ) : (
+                <>
+                  <div className="flex justify-center my-4">
+                    <img src={qrImageUrl} alt={`QR ${qrModal.tagId}`} className="w-64 h-64 rounded-lg border" />
+                  </div>
+                  <p className="text-xs text-gray-400 mb-4">Scan to view pet info on Finder</p>
+                </>
+              )}
               <div className="flex gap-2 justify-center">
-                <button onClick={() => downloadQR(qrModal.tagId)} className="bg-primary-600 text-white px-4 py-2 rounded-md text-sm flex items-center gap-1.5 hover:bg-primary-700">
-                  <Download size={14} /> Download
-                </button>
-                <button onClick={printQR} className="border border-primary-300 text-primary-700 px-4 py-2 rounded-md text-sm flex items-center gap-1.5 hover:bg-primary-50">
-                  <Printer size={14} /> Print
-                </button>
+                {qrModal.tagType !== 'nfc' && (
+                  <>
+                    <button onClick={() => downloadQR(qrModal.tagId)} className="bg-primary-600 text-white px-4 py-2 rounded-md text-sm flex items-center gap-1.5 hover:bg-primary-700">
+                      <Download size={14} /> Download
+                    </button>
+                    <button onClick={printQR} className="border border-primary-300 text-primary-700 px-4 py-2 rounded-md text-sm flex items-center gap-1.5 hover:bg-primary-50">
+                      <Printer size={14} /> Print
+                    </button>
+                  </>
+                )}
                 <button onClick={() => window.open(`${apiBase}/tags/${qrModal.tagId}/sticker`, '_blank')} className="border border-gray-300 text-gray-700 px-4 py-2 rounded-md text-sm flex items-center gap-1.5 hover:bg-gray-50">
                   Sticker
                 </button>

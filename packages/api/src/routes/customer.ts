@@ -38,7 +38,7 @@ router.get('/pets', requirePermission('pet.read'), async (req: AuthRequest, res:
   try {
     const pets = await Pet.find({ ownerId: req.user!.id, deletedAt: null }).sort({ createdAt: -1 });
     const petIds = pets.map((p) => p._id);
-    const tags = await Tag.find({ petId: { $in: petIds }, deletedAt: null }).select('tagId petId status');
+    const tags = await Tag.find({ petId: { $in: petIds }, deletedAt: null }).select('tagId tagType petId status');
     const tagMap = new Map(tags.map((t) => [t.petId.toString(), t]));
     const petsWithTag = pets.map((pet) => ({
       ...pet.toObject(),
