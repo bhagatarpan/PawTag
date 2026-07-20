@@ -23,10 +23,20 @@ function OwnerSearch({ owners, value, onSelect, required }: { owners: any[]; val
 
   const selected = owners.find((o) => o._id === value);
 
+  const normPhone = (p: string) => {
+    if (!p) return '';
+    let n = p.replace(/[\s\-()]/g, '');
+    if (n.startsWith('+64')) n = '0' + n.slice(3);
+    return n.toLowerCase();
+  };
+
   const filtered = query.trim()
     ? owners.filter((o) => {
         const q = query.toLowerCase();
-        return (o.fullName || '').toLowerCase().includes(q) || (o.email || '').toLowerCase().includes(q) || (o.phoneNumber || '').toLowerCase().includes(q);
+        if ((o.fullName || '').toLowerCase().includes(q)) return true;
+        if ((o.email || '').toLowerCase().includes(q)) return true;
+        if (normPhone(o.phoneNumber || '').includes(normPhone(query))) return true;
+        return false;
       })
     : owners;
 
