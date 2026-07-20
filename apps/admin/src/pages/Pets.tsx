@@ -429,33 +429,30 @@ export default function Pets() {
                     }`}>{pet.lostCount || 0}</span>
                   </td>
                   <td className="px-3 py-2">
-                    <div className="flex gap-1.5 items-center flex-wrap">
+                    <div className="flex gap-1.5 items-center">
                       <button onClick={() => startEdit(pet)} className="text-primary-500 hover:text-primary-700 p-1.5 rounded hover:bg-primary-50" title="Edit"><Edit2 size={15} /></button>
-                      {pet.status !== 'lost' && (
-                        <button onClick={async () => { await api.put(`/admin/pets/${pet._id}/status`, { status: 'lost' }); fetchPets(); }} className="bg-red-50 text-red-700 hover:bg-red-100 text-xs px-2 py-1 rounded border border-red-200 font-medium" title="Mark Lost">Lost</button>
-                      )}
-                      {pet.status !== 'found' && (
-                        <button onClick={async () => { await api.put(`/admin/pets/${pet._id}/status`, { status: 'found' }); fetchPets(); }} className="bg-amber-50 text-amber-700 hover:bg-amber-100 text-xs px-2 py-1 rounded border border-amber-200 font-medium" title="Mark Found">Found</button>
-                      )}
-                      {pet.status !== 'safe' && (
-                        <button onClick={async () => { await api.put(`/admin/pets/${pet._id}/status`, { status: 'safe' }); fetchPets(); }} className="bg-green-50 text-green-700 hover:bg-green-100 text-xs px-2 py-1 rounded border border-green-200 font-medium" title="Mark Safe">Safe</button>
-                      )}
-                      {pet.status !== 'deceased' && (
-                        <button onClick={async () => { await api.put(`/admin/pets/${pet._id}/status`, { status: 'deceased' }); fetchPets(); }} className="bg-gray-100 text-gray-700 hover:bg-gray-200 text-xs px-2 py-1 rounded border border-gray-300 font-medium" title="Mark Deceased">Deceased</button>
-                      )}
-                      {pet.status !== 'stolen' && (
-                        <button onClick={async () => { await api.put(`/admin/pets/${pet._id}/status`, { status: 'stolen' }); fetchPets(); }} className="bg-purple-50 text-purple-700 hover:bg-purple-100 text-xs px-2 py-1 rounded border border-purple-200 font-medium" title="Mark Stolen">Stolen</button>
-                      )}
-                      {pet.status !== 'transferred' && (
-                        <button onClick={async () => { await api.put(`/admin/pets/${pet._id}/status`, { status: 'transferred' }); fetchPets(); }} className="bg-blue-50 text-blue-700 hover:bg-blue-100 text-xs px-2 py-1 rounded border border-blue-200 font-medium" title="Mark Transferred">Transferred</button>
-                      )}
-                      {pet.status !== 'donated' && (
-                        <button onClick={async () => { await api.put(`/admin/pets/${pet._id}/status`, { status: 'donated' }); fetchPets(); }} className="bg-teal-50 text-teal-700 hover:bg-teal-100 text-xs px-2 py-1 rounded border border-teal-200 font-medium" title="Mark Donated">Donated</button>
-                      )}
-                      {pet.status !== 'sold' && (
-                        <button onClick={async () => { await api.put(`/admin/pets/${pet._id}/status`, { status: 'sold' }); fetchPets(); }} className="bg-amber-50 text-amber-700 hover:bg-amber-100 text-xs px-2 py-1 rounded border border-amber-200 font-medium" title="Mark Sold">Sold</button>
-                      )}
-                      <button onClick={() => deletePet(pet._id)} className="text-red-400 hover:text-red-600 p-1.5 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} /></button>
+                      <select
+                        value=""
+                        onChange={async (e) => {
+                          const val = e.target.value;
+                          if (!val) return;
+                          if (val === 'delete') { deletePet(pet._id); return; }
+                          if (!confirm(`Change status to "${val}"?`)) return;
+                          try { await api.put(`/admin/pets/${pet._id}/status`, { status: val }); fetchPets(); } catch {}
+                        }}
+                        className="text-xs border border-gray-300 rounded px-1.5 py-1 bg-white cursor-pointer"
+                      >
+                        <option value="">Actions</option>
+                        <option value="lost" className="text-red-600">Lost</option>
+                        <option value="found" className="text-amber-600">Found</option>
+                        <option value="safe" className="text-green-600">Safe</option>
+                        <option value="deceased" className="text-gray-600">Deceased</option>
+                        <option value="stolen" className="text-purple-600">Stolen</option>
+                        <option value="transferred" className="text-blue-600">Transferred</option>
+                        <option value="donated" className="text-teal-600">Donated</option>
+                        <option value="sold" className="text-amber-700">Sold</option>
+                        <option value="delete" className="text-red-600">Delete</option>
+                      </select>
                     </div>
                   </td>
                 </tr>
