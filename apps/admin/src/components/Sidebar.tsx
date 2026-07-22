@@ -15,6 +15,12 @@ import {
   Key,
   FolderTree,
   Target,
+  Layout,
+  Navigation,
+  PanelBottom,
+  Image,
+  Megaphone,
+  ArrowRightLeft,
 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 
@@ -46,6 +52,15 @@ const adminLinks: SidebarLink[] = [
   { to: '/audit-logs', label: 'Audit Logs', icon: ScrollText, permission: 'audit_log.read' },
 ];
 
+const cmsLinks: SidebarLink[] = [
+  { to: '/cms/pages', label: 'Pages', icon: Layout, permission: 'cms.page.read' },
+  { to: '/cms/navigation', label: 'Navigation', icon: Navigation, permission: 'cms.navigation.read' },
+  { to: '/cms/footer', label: 'Footer', icon: PanelBottom, permission: 'cms.footer.read' },
+  { to: '/cms/media', label: 'Media Library', icon: Image, permission: 'cms.media.read' },
+  { to: '/cms/announcements', label: 'Announcements', icon: Megaphone, permission: 'cms.announcement.read' },
+  { to: '/cms/redirects', label: 'Redirects', icon: ArrowRightLeft, permission: 'cms.redirect.read' },
+];
+
 export default function Sidebar() {
   const { hasPermission } = useAuth();
 
@@ -54,6 +69,10 @@ export default function Sidebar() {
   );
 
   const filteredAdminLinks = adminLinks.filter(
+    (link) => !link.permission || hasPermission(link.permission),
+  );
+
+  const filteredCmsLinks = cmsLinks.filter(
     (link) => !link.permission || hasPermission(link.permission),
   );
 
@@ -96,6 +115,27 @@ export default function Sidebar() {
                 key={link.to}
                 to={link.to}
                 end={link.to === '/'}
+                className={({ isActive }) =>
+                  `flex items-center gap-3 px-6 py-2.5 text-sm transition-colors ${
+                    isActive
+                      ? 'bg-primary-600 text-white'
+                      : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+                  }`
+                }
+              >
+                <link.icon size={18} />
+                {link.label}
+              </NavLink>
+            ))}
+          </>
+        )}
+        {filteredCmsLinks.length > 0 && (
+          <>
+            <div className="px-6 pt-4 pb-1 text-xs font-semibold text-gray-500 uppercase tracking-wider">CMS</div>
+            {filteredCmsLinks.map((link) => (
+              <NavLink
+                key={link.to}
+                to={link.to}
                 className={({ isActive }) =>
                   `flex items-center gap-3 px-6 py-2.5 text-sm transition-colors ${
                     isActive

@@ -23,6 +23,8 @@ import rbacRoutes from './routes/rbac';
 import customerRoutes from './routes/customer';
 import finderRoutes from './routes/finder';
 import uploadRoutes from './routes/upload';
+import cmsAdminRoutes from './routes/cms-admin';
+import cmsPublicRoutes from './routes/cms-public';
 import { startReminderService } from './services/reminder.service';
 
 const app = express();
@@ -108,9 +110,11 @@ app.get('/api/tags/:tagId/sticker', async (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/admin/rbac', rbacRoutes);
+app.use('/api/admin/cms', cmsAdminRoutes);
 app.use('/api/customer', customerRoutes);
 app.use('/api/finder', finderRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/public/cms', cmsPublicRoutes);
 
 // --- Error Handling ---
 app.use(notFoundHandler);

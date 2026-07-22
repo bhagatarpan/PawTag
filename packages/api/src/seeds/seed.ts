@@ -83,6 +83,7 @@ async function seed() {
       { name: 'SYSTEM_CONFIGURATION', displayName: 'System Configuration', description: 'Manage system settings and configuration', icon: 'Settings', sortOrder: 190 },
       { name: 'AUDIT_SECURITY', displayName: 'Audit & Security', description: 'View audit logs and security events', icon: 'ScrollText', sortOrder: 200 },
       { name: 'NOTIFICATION_MANAGEMENT', displayName: 'Notification Management', description: 'Manage notifications and templates', icon: 'Bell', sortOrder: 210 },
+      { name: 'CMS_MANAGEMENT', displayName: 'CMS Management', description: 'Manage website pages, navigation, footer, media, and announcements', icon: 'Layout', sortOrder: 220 },
     ];
 
     const groupMap: Record<string, string> = {};
@@ -307,6 +308,41 @@ async function seed() {
       { name: 'notification.delete', displayName: 'Delete Notifications', description: 'Delete notifications', resource: 'notification', action: 'delete', groupIndex: groupDefs.findIndex(g => g.name === 'NOTIFICATION_MANAGEMENT') },
       { name: 'notification.send', displayName: 'Send Notifications', description: 'Send notifications to users', resource: 'notification', action: 'send', groupIndex: groupDefs.findIndex(g => g.name === 'NOTIFICATION_MANAGEMENT') },
       { name: 'notification.template_manage', displayName: 'Manage Templates', description: 'Create and edit notification templates', resource: 'notification', action: 'template_manage', groupIndex: groupDefs.findIndex(g => g.name === 'NOTIFICATION_MANAGEMENT') },
+
+      // CMS — Pages
+      { name: 'cms.page.read', displayName: 'Read Pages', description: 'View CMS pages', resource: 'cms.page', action: 'read', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
+      { name: 'cms.page.create', displayName: 'Create Pages', description: 'Create new CMS pages', resource: 'cms.page', action: 'create', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
+      { name: 'cms.page.update', displayName: 'Update Pages', description: 'Update CMS pages', resource: 'cms.page', action: 'update', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
+      { name: 'cms.page.delete', displayName: 'Delete Pages', description: 'Delete CMS pages', resource: 'cms.page', action: 'delete', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
+      { name: 'cms.page.publish', displayName: 'Publish Pages', description: 'Publish CMS pages', resource: 'cms.page', action: 'publish', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
+      // CMS — Navigation
+      { name: 'cms.navigation.read', displayName: 'Read Navigation', description: 'View CMS navigation menus', resource: 'cms.navigation', action: 'read', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
+      { name: 'cms.navigation.create', displayName: 'Create Navigation', description: 'Create CMS navigation menus', resource: 'cms.navigation', action: 'create', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
+      { name: 'cms.navigation.update', displayName: 'Update Navigation', description: 'Update CMS navigation menus', resource: 'cms.navigation', action: 'update', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
+      { name: 'cms.navigation.delete', displayName: 'Delete Navigation', description: 'Delete CMS navigation menus', resource: 'cms.navigation', action: 'delete', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
+      // CMS — Footer
+      { name: 'cms.footer.read', displayName: 'Read Footer', description: 'View CMS footer configurations', resource: 'cms.footer', action: 'read', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
+      { name: 'cms.footer.create', displayName: 'Create Footer', description: 'Create CMS footer configurations', resource: 'cms.footer', action: 'create', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
+      { name: 'cms.footer.update', displayName: 'Update Footer', description: 'Update CMS footer configurations', resource: 'cms.footer', action: 'update', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
+      { name: 'cms.footer.delete', displayName: 'Delete Footer', description: 'Delete CMS footer configurations', resource: 'cms.footer', action: 'delete', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
+      // CMS — Media
+      { name: 'cms.media.read', displayName: 'Read Media', description: 'View media library', resource: 'cms.media', action: 'read', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
+      { name: 'cms.media.upload', displayName: 'Upload Media', description: 'Upload files to media library', resource: 'cms.media', action: 'upload', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
+      { name: 'cms.media.update', displayName: 'Update Media', description: 'Update media metadata', resource: 'cms.media', action: 'update', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
+      { name: 'cms.media.delete', displayName: 'Delete Media', description: 'Delete media files', resource: 'cms.media', action: 'delete', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
+      // CMS — Announcements
+      { name: 'cms.announcement.read', displayName: 'Read Announcements', description: 'View announcements', resource: 'cms.announcement', action: 'read', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
+      { name: 'cms.announcement.create', displayName: 'Create Announcements', description: 'Create announcements', resource: 'cms.announcement', action: 'create', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
+      { name: 'cms.announcement.update', displayName: 'Update Announcements', description: 'Update announcements', resource: 'cms.announcement', action: 'update', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
+      { name: 'cms.announcement.delete', displayName: 'Delete Announcements', description: 'Delete announcements', resource: 'cms.announcement', action: 'delete', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
+      // CMS — Redirects
+      { name: 'cms.redirect.read', displayName: 'Read Redirects', description: 'View URL redirects', resource: 'cms.redirect', action: 'read', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
+      { name: 'cms.redirect.create', displayName: 'Create Redirects', description: 'Create URL redirects', resource: 'cms.redirect', action: 'create', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
+      { name: 'cms.redirect.update', displayName: 'Update Redirects', description: 'Update URL redirects', resource: 'cms.redirect', action: 'update', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
+      { name: 'cms.redirect.delete', displayName: 'Delete Redirects', description: 'Delete URL redirects', resource: 'cms.redirect', action: 'delete', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
+      // CMS — Settings
+      { name: 'cms.settings.read', displayName: 'Read CMS Settings', description: 'View CMS settings', resource: 'cms.settings', action: 'read', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
+      { name: 'cms.settings.update', displayName: 'Update CMS Settings', description: 'Update CMS settings', resource: 'cms.settings', action: 'update', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
     ];
 
     const permMap: Record<string, string> = {};
@@ -450,6 +486,34 @@ async function seed() {
         { permissionName: 'notification.create' },
         { permissionName: 'notification.update' },
         { permissionName: 'notification.send' },
+        // CMS
+        { permissionName: 'cms.page.read' },
+        { permissionName: 'cms.page.create' },
+        { permissionName: 'cms.page.update' },
+        { permissionName: 'cms.page.delete' },
+        { permissionName: 'cms.page.publish' },
+        { permissionName: 'cms.navigation.read' },
+        { permissionName: 'cms.navigation.create' },
+        { permissionName: 'cms.navigation.update' },
+        { permissionName: 'cms.navigation.delete' },
+        { permissionName: 'cms.footer.read' },
+        { permissionName: 'cms.footer.create' },
+        { permissionName: 'cms.footer.update' },
+        { permissionName: 'cms.footer.delete' },
+        { permissionName: 'cms.media.read' },
+        { permissionName: 'cms.media.upload' },
+        { permissionName: 'cms.media.update' },
+        { permissionName: 'cms.media.delete' },
+        { permissionName: 'cms.announcement.read' },
+        { permissionName: 'cms.announcement.create' },
+        { permissionName: 'cms.announcement.update' },
+        { permissionName: 'cms.announcement.delete' },
+        { permissionName: 'cms.redirect.read' },
+        { permissionName: 'cms.redirect.create' },
+        { permissionName: 'cms.redirect.update' },
+        { permissionName: 'cms.redirect.delete' },
+        { permissionName: 'cms.settings.read' },
+        { permissionName: 'cms.settings.update' },
       ],
 
       CUSTOMER_SERVICE: [
@@ -563,6 +627,34 @@ async function seed() {
         { permissionName: 'content.archive' },
         { permissionName: 'content.restore' },
         { permissionName: 'content.upload_media' },
+        // CMS
+        { permissionName: 'cms.page.read' },
+        { permissionName: 'cms.page.create' },
+        { permissionName: 'cms.page.update' },
+        { permissionName: 'cms.page.delete' },
+        { permissionName: 'cms.page.publish' },
+        { permissionName: 'cms.navigation.read' },
+        { permissionName: 'cms.navigation.create' },
+        { permissionName: 'cms.navigation.update' },
+        { permissionName: 'cms.navigation.delete' },
+        { permissionName: 'cms.footer.read' },
+        { permissionName: 'cms.footer.create' },
+        { permissionName: 'cms.footer.update' },
+        { permissionName: 'cms.footer.delete' },
+        { permissionName: 'cms.media.read' },
+        { permissionName: 'cms.media.upload' },
+        { permissionName: 'cms.media.update' },
+        { permissionName: 'cms.media.delete' },
+        { permissionName: 'cms.announcement.read' },
+        { permissionName: 'cms.announcement.create' },
+        { permissionName: 'cms.announcement.update' },
+        { permissionName: 'cms.announcement.delete' },
+        { permissionName: 'cms.redirect.read' },
+        { permissionName: 'cms.redirect.create' },
+        { permissionName: 'cms.redirect.update' },
+        { permissionName: 'cms.redirect.delete' },
+        { permissionName: 'cms.settings.read' },
+        { permissionName: 'cms.settings.update' },
       ],
     };
 

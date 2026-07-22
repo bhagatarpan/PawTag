@@ -17,6 +17,13 @@ import RbacRoles from './pages/RbacRoles';
 import RbacPermissions from './pages/RbacPermissions';
 import RbacPermissionGroups from './pages/RbacPermissionGroups';
 import RbacScopes from './pages/RbacScopes';
+import CmsPages from './pages/cms/CmsPages';
+import CmsPageEditor from './pages/cms/CmsPageEditor';
+import CmsNavigationPage from './pages/cms/CmsNavigation';
+import CmsFooterPage from './pages/cms/CmsFooter';
+import CmsMediaPage from './pages/cms/CmsMedia';
+import CmsAnnouncementsPage from './pages/cms/CmsAnnouncements';
+import CmsRedirectsPage from './pages/cms/CmsRedirects';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
@@ -127,6 +134,13 @@ export default function App() {
       <Route path="/rbac/permissions" element={<ProtectedRoute><RbacPermissions /></ProtectedRoute>} />
       <Route path="/rbac/permission-groups" element={<ProtectedRoute><RbacPermissionGroups /></ProtectedRoute>} />
       <Route path="/rbac/scopes" element={<ProtectedRoute><RbacScopes /></ProtectedRoute>} />
+      <Route path="/cms/pages" element={<ProtectedRoute><CmsPages /></ProtectedRoute>} />
+      <Route path="/cms/pages/:id" element={<ProtectedRoute><CmsPageEditor /></ProtectedRoute>} />
+      <Route path="/cms/navigation" element={<ProtectedRoute><CmsNavigationPage /></ProtectedRoute>} />
+      <Route path="/cms/footer" element={<ProtectedRoute><CmsFooterPage /></ProtectedRoute>} />
+      <Route path="/cms/media" element={<ProtectedRoute><CmsMediaPage /></ProtectedRoute>} />
+      <Route path="/cms/announcements" element={<ProtectedRoute><CmsAnnouncementsPage /></ProtectedRoute>} />
+      <Route path="/cms/redirects" element={<ProtectedRoute><CmsRedirectsPage /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
