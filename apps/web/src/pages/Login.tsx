@@ -33,7 +33,11 @@ export default function Login() {
     } catch (err: any) {
       const responseCode = err.response?.data?.code;
       if (responseCode === 'REQUIRES_VERIFICATION') {
-        navigate('/verify-account');
+        const data = err.response?.data?.data;
+        const params = new URLSearchParams();
+        if (data?.email) params.set('email', data.email);
+        if (data?.phoneNumber) params.set('phone', data.phoneNumber);
+        navigate(`/verify-account?${params.toString()}`);
         return;
       }
       setError(err.response?.data?.error || 'Invalid email or password');
@@ -87,6 +91,11 @@ export default function Login() {
                 <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                   {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </button>
+              </div>
+              <div className="text-right">
+                <Link to="/forgot-password" className="text-sm text-teal-600 hover:text-teal-700">
+                  Forgot password?
+                </Link>
               </div>
             </div>
 

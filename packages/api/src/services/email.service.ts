@@ -35,7 +35,10 @@ async function sendMail(to: string, subject: string, html: string, from?: string
     console.log(`From:    ${fromAddress}`);
     console.log(`Subject: ${subject}`);
     console.log('----------------------------------------');
-    console.log('HTML length:', html.length, 'characters');
+    const urlMatch = html.match(/href="(http[^"]*verify[^"]*|http[^"]*reset[^"]*|http[^"]*token[^"]*)"/i);
+    if (urlMatch) {
+      console.log('🔗 LINK:', urlMatch[1]);
+    }
     console.log('========================================\n');
     return { success: true, messageId: `demo_${Date.now()}` };
   }

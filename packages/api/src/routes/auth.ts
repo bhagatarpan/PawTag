@@ -93,6 +93,11 @@ router.post('/register', validate(registerSchema), async (req, res: Response) =>
 
     const emailResult = await sendVerificationEmail(email, fullName, emailToken);
 
+    if (config.nodeEnv === 'development') {
+      console.log('\n🔑 [DEV] Email verification URL:');
+      console.log(`   ${config.frontendUrl}/verify-email?token=${emailToken}\n`);
+    }
+
     await AuditLog.create({
       userId: user._id,
       action: 'registration',
@@ -196,9 +201,12 @@ router.post('/login', validate(loginSchema), async (req, res: Response) => {
 });
 
 router.get('/verify-email', async (req, res: Response) => {
+  const isAjax = req.headers.accept?.includes('application/json') || req.headers['x-requested-with'] === 'XMLHttpRequest';
+
   try {
     const { token } = req.query;
     if (!token || typeof token !== 'string') {
+      if (isAjax) { res.status(400).json({ success: false, error: 'Invalid verification link.', code: 'invalid' }); return; }
       res.redirect(`${config.frontendUrl}/verify-account?email_status=invalid`);
       return;
     }
@@ -211,22 +219,26 @@ router.get('/verify-email', async (req, res: Response) => {
     });
 
     if (!verificationToken) {
+      if (isAjax) { res.status(400).json({ success: false, error: 'Invalid or used verification link.', code: 'invalid' }); return; }
       res.redirect(`${config.frontendUrl}/verify-account?email_status=invalid`);
       return;
     }
 
     if (verificationToken.expiresAt < new Date()) {
+      if (isAjax) { res.status(400).json({ success: false, error: 'This verification link has expired.', code: 'expired' }); return; }
       res.redirect(`${config.frontendUrl}/verify-account?email_status=expired`);
       return;
     }
 
     const user = await User.findById(verificationToken.userId);
     if (!user) {
+      if (isAjax) { res.status(400).json({ success: false, error: 'User not found.', code: 'invalid' }); return; }
       res.redirect(`${config.frontendUrl}/verify-account?email_status=invalid`);
       return;
     }
 
     if (user.emailVerified) {
+      if (isAjax) { res.json({ success: true, data: { message: 'Email already verified.', email: user.email, phoneNumber: user.phoneNumber } }); return; }
       res.redirect(`${config.frontendUrl}/verify-account?email_status=already_verified`);
       return;
     }
@@ -250,6 +262,10 @@ router.get('/verify-email', async (req, res: Response) => {
 
     await checkAndActivateUser(user._id.toString());
 
+    if (isAjax) {
+      res.json({ success: true, data: { message: 'Email verified successfully!', email: user.email, phoneNumber: user.phoneNumber } });
+      return;
+    }
     res.redirect(`${config.frontendUrl}/verify-account?email_status=verified`);
   } catch (error) {
     console.error('Email verification error:', error);
@@ -309,6 +325,11 @@ router.post('/resend-email-verification', validate(resendEmailVerificationSchema
     });
 
     const emailResult = await sendVerificationEmail(email, user.fullName, emailToken);
+
+    if (config.nodeEnv === 'development') {
+      console.log('\n🔑 [DEV] Email verification URL (resent):');
+      console.log(`   ${config.frontendUrl}/verify-email?token=${emailToken}\n`);
+    }
 
     await AuditLog.create({
       userId: user._id,
@@ -384,6 +405,12 @@ router.post('/send-phone-otp', validate(sendPhoneOtpSchema), async (req, res: Re
     });
 
     const smsResult = await sendPhoneOtpSMS(phoneNumber, otp);
+
+    if (config.nodeEnv === 'development') {
+      console.log('\n🔑 [DEV] Phone OTP:');
+      console.log(`   Phone: ${phoneNumber}`);
+      console.log(`   OTP:   ${otp}\n`);
+    }
 
     await AuditLog.create({
       userId: user._id,
@@ -595,6 +622,12 @@ router.post('/resend-phone-otp', validate(resendPhoneOtpSchema), async (req, res
 
     const smsResult = await sendPhoneOtpSMS(phoneNumber, otp);
 
+    if (config.nodeEnv === 'development') {
+      console.log('\n🔑 [DEV] Phone OTP (resent):');
+      console.log(`   Phone: ${phoneNumber}`);
+      console.log(`   OTP:   ${otp}\n`);
+    }
+
     await AuditLog.create({
       userId: user._id,
       action: 'phone_otp_resent',
@@ -690,6 +723,11 @@ router.post('/forgot-password', async (req, res: Response) => {
 
     await sendPasswordResetEmail(email, user.fullName, resetToken);
 
+    if (config.nodeEnv === 'development') {
+      console.log('\n🔑 [DEV] Password reset URL:');
+      console.log(`   ${config.frontendUrl}/reset-password?token=${resetToken}\n`);
+    }
+
     await AuditLog.create({
       userId: user._id,
       action: 'password_reset_requested',
@@ -703,6 +741,66 @@ router.post('/forgot-password', async (req, res: Response) => {
   } catch (error) {
     console.error('Forgot password error:', error);
     res.status(500).json({ success: false, error: 'Request failed' });
+  }
+});
+
+router.post('/reset-password', async (req, res: Response) => {
+  try {
+    const { token, newPassword } = req.body;
+
+    if (!token || typeof token !== 'string') {
+      res.status(400).json({ success: false, error: 'Invalid reset token.' });
+      return;
+    }
+
+    if (!newPassword || typeof newPassword !== 'string' || newPassword.length < 8) {
+      res.status(400).json({ success: false, error: 'New password must be at least 8 characters.' });
+      return;
+    }
+
+    const tokenHash = hashToken(token);
+    const verificationToken = await VerificationToken.findOne({
+      tokenHash,
+      type: 'password_reset',
+      usedAt: null,
+    });
+
+    if (!verificationToken) {
+      res.status(400).json({ success: false, error: 'Invalid or used reset link.' });
+      return;
+    }
+
+    if (verificationToken.expiresAt < new Date()) {
+      res.status(400).json({ success: false, error: 'This reset link has expired. Please request a new one.' });
+      return;
+    }
+
+    const user = await User.findById(verificationToken.userId);
+    if (!user) {
+      res.status(400).json({ success: false, error: 'User not found.' });
+      return;
+    }
+
+    user.passwordHash = await hashPassword(newPassword);
+    await user.save();
+
+    verificationToken.usedAt = new Date();
+    await verificationToken.save();
+
+    const clientInfo = getClientInfo(req);
+    await AuditLog.create({
+      userId: user._id,
+      action: 'password_reset_completed',
+      entity: 'user',
+      entityId: user._id.toString(),
+      ipAddress: clientInfo.ipAddress,
+      userAgent: clientInfo.userAgent,
+    });
+
+    res.json({ success: true, data: { message: 'Password has been reset successfully. You can now log in.' } });
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({ success: false, error: 'Failed to reset password' });
   }
 });
 

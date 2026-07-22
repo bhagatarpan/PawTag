@@ -5,6 +5,38 @@ const router = Router();
 
 // No auth required — this is the public finder portal
 
+// --- Public stats (must be before /:tagId routes) ---
+router.get('/stats', async (_req: Request, res: Response) => {
+  try {
+    const { Tag, FinderScan, User, Pet } = require('@pawtag/db');
+
+    const [totalTags, activeTags, totalScans, totalUsers, totalPets, lostPets, foundPets] = await Promise.all([
+      Tag.countDocuments({ deletedAt: null }),
+      Tag.countDocuments({ status: 'active', deletedAt: null }),
+      FinderScan.countDocuments(),
+      User.countDocuments(),
+      Pet.countDocuments({ deletedAt: null }),
+      Pet.countDocuments({ status: 'lost', deletedAt: null }),
+      Pet.countDocuments({ status: 'found', deletedAt: null }),
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        petsProtected: totalPets,
+        tagsSold: totalTags,
+        activeTags,
+        totalScans,
+        reunions: foundPets,
+        lostPets,
+        registeredUsers: totalUsers,
+      },
+    });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to fetch stats' });
+  }
+});
+
 /**
  * @swagger
  * /api/finder/{tagId}:
@@ -353,32 +385,6 @@ router.post('/:tagId/share-location', async (req: Request, res: Response) => {
     res.json({ success: true, data: { message: 'Location shared with owner' } });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to share location' });
-  }
-});
-
-router.get('/stats', async (_req: Request, res: Response) => {
-  try {
-    const { Product, Order, User } = require('@pawtag/db');
-
-    const [totalProducts, activeProducts, totalOrders, totalUsers] = await Promise.all([
-      Product.countDocuments(),
-      Product.countDocuments({ isActive: true }),
-      Order.countDocuments(),
-      User.countDocuments(),
-    ]);
-
-    res.json({
-      success: true,
-      data: {
-        petsProtected: 14231,
-        tagsSold: totalProducts > 0 ? totalProducts * 47 : 6840,
-        reunions: 1247,
-        activeOrders: totalOrders,
-        registeredUsers: totalUsers,
-      },
-    });
-  } catch {
-    res.status(500).json({ success: false, error: 'Failed to fetch stats' });
   }
 });
 

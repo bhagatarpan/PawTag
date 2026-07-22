@@ -16,10 +16,9 @@ export default function ProductDetail() {
 
   useEffect(() => {
     if (!id) return;
-    api.get(`/finder/shop/products`)
+    api.get(`/finder/shop/products/${id}`)
       .then((res) => {
-        const found = res.data.data?.find((p: Product) => p._id === id);
-        setProduct(found || null);
+        setProduct(res.data.data || null);
       })
       .catch(() => {})
       .finally(() => setLoading(false));

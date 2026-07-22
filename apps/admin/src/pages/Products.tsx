@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
+import { ImagePlus, X, Upload, Loader2 } from 'lucide-react';
 import api, { PaginatedData } from '../lib/api';
 
 interface ProductVariant {
@@ -32,6 +33,7 @@ export default function Products() {
   const [data, setData] = useState<PaginatedData<Product> | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
   const [page, setPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
@@ -40,21 +42,25 @@ export default function Products() {
     stock: 0, sku: '', currency: 'NZD', isActive: true, customizable: false, customizationPrice: 0,
   });
   const [variants, setVariants] = useState<ProductVariant[]>([]);
+  const [images, setImages] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchProducts = () => {
     setLoading(true);
-    api.get('/admin/products', { params: { page, limit: 20, search } })
+    api.get('/admin/products', { params: { page, limit: 20, search, category: categoryFilter || undefined } })
       .then((res) => setData(res.data.data))
       .catch(console.error)
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetchProducts(); }, [page]);
+  useEffect(() => { fetchProducts(); }, [page, categoryFilter]);
 
   const openCreate = () => {
     setEditing(null);
     setForm({ name: '', description: '', shortDescription: '', price: 0, category: '', stock: 0, sku: '', currency: 'NZD', isActive: true, customizable: false, customizationPrice: 0 });
     setVariants([]);
+    setImages([]);
     setShowForm(true);
   };
 
@@ -66,12 +72,49 @@ export default function Products() {
       isActive: p.isActive, customizable: p.customizable || false, customizationPrice: p.customizationPrice || 0,
     });
     setVariants(p.variants?.map((v) => ({ ...v, attributes: { ...v.attributes } })) || []);
+    setImages(p.images || []);
     setShowForm(true);
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      Array.from(files).forEach((file) => formData.append('images', file));
+
+      const res = await api.post('/upload/product-images', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+
+      const uploaded = res.data.data.images.map((img: { url: string }) => img.url);
+      setImages((prev) => [...prev, ...uploaded]);
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Failed to upload images');
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleImageDelete = async (imageUrl: string) => {
+    if (!confirm('Delete this image?')) return;
+    try {
+      const filename = imageUrl.split('/').pop();
+      if (filename) {
+        await api.delete(`/upload/product-images/${filename}`);
+      }
+      setImages((prev) => prev.filter((url) => url !== imageUrl));
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Failed to delete image');
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const payload = { ...form, variants };
+    const payload = { ...form, variants, images };
     if (editing) {
       await api.put(`/admin/products/${editing._id}`, payload);
     } else {
@@ -117,6 +160,16 @@ export default function Products() {
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
             className="border border-gray-300 rounded-md px-3 py-2 text-sm w-64 focus:ring-2 focus:ring-primary-500"
           />
+          <select
+            value={categoryFilter}
+            onChange={(e) => { setCategoryFilter(e.target.value); setPage(1); }}
+            className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500"
+          >
+            <option value="">All Categories</option>
+            {[...new Set(data?.items.map((p) => p.category) || [])].map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
           <button onClick={openCreate} className="bg-primary-600 text-white px-4 py-2 rounded-md text-sm hover:bg-primary-700">
             + Add Product
           </button>
@@ -165,6 +218,49 @@ export default function Products() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Description *</label>
                 <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm" rows={3} required />
               </div>
+            </div>
+
+            {/* Product Images */}
+            <div className="border-t border-gray-200 pt-4">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">Product Images</h3>
+              <div className="flex flex-wrap gap-3">
+                {images.map((img, i) => (
+                  <div key={i} className="relative group w-24 h-24 rounded-lg overflow-hidden border border-gray-200">
+                    <img src={img} alt={`Product ${i + 1}`} className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => handleImageDelete(img)}
+                      className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading || images.length >= 5}
+                  className="w-24 h-24 rounded-lg border-2 border-dashed border-gray-300 flex flex-col items-center justify-center text-gray-400 hover:border-primary-400 hover:text-primary-500 transition-colors disabled:opacity-50"
+                >
+                  {uploading ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : (
+                    <>
+                      <ImagePlus className="h-5 w-5 mb-1" />
+                      <span className="text-[10px]">Add Image</span>
+                    </>
+                  )}
+                </button>
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={handleImageUpload}
+                className="hidden"
+              />
+              <p className="text-xs text-gray-400 mt-2">Up to 5 images. JPG, PNG, WebP. Max 5MB each.</p>
             </div>
 
             {/* Customization */}
@@ -247,6 +343,7 @@ export default function Products() {
         <table className="w-full text-sm">
           <thead className="bg-gray-50">
             <tr>
+              <th className="text-left px-5 py-3 font-medium text-gray-500">Image</th>
               <th className="text-left px-5 py-3 font-medium text-gray-500">Name</th>
               <th className="text-left px-5 py-3 font-medium text-gray-500">SKU</th>
               <th className="text-left px-5 py-3 font-medium text-gray-500">Price</th>
@@ -259,12 +356,21 @@ export default function Products() {
           </thead>
           <tbody className="divide-y divide-gray-200">
             {loading ? (
-              <tr><td colSpan={8} className="px-5 py-8 text-center text-gray-500">Loading...</td></tr>
+              <tr><td colSpan={9} className="px-5 py-8 text-center text-gray-500">Loading...</td></tr>
             ) : data?.items.length === 0 ? (
-              <tr><td colSpan={8} className="px-5 py-8 text-center text-gray-500">No products found</td></tr>
+              <tr><td colSpan={9} className="px-5 py-8 text-center text-gray-500">No products found</td></tr>
             ) : (
               data?.items.map((p) => (
                 <tr key={p._id} className="hover:bg-gray-50">
+                  <td className="px-5 py-3">
+                    {p.images?.[0] ? (
+                      <img src={p.images[0]} alt={p.name} className="w-10 h-10 rounded object-cover" />
+                    ) : (
+                      <div className="w-10 h-10 rounded bg-gray-100 flex items-center justify-center">
+                        <ImagePlus className="h-4 w-4 text-gray-400" />
+                      </div>
+                    )}
+                  </td>
                   <td className="px-5 py-3">
                     <div className="font-medium">{p.name}</div>
                     {p.customizable && <span className="text-xs text-primary-600">Customizable</span>}

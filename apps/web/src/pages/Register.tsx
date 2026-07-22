@@ -58,7 +58,7 @@ export default function Register() {
             Your account has been created. Please verify your email address and mobile number to activate your account.
           </p>
           <button
-            onClick={() => navigate('/verify-account')}
+            onClick={() => navigate(`/verify-account?email=${encodeURIComponent(form.email)}&phone=${encodeURIComponent(form.phoneNumber)}`)}
             className="w-full py-3 bg-teal-600 text-white rounded-lg font-semibold hover:bg-teal-700 transition-all"
           >
             Verify My Account

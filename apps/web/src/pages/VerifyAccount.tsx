@@ -27,11 +27,17 @@ export default function VerifyAccount() {
   const [cooldown, setCooldown] = useState(0);
   const [emailSent, setEmailSent] = useState(false);
 
+  const emailParam = searchParams.get('email');
+  const phoneParam = searchParams.get('phone');
   const emailStatus = searchParams.get('email_status');
+
+  const effectiveEmail = status?.email || emailParam || '';
+  const effectivePhone = status?.phoneNumber || phoneParam || '';
 
   const fetchStatus = useCallback(async () => {
     try {
-      const res = await api.get('/auth/verification-status');
+      const params = emailParam ? `?email=${encodeURIComponent(emailParam)}` : '';
+      const res = await api.get(`/auth/verification-status${params}`);
       setStatus(res.data.data);
       setCooldown(res.data.data.otpCooldown || 0);
     } catch {
@@ -39,7 +45,7 @@ export default function VerifyAccount() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [emailParam]);
 
   useEffect(() => {
     fetchStatus();
@@ -49,6 +55,17 @@ export default function VerifyAccount() {
     if (emailStatus === 'verified') {
       setSuccess('Email verified successfully!');
       fetchStatus();
+      // If no auth (status is null), optimistically update local state
+      if (!status) {
+        setStatus(prev => prev ? { ...prev, emailVerified: true } : {
+          emailVerified: true,
+          phoneVerified: false,
+          status: 'pending_verification',
+          email: emailParam || '',
+          phoneNumber: phoneParam || '',
+          otpCooldown: 0,
+        });
+      }
     } else if (emailStatus === 'expired') {
       setError('This verification link has expired. Please request a new one.');
     } else if (emailStatus === 'invalid') {
@@ -56,7 +73,7 @@ export default function VerifyAccount() {
     } else if (emailStatus === 'already_verified') {
       setSuccess('Your email is already verified.');
     }
-  }, [emailStatus, fetchStatus]);
+  }, [emailStatus, fetchStatus, status, emailParam, phoneParam]);
 
   useEffect(() => {
     if (cooldown <= 0) return;
@@ -77,7 +94,7 @@ export default function VerifyAccount() {
     setError('');
     setSuccess('');
     try {
-      await api.post('/auth/resend-email-verification', { email: status?.email });
+      await api.post('/auth/resend-email-verification', { email: effectiveEmail });
       setSuccess('Verification email sent! Check your inbox.');
       setEmailSent(true);
       setCooldown(60);
@@ -93,7 +110,7 @@ export default function VerifyAccount() {
     setError('');
     setSuccess('');
     try {
-      await api.post('/auth/send-phone-otp', { phoneNumber: status?.phoneNumber });
+      await api.post('/auth/send-phone-otp', { phoneNumber: effectivePhone });
       setSuccess('OTP sent to your phone number.');
       setCooldown(60);
     } catch (err: any) {
@@ -112,10 +129,21 @@ export default function VerifyAccount() {
     setError('');
     setSuccess('');
     try {
-      await api.post('/auth/verify-phone', { otp: otpValue });
+      await api.post('/auth/verify-phone', { otp: otpValue, phoneNumber: effectivePhone });
       setSuccess('Phone number verified successfully!');
       setOtpValue('');
       fetchStatus();
+      // Optimistically update local state when no auth
+      if (!status) {
+        setStatus(prev => prev ? { ...prev, phoneVerified: true } : {
+          emailVerified: true,
+          phoneVerified: true,
+          status: 'pending_verification',
+          email: emailParam || '',
+          phoneNumber: phoneParam || '',
+          otpCooldown: 0,
+        });
+      }
     } catch (err: any) {
       const data = err.response?.data;
       if (data?.code === 'OTP_MAX_ATTEMPTS') {
@@ -131,7 +159,7 @@ export default function VerifyAccount() {
   };
 
   const handleContinue = () => {
-    navigate('/account');
+    navigate(status ? '/account' : '/login');
   };
 
   if (loading) {
@@ -142,8 +170,10 @@ export default function VerifyAccount() {
     );
   }
 
-  const allVerified = status?.emailVerified && status?.phoneVerified;
-  const isPending = status?.status === 'pending_verification';
+  const isEmailVerified = status?.emailVerified ?? false;
+  const isPhoneVerified = status?.phoneVerified ?? false;
+  const allVerified = isEmailVerified && isPhoneVerified;
+  const isPending = status?.status === 'pending_verification' || !status;
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-12">
@@ -177,14 +207,14 @@ export default function VerifyAccount() {
         <div className="space-y-4">
           {/* Step 1: Email Verification */}
           <div className={`bg-white rounded-xl border-2 p-6 transition-all ${
-            status?.emailVerified ? 'border-green-200 bg-green-50/30' : 'border-gray-200'
+            isEmailVerified ? 'border-green-200 bg-green-50/30' : 'border-gray-200'
           }`}>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
-                  status?.emailVerified ? 'bg-green-100' : 'bg-teal-100'
+                  isEmailVerified ? 'bg-green-100' : 'bg-teal-100'
                 }`}>
-                  {status?.emailVerified ? (
+                  {isEmailVerified ? (
                     <CheckCircle2 className="h-5 w-5 text-green-600" />
                   ) : (
                     <Mail className="h-5 w-5 text-teal-600" />
@@ -192,15 +222,15 @@ export default function VerifyAccount() {
                 </div>
                 <div>
                   <h3 className="font-semibold text-gray-900">Email Verification</h3>
-                  <p className="text-xs text-gray-500">{status?.email}</p>
+                  <p className="text-xs text-gray-500">{effectiveEmail}</p>
                 </div>
               </div>
-              {status?.emailVerified && (
+              {isEmailVerified && (
                 <span className="text-xs font-medium text-green-600 bg-green-100 px-2 py-1 rounded-full">Verified</span>
               )}
             </div>
 
-            {!status?.emailVerified && (
+            {!isEmailVerified && (
               <div>
                 <p className="text-sm text-gray-600 mb-3">
                   We'll send a verification link to your email address.
@@ -230,14 +260,14 @@ export default function VerifyAccount() {
 
           {/* Step 2: Phone Verification */}
           <div className={`bg-white rounded-xl border-2 p-6 transition-all ${
-            status?.phoneVerified ? 'border-green-200 bg-green-50/30' : 'border-gray-200'
+            isPhoneVerified ? 'border-green-200 bg-green-50/30' : 'border-gray-200'
           }`}>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
-                  status?.phoneVerified ? 'bg-green-100' : 'bg-teal-100'
+                  isPhoneVerified ? 'bg-green-100' : 'bg-teal-100'
                 }`}>
-                  {status?.phoneVerified ? (
+                  {isPhoneVerified ? (
                     <CheckCircle2 className="h-5 w-5 text-green-600" />
                   ) : (
                     <Phone className="h-5 w-5 text-teal-600" />
@@ -245,15 +275,15 @@ export default function VerifyAccount() {
                 </div>
                 <div>
                   <h3 className="font-semibold text-gray-900">Phone Verification</h3>
-                  <p className="text-xs text-gray-500">{status?.phoneNumber}</p>
+                  <p className="text-xs text-gray-500">{effectivePhone}</p>
                 </div>
               </div>
-              {status?.phoneVerified && (
+              {isPhoneVerified && (
                 <span className="text-xs font-medium text-green-600 bg-green-100 px-2 py-1 rounded-full">Verified</span>
               )}
             </div>
 
-            {!status?.phoneVerified && (
+            {!isPhoneVerified && (
               <div>
                 <p className="text-sm text-gray-600 mb-3">
                   Enter the 6-digit code sent to your phone.

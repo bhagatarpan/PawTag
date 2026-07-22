@@ -7,6 +7,7 @@ export default function VerifyEmail() {
   const [searchParams] = useSearchParams();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [message, setMessage] = useState('');
+  const [verifyParams, setVerifyParams] = useState('');
 
   useEffect(() => {
     const token = searchParams.get('token');
@@ -20,15 +21,22 @@ export default function VerifyEmail() {
       .then((res) => {
         if (res.data.success) {
           setStatus('success');
-          setMessage('Your email has been verified successfully!');
+          setMessage(res.data.data?.message || 'Your email has been verified successfully!');
+          const email = res.data.data?.email;
+          const phone = res.data.data?.phoneNumber;
+          const params = new URLSearchParams();
+          if (email) params.set('email', email);
+          if (phone) params.set('phone', phone);
+          params.set('email_status', 'verified');
+          setVerifyParams(params.toString());
         } else {
           setStatus('error');
           setMessage(res.data.error || 'Verification failed.');
         }
       })
-      .catch(() => {
+      .catch((err) => {
         setStatus('error');
-        setMessage('Something went wrong. Please try again.');
+        setMessage(err.response?.data?.error || 'Something went wrong. Please try again.');
       });
   }, [searchParams]);
 
@@ -48,7 +56,7 @@ export default function VerifyEmail() {
             <h1 className="text-2xl font-bold text-gray-900 mb-2">Email Verified!</h1>
             <p className="text-gray-600 mb-6">{message}</p>
             <Link
-              to="/verify-account"
+              to={`/verify-account${verifyParams ? `?${verifyParams}` : ''}`}
               className="inline-block py-3 px-6 bg-teal-600 text-white rounded-xl font-semibold hover:bg-teal-700 transition-all"
             >
               Continue to Verification
