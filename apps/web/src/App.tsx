@@ -17,6 +17,8 @@ import ResetPassword from './pages/ResetPassword';
 import About from './pages/About';
 import Privacy from './pages/Privacy';
 import Terms from './pages/Terms';
+import Faq from './pages/Faq';
+import Contact from './pages/Contact';
 import NotFound from './pages/NotFound';
 import MyPets from './pages/account/MyPets';
 import Profile from './pages/account/Profile';
@@ -48,6 +50,8 @@ export default function App() {
       <Route path="/about" element={<div className="min-h-screen flex flex-col"><Navbar /><main className="flex-1"><About /></main><Footer /><EmergencyLostPet /></div>} />
       <Route path="/privacy" element={<div className="min-h-screen flex flex-col"><Navbar /><main className="flex-1"><Privacy /></main><Footer /><EmergencyLostPet /></div>} />
       <Route path="/terms" element={<div className="min-h-screen flex flex-col"><Navbar /><main className="flex-1"><Terms /></main><Footer /><EmergencyLostPet /></div>} />
+      <Route path="/faq" element={<div className="min-h-screen flex flex-col"><Navbar /><main className="flex-1"><Faq /></main><Footer /><EmergencyLostPet /></div>} />
+      <Route path="/contact" element={<div className="min-h-screen flex flex-col"><Navbar /><main className="flex-1"><Contact /></main><Footer /><EmergencyLostPet /></div>} />
 
       {/* Account routes — no public Navbar/Footer, uses AccountLayout sidebar */}
       <Route path="/account" element={<ProtectedRoute><AccountLayout><MyPets /></AccountLayout></ProtectedRoute>} />
