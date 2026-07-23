@@ -3,6 +3,16 @@ import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Package, Truck, CheckCircle, Clock, XCircle, MapPin, CreditCard, Loader2 } from 'lucide-react';
 import api from '../../lib/api';
 
+const ORDER_STATUS_STEPS = ['pending', 'paid', 'shipped', 'delivered'];
+
+const ORDER_STATUS_LABELS: Record<string, string> = {
+  pending: 'Pending', paid: 'Paid', shipped: 'Shipped', delivered: 'Delivered', cancelled: 'Cancelled', refunded: 'Refunded',
+};
+
+function getOrderStatusLabel(status: string): string {
+  return ORDER_STATUS_LABELS[status] || status;
+}
+
 interface OrderItem {
   productName: string;
   variantName?: string;
@@ -42,12 +52,10 @@ interface Order {
   updatedAt: string;
 }
 
-const statusSteps = ['pending', 'paid', 'shipped', 'delivered'];
-
 const statusConfig: Record<string, { color: string; icon: any; label: string }> = {
-  pending: { color: 'text-yellow-600 bg-yellow-100', icon: Clock, label: 'Pending' },
-  paid: { color: 'text-blue-600 bg-blue-100', icon: CreditCard, label: 'Paid' },
-  shipped: { color: 'text-purple-600 bg-purple-100', icon: Truck, label: 'Shipped' },
+  pending: { color: 'text-yellow-600 bg-yellow-100', icon: Clock, label: getOrderStatusLabel('pending') },
+  paid: { color: 'text-blue-600 bg-blue-100', icon: CreditCard, label: getOrderStatusLabel('paid') },
+  shipped: { color: 'text-purple-600 bg-purple-100', icon: Truck, label: getOrderStatusLabel('shipped') },
   delivered: { color: 'text-green-600 bg-green-100', icon: CheckCircle, label: 'Delivered' },
   cancelled: { color: 'text-red-600 bg-red-100', icon: XCircle, label: 'Cancelled' },
   refunded: { color: 'text-gray-600 bg-gray-100', icon: XCircle, label: 'Refunded' },
@@ -87,7 +95,7 @@ export default function OrderDetail() {
     );
   }
 
-  const currentStep = statusSteps.indexOf(order.status);
+  const currentStep = ORDER_STATUS_STEPS.indexOf(order.status);
   const isCancelled = order.status === 'cancelled' || order.status === 'refunded';
   const cfg = statusConfig[order.status] || statusConfig.pending;
 
@@ -114,7 +122,7 @@ export default function OrderDetail() {
         <div className="bg-white rounded-xl border p-6">
           <h2 className="text-sm font-semibold text-gray-700 mb-4">Order Status</h2>
           <div className="flex items-center">
-            {statusSteps.map((step, i) => {
+            {ORDER_STATUS_STEPS.map((step, i) => {
               const StepIcon = statusConfig[step]?.icon || Clock;
               return (
                 <div key={step} className="flex items-center flex-1">
@@ -128,7 +136,7 @@ export default function OrderDetail() {
                       {step}
                     </span>
                   </div>
-                  {i < statusSteps.length - 1 && (
+                  {i < ORDER_STATUS_STEPS.length - 1 && (
                     <div className={`flex-1 h-0.5 mx-3 ${i < currentStep ? 'bg-teal-600' : 'bg-gray-200'}`} />
                   )}
                 </div>

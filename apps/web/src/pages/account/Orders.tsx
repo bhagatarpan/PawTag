@@ -3,16 +3,24 @@ import { Link } from 'react-router-dom';
 import { ShoppingBag, ChevronRight } from 'lucide-react';
 import api from '../../lib/api';
 
+const ORDER_STATUS_COLORS: Record<string, string> = {
+  pending: 'bg-yellow-100 text-yellow-700',
+  paid: 'bg-blue-100 text-blue-700',
+  shipped: 'bg-purple-100 text-purple-700',
+  delivered: 'bg-green-100 text-green-700',
+  cancelled: 'bg-red-100 text-red-700',
+  refunded: 'bg-gray-100 text-gray-700',
+};
+
+function getOrderStatusColor(status: string): string {
+  return ORDER_STATUS_COLORS[status] || 'bg-gray-100 text-gray-700';
+}
+
 export default function Orders() {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => { api.get('/customer/orders').then((r) => setOrders(r.data.data)).catch(console.error).finally(() => setLoading(false)); }, []);
-
-  const statusColor = (s: string) => {
-    const m: Record<string, string> = { pending: 'bg-yellow-100 text-yellow-700', paid: 'bg-blue-100 text-blue-700', shipped: 'bg-purple-100 text-purple-700', delivered: 'bg-green-100 text-green-700', cancelled: 'bg-red-100 text-red-700', refunded: 'bg-gray-100 text-gray-700' };
-    return m[s] || 'bg-gray-100 text-gray-700';
-  };
 
   return (
     <div>
@@ -42,7 +50,7 @@ export default function Orders() {
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${statusColor(order.status)}`}>{order.status}</span>
+                  <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${getOrderStatusColor(order.status)}`}>{order.status}</span>
                   <span className="text-sm font-semibold">${order.payment?.amount?.toFixed(2) || order.totalAmount?.toFixed(2) || '0.00'}</span>
                   <ChevronRight className="h-4 w-4 text-gray-400" />
                 </div>
