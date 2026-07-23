@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Menu, X, ShoppingCart, PawPrint, User, LogOut, ChevronDown } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
+import { useNavigation } from '../hooks/useCms';
 
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -11,12 +12,20 @@ export default function Navbar() {
   const location = useLocation();
   const { itemCount, items, total, removeItem, updateQuantity, clearCart } = useCart();
   const { user, logout } = useAuth();
+  const { menus, loading } = useNavigation('header');
 
-  const navLinks = [
+  // Fallback nav links when CMS not available
+  const fallbackLinks = [
     { to: '/', label: 'Home' },
     { to: '/shop', label: 'Shop' },
     { to: '/about', label: 'About' },
   ];
+
+  // Get nav links from CMS or fallback
+  const navLinks = loading || !menus.length ? fallbackLinks : menus[0]?.items?.map(item => ({
+    to: item.url,
+    label: item.label,
+  })) || fallbackLinks;
 
   const isActive = (path: string) => location.pathname === path;
 
