@@ -358,6 +358,19 @@ async function seed() {
       { name: 'cms.pet_reference.create', displayName: 'Create Pet References', description: 'Create pet reference data', resource: 'cms.pet_reference', action: 'create', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
       { name: 'cms.pet_reference.update', displayName: 'Update Pet References', description: 'Update pet reference data', resource: 'cms.pet_reference', action: 'update', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
       { name: 'cms.pet_reference.delete', displayName: 'Delete Pet References', description: 'Delete pet reference data', resource: 'cms.pet_reference', action: 'delete', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
+      // CMS — Homepage Sections
+      { name: 'cms.homepage.read', displayName: 'Read Homepage Sections', description: 'View homepage sections', resource: 'cms.homepage', action: 'read', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
+      { name: 'cms.homepage.create', displayName: 'Create Homepage Sections', description: 'Create homepage sections', resource: 'cms.homepage', action: 'create', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
+      { name: 'cms.homepage.update', displayName: 'Update Homepage Sections', description: 'Update homepage sections', resource: 'cms.homepage', action: 'update', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
+      { name: 'cms.homepage.delete', displayName: 'Delete Homepage Sections', description: 'Delete homepage sections', resource: 'cms.homepage', action: 'delete', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
+      // CMS — Shop Pages
+      { name: 'cms.shop_page.read', displayName: 'Read Shop Pages', description: 'View shop pages', resource: 'cms.shop_page', action: 'read', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
+      { name: 'cms.shop_page.create', displayName: 'Create Shop Pages', description: 'Create shop pages', resource: 'cms.shop_page', action: 'create', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
+      { name: 'cms.shop_page.update', displayName: 'Update Shop Pages', description: 'Update shop pages', resource: 'cms.shop_page', action: 'update', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
+      { name: 'cms.shop_page.delete', displayName: 'Delete Shop Pages', description: 'Delete shop pages', resource: 'cms.shop_page', action: 'delete', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
+      // CMS — Auth Pages
+      { name: 'cms.auth_page.read', displayName: 'Read Auth Pages', description: 'View auth pages', resource: 'cms.auth_page', action: 'read', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
+      { name: 'cms.auth_page.update', displayName: 'Update Auth Pages', description: 'Update auth pages', resource: 'cms.auth_page', action: 'update', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
     ];
 
     const permMap: Record<string, string> = {};
@@ -541,6 +554,16 @@ async function seed() {
         { permissionName: 'cms.pet_reference.create' },
         { permissionName: 'cms.pet_reference.update' },
         { permissionName: 'cms.pet_reference.delete' },
+        { permissionName: 'cms.homepage.read' },
+        { permissionName: 'cms.homepage.create' },
+        { permissionName: 'cms.homepage.update' },
+        { permissionName: 'cms.homepage.delete' },
+        { permissionName: 'cms.shop_page.read' },
+        { permissionName: 'cms.shop_page.create' },
+        { permissionName: 'cms.shop_page.update' },
+        { permissionName: 'cms.shop_page.delete' },
+        { permissionName: 'cms.auth_page.read' },
+        { permissionName: 'cms.auth_page.update' },
       ],
 
       CUSTOMER_SERVICE: [
@@ -694,6 +717,16 @@ async function seed() {
         { permissionName: 'cms.pet_reference.create' },
         { permissionName: 'cms.pet_reference.update' },
         { permissionName: 'cms.pet_reference.delete' },
+        { permissionName: 'cms.homepage.read' },
+        { permissionName: 'cms.homepage.create' },
+        { permissionName: 'cms.homepage.update' },
+        { permissionName: 'cms.homepage.delete' },
+        { permissionName: 'cms.shop_page.read' },
+        { permissionName: 'cms.shop_page.create' },
+        { permissionName: 'cms.shop_page.update' },
+        { permissionName: 'cms.shop_page.delete' },
+        { permissionName: 'cms.auth_page.read' },
+        { permissionName: 'cms.auth_page.update' },
       ],
     };
 

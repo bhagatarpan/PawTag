@@ -24,6 +24,9 @@ import {
   Mail,
   MessageSquare,
   Database,
+  Monitor,
+  ShoppingCart,
+  LogIn,
 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 
@@ -65,6 +68,9 @@ const cmsLinks: SidebarLink[] = [
   { to: '/cms/email-templates', label: 'Email Templates', icon: Mail, permission: 'cms.email_template.read' },
   { to: '/cms/sms-templates', label: 'SMS Templates', icon: MessageSquare, permission: 'cms.sms_template.read' },
   { to: '/cms/pet-references', label: 'Pet References', icon: Database, permission: 'cms.pet_reference.read' },
+  { to: '/cms/homepage', label: 'Homepage Sections', icon: Monitor, permission: 'cms.homepage.read' },
+  { to: '/cms/shop-pages', label: 'Shop Pages', icon: ShoppingCart, permission: 'cms.shop_page.read' },
+  { to: '/cms/auth-pages', label: 'Auth Pages', icon: LogIn, permission: 'cms.auth_page.read' },
 ];
 
 export default function Sidebar() {

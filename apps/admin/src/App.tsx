@@ -27,6 +27,9 @@ import CmsRedirectsPage from './pages/cms/CmsRedirects';
 import CmsEmailTemplatesPage from './pages/cms/CmsEmailTemplates';
 import CmsSmsTemplatesPage from './pages/cms/CmsSmsTemplates';
 import CmsPetReferencesPage from './pages/cms/CmsPetReferences';
+import CmsHomepageSectionsPage from './pages/cms/CmsHomepageSections';
+import CmsShopPagesPage from './pages/cms/CmsShopPages';
+import CmsAuthPagesPage from './pages/cms/CmsAuthPages';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
@@ -147,6 +150,9 @@ export default function App() {
       <Route path="/cms/email-templates" element={<ProtectedRoute><CmsEmailTemplatesPage /></ProtectedRoute>} />
       <Route path="/cms/sms-templates" element={<ProtectedRoute><CmsSmsTemplatesPage /></ProtectedRoute>} />
       <Route path="/cms/pet-references" element={<ProtectedRoute><CmsPetReferencesPage /></ProtectedRoute>} />
+      <Route path="/cms/homepage" element={<ProtectedRoute><CmsHomepageSectionsPage /></ProtectedRoute>} />
+      <Route path="/cms/shop-pages" element={<ProtectedRoute><CmsShopPagesPage /></ProtectedRoute>} />
+      <Route path="/cms/auth-pages" element={<ProtectedRoute><CmsAuthPagesPage /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

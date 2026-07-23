@@ -30,3 +30,6 @@ export { CmsRedirect, type ICmsRedirectDocument } from './models/CmsRedirect';
 export { CmsEmailTemplate, type ICmsEmailTemplateDocument } from './models/CmsEmailTemplate';
 export { CmsSmsTemplate, type ICmsSmsTemplateDocument } from './models/CmsSmsTemplate';
 export { CmsPetReference, type ICmsPetReferenceDocument } from './models/CmsPetReference';
+export { default as CmsHomepageSection, type ICmsHomepageSectionDocument } from './models/CmsHomepageSection';
+export { default as CmsShopPage, type ICmsShopPageDocument } from './models/CmsShopPage';
+export { default as CmsAuthPage, type ICmsAuthPageDocument } from './models/CmsAuthPage';
