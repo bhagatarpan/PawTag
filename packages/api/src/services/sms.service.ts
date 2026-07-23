@@ -1,3 +1,5 @@
+import { CmsSmsTemplate } from '@pawtag/db';
+
 interface SMSResult {
   success: boolean;
   messageId?: string;
@@ -80,11 +82,37 @@ function createSMSProvider(): SMSProvider {
 
 const smsProvider = createSMSProvider();
 
+// ─── CMS Template Rendering ──────────────────────────────────────────
+
+function replaceVariables(text: string, vars: Record<string, string>): string {
+  return text.replace(/\{\{(\w+)\}\}/g, (match, key) => vars[key] ?? match);
+}
+
+function processConditionals(text: string, vars: Record<string, string>): string {
+  return text.replace(/\{\{#(\w+)\}\}([\s\S]*?)\{\{\/\1\}\}/g, (_match, key, inner) => {
+    return vars[key] ? inner : '';
+  });
+}
+
+async function renderCmsSms(slug: string, variables: Record<string, string>): Promise<string | null> {
+  try {
+    const template = await CmsSmsTemplate.findOne({ slug, status: 'active', deletedAt: null });
+    if (!template) return null;
+    let msg = processConditionals(template.message, variables);
+    msg = replaceVariables(msg, variables);
+    return msg;
+  } catch (err) {
+    console.error(`CMS SMS template "${slug}" fetch failed, using fallback:`, err);
+    return null;
+  }
+}
+
 export async function sendSMS(to: string, message: string): Promise<SMSResult> {
   return smsProvider.send(to, message);
 }
 
 export async function sendPhoneOtpSMS(phoneNumber: string, otp: string): Promise<SMSResult> {
-  const message = `Your PawTag verification code is: ${otp}\n\nIt expires in 10 minutes. Do not share this code.`;
+  const cmsMsg = await renderCmsSms('phone-otp', { otp });
+  const message = cmsMsg || `Your PawTag verification code is: ${otp}\n\nIt expires in 10 minutes. Do not share this code.`;
   return sendSMS(phoneNumber, message);
 }

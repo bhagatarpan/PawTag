@@ -2,12 +2,14 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PawPrint, Mail, ArrowLeft, CheckCircle2, Loader2 } from 'lucide-react';
 import api from '../lib/api';
+import { useAuthPage } from '../hooks/useCms';
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
+  const { page: authPage } = useAuthPage('forgot_password');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,8 +34,8 @@ export default function ForgotPassword() {
               <PawPrint className="h-7 w-7 text-white" />
             </div>
           </Link>
-          <h1 className="text-2xl font-bold text-gray-900">Forgot your password?</h1>
-          <p className="text-gray-500 mt-2">Enter your email and we'll send you a reset link.</p>
+          <h1 className="text-2xl font-bold text-gray-900">{authPage?.title || 'Forgot your password?'}</h1>
+          <p className="text-gray-500 mt-2">{authPage?.subtitle || 'Enter your email and we\'ll send you a reset link.'}</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm p-8">

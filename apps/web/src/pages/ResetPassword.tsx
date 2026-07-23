@@ -2,11 +2,13 @@ import { useState } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { PawPrint, Lock, Eye, EyeOff, CheckCircle2, Loader2, ArrowLeft } from 'lucide-react';
 import api from '../lib/api';
+import { useAuthPage } from '../hooks/useCms';
 
 export default function ResetPassword() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const token = searchParams.get('token');
+  const { page: authPage } = useAuthPage('reset_password');
 
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -64,8 +66,8 @@ export default function ResetPassword() {
               <PawPrint className="h-7 w-7 text-white" />
             </div>
           </Link>
-          <h1 className="text-2xl font-bold text-gray-900">Reset your password</h1>
-          <p className="text-gray-500 mt-2">Enter your new password below.</p>
+          <h1 className="text-2xl font-bold text-gray-900">{authPage?.title || 'Reset your password'}</h1>
+          <p className="text-gray-500 mt-2">{authPage?.subtitle || 'Enter your new password below.'}</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm p-8">

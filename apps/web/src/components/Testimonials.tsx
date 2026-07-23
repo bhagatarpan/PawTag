@@ -68,10 +68,6 @@ export default function Testimonials() {
             </div>
           ))}
         </div>
-
-        <p className="text-center text-gray-400 text-xs mt-8">
-          Demo testimonials — real reviews coming soon.
-        </p>
       </div>
     </section>
   );
