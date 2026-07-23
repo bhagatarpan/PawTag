@@ -4,6 +4,7 @@ import { ShoppingCart, Search, Filter, PawPrint } from 'lucide-react';
 import api from '../lib/api';
 import { useCart } from '../context/CartContext';
 import { Product } from '../types';
+import SeoHead from '../components/SeoHead';
 
 export default function Shop() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -51,6 +52,11 @@ export default function Shop() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <SeoHead 
+        title="Shop"
+        description="Browse our range of QR-coded pet recovery tags. Each tag links to your pet's online profile, helping them get home faster."
+        keywords={['shop', 'pet tags', 'QR code tags', 'pet recovery', 'buy tags']}
+      />
       {/* Hero Banner */}
       <div className="bg-gradient-to-r from-teal-700 to-teal-600 text-white py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

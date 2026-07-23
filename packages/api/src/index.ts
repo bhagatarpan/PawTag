@@ -25,6 +25,10 @@ import finderRoutes from './routes/finder';
 import uploadRoutes from './routes/upload';
 import cmsAdminRoutes from './routes/cms-admin';
 import cmsPublicRoutes from './routes/cms-public';
+import cmsEmailAdminRoutes from './routes/cms-email-admin';
+import cmsSmsAdminRoutes from './routes/cms-sms-admin';
+import cmsPetRefAdminRoutes from './routes/cms-pet-ref-admin';
+import cmsSettingsPublicRoutes from './routes/cms-settings-public';
 import { startReminderService } from './services/reminder.service';
 
 const app = express();
@@ -111,10 +115,14 @@ app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/admin/rbac', rbacRoutes);
 app.use('/api/admin/cms', cmsAdminRoutes);
+app.use('/api/admin/cms/email', cmsEmailAdminRoutes);
+app.use('/api/admin/cms/sms', cmsSmsAdminRoutes);
+app.use('/api/admin/cms/pet-refs', cmsPetRefAdminRoutes);
 app.use('/api/customer', customerRoutes);
 app.use('/api/finder', finderRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/public/cms', cmsPublicRoutes);
+app.use('/api/public/cms', cmsSettingsPublicRoutes);
 
 // --- Error Handling ---
 app.use(notFoundHandler);

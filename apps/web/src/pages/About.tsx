@@ -1,4 +1,5 @@
 import { useCmsPage } from '../hooks/useCms';
+import SeoHead from '../components/SeoHead';
 
 // Fallback content when CMS page not available
 const fallbackContent = {
@@ -51,6 +52,11 @@ export default function About() {
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-12">
+      <SeoHead 
+        title={displayPage.title}
+        description="Learn about PawTag - a New Zealand company dedicated to pet safety and reunification through QR-coded recovery tags."
+        keywords={['about pawtag', 'pet safety', 'pet recovery', 'QR code tags', 'New Zealand']}
+      />
       <h1 className="text-3xl font-bold mb-6">{displayPage.title}</h1>
       <div className="prose prose-gray max-w-none">
         {sections.map((section) => (

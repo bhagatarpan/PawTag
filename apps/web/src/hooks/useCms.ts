@@ -88,6 +88,7 @@ export interface SiteSettings {
   'social.tiktok'?: string;
   'seo.defaultTitle'?: string;
   'seo.defaultDescription'?: string;
+  'seo.defaultKeywords'?: string;
   'contact.email'?: string;
   'contact.phone'?: string;
   'contact.address'?: string;
@@ -215,4 +216,81 @@ export function useSiteSettings() {
   }, []);
 
   return { settings, loading, error };
+}
+
+// Pet Reference types
+export interface PetReference {
+  type: string;
+  petSpecies?: string;
+  label: string;
+  value: string;
+  order: number;
+}
+
+// Hook for pet references
+export function usePetReferences(type?: string, petSpecies?: string) {
+  const [references, setReferences] = useState<PetReference[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    const params = new URLSearchParams();
+    if (type) params.set('type', type);
+    if (petSpecies) params.set('petSpecies', petSpecies);
+    const queryString = params.toString();
+    const url = `/public/cms/pet-references${queryString ? `?${queryString}` : ''}`;
+    
+    api.get(url)
+      .then((res) => {
+        if (!cancelled) {
+          setReferences(res.data.data || []);
+          setError(null);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err.message);
+          setReferences([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [type, petSpecies]);
+
+  return { references, loading, error };
+}
+
+// Hook for grouped pet references
+export function useGroupedPetReferences() {
+  const [grouped, setGrouped] = useState<Record<string, Record<string, { label: string; value: string }[]>>>({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    api.get('/public/cms/pet-references/grouped')
+      .then((res) => {
+        if (!cancelled) {
+          setGrouped(res.data.data || {});
+          setError(null);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err.message);
+          setGrouped({});
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  return { grouped, loading, error };
 }

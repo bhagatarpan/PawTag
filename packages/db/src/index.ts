@@ -27,3 +27,6 @@ export { CmsFooter, type ICmsFooterDocument, type ICmsFooterGroup, type ICmsFoot
 export { CmsMedia, type ICmsMediaDocument } from './models/CmsMedia';
 export { CmsAnnouncement, type ICmsAnnouncementDocument } from './models/CmsAnnouncement';
 export { CmsRedirect, type ICmsRedirectDocument } from './models/CmsRedirect';
+export { CmsEmailTemplate, type ICmsEmailTemplateDocument } from './models/CmsEmailTemplate';
+export { CmsSmsTemplate, type ICmsSmsTemplateDocument } from './models/CmsSmsTemplate';
+export { CmsPetReference, type ICmsPetReferenceDocument } from './models/CmsPetReference';

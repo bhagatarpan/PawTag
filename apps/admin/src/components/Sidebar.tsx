@@ -21,6 +21,9 @@ import {
   Image,
   Megaphone,
   ArrowRightLeft,
+  Mail,
+  MessageSquare,
+  Database,
 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 
@@ -59,6 +62,9 @@ const cmsLinks: SidebarLink[] = [
   { to: '/cms/media', label: 'Media Library', icon: Image, permission: 'cms.media.read' },
   { to: '/cms/announcements', label: 'Announcements', icon: Megaphone, permission: 'cms.announcement.read' },
   { to: '/cms/redirects', label: 'Redirects', icon: ArrowRightLeft, permission: 'cms.redirect.read' },
+  { to: '/cms/email-templates', label: 'Email Templates', icon: Mail, permission: 'cms.email_template.read' },
+  { to: '/cms/sms-templates', label: 'SMS Templates', icon: MessageSquare, permission: 'cms.sms_template.read' },
+  { to: '/cms/pet-references', label: 'Pet References', icon: Database, permission: 'cms.pet_reference.read' },
 ];
 
 export default function Sidebar() {

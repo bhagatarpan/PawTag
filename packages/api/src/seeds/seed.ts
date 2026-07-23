@@ -343,6 +343,21 @@ async function seed() {
       // CMS — Settings
       { name: 'cms.settings.read', displayName: 'Read CMS Settings', description: 'View CMS settings', resource: 'cms.settings', action: 'read', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
       { name: 'cms.settings.update', displayName: 'Update CMS Settings', description: 'Update CMS settings', resource: 'cms.settings', action: 'update', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
+      // CMS — Email Templates
+      { name: 'cms.email_template.read', displayName: 'Read Email Templates', description: 'View email templates', resource: 'cms.email_template', action: 'read', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
+      { name: 'cms.email_template.create', displayName: 'Create Email Templates', description: 'Create email templates', resource: 'cms.email_template', action: 'create', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
+      { name: 'cms.email_template.update', displayName: 'Update Email Templates', description: 'Update email templates', resource: 'cms.email_template', action: 'update', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
+      { name: 'cms.email_template.delete', displayName: 'Delete Email Templates', description: 'Delete email templates', resource: 'cms.email_template', action: 'delete', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
+      // CMS — SMS Templates
+      { name: 'cms.sms_template.read', displayName: 'Read SMS Templates', description: 'View SMS templates', resource: 'cms.sms_template', action: 'read', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
+      { name: 'cms.sms_template.create', displayName: 'Create SMS Templates', description: 'Create SMS templates', resource: 'cms.sms_template', action: 'create', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
+      { name: 'cms.sms_template.update', displayName: 'Update SMS Templates', description: 'Update SMS templates', resource: 'cms.sms_template', action: 'update', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
+      { name: 'cms.sms_template.delete', displayName: 'Delete SMS Templates', description: 'Delete SMS templates', resource: 'cms.sms_template', action: 'delete', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
+      // CMS — Pet References
+      { name: 'cms.pet_reference.read', displayName: 'Read Pet References', description: 'View pet reference data', resource: 'cms.pet_reference', action: 'read', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
+      { name: 'cms.pet_reference.create', displayName: 'Create Pet References', description: 'Create pet reference data', resource: 'cms.pet_reference', action: 'create', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
+      { name: 'cms.pet_reference.update', displayName: 'Update Pet References', description: 'Update pet reference data', resource: 'cms.pet_reference', action: 'update', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
+      { name: 'cms.pet_reference.delete', displayName: 'Delete Pet References', description: 'Delete pet reference data', resource: 'cms.pet_reference', action: 'delete', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
     ];
 
     const permMap: Record<string, string> = {};
@@ -514,6 +529,18 @@ async function seed() {
         { permissionName: 'cms.redirect.delete' },
         { permissionName: 'cms.settings.read' },
         { permissionName: 'cms.settings.update' },
+        { permissionName: 'cms.email_template.read' },
+        { permissionName: 'cms.email_template.create' },
+        { permissionName: 'cms.email_template.update' },
+        { permissionName: 'cms.email_template.delete' },
+        { permissionName: 'cms.sms_template.read' },
+        { permissionName: 'cms.sms_template.create' },
+        { permissionName: 'cms.sms_template.update' },
+        { permissionName: 'cms.sms_template.delete' },
+        { permissionName: 'cms.pet_reference.read' },
+        { permissionName: 'cms.pet_reference.create' },
+        { permissionName: 'cms.pet_reference.update' },
+        { permissionName: 'cms.pet_reference.delete' },
       ],
 
       CUSTOMER_SERVICE: [
@@ -655,6 +682,18 @@ async function seed() {
         { permissionName: 'cms.redirect.delete' },
         { permissionName: 'cms.settings.read' },
         { permissionName: 'cms.settings.update' },
+        { permissionName: 'cms.email_template.read' },
+        { permissionName: 'cms.email_template.create' },
+        { permissionName: 'cms.email_template.update' },
+        { permissionName: 'cms.email_template.delete' },
+        { permissionName: 'cms.sms_template.read' },
+        { permissionName: 'cms.sms_template.create' },
+        { permissionName: 'cms.sms_template.update' },
+        { permissionName: 'cms.sms_template.delete' },
+        { permissionName: 'cms.pet_reference.read' },
+        { permissionName: 'cms.pet_reference.create' },
+        { permissionName: 'cms.pet_reference.update' },
+        { permissionName: 'cms.pet_reference.delete' },
       ],
     };
 

@@ -88,8 +88,8 @@ export default function Footer() {
         <div className="border-t border-gray-800 mt-12 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-gray-500 text-sm">&copy; {new Date().getFullYear()} {companyName}. All rights reserved.</p>
           <div className="flex gap-6">
-            <a href="#" className="text-gray-500 hover:text-teal-400 text-sm transition-colors">Privacy</a>
-            <a href="#" className="text-gray-500 hover:text-teal-400 text-sm transition-colors">Terms</a>
+            <Link to="/privacy" className="text-gray-500 hover:text-teal-400 text-sm transition-colors">Privacy</Link>
+            <Link to="/terms" className="text-gray-500 hover:text-teal-400 text-sm transition-colors">Terms</Link>
           </div>
         </div>
       </div>

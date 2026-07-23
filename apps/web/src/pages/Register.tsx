@@ -148,9 +148,9 @@ export default function Register() {
               />
               <label htmlFor="acceptTerms" className="text-sm text-gray-600">
                 I agree to the{' '}
-                <span className="text-teal-600 font-medium cursor-pointer">Terms of Service</span>
+                <Link to="/terms" className="text-teal-600 font-medium hover:text-teal-700">Terms of Service</Link>
                 {' '}and{' '}
-                <span className="text-teal-600 font-medium cursor-pointer">Privacy Policy</span>
+                <Link to="/privacy" className="text-teal-600 font-medium hover:text-teal-700">Privacy Policy</Link>
               </label>
             </div>
 
