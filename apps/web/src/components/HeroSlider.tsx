@@ -1,8 +1,18 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, PawPrint, Scan, MapPin, Phone, UserCheck } from 'lucide-react';
+import { useHomepageSections } from '../hooks/useCms';
 
-const slides = [
+interface SlideData {
+  id: number;
+  tag: string;
+  headline: string;
+  sub: string;
+  cta: { text: string; to: string };
+  bg: string;
+}
+
+const defaultSlides: SlideData[] = [
   {
     id: 1,
     tag: 'Emotional',
@@ -10,7 +20,28 @@ const slides = [
     sub: "Let their tag do the talking.",
     cta: { text: 'Protect Your Pet', to: '/shop' },
     bg: 'from-primary-700 via-primary-600 to-primary-800',
-    visual: (
+  },
+  {
+    id: 2,
+    tag: 'Functional',
+    headline: 'Scan. Locate. Reunite.',
+    sub: 'From lost to home in three simple steps.',
+    cta: { text: 'Shop QR Tags', to: '/shop' },
+    bg: 'from-primary-800 via-primary-700 to-primary-600',
+  },
+  {
+    id: 3,
+    tag: 'Trust',
+    headline: 'Trusted by thousands of pet owners',
+    sub: 'Join a community that never stops looking out for each other.',
+    cta: { text: 'See How It Works', to: '/about' },
+    bg: 'from-primary-600 via-primary-700 to-primary-800',
+  },
+];
+
+function SlideVisual({ index }: { index: number }) {
+  if (index === 0) {
+    return (
       <div className="relative flex items-center justify-center">
         <div className="w-64 h-64 md:w-80 md:h-80 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center">
           <div className="text-center">
@@ -26,16 +57,10 @@ const slides = [
           <PawPrint size={20} className="text-white/30" />
         </div>
       </div>
-    ),
-  },
-  {
-    id: 2,
-    tag: 'Functional',
-    headline: 'Scan. Locate. Reunite.',
-    sub: 'From lost to home in three simple steps.',
-    cta: { text: 'Shop QR Tags', to: '/shop' },
-    bg: 'from-primary-800 via-primary-700 to-primary-600',
-    visual: (
+    );
+  }
+  if (index === 1) {
+    return (
       <div className="flex items-center gap-3 md:gap-5">
         {[
           { icon: PawPrint, label: 'Finder', desc: 'Finds pet' },
@@ -58,40 +83,47 @@ const slides = [
           </div>
         ))}
       </div>
-    ),
-  },
-  {
-    id: 3,
-    tag: 'Trust',
-    headline: 'Trusted by thousands of pet owners',
-    sub: 'Join a community that never stops looking out for each other.',
-    cta: { text: 'See How It Works', to: '/about' },
-    bg: 'from-primary-600 via-primary-700 to-primary-800',
-    visual: (
-      <div className="grid grid-cols-3 gap-4 md:gap-6">
-        {[
-          { num: '14K+', label: 'Pets Protected' },
-          { num: '42', label: 'Reunited Today' },
-          { num: '98%', label: 'Success Rate' },
-        ].map((stat) => (
-          <div key={stat.label} className="text-center p-4 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15">
-            <p className="text-3xl md:text-4xl font-bold text-white">{stat.num}</p>
-            <p className="text-white/70 text-xs mt-1 font-medium">{stat.label}</p>
-          </div>
-        ))}
-      </div>
-    ),
-  },
-];
+    );
+  }
+  return (
+    <div className="grid grid-cols-3 gap-4 md:gap-6">
+      {[
+        { num: '14K+', label: 'Pets Protected' },
+        { num: '42', label: 'Reunited Today' },
+        { num: '98%', label: 'Success Rate' },
+      ].map((stat) => (
+        <div key={stat.label} className="text-center p-4 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15">
+          <p className="text-3xl md:text-4xl font-bold text-white">{stat.num}</p>
+          <p className="text-white/70 text-xs mt-1 font-medium">{stat.label}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function HeroSlider() {
+  const { sections } = useHomepageSections('hero_slide');
   const [current, setCurrent] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [touchStart, setTouchStart] = useState<number | null>(null);
 
+  const slides = sections.length > 0
+    ? sections.map((s, i) => ({
+        id: i + 1,
+        tag: (s.content as Record<string, unknown>)?.tag as string || s.title,
+        headline: (s.content as Record<string, unknown>)?.headline as string || s.title,
+        sub: (s.content as Record<string, unknown>)?.sub as string || s.subtitle || '',
+        cta: {
+          text: (s.content as Record<string, unknown>)?.ctaText as string || 'Learn More',
+          to: (s.content as Record<string, unknown>)?.ctaUrl as string || '/shop',
+        },
+        bg: (s.content as Record<string, unknown>)?.bg as string || 'from-primary-700 via-primary-600 to-primary-800',
+      }))
+    : defaultSlides;
+
   const goTo = useCallback((index: number) => {
     setCurrent((index + slides.length) % slides.length);
-  }, []);
+  }, [slides.length]);
 
   const next = useCallback(() => goTo(current + 1), [current, goTo]);
   const prev = useCallback(() => goTo(current - 1), [current, goTo]);
@@ -110,7 +142,7 @@ export default function HeroSlider() {
     setTouchStart(null);
   };
 
-  const slide = slides[current];
+  const slide = slides[current] || defaultSlides[0];
 
   return (
     <section
@@ -140,7 +172,7 @@ export default function HeroSlider() {
           </div>
 
           <div key={`vis-${slide.id}`} className="hidden md:flex justify-center animate-fade-in">
-            {slide.visual}
+            <SlideVisual index={current % 3} />
           </div>
         </div>
       </div>
@@ -163,7 +195,7 @@ export default function HeroSlider() {
 
       {/* Dots */}
       <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2">
-        {slides.map((_, i) => (
+        {slides.map((_: unknown, i: number) => (
           <button
             key={i}
             onClick={() => goTo(i)}

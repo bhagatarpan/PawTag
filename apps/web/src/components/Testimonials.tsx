@@ -1,33 +1,29 @@
 import { Star } from 'lucide-react';
+import { useHomepageSections } from '../hooks/useCms';
 
-const testimonials = [
-  {
-    name: 'Sarah M.',
-    initials: 'SM',
-    color: 'bg-primary-500',
-    pet: 'Golden Retriever',
-    quote: "My dog Max got out during a storm last month. A neighbor found him 3 blocks away and scanned his PawTag. I had him back within 20 minutes. I can't imagine what would have happened without it.",
-    focus: 'Fast Reunion',
-  },
-  {
-    name: 'James K.',
-    initials: 'JK',
-    color: 'bg-sky-500',
-    pet: 'Tabby Cat',
-    quote: "Setting up Luna's profile took less than 5 minutes. The peace of mind knowing that anyone who finds her can instantly see her info and contact me — it's worth every penny.",
-    focus: 'Easy Setup',
-  },
-  {
-    name: 'Priya D.',
-    initials: 'PD',
-    color: 'bg-violet-500',
-    pet: 'Cocker Spaniel',
-    quote: "We travel a lot with our dog, and having PawTag gives me confidence that no matter where we are, if he slips his leash, someone can scan his tag and get him home safely.",
-    focus: 'Peace of Mind',
-  },
+const defaultTestimonials = [
+  { name: 'Sarah M.', initials: 'SM', color: 'bg-primary-500', pet: 'Golden Retriever', quote: "My dog Max got out during a storm last month. A neighbor found him 3 blocks away and scanned his PawTag. I had him back within 20 minutes. I can't imagine what would have happened without it.", focus: 'Fast Reunion' },
+  { name: 'James K.', initials: 'JK', color: 'bg-sky-500', pet: 'Tabby Cat', quote: "Setting up Luna's profile took less than 5 minutes. The peace of mind knowing that anyone who finds her can instantly see her info and contact me — it's worth every penny.", focus: 'Easy Setup' },
+  { name: 'Priya D.', initials: 'PD', color: 'bg-violet-500', pet: 'Cocker Spaniel', quote: "We travel a lot with our dog, and having PawTag gives me confidence that no matter where we are, if he slips his leash, someone can scan his tag and get him home safely.", focus: 'Peace of Mind' },
 ];
 
 export default function Testimonials() {
+  const { sections } = useHomepageSections('testimonial');
+
+  const testimonials = sections.length > 0
+    ? sections.map((s) => {
+        const content = s.content as Record<string, unknown>;
+        return {
+          name: (content?.name as string) || 'Anonymous',
+          initials: (content?.initials as string) || 'AN',
+          color: (content?.color as string) || 'bg-primary-500',
+          pet: (content?.pet as string) || 'Pet',
+          quote: (content?.quote as string) || s.subtitle || '',
+          focus: (content?.focus as string) || '',
+        };
+      })
+    : defaultTestimonials;
+
   return (
     <section className="py-20 bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -63,9 +59,11 @@ export default function Testimonials() {
                   <p className="font-semibold text-gray-900 text-sm">{t.name}</p>
                   <p className="text-gray-400 text-xs">Owner of a {t.pet}</p>
                 </div>
-                <span className="ml-auto text-xs font-medium text-primary-600 bg-primary-50 px-2.5 py-1 rounded-full">
-                  {t.focus}
-                </span>
+                {t.focus && (
+                  <span className="ml-auto text-xs font-medium text-primary-600 bg-primary-50 px-2.5 py-1 rounded-full">
+                    {t.focus}
+                  </span>
+                )}
               </div>
             </div>
           ))}
