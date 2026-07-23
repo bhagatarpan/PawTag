@@ -5,6 +5,7 @@ import api from '../lib/api';
 import { useCart } from '../context/CartContext';
 import { Product } from '../types';
 import SeoHead from '../components/SeoHead';
+import { useShopPage } from '../hooks/useCms';
 
 export default function Shop() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -13,6 +14,7 @@ export default function Shop() {
   const [category, setCategory] = useState('all');
   const [addingId, setAddingId] = useState<string | null>(null);
   const { addItem } = useCart();
+  const { page: shopPage } = useShopPage('shop');
 
   useEffect(() => {
     fetchProducts();
@@ -50,19 +52,22 @@ export default function Shop() {
     setTimeout(() => setAddingId(null), 1000);
   };
 
+  const shopTitle = (shopPage?.content as Record<string, unknown>)?.heroTitle as string || shopPage?.title || 'Shop PawTag Products';
+  const shopDesc = (shopPage?.content as Record<string, unknown>)?.heroDescription as string || shopPage?.subtitle || 'Browse our range of QR-coded pet recovery tags. Each tag links to your pet\'s online profile, helping them get home faster.';
+
   return (
     <div className="min-h-screen bg-gray-50">
       <SeoHead 
         title="Shop"
-        description="Browse our range of QR-coded pet recovery tags. Each tag links to your pet's online profile, helping them get home faster."
+        description={shopDesc}
         keywords={['shop', 'pet tags', 'QR code tags', 'pet recovery', 'buy tags']}
       />
       {/* Hero Banner */}
       <div className="bg-gradient-to-r from-teal-700 to-teal-600 text-white py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h1 className="text-4xl font-bold mb-4">Shop PawTag Products</h1>
+          <h1 className="text-4xl font-bold mb-4">{shopTitle}</h1>
           <p className="text-teal-100 text-lg max-w-2xl">
-            Browse our range of QR-coded pet recovery tags. Each tag links to your pet's online profile, helping them get home faster.
+            {shopDesc}
           </p>
         </div>
       </div>

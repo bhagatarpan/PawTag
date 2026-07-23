@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { PawPrint, Mail, Lock, User, Phone, Eye, EyeOff, CheckCircle } from 'lucide-react';
 import api from '../lib/api';
+import { useAuthPage } from '../hooks/useCms';
 
 export default function Register() {
   const [form, setForm] = useState({ fullName: '', email: '', phoneNumber: '', password: '', confirmPassword: '', acceptTerms: false });
@@ -10,6 +11,7 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const navigate = useNavigate();
+  const { page: authPage } = useAuthPage('register');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -83,8 +85,8 @@ export default function Register() {
               <PawPrint className="h-7 w-7 text-white" />
             </div>
           </Link>
-          <h1 className="text-2xl font-bold text-gray-900">Create your account</h1>
-          <p className="text-gray-500 mt-2">Join thousands of pet owners protecting their companions</p>
+          <h1 className="text-2xl font-bold text-gray-900">{authPage?.title || 'Create your account'}</h1>
+          <p className="text-gray-500 mt-2">{authPage?.subtitle || 'Join thousands of pet owners protecting their companions'}</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm p-8">
