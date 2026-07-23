@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext .ts",
     "seed": "tsx src/seeds/seed.ts",
+    "seed:cms": "tsx src/seeds/seed-cms.ts",
     "seed:products": "tsx src/seed-products.ts"
   },
   "dependencies": {
