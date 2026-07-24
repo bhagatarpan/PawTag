@@ -145,9 +145,14 @@ async function start() {
     // Start 24-hour reminder service
     startReminderService();
 
-    app.listen(config.port, () => {
+    const server = app.listen(config.port, () => {
       console.log(`PawTag API running on port ${config.port}`);
       console.log(`Environment: ${config.nodeEnv}`);
+    });
+
+    process.on('SIGTERM', () => {
+      console.log('SIGTERM received, shutting down...');
+      server.close(() => process.exit(0));
     });
   } catch (error) {
     console.error('Failed to start server:', error);
@@ -155,6 +160,12 @@ async function start() {
   }
 }
 
-start();
+// Only start server when run directly (not imported by tests)
+const isDirectRun = process.argv[1] && (
+  process.argv[1].endsWith('index.ts') || process.argv[1].endsWith('index.js')
+);
+if (isDirectRun || process.env.NODE_ENV !== 'test') {
+  start();
+}
 
 export default app;

@@ -18,18 +18,42 @@
     "build:finder": "pnpm --filter @pawtag/finder build",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
-    "clean": "pnpm -r exec rm -rf node_modules dist .turbo"
+    "clean": "pnpm -r exec rm -rf node_modules dist .turbo",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:unit": "vitest run --config vitest.config.ts tests/unit",
+    "test:integration": "vitest run tests/integration",
+    "test:smoke": "vitest run tests/smoke",
+    "test:regression": "vitest run tests/regression",
+    "test:coverage": "vitest run --coverage",
+    "test:all": "vitest run tests/unit tests/integration tests/smoke tests/regression"
   },
   "engines": {
     "node": ">=18"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^7.0.0",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/supertest": "^7.2.1",
     "@typescript-eslint/eslint-plugin": "^8.64.0",
     "@typescript-eslint/parser": "^8.64.0",
+    "@vitest/coverage-v8": "^4.1.10",
+    "bcryptjs": "^2.4.3",
     "eslint": "^10.7.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.1.1",
-    "prettier": "^3.9.5"
+    "happy-dom": "^20.11.1",
+    "jsdom": "^29.1.1",
+    "jsonwebtoken": "^9.0.3",
+    "mongodb-memory-server": "^11.2.0",
+    "mongoose": "^7.8.11",
+    "prettier": "^3.9.5",
+    "supertest": "^7.2.2",
+    "vitest": "^4.1.10",
+    "zod": "^3.25.76"
   }
 }
