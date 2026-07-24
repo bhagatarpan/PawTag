@@ -1,16 +1,16 @@
-import { useCmsPage } from '../hooks/useCms';
+import { useCmsPage, useSiteSettings } from '../hooks/useCms';
 import SeoHead from '../components/SeoHead';
 
 // Fallback content when CMS page not available
 const fallbackContent = {
-  title: 'About PawTag',
+  title: 'About',
   sections: [
     {
       _id: 'fallback-1',
       type: 'text',
       title: '',
       content: {
-        body: '<p class="text-lg text-gray-600 mb-4">PawTag is a New Zealand company dedicated to pet safety and reunification.</p><p class="text-gray-600 mb-4">Every year, thousands of pets go missing in New Zealand. Traditional ID tags can fall off or become unreadable. PawTag solves this problem with durable, scannable QR code tags that link directly to your pet\'s online profile.</p><p class="text-gray-600 mb-4">When someone finds your pet, they simply scan the QR code with their smartphone camera. No app download required. They see your pet\'s photo, name, and medical alerts, and can notify you immediately with their location.</p>'
+        body: ''
       },
       visible: true,
       status: 'published' as const,
@@ -30,6 +30,8 @@ const fallbackContent = {
 
 export default function About() {
   const { page, loading } = useCmsPage('about');
+  const { settings } = useSiteSettings();
+  const companyName = settings?.['company.name'] || 'PawTag';
 
   // Use CMS content or fallback
   const displayPage = page || fallbackContent;
@@ -53,11 +55,11 @@ export default function About() {
   return (
     <div className="max-w-3xl mx-auto px-4 py-12">
       <SeoHead 
-        title={displayPage.title}
-        description="Learn about PawTag - a New Zealand company dedicated to pet safety and reunification through QR-coded recovery tags."
-        keywords={['about pawtag', 'pet safety', 'pet recovery', 'QR code tags', 'New Zealand']}
+        title={`${companyName} - About Us`}
+        description={`Learn about ${companyName} - a New Zealand company dedicated to pet safety and reunification through QR-coded recovery tags.`}
+        keywords={['about', 'pet safety', 'pet recovery', 'QR code tags', 'New Zealand']}
       />
-      <h1 className="text-3xl font-bold mb-6">{displayPage.title}</h1>
+      <h1 className="text-3xl font-bold mb-6">{displayPage.title || `About ${companyName}`}</h1>
       <div className="prose prose-gray max-w-none">
         {sections.map((section) => (
           <div key={section._id}>

@@ -1,14 +1,16 @@
 import { Star } from 'lucide-react';
-import { useHomepageSections } from '../hooks/useCms';
-
-const defaultTestimonials = [
-  { name: 'Sarah M.', initials: 'SM', color: 'bg-primary-500', pet: 'Golden Retriever', quote: "My dog Max got out during a storm last month. A neighbor found him 3 blocks away and scanned his PawTag. I had him back within 20 minutes. I can't imagine what would have happened without it.", focus: 'Fast Reunion' },
-  { name: 'James K.', initials: 'JK', color: 'bg-sky-500', pet: 'Tabby Cat', quote: "Setting up Luna's profile took less than 5 minutes. The peace of mind knowing that anyone who finds her can instantly see her info and contact me — it's worth every penny.", focus: 'Easy Setup' },
-  { name: 'Priya D.', initials: 'PD', color: 'bg-violet-500', pet: 'Cocker Spaniel', quote: "We travel a lot with our dog, and having PawTag gives me confidence that no matter where we are, if he slips his leash, someone can scan his tag and get him home safely.", focus: 'Peace of Mind' },
-];
+import { useHomepageSections, useSiteSettings } from '../hooks/useCms';
 
 export default function Testimonials() {
   const { sections } = useHomepageSections('testimonial');
+  const { settings } = useSiteSettings();
+  const companyName = settings?.['company.name'] || 'PawTag';
+
+  const defaultTestimonials = [
+    { name: 'Sarah M.', initials: 'SM', color: 'bg-primary-500', pet: 'Golden Retriever', quote: `My dog Max got out during a storm last month. A neighbor found him 3 blocks away and scanned his ${companyName}. I had him back within 20 minutes. I can't imagine what would have happened without it.`, focus: 'Fast Reunion' },
+    { name: 'James K.', initials: 'JK', color: 'bg-sky-500', pet: 'Tabby Cat', quote: "Setting up Luna's profile took less than 5 minutes. The peace of mind knowing that anyone who finds her can instantly see her info and contact me — it's worth every penny.", focus: 'Easy Setup' },
+    { name: 'Priya D.', initials: 'PD', color: 'bg-violet-500', pet: 'Cocker Spaniel', quote: `We travel a lot with our dog, and having ${companyName} gives me confidence that no matter where we are, if he slips his leash, someone can scan his tag and get him home safely.`, focus: 'Peace of Mind' },
+  ];
 
   const testimonials = sections.length > 0
     ? sections.map((s) => {
@@ -35,7 +37,7 @@ export default function Testimonials() {
             What pet owners are saying
           </h2>
           <p className="text-gray-500 text-lg max-w-2xl mx-auto">
-            Hear from pet parents who trust PawTag to keep their families safe.
+            Hear from pet parents who trust {companyName} to keep their families safe.
           </p>
         </div>
 

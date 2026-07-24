@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Plus, Edit2, Trash2, Save, X, GripVertical, Eye, EyeOff, ArrowUp, ArrowDown } from 'lucide-react';
 import api from '../../lib/api';
+import SectionContentEditor from '../../components/SectionContentEditor';
 
 interface HomepageSection {
   _id: string;
@@ -26,7 +27,7 @@ const emptyForm = {
   sectionType: 'hero_slide',
   title: '',
   subtitle: '',
-  content: '{}' as string,
+  content: {} as Record<string, unknown>,
   order: 0,
   isActive: true,
 };
@@ -67,7 +68,7 @@ export default function CmsHomepageSections() {
       sectionType: section.sectionType,
       title: section.title,
       subtitle: section.subtitle || '',
-      content: JSON.stringify(section.content || {}, null, 2),
+      content: section.content || {},
       order: section.order,
       isActive: section.isActive,
     });
@@ -84,20 +85,12 @@ export default function CmsHomepageSections() {
     try {
       setSaving(true);
       setError('');
-      let content: Record<string, unknown> = {};
-      try {
-        content = JSON.parse(form.content);
-      } catch {
-        setError('Invalid JSON in content field');
-        setSaving(false);
-        return;
-      }
 
       const payload = {
         sectionType: form.sectionType,
         title: form.title,
         subtitle: form.subtitle || undefined,
-        content,
+        content: form.content,
         order: form.order,
         isActive: form.isActive,
       };
@@ -210,9 +203,8 @@ export default function CmsHomepageSections() {
               className="w-full border rounded-lg px-3 py-2" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Content (JSON)</label>
-            <textarea value={form.content} onChange={e => setForm({ ...form, content: e.target.value })}
-              rows={10} className="w-full border rounded-lg px-3 py-2 font-mono text-sm" />
+            <label className="block text-sm font-medium text-gray-700 mb-1">Content</label>
+            <SectionContentEditor sectionType={form.sectionType} value={form.content} onChange={(val) => setForm({ ...form, content: val })} />
           </div>
           <div className="flex items-center gap-2">
             <input type="checkbox" checked={form.isActive} onChange={e => setForm({ ...form, isActive: e.target.checked })} />

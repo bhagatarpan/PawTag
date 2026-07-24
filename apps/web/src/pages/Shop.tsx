@@ -5,7 +5,7 @@ import api from '../lib/api';
 import { useCart } from '../context/CartContext';
 import { Product } from '../types';
 import SeoHead from '../components/SeoHead';
-import { useShopPage } from '../hooks/useCms';
+import { useShopPage, useSiteSettings } from '../hooks/useCms';
 
 export default function Shop() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -15,6 +15,8 @@ export default function Shop() {
   const [addingId, setAddingId] = useState<string | null>(null);
   const { addItem } = useCart();
   const { page: shopPage } = useShopPage('shop');
+  const { settings } = useSiteSettings();
+  const companyName = settings?.['company.name'] || 'PawTag';
 
   useEffect(() => {
     fetchProducts();
@@ -52,7 +54,7 @@ export default function Shop() {
     setTimeout(() => setAddingId(null), 1000);
   };
 
-  const shopTitle = (shopPage?.content as Record<string, unknown>)?.heroTitle as string || shopPage?.title || 'Shop PawTag Products';
+  const shopTitle = (shopPage?.content as Record<string, unknown>)?.heroTitle as string || shopPage?.title || `Shop ${companyName} Products`;
   const shopDesc = (shopPage?.content as Record<string, unknown>)?.heroDescription as string || shopPage?.subtitle || 'Browse our range of QR-coded pet recovery tags. Each tag links to your pet\'s online profile, helping them get home faster.';
 
   return (

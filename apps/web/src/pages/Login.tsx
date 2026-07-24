@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { PawPrint, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { useAuthPage } from '../hooks/useCms';
+import { useAuthPage, useSiteSettings } from '../hooks/useCms';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -13,6 +13,8 @@ export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const { page: authPage } = useAuthPage('login');
+  const { settings } = useSiteSettings();
+  const companyName = settings?.['company.name'] || 'PawTag';
 
   const adminRoles = ['SUPER_ADMIN', 'ADMIN', 'CUSTOMER_SERVICE', 'WEBSITE_EDITOR'];
 
@@ -58,7 +60,7 @@ export default function Login() {
             </div>
           </Link>
           <h1 className="text-2xl font-bold text-gray-900">{authPage?.title || 'Welcome back'}</h1>
-          <p className="text-gray-500 mt-2">{authPage?.subtitle || 'Sign in to your PawTag account'}</p>
+          <p className="text-gray-500 mt-2">{authPage?.subtitle || 'Sign in to your {companyName} account'}</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm p-8">

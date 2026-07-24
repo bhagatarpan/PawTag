@@ -89,9 +89,8 @@ export interface SiteSettings {
   'seo.defaultTitle'?: string;
   'seo.defaultDescription'?: string;
   'seo.defaultKeywords'?: string;
-  'contact.email'?: string;
-  'contact.phone'?: string;
-  'contact.address'?: string;
+  'contact.businessHours'?: string;
+  'contact.businessHoliday'?: string;
 }
 
 // Hook for navigation

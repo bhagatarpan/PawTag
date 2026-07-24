@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, Routes, Route } from 'react-router-dom';
 import axios from 'axios';
 import { PawPrint, Phone, MapPin, AlertTriangle, Loader2, CheckCircle, ChevronLeft, ChevronRight, ShieldAlert, ShieldCheck, Clock, Mail, User } from 'lucide-react';
+import { useSiteSettings } from './hooks/useSiteSettings';
 
 interface PetPhoto {
   url: string;
@@ -35,6 +36,8 @@ interface FinderData {
 
 function FinderPage() {
   const { tagId } = useParams<{ tagId: string }>();
+  const { settings } = useSiteSettings();
+  const companyName = settings?.['company.name'] || 'PawTag';
   const [data, setData] = useState<FinderData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -351,7 +354,7 @@ function FinderPage() {
         </div>
 
         <p className="text-center text-xs text-gray-400 mt-6">
-          Powered by PawTag - Helping reunite lost pets with their families
+          Powered by {companyName} - Helping reunite lost pets with their families
         </p>
       </div>
     </div>
@@ -359,6 +362,8 @@ function FinderPage() {
 }
 
 export default function App() {
+  const { settings } = useSiteSettings();
+  const companyName = settings?.['company.name'] || 'PawTag';
   return (
     <Routes>
       <Route path="/:tagId" element={<FinderPage />} />
@@ -366,7 +371,7 @@ export default function App() {
         <div className="min-h-screen flex items-center justify-center">
           <div className="text-center">
             <PawPrint size={48} className="text-primary-600 mx-auto mb-4" />
-            <h1 className="text-xl font-bold mb-2">PawTag Finder</h1>
+            <h1 className="text-xl font-bold mb-2">{companyName} Finder</h1>
             <p className="text-gray-500">Scan a QR code to view a lost pet's information.</p>
           </div>
         </div>

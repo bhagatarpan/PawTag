@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import api, { PaginatedData } from '../lib/api';
-import { Plus, X, Save, Key, Lock, Unlock, Trash2 } from 'lucide-react';
+import { Plus, X, Save, Key, Lock, Unlock, Trash2, Edit2 } from 'lucide-react';
 
 export default function Users() {
   const [data, setData] = useState<PaginatedData<any> | null>(null);
@@ -18,6 +18,11 @@ export default function Users() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [rbacRoles, setRbacRoles] = useState<any[]>([]);
   const [roleDropdownUser, setRoleDropdownUser] = useState<string | null>(null);
+
+  const [editUser, setEditUser] = useState<any>(null);
+  const [editForm, setEditForm] = useState({ fullName: '', email: '', phoneNumber: '', responsibilityScore: 0 });
+  const [editError, setEditError] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
 
   const fetchRoles = () => {
     api.get('/admin/rbac/roles').then((res) => setRbacRoles(res.data.data || [])).catch(console.error);
@@ -97,6 +102,32 @@ export default function Users() {
     setActionLoading(id);
     try { await api.delete(`/admin/users/${id}`); fetchUsers(); } catch (err: any) { console.error(err); }
     finally { setActionLoading(null); }
+  };
+
+  const openEdit = (user: any) => {
+    setEditUser(user);
+    setEditForm({
+      fullName: user.fullName || '',
+      email: user.email || '',
+      phoneNumber: user.phoneNumber || '',
+      responsibilityScore: user.responsibilityScore || 0,
+    });
+    setEditError('');
+  };
+
+  const handleEditSave = async () => {
+    if (!editUser) return;
+    setEditSaving(true);
+    setEditError('');
+    try {
+      await api.put(`/admin/users/${editUser._id}`, editForm);
+      setEditUser(null);
+      fetchUsers();
+    } catch (err: any) {
+      setEditError(err.response?.data?.error || 'Failed to update user');
+    } finally {
+      setEditSaving(false);
+    }
   };
 
   return (
@@ -224,6 +255,9 @@ export default function Users() {
                 <td className="px-5 py-3 text-gray-500">{new Date(user.createdAt).toLocaleDateString()}</td>
                 <td className="px-5 py-3 text-right">
                   <div className="flex items-center justify-end gap-1 relative">
+                    <button onClick={() => openEdit(user)} title="Edit user" className="p-1.5 rounded hover:bg-blue-100 text-blue-600">
+                      <Edit2 size={14} />
+                    </button>
                     <button onClick={() => { setRoleDropdownUser(roleDropdownUser === user._id ? null : user._id); }} title="Assign role" className="p-1.5 rounded hover:bg-blue-100 text-blue-600">
                       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/></svg>
                     </button>
@@ -270,6 +304,42 @@ export default function Users() {
             <button disabled={page <= 1} onClick={() => setPage(page - 1)} className="px-3 py-1 border rounded disabled:opacity-50">Prev</button>
             <span className="px-3 py-1">Page {page} of {data.totalPages}</span>
             <button disabled={page >= data.totalPages} onClick={() => setPage(page + 1)} className="px-3 py-1 border rounded disabled:opacity-50">Next</button>
+          </div>
+        </div>
+      )}
+
+      {editUser && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-lg space-y-4">
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-semibold">Edit User — {editUser.fullName}</h3>
+              <button onClick={() => { setEditUser(null); setEditError(''); }} className="text-gray-400 hover:text-red-500"><X size={18} /></button>
+            </div>
+            {editError && <div className="bg-red-50 text-red-600 text-sm p-3 rounded">{editError}</div>}
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Full Name</label>
+                <input value={editForm.fullName} onChange={(e) => setEditForm({ ...editForm, fullName: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Email</label>
+                <input type="email" value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Phone Number</label>
+                <input value={editForm.phoneNumber} onChange={(e) => setEditForm({ ...editForm, phoneNumber: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Responsibility Score (0-10)</label>
+                <input type="number" min={0} max={10} value={editForm.responsibilityScore} onChange={(e) => setEditForm({ ...editForm, responsibilityScore: parseInt(e.target.value) || 0 })} className="w-full border rounded-md px-3 py-2 text-sm" />
+              </div>
+            </div>
+            <div className="flex gap-2 pt-2">
+              <button onClick={handleEditSave} disabled={editSaving} className="bg-primary-600 text-white px-4 py-2 rounded-md text-sm hover:bg-primary-700 flex items-center gap-1 disabled:opacity-50">
+                <Save size={14} /> {editSaving ? 'Saving...' : 'Save Changes'}
+              </button>
+              <button onClick={() => { setEditUser(null); setEditError(''); }} className="border px-4 py-2 rounded-md text-sm">Cancel</button>
+            </div>
           </div>
         </div>
       )}

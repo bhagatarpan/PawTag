@@ -1,5 +1,5 @@
 import { Award, Camera, Syringe, ClipboardCheck, Star, Sparkles } from 'lucide-react';
-import { useHomepageSections } from '../hooks/useCms';
+import { useHomepageSections, useSiteSettings } from '../hooks/useCms';
 
 const iconMap: Record<string, typeof Award> = { Award, Camera, Syringe, ClipboardCheck, Star, Sparkles };
 
@@ -12,12 +12,14 @@ const defaultActivities = [
 
 export default function ResponsibilityScore() {
   const { sections } = useHomepageSections('responsibility_score');
+  const { settings } = useSiteSettings();
+  const companyName = settings?.['company.name'] || 'PawTag';
   const content = sections[0]?.content as Record<string, unknown> | undefined;
 
   const score = (content?.score as string) || '820';
   const scoreLabel = (content?.scoreLabel as string) || 'Excellent';
   const sectionTitle = (content?.title as string) || sections[0]?.title || 'Earn points for being a great pet parent';
-  const sectionDesc = (content?.desc as string) || sections[0]?.subtitle || "PawTag Responsibility Score rewards you for keeping your pet's profile complete and up to date. The higher your score, the more trusted your profile appears to potential finders.";
+  const sectionDesc = (content?.desc as string) || sections[0]?.subtitle || `${companyName} Responsibility Score rewards you for keeping your pet's profile complete and up to date. The higher your score, the more trusted your profile appears to potential finders.`;
 
   const activities = (content?.activities as Array<Record<string, string>>) || defaultActivities;
 

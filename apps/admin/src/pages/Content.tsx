@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import api from '../lib/api';
+import RichTextEditor from '../components/RichTextEditor';
 
 export default function Content() {
   const [items, setItems] = useState<any[]>([]);
@@ -78,7 +79,7 @@ export default function Content() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Body (HTML)</label>
-              <textarea value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm font-mono" rows={10} required />
+              <RichTextEditor value={form.body} onChange={(val) => setForm({ ...form, body: val })} placeholder="Write your page content here..." />
             </div>
             <div className="grid grid-cols-3 gap-4">
               <div>

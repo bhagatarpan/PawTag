@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Plus, Edit2, Trash2, Save, X, Eye, EyeOff } from 'lucide-react';
 import api from '../../lib/api';
+import JsonEditor from '../../components/JsonEditor';
 
 interface ShopPage {
   _id: string;
@@ -176,8 +177,7 @@ export default function CmsShopPages() {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Content (JSON)</label>
-            <textarea value={form.content} onChange={e => setForm({ ...form, content: e.target.value })}
-              rows={12} className="w-full border rounded-lg px-3 py-2 font-mono text-sm" />
+            <JsonEditor value={form.content} onChange={(val) => setForm({ ...form, content: val })} height="350px" />
           </div>
           <div className="flex items-center gap-2">
             <input type="checkbox" checked={form.isActive} onChange={e => setForm({ ...form, isActive: e.target.checked })} />

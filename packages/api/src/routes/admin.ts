@@ -5,6 +5,7 @@ import { requirePermission } from '../middleware/permission';
 import { validate } from '../middleware/validation';
 import {
   updateUserStatusSchema,
+  updateUserSchema,
   adminResetPasswordSchema,
   createPetSchema,
   updatePetSchema,
@@ -580,6 +581,40 @@ router.put('/users/:id/unlock', requirePermission('user.activate'), async (req: 
     res.json({ success: true, data: { message: 'Account unlocked' } });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to unlock account' });
+  }
+});
+
+// PUT /api/admin/users/:id (edit user details)
+router.put('/users/:id', requirePermission('user.update'), validate(updateUserSchema), async (req: AuthRequest, res: Response) => {
+  try {
+    const user = await User.findOne({ _id: req.params.id, deletedAt: null });
+    if (!user) { res.status(404).json({ success: false, error: 'User not found' }); return; }
+
+    const changes: Record<string, unknown> = {};
+    const { fullName, email, phoneNumber, responsibilityScore } = req.body;
+
+    if (fullName !== undefined && fullName !== user.fullName) { changes.fullName = { old: user.fullName, new: fullName }; user.fullName = fullName; }
+    if (email !== undefined && email !== user.email) {
+      const existing = await User.findOne({ email, _id: { $ne: user._id }, deletedAt: null });
+      if (existing) { res.status(400).json({ success: false, error: 'Email already in use' }); return; }
+      changes.email = { old: user.email, new: email }; user.email = email;
+    }
+    if (phoneNumber !== undefined) { changes.phoneNumber = { old: user.phoneNumber, new: phoneNumber }; user.phoneNumber = phoneNumber; }
+    if (responsibilityScore !== undefined) { changes.responsibilityScore = { old: (user as any).responsibilityScore, new: responsibilityScore }; (user as any).responsibilityScore = responsibilityScore; }
+
+    await user.save();
+
+    await AuditLog.create({
+      userId: req.user!.id,
+      action: 'update_user',
+      entity: 'User',
+      entityId: req.params.id,
+      changes,
+    });
+
+    res.json({ success: true, data: user });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to update user' });
   }
 });
 
@@ -2333,6 +2368,16 @@ router.post('/settings', requirePermission('setting.create'), validate(createSet
     res.status(201).json({ success: true, data: setting });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to create setting' });
+  }
+});
+
+router.delete('/settings/:key', requirePermission('setting.update'), async (req, res: Response) => {
+  try {
+    const setting = await Setting.findOneAndDelete({ key: req.params.key });
+    if (!setting) { res.status(404).json({ success: false, error: 'Setting not found' }); return; }
+    res.json({ success: true, data: setting });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to delete setting' });
   }
 });
 

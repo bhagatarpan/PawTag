@@ -28,9 +28,9 @@ export default function Footer() {
   const displayGroups = footerLoading || !footer?.groups?.length ? fallbackGroups : footer.groups;
   const brandDescription = footer?.brandDescription || 'Smart QR-coded pet recovery tags. Because every pet deserves a safe way home.';
   const companyName = settings?.['company.name'] || 'PawTag';
-  const contactEmail = settings?.['contact.email'] || 'support@pawtag.co.nz';
-  const contactPhone = settings?.['contact.phone'] || '+64 XX XXX XXXX';
-  const contactAddress = settings?.['contact.address'] || 'New Zealand';
+  const contactEmail = settings?.['company.email'] || 'support@pawtag.co.nz';
+  const contactPhone = settings?.['company.phone'] || '+64 XX XXX XXXX';
+  const contactAddress = settings?.['company.address'] || 'New Zealand';
 
   return (
     <footer className="bg-gray-900 text-gray-300">

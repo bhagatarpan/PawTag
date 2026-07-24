@@ -1,8 +1,10 @@
-import { useCmsPage } from '../hooks/useCms';
+import { useCmsPage, useSiteSettings } from '../hooks/useCms';
 import SeoHead from '../components/SeoHead';
 
 export default function Privacy() {
   const { page, loading } = useCmsPage('privacy-policy');
+  const { settings } = useSiteSettings();
+  const companyName = settings?.['company.name'] || 'PawTag';
 
   if (loading) {
     return (
@@ -21,11 +23,11 @@ export default function Privacy() {
   return (
     <div className="max-w-3xl mx-auto px-4 py-12">
       <SeoHead 
-        title="Privacy Policy"
-        description="PawTag Privacy Policy - Learn how we collect, use, and protect your personal information."
-        keywords={['privacy policy', 'data protection', 'personal information', 'PawTag']}
+        title={`${companyName} - Privacy Policy`}
+        description={`${companyName} Privacy Policy - Learn how we collect, use, and protect your personal information.`}
+        keywords={['privacy policy', 'data protection', 'personal information', companyName]}
       />
-      <h1 className="text-3xl font-bold mb-6">{page?.title || 'Privacy Policy'}</h1>
+      <h1 className="text-3xl font-bold mb-6">{page?.title || `Privacy Policy - ${companyName}`}</h1>
       <div className="prose prose-gray max-w-none">
         {page?.sections?.filter(s => s.visible && s.status === 'published').map((section) => (
           <div key={section._id}>

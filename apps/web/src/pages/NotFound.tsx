@@ -1,7 +1,11 @@
 import { Link } from 'react-router-dom';
 import { PawPrint, Home, ArrowLeft } from 'lucide-react';
+import { useSiteSettings } from '../hooks/useCms';
 
 export default function NotFound() {
+  const { settings } = useSiteSettings();
+  const companyName = settings?.['company.name'] || 'PawTag';
+
   return (
     <div className="min-h-screen flex flex-col">
       <nav className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-100 shadow-sm">
@@ -47,7 +51,7 @@ export default function NotFound() {
 
       <footer className="bg-gray-900 text-gray-300 py-8">
         <div className="max-w-7xl mx-auto px-4 text-center">
-          <p className="text-gray-500 text-sm">&copy; {new Date().getFullYear()} PawTag. All rights reserved.</p>
+          <p className="text-gray-500 text-sm">&copy; {new Date().getFullYear()} {companyName}. All rights reserved.</p>
         </div>
       </footer>
     </div>

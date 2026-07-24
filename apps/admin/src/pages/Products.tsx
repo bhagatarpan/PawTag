@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { ImagePlus, X, Upload, Loader2 } from 'lucide-react';
 import api, { PaginatedData } from '../lib/api';
+import RichTextEditor from '../components/RichTextEditor';
 
 interface ProductVariant {
   name: string;
@@ -216,7 +217,7 @@ export default function Products() {
               </div>
               <div className="col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Description *</label>
-                <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm" rows={3} required />
+                <RichTextEditor value={form.description} onChange={(val) => setForm({ ...form, description: val })} placeholder="Describe your product..." minHeight="120px" />
               </div>
             </div>
 

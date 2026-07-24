@@ -50,9 +50,8 @@ async function run() {
         { key: 'company.email', value: 'support@pawtag.co.nz', category: 'company' },
         { key: 'company.phone', value: '+64 21 123 4567', category: 'company' },
         { key: 'company.address', value: 'Auckland, New Zealand', category: 'company' },
-        { key: 'contact.email', value: 'support@pawtag.co.nz', category: 'contact' },
-        { key: 'contact.phone', value: '+64 21 123 4567', category: 'contact' },
-        { key: 'contact.address', value: 'Auckland, New Zealand', category: 'contact' },
+        { key: 'contact.businessHours', value: 'Mon-Fri: 7am-6pm, Sat: 8am-2pm', category: 'contact' },
+        { key: 'contact.businessHoliday', value: 'Christmas day, Boxing day, Waitangi day, ANZAC day', category: 'contact' },
         { key: 'seo.defaultTitle', value: 'PawTag - Never Lose Your Pet Again', category: 'seo' },
         { key: 'seo.defaultDescription', value: 'Smart QR-coded pet recovery tags. Because every pet deserves a safe way home.', category: 'seo' },
         { key: 'seo.defaultKeywords', value: 'pet recovery, QR code, pet tag, lost pet, found pet, pet safety, New Zealand', category: 'seo' },
@@ -76,6 +75,8 @@ async function run() {
           settingsCreated++;
         }
       }
+      // Remove duplicate contact.* keys (use company.* instead)
+      await Setting.deleteMany({ key: { $in: ['contact.email', 'contact.phone', 'contact.address'] } }).session(session);
       console.log(`  ${settingsCreated} new settings created (${settings.length} total)\n`);
 
       // ═══════════════════════════════════════
@@ -187,6 +188,12 @@ async function run() {
               ctaText: 'Protect Your Pet',
               ctaUrl: '/shop',
               bg: 'from-primary-700 via-primary-600 to-primary-800',
+              visualType: 'paw',
+              duration: 5,
+              stats: [],
+              flowSteps: [],
+              imageUrl: '',
+              imageAlt: '',
             },
             order: 0,
             isActive: true,
@@ -201,6 +208,18 @@ async function run() {
               ctaText: 'Shop QR Tags',
               ctaUrl: '/shop',
               bg: 'from-primary-800 via-primary-700 to-primary-600',
+              visualType: 'flow',
+              duration: 5,
+              stats: [],
+              flowSteps: [
+                { icon: 'PawPrint', label: 'Finder', desc: 'Finds pet' },
+                { icon: 'Scan', label: 'Scan', desc: 'Scans tag' },
+                { icon: 'UserCheck', label: 'Profile', desc: 'Sees info' },
+                { icon: 'Phone', label: 'Contact', desc: 'Calls owner' },
+                { icon: 'MapPin', label: 'Reunited', desc: 'Pet home' },
+              ],
+              imageUrl: '',
+              imageAlt: '',
             },
             order: 1,
             isActive: true,
@@ -215,6 +234,16 @@ async function run() {
               ctaText: 'See How It Works',
               ctaUrl: '/about',
               bg: 'from-primary-600 via-primary-700 to-primary-800',
+              visualType: 'stats',
+              duration: 5,
+              stats: [
+                { number: '14K+', label: 'Pets Protected' },
+                { number: '42', label: 'Reunited Today' },
+                { number: '98%', label: 'Success Rate' },
+              ],
+              flowSteps: [],
+              imageUrl: '',
+              imageAlt: '',
             },
             order: 2,
             isActive: true,
@@ -372,10 +401,10 @@ async function run() {
           sections: [
             {
               sectionId: 'about-intro',
-              type: 'text',
+              type: 'rich_text',
               title: '',
               content: {
-                body: '<p class="text-lg text-gray-600 mb-4">PawTag is a New Zealand company dedicated to pet safety and reunification.</p><p class="text-gray-600 mb-4">Every year, thousands of pets go missing in New Zealand. Traditional ID tags can fall off or become unreadable. PawTag solves this problem with durable, scannable QR code tags that link directly to your pet\'s online profile.</p><p class="text-gray-600 mb-4">When someone finds your pet, they simply scan the QR code with their smartphone camera. No app download required. They see your pet\'s photo, name, and medical alerts, and can notify you immediately with their location.</p>',
+                html: '<p class="text-lg text-gray-600 mb-4">PawTag is a New Zealand company dedicated to pet safety and reunification.</p><p class="text-gray-600 mb-4">Every year, thousands of pets go missing in New Zealand. Traditional ID tags can fall off or become unreadable. PawTag solves this problem with durable, scannable QR code tags that link directly to your pet\'s online profile.</p><p class="text-gray-600 mb-4">When someone finds your pet, they simply scan the QR code with their smartphone camera. No app download required. They see your pet\'s photo, name, and medical alerts, and can notify you immediately with their location.</p>',
               },
               visible: true,
               order: 0,
@@ -383,10 +412,10 @@ async function run() {
             },
             {
               sectionId: 'about-mission',
-              type: 'text',
+              type: 'rich_text',
               title: 'Our Mission',
               content: {
-                body: '<p class="text-gray-600">To make pet recovery fast, simple, and reliable. We believe every pet deserves a safe way home.</p>',
+                html: '<p class="text-gray-600">To make pet recovery fast, simple, and reliable. We believe every pet deserves a safe way home.</p>',
               },
               visible: true,
               order: 1,
@@ -414,10 +443,10 @@ async function run() {
           sections: [
             {
               sectionId: 'privacy-body',
-              type: 'text',
+              type: 'rich_text',
               title: '',
               content: {
-                body: `<p class="text-lg text-gray-600 mb-4">Last updated: ${new Date().toLocaleDateString()}</p>
+                html: `<p class="text-lg text-gray-600 mb-4">Last updated: ${new Date().toLocaleDateString()}</p>
 <h2 class="text-xl font-semibold mt-6">1. Information We Collect</h2>
 <p>We collect information you provide directly to us, such as when you create an account, register a pet, purchase a tag, or contact us for support.</p>
 <h2 class="text-xl font-semibold mt-6">2. How We Use Your Information</h2>
@@ -455,10 +484,10 @@ async function run() {
           sections: [
             {
               sectionId: 'terms-body',
-              type: 'text',
+              type: 'rich_text',
               title: '',
               content: {
-                body: `<p class="text-lg text-gray-600 mb-4">Last updated: ${new Date().toLocaleDateString()}</p>
+                html: `<p class="text-lg text-gray-600 mb-4">Last updated: ${new Date().toLocaleDateString()}</p>
 <h2 class="text-xl font-semibold mt-6">1. Acceptance of Terms</h2>
 <p>By accessing or using PawTag's services, you agree to be bound by these Terms of Service.</p>
 <h2 class="text-xl font-semibold mt-6">2. Description of Service</h2>
@@ -501,16 +530,16 @@ async function run() {
               type: 'faq',
               title: 'Frequently Asked Questions',
               content: {
-                description: 'Everything you need to know about PawTag.',
-                faqs: [
-                  { q: 'How does PawTag work?', a: "Each PawTag has a unique QR code. When someone finds your pet, they scan the tag with their phone and instantly see your pet's profile with your contact details. No app is needed." },
-                  { q: 'Do finders need an app to scan the tag?', a: 'No. The QR code works with any smartphone camera. Simply point your camera at the tag and a link will appear to view the pet\'s profile.' },
-                  { q: 'What information is visible to finders?', a: "Only what you choose to share: your pet's name, photo, medical alerts, and a contact number or email. Your home address is never shown unless you add it." },
-                  { q: 'Is my personal data secure?', a: 'Yes. All data is encrypted and stored securely. We never sell or share your personal information. You control exactly what finders can see.' },
-                  { q: 'How long does the tag last?', a: 'PawTag QR tags are waterproof, scratch-resistant, and built to last the lifetime of your pet. They do not require batteries or charging.' },
-                  { q: "Can I update my pet's profile after purchasing?", a: "Yes. You can update your pet's photo, contact details, medical information, and any other profile data at any time from your account dashboard." },
-                  { q: 'What happens if my pet goes missing?', a: "When someone scans the tag, you'll receive an instant notification with the finder's location. You can then contact them directly to arrange a reunion." },
-                  { q: 'Do you ship internationally?', a: 'Currently we ship within New Zealand. International shipping is coming soon.' },
+                heading: 'Frequently Asked Questions',
+                items: [
+                  { question: 'How does PawTag work?', answer: "Each PawTag has a unique QR code. When someone finds your pet, they scan the tag with their phone and instantly see your pet's profile with your contact details. No app is needed." },
+                  { question: 'Do finders need an app to scan the tag?', answer: 'No. The QR code works with any smartphone camera. Simply point your camera at the tag and a link will appear to view the pet\'s profile.' },
+                  { question: 'What information is visible to finders?', answer: "Only what you choose to share: your pet's name, photo, medical alerts, and a contact number or email. Your home address is never shown unless you add it." },
+                  { question: 'Is my personal data secure?', answer: 'Yes. All data is encrypted and stored securely. We never sell or share your personal information. You control exactly what finders can see.' },
+                  { question: 'How long does the tag last?', answer: 'PawTag QR tags are waterproof, scratch-resistant, and built to last the lifetime of your pet. They do not require batteries or charging.' },
+                  { question: "Can I update my pet's profile after purchasing?", answer: "Yes. You can update your pet's photo, contact details, medical information, and any other profile data at any time from your account dashboard." },
+                  { question: 'What happens if my pet goes missing?', answer: "When someone scans the tag, you'll receive an instant notification with the finder's location. You can then contact them directly to arrange a reunion." },
+                  { question: 'Do you ship internationally?', answer: 'Currently we ship within New Zealand. International shipping is coming soon.' },
                 ],
               },
               visible: true,
@@ -525,6 +554,42 @@ async function run() {
         console.log('  Created FAQ page');
       } else {
         console.log('  FAQ page already exists');
+      }
+
+      // Contact
+      const existingContact = await CmsPage.findOne({ slug: 'contact', deletedAt: null }).session(session);
+      if (!existingContact) {
+        await CmsPage.create([{
+          slug: 'contact',
+          title: 'Contact Us',
+          metaTitle: 'Contact Us - PawTag Support',
+          metaDescription: 'Get in touch with the PawTag team. We\'re here to help with any questions about our pet recovery tags.',
+          metaKeywords: ['contact', 'support', 'help', 'PawTag', 'get in touch'],
+          sections: [
+            {
+              sectionId: 'contact-form',
+              type: 'contact_form',
+              title: 'Contact Page',
+              content: {
+                heading: 'Contact Us',
+                subtitle: "Have a question or need help? We'd love to hear from you.",
+                businessHours: 'Mon-Fri: 9am - 5pm NZST',
+                formTitle: 'Send us a message',
+                formButtonText: 'Send Message',
+                formSuccessMessage: "Thank you! We'll be in touch soon.",
+              },
+              visible: true,
+              order: 0,
+              status: 'published',
+            },
+          ],
+          status: 'published',
+          createdBy: adminId,
+          updatedBy: adminId,
+        }], { session });
+        console.log('  Created Contact page');
+      } else {
+        console.log('  Contact page already exists');
       }
       console.log('');
 

@@ -1,17 +1,19 @@
 import { UserPlus, Tag, Scan, Home } from 'lucide-react';
-import { useHomepageSections } from '../hooks/useCms';
+import { useHomepageSections, useSiteSettings } from '../hooks/useCms';
 
 const iconMap: Record<string, typeof UserPlus> = { UserPlus, Tag, Scan, Home };
 
-const defaultSteps = [
-  { num: 1, icon: 'UserPlus', title: 'Register Your Pet', desc: "Create a secure profile with your pet's name, photo, medical needs, and your contact details.", iconBg: 'bg-primary-600' },
-  { num: 2, icon: 'Tag', title: 'Attach Your PawTag', desc: "Clip the durable QR tag onto your pet's collar. It's waterproof, scratch-resistant, and built to last.", iconBg: 'bg-amber-500' },
-  { num: 3, icon: 'Scan', title: 'A Finder Scans', desc: "Anyone with a smartphone can scan the QR code — no app needed. They instantly see your pet's profile.", iconBg: 'bg-sky-500' },
-  { num: 4, icon: 'Home', title: 'Get Your Pet Home', desc: 'The finder contacts you directly, and you get an instant notification with their location. Reunion in minutes.', iconBg: 'bg-rose-500' },
-];
-
 export default function HowItWorks() {
   const { sections } = useHomepageSections('how_it_works');
+  const { settings } = useSiteSettings();
+  const companyName = settings?.['company.name'] || 'PawTag';
+
+  const defaultSteps = [
+    { num: 1, icon: 'UserPlus', title: 'Register Your Pet', desc: "Create a secure profile with your pet's name, photo, medical needs, and your contact details.", iconBg: 'bg-primary-600' },
+    { num: 2, icon: 'Tag', title: `Attach Your ${companyName}`, desc: "Clip the durable QR tag onto your pet's collar. It's waterproof, scratch-resistant, and built to last.", iconBg: 'bg-amber-500' },
+    { num: 3, icon: 'Scan', title: 'A Finder Scans', desc: "Anyone with a smartphone can scan the QR code — no app needed. They instantly see your pet's profile.", iconBg: 'bg-sky-500' },
+    { num: 4, icon: 'Home', title: 'Get Your Pet Home', desc: 'The finder contacts you directly, and you get an instant notification with their location. Reunion in minutes.', iconBg: 'bg-rose-500' },
+  ];
 
   const steps = sections.length > 0
     ? sections.map((s, i) => {
@@ -37,7 +39,7 @@ export default function HowItWorks() {
             From lost to home in four simple steps
           </h2>
           <p className="text-gray-500 text-lg max-w-2xl mx-auto">
-            PawTag makes reunions fast and stress-free. Here's how it works.
+            {companyName} makes reunions fast and stress-free. Here's how it works.
           </p>
         </div>
 

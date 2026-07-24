@@ -2,6 +2,7 @@ import { ReactNode, useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { PawPrint, LogOut, User, ShoppingBag, Bell, Settings, ChevronRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useSiteSettings } from '../hooks/useCms';
 import api from '../lib/api';
 
 const NAV_ITEMS = [
@@ -32,13 +33,16 @@ export default function AccountLayout({ children }: { children: ReactNode }) {
 
   const currentLabel = NAV_ITEMS.find((n) => isActive(n.path))?.label || 'Account';
 
+  const { settings } = useSiteSettings();
+  const companyName = settings?.['company.name'] || 'PawTag';
+
   return (
     <div className="min-h-screen bg-gray-50 flex">
       <div className="w-64 bg-white border-r border-gray-200 min-h-screen flex flex-col sticky top-16">
         <div className="p-4 border-b border-gray-100">
           <div className="flex items-center gap-2">
             <PawPrint size={24} className="text-teal-600" />
-            <span className="font-bold text-lg text-gray-900">My PawTag</span>
+            <span className="font-bold text-lg text-gray-900">My {companyName}</span>
           </div>
         </div>
         <nav className="flex-1 p-3 space-y-1">

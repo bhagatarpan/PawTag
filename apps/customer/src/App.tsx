@@ -3,6 +3,7 @@ import { useState, useEffect, FormEvent, createContext, useContext, ReactNode, u
 import api from './lib/api';
 import { PawPrint, LogOut, Plus, AlertTriangle, CheckCircle, Camera, Star, X, Edit2, Save, Upload, ShieldAlert, ShieldCheck, User, ShoppingBag, Bell, Settings, ChevronRight, Mail, Phone, MapPin, Lock, Clock, Skull, EyeOff, Activity } from 'lucide-react';
 import HealthRecords from './pages/HealthRecords';
+import { useSiteSettings } from './hooks/useSiteSettings';
 
 // --- Pet attribute options (mirrors shared/src/constants.ts) ---
 const PET_TYPES = ['Dog', 'Cat', 'Rabbit', 'Hamster', 'Guinea Pig', 'Bird'] as const;
@@ -256,6 +257,8 @@ const NAV_ITEMS = [
 function Sidebar() {
   const { user, logout } = useAuth();
   const location = useLocation();
+  const { settings } = useSiteSettings();
+  const companyName = settings?.['company.name'] || 'PawTag';
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
@@ -269,7 +272,7 @@ function Sidebar() {
   return (
     <div className="w-64 bg-white border-r min-h-screen flex flex-col">
       <div className="p-4 border-b">
-        <div className="flex items-center gap-2"><PawPrint size={24} className="text-primary-600" /><span className="font-bold text-lg">My PawTag</span></div>
+        <div className="flex items-center gap-2"><PawPrint size={24} className="text-primary-600" /><span className="font-bold text-lg">My {companyName}</span></div>
       </div>
       <nav className="flex-1 p-3 space-y-1">
         {NAV_ITEMS.map(({ path, label, icon: Icon }) => {

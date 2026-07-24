@@ -179,6 +179,13 @@ export const updateUserStatusSchema = z.object({
   status: z.enum(['active', 'inactive', 'suspended', 'pending_verification']),
 });
 
+export const updateUserSchema = z.object({
+  fullName: z.string().min(1).optional(),
+  email: z.string().email().optional(),
+  phoneNumber: z.string().optional(),
+  responsibilityScore: z.number().min(0).max(10).optional(),
+});
+
 // --- Tag Schemas ---
 export const createTagSchema = z.object({
   petId: z.string().min(1, 'Pet ID is required'),

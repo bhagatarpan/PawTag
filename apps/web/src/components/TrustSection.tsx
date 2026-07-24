@@ -1,5 +1,5 @@
 import { ShieldCheck, Lock, Eye, RotateCcw } from 'lucide-react';
-import { useHomepageSections } from '../hooks/useCms';
+import { useHomepageSections, useSiteSettings } from '../hooks/useCms';
 
 const iconMap: Record<string, typeof ShieldCheck> = { ShieldCheck, Lock, Eye, RotateCcw };
 
@@ -12,6 +12,8 @@ const defaultBadges = [
 
 export default function TrustSection() {
   const { sections } = useHomepageSections('trust');
+  const { settings } = useSiteSettings();
+  const companyName = settings?.['company.name'] || 'PawTag';
 
   const badges = sections.length > 0
     ? sections.map((s) => {
@@ -36,7 +38,7 @@ export default function TrustSection() {
             Your pet's safety is our priority
           </h2>
           <p className="text-gray-500 text-lg max-w-2xl mx-auto">
-            PawTag is built on a foundation of security, privacy, and reliability.
+            {companyName} is built on a foundation of security, privacy, and reliability.
           </p>
         </div>
 

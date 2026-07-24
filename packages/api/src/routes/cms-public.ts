@@ -116,9 +116,8 @@ const PUBLIC_SETTING_KEYS = [
   'seo.defaultTitle',
   'seo.defaultDescription',
   'seo.defaultKeywords',
-  'contact.email',
-  'contact.phone',
-  'contact.address',
+  'contact.businessHours',
+  'contact.businessHoliday',
 ];
 
 router.get('/settings', async (_req: Request, res: Response) => {
