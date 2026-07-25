@@ -18,6 +18,7 @@ import {
   createTagSchema,
   updateTagSchema,
 } from '../middleware/schemas';
+import { sendPasswordChangedEmail } from '../services/email.service';
 import {
   User,
   Pet,
@@ -528,6 +529,11 @@ router.post('/users/:id/reset-password', requirePermission('user.reset_password'
       entity: 'User',
       entityId: req.params.id,
       changes: { note: 'Admin reset password' },
+    });
+
+    const clientInfo = { ipAddress: req.ip || req.connection?.remoteAddress, userAgent: req.headers['user-agent'] };
+    sendPasswordChangedEmail(user.email, user.fullName, req.user!.id, clientInfo.ipAddress).catch((err) => {
+      console.error('Failed to send password changed email:', err);
     });
 
     res.json({ success: true, data: { message: 'Password reset successfully' } });

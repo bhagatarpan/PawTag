@@ -1,4 +1,5 @@
 import { useState, FormEvent } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 
 export default function Login() {
@@ -53,6 +54,11 @@ export default function Login() {
               className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               required
             />
+            <div className="mt-1 text-right">
+              <Link to="/forgot-password" className="text-xs text-primary-600 hover:text-primary-700">
+                Forgot password?
+              </Link>
+            </div>
           </div>
           <button
             type="submit"

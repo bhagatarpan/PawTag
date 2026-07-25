@@ -3,6 +3,7 @@ import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { PawPrint, Lock, Eye, EyeOff, CheckCircle2, Loader2, ArrowLeft } from 'lucide-react';
 import api from '../lib/api';
 import { useAuthPage } from '../hooks/useCms';
+import { validatePassword } from '@pawtag/shared';
 
 export default function ResetPassword() {
   const [searchParams] = useSearchParams();
@@ -41,8 +42,9 @@ export default function ResetPassword() {
       return;
     }
 
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters.');
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.valid) {
+      setError(passwordValidation.error!);
       return;
     }
 

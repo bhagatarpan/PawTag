@@ -2,6 +2,21 @@
 // PawTag Pet Constants — Selection options for pet attributes
 // ============================================================
 
+// --- Password Validation ---
+export const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).+$/;
+export const PASSWORD_MIN_LENGTH = 8;
+export const PASSWORD_ERROR_MESSAGE = 'Password must contain at least 8 characters with one uppercase letter, one lowercase letter, one number, and one special character';
+
+export function validatePassword(password: string): { valid: boolean; error?: string } {
+  if (password.length < PASSWORD_MIN_LENGTH) {
+    return { valid: false, error: `Password must be at least ${PASSWORD_MIN_LENGTH} characters` };
+  }
+  if (!PASSWORD_REGEX.test(password)) {
+    return { valid: false, error: PASSWORD_ERROR_MESSAGE };
+  }
+  return { valid: true };
+}
+
 // --- Pet Types ---
 export const PET_TYPES = [
   'Dog',

@@ -1,8 +1,11 @@
 import { z } from 'zod';
 
+const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).+$/;
+const passwordComplexityMessage = 'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character';
+
 export const registerSchema = z.object({
   email: z.string().email('Invalid email address'),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
+  password: z.string().min(8, 'Password must be at least 8 characters').regex(passwordRegex, passwordComplexityMessage),
   confirmPassword: z.string().min(1, 'Please confirm your password'),
   fullName: z.string().min(2, 'Full name is required'),
   phoneNumber: z.string().min(1, 'Phone number is required'),
@@ -43,11 +46,20 @@ export const verificationStatusSchema = z.object({
 
 export const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, 'Current password is required'),
-  newPassword: z.string().min(8, 'New password must be at least 8 characters'),
+  newPassword: z.string().min(8, 'New password must be at least 8 characters').regex(passwordRegex, passwordComplexityMessage),
 });
 
 export const adminResetPasswordSchema = z.object({
-  newPassword: z.string().min(8, 'Password must be at least 8 characters'),
+  newPassword: z.string().min(8, 'Password must be at least 8 characters').regex(passwordRegex, passwordComplexityMessage),
+});
+
+export const forgotPasswordSchema = z.object({
+  email: z.string().email('Invalid email address'),
+});
+
+export const resetPasswordSchema = z.object({
+  token: z.string().min(1, 'Reset token is required'),
+  newPassword: z.string().min(8, 'Password must be at least 8 characters').regex(passwordRegex, passwordComplexityMessage),
 });
 
 export const updateProfileSchema = z.object({

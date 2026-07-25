@@ -53,11 +53,17 @@ export function normalizeEmail(email: string): string {
 }
 
 export function normalizePhone(phone: string): string {
-  let normalized = phone.replace(/[\s\-()]/g, '');
+  let normalized = phone.replace(/[\s\-().]/g, '');
+
   if (normalized.startsWith('00')) normalized = '+' + normalized.slice(2);
-  if (normalized.startsWith('0') && !normalized.startsWith('+')) {
-    normalized = '+64' + normalized.slice(1);
+
+  if (!normalized.startsWith('+')) {
+    if (normalized.startsWith('0')) {
+      normalized = '+64' + normalized.slice(1);
+    } else {
+      normalized = '+' + normalized;
+    }
   }
-  if (!normalized.startsWith('+')) normalized = '+' + normalized;
+
   return normalized;
 }

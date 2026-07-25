@@ -11,6 +11,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@pawtag/shared": "workspace:*",
     "@monaco-editor/react": "^4.7.0",
     "@puckeditor/core": "^0.22.2",
     "@tiptap/extension-code-block-lowlight": "^3.28.0",

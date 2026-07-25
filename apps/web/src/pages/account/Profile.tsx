@@ -3,6 +3,7 @@ import { User, MapPin, Phone, Lock, Save } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../lib/api';
 import SaveToast from '../../components/SaveToast';
+import { validatePassword } from '@pawtag/shared';
 
 export default function Profile() {
   const { user, refreshUser } = useAuth();
@@ -98,7 +99,8 @@ function ChangePasswordForm() {
   const handleChangePassword = async (e: FormEvent) => {
     e.preventDefault(); setError('');
     if (newPassword !== confirmPassword) { setError('New passwords do not match'); return; }
-    if (newPassword.length < 8) { setError('Password must be at least 8 characters'); return; }
+    const passwordValidation = validatePassword(newPassword);
+    if (!passwordValidation.valid) { setError(passwordValidation.error!); return; }
     setSaving(true);
     try { await api.post('/auth/change-password', { currentPassword, newPassword }); setShowSaved(true); setCurrentPassword(''); setNewPassword(''); setConfirmPassword(''); }
     catch (err: any) { setError(err.response?.data?.error || 'Failed to change password'); }

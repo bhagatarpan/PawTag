@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, FormEvent } from 'react';
 import api from '../lib/api';
+import { validatePassword } from '@pawtag/shared';
 
 interface Setting {
   _id: string;
@@ -230,6 +231,59 @@ export default function Settings() {
           </div>
         )}
       </div>
+
+      {/* Change Password Section */}
+      <ChangePasswordSection />
     </div>
+  );
+}
+
+function ChangePasswordSection() {
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState('');
+  const [error, setError] = useState('');
+
+  const handleChangePassword = async (e: FormEvent) => {
+    e.preventDefault();
+    setMsg(''); setError('');
+    if (newPassword !== confirmPassword) { setError('New passwords do not match'); return; }
+    const passwordValidation = validatePassword(newPassword);
+    if (!passwordValidation.valid) { setError(passwordValidation.error!); return; }
+    setSaving(true);
+    try {
+      await api.post('/auth/change-password', { currentPassword, newPassword });
+      setMsg('Password changed successfully');
+      setCurrentPassword(''); setNewPassword(''); setConfirmPassword('');
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to change password');
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <form onSubmit={handleChangePassword} className="bg-white rounded-lg border p-6 space-y-4 mt-6">
+      <h2 className="text-lg font-semibold">Change Password</h2>
+      {msg && <div className="bg-green-50 text-green-700 text-sm p-3 rounded">{msg}</div>}
+      {error && <div className="bg-red-50 text-red-600 text-sm p-3 rounded">{error}</div>}
+      <div className="grid grid-cols-1 gap-4 max-w-md">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Current Password</label>
+          <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" required />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
+          <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" required minLength={8} />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Confirm New Password</label>
+          <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" required minLength={8} />
+        </div>
+      </div>
+      <button type="submit" disabled={saving} className="bg-primary-600 text-white px-6 py-2.5 rounded-md text-sm font-medium hover:bg-primary-700 disabled:opacity-50">
+        {saving ? 'Changing...' : 'Change Password'}
+      </button>
+    </form>
   );
 }

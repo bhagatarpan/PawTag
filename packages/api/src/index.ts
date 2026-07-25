@@ -55,16 +55,18 @@ app.use(morgan('dev'));
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 1000,
+  max: parseInt(process.env.RATE_LIMIT_MAX || '1000', 10),
   message: { success: false, error: 'Too many requests, please try again later' },
+  skip: () => process.env.NODE_ENV === 'test',
 });
 app.use('/api', limiter);
 
 // Stricter rate limit for auth routes
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 20,
+  max: parseInt(process.env.AUTH_RATE_LIMIT_MAX || '20', 10),
   message: { success: false, error: 'Too many auth attempts, please try again later' },
+  skip: () => process.env.NODE_ENV === 'test',
 });
 app.use('/api/auth', authLimiter);
 

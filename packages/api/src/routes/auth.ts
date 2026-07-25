@@ -11,6 +11,8 @@ import {
   resendPhoneOtpSchema,
   updateProfileSchema,
   changePasswordSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
 } from '../middleware/schemas';
 import {
   hashPassword,
@@ -22,7 +24,7 @@ import {
   normalizeEmail,
   normalizePhone,
 } from '../services/auth.service';
-import { sendVerificationEmail, sendPasswordResetEmail, sendWelcomeEmail } from '../services/email.service';
+import { sendVerificationEmail, sendPasswordResetEmail, sendPasswordChangedEmail, sendWelcomeEmail } from '../services/email.service';
 import { sendPhoneOtpSMS } from '../services/sms.service';
 import { User, Role, UserRole, VerificationToken, AuditLog } from '@pawtag/db';
 import { config } from '../config';
@@ -49,7 +51,7 @@ router.post('/register', validate(registerSchema), async (req, res: Response) =>
     const email = normalizeEmail(rawEmail);
     const phoneNumber = normalizePhone(rawPhone);
 
-    const existing = await User.findOne({ $or: [{ email }, { phoneNumber }] });
+    const existing = await User.findOne({ $or: [{ email }, { phoneNumber }], deletedAt: null });
     if (existing) {
       res.status(400).json({ success: false, error: 'An account with this email or phone number already exists' });
       return;
@@ -127,7 +129,7 @@ router.post('/login', validate(loginSchema), async (req, res: Response) => {
     const { email: rawEmail, password } = req.body;
     const email = normalizeEmail(rawEmail);
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email, deletedAt: null });
     if (!user) {
       res.status(401).json({ success: false, error: 'Invalid credentials' });
       return;
@@ -278,7 +280,7 @@ router.post('/resend-email-verification', validate(resendEmailVerificationSchema
     const { email: rawEmail } = req.body;
     const email = normalizeEmail(rawEmail);
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email, deletedAt: null });
     if (!user) {
       res.json({ success: true, data: { message: 'If an account exists, a verification email has been sent.' } });
       return;
@@ -358,7 +360,7 @@ router.post('/send-phone-otp', validate(sendPhoneOtpSchema), async (req, res: Re
     const { phoneNumber: rawPhone } = req.body;
     const phoneNumber = normalizePhone(rawPhone);
 
-    const user = await User.findOne({ phoneNumber });
+    const user = await User.findOne({ phoneNumber, deletedAt: null });
     if (!user) {
       res.json({ success: true, data: { message: 'If an account exists, an OTP has been sent.' } });
       return;
@@ -460,7 +462,7 @@ router.post('/verify-phone', validate(verifyPhoneSchema), async (req: AuthReques
         return;
       }
       const phoneNumber = normalizePhone(rawPhone);
-      const user = await User.findOne({ phoneNumber });
+      const user = await User.findOne({ phoneNumber, deletedAt: null });
       if (!user) {
         res.status(401).json({ success: false, error: 'Authentication required' });
         return;
@@ -574,7 +576,7 @@ router.post('/resend-phone-otp', validate(resendPhoneOtpSchema), async (req, res
     const { phoneNumber: rawPhone } = req.body;
     const phoneNumber = normalizePhone(rawPhone);
 
-    const user = await User.findOne({ phoneNumber });
+    const user = await User.findOne({ phoneNumber, deletedAt: null });
     if (!user) {
       res.json({ success: true, data: { message: 'If an account exists, an OTP has been sent.' } });
       return;
@@ -655,7 +657,7 @@ router.get('/verification-status', async (req: AuthRequest, res: Response) => {
     let userId = req.user?.id;
 
     if (!userId && req.query.email) {
-      const user = await User.findOne({ email: req.query.email as string });
+      const user = await User.findOne({ email: req.query.email as string, deletedAt: null });
       if (user) userId = user._id.toString();
     }
 
@@ -696,12 +698,12 @@ router.get('/verification-status', async (req: AuthRequest, res: Response) => {
   }
 });
 
-router.post('/forgot-password', async (req, res: Response) => {
+router.post('/forgot-password', validate(forgotPasswordSchema), async (req, res: Response) => {
   try {
     const { email: rawEmail } = req.body;
     const email = normalizeEmail(rawEmail);
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email, deletedAt: null });
     if (!user) {
       res.json({ success: true, data: { message: 'If an account exists, a reset email has been sent.' } });
       return;
@@ -744,19 +746,9 @@ router.post('/forgot-password', async (req, res: Response) => {
   }
 });
 
-router.post('/reset-password', async (req, res: Response) => {
+router.post('/reset-password', validate(resetPasswordSchema), async (req, res: Response) => {
   try {
     const { token, newPassword } = req.body;
-
-    if (!token || typeof token !== 'string') {
-      res.status(400).json({ success: false, error: 'Invalid reset token.' });
-      return;
-    }
-
-    if (!newPassword || typeof newPassword !== 'string' || newPassword.length < 8) {
-      res.status(400).json({ success: false, error: 'New password must be at least 8 characters.' });
-      return;
-    }
 
     const tokenHash = hashToken(token);
     const verificationToken = await VerificationToken.findOne({
@@ -795,6 +787,10 @@ router.post('/reset-password', async (req, res: Response) => {
       entityId: user._id.toString(),
       ipAddress: clientInfo.ipAddress,
       userAgent: clientInfo.userAgent,
+    });
+
+    sendPasswordChangedEmail(user.email, user.fullName, 'self', clientInfo.ipAddress).catch((err) => {
+      console.error('Failed to send password changed email:', err);
     });
 
     res.json({ success: true, data: { message: 'Password has been reset successfully. You can now log in.' } });
@@ -848,6 +844,12 @@ router.post('/change-password', authenticate, validate(changePasswordSchema), as
 
     user.passwordHash = await hashPassword(newPassword);
     await user.save();
+
+    const clientInfo = getClientInfo(req);
+    sendPasswordChangedEmail(user.email, user.fullName, 'self', clientInfo.ipAddress).catch((err) => {
+      console.error('Failed to send password changed email:', err);
+    });
+
     res.json({ success: true, data: { message: 'Password changed successfully' } });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to change password' });

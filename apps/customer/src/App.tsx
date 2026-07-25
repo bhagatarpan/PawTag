@@ -4,6 +4,7 @@ import api from './lib/api';
 import { PawPrint, LogOut, Plus, AlertTriangle, CheckCircle, Camera, Star, X, Edit2, Save, Upload, ShieldAlert, ShieldCheck, User, ShoppingBag, Bell, Settings, ChevronRight, Mail, Phone, MapPin, Lock, Clock, Skull, EyeOff, Activity } from 'lucide-react';
 import HealthRecords from './pages/HealthRecords';
 import { useSiteSettings } from './hooks/useSiteSettings';
+import { validatePassword } from '@pawtag/shared';
 
 // --- Pet attribute options (mirrors shared/src/constants.ts) ---
 const PET_TYPES = ['Dog', 'Cat', 'Rabbit', 'Hamster', 'Guinea Pig', 'Bird'] as const;
@@ -210,8 +211,9 @@ function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
   const login = async (email: string, password: string) => {
     const res = await api.post('/auth/login', { email, password });
-    localStorage.setItem('customer_token', res.data.data.token);
-    setUser(res.data.data.user);
+    const { token: newToken, user: userData } = res.data.data;
+    localStorage.setItem('customer_token', newToken);
+    setUser(userData);
     nav('/');
   };
   const logout = () => { localStorage.removeItem('customer_token'); setUser(null); nav('/login'); };
@@ -235,7 +237,21 @@ function Login() {
           <p className="text-sm text-gray-500 mt-1">Sign in to manage your pets</p>
         </div>
         {error && <div className="bg-red-50 text-red-600 text-sm p-3 rounded mb-4">{error}</div>}
-        <form onSubmit={async (e: FormEvent) => { e.preventDefault(); setError(''); try { await login(email, password); } catch (err: any) { setError(err.response?.data?.error || 'Login failed'); } }} className="space-y-4">
+        <form onSubmit={async (e: FormEvent) => { e.preventDefault(); setError(''); try { await login(email, password); } catch (err: any) {
+          const data = err.response?.data;
+          if (data?.code === 'REQUIRES_VERIFICATION') {
+            const missing = [];
+            if (data.data && !data.data.emailVerified) missing.push('email');
+            if (data.data && !data.data.phoneVerified) missing.push('phone');
+            const msg = missing.length > 0
+              ? `Please verify your ${missing.join(' and ')} to activate your account.`
+              : 'Please verify your email and phone number to activate your account.';
+            setError(msg + ' You will be redirected to the verification page.');
+            setTimeout(() => { window.location.href = `${window.location.origin}/../verify-account?email=${encodeURIComponent(data.data?.email || email)}`; }, 3000);
+          } else {
+            setError(err.response?.data?.error || 'Login failed');
+          }
+        } }} className="space-y-4">
           <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" required />
           <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" required />
           <button type="submit" className="w-full bg-primary-600 text-white py-2 rounded-md text-sm font-medium hover:bg-primary-700">Sign In</button>
@@ -664,7 +680,8 @@ function ChangePasswordForm() {
     e.preventDefault();
     setMsg(''); setError('');
     if (newPassword !== confirmPassword) { setError('New passwords do not match'); return; }
-    if (newPassword.length < 8) { setError('Password must be at least 8 characters'); return; }
+    const passwordValidation = validatePassword(newPassword);
+    if (!passwordValidation.valid) { setError(passwordValidation.error!); return; }
     setSaving(true);
     try {
       await api.post('/auth/change-password', { currentPassword, newPassword });

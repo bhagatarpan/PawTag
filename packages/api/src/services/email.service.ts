@@ -5,6 +5,7 @@ import {
   renderVerificationEmail,
   renderWelcomeEmail,
   renderPasswordResetEmail,
+  renderPasswordChangedEmail,
   renderOrderConfirmationEmail,
   renderShippingNotificationEmail,
   renderPetFoundEmail,
@@ -148,6 +149,19 @@ export async function sendPasswordResetEmail(
   if (cms) return sendMail(to, cms.subject, cms.html, cms.from);
   const html = renderPasswordResetEmail({ name, resetUrl });
   return sendMail(to, 'Reset your password — PawTag', html);
+}
+
+export async function sendPasswordChangedEmail(
+  to: string,
+  name: string,
+  changedBy: 'self' | string,
+  ipAddress?: string,
+): Promise<EmailResult> {
+  const vars = { name, changedBy, ipAddress: ipAddress || '' };
+  const cms = await renderCmsEmail('password-changed', vars);
+  if (cms) return sendMail(to, cms.subject, cms.html, cms.from);
+  const html = renderPasswordChangedEmail({ name, changedBy, ipAddress });
+  return sendMail(to, 'Your password has been changed — PawTag', html);
 }
 
 export async function sendPetFoundEmail(

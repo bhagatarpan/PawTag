@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { PawPrint, Mail, Lock, User, Phone, Eye, EyeOff, CheckCircle } from 'lucide-react';
 import api from '../lib/api';
 import { useAuthPage } from '../hooks/useCms';
+import { validatePassword } from '@pawtag/shared';
 
 export default function Register() {
   const [form, setForm] = useState({ fullName: '', email: '', phoneNumber: '', password: '', confirmPassword: '', acceptTerms: false });
@@ -21,8 +22,9 @@ export default function Register() {
       setError('Passwords do not match');
       return;
     }
-    if (form.password.length < 8) {
-      setError('Password must be at least 8 characters');
+    const passwordValidation = validatePassword(form.password);
+    if (!passwordValidation.valid) {
+      setError(passwordValidation.error!);
       return;
     }
     if (!form.acceptTerms) {

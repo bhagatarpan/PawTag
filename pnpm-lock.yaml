@@ -83,6 +83,9 @@ importers:
       '@monaco-editor/react':
         specifier: ^4.7.0
         version: 4.7.0(monaco-editor@0.56.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      '@pawtag/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@puckeditor/core':
         specifier: ^0.22.2
         version: 0.22.2(@floating-ui/dom@1.8.0)(@types/react-dom@18.3.7(@types/react@18.3.31))(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(use-sync-external-store@1.6.0(react@18.3.1))
@@ -180,6 +183,9 @@ importers:
 
   apps/customer:
     dependencies:
+      '@pawtag/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       axios:
         specifier: ^1.7.0
         version: 1.18.1(debug@4.4.3)
@@ -266,6 +272,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@pawtag/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@puckeditor/core':
         specifier: ^0.22.2
         version: 0.22.2(@floating-ui/dom@1.8.0)(@types/react-dom@18.3.7(@types/react@18.3.31))(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(use-sync-external-store@1.6.0(react@18.3.1))
