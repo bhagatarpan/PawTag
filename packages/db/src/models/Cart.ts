@@ -1,4 +1,4 @@
-import mongoose, { Schema, Document } from 'mongoose';
+import mongoose, { Schema } from 'mongoose';
 
 export interface ICartItem {
   productId: mongoose.Types.ObjectId;
@@ -12,9 +12,9 @@ export interface ICartItem {
   image?: string;
 }
 
-export interface ICartDocument extends Document {
+export interface ICartDocument extends mongoose.Document {
   userId: mongoose.Types.ObjectId;
-  items: (ICartItem & Document)[];
+  items: mongoose.Types.DocumentArray<ICartItem>;
   updatedAt: Date;
 }
 

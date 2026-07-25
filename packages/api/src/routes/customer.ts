@@ -3,7 +3,7 @@ import { AuthRequest, authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
 import { validate } from '../middleware/validation';
 import { createPetSchema, updatePetSchema } from '../middleware/schemas';
-import { Pet, Tag, Order, LocationEvent, Notification, FinderScan, User, generatePetId } from '@pawtag/db';
+import { Pet, Tag, Order, LocationEvent, Notification, FinderScan, User, generatePetId, Cart, Product } from '@pawtag/db';
 
 const router = Router();
 router.use(authenticate);
@@ -447,7 +447,6 @@ router.get('/pets/:id/locations', requirePermission('pet.read'), async (req: Aut
 
 router.get('/cart', requirePermission('order.create'), async (req: AuthRequest, res: Response) => {
   try {
-    const { Cart } = require('@pawtag/db');
     let cart = await Cart.findOne({ userId: req.user!.id });
     if (!cart) {
       cart = await Cart.create({ userId: req.user!.id, items: [] });
@@ -460,7 +459,6 @@ router.get('/cart', requirePermission('order.create'), async (req: AuthRequest, 
 
 router.post('/cart/items', requirePermission('order.create'), async (req: AuthRequest, res: Response) => {
   try {
-    const { Cart, Product } = require('@pawtag/db');
     const { productId, quantity = 1, variantName, petName } = req.body;
 
     const product = await Product.findById(productId);
@@ -520,7 +518,6 @@ router.post('/cart/items', requirePermission('order.create'), async (req: AuthRe
 
 router.put('/cart/items/:itemId', requirePermission('order.create'), async (req: AuthRequest, res: Response) => {
   try {
-    const { Cart } = require('@pawtag/db');
     const { quantity } = req.body;
     const cart = await Cart.findOne({ userId: req.user!.id });
     if (!cart) { res.status(404).json({ success: false, error: 'Cart not found' }); return; }
