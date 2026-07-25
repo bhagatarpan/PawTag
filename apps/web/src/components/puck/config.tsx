@@ -256,21 +256,44 @@ export const pawtagConfig: Config<PawtagComponents> = {
         },
       },
       defaultProps: { heading: 'FAQ', items: [] },
-      render: ({ heading, items }) => (
-        <section className="py-12 px-6 max-w-3xl mx-auto">
-          <h2 className="text-3xl font-bold text-center mb-8">{heading || 'FAQ'}</h2>
-          <div className="space-y-3">
-            {(items || []).map((item, i) => (
-              <div key={i} className="border border-gray-200 rounded-xl overflow-hidden">
-                <div className="p-5">
-                  <h3 className="font-semibold text-gray-900">{item.question}</h3>
-                  <p className="text-gray-600 text-sm mt-2">{item.answer}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      ),
+      render: ({ heading, items }) => {
+        const [openIndex, setOpenIndex] = useState<number | null>(null);
+        return (
+          <section className="py-12 px-6 max-w-3xl mx-auto">
+            <h2 className="text-3xl font-bold text-center mb-8">{heading || 'FAQ'}</h2>
+            <div className="space-y-3">
+              {(items || []).map((item, i) => {
+                const isOpen = openIndex === i;
+                return (
+                  <div key={i} className="border border-gray-200 rounded-xl overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => setOpenIndex(isOpen ? null : i)}
+                      className="w-full flex items-center justify-between p-5 text-left hover:bg-gray-50 transition-colors"
+                    >
+                      <h3 className="font-semibold text-gray-900 pr-4">{item.question}</h3>
+                      <svg
+                        className={`w-5 h-5 text-gray-500 flex-shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                    {isOpen && (
+                      <div className="px-5 pb-5">
+                        <p className="text-gray-600 text-sm leading-relaxed">{item.answer}</p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        );
+      },
     },
 
     ContactForm: {

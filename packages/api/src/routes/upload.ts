@@ -17,9 +17,7 @@ const storage = multer.diskStorage({
     cb(null, uploadDir);
   },
   filename: (_req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    const ext = path.extname(file.originalname).toLowerCase();
-    cb(null, `pet-${uniqueSuffix}${ext}`);
+    cb(null, file.originalname);
   },
 });
 
@@ -33,9 +31,7 @@ const productStorage = multer.diskStorage({
     cb(null, uploadDir);
   },
   filename: (_req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    const ext = path.extname(file.originalname).toLowerCase();
-    cb(null, `product-${uniqueSuffix}${ext}`);
+    cb(null, file.originalname);
   },
 });
 
