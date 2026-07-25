@@ -3,6 +3,7 @@ import { renderBase, renderCtaButton, renderInfoBox, renderDivider } from '../..
 import { renderVerificationEmail } from '../../packages/api/src/services/email/templates/verification-email';
 import { renderWelcomeEmail } from '../../packages/api/src/services/email/templates/welcome';
 import { renderPasswordResetEmail } from '../../packages/api/src/services/email/templates/password-reset';
+import { renderPasswordChangedEmail } from '../../packages/api/src/services/email/templates/password-changed';
 import { renderPetFoundEmail } from '../../packages/api/src/services/email/templates/pet-found';
 import { renderAccountStatusEmail } from '../../packages/api/src/services/email/templates/account-status';
 
@@ -117,5 +118,39 @@ describe('Account Status Email', () => {
   it('includes reason when provided', () => {
     const html = renderAccountStatusEmail({ name: 'Alice', status: 'active', reason: 'Reviewed by admin', viewDetailsUrl: 'https://app.com' });
     expect(html).toContain('Reviewed by admin');
+  });
+});
+
+describe('Password Changed Email', () => {
+  it('includes user name', () => {
+    const html = renderPasswordChangedEmail({ name: 'Bob', changedBy: 'self' });
+    expect(html).toContain('Bob');
+  });
+
+  it('includes "You" when changed by self', () => {
+    const html = renderPasswordChangedEmail({ name: 'Bob', changedBy: 'self' });
+    expect(html).toContain('You');
+  });
+
+  it('includes admin ID when changed by admin', () => {
+    const html = renderPasswordChangedEmail({ name: 'Bob', changedBy: 'admin-user-id-123' });
+    expect(html).toContain('admin-user-id-123');
+    expect(html).toContain('administrator');
+  });
+
+  it('includes IP address when provided', () => {
+    const html = renderPasswordChangedEmail({ name: 'Bob', changedBy: 'self', ipAddress: '192.168.1.1' });
+    expect(html).toContain('192.168.1.1');
+  });
+
+  it('includes support email for security concerns', () => {
+    const html = renderPasswordChangedEmail({ name: 'Bob', changedBy: 'self' });
+    expect(html).toContain('support@pawtag.co.nz');
+  });
+
+  it('is valid HTML', () => {
+    const html = renderPasswordChangedEmail({ name: 'Bob', changedBy: 'self' });
+    expect(html).toContain('<!DOCTYPE html>');
+    expect(html).toContain('PawTag');
   });
 });

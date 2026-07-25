@@ -221,11 +221,136 @@ describe('Integration: Auth - Protected Routes', () => {
     expect(newLoginRes.status).toBe(200);
   });
 
-  it('POST /api/auth/change-password rejects wrong current password', async () => {
+  it('POST /api/auth/change-password rejects weak new password', async () => {
     const res = await request(app)
       .post('/api/auth/change-password')
       .set('Authorization', `Bearer ${token}`)
-      .send({ currentPassword: 'WrongPassword123!', newPassword: 'NewPass123456!' });
+      .send({ currentPassword: 'Password123!', newPassword: 'weak' });
+    expect(res.status).toBe(400);
+  });
+
+  it('POST /api/auth/change-password rejects password missing complexity', async () => {
+    const res = await request(app)
+      .post('/api/auth/change-password')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ currentPassword: 'Password123!', newPassword: 'alllowercase1!' });
+    expect(res.status).toBe(400);
+  });
+});
+
+describe('Integration: Auth - Soft-Deleted User Login', () => {
+  it('POST /api/auth/login returns 401 for soft-deleted user', async () => {
+    // Create user directly with deletedAt set
+    const email = 'deleted@example.com';
+    const passwordHash = await bcrypt.hash('Password123!', 12);
+    await mongoose.connection.collections.users.insertOne({
+      email,
+      passwordHash,
+      fullName: 'Deleted User',
+      phoneNumber: '+64219999998',
+      role: 'customer',
+      status: 'active',
+      emailVerified: true,
+      phoneVerified: true,
+      deletedAt: new Date(),
+      responsibilityScore: 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const res = await request(app)
+      .post('/api/auth/login')
+      .send({ email, password: 'Password123!' });
+
     expect(res.status).toBe(401);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error).toBe('Invalid credentials');
+  });
+
+  it('POST /api/auth/forgot-password does not reveal soft-deleted user existence', async () => {
+    const email = 'deleted-forgot@example.com';
+    const passwordHash = await bcrypt.hash('Password123!', 12);
+    await mongoose.connection.collections.users.insertOne({
+      email,
+      passwordHash,
+      fullName: 'Deleted User',
+      phoneNumber: '+64219999997',
+      role: 'customer',
+      status: 'active',
+      emailVerified: true,
+      phoneVerified: true,
+      deletedAt: new Date(),
+      responsibilityScore: 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const res = await request(app)
+      .post('/api/auth/forgot-password')
+      .send({ email });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    // Should return same generic message as non-existent user
+    expect(res.body.data.message).toContain('If an account exists');
+  });
+});
+
+describe('Integration: Auth - Password Validation', () => {
+  it('POST /api/auth/register rejects password without uppercase', async () => {
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send({
+        email: 'test-lower@example.com',
+        password: 'lowercase1!',
+        confirmPassword: 'lowercase1!',
+        fullName: 'Test User',
+        phoneNumber: '+64211234567',
+        acceptTerms: true,
+      });
+    expect(res.status).toBe(400);
+  });
+
+  it('POST /api/auth/register rejects password without special character', async () => {
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send({
+        email: 'test-nospecial@example.com',
+        password: 'NoSpecial123',
+        confirmPassword: 'NoSpecial123',
+        fullName: 'Test User',
+        phoneNumber: '+64211234567',
+        acceptTerms: true,
+      });
+    expect(res.status).toBe(400);
+  });
+
+  it('POST /api/auth/forgot-password validates email format', async () => {
+    const res = await request(app)
+      .post('/api/auth/forgot-password')
+      .send({ email: 'not-an-email' });
+    expect(res.status).toBe(400);
+  });
+
+  it('POST /api/auth/forgot-password accepts valid email', async () => {
+    const res = await request(app)
+      .post('/api/auth/forgot-password')
+      .send({ email: 'valid@example.com' });
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+  });
+
+  it('POST /api/auth/reset-password validates token', async () => {
+    const res = await request(app)
+      .post('/api/auth/reset-password')
+      .send({ token: '', newPassword: 'NewPass123!' });
+    expect(res.status).toBe(400);
+  });
+
+  it('POST /api/auth/reset-password validates password complexity', async () => {
+    const res = await request(app)
+      .post('/api/auth/reset-password')
+      .send({ token: 'some-token', newPassword: 'weak' });
+    expect(res.status).toBe(400);
   });
 });

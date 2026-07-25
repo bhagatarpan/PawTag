@@ -170,5 +170,33 @@ describe('auth.service', () => {
     it('prepends + if no leading 0 or +', () => {
       expect(normalizePhone('64211234567')).toBe('+64211234567');
     });
+
+    it('handles international US number with +', () => {
+      expect(normalizePhone('+15551234567')).toBe('+15551234567');
+    });
+
+    it('handles international UK number with +', () => {
+      expect(normalizePhone('+447700900000')).toBe('+447700900000');
+    });
+
+    it('handles international number via 00 prefix', () => {
+      expect(normalizePhone('0015551234567')).toBe('+15551234567');
+    });
+
+    it('handles NZ landline 04 prefix', () => {
+      expect(normalizePhone('0412345678')).toBe('+64412345678');
+    });
+
+    it('handles NZ landline 09 prefix', () => {
+      expect(normalizePhone('0912345678')).toBe('+64912345678');
+    });
+
+    it('handles number with dots', () => {
+      expect(normalizePhone('021.123.4567')).toBe('+64211234567');
+    });
+
+    it('handles empty-like short number without 0 prefix', () => {
+      expect(normalizePhone('211234567')).toBe('+211234567');
+    });
   });
 });

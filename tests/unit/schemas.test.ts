@@ -12,13 +12,15 @@ import {
   createTagSchema,
   changePasswordSchema,
   updateProfileSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
 } from '../../packages/api/src/middleware/schemas';
 
 function validRegister() {
   return {
     email: 'test@example.com',
-    password: 'password123',
-    confirmPassword: 'password123',
+    password: 'Password123!',
+    confirmPassword: 'Password123!',
     fullName: 'John Doe',
     phoneNumber: '0211234567',
     acceptTerms: true as const,
@@ -83,6 +85,26 @@ describe('registerSchema', () => {
 
   it('fails with missing fullName', () => {
     const data = { ...validRegister(), fullName: '' };
+    expect(registerSchema.safeParse(data).success).toBe(false);
+  });
+
+  it('fails with password missing uppercase', () => {
+    const data = { ...validRegister(), password: 'password123!', confirmPassword: 'password123!' };
+    expect(registerSchema.safeParse(data).success).toBe(false);
+  });
+
+  it('fails with password missing lowercase', () => {
+    const data = { ...validRegister(), password: 'PASSWORD123!', confirmPassword: 'PASSWORD123!' };
+    expect(registerSchema.safeParse(data).success).toBe(false);
+  });
+
+  it('fails with password missing digit', () => {
+    const data = { ...validRegister(), password: 'PasswordWord!', confirmPassword: 'PasswordWord!' };
+    expect(registerSchema.safeParse(data).success).toBe(false);
+  });
+
+  it('fails with password missing special character', () => {
+    const data = { ...validRegister(), password: 'PasswordWord123', confirmPassword: 'PasswordWord123' };
     expect(registerSchema.safeParse(data).success).toBe(false);
   });
 });
@@ -258,17 +280,37 @@ describe('createTagSchema', () => {
 
 describe('changePasswordSchema', () => {
   it('passes with valid passwords', () => {
-    const data = { currentPassword: 'oldpass123', newPassword: 'newpass123' };
+    const data = { currentPassword: 'OldPass123!', newPassword: 'NewPass123!' };
     expect(changePasswordSchema.safeParse(data).success).toBe(true);
   });
 
   it('fails with short new password', () => {
-    const data = { currentPassword: 'oldpass123', newPassword: 'short' };
+    const data = { currentPassword: 'OldPass123!', newPassword: 'short' };
     expect(changePasswordSchema.safeParse(data).success).toBe(false);
   });
 
   it('fails with missing current password', () => {
-    const data = { currentPassword: '', newPassword: 'newpass123' };
+    const data = { currentPassword: '', newPassword: 'NewPass123!' };
+    expect(changePasswordSchema.safeParse(data).success).toBe(false);
+  });
+
+  it('fails with password missing uppercase', () => {
+    const data = { currentPassword: 'OldPass123!', newPassword: 'newpass123!' };
+    expect(changePasswordSchema.safeParse(data).success).toBe(false);
+  });
+
+  it('fails with password missing lowercase', () => {
+    const data = { currentPassword: 'OldPass123!', newPassword: 'NEWPASS123!' };
+    expect(changePasswordSchema.safeParse(data).success).toBe(false);
+  });
+
+  it('fails with password missing digit', () => {
+    const data = { currentPassword: 'OldPass123!', newPassword: 'NewPassWord!' };
+    expect(changePasswordSchema.safeParse(data).success).toBe(false);
+  });
+
+  it('fails with password missing special character', () => {
+    const data = { currentPassword: 'OldPass123!', newPassword: 'NewPassWord123' };
     expect(changePasswordSchema.safeParse(data).success).toBe(false);
   });
 });
@@ -294,5 +336,41 @@ describe('updateProfileSchema', () => {
 
   it('fails with invalid email', () => {
     expect(updateProfileSchema.safeParse({ email: 'bad' }).success).toBe(false);
+  });
+});
+
+describe('forgotPasswordSchema', () => {
+  it('passes with valid email', () => {
+    expect(forgotPasswordSchema.safeParse({ email: 'user@example.com' }).success).toBe(true);
+  });
+
+  it('fails with invalid email', () => {
+    expect(forgotPasswordSchema.safeParse({ email: 'not-an-email' }).success).toBe(false);
+  });
+
+  it('fails with missing email', () => {
+    expect(forgotPasswordSchema.safeParse({}).success).toBe(false);
+  });
+});
+
+describe('resetPasswordSchema', () => {
+  it('passes with valid token and password', () => {
+    const data = { token: 'valid-token-abc123', newPassword: 'NewPass123!' };
+    expect(resetPasswordSchema.safeParse(data).success).toBe(true);
+  });
+
+  it('fails with missing token', () => {
+    const data = { token: '', newPassword: 'NewPass123!' };
+    expect(resetPasswordSchema.safeParse(data).success).toBe(false);
+  });
+
+  it('fails with weak password', () => {
+    const data = { token: 'valid-token', newPassword: 'short' };
+    expect(resetPasswordSchema.safeParse(data).success).toBe(false);
+  });
+
+  it('fails with password missing complexity', () => {
+    const data = { token: 'valid-token', newPassword: 'alllowercase1!' };
+    expect(resetPasswordSchema.safeParse(data).success).toBe(false);
   });
 });
