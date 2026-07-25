@@ -17,6 +17,7 @@ interface FinderData {
     petType?: string;
     species: string;
     breed: string;
+    breedOrigin?: string;
     secondaryBreed?: string;
     color: string;
     pattern?: string;
@@ -146,10 +147,15 @@ function FinderPage() {
 
   const formatBreed = () => {
     if (!data) return '';
-    if (data.pet.breed === 'Mixed Breed' && data.pet.secondaryBreed) {
-      return `Mixed Breed (${data.pet.secondaryBreed})`;
+    const origin = data.pet.breedOrigin || 'Purebred';
+    const breed = data.pet.breed || '';
+    const secondary = data.pet.secondaryBreed || '';
+    if (origin === 'Unknown') return 'Unknown';
+    if ((origin === 'Mixed Breed' || origin === 'Designer Breed') && secondary && secondary !== 'Unknown') {
+      return `${origin === 'Designer Breed' ? 'Designer' : 'Mixed'} (${breed} × ${secondary})`;
     }
-    return data.pet.breed;
+    if (origin === 'Landrace') return `${breed} (Landrace)`;
+    return breed;
   };
 
   if (loading) {

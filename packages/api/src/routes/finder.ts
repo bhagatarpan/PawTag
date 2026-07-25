@@ -125,6 +125,7 @@ router.get('/:tagId', async (req: Request, res: Response) => {
           petId: pet.petId,
           species: pet.species,
           breed: pet.breed,
+          breedOrigin: pet.breedOrigin,
           secondaryBreed: pet.secondaryBreed,
           color: pet.color,
           pattern: pet.pattern,
