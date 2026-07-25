@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import api, { PaginatedData } from '../lib/api';
-import { Search, ChevronDown, ChevronUp, Trash2, Plus, Edit2, Save, X, Camera, Star, Upload } from 'lucide-react';
+import { Search, ChevronDown, ChevronUp, Trash2, Plus, Edit2, Save, X, Camera, Star, Upload, Info } from 'lucide-react';
+import { BREED_ORIGINS, getBreedsForOrigin, PET_BREEDS } from '@pawtag/shared';
+import type { PetType } from '@pawtag/shared';
 
 // --- Pet attribute options ---
 const PET_TYPES = ['Dog', 'Cat', 'Rabbit', 'Hamster', 'Guinea Pig', 'Bird'] as const;
@@ -22,17 +24,9 @@ const PET_PATTERNS: Record<string, string[]> = {
   'Guinea Pig': ['Solid', 'Roan', 'Dalmatian', 'Brindle', 'Himalayan', 'Dutch', 'Orange', 'Ticked', 'Agouti'],
   Bird: ['Solid', 'Pied', 'Lutino', 'Albino', 'Opaline', 'Spangle', 'Clearwing', 'Crested', 'Dominant Pied'],
 };
-const PET_BREEDS: Record<string, string[]> = {
-  Dog: ['Mixed Breed', 'Labrador Retriever', 'German Shepherd', 'Golden Retriever', 'French Bulldog', 'Bulldog', 'Poodle', 'Beagle', 'Rottweiler', 'Dachshund', 'German Shorthaired Pointer', 'Pembroke Welsh Corgi', 'Australian Shepherd', 'Yorkshire Terrier', 'Cavalier King Charles Spaniel', 'Doberman Pinscher', 'Boxer', 'Miniature Schnauzer', 'Cocker Spaniel', 'Shih Tzu', 'Border Collie', 'Belgian Malinois', 'Siberian Husky', 'Bernese Mountain Dog', 'Great Dane', 'Chihuahua', 'Pomeranian', 'Maltese', 'Pug', 'Shiba Inu', 'Shar Pei', 'Dalmatian', 'Goldendoodle', 'Labradoodle', 'Pomsky'],
-  Cat: ['Mixed Breed', 'Domestic Shorthair', 'Domestic Longhair', 'Ragdoll', 'Maine Coon', 'Persian', 'British Shorthair', 'Bengal', 'Abyssinian', 'Siamese', 'Russian Blue', 'Scottish Fold', 'Sphynx', 'Birman', 'Norwegian Forest Cat', 'Ragamuffin', 'Himalayan', 'Cornish Rex', 'Devon Rex', 'Manx', 'Munchkin', 'Turkish Van'],
-  Rabbit: ['Mixed Breed', 'Holland Lop', 'Mini Lop', 'English Lop', 'French Lop', 'Netherland Dwarf', 'Mini Rex', 'Standard Rex', 'Lionhead', 'Angora', 'Flemish Giant', 'Dutch', 'English Spot', 'Californian', 'New Zealand'],
-  Hamster: ['Syrian (Golden)', 'Dwarf Campbell', 'Dwarf Winter White', 'Roborovski', 'Chinese'],
-  'Guinea Pig': ['American', 'Peruvian', 'Silkie (Sheltie)', 'Teddy', 'Texel', 'Rex', 'American Crested', 'Skinny Pig', 'Sheba'],
-  Bird: ['Budgerigar (Budgie)', 'Cockatiel', 'Lovebird', 'African Grey', 'Amazon Parrot', 'Macaw', 'Cockatoo', 'Conure', 'Canary', 'Finch', 'Parrotlet', 'Quaker Parrot'],
-};
 
 const emptyForm = {
-  name: '', petType: 'Dog', breed: '', secondaryBreed: 'Unknown', color: '', pattern: '',
+  name: '', petType: 'Dog', breedOrigin: 'Purebred', breed: '', secondaryBreed: 'Unknown', color: '', pattern: '',
   gender: 'unknown', dateOfBirth: '', favouriteFood: '', medicalAlerts: '', ownerId: '',
 };
 
@@ -182,14 +176,24 @@ export default function Pets() {
   const clearFilters = () => { setPetType(''); setPetName(''); setPetBreed(''); setPetColor(''); setPetPattern(''); setStatusFilter(''); setOwnerName(''); setOwnerEmail(''); setOwnerPhone(''); setPage(1); };
   const hasActiveFilters = petType || petName || petBreed || petColor || petPattern || statusFilter || ownerName || ownerEmail || ownerPhone;
 
-  const handleTypeChange = (type: string) => { setForm({ ...form, petType: type, breed: '', secondaryBreed: 'Unknown', color: '', pattern: '' }); };
-  const handleBreedChange = (breed: string) => { setForm({ ...form, breed, secondaryBreed: breed !== 'Mixed Breed' ? 'Unknown' : '' }); };
+  const handleTypeChange = (type: string) => { setForm({ ...form, petType: type, breedOrigin: 'Purebred', breed: '', secondaryBreed: 'Unknown', color: '', pattern: '' }); };
+  const handleBreedOriginChange = (breedOrigin: string) => {
+    if (breedOrigin === 'Unknown') {
+      setForm({ ...form, breedOrigin, breed: 'Unknown', secondaryBreed: 'Unknown' });
+    } else if (breedOrigin === 'Mixed Breed' || breedOrigin === 'Designer Breed') {
+      setForm({ ...form, breedOrigin, breed: '', secondaryBreed: '' });
+    } else {
+      setForm({ ...form, breedOrigin, breed: '', secondaryBreed: 'Unknown' });
+    }
+  };
+  const handleBreedChange = (breed: string) => { setForm({ ...form, breed, secondaryBreed: (form.breedOrigin === 'Mixed Breed' || form.breedOrigin === 'Designer Breed') ? '' : 'Unknown' }); };
 
   const startAdd = () => { setEditingPet(null); setForm(emptyForm); setPhotos([]); setShowForm(true); };
   const startEdit = (pet: any) => {
     setEditingPet(pet);
     setForm({
-      name: pet.name, petType: pet.petType || 'Dog', breed: pet.breed || '', secondaryBreed: pet.secondaryBreed || 'Unknown',
+      name: pet.name, petType: pet.petType || 'Dog', breedOrigin: pet.breedOrigin || 'Purebred',
+      breed: pet.breed || '', secondaryBreed: pet.secondaryBreed || 'Unknown',
       color: pet.color || '', pattern: pet.pattern || '', gender: pet.gender || 'unknown',
       dateOfBirth: pet.dateOfBirth ? pet.dateOfBirth.split('T')[0] : '', favouriteFood: pet.favouriteFood || '',
       medicalAlerts: pet.medicalAlerts || '', ownerId: pet.ownerId?._id || pet.ownerId || '',
@@ -202,7 +206,7 @@ export default function Pets() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const payload: any = { ...form, species: form.petType, photos };
-    if (form.breed !== 'Mixed Breed') payload.secondaryBreed = 'Unknown';
+    if (form.breedOrigin !== 'Mixed Breed' && form.breedOrigin !== 'Designer Breed') payload.secondaryBreed = 'Unknown';
     if (editingPet) {
       await api.put(`/admin/pets/${editingPet._id}`, payload);
     } else {
@@ -215,8 +219,8 @@ export default function Pets() {
 
   const availableColors = form.petType ? PET_COLORS[form.petType] || [] : [];
   const availablePatterns = form.petType ? PET_PATTERNS[form.petType] || [] : [];
-  const availableBreeds = form.petType ? PET_BREEDS[form.petType] || [] : [];
-  const isMixedBreed = form.breed === 'Mixed Breed';
+  const availableBreeds = form.petType ? getBreedsForOrigin(form.petType as PetType, form.breedOrigin) : [];
+  const showSecondaryBreed = form.breedOrigin === 'Mixed Breed' || form.breedOrigin === 'Designer Breed';
 
   return (
     <div className="space-y-6">
@@ -254,19 +258,33 @@ export default function Pets() {
                 {PET_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
+            <div className="relative">
+              <label className="block text-xs text-gray-500 mb-1">Breed Origin *</label>
+              <div className="flex items-center gap-1">
+                <select value={form.breedOrigin} onChange={(e) => handleBreedOriginChange(e.target.value)} className="w-full border rounded-md px-2 py-1.5 text-sm" required>
+                  {BREED_ORIGINS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+                <span className="group relative flex-shrink-0">
+                  <Info size={14} className="text-gray-400 cursor-help" />
+                  <span className="absolute right-0 top-6 z-50 w-64 p-2 text-xs text-white bg-gray-800 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
+                    {BREED_ORIGINS.find((o) => o.value === form.breedOrigin)?.tooltip}
+                  </span>
+                </span>
+              </div>
+            </div>
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Breed *</label>
+              <label className="block text-xs text-gray-500 mb-1">{showSecondaryBreed ? 'Primary Breed *' : 'Breed *'}</label>
               <select value={form.breed} onChange={(e) => handleBreedChange(e.target.value)} className="w-full border rounded-md px-2 py-1.5 text-sm" required>
-                <option value="">Select...</option>
+                <option value="">{form.breedOrigin === 'Unknown' ? 'Unknown' : 'Select...'}</option>
                 {availableBreeds.map((b) => <option key={b} value={b}>{b}</option>)}
               </select>
             </div>
-            {isMixedBreed && (
+            {showSecondaryBreed && (
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Secondary Breed</label>
                 <select value={form.secondaryBreed} onChange={(e) => setForm({ ...form, secondaryBreed: e.target.value })} className="w-full border rounded-md px-2 py-1.5 text-sm">
-                  <option value="Unknown">Unknown</option>
-                  {availableBreeds.filter((b) => b !== 'Mixed Breed').map((b) => <option key={b} value={b}>{b}</option>)}
+                  <option value="">Select...</option>
+                  {availableBreeds.filter((b) => b !== form.breed).map((b) => <option key={b} value={b}>{b}</option>)}
                 </select>
               </div>
             )}
@@ -333,7 +351,7 @@ export default function Pets() {
               <label className="block text-xs font-medium text-gray-500 mb-1">Breed</label>
               <select value={petBreed} onChange={(e) => setPetBreed(e.target.value)} disabled={!petType} className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm disabled:opacity-50">
                 <option value="">{petType ? 'All Breeds' : 'Select type'}</option>
-                {(PET_BREEDS[petType] || []).map((b) => <option key={b} value={b}>{b}</option>)}
+                {((PET_BREEDS as Record<string, readonly string[]>)[petType] || []).map((b: string) => <option key={b} value={b}>{b}</option>)}
               </select>
             </div>
             <div>
@@ -384,7 +402,17 @@ export default function Pets() {
               <tr><td colSpan={11} className="px-4 py-6 text-center text-gray-500">No pets found</td></tr>
             ) : data?.items.map((pet: any) => {
               const mainPhoto = pet.photos?.length > 0 ? (pet.photos.find((p: any) => p.isMain) || pet.photos[0])?.url : pet.photoUrl;
-              const breedDisplay = pet.breed === 'Mixed Breed' && pet.secondaryBreed && pet.secondaryBreed !== 'Unknown' ? `Mixed (${pet.secondaryBreed})` : pet.breed;
+              const breedDisplay = (() => {
+                const origin = pet.breedOrigin || 'Purebred';
+                const breed = pet.breed || '';
+                const secondary = pet.secondaryBreed || '';
+                if (origin === 'Unknown') return 'Unknown';
+                if ((origin === 'Mixed Breed' || origin === 'Designer Breed') && secondary && secondary !== 'Unknown') {
+                  return `${origin === 'Designer Breed' ? 'Designer' : 'Mixed'} (${breed} × ${secondary})`;
+                }
+                if (origin === 'Landrace') return `${breed} (Landrace)`;
+                return breed;
+              })();
               const genderLabel = pet.gender === 'male' ? 'Male' : pet.gender === 'female' ? 'Female' : 'Unknown';
               return (
                 <tr key={pet._id} className="hover:bg-gray-50">

@@ -28,6 +28,59 @@ export const PET_TYPES = [
 ] as const;
 export type PetType = (typeof PET_TYPES)[number];
 
+// --- Breed Origin ---
+export interface BreedOriginOption {
+  value: string;
+  label: string;
+  tooltip: string;
+}
+
+export const BREED_ORIGINS: BreedOriginOption[] = [
+  {
+    value: 'Purebred',
+    label: 'Purebred',
+    tooltip: 'Both parents are of the same recognized breed. Example: Labrador Retriever, German Shepherd.',
+  },
+  {
+    value: 'Mixed Breed',
+    label: 'Mixed Breed',
+    tooltip: 'A mix of two or more different breeds, often with unknown ancestry. Example: A dog with Labrador and Terrier ancestry.',
+  },
+  {
+    value: 'Designer Breed',
+    label: 'Designer Breed',
+    tooltip: 'A deliberate cross between two purebred dogs to combine desired traits. Example: Labradoodle (Labrador × Poodle), Cockapoo.',
+  },
+  {
+    value: 'Landrace',
+    label: 'Landrace / Native',
+    tooltip: 'A naturally developed regional breed that evolved over time with little human-directed breeding. Example: Indian Pariah Dog, Carolina Dog.',
+  },
+  {
+    value: 'Unknown',
+    label: 'Unknown',
+    tooltip: 'The breed or ancestry is unknown, typically used for rescued or stray dogs when lineage cannot be identified.',
+  },
+];
+
+// --- Landrace / Native Breeds (by pet type) ---
+export const LANDRACE_BREEDS: Record<PetType, readonly string[]> = {
+  Dog: [
+    'Indian Pariah Dog', 'Carolina Dog', 'Canaan Dog', 'New Guinea Singing Dog',
+    'Basenji', 'Thai Ridgeback', 'Kintamani Dog', 'Taiwan Dog',
+    'Telomian', 'Xoloitzcuintli', 'Peruvian Hairless Dog', 'Africanis',
+  ],
+  Cat: [
+    'Arabian Mau', 'Aegean Cat', 'Thai Cat', 'Cyprus Cat',
+    'Turkish Van', 'Turkish Angora', 'Norwegian Forest Cat', 'Siberian Cat',
+    'Maine Coon', 'Kurilian Bobtail', 'Japanese Bobtail', 'Khao Manee',
+  ],
+  Rabbit: [],
+  Hamster: [],
+  'Guinea Pig': [],
+  Bird: [],
+};
+
 // --- Pet Colors (grouped by pet type) ---
 export const PET_COLORS: Record<PetType, readonly string[]> = {
   Dog: [
@@ -109,6 +162,10 @@ export const PET_BREEDS: Record<PetType, readonly string[]> = {
     'Vizsla', 'Brittany Spaniel', 'Setter (Irish)', 'Setter (English)',
     'Pointer', 'Havanese', 'Bichon Frise', 'Maltepoo',
     'Goldendoodle', 'Labradoodle', 'Cockapoo', 'Pomsky',
+    // Landrace / Native
+    'Indian Pariah Dog', 'Carolina Dog', 'Canaan Dog', 'New Guinea Singing Dog',
+    'Thai Ridgeback', 'Kintamani Dog', 'Taiwan Dog', 'Telomian',
+    'Xoloitzcuintli', 'Peruvian Hairless Dog', 'Africanis',
   ],
   Cat: [
     'Mixed Breed',
@@ -123,6 +180,9 @@ export const PET_BREEDS: Record<PetType, readonly string[]> = {
     'Somali', 'Balinese', 'Chartreux', 'Korat',
     'LaPerm', 'Manx', 'Munchkin', 'Singapura',
     'Snowshoe', 'Turkish Angora', 'Turkish Van',
+    // Landrace / Native
+    'Arabian Mau', 'Aegean Cat', 'Thai Cat', 'Cyprus Cat',
+    'Siberian Cat', 'Kurilian Bobtail', 'Japanese Bobtail', 'Khao Manee',
   ],
   Rabbit: [
     'Mixed Breed',
@@ -151,3 +211,20 @@ export const PET_BREEDS: Record<PetType, readonly string[]> = {
     'Mynah', 'Bourke\'s Parakeet', 'Lineolated Parakeet',
   ],
 };
+
+// --- Helper: get breeds filtered by breed origin ---
+export function getBreedsForOrigin(petType: PetType, breedOrigin: string): readonly string[] {
+  const allBreeds = PET_BREEDS[petType] || [];
+  switch (breedOrigin) {
+    case 'Landrace':
+      return LANDRACE_BREEDS[petType] || [];
+    case 'Unknown':
+      return ['Unknown'];
+    case 'Mixed Breed':
+    case 'Designer Breed':
+      return allBreeds.filter((b) => b !== 'Mixed Breed');
+    case 'Purebred':
+    default:
+      return allBreeds.filter((b) => b !== 'Mixed Breed');
+  }
+}
