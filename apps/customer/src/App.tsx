@@ -488,6 +488,8 @@ function PetsPage() {
                       {pet.linkedTag && <p className="text-sm text-primary-600 font-mono mt-0.5">Tag: {pet.linkedTag.tagId}<span className={`ml-1.5 inline-block w-2 h-2 rounded-full ${pet.linkedTag.status === 'active' ? 'bg-green-500' : pet.linkedTag.status === 'lost' ? 'bg-red-500' : 'bg-gray-400'}`} /><span className="ml-1 text-gray-400 font-sans">({pet.linkedTag.status})</span></p>}
                       {!pet.linkedTag && <p className="text-sm text-gray-300 mt-0.5">No tag linked</p>}
                       <p className="text-base text-gray-600 mt-1">{pet.petType || pet.species} — {formatBreed(pet)}</p>
+                      {pet.breedOrigin && pet.breedOrigin !== 'Purebred' && <p className="text-sm text-gray-400">Origin: {pet.breedOrigin}</p>}
+                      {pet.secondaryBreed && pet.secondaryBreed !== 'Unknown' && <p className="text-sm text-gray-400">Secondary: {pet.secondaryBreed}</p>}
                       <p className="text-base text-gray-500">Color: {pet.color}{pet.pattern ? ` | Pattern: ${pet.pattern}` : ''}</p>
                       <p className="text-base text-gray-500">Gender: {genderLabel(pet.gender)}{pet.age != null ? ` | Age: ${pet.age} yrs` : ''}</p>
                       {pet.favouriteFood && <p className="text-base text-gray-500">Fav Food: {pet.favouriteFood}</p>}
