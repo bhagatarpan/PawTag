@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef, FormEvent } from 'react';
-import { PawPrint, Plus, AlertTriangle, CheckCircle, Star, X, Edit2, Save, Upload, ShieldAlert, ShieldCheck, ShoppingBag, ChevronRight, Skull, EyeOff, Clock, Activity, Camera } from 'lucide-react';
+import { PawPrint, Plus, AlertTriangle, CheckCircle, Star, X, Edit2, Save, Upload, ShieldAlert, ShieldCheck, ShoppingBag, ChevronRight, Skull, EyeOff, Clock, Activity, Camera, Info } from 'lucide-react';
 import api from '../../lib/api';
 import HealthRecords from './HealthRecords';
 import SaveToast from '../../components/SaveToast';
+import { BREED_ORIGINS, getBreedsForOrigin } from '@pawtag/shared';
+import type { PetType } from '@pawtag/shared';
 
 const PET_TYPES = ['Dog', 'Cat', 'Rabbit', 'Hamster', 'Guinea Pig', 'Bird'] as const;
 
@@ -86,7 +88,7 @@ const PET_GENDERS = [
 ];
 
 const emptyForm = {
-  name: '', petType: 'Dog', breed: '', secondaryBreed: '', color: '', pattern: '',
+  name: '', petType: 'Dog', breedOrigin: 'Purebred', breed: '', secondaryBreed: '', color: '', pattern: '',
   gender: 'unknown', dateOfBirth: '', age: '', favouriteFood: '', medicalAlerts: '',
 };
 
@@ -217,15 +219,24 @@ export default function MyPets() {
 
   const availableColors = form.petType ? PET_COLORS[form.petType] || [] : [];
   const availablePatterns = form.petType ? PET_PATTERNS[form.petType] || [] : [];
-  const availableBreeds = form.petType ? PET_BREEDS[form.petType] || [] : [];
-  const isMixedBreed = form.breed === 'Mixed Breed';
+  const availableBreeds = form.petType ? getBreedsForOrigin(form.petType as PetType, form.breedOrigin) : [];
+  const showSecondaryBreed = form.breedOrigin === 'Mixed Breed' || form.breedOrigin === 'Designer Breed';
 
-  const handleTypeChange = (type: string) => setForm({ ...form, petType: type, breed: '', secondaryBreed: '', color: '', pattern: '' });
-  const handleBreedChange = (breed: string) => setForm({ ...form, breed, secondaryBreed: breed !== 'Mixed Breed' ? 'Unknown' : '' });
+  const handleTypeChange = (type: string) => setForm({ ...form, petType: type, breedOrigin: 'Purebred', breed: '', secondaryBreed: '', color: '', pattern: '' });
+  const handleBreedOriginChange = (breedOrigin: string) => {
+    if (breedOrigin === 'Unknown') {
+      setForm({ ...form, breedOrigin, breed: 'Unknown', secondaryBreed: 'Unknown' });
+    } else if (breedOrigin === 'Mixed Breed' || breedOrigin === 'Designer Breed') {
+      setForm({ ...form, breedOrigin, breed: '', secondaryBreed: '' });
+    } else {
+      setForm({ ...form, breedOrigin, breed: '', secondaryBreed: 'Unknown' });
+    }
+  };
+  const handleBreedChange = (breed: string) => setForm({ ...form, breed, secondaryBreed: (form.breedOrigin === 'Mixed Breed' || form.breedOrigin === 'Designer Breed') ? '' : 'Unknown' });
 
   const startEdit = (pet: any) => {
     setEditingPet(pet);
-    setForm({ name: pet.name, petType: pet.petType || 'Dog', breed: pet.breed || '', secondaryBreed: pet.secondaryBreed || 'Unknown', color: pet.color || '', pattern: pet.pattern || '', gender: pet.gender || 'unknown', dateOfBirth: pet.dateOfBirth ? pet.dateOfBirth.split('T')[0] : '', age: pet.age != null ? String(pet.age) : '', favouriteFood: pet.favouriteFood || '', medicalAlerts: pet.medicalAlerts || '' });
+    setForm({ name: pet.name, petType: pet.petType || 'Dog', breedOrigin: pet.breedOrigin || 'Purebred', breed: pet.breed || '', secondaryBreed: pet.secondaryBreed || 'Unknown', color: pet.color || '', pattern: pet.pattern || '', gender: pet.gender || 'unknown', dateOfBirth: pet.dateOfBirth ? pet.dateOfBirth.split('T')[0] : '', age: pet.age != null ? String(pet.age) : '', favouriteFood: pet.favouriteFood || '', medicalAlerts: pet.medicalAlerts || '' });
     setPhotos(pet.photos || []);
     setShowForm(true);
   };
@@ -235,7 +246,7 @@ export default function MyPets() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    const payload: any = { species: form.petType, photos, name: form.name, petType: form.petType, breed: form.breed, secondaryBreed: form.breed === 'Mixed Breed' ? form.secondaryBreed : 'Unknown', color: form.color, pattern: form.pattern, gender: form.gender, favouriteFood: form.favouriteFood, medicalAlerts: form.medicalAlerts };
+    const payload: any = { species: form.petType, photos, name: form.name, petType: form.petType, breedOrigin: form.breedOrigin, breed: form.breed, secondaryBreed: (form.breedOrigin === 'Mixed Breed' || form.breedOrigin === 'Designer Breed') ? form.secondaryBreed : 'Unknown', color: form.color, pattern: form.pattern, gender: form.gender, favouriteFood: form.favouriteFood, medicalAlerts: form.medicalAlerts };
     if (form.dateOfBirth) payload.dateOfBirth = form.dateOfBirth;
     if (form.age !== '') payload.age = parseFloat(form.age);
     try {
@@ -273,9 +284,15 @@ export default function MyPets() {
   };
 
   const formatBreed = (pet: any) => {
-    if (pet.breed === 'Mixed Breed' && pet.secondaryBreed && pet.secondaryBreed !== 'Unknown') return `Mixed (${pet.secondaryBreed})`;
-    if (pet.breed === 'Mixed Breed') return 'Mixed Breed';
-    return pet.breed;
+    const origin = pet.breedOrigin || 'Purebred';
+    const breed = pet.breed || '';
+    const secondary = pet.secondaryBreed || '';
+    if (origin === 'Unknown') return 'Unknown';
+    if ((origin === 'Mixed Breed' || origin === 'Designer Breed') && secondary && secondary !== 'Unknown') {
+      return `${origin === 'Designer Breed' ? 'Designer' : 'Mixed'} (${breed} × ${secondary})`;
+    }
+    if (origin === 'Landrace') return `${breed} (Landrace)`;
+    return breed;
   };
 
   const genderLabel = (g: string) => g === 'male' ? 'Male' : g === 'female' ? 'Female' : 'Unknown';
@@ -294,8 +311,22 @@ export default function MyPets() {
           <div className="grid grid-cols-2 gap-4">
             <div><label className="block text-xs text-gray-500 mb-1">Pet Name *</label><input placeholder="Pet Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm" required disabled={!!editingPet} />{editingPet && <p className="text-xs text-gray-400 mt-1">Name cannot be changed after creation</p>}</div>
             <div><label className="block text-xs text-gray-500 mb-1">Pet Type *</label><select value={form.petType} onChange={(e) => handleTypeChange(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" required>{PET_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}</select></div>
-            <div><label className="block text-xs text-gray-500 mb-1">Breed *</label><select value={form.breed} onChange={(e) => handleBreedChange(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" required><option value="">Select breed...</option>{availableBreeds.map((b) => <option key={b} value={b}>{b}</option>)}</select></div>
-            {isMixedBreed && <div><label className="block text-xs text-gray-500 mb-1">Secondary Breed *</label><select value={form.secondaryBreed} onChange={(e) => setForm({ ...form, secondaryBreed: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm" required><option value="">Select...</option><option value="Unknown">Unknown</option>{availableBreeds.filter((b) => b !== 'Mixed Breed').map((b) => <option key={b} value={b}>{b}</option>)}</select></div>}
+            <div className="relative">
+              <label className="block text-xs text-gray-500 mb-1">Breed Origin *</label>
+              <div className="flex items-center gap-1">
+                <select value={form.breedOrigin} onChange={(e) => handleBreedOriginChange(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" required>
+                  {BREED_ORIGINS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+                <span className="group relative flex-shrink-0">
+                  <Info size={14} className="text-gray-400 cursor-help" />
+                  <span className="absolute right-0 top-6 z-50 w-64 p-2 text-xs text-white bg-gray-800 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
+                    {BREED_ORIGINS.find((o) => o.value === form.breedOrigin)?.tooltip}
+                  </span>
+                </span>
+              </div>
+            </div>
+            <div><label className="block text-xs text-gray-500 mb-1">{showSecondaryBreed ? 'Primary Breed *' : 'Breed *'}</label><select value={form.breed} onChange={(e) => handleBreedChange(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" required><option value="">{form.breedOrigin === 'Unknown' ? 'Unknown' : 'Select breed...'}</option>{availableBreeds.map((b) => <option key={b} value={b}>{b}</option>)}</select></div>
+            {showSecondaryBreed && <div><label className="block text-xs text-gray-500 mb-1">Secondary Breed *</label><select value={form.secondaryBreed} onChange={(e) => setForm({ ...form, secondaryBreed: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm" required><option value="">Select...</option>{availableBreeds.filter((b) => b !== form.breed).map((b) => <option key={b} value={b}>{b}</option>)}</select></div>}
             <div><label className="block text-xs text-gray-500 mb-1">Color *</label><select value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm" required><option value="">Select color...</option>{availableColors.map((c) => <option key={c} value={c}>{c}</option>)}</select></div>
             <div><label className="block text-xs text-gray-500 mb-1">Pattern</label><select value={form.pattern} onChange={(e) => setForm({ ...form, pattern: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm"><option value="">Select pattern...</option>{availablePatterns.map((p) => <option key={p} value={p}>{p}</option>)}</select></div>
             <div><label className="block text-xs text-gray-500 mb-1">Gender</label><select value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm">{PET_GENDERS.map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}</select></div>
@@ -355,6 +386,8 @@ export default function MyPets() {
                       {pet.linkedTag && <p className="text-sm text-teal-600 font-mono mt-0.5">Tag: {pet.linkedTag.tagId} <span className="text-[10px] uppercase bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded font-sans font-medium">{pet.linkedTag.tagType || 'qr'}</span><span className={`ml-1.5 inline-block w-2 h-2 rounded-full ${pet.linkedTag.status === 'active' ? 'bg-green-500' : pet.linkedTag.status === 'lost' ? 'bg-red-500' : 'bg-gray-400'}`} /><span className="ml-1 text-gray-400 font-sans">({pet.linkedTag.status})</span></p>}
                       {!pet.linkedTag && <p className="text-sm text-gray-300 mt-0.5">No tag linked</p>}
                       <p className="text-base text-gray-600 mt-1">{pet.petType || pet.species} — {formatBreed(pet)}</p>
+                      <p className="text-sm text-gray-400">Origin: {pet.breedOrigin || 'Purebred'}</p>
+                      {pet.secondaryBreed && pet.secondaryBreed !== 'Unknown' && <p className="text-sm text-gray-400">Secondary: {pet.secondaryBreed}</p>}
                       <p className="text-base text-gray-500">Color: {pet.color}{pet.pattern ? ` | Pattern: ${pet.pattern}` : ''}</p>
                       <p className="text-base text-gray-500">Gender: {genderLabel(pet.gender)}{pet.age != null ? ` | Age: ${pet.age} yrs` : ''}</p>
                       {pet.favouriteFood && <p className="text-base text-gray-500">Fav Food: {pet.favouriteFood}</p>}
