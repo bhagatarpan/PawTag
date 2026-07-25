@@ -386,7 +386,9 @@ export default function Pets() {
               <th className="text-left px-3 py-2.5 font-medium text-gray-500">Name</th>
               <th className="text-left px-3 py-2.5 font-medium text-gray-500">Tag</th>
               <th className="text-left px-3 py-2.5 font-medium text-gray-500">Type</th>
+              <th className="text-left px-3 py-2.5 font-medium text-gray-500">Origin</th>
               <th className="text-left px-3 py-2.5 font-medium text-gray-500">Breed</th>
+              <th className="text-left px-3 py-2.5 font-medium text-gray-500">2nd Breed</th>
               <th className="text-left px-3 py-2.5 font-medium text-gray-500">Color</th>
               <th className="text-left px-3 py-2.5 font-medium text-gray-500">Gender</th>
               <th className="text-left px-3 py-2.5 font-medium text-gray-500">Owner</th>
@@ -397,22 +399,11 @@ export default function Pets() {
           </thead>
           <tbody className="divide-y divide-gray-200">
             {loading ? (
-              <tr><td colSpan={11} className="px-4 py-6 text-center text-gray-500">Loading...</td></tr>
+              <tr><td colSpan={13} className="px-4 py-6 text-center text-gray-500">Loading...</td></tr>
             ) : data?.items.length === 0 ? (
-              <tr><td colSpan={11} className="px-4 py-6 text-center text-gray-500">No pets found</td></tr>
+              <tr><td colSpan={13} className="px-4 py-6 text-center text-gray-500">No pets found</td></tr>
             ) : data?.items.map((pet: any) => {
               const mainPhoto = pet.photos?.length > 0 ? (pet.photos.find((p: any) => p.isMain) || pet.photos[0])?.url : pet.photoUrl;
-              const breedDisplay = (() => {
-                const origin = pet.breedOrigin || 'Purebred';
-                const breed = pet.breed || '';
-                const secondary = pet.secondaryBreed || '';
-                if (origin === 'Unknown') return 'Unknown';
-                if ((origin === 'Mixed Breed' || origin === 'Designer Breed') && secondary && secondary !== 'Unknown') {
-                  return `${origin === 'Designer Breed' ? 'Designer' : 'Mixed'} (${breed} × ${secondary})`;
-                }
-                if (origin === 'Landrace') return `${breed} (Landrace)`;
-                return breed;
-              })();
               const genderLabel = pet.gender === 'male' ? 'Male' : pet.gender === 'female' ? 'Female' : 'Unknown';
               return (
                 <tr key={pet._id} className="hover:bg-gray-50">
@@ -431,7 +422,9 @@ export default function Pets() {
                     ) : <span className="text-gray-300 text-xs">No tag</span>}
                   </td>
                   <td className="px-3 py-2 text-sm text-gray-600">{pet.petType}</td>
-                  <td className="px-3 py-2 text-sm text-gray-600">{breedDisplay}</td>
+                  <td className="px-3 py-2 text-sm text-gray-500">{pet.breedOrigin || 'Purebred'}</td>
+                  <td className="px-3 py-2 text-sm text-gray-600">{pet.breed}</td>
+                  <td className="px-3 py-2 text-sm text-gray-600">{pet.secondaryBreed && pet.secondaryBreed !== 'Unknown' ? pet.secondaryBreed : '—'}</td>
                   <td className="px-3 py-2 text-sm text-gray-600">{pet.color}</td>
                   <td className="px-3 py-2 text-sm text-gray-500">{genderLabel}</td>
                   <td className="px-3 py-2 text-sm text-gray-600">{pet.ownerId?.fullName || 'N/A'}</td>
