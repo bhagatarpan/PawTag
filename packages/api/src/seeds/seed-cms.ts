@@ -404,10 +404,21 @@ async function run() {
               type: 'rich_text',
               title: '',
               content: {
-                html: '<p class="text-lg text-gray-600 mb-4">PawTag is a New Zealand company dedicated to pet safety and reunification.</p><p class="text-gray-600 mb-4">Every year, thousands of pets go missing in New Zealand. Traditional ID tags can fall off or become unreadable. PawTag solves this problem with durable, scannable QR code tags that link directly to your pet\'s online profile.</p><p class="text-gray-600 mb-4">When someone finds your pet, they simply scan the QR code with their smartphone camera. No app download required. They see your pet\'s photo, name, and medical alerts, and can notify you immediately with their location.</p>',
+                html: '<p class="text-lg text-gray-600 mb-4">PawTag is a New Zealand-born pet recovery platform that helps reunite lost pets with their families — faster, simpler, and more reliably than traditional methods.</p>',
               },
               visible: true,
               order: 0,
+              status: 'published',
+            },
+            {
+              sectionId: 'about-story',
+              type: 'rich_text',
+              title: 'Our Story',
+              content: {
+                html: '<p class="text-gray-600 mb-4">Every year, thousands of pets go missing across New Zealand. Traditional methods — printed flyers, social media posts, and word of mouth — are slow and often ineffective. PawTag was created to change that.</p><p class="text-gray-600">We built a simple QR-coded tag system that connects a lost pet to their owner in seconds. When someone finds your pet, they scan the tag, see your contact details, and reach you instantly — no app download required.</p>',
+              },
+              visible: true,
+              order: 1,
               status: 'published',
             },
             {
@@ -415,10 +426,32 @@ async function run() {
               type: 'rich_text',
               title: 'Our Mission',
               content: {
-                html: '<p class="text-gray-600">To make pet recovery fast, simple, and reliable. We believe every pet deserves a safe way home.</p>',
+                html: '<p class="text-gray-600">To make pet recovery fast, simple, and reliable. We believe every pet deserves a safe way home, and every owner deserves peace of mind.</p>',
               },
               visible: true,
-              order: 1,
+              order: 2,
+              status: 'published',
+            },
+            {
+              sectionId: 'about-how',
+              type: 'rich_text',
+              title: 'How It Works',
+              content: {
+                html: '<div class="space-y-4"><div class="flex gap-4"><div class="flex-shrink-0 w-10 h-10 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center font-bold">1</div><div><h4 class="font-semibold text-gray-800">Order Your Tag</h4><p class="text-gray-600">Choose a tag for your pet and register your details online.</p></div></div><div class="flex gap-4"><div class="flex-shrink-0 w-10 h-10 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center font-bold">2</div><div><h4 class="font-semibold text-gray-800">Attach the Tag</h4><p class="text-gray-600">Clip the QR tag onto your pet\'s collar. It\'s lightweight and durable.</p></div></div><div class="flex gap-4"><div class="flex-shrink-0 w-10 h-10 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center font-bold">3</div><div><h4 class="font-semibold text-gray-800">Get Reunited</h4><p class="text-gray-600">If your pet is found, the finder scans the tag and contacts you right away.</p></div></div></div>',
+              },
+              visible: true,
+              order: 3,
+              status: 'published',
+            },
+            {
+              sectionId: 'about-values',
+              type: 'rich_text',
+              title: 'Why PawTag',
+              content: {
+                html: '<ul class="list-disc list-inside space-y-2 text-gray-600"><li><strong>No app needed</strong> — anyone with a smartphone camera can scan the QR code.</li><li><strong>Instant contact</strong> — the finder sees your contact info and can call or message you immediately.</li><li><strong>Real-time updates</strong> — mark your pet as lost or found from your dashboard.</li><li><strong>Health records</strong> — store vaccination and medical information in one place.</li><li><strong>Built for New Zealand</strong> — designed locally for Kiwi pet owners.</li></ul>',
+              },
+              visible: true,
+              order: 4,
               status: 'published',
             },
           ],

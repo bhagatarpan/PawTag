@@ -96,6 +96,9 @@ export default function About() {
             {section.type === 'text' && section.content?.body && (
               <div dangerouslySetInnerHTML={{ __html: section.content.body }} />
             )}
+            {section.type === 'rich_text' && section.content?.html && (
+              <div dangerouslySetInnerHTML={{ __html: section.content.html }} />
+            )}
           </div>
         ))}
       </div>
