@@ -134,6 +134,7 @@ export default function PuckPageBuilder({ sections, onChange }: PuckPageBuilderP
             config={pawtagConfig}
             data={puckData}
             onChange={handlePuckChange}
+            overrides={{ headerActions: () => <></> }}
           />
         </div>
       ) : (
