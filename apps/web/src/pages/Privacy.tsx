@@ -1,10 +1,41 @@
+import { Render } from '@puckeditor/core';
+import '@puckeditor/core/puck.css';
+import { pawtagConfig } from '../components/puck/config';
 import { useCmsPage, useSiteSettings } from '../hooks/useCms';
 import SeoHead from '../components/SeoHead';
+
+function sectionsToPuckData(sections: any[]) {
+  const typeMap: Record<string, string> = {
+    hero: 'HeroBanner', features: 'FeaturesGrid', rich_text: 'RichTextBlock',
+    gallery: 'ImageGallery', cards: 'CardsGrid', pricing: 'PricingTable',
+    testimonials: 'TestimonialsSection', faq: 'FaqAccordion',
+    timeline: 'TimelineSection', statistics: 'StatsCounter',
+    video: 'VideoEmbed', cta: 'CtaBanner', partners: 'PartnersLogos',
+    map: 'MapBlock', custom: 'CustomHtml', contact_form: 'ContactForm',
+  };
+
+  const content = (sections || [])
+    .filter((s: any) => s.visible !== false && s.status === 'published')
+    .sort((a: any, b: any) => (a.order || 0) - (b.order || 0))
+    .map((section: any, idx: number) => {
+      const props = { ...section.content };
+      return {
+        type: typeMap[section.type] || section.type,
+        props: {
+          id: section.sectionId || `section_${idx}`,
+          ...props,
+        },
+      };
+    });
+  return { content, root: {} };
+}
 
 export default function Privacy() {
   const { page, loading } = useCmsPage('privacy-policy');
   const { settings } = useSiteSettings();
   const companyName = settings?.['company.name'] || 'PawTag';
+
+  const puckData = sectionsToPuckData(page?.sections || []);
 
   if (loading) {
     return (
@@ -21,36 +52,21 @@ export default function Privacy() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-12">
-      <SeoHead 
+    <div className="min-h-screen bg-gray-50">
+      <SeoHead
         title={`${companyName} - Privacy Policy`}
         description={`${companyName} Privacy Policy - Learn how we collect, use, and protect your personal information.`}
         keywords={['privacy policy', 'data protection', 'personal information', companyName]}
       />
-      <h1 className="text-3xl font-bold mb-6">{page?.title || `Privacy Policy - ${companyName}`}</h1>
-      <div className="prose prose-gray max-w-none">
-        {page?.sections?.filter(s => s.visible && s.status === 'published').map((section) => (
-          <div key={section._id}>
-            {section.title && <h2 className="text-2xl font-bold mt-8 mb-4">{section.title}</h2>}
-            {section.type === 'text' && section.content?.body && (
-              <div dangerouslySetInnerHTML={{ __html: section.content.body }} />
-            )}
-          </div>
-        )) || (
-          <div className="text-gray-600 space-y-4">
-            <p className="text-lg">Last updated: {new Date().toLocaleDateString()}</p>
-            <h2 className="text-xl font-semibold mt-6">1. Information We Collect</h2>
-            <p>We collect information you provide directly to us, such as when you create an account, register a pet, purchase a tag, or contact us for support.</p>
-            <h2 className="text-xl font-semibold mt-6">2. How We Use Your Information</h2>
-            <p>We use the information we collect to provide, maintain, and improve our services, to process transactions, and to send you technical notices and support messages.</p>
-            <h2 className="text-xl font-semibold mt-6">3. Information Sharing</h2>
-            <p>We do not sell your personal information. We may share your information only when you direct us to (such as when a finder scans your pet's tag) or as required by law.</p>
-            <h2 className="text-xl font-semibold mt-6">4. Data Security</h2>
-            <p>We implement appropriate technical and organizational measures to protect your personal information against unauthorized access, alteration, disclosure, or destruction.</p>
-            <h2 className="text-xl font-semibold mt-6">5. Contact Us</h2>
-            <p>If you have questions about this Privacy Policy, please contact us at support@pawtag.co.nz.</p>
-          </div>
-        )}
+      <div className="bg-gradient-to-r from-teal-700 to-teal-600 text-white py-16">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h1 className="text-4xl font-bold mb-4">{page?.title || `Privacy Policy - ${companyName}`}</h1>
+          <p className="text-teal-100 text-lg">How we collect, use, and protect your personal information.</p>
+        </div>
+      </div>
+
+      <div className="py-12">
+        <Render config={pawtagConfig} data={puckData} />
       </div>
     </div>
   );

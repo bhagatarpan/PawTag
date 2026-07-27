@@ -1,70 +1,100 @@
+import { Render } from '@puckeditor/core';
+import '@puckeditor/core/puck.css';
+import { pawtagConfig } from '../components/puck/config';
 import { useCmsPage, useSiteSettings } from '../hooks/useCms';
 import SeoHead from '../components/SeoHead';
 
-const fallbackContent = {
-  title: 'About PawTag',
-  sections: [
-    {
-      _id: 'fallback-hero',
-      type: 'text',
-      title: '',
-      content: {
-        body: '<p class="text-lg text-gray-600">PawTag is a New Zealand-born pet recovery platform that helps reunite lost pets with their families — faster, simpler, and more reliably than traditional methods.</p>'
-      },
-      visible: true,
-      status: 'published' as const,
+function sectionsToPuckData(sections: any[]) {
+  const typeMap: Record<string, string> = {
+    hero: 'HeroBanner', features: 'FeaturesGrid', rich_text: 'RichTextBlock',
+    gallery: 'ImageGallery', cards: 'CardsGrid', pricing: 'PricingTable',
+    testimonials: 'TestimonialsSection', faq: 'FaqAccordion',
+    timeline: 'TimelineSection', statistics: 'StatsCounter',
+    video: 'VideoEmbed', cta: 'CtaBanner', partners: 'PartnersLogos',
+    map: 'MapBlock', custom: 'CustomHtml', contact_form: 'ContactForm',
+  };
+
+  const content = (sections || [])
+    .filter((s: any) => s.visible !== false && s.status === 'published')
+    .sort((a: any, b: any) => (a.order || 0) - (b.order || 0))
+    .map((section: any, idx: number) => {
+      const props = { ...section.content };
+      return {
+        type: typeMap[section.type] || section.type,
+        props: {
+          id: section.sectionId || `section_${idx}`,
+          ...props,
+        },
+      };
+    });
+  return { content, root: {} };
+}
+
+// Fallback content when CMS page not available
+const fallbackSections = [
+  {
+    sectionId: 'fallback-intro',
+    type: 'rich_text',
+    title: '',
+    content: { html: '<p class="text-lg text-gray-600">PawTag is a New Zealand-born pet recovery platform that helps reunite lost pets with their families — faster, simpler, and more reliably than traditional methods.</p>' },
+    visible: true,
+    order: 0,
+    status: 'published' as const,
+  },
+  {
+    sectionId: 'fallback-story',
+    type: 'rich_text',
+    title: 'Our Story',
+    content: { html: '<p class="text-gray-600 mb-4">Every year, thousands of pets go missing across New Zealand. Traditional methods — printed flyers, social media posts, and word of mouth — are slow and often ineffective. PawTag was created to change that.</p><p class="text-gray-600">We built a simple QR-coded tag system that connects a lost pet to their owner in seconds. When someone finds your pet, they scan the tag, see your contact details, and reach you instantly — no app download required.</p>' },
+    visible: true,
+    order: 1,
+    status: 'published' as const,
+  },
+  {
+    sectionId: 'fallback-mission',
+    type: 'rich_text',
+    title: 'Our Mission',
+    content: { html: '<p class="text-gray-600">To make pet recovery fast, simple, and reliable. We believe every pet deserves a safe way home, and every owner deserves peace of mind.</p>' },
+    visible: true,
+    order: 2,
+    status: 'published' as const,
+  },
+  {
+    sectionId: 'fallback-how',
+    type: 'rich_text',
+    title: 'How It Works',
+    content: { html: '<div class="space-y-4"><div class="flex gap-4"><div class="flex-shrink-0 w-10 h-10 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center font-bold">1</div><div><h4 class="font-semibold text-gray-800">Order Your Tag</h4><p class="text-gray-600">Choose a tag for your pet and register your details online.</p></div></div><div class="flex gap-4"><div class="flex-shrink-0 w-10 h-10 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center font-bold">2</div><div><h4 class="font-semibold text-gray-800">Attach the Tag</h4><p class="text-gray-600">Clip the QR tag onto your pet\'s collar. It\'s lightweight and durable.</p></div></div><div class="flex gap-4"><div class="flex-shrink-0 w-10 h-10 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center font-bold">3</div><div><h4 class="font-semibold text-gray-800">Get Reunited</h4><p class="text-gray-600">If your pet is found, the finder scans the tag and contacts you right away.</p></div></div></div>' },
+    visible: true,
+    order: 3,
+    status: 'published' as const,
+  },
+  {
+    sectionId: 'fallback-values',
+    type: 'cards',
+    title: 'Why PawTag',
+    content: {
+      heading: 'Why PawTag',
+      items: [
+        { icon: '\uD83F\uDDF1', title: 'No app needed', description: 'Anyone with a smartphone camera can scan the QR code.', link: '' },
+        { icon: '\u260E\uFE0F', title: 'Instant contact', description: 'The finder sees your contact info and can call or message you immediately.', link: '' },
+        { icon: '\uD83D\uDD04', title: 'Real-time updates', description: 'Mark your pet as lost or found from your dashboard.', link: '' },
+        { icon: '\uD83C\uDFE5', title: 'Health records', description: 'Store vaccination and medical information in one place.', link: '' },
+        { icon: '\uD83C\uDDF3\uD83C\uDDFF', title: 'Built for New Zealand', description: 'Designed locally for Kiwi pet owners.', link: '' },
+      ],
     },
-    {
-      _id: 'fallback-story',
-      type: 'text',
-      title: 'Our Story',
-      content: {
-        body: '<p class="text-gray-600">Every year, thousands of pets go missing across New Zealand. Traditional methods — printed flyers, social media posts, and word of mouth — are slow and often ineffective. PawTag was created to change that.</p><p class="text-gray-600">We built a simple QR-coded tag system that connects a lost pet to their owner in seconds. When someone finds your pet, they scan the tag, see your contact details, and reach you instantly — no app download required.</p>'
-      },
-      visible: true,
-      status: 'published' as const,
-    },
-    {
-      _id: 'fallback-mission',
-      type: 'text',
-      title: 'Our Mission',
-      content: {
-        body: '<p class="text-gray-600">To make pet recovery fast, simple, and reliable. We believe every pet deserves a safe way home, and every owner deserves peace of mind.</p>'
-      },
-      visible: true,
-      status: 'published' as const,
-    },
-    {
-      _id: 'fallback-how',
-      type: 'text',
-      title: 'How It Works',
-      content: {
-        body: '<div class="space-y-4"><div class="flex gap-4"><div class="flex-shrink-0 w-10 h-10 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center font-bold">1</div><div><h4 class="font-semibold text-gray-800">Order Your Tag</h4><p class="text-gray-600">Choose a tag for your pet and register your details online.</p></div></div><div class="flex gap-4"><div class="flex-shrink-0 w-10 h-10 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center font-bold">2</div><div><h4 class="font-semibold text-gray-800">Attach the Tag</h4><p class="text-gray-600">Clip the QR tag onto your pet\'s collar. It\'s lightweight and durable.</p></div></div><div class="flex gap-4"><div class="flex-shrink-0 w-10 h-10 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center font-bold">3</div><div><h4 class="font-semibold text-gray-800">Get Reunited</h4><p class="text-gray-600">If your pet is found, the finder scans the tag and contacts you right away.</p></div></div></div>'
-      },
-      visible: true,
-      status: 'published' as const,
-    },
-    {
-      _id: 'fallback-values',
-      type: 'text',
-      title: 'Why PawTag',
-      content: {
-        body: '<ul class="list-disc list-inside space-y-2 text-gray-600"><li><strong>No app needed</strong> — anyone with a smartphone camera can scan the QR code.</li><li><strong>Instant contact</strong> — the finder sees your contact info and can call or message you immediately.</li><li><strong>Real-time updates</strong> — mark your pet as lost or found from your dashboard.</li><li><strong>Health records</strong> — store vaccination and medical information in one place.</li><li><strong>Built for New Zealand</strong> — designed locally for Kiwi pet owners.</li></ul>'
-      },
-      visible: true,
-      status: 'published' as const,
-    },
-  ],
-};
+    visible: true,
+    order: 4,
+    status: 'published' as const,
+  },
+];
 
 export default function About() {
   const { page, loading } = useCmsPage('about');
   const { settings } = useSiteSettings();
   const companyName = settings?.['company.name'] || 'PawTag';
 
-  // Use CMS content or fallback
-  const displayPage = page || fallbackContent;
-  const sections = displayPage.sections?.filter(s => s.visible && s.status === 'published') || fallbackContent.sections;
+  const sections = page?.sections?.length ? page.sections : fallbackSections;
+  const puckData = sectionsToPuckData(sections);
 
   if (loading) {
     return (
@@ -82,25 +112,21 @@ export default function About() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-12">
-      <SeoHead 
+    <div className="min-h-screen bg-gray-50">
+      <SeoHead
         title={`${companyName} - About Us`}
         description={`Learn about ${companyName} - a New Zealand company dedicated to pet safety and reunification through QR-coded recovery tags.`}
         keywords={['about', 'pet safety', 'pet recovery', 'QR code tags', 'New Zealand']}
       />
-      <h1 className="text-3xl font-bold mb-6">{displayPage.title || `About ${companyName}`}</h1>
-      <div className="prose prose-gray max-w-none">
-        {sections.map((section) => (
-          <div key={section._id}>
-            {section.title && <h2 className="text-2xl font-bold mt-8 mb-4">{section.title}</h2>}
-            {section.type === 'text' && section.content?.body && (
-              <div dangerouslySetInnerHTML={{ __html: section.content.body }} />
-            )}
-            {section.type === 'rich_text' && section.content?.html && (
-              <div dangerouslySetInnerHTML={{ __html: section.content.html }} />
-            )}
-          </div>
-        ))}
+      <div className="bg-gradient-to-r from-teal-700 to-teal-600 text-white py-16">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h1 className="text-4xl font-bold mb-4">{page?.title || `About ${companyName}`}</h1>
+          <p className="text-teal-100 text-lg">Learn about our mission to reunite pets with their families.</p>
+        </div>
+      </div>
+
+      <div className="py-12">
+        <Render config={pawtagConfig} data={puckData} />
       </div>
     </div>
   );
