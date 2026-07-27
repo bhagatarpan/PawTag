@@ -57,6 +57,8 @@ function sectionsToPuckData(sections: PageSection[]) {
         type: sectionTypeToPuckType(section.type),
         props: {
           id: section.sectionId,
+          _status: section.status || 'published',
+          _visible: section.visible !== false,
           ...props,
         },
       };
@@ -68,7 +70,11 @@ function puckDataToSections(puckData: { content: any[]; root: any }): PageSectio
   return (puckData.content || []).map((item: any, idx: number) => {
     const props = { ...(item.props || {}) };
     const id = props.id;
+    const status = props._status || 'published';
+    const visible = props._visible !== false;
     delete props.id;
+    delete props._status;
+    delete props._visible;
 
     // Convert { url: string }[] back to string[] for images/logos in the API format
     if (item.type === 'ImageGallery' && Array.isArray(props.images)) {
@@ -84,9 +90,9 @@ function puckDataToSections(puckData: { content: any[]; root: any }): PageSectio
       title: props.heading || props.title || '',
       subtitle: props.subheading || '',
       content: props,
-      visible: true,
+      visible,
       order: idx,
-      status: 'draft' as const,
+      status,
     };
   });
 }
