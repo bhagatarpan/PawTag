@@ -23,6 +23,7 @@ type PawtagComponents = {
   };
   CardsGrid: {
     heading: string;
+    columns: string;
     items: { icon: string; title: string; description: string; link: string }[];
   };
   PricingTable: {
@@ -506,6 +507,15 @@ export const pawtagConfig: Config<PawtagComponents> = {
     CardsGrid: {
       fields: {
         heading: { type: 'text', label: 'Heading' },
+        columns: {
+          type: 'radio',
+          label: 'Columns',
+          options: [
+            { label: '2', value: '2' },
+            { label: '3', value: '3' },
+            { label: '4', value: '4' },
+          ],
+        },
         items: {
           type: 'array',
           label: 'Cards',
@@ -518,22 +528,25 @@ export const pawtagConfig: Config<PawtagComponents> = {
           },
         },
       },
-      defaultProps: { heading: 'Cards', items: [] },
-      render: ({ heading, items }) => (
-        <section className="py-12 px-6">
-          <h2 className="text-3xl font-bold text-center mb-8">{heading || 'Cards'}</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-            {(items || []).map((item, i) => (
-              <div key={i} className="p-6 rounded-xl border border-gray-200 hover:shadow-lg transition">
-                <div className="text-3xl mb-3">{item.icon}</div>
-                <h3 className="text-lg font-semibold mb-2">{item.title}</h3>
-                <p className="text-gray-600 text-sm">{item.description}</p>
-                {item.link && <a href={item.link} className="text-primary-600 text-sm mt-3 inline-block hover:underline">Learn more</a>}
-              </div>
-            ))}
-          </div>
-        </section>
-      ),
+      defaultProps: { heading: 'Cards', columns: '3', items: [] },
+      render: ({ heading, columns, items }) => {
+        const colClass = columns === '2' ? 'md:grid-cols-2' : columns === '4' ? 'md:grid-cols-4' : 'md:grid-cols-3';
+        return (
+          <section className="py-12 px-6">
+            <h2 className="text-3xl font-bold text-center mb-8">{heading || 'Cards'}</h2>
+            <div className={`grid grid-cols-1 ${colClass} gap-6 max-w-5xl mx-auto`}>
+              {(items || []).map((item, i) => (
+                <div key={i} className="p-6 rounded-xl border border-gray-200 hover:shadow-lg transition">
+                  <div className="text-3xl mb-3">{item.icon}</div>
+                  <h3 className="text-lg font-semibold mb-2">{item.title}</h3>
+                  <p className="text-gray-600 text-sm">{item.description}</p>
+                  {item.link && <a href={item.link} className="text-primary-600 text-sm mt-3 inline-block hover:underline">Learn more</a>}
+                </div>
+              ))}
+            </div>
+          </section>
+        );
+      },
     },
 
     PricingTable: {
