@@ -183,7 +183,7 @@ router.get('/:tagId', async (req: Request, res: Response) => {
  */
 router.post('/:tagId/notify', async (req: Request, res: Response) => {
   try {
-    const { finderPhone, finderEmail, finderName } = req.body;
+    const { finderPhone, finderEmail, finderName, latitude, longitude, accuracy, consent } = req.body;
 
     if (!finderPhone && !finderEmail) {
       res.status(400).json({ success: false, error: 'Please provide at least a phone number or email so the owner can contact you.' });
@@ -203,7 +203,7 @@ router.post('/:tagId/notify', async (req: Request, res: Response) => {
     const owner = tag.ownerId as any;
 
     // Update scan record with finder contact details
-    const scan = await FinderScan.findOne({ tagId: tag._id }).sort({ createdAt: -1 });
+    const scan = await FinderScan.findOne({ tagId: tag._id }).sort({ createdAt: -1 }) as any;
     if (scan) {
       scan.action = 'notified_owner';
       scan.notifiedAt = new Date();
@@ -211,7 +211,39 @@ router.post('/:tagId/notify', async (req: Request, res: Response) => {
       scan.finderPhone = finderPhone || undefined;
       scan.finderEmail = finderEmail || undefined;
       scan.finderName = finderName || undefined;
+      // Store location if provided
+      if (latitude && longitude) {
+        scan.location = { latitude, longitude };
+        scan.action = 'shared_location';
+      }
+      // Store consent for audit trail
+      if (consent) {
+        scan.consent = {
+          locationConsent: consent.locationConsent || 'skipped',
+          consentedAt: consent.consentedAt ? new Date(consent.consentedAt) : new Date(),
+          consentVersion: consent.consentVersion || '1.0',
+          ipAddress: req.ip || req.socket.remoteAddress || undefined,
+        };
+      }
       await scan.save();
+    }
+
+    // Save location event if GPS coordinates provided
+    let locationSaved = false;
+    if (latitude && longitude) {
+      await LocationEvent.create({
+        tagId: tag._id,
+        petId: pet._id,
+        ownerId: tag.ownerId,
+        timestamp: new Date(),
+        location: { latitude, longitude, accuracy, source: 'qr_scan' },
+      });
+
+      // Update tag last scan location
+      tag.lastScanLocation = { latitude, longitude, source: 'qr_scan' };
+      tag.lastScannedAt = new Date();
+      await tag.save();
+      locationSaved = true;
     }
 
     // Auto-mark pet as found
@@ -229,13 +261,22 @@ router.post('/:tagId/notify', async (req: Request, res: Response) => {
     if (finderEmail) contactParts.push(`Email: ${finderEmail}`);
     const contactInfo = contactParts.join(' | ');
 
+    // Build location context for notification
+    let locationContext = '';
+    if (locationSaved) {
+      const accuracyMeters = accuracy ? Math.round(accuracy) : null;
+      locationContext = accuracyMeters
+        ? `📍 They were approximately ${accuracyMeters}m from the scan location.`
+        : '📍 They shared their location with you.';
+    }
+
     // Create notification to owner
     if (owner) {
       await Notification.create({
         userId: owner._id,
         type: 'pet_found',
         title: `Your pet ${pet?.name || 'Unknown'} has been found!`,
-        message: `A kind person found your pet ${pet?.name || ''} (${pet?.petId || ''}). They left their contact details so you can reach them. ${contactInfo}`,
+        message: `A kind person found your pet ${pet?.name || ''} (${pet?.petId || ''}). They left their contact details so you can reach them. ${contactInfo}${locationContext ? '\n\n' + locationContext : ''}`,
         priority: 'high',
         data: {
           petId: pet?._id,
@@ -246,6 +287,7 @@ router.post('/:tagId/notify', async (req: Request, res: Response) => {
           finderEmail: finderEmail || null,
           finderName: finderName || null,
           foundAt: new Date().toISOString(),
+          location: locationSaved ? { latitude, longitude, accuracy } : null,
         },
       });
     }
@@ -255,6 +297,7 @@ router.post('/:tagId/notify', async (req: Request, res: Response) => {
       data: {
         message: 'Owner has been notified successfully! Thank you for helping reunite this pet with its owner.',
         petFound: pet?.status === 'found',
+        locationShared: locationSaved,
       },
     });
   } catch {
@@ -349,7 +392,7 @@ router.get('/:tagId/found-timer', async (req: Request, res: Response) => {
  */
 router.post('/:tagId/share-location', async (req: Request, res: Response) => {
   try {
-    const { latitude, longitude } = req.body;
+    const { latitude, longitude, accuracy } = req.body;
     if (!latitude || !longitude) {
       res.status(400).json({ success: false, error: 'Location coordinates required' });
       return;
@@ -367,7 +410,7 @@ router.post('/:tagId/share-location', async (req: Request, res: Response) => {
       petId: tag.petId,
       ownerId: tag.ownerId,
       timestamp: new Date(),
-      location: { latitude, longitude, source: 'qr_scan' },
+      location: { latitude, longitude, accuracy, source: 'qr_scan' },
     });
 
     // Update tag last scan location

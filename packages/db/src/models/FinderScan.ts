@@ -15,6 +15,12 @@ export interface IFinderScanDocument extends Document {
   finderPhone?: string;
   finderEmail?: string;
   finderName?: string;
+  consent?: {
+    locationConsent: 'granted' | 'denied' | 'skipped' | 'unavailable';
+    consentedAt?: Date;
+    consentVersion?: string;
+    ipAddress?: string;
+  };
 }
 
 const FinderScanSchema = new Schema<IFinderScanDocument>(
@@ -37,6 +43,12 @@ const FinderScanSchema = new Schema<IFinderScanDocument>(
     finderPhone: { type: String },
     finderEmail: { type: String },
     finderName: { type: String },
+    consent: {
+      locationConsent: { type: String, enum: ['granted', 'denied', 'skipped', 'unavailable'] },
+      consentedAt: { type: Date },
+      consentVersion: { type: String },
+      ipAddress: { type: String },
+    },
   },
   { timestamps: true },
 );

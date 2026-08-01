@@ -43,8 +43,6 @@ function FinderPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notified, setNotified] = useState(false);
-  const [sharing, setSharing] = useState(false);
-  const [locationShared, setLocationShared] = useState(false);
   const [photoIdx, setPhotoIdx] = useState(0);
   const [showContactForm, setShowContactForm] = useState(false);
   const [finderName, setFinderName] = useState('');
@@ -55,6 +53,11 @@ function FinderPage() {
   const [foundTimer, setFoundTimer] = useState<{ active: boolean; foundAt?: string; elapsed?: number; finderPhone?: string; finderEmail?: string; finderName?: string } | null>(null);
   const [timerDisplay, setTimerDisplay] = useState('');
 
+  // Location consent & capture state
+  const [locationConsent, setLocationConsent] = useState<'pending' | 'granted' | 'denied' | 'unavailable'>('pending');
+  const [finderLocation, setFinderLocation] = useState<{ latitude: number; longitude: number; accuracy?: number } | null>(null);
+  const [consentTimestamp, setConsentTimestamp] = useState<Date | null>(null);
+
   const apiBase = import.meta.env.VITE_API_URL || '/api';
 
   useEffect(() => {
@@ -63,7 +66,6 @@ function FinderPage() {
       .get(`${apiBase}/finder/${tagId}`)
       .then((res) => {
         setData(res.data.data);
-        // Check if pet is in 'found' status and load timer
         if (res.data.data.pet.status === 'found') {
           loadFoundTimer();
         }
@@ -95,6 +97,35 @@ function FinderPage() {
     return () => clearInterval(interval);
   }, [foundTimer]);
 
+  // Request GPS location after consent
+  const requestLocation = () => {
+    if (!navigator.geolocation) {
+      setLocationConsent('unavailable');
+      setConsentTimestamp(new Date());
+      return;
+    }
+    setLocationConsent('granted');
+    setConsentTimestamp(new Date());
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setFinderLocation({
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+          accuracy: pos.coords.accuracy,
+        });
+      },
+      () => {
+        setLocationConsent('denied');
+      },
+      { enableHighAccuracy: true, timeout: 10000 },
+    );
+  };
+
+  const declineLocation = () => {
+    setLocationConsent('denied');
+    setConsentTimestamp(new Date());
+  };
+
   const notifyOwner = async () => {
     if (!tagId) return;
     if (!finderPhone && !finderEmail) {
@@ -104,36 +135,25 @@ function FinderPage() {
     setNotifyLoading(true);
     setContactError('');
     try {
-      await axios.post(`${apiBase}/finder/${tagId}/notify`, {
-        finderName,
-        finderPhone,
-        finderEmail,
-      });
+      const payload: any = { finderName, finderPhone, finderEmail };
+      if (finderLocation) {
+        payload.latitude = finderLocation.latitude;
+        payload.longitude = finderLocation.longitude;
+        payload.accuracy = finderLocation.accuracy;
+      }
+      // Send consent info for audit trail
+      payload.consent = {
+        locationConsent: locationConsent === 'pending' ? 'skipped' : locationConsent,
+        consentedAt: consentTimestamp?.toISOString() || new Date().toISOString(),
+        consentVersion: '1.0',
+      };
+      await axios.post(`${apiBase}/finder/${tagId}/notify`, payload);
       setNotified(true);
       setShowContactForm(false);
       loadFoundTimer();
     } catch (err: any) {
       setContactError(err.response?.data?.error || 'Failed to notify owner. Please try again.');
     } finally { setNotifyLoading(false); }
-  };
-
-  const shareLocation = async () => {
-    if (!tagId || !navigator.geolocation) return;
-    setSharing(true);
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        try {
-          await axios.post(`${apiBase}/finder/${tagId}/share-location`, {
-            latitude: pos.coords.latitude,
-            longitude: pos.coords.longitude,
-          });
-          setLocationShared(true);
-        } catch { alert('Failed to share location.'); }
-        setSharing(false);
-      },
-      () => { alert('Could not get your location. Please enable GPS.'); setSharing(false); },
-      { enableHighAccuracy: true },
-    );
   };
 
   // Resolve photos and main photo
@@ -297,6 +317,39 @@ function FinderPage() {
                 </div>
               )}
 
+              {/* Location Consent Banner */}
+              {!notified && !foundTimer?.active && locationConsent === 'pending' && navigator.geolocation && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <MapPin size={20} className="text-blue-600 mt-0.5 shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-blue-800">Share your location to help reunite this pet?</p>
+                      <p className="text-xs text-blue-600 mt-1">Your approximate location will be shared with the pet's owner so they know where to find their pet. Location is only used for this purpose.</p>
+                      <div className="flex gap-2 mt-3">
+                        <button onClick={requestLocation} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors flex items-center gap-1.5">
+                          <MapPin size={14} /> Share Location
+                        </button>
+                        <button onClick={declineLocation} className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors">
+                          Skip
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Location captured indicator */}
+              {finderLocation && (
+                <div className="bg-green-50 text-green-700 py-2 px-3 rounded-lg text-sm flex items-center gap-2">
+                  <CheckCircle size={14} /> Location captured — will be shared with owner
+                </div>
+              )}
+              {locationConsent === 'denied' && (
+                <div className="bg-gray-50 text-gray-500 py-2 px-3 rounded-lg text-sm flex items-center gap-2">
+                  <MapPin size={14} /> Location not shared
+                </div>
+              )}
+
               {/* Notify Owner */}
               {!notified && !foundTimer?.active ? (
                 <>
@@ -325,9 +378,14 @@ function FinderPage() {
                           <input type="email" value={finderEmail} onChange={(e) => setFinderEmail(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" placeholder="e.g. john@example.com" />
                         </div>
                       </div>
+                      {finderLocation && (
+                        <div className="bg-blue-50 border border-blue-100 rounded-md p-2 text-xs text-blue-700 flex items-center gap-1.5">
+                          <MapPin size={12} /> Your location will be shared with the owner
+                        </div>
+                      )}
                       <div className="flex gap-2">
                         <button onClick={notifyOwner} disabled={notifyLoading || (!finderPhone && !finderEmail)} className="flex-1 bg-primary-600 text-white py-2.5 rounded-lg font-medium flex items-center justify-center gap-2 hover:bg-primary-700 transition-colors disabled:opacity-50">
-                          {notifyLoading ? <><Loader2 size={16} className="animate-spin" /> Sending...</> : <><CheckCircle size={16} /> Send Notification</>}
+                          {notifyLoading ? <><Loader2 size={16} className="animate-spin" /> Sending...</> : <><CheckCircle size={16} /> Send Notification{finderLocation ? ' + Location' : ''}</>}
                         </button>
                         <button onClick={() => { setShowContactForm(false); setContactError(''); }} className="px-4 py-2.5 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50">Cancel</button>
                       </div>
@@ -339,16 +397,6 @@ function FinderPage() {
                   <CheckCircle size={18} /> Owner has been notified! Thank you for helping.
                 </div>
               ) : null}
-
-              {!locationShared ? (
-                <button onClick={shareLocation} disabled={sharing} className="w-full border border-primary-600 text-primary-700 py-3 rounded-lg font-medium flex items-center justify-center gap-2 hover:bg-primary-50 transition-colors disabled:opacity-50">
-                  <MapPin size={18} /> {sharing ? 'Getting location...' : 'Share My Location'}
-                </button>
-              ) : (
-                <div className="bg-green-50 text-green-700 py-3 rounded-lg text-center flex items-center justify-center gap-2">
-                  <CheckCircle size={18} /> Location shared with owner!
-                </div>
-              )}
 
               {data.ownerPhone && (
                 <a href={`tel:${data.ownerPhone}`} className="block w-full border border-gray-300 text-gray-700 py-3 rounded-lg font-medium text-center hover:bg-gray-50 transition-colors">
