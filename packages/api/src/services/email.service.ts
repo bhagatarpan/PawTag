@@ -265,3 +265,41 @@ export async function sendShippingNotification(
   );
   return { success: result.success };
 }
+
+export async function sendSubscriptionWelcomeEmail(
+  to: string,
+  name: string,
+  tagId: string,
+  planName: string,
+  freePeriodEndsAt: Date,
+): Promise<EmailResult> {
+  const subscriptionsUrl = `${frontendUrl}/account/subscriptions`;
+  const freeEndDate = freePeriodEndsAt.toLocaleDateString('en-NZ', {
+    year: 'numeric', month: 'long', day: 'numeric',
+  });
+
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+      <div style="background: linear-gradient(135deg, #0d9488, #14b8a6); padding: 24px; border-radius: 12px 12px 0 0; text-align: center;">
+        <h1 style="color: white; font-size: 24px; margin: 0;">Welcome to PawTag!</h1>
+      </div>
+      <div style="background: #f9fafb; padding: 32px; border: 1px solid #e5e7eb;">
+        <h2 style="color: #111827; font-size: 20px;">Hi ${name},</h2>
+        <p style="color: #374151; font-size: 15px; line-height: 1.7;">Your PawTag subscription has been activated! Here are your details:</p>
+        <div style="background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin: 16px 0;">
+          <table style="width: 100%; font-size: 14px;">
+            <tr><td style="color: #6b7280; padding: 4px 0;">Tag ID</td><td style="color: #111827; font-weight: 600; font-family: monospace; text-align: right;">${tagId}</td></tr>
+            <tr><td style="color: #6b7280; padding: 4px 0;">Plan</td><td style="color: #111827; font-weight: 600; text-align: right;">${planName}</td></tr>
+            <tr><td style="color: #6b7280; padding: 4px 0;">Free Period Until</td><td style="color: #111827; font-weight: 600; text-align: right;">${freeEndDate}</td></tr>
+          </table>
+        </div>
+        <p style="color: #374151; font-size: 15px; line-height: 1.7;">Your tag comes with <strong>12 months free</strong> subscription. After that, you'll be charged based on your plan.</p>
+        <a href="${subscriptionsUrl}" style="display: inline-block; background: #0d9488; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; margin: 16px 0;">View Subscription</a>
+      </div>
+      <div style="text-align: center; padding: 16px; color: #9ca3af; font-size: 11px;">
+        PawTag — Reuniting lost pets with their families
+      </div>
+    </div>`;
+
+  return sendMail(to, `Your PawTag subscription is active — ${tagId}`, html);
+}

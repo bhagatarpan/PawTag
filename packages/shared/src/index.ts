@@ -73,6 +73,27 @@ export enum ContentStatus {
   ARCHIVED = 'archived',
 }
 
+export enum SubscriptionStatus {
+  ACTIVE = 'active',
+  EXPIRED = 'expired',
+  GRACE_PERIOD = 'grace_period',
+  CANCELLED = 'cancelled',
+  PENDING_PAYMENT = 'pending_payment',
+}
+
+export enum SubscriptionPlanType {
+  ANNUAL = 'annual',
+  MONTHLY = 'monthly',
+  FREE = 'free',
+}
+
+export enum InvoiceStatus {
+  PAID = 'paid',
+  PENDING = 'pending',
+  FAILED = 'failed',
+  REFUNDED = 'refunded',
+}
+
 // --- Core Models ---
 
 export interface User {
@@ -246,8 +267,74 @@ export interface Tag {
   ownerId: string;
   status: TagStatus;
   qrCodeUrl?: string;
+  tagType?: 'qr' | 'nfc';
   lastScannedAt?: string;
   lastScanLocation?: GeoLocation;
+  subscriptionStatus?: 'active' | 'inactive' | 'grace_period' | 'expired' | 'none';
+  subscriptionId?: string;
+  activatedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Subscription {
+  _id: string;
+  userId: string;
+  tagId: string;
+  orderId?: string;
+  planId?: string;
+  planName: string;
+  planType: SubscriptionPlanType;
+  status: SubscriptionStatus;
+  price: number;
+  currency: string;
+  startDate: string;
+  freePeriodEndsAt?: string;
+  currentPeriodStart: string;
+  currentPeriodEnd: string;
+  gracePeriodEndsAt?: string;
+  cancelledAt?: string;
+  cancellationReason?: string;
+  autoRenew: boolean;
+  renewalMethod: 'annual' | 'monthly';
+  stripeSubscriptionId?: string;
+  stripeCustomerId?: string;
+  lastPaymentDate?: string;
+  lastPaymentAmount?: number;
+  nextPaymentDate?: string;
+  lastScannedAt?: string;
+  totalScans: number;
+  reminderStates?: SubscriptionReminderStates;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string;
+}
+
+export interface SubscriptionReminderStates {
+  reminder30dSent?: boolean;
+  reminder7dSent?: boolean;
+  reminder1dSent?: boolean;
+  graceWeeklySentCount: number;
+  lastGraceReminderAt?: string;
+}
+
+export interface Invoice {
+  _id: string;
+  subscriptionId: string;
+  userId: string;
+  invoiceNumber: string;
+  amount: number;
+  currency: string;
+  status: InvoiceStatus;
+  stripeInvoiceId?: string;
+  stripePaymentIntentId?: string;
+  paymentMethod?: string;
+  billingPeriod: {
+    start: string;
+    end: string;
+  };
+  paidAt?: string;
+  dueDate: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -285,8 +372,30 @@ export interface Product {
   sku: string;
   weight?: number;
   dimensions?: ProductDimensions;
+  variants?: ProductVariant[];
+  customizable?: boolean;
+  customizationPrice?: number;
+  isSubscription?: boolean;
+  subscriptionConfig?: SubscriptionConfig;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ProductVariant {
+  name: string;
+  sku: string;
+  price: number;
+  stock: number;
+  image?: string;
+  attributes: Record<string, string>;
+}
+
+export interface SubscriptionConfig {
+  type: 'annual' | 'monthly';
+  freePeriodMonths: number;
+  gracePeriodWeeks: number;
+  stripePriceId?: string;
+  features: string[];
 }
 
 export interface ProductDimensions {
@@ -578,3 +687,56 @@ export function getOrderStatusColor(status: string): string {
 export function getOrderStatusLabel(status: string): string {
   return ORDER_STATUS_LABELS[status] || status;
 }
+
+// --- Subscription Status Utilities ---
+
+export const SUBSCRIPTION_STATUS_COLORS: Record<string, string> = {
+  active: 'bg-green-100 text-green-700',
+  expired: 'bg-red-100 text-red-700',
+  grace_period: 'bg-yellow-100 text-yellow-700',
+  cancelled: 'bg-gray-100 text-gray-700',
+  pending_payment: 'bg-orange-100 text-orange-700',
+  none: 'bg-gray-100 text-gray-500',
+};
+
+export const SUBSCRIPTION_STATUS_LABELS: Record<string, string> = {
+  active: 'Active',
+  expired: 'Expired',
+  grace_period: 'Grace Period',
+  cancelled: 'Cancelled',
+  pending_payment: 'Pending Payment',
+  none: 'No Subscription',
+};
+
+export function getSubscriptionStatusColor(status: string): string {
+  return SUBSCRIPTION_STATUS_COLORS[status] || 'bg-gray-100 text-gray-700';
+}
+
+export function getSubscriptionStatusLabel(status: string): string {
+  return SUBSCRIPTION_STATUS_LABELS[status] || status;
+}
+
+export function isTagActiveForFinder(subscriptionStatus?: string): boolean {
+  return subscriptionStatus === 'active' || subscriptionStatus === 'grace_period';
+}
+
+// --- Subscription Plan Constants ---
+
+export const SUBSCRIPTION_PLANS = {
+  annual: {
+    name: 'PawTag Annual',
+    price: 0.99,
+    billingCycle: 'yearly',
+    totalPrice: 11.88,
+    freePeriodMonths: 12,
+    gracePeriodWeeks: 4,
+  },
+  monthly: {
+    name: 'PawTag Monthly',
+    price: 1.99,
+    billingCycle: 'monthly',
+    totalPrice: 1.99,
+    freePeriodMonths: 12,
+    gracePeriodWeeks: 4,
+  },
+} as const;

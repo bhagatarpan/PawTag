@@ -7,6 +7,7 @@ import ProfilePage from './pages/ProfilePage';
 import OrdersPage from './pages/OrdersPage';
 import NotificationsPage from './pages/NotificationsPage';
 import SettingsPage from './pages/SettingsPage';
+import SubscriptionsPage from './pages/SubscriptionsPage';
 
 export default function App() {
   return (
@@ -16,6 +17,7 @@ export default function App() {
         <Route path="/" element={<Protected><DashboardLayout><PetsPage /></DashboardLayout></Protected>} />
         <Route path="/profile" element={<Protected><DashboardLayout><ProfilePage /></DashboardLayout></Protected>} />
         <Route path="/orders" element={<Protected><DashboardLayout><OrdersPage /></DashboardLayout></Protected>} />
+        <Route path="/subscriptions" element={<Protected><DashboardLayout><SubscriptionsPage /></DashboardLayout></Protected>} />
         <Route path="/notifications" element={<Protected><DashboardLayout><NotificationsPage /></DashboardLayout></Protected>} />
         <Route path="/settings" element={<Protected><DashboardLayout><SettingsPage /></DashboardLayout></Protected>} />
         <Route path="*" element={<Navigate to="/" replace />} />

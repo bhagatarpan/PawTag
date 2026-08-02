@@ -33,7 +33,11 @@ import cmsHomepageAdminRoutes from './routes/cms-homepage-admin';
 import cmsShopAdminRoutes from './routes/cms-shop-admin';
 import cmsAuthAdminRoutes from './routes/cms-auth-admin';
 import cmsPublicV2Routes from './routes/cms-public-v2';
+import customerSubscriptionRoutes from './routes/customer-subscriptions';
+import adminSubscriptionRoutes from './routes/admin-subscriptions';
+import webhookRoutes from './routes/webhooks';
 import { startReminderService } from './services/reminder.service';
+import { startSubscriptionService } from './services/subscription.service';
 
 const app = express();
 
@@ -128,6 +132,9 @@ app.use('/api/admin/cms/homepage', cmsHomepageAdminRoutes);
 app.use('/api/admin/cms/shop-pages', cmsShopAdminRoutes);
 app.use('/api/admin/cms/auth-pages', cmsAuthAdminRoutes);
 app.use('/api/customer', customerRoutes);
+app.use('/api/customer/subscriptions', customerSubscriptionRoutes);
+app.use('/api/admin/subscriptions', adminSubscriptionRoutes);
+app.use('/api/webhooks', webhookRoutes);
 app.use('/api/finder', finderRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/public/cms', cmsPublicRoutes);
@@ -146,6 +153,9 @@ async function start() {
 
     // Start 24-hour reminder service
     startReminderService();
+
+    // Start subscription lifecycle service
+    startSubscriptionService();
 
     const server = app.listen(config.port, () => {
       console.log(`PawTag API running on port ${config.port}`);

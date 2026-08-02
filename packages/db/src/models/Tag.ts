@@ -15,6 +15,9 @@ export interface ITagDocument extends Document {
     accuracy?: number;
     source: 'gps' | 'qr_scan' | 'nfc_tap' | 'manual';
   };
+  subscriptionStatus: 'active' | 'inactive' | 'grace_period' | 'expired' | 'none';
+  subscriptionId?: mongoose.Types.ObjectId;
+  activatedAt?: Date;
   deletedAt?: Date;
 }
 
@@ -34,6 +37,13 @@ const TagSchema = new Schema<ITagDocument>(
       accuracy: Number,
       source: { type: String, enum: ['gps', 'qr_scan', 'nfc_tap', 'manual'] },
     },
+    subscriptionStatus: {
+      type: String,
+      enum: ['active', 'inactive', 'grace_period', 'expired', 'none'],
+      default: 'none',
+    },
+    subscriptionId: { type: Schema.Types.ObjectId, ref: 'Subscription' },
+    activatedAt: { type: Date },
     deletedAt: { type: Date, default: null },
   },
   { timestamps: true },

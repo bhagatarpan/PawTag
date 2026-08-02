@@ -32,6 +32,8 @@ import CmsPetReferencesPage from './pages/cms/CmsPetReferences';
 import CmsHomepageSectionsPage from './pages/cms/CmsHomepageSections';
 import CmsShopPagesPage from './pages/cms/CmsShopPages';
 import CmsAuthPagesPage from './pages/cms/CmsAuthPages';
+import SubscriptionsPage from './pages/SubscriptionsPage';
+import SubscriptionDetailPage from './pages/SubscriptionDetailPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
@@ -157,6 +159,8 @@ export default function App() {
       <Route path="/cms/homepage" element={<ProtectedRoute><CmsHomepageSectionsPage /></ProtectedRoute>} />
       <Route path="/cms/shop-pages" element={<ProtectedRoute><CmsShopPagesPage /></ProtectedRoute>} />
       <Route path="/cms/auth-pages" element={<ProtectedRoute><CmsAuthPagesPage /></ProtectedRoute>} />
+      <Route path="/subscriptions" element={<ProtectedRoute><SubscriptionsPage /></ProtectedRoute>} />
+      <Route path="/subscriptions/:id" element={<ProtectedRoute><SubscriptionDetailPage /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

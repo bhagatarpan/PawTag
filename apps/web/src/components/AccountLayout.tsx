@@ -1,6 +1,6 @@
 import { ReactNode, useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { PawPrint, LogOut, User, ShoppingBag, Bell, Settings, ChevronRight } from 'lucide-react';
+import { PawPrint, LogOut, User, ShoppingBag, Bell, Settings, ChevronRight, CreditCard } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSiteSettings } from '../hooks/useCms';
 import api from '../lib/api';
@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { path: '/account', label: 'My Pets', icon: PawPrint },
   { path: '/account/profile', label: 'Profile', icon: User },
   { path: '/account/orders', label: 'Orders', icon: ShoppingBag },
+  { path: '/account/subscriptions', label: 'Subscriptions', icon: CreditCard },
   { path: '/account/notifications', label: 'Notifications', icon: Bell },
   { path: '/account/settings', label: 'Settings', icon: Settings },
 ];

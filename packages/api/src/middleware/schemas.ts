@@ -215,3 +215,26 @@ export const updateTagSchema = z.object({
   tagType: z.enum(['qr', 'nfc']).optional(),
   status: z.enum(['active', 'inactive', 'lost']).optional(),
 });
+
+// --- Subscription Schemas ---
+export const cancelSubscriptionSchema = z.object({
+  reason: z.string().optional(),
+});
+
+export const changePlanSchema = z.object({
+  planType: z.enum(['annual', 'monthly'], { errorMap: () => ({ message: 'Plan type must be "annual" or "monthly"' }) }),
+});
+
+export const autoRenewSchema = z.object({
+  autoRenew: z.boolean({ errorMap: () => ({ message: 'autoRenew must be a boolean' }) }),
+});
+
+export const adminUpdateSubscriptionStatusSchema = z.object({
+  status: z.enum(['active', 'expired', 'grace_period', 'cancelled', 'pending_payment']),
+  reason: z.string().optional(),
+});
+
+export const adminExtendSubscriptionSchema = z.object({
+  days: z.number().min(1, 'Days must be at least 1').max(365, 'Days cannot exceed 365'),
+  reason: z.string().optional(),
+});

@@ -33,3 +33,5 @@ export { CmsPetReference, type ICmsPetReferenceDocument } from './models/CmsPetR
 export { default as CmsHomepageSection, type ICmsHomepageSectionDocument } from './models/CmsHomepageSection';
 export { default as CmsShopPage, type ICmsShopPageDocument } from './models/CmsShopPage';
 export { default as CmsAuthPage, type ICmsAuthPageDocument } from './models/CmsAuthPage';
+export { Subscription, type ISubscriptionDocument } from './models/Subscription';
+export { Invoice, type IInvoiceDocument } from './models/Invoice';

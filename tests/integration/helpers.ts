@@ -139,6 +139,7 @@ export async function createCustomerWithRBAC(overrides: Partial<{ email: string;
     'order.read', 'order.create',
     'notification.read', 'notification.update',
     'customer.read',
+    'subscription.read', 'subscription.update',
   ];
 
   const permIds: string[] = [];

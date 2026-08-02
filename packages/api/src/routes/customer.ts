@@ -752,6 +752,46 @@ router.post('/orders', requirePermission('order.create'), async (req: AuthReques
     // Clear cart
     await Cart.findOneAndDelete({ userId: req.user!.id });
 
+    // Create subscriptions for tag products
+    try {
+      const { createSubscription } = await import('../services/subscription.service');
+      const { sendSubscriptionWelcomeEmail } = await import('../services/email.service');
+
+      for (const item of orderItems) {
+        const product = await Product.findById(item.productId);
+        if (product && product.isSubscription && product.subscriptionConfig) {
+          // Find or create a tag for this user (tags are created by admin, but for now check existing)
+          const userTags = await Tag.find({ ownerId: req.user!.id, deletedAt: null });
+
+          for (const tag of userTags) {
+            if (tag.subscriptionStatus === 'none' || !tag.subscriptionId) {
+              const subscription = await createSubscription({
+                userId: req.user!.id,
+                tagId: tag._id.toString(),
+                orderId: order._id.toString(),
+                planType: product.subscriptionConfig.type || 'annual',
+                planId: product._id.toString(),
+                price: product.price,
+              });
+
+              // Send subscription welcome email (non-blocking)
+              sendSubscriptionWelcomeEmail(
+                user?.email || '',
+                user?.fullName || 'Customer',
+                tag.tagId,
+                subscription.planName,
+                subscription.freePeriodEndsAt || new Date(),
+              ).catch((err: any) => console.error('Subscription email error:', err));
+
+              break; // One subscription per order item
+            }
+          }
+        }
+      }
+    } catch (subError) {
+      console.error('Subscription creation error:', subError);
+    }
+
     // Send confirmation email (non-blocking)
     const { sendOrderConfirmation } = require('../services/email.service');
     sendOrderConfirmation({

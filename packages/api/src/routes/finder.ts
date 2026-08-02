@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { Tag, FinderScan, LocationEvent, Notification } from '@pawtag/db';
+import { Tag, FinderScan, LocationEvent, Notification, Subscription } from '@pawtag/db';
 
 const router = Router();
 
@@ -105,6 +105,33 @@ router.get('/:tagId', async (req: Request, res: Response) => {
     const pet = tag.petId as any;
     const owner = tag.ownerId as any;
 
+    // Check subscription status
+    const isActiveForFinder = !tag.subscriptionStatus ||
+      tag.subscriptionStatus === 'active' ||
+      tag.subscriptionStatus === 'grace_period' ||
+      tag.subscriptionStatus === 'none';
+
+    if (!isActiveForFinder) {
+      // Tag subscription expired — still log the scan but return limited info
+      await FinderScan.create({
+        tagId: tag._id,
+        petId: pet?._id || tag._id,
+        deviceInfo: req.headers['user-agent'] || 'unknown',
+        action: 'viewed',
+      });
+
+      res.json({
+        success: true,
+        data: {
+          tagActive: false,
+          subscriptionStatus: tag.subscriptionStatus,
+          message: 'This PawTag is no longer active. The owner needs to renew their subscription.',
+          petInfo: null,
+        },
+      });
+      return;
+    }
+
     // Log the scan
     await FinderScan.create({
       tagId: tag._id,
@@ -116,6 +143,14 @@ router.get('/:tagId', async (req: Request, res: Response) => {
     // Update tag scan info
     tag.lastScannedAt = new Date();
     await tag.save();
+
+    // Update subscription scan count if linked
+    if (tag.subscriptionId) {
+      await Subscription.findByIdAndUpdate(tag.subscriptionId, {
+        lastScannedAt: new Date(),
+        $inc: { totalScans: 1 },
+      });
+    }
 
     res.json({
       success: true,
@@ -139,6 +174,7 @@ router.get('/:tagId', async (req: Request, res: Response) => {
         },
         tagId: tag.tagId,
         tagStatus: tag.status,
+        subscriptionStatus: tag.subscriptionStatus || 'none',
         ownerName: owner.fullName,
         ownerPhone: owner.phone,
       },

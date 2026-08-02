@@ -27,6 +27,7 @@ import {
   Monitor,
   ShoppingCart,
   LogIn,
+  CreditCard,
 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 
@@ -44,6 +45,7 @@ const mainLinks: SidebarLink[] = [
   { to: '/tags', label: 'Tags', icon: QrCode, permission: 'tag.read' },
   { to: '/products', label: 'Products', icon: ShoppingBag, permission: 'product.read' },
   { to: '/orders', label: 'Orders', icon: FileText, permission: 'order.read' },
+  { to: '/subscriptions', label: 'Subscriptions', icon: CreditCard, permission: 'subscription.read' },
   { to: '/statistics', label: 'Statistics', icon: BarChart3, permission: 'stats.read' },
   { to: '/content', label: 'Content', icon: Newspaper, permission: 'content.read' },
 ];
