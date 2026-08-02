@@ -375,6 +375,8 @@ export interface Product {
   variants?: ProductVariant[];
   customizable?: boolean;
   customizationPrice?: number;
+  shippingCost?: number;
+  warrantyMonths?: number;
   isSubscription?: boolean;
   subscriptionConfig?: SubscriptionConfig;
   createdAt: string;
@@ -394,6 +396,7 @@ export interface SubscriptionConfig {
   type: 'annual' | 'monthly';
   freePeriodMonths: number;
   gracePeriodWeeks: number;
+  monthlyPrice?: number;
   stripePriceId?: string;
   features: string[];
 }

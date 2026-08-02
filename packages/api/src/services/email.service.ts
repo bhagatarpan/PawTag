@@ -83,7 +83,7 @@ async function renderCmsEmail(slug: string, variables: Record<string, string>): 
   }
 }
 
-async function sendMail(to: string, subject: string, html: string, from?: string): Promise<EmailResult> {
+export async function sendMail(to: string, subject: string, html: string, from?: string): Promise<EmailResult> {
   const fromAddress = from || '"PawTag" <no-reply@pawtag.co.nz>';
 
   if (isDemoMode) {

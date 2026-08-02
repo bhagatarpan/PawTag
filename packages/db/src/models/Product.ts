@@ -31,11 +31,14 @@ export interface IProductDocument extends Document {
   variants: IProductVariant[];
   customizable: boolean;
   customizationPrice: number;
+  shippingCost: number;
+  warrantyMonths: number;
   isSubscription: boolean;
   subscriptionConfig?: {
     type: 'annual' | 'monthly';
     freePeriodMonths: number;
     gracePeriodWeeks: number;
+    monthlyPrice?: number;
     stripePriceId?: string;
     features: string[];
   };
@@ -73,11 +76,14 @@ const ProductSchema = new Schema<IProductDocument>(
     variants: [ProductVariantSchema],
     customizable: { type: Boolean, default: false },
     customizationPrice: { type: Number, default: 0, min: 0 },
+    shippingCost: { type: Number, default: 0, min: 0 },
+    warrantyMonths: { type: Number, default: 12, min: 0 },
     isSubscription: { type: Boolean, default: false, index: true },
     subscriptionConfig: {
       type: { type: String, enum: ['annual', 'monthly'] },
       freePeriodMonths: { type: Number, default: 12 },
       gracePeriodWeeks: { type: Number, default: 4 },
+      monthlyPrice: { type: Number },
       stripePriceId: { type: String },
       features: [{ type: String }],
     },

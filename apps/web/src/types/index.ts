@@ -13,6 +13,16 @@ export interface Product {
   sku: string;
   weight?: number;
   dimensions?: { length: number; width: number; height: number; unit: 'cm' | 'in' };
+  shippingCost?: number;
+  warrantyMonths?: number;
+  isSubscription?: boolean;
+  subscriptionConfig?: {
+    type: 'annual' | 'monthly';
+    freePeriodMonths: number;
+    gracePeriodWeeks: number;
+    monthlyPrice?: number;
+    features: string[];
+  };
   createdAt: string;
   updatedAt: string;
 }

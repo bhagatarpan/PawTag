@@ -1,9 +1,14 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Lock, CreditCard, PawPrint, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Lock, CreditCard, PawPrint, CheckCircle, Truck } from 'lucide-react';
 import api from '../lib/api';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
+
+const SHIPPING_ZONES = [
+  { value: 'city', label: 'NZ City / Suburb', cost: 7.99 },
+  { value: 'rural', label: 'Rural / Village', cost: 10.99 },
+] as const;
 
 export default function Checkout() {
   const { items, total, clearCart } = useCart();
@@ -12,6 +17,7 @@ export default function Checkout() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [orderNumber, setOrderNumber] = useState('');
+  const [shippingZone, setShippingZone] = useState<'city' | 'rural'>('city');
   const [form, setForm] = useState({
     line1: '',
     line2: '',
@@ -21,6 +27,9 @@ export default function Checkout() {
     country: 'NZ',
   });
 
+  const shippingCost = SHIPPING_ZONES.find((z) => z.value === shippingZone)?.cost || 7.99;
+  const orderTotal = total + shippingCost;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) { navigate('/login'); return; }
@@ -29,7 +38,7 @@ export default function Checkout() {
     setLoading(true);
     try {
       const res = await api.post('/customer/orders', {
-        shippingAddress: form,
+        shippingAddress: { ...form, shippingZone },
         paymentMethod: 'card',
       });
       setOrderNumber(res.data.data.orderNumber);
@@ -128,11 +137,37 @@ export default function Checkout() {
                     <input type="text" value={form.country} disabled className="w-full px-4 py-3 rounded-lg border border-gray-200 bg-gray-50 text-gray-500" />
                   </div>
                 </div>
+
+                {/* Shipping Zone */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <Truck className="inline h-4 w-4 mr-1" /> Shipping Zone *
+                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {SHIPPING_ZONES.map((zone) => (
+                      <button
+                        key={zone.value}
+                        type="button"
+                        onClick={() => setShippingZone(zone.value)}
+                        className={`p-4 rounded-xl border-2 text-left transition-all ${
+                          shippingZone === zone.value
+                            ? 'border-teal-500 bg-teal-50 ring-2 ring-teal-200'
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-gray-900">{zone.label}</span>
+                          <span className="text-sm font-bold text-teal-700">${zone.cost.toFixed(2)}</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
 
               <button type="submit" disabled={loading || !user || items.length === 0} className="w-full py-4 bg-teal-600 text-white rounded-xl font-semibold text-lg hover:bg-teal-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2">
                 <CreditCard className="h-5 w-5" />
-                {loading ? 'Placing Order...' : `Place Order — $${total.toFixed(2)}`}
+                {loading ? 'Placing Order...' : `Place Order — $${orderTotal.toFixed(2)}`}
               </button>
 
               <p className="text-xs text-gray-400 text-center">
@@ -166,12 +201,12 @@ export default function Checkout() {
                   <span>${total.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-sm text-gray-500">
-                  <span>Shipping</span>
-                  <span className="text-green-600 font-medium">Free</span>
+                  <span>Shipping ({SHIPPING_ZONES.find((z) => z.value === shippingZone)?.label})</span>
+                  <span>${shippingCost.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-100">
                   <span>Total</span>
-                  <span className="text-teal-700">${total.toFixed(2)}</span>
+                  <span className="text-teal-700">${orderTotal.toFixed(2)}</span>
                 </div>
               </div>
             </div>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ShoppingCart, ArrowLeft, PawPrint, Package, Shield, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ShoppingCart, ArrowLeft, PawPrint, Shield, Truck, Check, Wifi, Smartphone, Zap, AlertCircle } from 'lucide-react';
 import api from '../lib/api';
 import { useCart } from '../context/CartContext';
 import { Product } from '../types';
@@ -10,7 +10,6 @@ export default function ProductDetail() {
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
-  const [selectedImage, setSelectedImage] = useState(0);
   const [added, setAdded] = useState(false);
   const { addItem } = useCart();
 
@@ -37,6 +36,19 @@ export default function ProductDetail() {
     setTimeout(() => setAdded(false), 2000);
   };
 
+  const getProductIcon = (sku: string) => {
+    if (sku === 'PT-SCAN-001') return <Smartphone className="h-12 w-12" />;
+    if (sku === 'PT-PLUS-001') return <Zap className="h-12 w-12" />;
+    return <Wifi className="h-12 w-12" />;
+  };
+
+  const getBadge = (sku: string) => {
+    if (sku === 'PT-SCAN-001') return { label: 'Essential', color: 'bg-blue-100 text-blue-700' };
+    if (sku === 'PT-CLASSIC-001') return { label: 'Most Ordered', color: 'bg-amber-100 text-amber-700' };
+    if (sku === 'PT-PLUS-001') return { label: 'Premium', color: 'bg-purple-100 text-purple-700' };
+    return null;
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -57,6 +69,9 @@ export default function ProductDetail() {
     );
   }
 
+  const badge = getBadge(product.sku);
+  const monthlyPrice = product.subscriptionConfig?.monthlyPrice || 0;
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -70,36 +85,23 @@ export default function ProductDetail() {
         </nav>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-          {/* Image Gallery */}
+          {/* Image / Placeholder */}
           <div className="space-y-4">
-            <div className="relative bg-gradient-to-br from-teal-50 to-teal-100 rounded-2xl overflow-hidden aspect-square">
-              {product.images?.length ? (
-                <img src={product.images[selectedImage]} alt={product.name} className="w-full h-full object-cover" />
+            <div className="relative bg-gradient-to-br from-teal-50 to-teal-100 rounded-2xl overflow-hidden aspect-square flex items-center justify-center">
+              {product.images?.[0] ? (
+                <img src={product.images[0]} alt={product.name} className="w-full h-full object-cover" />
               ) : (
-                <div className="flex items-center justify-center h-full">
-                  <PawPrint className="h-48 w-48 text-teal-200" />
+                <div className="flex flex-col items-center gap-3 text-teal-300">
+                  {getProductIcon(product.sku)}
+                  <PawPrint className="h-40 w-40" />
                 </div>
               )}
-              {product.images && product.images.length > 1 && (
-                <>
-                  <button onClick={() => setSelectedImage((prev) => prev > 0 ? prev - 1 : product.images.length - 1)} className="absolute left-3 top-1/2 -translate-y-1/2 bg-white/90 rounded-full p-2 shadow-lg hover:bg-white">
-                    <ChevronLeft className="h-5 w-5 text-gray-700" />
-                  </button>
-                  <button onClick={() => setSelectedImage((prev) => prev < product.images.length - 1 ? prev + 1 : 0)} className="absolute right-3 top-1/2 -translate-y-1/2 bg-white/90 rounded-full p-2 shadow-lg hover:bg-white">
-                    <ChevronRight className="h-5 w-5 text-gray-700" />
-                  </button>
-                </>
+              {badge && (
+                <div className={`absolute top-4 left-4 px-3 py-1 rounded-full text-xs font-bold ${badge.color}`}>
+                  {badge.label}
+                </div>
               )}
             </div>
-            {product.images && product.images.length > 1 && (
-              <div className="flex gap-3">
-                {product.images.map((img, i) => (
-                  <button key={i} onClick={() => setSelectedImage(i)} className={`w-20 h-20 rounded-lg overflow-hidden border-2 transition-all ${selectedImage === i ? 'border-teal-500 ring-2 ring-teal-200' : 'border-gray-200 hover:border-gray-300'}`}>
-                    <img src={img} alt="" className="w-full h-full object-cover" />
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
 
           {/* Product Info */}
@@ -107,9 +109,24 @@ export default function ProductDetail() {
             <div>
               <span className="text-sm font-medium text-teal-600 uppercase tracking-wide">{product.category}</span>
               <h1 className="text-3xl font-bold text-gray-900 mt-2">{product.name}</h1>
-              <p className="text-4xl font-bold text-teal-700 mt-4">${product.price.toFixed(2)} <span className="text-base font-normal text-gray-500">NZD</span></p>
+              <p className="text-sm text-gray-500 mt-1">{product.shortDescription}</p>
             </div>
 
+            {/* Price */}
+            <div className="bg-teal-50 rounded-xl p-4">
+              <div className="flex items-baseline gap-2">
+                <span className="text-4xl font-bold text-teal-700">${product.price.toFixed(2)}</span>
+                <span className="text-base text-gray-500">NZD</span>
+              </div>
+              <p className="text-sm text-teal-600 mt-1">
+                Includes 12 months free subscription
+                {monthlyPrice > 0 && (
+                  <> — then ${monthlyPrice.toFixed(2)}/month billed annually</>
+                )}
+              </p>
+            </div>
+
+            {/* Description */}
             <div className="border-t border-b border-gray-200 py-6">
               <p className="text-gray-600 leading-relaxed">{product.description}</p>
             </div>
@@ -149,22 +166,36 @@ export default function ProductDetail() {
               </button>
             </div>
 
-            {/* Trust Badges */}
-            <div className="grid grid-cols-2 gap-4 pt-6">
+            {/* Info Badges */}
+            <div className="grid grid-cols-2 gap-4 pt-4">
               <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl">
-                <Shield className="h-8 w-8 text-teal-600" />
+                <Shield className="h-8 w-8 text-teal-600 flex-shrink-0" />
                 <div>
-                  <p className="font-medium text-gray-900 text-sm">Secure</p>
-                  <p className="text-gray-500 text-xs">Encrypted checkout</p>
+                  <p className="font-medium text-gray-900 text-sm">12 Month Warranty</p>
+                  <p className="text-gray-500 text-xs">Normal wear & tear</p>
                 </div>
               </div>
               <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl">
-                <Package className="h-8 w-8 text-teal-600" />
+                <Truck className="h-8 w-8 text-teal-600 flex-shrink-0" />
                 <div>
-                  <p className="font-medium text-gray-900 text-sm">Fast Shipping</p>
-                  <p className="text-gray-500 text-xs">NZ-wide delivery</p>
+                  <p className="font-medium text-gray-900 text-sm">NZ-Wide Shipping</p>
+                  <p className="text-gray-500 text-xs">From $7.99</p>
                 </div>
               </div>
+            </div>
+
+            {/* Warranty Details */}
+            <div className="bg-gray-50 rounded-xl p-4 space-y-2">
+              <h4 className="font-semibold text-gray-900 text-sm flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-amber-500" /> Warranty & Shipping
+              </h4>
+              <ul className="text-xs text-gray-600 space-y-1 ml-6">
+                <li>• 12 month warranty on normal wear and tear</li>
+                <li>• Physical damage (chewing, bending, breakage) not covered</li>
+                <li>• Warranty replacements shipped with a shipping charge</li>
+                <li>• Shipping: $7.99 NZ cities/suburbs, $10.99 rural/villages</li>
+                <li>• Lost or damaged? Replacement at full cost as new</li>
+              </ul>
             </div>
           </div>
         </div>

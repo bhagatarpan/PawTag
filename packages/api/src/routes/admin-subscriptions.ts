@@ -51,8 +51,7 @@ router.get('/', requirePermission('subscription.read'), async (req: AuthRequest,
         return (
           (user?.email?.toLowerCase().includes(searchLower)) ||
           (user?.fullName?.toLowerCase().includes(searchLower)) ||
-          (tag?.tagId?.toLowerCase().includes(searchLower)) ||
-          (sub.invoiceNumber?.toString().includes(searchLower))
+          (tag?.tagId?.toLowerCase().includes(searchLower))
         );
       });
     }
