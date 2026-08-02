@@ -1,4 +1,4 @@
-import { connectDatabase, Product } from '@pawtag/db';
+import { connectDatabase, Product, Setting } from '@pawtag/db';
 import dotenv from 'dotenv';
 import path from 'path';
 
@@ -101,6 +101,21 @@ async function seedProducts() {
     for (const p of result) {
       console.log(`  - ${p.name} (${p.sku}) — $${p.price} NZD + subscription`);
     }
+
+    // Seed company settings
+    const companySettings = [
+      { key: 'company.name', value: 'PawTag Ltd', category: 'company', description: 'Company name for invoices and emails' },
+      { key: 'company.address', value: '123 Street, Auckland 1010, New Zealand', category: 'company', description: 'Company address for invoices' },
+      { key: 'company.phone', value: '+64 21 123 4567', category: 'company', description: 'Company phone number' },
+      { key: 'company.email', value: 'billing@pawtag.co.nz', category: 'company', description: 'Billing email address' },
+      { key: 'company.gst', value: 'GST123456789', category: 'company', description: 'GST/Tax registration number' },
+      { key: 'company.website', value: 'pawtag.co.nz', category: 'company', description: 'Company website' },
+      { key: 'company.logo', value: '', category: 'company', description: 'Company logo URL for invoices' },
+    ];
+    for (const s of companySettings) {
+      await Setting.findOneAndUpdate({ key: s.key }, s, { upsert: true });
+    }
+    console.log(`Seeded ${companySettings.length} company settings`);
 
     console.log('Done!');
     process.exit(0);

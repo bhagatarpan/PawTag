@@ -36,6 +36,7 @@ import cmsPublicV2Routes from './routes/cms-public-v2';
 import customerSubscriptionRoutes from './routes/customer-subscriptions';
 import adminSubscriptionRoutes from './routes/admin-subscriptions';
 import webhookRoutes from './routes/webhooks';
+import invoiceAccessRoutes from './routes/invoice-access';
 import { startReminderService } from './services/reminder.service';
 import { startSubscriptionService } from './services/subscription.service';
 
@@ -134,6 +135,7 @@ app.use('/api/admin/cms/auth-pages', cmsAuthAdminRoutes);
 app.use('/api/customer', customerRoutes);
 app.use('/api/customer/subscriptions', customerSubscriptionRoutes);
 app.use('/api/admin/subscriptions', adminSubscriptionRoutes);
+app.use('/api', invoiceAccessRoutes);
 app.use('/api/webhooks', webhookRoutes);
 app.use('/api/finder', finderRoutes);
 app.use('/api/upload', uploadRoutes);

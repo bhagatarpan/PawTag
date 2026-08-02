@@ -303,3 +303,56 @@ export async function sendSubscriptionWelcomeEmail(
 
   return sendMail(to, `Your PawTag subscription is active — ${tagId}`, html);
 }
+
+export async function sendInvoiceOtpEmail(
+  to: string,
+  name: string,
+  invoiceNumber: string,
+  otp: string,
+): Promise<EmailResult> {
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+      <div style="background: linear-gradient(135deg, #0d9488, #14b8a6); padding: 24px; border-radius: 12px 12px 0 0; text-align: center;">
+        <h1 style="color: white; font-size: 22px; margin: 0;">Invoice Access Code</h1>
+      </div>
+      <div style="background: #f9fafb; padding: 32px; border: 1px solid #e5e7eb;">
+        <p style="color: #374151; font-size: 15px; line-height: 1.7;">Hi ${name},</p>
+        <p style="color: #374151; font-size: 15px; line-height: 1.7;">Your verification code for invoice <strong>${invoiceNumber}</strong> is:</p>
+        <div style="background: white; border: 2px dashed #0d9488; border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center;">
+          <span style="font-size: 36px; font-weight: 800; letter-spacing: 8px; color: #0d9488; font-family: monospace;">${otp}</span>
+        </div>
+        <p style="color: #6b7280; font-size: 13px; line-height: 1.6;">This code expires in <strong>10 minutes</strong>. If you didn't request this code, please ignore this email.</p>
+      </div>
+      <div style="text-align: center; padding: 16px; color: #9ca3af; font-size: 11px;">
+        PawTag — Reuniting lost pets with their families
+      </div>
+    </div>`;
+
+  return sendMail(to, `Your PawTag invoice access code — ${invoiceNumber}`, html);
+}
+
+export async function sendInvoiceEmail(
+  to: string,
+  name: string,
+  invoiceNumber: string,
+  invoiceHtml: string,
+): Promise<EmailResult> {
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+      <div style="background: linear-gradient(135deg, #0d9488, #14b8a6); padding: 24px; border-radius: 12px 12px 0 0; text-align: center;">
+        <h1 style="color: white; font-size: 22px; margin: 0;">Your Invoice</h1>
+      </div>
+      <div style="background: #f9fafb; padding: 32px; border: 1px solid #e5e7eb;">
+        <p style="color: #374151; font-size: 15px; line-height: 1.7;">Hi ${name},</p>
+        <p style="color: #374151; font-size: 15px; line-height: 1.7;">Please find your invoice <strong>${invoiceNumber}</strong> attached below.</p>
+        <div style="background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin: 16px 0; overflow: auto;">
+          ${invoiceHtml}
+        </div>
+      </div>
+      <div style="text-align: center; padding: 16px; color: #9ca3af; font-size: 11px;">
+        PawTag — Reuniting lost pets with their families
+      </div>
+    </div>`;
+
+  return sendMail(to, `Invoice ${invoiceNumber} from PawTag`, html);
+}

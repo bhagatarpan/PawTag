@@ -28,6 +28,7 @@ import {
   ShoppingCart,
   LogIn,
   CreditCard,
+  FileSignature,
 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 
@@ -73,6 +74,7 @@ const cmsLinks: SidebarLink[] = [
   { to: '/cms/homepage', label: 'Homepage Sections', icon: Monitor, permission: 'cms.homepage.read' },
   { to: '/cms/shop-pages', label: 'Shop Pages', icon: ShoppingCart, permission: 'cms.shop_page.read' },
   { to: '/cms/auth-pages', label: 'Auth Pages', icon: LogIn, permission: 'cms.auth_page.read' },
+  { to: '/cms/invoice-template', label: 'Invoice Template', icon: FileSignature, permission: 'cms.email_template.read' },
 ];
 
 export default function Sidebar() {

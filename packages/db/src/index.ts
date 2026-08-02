@@ -35,3 +35,4 @@ export { default as CmsShopPage, type ICmsShopPageDocument } from './models/CmsS
 export { default as CmsAuthPage, type ICmsAuthPageDocument } from './models/CmsAuthPage';
 export { Subscription, type ISubscriptionDocument } from './models/Subscription';
 export { Invoice, type IInvoiceDocument } from './models/Invoice';
+export { InvoiceAccessToken, type IInvoiceAccessTokenDocument } from './models/InvoiceAccessToken';

@@ -32,6 +32,7 @@ import CmsPetReferencesPage from './pages/cms/CmsPetReferences';
 import CmsHomepageSectionsPage from './pages/cms/CmsHomepageSections';
 import CmsShopPagesPage from './pages/cms/CmsShopPages';
 import CmsAuthPagesPage from './pages/cms/CmsAuthPages';
+import CmsInvoiceTemplatePage from './pages/cms/CmsInvoiceTemplate';
 import SubscriptionsPage from './pages/SubscriptionsPage';
 import SubscriptionDetailPage from './pages/SubscriptionDetailPage';
 
@@ -159,6 +160,7 @@ export default function App() {
       <Route path="/cms/homepage" element={<ProtectedRoute><CmsHomepageSectionsPage /></ProtectedRoute>} />
       <Route path="/cms/shop-pages" element={<ProtectedRoute><CmsShopPagesPage /></ProtectedRoute>} />
       <Route path="/cms/auth-pages" element={<ProtectedRoute><CmsAuthPagesPage /></ProtectedRoute>} />
+      <Route path="/cms/invoice-template" element={<ProtectedRoute><CmsInvoiceTemplatePage /></ProtectedRoute>} />
       <Route path="/subscriptions" element={<ProtectedRoute><SubscriptionsPage /></ProtectedRoute>} />
       <Route path="/subscriptions/:id" element={<ProtectedRoute><SubscriptionDetailPage /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />

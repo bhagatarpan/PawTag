@@ -205,6 +205,7 @@ export default function SubscriptionDetailPage() {
                     <th className="text-left text-xs font-medium text-gray-500 uppercase py-2">Status</th>
                     <th className="text-left text-xs font-medium text-gray-500 uppercase py-2">Period</th>
                     <th className="text-left text-xs font-medium text-gray-500 uppercase py-2">Paid</th>
+                    <th className="text-right text-xs font-medium text-gray-500 uppercase py-2">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -221,6 +222,46 @@ export default function SubscriptionDetailPage() {
                         {formatDate(inv.billingPeriod.start)} — {formatDate(inv.billingPeriod.end)}
                       </td>
                       <td className="py-2 text-sm">{inv.paidAt ? formatDate(inv.paidAt) : '—'}</td>
+                      <td className="py-2 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={async () => {
+                              try {
+                                const res = await fetch(`/api/admin/invoices/${inv._id}/view`, {
+                                  headers: { 'Authorization': 'Bearer ' + localStorage.getItem('admin_token') },
+                                });
+                                const data = await res.json();
+                                if (data.success) window.open(data.data.secureUrl, '_blank');
+                              } catch {}
+                            }}
+                            className="text-teal-600 hover:text-teal-700 text-xs font-medium border border-teal-200 px-2 py-1 rounded hover:bg-teal-50"
+                          >
+                            View
+                          </button>
+                          <button
+                            onClick={async () => {
+                              try {
+                                const res = await fetch(`/api/admin/invoices/${inv._id}/email`, {
+                                  method: 'POST',
+                                  headers: { 'Authorization': 'Bearer ' + localStorage.getItem('admin_token'), 'Content-Type': 'application/json' },
+                                });
+                                const data = await res.json();
+                                if (data.success) alert(data.data.message);
+                                else alert(data.error || 'Failed to email');
+                              } catch { alert('Failed to email invoice'); }
+                            }}
+                            className="text-blue-600 hover:text-blue-700 text-xs font-medium border border-blue-200 px-2 py-1 rounded hover:bg-blue-50"
+                          >
+                            Email
+                          </button>
+                          <button
+                            onClick={() => window.open(`/api/admin/invoices/${inv._id}/print?token=${localStorage.getItem('admin_token')}`, '_blank')}
+                            className="text-gray-600 hover:text-gray-700 text-xs font-medium border border-gray-200 px-2 py-1 rounded hover:bg-gray-50"
+                          >
+                            Print
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

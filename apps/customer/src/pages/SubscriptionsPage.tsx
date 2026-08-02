@@ -265,11 +265,25 @@ export default function SubscriptionsPage() {
                       {formatDate(inv.billingPeriod.start)} — {formatDate(inv.billingPeriod.end)}
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-sm font-semibold">${inv.amount.toFixed(2)}</div>
-                    <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[inv.status]}`}>
-                      {inv.status}
-                    </span>
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <div className="text-sm font-semibold">${inv.amount.toFixed(2)}</div>
+                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[inv.status]}`}>
+                        {inv.status}
+                      </span>
+                    </div>
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        try {
+                          const res = await api.post(`/customer/invoices/${inv._id}/access`);
+                          if (res.data.success) window.open(res.data.data.secureUrl, '_blank');
+                        } catch {}
+                      }}
+                      className="text-primary-600 hover:text-primary-700 text-xs font-medium border border-primary-200 px-2.5 py-1 rounded-md hover:bg-primary-50"
+                    >
+                      View
+                    </button>
                   </div>
                 </div>
               ))}

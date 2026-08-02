@@ -27,6 +27,7 @@ import OrderDetail from './pages/account/OrderDetail';
 import Notifications from './pages/account/Notifications';
 import Settings from './pages/account/Settings';
 import Subscriptions from './pages/account/Subscriptions';
+import InvoiceView from './pages/InvoiceView';
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const token = localStorage.getItem('pawtag_token');
@@ -62,6 +63,9 @@ export default function App() {
       <Route path="/account/subscriptions" element={<ProtectedRoute><AccountLayout><Subscriptions /></AccountLayout></ProtectedRoute>} />
       <Route path="/account/notifications" element={<ProtectedRoute><AccountLayout><Notifications /></AccountLayout></ProtectedRoute>} />
       <Route path="/account/settings" element={<ProtectedRoute><AccountLayout><Settings /></AccountLayout></ProtectedRoute>} />
+
+      {/* Invoice view — no Navbar/Footer, standalone page */}
+      <Route path="/invoice/:token" element={<InvoiceView />} />
 
       {/* Catch-all */}
       <Route path="*" element={<Navigate to="/" replace />} />
