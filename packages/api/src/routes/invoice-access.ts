@@ -5,8 +5,10 @@ import { InvoiceAccessToken, Invoice, Subscription, User, AuditLog } from '@pawt
 import { generateOtp, generateSecureToken, hashToken } from '../services/auth.service';
 import { sendInvoiceOtpEmail, sendInvoiceEmail } from '../services/email.service';
 import { generateInvoiceHtml } from '../services/invoice-html.service';
+import { config } from '../config';
 
 const router = Router();
+const FRONTEND_URL = config.frontendUrl || 'http://localhost:3000';
 
 function getClientInfo(req: any) {
   return { ipAddress: req.ip || req.connection?.remoteAddress, userAgent: req.headers['user-agent'] };
@@ -46,7 +48,7 @@ router.post('/customer/invoices/:invoiceId/access', authenticate, async (req: Au
       await sendInvoiceOtpEmail(email, name, invoice.invoiceNumber, otp);
     }
 
-    res.json({ success: true, data: { secureUrl: `/invoice/${secureToken}` } });
+    res.json({ success: true, data: { secureUrl: `${FRONTEND_URL}/invoice/${secureToken}` } });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to generate invoice access' });
   }
@@ -194,7 +196,7 @@ router.get('/admin/invoices/:invoiceId/view', authenticate, requirePermission('s
       ...clientInfo,
     });
 
-    res.json({ success: true, data: { secureUrl: `/invoice/${secureToken}?admin=1` } });
+    res.json({ success: true, data: { secureUrl: `${FRONTEND_URL}/invoice/${secureToken}?admin=1` } });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to generate view link' });
   }

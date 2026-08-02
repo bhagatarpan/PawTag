@@ -255,7 +255,16 @@ export default function SubscriptionDetailPage() {
                             Email
                           </button>
                           <button
-                            onClick={() => window.open(`/api/admin/invoices/${inv._id}/print?token=${localStorage.getItem('admin_token')}`, '_blank')}
+                            onClick={async () => {
+                              try {
+                                const res = await fetch(`/api/admin/invoices/${inv._id}/print`, {
+                                  headers: { 'Authorization': 'Bearer ' + localStorage.getItem('admin_token') },
+                                });
+                                const html = await res.text();
+                                const w = window.open('', '_blank');
+                                if (w) { w.document.write(html); w.document.close(); }
+                              } catch { alert('Failed to print invoice'); }
+                            }}
                             className="text-gray-600 hover:text-gray-700 text-xs font-medium border border-gray-200 px-2 py-1 rounded hover:bg-gray-50"
                           >
                             Print
