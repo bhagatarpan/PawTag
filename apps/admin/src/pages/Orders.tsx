@@ -54,14 +54,15 @@ export default function Orders() {
               <th className="text-left px-5 py-3 font-medium text-gray-500">Items</th>
               <th className="text-left px-5 py-3 font-medium text-gray-500">Amount</th>
               <th className="text-left px-5 py-3 font-medium text-gray-500">Status</th>
+              <th className="text-left px-5 py-3 font-medium text-gray-500">Invoice</th>
               <th className="text-left px-5 py-3 font-medium text-gray-500">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
             {loading ? (
-              <tr><td colSpan={6} className="px-5 py-8 text-center text-gray-500">Loading...</td></tr>
+              <tr><td colSpan={7} className="px-5 py-8 text-center text-gray-500">Loading...</td></tr>
             ) : data?.items.length === 0 ? (
-              <tr><td colSpan={6} className="px-5 py-8 text-center text-gray-500">No orders found</td></tr>
+              <tr><td colSpan={7} className="px-5 py-8 text-center text-gray-500">No orders found</td></tr>
             ) : (
               data?.items.map((order: any) => (
                 <tr key={order._id} className="hover:bg-gray-50">
@@ -82,6 +83,56 @@ export default function Orders() {
                       <option value="cancelled">Cancelled</option>
                       <option value="refunded">Refunded</option>
                     </select>
+                  </td>
+                  <td className="px-5 py-3">
+                    {order.latestInvoice ? (
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs">{order.latestInvoice.invoiceNumber}</span>
+                        <span className={`inline-flex px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
+                          order.latestInvoice.status === 'paid' ? 'bg-green-100 text-green-700' :
+                          order.latestInvoice.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                          'bg-red-100 text-red-700'
+                        }`}>{order.latestInvoice.status}</span>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-gray-400">No invoice</span>
+                    )}
+                  </td>
+                  <td className="px-5 py-3">
+                    {order.latestInvoice && (
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={async () => {
+                            try {
+                              const res = await fetch(`/api/admin/invoices/${order.latestInvoice._id}/view`, {
+                                headers: { 'Authorization': 'Bearer ' + localStorage.getItem('admin_token') },
+                              });
+                              const data = await res.json();
+                              if (data.success) window.open(data.data.secureUrl, '_blank');
+                            } catch {}
+                          }}
+                          className="text-teal-600 hover:text-teal-700 text-xs font-medium border border-teal-200 px-2 py-1 rounded hover:bg-teal-50"
+                        >View</button>
+                        <button
+                          onClick={async () => {
+                            try {
+                              const res = await fetch(`/api/admin/invoices/${order.latestInvoice._id}/email`, {
+                                method: 'POST',
+                                headers: { 'Authorization': 'Bearer ' + localStorage.getItem('admin_token'), 'Content-Type': 'application/json' },
+                              });
+                              const data = await res.json();
+                              if (data.success) alert(data.data.message);
+                              else alert(data.error || 'Failed');
+                            } catch { alert('Failed to email'); }
+                          }}
+                          className="text-blue-600 hover:text-blue-700 text-xs font-medium border border-blue-200 px-2 py-1 rounded hover:bg-blue-50"
+                        >Email</button>
+                        <button
+                          onClick={() => window.open(`/api/admin/invoices/${order.latestInvoice._id}/print?token=${localStorage.getItem('admin_token')}`, '_blank')}
+                          className="text-gray-600 hover:text-gray-700 text-xs font-medium border border-gray-200 px-2 py-1 rounded hover:bg-gray-50"
+                        >Print</button>
+                      </div>
+                    )}
                   </td>
                   <td className="px-5 py-3 text-gray-500 text-xs">
                     {new Date(order.createdAt).toLocaleDateString()}

@@ -34,6 +34,8 @@ import {
   generatePetId,
   UserRole,
   Role,
+  Subscription,
+  Invoice,
 } from '@pawtag/db';
 import { hashPassword } from '../services/auth.service';
 
@@ -1980,9 +1982,29 @@ router.get('/orders', requirePermission('order.read'), async (req, res: Response
       .skip((Number(page) - 1) * Number(limit))
       .limit(Number(limit));
 
+    // Enrich with latest invoice per order's user
+    const userIds = [...new Set(orders.map((o: any) => o.userId?._id?.toString()).filter(Boolean))];
+    const subscriptions = await Subscription.find({ userId: { $in: userIds } }).select('_id userId');
+    const subIds = subscriptions.map((s: any) => s._id);
+    const invoices = await Invoice.find({ subscriptionId: { $in: subIds } })
+      .sort({ createdAt: -1 })
+      .select('invoiceId subscriptionId userId amount currency status billingPeriod paidAt createdAt');
+
+    // Build a map: userId -> latest invoice
+    const invoiceMap = new Map<string, any>();
+    for (const inv of invoices) {
+      const uid = (inv as any).userId?.toString();
+      if (uid && !invoiceMap.has(uid)) invoiceMap.set(uid, inv);
+    }
+
+    const ordersWithInvoices = orders.map((o: any) => ({
+      ...o.toObject(),
+      latestInvoice: invoiceMap.get(o.userId?._id?.toString()) || null,
+    }));
+
     res.json({
       success: true,
-      data: { items: orders, total, page: Number(page), limit: Number(limit), totalPages: Math.ceil(total / Number(limit)) },
+      data: { items: ordersWithInvoices, total, page: Number(page), limit: Number(limit), totalPages: Math.ceil(total / Number(limit)) },
     });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch orders' });
