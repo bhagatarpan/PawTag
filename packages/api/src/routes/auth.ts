@@ -26,6 +26,7 @@ import {
 } from '../services/auth.service';
 import { sendVerificationEmail, sendPasswordResetEmail, sendPasswordChangedEmail, sendWelcomeEmail } from '../services/email.service';
 import { sendPhoneOtpSMS } from '../services/sms.service';
+import { isRegistrationOtpDisabled } from '../services/otp-settings.service';
 import { User, Role, UserRole, VerificationToken, AuditLog } from '@pawtag/db';
 import { config } from '../config';
 
@@ -368,6 +369,26 @@ router.post('/send-phone-otp', validate(sendPhoneOtpSchema), async (req, res: Re
 
     if (user.phoneVerified) {
       res.json({ success: true, data: { message: 'Your phone number is already verified.' } });
+      return;
+    }
+
+    // Check if system-wide registration OTP is disabled
+    if (await isRegistrationOtpDisabled()) {
+      user.phoneVerified = true;
+      await user.save();
+
+      await AuditLog.create({
+        userId: user._id,
+        action: 'phone_otp_skipped_system',
+        entity: 'user',
+        entityId: user._id.toString(),
+        ipAddress: getClientInfo(req).ipAddress,
+        userAgent: getClientInfo(req).userAgent,
+      });
+
+      await checkAndActivateUser(user._id);
+
+      res.json({ success: true, data: { message: 'Phone verified (system override).', otpSkipped: true } });
       return;
     }
 

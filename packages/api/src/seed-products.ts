@@ -117,6 +117,16 @@ async function seedProducts() {
     }
     console.log(`Seeded ${companySettings.length} company settings`);
 
+    // Seed OTP system settings
+    const otpSettings = [
+      { key: 'otp.noOtpForInvoice', value: 'false', category: 'otp', description: 'When true, system-wide invoice OTP is skipped. Use during OTP service outages.' },
+      { key: 'otp.noOtpDuringRegistration', value: 'false', category: 'otp', description: 'When true, system-wide registration phone OTP is skipped. Use during SMS service outages.' },
+    ];
+    for (const s of otpSettings) {
+      await Setting.findOneAndUpdate({ key: s.key }, s, { upsert: true });
+    }
+    console.log(`Seeded ${otpSettings.length} OTP system settings`);
+
     console.log('Done!');
     process.exit(0);
   } catch (error) {

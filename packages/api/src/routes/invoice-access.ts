@@ -5,6 +5,7 @@ import { InvoiceAccessToken, Invoice, Subscription, User, AuditLog } from '@pawt
 import { generateOtp, generateSecureToken, hashToken } from '../services/auth.service';
 import { sendInvoiceOtpEmail, sendInvoiceEmail } from '../services/email.service';
 import { generateInvoiceHtml } from '../services/invoice-html.service';
+import { isInvoiceOtpDisabled } from '../services/otp-settings.service';
 import { config } from '../config';
 
 const router = Router();
@@ -28,9 +29,11 @@ router.post('/customer/invoices/:invoiceId/access', authenticate, async (req: Au
     // Invalidate any existing tokens for this invoice
     await InvoiceAccessToken.deleteMany({ invoiceId: invoice._id, userId: req.user!.id });
 
-    // Check if user has skip OTP enabled
+    // Check if user has skip OTP enabled or system-wide OTP is disabled
     const user = await User.findById(req.user!.id).select('skipInvoiceOtp skipInvoiceOtpExpiresAt email fullName');
-    const skipOtp = (user as any)?.skipInvoiceOtp && (user as any)?.skipInvoiceOtpExpiresAt && new Date() < new Date((user as any).skipInvoiceOtpExpiresAt);
+    const userSkipOtp = (user as any)?.skipInvoiceOtp && (user as any)?.skipInvoiceOtpExpiresAt && new Date() < new Date((user as any).skipInvoiceOtpExpiresAt);
+    const systemOtpDisabled = await isInvoiceOtpDisabled();
+    const skipOtp = userSkipOtp || systemOtpDisabled;
 
     if (skipOtp) {
       // Skip OTP — pre-verified, return invoice HTML directly via secure URL
@@ -48,7 +51,7 @@ router.post('/customer/invoices/:invoiceId/access', authenticate, async (req: Au
         action: 'invoice_otp_skipped',
         entity: 'Invoice',
         entityId: invoice._id.toString(),
-        changes: { reason: 'skipInvoiceOtp enabled' },
+        changes: { reason: systemOtpDisabled ? 'system otp.noOtpForInvoice enabled' : 'user skipInvoiceOtp enabled' },
         ...clientInfo,
       });
 
