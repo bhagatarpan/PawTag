@@ -111,6 +111,8 @@ const PUBLIC_SETTING_KEYS = [
   'sms.senderNumber',
   'checkout.defaultCountry',
   'checkout.currencyLabel',
+  'pricing.bundle2Discount',
+  'pricing.bundle3Discount',
 ];
 
 router.get('/settings', async (_req: Request, res: Response) => {

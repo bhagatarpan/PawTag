@@ -1,15 +1,25 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Lock, CreditCard, PawPrint, CheckCircle, Truck, Tag } from 'lucide-react';
 import api from '../lib/api';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
-import { getBundleDiscount } from '@pawtag/shared';
 
 const SHIPPING_ZONES = [
   { value: 'city', label: 'NZ City / Suburb', cost: 7.99 },
   { value: 'rural', label: 'Rural / Village', cost: 10.99 },
 ] as const;
+
+const DEFAULT_BUNDLE_DISCOUNTS: Record<number, number> = {
+  2: 10,
+  3: 15,
+};
+
+function getBundleDiscountFromSettings(itemCount: number, settings: Record<string, string>): number {
+  if (itemCount >= 3) return parseInt(settings['pricing.bundle3Discount'] || '15', 10);
+  if (itemCount >= 2) return parseInt(settings['pricing.bundle2Discount'] || '10', 10);
+  return 0;
+}
 
 export default function Checkout() {
   const { items, total, clearCart } = useCart();
@@ -21,6 +31,7 @@ export default function Checkout() {
   const [shippingZone, setShippingZone] = useState<'city' | 'rural'>('city');
   const [referralCode, setReferralCode] = useState('');
   const [referralApplied, setReferralApplied] = useState(false);
+  const [bundleSettings, setBundleSettings] = useState<Record<string, string>>({});
   const [form, setForm] = useState({
     line1: '',
     line2: '',
@@ -30,11 +41,17 @@ export default function Checkout() {
     country: 'NZ',
   });
 
-  // Calculate bundle discount (counts subscription-tag-like items by name heuristic)
+  useEffect(() => {
+    api.get('/public/cms/settings')
+      .then((res) => setBundleSettings(res.data.data || {}))
+      .catch(() => {});
+  }, []);
+
+  // Calculate bundle discount using settings from admin panel
   const tagItemCount = items.filter(i =>
     i.name.toLowerCase().includes('pawtag') || i.name.toLowerCase().includes('tag')
   ).reduce((sum, i) => sum + i.quantity, 0);
-  const bundleDiscountPercent = getBundleDiscount(tagItemCount);
+  const bundleDiscountPercent = getBundleDiscountFromSettings(tagItemCount, bundleSettings);
   const bundleDiscountAmount = bundleDiscountPercent > 0
     ? Math.round(items.filter(i => i.name.toLowerCase().includes('pawtag') || i.name.toLowerCase().includes('tag'))
         .reduce((sum, i) => sum + (i.price * i.quantity), 0) * (bundleDiscountPercent / 100) * 100) / 100
