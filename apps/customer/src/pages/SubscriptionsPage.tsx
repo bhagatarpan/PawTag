@@ -18,6 +18,9 @@ interface Subscription {
   totalScans: number;
   lastScannedAt?: string;
   createdAt: string;
+  petName?: string;
+  petType?: string;
+  productName?: string;
 }
 
 interface Invoice {
@@ -159,7 +162,12 @@ export default function SubscriptionsPage() {
           <div className="flex items-start justify-between mb-4">
             <div>
               <h2 className="text-xl font-bold text-gray-900">{sub.tagId?.tagId || 'N/A'}</h2>
-              <p className="text-sm text-gray-500">{sub.planName}</p>
+              {sub.petName && (
+                <p className="text-sm text-primary-600 font-medium">
+                  {sub.petName}{sub.petType ? ` (${sub.petType})` : ''}
+                </p>
+              )}
+              <p className="text-sm text-gray-500">{sub.productName || sub.planName}</p>
             </div>
             <span className={`inline-flex px-3 py-1 rounded-full text-sm font-medium ${STATUS_COLORS[sub.status]}`}>
               {sub.status.replace('_', ' ')}
@@ -328,7 +336,12 @@ export default function SubscriptionsPage() {
                       {sub.status.replace('_', ' ')}
                     </span>
                   </div>
-                  <p className="text-sm text-gray-500 mt-1">{sub.planName} — ${sub.price.toFixed(2)}/mo</p>
+                  {sub.petName && (
+                    <p className="text-sm text-primary-600 font-medium mt-1">
+                      {sub.petName}{sub.petType ? ` (${sub.petType})` : ''}
+                    </p>
+                  )}
+                  <p className="text-sm text-gray-500 mt-0.5">{sub.productName || sub.planName} — ${sub.price.toFixed(2)}/mo</p>
                 </div>
                 <div className="text-right text-sm text-gray-500">
                   <div>Scans: {sub.totalScans}</div>

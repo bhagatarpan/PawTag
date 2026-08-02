@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { AuthRequest, authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
-import { Subscription, Invoice, Tag, User } from '@pawtag/db';
+import { Subscription, Invoice, Tag, User, Pet } from '@pawtag/db';
 import {
   renewSubscription,
   cancelSubscription,
@@ -30,10 +30,28 @@ router.get('/', requirePermission('customer.read'), async (req: AuthRequest, res
       deletedAt: null,
     })
       .populate('tagId', 'tagId tagType status petId')
-      .populate('planId', 'name price images')
+      .populate('planId', 'name price images sku')
       .sort({ createdAt: -1 });
 
-    res.json({ success: true, data: subscriptions });
+    // Populate pet names from tag.petId
+    const petIds = subscriptions
+      .map((s) => (s.tagId as any)?.petId)
+      .filter(Boolean);
+    const pets = await Pet.find({ _id: { $in: petIds } }).select('name petType breed');
+    const petMap = new Map(pets.map((p) => [p._id.toString(), p]));
+
+    const enriched = subscriptions.map((s) => {
+      const tag = s.tagId as any;
+      const pet = tag?.petId ? petMap.get(tag.petId.toString()) : null;
+      return {
+        ...s.toObject(),
+        petName: pet?.name || null,
+        petType: pet?.petType || null,
+        productName: (s.planId as any)?.name || s.planName,
+      };
+    });
+
+    res.json({ success: true, data: enriched });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch subscriptions' });
   }
@@ -56,14 +74,34 @@ router.get('/:id', requirePermission('customer.read'), async (req: AuthRequest, 
       deletedAt: null,
     })
       .populate('tagId', 'tagId tagType status petId')
-      .populate('planId', 'name price images description');
+      .populate('planId', 'name price images description sku');
 
     if (!subscription) {
       res.status(404).json({ success: false, error: 'Subscription not found' });
       return;
     }
 
-    res.json({ success: true, data: subscription });
+    // Populate pet name
+    const tag = subscription.tagId as any;
+    let petName = null;
+    let petType = null;
+    if (tag?.petId) {
+      const pet = await Pet.findById(tag.petId).select('name petType breed');
+      if (pet) {
+        petName = pet.name;
+        petType = pet.petType;
+      }
+    }
+
+    res.json({
+      success: true,
+      data: {
+        ...subscription.toObject(),
+        petName,
+        petType,
+        productName: (subscription.planId as any)?.name || subscription.planName,
+      },
+    });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch subscription' });
   }

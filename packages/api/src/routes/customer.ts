@@ -3,7 +3,7 @@ import { AuthRequest, authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
 import { validate } from '../middleware/validation';
 import { createPetSchema, updatePetSchema } from '../middleware/schemas';
-import { Pet, Tag, Order, LocationEvent, Notification, FinderScan, User, generatePetId, Cart, Product } from '@pawtag/db';
+import { Pet, Tag, Order, LocationEvent, Notification, FinderScan, User, generatePetId, Cart, Product, Subscription } from '@pawtag/db';
 
 const router = Router();
 router.use(authenticate);
@@ -38,12 +38,32 @@ router.get('/pets', requirePermission('pet.read'), async (req: AuthRequest, res:
   try {
     const pets = await Pet.find({ ownerId: req.user!.id, deletedAt: null }).sort({ createdAt: -1 });
     const petIds = pets.map((p) => p._id);
-    const tags = await Tag.find({ petId: { $in: petIds }, deletedAt: null }).select('tagId tagType petId status');
+    const tags = await Tag.find({ petId: { $in: petIds }, deletedAt: null }).select('tagId tagType petId status subscriptionStatus subscriptionId activatedAt');
+    const tagIds = tags.map((t) => t._id);
+    const subscriptions = await Subscription.find({ tagId: { $in: tagIds }, deletedAt: null })
+      .populate('planId', 'name sku');
+    const subMap = new Map(subscriptions.map((s: any) => [s.tagId.toString(), s]));
     const tagMap = new Map(tags.map((t) => [t.petId.toString(), t]));
-    const petsWithTag = pets.map((pet) => ({
-      ...pet.toObject(),
-      linkedTag: tagMap.get(pet._id.toString()) || null,
-    }));
+    const petsWithTag = pets.map((pet) => {
+      const tag = tagMap.get(pet._id.toString());
+      const sub = tag ? subMap.get(tag._id.toString()) : null;
+      return {
+        ...pet.toObject(),
+        linkedTag: tag ? {
+          ...tag.toObject(),
+          subscription: sub ? {
+            planName: sub.planName,
+            planType: sub.planType,
+            status: sub.status,
+            price: sub.price,
+            freePeriodEndsAt: sub.freePeriodEndsAt,
+            currentPeriodEnd: sub.currentPeriodEnd,
+            autoRenew: sub.autoRenew,
+            productName: (sub.planId as any)?.name || sub.planName,
+          } : null,
+        } : null,
+      };
+    });
     res.json({ success: true, data: petsWithTag });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch pets' });
