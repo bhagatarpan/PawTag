@@ -34,12 +34,11 @@ export default function Products() {
   const [data, setData] = useState<PaginatedData<Product> | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('');
   const [page, setPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
   const [form, setForm] = useState({
-    name: '', description: '', shortDescription: '', price: 0, category: '',
+    name: '', description: '', shortDescription: '', price: 0, category: 'PawTag',
     stock: 0, sku: '', currency: 'NZD', isActive: true, customizable: false, customizationPrice: 0,
   });
   const [variants, setVariants] = useState<ProductVariant[]>([]);
@@ -49,17 +48,17 @@ export default function Products() {
 
   const fetchProducts = () => {
     setLoading(true);
-    api.get('/admin/products', { params: { page, limit: 20, search, category: categoryFilter || undefined } })
+    api.get('/admin/products', { params: { page, limit: 20, search, category: 'PawTag' } })
       .then((res) => setData(res.data.data))
       .catch(console.error)
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetchProducts(); }, [page, categoryFilter]);
+  useEffect(() => { fetchProducts(); }, [page]);
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ name: '', description: '', shortDescription: '', price: 0, category: '', stock: 0, sku: '', currency: 'NZD', isActive: true, customizable: false, customizationPrice: 0 });
+    setForm({ name: '', description: '', shortDescription: '', price: 0, category: 'PawTag', stock: 0, sku: '', currency: 'NZD', isActive: true, customizable: false, customizationPrice: 0 });
     setVariants([]);
     setImages([]);
     setShowForm(true);
@@ -115,7 +114,7 @@ export default function Products() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const payload = { ...form, variants, images };
+    const payload = { ...form, category: 'PawTag', variants, images };
     if (editing) {
       await api.put(`/admin/products/${editing._id}`, payload);
     } else {
@@ -161,16 +160,6 @@ export default function Products() {
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
             className="border border-gray-300 rounded-md px-3 py-2 text-sm w-64 focus:ring-2 focus:ring-primary-500"
           />
-          <select
-            value={categoryFilter}
-            onChange={(e) => { setCategoryFilter(e.target.value); setPage(1); }}
-            className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500"
-          >
-            <option value="">All Categories</option>
-            {[...new Set(data?.items.map((p) => p.category) || [])].map((c) => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </select>
           <button onClick={openCreate} className="bg-primary-600 text-white px-4 py-2 rounded-md text-sm hover:bg-primary-700">
             + Add Product
           </button>
@@ -197,7 +186,12 @@ export default function Products() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">SKU *</label>
-                <input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm" required />
+                <select value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm" required>
+                  <option value="">Select SKU...</option>
+                  <option value="PT-SCAN-001">PT-SCAN-001 — PawTag Scan</option>
+                  <option value="PT-CLASSIC-001">PT-CLASSIC-001 — PawTag Classic</option>
+                  <option value="PT-PLUS-001">PT-PLUS-001 — PawTag Plus</option>
+                </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Base Price (NZD) *</label>
@@ -205,7 +199,7 @@ export default function Products() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Category *</label>
-                <input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm" placeholder="e.g. Pet Tags, Accessories" required />
+                <input value="PawTag" disabled className="w-full border rounded-md px-3 py-2 text-sm bg-gray-50 text-gray-500" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Base Stock</label>
@@ -348,7 +342,6 @@ export default function Products() {
               <th className="text-left px-5 py-3 font-medium text-gray-500">Name</th>
               <th className="text-left px-5 py-3 font-medium text-gray-500">SKU</th>
               <th className="text-left px-5 py-3 font-medium text-gray-500">Price</th>
-              <th className="text-left px-5 py-3 font-medium text-gray-500">Category</th>
               <th className="text-left px-5 py-3 font-medium text-gray-500">Stock</th>
               <th className="text-left px-5 py-3 font-medium text-gray-500">Variants</th>
               <th className="text-left px-5 py-3 font-medium text-gray-500">Status</th>
@@ -357,9 +350,9 @@ export default function Products() {
           </thead>
           <tbody className="divide-y divide-gray-200">
             {loading ? (
-              <tr><td colSpan={9} className="px-5 py-8 text-center text-gray-500">Loading...</td></tr>
+              <tr><td colSpan={8} className="px-5 py-8 text-center text-gray-500">Loading...</td></tr>
             ) : data?.items.length === 0 ? (
-              <tr><td colSpan={9} className="px-5 py-8 text-center text-gray-500">No products found</td></tr>
+              <tr><td colSpan={8} className="px-5 py-8 text-center text-gray-500">No products found</td></tr>
             ) : (
               data?.items.map((p) => (
                 <tr key={p._id} className="hover:bg-gray-50">
@@ -378,7 +371,6 @@ export default function Products() {
                   </td>
                   <td className="px-5 py-3 font-mono text-gray-600 text-xs">{p.sku}</td>
                   <td className="px-5 py-3">${p.price.toFixed(2)}</td>
-                  <td className="px-5 py-3 text-gray-600">{p.category}</td>
                   <td className="px-5 py-3">
                     {p.variants?.length > 0 ? (
                       <span className="text-xs text-gray-500">{p.variants.reduce((s, v) => s + v.stock, 0)} total</span>
@@ -396,9 +388,8 @@ export default function Products() {
                       {p.isActive ? 'Active' : 'Inactive'}
                     </span>
                   </td>
-                  <td className="px-5 py-3 flex gap-2">
+                  <td className="px-5 py-3">
                     <button onClick={() => openEdit(p)} className="text-primary-600 hover:text-primary-800 text-xs">Edit</button>
-                    <button onClick={() => deleteProduct(p._id)} className="text-red-500 hover:text-red-700 text-xs">Delete</button>
                   </td>
                 </tr>
               ))
