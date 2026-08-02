@@ -349,6 +349,17 @@ async function createInvoice(data: {
   });
 }
 
+async function resetExpiredSkipOtp() {
+  const now = new Date();
+  const result = await User.updateMany(
+    { skipInvoiceOtp: true, skipInvoiceOtpExpiresAt: { $lte: now } },
+    { $set: { skipInvoiceOtp: false }, $unset: { skipInvoiceOtpExpiresAt: 1 } },
+  );
+  if (result.modifiedCount > 0) {
+    console.log(`[SubscriptionService] Auto-reset skipInvoiceOtp for ${result.modifiedCount} expired user(s)`);
+  }
+}
+
 async function runSubscriptionChecks() {
   console.log('[SubscriptionService] Running subscription checks...');
 
@@ -357,6 +368,7 @@ async function runSubscriptionChecks() {
   await checkGracePeriodExpiry();
   await sendGracePeriodReminders();
   await processAutoRenewals();
+  await resetExpiredSkipOtp();
 
   console.log('[SubscriptionService] Subscription checks complete');
 }

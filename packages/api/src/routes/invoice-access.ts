@@ -23,25 +23,53 @@ router.post('/customer/invoices/:invoiceId/access', authenticate, async (req: Au
 
     const secureToken = generateSecureToken();
     const tokenHash = hashToken(secureToken);
-    const otp = generateOtp();
-    const otpHash = hashToken(otp);
     const clientInfo = getClientInfo(req);
 
     // Invalidate any existing tokens for this invoice
     await InvoiceAccessToken.deleteMany({ invoiceId: invoice._id, userId: req.user!.id });
 
-    const access = await InvoiceAccessToken.create({
+    // Check if user has skip OTP enabled
+    const user = await User.findById(req.user!.id).select('skipInvoiceOtp skipInvoiceOtpExpiresAt email fullName');
+    const skipOtp = (user as any)?.skipInvoiceOtp && (user as any)?.skipInvoiceOtpExpiresAt && new Date() < new Date((user as any).skipInvoiceOtpExpiresAt);
+
+    if (skipOtp) {
+      // Skip OTP — pre-verified, return invoice HTML directly via secure URL
+      await InvoiceAccessToken.create({
+        invoiceId: invoice._id,
+        userId: req.user!.id,
+        tokenHash,
+        expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+        verifiedAt: new Date(),
+        ...clientInfo,
+      });
+
+      await AuditLog.create({
+        userId: req.user!.id,
+        action: 'invoice_otp_skipped',
+        entity: 'Invoice',
+        entityId: invoice._id.toString(),
+        changes: { reason: 'skipInvoiceOtp enabled' },
+        ...clientInfo,
+      });
+
+      res.json({ success: true, data: { secureUrl: `${FRONTEND_URL}/invoice/${secureToken}?admin=1`, skipOtp: true } });
+      return;
+    }
+
+    // Normal flow — generate OTP and send email
+    const otp = generateOtp();
+    const otpHash = hashToken(otp);
+
+    await InvoiceAccessToken.create({
       invoiceId: invoice._id,
       userId: req.user!.id,
       tokenHash,
-      expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000),
       otpHash,
       otpExpiresAt: new Date(Date.now() + 10 * 60 * 1000),
       ...clientInfo,
     });
 
-    // Send OTP email
-    const user = await User.findById(req.user!.id).select('fullName name email');
     const name = (user as any)?.fullName || (user as any)?.name || 'Customer';
     const email = (user as any)?.email;
     if (email) {

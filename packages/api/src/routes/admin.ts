@@ -41,6 +41,10 @@ import { hashPassword } from '../services/auth.service';
 
 const router = Router();
 
+function getClientInfo(req: any) {
+  return { ipAddress: req.ip || req.connection?.remoteAddress, userAgent: req.headers['user-agent'] };
+}
+
 // All admin routes require authentication
 router.use(authenticate);
 
@@ -2072,6 +2076,37 @@ router.put('/orders/:id/status', requirePermission('order.update'), async (req: 
     res.json({ success: true, data: order });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to update order' });
+  }
+});
+
+// --- Skip Invoice OTP ---
+router.put('/users/:id/skip-invoice-otp', requirePermission('user.update'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { skip } = req.body;
+    const user = await User.findById(req.params.id);
+    if (!user) { res.status(404).json({ success: false, error: 'User not found' }); return; }
+
+    if (skip) {
+      user.skipInvoiceOtp = true;
+      user.skipInvoiceOtpExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    } else {
+      user.skipInvoiceOtp = false;
+      user.skipInvoiceOtpExpiresAt = undefined;
+    }
+    await user.save();
+
+    await AuditLog.create({
+      userId: req.user!.id,
+      action: skip ? 'skip_invoice_otp_enabled' : 'skip_invoice_otp_disabled',
+      entity: 'User',
+      entityId: req.params.id,
+      changes: { skipInvoiceOtp: { old: !skip, new: skip }, expiresAt: user.skipInvoiceOtpExpiresAt },
+      ...getClientInfo(req),
+    });
+
+    res.json({ success: true, data: { skipInvoiceOtp: user.skipInvoiceOtp, expiresAt: user.skipInvoiceOtpExpiresAt } });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to update skip invoice OTP' });
   }
 });
 

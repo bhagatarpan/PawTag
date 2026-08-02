@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import api, { PaginatedData } from '../lib/api';
-import { Plus, X, Save, Key, Lock, Unlock, Trash2, Edit2 } from 'lucide-react';
+import { Plus, X, Save, Key, Lock, Unlock, Trash2, Edit2, Shield, ShieldOff } from 'lucide-react';
 
 export default function Users() {
   const [data, setData] = useState<PaginatedData<any> | null>(null);
@@ -23,6 +23,7 @@ export default function Users() {
   const [editForm, setEditForm] = useState({ fullName: '', email: '', phoneNumber: '', responsibilityScore: 0 });
   const [editError, setEditError] = useState('');
   const [editSaving, setEditSaving] = useState(false);
+  const [skipOtpLoading, setSkipOtpLoading] = useState<string | null>(null);
 
   const fetchRoles = () => {
     api.get('/admin/rbac/roles').then((res) => setRbacRoles(res.data.data || [])).catch(console.error);
@@ -57,6 +58,18 @@ export default function Users() {
     fetchUsers();
   };
   const updateStatus = async (id: string, status: string) => { await api.put(`/admin/users/${id}/status`, { status }); fetchUsers(); };
+
+  const toggleSkipOtp = async (userId: string, skip: boolean) => {
+    setSkipOtpLoading(userId);
+    try {
+      await api.put(`/admin/users/${userId}/skip-invoice-otp`, { skip });
+      fetchUsers();
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Failed to update');
+    } finally {
+      setSkipOtpLoading(null);
+    }
+  };
 
   const registerOwner = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -205,15 +218,16 @@ export default function Users() {
               <th className="text-left px-5 py-3 font-medium text-gray-500">Role</th>
               <th className="text-left px-5 py-3 font-medium text-gray-500">Status</th>
               <th className="text-left px-5 py-3 font-medium text-gray-500">Score</th>
+              <th className="text-left px-5 py-3 font-medium text-gray-500">OTP Skip</th>
               <th className="text-left px-5 py-3 font-medium text-gray-500">Joined</th>
               <th className="text-right px-5 py-3 font-medium text-gray-500">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
             {loading ? (
-              <tr><td colSpan={8} className="px-5 py-8 text-center text-gray-500">Loading...</td></tr>
+              <tr><td colSpan={9} className="px-5 py-8 text-center text-gray-500">Loading...</td></tr>
             ) : data?.items.length === 0 ? (
-              <tr><td colSpan={8} className="px-5 py-8 text-center text-gray-500">No users found</td></tr>
+              <tr><td colSpan={9} className="px-5 py-8 text-center text-gray-500">No users found</td></tr>
             ) : data?.items.map((user: any) => (
               <tr key={user._id} className="hover:bg-gray-50">
                 <td className="px-5 py-3 font-medium">{user.fullName}</td>
@@ -251,6 +265,27 @@ export default function Users() {
                       'bg-red-100 text-red-700'
                     }`}>{user.responsibilityScore || 0}</span>
                   ) : <span className="text-gray-300 text-sm">—</span>}
+                </td>
+                <td className="px-5 py-3">
+                  {user.skipInvoiceOtp && user.skipInvoiceOtpExpiresAt && new Date(user.skipInvoiceOtpExpiresAt) > new Date() ? (
+                    <button
+                      onClick={() => toggleSkipOtp(user._id, false)}
+                      disabled={skipOtpLoading === user._id}
+                      title={`Skip OTP active — expires ${new Date(user.skipInvoiceOtpExpiresAt).toLocaleString()}. Click to disable.`}
+                      className="flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-green-100 text-green-700 hover:bg-green-200 disabled:opacity-50"
+                    >
+                      <Shield size={12} /> Active
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => toggleSkipOtp(user._id, true)}
+                      disabled={skipOtpLoading === user._id}
+                      title="Enable Skip OTP for 24 hours"
+                      className="flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 disabled:opacity-50"
+                    >
+                      <ShieldOff size={12} /> Off
+                    </button>
+                  )}
                 </td>
                 <td className="px-5 py-3 text-gray-500">{new Date(user.createdAt).toLocaleDateString()}</td>
                 <td className="px-5 py-3 text-right">
