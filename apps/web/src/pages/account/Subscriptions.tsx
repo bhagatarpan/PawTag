@@ -17,6 +17,9 @@ interface Subscription {
   renewalMethod: string;
   totalScans: number;
   lastScannedAt?: string;
+  petName?: string;
+  petType?: string;
+  productName?: string;
 }
 
 interface Invoice {
@@ -107,7 +110,12 @@ export default function Subscriptions() {
           <div className="flex items-start justify-between mb-4">
             <div>
               <h2 className="text-xl font-bold text-gray-900">{sub.tagId?.tagId || 'N/A'}</h2>
-              <p className="text-sm text-gray-500">{sub.planName}</p>
+              {sub.petName && (
+                <p className="text-sm text-teal-600 font-medium">
+                  {sub.petName}{sub.petType ? ` (${sub.petType})` : ''}
+                </p>
+              )}
+              <p className="text-sm text-gray-500">{sub.productName || sub.planName}</p>
             </div>
             <span className={`inline-flex px-3 py-1 rounded-full text-sm font-medium ${STATUS_COLORS[sub.status]}`}>{sub.status.replace('_', ' ')}</span>
           </div>
@@ -148,7 +156,13 @@ export default function Subscriptions() {
           {subscriptions.map(sub => (
             <div key={sub._id} onClick={() => setSelectedId(sub._id)} className="bg-white rounded-lg border border-gray-200 p-5 cursor-pointer hover:border-teal-300 hover:shadow-sm transition-all">
               <div className="flex items-start justify-between">
-                <div><div className="flex items-center gap-3"><span className="font-mono font-bold text-gray-900">{sub.tagId?.tagId || 'N/A'}</span><span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[sub.status]}`}>{sub.status.replace('_', ' ')}</span></div><p className="text-sm text-gray-500 mt-1">{sub.planName} — ${sub.price.toFixed(2)}/mo</p></div>
+                <div><div className="flex items-center gap-3"><span className="font-mono font-bold text-gray-900">{sub.tagId?.tagId || 'N/A'}</span><span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[sub.status]}`}>{sub.status.replace('_', ' ')}</span></div>
+                  {sub.petName && (
+                    <p className="text-sm text-teal-600 font-medium mt-1">
+                      {sub.petName}{sub.petType ? ` (${sub.petType})` : ''}
+                    </p>
+                  )}
+                  <p className="text-sm text-gray-500 mt-0.5">{sub.productName || sub.planName} — ${sub.price.toFixed(2)}/mo</p></div>
                 <div className="text-right text-sm text-gray-500"><div>Scans: {sub.totalScans}</div>{sub.freePeriodEndsAt && <div className="text-xs text-gray-400">{daysUntil(sub.freePeriodEndsAt)}d free left</div>}</div>
               </div>
               <div className="flex items-center gap-4 mt-3 text-xs text-gray-400"><span>Purchased: {formatDate(sub.startDate)}</span><span>{sub.autoRenew ? 'Auto-renew on' : 'Off'}</span>{sub.gracePeriodEndsAt && <span className="text-yellow-600">Grace: {formatDate(sub.gracePeriodEndsAt)}</span>}</div>

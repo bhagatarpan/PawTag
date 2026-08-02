@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, FormEvent } from 'react';
-import { PawPrint, Plus, AlertTriangle, CheckCircle, Star, X, Edit2, Save, Upload, ShieldAlert, ShieldCheck, ShoppingBag, ChevronRight, Skull, EyeOff, Clock, Activity, Camera, Info } from 'lucide-react';
+import { PawPrint, Plus, AlertTriangle, CheckCircle, Star, X, Edit2, Save, Upload, ShieldAlert, ShieldCheck, ShoppingBag, ChevronRight, Skull, EyeOff, Clock, Activity, Camera, Info, CreditCard } from 'lucide-react';
 import api from '../../lib/api';
 import HealthRecords from './HealthRecords';
 import SaveToast from '../../components/SaveToast';
@@ -385,6 +385,28 @@ export default function MyPets() {
                       {pet.petId && <p className="text-sm text-gray-400 font-mono">ID: {pet.petId}</p>}
                       {pet.linkedTag && <p className="text-sm text-teal-600 font-mono mt-0.5">Tag: {pet.linkedTag.tagId} <span className="text-[10px] uppercase bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded font-sans font-medium">{pet.linkedTag.tagType || 'qr'}</span><span className={`ml-1.5 inline-block w-2 h-2 rounded-full ${pet.linkedTag.status === 'active' ? 'bg-green-500' : pet.linkedTag.status === 'lost' ? 'bg-red-500' : 'bg-gray-400'}`} /><span className="ml-1 text-gray-400 font-sans">({pet.linkedTag.status})</span></p>}
                       {!pet.linkedTag && <p className="text-sm text-gray-300 mt-0.5">No tag linked</p>}
+                      {pet.linkedTag?.subscription && (
+                        <div className="mt-2 p-2 bg-teal-50 rounded-lg border border-teal-100">
+                          <div className="flex items-center gap-1.5 text-xs text-teal-700 font-medium">
+                            <CreditCard size={12} />
+                            <span>{pet.linkedTag.subscription.productName}</span>
+                            <span className={`ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                              pet.linkedTag.subscription.status === 'active' ? 'bg-green-100 text-green-700' :
+                              pet.linkedTag.subscription.status === 'grace_period' ? 'bg-yellow-100 text-yellow-700' :
+                              'bg-red-100 text-red-700'
+                            }`}>
+                              {pet.linkedTag.subscription.status === 'active' ? 'Active' :
+                               pet.linkedTag.subscription.status === 'grace_period' ? 'Expiring Soon' : 'Expired'}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-teal-600 mt-0.5">
+                            ${pet.linkedTag.subscription.price}/mo · {pet.linkedTag.subscription.autoRenew ? 'Auto-renew on' : 'Auto-renew off'}
+                          </p>
+                        </div>
+                      )}
+                      {pet.linkedTag && !pet.linkedTag.subscription && (
+                        <p className="text-xs text-gray-400 mt-1 italic">No active subscription</p>
+                      )}
                       <p className="text-base text-gray-600 mt-1">{pet.petType || pet.species} — {formatBreed(pet)}</p>
                       <p className="text-sm text-gray-400">Origin: {pet.breedOrigin || 'Purebred'}</p>
                       {pet.secondaryBreed && pet.secondaryBreed !== 'Unknown' && <p className="text-sm text-gray-400">Secondary: {pet.secondaryBreed}</p>}
