@@ -1,5 +1,6 @@
-import { Subscription, Tag, Invoice, User, Notification, Product } from '@pawtag/db';
+import { Subscription, Tag, Invoice, User, Notification, Product, TagExpiryNotification, Setting } from '@pawtag/db';
 import { sendMail } from './email.service';
+import { createAndDeliverNotification } from './notification-delivery.service';
 
 const GRACE_PERIOD_WEEKS = 4;
 const FREE_PERIOD_MONTHS = 12;
@@ -360,6 +361,74 @@ async function resetExpiredSkipOtp() {
   }
 }
 
+async function checkTagExpiryNotifications() {
+  const daysBeforeSetting = await Setting.findOne({ key: 'notifications.tagExpiryDaysBefore' }).lean();
+  const daysBefore = daysBeforeSetting ? parseInt(daysBeforeSetting.value, 10) : 30;
+  if (isNaN(daysBefore) || daysBefore <= 0) return;
+
+  const cutoffDate = new Date();
+  cutoffDate.setDate(cutoffDate.getDate() + daysBefore);
+
+  const expiringSubs = await Subscription.find({
+    status: 'active',
+    currentPeriodEnd: { $lte: cutoffDate, $gt: new Date() },
+  }).populate('tagId', 'tagId').populate('userId', 'fullName email');
+
+  let notifiedCount = 0;
+  for (const sub of expiringSubs) {
+    const daysUntilExpiry = Math.ceil((new Date(sub.currentPeriodEnd).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+
+    // Dedup: check if already notified today
+    const existing = await TagExpiryNotification.findOne({
+      subscriptionId: sub._id,
+      notifiedAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+    });
+    if (existing) continue;
+
+    const tag = sub.tagId as any;
+    const user = sub.userId as any;
+
+    await TagExpiryNotification.create({
+      subscriptionId: sub._id,
+      tagId: tag?._id,
+      ownerId: user?._id,
+      daysUntilExpiry,
+    });
+
+    // Notify admins
+    const adminEmailsSetting = await Setting.findOne({ key: 'notifications.tagExpiryAdminEmails' }).lean();
+    const adminEmails = adminEmailsSetting?.value
+      ? adminEmailsSetting.value.split(',').map(e => e.trim()).filter(Boolean)
+      : [];
+
+    const admins = adminEmails.length > 0
+      ? await User.find({ email: { $in: adminEmails } }).select('_id email fullName')
+      : await User.find({ role: { $in: ['admin', 'super_admin'] } }).select('_id email fullName');
+
+    for (const admin of admins) {
+      await createAndDeliverNotification({
+        userId: (admin as any)._id.toString(),
+        type: 'tag_expiry_warning',
+        title: `Tag Subscription Expiring in ${daysUntilExpiry} days`,
+        message: `Tag ${(tag as any)?.tagId || 'Unknown'} owned by ${(user as any)?.fullName || 'Customer'} expires in ${daysUntilExpiry} days. Consider reaching out for renewal.`,
+        data: { tagId: (tag as any)?.tagId, subscriptionId: sub._id.toString(), daysUntilExpiry },
+        priority: daysUntilExpiry <= 7 ? 'high' : 'normal',
+        actionUrl: `/subscriptions/${sub._id}`,
+        channel: 'alert',
+        sendPush: false,
+        sendEmail: true,
+        emailSubject: `PawTag Admin: Tag Expiring in ${daysUntilExpiry} days`,
+      });
+    }
+
+    notifiedCount++;
+  }
+
+  if (notifiedCount > 0) {
+    console.log(`[SubscriptionService] Created ${notifiedCount} tag expiry notification(s)`);
+  }
+}
+
 async function runSubscriptionChecks() {
   console.log('[SubscriptionService] Running subscription checks...');
 
@@ -369,6 +438,7 @@ async function runSubscriptionChecks() {
   await sendGracePeriodReminders();
   await processAutoRenewals();
   await resetExpiredSkipOtp();
+  await checkTagExpiryNotifications();
 
   console.log('[SubscriptionService] Subscription checks complete');
 }

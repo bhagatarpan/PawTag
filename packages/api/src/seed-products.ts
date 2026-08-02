@@ -127,6 +127,26 @@ async function seedProducts() {
     }
     console.log(`Seeded ${otpSettings.length} OTP system settings`);
 
+    // Seed bundle pricing settings
+    const pricingSettings = [
+      { key: 'pricing.bundle2Discount', value: '10', category: 'pricing', description: 'Discount percentage for buying 2 tags (default 10%)' },
+      { key: 'pricing.bundle3Discount', value: '15', category: 'pricing', description: 'Discount percentage for buying 3+ tags (default 15%)' },
+    ];
+    for (const s of pricingSettings) {
+      await Setting.findOneAndUpdate({ key: s.key }, s, { upsert: true });
+    }
+    console.log(`Seeded ${pricingSettings.length} pricing settings`);
+
+    // Seed notification settings
+    const notificationSettings = [
+      { key: 'notifications.tagExpiryDaysBefore', value: '30', category: 'notifications', description: 'Days before subscription expiry to start notifying admins' },
+      { key: 'notifications.tagExpiryAdminEmails', value: '', category: 'notifications', description: 'Comma-separated admin emails for expiry alerts (empty = all admins)' },
+    ];
+    for (const s of notificationSettings) {
+      await Setting.findOneAndUpdate({ key: s.key }, s, { upsert: true });
+    }
+    console.log(`Seeded ${notificationSettings.length} notification settings`);
+
     console.log('Done!');
     process.exit(0);
   } catch (error) {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import api from '../lib/api';
-import { Users, PawPrint, QrCode, ShoppingBag, AlertTriangle, Activity } from 'lucide-react';
+import { Users, PawPrint, QrCode, ShoppingBag, AlertTriangle, Activity, Gift } from 'lucide-react';
 
 interface DashboardStats {
   totalUsers: number;
@@ -31,6 +31,7 @@ function StatCard({ label, value, icon: Icon, color }: { label: string; value: s
 
 export default function Dashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [expiringTags, setExpiringTags] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -39,6 +40,10 @@ export default function Dashboard() {
       .then((res) => setStats(res.data.data))
       .catch(console.error)
       .finally(() => setLoading(false));
+
+    api.get('/admin/tag-expiry-notifications', { params: { limit: 5, acknowledged: false } })
+      .then((res) => setExpiringTags(res.data.data.items || []))
+      .catch(() => {});
   }, []);
 
   if (loading) return <div className="text-center py-12 text-gray-500">Loading dashboard...</div>;
@@ -76,45 +81,86 @@ export default function Dashboard() {
         />
       </div>
 
-      {stats.recentOrders.length > 0 && (
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {stats.recentOrders.length > 0 && (
+          <div className="bg-white rounded-lg border border-gray-200">
+            <div className="px-5 py-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold">Recent Orders</h2>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="text-left px-5 py-3 font-medium text-gray-500">Order #</th>
+                    <th className="text-left px-5 py-3 font-medium text-gray-500">Customer</th>
+                    <th className="text-left px-5 py-3 font-medium text-gray-500">Amount</th>
+                    <th className="text-left px-5 py-3 font-medium text-gray-500">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {stats.recentOrders.map((order: any) => (
+                    <tr key={order._id}>
+                      <td className="px-5 py-3 font-medium">{order.orderNumber}</td>
+                      <td className="px-5 py-3 text-gray-600">{order.userId?.fullName || 'N/A'}</td>
+                      <td className="px-5 py-3">${order.payment?.amount?.toLocaleString()}</td>
+                      <td className="px-5 py-3">
+                        <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${
+                          order.status === 'delivered'
+                            ? 'bg-green-100 text-green-700'
+                            : order.status === 'pending'
+                            ? 'bg-yellow-100 text-yellow-700'
+                            : 'bg-gray-100 text-gray-700'
+                        }`}>
+                          {order.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         <div className="bg-white rounded-lg border border-gray-200">
           <div className="px-5 py-4 border-b border-gray-200">
-            <h2 className="text-lg font-semibold">Recent Orders</h2>
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              <AlertTriangle size={18} className="text-amber-500" />
+              Tags Expiring Soon
+            </h2>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="text-left px-5 py-3 font-medium text-gray-500">Order #</th>
-                  <th className="text-left px-5 py-3 font-medium text-gray-500">Customer</th>
-                  <th className="text-left px-5 py-3 font-medium text-gray-500">Amount</th>
-                  <th className="text-left px-5 py-3 font-medium text-gray-500">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {stats.recentOrders.map((order: any) => (
-                  <tr key={order._id}>
-                    <td className="px-5 py-3 font-medium">{order.orderNumber}</td>
-                    <td className="px-5 py-3 text-gray-600">{order.userId?.fullName || 'N/A'}</td>
-                    <td className="px-5 py-3">${order.payment?.amount?.toLocaleString()}</td>
-                    <td className="px-5 py-3">
-                      <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${
-                        order.status === 'delivered'
-                          ? 'bg-green-100 text-green-700'
-                          : order.status === 'pending'
-                          ? 'bg-yellow-100 text-yellow-700'
-                          : 'bg-gray-100 text-gray-700'
-                      }`}>
-                        {order.status}
-                      </span>
-                    </td>
+            {expiringTags.length === 0 ? (
+              <div className="px-5 py-8 text-center text-gray-400">No tags expiring soon</div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="text-left px-5 py-3 font-medium text-gray-500">Tag</th>
+                    <th className="text-left px-5 py-3 font-medium text-gray-500">Owner</th>
+                    <th className="text-left px-5 py-3 font-medium text-gray-500">Days Left</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {expiringTags.map((n: any) => (
+                    <tr key={n._id}>
+                      <td className="px-5 py-3 font-mono text-xs">{n.tagId?.tagId || 'N/A'}</td>
+                      <td className="px-5 py-3 text-gray-600">{n.ownerId?.fullName || 'Unknown'}</td>
+                      <td className="px-5 py-3">
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                          n.daysUntilExpiry <= 7 ? 'bg-red-100 text-red-700' :
+                          n.daysUntilExpiry <= 14 ? 'bg-amber-100 text-amber-700' :
+                          'bg-blue-100 text-blue-700'
+                        }`}>{n.daysUntilExpiry}d</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }

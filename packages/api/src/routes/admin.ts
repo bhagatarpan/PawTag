@@ -36,6 +36,7 @@ import {
   Role,
   Subscription,
   Invoice,
+  TagExpiryNotification,
 } from '@pawtag/db';
 import { hashPassword } from '../services/auth.service';
 
@@ -2107,6 +2108,63 @@ router.put('/users/:id/skip-invoice-otp', requirePermission('user.update'), asyn
     res.json({ success: true, data: { skipInvoiceOtp: user.skipInvoiceOtp, expiresAt: user.skipInvoiceOtpExpiresAt } });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to update skip invoice OTP' });
+  }
+});
+
+// --- Tag Expiry Notifications ---
+router.get('/tag-expiry-notifications', requirePermission('subscription.read'), async (req: AuthRequest, res: Response) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 20;
+    const skip = (page - 1) * limit;
+    const showAcknowledged = req.query.acknowledged === 'true';
+
+    const filter: any = {};
+    if (!showAcknowledged) filter.acknowledged = false;
+
+    const [items, total] = await Promise.all([
+      TagExpiryNotification.find(filter)
+        .populate('tagId', 'tagId')
+        .populate('ownerId', 'fullName email')
+        .populate('subscriptionId', 'currentPeriodEnd planName')
+        .sort({ daysUntilExpiry: 1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      TagExpiryNotification.countDocuments(filter),
+    ]);
+
+    res.json({
+      success: true,
+      data: { items, total, page, limit, totalPages: Math.ceil(total / limit) },
+    });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to fetch tag expiry notifications' });
+  }
+});
+
+router.put('/tag-expiry-notifications/:id/acknowledge', requirePermission('subscription.update'), async (req: AuthRequest, res: Response) => {
+  try {
+    const notification = await TagExpiryNotification.findByIdAndUpdate(
+      req.params.id,
+      { acknowledged: true, acknowledgedBy: req.user!.id, acknowledgedAt: new Date() },
+      { new: true },
+    );
+    if (!notification) { res.status(404).json({ success: false, error: 'Notification not found' }); return; }
+    res.json({ success: true, data: notification });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to acknowledge notification' });
+  }
+});
+
+router.get('/tag-expiry-notifications/stats', requirePermission('subscription.read'), async (_req: AuthRequest, res: Response) => {
+  try {
+    const unacknowledged = await TagExpiryNotification.countDocuments({ acknowledged: false });
+    const critical = await TagExpiryNotification.countDocuments({ acknowledged: false, daysUntilExpiry: { $lte: 7 } });
+    const total = await TagExpiryNotification.countDocuments();
+    res.json({ success: true, data: { unacknowledged, critical, total } });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to get stats' });
   }
 });
 

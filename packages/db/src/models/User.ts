@@ -30,6 +30,18 @@ export interface IUserDocument extends Document {
   responsibilityScore: number;
   skipInvoiceOtp: boolean;
   skipInvoiceOtpExpiresAt?: Date;
+  notificationPreferences?: {
+    email: boolean;
+    push: boolean;
+    inApp: boolean;
+    channels: {
+      petFound: boolean;
+      orderUpdate: boolean;
+      subscriptionReminder: boolean;
+      referral: boolean;
+      marketing: boolean;
+    };
+  };
   deletedAt?: Date;
 }
 
@@ -68,6 +80,18 @@ const UserSchema = new Schema<IUserDocument>(
     responsibilityScore: { type: Number, default: 0, min: 0 },
     skipInvoiceOtp: { type: Boolean, default: false },
     skipInvoiceOtpExpiresAt: { type: Date, default: null },
+    notificationPreferences: {
+      email: { type: Boolean, default: true },
+      push: { type: Boolean, default: true },
+      inApp: { type: Boolean, default: true },
+      channels: {
+        petFound: { type: Boolean, default: true },
+        orderUpdate: { type: Boolean, default: true },
+        subscriptionReminder: { type: Boolean, default: true },
+        referral: { type: Boolean, default: true },
+        marketing: { type: Boolean, default: false },
+      },
+    },
     deletedAt: { type: Date, default: null },
   },
   { timestamps: true },

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { PawPrint, LogOut, User, ShoppingBag, Bell, Settings, CreditCard } from 'lucide-react';
+import { PawPrint, LogOut, User, ShoppingBag, Bell, Settings, CreditCard, Gift } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { useSiteSettings } from '../hooks/useSiteSettings';
 import api from '../lib/api';
@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { path: '/orders', label: 'Orders', icon: ShoppingBag },
   { path: '/subscriptions', label: 'Subscriptions', icon: CreditCard },
   { path: '/notifications', label: 'Notifications', icon: Bell },
+  { path: '/referrals', label: 'Referrals', icon: Gift },
   { path: '/settings', label: 'Settings', icon: Settings },
 ];
 

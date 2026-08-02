@@ -59,6 +59,10 @@ export enum NotificationType {
   FINDER_SCAN = 'finder_scan',
   ORDER_UPDATE = 'order_update',
   SYSTEM = 'system',
+  FINDER_REMINDER = 'finder_reminder',
+  SUBSCRIPTION_EXPIRING = 'subscription_expiring',
+  REFERRAL_REWARD = 'referral_reward',
+  TAG_EXPIRY_WARNING = 'tag_expiry_warning',
 }
 
 export enum FinderAction {
@@ -419,6 +423,12 @@ export interface Order {
   billingAddress?: Address;
   trackingNumber?: string;
   notes?: string;
+  discount?: {
+    percent: number;
+    amount: number;
+    reason: string;
+  };
+  referredByCode?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -429,6 +439,9 @@ export interface OrderItem {
   quantity: number;
   unitPrice: number;
   totalPrice: number;
+  variantName?: string;
+  petName?: string;
+  customizationTotal?: number;
 }
 
 export interface PaymentInfo {
@@ -461,6 +474,9 @@ export interface Notification {
   message: string;
   data?: Record<string, unknown>;
   read: boolean;
+  priority?: 'low' | 'normal' | 'high';
+  actionUrl?: string;
+  channel?: 'info' | 'alert' | 'reminder' | 'marketing';
   createdAt: string;
 }
 
@@ -743,3 +759,73 @@ export const SUBSCRIPTION_PLANS = {
     gracePeriodWeeks: 4,
   },
 } as const;
+
+// --- Referral Types ---
+
+export interface ReferralCode {
+  _id: string;
+  userId: string;
+  code: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface Referral {
+  _id: string;
+  referrerId: string;
+  refereeId: string;
+  referralCode: string;
+  status: 'pending' | 'completed' | 'rewarded';
+  referrerRewardMonths: number;
+  refereeRewardMonths: number;
+  orderId?: string;
+  createdAt: string;
+  completedAt?: string;
+}
+
+export interface ReferralStats {
+  totalReferrals: number;
+  completedReferrals: number;
+  pendingReferrals: number;
+  totalRewardMonths: number;
+}
+
+// --- Push Token Types ---
+
+export interface PushToken {
+  _id: string;
+  userId: string;
+  token: string;
+  platform: 'web' | 'ios' | 'android';
+  isActive: boolean;
+  createdAt: string;
+  lastUsedAt: string;
+}
+
+// --- Tag Expiry Notification Types ---
+
+export interface TagExpiryNotification {
+  _id: string;
+  subscriptionId: string;
+  tagId: string;
+  ownerId: string;
+  daysUntilExpiry: number;
+  notifiedAt: string;
+  acknowledged: boolean;
+  acknowledgedBy?: string;
+  acknowledgedAt?: string;
+  createdAt: string;
+}
+
+// --- Bundle Pricing ---
+
+export const BUNDLE_DISCOUNTS = {
+  2: 10,
+  3: 15,
+} as const;
+
+export function getBundleDiscount(itemCount: number): number {
+  if (itemCount >= 3) return BUNDLE_DISCOUNTS[3];
+  if (itemCount >= 2) return BUNDLE_DISCOUNTS[2];
+  return 0;
+}

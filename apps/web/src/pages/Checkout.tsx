@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Lock, CreditCard, PawPrint, CheckCircle, Truck } from 'lucide-react';
+import { ArrowLeft, Lock, CreditCard, PawPrint, CheckCircle, Truck, Tag } from 'lucide-react';
 import api from '../lib/api';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
+import { getBundleDiscount } from '@pawtag/shared';
 
 const SHIPPING_ZONES = [
   { value: 'city', label: 'NZ City / Suburb', cost: 7.99 },
@@ -18,6 +19,8 @@ export default function Checkout() {
   const [success, setSuccess] = useState(false);
   const [orderNumber, setOrderNumber] = useState('');
   const [shippingZone, setShippingZone] = useState<'city' | 'rural'>('city');
+  const [referralCode, setReferralCode] = useState('');
+  const [referralApplied, setReferralApplied] = useState(false);
   const [form, setForm] = useState({
     line1: '',
     line2: '',
@@ -27,8 +30,19 @@ export default function Checkout() {
     country: 'NZ',
   });
 
+  // Calculate bundle discount (counts subscription-tag-like items by name heuristic)
+  const tagItemCount = items.filter(i =>
+    i.name.toLowerCase().includes('pawtag') || i.name.toLowerCase().includes('tag')
+  ).reduce((sum, i) => sum + i.quantity, 0);
+  const bundleDiscountPercent = getBundleDiscount(tagItemCount);
+  const bundleDiscountAmount = bundleDiscountPercent > 0
+    ? Math.round(items.filter(i => i.name.toLowerCase().includes('pawtag') || i.name.toLowerCase().includes('tag'))
+        .reduce((sum, i) => sum + (i.price * i.quantity), 0) * (bundleDiscountPercent / 100) * 100) / 100
+    : 0;
+
   const shippingCost = SHIPPING_ZONES.find((z) => z.value === shippingZone)?.cost || 7.99;
-  const orderTotal = total + shippingCost;
+  const discountedSubtotal = total - bundleDiscountAmount;
+  const orderTotal = discountedSubtotal + shippingCost;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,6 +54,7 @@ export default function Checkout() {
       const res = await api.post('/customer/orders', {
         shippingAddress: { ...form, shippingZone },
         paymentMethod: 'card',
+        referralCode: referralApplied ? referralCode : undefined,
       });
       setOrderNumber(res.data.data.orderNumber);
       setSuccess(true);
@@ -200,14 +215,50 @@ export default function Checkout() {
                   <span>Subtotal</span>
                   <span>${total.toFixed(2)}</span>
                 </div>
+                {bundleDiscountAmount > 0 && (
+                  <div className="flex justify-between text-sm text-green-600 font-medium">
+                    <span className="flex items-center gap-1"><Tag size={14} /> Bundle Discount ({bundleDiscountPercent}%)</span>
+                    <span>-${bundleDiscountAmount.toFixed(2)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-sm text-gray-500">
                   <span>Shipping ({SHIPPING_ZONES.find((z) => z.value === shippingZone)?.label})</span>
                   <span>${shippingCost.toFixed(2)}</span>
                 </div>
+
+                {/* Referral Code */}
+                <div className="pt-2">
+                  {referralApplied ? (
+                    <div className="flex items-center justify-between text-sm text-green-600">
+                      <span className="flex items-center gap-1"><Tag size={14} /> Referral code applied</span>
+                      <button onClick={() => { setReferralApplied(false); setReferralCode(''); }} className="text-xs text-gray-400 hover:text-red-500">Remove</button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={referralCode}
+                        onChange={e => setReferralCode(e.target.value.toUpperCase())}
+                        placeholder="Referral code"
+                        className="flex-1 px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-teal-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => { if (referralCode.length >= 6) setReferralApplied(true); }}
+                        disabled={referralCode.length < 6}
+                        className="px-3 py-1.5 text-sm text-teal-600 border border-teal-200 rounded-lg hover:bg-teal-50 disabled:opacity-50"
+                      >Apply</button>
+                    </div>
+                  )}
+                </div>
+
                 <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-100">
                   <span>Total</span>
                   <span className="text-teal-700">${orderTotal.toFixed(2)}</span>
                 </div>
+                {bundleDiscountAmount > 0 && (
+                  <p className="text-xs text-green-600 text-right">You save ${bundleDiscountAmount.toFixed(2)} with bundle pricing!</p>
+                )}
               </div>
             </div>
           </div>

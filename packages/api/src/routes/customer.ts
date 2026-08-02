@@ -3,7 +3,9 @@ import { AuthRequest, authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
 import { validate } from '../middleware/validation';
 import { createPetSchema, updatePetSchema } from '../middleware/schemas';
-import { Pet, Tag, Order, LocationEvent, Notification, FinderScan, User, generatePetId, Cart, Product, Subscription } from '@pawtag/db';
+import { Pet, Tag, Order, LocationEvent, Notification, FinderScan, User, generatePetId, Cart, Product, Subscription, Referral } from '@pawtag/db';
+import { calculateBundleDiscount } from '../services/bundle-pricing.service';
+import { validateReferralCode, createReferralOnOrder, completeReferralRewards } from '../services/referral.service';
 
 const router = Router();
 router.use(authenticate);
@@ -664,7 +666,7 @@ router.get('/orders/:id', requirePermission('order.read'), async (req: AuthReque
 router.post('/orders', requirePermission('order.create'), async (req: AuthRequest, res: Response) => {
   try {
     const { Cart, Order, Product, User } = require('@pawtag/db');
-    const { shippingAddress, paymentMethod = 'card' } = req.body;
+    const { shippingAddress, paymentMethod = 'card', referralCode } = req.body;
 
     if (!shippingAddress?.line1 || !shippingAddress?.city || !shippingAddress?.state || !shippingAddress?.zip) {
       res.status(400).json({ success: false, error: 'Shipping address is required (line1, city, state, zip)' });
@@ -726,6 +728,35 @@ router.post('/orders', requirePermission('order.create'), async (req: AuthReques
       await product.save();
     }
 
+    // Calculate bundle discount for subscription products
+    const bundleItems = orderItems.map(item => ({
+      productId: item.productId.toString(),
+      isSubscription: false,
+      unitPrice: item.unitPrice,
+      quantity: item.quantity,
+    }));
+
+    // Resolve subscription status for each item
+    for (let i = 0; i < bundleItems.length; i++) {
+      const product = await Product.findById(bundleItems[i].productId);
+      bundleItems[i].isSubscription = !!(product?.isSubscription);
+    }
+
+    const bundleDiscount = await calculateBundleDiscount(bundleItems);
+
+    // Validate referral code if provided
+    let referralData: { referrerId: string; valid: boolean } | null = null;
+    if (referralCode) {
+      const validation = await validateReferralCode(referralCode);
+      if (validation.valid && validation.referrerId) {
+        referralData = { referrerId: validation.referrerId, valid: true };
+      }
+    }
+
+    // Apply discount to total
+    const discountAmount = bundleDiscount.amount;
+    const finalAmount = Math.round((totalAmount - discountAmount) * 100) / 100;
+
     // Generate order number
     const orderCount = await Order.countDocuments();
     const orderNumber = `PT-${String(orderCount + 1).padStart(6, '0')}`;
@@ -733,7 +764,7 @@ router.post('/orders', requirePermission('order.create'), async (req: AuthReques
     // Process payment via Stripe
     const { createPaymentIntent } = require('../services/stripe.service');
     const paymentResult = await createPaymentIntent({
-      amount: totalAmount,
+      amount: finalAmount,
       currency: 'NZD',
       orderId: orderNumber,
       customerEmail: user?.email || '',
@@ -746,7 +777,7 @@ router.post('/orders', requirePermission('order.create'), async (req: AuthReques
     }
 
     // Create order with payment info
-    const order = await Order.create({
+    const orderData: any = {
       orderNumber,
       userId: req.user!.id,
       items: orderItems,
@@ -755,7 +786,7 @@ router.post('/orders', requirePermission('order.create'), async (req: AuthReques
         method: paymentMethod,
         status: 'completed',
         transactionId: paymentResult.paymentIntentId,
-        amount: totalAmount,
+        amount: finalAmount,
         currency: 'NZD',
         paidAt: new Date(),
       },
@@ -767,7 +798,23 @@ router.post('/orders', requirePermission('order.create'), async (req: AuthReques
         zip: shippingAddress.zip,
         country: shippingAddress.country || 'NZ',
       },
-    });
+    };
+
+    // Add bundle discount if applied
+    if (discountAmount > 0) {
+      orderData.discount = {
+        percent: bundleDiscount.percent,
+        amount: discountAmount,
+        reason: bundleDiscount.reason,
+      };
+    }
+
+    // Add referral code if used
+    if (referralData) {
+      orderData.referredByCode = referralCode.toUpperCase();
+    }
+
+    const order = await Order.create(orderData);
 
     // Clear cart
     await Cart.findOneAndDelete({ userId: req.user!.id });
@@ -812,6 +859,16 @@ router.post('/orders', requirePermission('order.create'), async (req: AuthReques
       console.error('Subscription creation error:', subError);
     }
 
+    // Process referral rewards if referral code was used
+    if (referralData) {
+      try {
+        await createReferralOnOrder(referralData.referrerId, req.user!.id, referralCode, order._id.toString());
+        await completeReferralRewards(order._id.toString());
+      } catch (refError) {
+        console.error('Referral processing error:', refError);
+      }
+    }
+
     // Send confirmation email (non-blocking)
     const { sendOrderConfirmation } = require('../services/email.service');
     sendOrderConfirmation({
@@ -825,7 +882,9 @@ router.post('/orders', requirePermission('order.create'), async (req: AuthReques
         variantName: item.variantName,
         petName: item.petName,
       })),
-      total: totalAmount,
+      subtotal: totalAmount,
+      discount: discountAmount > 0 ? { percent: bundleDiscount.percent, amount: discountAmount, reason: bundleDiscount.reason } : undefined,
+      total: finalAmount,
       shippingAddress: {
         line1: shippingAddress.line1,
         city: shippingAddress.city,
@@ -1044,6 +1103,42 @@ router.get('/notifications/unread-count', requirePermission('notification.read')
     res.json({ success: true, data: { count } });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to get unread count' });
+  }
+});
+
+// --- Notification Preferences ---
+router.get('/notification-preferences', requirePermission('notification.read'), async (req: AuthRequest, res: Response) => {
+  try {
+    const user = await User.findById(req.user!.id).select('notificationPreferences');
+    const prefs = (user as any)?.notificationPreferences || {
+      email: true, push: true, inApp: true,
+      channels: { petFound: true, orderUpdate: true, subscriptionReminder: true, referral: true, marketing: false },
+    };
+    res.json({ success: true, data: prefs });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to get notification preferences' });
+  }
+});
+
+router.put('/notification-preferences', requirePermission('notification.update'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { email, push, inApp, channels } = req.body;
+    const update: any = {};
+    if (email !== undefined) update['notificationPreferences.email'] = email;
+    if (push !== undefined) update['notificationPreferences.push'] = push;
+    if (inApp !== undefined) update['notificationPreferences.inApp'] = inApp;
+    if (channels) {
+      if (channels.petFound !== undefined) update['notificationPreferences.channels.petFound'] = channels.petFound;
+      if (channels.orderUpdate !== undefined) update['notificationPreferences.channels.orderUpdate'] = channels.orderUpdate;
+      if (channels.subscriptionReminder !== undefined) update['notificationPreferences.channels.subscriptionReminder'] = channels.subscriptionReminder;
+      if (channels.referral !== undefined) update['notificationPreferences.channels.referral'] = channels.referral;
+      if (channels.marketing !== undefined) update['notificationPreferences.channels.marketing'] = channels.marketing;
+    }
+
+    const user = await User.findByIdAndUpdate(req.user!.id, { $set: update }, { new: true }).select('notificationPreferences');
+    res.json({ success: true, data: (user as any)?.notificationPreferences });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to update notification preferences' });
   }
 });
 

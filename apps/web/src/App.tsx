@@ -19,6 +19,7 @@ import Privacy from './pages/Privacy';
 import Terms from './pages/Terms';
 import Faq from './pages/Faq';
 import Contact from './pages/Contact';
+import Refer from './pages/Refer';
 import NotFound from './pages/NotFound';
 import MyPets from './pages/account/MyPets';
 import Profile from './pages/account/Profile';
@@ -54,6 +55,7 @@ export default function App() {
       <Route path="/terms" element={<div className="min-h-screen flex flex-col"><Navbar /><main className="flex-1"><Terms /></main><Footer /><EmergencyLostPet /></div>} />
       <Route path="/faq" element={<div className="min-h-screen flex flex-col"><Navbar /><main className="flex-1"><Faq /></main><Footer /><EmergencyLostPet /></div>} />
       <Route path="/contact" element={<div className="min-h-screen flex flex-col"><Navbar /><main className="flex-1"><Contact /></main><Footer /><EmergencyLostPet /></div>} />
+      <Route path="/refer" element={<div className="min-h-screen flex flex-col"><Navbar /><main className="flex-1"><Refer /></main><Footer /></div>} />
 
       {/* Account routes — no public Navbar/Footer, uses AccountLayout sidebar */}
       <Route path="/account" element={<ProtectedRoute><AccountLayout><MyPets /></AccountLayout></ProtectedRoute>} />

@@ -40,6 +40,12 @@ export interface IOrderDocument extends Document {
   };
   trackingNumber?: string;
   notes?: string;
+  discount?: {
+    percent: number;
+    amount: number;
+    reason: string;
+  };
+  referredByCode?: string;
   deletedAt?: Date;
 }
 
@@ -91,6 +97,12 @@ const OrderSchema = new Schema<IOrderDocument>(
     },
     trackingNumber: String,
     notes: String,
+    discount: {
+      percent: { type: Number, default: 0 },
+      amount: { type: Number, default: 0 },
+      reason: { type: String },
+    },
+    referredByCode: { type: String },
     deletedAt: { type: Date, default: null },
   },
   { timestamps: true },

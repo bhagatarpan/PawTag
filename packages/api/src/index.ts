@@ -37,6 +37,8 @@ import customerSubscriptionRoutes from './routes/customer-subscriptions';
 import adminSubscriptionRoutes from './routes/admin-subscriptions';
 import webhookRoutes from './routes/webhooks';
 import invoiceAccessRoutes from './routes/invoice-access';
+import referralRoutes from './routes/referrals';
+import pushTokenRoutes from './routes/push-tokens';
 import { startReminderService } from './services/reminder.service';
 import { startSubscriptionService } from './services/subscription.service';
 
@@ -139,6 +141,8 @@ app.use('/api', invoiceAccessRoutes);
 app.use('/api/webhooks', webhookRoutes);
 app.use('/api/finder', finderRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api', referralRoutes);
+app.use('/api', pushTokenRoutes);
 app.use('/api/public/cms', cmsPublicRoutes);
 app.use('/api/public/cms', cmsSettingsPublicRoutes);
 app.use('/api/public/cms', cmsPublicV2Routes);
