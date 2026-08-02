@@ -266,7 +266,7 @@ export async function checkExpiredSubscriptions() {
 export async function checkGracePeriodExpiry() {
   const now = new Date();
 
-  // Grace period expired → inactive
+  // Grace period expired → subscription expired, tag shows "Subscription Expired"
   const graceExpired = await Subscription.find({
     status: 'grace_period',
     gracePeriodEndsAt: { $lte: now },
@@ -278,10 +278,10 @@ export async function checkGracePeriodExpiry() {
     await sub.save();
 
     await Tag.findByIdAndUpdate(sub.tagId, {
-      subscriptionStatus: 'inactive',
+      subscriptionStatus: 'expired',
     });
 
-    console.log(`[SubscriptionService] Subscription ${sub._id} expired — tag deactivated`);
+    console.log(`[SubscriptionService] Subscription ${sub._id} expired — tag deactivated (Subscription Expired)`);
   }
 }
 

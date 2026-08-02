@@ -193,7 +193,7 @@ router.put('/:id/status', requirePermission('subscription.update'), async (req: 
     if (status === 'active') {
       await Tag.findByIdAndUpdate(subscription.tagId, { subscriptionStatus: 'active' });
     } else if (status === 'expired') {
-      await Tag.findByIdAndUpdate(subscription.tagId, { subscriptionStatus: 'inactive' });
+      await Tag.findByIdAndUpdate(subscription.tagId, { subscriptionStatus: 'expired' });
     } else if (status === 'grace_period') {
       await Tag.findByIdAndUpdate(subscription.tagId, { subscriptionStatus: 'grace_period' });
     }
