@@ -345,7 +345,7 @@ export default function Tags() {
         <form onSubmit={handleSearch} className="flex gap-2">
           <input
             type="text"
-            placeholder="Search by tag ID..."
+            placeholder="Search by tag ID, pet name, owner, email or phone..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="border border-gray-300 rounded-md px-3 py-2 text-sm w-64"

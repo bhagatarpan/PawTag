@@ -1171,7 +1171,35 @@ router.get('/tags', requirePermission('tag.read'), async (req, res: Response) =>
   try {
     const { page = 1, limit = 20, search, status, tagType } = req.query;
     const query: any = { deletedAt: null };
-    if (search) query.tagId = { $regex: search, $options: 'i' };
+
+    if (search) {
+      const searchStr = search as string;
+      const searchRegex = { $regex: searchStr, $options: 'i' };
+
+      // Find matching pet IDs (by name)
+      const matchingPets = await Pet.find({ name: searchRegex }).select('_id');
+      const petIds = matchingPets.map((p) => p._id);
+
+      // Find matching owner IDs (by name, email, or phone)
+      const matchingOwners = await User.find({
+        $or: [
+          { fullName: searchRegex },
+          { email: searchRegex },
+          { phoneNumber: searchRegex },
+        ],
+      }).select('_id');
+      const ownerIds = matchingOwners.map((u) => u._id);
+
+      // Search by tagId, petId, or ownerId
+      const orConditions: any[] = [
+        { tagId: searchRegex },
+      ];
+      if (petIds.length > 0) orConditions.push({ petId: { $in: petIds } });
+      if (ownerIds.length > 0) orConditions.push({ ownerId: { $in: ownerIds } });
+
+      query.$or = orConditions;
+    }
+
     if (status) query.status = status;
     if (tagType) query.tagType = tagType;
 
