@@ -144,7 +144,7 @@ export const createProductSchema = z.object({
   shortDescription: z.string().optional(),
   price: z.number().positive(),
   currency: z.string().optional(),
-  images: z.array(z.string().url()).optional(),
+  images: z.array(z.string()).optional(),
   category: z.string().min(1),
   tags: z.array(z.string()).optional(),
   stock: z.number().int().min(0),
@@ -158,6 +158,28 @@ export const createProductSchema = z.object({
       unit: z.enum(['cm', 'in']),
     })
     .optional(),
+  isActive: z.boolean().optional(),
+  customizable: z.boolean().optional(),
+  customizationPrice: z.number().min(0).optional(),
+  variants: z.array(z.object({
+    name: z.string(),
+    sku: z.string(),
+    price: z.number().optional(),
+    stock: z.number().int().min(0),
+    image: z.string().optional(),
+    attributes: z.record(z.string()).optional(),
+  })).optional(),
+  isSubscription: z.boolean().optional(),
+  subscriptionConfig: z.object({
+    type: z.string(),
+    freePeriodMonths: z.number(),
+    gracePeriodWeeks: z.number(),
+    monthlyPrice: z.number().optional(),
+    stripePriceId: z.string().optional(),
+    features: z.array(z.string()).optional(),
+  }).optional(),
+  warrantyMonths: z.number().optional(),
+  shippingCost: z.number().min(0).optional(),
 });
 
 export const updateProductSchema = createProductSchema.partial();
