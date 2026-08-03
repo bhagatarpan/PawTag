@@ -2,7 +2,7 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "rootDir": "./src",
+    "rootDir": null,
     "jsx": "react-jsx",
     "declaration": false,
     "declarationMap": false,

@@ -16,7 +16,12 @@
     "isolatedModules": true,
     "declaration": true,
     "declarationMap": true,
-    "sourceMap": true
+    "sourceMap": true,
+    "baseUrl": ".",
+    "paths": {
+      "@pawtag/shared": ["./packages/shared/src"],
+      "@pawtag/db": ["./packages/db/src"]
+    }
   },
   "exclude": ["node_modules", "dist", "build"]
 }
