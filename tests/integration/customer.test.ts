@@ -515,7 +515,7 @@ describe('Integration: Customer - Responsibility Score', () => {
       .get('/api/customer/responsibility')
       .set('Authorization', `Bearer ${fakeToken}`);
 
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(403);
   });
 });
 

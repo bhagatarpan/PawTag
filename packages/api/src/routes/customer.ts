@@ -6,6 +6,8 @@ import { createPetSchema, updatePetSchema } from '../middleware/schemas';
 import { Pet, Tag, Order, LocationEvent, Notification, FinderScan, User, generatePetId, Cart, Product, Subscription, Referral } from '@pawtag/db';
 import { calculateBundleDiscount } from '../services/bundle-pricing.service';
 import { validateReferralCode, createReferralOnOrder, completeReferralRewards } from '../services/referral.service';
+import { createPaymentIntent } from '../services/stripe.service';
+import { sendOrderConfirmation } from '../services/email.service';
 
 const router = Router();
 router.use(authenticate);
@@ -563,11 +565,10 @@ router.put('/cart/items/:itemId', requirePermission('order.create'), async (req:
 
 router.delete('/cart/items/:itemId', requirePermission('order.create'), async (req: AuthRequest, res: Response) => {
   try {
-    const { Cart } = require('@pawtag/db');
     const cart = await Cart.findOne({ userId: req.user!.id });
     if (!cart) { res.status(404).json({ success: false, error: 'Cart not found' }); return; }
 
-    cart.items = cart.items.filter((item: any) => item._id.toString() !== req.params.itemId);
+    cart.items = cart.items.filter((item: any) => item._id.toString() !== req.params.itemId) as any;
     cart.updatedAt = new Date();
     await cart.save();
     res.json({ success: true, data: cart });
@@ -578,7 +579,6 @@ router.delete('/cart/items/:itemId', requirePermission('order.create'), async (r
 
 router.delete('/cart', requirePermission('order.create'), async (req: AuthRequest, res: Response) => {
   try {
-    const { Cart } = require('@pawtag/db');
     await Cart.findOneAndDelete({ userId: req.user!.id });
     res.json({ success: true, data: { message: 'Cart cleared' } });
   } catch {
@@ -665,7 +665,6 @@ router.get('/orders/:id', requirePermission('order.read'), async (req: AuthReque
 
 router.post('/orders', requirePermission('order.create'), async (req: AuthRequest, res: Response) => {
   try {
-    const { Cart, Order, Product, User } = require('@pawtag/db');
     const { shippingAddress, paymentMethod = 'card', referralCode } = req.body;
 
     if (!shippingAddress?.line1 || !shippingAddress?.city || !shippingAddress?.state || !shippingAddress?.zip) {
@@ -762,7 +761,6 @@ router.post('/orders', requirePermission('order.create'), async (req: AuthReques
     const orderNumber = `PT-${String(orderCount + 1).padStart(6, '0')}`;
 
     // Process payment via Stripe
-    const { createPaymentIntent } = require('../services/stripe.service');
     const paymentResult = await createPaymentIntent({
       amount: finalAmount,
       currency: 'NZD',
@@ -870,9 +868,8 @@ router.post('/orders', requirePermission('order.create'), async (req: AuthReques
     }
 
     // Send confirmation email (non-blocking)
-    const { sendOrderConfirmation } = require('../services/email.service');
     sendOrderConfirmation({
-      to: user?.email,
+      to: user?.email || '',
       customerName: user?.fullName || 'Customer',
       orderNumber,
       items: orderItems.map((item: any) => ({

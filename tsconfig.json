@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "paths": {
+      "@pawtag/db": ["./packages/db/src"],
+      "@pawtag/shared": ["./packages/shared/src"]
+    }
+  },
+  "include": [
+    "tests/**/*.ts",
+    "packages/api/src/**/*.test.ts",
+    "vitest.config.ts"
+  ],
+  "exclude": ["node_modules", "dist", "build"]
+}

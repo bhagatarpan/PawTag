@@ -272,7 +272,7 @@ describe('Integration: CMS Admin - Footer', () => {
       .send({
         name: 'Main Footer',
         copyright: '2026 PawTag',
-        groups: [{ title: 'Links', items: [{ label: 'Home', url: '/' }] }],
+        groups: [{ title: 'Links', links: [{ label: 'Home', url: '/', visible: true, order: 0 }] }],
       });
 
     expect(res.status).toBe(201);
@@ -408,7 +408,7 @@ describe('Integration: CMS Admin - Announcements', () => {
     const createRes = await request(app)
       .post('/api/admin/cms/announcements')
       .set('Authorization', `Bearer ${token}`)
-      .send({ title: 'Delete Me', message: 'Bye', type: 'modal' });
+      .send({ title: 'Delete Me', message: 'Bye', type: 'banner' });
 
     const id = createRes.body.data._id;
     const res = await request(app)

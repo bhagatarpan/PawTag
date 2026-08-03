@@ -47,7 +47,7 @@ const CmsFooterLinkSchema = new Schema<ICmsFooterLink>(
 
 const CmsFooterGroupSchema = new Schema<ICmsFooterGroup>(
   {
-    groupId: { type: String, required: true },
+    groupId: { type: String, default: () => new mongoose.Types.ObjectId().toString() },
     title: { type: String, required: true, trim: true },
     links: [CmsFooterLinkSchema],
     visible: { type: Boolean, default: true },

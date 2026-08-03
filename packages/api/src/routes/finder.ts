@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { Tag, FinderScan, LocationEvent, Notification, Subscription } from '@pawtag/db';
+import { Tag, FinderScan, LocationEvent, Notification, Subscription, User, Pet, SiteContent, Product } from '@pawtag/db';
 
 const router = Router();
 
@@ -8,8 +8,6 @@ const router = Router();
 // --- Public stats (must be before /:tagId routes) ---
 router.get('/stats', async (_req: Request, res: Response) => {
   try {
-    const { Tag, FinderScan, User, Pet } = require('@pawtag/db');
-
     const [totalTags, activeTags, totalScans, totalUsers, totalPets, lostPets, foundPets] = await Promise.all([
       Tag.countDocuments({ deletedAt: null }),
       Tag.countDocuments({ status: 'active', deletedAt: null }),
@@ -493,7 +491,6 @@ router.post('/:tagId/share-location', async (req: Request, res: Response) => {
  */
 router.get('/shop/products', async (req: Request, res: Response) => {
   try {
-    const { Product } = require('@pawtag/db');
     const { page = 1, limit = 50, category, search } = req.query;
     const query: any = { isActive: true };
     
@@ -520,7 +517,6 @@ router.get('/shop/products', async (req: Request, res: Response) => {
 
 router.get('/shop/products/:id', async (req: Request, res: Response) => {
   try {
-    const { Product } = require('@pawtag/db');
     const product = await Product.findById(req.params.id);
     if (!product) {
       res.status(404).json({ success: false, error: 'Product not found' });
@@ -564,7 +560,6 @@ router.get('/shop/products/:id', async (req: Request, res: Response) => {
  */
 router.get('/content/:slug', async (req: Request, res: Response) => {
   try {
-    const { SiteContent } = require('@pawtag/db');
     const content = await SiteContent.findOne({ slug: req.params.slug, status: 'published' });
     if (!content) {
       res.status(404).json({ success: false, error: 'Page not found' });

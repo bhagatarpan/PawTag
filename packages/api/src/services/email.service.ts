@@ -204,6 +204,8 @@ export interface OrderEmailData {
     variantName?: string;
     petName?: string;
   }>;
+  subtotal?: number;
+  discount?: { percent: number; amount: number; reason: string };
   total: number;
   shippingAddress: {
     line1: string;

@@ -191,6 +191,7 @@ export async function createPet(ownerId: string, overrides: Record<string, any> 
     ownerId: new mongoose.Types.ObjectId(ownerId),
     petId: overrides.petId || 'PET-TEST-001',
     name: overrides.name || 'Buddy',
+    petType: overrides.petType || 'Dog',
     species: overrides.species || 'dog',
     breed: overrides.breed || 'Golden Retriever',
     color: overrides.color || 'Golden',

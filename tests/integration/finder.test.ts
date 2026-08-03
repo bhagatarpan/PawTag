@@ -33,6 +33,7 @@ async function createPet(ownerId: string, overrides: Record<string, any> = {}) {
     ownerId: new mongoose.Types.ObjectId(ownerId),
     petId: overrides.petId || 'PET-FINDER-001',
     name: overrides.name || 'Buddy',
+    petType: overrides.petType || 'Dog',
     species: overrides.species || 'dog',
     breed: overrides.breed || 'Golden Retriever',
     color: overrides.color || 'Golden',
@@ -288,7 +289,7 @@ describe('Integration: Finder - Share Location', () => {
   it('POST /api/finder/:tagId/share-location returns 404 for non-existent tag', async () => {
     const res = await request(app)
       .post('/api/finder/FAKE-TAG/share-location')
-      .send({ latitude: 0, longitude: 0 });
+      .send({ latitude: -36.85, longitude: 174.76 });
 
     expect(res.status).toBe(404);
   });
