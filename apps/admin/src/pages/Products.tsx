@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { ImagePlus, X, Upload, Loader2 } from 'lucide-react';
+import { ImagePlus, X, Upload, Loader2, Search, SlidersHorizontal, ChevronDown } from 'lucide-react';
 import api, { PaginatedData } from '../lib/api';
 import RichTextEditor from '../components/RichTextEditor';
 
@@ -30,10 +30,23 @@ interface Product {
 
 const emptyVariant = (): ProductVariant => ({ name: '', sku: '', price: undefined, stock: 0, attributes: {} });
 
+const SORT_OPTIONS = [
+  { value: 'createdAt', label: 'Newest' },
+  { value: 'name', label: 'Name' },
+  { value: 'price', label: 'Price' },
+  { value: 'stock', label: 'Stock' },
+  { value: 'sku', label: 'SKU' },
+];
+
 export default function Products() {
   const [data, setData] = useState<PaginatedData<Product> | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [category, setCategory] = useState('');
+  const [isActive, setIsActive] = useState('');
+  const [stockStatus, setStockStatus] = useState('');
+  const [sortBy, setSortBy] = useState('createdAt');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [page, setPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
@@ -45,16 +58,41 @@ export default function Products() {
   const [images, setImages] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
   const fetchProducts = () => {
     setLoading(true);
-    api.get('/admin/products', { params: { page, limit: 20, search, category: 'PawTag' } })
+    const params: Record<string, any> = { page, limit: 20, sortBy, sortDir };
+    if (search) params.search = search;
+    if (category) params.category = category;
+    if (isActive) params.isActive = isActive;
+    if (stockStatus) params.stockStatus = stockStatus;
+    api.get('/admin/products', { params })
       .then((res) => setData(res.data.data))
       .catch(console.error)
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetchProducts(); }, [page]);
+  useEffect(() => { fetchProducts(); }, [page, sortBy, sortDir, category, isActive, stockStatus]);
+
+  const handleSearchChange = (value: string) => {
+    setSearch(value);
+    setPage(1);
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    searchTimeoutRef.current = setTimeout(() => fetchProducts(), 300);
+  };
+
+  const activeFilterCount = [category, isActive, stockStatus].filter(Boolean).length;
+
+  const clearFilters = () => {
+    setSearch('');
+    setCategory('');
+    setIsActive('');
+    setStockStatus('');
+    setSortBy('createdAt');
+    setSortDir('desc');
+    setPage(1);
+  };
 
   const openCreate = () => {
     setEditing(null);
@@ -148,21 +186,108 @@ export default function Products() {
     : form.stock;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
+      {/* Header */}
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold">Product Management</h1>
-          <p className="text-sm text-gray-500 mt-1">{data?.total || 0} products total</p>
+          <p className="text-sm text-gray-500 mt-1">{data?.total || 0} products{activeFilterCount > 0 ? ` (filtered)` : ''}</p>
         </div>
-        <div className="flex gap-3">
-          <input
-            type="text" placeholder="Search products..." value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            className="border border-gray-300 rounded-md px-3 py-2 text-sm w-64 focus:ring-2 focus:ring-primary-500"
-          />
-          <button onClick={openCreate} className="bg-primary-600 text-white px-4 py-2 rounded-md text-sm hover:bg-primary-700">
-            + Add Product
-          </button>
+        <button onClick={openCreate} className="bg-primary-600 text-white px-4 py-2 rounded-md text-sm hover:bg-primary-700">
+          + Add Product
+        </button>
+      </div>
+
+      {/* Filter Bar */}
+      <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Search */}
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search by name, SKU, or description..."
+              value={search}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              className="w-full border border-gray-300 rounded-md pl-9 pr-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            />
+          </div>
+
+          {/* Category */}
+          <div className="relative">
+            <select
+              value={category}
+              onChange={(e) => { setCategory(e.target.value); setPage(1); }}
+              className="appearance-none border border-gray-300 rounded-md px-3 py-2 pr-8 text-sm focus:ring-2 focus:ring-primary-500 bg-white"
+            >
+              <option value="">All Categories</option>
+              <option value="PawTag">PawTag</option>
+            </select>
+            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+          </div>
+
+          {/* Status */}
+          <div className="relative">
+            <select
+              value={isActive}
+              onChange={(e) => { setIsActive(e.target.value); setPage(1); }}
+              className="appearance-none border border-gray-300 rounded-md px-3 py-2 pr-8 text-sm focus:ring-2 focus:ring-primary-500 bg-white"
+            >
+              <option value="">All Status</option>
+              <option value="true">Active</option>
+              <option value="false">Inactive</option>
+            </select>
+            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+          </div>
+
+          {/* Stock */}
+          <div className="relative">
+            <select
+              value={stockStatus}
+              onChange={(e) => { setStockStatus(e.target.value); setPage(1); }}
+              className="appearance-none border border-gray-300 rounded-md px-3 py-2 pr-8 text-sm focus:ring-2 focus:ring-primary-500 bg-white"
+            >
+              <option value="">All Stock</option>
+              <option value="in">In Stock (&gt;10)</option>
+              <option value="low">Low Stock (1–10)</option>
+              <option value="out">Out of Stock</option>
+            </select>
+            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+          </div>
+
+          {/* Sort */}
+          <div className="flex items-center gap-1">
+            <div className="relative">
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="appearance-none border border-gray-300 rounded-md px-3 py-2 pr-8 text-sm focus:ring-2 focus:ring-primary-500 bg-white"
+              >
+                {SORT_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+            </div>
+            <button
+              onClick={() => setSortDir(sortDir === 'asc' ? 'desc' : 'asc')}
+              className="border border-gray-300 rounded-md px-2 py-2 text-sm hover:bg-gray-50 focus:ring-2 focus:ring-primary-500"
+              title={sortDir === 'asc' ? 'Ascending' : 'Descending'}
+            >
+              <SlidersHorizontal className={`h-4 w-4 text-gray-500 transition-transform ${sortDir === 'asc' ? '' : 'rotate-180'}`} />
+            </button>
+          </div>
+
+          {/* Clear Filters */}
+          {activeFilterCount > 0 && (
+            <button
+              onClick={clearFilters}
+              className="text-sm text-primary-600 hover:text-primary-800 font-medium flex items-center gap-1"
+            >
+              <X className="h-3.5 w-3.5" />
+              Clear ({activeFilterCount})
+            </button>
+          )}
         </div>
       </div>
 
@@ -374,7 +499,11 @@ export default function Products() {
                   <td className="px-5 py-3">
                     {p.variants?.length > 0 ? (
                       <span className="text-xs text-gray-500">{p.variants.reduce((s, v) => s + v.stock, 0)} total</span>
-                    ) : p.stock}
+                    ) : (
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${p.stock === 0 ? 'bg-red-100 text-red-700' : p.stock <= 10 ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`}>
+                        {p.stock}
+                      </span>
+                    )}
                   </td>
                   <td className="px-5 py-3">
                     {p.variants?.length > 0 ? (

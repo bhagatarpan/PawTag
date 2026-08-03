@@ -1708,20 +1708,37 @@ router.post('/tags/qr-bulk', requirePermission('tag.generate_qr'), async (req: A
  */
 router.get('/products', requirePermission('product.read'), async (req, res: Response) => {
   try {
-    const { page = 1, limit = 20, search, category, isActive } = req.query;
+    const { page = 1, limit = 20, search, category, isActive, stockStatus, sortBy = 'createdAt', sortDir = 'desc' } = req.query;
     const query: any = {};
     if (search) {
       query.$or = [
         { name: { $regex: search, $options: 'i' } },
         { sku: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } },
       ];
     }
     if (category) query.category = category;
     if (isActive !== undefined) query.isActive = isActive === 'true';
+    if (stockStatus === 'out') {
+      query.stock = 0;
+      query.$or = [{ variants: { $size: 0 } }, { variants: { $exists: false } }];
+    } else if (stockStatus === 'low') {
+      query.stock = { $gt: 0, $lte: 10 };
+    } else if (stockStatus === 'in') {
+      query.stock = { $gt: 10 };
+    }
+
+    const sort: any = {};
+    const dir = sortDir === 'asc' ? 1 : -1;
+    if (sortBy === 'name') sort.name = dir;
+    else if (sortBy === 'price') sort.price = dir;
+    else if (sortBy === 'stock') sort.stock = dir;
+    else if (sortBy === 'sku') sort.sku = dir;
+    else sort.createdAt = dir;
 
     const total = await Product.countDocuments(query);
     const products = await Product.find(query)
-      .sort({ createdAt: -1 })
+      .sort(sort)
       .skip((Number(page) - 1) * Number(limit))
       .limit(Number(limit));
 
