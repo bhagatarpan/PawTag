@@ -30,7 +30,7 @@ export default function Login() {
       const isAdmin = roles.some((r) => adminRoles.includes(r));
 
       if (isAdmin) {
-        window.location.href = 'http://localhost:3001';
+        window.location.href = import.meta.env.VITE_ADMIN_URL || 'http://localhost:3001';
       } else {
         navigate('/account');
       }
