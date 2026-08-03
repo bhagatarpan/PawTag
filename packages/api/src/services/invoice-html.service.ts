@@ -6,8 +6,19 @@ interface InvoiceData {
   user: any;
 }
 
-function formatDate(d: Date | string): string {
+  function formatDate(d: Date | string | undefined): string {
+  if (!d) return 'N/A';
   return new Date(d).toLocaleDateString('en-NZ', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function getBillingPeriod(invoice: any): { start?: string; end?: string } {
+  if (invoice.billingPeriod?.start && invoice.billingPeriod?.end) {
+    return { start: invoice.billingPeriod.start, end: invoice.billingPeriod.end };
+  }
+  if (invoice.periodStart && invoice.periodEnd) {
+    return { start: invoice.periodStart, end: invoice.periodEnd };
+  }
+  return { start: invoice.paidAt, end: invoice.paidAt };
 }
 
 function escapeHtml(str: string): string {
@@ -142,7 +153,7 @@ function buildDefaultInvoiceHtml(data: InvoiceData, company: Record<string, stri
               <strong>${escapeHtml(subscription?.planName || 'Subscription')}</strong>
               <br><span style="color:#6b7280;font-size:12px;">Tag: ${escapeHtml(subscription?.tagId?.tagId || 'N/A')}</span>
             </td>
-            <td>${formatDate(invoice.billingPeriod.start)} — ${formatDate(invoice.billingPeriod.end)}</td>
+            <td>${formatDate(getBillingPeriod(invoice).start)} — ${formatDate(getBillingPeriod(invoice).end)}</td>
             <td class="amount-col">${invoice.currency || 'NZD'} $${invoice.amount.toFixed(2)}</td>
           </tr>
           <tr class="total-row">
@@ -218,8 +229,8 @@ export async function generateInvoiceHtml(invoiceId: string): Promise<string> {
       'invoice.amount': `$${invoice.amount.toFixed(2)}`,
       'invoice.currency': invoice.currency || 'NZD',
       'invoice.paymentMethod': invoice.paymentMethod || '',
-      'invoice.billingPeriodStart': formatDate(invoice.billingPeriod.start),
-      'invoice.billingPeriodEnd': formatDate(invoice.billingPeriod.end),
+      'invoice.billingPeriodStart': formatDate(getBillingPeriod(invoice).start),
+      'invoice.billingPeriodEnd': formatDate(getBillingPeriod(invoice).end),
       'customer.name': customerName,
       'customer.email': customerEmail,
       'subscription.planName': subscription?.planName || 'Subscription',
