@@ -7,6 +7,12 @@ export default defineConfig({
     environment: 'node',
     include: ['packages/api/src/**/*.test.ts', 'tests/**/*.test.ts'],
     exclude: ['node_modules', 'dist'],
+    pool: 'forks',
+    poolOptions: {
+      forks: {
+        singleFork: true,
+      },
+    },
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html', 'lcov'],

@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import mongoose from 'mongoose';
-import { MongoMemoryServer } from 'mongodb-memory-server';
 import request from 'supertest';
 import express from 'express';
 import jwt from 'jsonwebtoken';
@@ -8,8 +7,8 @@ import jwt from 'jsonwebtoken';
 // Import the app and setup
 import app from '../../packages/api/src/index';
 import { config } from '../../packages/api/src/config';
+import { setupTestDb, teardownTestDb } from './setup';
 
-let mongoServer: MongoMemoryServer;
 let userId: string;
 let token: string;
 let adminToken: string;
@@ -19,9 +18,7 @@ let petId: string;
 let subscriptionId: string;
 
 beforeAll(async () => {
-  mongoServer = await MongoMemoryServer.create();
-  const uri = mongoServer.getUri();
-  await mongoose.connect(uri);
+  await setupTestDb();
 
   // Create customer
   const userRes = await mongoose.connection.collections.users.insertOne({
@@ -154,8 +151,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await mongoose.disconnect();
-  await mongoServer.stop();
+  await teardownTestDb();
 });
 
 beforeEach(async () => {
