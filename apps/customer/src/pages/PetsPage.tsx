@@ -84,9 +84,15 @@ export default function PetsPage() {
     e.preventDefault();
     const payload: any = { ...form, species: form.petType, photos };
     if (form.breedOrigin !== 'Mixed Breed' && form.breedOrigin !== 'Designer Breed') payload.secondaryBreed = 'Unknown';
-    if (editingPet) { await api.put(`/customer/pets/${editingPet._id}`, payload); } else { await api.post('/customer/pets', payload); }
-    cancelForm();
-    refreshPets();
+    if (form.age) payload.age = parseFloat(form.age);
+    if (!payload.dateOfBirth) delete payload.dateOfBirth;
+    try {
+      if (editingPet) { await api.put(`/customer/pets/${editingPet._id}`, payload); } else { await api.post('/customer/pets', payload); }
+      cancelForm();
+      refreshPets();
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Failed to save pet');
+    }
   };
 
   const markLost = async (id: string) => { await api.post(`/customer/pets/${id}/mark-lost`); refreshPets(); };
