@@ -5,6 +5,7 @@ import Login from './pages/Login';
 import PetsPage from './pages/PetsPage';
 import ProfilePage from './pages/ProfilePage';
 import OrdersPage from './pages/OrdersPage';
+import OrderDetailPage from './pages/OrderDetailPage';
 import NotificationsPage from './pages/NotificationsPage';
 import SettingsPage from './pages/SettingsPage';
 import SubscriptionsPage from './pages/SubscriptionsPage';
@@ -19,6 +20,7 @@ export default function App() {
         <Route path="/" element={<Protected><DashboardLayout><PetsPage /></DashboardLayout></Protected>} />
         <Route path="/profile" element={<Protected><DashboardLayout><ProfilePage /></DashboardLayout></Protected>} />
         <Route path="/orders" element={<Protected><DashboardLayout><OrdersPage /></DashboardLayout></Protected>} />
+        <Route path="/orders/:id" element={<Protected><DashboardLayout><OrderDetailPage /></DashboardLayout></Protected>} />
         <Route path="/subscriptions" element={<Protected><DashboardLayout><SubscriptionsPage /></DashboardLayout></Protected>} />
         <Route path="/notifications" element={<Protected><DashboardLayout><NotificationsPage /></DashboardLayout></Protected>} />
         <Route path="/notification-preferences" element={<Protected><DashboardLayout><NotificationPreferencesPage /></DashboardLayout></Protected>} />
