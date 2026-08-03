@@ -11,6 +11,7 @@ export default function ProductDetail() {
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(0);
   const { addItem } = useCart();
 
   useEffect(() => {
@@ -88,8 +89,12 @@ export default function ProductDetail() {
           {/* Image / Placeholder */}
           <div className="space-y-4">
             <div className="relative bg-gradient-to-br from-teal-50 to-teal-100 rounded-2xl overflow-hidden aspect-square flex items-center justify-center">
-              {product.images?.[0] ? (
-                <img src={product.images[0]} alt={product.name} className="w-full h-full object-cover" />
+              {product.images && product.images.length > 0 ? (
+                <img
+                  src={product.images[selectedImage] || product.images[0]}
+                  alt={product.name}
+                  className="w-full h-full object-cover"
+                />
               ) : (
                 <div className="flex flex-col items-center gap-3 text-teal-300">
                   {getProductIcon(product.sku)}
@@ -101,7 +106,30 @@ export default function ProductDetail() {
                   {badge.label}
                 </div>
               )}
+              {product.images && product.images.length > 1 && (
+                <div className="absolute bottom-4 right-4 bg-black/50 text-white text-xs px-2 py-1 rounded-full">
+                  {selectedImage + 1} / {product.images.length}
+                </div>
+              )}
             </div>
+            {/* Thumbnails */}
+            {product.images && product.images.length > 1 && (
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {product.images.map((img, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setSelectedImage(i)}
+                    className={`flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-all ${
+                      i === selectedImage
+                        ? 'border-teal-500 ring-2 ring-teal-200'
+                        : 'border-gray-200 hover:border-gray-300 opacity-70 hover:opacity-100'
+                    }`}
+                  >
+                    <img src={img} alt={`${product.name} ${i + 1}`} className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Product Info */}

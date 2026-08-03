@@ -4,6 +4,8 @@ import path from 'path';
 
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
+const API_URL = process.env.API_URL || 'http://localhost:5000';
+
 const products = [
   {
     name: 'PawTag Scan',
@@ -11,7 +13,7 @@ const products = [
     shortDescription: 'QR code tag — scan with phone camera',
     price: 9.99,
     currency: 'NZD',
-    images: [],
+    images: [`${API_URL}/api/uploads/products/pawtag-scan.svg`],
     category: 'PawTag',
     tags: ['qr', 'plastic', 'essential', 'subscription'],
     isActive: true,
@@ -37,7 +39,7 @@ const products = [
     shortDescription: 'NFC tag — tap with phone (Most Ordered)',
     price: 19.99,
     currency: 'NZD',
-    images: [],
+    images: [`${API_URL}/api/uploads/products/pawtag-classic.svg`],
     category: 'PawTag',
     tags: ['nfc', 'plastic', 'popular', 'subscription'],
     isActive: true,
@@ -63,7 +65,7 @@ const products = [
     shortDescription: 'NFC tag — metal edges + epoxy resin',
     price: 39.99,
     currency: 'NZD',
-    images: [],
+    images: [`${API_URL}/api/uploads/products/pawtag-plus.svg`],
     category: 'PawTag',
     tags: ['nfc', 'metal', 'premium', 'epoxy', 'subscription'],
     isActive: true,
