@@ -1,4 +1,5 @@
 import { useState, useEffect, FormEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Plus, AlertTriangle, CheckCircle, Star, X, Edit2, Save, ShieldAlert, ShieldCheck, ShoppingBag, ChevronRight, Clock, Skull, EyeOff, Activity, Info, CreditCard } from 'lucide-react';
 import api from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -11,6 +12,7 @@ import type { PetType } from '@pawtag/shared';
 
 export default function PetsPage() {
   const { } = useAuth();
+  const navigate = useNavigate();
   const [pets, setPets] = useState<any[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editingPet, setEditingPet] = useState<any>(null);
@@ -238,6 +240,14 @@ export default function PetsPage() {
                           <p className="text-[11px] text-teal-600 mt-0.5">
                             ${pet.linkedTag.subscription.price}/mo · {pet.linkedTag.subscription.autoRenew ? 'Auto-renew on' : 'Auto-renew off'}
                           </p>
+                          {(pet.linkedTag.subscription.status === 'grace_period' || pet.linkedTag.subscription.status === 'expired') && (
+                            <button
+                              onClick={() => navigate('/subscriptions')}
+                              className="mt-2 px-3 py-1.5 bg-primary-600 text-white rounded-md text-xs font-medium hover:bg-primary-700"
+                            >
+                              Renew Subscription
+                            </button>
+                          )}
                         </div>
                       )}
                       {pet.linkedTag && !pet.linkedTag.subscription && (
