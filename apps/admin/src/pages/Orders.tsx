@@ -67,6 +67,18 @@ export default function Orders() {
 
   const canCancel = (status: string) => ORDER_STATUS_TRANSITIONS[status]?.includes('cancelled');
   const canRefund = (status: string) => ORDER_STATUS_TRANSITIONS[status]?.includes('refunded');
+  const canShip = (status: string) => ORDER_STATUS_TRANSITIONS[status]?.includes('shipped');
+
+  const createShipment = async (orderId: string) => {
+    if (!confirm('Create shipment for this order?')) return;
+    try {
+      const res = await api.post(`/admin/orders/${orderId}/create-shipment`);
+      alert(`Shipment created!\nTracking: ${res.data.data.trackingNumber}\nCarrier: ${res.data.data.carrier}`);
+      fetchOrders();
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Failed to create shipment');
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -197,6 +209,17 @@ export default function Orders() {
                           onClick={() => setActionModal({ orderId: order._id, action: 'refund' })}
                           className="text-orange-600 hover:text-orange-700 text-xs font-medium border border-orange-200 px-2 py-1 rounded hover:bg-orange-50"
                         >Refund</button>
+                      )}
+                      {canShip(order.status) && (
+                        <button
+                          onClick={() => createShipment(order._id)}
+                          className="text-indigo-600 hover:text-indigo-700 text-xs font-medium border border-indigo-200 px-2 py-1 rounded hover:bg-indigo-50"
+                        >Ship</button>
+                      )}
+                      {order.trackingNumber && (
+                        <span className="text-xs text-gray-500 font-mono" title={order.carrier}>
+                          {order.trackingNumber}
+                        </span>
                       )}
                     </div>
                   </td>

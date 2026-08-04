@@ -41,6 +41,8 @@ export interface IOrderDocument extends Document {
     country: string;
   };
   trackingNumber?: string;
+  carrier?: string;
+  shippingLabelUrl?: string;
   notes?: string;
   discount?: {
     percent: number;
@@ -100,6 +102,8 @@ const OrderSchema = new Schema<IOrderDocument>(
       country: String,
     },
     trackingNumber: String,
+    carrier: String,
+    shippingLabelUrl: String,
     notes: String,
     discount: {
       percent: { type: Number, default: 0 },

@@ -2260,6 +2260,93 @@ router.post('/orders/:id/refund', requirePermission('order.update'), async (req:
   }
 });
 
+// --- Create Shipment ---
+router.post('/orders/:id/create-shipment', requirePermission('order.update'), async (req: AuthRequest, res: Response) => {
+  try {
+    const order = await Order.findById(req.params.id);
+    if (!order) { res.status(404).json({ success: false, error: 'Order not found' }); return; }
+
+    if (!isValidTransition(order.status, 'shipped')) {
+      res.status(400).json({ success: false, error: `Cannot ship order in "${order.status}" status` });
+      return;
+    }
+
+    const { createShipment } = await import('../services/shipping.service');
+    const result = await createShipment({
+      orderNumber: order.orderNumber,
+      shippingAddress: order.shippingAddress,
+      items: order.items.map((item) => ({
+        productName: item.productName,
+        quantity: item.quantity,
+      })),
+    });
+
+    if (!result.success) {
+      res.status(400).json({ success: false, error: result.error });
+      return;
+    }
+
+    const previousStatus = order.status;
+    order.status = 'shipped';
+    order.trackingNumber = result.trackingNumber;
+    order.carrier = result.carrier;
+    order.shippingLabelUrl = result.labelUrl;
+    await order.save();
+
+    // Audit log
+    await AuditLog.create({
+      userId: req.user!.id,
+      action: 'create_shipment',
+      entity: 'Order',
+      entityId: req.params.id,
+      changes: { status: { old: previousStatus, new: 'shipped' }, trackingNumber: result.trackingNumber, carrier: result.carrier },
+      ...getClientInfo(req),
+    });
+
+    // Notify customer
+    const { Notification } = await import('@pawtag/db');
+    const user = await User.findById(order.userId);
+    await Notification.create({
+      userId: order.userId,
+      audience: 'customer',
+      type: 'order_update',
+      title: 'Order shipped',
+      message: `Your order ${order.orderNumber} has shipped via ${result.carrier}. Tracking: ${result.trackingNumber}`,
+      data: { orderId: order._id.toString(), orderNumber: order.orderNumber, trackingNumber: result.trackingNumber, carrier: result.carrier },
+      priority: 'high',
+      channel: 'alert',
+    });
+
+    // Send email
+    try {
+      const { sendMail } = await import('../services/email.service');
+      await sendMail(
+        user?.email || '',
+        `Order ${order.orderNumber} has shipped`,
+        `<h2>Order Shipped</h2>
+         <p>Your order <strong>${order.orderNumber}</strong> has shipped!</p>
+         <p><strong>Carrier:</strong> ${result.carrier}</p>
+         <p><strong>Tracking:</strong> ${result.trackingNumber}</p>
+         ${result.labelUrl ? `<p><a href="${result.labelUrl}">View shipping label</a></p>` : ''}`,
+      );
+    } catch (emailErr) {
+      console.error('Shipment notification email error:', emailErr);
+    }
+
+    res.json({
+      success: true,
+      data: {
+        trackingNumber: result.trackingNumber,
+        carrier: result.carrier,
+        labelUrl: result.labelUrl,
+        status: order.status,
+      },
+    });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to create shipment' });
+  }
+});
+
 // --- Skip Invoice OTP ---
 router.put('/users/:id/skip-invoice-otp', requirePermission('user.update'), async (req: AuthRequest, res: Response) => {
   try {
