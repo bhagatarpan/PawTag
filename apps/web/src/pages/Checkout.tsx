@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Lock, CreditCard, PawPrint, CheckCircle, Truck, Tag } from 'lucide-react';
+import { ArrowLeft, Lock, CreditCard, PawPrint, CheckCircle, Truck, Tag, Loader2 } from 'lucide-react';
 import api from '../lib/api';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
@@ -32,6 +32,7 @@ export default function Checkout() {
   const [referralCode, setReferralCode] = useState('');
   const [referralApplied, setReferralApplied] = useState(false);
   const [bundleSettings, setBundleSettings] = useState<Record<string, string>>({});
+  const [paymentStep, setPaymentStep] = useState<'form' | 'processing' | 'success'>('form');
   const [form, setForm] = useState({
     line1: '',
     line2: '',
@@ -67,30 +68,48 @@ export default function Checkout() {
     if (items.length === 0) return;
 
     setLoading(true);
+    setPaymentStep('processing');
     try {
+      // Step 1: Create order (returns pending_payment status + clientSecret)
       const res = await api.post('/customer/orders', {
         shippingAddress: { ...form, shippingZone },
         paymentMethod: 'card',
         referralCode: referralApplied ? referralCode : undefined,
       });
-      setOrderNumber(res.data.data.orderNumber);
+
+      const orderData = res.data.data;
+      setOrderNumber(orderData.orderNumber);
+
+      // Step 2: In demo mode, simulate payment confirmation
+      // In real mode, this would use Stripe.js to confirmCardPayment(clientSecret)
+      if (orderData.clientSecret?.includes('demo')) {
+        // Demo mode: call confirm-payment endpoint
+        await api.post(`/customer/orders/${orderData.orderNumber}/confirm-payment`);
+      } else {
+        // Real Stripe mode: would use Stripe.js here
+        // const stripe = await loadStripe(process.env.REACT_APP_STRIPE_PUBLIC_KEY!);
+        // await stripe?.confirmCardPayment(orderData.clientSecret, { ... });
+      }
+
       setSuccess(true);
+      setPaymentStep('success');
       clearCart();
     } catch (err: any) {
       alert(err.response?.data?.error || 'Failed to place order');
+      setPaymentStep('form');
     } finally {
       setLoading(false);
     }
   };
 
-  if (success) {
+  if (success || paymentStep === 'success') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full text-center">
           <div className="h-16 w-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
             <CheckCircle className="h-10 w-10 text-green-600" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Order Placed!</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Payment Confirmed!</h1>
           <p className="text-gray-500 mb-4">Thank you for your order.</p>
           <p className="text-lg font-mono font-semibold text-teal-700 mb-6">{orderNumber}</p>
           <p className="text-sm text-gray-400 mb-6">We'll send you an email confirmation shortly.</p>
@@ -198,12 +217,21 @@ export default function Checkout() {
               </div>
 
               <button type="submit" disabled={loading || !user || items.length === 0} className="w-full py-4 bg-teal-600 text-white rounded-xl font-semibold text-lg hover:bg-teal-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2">
-                <CreditCard className="h-5 w-5" />
-                {loading ? 'Placing Order...' : `Place Order — $${orderTotal.toFixed(2)}`}
+                {paymentStep === 'processing' ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Processing Payment...
+                  </>
+                ) : (
+                  <>
+                    <CreditCard className="h-5 w-5" />
+                    {`Pay $${orderTotal.toFixed(2)}`}
+                  </>
+                )}
               </button>
 
               <p className="text-xs text-gray-400 text-center">
-                Demo checkout — no real payment is processed.
+                Secure payment powered by Stripe. Demo mode for testing.
               </p>
             </form>
           </div>

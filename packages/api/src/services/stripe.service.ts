@@ -69,6 +69,73 @@ export async function confirmPayment(paymentIntentId: string): Promise<{ status:
   }
 }
 
+/**
+ * Simulate a successful payment webhook for demo mode.
+ * This triggers the same webhook handler as a real Stripe event.
+ */
+export async function simulatePaymentSuccess(orderNumber: string): Promise<{ success: boolean; error?: string }> {
+  if (!orderNumber.startsWith('PT-')) {
+    return { success: false, error: 'Invalid order number format' };
+  }
+
+  try {
+    const response = await fetch(`http://localhost:${process.env.PORT || 5000}/api/webhooks/stripe`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'payment_intent.succeeded',
+        data: {
+          object: {
+            id: `pi_demo_${Date.now()}`,
+            metadata: { orderNumber },
+          },
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      return { success: false, error: 'Webhook simulation failed' };
+    }
+
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Simulate a failed payment webhook for demo mode.
+ */
+export async function simulatePaymentFailure(orderNumber: string): Promise<{ success: boolean; error?: string }> {
+  if (!orderNumber.startsWith('PT-')) {
+    return { success: false, error: 'Invalid order number format' };
+  }
+
+  try {
+    const response = await fetch(`http://localhost:${process.env.PORT || 5000}/api/webhooks/stripe`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'payment_intent.payment_failed',
+        data: {
+          object: {
+            id: `pi_demo_${Date.now()}`,
+            metadata: { orderNumber },
+          },
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      return { success: false, error: 'Webhook simulation failed' };
+    }
+
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
 export async function createRefund(paymentIntentId: string, amount?: number): Promise<{ success: boolean; refundId?: string; error?: string }> {
   // Demo mode
   if (paymentIntentId.startsWith('pi_demo_')) {

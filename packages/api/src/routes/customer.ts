@@ -5,9 +5,9 @@ import { validate } from '../middleware/validation';
 import { createPetSchema, updatePetSchema } from '../middleware/schemas';
 import { Pet, Tag, Order, LocationEvent, Notification, FinderScan, User, generatePetId, Cart, Product, Subscription, Referral } from '@pawtag/db';
 import { calculateBundleDiscount } from '../services/bundle-pricing.service';
-import { validateReferralCode, createReferralOnOrder, completeReferralRewards } from '../services/referral.service';
+import { validateReferralCode } from '../services/referral.service';
 import { createPaymentIntent } from '../services/stripe.service';
-import { sendOrderConfirmation } from '../services/email.service';
+import { sendOrderConfirmation, sendSubscriptionWelcomeEmail } from '../services/email.service';
 
 const router = Router();
 router.use(authenticate);
@@ -779,14 +779,13 @@ router.post('/orders', requirePermission('order.create'), async (req: AuthReques
       orderNumber,
       userId: req.user!.id,
       items: orderItems,
-      status: paymentMethod === 'card' ? 'paid' : 'pending',
+      status: paymentMethod === 'card' ? 'pending_payment' : 'pending',
       payment: {
         method: paymentMethod,
-        status: 'completed',
+        status: 'pending',
         transactionId: paymentResult.paymentIntentId,
         amount: finalAmount,
         currency: 'NZD',
-        paidAt: new Date(),
       },
       shippingAddress: {
         line1: shippingAddress.line1,
@@ -817,21 +816,85 @@ router.post('/orders', requirePermission('order.create'), async (req: AuthReques
     // Clear cart
     await Cart.findOneAndDelete({ userId: req.user!.id });
 
+    // NOTE: Subscription creation, referral processing, and order confirmation email
+    // are now handled in the Stripe webhook handler (payment_intent.succeeded event)
+    // to ensure they only fire after payment is confirmed.
+
+    res.status(201).json({
+      success: true,
+      data: {
+        ...order.toObject(),
+        clientSecret: paymentResult.clientSecret,
+      },
+    });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to create order' });
+  }
+});
+
+/**
+ * @swagger
+ * /api/customer/orders/{orderNumber}/confirm-payment:
+ *   post:
+ *     summary: Confirm payment for demo mode orders
+ *     tags: [Customer]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: orderNumber
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Order number (e.g., PT-000001)
+ *     responses:
+ *       200:
+ *         description: Payment confirmed successfully
+ *       400:
+ *         description: Invalid order or already paid
+ *       404:
+ *         description: Order not found
+ */
+router.post('/orders/:orderNumber/confirm-payment', requirePermission('order.create'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { orderNumber } = req.params;
+
+    // Verify order belongs to user and is in pending_payment status
+    const order = await Order.findOne({
+      orderNumber,
+      userId: req.user!.id,
+      status: 'pending_payment',
+    });
+
+    if (!order) {
+      res.status(404).json({ success: false, error: 'Order not found or already processed' });
+      return;
+    }
+
+    // Mark order as paid
+    order.status = 'paid';
+    order.payment.status = 'completed';
+    order.payment.paidAt = new Date();
+    await order.save();
+
+    console.log(`[Demo Payment] Order ${orderNumber} marked as paid`);
+
+    // Get user info for emails
+    const user = await User.findById(order.userId);
+
     // Create subscriptions for tag products
     try {
       const { createSubscription } = await import('../services/subscription.service');
-      const { sendSubscriptionWelcomeEmail } = await import('../services/email.service');
 
-      for (const item of orderItems) {
+      for (const item of order.items) {
         const product = await Product.findById(item.productId);
         if (product && product.isSubscription && product.subscriptionConfig) {
-          // Find or create a tag for this user (tags are created by admin, but for now check existing)
-          const userTags = await Tag.find({ ownerId: req.user!.id, deletedAt: null });
+          const userTags = await Tag.find({ ownerId: order.userId, deletedAt: null });
 
           for (const tag of userTags) {
             if (tag.subscriptionStatus === 'none' || !tag.subscriptionId) {
               const subscription = await createSubscription({
-                userId: req.user!.id,
+                userId: order.userId.toString(),
                 tagId: tag._id.toString(),
                 orderId: order._id.toString(),
                 planType: product.subscriptionConfig.type || 'annual',
@@ -839,7 +902,6 @@ router.post('/orders', requirePermission('order.create'), async (req: AuthReques
                 price: product.price,
               });
 
-              // Send subscription welcome email (non-blocking)
               sendSubscriptionWelcomeEmail(
                 user?.email || '',
                 user?.fullName || 'Customer',
@@ -848,7 +910,7 @@ router.post('/orders', requirePermission('order.create'), async (req: AuthReques
                 subscription.freePeriodEndsAt || new Date(),
               ).catch((err: any) => console.error('Subscription email error:', err));
 
-              break; // One subscription per order item
+              break;
             }
           }
         }
@@ -857,42 +919,50 @@ router.post('/orders', requirePermission('order.create'), async (req: AuthReques
       console.error('Subscription creation error:', subError);
     }
 
-    // Process referral rewards if referral code was used
-    if (referralData) {
+    // Process referral rewards
+    if (order.referredByCode) {
       try {
-        await createReferralOnOrder(referralData.referrerId, req.user!.id, referralCode, order._id.toString());
+        const { createReferralOnOrder, completeReferralRewards } = await import('../services/referral.service');
+        await createReferralOnOrder(order.referredByCode, order.userId.toString(), order.referredByCode, order._id.toString());
         await completeReferralRewards(order._id.toString());
       } catch (refError) {
         console.error('Referral processing error:', refError);
       }
     }
 
-    // Send confirmation email (non-blocking)
-    sendOrderConfirmation({
-      to: user?.email || '',
-      customerName: user?.fullName || 'Customer',
-      orderNumber,
-      items: orderItems.map((item: any) => ({
-        productName: item.productName,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        variantName: item.variantName,
-        petName: item.petName,
-      })),
-      subtotal: totalAmount,
-      discount: discountAmount > 0 ? { percent: bundleDiscount.percent, amount: discountAmount, reason: bundleDiscount.reason } : undefined,
-      total: finalAmount,
-      shippingAddress: {
-        line1: shippingAddress.line1,
-        city: shippingAddress.city,
-        state: shippingAddress.state,
-        zip: shippingAddress.zip,
-      },
-    }).catch((err: any) => console.error('Email send error:', err));
+    // Send order confirmation email
+    try {
+      await sendOrderConfirmation({
+        to: user?.email || '',
+        customerName: user?.fullName || 'Customer',
+        orderNumber,
+        items: order.items.map((item: any) => ({
+          productName: item.productName,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          variantName: item.variantName,
+          petName: item.petName,
+        })),
+        subtotal: order.payment.amount,
+        total: order.payment.amount,
+        shippingAddress: {
+          line1: order.shippingAddress.line1,
+          city: order.shippingAddress.city,
+          state: order.shippingAddress.state,
+          zip: order.shippingAddress.zip,
+        },
+      });
+      console.log(`[Demo Payment] Confirmation email sent for order ${orderNumber}`);
+    } catch (emailError) {
+      console.error('Email send error:', emailError);
+    }
 
-    res.status(201).json({ success: true, data: order });
+    // Re-fetch order to get updated status
+    const updatedOrder = await Order.findOne({ orderNumber });
+
+    res.json({ success: true, data: updatedOrder });
   } catch {
-    res.status(500).json({ success: false, error: 'Failed to create order' });
+    res.status(500).json({ success: false, error: 'Failed to confirm payment' });
   }
 });
 

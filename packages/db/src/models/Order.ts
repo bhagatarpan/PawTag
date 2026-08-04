@@ -13,7 +13,7 @@ export interface IOrderDocument extends Document {
     totalPrice: number;
     customizationTotal?: number;
   }>;
-  status: 'pending' | 'paid' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
+  status: 'pending' | 'pending_payment' | 'paid' | 'packing' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
   payment: {
     method: 'card' | 'paypal' | 'bank_transfer';
     status: 'pending' | 'completed' | 'failed' | 'refunded';
@@ -67,7 +67,7 @@ const OrderSchema = new Schema<IOrderDocument>(
     ],
     status: {
       type: String,
-      enum: ['pending', 'paid', 'shipped', 'delivered', 'cancelled', 'refunded'],
+      enum: ['pending', 'pending_payment', 'paid', 'packing', 'shipped', 'delivered', 'cancelled', 'refunded'],
       default: 'pending',
       index: true,
     },
