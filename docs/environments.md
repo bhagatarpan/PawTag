@@ -37,6 +37,7 @@ Used during database seeding to create initial accounts. Required in production 
 | `ADMIN_URL` | `http://localhost:3001` | Admin portal URL |
 | `CUSTOMER_URL` | `http://localhost:3002` | Customer portal URL |
 | `FINDER_URL` | `http://localhost:3003` | Finder page URL |
+| `ALLOWED_ORIGINS` | `localhost:3000-3003` (dev) | Comma-separated CORS allowed origins. Required in production. |
 
 ## Payment (Stripe)
 

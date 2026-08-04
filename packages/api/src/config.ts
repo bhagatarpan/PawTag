@@ -4,6 +4,22 @@ import { validateEnv } from './config/validateEnv';
 dotenv.config();
 validateEnv();
 
+const parseAllowedOrigins = (): string[] => {
+  const raw = process.env.ALLOWED_ORIGINS;
+  if (raw) return raw.split(',').map(s => s.trim()).filter(Boolean);
+
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('ALLOWED_ORIGINS environment variable is required in production');
+  }
+
+  return [
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://localhost:3002',
+    'http://localhost:3003',
+  ];
+};
+
 export const config = {
   port: parseInt(process.env.PORT || '5000', 10),
   dbUrl: process.env.DB_URL!,
@@ -18,4 +34,5 @@ export const config = {
   nodeEnv: process.env.NODE_ENV || 'development',
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
   smsProvider: process.env.SMS_PROVIDER || 'demo',
+  allowedOrigins: parseAllowedOrigins(),
 };
