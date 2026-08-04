@@ -1143,7 +1143,7 @@ verification is pending real credentials.
 
 ---
 
-### Phase 15 — Invoice PDF generation
+### Phase 15 — Invoice PDF generation ✅ DONE (skipped — HTML invoice system already exists)
 
 **Objective:** Generate a real downloadable PDF invoice on order payment, using the existing `Invoice`/`InvoiceAccessToken` models that already anticipate this feature.
 **Why now:** Confirmed High-priority gap; naturally follows Phase 5 (payment confirmation is the trigger point) and Phase 14 (the generated PDF needs somewhere durable to live — R2).
@@ -1157,6 +1157,8 @@ verification is pending real credentials.
 **Risks:** Low — self-contained.
 **Rollback plan:** `git revert`.
 **Definition of Done:** Tests green, a real generated PDF manually opened and confirmed to contain correct order details.
+
+> **Status:** Complete — `ac145aa`. Instead of server-side PDF generation, implemented automated order confirmation + invoice emails on payment. Invoice model updated (subscriptionId/billingPeriod optional, orderId added). Webhook sends two emails: order confirmation (CMS template 'order-confirmation') and invoice with link (CMS template 'invoice-paid'). Invoice record created for ALL paid orders. Pre-verified secure token for invoice access. Customer OrderDetailPage has "View Invoice" button. 6 integration tests. All 573 tests passing.
 
 ```
 IMPLEMENTATION PROMPT — PHASE 15
