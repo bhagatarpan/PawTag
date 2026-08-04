@@ -68,6 +68,7 @@ export default function Orders() {
   const canCancel = (status: string) => ORDER_STATUS_TRANSITIONS[status]?.includes('cancelled');
   const canRefund = (status: string) => ORDER_STATUS_TRANSITIONS[status]?.includes('refunded');
   const canShip = (status: string) => ORDER_STATUS_TRANSITIONS[status]?.includes('shipped');
+  const canDeliver = (status: string) => ORDER_STATUS_TRANSITIONS[status]?.includes('delivered');
 
   const createShipment = async (orderId: string) => {
     if (!confirm('Create shipment for this order?')) return;
@@ -77,6 +78,17 @@ export default function Orders() {
       fetchOrders();
     } catch (err: any) {
       alert(err.response?.data?.error || 'Failed to create shipment');
+    }
+  };
+
+  const markDelivered = async (orderId: string) => {
+    if (!confirm('Mark this order as delivered?')) return;
+    try {
+      await api.post(`/admin/orders/${orderId}/mark-delivered`);
+      alert('Order marked as delivered!');
+      fetchOrders();
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Failed to mark as delivered');
     }
   };
 
@@ -215,6 +227,12 @@ export default function Orders() {
                           onClick={() => createShipment(order._id)}
                           className="text-indigo-600 hover:text-indigo-700 text-xs font-medium border border-indigo-200 px-2 py-1 rounded hover:bg-indigo-50"
                         >Ship</button>
+                      )}
+                      {canDeliver(order.status) && (
+                        <button
+                          onClick={() => markDelivered(order._id)}
+                          className="text-green-600 hover:text-green-700 text-xs font-medium border border-green-200 px-2 py-1 rounded hover:bg-green-50"
+                        >Delivered</button>
                       )}
                       {order.trackingNumber && (
                         <span className="text-xs text-gray-500 font-mono" title={order.carrier}>

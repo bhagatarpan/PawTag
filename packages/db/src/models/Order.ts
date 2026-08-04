@@ -52,6 +52,7 @@ export interface IOrderDocument extends Document {
   referredByCode?: string;
   cancellationReason?: string;
   refundReason?: string;
+  deliveredAt?: Date;
   deletedAt?: Date;
 }
 
@@ -113,6 +114,7 @@ const OrderSchema = new Schema<IOrderDocument>(
     referredByCode: { type: String },
     cancellationReason: { type: String },
     refundReason: { type: String },
+    deliveredAt: { type: Date },
     deletedAt: { type: Date, default: null },
   },
   { timestamps: true },

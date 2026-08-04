@@ -20,6 +20,7 @@ import {
 } from '../middleware/schemas';
 import { sendPasswordChangedEmail } from '../services/email.service';
 import { isValidTransition } from '../services/orderStatus.service';
+import { notifyCustomerOfStatusChange } from '../services/orderNotification.service';
 import {
   User,
   Pet,
@@ -2103,6 +2104,13 @@ router.put('/orders/:id/status', requirePermission('order.update'), async (req: 
       ...getClientInfo(req),
     });
 
+    // Notify customer of status change
+    try {
+      await notifyCustomerOfStatusChange(order, status, { trackingNumber });
+    } catch (notifError) {
+      console.error('Status update notification error:', notifError);
+    }
+
     res.json({ success: true, data: order });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to update order' });
@@ -2146,31 +2154,10 @@ router.post('/orders/:id/cancel', requirePermission('order.update'), async (req:
     });
 
     // Notify customer
-    const { Notification } = await import('@pawtag/db');
-    const user = await User.findById(order.userId);
-    await Notification.create({
-      userId: order.userId,
-      audience: 'customer',
-      type: 'order_update',
-      title: 'Order cancelled',
-      message: `Your order ${order.orderNumber} has been cancelled. Reason: ${reason}`,
-      data: { orderId: order._id.toString(), orderNumber: order.orderNumber },
-      priority: 'high',
-      channel: 'alert',
-    });
-
-    // Send email
     try {
-      const { sendMail } = await import('../services/email.service');
-      await sendMail(
-        user?.email || '',
-        `Order ${order.orderNumber} cancelled`,
-        `<h2>Order Cancelled</h2>
-         <p>Your order <strong>${order.orderNumber}</strong> has been cancelled.</p>
-         <p><strong>Reason:</strong> ${reason}</p>`,
-      );
-    } catch (emailErr) {
-      console.error('Cancel notification email error:', emailErr);
+      await notifyCustomerOfStatusChange(order, 'cancelled', { reason });
+    } catch (notifError) {
+      console.error('Cancel notification error:', notifError);
     }
 
     res.json({ success: true, data: order });
@@ -2226,32 +2213,10 @@ router.post('/orders/:id/refund', requirePermission('order.update'), async (req:
     });
 
     // Notify customer
-    const { Notification } = await import('@pawtag/db');
-    const user = await User.findById(order.userId);
-    await Notification.create({
-      userId: order.userId,
-      audience: 'customer',
-      type: 'order_update',
-      title: 'Order refunded',
-      message: `Your order ${order.orderNumber} has been refunded. Reason: ${reason}`,
-      data: { orderId: order._id.toString(), orderNumber: order.orderNumber },
-      priority: 'high',
-      channel: 'alert',
-    });
-
-    // Send email
     try {
-      const { sendMail } = await import('../services/email.service');
-      await sendMail(
-        user?.email || '',
-        `Order ${order.orderNumber} refunded`,
-        `<h2>Order Refunded</h2>
-         <p>Your order <strong>${order.orderNumber}</strong> has been refunded.</p>
-         <p><strong>Reason:</strong> ${reason}</p>
-         <p><strong>Refund ID:</strong> ${refundResult.refundId}</p>`,
-      );
-    } catch (emailErr) {
-      console.error('Refund notification email error:', emailErr);
+      await notifyCustomerOfStatusChange(order, 'refunded', { reason });
+    } catch (notifError) {
+      console.error('Refund notification error:', notifError);
     }
 
     res.json({ success: true, data: { order, refundId: refundResult.refundId } });
@@ -2304,33 +2269,10 @@ router.post('/orders/:id/create-shipment', requirePermission('order.update'), as
     });
 
     // Notify customer
-    const { Notification } = await import('@pawtag/db');
-    const user = await User.findById(order.userId);
-    await Notification.create({
-      userId: order.userId,
-      audience: 'customer',
-      type: 'order_update',
-      title: 'Order shipped',
-      message: `Your order ${order.orderNumber} has shipped via ${result.carrier}. Tracking: ${result.trackingNumber}`,
-      data: { orderId: order._id.toString(), orderNumber: order.orderNumber, trackingNumber: result.trackingNumber, carrier: result.carrier },
-      priority: 'high',
-      channel: 'alert',
-    });
-
-    // Send email
     try {
-      const { sendMail } = await import('../services/email.service');
-      await sendMail(
-        user?.email || '',
-        `Order ${order.orderNumber} has shipped`,
-        `<h2>Order Shipped</h2>
-         <p>Your order <strong>${order.orderNumber}</strong> has shipped!</p>
-         <p><strong>Carrier:</strong> ${result.carrier}</p>
-         <p><strong>Tracking:</strong> ${result.trackingNumber}</p>
-         ${result.labelUrl ? `<p><a href="${result.labelUrl}">View shipping label</a></p>` : ''}`,
-      );
-    } catch (emailErr) {
-      console.error('Shipment notification email error:', emailErr);
+      await notifyCustomerOfStatusChange(order, 'shipped', { trackingNumber: result.trackingNumber, carrier: result.carrier });
+    } catch (notifError) {
+      console.error('Shipment notification error:', notifError);
     }
 
     res.json({
@@ -2344,6 +2286,45 @@ router.post('/orders/:id/create-shipment', requirePermission('order.update'), as
     });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to create shipment' });
+  }
+});
+
+// --- Mark Order Delivered ---
+router.post('/orders/:id/mark-delivered', requirePermission('order.update'), async (req: AuthRequest, res: Response) => {
+  try {
+    const order = await Order.findById(req.params.id);
+    if (!order) { res.status(404).json({ success: false, error: 'Order not found' }); return; }
+
+    if (!isValidTransition(order.status, 'delivered')) {
+      res.status(400).json({ success: false, error: `Cannot mark order as delivered in "${order.status}" status` });
+      return;
+    }
+
+    const previousStatus = order.status;
+    order.status = 'delivered';
+    order.deliveredAt = new Date();
+    await order.save();
+
+    // Audit log
+    await AuditLog.create({
+      userId: req.user!.id,
+      action: 'mark_delivered',
+      entity: 'Order',
+      entityId: req.params.id,
+      changes: { status: { old: previousStatus, new: 'delivered' } },
+      ...getClientInfo(req),
+    });
+
+    // Notify customer
+    try {
+      await notifyCustomerOfStatusChange(order, 'delivered');
+    } catch (notifError) {
+      console.error('Delivered notification error:', notifError);
+    }
+
+    res.json({ success: true, data: order });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to mark order as delivered' });
   }
 });
 

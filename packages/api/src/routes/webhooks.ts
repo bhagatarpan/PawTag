@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { Subscription, Invoice, Tag, Order, User, Product, Cart, Notification } from '@pawtag/db';
+import { notifyCustomerOfStatusChange } from '../services/orderNotification.service';
 
 const router = Router();
 
@@ -187,32 +188,12 @@ async function handlePaymentIntentSucceeded(paymentIntent: any) {
     console.error('Admin notification error:', adminError);
   }
 
-  // Send order confirmation email
+  // Send customer order confirmation (centralized notification)
   try {
-    const { sendOrderConfirmation } = await import('../services/email.service');
-    await sendOrderConfirmation({
-      to: user?.email || '',
-      customerName: user?.fullName || 'Customer',
-      orderNumber,
-      items: order.items.map((item: any) => ({
-        productName: item.productName,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        variantName: item.variantName,
-        petName: item.petName,
-      })),
-      subtotal: order.payment.amount,
-      total: order.payment.amount,
-      shippingAddress: {
-        line1: order.shippingAddress.line1,
-        city: order.shippingAddress.city,
-        state: order.shippingAddress.state,
-        zip: order.shippingAddress.zip,
-      },
-    });
-    console.log(`[Webhook] Confirmation email sent for order ${orderNumber}`);
-  } catch (emailError) {
-    console.error('Email send error:', emailError);
+    await notifyCustomerOfStatusChange(order, 'paid');
+    console.log(`[Webhook] Customer notification sent for order ${orderNumber}`);
+  } catch (notifError) {
+    console.error('Customer notification error:', notifError);
   }
 }
 
@@ -233,6 +214,14 @@ async function handlePaymentIntentFailed(paymentIntent: any) {
   await order.save();
 
   console.log(`[Webhook] Order ${orderNumber} cancelled due to payment failure`);
+
+  // Notify customer
+  try {
+    await notifyCustomerOfStatusChange(order, 'cancelled', { reason: 'Payment failed' });
+    console.log(`[Webhook] Customer notified of payment failure for order ${orderNumber}`);
+  } catch (notifError) {
+    console.error('Customer notification error:', notifError);
+  }
 
   // Restore stock
   try {
