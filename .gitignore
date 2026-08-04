@@ -33,12 +33,13 @@ pnpm-debug.log*
 coverage/
 .nyc_output/
 
-# Flutter (existing)
+# Flutter (removed — no longer part of this project)
 build/
 .dart_tool/
 .packages
 *.iml
 .metadata
+.flutter-plugins-dependencies
 
 # Misc
 *.tgz
