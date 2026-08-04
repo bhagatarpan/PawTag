@@ -16,7 +16,7 @@ PawTag/
 │   ├── web/       → Public site & shop (port 3000)
 │   ├── customer/  → Customer portal (port 3002)
 │   └── finder/    → Finder portal (port 3003)
-├── mobile/        → Flutter app (future)
+├── mobile/        → React Native (Expo) app (planned, Phase 22+)
 └── docker/        → Docker configs
 ```
 
@@ -75,13 +75,4 @@ pnpm typecheck
 
 ## Next Move
 
-1. Commit all Phase 1–4 work (`pnpm typecheck` passes clean, 37 files changed).
-2. Run `pnpm seed:products` from `packages/api/` to populate test products with variants.
-3. Test the full flow end-to-end: browse shop → add to cart → register → login → checkout → order confirmation email.
-4. Add image upload for product images (currently products have no images — use placeholder or upload endpoint).
-5. Connect payment to real Stripe test keys when ready for live testing.
-6. Add product search/filtering to admin portal (currently basic).
-7. Add order detail page for customers (currently inline expand in orders list).
-8. Add password reset flow (currently a stub).
-9. Test all portals: admin (:3001), customer (:3002), finder (:3003), web (:3000).
-10. Save progress state for next session.
+See `ARCHITECTURE.md` for the full system architecture and `PawTag-Enterprise-Roadmap.md` for the 26-phase production roadmap. Work phases in order — later phases assume earlier ones are complete.
