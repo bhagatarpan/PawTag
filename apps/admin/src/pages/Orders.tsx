@@ -1,6 +1,28 @@
 import { useEffect, useState } from 'react';
 import api, { PaginatedData } from '../lib/api';
 
+const ORDER_STATUS_TRANSITIONS: Record<string, string[]> = {
+  pending: ['pending_payment', 'paid', 'cancelled'],
+  pending_payment: ['paid', 'cancelled'],
+  paid: ['packing', 'cancelled', 'refunded'],
+  packing: ['shipped', 'cancelled'],
+  shipped: ['delivered'],
+  delivered: ['refunded'],
+  cancelled: [],
+  refunded: [],
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  pending: 'Pending',
+  pending_payment: 'Pending Payment',
+  paid: 'Paid',
+  packing: 'Packing',
+  shipped: 'Shipped',
+  delivered: 'Delivered',
+  cancelled: 'Cancelled',
+  refunded: 'Refunded',
+};
+
 export default function Orders() {
   const [data, setData] = useState<PaginatedData<any> | null>(null);
   const [loading, setLoading] = useState(true);
@@ -37,7 +59,9 @@ export default function Orders() {
         >
           <option value="">All Status</option>
           <option value="pending">Pending</option>
+          <option value="pending_payment">Pending Payment</option>
           <option value="paid">Paid</option>
+          <option value="packing">Packing</option>
           <option value="shipped">Shipped</option>
           <option value="delivered">Delivered</option>
           <option value="cancelled">Cancelled</option>
@@ -72,16 +96,14 @@ export default function Orders() {
                   <td className="px-5 py-3">${order.payment?.amount?.toLocaleString()}</td>
                   <td className="px-5 py-3">
                     <select
-                      value={order.status}
-                      onChange={(e) => updateStatus(order._id, e.target.value)}
+                      value=""
+                      onChange={(e) => { if (e.target.value) updateStatus(order._id, e.target.value); }}
                       className="border border-gray-200 rounded px-2 py-1 text-xs"
                     >
-                      <option value="pending">Pending</option>
-                      <option value="paid">Paid</option>
-                      <option value="shipped">Shipped</option>
-                      <option value="delivered">Delivered</option>
-                      <option value="cancelled">Cancelled</option>
-                      <option value="refunded">Refunded</option>
+                      <option value="" disabled>{STATUS_LABELS[order.status] || order.status}</option>
+                      {(ORDER_STATUS_TRANSITIONS[order.status] || []).map((s) => (
+                        <option key={s} value={s}>{STATUS_LABELS[s]}</option>
+                      ))}
                     </select>
                   </td>
                   <td className="px-5 py-3">

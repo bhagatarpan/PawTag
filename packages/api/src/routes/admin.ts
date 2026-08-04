@@ -19,6 +19,7 @@ import {
   updateTagSchema,
 } from '../middleware/schemas';
 import { sendPasswordChangedEmail } from '../services/email.service';
+import { isValidTransition } from '../services/orderStatus.service';
 import {
   User,
   Pet,
@@ -2077,18 +2078,28 @@ router.get('/orders', requirePermission('order.read'), async (req, res: Response
 router.put('/orders/:id/status', requirePermission('order.update'), async (req: AuthRequest, res: Response) => {
   try {
     const { status, trackingNumber } = req.body;
-    const update: any = { status };
-    if (trackingNumber) update.trackingNumber = trackingNumber;
 
-    const order = await Order.findByIdAndUpdate(req.params.id, update, { new: true });
+    const order = await Order.findById(req.params.id);
     if (!order) { res.status(404).json({ success: false, error: 'Order not found' }); return; }
+
+    const previousStatus = order.status;
+
+    if (!isValidTransition(previousStatus, status)) {
+      res.status(400).json({ success: false, error: `Invalid status transition from ${previousStatus} to ${status}` });
+      return;
+    }
+
+    order.status = status;
+    if (trackingNumber) order.trackingNumber = trackingNumber;
+    await order.save();
 
     await AuditLog.create({
       userId: req.user!.id,
       action: 'update_order_status',
       entity: 'Order',
       entityId: req.params.id,
-      changes: { status: { old: 'unknown', new: status } },
+      changes: { status: { old: previousStatus, new: status } },
+      ...getClientInfo(req),
     });
 
     res.json({ success: true, data: order });

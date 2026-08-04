@@ -1,5 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
+export type OrderStatus = 'pending' | 'pending_payment' | 'paid' | 'packing' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
+
 export interface IOrderDocument extends Document {
   orderNumber: string;
   userId: mongoose.Types.ObjectId;
@@ -13,7 +15,7 @@ export interface IOrderDocument extends Document {
     totalPrice: number;
     customizationTotal?: number;
   }>;
-  status: 'pending' | 'pending_payment' | 'paid' | 'packing' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
+  status: OrderStatus;
   payment: {
     method: 'card' | 'paypal' | 'bank_transfer';
     status: 'pending' | 'completed' | 'failed' | 'refunded';
