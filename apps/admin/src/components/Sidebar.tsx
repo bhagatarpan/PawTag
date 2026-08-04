@@ -58,6 +58,7 @@ const mainLinks: SidebarLink[] = [
 ];
 
 const adminLinks: SidebarLink[] = [
+  { to: '/support-requests', label: 'Support Requests', icon: MessageSquare },
   { to: '/notifications', label: 'Notifications', icon: Bell },
   { to: '/referrals', label: 'Referrals', icon: Gift },
   { to: '/tag-expiry-notifications', label: 'Tag Expiry Alerts', icon: AlertTriangle },

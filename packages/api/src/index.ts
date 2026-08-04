@@ -40,8 +40,10 @@ import webhookRoutes from './routes/webhooks';
 import invoiceAccessRoutes from './routes/invoice-access';
 import referralRoutes from './routes/referrals';
 import pushTokenRoutes from './routes/push-tokens';
+import { publicRouter as supportPublicRoutes, adminRouter as supportAdminRoutes } from './routes/support';
 import { startReminderService } from './services/reminder.service';
 import { startSubscriptionService } from './services/subscription.service';
+import { startLowStockService } from './jobs/lowStockCheck';
 
 const app = express();
 
@@ -154,6 +156,8 @@ app.use('/api/finder', finderRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api', referralRoutes);
 app.use('/api', pushTokenRoutes);
+app.use('/api/support', supportPublicRoutes);
+app.use('/api/admin/support-requests', supportAdminRoutes);
 app.use('/api/public/cms', cmsPublicRoutes);
 app.use('/api/public/cms', cmsSettingsPublicRoutes);
 app.use('/api/public/cms', cmsPublicV2Routes);
@@ -173,6 +177,9 @@ async function start() {
 
     // Start subscription lifecycle service
     startSubscriptionService();
+
+    // Start daily low stock check service
+    startLowStockService();
 
     const server = app.listen(config.port, () => {
       console.log(`PawTag API running on port ${config.port}`);

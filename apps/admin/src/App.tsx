@@ -39,6 +39,7 @@ import Referrals from './pages/Referrals';
 import TagExpiryNotifications from './pages/TagExpiryNotifications';
 import Notifications from './pages/Notifications';
 import WriteNfcTag from './pages/WriteNfcTag';
+import SupportRequests from './pages/SupportRequests';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
@@ -171,6 +172,7 @@ export default function App() {
       <Route path="/referrals" element={<ProtectedRoute><Referrals /></ProtectedRoute>} />
       <Route path="/tag-expiry-notifications" element={<ProtectedRoute><TagExpiryNotifications /></ProtectedRoute>} />
       <Route path="/write-nfc" element={<ProtectedRoute><WriteNfcTag /></ProtectedRoute>} />
+      <Route path="/support-requests" element={<ProtectedRoute><SupportRequests /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

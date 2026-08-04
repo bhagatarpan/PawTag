@@ -1,5 +1,5 @@
 import type { Config } from '@puckeditor/core';
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useSiteSettings } from '../../hooks/useCms';
 
 type PawtagComponents = {
@@ -323,6 +323,32 @@ export const pawtagConfig: Config<PawtagComponents> = {
         const contactAddress = settings['company.address'] || 'Auckland, New Zealand';
         const hours = businessHours || settings['contact.businessHours'] || 'Mon-Fri: 7am-6pm, Sat: 8am-2pm';
         const holiday = businessHoliday || settings['contact.businessHoliday'] || 'Christmas day, Boxing day, Waitangi day, ANZAC day';
+        const [formData, setFormData] = React.useState({ name: '', email: '', message: '' });
+        const [submitting, setSubmitting] = React.useState(false);
+        const [submitted, setSubmitted] = React.useState(false);
+        const [error, setError] = React.useState('');
+        const handleSubmit = async (e: React.FormEvent) => {
+          e.preventDefault();
+          setSubmitting(true);
+          setError('');
+          try {
+            const res = await fetch('/api/support/contact', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(formData),
+            });
+            const data = await res.json();
+            if (data.success) {
+              setSubmitted(true);
+            } else {
+              setError(data.error || 'Failed to submit. Please try again.');
+            }
+          } catch {
+            setError('Network error. Please try again.');
+          } finally {
+            setSubmitting(false);
+          }
+        };
         return (
         <section className="py-12 px-6">
           <div className="max-w-6xl mx-auto">
@@ -330,54 +356,38 @@ export const pawtagConfig: Config<PawtagComponents> = {
               {/* Contact Form - Left */}
               <div>
                 <h2 className="text-2xl font-bold text-gray-900 mb-8">{formTitle || 'Send Us a Message'}</h2>
-                <form className="space-y-5" onSubmit={(e) => { e.preventDefault(); alert(formSuccessMessage); }}>
+                {submitted ? (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-8 text-center">
+                    <svg className="w-12 h-12 text-green-500 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <p className="text-green-800 font-medium text-lg">{formSuccessMessage || "Thank you! We'll be in touch soon."}</p>
+                  </div>
+                ) : (
+                <form className="space-y-5" onSubmit={handleSubmit}>
+                  {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">{error}</div>}
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1.5">Name *</label>
-                      <input type="text" className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500" />
+                      <input type="text" required value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500" />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1.5">Email *</label>
-                      <input type="email" className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500" />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1.5">Phone</label>
-                      <input type="tel" className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500" />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1.5">Subject</label>
-                      <select className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white">
-                        <option>Online Enquiry</option>
-                        <option>General Question</option>
-                        <option>Support</option>
-                        <option>Feedback</option>
-                        <option>Other</option>
-                      </select>
+                      <input type="email" required value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500" />
                     </div>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">Message *</label>
-                    <textarea rows={5} className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 resize-none" />
+                    <textarea rows={5} required value={formData.message} onChange={(e) => setFormData({ ...formData, message: e.target.value })} className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 resize-none" placeholder="How can we help you?" />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Attachments (optional)</label>
-                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-teal-400 transition-colors cursor-pointer bg-gray-50">
-                      <svg className="mx-auto h-8 w-8 text-gray-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                      </svg>
-                      <p className="text-sm text-gray-600 mb-1">Choose files to upload</p>
-                      <p className="text-xs text-gray-400">Max 5 files, up to 10MB each. Allowed: pdf,doc,docx,xls,xlsx,jpg,jpeg,png,gif,webp</p>
-                    </div>
-                  </div>
-                  <button type="submit" className="w-full bg-teal-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-teal-700 transition-all flex items-center justify-center gap-2">
+                  <button type="submit" disabled={submitting} className="w-full bg-teal-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-teal-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                     </svg>
-                    {formButtonText || 'Send Message'}
+                    {submitting ? 'Sending...' : (formButtonText || 'Send Message')}
                   </button>
                 </form>
+                )}
               </div>
               {/* Contact Info - Right */}
               <div>

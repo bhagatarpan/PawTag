@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { Subscription, Invoice, InvoiceAccessToken, Tag, Order, User, Product, Cart, Notification, AuditLog } from '@pawtag/db';
 import { notifyCustomerOfStatusChange } from '../services/orderNotification.service';
-import { sendOrderConfirmation, sendInvoiceEmail } from '../services/email.service';
+import { sendOrderConfirmation, sendInvoiceEmail, sendMail } from '../services/email.service';
 import { generateInvoiceHtml } from '../services/invoice-html.service';
 import { generateSecureToken, hashToken } from '../services/auth.service';
 
@@ -454,6 +454,59 @@ async function handleInvoicePaymentFailed(invoice: any) {
     },
     dueDate: new Date(),
   });
+
+  // Look up user to send dunning notification
+  const user = await User.findById(subscription.userId);
+  if (user) {
+    const customerName = user.fullName || 'there';
+    const amount = (invoice.amount_due / 100).toFixed(2);
+
+    // In-app notification
+    await Notification.create({
+      userId: user._id,
+      audience: 'customer',
+      type: 'subscription_expiring',
+      title: 'Payment Failed',
+      message: `Your subscription payment of $${amount} failed. Please update your payment method to avoid service interruption.`,
+      data: { subscriptionId: subscription._id.toString(), invoiceNumber: `INV-${String(count + 1).padStart(6, '0')}` },
+      priority: 'high',
+      channel: 'alert',
+    });
+
+    // Dunning email
+    const html = `
+      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+        <h2 style="color:#dc2626;">⚠️ Payment Failed</h2>
+        <p>Hi ${customerName},</p>
+        <p>We were unable to process your subscription payment of <strong>$${amount}</strong>.</p>
+        <p>To avoid service interruption, please update your payment method by visiting your account dashboard.</p>
+        <p style="margin-top:24px;">
+          <a href="${process.env.APP_URL || 'http://localhost:3002'}/subscriptions" style="display:inline-block;background:#14b8a6;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;">Update Payment Method</a>
+        </p>
+        <p style="color:#6b7280;font-size:13px;margin-top:24px;">If you believe this is an error, please contact our support team.</p>
+      </div>`;
+
+    try {
+      await sendMail(user.email, '[PawTag] Action Required — Subscription Payment Failed', html);
+    } catch (err) {
+      console.error('Dunning email error:', err);
+    }
+
+    // Admin notification
+    const adminUser = await User.findOne({ role: 'admin' }).select('_id').lean();
+    if (adminUser) {
+      await Notification.create({
+        userId: adminUser._id,
+        audience: 'admin',
+        type: 'system',
+        title: 'Subscription Payment Failed',
+        message: `${user.fullName || user.email}'s subscription payment of $${amount} failed.`,
+        data: { subscriptionId: subscription._id.toString(), userId: user._id.toString() },
+        priority: 'normal',
+        channel: 'alert',
+      });
+    }
+  }
 
   console.log(`[Webhook] Invoice payment failed for subscription ${subscription._id}`);
 }
