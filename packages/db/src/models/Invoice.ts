@@ -59,5 +59,7 @@ const InvoiceSchema = new Schema<IInvoiceDocument>(
 
 InvoiceSchema.index({ userId: 1, status: 1 });
 InvoiceSchema.index({ invoiceNumber: 1 }, { unique: true });
+InvoiceSchema.index({ subscriptionId: 1, createdAt: -1 });
+InvoiceSchema.index({ userId: 1, subscriptionId: 1, createdAt: -1 });
 
 export const Invoice = mongoose.model<IInvoiceDocument>('Invoice', InvoiceSchema);

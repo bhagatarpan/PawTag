@@ -309,6 +309,9 @@ PetSchema.index({ status: 1 });
 PetSchema.index({ petType: 1 });
 PetSchema.index({ petId: 1 }, { unique: true });
 PetSchema.index({ deletedAt: 1 });
+PetSchema.index({ ownerId: 1, deletedAt: 1, createdAt: -1 });
+PetSchema.index({ status: 1, deletedAt: 1 });
+PetSchema.index({ status: 1, foundByFinderAt: 1, deletedAt: 1 });
 
 export const Pet = mongoose.model<IPetDocument>('Pet', PetSchema);
 

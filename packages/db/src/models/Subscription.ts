@@ -103,5 +103,8 @@ const SubscriptionSchema = new Schema<ISubscriptionDocument>(
 SubscriptionSchema.index({ userId: 1, tagId: 1 });
 SubscriptionSchema.index({ status: 1, currentPeriodEnd: 1 });
 SubscriptionSchema.index({ status: 1, gracePeriodEndsAt: 1 });
+SubscriptionSchema.index({ stripeSubscriptionId: 1 });
+SubscriptionSchema.index({ userId: 1, status: 1, currentPeriodEnd: -1 });
+SubscriptionSchema.index({ status: 1, currentPeriodEnd: 1, autoRenew: 1, deletedAt: 1 });
 
 export const Subscription = mongoose.model<ISubscriptionDocument>('Subscription', SubscriptionSchema);

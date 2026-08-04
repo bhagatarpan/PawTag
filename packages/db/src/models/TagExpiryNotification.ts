@@ -24,5 +24,6 @@ const TagExpiryNotificationSchema = new Schema<ITagExpiryNotificationDocument>({
 
 TagExpiryNotificationSchema.index({ subscriptionId: 1, notifiedAt: -1 });
 TagExpiryNotificationSchema.index({ acknowledged: 1, createdAt: -1 });
+TagExpiryNotificationSchema.index({ acknowledged: 1, daysUntilExpiry: 1 });
 
 export const TagExpiryNotification = mongoose.model<ITagExpiryNotificationDocument>('TagExpiryNotification', TagExpiryNotificationSchema);

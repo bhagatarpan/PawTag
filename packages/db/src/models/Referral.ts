@@ -26,5 +26,7 @@ const ReferralSchema = new Schema<IReferralDocument>({
 ReferralSchema.index({ referrerId: 1 });
 ReferralSchema.index({ refereeId: 1 });
 ReferralSchema.index({ referralCode: 1 });
+ReferralSchema.index({ orderId: 1, status: 1 });
+ReferralSchema.index({ referrerId: 1, status: 1 });
 
 export const Referral = mongoose.model<IReferralDocument>('Referral', ReferralSchema);

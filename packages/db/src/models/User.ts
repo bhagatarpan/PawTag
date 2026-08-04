@@ -98,6 +98,7 @@ const UserSchema = new Schema<IUserDocument>(
 );
 
 UserSchema.index({ email: 1 });
+UserSchema.index({ phoneNumber: 1 });
 UserSchema.index({ roles: 1 });
 UserSchema.index({ status: 1 });
 UserSchema.index({ deletedAt: 1 });

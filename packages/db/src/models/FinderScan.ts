@@ -55,5 +55,7 @@ const FinderScanSchema = new Schema<IFinderScanDocument>(
 
 FinderScanSchema.index({ tagId: 1, createdAt: -1 });
 FinderScanSchema.index({ petId: 1 });
+FinderScanSchema.index({ petId: 1, action: 1, notifiedAt: -1 });
+FinderScanSchema.index({ createdAt: -1 });
 
 export const FinderScan = mongoose.model<IFinderScanDocument>('FinderScan', FinderScanSchema);

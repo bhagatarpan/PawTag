@@ -52,5 +52,7 @@ const TagSchema = new Schema<ITagDocument>(
 TagSchema.index({ ownerId: 1 });
 TagSchema.index({ petId: 1 });
 TagSchema.index({ deletedAt: 1 });
+TagSchema.index({ petId: 1, deletedAt: 1 });
+TagSchema.index({ ownerId: 1, deletedAt: 1 });
 
 export const Tag = mongoose.model<ITagDocument>('Tag', TagSchema);
