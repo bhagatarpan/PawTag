@@ -28,6 +28,9 @@ export default function Orders() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
+  const [actionModal, setActionModal] = useState<{ orderId: string; action: 'cancel' | 'refund' } | null>(null);
+  const [reason, setReason] = useState('');
+  const [actionLoading, setActionLoading] = useState(false);
 
   const fetchOrders = () => {
     setLoading(true);
@@ -46,6 +49,24 @@ export default function Orders() {
     await api.put(`/admin/orders/${id}/status`, { status });
     fetchOrders();
   };
+
+  const executeAction = async () => {
+    if (!actionModal || !reason.trim()) return;
+    setActionLoading(true);
+    try {
+      await api.post(`/admin/orders/${actionModal.orderId}/${actionModal.action}`, { reason: reason.trim() });
+      setActionModal(null);
+      setReason('');
+      fetchOrders();
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Action failed');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const canCancel = (status: string) => ORDER_STATUS_TRANSITIONS[status]?.includes('cancelled');
+  const canRefund = (status: string) => ORDER_STATUS_TRANSITIONS[status]?.includes('refunded');
 
   return (
     <div className="space-y-6">
@@ -121,49 +142,63 @@ export default function Orders() {
                     )}
                   </td>
                   <td className="px-5 py-3">
-                    {order.latestInvoice && (
-                      <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1 flex-wrap">
+                      {order.latestInvoice && (
+                        <>
+                          <button
+                            onClick={async () => {
+                              try {
+                                const res = await fetch(`/api/admin/invoices/${order.latestInvoice._id}/view`, {
+                                  headers: { 'Authorization': 'Bearer ' + localStorage.getItem('admin_token') },
+                                });
+                                const data = await res.json();
+                                if (data.success) window.open(data.data.secureUrl, '_blank');
+                              } catch {}
+                            }}
+                            className="text-teal-600 hover:text-teal-700 text-xs font-medium border border-teal-200 px-2 py-1 rounded hover:bg-teal-50"
+                          >View</button>
+                          <button
+                            onClick={async () => {
+                              try {
+                                const res = await fetch(`/api/admin/invoices/${order.latestInvoice._id}/email`, {
+                                  method: 'POST',
+                                  headers: { 'Authorization': 'Bearer ' + localStorage.getItem('admin_token'), 'Content-Type': 'application/json' },
+                                });
+                                const data = await res.json();
+                                if (data.success) alert(data.data.message);
+                                else alert(data.error || 'Failed');
+                              } catch { alert('Failed to email'); }
+                            }}
+                            className="text-blue-600 hover:text-blue-700 text-xs font-medium border border-blue-200 px-2 py-1 rounded hover:bg-blue-50"
+                          >Email</button>
+                          <button
+                            onClick={async () => {
+                              try {
+                                const res = await fetch(`/api/admin/invoices/${order.latestInvoice._id}/print`, {
+                                  headers: { 'Authorization': 'Bearer ' + localStorage.getItem('admin_token') },
+                                });
+                                const html = await res.text();
+                                const w = window.open('', '_blank');
+                                if (w) { w.document.write(html); w.document.close(); }
+                              } catch { alert('Failed to print invoice'); }
+                            }}
+                            className="text-gray-600 hover:text-gray-700 text-xs font-medium border border-gray-200 px-2 py-1 rounded hover:bg-gray-50"
+                          >Print</button>
+                        </>
+                      )}
+                      {canCancel(order.status) && (
                         <button
-                          onClick={async () => {
-                            try {
-                              const res = await fetch(`/api/admin/invoices/${order.latestInvoice._id}/view`, {
-                                headers: { 'Authorization': 'Bearer ' + localStorage.getItem('admin_token') },
-                              });
-                              const data = await res.json();
-                              if (data.success) window.open(data.data.secureUrl, '_blank');
-                            } catch {}
-                          }}
-                          className="text-teal-600 hover:text-teal-700 text-xs font-medium border border-teal-200 px-2 py-1 rounded hover:bg-teal-50"
-                        >View</button>
+                          onClick={() => setActionModal({ orderId: order._id, action: 'cancel' })}
+                          className="text-red-600 hover:text-red-700 text-xs font-medium border border-red-200 px-2 py-1 rounded hover:bg-red-50"
+                        >Cancel</button>
+                      )}
+                      {canRefund(order.status) && (
                         <button
-                          onClick={async () => {
-                            try {
-                              const res = await fetch(`/api/admin/invoices/${order.latestInvoice._id}/email`, {
-                                method: 'POST',
-                                headers: { 'Authorization': 'Bearer ' + localStorage.getItem('admin_token'), 'Content-Type': 'application/json' },
-                              });
-                              const data = await res.json();
-                              if (data.success) alert(data.data.message);
-                              else alert(data.error || 'Failed');
-                            } catch { alert('Failed to email'); }
-                          }}
-                          className="text-blue-600 hover:text-blue-700 text-xs font-medium border border-blue-200 px-2 py-1 rounded hover:bg-blue-50"
-                        >Email</button>
-                        <button
-                          onClick={async () => {
-                            try {
-                              const res = await fetch(`/api/admin/invoices/${order.latestInvoice._id}/print`, {
-                                headers: { 'Authorization': 'Bearer ' + localStorage.getItem('admin_token') },
-                              });
-                              const html = await res.text();
-                              const w = window.open('', '_blank');
-                              if (w) { w.document.write(html); w.document.close(); }
-                            } catch { alert('Failed to print invoice'); }
-                          }}
-                          className="text-gray-600 hover:text-gray-700 text-xs font-medium border border-gray-200 px-2 py-1 rounded hover:bg-gray-50"
-                        >Print</button>
-                      </div>
-                    )}
+                          onClick={() => setActionModal({ orderId: order._id, action: 'refund' })}
+                          className="text-orange-600 hover:text-orange-700 text-xs font-medium border border-orange-200 px-2 py-1 rounded hover:bg-orange-50"
+                        >Refund</button>
+                      )}
+                    </div>
                   </td>
                   <td className="px-5 py-3 text-gray-500 text-xs">
                     {new Date(order.createdAt).toLocaleDateString()}
@@ -174,6 +209,43 @@ export default function Orders() {
           </tbody>
         </table>
       </div>
+
+      {actionModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4">
+              {actionModal.action === 'cancel' ? 'Cancel Order' : 'Refund Order'}
+            </h3>
+            <p className="text-sm text-gray-600 mb-4">
+              {actionModal.action === 'cancel'
+                ? 'This will cancel the order and restore stock. This action cannot be undone.'
+                : 'This will refund the payment via Stripe and mark the order as refunded. This action cannot be undone.'}
+            </p>
+            <textarea
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="Reason (required)"
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm mb-4"
+              rows={3}
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => { setActionModal(null); setReason(''); }}
+                className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded"
+              >Cancel</button>
+              <button
+                onClick={executeAction}
+                disabled={!reason.trim() || actionLoading}
+                className={`px-4 py-2 text-sm text-white rounded disabled:opacity-50 ${
+                  actionModal.action === 'cancel' ? 'bg-red-600 hover:bg-red-700' : 'bg-orange-600 hover:bg-orange-700'
+                }`}
+              >
+                {actionLoading ? 'Processing...' : actionModal.action === 'cancel' ? 'Cancel Order' : 'Refund Order'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

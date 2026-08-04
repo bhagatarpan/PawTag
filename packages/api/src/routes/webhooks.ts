@@ -229,25 +229,19 @@ async function handlePaymentIntentFailed(paymentIntent: any) {
   // Mark order as cancelled
   order.status = 'cancelled';
   order.payment.status = 'failed';
+  order.cancellationReason = 'Payment failed';
   await order.save();
 
   console.log(`[Webhook] Order ${orderNumber} cancelled due to payment failure`);
 
   // Restore stock
-  for (const item of order.items) {
-    const product = await Product.findById(item.productId);
-    if (product) {
-      if (item.variantName && product.variants?.length) {
-        const variant = product.variants.find((v: any) => v.name === item.variantName);
-        if (variant) variant.stock += item.quantity;
-      } else {
-        product.stock += item.quantity;
-      }
-      await product.save();
-    }
+  try {
+    const { restoreOrderStock } = await import('../services/inventory.service');
+    await restoreOrderStock(order.items);
+    console.log(`[Webhook] Stock restored for order ${orderNumber}`);
+  } catch (err) {
+    console.error('Stock restoration error:', err);
   }
-
-  console.log(`[Webhook] Stock restored for order ${orderNumber}`);
 }
 
 async function handleInvoicePaymentSucceeded(invoice: any) {

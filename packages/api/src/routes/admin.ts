@@ -2109,6 +2109,157 @@ router.put('/orders/:id/status', requirePermission('order.update'), async (req: 
   }
 });
 
+// --- Cancel Order ---
+router.post('/orders/:id/cancel', requirePermission('order.update'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { reason } = req.body;
+    if (!reason) {
+      res.status(400).json({ success: false, error: 'Cancellation reason is required' });
+      return;
+    }
+
+    const order = await Order.findById(req.params.id);
+    if (!order) { res.status(404).json({ success: false, error: 'Order not found' }); return; }
+
+    if (!isValidTransition(order.status, 'cancelled')) {
+      res.status(400).json({ success: false, error: `Cannot cancel order in "${order.status}" status` });
+      return;
+    }
+
+    const previousStatus = order.status;
+    order.status = 'cancelled';
+    order.cancellationReason = reason;
+    await order.save();
+
+    // Restore stock
+    const { restoreOrderStock } = await import('../services/inventory.service');
+    await restoreOrderStock(order.items);
+
+    // Audit log
+    await AuditLog.create({
+      userId: req.user!.id,
+      action: 'cancel_order',
+      entity: 'Order',
+      entityId: req.params.id,
+      changes: { status: { old: previousStatus, new: 'cancelled' }, reason },
+      ...getClientInfo(req),
+    });
+
+    // Notify customer
+    const { Notification } = await import('@pawtag/db');
+    const user = await User.findById(order.userId);
+    await Notification.create({
+      userId: order.userId,
+      audience: 'customer',
+      type: 'order_update',
+      title: 'Order cancelled',
+      message: `Your order ${order.orderNumber} has been cancelled. Reason: ${reason}`,
+      data: { orderId: order._id.toString(), orderNumber: order.orderNumber },
+      priority: 'high',
+      channel: 'alert',
+    });
+
+    // Send email
+    try {
+      const { sendMail } = await import('../services/email.service');
+      await sendMail(
+        user?.email || '',
+        `Order ${order.orderNumber} cancelled`,
+        `<h2>Order Cancelled</h2>
+         <p>Your order <strong>${order.orderNumber}</strong> has been cancelled.</p>
+         <p><strong>Reason:</strong> ${reason}</p>`,
+      );
+    } catch (emailErr) {
+      console.error('Cancel notification email error:', emailErr);
+    }
+
+    res.json({ success: true, data: order });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to cancel order' });
+  }
+});
+
+// --- Refund Order ---
+router.post('/orders/:id/refund', requirePermission('order.update'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { reason, amount } = req.body;
+    if (!reason) {
+      res.status(400).json({ success: false, error: 'Refund reason is required' });
+      return;
+    }
+
+    const order = await Order.findById(req.params.id);
+    if (!order) { res.status(404).json({ success: false, error: 'Order not found' }); return; }
+
+    if (!isValidTransition(order.status, 'refunded')) {
+      res.status(400).json({ success: false, error: `Cannot refund order in "${order.status}" status` });
+      return;
+    }
+
+    if (!order.payment.transactionId) {
+      res.status(400).json({ success: false, error: 'No payment transaction to refund' });
+      return;
+    }
+
+    const { createRefund } = await import('../services/stripe.service');
+    const refundResult = await createRefund(order.payment.transactionId, amount);
+
+    if (!refundResult.success) {
+      res.status(400).json({ success: false, error: `Stripe refund failed: ${refundResult.error}` });
+      return;
+    }
+
+    const previousStatus = order.status;
+    order.status = 'refunded';
+    order.refundReason = reason;
+    order.payment.status = 'refunded';
+    await order.save();
+
+    // Audit log
+    await AuditLog.create({
+      userId: req.user!.id,
+      action: 'refund_order',
+      entity: 'Order',
+      entityId: req.params.id,
+      changes: { status: { old: previousStatus, new: 'refunded' }, reason, refundId: refundResult.refundId },
+      ...getClientInfo(req),
+    });
+
+    // Notify customer
+    const { Notification } = await import('@pawtag/db');
+    const user = await User.findById(order.userId);
+    await Notification.create({
+      userId: order.userId,
+      audience: 'customer',
+      type: 'order_update',
+      title: 'Order refunded',
+      message: `Your order ${order.orderNumber} has been refunded. Reason: ${reason}`,
+      data: { orderId: order._id.toString(), orderNumber: order.orderNumber },
+      priority: 'high',
+      channel: 'alert',
+    });
+
+    // Send email
+    try {
+      const { sendMail } = await import('../services/email.service');
+      await sendMail(
+        user?.email || '',
+        `Order ${order.orderNumber} refunded`,
+        `<h2>Order Refunded</h2>
+         <p>Your order <strong>${order.orderNumber}</strong> has been refunded.</p>
+         <p><strong>Reason:</strong> ${reason}</p>
+         <p><strong>Refund ID:</strong> ${refundResult.refundId}</p>`,
+      );
+    } catch (emailErr) {
+      console.error('Refund notification email error:', emailErr);
+    }
+
+    res.json({ success: true, data: { order, refundId: refundResult.refundId } });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to refund order' });
+  }
+});
+
 // --- Skip Invoice OTP ---
 router.put('/users/:id/skip-invoice-otp', requirePermission('user.update'), async (req: AuthRequest, res: Response) => {
   try {
