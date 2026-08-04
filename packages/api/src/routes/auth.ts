@@ -23,6 +23,11 @@ import {
   hashToken,
   normalizeEmail,
   normalizePhone,
+  generateRefreshToken,
+  storeRefreshToken,
+  verifyRefreshToken,
+  rotateRefreshToken,
+  revokeRefreshToken,
 } from '../services/auth.service';
 import { sendVerificationEmail, sendPasswordResetEmail, sendPasswordChangedEmail, sendWelcomeEmail } from '../services/email.service';
 import { sendPhoneOtpSMS } from '../services/sms.service';
@@ -183,10 +188,14 @@ router.post('/login', validate(loginSchema), async (req, res: Response) => {
 
     const token = generateToken({ id: user._id.toString(), email: user.email, role: user.role });
 
+    const refreshTokens = generateRefreshToken();
+    await storeRefreshToken(user._id.toString(), refreshTokens.tokenHash);
+
     res.json({
       success: true,
       data: {
         token,
+        refreshToken: refreshTokens.token,
         user: {
           id: user._id,
           email: user.email,
@@ -874,6 +883,60 @@ router.post('/change-password', authenticate, validate(changePasswordSchema), as
     res.json({ success: true, data: { message: 'Password changed successfully' } });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to change password' });
+  }
+});
+
+router.post('/refresh', async (req, res: Response) => {
+  try {
+    const { refreshToken } = req.body;
+    if (!refreshToken) {
+      res.status(400).json({ success: false, error: 'Refresh token is required' });
+      return;
+    }
+
+    const result = await verifyRefreshToken(refreshToken);
+    if (!result) {
+      res.status(401).json({ success: false, error: 'Invalid or expired refresh token' });
+      return;
+    }
+
+    const user = await User.findById(result.userId);
+    if (!user || user.status === 'suspended' || user.status === 'inactive') {
+      res.status(401).json({ success: false, error: 'User not found or inactive' });
+      return;
+    }
+
+    const newRefreshTokens = await rotateRefreshToken(refreshToken);
+    if (!newRefreshTokens) {
+      res.status(401).json({ success: false, error: 'Failed to rotate refresh token' });
+      return;
+    }
+
+    const newAccessToken = generateToken({ id: user._id.toString(), email: user.email, role: user.role });
+
+    res.json({
+      success: true,
+      data: {
+        token: newAccessToken,
+        refreshToken: newRefreshTokens.token,
+      },
+    });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to refresh token' });
+  }
+});
+
+router.post('/logout', async (req: AuthRequest, res: Response) => {
+  try {
+    const { refreshToken } = req.body;
+
+    if (refreshToken) {
+      await revokeRefreshToken(refreshToken);
+    }
+
+    res.json({ success: true, data: { message: 'Logged out successfully' } });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to logout' });
   }
 });
 

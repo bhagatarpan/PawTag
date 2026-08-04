@@ -40,3 +40,4 @@ export { ReferralCode, type IReferralCodeDocument } from './models/ReferralCode'
 export { Referral, type IReferralDocument } from './models/Referral';
 export { TagExpiryNotification, type ITagExpiryNotificationDocument } from './models/TagExpiryNotification';
 export { PushToken, type IPushTokenDocument } from './models/PushToken';
+export { RefreshToken, type IRefreshTokenDocument } from './models/RefreshToken';

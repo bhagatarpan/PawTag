@@ -768,12 +768,19 @@ async function seed() {
     // ── 6. Bootstrap Admin User ──
     console.log('\n--- Bootstrapping Admin User ---');
     const adminEmail = (process.env.BOOTSTRAP_ADMIN_EMAIL || 'admin@pawtag.co.nz').toLowerCase();
-    const adminPassword = process.env.BOOTSTRAP_ADMIN_PASSWORD || 'PawTagAdmin2024!';
+    const adminPassword = process.env.BOOTSTRAP_ADMIN_PASSWORD;
+    if (!adminPassword) {
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error('BOOTSTRAP_ADMIN_PASSWORD must be set in production');
+      }
+      console.warn('  ⚠ BOOTSTRAP_ADMIN_PASSWORD not set — generating random password for dev');
+    }
+    const finalAdminPassword = adminPassword || require('crypto').randomBytes(16).toString('hex');
 
     let adminUser = await User.findOne({ email: adminEmail }).session(session);
 
     if (!adminUser) {
-      const passwordHash = await bcrypt.hash(adminPassword, 12);
+      const passwordHash = await bcrypt.hash(finalAdminPassword, 12);
       adminUser = (await User.create([{
         email: adminEmail,
         passwordHash,
@@ -785,6 +792,9 @@ async function seed() {
         phoneVerified: false,
       }], { session }))[0];
       console.log(`  Created admin user: ${adminEmail}`);
+      if (!adminPassword) {
+        console.log(`  ⚠ Generated admin password: ${finalAdminPassword}`);
+      }
     } else {
       console.log(`  Admin user already exists: ${adminEmail}`);
     }
@@ -816,13 +826,20 @@ async function seed() {
 
     // ── 7. Bootstrap Test Customer ──
     console.log('\n--- Bootstrapping Test Customer ---');
-    const testCustomerEmail = 'john@example.com';
-    const testCustomerPassword = 'TestPass123!';
+    const testCustomerEmail = process.env.BOOTSTRAP_TEST_EMAIL || 'john@example.com';
+    const testCustomerPassword = process.env.BOOTSTRAP_TEST_PASSWORD;
+    if (!testCustomerPassword) {
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error('BOOTSTRAP_TEST_PASSWORD must be set in production');
+      }
+      console.warn('  ⚠ BOOTSTRAP_TEST_PASSWORD not set — generating random password for dev');
+    }
+    const finalTestPassword = testCustomerPassword || require('crypto').randomBytes(16).toString('hex');
 
     let testCustomer = await User.findOne({ email: testCustomerEmail }).session(session);
 
     if (!testCustomer) {
-      const passwordHash = await bcrypt.hash(testCustomerPassword, 12);
+      const passwordHash = await bcrypt.hash(finalTestPassword, 12);
       testCustomer = (await User.create([{
         email: testCustomerEmail,
         passwordHash,
@@ -834,6 +851,9 @@ async function seed() {
         phoneVerified: false,
       }], { session }))[0];
       console.log(`  Created test customer: ${testCustomerEmail}`);
+      if (!testCustomerPassword) {
+        console.log(`  ⚠ Generated test customer password: ${finalTestPassword}`);
+      }
     } else {
       console.log(`  Test customer already exists: ${testCustomerEmail}`);
     }
