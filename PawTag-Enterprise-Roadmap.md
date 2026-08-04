@@ -1077,7 +1077,7 @@ not consider it done without a test that proves no pet data is lost).
 
 ---
 
-### Phase 14 — Migrate file uploads to object storage
+### Phase 14 — Migrate file uploads to object storage ✅ DONE
 
 **Objective:** Move pet photos, vet document uploads, and product images from local disk (`multer.diskStorage`) to Cloudflare R2, so files survive redeploys and scale properly.
 **Why now:** Confirmed Critical gap — local disk storage will silently lose every uploaded file on the next redeploy of most modern hosting platforms. Must be fixed before any real deployment (Phase 16).
@@ -1091,6 +1091,8 @@ not consider it done without a test that proves no pet data is lost).
 **Risks:** Requires a real Cloudflare R2 bucket + credentials — external dependency, same pattern as Phase 9's courier account.
 **Rollback plan:** Keep local-disk logic behind a feature flag for one deploy cycle in case R2 credentials aren't ready, defaulting to R2 once configured.
 **Definition of Done:** Tests green against a mocked/real R2 client; existing local `uploads/` directory usage fully removed from the code path.
+
+> **Status:** Complete — `f08c1e8`. `@aws-sdk/client-s3` + `@aws-sdk/s3-request-presigner` installed. Created `r2.service.ts` with S3 client, upload/delete/presigned URL functions. Updated `upload.ts` to use `multer.memoryStorage()` with automatic R2 upload when credentials are configured, falling back to local disk in dev. Added R2 env vars to `.env.example`. 5 integration tests with mocked S3 client. All 567 tests passing.
 
 ```
 IMPLEMENTATION PROMPT — PHASE 14

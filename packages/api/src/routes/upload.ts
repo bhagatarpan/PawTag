@@ -4,40 +4,12 @@ import path from 'path';
 import fs from 'fs';
 import { AuthRequest, authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
+import { uploadToR2, deleteFromR2, generateUniqueFilename, isR2Configured } from '../services/r2.service';
 
 const router = Router();
 
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => {
-    const uploadDir = path.join(__dirname, '../../uploads/pets');
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    cb(null, uploadDir);
-  },
-  filename: (_req, file, cb) => {
-    const uniquePrefix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-    const ext = path.extname(file.originalname);
-    cb(null, `${uniquePrefix}${ext}`);
-  },
-});
-
-// Configure multer for product image uploads
-const productStorage = multer.diskStorage({
-  destination: (_req, _file, cb) => {
-    const uploadDir = path.join(__dirname, '../../uploads/products');
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    cb(null, uploadDir);
-  },
-  filename: (_req, file, cb) => {
-    const uniquePrefix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-    const ext = path.extname(file.originalname);
-    cb(null, `${uniquePrefix}${ext}`);
-  },
-});
+// Configure multer for memory storage (works with both R2 and local fallback)
+const memoryStorage = multer.memoryStorage();
 
 const fileFilter = (_req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
   const allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/avif'];
@@ -49,16 +21,27 @@ const fileFilter = (_req: any, file: Express.Multer.File, cb: multer.FileFilterC
 };
 
 const upload = multer({
-  storage,
+  storage: memoryStorage,
   fileFilter,
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
 });
 
-const productUpload = multer({
-  storage: productStorage,
-  fileFilter,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
-});
+// Local disk fallback helper (when R2 is not configured)
+function saveToLocalStorage(buffer: Buffer, folder: string, filename: string): string {
+  const uploadDir = path.join(__dirname, `../../uploads/${folder}`);
+  if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+  }
+  fs.writeFileSync(path.join(uploadDir, filename), buffer);
+  return filename;
+}
+
+function deleteFromLocalStorage(folder: string, filename: string): void {
+  const filePath = path.join(__dirname, `../../uploads/${folder}`, filename);
+  if (fs.existsSync(filePath)) {
+    fs.unlinkSync(filePath);
+  }
+}
 
 /**
  * @swagger
@@ -106,8 +89,8 @@ const productUpload = multer({
  *       413:
  *         description: File too large (max 5MB)
  */
-router.post('/pet-photo', authenticate, (req: AuthRequest, res: Response) => {
-  upload.single('photo')(req, res, (err) => {
+router.post('/pet-photo', authenticate, async (req: AuthRequest, res: Response) => {
+  upload.single('photo')(req, res, async (err) => {
     if (err instanceof multer.MulterError) {
       if (err.code === 'LIMIT_FILE_SIZE') {
         res.status(413).json({ success: false, error: 'File too large. Maximum size is 5MB.' });
@@ -125,11 +108,28 @@ router.post('/pet-photo', authenticate, (req: AuthRequest, res: Response) => {
       return;
     }
 
-    const photoUrl = `${req.protocol}://${req.get('host')}/api/uploads/pets/${req.file.filename}`;
-    res.json({
-      success: true,
-      data: { url: photoUrl, filename: req.file.filename },
-    });
+    try {
+      const filename = generateUniqueFilename(req.file.originalname);
+      let photoUrl: string;
+
+      if (isR2Configured()) {
+        // Upload to R2
+        const key = `pets/${filename}`;
+        photoUrl = await uploadToR2(key, req.file.buffer, req.file.mimetype);
+      } else {
+        // Fallback to local disk
+        saveToLocalStorage(req.file.buffer, 'pets', filename);
+        photoUrl = `${req.protocol}://${req.get('host')}/api/uploads/pets/${filename}`;
+      }
+
+      res.json({
+        success: true,
+        data: { url: photoUrl, filename },
+      });
+    } catch (uploadError) {
+      console.error('Upload error:', uploadError);
+      res.status(500).json({ success: false, error: 'Failed to upload photo' });
+    }
   });
 });
 
@@ -166,8 +166,8 @@ router.post('/pet-photo', authenticate, (req: AuthRequest, res: Response) => {
  *       413:
  *         description: File too large
  */
-router.post('/product-images', authenticate, requirePermission('product.update'), (req: AuthRequest, res: Response) => {
-  productUpload.array('images', 5)(req, res, (err) => {
+router.post('/product-images', authenticate, requirePermission('product.update'), async (req: AuthRequest, res: Response) => {
+  upload.array('images', 5)(req, res, async (err) => {
     if (err instanceof multer.MulterError) {
       if (err.code === 'LIMIT_FILE_SIZE') {
         res.status(413).json({ success: false, error: 'File too large. Maximum size is 5MB per image.' });
@@ -189,16 +189,34 @@ router.post('/product-images', authenticate, requirePermission('product.update')
       return;
     }
 
-    const baseUrl = `${req.protocol}://${req.get('host')}/api/uploads/products`;
-    const uploaded = req.files.map((file) => ({
-      url: `${baseUrl}/${file.filename}`,
-      filename: file.filename,
-    }));
+    try {
+      const uploaded = [];
 
-    res.json({
-      success: true,
-      data: { images: uploaded },
-    });
+      for (const file of req.files) {
+        const filename = generateUniqueFilename(file.originalname);
+        let url: string;
+
+        if (isR2Configured()) {
+          // Upload to R2
+          const key = `products/${filename}`;
+          url = await uploadToR2(key, file.buffer, file.mimetype);
+        } else {
+          // Fallback to local disk
+          saveToLocalStorage(file.buffer, 'products', filename);
+          url = `${req.protocol}://${req.get('host')}/api/uploads/products/${filename}`;
+        }
+
+        uploaded.push({ url, filename });
+      }
+
+      res.json({
+        success: true,
+        data: { images: uploaded },
+      });
+    } catch (uploadError) {
+      console.error('Upload error:', uploadError);
+      res.status(500).json({ success: false, error: 'Failed to upload images' });
+    }
   });
 });
 
@@ -226,17 +244,18 @@ router.post('/product-images', authenticate, requirePermission('product.update')
  *       404:
  *         description: Image not found
  */
-router.delete('/product-images/:filename', authenticate, requirePermission('product.update'), (req: AuthRequest, res: Response) => {
+router.delete('/product-images/:filename', authenticate, requirePermission('product.update'), async (req: AuthRequest, res: Response) => {
   try {
     const { filename } = req.params;
-    const filePath = path.join(__dirname, '../../uploads/products', filename);
 
-    if (!fs.existsSync(filePath)) {
-      res.status(404).json({ success: false, error: 'Image not found' });
-      return;
+    if (isR2Configured()) {
+      // Delete from R2
+      await deleteFromR2(`products/${filename}`);
+    } else {
+      // Fallback to local disk
+      deleteFromLocalStorage('products', filename);
     }
 
-    fs.unlinkSync(filePath);
     res.json({ success: true, data: { message: 'Image deleted' } });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to delete image' });

@@ -72,6 +72,20 @@ Without SMTP configured, emails are logged to console in development mode.
 |----------|---------|-------------|
 | `ADMIN_ALERT_EMAIL` | *(empty)* | Email address for order alerts, low-stock warnings |
 
+## Object Storage (Cloudflare R2)
+
+Used for file uploads (pet photos, product images). Falls back to local disk in development if not configured.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `R2_ACCESS_KEY_ID` | *(empty)* | R2 API access key ID |
+| `R2_SECRET_ACCESS_KEY` | *(empty)* | R2 API secret access key |
+| `R2_BUCKET_NAME` | *(empty)* | R2 bucket name |
+| `R2_ENDPOINT` | *(empty)* | R2 endpoint URL (e.g., `https://<account-id>.r2.cloudflarestorage.com`) |
+| `R2_PUBLIC_URL` | *(empty)* | Public URL for serving uploaded files (e.g., `https://pub-xxx.r2.dev` or custom domain) |
+
+When all R2 credentials are set, uploads go to R2. Otherwise, files are saved to local disk (development only).
+
 ## Server
 
 | Variable | Default | Description |
