@@ -267,8 +267,9 @@ export interface Pet {
 export interface Tag {
   _id: string;
   tagId: string;          // Human-readable ID like PT-123456
-  petId: string;
-  ownerId: string;
+  petId?: string;
+  ownerId?: string;
+  orderId?: string;
   status: TagStatus;
   qrCodeUrl?: string;
   tagType?: 'qr' | 'nfc';
@@ -382,6 +383,7 @@ export interface Product {
   shippingCost?: number;
   warrantyMonths?: number;
   isSubscription?: boolean;
+  isTagProduct?: boolean;
   subscriptionConfig?: SubscriptionConfig;
   createdAt: string;
   updatedAt: string;

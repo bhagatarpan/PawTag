@@ -2,6 +2,11 @@ import { Router, Request, Response } from 'express';
 import { Subscription, Invoice, Tag, Order, User, Product, Cart, Notification } from '@pawtag/db';
 import { notifyCustomerOfStatusChange } from '../services/orderNotification.service';
 
+function generateTagId(): string {
+  const digits = Math.floor(100000 + Math.random() * 900000).toString();
+  return `PT-${digits}`;
+}
+
 const router = Router();
 
 router.post('/stripe', async (req: Request, res: Response) => {
@@ -124,6 +129,28 @@ async function handlePaymentIntentSucceeded(paymentIntent: any) {
     }
   } catch (subError) {
     console.error('Subscription creation error:', subError);
+  }
+
+  // Auto-create tags for tag products
+  try {
+    for (const item of order.items) {
+      const product = await Product.findById(item.productId);
+      if (product && product.isTagProduct) {
+        for (let i = 0; i < item.quantity; i++) {
+          const tagId = generateTagId();
+          await Tag.create({
+            tagId,
+            tagType: 'qr',
+            orderId: order._id,
+            status: 'inactive',
+            subscriptionStatus: 'none',
+          });
+          console.log(`[Webhook] Auto-created tag ${tagId} for order ${orderNumber}`);
+        }
+      }
+    }
+  } catch (tagError) {
+    console.error('Tag auto-creation error:', tagError);
   }
 
   // Process referral rewards

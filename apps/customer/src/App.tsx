@@ -14,6 +14,7 @@ import SettingsPage from './pages/SettingsPage';
 import SubscriptionsPage from './pages/SubscriptionsPage';
 import ReferralsPage from './pages/ReferralsPage';
 import NotificationPreferencesPage from './pages/NotificationPreferencesPage';
+import RedeemTagPage from './pages/RedeemTagPage';
 
 export default function App() {
   return (
@@ -31,6 +32,7 @@ export default function App() {
         <Route path="/notifications" element={<Protected><DashboardLayout><NotificationsPage /></DashboardLayout></Protected>} />
         <Route path="/notification-preferences" element={<Protected><DashboardLayout><NotificationPreferencesPage /></DashboardLayout></Protected>} />
         <Route path="/referrals" element={<Protected><DashboardLayout><ReferralsPage /></DashboardLayout></Protected>} />
+        <Route path="/redeem-tag" element={<Protected><DashboardLayout><RedeemTagPage /></DashboardLayout></Protected>} />
         <Route path="/settings" element={<Protected><DashboardLayout><SettingsPage /></DashboardLayout></Protected>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

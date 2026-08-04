@@ -3,8 +3,9 @@ import mongoose, { Schema, Document } from 'mongoose';
 export interface ITagDocument extends Document {
   tagId: string;
   tagType: 'qr' | 'nfc';
-  petId: mongoose.Types.ObjectId;
-  ownerId: mongoose.Types.ObjectId;
+  petId?: mongoose.Types.ObjectId;
+  ownerId?: mongoose.Types.ObjectId;
+  orderId?: mongoose.Types.ObjectId;
   status: 'active' | 'inactive' | 'lost';
   qrCodeUrl?: string;
   nfcUrl?: string;
@@ -25,9 +26,10 @@ const TagSchema = new Schema<ITagDocument>(
   {
     tagId: { type: String, required: true, unique: true, index: true },
     tagType: { type: String, enum: ['qr', 'nfc'], default: 'qr', index: true },
-    petId: { type: Schema.Types.ObjectId, ref: 'Pet', required: true, index: true },
-    ownerId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-    status: { type: String, enum: ['active', 'inactive', 'lost'], default: 'active' },
+    petId: { type: Schema.Types.ObjectId, ref: 'Pet', index: true },
+    ownerId: { type: Schema.Types.ObjectId, ref: 'User', index: true },
+    orderId: { type: Schema.Types.ObjectId, ref: 'Order' },
+    status: { type: String, enum: ['active', 'inactive', 'lost'], default: 'inactive' },
     qrCodeUrl: { type: String },
     nfcUrl: { type: String },
     lastScannedAt: { type: Date },

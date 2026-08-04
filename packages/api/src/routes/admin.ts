@@ -1066,7 +1066,7 @@ router.get('/pets', requirePermission('pet.read'), async (req, res: Response) =>
     // Attach linked tag info for each pet
     const petIds = pets.map((p) => p._id);
     const tags = await Tag.find({ petId: { $in: petIds }, deletedAt: null }).select('tagId petId status');
-    const tagMap = new Map(tags.map((t) => [t.petId.toString(), t]));
+    const tagMap = new Map(tags.filter((t) => t.petId).map((t) => [t.petId!.toString(), t]));
     const petsWithTag = pets.map((pet) => ({
       ...pet.toObject(),
       linkedTag: tagMap.get(pet._id.toString()) || null,
@@ -1381,7 +1381,7 @@ router.put('/tags/:id', requirePermission('tag.update'), validate(updateTagSchem
     const tag = await Tag.findOne({ _id: req.params.id, deletedAt: null });
     if (!tag) { res.status(404).json({ success: false, error: 'Tag not found' }); return; }
 
-    if (req.body.petId && req.body.petId !== tag.petId.toString()) {
+    if (req.body.petId && req.body.petId !== tag.petId?.toString()) {
       const newPet = await Pet.findOne({ _id: req.body.petId, deletedAt: null });
       if (!newPet) { res.status(400).json({ success: false, error: 'Pet not found' }); return; }
       const existingTagOnNewPet = await Tag.findOne({ petId: req.body.petId, _id: { $ne: tag._id }, deletedAt: null });

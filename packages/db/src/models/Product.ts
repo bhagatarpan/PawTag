@@ -34,6 +34,7 @@ export interface IProductDocument extends Document {
   shippingCost: number;
   warrantyMonths: number;
   isSubscription: boolean;
+  isTagProduct: boolean;
   subscriptionConfig?: {
     type: 'annual' | 'monthly';
     freePeriodMonths: number;
@@ -79,6 +80,7 @@ const ProductSchema = new Schema<IProductDocument>(
     shippingCost: { type: Number, default: 0, min: 0 },
     warrantyMonths: { type: Number, default: 12, min: 0 },
     isSubscription: { type: Boolean, default: false, index: true },
+    isTagProduct: { type: Boolean, default: false, index: true },
     subscriptionConfig: {
       type: { type: String, enum: ['annual', 'monthly'] },
       freePeriodMonths: { type: Number, default: 12 },

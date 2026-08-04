@@ -1,4 +1,5 @@
 import { Router, Response } from 'express';
+import mongoose from 'mongoose';
 import { AuthRequest, authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
 import { validate } from '../middleware/validation';
@@ -47,7 +48,7 @@ router.get('/pets', requirePermission('pet.read'), async (req: AuthRequest, res:
     const subscriptions = await Subscription.find({ tagId: { $in: tagIds }, deletedAt: null })
       .populate('planId', 'name sku');
     const subMap = new Map(subscriptions.map((s: any) => [s.tagId.toString(), s]));
-    const tagMap = new Map(tags.map((t) => [t.petId.toString(), t]));
+    const tagMap = new Map(tags.filter((t) => t.petId).map((t) => [t.petId!.toString(), t]));
     const petsWithTag = pets.map((pet) => {
       const tag = tagMap.get(pet._id.toString());
       const sub = tag ? subMap.get(tag._id.toString()) : null;
@@ -295,6 +296,108 @@ router.get('/tags', requirePermission('tag.read'), async (req: AuthRequest, res:
     res.json({ success: true, data: tags });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch tags' });
+  }
+});
+
+// --- Redeem Tag ---
+/**
+ * @swagger
+ * /api/customer/tags/redeem:
+ *   post:
+ *     summary: Redeem a physical tag and link it to your account
+ *     tags: [Customer]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [tagId]
+ *             properties:
+ *               tagId:
+ *                 type: string
+ *                 description: The tag ID printed on the physical tag (e.g. PT-123456)
+ *     responses:
+ *       200:
+ *         description: Tag redeemed successfully
+ *       404:
+ *         description: Tag ID not recognized
+ *       409:
+ *         description: Tag has already been activated
+ *       403:
+ *         description: Tag belongs to a different customer's order
+ */
+router.post('/tags/redeem', requirePermission('tag.create'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { tagId } = req.body;
+    if (!tagId) {
+      res.status(400).json({ success: false, error: 'Tag ID is required' });
+      return;
+    }
+
+    const tag = await Tag.findOne({ tagId, deletedAt: null });
+    if (!tag) {
+      res.status(404).json({ success: false, error: 'Tag ID not recognized — check the code on your tag' });
+      return;
+    }
+
+    if (tag.ownerId) {
+      res.status(409).json({ success: false, error: 'This tag has already been activated' });
+      return;
+    }
+
+    // If tag has an orderId, verify it belongs to this customer and is shipped/delivered
+    if (tag.orderId) {
+      const order = await Order.findById(tag.orderId);
+      if (!order) {
+        res.status(404).json({ success: false, error: 'Associated order not found' });
+        return;
+      }
+      if (order.userId.toString() !== req.user!.id) {
+        res.status(403).json({ success: false, error: 'This tag belongs to a different customer' });
+        return;
+      }
+      if (!['shipped', 'delivered'].includes(order.status)) {
+        res.status(400).json({ success: false, error: 'Tag can only be redeemed after order is shipped or delivered' });
+        return;
+      }
+    }
+
+    // Redeem the tag
+    tag.ownerId = new mongoose.Types.ObjectId(req.user!.id);
+    tag.status = 'active';
+    tag.activatedAt = new Date();
+    await tag.save();
+
+    res.json({ success: true, data: tag });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to redeem tag' });
+  }
+});
+
+// --- Get Unredeemed Tag Count ---
+router.get('/tags/unredeemed-count', requirePermission('tag.read'), async (req: AuthRequest, res: Response) => {
+  try {
+    // Find delivered orders for this user that have tag products
+    const deliveredOrders = await Order.find({
+      userId: req.user!.id,
+      status: { $in: ['shipped', 'delivered'] },
+    });
+
+    const orderIds = deliveredOrders.map((o) => o._id);
+
+    // Find tags linked to these orders that haven't been redeemed yet
+    const unredeemedCount = await Tag.countDocuments({
+      orderId: { $in: orderIds },
+      ownerId: { $exists: false },
+      deletedAt: null,
+    });
+
+    res.json({ success: true, data: { count: unredeemedCount } });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to get unredeemed count' });
   }
 });
 

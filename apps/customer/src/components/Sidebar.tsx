@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { PawPrint, LogOut, User, ShoppingBag, Bell, Settings, CreditCard, Gift } from 'lucide-react';
+import { PawPrint, LogOut, User, ShoppingBag, Bell, Settings, CreditCard, Gift, QrCode } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { useSiteSettings } from '../hooks/useSiteSettings';
 import api from '../lib/api';
 
 const NAV_ITEMS = [
   { path: '/', label: 'My Pets', icon: PawPrint },
+  { path: '/redeem-tag', label: 'Activate Tag', icon: QrCode },
   { path: '/profile', label: 'Profile', icon: User },
   { path: '/orders', label: 'Orders', icon: ShoppingBag },
   { path: '/subscriptions', label: 'Subscriptions', icon: CreditCard },

@@ -1,6 +1,6 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, AlertTriangle, CheckCircle, Star, X, Edit2, Save, ShieldAlert, ShieldCheck, ShoppingBag, ChevronRight, Clock, Skull, EyeOff, Activity, Info, CreditCard } from 'lucide-react';
+import { Plus, AlertTriangle, CheckCircle, Star, X, Edit2, Save, ShieldAlert, ShieldCheck, ShoppingBag, ChevronRight, Clock, Skull, EyeOff, Activity, Info, CreditCard, QrCode } from 'lucide-react';
 import api from '../lib/api';
 import { useAuth } from '../lib/auth';
 import PhotoManager from '../components/PhotoManager';
@@ -21,9 +21,14 @@ export default function PetsPage() {
   const [foundTimers, setFoundTimers] = useState<Record<string, string>>({});
   const [timeToFoundMsg, setTimeToFoundMsg] = useState('');
   const [healthPet, setHealthPet] = useState<any>(null);
+  const [unredeemedCount, setUnredeemedCount] = useState(0);
 
   const refreshPets = () => api.get('/customer/pets').then((r) => setPets(r.data.data)).catch(console.error);
   useEffect(() => { refreshPets(); }, []);
+
+  useEffect(() => {
+    api.get('/customer/tags/unredeemed-count').then((r) => setUnredeemedCount(r.data.data.count)).catch(() => {});
+  }, []);
 
   useEffect(() => {
     const foundPets = pets.filter((p) => p.status === 'found');
@@ -142,6 +147,22 @@ export default function PetsPage() {
         <h1 className="text-2xl font-bold">My Pets</h1>
         <button onClick={startAdd} className="bg-primary-600 text-white px-4 py-2 rounded-md text-sm flex items-center gap-2 hover:bg-primary-700"><Plus size={16} /> Add Pet</button>
       </div>
+
+      {unredeemedCount > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 flex items-center gap-4">
+          <QrCode size={24} className="text-blue-600 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="font-medium text-blue-800">You have {unredeemedCount} unredeemed tag{unredeemedCount > 1 ? 's' : ''}</p>
+            <p className="text-sm text-blue-600">Activate your tag to link it to a pet profile and start protecting them.</p>
+          </div>
+          <button
+            onClick={() => navigate('/redeem-tag')}
+            className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700"
+          >
+            Activate Now
+          </button>
+        </div>
+      )}
 
       {showForm && (
         <form onSubmit={handleSubmit} className="bg-white rounded-lg border p-6 mb-6 space-y-4">
