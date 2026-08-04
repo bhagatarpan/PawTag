@@ -328,7 +328,8 @@ export interface SubscriptionReminderStates {
 
 export interface Invoice {
   _id: string;
-  subscriptionId: string;
+  subscriptionId?: string;
+  orderId?: string;
   userId: string;
   invoiceNumber: string;
   amount: number;
@@ -337,12 +338,12 @@ export interface Invoice {
   stripeInvoiceId?: string;
   stripePaymentIntentId?: string;
   paymentMethod?: string;
-  billingPeriod: {
+  billingPeriod?: {
     start: string;
     end: string;
   };
   paidAt?: string;
-  dueDate: string;
+  dueDate?: string;
   createdAt: string;
   updatedAt: string;
 }

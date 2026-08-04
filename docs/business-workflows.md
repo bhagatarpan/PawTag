@@ -134,3 +134,64 @@ PawTag supports NFC tags as an alternative to QR codes. When an NFC tag is tappe
 - If "NFC Not Supported" is shown, ensure you're using Chrome on Android
 - If the write fails, try a different blank NFC tag
 - If the tag doesn't open the page, verify the NFC tag is NTAG213/215/216 compatible
+
+---
+
+## Order Confirmation & Invoice Email Flow
+
+### Overview
+
+When a customer completes payment (via the `payment_intent.succeeded` Stripe webhook), the system automatically sends two emails and creates an invoice record.
+
+### Flow
+
+```
+Payment succeeds (Stripe webhook)
+  │
+  ├─ 1. Mark order as paid
+  ├─ 2. Create subscriptions (if subscription products)
+  ├─ 3. Auto-create QR tags (if tag products)
+  ├─ 4. Process referral rewards
+  ├─ 5. Admin notification + email
+  │
+  ├─ 6. Send Order Confirmation email
+  │     └─ CMS template: 'order-confirmation'
+  │     └─ Contains: items, totals, shipping address, "View Order" CTA
+  │
+  ├─ 7. Create Invoice record (for ALL paid orders)
+  │     └─ Invoice number: INV-XXXXXX (auto-incrementing)
+  │     └─ Links to order via orderId field
+  │
+  ├─ 8. Generate secure invoice access token
+  │     └─ Pre-verified (no OTP) — same as admin view links
+  │     └─ 24-hour expiry for email links
+  │
+  ├─ 9. Send Invoice email
+  │     └─ CMS template: 'invoice-paid'
+  │     └─ Contains: invoice number, amount, "View Invoice" CTA
+  │
+  ├─ 10. Create Notification record (customer in-app history)
+  │
+  └─ 11. Create AuditLog entries (order_confirmation_sent, invoice_sent)
+```
+
+### Email Templates
+
+| Template | Slug | Variables |
+|----------|------|-----------|
+| Order Confirmation | `order-confirmation` | `name`, `orderNumber`, `total`, `shippingAddress.*`, `viewOrderUrl` |
+| Invoice Ready | `invoice-paid` | `name`, `invoiceNumber`, `amount`, `viewInvoiceUrl`, `company` |
+
+Both templates are CMS-editable from the admin panel (Settings > Email Templates).
+
+### Invoice Access
+
+- **Customer:** Clicks "View Invoice" on order detail page → `POST /customer/invoices/:id/access` → opens secure URL
+- **Admin:** Clicks "View" on order management → `GET /admin/invoices/:id/view` → opens secure URL with `?admin=1`
+- **Email link:** Pre-verified token, no OTP required, 24-hour expiry
+
+### Database Changes
+
+- `Invoice` model: `subscriptionId` and `billingPeriod` are now optional (previously required)
+- `Invoice` model: new `orderId` field links invoices to regular product orders
+- `InvoiceAccessToken`: used for secure token-based invoice access

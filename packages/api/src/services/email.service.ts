@@ -338,7 +338,20 @@ export async function sendInvoiceEmail(
   name: string,
   invoiceNumber: string,
   invoiceHtml: string,
+  viewInvoiceUrl?: string,
+  amount?: number,
 ): Promise<EmailResult> {
+  const vars: Record<string, string> = {
+    name,
+    invoiceNumber,
+    amount: amount ? `$${amount.toFixed(2)}` : '',
+    viewInvoiceUrl: viewInvoiceUrl || '',
+    company: (await (await import('@pawtag/db')).Setting.findOne({ key: 'company.name' }).lean())?.value || 'PawTag',
+  };
+
+  const cms = await renderCmsEmail('invoice-paid', vars);
+  if (cms) return sendMail(to, cms.subject, cms.html, cms.from);
+
   const html = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
       <div style="background: linear-gradient(135deg, #0d9488, #14b8a6); padding: 24px; border-radius: 12px 12px 0 0; text-align: center;">
@@ -346,7 +359,11 @@ export async function sendInvoiceEmail(
       </div>
       <div style="background: #f9fafb; padding: 32px; border: 1px solid #e5e7eb;">
         <p style="color: #374151; font-size: 15px; line-height: 1.7;">Hi ${name},</p>
-        <p style="color: #374151; font-size: 15px; line-height: 1.7;">Please find your invoice <strong>${invoiceNumber}</strong> attached below.</p>
+        <p style="color: #374151; font-size: 15px; line-height: 1.7;">Your invoice <strong>${invoiceNumber}</strong>${amount ? ` for <strong>$${amount.toFixed(2)}</strong>` : ''} is ready.</p>
+        ${viewInvoiceUrl ? `
+        <div style="text-align: center; margin: 24px 0;">
+          <a href="${viewInvoiceUrl}" style="display: inline-block; background: #0d9488; color: white; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">View Invoice</a>
+        </div>` : ''}
         <div style="background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin: 16px 0; overflow: auto;">
           ${invoiceHtml}
         </div>

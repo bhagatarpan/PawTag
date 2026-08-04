@@ -1,4 +1,4 @@
-import { Setting, CmsEmailTemplate, Invoice, Subscription, User } from '@pawtag/db';
+import { Setting, CmsEmailTemplate, Invoice, Subscription, User, Order } from '@pawtag/db';
 
 interface InvoiceData {
   invoice: any;
@@ -43,7 +43,7 @@ function statusColor(status: string): string {
   }
 }
 
-function buildDefaultInvoiceHtml(data: InvoiceData, company: Record<string, string>): string {
+function buildDefaultInvoiceHtml(data: InvoiceData, company: Record<string, string>, order?: any): string {
   const { invoice, subscription, user } = data;
   const companyName = company['company.name'] || 'PawTag Ltd';
   const companyAddress = company['company.address'] || '';
@@ -55,6 +55,53 @@ function buildDefaultInvoiceHtml(data: InvoiceData, company: Record<string, stri
 
   const currentYear = new Date().getFullYear();
   const statusCol = statusColor(invoice.status);
+
+  // Build line items — from order items or subscription
+  const hasOrderItems = order?.items?.length > 0;
+  const hasSubscription = !!subscription;
+
+  let lineItemRows = '';
+  if (hasOrderItems) {
+    lineItemRows = order.items.map((item: any) => `
+          <tr>
+            <td>
+              <strong>${escapeHtml(item.productName)}</strong>
+              ${item.variantName ? `<br><span style="color:#6b7280;font-size:12px;">${escapeHtml(item.variantName)}</span>` : ''}
+              ${item.petName ? `<br><span style="color:#0d9488;font-size:12px;">For: ${escapeHtml(item.petName)}</span>` : ''}
+            </td>
+            <td>${item.quantity}</td>
+            <td class="amount-col">$${(item.unitPrice * item.quantity).toFixed(2)}</td>
+          </tr>`).join('');
+  } else if (hasSubscription) {
+    lineItemRows = `
+          <tr>
+            <td>
+              <strong>${escapeHtml(subscription.planName || 'Subscription')}</strong>
+              <br><span style="color:#6b7280;font-size:12px;">Tag: ${escapeHtml(subscription?.tagId?.tagId || 'N/A')}</span>
+            </td>
+            <td>—</td>
+            <td class="amount-col">${invoice.currency || 'NZD'} $${invoice.amount.toFixed(2)}</td>
+          </tr>`;
+  } else {
+    lineItemRows = `
+          <tr>
+            <td><strong>${escapeHtml(invoice.invoiceNumber)}</strong></td>
+            <td>—</td>
+            <td class="amount-col">${invoice.currency || 'NZD'} $${invoice.amount.toFixed(2)}</td>
+          </tr>`;
+  }
+
+  const descHeader = hasOrderItems ? 'Item' : 'Description';
+  const qtyHeader = hasOrderItems ? 'Qty' : 'Billing Period';
+
+  let qtyCol: string;
+  if (hasOrderItems) {
+    qtyCol = '';
+  } else if (hasSubscription && invoice.billingPeriod) {
+    qtyCol = `${formatDate(getBillingPeriod(invoice).start)} — ${formatDate(getBillingPeriod(invoice).end)}`;
+  } else {
+    qtyCol = '—';
+  }
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -133,7 +180,7 @@ function buildDefaultInvoiceHtml(data: InvoiceData, company: Record<string, stri
         <div class="meta-block">
           <h3>Invoice Details</h3>
           <p><span class="label">Date:</span> ${formatDate(invoice.createdAt)}</p>
-          <p><span class="label">Due:</span> ${formatDate(invoice.dueDate)}</p>
+          ${invoice.dueDate ? `<p><span class="label">Due:</span> ${formatDate(invoice.dueDate)}</p>` : ''}
           ${invoice.paidAt ? `<p><span class="label">Paid:</span> ${formatDate(invoice.paidAt)}</p>` : ''}
           ${invoice.paymentMethod ? `<p><span class="label">Method:</span> ${escapeHtml(invoice.paymentMethod)}</p>` : ''}
         </div>
@@ -142,20 +189,13 @@ function buildDefaultInvoiceHtml(data: InvoiceData, company: Record<string, stri
       <table>
         <thead>
           <tr>
-            <th>Description</th>
-            <th>Billing Period</th>
+            <th>${descHeader}</th>
+            <th>${qtyHeader}</th>
             <th style="text-align:right;">Amount</th>
           </tr>
         </thead>
         <tbody>
-          <tr>
-            <td>
-              <strong>${escapeHtml(subscription?.planName || 'Subscription')}</strong>
-              <br><span style="color:#6b7280;font-size:12px;">Tag: ${escapeHtml(subscription?.tagId?.tagId || 'N/A')}</span>
-            </td>
-            <td>${formatDate(getBillingPeriod(invoice).start)} — ${formatDate(getBillingPeriod(invoice).end)}</td>
-            <td class="amount-col">${invoice.currency || 'NZD'} $${invoice.amount.toFixed(2)}</td>
-          </tr>
+          ${lineItemRows}
           <tr class="total-row">
             <td colspan="2"><strong>Total</strong></td>
             <td class="amount-col"><strong>${invoice.currency || 'NZD'} $${invoice.amount.toFixed(2)}</strong></td>
@@ -178,10 +218,20 @@ export async function generateInvoiceHtml(invoiceId: string): Promise<string> {
   const invoice = await Invoice.findById(invoiceId).lean();
   if (!invoice) throw new Error('Invoice not found');
 
-  const subscription = await Subscription.findById(invoice.subscriptionId)
-    .populate('tagId', 'tagId')
-    .populate('planId', 'name')
-    .lean();
+  // Subscription lookup is conditional — only for subscription invoices
+  let subscription: any = null;
+  if (invoice.subscriptionId) {
+    subscription = await Subscription.findById(invoice.subscriptionId)
+      .populate('tagId', 'tagId')
+      .populate('planId', 'name')
+      .lean();
+  }
+
+  // Order lookup — for non-subscription invoices, we need order items
+  let order: any = null;
+  if (invoice.orderId) {
+    order = await Order.findById(invoice.orderId).lean();
+  }
 
   const user = await User.findById(invoice.userId)
     .select('fullName email phoneNumber address')
@@ -222,19 +272,19 @@ export async function generateInvoiceHtml(invoiceId: string): Promise<string> {
       'company.logo': companyLogo,
       'invoice.number': invoice.invoiceNumber,
       'invoice.date': formatDate(invoice.createdAt),
-      'invoice.dueDate': formatDate(invoice.dueDate),
+      'invoice.dueDate': invoice.dueDate ? formatDate(invoice.dueDate) : formatDate(invoice.createdAt),
       'invoice.paidAt': invoice.paidAt ? formatDate(invoice.paidAt) : '',
       'invoice.status': invoice.status.toUpperCase(),
       'invoice.statusColor': statusCol,
       'invoice.amount': `$${invoice.amount.toFixed(2)}`,
       'invoice.currency': invoice.currency || 'NZD',
       'invoice.paymentMethod': invoice.paymentMethod || '',
-      'invoice.billingPeriodStart': formatDate(getBillingPeriod(invoice).start),
-      'invoice.billingPeriodEnd': formatDate(getBillingPeriod(invoice).end),
+      'invoice.billingPeriodStart': invoice.billingPeriod ? formatDate(getBillingPeriod(invoice).start) : formatDate(invoice.createdAt),
+      'invoice.billingPeriodEnd': invoice.billingPeriod ? formatDate(getBillingPeriod(invoice).end) : formatDate(invoice.createdAt),
       'customer.name': customerName,
       'customer.email': customerEmail,
-      'subscription.planName': subscription?.planName || 'Subscription',
-      'subscription.tagId': (subscription?.tagId as any)?.tagId || 'N/A',
+      'subscription.planName': subscription?.planName || '',
+      'subscription.tagId': (subscription?.tagId as any)?.tagId || '',
       'year': String(currentYear),
     };
 
@@ -244,7 +294,7 @@ export async function generateInvoiceHtml(invoiceId: string): Promise<string> {
     return body;
   }
 
-  return buildDefaultInvoiceHtml(data, company);
+  return buildDefaultInvoiceHtml(data, company, order);
 }
 
 export async function generateInvoiceEmailHtml(invoiceId: string): Promise<{ html: string; subject: string }> {

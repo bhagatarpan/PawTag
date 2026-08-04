@@ -4,7 +4,7 @@ import { AuthRequest, authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
 import { validate } from '../middleware/validation';
 import { createPetSchema, updatePetSchema } from '../middleware/schemas';
-import { Pet, Tag, Order, LocationEvent, Notification, FinderScan, User, generatePetId, Cart, Product, Subscription, Referral, Setting, AuditLog } from '@pawtag/db';
+import { Pet, Tag, Order, LocationEvent, Notification, FinderScan, User, generatePetId, Cart, Product, Subscription, Referral, Setting, AuditLog, Invoice } from '@pawtag/db';
 import { calculateBundleDiscount } from '../services/bundle-pricing.service';
 import { validateReferralCode } from '../services/referral.service';
 import { createPaymentIntent } from '../services/stripe.service';
@@ -857,6 +857,16 @@ router.get('/orders/:id', requirePermission('order.read'), async (req: AuthReque
     res.json({ success: true, data: order });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch order' });
+  }
+});
+
+router.get('/orders/:id/invoice', requirePermission('order.read'), async (req: AuthRequest, res: Response) => {
+  try {
+    const invoice = await Invoice.findOne({ orderId: req.params.id, userId: req.user!.id });
+    if (!invoice) { res.status(404).json({ success: false, error: 'Invoice not found for this order' }); return; }
+    res.json({ success: true, data: { _id: invoice._id, invoiceNumber: invoice.invoiceNumber, amount: invoice.amount, status: invoice.status } });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to fetch invoice' });
   }
 });
 

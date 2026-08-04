@@ -792,6 +792,21 @@ async function run() {
           variables: ['name', 'status', 'reason'],
           status: 'active' as const,
         },
+        {
+          name: 'Invoice Ready',
+          slug: 'invoice-paid',
+          subject: 'Invoice {{invoiceNumber}} — {{company}}',
+          title: 'Your Invoice is Ready',
+          subtitle: 'Invoice {{invoiceNumber}}',
+          body: 'Hi {{name}},\n\nYour invoice **{{invoiceNumber}}**{{#amount}} for **{{amount}}**{{/amount}} is ready.\n\nYou can view and download your invoice using the link below.\n\nThank you for your business!',
+          ctaText: 'View Invoice',
+          ctaUrl: '{{viewInvoiceUrl}}',
+          preheader: 'Your PawTag invoice {{invoiceNumber}} is ready to view.',
+          senderEmail: 'billing@pawtag.co.nz',
+          senderName: 'PawTag',
+          variables: ['name', 'invoiceNumber', 'amount', 'viewInvoiceUrl', 'company'],
+          status: 'active' as const,
+        },
       ];
 
       let emailCreated = 0;

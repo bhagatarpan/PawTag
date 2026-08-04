@@ -1,6 +1,9 @@
 import { Router, Request, Response } from 'express';
-import { Subscription, Invoice, Tag, Order, User, Product, Cart, Notification } from '@pawtag/db';
+import { Subscription, Invoice, InvoiceAccessToken, Tag, Order, User, Product, Cart, Notification, AuditLog } from '@pawtag/db';
 import { notifyCustomerOfStatusChange } from '../services/orderNotification.service';
+import { sendOrderConfirmation, sendInvoiceEmail } from '../services/email.service';
+import { generateInvoiceHtml } from '../services/invoice-html.service';
+import { generateSecureToken, hashToken } from '../services/auth.service';
 
 function generateTagId(): string {
   const digits = Math.floor(100000 + Math.random() * 900000).toString();
@@ -215,10 +218,127 @@ async function handlePaymentIntentSucceeded(paymentIntent: any) {
     console.error('Admin notification error:', adminError);
   }
 
-  // Send customer order confirmation (centralized notification)
+  // Send customer order confirmation + invoice email (centralized notification)
   try {
-    await notifyCustomerOfStatusChange(order, 'paid');
-    console.log(`[Webhook] Customer notification sent for order ${orderNumber}`);
+    // 1. Send Order Confirmation email
+    const customerName = user?.fullName || 'Customer';
+    const customerEmail = user?.email;
+    if (customerEmail) {
+      await sendOrderConfirmation({
+        to: customerEmail,
+        customerName,
+        orderNumber: order.orderNumber,
+        items: order.items.map((item: any) => ({
+          productName: item.productName,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          variantName: item.variantName,
+          petName: item.petName,
+        })),
+        subtotal: order.payment.amount - (order.discount?.amount || 0),
+        discount: order.discount,
+        total: order.payment.amount,
+        shippingAddress: order.shippingAddress || { line1: '', city: '', state: '', zip: '' },
+      });
+      console.log(`[Webhook] Order confirmation email sent for ${orderNumber}`);
+    }
+
+    // 2. Create Invoice record for ALL paid orders
+    const invoiceCount = await Invoice.countDocuments();
+    const invoiceNumber = `INV-${String(invoiceCount + 1).padStart(6, '0')}`;
+
+    // Find the subscription ID if this order has subscription products
+    let subscriptionId: any = undefined;
+    let billingPeriod: { start: Date; end: Date } | undefined = undefined;
+    for (const item of order.items) {
+      const product = await Product.findById(item.productId);
+      if (product?.isSubscription && product.subscriptionConfig) {
+        const sub = await Subscription.findOne({ userId: order.userId, orderId: order._id });
+        if (sub) {
+          subscriptionId = sub._id;
+          if (sub.currentPeriodStart && sub.currentPeriodEnd) {
+            billingPeriod = { start: sub.currentPeriodStart, end: sub.currentPeriodEnd };
+          }
+          break;
+        }
+      }
+    }
+
+    const invoice = await Invoice.create({
+      ...(subscriptionId ? { subscriptionId } : {}),
+      orderId: order._id,
+      userId: order.userId,
+      invoiceNumber,
+      amount: order.payment.amount,
+      currency: order.payment.currency || 'NZD',
+      status: 'paid',
+      paymentMethod: order.payment.method,
+      paidAt: order.payment.paidAt || new Date(),
+      ...(billingPeriod ? { billingPeriod } : {}),
+    });
+    console.log(`[Webhook] Invoice ${invoiceNumber} created for order ${orderNumber}`);
+
+    // 3. Generate secure access token for invoice (pre-verified, no OTP)
+    const secureToken = generateSecureToken();
+    const tokenHash = hashToken(secureToken);
+
+    const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
+    await InvoiceAccessToken.create({
+      invoiceId: invoice._id,
+      userId: order.userId,
+      tokenHash,
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours for email links
+      verifiedAt: new Date(), // Pre-verified — no OTP needed
+    });
+
+    const invoiceUrl = `${FRONTEND_URL}/invoice/${secureToken}?admin=1`;
+
+    // 4. Send Invoice email
+    if (customerEmail) {
+      const invoiceHtml = await generateInvoiceHtml(invoice._id.toString());
+      await sendInvoiceEmail(customerEmail, customerName, invoiceNumber, invoiceHtml, invoiceUrl, invoice.amount);
+      console.log(`[Webhook] Invoice email sent for ${orderNumber}`);
+    }
+
+    // 5. Log Notification records (customer in-app history)
+    await Notification.create({
+      userId: order.userId,
+      audience: 'customer',
+      type: 'order_update',
+      title: 'Order confirmed',
+      message: `Your order ${orderNumber} has been confirmed. Invoice ${invoiceNumber} is ready.`,
+      data: {
+        orderId: order._id.toString(),
+        orderNumber,
+        invoiceId: invoice._id.toString(),
+        invoiceNumber,
+        status: 'paid',
+        invoiceUrl,
+      },
+      priority: 'normal',
+      channel: 'info',
+    });
+
+    // 6. Audit log both email sends
+    const clientInfo = { ipAddress: 'system', userAgent: 'webhook' };
+    await AuditLog.create({
+      userId: order.userId,
+      action: 'order_confirmation_sent',
+      entity: 'Order',
+      entityId: order._id.toString(),
+      changes: { orderNumber, emailSentTo: customerEmail },
+      ...clientInfo,
+    });
+    await AuditLog.create({
+      userId: order.userId,
+      action: 'invoice_sent',
+      entity: 'Invoice',
+      entityId: invoice._id.toString(),
+      changes: { invoiceNumber, emailSentTo: customerEmail, invoiceUrl },
+      ...clientInfo,
+    });
+
+    console.log(`[Webhook] Customer notifications and audit logs created for order ${orderNumber}`);
   } catch (notifError) {
     console.error('Customer notification error:', notifError);
   }

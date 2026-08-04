@@ -1,7 +1,8 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IInvoiceDocument extends Document {
-  subscriptionId: mongoose.Types.ObjectId;
+  subscriptionId?: mongoose.Types.ObjectId;
+  orderId?: mongoose.Types.ObjectId;
   userId: mongoose.Types.ObjectId;
   invoiceNumber: string;
 
@@ -14,13 +15,13 @@ export interface IInvoiceDocument extends Document {
   stripePaymentIntentId?: string;
   paymentMethod?: string;
 
-  billingPeriod: {
+  billingPeriod?: {
     start: Date;
     end: Date;
   };
 
   paidAt?: Date;
-  dueDate: Date;
+  dueDate?: Date;
 
   createdAt: Date;
   updatedAt: Date;
@@ -28,7 +29,8 @@ export interface IInvoiceDocument extends Document {
 
 const InvoiceSchema = new Schema<IInvoiceDocument>(
   {
-    subscriptionId: { type: Schema.Types.ObjectId, ref: 'Subscription', required: true, index: true },
+    subscriptionId: { type: Schema.Types.ObjectId, ref: 'Subscription', index: true },
+    orderId: { type: Schema.Types.ObjectId, ref: 'Order', index: true },
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     invoiceNumber: { type: String, required: true, unique: true },
 
@@ -47,18 +49,19 @@ const InvoiceSchema = new Schema<IInvoiceDocument>(
     paymentMethod: { type: String },
 
     billingPeriod: {
-      start: { type: Date, required: true },
-      end: { type: Date, required: true },
+      start: { type: Date },
+      end: { type: Date },
     },
 
     paidAt: { type: Date },
-    dueDate: { type: Date, required: true },
+    dueDate: { type: Date },
   },
   { timestamps: true },
 );
 
 InvoiceSchema.index({ userId: 1, status: 1 });
 InvoiceSchema.index({ invoiceNumber: 1 }, { unique: true });
+InvoiceSchema.index({ orderId: 1, createdAt: -1 });
 InvoiceSchema.index({ subscriptionId: 1, createdAt: -1 });
 InvoiceSchema.index({ userId: 1, subscriptionId: 1, createdAt: -1 });
 

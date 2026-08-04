@@ -256,7 +256,9 @@ router.post('/admin/invoices/:invoiceId/email', authenticate, requirePermission(
     if (!recipientEmail) { res.status(400).json({ success: false, error: 'No email address' }); return; }
 
     const invoiceHtml = await generateInvoiceHtml(invoice._id.toString());
-    await sendInvoiceEmail(recipientEmail, recipientName, invoice.invoiceNumber, invoiceHtml);
+    const secureToken = generateSecureToken();
+    const invoiceUrl = `${FRONTEND_URL}/invoice/${secureToken}?admin=1`;
+    await sendInvoiceEmail(recipientEmail, recipientName, invoice.invoiceNumber, invoiceHtml, invoiceUrl, invoice.amount);
 
     // Audit log
     const clientInfo = getClientInfo(req);

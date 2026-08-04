@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Package, Truck, CreditCard, MapPin, Tag, StickyNote } from 'lucide-react';
+import { ArrowLeft, Package, Truck, CreditCard, MapPin, Tag, StickyNote, FileText } from 'lucide-react';
 import api from '../lib/api';
 
 interface OrderItem {
@@ -60,6 +60,7 @@ export default function OrderDetailPage() {
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [invoice, setInvoice] = useState<{ _id: string; invoiceNumber: string; amount: number; status: string } | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -68,6 +69,24 @@ export default function OrderDetailPage() {
       .catch((e) => setError(e.response?.data?.error || 'Order not found'))
       .finally(() => setLoading(false));
   }, [id]);
+
+  useEffect(() => {
+    if (!id || !order || order.status === 'pending') return;
+    api.get(`/customer/orders/${id}/invoice`)
+      .then((r) => setInvoice(r.data.data))
+      .catch(() => {}); // No invoice yet — that's fine
+  }, [id, order]);
+
+  const handleViewInvoice = async () => {
+    if (!invoice) return;
+    try {
+      const res = await api.post(`/customer/invoices/${invoice._id}/access`);
+      const { secureUrl } = res.data.data;
+      window.open(secureUrl, '_blank');
+    } catch {
+      alert('Failed to generate invoice link. Please try again.');
+    }
+  };
 
   if (loading) {
     return (
@@ -111,6 +130,18 @@ export default function OrderDetailPage() {
             {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
           </span>
         </div>
+
+        {invoice && order.status !== 'pending' && (
+          <div className="mt-4">
+            <button
+              onClick={handleViewInvoice}
+              className="inline-flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary-700 transition-colors"
+            >
+              <FileText size={16} />
+              View Invoice — {invoice.invoiceNumber}
+            </button>
+          </div>
+        )}
 
         {!isCancelled && (
           <div className="mt-6">
