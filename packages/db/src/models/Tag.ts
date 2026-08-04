@@ -6,6 +6,7 @@ export interface ITagDocument extends Document {
   petId?: mongoose.Types.ObjectId;
   ownerId?: mongoose.Types.ObjectId;
   orderId?: mongoose.Types.ObjectId;
+  nfcEnabled: boolean;
   status: 'active' | 'inactive' | 'lost';
   qrCodeUrl?: string;
   nfcUrl?: string;
@@ -29,6 +30,7 @@ const TagSchema = new Schema<ITagDocument>(
     petId: { type: Schema.Types.ObjectId, ref: 'Pet', index: true },
     ownerId: { type: Schema.Types.ObjectId, ref: 'User', index: true },
     orderId: { type: Schema.Types.ObjectId, ref: 'Order' },
+    nfcEnabled: { type: Boolean, default: false },
     status: { type: String, enum: ['active', 'inactive', 'lost'], default: 'inactive' },
     qrCodeUrl: { type: String },
     nfcUrl: { type: String },

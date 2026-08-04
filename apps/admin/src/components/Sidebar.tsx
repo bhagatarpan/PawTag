@@ -33,6 +33,7 @@ import {
   Gift,
   AlertTriangle,
   Bell,
+  Wifi,
 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import api from '../lib/api';
@@ -60,6 +61,7 @@ const adminLinks: SidebarLink[] = [
   { to: '/notifications', label: 'Notifications', icon: Bell },
   { to: '/referrals', label: 'Referrals', icon: Gift },
   { to: '/tag-expiry-notifications', label: 'Tag Expiry Alerts', icon: AlertTriangle },
+  { to: '/write-nfc', label: 'Write NFC Tag', icon: Wifi },
   { to: '/rbac/roles', label: 'Roles', icon: Shield, permission: 'role.read' },
   { to: '/rbac/permissions', label: 'Permissions', icon: Key, permission: 'permission.read' },
   { to: '/rbac/permission-groups', label: 'Permission Groups', icon: FolderTree, permission: 'permission_group.read' },
