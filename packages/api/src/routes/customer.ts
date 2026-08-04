@@ -4,7 +4,7 @@ import { AuthRequest, authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
 import { validate } from '../middleware/validation';
 import { createPetSchema, updatePetSchema } from '../middleware/schemas';
-import { Pet, Tag, Order, LocationEvent, Notification, FinderScan, User, generatePetId, Cart, Product, Subscription, Referral } from '@pawtag/db';
+import { Pet, Tag, Order, LocationEvent, Notification, FinderScan, User, generatePetId, Cart, Product, Subscription, Referral, Setting, AuditLog } from '@pawtag/db';
 import { calculateBundleDiscount } from '../services/bundle-pricing.service';
 import { validateReferralCode } from '../services/referral.service';
 import { createPaymentIntent } from '../services/stripe.service';
@@ -369,11 +369,105 @@ router.post('/tags/redeem', requirePermission('tag.create'), async (req: AuthReq
     tag.ownerId = new mongoose.Types.ObjectId(req.user!.id);
     tag.status = 'active';
     tag.activatedAt = new Date();
+
+    // Handle replacement tag: transfer pet linkage from old tag
+    if (tag.replacesTagId) {
+      const oldTag = await Tag.findById(tag.replacesTagId);
+      if (oldTag && oldTag.ownerId?.toString() === req.user!.id) {
+        // Transfer pet linkage
+        if (oldTag.petId) {
+          tag.petId = oldTag.petId;
+        }
+        // Deactivate old tag
+        oldTag.status = 'inactive';
+        oldTag.replacedByTagId = tag._id;
+        await oldTag.save();
+      }
+    }
+
     await tag.save();
 
     res.json({ success: true, data: tag });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to redeem tag' });
+  }
+});
+
+// --- Request Tag Replacement ---
+router.post('/tags/:id/request-replacement', requirePermission('tag.create'), async (req: AuthRequest, res: Response) => {
+  try {
+    const tag = await Tag.findOne({ _id: req.params.id, ownerId: req.user!.id, deletedAt: null });
+    if (!tag) {
+      res.status(404).json({ success: false, error: 'Tag not found or not owned by you' });
+      return;
+    }
+
+    const { reason } = req.body;
+    if (!reason) {
+      res.status(400).json({ success: false, error: 'Reason is required (lost, damaged, etc.)' });
+      return;
+    }
+
+    // Get replacement price from settings (default to 0 for free replacement)
+    const priceSetting = await Setting.findOne({ key: 'replacement_tag_price_nzd' });
+    const replacementPrice = priceSetting ? parseFloat(priceSetting.value) : 0;
+
+    // Find a tag product to use for the replacement order (or use a generic replacement item)
+    const tagProduct = await Product.findOne({ isTagProduct: true, isActive: true });
+
+    // Create a replacement order
+    const orderCount = await Order.countDocuments();
+    const orderNumber = `PT-${String(orderCount + 1).padStart(6, '0')}`;
+
+    const orderItems = tagProduct
+      ? [{
+          productId: tagProduct._id,
+          productName: `${tagProduct.name} (Replacement)`,
+          quantity: 1,
+          unitPrice: replacementPrice,
+          totalPrice: replacementPrice,
+        }]
+      : [{
+          productId: new mongoose.Types.ObjectId(),
+          productName: 'PawTag Replacement',
+          quantity: 1,
+          unitPrice: replacementPrice,
+          totalPrice: replacementPrice,
+        }];
+
+    const order = await Order.create({
+      orderNumber,
+      userId: req.user!.id,
+      items: orderItems,
+      status: 'pending',
+      payment: {
+        method: 'card',
+        status: 'pending',
+        amount: replacementPrice,
+        currency: 'NZD',
+      },
+      shippingAddress: {
+        line1: 'Same as previous order',
+        city: 'Auckland',
+        state: 'Auckland',
+        zip: '1010',
+        country: 'NZ',
+      },
+    });
+
+    // Create audit log
+    await AuditLog.create({
+      userId: req.user!.id,
+      action: 'request_tag_replacement',
+      entity: 'Tag',
+      entityId: tag._id.toString(),
+      changes: { reason, replacementOrderNumber: orderNumber },
+    });
+
+    res.json({ success: true, data: { order, replacementPrice } });
+  } catch (err: any) {
+    console.error('Replacement request error:', err.message, err.stack);
+    res.status(500).json({ success: false, error: 'Failed to request replacement' });
   }
 });
 

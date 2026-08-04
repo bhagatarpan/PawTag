@@ -271,6 +271,8 @@ export interface Tag {
   ownerId?: string;
   orderId?: string;
   nfcEnabled?: boolean;
+  replacesTagId?: string;
+  replacedByTagId?: string;
   status: TagStatus;
   qrCodeUrl?: string;
   tagType?: 'qr' | 'nfc';

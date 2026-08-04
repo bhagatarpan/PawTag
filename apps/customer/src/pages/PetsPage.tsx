@@ -244,6 +244,24 @@ export default function PetsPage() {
                       {pet.petId && <p className="text-sm text-gray-400 font-mono">ID: {pet.petId}</p>}
                       {pet.linkedTag && <p className="text-sm text-primary-600 font-mono mt-0.5">Tag: {pet.linkedTag.tagId}<span className={`ml-1.5 inline-block w-2 h-2 rounded-full ${pet.linkedTag.status === 'active' ? 'bg-green-500' : pet.linkedTag.status === 'lost' ? 'bg-red-500' : 'bg-gray-400'}`} /><span className="ml-1 text-gray-400 font-sans">({pet.linkedTag.status})</span></p>}
                       {!pet.linkedTag && <p className="text-sm text-gray-300 mt-0.5">No tag linked</p>}
+                      {pet.linkedTag && pet.linkedTag.status === 'active' && (
+                        <button
+                          onClick={async () => {
+                            const reason = prompt('Why do you need a replacement? (e.g., lost, damaged)');
+                            if (reason) {
+                              try {
+                                await api.post(`/customer/tags/${pet.linkedTag._id}/request-replacement`, { reason });
+                                alert('Replacement request submitted! Check your orders for the replacement tag.');
+                              } catch (err: any) {
+                                alert(err.response?.data?.error || 'Failed to request replacement');
+                              }
+                            }
+                          }}
+                          className="text-xs text-red-500 hover:text-red-700 mt-1 underline"
+                        >
+                          Report lost or damaged tag
+                        </button>
+                      )}
                       {pet.linkedTag?.subscription && (
                         <div className="mt-2 p-2 bg-teal-50 rounded-lg border border-teal-100">
                           <div className="flex items-center gap-1.5 text-xs text-teal-700 font-medium">
