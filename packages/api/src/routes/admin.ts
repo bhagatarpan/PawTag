@@ -38,6 +38,7 @@ import {
   Subscription,
   Invoice,
   TagExpiryNotification,
+  Notification,
 } from '@pawtag/db';
 import { hashPassword } from '../services/auth.service';
 
@@ -2193,6 +2194,45 @@ router.get('/tag-expiry-notifications/stats', requirePermission('subscription.re
     res.json({ success: true, data: { unacknowledged, critical, total } });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to get stats' });
+  }
+});
+
+// --- Admin Notifications ---
+router.get('/notifications', requirePermission('notification.read'), async (_req: AuthRequest, res: Response) => {
+  try {
+    const notifications = await Notification.find({ audience: 'admin' })
+      .sort({ createdAt: -1 })
+      .limit(50);
+    res.json({ success: true, data: notifications });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to fetch notifications' });
+  }
+});
+
+router.get('/notifications/unread-count', requirePermission('notification.read'), async (_req: AuthRequest, res: Response) => {
+  try {
+    const count = await Notification.countDocuments({ audience: 'admin', read: false });
+    res.json({ success: true, data: { count } });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to get unread count' });
+  }
+});
+
+router.put('/notifications/:id/read', requirePermission('notification.update'), async (req: AuthRequest, res: Response) => {
+  try {
+    await Notification.findByIdAndUpdate(req.params.id, { read: true });
+    res.json({ success: true });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to mark notification as read' });
+  }
+});
+
+router.put('/notifications/mark-all-read', requirePermission('notification.update'), async (_req: AuthRequest, res: Response) => {
+  try {
+    await Notification.updateMany({ audience: 'admin', read: false }, { read: true });
+    res.json({ success: true });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to mark all as read' });
   }
 });
 

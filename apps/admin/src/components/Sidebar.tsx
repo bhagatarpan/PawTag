@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import {
   LayoutDashboard,
   Users,
@@ -31,8 +32,10 @@ import {
   FileSignature,
   Gift,
   AlertTriangle,
+  Bell,
 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
+import api from '../lib/api';
 
 interface SidebarLink {
   to: string;
@@ -54,6 +57,7 @@ const mainLinks: SidebarLink[] = [
 ];
 
 const adminLinks: SidebarLink[] = [
+  { to: '/notifications', label: 'Notifications', icon: Bell },
   { to: '/referrals', label: 'Referrals', icon: Gift },
   { to: '/tag-expiry-notifications', label: 'Tag Expiry Alerts', icon: AlertTriangle },
   { to: '/rbac/roles', label: 'Roles', icon: Shield, permission: 'role.read' },
@@ -83,6 +87,18 @@ const cmsLinks: SidebarLink[] = [
 
 export default function Sidebar() {
   const { hasPermission } = useAuth();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    const fetchCount = () => {
+      api.get('/admin/notifications/unread-count')
+        .then((res) => setUnreadCount(res.data.data?.count || 0))
+        .catch(() => {});
+    };
+    fetchCount();
+    const interval = setInterval(fetchCount, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   const filteredMainLinks = mainLinks.filter(
     (link) => !link.permission || hasPermission(link.permission),
@@ -144,7 +160,12 @@ export default function Sidebar() {
                 }
               >
                 <link.icon size={18} />
-                {link.label}
+                <span className="flex-1">{link.label}</span>
+                {link.to === '/notifications' && unreadCount > 0 && (
+                  <span className="bg-red-500 text-white text-xs font-bold rounded-full px-1.5 py-0.5 min-w-[18px] text-center">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
               </NavLink>
             ))}
           </>

@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { Subscription, Invoice, Tag, Order, User, Product, Cart } from '@pawtag/db';
+import { Subscription, Invoice, Tag, Order, User, Product, Cart, Notification } from '@pawtag/db';
 
 const router = Router();
 
@@ -134,6 +134,57 @@ async function handlePaymentIntentSucceeded(paymentIntent: any) {
     } catch (refError) {
       console.error('Referral processing error:', refError);
     }
+  }
+
+  // Admin notification (idempotent — skip if already notified for this PaymentIntent)
+  try {
+    const existingAdminNotif = await Notification.findOne({
+      audience: 'admin',
+      'data.paymentIntentId': paymentIntent.id,
+    });
+    if (!existingAdminNotif) {
+      const adminNotif = await Notification.create({
+        userId: order.userId,
+        audience: 'admin',
+        type: 'new_order',
+        title: 'New order received',
+        message: `Order ${orderNumber} — $${order.payment.amount.toFixed(2)} NZD`,
+        data: {
+          orderId: order._id.toString(),
+          orderNumber,
+          amount: order.payment.amount,
+          paymentIntentId: paymentIntent.id,
+          customerName: user?.fullName || 'Unknown',
+          customerEmail: user?.email || 'Unknown',
+        },
+        priority: 'high',
+        channel: 'alert',
+      });
+
+      // Send admin email
+      const adminEmail = process.env.ADMIN_ALERT_EMAIL;
+      if (adminEmail) {
+        try {
+          const { sendMail } = await import('../services/email.service');
+          await sendMail(
+            adminEmail,
+            `New PawTag order: ${orderNumber}`,
+            `<h2>New Order Received</h2>
+             <p><strong>Order:</strong> ${orderNumber}</p>
+             <p><strong>Customer:</strong> ${user?.fullName || 'Unknown'} (${user?.email || 'Unknown'})</p>
+             <p><strong>Amount:</strong> $${order.payment.amount.toFixed(2)} NZD</p>
+             <p><strong>Payment ID:</strong> ${paymentIntent.id}</p>`,
+          );
+        } catch (emailErr) {
+          console.error('Admin notification email error:', emailErr);
+        }
+      }
+      console.log(`[Webhook] Admin notification created for order ${orderNumber}`);
+    } else {
+      console.log(`[Webhook] Admin notification already exists for PaymentIntent ${paymentIntent.id}`);
+    }
+  } catch (adminError) {
+    console.error('Admin notification error:', adminError);
   }
 
   // Send order confirmation email
