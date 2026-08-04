@@ -1908,10 +1908,437 @@ anything, remains before commercial launch.
 
 ---
 
+## Part 8B — Affiliate Marketplace Track (Phases 27–32)
+
+**Added after the founder's original 26-phase roadmap. This is a separate, parallel track — not a change to Phases 1–26.**
+
+### Architecture decision: keep this completely separate from the existing shop
+
+You want to sell pet products, food, and toys **without holding stock** — a customer clicks through to a partner retailer's site, buys there, and you earn a commission. This is architecturally a different business from your tag/subscription shop (Phases 5–13), which owns payment, inventory, and fulfillment end-to-end. Trying to force affiliate products through the existing `Order`/`Product`/Stripe/shipping system would corrupt the order state machine built in Phase 6 for real fulfillment — an affiliate "order" never gets packed, shipped, or delivered by you, so it shouldn't live in the same table pretending it might.
+
+**Decision: build a new, self-contained affiliate module alongside the existing shop, not inside it.**
+
+New data model (all new, nothing existing changes):
+- **`AffiliatePartner`** — one record per affiliate network/program (name, commission structure, API credentials, payout terms)
+- **`AffiliateProduct`** — the products you display (title, image, display price, category, link to a `AffiliatePartner`, destination URL template)
+- **`AffiliateClick`** — every time a visitor clicks "Buy on [Partner]," logged with a generated tracking ID, timestamp, and (if logged in) your user's ID
+- **`AffiliateConversion`** — a completed purchase reported back by the network, matched to a click, with the commission amount and payout status (`pending` → `approved` → `paid`)
+
+**How the money flow actually works** (so you know what you're signing up for): visitor clicks a product on PawTag → hits your own `/go/:slug` redirect (this is the only part *you* build) → lands on the partner's real product page with a tracking ID embedded in the URL → they buy there, on their site, with their payment system — you never touch money, stock, or shipping for these items → the affiliate network tells you, days or weeks later (via a webhook or a report you pull), that a sale happened and what you earned → you get paid by the network on their schedule (typically monthly, net-30 or longer), not per-transaction. **This means affiliate revenue is inherently delayed and not instantly verifiable** — plan cash flow accordingly, this isn't a Stripe-speed payment.
+
+**Which affiliate network(s) to use — recommendation:** don't try to sign individual deals with every pet brand. Two-track approach:
+1. **Amazon Associates** first — fastest to get approved, by far the largest pet product catalog (food, toys, accessories), well-documented API for generating tracking links. Good for launch.
+2. **One aggregator network** (Awin or Impact — both are well-established, industry-standard affiliate networks) added once you have some traffic — these give you one API/dashboard covering many individual pet retailers (Chewy, PetSmart-type brands, boutique pet brands) instead of separate integrations for each. This is the same "avoid duplicate technology" principle from Part 1: one integration pattern (the `AffiliatePartner` model), many networks plugged into it.
+
+**Legal — do not skip this:** in the US, FTC rules (and equivalent consumer-protection rules elsewhere) require a **clear and conspicuous disclosure** near affiliate links — e.g. "As an Amazon Associate, PawTag earns from qualifying purchases" — not buried only in a footer or terms page. This is built into Phase 31 below, not treated as an afterthought.
+
+**What does NOT change in Phases 1–26:** nothing. Your tag/subscription shop keeps its own Stripe checkout, its own `Order` state machine, its own shipping integration. The affiliate module is additive — it can be built, tested, and even launched independently of where you are in the original 26 phases, though it makes sense to sequence it after your core platform (Phase 26) is stable, since it reuses the admin app, the design system, and the deployed infrastructure you'll already have in place.
+
+---
+
+### Phase 27 — Affiliate data model & network account setup
+
+**Objective:** Create the `AffiliatePartner`, `AffiliateProduct`, `AffiliateClick`, and `AffiliateConversion` models, and integrate the Amazon Associates link-generation API as the first partner.
+**Why this phase comes now:** Foundation for everything else in this track; nothing else in Phases 28–31 can be built without these models existing.
+**Scope:** New Mongoose models, a new `packages/api/src/services/affiliate/` directory with a partner-agnostic interface and an Amazon Associates implementation.
+**Files likely affected:** `packages/db/src/models/AffiliatePartner.ts`, `AffiliateProduct.ts`, `AffiliateClick.ts`, `AffiliateConversion.ts` (new), `packages/api/src/services/affiliate/`.
+**Database changes:** Four new collections, as described above.
+**API changes:** `POST /api/admin/affiliate/partners` and `POST /api/admin/affiliate/products` (admin-only CRUD, following the exact permission-gated pattern already used for `Product` in `admin.ts`).
+**UI changes:** None yet (admin UI for managing these comes in Phase 28).
+**Testing required:** Unit tests for the Amazon link-generation service; integration tests for the new admin CRUD routes.
+**Acceptance criteria:** An admin can create an `AffiliatePartner` record for Amazon Associates and an `AffiliateProduct` pointing at a real Amazon product, and the system generates a correctly-tagged Amazon affiliate link for it.
+**Risks:** Requires a real, approved Amazon Associates account (external/business dependency — Amazon's approval process itself takes time and requires some initial traffic/content, flag this clearly to the founder as a prerequisite, not something the AI can obtain).
+**Rollback plan:** New, additive models — safe to revert entirely with no impact on the existing shop.
+**Definition of Done:** Tests green; one real Amazon affiliate link manually verified to resolve correctly and carry the tracking tag.
+
+```
+IMPLEMENTATION PROMPT — PHASE 27
+
+You are working in the PawTag monorepo. This is Phase 27, the first phase of the new Affiliate
+Marketplace track, built on top of the already-complete original 26-phase roadmap. Do ONLY the
+work below.
+
+PREREQUISITE (founder/external action): a real, approved Amazon Associates account and its
+tracking ID are needed for live verification. If unavailable, implement the full service using
+Amazon's documented link format and Product Advertising API structure, and clearly flag live
+verification as pending real credentials.
+
+TASK:
+1. Create four new Mongoose models in `packages/db/src/models/`, following the exact
+   conventions already used by existing models (timestamps, soft-delete pattern if used
+   elsewhere, exported from `packages/db/src/index.ts`):
+   - `AffiliatePartner.ts`: `name`, `network` (enum: `amazon_associates`, `awin`, `impact`,
+     `other`), `trackingId` (your affiliate/tracking ID with this partner), `apiCredentials`
+     (encrypted or reference to a secret, not plaintext — follow whatever secret-handling
+     pattern already exists in the codebase for third-party API keys, e.g. how the Stripe
+     secret key is read from env vars, and do not store raw API secrets in the database),
+     `commissionRateEstimate` (number, informational only — actual commission comes from the
+     network's conversion reports, not something you set), `active` (boolean).
+   - `AffiliateProduct.ts`: `title`, `description`, `imageUrl`, `displayPrice`, `category`,
+     `partnerId` (ref `AffiliatePartner`), `destinationUrl` (the partner's actual product page),
+     `slug` (unique, used in the Phase 29 redirect route), `active` (boolean).
+   - `AffiliateClick.ts`: `affiliateProductId` (ref), `userId` (ref `User`, nullable — not
+     every clicker is logged in), `trackingToken` (unique generated ID for this click),
+     `clickedAt`, `userAgent`, `ipHash` (hash the IP, don't store it raw, for basic privacy).
+   - `AffiliateConversion.ts`: `affiliateClickId` (ref, nullable if the network doesn't support
+     click-level matching for this partner), `affiliateProductId` (ref), `partnerId` (ref),
+     `orderValueReported` (number), `commissionAmount` (number), `status` (enum: `pending`,
+     `approved`, `paid`, `reversed`), `reportedAt`, `paidAt` (nullable), `externalConversionId`
+     (the network's own ID for this conversion, for reconciliation).
+2. Create `packages/api/src/services/affiliate/types.ts` defining a partner-agnostic interface:
+   `generateAffiliateLink(product: AffiliateProduct, trackingToken: string): string`.
+3. Create `packages/api/src/services/affiliate/amazonAssociates.ts` implementing that interface
+   for Amazon: takes a product's ASIN or destination URL and the account's Associates tracking
+   ID, and returns a correctly-formatted Amazon affiliate link (`https://www.amazon.com/dp/
+   {ASIN}?tag={trackingId}` pattern, or via the Product Advertising API if you choose to
+   integrate it for live pricing — a simple tagged-URL approach is acceptable for this phase;
+   live pricing sync is out of scope here). If no real tracking ID is configured in the
+   environment, generate a clearly-marked placeholder link for local dev/testing.
+4. Add admin-only CRUD routes in a new `packages/api/src/routes/admin-affiliate.ts`:
+   `POST/GET/PUT/DELETE /partners` and `POST/GET/PUT/DELETE /products`, gated by an appropriate
+   permission (add a new `affiliate.manage` permission following the existing RBAC pattern from
+   `packages/db/src/models/Permission.ts`).
+5. Write unit tests for the Amazon link-generation function (correct tag appended, handles
+   missing tracking ID gracefully) and integration tests for the new admin CRUD routes
+   (creation, permission rejection, validation failure — same pattern as other admin routes).
+
+TESTS TO RUN: `pnpm test:unit`, `pnpm test:integration`, `pnpm typecheck`. All must pass.
+
+FILES TO UPDATE: four new model files, new `packages/api/src/services/affiliate/` directory,
+new `admin-affiliate.ts` route file, `packages/db/src/models/Permission.ts` (new permission).
+
+DOCUMENTATION: create `docs/affiliate-marketplace.md` documenting the four new models, the
+partner-agnostic service interface, and how to add a second network later (e.g. Awin) by
+implementing the same interface.
+
+COMPLETION CRITERIA: all new tests pass. If a real Amazon Associates tracking ID is available,
+generate and manually verify one real affiliate link resolves correctly; otherwise state this is
+pending account approval, which is a founder action.
+```
+
+---
+
+### Phase 28 — Affiliate storefront (browse & product pages)
+
+**Objective:** Build the customer-facing browsing experience for affiliate products on `apps/web` — category browsing, product detail, and a clear "Buy on [Partner]" call-to-action, visually distinct from your own tag/subscription products.
+**Why this phase comes now:** Needs the Phase 27 data model to exist first; this is the first customer-visible piece of the affiliate track.
+**Scope:** New storefront pages/components in `apps/web`, reusing the existing design system rather than introducing a new one.
+**Files likely affected:** New pages/components under `apps/web/src/pages/`, `GET /api/affiliate/products` (public route).
+**Database changes:** None beyond Phase 27.
+**API changes:** `GET /api/affiliate/products` (public, paginated, filterable by category), `GET /api/affiliate/products/:slug`.
+**UI changes:** New "Shop" or "Affiliate Marketplace" section on `apps/web` with category filters and product cards; each card clearly labeled as sold by the partner, not by PawTag directly.
+**Testing required:** Integration tests for the new public routes (pagination, filtering, only returns `active` products).
+**Acceptance criteria:** A visitor can browse affiliate products by category and reach a product detail page without any account or login.
+**Risks:** Low.
+**Rollback plan:** `git revert`; purely additive.
+**Definition of Done:** Tests green; manual browse-through confirms the experience is clear and doesn't get confused with your own checkout flow.
+
+```
+IMPLEMENTATION PROMPT — PHASE 28
+
+You are working in the PawTag monorepo. This is Phase 28 of the Affiliate Marketplace track
+(Phase 27 — data model and Amazon integration — is complete). Do ONLY the work below.
+
+TASK:
+1. Add `GET /api/affiliate/products` (public, no auth) in `packages/api/src/routes/`, returning
+   paginated `AffiliateProduct` records where `active: true`, filterable by `category` query
+   param, and `GET /api/affiliate/products/:slug` for a single product's detail. Neither route
+   exposes `AffiliatePartner.apiCredentials` or any other sensitive partner field — return only
+   the fields needed for display (title, description, imageUrl, displayPrice, category,
+   partner's display name only).
+2. In `apps/web`, add a new storefront section (e.g. `/shop` or `/marketplace` — pick whichever
+   fits the existing site's navigation/IA best, check `apps/web/src/App.tsx` or router config
+   for the existing route structure and follow its conventions) with: a category filter/browse
+   view calling the new products list route, and a product detail page calling the single-
+   product route.
+3. On each product card and detail page, add a clearly labeled "Buy on {Partner Name}" button
+   — this does NOT link directly to the partner yet (that's Phase 29's redirect service); for
+   this phase, it's acceptable for the button to link to a placeholder `/go/{slug}` path that
+   doesn't yet do anything, since Phase 29 implements it.
+4. Visually distinguish affiliate products from your own tag/subscription products — a small
+   badge or label such as "Sold by {Partner}" on every affiliate product card, reusing existing
+   design tokens from the frontend-design system rather than introducing new colors/styles.
+5. Write integration tests for both new routes: pagination works correctly, category filtering
+   works, inactive products are excluded, and the response never includes
+   `AffiliatePartner.apiCredentials` or other sensitive fields (assert this explicitly).
+
+TESTS TO RUN: `pnpm test:integration`, `pnpm typecheck`. All must pass.
+
+FILES TO UPDATE: new public affiliate-products route file, new `apps/web` storefront
+pages/components.
+
+COMPLETION CRITERIA: integration tests pass, explicitly including the assertion that sensitive
+partner credential fields are never exposed in the public API response. Manually confirm the
+new storefront section renders correctly and is clearly distinguishable from the tag shop.
+```
+
+---
+
+### Phase 29 — Click tracking & redirect service
+
+**Objective:** Build the `/go/:slug` redirect route that logs an `AffiliateClick` and sends the visitor on to the partner's site with the correct tracking parameters attached.
+**Why this phase comes now:** This is the actual mechanism that earns you money — needs the storefront (Phase 28) to have somewhere to link from.
+**Scope:** One server route, fast and reliable (this is on the critical path of every potential sale — it must not be slow or flaky).
+**Files likely affected:** New `packages/api/src/routes/affiliate-redirect.ts`.
+**Database changes:** None beyond Phase 27.
+**API changes:** `GET /go/:slug` — public, unauthenticated, immediately issues an HTTP redirect.
+**UI changes:** None (server-side redirect, not a page).
+**Testing required:** Integration test confirming a click is logged and the redirect target contains the correct affiliate tracking parameters.
+**Acceptance criteria:** Every click through this route is logged before the redirect fires, and the destination URL always carries your tracking tag.
+**Risks:** This route must be fast (sub-100ms) since it sits between a customer's click and a purchase — a slow redirect loses sales. Keep the click-logging write non-blocking where safe (e.g., don't make the customer wait on a slow write) without sacrificing data integrity.
+**Rollback plan:** `git revert`; if this route breaks, affiliate links simply stop resolving — no impact on the core tag shop.
+**Definition of Done:** Tests green; a real manual click-through to Amazon (if credentials are live) resolves correctly and appears in the `AffiliateClick` log.
+
+```
+IMPLEMENTATION PROMPT — PHASE 29
+
+You are working in the PawTag monorepo. This is Phase 29 of the Affiliate Marketplace track
+(Phases 27–28 complete). Do ONLY the work below.
+
+TASK:
+1. Create `packages/api/src/routes/affiliate-redirect.ts` with `GET /go/:slug` (public route,
+   mounted near the root, not under `/api`, since this is meant to be a short, clean URL a
+   customer clicks — e.g. `https://pawtag.co.nz/go/some-product-slug`). On request: look up the
+   `AffiliateProduct` by `slug` (404 with a friendly message if not found or inactive), generate
+   a `trackingToken` (a short random ID), create an `AffiliateClick` record (product ID, user ID
+   if the request includes a valid session/JWT — check for it but do not require
+   authentication, hashed IP, user agent, the tracking token), call the appropriate
+   `affiliate` service (from Phase 27, selected based on the product's `AffiliatePartner.network`
+   field) to generate the correctly-tagged destination URL including the tracking token as a
+   sub-ID parameter where the network's URL format supports it (Amazon's standard tag format
+   doesn't support arbitrary sub-IDs without the Product Advertising API or Amazon's
+   "AssociateTag + ascsubtag" parameter — use `ascsubtag` if targeting Amazon, since it exists
+   specifically for this purpose), and issue an HTTP 302 redirect to that URL.
+2. Ensure the `AffiliateClick` write happens before the redirect is issued (don't fire-and-
+   forget it in a way that could lose the record if the process is interrupted), but keep the
+   whole handler fast — a single indexed insert should already be well under 100ms; do not add
+   any unnecessary synchronous work (e.g. don't call an external API to "verify" the link before
+   redirecting — trust the pre-generated destination URL).
+3. Add rate limiting to this route to prevent it being used to spam-click and inflate click
+   counts (reuse the existing rate-limiter pattern from `auth.ts`, tuned appropriately for a
+   public high-traffic route — more permissive than login, since real users will click this
+   often, but enough to block obvious abuse).
+4. Write an integration test: request `/go/{valid-slug}` and assert (a) a 302 response with a
+   `Location` header pointing at the expected partner destination URL including the tracking
+   token/subtag, and (b) exactly one `AffiliateClick` record was created with the correct
+   product reference. Also test the 404 case for an unknown or inactive slug.
+
+TESTS TO RUN: `pnpm test:integration`, `pnpm typecheck`. All must pass.
+
+FILES TO UPDATE: new `affiliate-redirect.ts` route file, mounted in the main Express app setup.
+
+COMPLETION CRITERIA: integration tests pass. If a real Amazon Associates tracking ID is
+configured, manually click through a real `/go/:slug` link and confirm it lands on Amazon with
+the tag and subtag both present in the URL, and that the corresponding `AffiliateClick` record
+appears in the database; otherwise state this specific check is pending real credentials.
+```
+
+---
+
+### Phase 30 — Conversion & commission ingestion
+
+**Objective:** Receive conversion/commission data back from the affiliate network (via webhook if the network supports it, or a scheduled report pull if not) and record it as `AffiliateConversion`, matched back to the original click where possible.
+**Why this phase comes now:** This is where affiliate revenue actually becomes visible in your system — needs clicks (Phase 29) to exist to match against.
+**Scope:** One ingestion path per network integrated (Amazon first). Amazon Associates does not offer a real-time webhook — commission data is available via periodic reports/API pull, so this phase implements a scheduled job (reusing the `node-cron` pattern from the original roadmap's Phase 19) rather than a webhook for Amazon specifically; document this network-specific difference clearly, since a future network (e.g. Awin) may support real webhooks and should use them when it does.
+**Files likely affected:** New `packages/api/src/jobs/affiliateConversionSync.ts`, `packages/api/src/services/affiliate/amazonAssociates.ts` (extend).
+**Database changes:** None beyond Phase 27.
+**API changes:** None public; internal job only (add a webhook endpoint here too, structured generically, for future networks that do support them).
+**UI changes:** None yet (dashboard is Phase 31).
+**Testing required:** Unit/integration tests using a mocked network API response, confirming conversions are correctly parsed, matched to clicks, and not double-recorded on repeated syncs.
+**Acceptance criteria:** Running the sync job against a (mocked, then real) network report produces accurate `AffiliateConversion` records with no duplicates on re-runs.
+**Risks:** Amazon's reporting has a delay (commissions aren't visible same-day) — set expectations correctly in the admin dashboard copy (Phase 31), not as a bug.
+**Rollback plan:** `git revert`; conversion data already ingested is historical and unaffected.
+**Definition of Done:** Tests green against mocked data; if live credentials exist, one real sync run manually verified against the actual Amazon Associates dashboard numbers.
+
+```
+IMPLEMENTATION PROMPT — PHASE 30
+
+You are working in the PawTag monorepo. This is Phase 30 of the Affiliate Marketplace track
+(Phases 27–29 complete). Do ONLY the work below.
+
+NOTE: Amazon Associates does not provide real-time conversion webhooks — commission data must
+be pulled periodically via their reporting interface/API, and there is an inherent reporting
+delay (commissions typically aren't visible until at least the next day). Build accordingly;
+this is expected network behavior, not something to work around.
+
+TASK:
+1. Extend `packages/api/src/services/affiliate/amazonAssociates.ts` with a function that
+   fetches recent conversion/commission data. If using Amazon's Product Advertising API or
+   Associates reporting export, implement against its actual documented format; if no live
+   credentials are configured, implement against a clearly-defined mock response shape and add
+   a code comment stating live integration needs a real Associates account with reporting
+   access enabled.
+2. Create `packages/api/src/jobs/affiliateConversionSync.ts`: for each active `AffiliatePartner`
+   with `network: 'amazon_associates'`, call the fetch function above, and for each returned
+   conversion record: attempt to match it to an existing `AffiliateClick` via the tracking
+   subtag if present in the network's report; if no subtag match is available (common — not
+   every network reliably passes sub-IDs back), still record the `AffiliateConversion` with
+   `affiliateClickId: null` and match it to the `AffiliateProduct` by ASIN/product reference
+   instead, so revenue is still tracked even without perfect click attribution. Use the
+   network's `externalConversionId` to prevent creating a duplicate `AffiliateConversion` record
+   on repeated sync runs (upsert by that field, not a plain insert).
+3. Schedule this job daily via `node-cron` (same pattern as the original roadmap's low-stock
+   job), guarded against running during tests.
+4. Design the ingestion function generically enough that a future network integration (e.g.
+   Awin, which does support real-time postback webhooks) could plug in either via this same
+   scheduled-pull pattern or via a new `POST /api/webhooks/affiliate/:network` endpoint — add
+   that webhook route now as a stub that validates a shared-secret signature and calls the same
+   underlying "record a conversion" function used by the scheduled job, so the recording logic
+   isn't duplicated between the two entry paths even though only the pull-based Amazon path is
+   live in this phase.
+5. Write tests using a mocked Amazon API response: first sync creates the expected
+   `AffiliateConversion` records with correct matching; running the same sync again with the
+   same mocked data does not create duplicates (asserts on `externalConversionId` uniqueness).
+
+TESTS TO RUN: `pnpm test:unit`, `pnpm test:integration`, `pnpm typecheck`. All must pass.
+
+FILES TO UPDATE: `amazonAssociates.ts` (extended), new `affiliateConversionSync.ts` job, new
+generic affiliate webhook route stub.
+
+COMPLETION CRITERIA: tests pass against mocked data, explicitly proving no duplicate conversions
+on repeated sync runs. If live Amazon Associates reporting access is available, run the sync
+once for real and manually cross-check the resulting numbers against the Amazon Associates
+dashboard; otherwise state this is pending reporting-API access, a founder/account action.
+```
+
+---
+
+### Phase 31 — Admin affiliate revenue dashboard & legal disclosure
+
+**Objective:** Give the founder visibility into affiliate performance (clicks, conversions, pending/paid commission) in the admin app, and implement the FTC-style affiliate disclosure required by law wherever affiliate links appear.
+**Why this phase comes now:** Closes the loop — Phases 27–30 build the plumbing, this phase makes it visible and makes the whole thing legally compliant before real traffic hits it.
+**Scope:** Extend the Phase 18-style admin analytics pattern with affiliate-specific metrics; add a persistent, clearly visible disclosure component wherever affiliate products/links are shown on `apps/web`.
+**Files likely affected:** New `packages/api/src/routes/admin-affiliate.ts` additions (or a new analytics sub-route), `apps/admin/src/pages/`, `apps/web` affiliate storefront components from Phase 28.
+**Database changes:** None beyond Phase 27.
+**API changes:** `GET /api/admin/affiliate/overview` (clicks/conversions/commission this week/month, top-performing products, pending vs. paid commission totals).
+**UI changes:** New admin dashboard section; a disclosure banner/label on every affiliate storefront page and product card.
+**Testing required:** Integration test for the new analytics endpoint against seeded click/conversion data.
+**Acceptance criteria:** The founder can see, without touching the database, how much the affiliate program has earned and what's still pending payout from the network; every page displaying affiliate products shows a clear, honest disclosure.
+**Risks:** Getting the legal disclosure wrong is a real compliance risk, not just a nice-to-have — write the disclosure text plainly and make sure it's visually adjacent to the links, not hidden.
+**Rollback plan:** `git revert`.
+**Definition of Done:** Tests green; disclosure visible and readable on every relevant page, confirmed manually.
+
+```
+IMPLEMENTATION PROMPT — PHASE 31
+
+You are working in the PawTag monorepo. This is Phase 31 of the Affiliate Marketplace track
+(Phases 27–30 complete). Do ONLY the work below.
+
+TASK:
+1. Add `GET /api/admin/affiliate/overview` in `packages/api/src/routes/admin-affiliate.ts`
+   (gated by the `affiliate.manage` permission from Phase 27), returning: total clicks and
+   conversions for today/this week/this month, total commission by status (`pending`,
+   `approved`, `paid`) as separate sums, and a list of the top 10 `AffiliateProduct`s by click
+   count and by commission earned. Use a Mongoose aggregation, following the same pattern
+   already used in the core roadmap's Phase 18 admin analytics route — mirror its structure and
+   conventions for consistency rather than inventing a new style.
+2. In `apps/admin`, add a new "Affiliate" section to the dashboard (or a dedicated page) showing
+   these metrics as labeled cards plus a simple table of top-performing products. Include a
+   brief note in the UI itself that Amazon commission data has a reporting delay (per Phase 30)
+   so the founder doesn't mistake a lag in numbers for a bug.
+3. Create a reusable `AffiliateDisclosure` component in `apps/web` (and reuse it wherever
+   affiliate content might appear on other frontends later) with text along the lines of: "This
+   page contains affiliate links. If you make a purchase through one of these links, PawTag may
+   earn a commission at no extra cost to you." Place this component: (a) once, prominently, at
+   the top of the affiliate storefront/marketplace section from Phase 28, and (b) as a small,
+   always-visible label directly on or immediately next to every individual "Buy on {Partner}"
+   button — not only as a single banner elsewhere on the page, since disclosure needs to be
+   visible at the point of the link itself, not just somewhere on the page.
+4. Write an integration test for the new analytics endpoint: seed known clicks and conversions
+   across multiple products and statuses, call the endpoint, and assert every returned number
+   exactly matches the seeded data (mirror the exact-match assertion style used in the core
+   roadmap's Phase 18 test).
+
+TESTS TO RUN: `pnpm test:integration`, `pnpm typecheck`, `pnpm test`. All must pass.
+
+FILES TO UPDATE: `admin-affiliate.ts` (new overview route), admin dashboard frontend, new
+`AffiliateDisclosure` component in `apps/web`, applied to the Phase 28 storefront pages.
+
+DOCUMENTATION: add a short section to `docs/affiliate-marketplace.md` (from Phase 27) explaining
+the disclosure requirement and confirming where it's implemented, so this isn't accidentally
+removed in a future redesign without someone realizing it's a legal requirement, not decoration.
+
+COMPLETION CRITERIA: integration test passes with exact-match assertions. Manually confirm the
+disclosure component is visible on the marketplace page and next to every individual affiliate
+buy button — report this check explicitly, since it's the compliance-critical part of this
+phase.
+```
+
+---
+
+### Phase 32 — Mobile app affiliate browsing (optional, sequence after Phase 24)
+
+**Objective:** Extend the pet-owner mobile app (from the core roadmap's Stage H) with the same affiliate browsing and click-through experience as the web storefront.
+**Why this phase comes now:** Optional/lower priority — only build this once both the mobile app's core features (core roadmap Phase 24) and the affiliate storefront (Phase 28) independently exist and are stable. Sequence flexibly; this doesn't block anything else.
+**Scope:** Mobile screens mirroring Phase 28's browse/detail pages, using the mobile app's existing API client pattern; clicks open the `/go/:slug` redirect (Phase 29) in the device's browser or an in-app browser view rather than the app's own webview trying to handle partner checkout.
+**Files likely affected:** New screens under `apps/mobile/src/`.
+**Database changes:** None.
+**API changes:** None (reuses the public routes from Phases 28–29).
+**UI changes:** N/A (new mobile screens).
+**Testing required:** Manual device testing that tapping a product opens the correct partner page in the system browser (not trapped inside the app, which can cause issues with some retailers' checkout/payment flows).
+**Acceptance criteria:** A pet owner can browse and buy affiliate products from within the mobile app, with the actual purchase happening in a full, trusted browser context.
+**Risks:** Low — mostly a UI-consumption phase of already-built APIs.
+**Rollback plan:** Additive, no impact on other app features.
+**Definition of Done:** Verified on a real device that tapping through leaves the app cleanly and lands correctly on the partner's site.
+
+```
+IMPLEMENTATION PROMPT — PHASE 32
+
+You are working in the PawTag monorepo. This is Phase 32 of the Affiliate Marketplace track.
+Prerequisites: the mobile app's core features (original roadmap Phase 24) and the affiliate
+storefront + redirect service (Phases 28–29 of this track) must all be complete. Do ONLY the
+work below.
+
+TASK:
+1. Build Affiliate Browse and Product Detail screens in `apps/mobile`, calling the existing
+   public `GET /api/affiliate/products` and `GET /api/affiliate/products/:slug` routes from
+   Phase 28 — mirror the web storefront's category filtering and layout conventions, adapted to
+   mobile UI patterns already established elsewhere in the app (Phase 23/24 screens).
+2. Add the same `AffiliateDisclosure`-equivalent text from Phase 31 to these mobile screens —
+   duplicate the exact wording used on web for consistency, adapted to a mobile-appropriate
+   compact placement (e.g. a persistent small banner at the top of the browse screen, plus a
+   one-line label under each buy button).
+3. Implement the "Buy on {Partner}" action using `expo-web-browser`'s `openBrowserAsync` (an
+   in-app browser tab that still uses the system's real browser engine and cookie/session
+   context — NOT a custom webview that could interfere with the partner's own checkout, login,
+   or payment flow) pointed at the app's own `/go/:slug` redirect URL from Phase 29, which then
+   forwards on to the partner exactly as it does for web visitors.
+4. Manually test on a real device: tap a product's buy button, confirm the in-app browser opens,
+   the `/go/:slug` redirect resolves correctly, and the partner's real site loads with the
+   affiliate tag present in the URL (check the browser's address bar).
+
+TESTS TO RUN: `pnpm typecheck`. This phase is primarily manual-device-verified since it's UI
+consumption of already-tested APIs; report the real-device test result explicitly.
+
+FILES TO UPDATE: new screens under `apps/mobile/src/`, `apps/mobile/package.json`
+(`expo-web-browser` dependency if not already present).
+
+COMPLETION CRITERIA: report explicit real-device confirmation that the buy flow opens correctly,
+redirects correctly, and lands on the partner's real site with tracking intact.
+```
+
+---
+
+## Part 8B Summary — What This Adds and What It Doesn't Touch
+
+| | Core roadmap (Phases 1–26) | Affiliate track (Phases 27–32) |
+|---|---|---|
+| Stock/inventory | Yours, tracked and decremented | None — partner's problem entirely |
+| Payment | Stripe, captured by you | None — captured by the partner, you're never PCI-in-scope for these items |
+| Shipping/fulfillment | Built in Phases 9–13 | None — partner ships |
+| Revenue timing | Immediate, at checkout | Delayed, reported by the network days/weeks later |
+| Order state machine (Phase 6) | Used | Not used — affiliate purchases aren't `Order` records at all |
+| Data model | `Product`, `Order`, `Subscription` | New, separate: `AffiliatePartner`, `AffiliateProduct`, `AffiliateClick`, `AffiliateConversion` |
+
+Nothing in Phases 1–26 needs to change to support this. That separation is deliberate — it's what lets you launch the affiliate marketplace independently, on its own timeline, without putting the tag/subscription business (your core product) at any risk.
+
+---
+
 ## Part 9 — How to Use This
 
 1. Read Part 1 once — those are the decisions; you don't need to revisit them.
 2. Skim Parts 2–5 to understand where the business currently has real operational gaps (fulfillment is the big one).
 3. Work the phases in Part 8 **in order, one at a time**. For each: copy the implementation prompt into Claude Code, let it complete the phase fully (including its tests), review the result, then move to the next phase. Don't skip ahead — later phases assume earlier ones are genuinely done, not just started.
 4. A handful of phases (9, 14, 16, 24, 25) need something from you first — a courier account, an R2/Sentry/Expo account, etc. Those are called out explicitly in each phase; nothing will silently block on them, but they won't be *fully* verified until you've provided the credentials.
-5. Phase 26 is the finish line: a checklist you can point to and say, honestly, "this is production-ready."
+5. Phase 26 is the finish line for the core platform: a checklist you can point to and say, honestly, "this is production-ready."
+6. **Phases 27–32 (Part 8B) are a separate, optional track** for the affiliate marketplace — start it whenever you're ready, independent of exactly where you are in 1–26, though it makes sense to have your core platform stable first since the affiliate storefront lives on `apps/web` and the admin dashboard alongside it. Phase 27 needs an approved Amazon Associates account before it can be fully verified — that approval process is worth starting now, in parallel, since it can take time on Amazon's side.
