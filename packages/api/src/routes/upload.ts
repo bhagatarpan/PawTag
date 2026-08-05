@@ -1,14 +1,13 @@
 import { Router, Response } from 'express';
 import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
 import { AuthRequest, authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
 import { uploadToR2, deleteFromR2, generateUniqueFilename, isR2Configured } from '../services/r2.service';
+import logger from '../lib/logger';
 
 const router = Router();
 
-// Configure multer for memory storage (works with both R2 and local fallback)
+// Configure multer for memory storage (R2 only — no local disk fallback)
 const memoryStorage = multer.memoryStorage();
 
 const fileFilter = (_req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
@@ -25,23 +24,6 @@ const upload = multer({
   fileFilter,
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
 });
-
-// Local disk fallback helper (when R2 is not configured)
-function saveToLocalStorage(buffer: Buffer, folder: string, filename: string): string {
-  const uploadDir = path.join(__dirname, `../../uploads/${folder}`);
-  if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir, { recursive: true });
-  }
-  fs.writeFileSync(path.join(uploadDir, filename), buffer);
-  return filename;
-}
-
-function deleteFromLocalStorage(folder: string, filename: string): void {
-  const filePath = path.join(__dirname, `../../uploads/${folder}`, filename);
-  if (fs.existsSync(filePath)) {
-    fs.unlinkSync(filePath);
-  }
-}
 
 /**
  * @swagger
@@ -109,25 +91,21 @@ router.post('/pet-photo', authenticate, async (req: AuthRequest, res: Response) 
     }
 
     try {
-      const filename = generateUniqueFilename(req.file.originalname);
-      let photoUrl: string;
-
-      if (isR2Configured()) {
-        // Upload to R2
-        const key = `pets/${filename}`;
-        photoUrl = await uploadToR2(key, req.file.buffer, req.file.mimetype);
-      } else {
-        // Fallback to local disk
-        saveToLocalStorage(req.file.buffer, 'pets', filename);
-        photoUrl = `${req.protocol}://${req.get('host')}/api/uploads/pets/${filename}`;
+      if (!isR2Configured()) {
+        res.status(500).json({ success: false, error: 'File storage is not configured. Please set R2 environment variables.' });
+        return;
       }
+
+      const filename = generateUniqueFilename(req.file.originalname);
+      const key = `pets/${filename}`;
+      const photoUrl = await uploadToR2(key, req.file.buffer, req.file.mimetype);
 
       res.json({
         success: true,
         data: { url: photoUrl, filename },
       });
     } catch (uploadError) {
-      console.error('Upload error:', uploadError);
+      logger.error({ err: uploadError }, 'Upload error');
       res.status(500).json({ success: false, error: 'Failed to upload photo' });
     }
   });
@@ -190,22 +168,17 @@ router.post('/product-images', authenticate, requirePermission('product.update')
     }
 
     try {
+      if (!isR2Configured()) {
+        res.status(500).json({ success: false, error: 'File storage is not configured. Please set R2 environment variables.' });
+        return;
+      }
+
       const uploaded = [];
 
       for (const file of req.files) {
         const filename = generateUniqueFilename(file.originalname);
-        let url: string;
-
-        if (isR2Configured()) {
-          // Upload to R2
-          const key = `products/${filename}`;
-          url = await uploadToR2(key, file.buffer, file.mimetype);
-        } else {
-          // Fallback to local disk
-          saveToLocalStorage(file.buffer, 'products', filename);
-          url = `${req.protocol}://${req.get('host')}/api/uploads/products/${filename}`;
-        }
-
+        const key = `products/${filename}`;
+        const url = await uploadToR2(key, file.buffer, file.mimetype);
         uploaded.push({ url, filename });
       }
 
@@ -214,7 +187,7 @@ router.post('/product-images', authenticate, requirePermission('product.update')
         data: { images: uploaded },
       });
     } catch (uploadError) {
-      console.error('Upload error:', uploadError);
+      logger.error({ err: uploadError }, 'Upload error');
       res.status(500).json({ success: false, error: 'Failed to upload images' });
     }
   });
@@ -248,13 +221,12 @@ router.delete('/product-images/:filename', authenticate, requirePermission('prod
   try {
     const { filename } = req.params;
 
-    if (isR2Configured()) {
-      // Delete from R2
-      await deleteFromR2(`products/${filename}`);
-    } else {
-      // Fallback to local disk
-      deleteFromLocalStorage('products', filename);
+    if (!isR2Configured()) {
+      res.status(500).json({ success: false, error: 'File storage is not configured. Please set R2 environment variables.' });
+      return;
     }
+
+    await deleteFromR2(`products/${filename}`);
 
     res.json({ success: true, data: { message: 'Image deleted' } });
   } catch {

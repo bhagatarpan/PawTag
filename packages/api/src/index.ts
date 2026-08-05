@@ -1,6 +1,16 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
+// Initialize Sentry before any other imports
+import * as Sentry from '@sentry/node';
+if (process.env.SENTRY_DSN && process.env.NODE_ENV !== 'test') {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    environment: process.env.NODE_ENV || 'development',
+    tracesSampleRate: 0.1,
+  });
+}
+
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -13,6 +23,7 @@ import { config } from './config';
 import { connectDatabase } from '@pawtag/db';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { swaggerSpec } from './swagger';
+import logger from './lib/logger';
 
 import QRCode from 'qrcode';
 import { Tag } from '@pawtag/db';
@@ -164,13 +175,16 @@ app.use('/api/public/cms', cmsPublicV2Routes);
 
 // --- Error Handling ---
 app.use(notFoundHandler);
+if (process.env.SENTRY_DSN && process.env.NODE_ENV !== 'test') {
+  Sentry.setupExpressErrorHandler(app);
+}
 app.use(errorHandler);
 
 // --- Start Server ---
 async function start() {
   try {
     await connectDatabase(config.dbUrl);
-    console.log('Database connected');
+    logger.info('Database connected');
 
     // Start 24-hour reminder service
     startReminderService();
@@ -182,16 +196,16 @@ async function start() {
     startLowStockService();
 
     const server = app.listen(config.port, () => {
-      console.log(`PawTag API running on port ${config.port}`);
-      console.log(`Environment: ${config.nodeEnv}`);
+      logger.info(`PawTag API running on port ${config.port}`);
+      logger.info(`Environment: ${config.nodeEnv}`);
     });
 
     process.on('SIGTERM', () => {
-      console.log('SIGTERM received, shutting down...');
+      logger.info('SIGTERM received, shutting down...');
       server.close(() => process.exit(0));
     });
-  } catch (error) {
-    console.error('Failed to start server:', error);
+  } catch (error: any) {
+    logger.error({ err: error }, 'Failed to start server');
     process.exit(1);
   }
 }

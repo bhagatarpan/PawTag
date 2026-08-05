@@ -92,6 +92,13 @@ When all R2 credentials are set, uploads go to R2. Otherwise, files are saved to
 |----------|---------|-------------|
 | `PORT` | `5000` | API server port |
 | `NODE_ENV` | `development` | `development`, `staging`, or `production` |
+| `LOG_LEVEL` | `info` | Logging level: `silent`, `fatal`, `error`, `warn`, `info`, `debug`, `trace` |
+
+## Monitoring & Error Tracking
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `SENTRY_DSN` | *(empty)* | Sentry DSN for error tracking. When set, errors are reported to Sentry in non-test environments. |
 
 ## Verification
 

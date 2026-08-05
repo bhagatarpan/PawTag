@@ -4,6 +4,7 @@ import { notifyCustomerOfStatusChange } from '../services/orderNotification.serv
 import { sendOrderConfirmation, sendInvoiceEmail, sendMail } from '../services/email.service';
 import { generateInvoiceHtml } from '../services/invoice-html.service';
 import { generateSecureToken, hashToken } from '../services/auth.service';
+import logger from '../lib/logger';
 
 function generateTagId(): string {
   const digits = Math.floor(100000 + Math.random() * 900000).toString();
@@ -18,7 +19,7 @@ router.post('/stripe', async (req: Request, res: Response) => {
   // Demo mode — accept test events
   if (!process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY === 'sk_test_demo_key') {
     const event = req.body;
-    console.log(`[Webhook] Received demo event: ${event.type || 'unknown'}`);
+    logger.info({ eventType: event.type }, 'Received demo webhook event');
 
     if (event.type === 'payment_intent.succeeded') {
       await handlePaymentIntentSucceeded(event.data?.object);
@@ -61,7 +62,7 @@ router.post('/stripe', async (req: Request, res: Response) => {
 
     res.json({ received: true });
   } catch (error: any) {
-    console.error('[Webhook] Error:', error.message);
+    logger.error({ err: error }, 'Webhook error')
     res.status(400).json({ error: error.message });
   }
 });
@@ -69,19 +70,19 @@ router.post('/stripe', async (req: Request, res: Response) => {
 async function handlePaymentIntentSucceeded(paymentIntent: any) {
   const orderNumber = paymentIntent.metadata?.orderNumber;
   if (!orderNumber) {
-    console.log('[Webhook] No orderNumber in payment_intent metadata');
+    logger.info('No orderNumber in payment_intent metadata');
     return;
   }
 
   const order = await Order.findOne({ orderNumber });
   if (!order) {
-    console.log('[Webhook] Order not found:', orderNumber);
+    logger.info({ orderNumber }, 'Order not found')
     return;
   }
 
   // Only update if still in pending_payment status
   if (order.status !== 'pending_payment') {
-    console.log(`[Webhook] Order ${orderNumber} already in status: ${order.status}`);
+    logger.info({ orderNumber, status: order.status }, 'Order already in status')
     return;
   }
 
@@ -91,7 +92,7 @@ async function handlePaymentIntentSucceeded(paymentIntent: any) {
   order.payment.paidAt = new Date();
   await order.save();
 
-  console.log(`[Webhook] Order ${orderNumber} marked as paid`);
+  logger.info({ orderNumber }, 'Order marked as paid');
 
   // Get user info for emails
   const user = await User.findById(order.userId);
@@ -123,7 +124,7 @@ async function handlePaymentIntentSucceeded(paymentIntent: any) {
               tag.tagId,
               subscription.planName,
               subscription.freePeriodEndsAt || new Date(),
-            ).catch((err: any) => console.error('Subscription email error:', err));
+            ).catch((err: any) => logger.error({ err }, 'Subscription email error'));
 
             break;
           }
@@ -131,7 +132,7 @@ async function handlePaymentIntentSucceeded(paymentIntent: any) {
       }
     }
   } catch (subError) {
-    console.error('Subscription creation error:', subError);
+    logger.error({ err: subError }, 'Subscription creation error');
   }
 
   // Auto-create tags for tag products
@@ -148,12 +149,12 @@ async function handlePaymentIntentSucceeded(paymentIntent: any) {
             status: 'inactive',
             subscriptionStatus: 'none',
           });
-          console.log(`[Webhook] Auto-created tag ${tagId} for order ${orderNumber}`);
+          logger.info({ tagId, orderNumber }, 'Auto-created tag');
         }
       }
     }
   } catch (tagError) {
-    console.error('Tag auto-creation error:', tagError);
+    logger.error({ err: tagError }, 'Tag auto-creation error');
   }
 
   // Process referral rewards
@@ -163,7 +164,7 @@ async function handlePaymentIntentSucceeded(paymentIntent: any) {
       await createReferralOnOrder(order.referredByCode, order.userId.toString(), order.referredByCode, order._id.toString());
       await completeReferralRewards(order._id.toString());
     } catch (refError) {
-      console.error('Referral processing error:', refError);
+      logger.error({ err: refError }, 'Referral processing error');
     }
   }
 
@@ -207,15 +208,15 @@ async function handlePaymentIntentSucceeded(paymentIntent: any) {
              <p><strong>Payment ID:</strong> ${paymentIntent.id}</p>`,
           );
         } catch (emailErr) {
-          console.error('Admin notification email error:', emailErr);
+          logger.error({ err: emailErr }, 'Admin notification email error');
         }
       }
-      console.log(`[Webhook] Admin notification created for order ${orderNumber}`);
+      logger.info({ orderNumber }, 'Admin notification created');
     } else {
-      console.log(`[Webhook] Admin notification already exists for PaymentIntent ${paymentIntent.id}`);
+      logger.info({ paymentIntentId: paymentIntent.id }, 'Admin notification already exists');
     }
   } catch (adminError) {
-    console.error('Admin notification error:', adminError);
+    logger.error({ err: adminError }, 'Admin notification error');
   }
 
   // Send customer order confirmation + invoice email (centralized notification)
@@ -240,7 +241,7 @@ async function handlePaymentIntentSucceeded(paymentIntent: any) {
         total: order.payment.amount,
         shippingAddress: order.shippingAddress || { line1: '', city: '', state: '', zip: '' },
       });
-      console.log(`[Webhook] Order confirmation email sent for ${orderNumber}`);
+      logger.info({ orderNumber }, 'Order confirmation email sent');
     }
 
     // 2. Create Invoice record for ALL paid orders
@@ -276,7 +277,7 @@ async function handlePaymentIntentSucceeded(paymentIntent: any) {
       paidAt: order.payment.paidAt || new Date(),
       ...(billingPeriod ? { billingPeriod } : {}),
     });
-    console.log(`[Webhook] Invoice ${invoiceNumber} created for order ${orderNumber}`);
+    logger.info({ invoiceNumber, orderNumber }, 'Invoice created');
 
     // 3. Generate secure access token for invoice (pre-verified, no OTP)
     const secureToken = generateSecureToken();
@@ -297,7 +298,7 @@ async function handlePaymentIntentSucceeded(paymentIntent: any) {
     if (customerEmail) {
       const invoiceHtml = await generateInvoiceHtml(invoice._id.toString());
       await sendInvoiceEmail(customerEmail, customerName, invoiceNumber, invoiceHtml, invoiceUrl, invoice.amount);
-      console.log(`[Webhook] Invoice email sent for ${orderNumber}`);
+      logger.info({ orderNumber }, 'Invoice email sent');
     }
 
     // 5. Log Notification records (customer in-app history)
@@ -338,9 +339,9 @@ async function handlePaymentIntentSucceeded(paymentIntent: any) {
       ...clientInfo,
     });
 
-    console.log(`[Webhook] Customer notifications and audit logs created for order ${orderNumber}`);
+    logger.info({ orderNumber }, 'Customer notifications and audit logs created');
   } catch (notifError) {
-    console.error('Customer notification error:', notifError);
+    logger.error({ err: notifError }, 'Customer notification error');
   }
 }
 
@@ -360,23 +361,23 @@ async function handlePaymentIntentFailed(paymentIntent: any) {
   order.cancellationReason = 'Payment failed';
   await order.save();
 
-  console.log(`[Webhook] Order ${orderNumber} cancelled due to payment failure`);
+  logger.info({ orderNumber }, 'Order cancelled due to payment failure');
 
   // Notify customer
   try {
     await notifyCustomerOfStatusChange(order, 'cancelled', { reason: 'Payment failed' });
-    console.log(`[Webhook] Customer notified of payment failure for order ${orderNumber}`);
+    logger.info({ orderNumber }, 'Customer notified of payment failure');
   } catch (notifError) {
-    console.error('Customer notification error:', notifError);
+    logger.error({ err: notifError }, 'Customer notification error');
   }
 
   // Restore stock
   try {
     const { restoreOrderStock } = await import('../services/inventory.service');
     await restoreOrderStock(order.items);
-    console.log(`[Webhook] Stock restored for order ${orderNumber}`);
+    logger.info({ orderNumber }, 'Stock restored');
   } catch (err) {
-    console.error('Stock restoration error:', err);
+    logger.error({ err }, 'Stock restoration error');
   }
 }
 
@@ -388,7 +389,7 @@ async function handleInvoicePaymentSucceeded(invoice: any) {
   });
 
   if (!subscription) {
-    console.log('[Webhook] Subscription not found for stripe ID:', invoice.subscription);
+    logger.info({ subscriptionId: invoice.subscription }, 'Subscription not found for stripe ID');
     return;
   }
 
@@ -427,7 +428,7 @@ async function handleInvoicePaymentSucceeded(invoice: any) {
     dueDate: new Date(invoice.period_end * 1000),
   });
 
-  console.log(`[Webhook] Invoice paid for subscription ${subscription._id}`);
+  logger.info({ subscriptionId: subscription._id }, 'Invoice paid for subscription');
 }
 
 async function handleInvoicePaymentFailed(invoice: any) {
@@ -489,7 +490,7 @@ async function handleInvoicePaymentFailed(invoice: any) {
     try {
       await sendMail(user.email, '[PawTag] Action Required — Subscription Payment Failed', html);
     } catch (err) {
-      console.error('Dunning email error:', err);
+      logger.error({ err }, 'Dunning email error');
     }
 
     // Admin notification
@@ -508,7 +509,7 @@ async function handleInvoicePaymentFailed(invoice: any) {
     }
   }
 
-  console.log(`[Webhook] Invoice payment failed for subscription ${subscription._id}`);
+  logger.info({ subscriptionId: subscription._id }, 'Invoice payment failed');
 }
 
 async function handleSubscriptionDeleted(subscription: any) {
@@ -523,7 +524,7 @@ async function handleSubscriptionDeleted(subscription: any) {
   sub.cancellationReason = 'Cancelled via Stripe';
   await sub.save();
 
-  console.log(`[Webhook] Subscription ${sub._id} cancelled via Stripe`);
+  logger.info({ subscriptionId: sub._id }, 'Subscription cancelled via Stripe');
 }
 
 export default router;

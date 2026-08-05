@@ -115,14 +115,7 @@ export default function Login() {
             </p>
           </div>
 
-          <div className="mt-4 p-3 bg-gray-50 rounded-lg space-y-1">
-            <p className="text-xs text-gray-400 text-center">
-              <span className="font-medium">Demo admin:</span> admin@pawtag.co.nz / PawTagAdmin2024!
-            </p>
-            <p className="text-xs text-gray-400 text-center">
-              <span className="font-medium">Test customer:</span> john@example.com / TestPass123!
-            </p>
-          </div>
+
         </div>
       </div>
     </div>

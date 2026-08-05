@@ -1,7 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
+import logger from '../lib/logger';
 
 export function errorHandler(err: Error, _req: Request, res: Response, _next: NextFunction): void {
-  console.error('Unhandled error:', err);
+  logger.error({ err }, 'Unhandled error');
 
   if (err.name === 'ValidationError') {
     res.status(400).json({ success: false, error: err.message });
