@@ -10,6 +10,7 @@ import {
   renderShippingNotificationEmail,
   renderPetFoundEmail,
   renderAccountStatusEmail,
+  renderLoginNotificationEmail,
 } from './email/templates';
 
 const transporter = nodemailer.createTransport({
@@ -191,6 +192,22 @@ export async function sendAccountStatusEmail(
   if (cms) return sendMail(to, cms.subject, cms.html, cms.from);
   const html = renderAccountStatusEmail({ name, status, reason });
   return sendMail(to, 'Your PawTag account status has changed', html);
+}
+
+export async function sendLoginNotification(
+  to: string,
+  name: string,
+  email: string,
+  ipAddress: string,
+  userAgent: string,
+  success: boolean,
+): Promise<EmailResult> {
+  const timestamp = new Date().toLocaleString('en-NZ', { timeZone: 'Pacific/Auckland' });
+  const html = renderLoginNotificationEmail({ name, email, ipAddress, userAgent, timestamp, success });
+  const subject = success
+    ? 'New login to your PawTag admin account'
+    : 'Failed login attempt on your PawTag admin account';
+  return sendMail(to, subject, html);
 }
 
 export interface OrderEmailData {

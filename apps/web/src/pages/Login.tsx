@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { PawPrint, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useAuthPage, useSiteSettings } from '../hooks/useCms';
+import api from '../lib/api';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -10,6 +11,10 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [captchaRequired, setCaptchaRequired] = useState(false);
+  const [captchaQuestion, setCaptchaQuestion] = useState('');
+  const [captchaToken, setCaptchaToken] = useState('');
+  const [captchaAnswer, setCaptchaAnswer] = useState('');
   const { login } = useAuth();
   const navigate = useNavigate();
   const { page: authPage } = useAuthPage('login');
@@ -18,12 +23,23 @@ export default function Login() {
 
   const adminRoles = ['SUPER_ADMIN', 'ADMIN', 'CUSTOMER_SERVICE', 'WEBSITE_EDITOR'];
 
+  const fetchCaptcha = async () => {
+    try {
+      const res = await api.get('/auth/captcha');
+      setCaptchaQuestion(res.data.data.question);
+      setCaptchaToken(res.data.data.token);
+      setCaptchaAnswer('');
+    } catch {
+      setError('Failed to load verification challenge');
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
-      const userData = await login(email, password);
+      const userData = await login(email, password, captchaRequired ? captchaToken : undefined, captchaRequired ? captchaAnswer : undefined);
 
       // Determine redirect based on RBAC role
       const roles: string[] = userData.rbacRoles?.map((r: any) => r.name) || [];
@@ -36,6 +52,13 @@ export default function Login() {
       }
     } catch (err: any) {
       const responseCode = err.response?.data?.code;
+      if (responseCode === 'CAPTCHA_REQUIRED') {
+        setCaptchaRequired(true);
+        await fetchCaptcha();
+        setError('Please complete the verification challenge below');
+        setLoading(false);
+        return;
+      }
       if (responseCode === 'REQUIRES_VERIFICATION') {
         const data = err.response?.data?.data;
         const params = new URLSearchParams();
@@ -45,6 +68,9 @@ export default function Login() {
         return;
       }
       setError(err.response?.data?.error || 'Invalid email or password');
+      if (captchaRequired) {
+        await fetchCaptcha();
+      }
     } finally {
       setLoading(false);
     }
@@ -103,7 +129,34 @@ export default function Login() {
               </div>
             </div>
 
-            <button type="submit" disabled={loading} className="w-full py-3 bg-teal-600 text-white rounded-lg font-semibold hover:bg-teal-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all">
+            {captchaRequired && (
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-3">
+                <label className="block text-sm font-medium text-gray-700">Verify you're human</label>
+                <div className="flex items-center gap-3">
+                  <span className="text-lg font-mono bg-white border border-gray-300 rounded px-4 py-2 text-gray-800 select-none">
+                    {captchaQuestion}
+                  </span>
+                  <span className="text-gray-400">=</span>
+                  <input
+                    type="number"
+                    value={captchaAnswer}
+                    onChange={(e) => setCaptchaAnswer(e.target.value)}
+                    className="w-20 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    placeholder="?"
+                    required
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={fetchCaptcha}
+                  className="text-sm text-teal-600 hover:text-teal-700"
+                >
+                  Get new challenge
+                </button>
+              </div>
+            )}
+
+            <button type="submit" disabled={loading || (captchaRequired && !captchaAnswer)} className="w-full py-3 bg-teal-600 text-white rounded-lg font-semibold hover:bg-teal-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all">
               {loading ? 'Signing in...' : 'Sign In'}
             </button>
           </form>

@@ -1,4 +1,5 @@
 import { Router, Response } from 'express';
+import jwt from 'jsonwebtoken';
 import rateLimit from 'express-rate-limit';
 import { AuthRequest, authenticate } from '../middleware/auth';
 import { validate } from '../middleware/validation';
@@ -30,7 +31,7 @@ import {
   rotateRefreshToken,
   revokeRefreshToken,
 } from '../services/auth.service';
-import { sendVerificationEmail, sendPasswordResetEmail, sendPasswordChangedEmail, sendWelcomeEmail } from '../services/email.service';
+import { sendVerificationEmail, sendPasswordResetEmail, sendPasswordChangedEmail, sendWelcomeEmail, sendLoginNotification } from '../services/email.service';
 import { sendPhoneOtpSMS } from '../services/sms.service';
 import { isRegistrationOtpDisabled } from '../services/otp-settings.service';
 import { User, Role, UserRole, VerificationToken, AuditLog } from '@pawtag/db';
@@ -161,12 +162,61 @@ router.post('/register', registerLimiter, validate(registerSchema), async (req, 
   }
 });
 
+// CAPTCHA endpoint: generates a simple math challenge
+router.get('/captcha', (_req, res: Response) => {
+  const a = Math.floor(Math.random() * 10) + 1;
+  const b = Math.floor(Math.random() * 10) + 1;
+  const operators = ['+', '-', '×'];
+  const op = operators[Math.floor(Math.random() * operators.length)];
+  let answer: number;
+  let question: string;
+
+  switch (op) {
+    case '+': answer = a + b; question = `${a} + ${b}`; break;
+    case '-': answer = a - b; question = `${a} − ${b}`; break;
+    case '×': answer = a * b; question = `${a} × ${b}`; break;
+    default: answer = a + b; question = `${a} + ${b}`;
+  }
+
+  const token = jwt.sign({ captchaAnswer: answer }, config.jwtSecret, { expiresIn: '5m' });
+
+  res.json({
+    success: true,
+    data: { question: `What is ${question}?`, token },
+  });
+});
+
 router.post('/login', loginLimiter, validate(loginSchema), async (req, res: Response) => {
   try {
-    const { email: rawEmail, password } = req.body;
+    const { email: rawEmail, password, captchaToken, captchaAnswer } = req.body;
     const email = normalizeEmail(rawEmail);
 
     const user = await User.findOne({ email, deletedAt: null });
+
+    // CAPTCHA check: after 2 failed attempts, require CAPTCHA
+    if (user && (user.failedLoginAttempts || 0) >= 2 && !captchaToken) {
+      res.status(400).json({
+        success: false,
+        error: 'CAPTCHA required. Please complete the verification.',
+        code: 'CAPTCHA_REQUIRED',
+      });
+      return;
+    }
+
+    // Validate CAPTCHA if provided
+    if (captchaToken && captchaAnswer !== undefined) {
+      try {
+        const decoded = jwt.verify(captchaToken, config.jwtSecret) as { captchaAnswer: number; exp: number };
+        if (decoded.captchaAnswer !== captchaAnswer) {
+          res.status(400).json({ success: false, error: 'Invalid CAPTCHA answer. Please try again.' });
+          return;
+        }
+      } catch {
+        res.status(400).json({ success: false, error: 'CAPTCHA expired. Please get a new one.' });
+        return;
+      }
+    }
+
     if (!user) {
       res.status(401).json({ success: false, error: 'Invalid credentials' });
       return;
@@ -207,6 +257,15 @@ router.post('/login', loginLimiter, validate(loginSchema), async (req, res: Resp
         });
       }
       await user.save();
+
+      // Send notification for failed admin login attempts
+      const isAdminUser = user.role === 'admin' || user.role === 'customer_service';
+      if (isAdminUser) {
+        const ip = req.ip || req.connection?.remoteAddress || 'unknown';
+        const ua = req.headers['user-agent'] || 'unknown';
+        sendLoginNotification(user.email, user.fullName, user.email, ip, ua, false).catch(() => {});
+      }
+
       res.status(401).json({ success: false, error: 'Invalid credentials' });
       return;
     }
@@ -261,6 +320,13 @@ router.post('/login', loginLimiter, validate(loginSchema), async (req, res: Resp
 
     const refreshTokens = generateRefreshToken();
     await storeRefreshToken(user._id.toString(), refreshTokens.tokenHash);
+
+    // Send login notification for admin accounts
+    if (isAdmin) {
+      const ip = req.ip || req.connection?.remoteAddress || 'unknown';
+      const ua = req.headers['user-agent'] || 'unknown';
+      sendLoginNotification(user.email, user.fullName, user.email, ip, ua, true).catch(() => {});
+    }
 
     res.json({
       success: true,

@@ -5,7 +5,7 @@ import { User } from '../types';
 interface AuthContextType {
   user: User | null;
   token: string | null;
-  login: (email: string, password: string) => Promise<User>;
+  login: (email: string, password: string, captchaToken?: string, captchaAnswer?: string) => Promise<User>;
   logout: () => void;
   refreshUser: () => Promise<void>;
   isLoading: boolean;
@@ -29,11 +29,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [token]);
 
-  const login = async (email: string, password: string): Promise<User> => {
-    const res = await api.post('/auth/login', { email, password });
+  const login = async (email: string, password: string, captchaToken?: string, captchaAnswer?: string): Promise<User> => {
+    const payload: any = { email, password };
+    if (captchaToken && captchaAnswer) {
+      payload.captchaToken = captchaToken;
+      payload.captchaAnswer = parseInt(captchaAnswer, 10);
+    }
+    const res = await api.post('/auth/login', payload);
     const data = res.data;
 
-    if (data.code === 'REQUIRES_VERIFICATION') {
+    if (data.code === 'REQUIRES_VERIFICATION' || data.code === 'CAPTCHA_REQUIRED') {
       const error: any = new Error(data.error);
       error.code = data.code;
       error.data = data.data;

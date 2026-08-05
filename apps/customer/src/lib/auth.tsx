@@ -4,7 +4,7 @@ import api from './api';
 
 interface AuthContextType {
   user: any;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, captchaToken?: string, captchaAnswer?: string) => Promise<void>;
   logout: () => void;
   refreshUser: () => void;
 }
@@ -20,8 +20,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (token) api.get('/auth/me').then((r) => setUser(r.data.data)).catch(() => localStorage.removeItem('customer_token'));
   }, []);
 
-  const login = async (email: string, password: string) => {
-    const res = await api.post('/auth/login', { email, password });
+  const login = async (email: string, password: string, captchaToken?: string, captchaAnswer?: string) => {
+    const payload: any = { email, password };
+    if (captchaToken && captchaAnswer) {
+      payload.captchaToken = captchaToken;
+      payload.captchaAnswer = parseInt(captchaAnswer, 10);
+    }
+    const res = await api.post('/auth/login', payload);
     const { token: newToken, user: userData } = res.data.data;
     localStorage.setItem('customer_token', newToken);
     setUser(userData);
