@@ -1,4 +1,5 @@
 import { Router, Response } from 'express';
+import rateLimit from 'express-rate-limit';
 import { AuthRequest, authenticate } from '../middleware/auth';
 import { validate } from '../middleware/validation';
 import {
@@ -37,6 +38,36 @@ import { config } from '../config';
 
 const router = Router();
 
+// Brute-force protection: 5 login attempts per 15 minutes per IP
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: parseInt(process.env.LOGIN_RATE_LIMIT_MAX || '5', 10),
+  message: { success: false, error: 'Too many login attempts. Please try again in 15 minutes.' },
+  skip: () => process.env.NODE_ENV === 'test',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Prevent spam account creation: 3 registrations per hour per IP
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: parseInt(process.env.REGISTER_RATE_LIMIT_MAX || '3', 10),
+  message: { success: false, error: 'Too many registration attempts. Please try again later.' },
+  skip: () => process.env.NODE_ENV === 'test',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Prevent email bombing: 3 password resets per hour per IP
+const forgotPasswordLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: parseInt(process.env.FORGOT_PASSWORD_RATE_LIMIT_MAX || '3', 10),
+  message: { success: false, error: 'Too many password reset attempts. Please try again later.' },
+  skip: () => process.env.NODE_ENV === 'test',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 function getClientInfo(req: any) {
   return { ipAddress: req.ip || req.connection?.remoteAddress, userAgent: req.headers['user-agent'] };
 }
@@ -51,7 +82,7 @@ async function checkAndActivateUser(userId: string) {
   }
 }
 
-router.post('/register', validate(registerSchema), async (req, res: Response) => {
+router.post('/register', registerLimiter, validate(registerSchema), async (req, res: Response) => {
   try {
     const { email: rawEmail, password, fullName, phoneNumber: rawPhone } = req.body;
     const email = normalizeEmail(rawEmail);
@@ -130,7 +161,7 @@ router.post('/register', validate(registerSchema), async (req, res: Response) =>
   }
 });
 
-router.post('/login', validate(loginSchema), async (req, res: Response) => {
+router.post('/login', loginLimiter, validate(loginSchema), async (req, res: Response) => {
   try {
     const { email: rawEmail, password } = req.body;
     const email = normalizeEmail(rawEmail);
@@ -141,10 +172,50 @@ router.post('/login', validate(loginSchema), async (req, res: Response) => {
       return;
     }
 
+    // Check if account is locked due to too many failed attempts
+    if (user.lockedUntil && user.lockedUntil > new Date()) {
+      const minutesLeft = Math.ceil((user.lockedUntil.getTime() - Date.now()) / 60000);
+      res.status(423).json({
+        success: false,
+        error: `Account locked due to too many failed login attempts. Try again in ${minutesLeft} minute${minutesLeft > 1 ? 's' : ''}.`,
+        code: 'ACCOUNT_LOCKED',
+      });
+      return;
+    }
+
+    // If lockout has expired, clear it
+    if (user.lockedUntil && user.lockedUntil <= new Date()) {
+      user.failedLoginAttempts = 0;
+      user.lockedUntil = undefined;
+      await user.save();
+    }
+
     const valid = await verifyPassword(password, user.passwordHash);
     if (!valid) {
+      // Track failed login attempts
+      user.failedLoginAttempts = (user.failedLoginAttempts || 0) + 1;
+      const MAX_ATTEMPTS = 5;
+      const LOCKOUT_MINUTES = 30;
+      if (user.failedLoginAttempts >= MAX_ATTEMPTS) {
+        user.lockedUntil = new Date(Date.now() + LOCKOUT_MINUTES * 60 * 1000);
+        await AuditLog.create({
+          userId: user._id.toString(),
+          action: 'account_locked',
+          entity: 'User',
+          entityId: user._id.toString(),
+          changes: { reason: 'too_many_failed_logins', attempts: user.failedLoginAttempts },
+        });
+      }
+      await user.save();
       res.status(401).json({ success: false, error: 'Invalid credentials' });
       return;
+    }
+
+    // Successful login — reset failed attempts
+    if (user.failedLoginAttempts > 0) {
+      user.failedLoginAttempts = 0;
+      user.lockedUntil = undefined;
+      await user.save();
     }
 
     if (user.status === 'suspended') {
@@ -728,7 +799,7 @@ router.get('/verification-status', async (req: AuthRequest, res: Response) => {
   }
 });
 
-router.post('/forgot-password', validate(forgotPasswordSchema), async (req, res: Response) => {
+router.post('/forgot-password', forgotPasswordLimiter, validate(forgotPasswordSchema), async (req, res: Response) => {
   try {
     const { email: rawEmail } = req.body;
     const email = normalizeEmail(rawEmail);

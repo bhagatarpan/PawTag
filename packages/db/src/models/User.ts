@@ -28,6 +28,8 @@ export interface IUserDocument extends Document {
     relationship: string;
   };
   responsibilityScore: number;
+  failedLoginAttempts: number;
+  lockedUntil?: Date;
   skipInvoiceOtp: boolean;
   skipInvoiceOtpExpiresAt?: Date;
   notificationPreferences?: {
@@ -78,6 +80,8 @@ const UserSchema = new Schema<IUserDocument>(
       relationship: String,
     },
     responsibilityScore: { type: Number, default: 0, min: 0 },
+    failedLoginAttempts: { type: Number, default: 0, min: 0 },
+    lockedUntil: { type: Date, default: null },
     skipInvoiceOtp: { type: Boolean, default: false },
     skipInvoiceOtpExpiresAt: { type: Date, default: null },
     notificationPreferences: {
