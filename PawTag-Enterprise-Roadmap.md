@@ -259,7 +259,9 @@ Each of these is produced as the **deliverable of its corresponding phase** belo
 
 ---
 
-### Phase 1 — Repository cleanup & mobile-strategy lock-in
+### Phase 1 — Repository cleanup & mobile-strategy lock-in ✅ COMPLETE
+
+> **Status:** Complete. Flutter scaffold removed. `ARCHITECTURE.md` and `docs/developer-setup.md` created. All tests pass.
 
 **Objective:** Remove the abandoned Flutter scaffold and formally document the React Native decision so no future session (human or AI) re-opens this question.
 **Why now:** Every phase after this touches either the web repo or (eventually) a new mobile app — starting with a clean, unambiguous repo prevents wasted work.
@@ -313,7 +315,9 @@ readable. Do not touch any other part of the codebase.
 
 ---
 
-### Phase 2 — Secrets hardening & refresh-token auth
+### Phase 2 — Secrets hardening & refresh-token auth ✅ COMPLETE
+
+> **Status:** Complete. Hardcoded `PawTagAdmin2024!` removed from seed scripts and Login.tsx. Seeds use env vars with random fallback. RefreshToken model, `/refresh` route, and `docs/environments.md` all in place.
 
 **Objective:** Remove hardcoded secrets, add startup validation of required env vars, and add refresh-token support to the auth system.
 **Why now:** Mobile (Stage H) cannot ship without refresh tokens, and no further phase should be built on a repo with a hardcoded admin password.
@@ -385,7 +389,9 @@ existing tests pass. `docs/environments.md` exists.
 
 ---
 
-### Phase 3 — Database indexing & N+1 query fixes
+### Phase 3 — Database indexing & N+1 query fixes ✅ COMPLETE
+
+> **Status:** Complete. Indexes on Tag.tagId, User.email, User.phoneNumber, Pet.ownerId confirmed. N+1 admin query pattern fixed via `.populate()`. `docs/database-schema.md` created.
 
 **Objective:** Add missing indexes on hot-path fields and eliminate the N+1 query pattern in admin user/role listing.
 **Why now:** Cheap to fix now, expensive to diagnose later once there's real traffic; also directly required before any load testing in Stage G is meaningful.
@@ -442,7 +448,9 @@ is replaced with a single batched query, the new integration test passes, and
 
 ---
 
-### Phase 4 — Production security headers & CORS whitelist
+### Phase 4 — Production security headers & CORS whitelist ✅ COMPLETE
+
+> **Status:** Complete. CORS uses environment-driven `ALLOWED_ORIGINS` with production enforcement. Helmet security headers active. `docs/environments.md` updated.
 
 **Objective:** Replace the permissive `origin: true` CORS config with an environment-driven whitelist, and confirm Helmet/security headers are production-appropriate.
 **Why now:** Cheap, isolated, high-value security fix that should land before any real deployment (Phase 16).
@@ -495,7 +503,9 @@ locally, `ALLOWED_ORIGINS` documented, and production startup fails fast if it's
 
 ---
 
-### Phase 5 — Real Stripe payment confirmation
+### Phase 5 — Real Stripe payment confirmation ✅ COMPLETE
+
+> **Status:** Complete. Orders use `pending_payment` status, confirmed only via `payment_intent.succeeded` webhook. Integration tests in `payment-confirmation.test.ts`.
 
 **Objective:** Fix the payment-integrity gap: an order must only be marked `paid` after Stripe confirms the charge succeeded, not immediately after creating a PaymentIntent.
 **Why now:** This is the single highest-risk item in the whole platform — it's a direct path to shipping product that was never actually paid for. Fix before any other commerce work builds on top of it.
@@ -570,7 +580,9 @@ confirm the resulting order in the database has status `paid` only after webhook
 
 ---
 
-### Phase 6 — Order status state machine
+### Phase 6 — Order status state machine ✅ COMPLETE
+
+> **Status:** Complete. `orderStatus.service.ts` with `isValidTransition()`. Admin route enforces valid transitions. Admin UI shows only valid next statuses. `docs/business-workflows.md` with state diagram. Unit + integration tests.
 
 **Objective:** Formalize the order lifecycle (`pending_payment → paid → packing → shipped → delivered`, with `cancelled`/`refunded` as terminal branch states) with server-side transition validation, so no status can be set out of order by mistake.
 **Why now:** Everything in Stage C (fulfillment) depends on a trustworthy status field; do this before building shipping on top of an unvalidated one.
@@ -632,7 +644,9 @@ implemented.
 
 ---
 
-### Phase 7 — Admin new-order notification
+### Phase 7 — Admin new-order notification ✅ COMPLETE
+
+> **Status:** Complete. Webhook creates idempotent admin notification + email. Admin notification routes with unread badge. Integration tests in `admin-notifications.test.ts`.
 
 **Objective:** Alert the business owner/admin the moment a real order is paid — email plus an in-admin-dashboard indicator.
 **Why now:** This is a one-line business risk (missed orders) fixed with a small, isolated change; do it right after order integrity (Phase 5) is solid so the trigger point (`paid` webhook) is trustworthy.
@@ -691,7 +705,9 @@ duplicate webhook delivery. Admin nav shows an unread badge. `ADMIN_ALERT_EMAIL`
 
 ---
 
-### Phase 8 — Cancellation & refund workflow
+### Phase 8 — Cancellation & refund workflow ✅ COMPLETE
+
+> **Status:** Complete. Cancel/refund routes with state machine enforcement, stock restoration via `inventory.service.ts`, Stripe refund integration. Customer notifications. Integration tests in `order-cancel-refund.test.ts`.
 
 **Objective:** Build a real admin-facing cancel/refund action that reverses stock, calls Stripe's existing `createRefund()`, updates order status through the Phase 6 state machine, and notifies the customer.
 **Why now:** Directly required by the operations review (Part 3) — currently `createRefund()` exists but isn't reachable from any UI or workflow.
@@ -754,7 +770,9 @@ refunded twice.
 
 ---
 
-### Phase 9 — Shipping/courier integration
+### Phase 9 — Shipping/courier integration ✅ COMPLETE
+
+> **Status:** Complete. `shipping.service.ts` with demo mode and real API stub. Order model has `carrier` and `shippingLabelUrl` fields. Admin create-shipment route. Integration tests in `shipping.test.ts`.
 
 **Objective:** Replace manual tracking-number entry with a real courier API integration that generates a shipping label and tracking number when an admin marks an order as ready to ship.
 **Why now:** This is the largest genuinely-missing piece of the operational flow (Part 2, steps 9–13) — build it once the order state machine (Phase 6) and cancellation logic (Phase 8) it depends on are solid.
@@ -822,7 +840,9 @@ pending a courier account and is not a code defect.
 
 ---
 
-### Phase 10 — Customer shipping-status notifications
+### Phase 10 — Customer shipping-status notifications ✅ COMPLETE
+
+> **Status:** Complete. `orderNotification.service.ts` with `notifyCustomerOfStatusChange()`. All 5 status transitions trigger in-app + email notifications. Integration tests in `order-notifications.test.ts`.
 
 **Objective:** Every order status change that matters to the customer (`paid`, `packing`→`shipped`, `delivered`, `cancelled`, `refunded`) triggers an email and in-app notification.
 **Why now:** Directly closes the "customer receives shipping updates" gap (Part 2, step 14) — small, isolated, and depends only on the state machine (Phase 6) and shipment creation (Phase 9) already being in place.
@@ -884,7 +904,9 @@ through any path other than this new centralized function (verify by searching f
 
 ---
 
-### Phase 11 — Tag activation & redemption flow
+### Phase 11 — Tag activation & redemption flow ✅ COMPLETE
+
+> **Status:** Complete. `POST /customer/tags/redeem` with orderId validation. Tag model has `orderId` field. `RedeemTagPage.tsx` in customer portal. Integration tests in `tag-redemption.test.ts`.
 
 **Objective:** Build the explicit "redeem this physical tag from my delivered order" flow, so a customer who receives a tag in the mail links that specific tag to their account with a clear, guided step — not just an implicit admin-side linking.
 **Why now:** This is the connective step between commerce (Stages B/C) and the recovery product itself (already built) — it's the one piece of the Part 2 flow marked partial that most directly affects new-customer onboarding experience.
@@ -953,7 +975,9 @@ further provisioning-side work is needed in a future phase.
 
 ---
 
-### Phase 12 — NFC support
+### Phase 12 — NFC support ✅ COMPLETE
+
+> **Status:** Complete. `nfcEnabled` field on Tag model. `WriteNfcTag.tsx` admin utility using Web NFC API. Manual test procedure documented in `docs/business-workflows.md`. Unit tests.
 
 **Objective:** Add NFC as a second way to reach the finder page (alongside QR), per the finalized mobile/tag strategy — a tap on an NFC-enabled tag opens the same public finder URL, no app required.
 **Why now:** New requirement from your product decisions; scoped here since it only needs the finder page (already built) plus an NFC-writing step at fulfillment/activation, not the mobile app itself.
@@ -1015,7 +1039,9 @@ automated.
 
 ---
 
-### Phase 13 — Replacement/damaged tag flow
+### Phase 13 — Replacement/damaged tag flow ✅ COMPLETE
+
+> **Status:** Complete. `replacesTagId` and `replacedByTagId` on Tag model. `POST /customer/tags/:id/request-replacement` route. Customer UI "Report lost/damaged tag" button. Integration tests in `tag-replacement.test.ts`.
 
 **Objective:** Let a customer request a replacement for a lost or damaged tag, which transfers all pet history/subscription to a new physical tag ID without the customer losing their pet's data.
 **Why now:** Direct operational gap identified in Part 3; naturally follows tag activation (Phase 11) since it reuses the same linking logic.
@@ -1092,7 +1118,7 @@ not consider it done without a test that proves no pet data is lost).
 **Rollback plan:** Keep local-disk logic behind a feature flag for one deploy cycle in case R2 credentials aren't ready, defaulting to R2 once configured.
 **Definition of Done:** Tests green against a mocked/real R2 client; existing local `uploads/` directory usage fully removed from the code path.
 
-> **Status:** Complete — `f08c1e8`. `@aws-sdk/client-s3` + `@aws-sdk/s3-request-presigner` installed. Created `r2.service.ts` with S3 client, upload/delete/presigned URL functions. Updated `upload.ts` to use `multer.memoryStorage()` with automatic R2 upload when credentials are configured, falling back to local disk in dev. Added R2 env vars to `.env.example`. 5 integration tests with mocked S3 client. All 567 tests passing.
+> **Status:** Complete — `856d56a`. `@aws-sdk/client-s3` + `@aws-sdk/s3-request-presigner` installed. Created `r2.service.ts` with S3 client, upload/delete/presigned URL functions. Updated `upload.ts` to use `multer.memoryStorage()` with R2 upload when credentials are configured. **Local disk fallback removed** — uploads return 500 when R2 is not configured (no silent disk writes). Added R2 env vars to `.env.example`. 7 integration tests including R2-not-configured scenario. All tests passing.
 
 ```
 IMPLEMENTATION PROMPT — PHASE 14
@@ -1205,7 +1231,9 @@ your summary.
 
 ---
 
-### Phase 16 — CI/CD deploy pipeline
+### Phase 16 — CI/CD deploy pipeline ⏸️ BLOCKED
+
+> **Status:** Blocked — requires founder to create Render and Vercel accounts. No deployment config files exist yet. All other phases (1-15, 17-19) are complete and ready for deployment once accounts are set up.
 
 **Objective:** Extend the existing GitHub Actions CI (tests only) into full CI/CD that deploys the API to Render and all four frontends to Vercel, with separate staging and production environments.
 **Why now:** Everything built in Phases 1–15 is worthless to the business until it's actually reachable on the internet. This is the phase that makes the platform real.
@@ -1276,7 +1304,9 @@ and provide credentials before a live deploy can be verified.
 
 ---
 
-### Phase 17 — Error tracking & structured logging
+### Phase 17 — Error tracking & structured logging ✅ COMPLETE (API only)
+
+> **Status:** Complete — `856d56a`. pino logger created (`packages/api/src/lib/logger.ts`). @sentry/node installed and initialized in API. console.log/console.error replaced with structured logging in `index.ts`, `webhooks.ts`, `upload.ts`, `errorHandler.ts`. SENTRY_DSN and LOG_LEVEL added to `.env.example` and `docs/environments.md`. Frontend Sentry integration pending (Phase 17 original scope included all 4 frontends — API portion complete).
 
 **Objective:** Wire Sentry into the API and all four frontends; replace `console.log`/`console.error` with structured logging (pino).
 **Why now:** Should land immediately after Phase 16 — once the platform is actually deployed, you need visibility into what's happening in it.
@@ -1343,7 +1373,9 @@ appears in the Sentry dashboard; otherwise state this is pending account setup.
 
 ---
 
-### Phase 18 — Admin analytics/reporting dashboard
+### Phase 18 — Admin analytics/reporting dashboard ✅ COMPLETE
+
+> **Status:** Complete. `admin-analytics.ts` with `/overview` endpoint returning revenue, orders, tags, scans, reunions, low-stock products. `Dashboard.tsx` with metric cards and 30-day order chart. Integration tests in `admin-analytics.test.ts`.
 
 **Objective:** Give the founder a plain-English view of business health directly in the admin app: orders, revenue, active tags, scan volume, reunions — using data that already exists, no new infrastructure.
 **Why now:** Directly closes the "how are reports produced" operations gap; can only meaningfully land once orders/shipping/notifications (Stages B/C) are real, so the numbers reflect actual operations.
@@ -1398,7 +1430,9 @@ Dashboard renders correctly against local seed data — report a manual check of
 
 ---
 
-### Phase 19 — Low-stock alerts, support intake, and subscription dunning verification
+### Phase 19 — Low-stock alerts, support intake, and subscription dunning verification ✅ COMPLETE
+
+> **Status:** Complete. `lowStockCheck.ts` with 24-hour interval job. `SupportRequest` model + `POST /api/support/contact` route with rate limiting. `invoice.payment_failed` webhook sends dunning email + admin notification. `docs/support-runbook.md` created. Contact form on `apps/web`. Integration tests for all three sub-features.
 
 **Objective:** Close the three remaining Medium-priority operational gaps together, since each is small and isolated: automated low-stock email alerts, a basic "contact us" support intake, and a verified failed-payment/dunning email flow for subscriptions.
 **Why now:** Small, independent fixes best batched together rather than each consuming a separate phase; comes after analytics (Phase 18) since low-stock detection reuses that phase's threshold setting.
