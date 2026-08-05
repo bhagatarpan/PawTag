@@ -249,12 +249,19 @@ export default function Users() {
                   )}
                 </td>
                 <td className="px-5 py-3">
-                  <select value={user.status} onChange={(e) => updateStatus(user._id, e.target.value)} className="border border-gray-200 rounded px-2 py-1 text-xs">
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                    <option value="suspended">Suspended</option>
-                    <option value="pending_verification">Pending Verification</option>
-                  </select>
+                  <div className="flex items-center gap-1.5">
+                    <select value={user.status} onChange={(e) => updateStatus(user._id, e.target.value)} className="border border-gray-200 rounded px-2 py-1 text-xs">
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+                      <option value="suspended">Suspended</option>
+                      <option value="pending_verification">Pending Verification</option>
+                    </select>
+                    {user.lockedUntil && new Date(user.lockedUntil) > new Date() && (
+                      <span title={`Brute-force locked until ${new Date(user.lockedUntil).toLocaleString()}`} className="inline-flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-full bg-red-100 text-red-700">
+                        <Lock size={10} /> Locked
+                      </span>
+                    )}
+                  </div>
                 </td>
                 <td className="px-5 py-3">
                   {user.rbacRoles?.some((ur: any) => ur.roleId?.name === 'PET_OWNER') ? (

@@ -560,6 +560,8 @@ router.put('/users/:id/lock', requirePermission('user.deactivate'), async (req: 
 
     const oldStatus = user.status;
     user.status = 'suspended';
+    user.failedLoginAttempts = 0;
+    user.lockedUntil = undefined;
     await user.save();
 
     await AuditLog.create({
@@ -584,6 +586,8 @@ router.put('/users/:id/unlock', requirePermission('user.activate'), async (req: 
 
     const oldStatus = user.status;
     user.status = 'active';
+    user.failedLoginAttempts = 0;
+    user.lockedUntil = undefined;
     await user.save();
 
     await AuditLog.create({
