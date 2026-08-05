@@ -1849,4 +1849,37 @@ router.put('/pets/:id/desexing', requirePermission('desexing.update'), async (re
   }
 });
 
+// --- MFA Settings ---
+router.put('/settings/mfa', requirePermission('pet.read'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { enabled } = req.body;
+    if (typeof enabled !== 'boolean') {
+      res.status(400).json({ success: false, error: 'enabled must be a boolean' });
+      return;
+    }
+
+    const user = await User.findById(req.user!.id);
+    if (!user || user.deletedAt) {
+      res.status(404).json({ success: false, error: 'User not found' });
+      return;
+    }
+
+    const oldValue = user.mfaEnabled;
+    user.mfaEnabled = enabled;
+    await user.save();
+
+    await AuditLog.create({
+      userId: req.user!.id,
+      action: enabled ? 'mfa_enabled' : 'mfa_disabled',
+      entity: 'User',
+      entityId: req.user!.id,
+      changes: { mfaEnabled: { old: oldValue, new: enabled } },
+    });
+
+    res.json({ success: true, data: { mfaEnabled: enabled } });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to update MFA settings' });
+  }
+});
+
 export default router;

@@ -42,7 +42,7 @@ async function run() {
       // 1. SETTINGS
       // ═══════════════════════════════════════
       console.log('--- Seeding Settings ---');
-      const settings: Array<{ key: string; value: string; category: string }> = [
+      const settings: Array<{ key: string; value: string; category: string; description?: string }> = [
         { key: 'site.name', value: 'PawTag', category: 'site' },
         { key: 'site.tagline', value: 'Never Lose Your Pet Again', category: 'site' },
         { key: 'site.description', value: 'Smart QR-coded pet recovery tags. Because every pet deserves a safe way home.', category: 'site' },
@@ -65,6 +65,10 @@ async function run() {
         { key: 'emails.supportEmail', value: 'support@pawtag.co.nz', category: 'emails' },
         { key: 'checkout.defaultCountry', value: 'NZ', category: 'checkout' },
         { key: 'checkout.currencyLabel', value: 'NZD', category: 'checkout' },
+        { key: 'mfa.adminEnabled', value: 'false', category: 'mfa', description: 'Global toggle for admin/CSR MFA' },
+        { key: 'mfa.customerEnabled', value: 'true', category: 'mfa', description: 'Default MFA setting for new customer registrations' },
+        { key: 'mfa.testMode', value: 'false', category: 'mfa', description: 'Send MFA OTP to test email instead of actual user' },
+        { key: 'mfa.testEmail', value: 'arpanbhagat@yahoo.com', category: 'mfa', description: 'Test email address for MFA in dev mode' },
       ];
 
       let settingsCreated = 0;

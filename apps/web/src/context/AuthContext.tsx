@@ -5,7 +5,7 @@ import { User } from '../types';
 interface AuthContextType {
   user: User | null;
   token: string | null;
-  login: (email: string, password: string, captchaToken?: string, captchaAnswer?: string) => Promise<User>;
+  login: (email: string, password: string, captchaToken?: string, captchaAnswer?: string) => Promise<any>;
   logout: () => void;
   refreshUser: () => Promise<void>;
   isLoading: boolean;
@@ -29,7 +29,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [token]);
 
-  const login = async (email: string, password: string, captchaToken?: string, captchaAnswer?: string): Promise<User> => {
+  const login = async (email: string, password: string, captchaToken?: string, captchaAnswer?: string): Promise<any> => {
     const payload: any = { email, password };
     if (captchaToken && captchaAnswer) {
       payload.captchaToken = captchaToken;
@@ -43,6 +43,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       error.code = data.code;
       error.data = data.data;
       throw error;
+    }
+
+    // If MFA is required, return the data for the login page to handle
+    if (data.data?.code === 'MFA_REQUIRED') {
+      return data.data;
     }
 
     const { token: newToken, user: userData } = data.data;

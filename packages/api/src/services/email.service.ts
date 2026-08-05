@@ -11,6 +11,7 @@ import {
   renderPetFoundEmail,
   renderAccountStatusEmail,
   renderLoginNotificationEmail,
+  renderLoginOtpEmail,
 } from './email/templates';
 
 const transporter = nodemailer.createTransport({
@@ -391,4 +392,18 @@ export async function sendInvoiceEmail(
     </div>`;
 
   return sendMail(to, `Invoice ${invoiceNumber} from PawTag`, html);
+}
+
+export async function sendLoginOtpEmail(
+  to: string,
+  name: string,
+  otp: string,
+  expiresIn: string = '5 minutes',
+): Promise<EmailResult> {
+  const vars: Record<string, string> = { name, otp, expiresIn };
+  const cms = await renderCmsEmail('login-mfa-otp', vars);
+  if (cms) return sendMail(to, cms.subject, cms.html, cms.from);
+
+  const html = renderLoginOtpEmail({ name, otp, expiresIn });
+  return sendMail(to, 'Your PawTag Login Verification Code', html);
 }

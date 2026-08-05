@@ -611,7 +611,7 @@ router.put('/users/:id', requirePermission('user.update'), validate(updateUserSc
     if (!user) { res.status(404).json({ success: false, error: 'User not found' }); return; }
 
     const changes: Record<string, unknown> = {};
-    const { fullName, email, phoneNumber, responsibilityScore } = req.body;
+    const { fullName, email, phoneNumber, responsibilityScore, mfaEnabled } = req.body;
 
     if (fullName !== undefined && fullName !== user.fullName) { changes.fullName = { old: user.fullName, new: fullName }; user.fullName = fullName; }
     if (email !== undefined && email !== user.email) {
@@ -621,6 +621,7 @@ router.put('/users/:id', requirePermission('user.update'), validate(updateUserSc
     }
     if (phoneNumber !== undefined) { changes.phoneNumber = { old: user.phoneNumber, new: phoneNumber }; user.phoneNumber = phoneNumber; }
     if (responsibilityScore !== undefined) { changes.responsibilityScore = { old: (user as any).responsibilityScore, new: responsibilityScore }; (user as any).responsibilityScore = responsibilityScore; }
+    if (mfaEnabled !== undefined) { changes.mfaEnabled = { old: (user as any).mfaEnabled, new: mfaEnabled }; (user as any).mfaEnabled = mfaEnabled; }
 
     await user.save();
 

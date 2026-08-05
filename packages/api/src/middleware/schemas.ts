@@ -220,6 +220,7 @@ export const updateUserSchema = z.object({
   email: z.string().email().optional(),
   phoneNumber: z.string().optional(),
   responsibilityScore: z.number().min(0).max(10).optional(),
+  mfaEnabled: z.boolean().optional(),
 });
 
 // --- Tag Schemas ---

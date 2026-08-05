@@ -8,3 +8,4 @@ export { renderShippingNotificationEmail } from './shipping-notification';
 export { renderPetFoundEmail } from './pet-found';
 export { renderAccountStatusEmail } from './account-status';
 export { renderLoginNotificationEmail } from './login-notification';
+export { renderLoginOtpEmail } from './mfa-otp';

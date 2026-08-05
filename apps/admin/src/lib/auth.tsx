@@ -23,7 +23,7 @@ interface AuthContextType {
   token: string | null;
   permissions: EffectivePermission[];
   hasPermission: (permissionName: string) => boolean;
-  login: (email: string, password: string, captchaToken?: string, captchaAnswer?: string) => Promise<void>;
+  login: (email: string, password: string, captchaToken?: string, captchaAnswer?: string) => Promise<any>;
   logout: () => void;
   isLoading: boolean;
 }
@@ -83,7 +83,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       payload.captchaAnswer = parseInt(captchaAnswer, 10);
     }
     const res = await api.post('/auth/login', payload);
-    const { token: newToken, user: userData } = res.data.data;
+    const data = res.data.data;
+
+    // If MFA is required, return the data for the login page to handle
+    if (data.code === 'MFA_REQUIRED') {
+      return data;
+    }
+
+    const { token: newToken, user: userData } = data;
     const isAdmin = userData.rbacRoles?.some((r: any) =>
       ['SUPER_ADMIN', 'ADMIN', 'CUSTOMER_SERVICE', 'WEBSITE_EDITOR'].includes(r.name)
     );
@@ -93,6 +100,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('admin_token', newToken);
     setToken(newToken);
     setUser(userData);
+    return data;
   };
 
   const logout = () => {

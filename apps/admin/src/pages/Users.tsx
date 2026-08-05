@@ -24,6 +24,7 @@ export default function Users() {
   const [editError, setEditError] = useState('');
   const [editSaving, setEditSaving] = useState(false);
   const [skipOtpLoading, setSkipOtpLoading] = useState<string | null>(null);
+  const [mfaLoading, setMfaLoading] = useState<string | null>(null);
 
   const fetchRoles = () => {
     api.get('/admin/rbac/roles').then((res) => setRbacRoles(res.data.data || [])).catch(console.error);
@@ -68,6 +69,18 @@ export default function Users() {
       alert(err.response?.data?.error || 'Failed to update');
     } finally {
       setSkipOtpLoading(null);
+    }
+  };
+
+  const toggleMfa = async (userId: string, enabled: boolean) => {
+    setMfaLoading(userId);
+    try {
+      await api.put(`/admin/users/${userId}`, { mfaEnabled: enabled });
+      fetchUsers();
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Failed to update MFA');
+    } finally {
+      setMfaLoading(null);
     }
   };
 
@@ -219,15 +232,16 @@ export default function Users() {
               <th className="text-left px-5 py-3 font-medium text-gray-500">Status</th>
               <th className="text-left px-5 py-3 font-medium text-gray-500">Score</th>
               <th className="text-left px-5 py-3 font-medium text-gray-500">OTP Skip</th>
+              <th className="text-left px-5 py-3 font-medium text-gray-500">MFA</th>
               <th className="text-left px-5 py-3 font-medium text-gray-500">Joined</th>
               <th className="text-right px-5 py-3 font-medium text-gray-500">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
             {loading ? (
-              <tr><td colSpan={9} className="px-5 py-8 text-center text-gray-500">Loading...</td></tr>
+              <tr><td colSpan={10} className="px-5 py-8 text-center text-gray-500">Loading...</td></tr>
             ) : data?.items.length === 0 ? (
-              <tr><td colSpan={9} className="px-5 py-8 text-center text-gray-500">No users found</td></tr>
+              <tr><td colSpan={10} className="px-5 py-8 text-center text-gray-500">No users found</td></tr>
             ) : data?.items.map((user: any) => (
               <tr key={user._id} className="hover:bg-gray-50">
                 <td className="px-5 py-3 font-medium">{user.fullName}</td>
@@ -293,6 +307,20 @@ export default function Users() {
                       <ShieldOff size={12} /> Off
                     </button>
                   )}
+                </td>
+                <td className="px-5 py-3">
+                  <button
+                    onClick={() => toggleMfa(user._id, user.mfaEnabled === false)}
+                    disabled={mfaLoading === user._id}
+                    title={user.mfaEnabled === false ? 'MFA disabled — click to enable' : 'MFA enabled — click to disable'}
+                    className={`flex items-center gap-1 text-xs px-2 py-1 rounded-full disabled:opacity-50 ${
+                      user.mfaEnabled === false
+                        ? 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                        : 'bg-green-100 text-green-700 hover:bg-green-200'
+                    }`}
+                  >
+                    <Shield size={12} /> {user.mfaEnabled === false ? 'Off' : 'On'}
+                  </button>
                 </td>
                 <td className="px-5 py-3 text-gray-500">{new Date(user.createdAt).toLocaleDateString()}</td>
                 <td className="px-5 py-3 text-right">

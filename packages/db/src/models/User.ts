@@ -28,6 +28,7 @@ export interface IUserDocument extends Document {
     relationship: string;
   };
   responsibilityScore: number;
+  mfaEnabled: boolean;
   failedLoginAttempts: number;
   lockedUntil?: Date;
   skipInvoiceOtp: boolean;
@@ -80,6 +81,7 @@ const UserSchema = new Schema<IUserDocument>(
       relationship: String,
     },
     responsibilityScore: { type: Number, default: 0, min: 0 },
+    mfaEnabled: { type: Boolean, default: true },
     failedLoginAttempts: { type: Number, default: 0, min: 0 },
     lockedUntil: { type: Date, default: null },
     skipInvoiceOtp: { type: Boolean, default: false },

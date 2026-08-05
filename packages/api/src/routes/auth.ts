@@ -31,10 +31,10 @@ import {
   rotateRefreshToken,
   revokeRefreshToken,
 } from '../services/auth.service';
-import { sendVerificationEmail, sendPasswordResetEmail, sendPasswordChangedEmail, sendWelcomeEmail, sendLoginNotification } from '../services/email.service';
+import { sendVerificationEmail, sendPasswordResetEmail, sendPasswordChangedEmail, sendWelcomeEmail, sendLoginNotification, sendLoginOtpEmail } from '../services/email.service';
 import { sendPhoneOtpSMS } from '../services/sms.service';
 import { isRegistrationOtpDisabled } from '../services/otp-settings.service';
-import { User, Role, UserRole, VerificationToken, AuditLog } from '@pawtag/db';
+import { User, Role, UserRole, VerificationToken, AuditLog, Setting } from '@pawtag/db';
 import { config } from '../config';
 
 const router = Router();
@@ -64,6 +64,26 @@ const forgotPasswordLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: parseInt(process.env.FORGOT_PASSWORD_RATE_LIMIT_MAX || '3', 10),
   message: { success: false, error: 'Too many password reset attempts. Please try again later.' },
+  skip: () => process.env.NODE_ENV === 'test',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// MFA: 1 OTP send per 30 seconds
+const mfaSendLimiter = rateLimit({
+  windowMs: 30 * 1000,
+  max: parseInt(process.env.MFA_SEND_RATE_LIMIT_MAX || '1', 10),
+  message: { success: false, error: 'Please wait before requesting a new code.' },
+  skip: () => process.env.NODE_ENV === 'test',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// MFA: 5 verify attempts per 15 minutes
+const mfaVerifyLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: parseInt(process.env.MFA_VERIFY_RATE_LIMIT_MAX || '5', 10),
+  message: { success: false, error: 'Too many verification attempts. Please try again later.' },
   skip: () => process.env.NODE_ENV === 'test',
   standardHeaders: true,
   legacyHeaders: false,
@@ -316,6 +336,77 @@ router.post('/login', loginLimiter, validate(loginSchema), async (req, res: Resp
       return;
     }
 
+    // MFA check: determine if MFA is required for this user
+    const mfaAdminEnabled = (await Setting.findOne({ key: 'mfa.adminEnabled' }).lean())?.value === 'true';
+    const mfaCustomerEnabled = (await Setting.findOne({ key: 'mfa.customerEnabled' }).lean())?.value === 'true';
+    const mfaTestMode = (await Setting.findOne({ key: 'mfa.testMode' }).lean())?.value === 'true';
+    const mfaTestEmail = (await Setting.findOne({ key: 'mfa.testEmail' }).lean())?.value || 'arpanbhagat@yahoo.com';
+
+    let mfaRequired = false;
+    if (isAdmin) {
+      // Admin/CSR: MFA only if global admin setting is enabled
+      mfaRequired = mfaAdminEnabled;
+    } else {
+      // Customer: MFA if per-user field is true (defaults true) AND global setting is enabled
+      mfaRequired = user.mfaEnabled !== false && mfaCustomerEnabled;
+    }
+
+    if (mfaRequired) {
+      // Generate temp token for MFA flow (5 min expiry)
+      const tempToken = jwt.sign(
+        { userId: user._id.toString(), email: user.email, purpose: 'login_mfa' },
+        config.jwtSecret,
+        { expiresIn: '5m' },
+      );
+
+      // Generate and send OTP
+      const otp = generateOtp();
+      const otpHash = hashToken(otp);
+      const mfaOtpExpiry = 5; // minutes
+
+      await VerificationToken.create({
+        userId: user._id,
+        tokenHash: otpHash,
+        type: 'login_mfa',
+        expiresAt: new Date(Date.now() + mfaOtpExpiry * 60 * 1000),
+        attempts: 0,
+        ipAddress: req.ip || req.connection?.remoteAddress,
+        userAgent: req.headers['user-agent'],
+      });
+
+      // Send OTP email (test mode: send to test email)
+      const recipient = mfaTestMode ? mfaTestEmail : user.email;
+      const ip = req.ip || req.connection?.remoteAddress || 'unknown';
+      const ua = req.headers['user-agent'] || 'unknown';
+      sendLoginOtpEmail(recipient, user.fullName, otp, `${mfaOtpExpiry} minutes`).catch(() => {});
+
+      // Audit log
+      await AuditLog.create({
+        userId: user._id,
+        action: 'login_mfa_otp_sent',
+        entity: 'User',
+        entityId: user._id.toString(),
+        ipAddress: ip,
+        userAgent: ua,
+      });
+
+      // Mask email for response
+      const [localPart, domain] = user.email.split('@');
+      const maskedEmail = localPart.charAt(0) + '***' + localPart.charAt(localPart.length - 1) + '@' + domain;
+
+      res.json({
+        success: true,
+        data: {
+          code: 'MFA_REQUIRED',
+          tempToken,
+          maskedEmail,
+          expiresIn: mfaOtpExpiry * 60,
+        },
+      });
+      return;
+    }
+
+    // No MFA required — generate tokens directly
     const token = generateToken({ id: user._id.toString(), email: user.email, role: user.role });
 
     const refreshTokens = generateRefreshToken();
@@ -1074,6 +1165,235 @@ router.post('/logout', async (req: AuthRequest, res: Response) => {
     res.json({ success: true, data: { message: 'Logged out successfully' } });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to logout' });
+  }
+});
+
+// --- MFA: Send OTP ---
+router.post('/mfa/send-otp', mfaSendLimiter, async (req: AuthRequest, res: Response) => {
+  try {
+    const { tempToken } = req.body;
+    if (!tempToken || typeof tempToken !== 'string') {
+      res.status(400).json({ success: false, error: 'Session token is required.' });
+      return;
+    }
+
+    // Verify temp token
+    let decoded: { userId: string; email: string; purpose: string; exp: number };
+    try {
+      decoded = jwt.verify(tempToken, config.jwtSecret) as { userId: string; email: string; purpose: string; exp: number };
+    } catch {
+      res.status(401).json({ success: false, error: 'Session expired. Please log in again.' });
+      return;
+    }
+
+    if (decoded.purpose !== 'login_mfa') {
+      res.status(401).json({ success: false, error: 'Invalid session.' });
+      return;
+    }
+
+    const user = await User.findById(decoded.userId);
+    if (!user || user.deletedAt) {
+      res.status(401).json({ success: false, error: 'User not found.' });
+      return;
+    }
+
+    // Generate OTP
+    const otp = generateOtp();
+    const otpHash = hashToken(otp);
+    const mfaOtpExpiry = 5; // minutes
+
+    // Store OTP
+    await VerificationToken.create({
+      userId: user._id,
+      tokenHash: otpHash,
+      type: 'login_mfa',
+      expiresAt: new Date(Date.now() + mfaOtpExpiry * 60 * 1000),
+      attempts: 0,
+      ipAddress: req.ip || req.connection?.remoteAddress,
+      userAgent: req.headers['user-agent'],
+    });
+
+    // Check test mode
+    const mfaTestMode = (await Setting.findOne({ key: 'mfa.testMode' }).lean())?.value === 'true';
+    const mfaTestEmail = (await Setting.findOne({ key: 'mfa.testEmail' }).lean())?.value || 'arpanbhagat@yahoo.com';
+    const recipient = mfaTestMode ? mfaTestEmail : user.email;
+
+    // Send OTP email
+    const ip = req.ip || req.connection?.remoteAddress || 'unknown';
+    const ua = req.headers['user-agent'] || 'unknown';
+    sendLoginOtpEmail(recipient, user.fullName, otp, `${mfaOtpExpiry} minutes`).catch(() => {});
+
+    // Audit log
+    await AuditLog.create({
+      userId: user._id,
+      action: 'login_mfa_otp_sent',
+      entity: 'User',
+      entityId: user._id.toString(),
+      ipAddress: ip,
+      userAgent: ua,
+    });
+
+    // Mask email
+    const [localPart, domain] = user.email.split('@');
+    const maskedEmail = localPart.charAt(0) + '***' + localPart.charAt(localPart.length - 1) + '@' + domain;
+
+    res.json({
+      success: true,
+      data: {
+        message: 'A verification code has been sent to your email.',
+        maskedEmail,
+        expiresIn: mfaOtpExpiry * 60,
+      },
+    });
+  } catch (error) {
+    console.error('MFA send-otp error:', error);
+    res.status(500).json({ success: false, error: 'Failed to send verification code.' });
+  }
+});
+
+// --- MFA: Verify OTP ---
+router.post('/mfa/verify', mfaVerifyLimiter, async (req: AuthRequest, res: Response) => {
+  try {
+    const { tempToken, otp } = req.body;
+    if (!tempToken || !otp) {
+      res.status(400).json({ success: false, error: 'Session token and verification code are required.' });
+      return;
+    }
+
+    // Verify temp token
+    let decoded: { userId: string; email: string; purpose: string; exp: number };
+    try {
+      decoded = jwt.verify(tempToken, config.jwtSecret) as { userId: string; email: string; purpose: string; exp: number };
+    } catch {
+      res.status(401).json({ success: false, error: 'Session expired. Please log in again.' });
+      return;
+    }
+
+    if (decoded.purpose !== 'login_mfa') {
+      res.status(401).json({ success: false, error: 'Invalid session.' });
+      return;
+    }
+
+    const user = await User.findById(decoded.userId);
+    if (!user || user.deletedAt) {
+      res.status(401).json({ success: false, error: 'User not found.' });
+      return;
+    }
+
+    if (user.status === 'suspended') {
+      res.status(403).json({ success: false, error: 'Your account has been suspended.', code: 'ACCOUNT_SUSPENDED' });
+      return;
+    }
+    if (user.status === 'inactive') {
+      res.status(403).json({ success: false, error: 'Your account is inactive.', code: 'ACCOUNT_INACTIVE' });
+      return;
+    }
+
+    // Find OTP token
+    const otpHash = hashToken(otp);
+    const token = await VerificationToken.findOne({
+      userId: user._id,
+      tokenHash: otpHash,
+      type: 'login_mfa',
+      usedAt: null,
+    }).sort({ createdAt: -1 });
+
+    if (!token) {
+      // Find any unused token to check attempts
+      const anyToken = await VerificationToken.findOne({
+        userId: user._id,
+        type: 'login_mfa',
+        usedAt: null,
+      }).sort({ createdAt: -1 });
+
+      if (!anyToken) {
+        res.status(400).json({ success: false, error: 'No verification code found. Please request a new one.', code: 'OTP_MAX_ATTEMPTS' });
+        return;
+      }
+
+      const maxAttempts = parseInt(process.env.MAX_OTP_ATTEMPTS || '5', 10);
+      if (anyToken.attempts >= maxAttempts) {
+        res.status(400).json({ success: false, error: 'Too many attempts. Please request a new code.', code: 'OTP_MAX_ATTEMPTS' });
+        return;
+      }
+
+      anyToken.attempts += 1;
+      await anyToken.save();
+
+      const remaining = maxAttempts - anyToken.attempts;
+      res.status(400).json({
+        success: false,
+        error: 'Invalid verification code.',
+        code: 'INVALID_OTP',
+        data: { remainingAttempts: remaining },
+      });
+      return;
+    }
+
+    // Check expiry
+    if (token.expiresAt < new Date()) {
+      res.status(400).json({ success: false, error: 'This code has expired. Please request a new one.', code: 'OTP_EXPIRED' });
+      return;
+    }
+
+    // Check max attempts
+    const maxAttempts = parseInt(process.env.MAX_OTP_ATTEMPTS || '5', 10);
+    if (token.attempts >= maxAttempts) {
+      res.status(400).json({ success: false, error: 'Too many attempts. Please request a new code.', code: 'OTP_MAX_ATTEMPTS' });
+      return;
+    }
+
+    // Mark OTP as used
+    token.usedAt = new Date();
+    token.attempts += 1;
+    await token.save();
+
+    // Generate real tokens
+    const jwtToken = generateToken({ id: user._id.toString(), email: user.email, role: user.role });
+    const refreshTokens = generateRefreshToken();
+    await storeRefreshToken(user._id.toString(), refreshTokens.tokenHash);
+
+    // Get RBAC roles
+    const userRoles = await UserRole.find({ userId: user._id, isActive: true })
+      .populate('roleId', 'name displayName isSuperAdmin');
+    const rbacRoles = userRoles.map((ur) => ur.roleId);
+
+    // Audit log
+    const ip = req.ip || req.connection?.remoteAddress || 'unknown';
+    const ua = req.headers['user-agent'] || 'unknown';
+    await AuditLog.create({
+      userId: user._id,
+      action: 'login_mfa_verified',
+      entity: 'User',
+      entityId: user._id.toString(),
+      ipAddress: ip,
+      userAgent: ua,
+    });
+
+    // Send login notification for admin accounts
+    const isAdmin = rbacRoles.some((r: any) => r.isSuperAdmin || ['SUPER_ADMIN', 'ADMIN', 'CUSTOMER_SERVICE', 'WEBSITE_EDITOR'].includes(r.name));
+    if (isAdmin) {
+      sendLoginNotification(user.email, user.fullName, user.email, ip, ua, true).catch(() => {});
+    }
+
+    res.json({
+      success: true,
+      data: {
+        token: jwtToken,
+        refreshToken: refreshTokens.token,
+        user: {
+          id: user._id,
+          email: user.email,
+          fullName: user.fullName,
+          role: user.role,
+          status: user.status,
+          rbacRoles,
+        },
+      },
+    });
+  } catch (error) {
+    console.error('MFA verify error:', error);
+    res.status(500).json({ success: false, error: 'Verification failed.' });
   }
 });
 

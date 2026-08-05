@@ -4,7 +4,7 @@ import api from './api';
 
 interface AuthContextType {
   user: any;
-  login: (email: string, password: string, captchaToken?: string, captchaAnswer?: string) => Promise<void>;
+  login: (email: string, password: string, captchaToken?: string, captchaAnswer?: string) => Promise<any>;
   logout: () => void;
   refreshUser: () => void;
 }
@@ -27,10 +27,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       payload.captchaAnswer = parseInt(captchaAnswer, 10);
     }
     const res = await api.post('/auth/login', payload);
-    const { token: newToken, user: userData } = res.data.data;
+    const data = res.data.data;
+
+    // If MFA is required, return the data for the login page to handle
+    if (data.code === 'MFA_REQUIRED') {
+      return data;
+    }
+
+    const { token: newToken, user: userData } = data;
     localStorage.setItem('customer_token', newToken);
     setUser(userData);
     nav('/');
+    return data;
   };
 
   const logout = () => { localStorage.removeItem('customer_token'); setUser(null); nav('/login'); };
