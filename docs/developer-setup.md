@@ -127,9 +127,50 @@ The API uses Express with:
 
 Routes are in `packages/api/src/routes/`. Each route file handles a domain (auth, customer, admin, finder, etc.).
 
-## Frontend Development
+## Mobile App (React Native / Expo)
 
-Each frontend is a **Vite + React + TypeScript + Tailwind CSS** application. They share:
+The mobile app lives in `apps/mobile` and uses React Native with Expo.
+
+### Prerequisites
+- **Expo CLI**: `npm install -g expo-cli` (or use `npx expo`)
+- **Expo Go** app installed on your phone (from App Store / Google Play)
+- For iOS development: Xcode (Mac only)
+- For Android development: Android Studio
+
+### Running the Mobile App
+
+```bash
+# Start the mobile app (requires API running on port 5000)
+cd apps/mobile
+npx expo start
+```
+
+Scan the QR code with your phone:
+- **iPhone**: Open Camera app, point at QR code, tap the notification
+- **Android**: Open Expo Go app, tap "Scan QR code"
+
+The app will load and auto-refresh on code changes.
+
+### Environment Variables
+
+Create `apps/mobile/.env`:
+```
+EXPO_PUBLIC_API_URL=http://localhost:5000/api
+```
+
+For staging/production, set `EXPO_PUBLIC_API_URL` to the appropriate API URL.
+
+### Architecture
+
+- **Navigation**: React Navigation (stack navigator with auth gate)
+- **Auth**: JWT tokens stored in `expo-secure-store` (encrypted, never AsyncStorage)
+- **API Client**: Axios with automatic 401 → refresh token → retry interceptor
+- **Design Tokens**: `src/theme/tokens.ts` (from DESIGN.md)
+- **State Components**: `src/components/states/` (SkeletonLoader, Spinner, EmptyState, ErrorState, SuccessConfirmation)
+
+## Frontend Development (Web)
+
+Each web frontend is a **Vite + React + TypeScript + Tailwind CSS** application. They share:
 - `packages/shared` for types and validation
 - Similar project structure and conventions
 - The same API client pattern (Axios with auth interceptors)
