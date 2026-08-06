@@ -7,14 +7,14 @@ PawTag is a pet recovery platform using QR code and NFC tags. A pet owner purcha
 ## High-Level Architecture
 
 ```
-┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐
-│   apps/web   │  │ apps/admin  │  │apps/customer│  │ apps/finder │
-│  Public Site │  │ Admin Portal│  │ Customer    │  │ Finder Page │
-│  & Shop      │  │ (CRUD/RBAC) │  │ Portal      │  │ (Public)    │
-│  :3000       │  │ :3001       │  │ :3002       │  │ :3003       │
-└──────┬───────┘  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘
-       │                 │                │                 │
-       └─────────────────┴────────────────┴─────────────────┘
+┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐
+│   apps/web   │  │ apps/admin  │  │apps/customer│  │ apps/finder │  │ apps/mobile │
+│  Public Site │  │ Admin Portal│  │ Customer    │  │ Finder Page │  │ React Native│
+│  & Shop      │  │ (CRUD/RBAC) │  │ Portal      │  │ (Public)    │  │ (Expo)      │
+│  :3000       │  │ :3001       │  │ :3002       │  │ :3003       │  │ iOS/Android │
+└──────┬───────┘  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘
+       │                 │                │                 │                 │
+       └─────────────────┴────────────────┴─────────────────┴─────────────────┘
                                      │
                               ┌──────┴──────┐
                               │ packages/api │
@@ -54,15 +54,33 @@ Each frontend is a separate Vite + React + TypeScript + Tailwind CSS application
 
 The finder page is intentionally kept minimal — it's the page a stressed stranger opens on their phone with poor signal to report a found pet. Bundling it with heavier apps would hurt the one interaction that matters most for reunions.
 
-## Mobile Strategy — React Native (Expo)
+## Mobile App — React Native (Expo)
 
-A React Native (Expo) app will be built in `apps/mobile` for pet owners. It will:
+The mobile app (`apps/mobile`) is a React Native (Expo) app for pet owners, built with:
 
-- Import `packages/shared` directly for types, validation, and API client — no duplication of business logic
-- Use the same JWT auth system (extended with refresh tokens)
-- Provide native capabilities the web cannot: camera-based QR scanning, NFC tag activation, push notifications
+- **Expo SDK 52** — managed workflow with EAS Build
+- **React Navigation** — stack + bottom tab navigation (13 screens)
+- **Native capabilities**: camera-based QR scanning, NFC tag activation, push notifications
+- Imports `packages/shared` directly for types and validation — no business logic duplication
+- Uses the same JWT auth system with refresh tokens for long-lived sessions
+- Token storage via `expo-secure-store`
+- Push notifications via `expo-notifications` → Expo Push API → Firebase Cloud Messaging (Android) / APNs (iOS)
 
-The finder role gets **no app** — both NFC taps and QR scans open the existing `apps/finder` web page. The physical NFC chip is programmed to open the finder URL; no finder-side download is needed.
+The finder role gets **no app** — both NFC taps and QR scans open the existing `apps/finder` web page.
+
+### Mobile Screens
+
+| Screen | Purpose |
+|--------|---------|
+| Login / Register / ForgotPassword | Auth flows with MFA support |
+| Home | Dashboard with 7 quick action cards |
+| PetList / PetDetail / AddPet | Pet management (CRUD) |
+| QRScanner / NFCScanner | Tag scanning and activation |
+| RedeemTag | Manual tag ID entry + activation |
+| LostMode | Toggle pet lost/found status with confirmation |
+| HealthRecords | 7-tab health records (vaccinations, microchips, etc.) |
+| SubscriptionScreen | View/manage subscriptions |
+| OrderHistory | Order list with tracking |
 
 ## Shared Package
 
@@ -103,16 +121,18 @@ Access tokens are short-lived (30 min). Refresh tokens (30-day, rotating) suppor
 
 ## External Services
 
-| Service | Purpose |
-|---------|---------|
-| MongoDB Atlas | Database |
-| Stripe | Payments, subscriptions |
-| Postmark | Transactional email |
-| Twilio | SMS/OTP |
-| Cloudflare R2 | Object storage (photos, PDFs) |
-| Sentry | Error tracking |
-| Better Stack | Logging, uptime monitoring |
-| Expo | Mobile push notifications |
+| Service | Purpose | Env Var | Failure Impact |
+|---------|---------|---------|----------------|
+| MongoDB Atlas | Database — stores all application data | `DB_URL` | **Critical** — entire app down |
+| Stripe | Payments, subscriptions, customer portal | `STRIPE_SECRET_KEY` | **Critical** — no purchases or subscriptions |
+| Postmark | Transactional email (receipts, verification, notifications) | `SMTP_*` | **High** — emails logged to console, users can't verify/reset |
+| Twilio | SMS/OTP for phone verification | `TWILIO_*` | **Medium** — OTP falls back to demo mode (logged to console) |
+| Cloudflare R2 | Object storage (pet photos, product images, PDFs) | `R2_*` | **Low** — falls back to local disk in dev |
+| Sentry | Error tracking and performance monitoring | `SENTRY_DSN` | **Low** — errors only visible in server logs |
+| Better Stack | Logging, uptime monitoring | — | **Low** — monitoring gap only |
+| Expo | Mobile push notifications, EAS Build | — | **Medium** — push notifications fail silently, no new mobile builds |
+| Apple APNs | iOS push notification delivery | (configured in Expo) | **Medium** — iOS notifications fail |
+| Google FCM | Android push notification delivery | (configured in Expo) | **Medium** — Android notifications fail |
 
 ## Environment Strategy
 
@@ -121,3 +141,23 @@ Three environments with complete separation:
 - **Local** — `pnpm dev:all`, local MongoDB or memory server, Stripe test mode
 - **Staging** — Separate Atlas cluster, Stripe test-mode account, deployed via `develop` branch
 - **Production** — Separate Atlas cluster, Stripe live account, deployed via `main` branch
+
+See `docs/deployment/staging.md` and `docs/deployment/production.md` for deployment procedures.
+
+## Key Documentation
+
+| Document | Purpose |
+|----------|---------|
+| `docs/developer-setup.md` | Local development setup |
+| `docs/environments.md` | Environment variable reference |
+| `docs/database-schema.md` | All 35+ Mongoose models |
+| `docs/business-workflows.md` | Business logic flows |
+| `docs/deployment/staging.md` | Staging deployment guide |
+| `docs/deployment/production.md` | Production deployment guide |
+| `docs/deployment/mobile-release.md` | Mobile app store submission |
+| `docs/release-process.md` | How to ship safely |
+| `docs/rollback.md` | How to undo deployments |
+| `docs/support-runbook.md` | Customer support procedures |
+| `docs/disaster-recovery.md` | Infrastructure failure recovery |
+| `docs/mobile-ux-audit.md` | Mobile UX quality audit |
+| `docs/launch-checklist.md` | Pre-launch verification |
