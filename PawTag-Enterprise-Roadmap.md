@@ -254,7 +254,7 @@ Each of these is produced as the **deliverable of its corresponding phase** belo
 > **Stage E — Infrastructure Hardening (14–16)**
 > **Stage F — Observability & Operations (17–19)**
 > **Stage G — Test Hardening (20–21)**
-> **Stage H — Mobile App (21B, 22–25)**
+> **Stage H — Mobile App (21B, 22–24, 24B, 25)**
 > **Stage I — Documentation & Launch Readiness (26)**
 
 ---
@@ -1674,7 +1674,7 @@ additions themselves.
 **API changes:** None.
 **UI changes:** None directly (foundational — consumed by Phase 23 onward).
 **Testing required:** None automatable — this is a design/documentation phase. Verification is a visual review, not a test suite.
-**Acceptance criteria:** `DESIGN.md` exists, is specific (real hex codes, real point sizes, real spacing scale — not vague adjectives), explains *why* each major choice fits a pet-recovery brand, and the mobile token file is a direct, faithful translation of it.
+**Acceptance criteria:** `DESIGN.md` exists, is specific (real hex codes, real point sizes, real spacing scale — not vague adjectives), explains *why* each major choice fits a pet-recovery brand, includes a concrete motion/interaction specification and a states catalog (see expanded scope below, added when this phase was extended to support the Phase 24B UX Quality Pass), and the mobile token file is a direct, faithful translation of it.
 **Risks:** The main risk is scope creep into restyling existing apps, or the opposite risk — treating this as busywork and producing a thin, generic document that doesn't actually guide anything. Guard against both explicitly.
 **Rollback plan:** `git revert`; purely additive, nothing else depends on this phase's exact content being final (it can be revised later without breaking anything already built against it, as long as the token file's variable *names* stay stable even if their values change).
 **Definition of Done:** `DESIGN.md` reviewed and approved by the founder (this is a brand decision, not a technical one — the founder's sign-off matters here more than in almost any other phase in this roadmap) before Phase 22 proceeds.
@@ -1722,9 +1722,28 @@ TASK:
      inputs, badges/tags — described with enough specificity (corner radius, shadow/elevation
      style, border treatment) that a developer or AI agent could implement them without
      guessing.
-   - **Motion/interaction feel**: brief guidance on transition speed/easing philosophy (e.g.
-     "quick and light, never sluggish — this app is often used in a stressful moment, it
-     should never feel like it's making the user wait").
+   - **Motion & interaction specification** (expanded — this is not a vibe statement, it's a
+     concrete spec the mobile app is built against): standard transition duration(s) in
+     milliseconds for screen transitions, modal/sheet presentation, and micro-interactions
+     (e.g. 200ms for small UI feedback, 300ms for screen navigation — pick real numbers), a
+     named easing curve for each (e.g. ease-out for entrances, ease-in for exits), which
+     interactions get haptic feedback and at what intensity (e.g. a light haptic on successful
+     tag scan, a success haptic on "pet reunited" confirmation, a warning haptic before
+     confirming "mark pet as lost" given how significant that action is), and a general
+     principle (e.g. "this app is often used in a stressful moment — motion should feel quick
+     and reassuring, never sluggish, never playful in a way that trivializes a lost pet").
+   - **States catalog** (new): for each of the following state types, define what it should
+     look like across the app — not per individual screen, but as a reusable pattern every
+     screen follows: **loading state** (skeleton screens preferred over spinners for
+     content-heavy screens like pet lists; a spinner is acceptable for quick actions under
+     ~1 second), **empty state** (an icon/illustration + a friendly one-line message + a clear
+     call-to-action, matching the tone established in the CMS Polish track's empty-state
+     pattern from Phase 36 — reuse that same voice), **error state** (what a failed network
+     request looks like — a retry action, plain-language error text, never a raw error code
+     shown to the user), and **success/confirmation state** (how the app confirms an important
+     action succeeded — e.g. the "pet reunited" moment deserves a genuinely celebratory,
+     emotionally resonant confirmation screen, not a generic toast, given how significant that
+     moment is to the person using the app).
    - **Imagery/photography style**: guidance for pet photos, icons, illustration style if any.
    - **Tone of voice**: brief note on UI copy tone (plain, warm, calm — never cute at the
      expense of clarity, especially in lost-pet-related flows).
@@ -1733,11 +1752,23 @@ TASK:
    as the very first step inside Phase 22 if that fits the actual session flow better — either
    is acceptable, but the token file must exist and be consumed by every mobile screen from
    the very first one built in Phase 22 onward): exported constants/objects for colors,
-   typography scale, spacing scale, and border-radius scale, matching `DESIGN.md` exactly and
+   typography scale, spacing scale, border-radius scale, **and now also motion constants**
+   (transition durations in ms, named easing curves, and a mapping of which interaction types
+   trigger which haptic feedback level using `expo-haptics`), matching `DESIGN.md` exactly and
    using the styling approach Phase 22 will actually use (check what's chosen — e.g. plain
    StyleSheet objects, a themed component library, or a CSS-in-JS solution — and match that
    pattern rather than dictating a new one).
-4. If the audit in step 1 reveals real, meaningful visual inconsistency between the four
+4. Build reusable state components in `apps/mobile/src/components/states/` implementing the
+   states catalog from `DESIGN.md`: a `SkeletonLoader` component (content-shaped, not a
+   generic spinner, for list/detail screens), a `Spinner` component (for sub-1-second quick
+   actions only), an `EmptyState` component (icon + message + CTA, configurable per screen),
+   an `ErrorState` component (retry action + plain-language message, never a raw error code),
+   and a `SuccessConfirmation` component (used specifically for significant moments like "pet
+   reunited" — built to feel genuinely celebratory, not a generic toast). Every mobile screen
+   built in Phases 22–24 must use these shared components for its loading/empty/error/success
+   states rather than each screen inventing its own — this is what Phase 24B will later audit
+   for completeness.
+5. If the audit in step 1 reveals real, meaningful visual inconsistency between the four
    existing web apps (not just minor differences, but genuinely conflicting color/type
    choices), document this as a "Findings" section at the end of `DESIGN.md` — do not silently
    fix it in this phase, since that would be an unplanned redesign of working, shipped apps.
@@ -1747,15 +1778,19 @@ TESTS TO RUN: `pnpm typecheck` (confirm the new token file is valid TypeScript w
 errors). This phase has no automated test suite of its own — it's a documentation and
 foundational-config phase.
 
-FILES TO UPDATE: new `DESIGN.md` at repo root, new `apps/mobile/src/theme/tokens.ts`.
+FILES TO UPDATE: new `DESIGN.md` at repo root, new `apps/mobile/src/theme/tokens.ts`, new
+`apps/mobile/src/components/states/` directory (five shared state components), `expo-haptics`
+added as a dependency of `apps/mobile`.
 
 COMPLETION CRITERIA: `DESIGN.md` exists, is specific and reasoned (not vague), and accurately
 reflects an audit of what's real in the codebase today rather than an invented-from-nothing
-palette. The mobile token file is a faithful, complete translation of it. Explicitly flag in
-your summary that `DESIGN.md` should be reviewed and approved by the founder before Phase 22's
-screens are built on top of it — this is the one phase in the roadmap where a business/brand
-decision matters more than a technical one, and it shouldn't proceed on an AI agent's
-unreviewed judgment alone.
+palette — and now explicitly includes a concrete motion/interaction spec (real durations,
+easing, haptic mapping) and a states catalog (loading/empty/error/success), not just static
+visual tokens. The mobile token file and the five shared state components are a faithful,
+complete translation of that spec. Explicitly flag in your summary that `DESIGN.md` should be
+reviewed and approved by the founder before Phase 22's screens are built on top of it — this is
+the one phase in the roadmap where a business/brand decision matters more than a technical one,
+and it shouldn't proceed on an AI agent's unreviewed judgment alone.
 ```
 
 ---
@@ -1956,6 +1991,90 @@ history) works against staging data regardless.
 
 ---
 
+### Phase 24B — Mobile UX Quality Pass
+
+**Objective:** A dedicated, structured design-quality gate before the app goes anywhere near a store submission — a heuristic usability evaluation, a platform-conformance check against iOS Human Interface Guidelines and Android Material Design (evaluated separately, not as one identical UI on both platforms), a completeness audit of the states catalog from Phase 21B across every screen built in Phases 22–24, and a performance/feel pass. This is the phase that turns "it works and looks consistent" into "it feels genuinely modern and good to use."
+**Why this phase comes now:** Deliberately placed after all functional mobile screens exist (Phases 22–24) but before store-submission prep (Phase 25) — auditing screens before they're built would be premature, and auditing after store submission is too late to fix anything cheaply.
+**Scope:** No new features. This phase reviews and refines what already exists against explicit, named standards — it is a quality gate, not a feature phase.
+**Files likely affected:** Any mobile screen found lacking against the criteria below — fixes should be targeted (a missing empty state, a jarring transition, a platform-inappropriate navigation pattern), not a rewrite.
+**Database changes:** None.
+**API changes:** None.
+**UI changes:** Targeted refinements across existing screens — states added where missing, platform-specific navigation/gesture patterns corrected where wrong, transitions/haptics applied per Phase 21B's motion spec where absent.
+**Testing required:** This phase's "testing" is the audit itself — a documented heuristic evaluation and conformance checklist, plus a manual performance check (frame rate during scroll/navigation, cold-start time) on real devices.
+**Acceptance criteria:** Every screen built in Phases 22–24 has all four states (loading/empty/error/success) implemented using the Phase 21B shared components; every screen's primary navigation pattern matches its platform's native convention; a heuristic evaluation against Nielsen's 10 usability heuristics finds no unresolved severe issues; cold-start time and scroll frame rate meet a stated target (define specific numbers during the phase — e.g. under 3 seconds cold start, no dropped frames during normal list scrolling — based on what's realistic for the app's actual complexity).
+**Risks:** The temptation to treat this as a rubber-stamp pass rather than genuine scrutiny — guard against that explicitly by requiring the audit findings to be written down, not just a "looks good" summary.
+**Rollback plan:** `git revert` on any specific fix if it introduces a regression; the audit itself has no code to roll back.
+**Definition of Done:** A written audit report exists covering all four evaluation areas (heuristics, platform conformance, states completeness, performance), every issue found is either fixed or explicitly deferred with a stated reason, and the founder has reviewed the report before Phase 25 begins.
+
+```
+IMPLEMENTATION PROMPT — PHASE 24B
+
+You are working in the PawTag monorepo. This is Phase 24B, sitting between Phase 24 and Phase
+25 in the mobile stage — Phases 21B–24 are complete (design system, scaffold, pet management/
+QR/NFC, subscriptions/push/lost-mode/order-history). Do ONLY the work below. This is a quality
+audit and refinement phase, not a feature phase.
+
+TASK:
+1. **Heuristic evaluation.** Go through every screen in `apps/mobile` and evaluate it against
+   Nielsen's 10 usability heuristics (visibility of system status, match between system and
+   the real world, user control and freedom, consistency and standards, error prevention,
+   recognition rather than recall, flexibility and efficiency of use, aesthetic and minimalist
+   design, help users recognize/diagnose/recover from errors, help and documentation). For
+   each screen, note any violation found (e.g. "no loading indicator while the tag redemption
+   request is in flight" violates visibility of system status). Produce a written list of
+   findings, each tagged by severity (critical / serious / minor), following the same rigor as
+   the accessibility audit already done for the CMS admin screens in the core roadmap's Phase
+   36 — mirror that documentation style.
+2. **Platform conformance check.** Review every screen against iOS Human Interface Guidelines
+   and Android Material Design guidelines *separately* — check specifically: navigation
+   pattern (iOS typically uses a bottom tab bar with a distinct back-navigation convention;
+   Android has its own back-gesture/button conventions — confirm `@react-navigation/native` is
+   configured to respect each platform's native feel rather than forcing one identical pattern
+   on both), typography conventions (system font usage vs. custom font, appropriate for each
+   platform), and standard control appearance (switches, buttons, alerts should look native to
+   each platform where the app uses platform-default components, per each guideline's actual
+   current recommendations — look these up directly rather than relying on assumed knowledge,
+   since these guidelines are updated periodically).
+3. **States completeness audit.** Go through every screen built in Phases 22–24 and confirm it
+   correctly uses the `SkeletonLoader`/`Spinner`, `EmptyState`, `ErrorState`, and
+   `SuccessConfirmation` components from Phase 21B for every applicable case (a list screen
+   needs a loading state and an empty state at minimum; any screen that calls the API needs an
+   error state; significant actions — tag activation, pet reunited, subscription started —
+   need a success confirmation, not a generic toast). List every screen missing any applicable
+   state and fix it by using the existing shared components — do not invent new one-off state
+   handling per screen.
+4. **Performance/feel pass.** On a real device (not just a simulator, since simulator
+   performance is not representative), measure and record: cold-start time from tapping the
+   app icon to the first interactive screen, and scroll frame rate on the longest list screen
+   (likely order history or pet list) using React Native's built-in performance monitor or
+   Flipper. Define a target for each (state your reasoning for the number chosen — e.g. "under
+   3 seconds cold start is a reasonable bar for an Expo-managed app of this complexity") and
+   fix any specific bottleneck found (e.g. an unmemoized list render, an unnecessarily large
+   image asset) rather than broadly re-architecting if a screen already meets the bar.
+5. Write `docs/mobile-ux-audit.md` documenting all four evaluation areas: every finding from
+   steps 1–4, its severity, whether it was fixed in this phase or explicitly deferred (with a
+   one-line reason — e.g. "deferred: cosmetic only, low severity, scheduling for a future pass
+   rather than delaying launch"), and the final measured performance numbers against their
+   targets.
+
+TESTS TO RUN: `pnpm typecheck` for any code changes made while fixing findings. This phase's
+primary "test" is the written audit itself and the real-device performance measurements —
+report both explicitly, including the actual measured numbers, not just "performance is good."
+
+FILES TO UPDATE: any mobile screen with a fixable finding, new `docs/mobile-ux-audit.md`.
+
+COMPLETION CRITERIA: `docs/mobile-ux-audit.md` exists and covers all four evaluation areas with
+specific, severity-tagged findings — not a vague "looks good" summary. Every critical and
+serious finding is fixed, not just noted. Every screen from Phases 22–24 correctly uses all
+four Phase 21B state components where applicable. Real cold-start and scroll-performance
+numbers are reported against a stated target. Explicitly flag in your summary that the founder
+should review `docs/mobile-ux-audit.md` before Phase 25 (store submission) begins — like Phase
+21B, this phase produces a judgment call about "does this feel good," which deserves a human
+sign-off, not just a passing automated check.
+```
+
+---
+
 ### Phase 25 — Mobile store readiness & E2E
 
 **Objective:** Prepare the mobile app for App Store and Google Play submission, and add Detox/Maestro E2E coverage for the mobile-specific flows.
@@ -1975,7 +2094,9 @@ history) works against staging data regardless.
 IMPLEMENTATION PROMPT — PHASE 25
 
 You are working in the PawTag monorepo. This is Phase 25 of a 26-phase roadmap (Phases 22–24 —
-full mobile feature set — complete). Do ONLY the work below.
+full mobile feature set — and Phase 24B — the UX quality audit and its resulting fixes — are
+complete, and `docs/mobile-ux-audit.md` has been reviewed by the founder). Do ONLY the work
+below.
 
 TASK:
 1. Configure `apps/mobile/app.json` with proper app name, bundle identifiers (iOS) and package
@@ -2806,4 +2927,4 @@ by actually using it to add one real new block type.
 5. Phase 26 is the finish line for the core platform: a checklist you can point to and say, honestly, "this is production-ready."
 6. **Phases 27–32 (Part 8B)** are the affiliate marketplace — separate, optional, start whenever you're ready. Phase 27 needs an approved Amazon Associates account before it can be fully verified.
 7. **Phases 33–36 (Part 8C)** are the CMS polish track — also independent, and honestly the lowest-risk, fastest-to-value track of the three, since it touches presentation and workflow, not core business logic. A good candidate to run early, even in parallel with the others, if the day-to-day content-editing experience is the thing bothering you most right now.
-8. **Phase 21B** sits inside the core sequence (between 21 and 22), not a separate track — it's a short, non-technical decision point (approving `DESIGN.md`) that has to happen before mobile screens get built, so don't skip past it even though it's not a "phase" in the traditional engineering sense.
+8. **Phase 21B and Phase 24B** sit inside the core sequence, not a separate track — both are short, non-technical decision points (approving `DESIGN.md`, then later reviewing `docs/mobile-ux-audit.md`) that gate the mobile stage's start and its finish. Don't skip either just because they're not "engineering" phases in the traditional sense — they're the two places where "does this feel good to use" gets a deliberate answer instead of being assumed.
