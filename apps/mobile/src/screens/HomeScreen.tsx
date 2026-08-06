@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-nati
 import { useAuth } from '../lib/auth-context';
 import { colors, typography, spacing, borderRadius, shadows } from '../theme/tokens';
 
-export function HomeScreen() {
+export function HomeScreen({ navigation }: any) {
   const { user, logout } = useAuth();
 
   return (
@@ -13,18 +13,42 @@ export function HomeScreen() {
         <Text style={styles.subtitle}>Your pets are safe with PawTag</Text>
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Getting Started</Text>
-        <Text style={styles.cardDescription}>
-          This is your PawTag home screen. More features coming in the next phases:
-        </Text>
-        <View style={styles.featureList}>
-          <Text style={styles.featureItem}>• Pet management & profiles</Text>
-          <Text style={styles.featureItem}>• QR & NFC tag activation</Text>
-          <Text style={styles.featureItem}>• Push notifications</Text>
-          <Text style={styles.featureItem}>• Lost mode</Text>
-          <Text style={styles.featureItem}>• Order history</Text>
-        </View>
+      <View style={styles.quickActions}>
+        <TouchableOpacity
+          style={styles.actionCard}
+          onPress={() => navigation.navigate('Pets')}
+        >
+          <Text style={styles.actionIcon}>🐾</Text>
+          <Text style={styles.actionTitle}>My Pets</Text>
+          <Text style={styles.actionDesc}>View and manage your pets</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.actionCard}
+          onPress={() => navigation.navigate('RedeemTag')}
+        >
+          <Text style={styles.actionIcon}>🏷️</Text>
+          <Text style={styles.actionTitle}>Activate Tag</Text>
+          <Text style={styles.actionDesc}>Scan QR or tap NFC to activate</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.actionCard}
+          onPress={() => navigation.navigate('QRScanner')}
+        >
+          <Text style={styles.actionIcon}>📷</Text>
+          <Text style={styles.actionTitle}>Scan QR</Text>
+          <Text style={styles.actionDesc}>Quick QR code scan</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.actionCard}
+          onPress={() => navigation.navigate('NFCScanner')}
+        >
+          <Text style={styles.actionIcon}>📡</Text>
+          <Text style={styles.actionTitle}>NFC Tap</Text>
+          <Text style={styles.actionDesc}>Tap an NFC tag</Text>
+        </TouchableOpacity>
       </View>
 
       <TouchableOpacity style={styles.logoutButton} onPress={logout}>
@@ -41,6 +65,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: spacing[6],
+    paddingBottom: spacing[12],
   },
   header: {
     marginBottom: spacing[6],
@@ -56,32 +81,29 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.body,
     color: colors.gray[500],
   },
-  card: {
+  quickActions: {
+    gap: spacing[3],
+    marginBottom: spacing[6],
+  },
+  actionCard: {
     backgroundColor: colors.white,
     borderRadius: borderRadius['2xl'],
-    padding: spacing[6],
-    marginBottom: spacing[6],
+    padding: spacing[5],
     ...shadows.subtle,
   },
-  cardTitle: {
+  actionIcon: {
+    fontSize: 32,
+    marginBottom: spacing[2],
+  },
+  actionTitle: {
     fontSize: typography.fontSize.h3,
     fontWeight: typography.fontWeight.semibold,
     color: colors.gray[900],
-    marginBottom: spacing[2],
+    marginBottom: spacing[1],
   },
-  cardDescription: {
-    fontSize: typography.fontSize.body,
+  actionDesc: {
+    fontSize: typography.fontSize.bodySm,
     color: colors.gray[500],
-    lineHeight: 24,
-    marginBottom: spacing[4],
-  },
-  featureList: {
-    gap: spacing[2],
-  },
-  featureItem: {
-    fontSize: typography.fontSize.body,
-    color: colors.gray[700],
-    lineHeight: 24,
   },
   logoutButton: {
     backgroundColor: colors.red[50],
