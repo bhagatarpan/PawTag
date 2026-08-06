@@ -117,20 +117,24 @@ export async function createCustomerWithRBAC(overrides: Partial<{ email: string;
 
   const userId = user.insertedId.toString();
 
-  // Create customer role
-  const role = await mongoose.connection.collections.roles.insertOne({
-    name: 'CUSTOMER',
-    displayName: 'Customer',
-    description: 'Standard customer',
-    roleType: 'system',
-    isSystemRole: true,
-    isSuperAdmin: false,
-    isActive: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  });
+  // Create customer role (reuse if exists to avoid duplicate key errors)
+  let role = await mongoose.connection.collections.roles.findOne({ name: 'CUSTOMER' });
+  if (!role) {
+    const result = await mongoose.connection.collections.roles.insertOne({
+      name: 'CUSTOMER',
+      displayName: 'Customer',
+      description: 'Standard customer',
+      roleType: 'system',
+      isSystemRole: true,
+      isSuperAdmin: false,
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    role = await mongoose.connection.collections.roles.findOne({ _id: result.insertedId });
+  }
 
-  const roleId = role.insertedId.toString();
+  const roleId = role!._id.toString();
 
   // Create permissions needed for customer routes
   const permNames = [
