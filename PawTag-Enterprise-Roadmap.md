@@ -1512,7 +1512,7 @@ COMPLETION CRITERIA: all tests across Parts A, B, and C pass. `docs/support-runb
 
 ---
 
-### Phase 20 — Integration test expansion
+### Phase 20 — Integration test expansion ✅ COMPLETE
 
 **Objective:** Bring every route file up to meaningful integration test coverage — the biggest remaining testing gap identified in the original audit (overall API coverage ~16%).
 **Why now:** Do this once the commerce/fulfillment features (Stages B–D) are feature-complete, so tests are written against final behavior, not behavior that's about to change.
@@ -1534,6 +1534,10 @@ COMPLETION CRITERIA: all tests across Parts A, B, and C pass. `docs/support-runb
 > - `tests/integration/cms-and-subs.test.ts` (45 tests) — CMS pages/blogs/testimonials/FAQs, customer notifications/subscriptions, admin subscriptions
 > - `tests/integration/invoice-access-full.test.ts` (28 tests) — invoice access/send/verify/resend-OTP
 > Total: 790 passing (up from 670), 9 pre-existing RBAC failures remain. Typecheck clean.
+> **Update (`17dbde2`):** all 9 RBAC integration test failures subsequently resolved (test
+> expectation fixes — auto-generated clone names, `permissionId` field naming, required `code`
+> field on scope creation, correct status codes, correct response shapes). **799 tests passing,
+> 0 failures**, as of this commit.
 
 ```
 IMPLEMENTATION PROMPT — PHASE 20
@@ -1571,6 +1575,25 @@ Payment-related code (Phase 5 webhook logic), tag redemption (Phase 11), and fin
 (`finder.ts`) each individually show 100% statement coverage. Report the final coverage summary
 table in your response.
 ```
+
+---
+
+### Unplanned Addition — Authentication Hardening (MFA, CAPTCHA, Brute-Force Protection) ✅ COMPLETE
+
+**This was not part of the original 26-phase plan.** It was implemented alongside Phases 1–20 and is documented here after the fact so the roadmap stays an accurate record of what the repository actually contains, not just what was originally planned. Good additions — genuinely closes real security gaps (login endpoints are one of the most commonly attacked surfaces on any commercial platform) — just tracked separately since they weren't scoped, reviewed, or sequenced as part of the plan above.
+
+**What was built**, across four commits (`2fcf71c`, `bd6689e`, `b2cfd0e`, `67576e3`):
+
+- **Brute-force protection**: login is rate-limited (5 attempts / 15 min / IP, configurable via `LOGIN_RATE_LIMIT_MAX`), with account lockout after 5 failed attempts for 30 minutes, an audit log entry on lockout, and the failed-attempt counter reset on successful login. Registration and forgot-password are separately rate-limited (3/hour/IP) against spam and email-bombing.
+- **Admin lock/unlock enhancement**: the existing admin account lock/unlock action now also clears brute-force lockout fields, with a "Locked" badge and expiry tooltip on the admin Users page.
+- **CAPTCHA**: a math-based challenge appears after 2 failed login attempts, validated server-side via a signed, short-lived JWT (5 min expiry), across all three login surfaces (admin, web, customer).
+- **Admin login notification emails**: admin accounts get an email on every successful login (IP, device, timestamp) and on failed attempts — lets you notice a compromised admin account fast.
+- **Multi-factor authentication (email OTP)**: toggleable per role via settings (`mfa.adminEnabled`, `mfa.customerEnabled`) and per-customer via a self-service toggle in account settings; `POST /auth/mfa/send-otp` and `/auth/mfa/verify` routes, rate-limited; a `tempToken` flow so a password-correct-but-MFA-pending session can't fully authenticate until the OTP is verified.
+- **Documentation**: a new `AUTH-FLOWS.md` (2,352 lines) describing every auth path in detail — worth reading in full if you want to understand exactly how login/lockout/MFA interact.
+
+**Files touched:** `packages/api/src/routes/auth.ts`, `packages/db/src/models/User.ts` (new `mfaEnabled`, `failedLoginAttempts`, `lockedUntil` fields), `packages/db/src/models/VerificationToken.ts` (new `login_mfa` type), new email templates (`login-notification.ts`, `mfa-otp.ts`), all three frontend login pages and auth contexts (admin, web, customer), `AUTH-FLOWS.md`.
+
+**One thing worth your attention, not a criticism:** because this work fell outside the planned roadmap, it didn't go through the same "why this phase comes now / acceptance criteria / rollback plan" discipline the rest of this document enforces. It's tested (folded into the 799 passing tests) and appears complete, but if security-sensitive auth changes like this happen again outside a planned phase, it's worth a deliberate review pass rather than assuming test-passing equals production-ready — MFA and lockout logic in particular are the kind of code where a subtle bug (e.g. a lockout that can't be triggered, or an OTP bypass path) is easy to miss without a dedicated security-focused read-through. Consider a short, explicit "review the auth-hardening work" task before this goes to production, separate from continuing the roadmap forward.
 
 ---
 
