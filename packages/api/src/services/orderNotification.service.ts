@@ -1,5 +1,6 @@
 import { Notification, type IOrderDocument } from '@pawtag/db';
 import { sendMail } from './email.service';
+import { sendPushToUser } from './push-notification.service';
 
 interface StatusChangeExtra {
   trackingNumber?: string;
@@ -80,12 +81,15 @@ export async function notifyCustomerOfStatusChange(
   const customerName = user?.fullName || 'Customer';
 
   // Create in-app notification
+  const notifTitle = notifConfig.title;
+  const notifMessage = notifConfig.getMessage(order.orderNumber, extra);
+
   await Notification.create({
     userId: order.userId,
     audience: 'customer',
     type: 'order_update',
-    title: notifConfig.title,
-    message: notifConfig.getMessage(order.orderNumber, extra),
+    title: notifTitle,
+    message: notifMessage,
     data: {
       orderId: order._id.toString(),
       orderNumber: order.orderNumber,
@@ -96,6 +100,14 @@ export async function notifyCustomerOfStatusChange(
     priority: newStatus === 'cancelled' || newStatus === 'refunded' ? 'high' : 'normal',
     channel: 'alert',
   });
+
+  // Send push notification
+  await sendPushToUser(order.userId.toString(), notifTitle, notifMessage, {
+    type: 'order_update',
+    orderId: order._id.toString(),
+    orderNumber: order.orderNumber,
+    status: newStatus,
+  }).catch(() => {});
 
   // Send email
   const emailConfig = STATUS_EMAILS[newStatus];

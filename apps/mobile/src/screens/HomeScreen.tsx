@@ -49,6 +49,33 @@ export function HomeScreen({ navigation }: any) {
           <Text style={styles.actionTitle}>NFC Tap</Text>
           <Text style={styles.actionDesc}>Tap an NFC tag</Text>
         </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.actionCard}
+          onPress={() => navigation.navigate('LostMode')}
+        >
+          <Text style={styles.actionIcon}>🚨</Text>
+          <Text style={styles.actionTitle}>Lost Mode</Text>
+          <Text style={styles.actionDesc}>Mark pets as lost or found</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.actionCard}
+          onPress={() => navigation.navigate('Subscriptions')}
+        >
+          <Text style={styles.actionIcon}>📦</Text>
+          <Text style={styles.actionTitle}>Subscriptions</Text>
+          <Text style={styles.actionDesc}>Manage your tag subscriptions</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.actionCard}
+          onPress={() => navigation.navigate('OrderHistory')}
+        >
+          <Text style={styles.actionIcon}>🛒</Text>
+          <Text style={styles.actionTitle}>Order History</Text>
+          <Text style={styles.actionDesc}>View past orders and invoices</Text>
+        </TouchableOpacity>
       </View>
 
       <TouchableOpacity style={styles.logoutButton} onPress={logout}>

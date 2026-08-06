@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { Tag, FinderScan, LocationEvent, Notification, Subscription, User, Pet, SiteContent, Product } from '@pawtag/db';
+import { sendPushToUser } from '../services/push-notification.service';
 
 const router = Router();
 
@@ -306,11 +307,14 @@ router.post('/:tagId/notify', async (req: Request, res: Response) => {
 
     // Create notification to owner
     if (owner) {
+      const notifTitle = `Your pet ${pet?.name || 'Unknown'} has been found!`;
+      const notifMessage = `A kind person found your pet ${pet?.name || ''} (${pet?.petId || ''}). They left their contact details so you can reach them. ${contactInfo}${locationContext ? '\n\n' + locationContext : ''}`;
+
       await Notification.create({
         userId: owner._id,
         type: 'pet_found',
-        title: `Your pet ${pet?.name || 'Unknown'} has been found!`,
-        message: `A kind person found your pet ${pet?.name || ''} (${pet?.petId || ''}). They left their contact details so you can reach them. ${contactInfo}${locationContext ? '\n\n' + locationContext : ''}`,
+        title: notifTitle,
+        message: notifMessage,
         priority: 'high',
         data: {
           petId: pet?._id,
@@ -324,6 +328,12 @@ router.post('/:tagId/notify', async (req: Request, res: Response) => {
           location: locationSaved ? { latitude, longitude, accuracy } : null,
         },
       });
+
+      await sendPushToUser(owner._id.toString(), notifTitle, notifMessage, {
+        type: 'pet_found',
+        petId: pet?._id?.toString() || '',
+        tagId: tag.tagId,
+      }).catch(() => {});
     }
 
     res.json({

@@ -14,6 +14,9 @@ import { QRScannerScreen } from '../screens/tags/QRScannerScreen';
 import { NFCScannerScreen } from '../screens/tags/NFCScannerScreen';
 import { RedeemTagScreen } from '../screens/tags/RedeemTagScreen';
 import { HealthRecordsScreen } from '../screens/health/HealthRecordsScreen';
+import { SubscriptionScreen } from '../screens/subscriptions/SubscriptionScreen';
+import { OrderHistoryScreen } from '../screens/orders/OrderHistoryScreen';
+import { LostModeScreen } from '../screens/pets/LostModeScreen';
 import { FullScreenSpinner } from '../components/states/Spinner';
 import { colors, typography } from '../theme/tokens';
 import { Text } from 'react-native';
@@ -29,6 +32,9 @@ export type RootStackParamList = {
   NFCScanner: undefined;
   RedeemTag: { tagId?: string };
   HealthRecords: { petId: string; petName: string };
+  Subscriptions: undefined;
+  OrderHistory: undefined;
+  LostMode: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -109,6 +115,9 @@ export function RootNavigator() {
             <Stack.Screen name="NFCScanner" component={NFCScannerScreen} options={authScreenOptions} />
             <Stack.Screen name="RedeemTag" component={RedeemTagScreen} options={authScreenOptions} />
             <Stack.Screen name="HealthRecords" component={HealthRecordsScreen} options={authScreenOptions} />
+            <Stack.Screen name="Subscriptions" component={SubscriptionScreen} options={authScreenOptions} />
+            <Stack.Screen name="OrderHistory" component={OrderHistoryScreen} options={authScreenOptions} />
+            <Stack.Screen name="LostMode" component={LostModeScreen} options={authScreenOptions} />
           </>
         )}
       </Stack.Navigator>

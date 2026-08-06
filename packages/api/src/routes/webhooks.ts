@@ -3,6 +3,7 @@ import { Subscription, Invoice, InvoiceAccessToken, Tag, Order, User, Product, C
 import { notifyCustomerOfStatusChange } from '../services/orderNotification.service';
 import { sendOrderConfirmation, sendInvoiceEmail, sendMail } from '../services/email.service';
 import { generateInvoiceHtml } from '../services/invoice-html.service';
+import { sendPushToUser } from '../services/push-notification.service';
 import { generateSecureToken, hashToken } from '../services/auth.service';
 import logger from '../lib/logger';
 
@@ -302,12 +303,15 @@ async function handlePaymentIntentSucceeded(paymentIntent: any) {
     }
 
     // 5. Log Notification records (customer in-app history)
+    const confirmTitle = 'Order confirmed';
+    const confirmMessage = `Your order ${orderNumber} has been confirmed. Invoice ${invoiceNumber} is ready.`;
+
     await Notification.create({
       userId: order.userId,
       audience: 'customer',
       type: 'order_update',
-      title: 'Order confirmed',
-      message: `Your order ${orderNumber} has been confirmed. Invoice ${invoiceNumber} is ready.`,
+      title: confirmTitle,
+      message: confirmMessage,
       data: {
         orderId: order._id.toString(),
         orderNumber,
@@ -319,6 +323,13 @@ async function handlePaymentIntentSucceeded(paymentIntent: any) {
       priority: 'normal',
       channel: 'info',
     });
+
+    await sendPushToUser(order.userId.toString(), confirmTitle, confirmMessage, {
+      type: 'order_update',
+      orderId: order._id.toString(),
+      orderNumber,
+      status: 'paid',
+    }).catch(() => {});
 
     // 6. Audit log both email sends
     const clientInfo = { ipAddress: 'system', userAgent: 'webhook' };
@@ -463,16 +474,24 @@ async function handleInvoicePaymentFailed(invoice: any) {
     const amount = (invoice.amount_due / 100).toFixed(2);
 
     // In-app notification
+    const failTitle = 'Payment Failed';
+    const failMessage = `Your subscription payment of $${amount} failed. Please update your payment method to avoid service interruption.`;
+
     await Notification.create({
       userId: user._id,
       audience: 'customer',
       type: 'subscription_expiring',
-      title: 'Payment Failed',
-      message: `Your subscription payment of $${amount} failed. Please update your payment method to avoid service interruption.`,
+      title: failTitle,
+      message: failMessage,
       data: { subscriptionId: subscription._id.toString(), invoiceNumber: `INV-${String(count + 1).padStart(6, '0')}` },
       priority: 'high',
       channel: 'alert',
     });
+
+    await sendPushToUser(user._id.toString(), failTitle, failMessage, {
+      type: 'subscription_expiring',
+      subscriptionId: subscription._id.toString(),
+    }).catch(() => {});
 
     // Dunning email
     const html = `

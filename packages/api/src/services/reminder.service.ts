@@ -1,4 +1,5 @@
 import { Pet, Notification } from '@pawtag/db';
+import { sendPushToUser } from './push-notification.service';
 
 const REMINDER_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const REMINDER_CHECK_INTERVAL_MS = 60 * 60 * 1000; // Check every hour
@@ -52,11 +53,14 @@ async function sendFinderReminders() {
       (Date.now() - new Date(pet.foundByFinderAt!).getTime()) / (1000 * 60 * 60)
     );
 
+    const reminderTitle = `REMINDER: Your pet ${pet.name} is still waiting to be reunited!`;
+    const reminderMessage = `${finderName} found your pet ${pet.name} (${pet.petId}) ${hoursSinceFound} hours ago and left their contact details. Please reach out to them to bring your pet home!\n\nFinder contact — Phone: ${finderPhone} | Email: ${finderEmail}`;
+
     await Notification.create({
       userId: owner._id,
       type: 'finder_reminder',
-      title: `REMINDER: Your pet ${pet.name} is still waiting to be reunited!`,
-      message: `${finderName} found your pet ${pet.name} (${pet.petId}) ${hoursSinceFound} hours ago and left their contact details. Please reach out to them to bring your pet home!\n\nFinder contact — Phone: ${finderPhone} | Email: ${finderEmail}`,
+      title: reminderTitle,
+      message: reminderMessage,
       priority: 'high',
       data: {
         petId: pet._id.toString(),
@@ -70,6 +74,11 @@ async function sendFinderReminders() {
         reminderNumber: Math.floor(hoursSinceFound / 24),
       },
     });
+
+    await sendPushToUser(owner._id.toString(), reminderTitle, reminderMessage, {
+      type: 'finder_reminder',
+      petId: pet._id.toString(),
+    }).catch(() => {});
 
     console.log(`[ReminderService] Sent reminder for pet ${pet.name} (${pet.petId}) to ${owner.email}`);
   }

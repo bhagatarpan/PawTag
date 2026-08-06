@@ -2,11 +2,16 @@ import { Router, Response } from 'express';
 import { AuthRequest, authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
 import { Subscription, Invoice, Tag, User, Pet } from '@pawtag/db';
+import Stripe from 'stripe';
 import {
   renewSubscription,
   cancelSubscription,
   changeSubscriptionPlan,
 } from '../services/subscription.service';
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_demo_key', {
+  apiVersion: '2024-06-20' as any,
+});
 
 const router = Router();
 router.use(authenticate);
@@ -280,6 +285,99 @@ router.post('/:id/change-plan', requirePermission('customer.read'), async (req: 
     res.json({ success: true, data: updated });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message || 'Failed to change plan' });
+  }
+});
+
+/**
+ * @swagger
+ * /api/customer/subscriptions/portal-link:
+ *   post:
+ *     summary: Get Stripe billing portal session URL
+ *     tags: [Customer Subscriptions]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               subscriptionId:
+ *                 type: string
+ *                 description: Optional specific subscription to manage
+ *     responses:
+ *       200:
+ *         description: Portal session URL
+ */
+router.post('/portal-link', requirePermission('customer.read'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { subscriptionId } = req.body || {};
+
+    let stripeCustomerId: string | undefined;
+
+    if (subscriptionId) {
+      const subscription = await Subscription.findOne({
+        _id: subscriptionId,
+        userId: req.user!.id,
+        deletedAt: null,
+      });
+      if (!subscription) {
+        res.status(404).json({ success: false, error: 'Subscription not found' });
+        return;
+      }
+      stripeCustomerId = subscription.stripeCustomerId;
+    } else {
+      // Find any subscription with a Stripe customer ID
+      const subscription = await Subscription.findOne({
+        userId: req.user!.id,
+        stripeCustomerId: { $exists: true, $ne: null },
+        deletedAt: null,
+      });
+      stripeCustomerId = subscription?.stripeCustomerId;
+    }
+
+    // Demo mode: if no real Stripe key, return a demo URL
+    if (!process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY === 'sk_test_demo_key') {
+      res.json({
+        success: true,
+        data: { url: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/subscriptions?demo=portal` },
+      });
+      return;
+    }
+
+    if (!stripeCustomerId) {
+      // No Stripe customer yet — create a portal session anyway (Stripe will handle it)
+      const user = await User.findById(req.user!.id).select('email fullName');
+      if (!user) {
+        res.status(404).json({ success: false, error: 'User not found' });
+        return;
+      }
+
+      const customer = await stripe.customers.create({
+        email: user.email,
+        name: user.fullName,
+        metadata: { userId: req.user!.id },
+      });
+
+      stripeCustomerId = customer.id;
+
+      // Update any subscriptions without a Stripe customer ID
+      await Subscription.updateMany(
+        { userId: req.user!.id, stripeCustomerId: { $exists: false } },
+        { stripeCustomerId: customer.id },
+      );
+    }
+
+    const session = await stripe.billingPortal.sessions.create({
+      customer: stripeCustomerId,
+      return_url: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/subscriptions`,
+    });
+
+    res.json({ success: true, data: { url: session.url } });
+  } catch (error: any) {
+    console.error('[Subscriptions] Portal link error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to create portal session' });
   }
 });
 

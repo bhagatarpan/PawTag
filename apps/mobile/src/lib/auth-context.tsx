@@ -6,6 +6,7 @@ import {
   setTokens,
   clearTokens,
 } from '../lib/tokenStorage';
+import { registerForPushNotifications } from './pushNotifications';
 
 interface User {
   _id: string;
@@ -78,6 +79,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { token: accessToken, refreshToken: newRefreshToken, user: userData } = data;
     await setTokens(accessToken, newRefreshToken);
     setUser(userData);
+
+    // Register push token in background (non-blocking)
+    registerForPushNotifications();
+
     return {};
   };
 
