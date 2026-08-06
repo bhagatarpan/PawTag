@@ -254,7 +254,7 @@ Each of these is produced as the **deliverable of its corresponding phase** belo
 > **Stage E — Infrastructure Hardening (14–16)**
 > **Stage F — Observability & Operations (17–19)**
 > **Stage G — Test Hardening (20–21)**
-> **Stage H — Mobile App (22–25)**
+> **Stage H — Mobile App (21B, 22–25)**
 > **Stage I — Documentation & Launch Readiness (26)**
 
 ---
@@ -1664,10 +1664,106 @@ additions themselves.
 
 ---
 
+### Phase 21B — PawTag Design System (`DESIGN.md`)
+
+**Objective:** Produce a single, authoritative `DESIGN.md` documenting PawTag's own visual identity — colors, typography, spacing, component patterns, motion, tone — with the reasoning behind each choice, then turn it into a real design-token file the new mobile app builds from, so it's visually coherent from its very first screen instead of accumulating ad hoc styling decisions screen by screen.
+**Why this phase comes now:** Deliberately placed right before the mobile app's first screen (Phase 22) rather than after — a design system written after screens already exist just documents whatever was improvised, which defeats the point. This is the one phase in Stage H that has to come first.
+**Scope:** One reference document, one token file. This phase does **not** restyle `apps/web`, `apps/customer`, `apps/admin`, or `apps/finder` — that's explicitly out of scope, to avoid turning a mobile-prep phase into an unplanned redesign of four working apps. If real inconsistency is found between the four existing apps during the audit step, it gets documented as a *finding* for a future decision, not silently fixed here.
+**Files likely affected:** New `DESIGN.md` at the repo root, new `apps/mobile/src/theme/tokens.ts` (and equivalent theme-provider wiring for whatever styling approach the mobile app uses — check Phase 22's choice of styling library first, since this phase should follow Phase 22's scaffold decision, not dictate it — see note in the implementation prompt about sequencing this within Phase 22 if needed).
+**Database changes:** None.
+**API changes:** None.
+**UI changes:** None directly (foundational — consumed by Phase 23 onward).
+**Testing required:** None automatable — this is a design/documentation phase. Verification is a visual review, not a test suite.
+**Acceptance criteria:** `DESIGN.md` exists, is specific (real hex codes, real point sizes, real spacing scale — not vague adjectives), explains *why* each major choice fits a pet-recovery brand, and the mobile token file is a direct, faithful translation of it.
+**Risks:** The main risk is scope creep into restyling existing apps, or the opposite risk — treating this as busywork and producing a thin, generic document that doesn't actually guide anything. Guard against both explicitly.
+**Rollback plan:** `git revert`; purely additive, nothing else depends on this phase's exact content being final (it can be revised later without breaking anything already built against it, as long as the token file's variable *names* stay stable even if their values change).
+**Definition of Done:** `DESIGN.md` reviewed and approved by the founder (this is a brand decision, not a technical one — the founder's sign-off matters here more than in almost any other phase in this roadmap) before Phase 22 proceeds.
+
+```
+IMPLEMENTATION PROMPT — PHASE 21B
+
+You are working in the PawTag monorepo. This is Phase 21B, sitting between Phase 21 (E2E
+tests) and Phase 22 (mobile scaffold) in the roadmap — Phases 1–21 are complete. Do ONLY the
+work below.
+
+CONTEXT: getdesign.md (https://getdesign.md/) popularized a useful pattern: a single DESIGN.md
+file documenting a product's design system (colors with reasoning, type scale, spacing scale,
+component patterns, motion, tone) as a reference an AI coding agent can build consistently
+from. Their public catalog contains reverse-engineered analyses of real brands (Stripe,
+Airbnb, Notion, etc.) as inspiration. DO NOT copy any specific brand's actual colors,
+gradients, typography pairing, or other distinctive visual signature from that catalog or
+anywhere else — that creates real brand-confusion and trade-dress risk for a commercial
+product. Use the catalog, if you reference it at all, only to understand the *shape* of a
+good DESIGN.md document (what sections it has, what level of specificity it uses), never as a
+source of actual design values.
+
+TASK:
+1. Audit PawTag's current visual identity as it actually exists in the code today — do not
+   invent one from scratch if a real one is already partially established. Check: `apps/web`,
+   `apps/customer`, `apps/admin` for existing Tailwind config / CSS custom properties / design
+   tokens, the `frontend-design` conventions already referenced in earlier phases (Phase 35's
+   CMS blocks, for instance, were told to reuse "existing design tokens" — find what those
+   actually are), the site's logo/favicon/brand assets, and any existing color palette in use
+   across the CMS block components from the CMS Polish track if that work has been done.
+   Summarize what you find as the *current, real* baseline — colors, fonts, spacing patterns
+   actually in use today, not aspirational ones.
+2. Based on that audit (extending and formalizing what's real, not replacing it with something
+   unrelated), write `DESIGN.md` at the repo root covering, at minimum:
+   - **Brand character**: 2-3 sentences on the intended feel — this is a pet-recovery service,
+     often used by someone stressed or worried about a missing pet, so warmth, clarity, and
+     reassurance should be explicit design goals, not just "modern and clean."
+   - **Color palette**: real hex values for primary, secondary, accent, semantic colors
+     (success/warning/error/info), neutrals/grays, each with a one-line reason for its role.
+   - **Typography**: font family/families actually used or chosen, a defined type scale (e.g.
+     display, h1–h3, body, caption) with actual point/rem sizes and weights.
+   - **Spacing scale**: a defined step scale (e.g. 4/8/12/16/24/32/48/64px) used consistently
+     rather than arbitrary values.
+   - **Component patterns**: buttons (primary/secondary/destructive states), cards, form
+     inputs, badges/tags — described with enough specificity (corner radius, shadow/elevation
+     style, border treatment) that a developer or AI agent could implement them without
+     guessing.
+   - **Motion/interaction feel**: brief guidance on transition speed/easing philosophy (e.g.
+     "quick and light, never sluggish — this app is often used in a stressful moment, it
+     should never feel like it's making the user wait").
+   - **Imagery/photography style**: guidance for pet photos, icons, illustration style if any.
+   - **Tone of voice**: brief note on UI copy tone (plain, warm, calm — never cute at the
+     expense of clarity, especially in lost-pet-related flows).
+3. Translate `DESIGN.md` into `apps/mobile/src/theme/tokens.ts` (create the mobile app's theme
+   directory now even if Phase 22 hasn't formally started, or coordinate this file's creation
+   as the very first step inside Phase 22 if that fits the actual session flow better — either
+   is acceptable, but the token file must exist and be consumed by every mobile screen from
+   the very first one built in Phase 22 onward): exported constants/objects for colors,
+   typography scale, spacing scale, and border-radius scale, matching `DESIGN.md` exactly and
+   using the styling approach Phase 22 will actually use (check what's chosen — e.g. plain
+   StyleSheet objects, a themed component library, or a CSS-in-JS solution — and match that
+   pattern rather than dictating a new one).
+4. If the audit in step 1 reveals real, meaningful visual inconsistency between the four
+   existing web apps (not just minor differences, but genuinely conflicting color/type
+   choices), document this as a "Findings" section at the end of `DESIGN.md` — do not silently
+   fix it in this phase, since that would be an unplanned redesign of working, shipped apps.
+   Flag it clearly for a future, deliberate decision instead.
+
+TESTS TO RUN: `pnpm typecheck` (confirm the new token file is valid TypeScript with no type
+errors). This phase has no automated test suite of its own — it's a documentation and
+foundational-config phase.
+
+FILES TO UPDATE: new `DESIGN.md` at repo root, new `apps/mobile/src/theme/tokens.ts`.
+
+COMPLETION CRITERIA: `DESIGN.md` exists, is specific and reasoned (not vague), and accurately
+reflects an audit of what's real in the codebase today rather than an invented-from-nothing
+palette. The mobile token file is a faithful, complete translation of it. Explicitly flag in
+your summary that `DESIGN.md` should be reviewed and approved by the founder before Phase 22's
+screens are built on top of it — this is the one phase in the roadmap where a business/brand
+decision matters more than a technical one, and it shouldn't proceed on an AI agent's
+unreviewed judgment alone.
+```
+
+---
+
 ### Phase 22 — Mobile app scaffold
 
 **Objective:** Stand up the React Native (Expo) app in `apps/mobile`, sharing types/validation from `packages/shared`, with working auth (using the Phase 2 refresh-token system) as the first vertical slice.
-**Why now:** First mobile phase — everything else in Stage H builds on this scaffold. Deliberately sequenced after the web platform is stable (Stages A–G) so mobile reuses a trustworthy API rather than being built in parallel with a moving target.
+**Why now:** First mobile phase — everything else in Stage H builds on this scaffold. Deliberately sequenced after the web platform is stable (Stages A–G) **and after Phase 21B's `DESIGN.md`/token file exist**, so mobile reuses a trustworthy API and a decided visual identity rather than being built in parallel with two moving targets at once.
 **Scope:** Expo app init, navigation shell, login/register/forgot-password screens wired to the real API with refresh-token handling and secure token storage.
 **Files likely affected:** New `apps/mobile/` directory (Expo project), `pnpm-workspace.yaml` update to include it.
 **Database changes:** None.
@@ -1682,9 +1778,15 @@ additions themselves.
 ```
 IMPLEMENTATION PROMPT — PHASE 22
 
-You are working in the PawTag monorepo. This is Phase 22 of a 26-phase roadmap (Phases 1–21
-complete — the web platform is fully production-ready). Do ONLY the work below. This is the
-first mobile phase.
+You are working in the PawTag monorepo. This is Phase 22 of a 26-phase roadmap (Phases 1–21 and
+21B complete — the web platform is fully production-ready and `DESIGN.md` / the mobile design
+tokens exist and have been approved by the founder). Do ONLY the work below. This is the first
+mobile phase.
+
+IMPORTANT: use `apps/mobile/src/theme/tokens.ts` from Phase 21B for every color, font size,
+spacing, and radius value in the screens you build — do not introduce new ad hoc style values.
+If Phase 21B's token file doesn't exist yet when you start this phase, stop and create it first
+by following Phase 21B's implementation prompt, since every screen from here on depends on it.
 
 TASK:
 1. Initialize a new Expo (React Native, TypeScript template) project at `apps/mobile` using
@@ -2403,6 +2505,298 @@ Nothing in Phases 1–26 needs to change to support this. That separation is del
 
 ---
 
+## Part 8C — CMS Polish Track (Phases 33–36)
+
+**Added after the affiliate track. Also a separate, parallel track — not a change to Phases 1–32.**
+
+### The UX thinking behind this track
+
+You already have the hard part built: a genuinely capable CMS (Puck for visual page-building, Tiptap for rich text, versioning, redirects, media). What's missing isn't features — it's the layer of empathy that turns "a working admin panel" into "something I actually enjoy opening." Four principles drive every phase below, and I want to state them plainly so you can judge the results against them, not just take my word for it:
+
+1. **Plain language over system language.** You should never see a field called `heroSectionVariant` or a collection called `CmsHomepageSection`. You should see "Homepage banner" and "Add a new section." The database can keep its technical names — the screen you look at never should.
+2. **Progressive disclosure.** The first thing you see for any block is the 2–3 things you'll actually change 95% of the time (headline, image, button text). Anything technical — custom CSS, SEO meta fields, advanced layout options — lives behind a collapsed "Advanced" section, present for whoever needs it, invisible until then.
+3. **A safety net removes fear, and fear is the #1 reason non-technical people avoid touching a CMS.** You should always be able to see a live preview before anything goes public, and always be able to undo — one click back to how it looked five minutes ago. If you can't break it permanently, you'll actually use it.
+4. **Guided, not blank.** A blank canvas is intimidating even for professionals. You should be choosing from a gallery of pre-built, on-brand blocks ("Hero banner," "Photo grid," "Customer quote," "Call to action") that already look right the moment you drop them in — not assembling one from scratch.
+
+And because you also asked for this to stay **highly customizable and extendable** — that's a promise to your future developers (human or AI), not to you directly: every block in Phase 35 is built as a self-contained, registered component. Adding a brand-new block type later means writing one new component and registering it in one place — it does not mean touching every existing page or rewriting the editor. Simple for you today, open-ended for whoever builds on it later.
+
+---
+
+### Phase 33 — Plain-language content model & simplified CMS navigation
+
+**Objective:** Re-label every CMS field, section, and navigation item from developer terminology to plain business language, and reorganize the admin CMS navigation around what a business owner is trying to *do* ("Edit homepage," "Manage pages," "Site-wide settings") rather than how the data happens to be modeled.
+**Why this phase comes now:** Everything else in this track (live preview, block gallery, guidance) is wasted if the person using it is still staring at field names like `sortOrder` or `sectionType`. Fix the words before polishing anything visual.
+**Scope:** A display-label mapping layer over the existing CMS admin UI — this does not change the underlying data model or API from Phases 1–32, only how it's presented.
+**Files likely affected:** `apps/admin/src/pages/cms/` (all CMS-related admin pages), a new `apps/admin/src/lib/cmsLabels.ts` central label dictionary.
+**Database changes:** None — field names in `packages/db/src/models/Cms*.ts` stay exactly as they are; this is presentation-only.
+**API changes:** None.
+**UI changes:** Every CMS-related screen relabeled; admin navigation's "CMS" area reorganized into task-based groups: "Homepage," "Pages," "Navigation & Footer," "Announcements," "Redirects" — instead of a flat list of model names.
+**Testing required:** A simple snapshot/visual-regression check confirming no functionality changed, only labels and grouping (this phase is exceptionally low-risk to break anything, since it touches display strings, not logic).
+**Acceptance criteria:** A non-technical reviewer (you) can open every CMS screen and understand what each field does from its label alone, with zero explanation needed.
+**Risks:** Very low — text and navigation changes only.
+**Rollback plan:** `git revert`; no data or API impact.
+**Definition of Done:** Full pass through every CMS admin screen with plain-language labels, confirmed readable by a non-technical person (you) before moving to Phase 34.
+
+```
+IMPLEMENTATION PROMPT — PHASE 33
+
+You are working in the PawTag monorepo. This is Phase 33, the first phase of the CMS Polish
+track, built on top of the completed core roadmap and affiliate track. Do ONLY the work below.
+
+TASK:
+1. Create `apps/admin/src/lib/cmsLabels.ts`: a single, centralized dictionary mapping every
+   technical field/model/enum name currently shown anywhere in the CMS admin UI to a plain-
+   language label and, where useful, a one-sentence plain-language help/description string.
+   Go through every CMS-related admin screen (search `apps/admin/src/pages/` for anything
+   related to `CmsPage`, `CmsHomepageSection`, `CmsNavigation`, `CmsFooter`, `CmsMedia`,
+   `CmsAnnouncement`, `CmsRedirect`, `CmsPageVersion`) and build this dictionary from what you
+   actually find — do not guess at field names, read the real components. Examples of the kind
+   of translation expected: `sectionType` → "Section style", `sortOrder` → "Display order",
+   `isActive`/`published` → "Live on site" / "Draft (not visible yet)", `redirectFrom`/
+   `redirectTo` → "Old page address" / "Sends visitors to". Write real, complete label mappings
+   for every field you find, not a partial example set.
+2. Update every CMS admin component to read labels from this dictionary instead of hardcoding
+   technical field names or auto-generated form labels. Where a field currently has no
+   human-friendly context at all, add a short helper/description line beneath it using the new
+   dictionary's description strings.
+3. Reorganize the admin app's navigation for the CMS area (find the main admin sidebar/nav
+   component) from a flat list of technical model names into task-based groups: "Homepage,"
+   "Pages," "Navigation & Footer," "Announcements," "Redirects," "Media Library" — group the
+   existing routes/pages under these headings rather than renaming the underlying routes
+   themselves (avoid breaking any bookmarked URLs or route-based tests from earlier phases).
+4. Do not change any API request/response shape, any database field name, or any business
+   logic in this phase — verify this by running the full existing test suite unmodified and
+   confirming it still passes with zero changes needed to any test.
+
+TESTS TO RUN: `pnpm test`, `pnpm typecheck`. All existing tests must pass completely unchanged
+— if any test needs to be modified because of this phase, that's a sign the phase has
+overstepped its scope (presentation-only) and should be corrected back to that scope.
+
+FILES TO UPDATE: new `apps/admin/src/lib/cmsLabels.ts`, every CMS-related component under
+`apps/admin/src/pages/`, the admin navigation/sidebar component.
+
+COMPLETION CRITERIA: every field, button, and navigation item across the CMS admin area uses a
+plain-language label with no raw technical/database field names visible anywhere in the UI. All
+existing tests pass unchanged. Provide a short before/after list of at least 10 of the most
+important label changes in your summary so the founder can spot-check them.
+```
+
+---
+
+### Phase 34 — Live preview, drafts, and one-click undo
+
+**Objective:** Build the safety net: every edit shows a live preview before it goes public, content has an explicit Draft/Live state, and any past version (already tracked by the existing `CmsPageVersion` model) can be restored with one click.
+**Why this phase comes now:** This is the single highest-impact change for a non-technical user's confidence — it directly targets "fear of breaking something," which is the real reason CMS tools go unused. Needs Phase 33's plain-language labels in place first so the preview/publish controls themselves read clearly.
+**Scope:** A preview pane (desktop/tablet/mobile toggle) reflecting unsaved changes before publishing; an explicit "Save Draft" vs. "Publish" action; a version history panel with one-click "Restore this version," built on the existing `CmsPageVersion` model.
+**Files likely affected:** `apps/admin/src/pages/cms/` editor components, `packages/api/src/routes/cms-*-admin.ts` (extend to support draft/published state distinctly, if not already present — check first).
+**Database changes:** Confirm/add an explicit `status: 'draft' | 'published'` field on content models where one doesn't already exist (check `CmsPage.ts` and `CmsHomepageSection.ts` — some may already have `isActive`-style flags to build on rather than duplicate).
+**API changes:** Editing content saves as a draft by default; a separate "Publish" action promotes it to live; `GET` routes serving `apps/web` continue returning only published content (no change to public-facing behavior).
+**UI changes:** New live-preview pane with device-size toggle, explicit Save Draft / Publish buttons (not a single ambiguous "Save"), version history sidebar with restore action.
+**Testing required:** Integration tests confirming draft content never appears on the public site until published, and that restoring a prior version correctly reverts content.
+**Acceptance criteria:** A user can make a change, see exactly how it will look on desktop/tablet/mobile, decide not to publish, and walk away with zero risk of the live site changing — and can always get back to any previous version.
+**Risks:** Must not break existing published content during the migration to explicit draft/published state — run this against a copy of real content first, not directly against production data.
+**Rollback plan:** `git revert`; if a data migration was needed for the new status field, ensure it's additive (default existing content to `published` so nothing that was live disappears).
+**Definition of Done:** Tests green; manual walkthrough confirms preview accuracy across all three device sizes and that restore-from-history works correctly.
+
+```
+IMPLEMENTATION PROMPT — PHASE 34
+
+You are working in the PawTag monorepo. This is Phase 34 of the CMS Polish track (Phase 33 —
+plain-language labels — complete). Do ONLY the work below.
+
+TASK:
+1. Audit `packages/db/src/models/CmsPage.ts`, `CmsHomepageSection.ts`, `CmsFooter.ts`,
+   `CmsNavigation.ts`, and `CmsAnnouncement.ts` for existing state fields (e.g. `isActive`,
+   `published`, `status`). Where a clear draft/published distinction doesn't already exist, add
+   a `status: 'draft' | 'published'` field (default `published` for any existing content, so no
+   currently-live content silently disappears when this migration runs). Where an equivalent
+   field already exists, reuse it rather than adding a duplicate — document which you did for
+   each model.
+2. Update the public-facing CMS routes (`cms-public.ts`, `cms-public-v2.ts`) to filter strictly
+   on `status: 'published'` (or the equivalent existing field) — draft content must never be
+   returned to `apps/web`, `apps/customer`, or `apps/finder`. Add an integration test proving
+   this explicitly: create a draft-status page, confirm the public route does not return it;
+   publish it, confirm the public route now does.
+3. In each CMS admin editor screen, replace any single ambiguous "Save" button with two
+   distinct actions: "Save Draft" (writes changes with `status: 'draft'`, does not affect the
+   live site) and "Publish" (writes changes with `status: 'published'`, goes live
+   immediately). Label these clearly per Phase 33's plain-language dictionary, and add a
+   small, persistent status indicator on the editor ("Draft — not visible on your site yet" /
+   "Live — visible to visitors now") so there's never ambiguity about current state.
+4. Build a live preview pane alongside the editor showing the content as it will actually
+   render, using the real frontend rendering logic (embed `apps/web`'s actual page-rendering
+   component if feasible via a shared component/package, rather than building a second,
+   separately-maintained preview renderer that could drift out of sync with the real site) —
+   include a toggle for Desktop / Tablet / Mobile preview widths.
+5. Build a version-history panel using the existing `CmsPageVersion` model: list past versions
+   with a human-readable timestamp ("Edited 2 hours ago by [name]"), and a "Restore this
+   version" button that reverts the content to that version's state (saved as a new draft by
+   default, not force-published — restoring should never silently go live without an explicit
+   publish action, consistent with the draft/publish separation above).
+6. Write integration tests: draft content is excluded from public routes; publishing makes it
+   included; restoring a prior version correctly reverts field values and creates a new draft
+   rather than instantly overwriting the live version.
+
+TESTS TO RUN: `pnpm test:integration`, `pnpm typecheck`, `pnpm test`. All must pass, including
+confirmation that no previously-published content became invisible due to the status migration.
+
+FILES TO UPDATE: relevant `packages/db/src/models/Cms*.ts` files, `cms-public.ts`,
+`cms-public-v2.ts`, all CMS admin editor components, new preview pane component, new version
+history component.
+
+COMPLETION CRITERIA: integration tests pass, explicitly proving draft content stays private and
+restore-from-history works correctly without accidentally publishing. Manually verify the
+preview pane accurately reflects the real site's rendering at all three device widths, and
+report this check explicitly — visual accuracy here is the entire point of this phase.
+```
+
+---
+
+### Phase 35 — Pre-built, on-brand block gallery
+
+**Objective:** Replace the blank Puck canvas with a curated gallery of pre-built, on-brand content blocks (Hero banner, Photo grid, Customer testimonial, Call-to-action, FAQ accordion, Team/pet spotlight card) that a non-technical user picks from and fills in — never assembles from scratch.
+**Why this phase comes now:** This is the single biggest lever on "intuitive" and "feature-rich" from your original ask — needs the safety net (Phase 34) in place first so trying a new block feels risk-free.
+**Scope:** Design and register 6–8 real, reusable Puck block components with sensible defaults and brand-locked styling (correct fonts/colors/spacing baked in, not user-configurable in a way that could break brand consistency), each with only a small number of genuinely editable fields (image, headline, body text, button label/link — not raw CSS).
+**Files likely affected:** New `apps/admin/src/cms-blocks/` directory (one file per block component), Puck config registration.
+**Database changes:** None (block content still stored via the existing `CmsHomepageSection`/`CmsPage` content structure).
+**API changes:** None.
+**UI changes:** A visual block-picker gallery (thumbnail previews, not a text dropdown) when adding a new section to a page.
+**Testing required:** Visual/manual review of each block rendering correctly with placeholder content, at all three preview widths from Phase 34.
+**Acceptance criteria:** A non-technical user can build a complete, professional-looking page section in under two minutes by picking a block and filling in three or four fields, with zero risk of it looking "off-brand."
+**Risks:** Over-restricting customization frustrates power users later — mitigate with Phase 36's "Advanced" escape hatch, not by loosening brand constraints in this phase.
+**Rollback plan:** Additive; existing pages built with the current Puck setup are unaffected.
+**Definition of Done:** All 6–8 blocks built, registered, documented, and manually confirmed to render correctly and consistently on brand.
+
+```
+IMPLEMENTATION PROMPT — PHASE 35
+
+You are working in the PawTag monorepo. This is Phase 35 of the CMS Polish track (Phases 33–34
+complete). Do ONLY the work below.
+
+TASK:
+1. Read the existing Puck configuration (search for where `@puckeditor/core` is configured —
+   likely in `apps/admin/src/` — and check `apps/web` for how existing homepage sections
+   currently render) to understand the current component registration pattern. Also check
+   `/mnt/skills/public/frontend-design/SKILL.md`-style design-token conventions already
+   established for this codebase (colors, spacing, typography) so new blocks stay visually
+   consistent with the rest of the site rather than introducing new ad hoc styles.
+2. Design and build 6–8 reusable block components in a new `apps/admin/src/cms-blocks/`
+   directory (one file per block), each following this exact philosophy: brand styling
+   (colors, fonts, spacing, corner radii) is hardcoded from the existing design tokens and is
+   NOT an editable field; only genuinely content-level fields are editable. Build at minimum:
+   - **Hero Banner**: background image, headline, subheading, one button (label + link)
+   - **Photo Grid**: 3–6 images with optional captions
+   - **Customer Testimonial**: quote text, customer name, optional photo
+   - **Call to Action**: headline, short body text, one button
+   - **FAQ Accordion**: a repeatable list of question/answer pairs
+   - **Pet Spotlight Card**: photo, pet name, short story text — reasonable for a pet-recovery
+     brand's storytelling content specifically
+   Each block's editable-field count should be small (3–6 fields) — if a block seems to need
+   more, split it into two blocks rather than adding more fields to one.
+3. Register each block in the Puck configuration with a clear plain-language name (per Phase
+   33's label conventions) and a representative thumbnail/preview image for the block picker.
+4. Replace or extend the current block-adding UI so that choosing a new section shows a visual
+   gallery of these blocks (thumbnail + one-line description) rather than a plain text list or
+   dropdown.
+5. For each block, provide sensible, appealing placeholder/default content so that dropping a
+   fresh block onto a page immediately looks reasonable, not empty or broken, before the user
+   fills anything in.
+6. Manually verify (and screenshot or describe in your summary) that every block renders
+   correctly and consistently with the site's existing brand styling at desktop, tablet, and
+   mobile preview widths (using Phase 34's preview pane).
+
+TESTS TO RUN: `pnpm typecheck`. This phase is primarily visual/design work — include a manual
+verification checklist in your summary confirming each of the 6–8 blocks was checked at all
+three preview widths.
+
+FILES TO UPDATE: new `apps/admin/src/cms-blocks/` directory with one file per block, Puck
+configuration registration, the block-picker gallery UI component.
+
+DOCUMENTATION: append a "Content Blocks" section to `docs/affiliate-marketplace.md`'s sibling —
+create `docs/cms-content-guide.md` — listing each block, what it's for, and a screenshot or
+description of its editable fields, written in plain language for the founder to reference.
+
+COMPLETION CRITERIA: all 6–8 blocks are built, registered, visually verified at all three
+preview widths, and documented in `docs/cms-content-guide.md`. The block-picker gallery shows
+visual thumbnails, not a plain text list.
+```
+
+---
+
+### Phase 36 — In-context guidance, accessibility, and the developer extensibility guide
+
+**Objective:** Add contextual help throughout the CMS admin UI (tooltips, empty-state guidance, inline hints), bring the CMS admin screens up to solid accessibility standards, and write the developer-facing guide for adding new block types — so "highly extendable" is a documented, repeatable process, not tribal knowledge.
+**Why this phase comes now:** Closes out the track — needs the finished plain-language UI (33), safety net (34), and block gallery (35) all in place, since guidance and documentation should describe the *final* experience, not an intermediate one.
+**Scope:** Tooltips/help text on every non-obvious control; friendly empty states ("You haven't added any announcements yet — click here to add your first one") instead of blank tables; an accessibility pass (keyboard navigation, screen-reader labels, color contrast) on all CMS admin screens; a written guide for developers on registering a new block.
+**Files likely affected:** All CMS admin components (incremental additions, not rewrites), new `docs/cms-block-authoring-guide.md`.
+**Database changes:** None.
+**API changes:** None.
+**UI changes:** Tooltips, empty states, accessibility fixes across the CMS admin area.
+**Testing required:** Automated accessibility audit (axe-core, consistent with the original roadmap's testing plan) run specifically against the CMS admin screens; manual keyboard-only navigation test.
+**Acceptance criteria:** Every CMS screen passes an automated accessibility check with no critical/serious violations; every non-obvious control has a one-line explanation available on hover/focus; a developer (or AI coding session) can follow the authoring guide to add a genuinely new block type without needing to ask a human for help.
+**Risks:** Low.
+**Rollback plan:** `git revert`; additive only.
+**Definition of Done:** Accessibility audit passes, guidance is present throughout, and the extensibility guide is written and — ideally — test-driven by actually adding one new sample block type following only the guide's instructions.
+
+```
+IMPLEMENTATION PROMPT — PHASE 36
+
+You are working in the PawTag monorepo. This is Phase 36, the final phase of the CMS Polish
+track (Phases 33–35 complete). Do ONLY the work below.
+
+TASK:
+1. Go through every CMS admin screen and add a short, plain-language tooltip or inline help
+   line (reusing the description strings from Phase 33's `cmsLabels.ts` dictionary where they
+   exist, extending that dictionary with additional descriptions where needed) on every control
+   that isn't immediately self-explanatory — err on the side of a few extra words of guidance
+   rather than assuming familiarity.
+2. Replace every empty-state table/list in the CMS admin area (e.g. an empty announcements
+   list, an empty redirects list) with a friendly, actionable message and a clear call-to-
+   action button — e.g. "You haven't added any announcements yet. Announcements appear as a
+   banner at the top of your site — click below to add your first one," with a button that
+   goes straight into the creation flow, rather than a bare empty table.
+3. Add `@axe-core/react` (or run `axe-core` via a Playwright-based check if that fits the
+   existing testing setup better — check what's already used elsewhere in the codebase's
+   testing stack per the original roadmap's Phase 21) against every CMS admin route, and fix
+   any critical or serious violations found — common issues to check for specifically: color
+   contrast on buttons/labels, missing `aria-label`s on icon-only buttons, keyboard focus order
+   through the block editor and preview pane, and proper heading hierarchy on each screen.
+4. Manually test full keyboard-only navigation (no mouse) through: adding a new page, adding a
+   block from the Phase 35 gallery, editing its content, and publishing it — confirm every step
+   is reachable and operable via keyboard alone, and report this test explicitly.
+5. Write `docs/cms-block-authoring-guide.md`: a step-by-step guide for a developer (or a future
+   AI coding session) to add a brand-new block type to the Phase 35 gallery — creating the
+   component file, defining its editable fields, registering it in the Puck config, adding its
+   thumbnail, and adding its plain-language label/description to `cmsLabels.ts`. Write this
+   guide, then as a validation step, actually follow it yourself to add one new simple sample
+   block (e.g. a "Video Embed" block) end-to-end, and note in your summary whether the guide
+   was sufficient on its own or needed correction — correct the guide if it did.
+
+TESTS TO RUN: automated accessibility check against all CMS admin routes (report violation
+count before and after fixes), `pnpm typecheck`, `pnpm test`. All must pass, with zero critical
+or serious accessibility violations remaining on CMS screens.
+
+FILES TO UPDATE: CMS admin components (tooltips, empty states), accessibility fixes throughout,
+new `docs/cms-block-authoring-guide.md`, one new sample block built while validating the guide.
+
+COMPLETION CRITERIA: automated accessibility audit shows zero critical/serious violations on
+CMS admin screens. Manual keyboard-only walkthrough of the full add-page-add-block-publish flow
+is confirmed working and reported explicitly. The authoring guide exists and was proven to work
+by actually using it to add one real new block type.
+```
+
+---
+
+## Part 8C Summary — What "Polished" Looks Like When This Track Is Done
+
+- You open the CMS and every label makes sense without asking anyone what it means.
+- You can try anything — a new block, a big change to the homepage — see exactly how it'll look on phone, tablet, and desktop, and walk away without publishing if you're not sure. Nothing goes live until you explicitly say "Publish."
+- If something ever does look wrong after publishing, you click "Restore this version" and it's back to how it was, no developer needed.
+- Adding new content is picking from a gallery of good-looking, on-brand blocks and filling in a few fields — never staring at a blank page wondering where to start.
+- None of this locks your future developers in: every block is one small, self-contained, documented component, and the guide in Phase 36 means adding the next one doesn't require reverse-engineering how the last one was built.
+
+---
+
 ## Part 9 — How to Use This
 
 1. Read Part 1 once — those are the decisions; you don't need to revisit them.
@@ -2410,4 +2804,6 @@ Nothing in Phases 1–26 needs to change to support this. That separation is del
 3. Work the phases in Part 8 **in order, one at a time**. For each: copy the implementation prompt into Claude Code, let it complete the phase fully (including its tests), review the result, then move to the next phase. Don't skip ahead — later phases assume earlier ones are genuinely done, not just started.
 4. A handful of phases (9, 14, 16, 24, 25) need something from you first — a courier account, an R2/Sentry/Expo account, etc. Those are called out explicitly in each phase; nothing will silently block on them, but they won't be *fully* verified until you've provided the credentials.
 5. Phase 26 is the finish line for the core platform: a checklist you can point to and say, honestly, "this is production-ready."
-6. **Phases 27–32 (Part 8B) are a separate, optional track** for the affiliate marketplace — start it whenever you're ready, independent of exactly where you are in 1–26, though it makes sense to have your core platform stable first since the affiliate storefront lives on `apps/web` and the admin dashboard alongside it. Phase 27 needs an approved Amazon Associates account before it can be fully verified — that approval process is worth starting now, in parallel, since it can take time on Amazon's side.
+6. **Phases 27–32 (Part 8B)** are the affiliate marketplace — separate, optional, start whenever you're ready. Phase 27 needs an approved Amazon Associates account before it can be fully verified.
+7. **Phases 33–36 (Part 8C)** are the CMS polish track — also independent, and honestly the lowest-risk, fastest-to-value track of the three, since it touches presentation and workflow, not core business logic. A good candidate to run early, even in parallel with the others, if the day-to-day content-editing experience is the thing bothering you most right now.
+8. **Phase 21B** sits inside the core sequence (between 21 and 22), not a separate track — it's a short, non-technical decision point (approving `DESIGN.md`) that has to happen before mobile screens get built, so don't skip past it even though it's not a "phase" in the traditional engineering sense.
