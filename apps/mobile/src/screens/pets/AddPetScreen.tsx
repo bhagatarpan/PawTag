@@ -63,7 +63,9 @@ export function AddPetScreen({ navigation }: AddPetScreenProps) {
       if (form.notes) payload.notes = form.notes;
 
       await api.post('/customer/pets', payload);
-      navigation.goBack();
+      Alert.alert('Pet Added', `${form.name} has been added successfully!`, [
+        { text: 'OK', onPress: () => navigation.goBack() },
+      ]);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to add pet');
     } finally {

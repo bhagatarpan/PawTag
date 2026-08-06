@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import api from '../../api/client';
 import { colors, typography, spacing, borderRadius, shadows } from '../../theme/tokens';
+import { hapticMedium, hapticSuccess, hapticError } from '../../lib/haptics';
 
 interface Pet {
   _id: string;
@@ -95,6 +96,7 @@ export function PetDetailScreen({ navigation, route }: PetDetailScreenProps) {
       if (form.notes !== undefined) payload.notes = form.notes;
 
       await api.put(`/customer/pets/${pet._id}`, payload);
+      hapticSuccess();
       setEditing(false);
       await fetchPet();
     } catch (err: any) {
@@ -113,7 +115,10 @@ export function PetDetailScreen({ navigation, route }: PetDetailScreenProps) {
         onPress: async () => {
           try {
             await api.delete(`/customer/pets/${petId}`);
-            navigation.goBack();
+            hapticSuccess();
+            Alert.alert('Deleted', `${pet?.name} has been deleted.`, [
+              { text: 'OK', onPress: () => navigation.goBack() },
+            ]);
           } catch (err: any) {
             Alert.alert('Error', err.response?.data?.error || 'Failed to delete pet');
           }
@@ -130,6 +135,7 @@ export function PetDetailScreen({ navigation, route }: PetDetailScreenProps) {
         style: 'destructive',
         onPress: async () => {
           try {
+            hapticError();
             await api.post(`/customer/pets/${petId}/mark-lost`);
             await fetchPet();
           } catch (err: any) {
@@ -142,6 +148,7 @@ export function PetDetailScreen({ navigation, route }: PetDetailScreenProps) {
 
   const handleMarkFound = async () => {
     try {
+      hapticSuccess();
       await api.post(`/customer/pets/${petId}/mark-found`);
       await fetchPet();
     } catch (err: any) {

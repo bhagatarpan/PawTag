@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,9 +7,11 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  RefreshControl,
 } from 'react-native';
 import api from '../../api/client';
 import { colors, typography, spacing, borderRadius, shadows } from '../../theme/tokens';
+import { hapticMedium, hapticSuccess } from '../../lib/haptics';
 
 interface Pet {
   _id: string;
@@ -33,6 +35,7 @@ export function LostModeScreen({ navigation }: any) {
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
 
   const fetchPets = async () => {
     try {
@@ -50,6 +53,12 @@ export function LostModeScreen({ navigation }: any) {
     fetchPets();
   }, []);
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchPets();
+    setRefreshing(false);
+  }, []);
+
   const handleToggleLost = (pet: Pet) => {
     if (pet.status === 'lost') {
       // Mark as found
@@ -60,11 +69,12 @@ export function LostModeScreen({ navigation }: any) {
           { text: 'Cancel', style: 'cancel' },
           {
             text: 'Mark Found',
-            onPress: async () => {
-              setToggling(pet._id);
-              try {
-                await api.post(`/customer/pets/${pet._id}/mark-found`);
-                await fetchPets();
+                onPress: async () => {
+                  setToggling(pet._id);
+                  try {
+                    hapticSuccess();
+                    await api.post(`/customer/pets/${pet._id}/mark-found`);
+                    await fetchPets();
               } catch (err: any) {
                 Alert.alert('Error', err.response?.data?.error || 'Failed to update pet status');
               } finally {
@@ -84,11 +94,12 @@ export function LostModeScreen({ navigation }: any) {
           {
             text: 'Mark Lost',
             style: 'destructive',
-            onPress: async () => {
-              setToggling(pet._id);
-              try {
-                await api.post(`/customer/pets/${pet._id}/mark-lost`);
-                await fetchPets();
+                onPress: async () => {
+                  setToggling(pet._id);
+                  try {
+                    hapticMedium();
+                    await api.post(`/customer/pets/${pet._id}/mark-lost`);
+                    await fetchPets();
               } catch (err: any) {
                 Alert.alert('Error', err.response?.data?.error || 'Failed to update pet status');
               } finally {
@@ -110,7 +121,11 @@ export function LostModeScreen({ navigation }: any) {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary[500]} />}
+    >
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Text style={styles.backText}>← Back</Text>

@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
 import { useAuth } from '../lib/auth-context';
 import { colors, typography, spacing, borderRadius, shadows } from '../theme/tokens';
+import { hapticLight } from '../lib/haptics';
 
 export function HomeScreen({ navigation }: any) {
   const { user, logout } = useAuth();
@@ -16,7 +17,7 @@ export function HomeScreen({ navigation }: any) {
       <View style={styles.quickActions}>
         <TouchableOpacity
           style={styles.actionCard}
-          onPress={() => navigation.navigate('Pets')}
+          onPress={() => { hapticLight(); navigation.navigate('Pets'); }}
         >
           <Text style={styles.actionIcon}>🐾</Text>
           <Text style={styles.actionTitle}>My Pets</Text>
@@ -25,7 +26,7 @@ export function HomeScreen({ navigation }: any) {
 
         <TouchableOpacity
           style={styles.actionCard}
-          onPress={() => navigation.navigate('RedeemTag')}
+          onPress={() => { hapticLight(); navigation.navigate('RedeemTag'); }}
         >
           <Text style={styles.actionIcon}>🏷️</Text>
           <Text style={styles.actionTitle}>Activate Tag</Text>
@@ -34,7 +35,7 @@ export function HomeScreen({ navigation }: any) {
 
         <TouchableOpacity
           style={styles.actionCard}
-          onPress={() => navigation.navigate('QRScanner')}
+          onPress={() => { hapticLight(); navigation.navigate('QRScanner'); }}
         >
           <Text style={styles.actionIcon}>📷</Text>
           <Text style={styles.actionTitle}>Scan QR</Text>
@@ -43,7 +44,7 @@ export function HomeScreen({ navigation }: any) {
 
         <TouchableOpacity
           style={styles.actionCard}
-          onPress={() => navigation.navigate('NFCScanner')}
+          onPress={() => { hapticLight(); navigation.navigate('NFCScanner'); }}
         >
           <Text style={styles.actionIcon}>📡</Text>
           <Text style={styles.actionTitle}>NFC Tap</Text>
@@ -52,7 +53,7 @@ export function HomeScreen({ navigation }: any) {
 
         <TouchableOpacity
           style={styles.actionCard}
-          onPress={() => navigation.navigate('LostMode')}
+          onPress={() => { hapticLight(); navigation.navigate('LostMode'); }}
         >
           <Text style={styles.actionIcon}>🚨</Text>
           <Text style={styles.actionTitle}>Lost Mode</Text>
@@ -61,7 +62,7 @@ export function HomeScreen({ navigation }: any) {
 
         <TouchableOpacity
           style={styles.actionCard}
-          onPress={() => navigation.navigate('Subscriptions')}
+          onPress={() => { hapticLight(); navigation.navigate('Subscriptions'); }}
         >
           <Text style={styles.actionIcon}>📦</Text>
           <Text style={styles.actionTitle}>Subscriptions</Text>
@@ -70,7 +71,7 @@ export function HomeScreen({ navigation }: any) {
 
         <TouchableOpacity
           style={styles.actionCard}
-          onPress={() => navigation.navigate('OrderHistory')}
+          onPress={() => { hapticLight(); navigation.navigate('OrderHistory'); }}
         >
           <Text style={styles.actionIcon}>🛒</Text>
           <Text style={styles.actionTitle}>Order History</Text>
@@ -78,7 +79,15 @@ export function HomeScreen({ navigation }: any) {
         </TouchableOpacity>
       </View>
 
-      <TouchableOpacity style={styles.logoutButton} onPress={logout}>
+      <TouchableOpacity
+        style={styles.logoutButton}
+        onPress={() => {
+          Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Sign Out', style: 'destructive', onPress: logout },
+          ]);
+        }}
+      >
         <Text style={styles.logoutText}>Sign Out</Text>
       </TouchableOpacity>
     </ScrollView>

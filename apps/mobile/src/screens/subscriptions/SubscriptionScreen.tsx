@@ -13,6 +13,7 @@ import api from '../../api/client';
 import { colors, typography, spacing, borderRadius, shadows } from '../../theme/tokens';
 import { EmptyState } from '../../components/states/EmptyState';
 import { ErrorState } from '../../components/states/ErrorState';
+import { hapticLight } from '../../lib/haptics';
 
 interface Subscription {
   _id: string;
@@ -67,6 +68,7 @@ export function SubscriptionScreen({ navigation }: any) {
   };
 
   const handleManageSubscription = async () => {
+    hapticLight();
     setPortalLoading(true);
     try {
       const res = await api.post('/customer/subscriptions/portal-link');

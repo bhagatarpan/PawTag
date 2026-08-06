@@ -13,6 +13,7 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import api from '../../api/client';
 import { colors, typography, spacing, borderRadius, shadows } from '../../theme/tokens';
+import { hapticLight, hapticSuccess } from '../../lib/haptics';
 
 interface HealthRecordsScreenProps {
   navigation: any;
@@ -36,14 +37,17 @@ export function HealthRecordsScreen({ navigation, route }: HealthRecordsScreenPr
   const [activeTab, setActiveTab] = useState<Tab>('vaccinations');
   const [records, setRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [showAdd, setShowAdd] = useState(false);
 
   const fetchRecords = async () => {
     try {
       const res = await api.get(`/customer/pets/${petId}/${activeTab}`);
       setRecords(res.data.data || []);
-    } catch {
+      setError('');
+    } catch (err: any) {
       setRecords([]);
+      setError(err.response?.data?.error || 'Failed to load health records');
     } finally {
       setLoading(false);
     }
@@ -64,6 +68,7 @@ export function HealthRecordsScreen({ navigation, route }: HealthRecordsScreenPr
         style: 'destructive',
         onPress: async () => {
           try {
+            hapticSuccess();
             await api.delete(`/customer/pets/${petId}/${endpoint}`);
             fetchRecords();
           } catch (err: any) {
@@ -193,7 +198,7 @@ export function HealthRecordsScreen({ navigation, route }: HealthRecordsScreenPr
         renderItem={({ item }) => (
           <TouchableOpacity
             style={[styles.tab, activeTab === item.key && styles.tabActive]}
-            onPress={() => setActiveTab(item.key)}
+            onPress={() => { hapticLight(); setActiveTab(item.key); }}
           >
             <Text style={[styles.tabText, activeTab === item.key && styles.tabTextActive]}>
               {item.label}
@@ -205,6 +210,13 @@ export function HealthRecordsScreen({ navigation, route }: HealthRecordsScreenPr
       {loading ? (
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={colors.primary[600]} />
+        </View>
+      ) : error ? (
+        <View style={styles.centered}>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={() => { setLoading(true); fetchRecords(); }}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <FlatList
@@ -390,5 +402,25 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.body,
     color: colors.gray[500],
     textAlign: 'center',
+  },
+  errorText: {
+    fontSize: typography.fontSize.bodySm,
+    color: colors.red[600],
+    backgroundColor: colors.red[50],
+    padding: spacing[3],
+    borderRadius: borderRadius.lg,
+    marginBottom: spacing[4],
+    textAlign: 'center',
+  },
+  retryButton: {
+    backgroundColor: colors.primary[600],
+    borderRadius: borderRadius.xl,
+    paddingHorizontal: spacing[6],
+    paddingVertical: spacing[3],
+  },
+  retryButtonText: {
+    color: colors.white,
+    fontSize: typography.fontSize.body,
+    fontWeight: typography.fontWeight.semibold,
   },
 });

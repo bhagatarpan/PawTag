@@ -12,6 +12,7 @@ import api from '../../api/client';
 import { colors, typography, spacing, borderRadius, shadows } from '../../theme/tokens';
 import { EmptyState } from '../../components/states/EmptyState';
 import { ErrorState } from '../../components/states/ErrorState';
+import { hapticLight } from '../../lib/haptics';
 
 interface Order {
   _id: string;
@@ -83,6 +84,7 @@ export function OrderHistoryScreen({ navigation }: any) {
   };
 
   const toggleExpand = (id: string) => {
+    hapticLight();
     setExpandedId(expandedId === id ? null : id);
   };
 

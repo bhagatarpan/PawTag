@@ -28,6 +28,7 @@ export function RegisterScreen({ navigation }: RegisterScreenProps) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [acceptTerms, setAcceptTerms] = useState(false);
 
   const handleRegister = async () => {
     setError('');
@@ -44,6 +45,10 @@ export function RegisterScreen({ navigation }: RegisterScreenProps) {
       setError('Password must be at least 8 characters');
       return;
     }
+    if (!acceptTerms) {
+      setError('You must agree to the Terms of Service and Privacy Policy');
+      return;
+    }
 
     setLoading(true);
     try {
@@ -53,7 +58,7 @@ export function RegisterScreen({ navigation }: RegisterScreenProps) {
         phoneNumber,
         password,
         confirmPassword,
-        acceptTerms: true,
+        acceptTerms,
       });
       setSuccess(true);
     } catch (err: any) {
@@ -160,11 +165,20 @@ export function RegisterScreen({ navigation }: RegisterScreenProps) {
             />
           </View>
 
-          <Text style={styles.termsText}>
-            By creating an account, you agree to our{' '}
-            <Text style={styles.termsLink}>Terms of Service</Text> and{' '}
-            <Text style={styles.termsLink}>Privacy Policy</Text>
-          </Text>
+          <TouchableOpacity
+            style={styles.checkboxRow}
+            onPress={() => setAcceptTerms(!acceptTerms)}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.checkbox, acceptTerms && styles.checkboxChecked]}>
+              {acceptTerms && <Text style={styles.checkmark}>✓</Text>}
+            </View>
+            <Text style={styles.termsText}>
+              I agree to the{' '}
+              <Text style={styles.termsLink}>Terms of Service</Text> and{' '}
+              <Text style={styles.termsLink}>Privacy Policy</Text>
+            </Text>
+          </TouchableOpacity>
 
           <TouchableOpacity
             style={[styles.button, loading && styles.buttonDisabled]}
@@ -262,12 +276,35 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.body,
     color: colors.gray[900],
   },
+  checkboxRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing[4],
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: colors.gray[300],
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing[2],
+  },
+  checkboxChecked: {
+    backgroundColor: colors.primary[600],
+    borderColor: colors.primary[600],
+  },
+  checkmark: {
+    color: colors.white,
+    fontSize: 14,
+    fontWeight: typography.fontWeight.bold,
+  },
   termsText: {
     fontSize: typography.fontSize.bodySm,
     color: colors.gray[500],
-    textAlign: 'center',
-    marginBottom: spacing[4],
     lineHeight: 20,
+    flex: 1,
   },
   termsLink: {
     color: colors.primary[600],

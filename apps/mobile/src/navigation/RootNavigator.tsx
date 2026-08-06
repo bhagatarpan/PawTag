@@ -79,6 +79,17 @@ function MainTabs() {
 const screenOptions = {
   headerShown: false,
   contentStyle: { backgroundColor: colors.gray[50] },
+  animation: 'slide_from_right' as const,
+};
+
+const stackScreenOptions = {
+  ...screenOptions,
+  headerShown: true,
+  headerTitle: '',
+  headerShadowVisible: false,
+  headerStyle: { backgroundColor: colors.gray[50] },
+  headerTintColor: colors.primary[600],
+  headerBackTitle: 'Back',
 };
 
 const authScreenOptions = {
@@ -109,15 +120,15 @@ export function RootNavigator() {
         ) : (
           <>
             <Stack.Screen name="MainTabs" component={MainTabs} options={screenOptions} />
-            <Stack.Screen name="PetDetail" component={PetDetailScreen} options={authScreenOptions} />
-            <Stack.Screen name="AddPet" component={AddPetScreen} options={authScreenOptions} />
-            <Stack.Screen name="QRScanner" component={QRScannerScreen} options={authScreenOptions} />
-            <Stack.Screen name="NFCScanner" component={NFCScannerScreen} options={authScreenOptions} />
-            <Stack.Screen name="RedeemTag" component={RedeemTagScreen} options={authScreenOptions} />
-            <Stack.Screen name="HealthRecords" component={HealthRecordsScreen} options={authScreenOptions} />
-            <Stack.Screen name="Subscriptions" component={SubscriptionScreen} options={authScreenOptions} />
-            <Stack.Screen name="OrderHistory" component={OrderHistoryScreen} options={authScreenOptions} />
-            <Stack.Screen name="LostMode" component={LostModeScreen} options={authScreenOptions} />
+            <Stack.Screen name="PetDetail" component={PetDetailScreen} options={stackScreenOptions} />
+            <Stack.Screen name="AddPet" component={AddPetScreen} options={stackScreenOptions} />
+            <Stack.Screen name="QRScanner" component={QRScannerScreen} options={{ ...stackScreenOptions, headerShown: false }} />
+            <Stack.Screen name="NFCScanner" component={NFCScannerScreen} options={{ ...stackScreenOptions, headerShown: false }} />
+            <Stack.Screen name="RedeemTag" component={RedeemTagScreen} options={stackScreenOptions} />
+            <Stack.Screen name="HealthRecords" component={HealthRecordsScreen} options={stackScreenOptions} />
+            <Stack.Screen name="Subscriptions" component={SubscriptionScreen} options={stackScreenOptions} />
+            <Stack.Screen name="OrderHistory" component={OrderHistoryScreen} options={stackScreenOptions} />
+            <Stack.Screen name="LostMode" component={LostModeScreen} options={stackScreenOptions} />
           </>
         )}
       </Stack.Navigator>

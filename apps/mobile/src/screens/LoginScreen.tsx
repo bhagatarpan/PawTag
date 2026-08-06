@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { useAuth } from '../lib/auth-context';
 import { colors, typography, spacing, borderRadius, shadows } from '../theme/tokens';
+import { hapticMedium } from '../lib/haptics';
 
 interface LoginScreenProps {
   navigation: any;
@@ -37,6 +38,7 @@ export function LoginScreen({ navigation }: LoginScreenProps) {
       setError('Please fill in all fields');
       return;
     }
+    hapticMedium();
     setError('');
     setLoading(true);
     try {
@@ -91,6 +93,21 @@ export function LoginScreen({ navigation }: LoginScreenProps) {
       setError(err.response?.data?.error || 'Failed to resend code.');
     }
   };
+
+  // MFA countdown timer
+  useEffect(() => {
+    if (!mfaRequired || mfaExpiry <= 0) return;
+    const interval = setInterval(() => {
+      setMfaExpiry((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [mfaRequired, mfaExpiry > 0]);
 
   // MFA OTP screen
   if (mfaRequired) {

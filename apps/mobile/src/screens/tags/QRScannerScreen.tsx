@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { colors, typography, spacing, borderRadius, shadows } from '../../theme/tokens';
 import api from '../../api/client';
+import { hapticSuccess } from '../../lib/haptics';
 
 interface QRScannerScreenProps {
   navigation: any;
@@ -12,20 +13,22 @@ export function QRScannerScreen({ navigation }: QRScannerScreenProps) {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanning, setScanning] = useState(true);
 
-  const handleBarcodeScanned = async (data: string) => {
+  const handleBarcodeScanned = async (scanningResult: { type: string; data: string }) => {
     if (!scanning) return;
     setScanning(false);
+
+    const rawData = scanningResult.data;
 
     // Extract tagId from the scanned URL
     // URLs look like: https://pawtag.co.nz/finder/PT-123456 or just PT-123456
     let tagId = '';
     try {
-      const url = new URL(data);
+      const url = new URL(rawData);
       const pathParts = url.pathname.split('/');
       tagId = pathParts[pathParts.length - 1];
     } catch {
       // If it's not a URL, treat it as a raw tag ID
-      tagId = data;
+      tagId = rawData;
     }
 
     if (!tagId) {
@@ -35,6 +38,7 @@ export function QRScannerScreen({ navigation }: QRScannerScreenProps) {
       return;
     }
 
+    hapticSuccess();
     // Navigate to redemption with the scanned tagId
     navigation.navigate('RedeemTag', { tagId });
   };
@@ -69,7 +73,7 @@ export function QRScannerScreen({ navigation }: QRScannerScreenProps) {
       <CameraView
         style={styles.camera}
         barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
-        onBarcodeScanned={scanning ? undefined : undefined}
+        onBarcodeScanned={scanning ? undefined : handleBarcodeScanned}
       />
       <View style={styles.overlay}>
         <View style={styles.scanArea} />

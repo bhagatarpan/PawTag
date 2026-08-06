@@ -1,5 +1,5 @@
 import * as Notifications from 'expo-notifications';
-import { Platform } from 'react-native';
+import { Platform, Alert, Linking } from 'react-native';
 import api from '../api/client';
 
 Notifications.setNotificationHandler({
@@ -21,6 +21,14 @@ export async function registerForPushNotifications(): Promise<string | null> {
     }
 
     if (finalStatus !== 'granted') {
+      Alert.alert(
+        'Notifications Disabled',
+        'Push notifications are disabled. You won\'t receive alerts when your pet is found. Enable them in Settings.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Open Settings', onPress: () => Linking.openSettings() },
+        ],
+      );
       return null;
     }
 
