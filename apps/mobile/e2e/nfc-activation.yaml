@@ -1,0 +1,46 @@
+# E2E Test: NFC-based Tag Activation Flow
+# Prerequisites: Maestro CLI installed, API running, test account, Android device with NFC
+# Note: NFC cannot be simulated — this test verifies the UI flow up to the NFC prompt
+# Run: maestro test e2e/nfc-activation.yaml
+
+appId: co.nz.pawtag
+name: NFC Tag Activation Flow
+tags:
+  - e2e
+  - activation
+  - nfc
+  - android-only
+
+---
+# Step 1: Launch app and log in
+- launchApp
+- waitForAnimationToEnd
+- tapOn: "Email"
+- inputText: "test@pawtag.co.nz"
+- tapOn: "Password"
+- inputText: "TestPass123!"
+- tapOn: "Sign In"
+- waitForAnimationToEnd
+
+# Step 2: Navigate to Activate tab
+- tapOn: "Activate"
+- waitForAnimationToEnd
+
+# Step 3: Tap "Tap NFC Tag"
+- tapOn: "Tap NFC Tag"
+- waitForAnimationToEnd
+
+# Step 4: NFC scanner screen should appear
+- extendedWaitUntil:
+    visible: "Hold your phone near the NFC tag"
+    timeout: 10000
+
+# Step 5: Verify NFC instruction is visible
+- assertVisible: "Hold your phone near the NFC tag"
+
+# Step 6: Cancel (go back) — NFC requires physical tap
+- tapOn: "Cancel"
+- waitForAnimationToEnd
+
+# Step 7: Verify we're back on Activate screen
+- assertVisible: "Activate Your Tag"

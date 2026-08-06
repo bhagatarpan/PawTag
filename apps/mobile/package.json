@@ -9,7 +9,16 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src/"
+    "lint": "eslint src/",
+    "e2e": "maestro test e2e/",
+    "e2e:qr": "maestro test e2e/qr-activation.yaml",
+    "e2e:nfc": "maestro test e2e/nfc-activation.yaml",
+    "e2e:lost": "maestro test e2e/lost-mode.yaml",
+    "eas:build:dev": "eas build --profile development",
+    "eas:build:preview": "eas build --profile preview",
+    "eas:build:prod": "eas build --profile production",
+    "eas:submit:ios": "eas submit --platform ios",
+    "eas:submit:android": "eas submit --platform android"
   },
   "dependencies": {
     "@pawtag/shared": "workspace:*",

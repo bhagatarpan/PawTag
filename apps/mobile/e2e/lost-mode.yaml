@@ -1,0 +1,102 @@
+# E2E Test: Lost Mode Toggle with Confirmation
+# Prerequisites: Maestro CLI installed, API running, test account with at least one pet
+# Run: maestro test e2e/lost-mode.yaml
+
+appId: co.nz.pawtag
+name: Lost Mode Toggle Flow
+tags:
+  - e2e
+  - lost-mode
+
+---
+# Step 1: Launch app and log in
+- launchApp
+- waitForAnimationToEnd
+- tapOn: "Email"
+- inputText: "test@pawtag.co.nz"
+- tapOn: "Password"
+- inputText: "TestPass123!"
+- tapOn: "Sign In"
+- waitForAnimationToEnd
+
+# Step 2: Navigate to Home tab and tap "Lost Mode" action card
+- tapOn: "Lost Mode"
+- waitForAnimationToEnd
+
+# Step 3: Lost Mode screen should load
+- extendedWaitUntil:
+    visible: "Lost Mode"
+    timeout: 10000
+
+# Step 4: Verify header text
+- assertVisible: "Toggle lost status for your pets"
+
+# Step 5: If no pets, verify empty state
+- runFlow:
+    when:
+      visible: "No pets registered"
+    steps:
+      - assertVisible: "Add a Pet"
+      - tapOn: "Add a Pet"
+      - waitForAnimationToEnd
+      - back
+      - back
+
+# Step 6: If pets exist, try toggling
+- runFlow:
+    when:
+      visible: "Mark as Lost"
+    steps:
+      # Tap the first "Mark as Lost" button
+      - tapOn:
+          text: "Mark as Lost"
+          index: 0
+      - waitForAnimationToEnd
+
+      # Confirmation dialog should appear
+      - extendedWaitUntil:
+          visible: "Mark as Lost"
+          timeout: 5000
+
+      # Confirm the action
+      - tapOn: "Mark Lost"
+      - waitForAnimationToEnd
+
+      # Verify status changed (should now show "Mark as Found/Safe")
+      - extendedWaitUntil:
+          visible: "Mark as Found/Safe"
+          timeout: 10000
+
+# Step 7: Toggle back to safe
+- runFlow:
+    when:
+      visible: "Mark as Found/Safe"
+    steps:
+      - tapOn:
+          text: "Mark as Found/Safe"
+          index: 0
+      - waitForAnimationToEnd
+
+      # Confirmation dialog should appear
+      - extendedWaitUntil:
+          visible: "Mark as Found"
+          timeout: 5000
+
+      # Confirm the action
+      - tapOn: "Mark Found"
+      - waitForAnimationToEnd
+
+      # Verify status changed back (should now show "Mark as Lost")
+      - extendedWaitUntil:
+          visible: "Mark as Lost"
+          timeout: 10000
+
+# Step 8: Pull-to-refresh
+- swipe:
+    direction: DOWN
+- waitForAnimationToEnd
+
+# Step 9: Navigate back
+- tapOn:
+    text: "← Back"
+- waitForAnimationToEnd

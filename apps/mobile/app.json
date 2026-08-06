@@ -15,15 +15,44 @@
     "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "co.nz.pawtag"
+      "bundleIdentifier": "co.nz.pawtag",
+      "config": {
+        "usesNonExemptEncryption": false
+      },
+      "infoPlist": {
+        "NSCameraUsageDescription": "PawTag uses your camera to scan your pet's QR code tag during activation and to scan tags when you find a lost pet.",
+        "NSNFCReaderUsageDescription": "PawTag uses NFC to read your pet's NFC tag during activation — just tap your phone to the tag.",
+        "NSLocationWhenInUseUsageDescription": "PawTag uses your location to share where a lost pet was found, helping reunite pets with their owners."
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0d9488"
       },
-      "package": "co.nz.pawtag"
+      "package": "co.nz.pawtag",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.NFC",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION"
+      ]
     },
-    "plugins": []
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "PawTag uses your camera to scan your pet's QR code tag during activation and to scan tags when you find a lost pet."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#0d9488"
+        }
+      ]
+    ]
   }
 }

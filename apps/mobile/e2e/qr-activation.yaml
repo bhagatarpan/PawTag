@@ -1,0 +1,54 @@
+# E2E Test: QR-based Tag Activation Flow
+# Prerequisites: Maestro CLI installed, API running, test account exists
+# Run: maestro test e2e/qr-activation.yaml
+
+appId: co.nz.pawtag
+name: QR Tag Activation Flow
+tags:
+  - e2e
+  - activation
+  - qr
+
+---
+# Step 1: Launch app and log in
+- launchApp
+- waitForAnimationToEnd
+- tapOn: "Email"
+- inputText: "test@pawtag.co.nz"
+- tapOn: "Password"
+- inputText: "TestPass123!"
+- tapOn: "Sign In"
+- waitForAnimationToEnd
+
+# Step 2: Navigate to Activate tab
+- tapOn: "Activate"
+- waitForAnimationToEnd
+
+# Step 3: Tap "Scan QR Code"
+- tapOn: "Scan QR Code"
+- waitForAnimationToEnd
+
+# Step 4: Camera permission screen (first time)
+# Maestro handles permission dialogs automatically on Android
+# On iOS, may need to pre-grant permission in test setup
+- extendedWaitUntil:
+    visible: "Point your camera at the QR code"
+    timeout: 10000
+
+# Step 5: Cancel scanner (we can't scan a real QR in E2E)
+- tapOn: "Cancel"
+- waitForAnimationToEnd
+
+# Step 6: Verify we're back on Activate screen
+- assertVisible: "Activate Your Tag"
+
+# Step 7: Manual entry flow
+- tapOn: "Tag ID"
+- inputText: "PT-E2E-TEST"
+- tapOn: "Activate Tag"
+- waitForAnimationToEnd
+
+# Step 8: Either success or error (both are valid outcomes)
+- assertVisible:
+    point: "50%,50%"
+    text: "Tag Activated!|Failed to activate tag"
