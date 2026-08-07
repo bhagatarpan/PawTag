@@ -14,7 +14,7 @@ const contactLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
   max: parseInt(process.env.SUPPORT_RATE_LIMIT_MAX || '5', 10),
   message: { success: false, error: 'Too many support requests. Please try again later.' },
-  skip: () => process.env.NODE_ENV === 'test',
+  skip: () => process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development',
 });
 
 const contactSchema = z.object({

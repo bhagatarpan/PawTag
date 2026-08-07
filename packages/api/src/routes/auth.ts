@@ -44,7 +44,7 @@ const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: parseInt(process.env.LOGIN_RATE_LIMIT_MAX || '5', 10),
   message: { success: false, error: 'Too many login attempts. Please try again in 15 minutes.' },
-  skip: () => process.env.NODE_ENV === 'test',
+  skip: () => process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development',
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -54,7 +54,7 @@ const registerLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: parseInt(process.env.REGISTER_RATE_LIMIT_MAX || '3', 10),
   message: { success: false, error: 'Too many registration attempts. Please try again later.' },
-  skip: () => process.env.NODE_ENV === 'test',
+  skip: () => process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development',
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -64,7 +64,7 @@ const forgotPasswordLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: parseInt(process.env.FORGOT_PASSWORD_RATE_LIMIT_MAX || '3', 10),
   message: { success: false, error: 'Too many password reset attempts. Please try again later.' },
-  skip: () => process.env.NODE_ENV === 'test',
+  skip: () => process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development',
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -74,7 +74,7 @@ const mfaSendLimiter = rateLimit({
   windowMs: 30 * 1000,
   max: parseInt(process.env.MFA_SEND_RATE_LIMIT_MAX || '1', 10),
   message: { success: false, error: 'Please wait before requesting a new code.' },
-  skip: () => process.env.NODE_ENV === 'test',
+  skip: () => process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development',
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -84,7 +84,7 @@ const mfaVerifyLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: parseInt(process.env.MFA_VERIFY_RATE_LIMIT_MAX || '5', 10),
   message: { success: false, error: 'Too many verification attempts. Please try again later.' },
-  skip: () => process.env.NODE_ENV === 'test',
+  skip: () => process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development',
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -101,6 +101,23 @@ async function checkAndActivateUser(userId: string) {
     await user.save();
     await sendWelcomeEmail(user.email, user.fullName);
   }
+}
+
+/** In development with MFA test mode enabled, route verification emails to the test email. */
+async function resolveVerificationRecipient(originalEmail: string): Promise<string> {
+  if (config.nodeEnv !== 'development') return originalEmail;
+  const mfaTestMode = (await Setting.findOne({ key: 'mfa.testMode' }).lean())?.value === 'true';
+  if (!mfaTestMode) return originalEmail;
+  const mfaTestEmail = (await Setting.findOne({ key: 'mfa.testEmail' }).lean())?.value || 'arpanbhagat@yahoo.com';
+  return mfaTestEmail;
+}
+
+/** In development with MFA test mode enabled, return the test email for sending OTPs, else null. */
+async function getTestEmailRecipient(): Promise<string | null> {
+  if (config.nodeEnv !== 'development') return null;
+  const mfaTestMode = (await Setting.findOne({ key: 'mfa.testMode' }).lean())?.value === 'true';
+  if (!mfaTestMode) return null;
+  return (await Setting.findOne({ key: 'mfa.testEmail' }).lean())?.value || 'arpanbhagat@yahoo.com';
 }
 
 router.post('/register', registerLimiter, validate(registerSchema), async (req, res: Response) => {
@@ -151,7 +168,7 @@ router.post('/register', registerLimiter, validate(registerSchema), async (req, 
       userAgent: clientInfo.userAgent,
     });
 
-    const emailResult = await sendVerificationEmail(email, fullName, emailToken);
+    const emailResult = await sendVerificationEmail(await resolveVerificationRecipient(email), fullName, emailToken);
 
     if (config.nodeEnv === 'development') {
       console.log('\n🔑 [DEV] Email verification URL:');
@@ -455,13 +472,23 @@ router.get('/verify-email', async (req, res: Response) => {
     const verificationToken = await VerificationToken.findOne({
       tokenHash,
       type: 'email_verification',
-      usedAt: null,
     });
 
     if (!verificationToken) {
       if (isAjax) { res.status(400).json({ success: false, error: 'Invalid or used verification link.', code: 'invalid' }); return; }
       res.redirect(`${config.frontendUrl}/verify-account?email_status=invalid`);
       return;
+    }
+
+    // Idempotency guard: if this exact token already verified the user (e.g. a
+    // double-invocation of the frontend effect), treat it as success instead of "used".
+    if (verificationToken.usedAt) {
+      const alreadyUser = await User.findById(verificationToken.userId);
+      if (alreadyUser && alreadyUser.emailVerified) {
+        if (isAjax) { res.json({ success: true, data: { message: 'Email already verified.', email: alreadyUser.email, phoneNumber: alreadyUser.phoneNumber } }); return; }
+        res.redirect(`${config.frontendUrl}/verify-account?email_status=already_verified`);
+        return;
+      }
     }
 
     if (verificationToken.expiresAt < new Date()) {
@@ -564,7 +591,7 @@ router.post('/resend-email-verification', validate(resendEmailVerificationSchema
       userAgent: clientInfo.userAgent,
     });
 
-    const emailResult = await sendVerificationEmail(email, user.fullName, emailToken);
+    const emailResult = await sendVerificationEmail(await resolveVerificationRecipient(email), user.fullName, emailToken);
 
     if (config.nodeEnv === 'development') {
       console.log('\n🔑 [DEV] Email verification URL (resent):');
@@ -665,6 +692,12 @@ router.post('/send-phone-otp', validate(sendPhoneOtpSchema), async (req, res: Re
     });
 
     const smsResult = await sendPhoneOtpSMS(phoneNumber, otp);
+
+    // In dev + test mode, also email the OTP to the test email so it's easy to retrieve
+    const testRecipient = await getTestEmailRecipient();
+    if (testRecipient) {
+      sendLoginOtpEmail(testRecipient, user.fullName, otp, '10 minutes').catch(() => {});
+    }
 
     if (config.nodeEnv === 'development') {
       console.log('\n🔑 [DEV] Phone OTP:');
@@ -882,6 +915,12 @@ router.post('/resend-phone-otp', validate(resendPhoneOtpSchema), async (req, res
 
     const smsResult = await sendPhoneOtpSMS(phoneNumber, otp);
 
+    // In dev + test mode, also email the OTP to the test email so it's easy to retrieve
+    const testRecipient = await getTestEmailRecipient();
+    if (testRecipient) {
+      sendLoginOtpEmail(testRecipient, user.fullName, otp, '10 minutes').catch(() => {});
+    }
+
     if (config.nodeEnv === 'development') {
       console.log('\n🔑 [DEV] Phone OTP (resent):');
       console.log(`   Phone: ${phoneNumber}`);
@@ -920,7 +959,10 @@ router.get('/verification-status', async (req: AuthRequest, res: Response) => {
     }
 
     if (!userId) {
-      res.status(401).json({ success: false, error: 'Authentication required or email required' });
+      // Not authenticated and no email given (e.g. someone hit /verify-account directly).
+      // Return 200 with null data so the frontend renders the verification steps instead of
+      // the axios interceptor redirecting to /login on a 401.
+      res.status(200).json({ success: true, data: null });
       return;
     }
 

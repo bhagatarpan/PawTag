@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Copy, Share2, Users, Gift, Clock, CheckCircle } from 'lucide-react';
-import api from '../lib/api';
+import api from '../../lib/api';
 
-export default function ReferralsPage() {
+export default function Referrals() {
   const [code, setCode] = useState('');
   const [shareUrl, setShareUrl] = useState('');
   const [stats, setStats] = useState<any>(null);
@@ -46,7 +46,7 @@ export default function ReferralsPage() {
         <p className="text-sm text-gray-500">Invite friends and both earn 1 month free on your subscription!</p>
       </div>
 
-      <div className="bg-gradient-to-r from-primary-500 to-primary-600 rounded-xl p-6 text-white">
+      <div className="bg-gradient-to-r from-teal-500 to-teal-600 rounded-xl p-6 text-white">
         <h2 className="text-lg font-semibold mb-2">Your Referral Code</h2>
         <div className="flex items-center gap-3 mb-4">
           <span className="text-3xl font-mono font-bold tracking-wider">{code}</span>
@@ -57,7 +57,7 @@ export default function ReferralsPage() {
             <Share2 size={20} />
           </button>
         </div>
-        <p className="text-sm text-primary-100">
+        <p className="text-sm text-teal-100">
           {copied ? 'Copied to clipboard!' : 'Share this code with friends. When they buy a tag, you both get 1 month free!'}
         </p>
       </div>
@@ -77,7 +77,7 @@ export default function ReferralsPage() {
         </div>
         <div className="bg-white rounded-lg border p-4">
           <div className="flex items-center gap-2 text-gray-500 text-sm mb-1"><Gift size={16} /> Rewards Earned</div>
-          <p className="text-2xl font-bold text-primary-600">{stats?.totalRewardMonths || 0} mo</p>
+          <p className="text-2xl font-bold text-teal-600">{stats?.totalRewardMonths || 0} mo</p>
         </div>
       </div>
 

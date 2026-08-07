@@ -33,9 +33,8 @@ Used during database seeding to create initial accounts. Required in production 
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `FRONTEND_URL` | `http://localhost:3000` | Public web app URL (used in emails, CORS) |
+| `FRONTEND_URL` | `http://localhost:3000` | Public web app URL (used in emails, CORS). Also serves the customer portal. |
 | `ADMIN_URL` | `http://localhost:3001` | Admin portal URL |
-| `CUSTOMER_URL` | `http://localhost:3002` | Customer portal URL |
 | `FINDER_URL` | `http://localhost:3003` | Finder page URL |
 | `ALLOWED_ORIGINS` | `localhost:3000-3003` (dev) | Comma-separated CORS allowed origins. Required in production. |
 

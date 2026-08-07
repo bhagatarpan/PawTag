@@ -27,14 +27,13 @@ cd packages/api && pnpm seed && cd ../..
 pnpm dev:all
 ```
 
-This starts five services concurrently:
+This starts four services concurrently:
 
 | Service | URL | Purpose |
 |---------|-----|---------|
 | API | http://localhost:5000 | Express backend |
-| Web | http://localhost:3000 | Public site & shop |
+| Web | http://localhost:3000 | Public site, shop, auth & customer portal |
 | Admin | http://localhost:3001 | Admin portal |
-| Customer | http://localhost:3002 | Customer portal |
 | Finder | http://localhost:3003 | Finder page |
 
 ## Default Accounts
@@ -96,8 +95,7 @@ PawTag/
 │   └── shared/    → Shared TypeScript types & validation
 ├── apps/
 │   ├── admin/     → Admin portal (port 3001)
-│   ├── web/       → Public site & shop (port 3000)
-│   ├── customer/  → Customer portal (port 3002)
+│   ├── web/       → Public site, shop, auth & customer portal (port 3000)
 │   └── finder/    → Finder portal (port 3003)
 ├── tests/
 │   ├── unit/      → Unit tests

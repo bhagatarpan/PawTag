@@ -57,7 +57,7 @@ async function run() {
         { key: 'seo.defaultKeywords', value: 'pet recovery, QR code, pet tag, lost pet, found pet, pet safety, New Zealand', category: 'seo' },
         { key: 'social.facebook', value: 'https://facebook.com/pawtag', category: 'social' },
         { key: 'social.instagram', value: 'https://instagram.com/pawtag', category: 'social' },
-        { key: 'urls.customerPortal', value: 'http://localhost:3002', category: 'urls' },
+        { key: 'urls.customerPortal', value: 'http://localhost:3000', category: 'urls', description: 'Customer portal is served by the web app (port 3000)' },
         { key: 'urls.finderPortal', value: 'http://localhost:3003', category: 'urls' },
         { key: 'urls.frontend', value: 'http://localhost:3000', category: 'urls' },
         { key: 'emails.senderName', value: 'PawTag', category: 'emails' },

@@ -1,4 +1,4 @@
-import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 import { CmsEmailTemplate } from '@pawtag/db';
 import { renderBase, renderCtaButton } from './email/templates/base';
 import {
@@ -14,17 +14,16 @@ import {
   renderLoginOtpEmail,
 } from './email/templates';
 
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'localhost',
-  port: parseInt(process.env.SMTP_PORT || '587'),
-  secure: process.env.SMTP_SECURE === 'true',
-  auth: process.env.SMTP_USER ? {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  } : undefined,
-});
+const resendApiKey = process.env.RESEND_API_KEY;
+const resend = resendApiKey ? new Resend(resendApiKey) : null;
 
-const isDemoMode = !process.env.SMTP_HOST || process.env.SMTP_HOST === 'localhost';
+// In development without Resend key, use onboarding@resend.dev (Resend's test domain)
+// In production, use the configured sender email
+const defaultFrom = process.env.NODE_ENV === 'production'
+  ? '"PawTag" <no-reply@pawtag.co.nz>'
+  : '"PawTag" <onboarding@resend.dev>';
+
+const isDemoMode = !resend;
 const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
 
 type EmailResult = { success: boolean; messageId?: string; error?: string };
@@ -86,11 +85,13 @@ async function renderCmsEmail(slug: string, variables: Record<string, string>): 
 }
 
 export async function sendMail(to: string, subject: string, html: string, from?: string): Promise<EmailResult> {
-  const fromAddress = from || '"PawTag" <no-reply@pawtag.co.nz>';
+  // In development, always use Resend's pre-verified test domain (onboarding@resend.dev)
+  // so custom unverified domains like pawtag.co.nz don't cause rejections.
+  const fromAddress = process.env.NODE_ENV === 'production' ? (from || defaultFrom) : defaultFrom;
 
   if (isDemoMode) {
     console.log('\n========================================');
-    console.log('📧 [DEMO EMAIL]');
+    console.log('📧 [DEMO EMAIL — No RESEND_API_KEY set]');
     console.log('========================================');
     console.log(`To:      ${to}`);
     console.log(`From:    ${fromAddress}`);
@@ -105,13 +106,20 @@ export async function sendMail(to: string, subject: string, html: string, from?:
   }
 
   try {
-    const info = await transporter.sendMail({
+    const { data, error } = await resend!.emails.send({
       from: fromAddress,
-      to,
+      to: [to],
       subject,
       html,
     });
-    return { success: true, messageId: info.messageId };
+
+    if (error) {
+      console.error('Resend email failed:', error.message);
+      return { success: false, error: error.message };
+    }
+
+    console.log(`📧 Email sent to ${to} — ID: ${data?.id}`);
+    return { success: true, messageId: data?.id };
   } catch (error: any) {
     console.error('Email send failed:', error.message);
     return { success: false, error: error.message };

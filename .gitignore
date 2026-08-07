@@ -24,6 +24,10 @@ out/
 .DS_Store
 Thumbs.db
 
+# Expo
+.expo/
+.expo-shared/
+
 # Logs
 *.log
 npm-debug.log*

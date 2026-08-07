@@ -17,8 +17,13 @@ export default function VerifyEmail() {
       return;
     }
 
+    // Guard against React StrictMode double-invoking this effect in dev (mount → unmount →
+    // remount). The cancelled flag prevents the first (cleaned-up) invocation from overwriting
+    // the state of the second one, and the API is idempotent so a re-run is harmless.
+    let cancelled = false;
     api.get(`/auth/verify-email?token=${token}`)
       .then((res) => {
+        if (cancelled) return;
         if (res.data.success) {
           setStatus('success');
           setMessage(res.data.data?.message || 'Your email has been verified successfully!');
@@ -35,9 +40,11 @@ export default function VerifyEmail() {
         }
       })
       .catch((err) => {
+        if (cancelled) return;
         setStatus('error');
         setMessage(err.response?.data?.error || 'Something went wrong. Please try again.');
       });
+    return () => { cancelled = true; };
   }, [searchParams]);
 
   return (

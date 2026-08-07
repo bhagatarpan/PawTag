@@ -7,14 +7,12 @@
     "dev:api": "pnpm --filter @pawtag/api dev",
     "dev:admin": "pnpm --filter @pawtag/admin dev",
     "dev:web": "pnpm --filter @pawtag/web dev",
-    "dev:customer": "pnpm --filter @pawtag/customer dev",
     "dev:finder": "pnpm --filter @pawtag/finder dev",
-    "dev:all": "pnpm run --parallel dev:api dev:admin dev:web dev:customer dev:finder",
-    "build": "pnpm run --parallel build:api build:admin build:web build:customer build:finder",
+    "dev:all": "concurrently -n api,admin,web,finder -c blue,green,magenta,yellow \"pnpm run dev:api\" \"pnpm run dev:admin\" \"pnpm run dev:web\" \"pnpm run dev:finder\"",
+    "build": "concurrently \"pnpm run build:api\" \"pnpm run build:admin\" \"pnpm run build:web\" \"pnpm run build:finder\"",
     "build:api": "pnpm --filter @pawtag/api build",
     "build:admin": "pnpm --filter @pawtag/admin build",
     "build:web": "pnpm --filter @pawtag/web build",
-    "build:customer": "pnpm --filter @pawtag/customer build",
     "build:finder": "pnpm --filter @pawtag/finder build",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
@@ -28,6 +26,7 @@
     "test:coverage": "vitest run --coverage",
     "test:all": "vitest run tests/unit tests/integration tests/smoke tests/regression"
   },
+  "//scripts": "dev:all/build run the four dev servers (and builds) in parallel via concurrently, since this shell doesn't support background jobs; name/color flags keep the log streams distinguishable. Note: deliberately NO -k flag -- with -k, the moment the fastest process exits (e.g. the finder build) concurrently kills all the others and the build fails.",
   "engines": {
     "node": ">=18"
   },
@@ -42,6 +41,7 @@
     "@typescript-eslint/parser": "^8.64.0",
     "@vitest/coverage-v8": "^4.1.10",
     "bcryptjs": "^2.4.3",
+    "concurrently": "^10.0.4",
     "eslint": "^10.7.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react": "^7.37.5",

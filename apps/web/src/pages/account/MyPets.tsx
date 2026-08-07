@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, FormEvent } from 'react';
-import { PawPrint, Plus, AlertTriangle, CheckCircle, Star, X, Edit2, Save, Upload, ShieldAlert, ShieldCheck, ShoppingBag, ChevronRight, Skull, EyeOff, Clock, Activity, Camera, Info, CreditCard } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { PawPrint, Plus, AlertTriangle, CheckCircle, Star, X, Edit2, Save, Upload, ShieldAlert, ShieldCheck, ShoppingBag, ChevronRight, Skull, EyeOff, Clock, Activity, Camera, Info, CreditCard, QrCode } from 'lucide-react';
 import api from '../../lib/api';
 import HealthRecords from './HealthRecords';
 import SaveToast from '../../components/SaveToast';
@@ -176,6 +177,7 @@ function PhotoManager({ photos, onChange }: { photos: PhotoItem[]; onChange: (ph
 }
 
 export default function MyPets() {
+  const navigate = useNavigate();
   const [pets, setPets] = useState<any[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editingPet, setEditingPet] = useState<any>(null);
@@ -185,9 +187,14 @@ export default function MyPets() {
   const [timeToFoundMsg, setTimeToFoundMsg] = useState('');
   const [healthPet, setHealthPet] = useState<any>(null);
   const [showSaved, setShowSaved] = useState(false);
+  const [unredeemedCount, setUnredeemedCount] = useState(0);
 
   const refreshPets = () => api.get('/customer/pets').then((r) => setPets(r.data.data)).catch(console.error);
   useEffect(() => { refreshPets(); }, []);
+
+  useEffect(() => {
+    api.get('/customer/tags/unredeemed-count').then((r) => setUnredeemedCount(r.data.data.count)).catch(() => {});
+  }, []);
 
   useEffect(() => {
     const foundPets = pets.filter((p) => p.status === 'found');
@@ -305,6 +312,22 @@ export default function MyPets() {
       </div>
       {showSaved && <SaveToast message="Pet saved successfully" onDone={() => setShowSaved(false)} />}
 
+      {unredeemedCount > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 flex items-center gap-4">
+          <QrCode size={24} className="text-blue-600 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="font-medium text-blue-800">You have {unredeemedCount} unredeemed tag{unredeemedCount > 1 ? 's' : ''}</p>
+            <p className="text-sm text-blue-600">Activate your tag to link it to a pet profile and start protecting them.</p>
+          </div>
+          <button
+            onClick={() => navigate('/account/redeem-tag')}
+            className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700"
+          >
+            Activate Now
+          </button>
+        </div>
+      )}
+
       {showForm && (
         <form onSubmit={handleSubmit} className="bg-white rounded-lg border p-6 mb-6 space-y-4">
           <h2 className="text-lg font-semibold">{editingPet ? `Edit ${editingPet.name}` : 'Add New Pet'}</h2>
@@ -406,6 +429,24 @@ export default function MyPets() {
                       )}
                       {pet.linkedTag && !pet.linkedTag.subscription && (
                         <p className="text-xs text-gray-400 mt-1 italic">No active subscription</p>
+                      )}
+                      {pet.linkedTag && pet.linkedTag.status === 'active' && (
+                        <button
+                          onClick={async () => {
+                            const reason = prompt('Why do you need a replacement? (e.g., lost, damaged)');
+                            if (reason) {
+                              try {
+                                await api.post(`/customer/tags/${pet.linkedTag._id}/request-replacement`, { reason });
+                                alert('Replacement request submitted! Check your orders for the replacement tag.');
+                              } catch (err: any) {
+                                alert(err.response?.data?.error || 'Failed to request replacement');
+                              }
+                            }
+                          }}
+                          className="text-xs text-red-500 hover:text-red-700 mt-1 underline"
+                        >
+                          Report lost or damaged tag
+                        </button>
                       )}
                       <p className="text-base text-gray-600 mt-1">{pet.petType || pet.species} — {formatBreed(pet)}</p>
                       <p className="text-sm text-gray-400">Origin: {pet.breedOrigin || 'Purebred'}</p>

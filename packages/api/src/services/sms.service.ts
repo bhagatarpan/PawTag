@@ -12,12 +12,28 @@ interface SMSProvider {
 
 class DemoSMSProvider implements SMSProvider {
   async send(to: string, message: string): Promise<SMSResult> {
-    console.log('\n========================================');
-    console.log('📱 [DEMO SMS]');
-    console.log('========================================');
-    console.log(`To:      ${to}`);
-    console.log(`Message: ${message}`);
-    console.log('========================================\n');
+    // Extract OTP code if present (6-digit number)
+    const otpMatch = message.match(/\b(\d{6})\b/);
+
+    console.log('\n');
+    console.log('╔══════════════════════════════════════════════╗');
+    console.log('║          📱 SMS SENT (DEMO MODE)            ║');
+    console.log('╠══════════════════════════════════════════════╣');
+    console.log(`║  To:      ${to}`);
+    console.log('║');
+    console.log(`║  Message: ${message.substring(0, 50)}${message.length > 50 ? '...' : ''}`);
+
+    if (otpMatch) {
+      console.log('║');
+      console.log('║  ┌────────────────────────────────────────┐');
+      console.log(`║  │  OTP CODE:  ${otpMatch[1]}                      │`);
+      console.log('║  └────────────────────────────────────────┘');
+      console.log('║');
+      console.log('║  ⏱️  Expires in 10 minutes');
+    }
+
+    console.log('╚══════════════════════════════════════════════╝');
+    console.log('\n');
     return { success: true, messageId: `demo_sms_${Date.now()}` };
   }
 }

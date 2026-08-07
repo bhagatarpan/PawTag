@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../lib/api';
+import { QrCode, CheckCircle, ArrowRight, Home } from 'lucide-react';
+import api from '../../lib/api';
 
-export default function RedeemTagPage() {
+export default function RedeemTag() {
   const [tagId, setTagId] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -30,7 +31,7 @@ export default function RedeemTagPage() {
     return (
       <div className="max-w-md mx-auto mt-10 p-6 bg-white rounded-lg shadow-md">
         <div className="text-center">
-          <div className="text-5xl mb-4">✅</div>
+          <div className="text-5xl mb-4"><CheckCircle size={48} className="mx-auto text-green-500" /></div>
           <h1 className="text-2xl font-bold text-green-600 mb-2">Tag Activated!</h1>
           <p className="text-gray-600 mb-4">
             Tag <span className="font-mono font-bold">{redeemedTag.tagId}</span> has been linked to your account.
@@ -40,16 +41,16 @@ export default function RedeemTagPage() {
           </p>
           <div className="flex gap-3 justify-center">
             <button
-              onClick={() => navigate('/pets/new')}
-              className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+              onClick={() => navigate('/account')}
+              className="bg-teal-600 text-white px-4 py-2 rounded-md hover:bg-teal-700 flex items-center gap-2"
             >
-              Create Pet Profile
+              <ArrowRight size={16} /> Create Pet Profile
             </button>
             <button
-              onClick={() => navigate('/')}
-              className="bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300"
+              onClick={() => navigate('/account')}
+              className="bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300 flex items-center gap-2"
             >
-              Go to Dashboard
+              <Home size={16} /> Go to Dashboard
             </button>
           </div>
         </div>
@@ -59,7 +60,10 @@ export default function RedeemTagPage() {
 
   return (
     <div className="max-w-md mx-auto mt-10 p-6 bg-white rounded-lg shadow-md">
-      <h1 className="text-2xl font-bold mb-2">Activate Your Tag</h1>
+      <div className="flex items-center gap-2 mb-2">
+        <QrCode size={24} className="text-teal-600" />
+        <h1 className="text-2xl font-bold">Activate Your Tag</h1>
+      </div>
       <p className="text-gray-600 mb-6">
         Enter the tag ID printed on your physical PawTag. You can find it on the back of the tag.
       </p>
@@ -75,7 +79,7 @@ export default function RedeemTagPage() {
             value={tagId}
             onChange={(e) => setTagId(e.target.value)}
             placeholder="PT-123456"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-lg text-center"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 font-mono text-lg text-center"
             required
             autoFocus
           />
@@ -90,7 +94,7 @@ export default function RedeemTagPage() {
         <button
           type="submit"
           disabled={loading || !tagId.trim()}
-          className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full bg-teal-600 text-white py-2 px-4 rounded-md hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {loading ? 'Activating...' : 'Activate Tag'}
         </button>

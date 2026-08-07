@@ -501,7 +501,7 @@ async function handleInvoicePaymentFailed(invoice: any) {
         <p>We were unable to process your subscription payment of <strong>$${amount}</strong>.</p>
         <p>To avoid service interruption, please update your payment method by visiting your account dashboard.</p>
         <p style="margin-top:24px;">
-          <a href="${process.env.APP_URL || 'http://localhost:3002'}/subscriptions" style="display:inline-block;background:#14b8a6;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;">Update Payment Method</a>
+          <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/subscriptions" style="display:inline-block;background:#14b8a6;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;">Update Payment Method</a>
         </p>
         <p style="color:#6b7280;font-size:13px;margin-top:24px;">If you believe this is an error, please contact our support team.</p>
       </div>`;

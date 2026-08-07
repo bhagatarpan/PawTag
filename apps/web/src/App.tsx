@@ -28,6 +28,9 @@ import OrderDetail from './pages/account/OrderDetail';
 import Notifications from './pages/account/Notifications';
 import Settings from './pages/account/Settings';
 import Subscriptions from './pages/account/Subscriptions';
+import RedeemTag from './pages/account/RedeemTag';
+import Referrals from './pages/account/Referrals';
+import NotificationPreferences from './pages/account/NotificationPreferences';
 import InvoiceView from './pages/InvoiceView';
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
@@ -64,6 +67,9 @@ export default function App() {
       <Route path="/account/orders/:id" element={<ProtectedRoute><AccountLayout><OrderDetail /></AccountLayout></ProtectedRoute>} />
       <Route path="/account/subscriptions" element={<ProtectedRoute><AccountLayout><Subscriptions /></AccountLayout></ProtectedRoute>} />
       <Route path="/account/notifications" element={<ProtectedRoute><AccountLayout><Notifications /></AccountLayout></ProtectedRoute>} />
+      <Route path="/account/notification-preferences" element={<ProtectedRoute><AccountLayout><NotificationPreferences /></AccountLayout></ProtectedRoute>} />
+      <Route path="/account/redeem-tag" element={<ProtectedRoute><AccountLayout><RedeemTag /></AccountLayout></ProtectedRoute>} />
+      <Route path="/account/referrals" element={<ProtectedRoute><AccountLayout><Referrals /></AccountLayout></ProtectedRoute>} />
       <Route path="/account/settings" element={<ProtectedRoute><AccountLayout><Settings /></AccountLayout></ProtectedRoute>} />
 
       {/* Invoice view — no Navbar/Footer, standalone page */}

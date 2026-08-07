@@ -13,10 +13,9 @@ PawTag/
 │   └── shared/    → Shared TypeScript types
 ├── apps/
 │   ├── admin/     → Admin portal (port 3001) - god-mode CRUD
-│   ├── web/       → Public site & shop (port 3000)
-│   ├── customer/  → Customer portal (port 3002)
+│   ├── web/       → Public site, shop, auth & customer portal (port 3000)
+│   ├── mobile/    → React Native (Expo) app
 │   └── finder/    → Finder portal (port 3003)
-├── mobile/        → React Native (Expo) app (planned, Phase 22+)
 └── docker/        → Docker configs
 ```
 
@@ -32,8 +31,7 @@ pnpm dev:all
 # Run individual services
 pnpm dev:api       # API on :5000
 pnpm dev:admin     # Admin on :3001
-pnpm dev:web       # Public site on :3000
-pnpm dev:customer  # Customer portal on :3002
+pnpm dev:web       # Public site, shop, auth & customer portal on :3000
 pnpm dev:finder    # Finder portal on :3003
 
 # Build everything
@@ -52,6 +50,24 @@ pnpm typecheck
 ### Default Admin Account
 - Email: `admin@pawtag.co.nz`
 - Password: `PawTagAdmin2024!`
+
+## Dev-Time Email Routing
+
+In development, when the `mfa.testMode` CMS setting is `true` (it is by default via `seed-cms.ts`),
+verification emails and OTPs are routed to the test email (`mfa.testEmail`, default
+`arpanbhagat@yahoo.com`) instead of the user's real address:
+
+- Registration/email-verification links → sent to test email
+- Login MFA OTPs → sent to test email
+- Phone (SMS) OTPs → still printed in the API terminal as demo SMS **and** also emailed to test email
+
+This lets you register with a throwaway address like `dave@example.com` while still receiving the
+links/codes in a real inbox. In production this routing is disabled — emails always go to the
+user's own address.
+
+Also note: in dev, `email.service.ts` always sends from `onboarding@resend.dev` (Resend's
+pre-verified test domain) so unverified custom domains like `pawtag.co.nz` don't cause rejections.
+Production uses the configured domain sender.
 
 ## Tech Stack
 - **Backend:** Node.js, Express, Mongoose, JWT, bcrypt, Zod validation

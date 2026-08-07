@@ -42,11 +42,32 @@ One real gap confirmed in code: `auth.service.ts` issues a single JWT with an ex
 
 If you later need enterprise SSO (e.g., a corporate pet-insurance partner wants their staff to log in with their own company login), that's an additive integration on top of this system, not a replacement — defer it until a real customer asks for it.
 
-### 1.4 Frontend strategy — keep four separate apps, don't merge them
+**Registration/verification hardening (done):** Dev email-test routing — when the `mfa.testMode` CMS setting is
+on, the registration email-verification link **and** phone OTPs are delivered to `mfa.testEmail`
+(`arpanbhagat@yahoo.com`) instead of the registered address, so a throwaway email like
+`dave@example.com` still receives its codes in a real inbox. Email always sends from `onboarding@resend.dev`
+in dev so unverified custom domains don't cause rejections. Bug fixes: `verify-email` is now idempotent
+(re-clicking a used link reads as "already verified" instead of "invalid/used" — this also avoids a false
+error from React StrictMode double-invoking the page effect in dev); `verification-status` returns
+`200 { data: null }` instead of 401 when unauthenticated so the /verify-account page isn't bounced to login;
+and `verifyPhoneSchema` accepts an optional `phoneNumber` so unauthenticated phone verification works
+(previously Zod stripped the field and the route returned 401, redirecting users to login). See
+`AGENTS.md` → Dev-Time Email Routing.
 
-**Decision: keep `apps/web`, `apps/customer`, `apps/admin`, `apps/finder` as four separate builds.**
+### 1.4 Frontend strategy — consolidated web app + separate privileged/admin and finder apps
 
-This looks like duplication at first glance but isn't: each serves a different audience with a different security posture (public marketing, authenticated customer, privileged admin, anonymous finder) and different performance needs (the finder page in particular must be tiny and load instantly on a stranger's phone with poor signal — bundling it with the full customer portal would hurt the one interaction that matters most for reunions). Keep them separate; unify them only at the **design-system level** (see Phase 4) so they don't visually drift.
+**Decision (revised): the customer portal is consolidated into `apps/web` (public site + shop + auth + customer portal as one build). `apps/admin` and `apps/finder` remain separate.**
+
+> **✅ Executed.** `apps/customer` was removed and its unique features (tag redemption, referrals,
+> notification preferences, order detail, replacement-tag flow) were ported into `apps/web` under
+> `/account/*`. `package.json` `dev:all`/`build` now run api/admin/web/finder in parallel via
+> `concurrently`; the customer service was removed from `docker-compose.yml`; port 3002 was dropped from
+> the CORS allow-list and `webhooks.ts`; the pnpm lockfile was regenerated; and `AGENTS.md`,
+> `ARCHITECTURE.md`, `AUTH-FLOWS.md`, `docs/developer-setup.md`, `docs/environments.md`,
+> `docs/launch-checklist.md`, and `tests/AUDIT-REPORT.md` were updated to the single-portal topology.
+> Covered by the integration suites (all tests green).
+
+The customer-facing experience lives in a single app (`apps/web`) so there is exactly one login, one registration, and one verification flow — no duplicated account dashboards to maintain and no risk of a customer getting stuck between two portals. The remaining apps are separate for good reasons: the admin portal is a privileged, staff-only surface with a different security posture (admin RBAC), and the finder page in particular must stay tiny and load instantly on a stranger's phone with poor signal — bundling it with the full customer portal would hurt the one interaction that matters most for reunions. Unify them only at the **design-system level** (see Phase 4) so they don't visually drift.
 
 ### 1.5 Deployment strategy
 
@@ -55,14 +76,14 @@ You asked me to recommend where this runs, and why, category by category. Table 
 | Layer | Recommendation | Why |
 |---|---|---|
 | Backend API (Docker) | **Render** (Web Service, autoscaling) | `docker/Dockerfile.api` already exists and works as-is. Render deploys a Dockerfile with zero extra config, gives you managed TLS, autoscaling, health checks, and preview environments per PR — enterprise behavior without needing a DevOps hire. |
-| Web, customer, admin, finder (4 SPAs) | **Vercel** | Static/SPA hosting with global CDN, automatic SSL, instant rollbacks, and a preview URL for every pull request — lets you (non-technical) *see* a change before it's live, just by clicking a link. |
+| Web, admin, finder (3 SPA deploys: web app incl. customer portal, admin, finder) | **Vercel** | Static/SPA hosting with global CDN, automatic SSL, instant rollbacks, and a preview URL for every pull request — lets you (non-technical) *see* a change before it's live, just by clicking a link. |
 | Database | **MongoDB Atlas** (already in use) | Keep it — don't migrate. Move to a paid tier with **daily automated backups + point-in-time recovery** and enable **IP allowlisting** restricted to Render's egress IPs. |
 | Object storage (pet photos, vet PDFs, product images) | **Cloudflare R2** | S3-compatible API (so no code lock-in) with **zero egress fees** — meaningfully cheaper than AWS S3 at your scale, since every finder-page view loads a pet photo. |
 | Email (transactional) | **Postmark** | Best-in-class deliverability for transactional mail (verification, password reset, order confirmation, "your pet was found") — this category cannot tolerate landing in spam. |
 | SMS | **Twilio** | Industry standard, already assumed by the existing `sms.service.ts`/CMS SMS templates — no change needed, just move to a real account. |
 | Payments | **Stripe** (already integrated) | Keep. Move off demo mode, use **Stripe Checkout** or Elements for PCI-compliant card capture, and use **Stripe Billing** (subscriptions) natively for renewals instead of hand-rolled expiry logic — less code for you to maintain, and Stripe handles dunning (failed-payment retries) for you. |
 | Shipping / courier | **Sendle** or **NZ Post eCommerce API** | Your seed admin account is `@pawtag.co.nz` — assuming NZ-based fulfillment, both offer label generation + tracking-number APIs with reasonable small-business pricing. Pick whichever your actual courier relationship favors; the integration code is a thin adapter either way. |
-| Monitoring / error tracking | **Sentry** | One tool, covers the Express API, all four React apps, and (later) the React Native app. Free tier is enough at launch. |
+| Monitoring / error tracking | **Sentry** | One tool, covers the Express API, all three React apps, and (later) the React Native app. Free tier is enough at launch. |
 | Logging | **Better Stack (Logtail)** | Cheap, simple log aggregation + uptime monitoring + a public status page — gives you, the founder, a plain-English dashboard of "is the site up" without needing to read logs yourself. |
 | CI/CD | **GitHub Actions** (already present) | Extend the existing `ci.yml` (tests already run here) to also **deploy** to Render/Vercel on merge to `main` (production) and `develop` (staging). |
 | Secrets management | **Render/Vercel built-in encrypted env vars** for now; **Doppler** once you have more than 1–2 people touching infrastructure | Avoids secrets ever being pasted into chat, code, or Slack. |
@@ -290,8 +311,9 @@ TASK:
    reference, stop and report it instead of deleting.
 2. Create `ARCHITECTURE.md` at the repo root documenting:
    - One Express API (`packages/api`) serves all clients.
-   - Four web frontends (`apps/web`, `apps/customer`, `apps/admin`, `apps/finder`) — explain
-     why they stay separate (different audiences, the finder page must stay minimal).
+   - Three web frontends (`apps/web` incl. customer portal, `apps/admin`, `apps/finder`) — explain
+     why the customer portal lives inside `apps/web` (one login/register/verify flow) while the
+     admin and finder apps stay separate (different audiences, the finder page must stay minimal).
    - Mobile strategy: a new React Native (Expo) app for pet owners will live in `apps/mobile`
      and will depend on `packages/shared` for types. The finder role gets no app — NFC taps
      and QR scans both open the existing `apps/finder` web page.
@@ -510,7 +532,7 @@ locally, `ALLOWED_ORIGINS` documented, and production startup fails fast if it's
 **Objective:** Fix the payment-integrity gap: an order must only be marked `paid` after Stripe confirms the charge succeeded, not immediately after creating a PaymentIntent.
 **Why now:** This is the single highest-risk item in the whole platform — it's a direct path to shipping product that was never actually paid for. Fix before any other commerce work builds on top of it.
 **Scope:** Move order creation to a `pending_payment` state, integrate Stripe Checkout (hosted, PCI-compliant) or Elements on the frontend, and only flip the order to `paid` inside the existing `webhooks.ts` Stripe handler on `payment_intent.succeeded`. Confirm order-confirmation email fires on that same trigger.
-**Files likely affected:** `packages/api/src/routes/customer.ts`, `packages/api/src/routes/webhooks.ts`, `packages/api/src/services/stripe.service.ts`, `packages/db/src/models/Order.ts`, `apps/customer/src/pages/Checkout*.tsx` (or equivalent).
+**Files likely affected:** `packages/api/src/routes/customer.ts`, `packages/api/src/routes/webhooks.ts`, `packages/api/src/services/stripe.service.ts`, `packages/db/src/models/Order.ts`, `apps/web/src/pages/Checkout.tsx` (customer checkout lives in the web app).
 **Database changes:** Order status enum gains `pending_payment` (or reuses `pending` with a clearer meaning — decide during implementation and document the decision inline).
 **API changes:** `POST /customer/orders` now creates the order in a pending state and returns a Stripe client secret for the frontend to confirm; the webhook handler becomes the sole place that flips status to `paid`.
 **UI changes:** Customer checkout page integrates Stripe Elements/Checkout for card capture instead of assuming success.
@@ -556,7 +578,7 @@ TASK:
    casing it — add a way to simulate the webhook firing in demo mode (e.g. a `confirmPayment`
    call from the frontend after entering test details, which internally calls the same webhook
    handler logic) so local development doesn't require a real Stripe account.
-5. Update the customer checkout frontend (`apps/customer/src/pages/` — find the checkout page)
+5. Update the customer checkout frontend (`apps/web/src/pages/Checkout.tsx`)
    to use Stripe.js/Elements: after the order is created and a `clientSecret` returned, confirm
    the card payment client-side using Stripe's `confirmCardPayment`, then poll or redirect to
    an order-confirmation page. Use `@stripe/stripe-js` and `@stripe/react-stripe-js` (add as
@@ -911,7 +933,7 @@ through any path other than this new centralized function (verify by searching f
 **Objective:** Build the explicit "redeem this physical tag from my delivered order" flow, so a customer who receives a tag in the mail links that specific tag to their account with a clear, guided step — not just an implicit admin-side linking.
 **Why now:** This is the connective step between commerce (Stages B/C) and the recovery product itself (already built) — it's the one piece of the Part 2 flow marked partial that most directly affects new-customer onboarding experience.
 **Scope:** A "redeem tag" screen in the customer portal (and later, mobile) where the customer enters the tag ID printed on their physical tag (or scans it), which the system validates against their delivered order before linking it to their account and prompting pet-profile creation.
-**Files likely affected:** `packages/api/src/routes/customer.ts`, `apps/customer/src/pages/` (new redeem-tag page), `packages/db/src/models/Tag.ts` (confirm/add an `orderId` reference so a tag can be traced back to the order it shipped in).
+**Files likely affected:** `packages/api/src/routes/customer.ts`, `apps/web/src/pages/account/RedeemTag.tsx` (customer portal lives in the web app), `packages/db/src/models/Tag.ts` (confirm/add an `orderId` reference so a tag can be traced back to the order it shipped in).
 **Database changes:** Add `orderId` reference on `Tag` if not already present (needed to validate that a redeemed tag ID actually belongs to that customer's delivered order, preventing tag-ID guessing).
 **API changes:** `POST /customer/tags/redeem` (body: `{ tagId }`) — validates the tag exists, isn't already claimed, and (if `orderId` linkage exists) belongs to a delivered order for this customer or is otherwise a valid unclaimed tag purchased through the shop.
 **UI changes:** New guided "Activate your tag" flow in the customer portal, triggered right after login if the customer has a delivered order with an unredeemed tag.
@@ -947,7 +969,7 @@ TASK:
    provisioned tags), allow redemption by any authenticated customer. On success, set
    `ownerId` to the requesting customer and return the tag, prompting the frontend to continue
    into pet-profile creation/linking.
-4. In `apps/customer`, add a new page/flow for tag redemption: a form to enter (or camera-scan,
+4. In `apps/web` (customer portal), add/link a tag-redemption page at `/account/redeem-tag`: a form to enter (or camera-scan,
    using an existing QR/camera library if one is already a dependency, otherwise a manual text
    input is sufficient for this phase — do not add a new scanning library just for this) the
    tag ID, calling the new endpoint, then routing into the existing add-pet/link-tag flow on
@@ -1046,7 +1068,7 @@ automated.
 **Objective:** Let a customer request a replacement for a lost or damaged tag, which transfers all pet history/subscription to a new physical tag ID without the customer losing their pet's data.
 **Why now:** Direct operational gap identified in Part 3; naturally follows tag activation (Phase 11) since it reuses the same linking logic.
 **Scope:** Customer-initiated replacement request (creates a new order for a replacement tag, at a discounted/free rate per business policy — policy value itself is a business decision for the founder, not a technical one; implement it as a configurable price via the existing `Setting`/`FeatureFlag` pattern already used elsewhere in the codebase). On fulfillment of that replacement order and redemption of the new tag, the old tag is deactivated and all pet/subscription data transfers to the new tag ID.
-**Files likely affected:** `packages/api/src/routes/customer.ts`, `packages/db/src/models/Tag.ts`, `apps/customer/src/pages/`.
+**Files likely affected:** `packages/api/src/routes/customer.ts`, `packages/db/src/models/Tag.ts`, `apps/web/src/pages/account/MyPets.tsx` (customer portal lives in the web app).
 **Database changes:** Add a `replacedByTagId`/`replacesTagId` reference pair on `Tag` to preserve the audit trail of tag replacement.
 **API changes:** `POST /customer/tags/:id/request-replacement`.
 **UI changes:** "Report lost/damaged tag" action on the customer's pet/tag management page.
@@ -1082,7 +1104,7 @@ TASK:
    old tag's `petId` linkage to the new tag, so the pet's QR/NFC access transfers seamlessly and
    the customer doesn't need to re-link their pet manually. Set the old tag's `replacedByTagId`
    to the new tag's ID for the audit trail.
-5. In `apps/customer`'s pet/tag management page, add a "Report lost or damaged tag — order
+5. In `apps/web`'s pet/tag management page (customer portal), add a "Report lost or damaged tag — order
    replacement" action that calls the new request-replacement route.
 6. Write integration tests: requesting a replacement creates an order at the configured price;
    redeeming a replacement tag deactivates the old tag, transfers pet linkage, and sets both
@@ -1211,7 +1233,7 @@ TASK:
    storing the resulting URL on the invoice.
 5. Extend `packages/api/src/routes/invoice-access.ts` with a route that, given a valid
    `InvoiceAccessToken`, redirects to or serves the `pdfUrl`.
-6. In `apps/customer`'s order-detail page, add a "Download invoice" link once the order is
+6. In `apps/web`'s order-detail page (customer portal), add a "Download invoice" link once the order is
    paid, pointing at the invoice-access route with the appropriate token.
 7. Write an integration test: simulate `payment_intent.succeeded`, mock the R2 upload (as in
    Phase 14's pattern), and assert an `Invoice` record is created with a `pdfUrl` populated,
@@ -1264,7 +1286,7 @@ TASK:
    pointing at `docker/Dockerfile.api`, with `envVars` referencing (not hardcoding) the secrets
    documented in `docs/environments.md` (Render supports marking env vars as "sync: false" so
    they're set manually in the dashboard rather than committed).
-2. For each of the four frontend apps (`apps/web`, `apps/customer`, `apps/admin`,
+2. For each of the three frontend apps (`apps/web` incl. customer portal, `apps/admin`,
    `apps/finder`), add a `vercel.json` configuring the build (Vite build command/output
    directory — check each app's existing `package.json` build script) and the API base URL as
    a build-time environment variable pointing at the correct backend URL per environment.
@@ -1344,7 +1366,7 @@ TASK:
    throughout `packages/api/src/routes/` and `services/` with the new logger — do this as a
    careful find-and-replace, preserving the actual log content/context of each call, not just
    swapping the function name blindly.
-3. For each of `apps/web`, `apps/customer`, `apps/admin`, `apps/finder`: add `@sentry/react`,
+3. For each of `apps/web` (incl. customer portal), `apps/admin`, `apps/finder`: add `@sentry/react`,
    initialize it in the app's entry file reading a `VITE_SENTRY_DSN` env var (skip if unset),
    and wrap the app's root component in Sentry's `ErrorBoundary` (this also satisfies the
    "React apps have no error boundaries" gap from the audit — use Sentry's ErrorBoundary
@@ -1621,7 +1643,7 @@ complete). Do ONLY the work below.
 TASK:
 1. Add Playwright (`@playwright/test`) as a dev dependency at the repo root. Create
    `playwright.config.ts` configured to run against local dev servers (or a staging URL via
-   environment variable) for `apps/web`, `apps/customer`, `apps/admin`, and `apps/finder`, with
+   environment variable) for `apps/web` (incl. customer portal), `apps/admin`, and `apps/finder`, with
    screenshot-on-failure and trace-on-retry enabled.
 2. Write five E2E test files in `tests/e2e/`:
    - `checkout.spec.ts`: visit `apps/web`, browse to a product, add to cart, register a new
@@ -1668,7 +1690,7 @@ additions themselves.
 
 **Objective:** Produce a single, authoritative `DESIGN.md` documenting PawTag's own visual identity — colors, typography, spacing, component patterns, motion, tone — with the reasoning behind each choice, then turn it into a real design-token file the new mobile app builds from, so it's visually coherent from its very first screen instead of accumulating ad hoc styling decisions screen by screen.
 **Why this phase comes now:** Deliberately placed right before the mobile app's first screen (Phase 22) rather than after — a design system written after screens already exist just documents whatever was improvised, which defeats the point. This is the one phase in Stage H that has to come first.
-**Scope:** One reference document, one token file. This phase does **not** restyle `apps/web`, `apps/customer`, `apps/admin`, or `apps/finder` — that's explicitly out of scope, to avoid turning a mobile-prep phase into an unplanned redesign of four working apps. If real inconsistency is found between the four existing apps during the audit step, it gets documented as a *finding* for a future decision, not silently fixed here.
+**Scope:** One reference document, one token file. This phase does **not** restyle `apps/web`, `apps/admin`, or `apps/finder` — that's explicitly out of scope, to avoid turning a mobile-prep phase into an unplanned redesign of working apps. If real inconsistency is found between the existing apps during the audit step, it gets documented as a *finding* for a future decision, not silently fixed here.
 **Files likely affected:** New `DESIGN.md` at the repo root, new `apps/mobile/src/theme/tokens.ts` (and equivalent theme-provider wiring for whatever styling approach the mobile app uses — check Phase 22's choice of styling library first, since this phase should follow Phase 22's scaffold decision, not dictate it — see note in the implementation prompt about sequencing this within Phase 22 if needed).
 **Database changes:** None.
 **API changes:** None.
@@ -1699,8 +1721,8 @@ source of actual design values.
 
 TASK:
 1. Audit PawTag's current visual identity as it actually exists in the code today — do not
-   invent one from scratch if a real one is already partially established. Check: `apps/web`,
-   `apps/customer`, `apps/admin` for existing Tailwind config / CSS custom properties / design
+    invent one from scratch if a real one is already partially established. Check: `apps/web`,
+    `apps/admin` for existing Tailwind config / CSS custom properties / design
    tokens, the `frontend-design` conventions already referenced in earlier phases (Phase 35's
    CMS blocks, for instance, were told to reuse "existing design tokens" — find what those
    actually are), the site's logo/favicon/brand assets, and any existing color palette in use
@@ -1827,14 +1849,14 @@ TASK:
 1. Initialize a new Expo (React Native, TypeScript template) project at `apps/mobile` using
    `npx create-expo-app`. Add it to `pnpm-workspace.yaml` as a workspace package. Configure it
    to depend on `packages/shared` (the existing shared TypeScript types/validation package) via
-   the pnpm workspace protocol, exactly as the existing web apps already do — check
-   `apps/customer/package.json` for the exact dependency syntax to mirror.
+the pnpm workspace protocol, exactly as the existing web apps already do — check
+    `apps/web/package.json` for the exact dependency syntax to mirror.
 2. Set up navigation using `@react-navigation/native` with a stack navigator, and an auth-state
    gate: unauthenticated users see Login/Register/Forgot-Password screens, authenticated users
    see an empty placeholder "Home" screen (real screens come in later phases).
 3. Build a typed API client for the mobile app (in `apps/mobile/src/api/`) that mirrors the
-   pattern already used by `apps/customer`'s API client (check
-   `apps/customer/src/` for its existing fetch/axios wrapper and copy its conventions), pointed
+    pattern already used by the web app's API client (check
+    `apps/web/src/lib/api.ts` for the existing fetch/axios wrapper and copy its conventions), pointed
    at the API base URL via an Expo environment variable (`EXPO_PUBLIC_API_URL`), supporting
    different values for local dev vs. staging vs. production builds.
 4. Implement Login, Register, and Forgot Password screens calling the existing
@@ -1891,7 +1913,7 @@ mobile auth scaffold — complete). Do ONLY the work below.
 TASK:
 1. Build Pet List and Pet Detail/Edit screens in `apps/mobile`, calling the existing
    `/api/customer/pets` routes (list, get, create, update, delete) — mirror the data shape and
-   validation already used by `apps/customer`'s pet management pages so behavior is consistent
+   validation already used by `apps/web`'s pet management pages so behavior is consistent
    across web and mobile.
 2. Add camera-based QR scanning using `expo-camera`'s barcode scanning capability: a "Scan tag"
    screen that reads a QR code, extracts the `tagId` from the scanned finder URL, and calls the
@@ -2735,7 +2757,7 @@ TASK:
    each model.
 2. Update the public-facing CMS routes (`cms-public.ts`, `cms-public-v2.ts`) to filter strictly
    on `status: 'published'` (or the equivalent existing field) — draft content must never be
-   returned to `apps/web`, `apps/customer`, or `apps/finder`. Add an integration test proving
+   returned to `apps/web`, or `apps/finder`. Add an integration test proving
    this explicitly: create a draft-status page, confirm the public route does not return it;
    publish it, confirm the public route now does.
 3. In each CMS admin editor screen, replace any single ambiguous "Save" button with two

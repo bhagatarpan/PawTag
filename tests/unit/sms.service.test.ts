@@ -30,7 +30,7 @@ describe('sms.service', () => {
       expect(result.success).toBe(true);
       expect(result.messageId).toMatch(/^demo_sms_/);
       const logOutput = consoleSpy.mock.calls.flat().join('\n');
-      expect(logOutput).toContain('DEMO SMS');
+      expect(logOutput).toContain('SMS SENT (DEMO MODE)');
       expect(logOutput).toContain('+64211234567');
       expect(logOutput).toContain('Hello from PawTag');
     });
@@ -74,7 +74,7 @@ describe('sms.service', () => {
       const logOutput = consoleSpy.mock.calls.flat().join('\n');
       expect(logOutput).toContain('999000');
       expect(logOutput).toContain('PawTag verification code');
-      expect(logOutput).toContain('expires in 10 minutes');
+      expect(logOutput).toContain('Expires in 10 minutes');
     });
 
     it('falls back to default message when CMS template query throws', async () => {
@@ -103,7 +103,7 @@ describe('sms.service', () => {
       expect(result.success).toBe(true);
       expect(result.messageId).toMatch(/^demo_sms_/);
       const logOutput = consoleSpy.mock.calls.flat().join('\n');
-      expect(logOutput).toContain('📱 [DEMO SMS]');
+      expect(logOutput).toContain('SMS SENT (DEMO MODE)');
       expect(logOutput).toContain('Test message');
     });
   });

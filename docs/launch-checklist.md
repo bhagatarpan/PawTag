@@ -217,9 +217,8 @@ These items require human action and cannot be completed by the AI:
 | Component | Status | Notes |
 |-----------|--------|-------|
 | Backend API | ✅ Feature-complete | 799 tests passing |
-| Web (Public) | ✅ Feature-complete | Marketing, shop, checkout |
+| Web App | ✅ Feature-complete | Marketing, shop, checkout, auth & customer portal (pets, orders, subscriptions, tags, referrals) |
 | Admin Portal | ✅ Feature-complete | Full CRUD, RBAC, analytics |
-| Customer Portal | ✅ Feature-complete | Pet management, orders, subscriptions |
 | Finder Page | ✅ Feature-complete | Public tag lookup |
 | Mobile App | ✅ Feature-complete | Auth, pets, QR/NFC, lost mode, subscriptions, orders |
 | CI/CD | ⏳ Blocked on founder | Needs Render/Vercel accounts |

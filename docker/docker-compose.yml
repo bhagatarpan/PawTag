@@ -37,19 +37,6 @@ services:
       - api
     restart: unless-stopped
 
-  customer:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.web
-      args:
-        APP_NAME: customer
-        PORT: "3002"
-    ports:
-      - "3002:80"
-    depends_on:
-      - api
-    restart: unless-stopped
-
   finder:
     build:
       context: ..

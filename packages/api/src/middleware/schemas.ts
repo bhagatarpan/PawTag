@@ -32,8 +32,12 @@ export const sendPhoneOtpSchema = z.object({
   phoneNumber: z.string().min(1, 'Phone number is required'),
 });
 
+// phoneNumber is optional so unauthenticated users (during registration) can verify by phone;
+// the route falls back to auth-token-based lookup when present. Without it here the validate()
+// middleware would strip the field from req.body before the route can read it.
 export const verifyPhoneSchema = z.object({
   otp: z.string().length(6, 'OTP must be 6 digits'),
+  phoneNumber: z.string().min(1, 'Phone number is required').optional(),
 });
 
 export const resendPhoneOtpSchema = z.object({

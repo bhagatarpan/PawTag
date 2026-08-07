@@ -12,7 +12,9 @@
       "resizeMode": "contain",
       "backgroundColor": "#0d9488"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "co.nz.pawtag",
@@ -52,7 +54,9 @@
           "icon": "./assets/icon.png",
           "color": "#0d9488"
         }
-      ]
+      ],
+      "expo-font",
+      "expo-secure-store"
     ]
   }
 }

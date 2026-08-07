@@ -30,8 +30,7 @@ PawTag/
 │   └── shared/     → Shared types
 ├── apps/
 │   ├── admin/      → Admin CMS portal (39 components)
-│   ├── web/        → Public site & shop (41 components)
-│   ├── customer/   → Customer portal
+│   ├── web/        → Public site, shop, auth & customer portal (merged)
 │   └── finder/     → Finder portal
 ├── tests/          → Test suites (NEW)
 └── .github/        → CI/CD (NEW)

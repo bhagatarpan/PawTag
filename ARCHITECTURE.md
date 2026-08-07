@@ -7,14 +7,15 @@ PawTag is a pet recovery platform using QR code and NFC tags. A pet owner purcha
 ## High-Level Architecture
 
 ```
-┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐
-│   apps/web   │  │ apps/admin  │  │apps/customer│  │ apps/finder │  │ apps/mobile │
-│  Public Site │  │ Admin Portal│  │ Customer    │  │ Finder Page │  │ React Native│
-│  & Shop      │  │ (CRUD/RBAC) │  │ Portal      │  │ (Public)    │  │ (Expo)      │
-│  :3000       │  │ :3001       │  │ :3002       │  │ :3003       │  │ iOS/Android │
-└──────┬───────┘  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘
-       │                 │                │                 │                 │
-       └─────────────────┴────────────────┴─────────────────┴─────────────────┘
+┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐
+│   apps/web   │  │ apps/admin  │  │ apps/finder │  │ apps/mobile │
+│  Public Site │  │ Admin Portal│  │ Finder Page │  │ React Native│
+│  + Shop +     │  │ (CRUD/RBAC) │  │ (Public)    │  │ (Expo)      │
+│ Customer Portal│ │ :3001       │  │ :3003       │  │ iOS/Android │
+│  :3000       │  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘
+└──────┬───────┘         │                 │                 │
+       │                 │                 │                 │
+       └─────────────────┴─────────────────┴─────────────────┘
                                      │
                               ┌──────┴──────┐
                               │ packages/api │
@@ -34,22 +35,21 @@ PawTag is a pet recovery platform using QR code and NFC tags. A pet owner purcha
 
 ## One Backend
 
-A single Express API (`packages/api`) serves all clients — web, admin, customer portal, finder page, and the future mobile app. There is no API duplication; each client consumes the same endpoints with different permission levels.
+A single Express API (`packages/api`) serves all clients — web, admin, finder page, and the future mobile app. There is no API duplication; each client consumes the same endpoints with different permission levels.
 
 - **Port 5000** in development
 - JWT-based authentication with RBAC (role-based access control)
 - Zod validation on all inputs
 - Consistent `{ success, data?, error? }` response shape
 
-## Four Web Frontends
+## Frontends
 
-Each frontend is a separate Vite + React + TypeScript + Tailwind CSS application, built and deployed independently. They are not merged because each serves a different audience with a different security posture:
+The web app consolidates the public site, shop, auth, and the customer portal into a single application so customers have one seamless experience — browse, buy, sign up, verify, and manage their account (pets, orders, subscriptions, notifications, tag activation) in one place.
 
 | App | Port | Audience | Auth | Purpose |
 |-----|------|----------|------|---------|
-| `apps/web` | 3000 | Public | Optional | Marketing site, shop, checkout, account pages |
+| `apps/web` | 3000 | Public/Pet owners | Optional | Marketing site, shop, checkout, auth, customer portal (pets, orders, subscriptions, tags, referrals) |
 | `apps/admin` | 3001 | Staff | Admin RBAC | Full CRUD, dashboard, order management, CMS |
-| `apps/customer` | 3002 | Pet owners | Customer | Pet management, orders, subscriptions, notifications |
 | `apps/finder` | 3003 | Strangers | None | Public tag lookup — must be tiny and fast |
 
 The finder page is intentionally kept minimal — it's the page a stressed stranger opens on their phone with poor signal to report a found pet. Bundling it with heavier apps would hurt the one interaction that matters most for reunions.
