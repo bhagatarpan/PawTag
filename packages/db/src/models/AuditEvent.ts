@@ -10,6 +10,7 @@ export type ActorType =
   | 'API_CLIENT'
   | 'WEBHOOK'
   | 'AI_AGENT'
+  | 'FINDER'
   | 'UNKNOWN';
 
 export type EventCategory =
@@ -144,7 +145,7 @@ const AuditEventSchema = new Schema<IAuditEventDocument>(
     actorType: {
       type: String,
       required: true,
-      enum: ['USER', 'ADMIN', 'SERVICE', 'SYSTEM', 'SCHEDULED_JOB', 'API_CLIENT', 'WEBHOOK', 'AI_AGENT', 'UNKNOWN'],
+      enum: ['USER', 'ADMIN', 'SERVICE', 'SYSTEM', 'SCHEDULED_JOB', 'API_CLIENT', 'WEBHOOK', 'AI_AGENT', 'FINDER', 'UNKNOWN'],
       index: true,
     },
     actorId: { type: String, index: true },

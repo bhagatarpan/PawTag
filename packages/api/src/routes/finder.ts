@@ -1,10 +1,52 @@
 import { Router, Request, Response } from 'express';
 import { Tag, FinderScan, LocationEvent, Notification, Subscription, User, Pet, SiteContent, Product } from '@pawtag/db';
 import { sendPushToUser } from '../services/push-notification.service';
+import { auditService, type AuditContext } from '../services/audit';
 
 const router = Router();
 
 // No auth required — this is the public finder portal
+
+async function auditFinderEvent(
+  req: Request,
+  input: Parameters<typeof auditService.log>[1],
+  overrides: Partial<AuditContext> = {},
+): Promise<void> {
+  // Fire and forget - don't await to prevent blocking response
+  const logAudit = async () => {
+    try {
+      const reqContext = (req as any).auditContext as AuditContext;
+      if (!reqContext) {
+        // For public routes without audit middleware, create minimal context
+        await auditService.log({
+          actorType: 'FINDER',
+          actorId: 'anonymous',
+          sourceIp: req.ip || req.headers['x-forwarded-for']?.toString().split(',')[0]?.trim() || 'unknown',
+          userAgent: req.headers['user-agent']?.toString() || 'unknown',
+          applicationName: 'pawtag-finder',
+          applicationVersion: '1.0.0',
+          apiVersion: 'v1',
+          environment: process.env.NODE_ENV || 'development',
+          ...overrides,
+        }, input);
+        return;
+      }
+      const context: AuditContext = {
+        ...reqContext,
+        actorType: 'FINDER',
+        actorId: 'anonymous',
+        ...overrides,
+      } as AuditContext;
+      await auditService.log(context, input);
+    } catch (err) {
+      // Log audit failure but don't break the response
+      console.error('[Audit] Failed to log finder event:', err);
+    }
+  };
+  
+  // Fire and forget
+  logAudit();
+}
 
 // --- Public stats (must be before /:tagId routes) ---
 router.get('/stats', async (_req: Request, res: Response) => {
@@ -178,6 +220,28 @@ router.get('/:tagId', async (req: Request, res: Response) => {
         ownerPhone: owner.phone,
       },
     });
+
+    await auditFinderEvent(req, {
+      action: 'view_pet_info',
+      eventType: 'finder_view_pet',
+      eventCategory: 'READ',
+      operationType: 'READ',
+      resourceType: 'Tag',
+      resourceId: tag._id.toString(),
+      outcome: 'SUCCESS',
+      severity: 'MEDIUM',
+      metadata: {
+        tagId: tag.tagId,
+        petId: pet._id.toString(),
+        petName: pet.name,
+        petStatus: pet.status,
+        subscriptionStatus: tag.subscriptionStatus,
+        ownerId: owner?._id?.toString(),
+        ownerName: owner?.fullName,
+        fieldsAccessed: ['pet.name', 'pet.petId', 'pet.species', 'pet.breed', 'pet.medicalAlerts', 'pet.status', 'ownerName', 'ownerPhone'],
+        subscriptionActive: isActiveForFinder,
+      },
+    });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to load pet info' });
   }
@@ -344,6 +408,31 @@ router.post('/:tagId/notify', async (req: Request, res: Response) => {
         locationShared: locationSaved,
       },
     });
+
+    await auditFinderEvent(req, {
+      action: 'notify_owner',
+      eventType: 'finder_notify_owner',
+      eventCategory: 'SYSTEM',
+      operationType: 'CREATE',
+      resourceType: 'FinderScan',
+      resourceId: scan?._id?.toString() || tag._id.toString(),
+      outcome: 'SUCCESS',
+      severity: 'HIGH',
+      metadata: {
+        tagId: tag.tagId,
+        petId: pet?._id?.toString(),
+        petName: pet?.name,
+        petStatus: pet?.status,
+        ownerId: owner?._id?.toString(),
+        finderName: finderName || null,
+        finderPhone: finderPhone || null,
+        finderEmail: finderEmail || null,
+        locationShared: locationSaved,
+        location: locationSaved ? { latitude, longitude, accuracy } : null,
+        petFound: pet?.status === 'found',
+        consent: consent || null,
+      },
+    });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to notify owner' });
   }
@@ -471,6 +560,24 @@ router.post('/:tagId/share-location', async (req: Request, res: Response) => {
     }
 
     res.json({ success: true, data: { message: 'Location shared with owner' } });
+
+    await auditFinderEvent(req, {
+      action: 'share_location',
+      eventType: 'finder_share_location',
+      eventCategory: 'SYSTEM',
+      operationType: 'CREATE',
+      resourceType: 'LocationEvent',
+      resourceId: tag._id.toString(),
+      outcome: 'SUCCESS',
+      severity: 'MEDIUM',
+      metadata: {
+        tagId: tag.tagId,
+        petId: tag.petId?.toString(),
+        ownerId: tag.ownerId?.toString(),
+        location: { latitude, longitude, accuracy },
+        scanId: scan?._id?.toString(),
+      },
+    });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to share location' });
   }
