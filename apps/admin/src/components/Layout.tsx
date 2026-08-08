@@ -1,5 +1,6 @@
 import { ReactNode } from 'react';
 import Sidebar from './Sidebar';
+import ToastHost from './ToastHost';
 import { useAuth } from '../lib/auth';
 
 export default function Layout({ children }: { children: ReactNode }) {
@@ -26,6 +27,7 @@ export default function Layout({ children }: { children: ReactNode }) {
         </header>
         <main className="flex-1 overflow-auto p-6">{children}</main>
       </div>
+      <ToastHost />
     </div>
   );
 }
