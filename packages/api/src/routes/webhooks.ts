@@ -1,15 +1,42 @@
 import { Router, Request, Response } from 'express';
-import { Subscription, Invoice, InvoiceAccessToken, Tag, Order, User, Product, Cart, Notification, AuditLog } from '@pawtag/db';
+import { Subscription, Invoice, InvoiceAccessToken, Tag, Order, User, Product, Cart, Notification, AuditLog, AuditEvent } from '@pawtag/db';
 import { notifyCustomerOfStatusChange } from '../services/orderNotification.service';
 import { sendOrderConfirmation, sendInvoiceEmail, sendMail } from '../services/email.service';
 import { generateInvoiceHtml } from '../services/invoice-html.service';
 import { sendPushToUser } from '../services/push-notification.service';
 import { generateSecureToken, hashToken } from '../services/auth.service';
 import logger from '../lib/logger';
+import { auditService, type AuditContext } from '../services/audit';
 
 function generateTagId(): string {
   const digits = Math.floor(100000 + Math.random() * 900000).toString();
   return `PT-${digits}`;
+}
+
+async function auditWebhookEvent(
+  input: Parameters<typeof auditService.log>[1],
+  overrides: Partial<AuditContext> = {},
+): Promise<void> {
+  // Fire and forget
+  const logAudit = async () => {
+    try {
+      await auditService.log({
+        actorType: 'WEBHOOK',
+        actorId: 'stripe',
+        actorUsername: 'stripe-webhook',
+        sourceIp: 'webhook',
+        userAgent: 'stripe-webhook',
+        applicationName: 'pawtag-api',
+        applicationVersion: '1.0.0',
+        apiVersion: 'v1',
+        environment: process.env.NODE_ENV || 'development',
+        ...overrides,
+      }, input);
+    } catch (err) {
+      console.error('[Audit] Failed to log webhook event:', err);
+    }
+  };
+  logAudit();
 }
 
 const router = Router();
@@ -95,8 +122,34 @@ async function handlePaymentIntentSucceeded(paymentIntent: any) {
 
   logger.info({ orderNumber }, 'Order marked as paid');
 
-  // Get user info for emails
+  // Get user info for emails and audit
   const user = await User.findById(order.userId);
+
+  await auditWebhookEvent({
+    action: 'payment_succeeded',
+    eventType: 'stripe_payment_intent_succeeded',
+    eventCategory: 'FINANCIAL',
+    operationType: 'UPDATE',
+    resourceType: 'Order',
+    resourceId: order._id.toString(),
+    outcome: 'SUCCESS',
+    severity: 'HIGH',
+    metadata: {
+      orderNumber,
+      paymentIntentId: paymentIntent.id,
+      amount: order.payment.amount,
+      currency: order.payment.currency,
+      paymentMethod: order.payment.method,
+      userId: order.userId.toString(),
+      userEmail: user?.email,
+      items: order.items.map((item) => ({
+        productId: item.productId.toString(),
+        productName: item.productName,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+      })),
+    },
+  });
 
   // Create subscriptions for tag products
   try {
@@ -374,6 +427,26 @@ async function handlePaymentIntentFailed(paymentIntent: any) {
 
   logger.info({ orderNumber }, 'Order cancelled due to payment failure');
 
+  await auditWebhookEvent({
+    action: 'payment_failed',
+    eventType: 'stripe_payment_intent_failed',
+    eventCategory: 'FINANCIAL',
+    operationType: 'UPDATE',
+    resourceType: 'Order',
+    resourceId: order._id.toString(),
+    outcome: 'FAILURE',
+    severity: 'HIGH',
+    metadata: {
+      orderNumber,
+      paymentIntentId: paymentIntent.id,
+      amount: order.payment.amount,
+      currency: order.payment.currency,
+      failureReason: paymentIntent.last_payment_error?.message || 'Unknown',
+      userId: order.userId.toString(),
+      stockRestored: true,
+    },
+  });
+
   // Notify customer
   try {
     await notifyCustomerOfStatusChange(order, 'cancelled', { reason: 'Payment failed' });
@@ -422,7 +495,7 @@ async function handleInvoicePaymentSucceeded(invoice: any) {
 
   // Create invoice record
   const count = await Invoice.countDocuments();
-  await Invoice.create({
+  const createdInvoice = await Invoice.create({
     subscriptionId: subscription._id,
     userId: subscription.userId,
     invoiceNumber: `INV-${String(count + 1).padStart(6, '0')}`,
@@ -439,6 +512,27 @@ async function handleInvoicePaymentSucceeded(invoice: any) {
     dueDate: new Date(invoice.period_end * 1000),
   });
 
+  await auditWebhookEvent({
+    action: 'invoice_payment_succeeded',
+    eventType: 'stripe_invoice_payment_succeeded',
+    eventCategory: 'FINANCIAL',
+    operationType: 'CREATE',
+    resourceType: 'Invoice',
+    resourceId: createdInvoice._id.toString(),
+    outcome: 'SUCCESS',
+    severity: 'HIGH',
+    metadata: {
+      stripeInvoiceId: invoice.id,
+      stripeSubscriptionId: invoice.subscription,
+      subscriptionId: subscription._id.toString(),
+      userId: subscription.userId.toString(),
+      amount: invoice.amount_paid / 100,
+      currency: invoice.currency,
+      billingPeriod: { start: invoice.period_start, end: invoice.period_end },
+      tagId: subscription.tagId?.toString(),
+    },
+  });
+
   logger.info({ subscriptionId: subscription._id }, 'Invoice paid for subscription');
 }
 
@@ -452,7 +546,7 @@ async function handleInvoicePaymentFailed(invoice: any) {
   if (!subscription) return;
 
   const count = await Invoice.countDocuments();
-  await Invoice.create({
+  const createdInvoice = await Invoice.create({
     subscriptionId: subscription._id,
     userId: subscription.userId,
     invoiceNumber: `INV-${String(count + 1).padStart(6, '0')}`,
@@ -465,6 +559,28 @@ async function handleInvoicePaymentFailed(invoice: any) {
       end: new Date(invoice.period_end * 1000),
     },
     dueDate: new Date(),
+  });
+
+  await auditWebhookEvent({
+    action: 'invoice_payment_failed',
+    eventType: 'stripe_invoice_payment_failed',
+    eventCategory: 'FINANCIAL',
+    operationType: 'CREATE',
+    resourceType: 'Invoice',
+    resourceId: createdInvoice._id.toString(),
+    outcome: 'FAILURE',
+    severity: 'HIGH',
+    metadata: {
+      stripeInvoiceId: invoice.id,
+      stripeSubscriptionId: invoice.subscription,
+      subscriptionId: subscription._id.toString(),
+      userId: subscription.userId.toString(),
+      amount: invoice.amount_due / 100,
+      currency: invoice.currency,
+      billingPeriod: { start: invoice.period_start, end: invoice.period_end },
+      tagId: subscription.tagId?.toString(),
+      failureReason: invoice.last_payment_error?.message || 'Unknown',
+    },
   });
 
   // Look up user to send dunning notification
@@ -542,6 +658,27 @@ async function handleSubscriptionDeleted(subscription: any) {
   sub.cancelledAt = new Date();
   sub.cancellationReason = 'Cancelled via Stripe';
   await sub.save();
+
+  await auditWebhookEvent({
+    action: 'subscription_cancelled',
+    eventType: 'stripe_subscription_deleted',
+    eventCategory: 'FINANCIAL',
+    operationType: 'UPDATE',
+    resourceType: 'Subscription',
+    resourceId: sub._id.toString(),
+    outcome: 'SUCCESS',
+    severity: 'HIGH',
+    metadata: {
+      stripeSubscriptionId: subscription.id,
+      subscriptionId: sub._id.toString(),
+      userId: sub.userId.toString(),
+      tagId: sub.tagId?.toString(),
+      planType: sub.planType,
+      planName: sub.planName,
+      cancellationReason: 'Cancelled via Stripe',
+      cancelledAt: sub.cancelledAt,
+    },
+  });
 
   logger.info({ subscriptionId: sub._id }, 'Subscription cancelled via Stripe');
 }
