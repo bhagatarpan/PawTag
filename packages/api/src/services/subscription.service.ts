@@ -1,10 +1,37 @@
 import { Subscription, Tag, Invoice, User, Notification, Product, TagExpiryNotification, Setting } from '@pawtag/db';
 import { sendMail } from './email.service';
 import { createAndDeliverNotification } from './notification-delivery.service';
+import { auditService, type AuditContext } from './audit';
 
 const GRACE_PERIOD_WEEKS = 4;
 const FREE_PERIOD_MONTHS = 12;
 const REMINDER_CHECK_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
+
+async function auditJobEvent(
+  input: Parameters<typeof auditService.log>[1],
+  overrides: Partial<AuditContext> = {},
+): Promise<void> {
+  // Fire and forget
+  const logAudit = async () => {
+    try {
+      await auditService.log({
+        actorType: 'SCHEDULED_JOB',
+        actorId: 'subscriptionService',
+        actorUsername: 'subscription-service-job',
+        sourceIp: 'system',
+        userAgent: 'scheduled-job',
+        applicationName: 'pawtag-api',
+        applicationVersion: '1.0.0',
+        apiVersion: 'v1',
+        environment: process.env.NODE_ENV || 'development',
+        ...overrides,
+      }, input);
+    } catch (err) {
+      console.error('[Audit] Failed to log job event:', err);
+    }
+  };
+  logAudit();
+}
 
 export function startSubscriptionService() {
   setInterval(async () => {
@@ -72,6 +99,29 @@ export async function createSubscription(data: {
     activatedAt: now,
   });
 
+  await auditJobEvent({
+    action: 'subscription_created',
+    eventType: 'subscription_create',
+    eventCategory: 'FINANCIAL',
+    operationType: 'CREATE',
+    resourceType: 'Subscription',
+    resourceId: subscription._id.toString(),
+    outcome: 'SUCCESS',
+    severity: 'HIGH',
+    metadata: {
+      userId: data.userId,
+      tagId: data.tagId,
+      orderId: data.orderId,
+      planType,
+      planName: planNames[planType],
+      price,
+      currency: 'NZD',
+      freePeriodEndsAt,
+      currentPeriodEnd,
+      autoRenew: true,
+    },
+  });
+
   return subscription;
 }
 
@@ -79,6 +129,8 @@ export async function renewSubscription(subscriptionId: string, paymentMethod?: 
   const subscription = await Subscription.findById(subscriptionId);
   if (!subscription) throw new Error('Subscription not found');
 
+  const oldStatus = subscription.status;
+  const oldPeriodEnd = subscription.currentPeriodEnd;
   const now = new Date();
   const newPeriodEnd = new Date(subscription.currentPeriodEnd);
 
@@ -126,6 +178,32 @@ export async function renewSubscription(subscriptionId: string, paymentMethod?: 
     paymentMethod,
   });
 
+  await auditJobEvent({
+    action: 'subscription_renewed',
+    eventType: 'subscription_renewal',
+    eventCategory: 'FINANCIAL',
+    operationType: 'UPDATE',
+    resourceType: 'Subscription',
+    resourceId: subscription._id.toString(),
+    outcome: 'SUCCESS',
+    severity: 'HIGH',
+    metadata: {
+      userId: subscription.userId.toString(),
+      tagId: subscription.tagId?.toString(),
+      oldStatus,
+      newStatus: 'active',
+      wasInGrace,
+      wasExpired,
+      oldPeriodEnd,
+      newPeriodEnd,
+      price: subscription.price,
+      currency: 'NZD',
+      paymentMethod,
+      planType: subscription.planType,
+      planName: subscription.planName,
+    },
+  });
+
   return subscription;
 }
 
@@ -133,12 +211,36 @@ export async function cancelSubscription(subscriptionId: string, reason?: string
   const subscription = await Subscription.findById(subscriptionId);
   if (!subscription) throw new Error('Subscription not found');
 
-  // Cancellation: continues until end of billing period
+  const oldStatus = subscription.status;
+  const userId = subscription.userId instanceof Object ? subscription.userId.toString() : String(subscription.userId);
+  const tagId = subscription.tagId instanceof Object ? subscription.tagId.toString() : String(subscription.tagId);
   subscription.autoRenew = false;
   subscription.cancelledAt = new Date();
   subscription.cancellationReason = reason;
 
   await subscription.save();
+
+  await auditJobEvent({
+    action: 'subscription_cancelled',
+    eventType: 'subscription_cancellation',
+    eventCategory: 'FINANCIAL',
+    operationType: 'UPDATE',
+    resourceType: 'Subscription',
+    resourceId: subscription._id.toString(),
+    outcome: 'SUCCESS',
+    severity: 'HIGH',
+    metadata: {
+      userId,
+      tagId,
+      oldStatus,
+      newStatus: 'cancelled',
+      cancellationReason: reason,
+      cancelledAt: subscription.cancelledAt,
+      planType: subscription.planType,
+      planName: subscription.planName,
+    },
+  });
+
   return subscription;
 }
 
@@ -232,6 +334,28 @@ export async function checkExpiringSubscriptions() {
     sub.reminderStates = reminderStates;
     await sub.save();
   }
+
+  if (expiringSubs.length > 0) {
+    await auditJobEvent({
+      action: 'expiring_subscriptions_check',
+      eventType: 'scheduled_expiring_check',
+      eventCategory: 'SYSTEM',
+      operationType: 'READ',
+      resourceType: 'Subscription',
+      resourceId: 'multiple',
+      outcome: 'SUCCESS',
+      severity: 'MEDIUM',
+      metadata: {
+        checkedCount: expiringSubs.length,
+        remindersSent: expiringSubs.filter(s => {
+          const days = Math.ceil((s.currentPeriodEnd.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+          return (days <= 1 && !s.reminderStates?.reminder1dSent) ||
+                 (days <= 7 && !s.reminderStates?.reminder7dSent) ||
+                 (days <= 30 && !s.reminderStates?.reminder30dSent);
+        }).length,
+      },
+    });
+  }
 }
 
 export async function checkExpiredSubscriptions() {
@@ -246,6 +370,7 @@ export async function checkExpiredSubscriptions() {
   });
 
   for (const sub of expiredSubs) {
+    const oldStatus = sub.status;
     sub.status = 'grace_period';
     const graceEnd = new Date(now);
     graceEnd.setDate(graceEnd.getDate() + GRACE_PERIOD_WEEKS * 7);
@@ -262,6 +387,30 @@ export async function checkExpiredSubscriptions() {
 
     console.log(`[SubscriptionService] Subscription ${sub._id} moved to grace period until ${graceEnd}`);
   }
+
+  if (expiredSubs.length > 0) {
+    await auditJobEvent({
+      action: 'subscriptions_expired_to_grace',
+      eventType: 'scheduled_expired_to_grace',
+      eventCategory: 'FINANCIAL',
+      operationType: 'UPDATE',
+      resourceType: 'Subscription',
+      resourceId: 'multiple',
+      outcome: 'SUCCESS',
+      severity: 'HIGH',
+      metadata: {
+        transitionedCount: expiredSubs.length,
+        gracePeriodWeeks: GRACE_PERIOD_WEEKS,
+        subscriptions: expiredSubs.map(s => ({
+          subscriptionId: s._id.toString(),
+          userId: s.userId.toString(),
+          tagId: s.tagId?.toString(),
+          planType: s.planType,
+          graceEndsAt: s.gracePeriodEndsAt,
+        })),
+      },
+    });
+  }
 }
 
 export async function checkGracePeriodExpiry() {
@@ -275,6 +424,7 @@ export async function checkGracePeriodExpiry() {
   });
 
   for (const sub of graceExpired) {
+    const oldStatus = sub.status;
     sub.status = 'expired';
     await sub.save();
 
@@ -283,6 +433,29 @@ export async function checkGracePeriodExpiry() {
     });
 
     console.log(`[SubscriptionService] Subscription ${sub._id} expired — tag deactivated (Subscription Expired)`);
+  }
+
+  if (graceExpired.length > 0) {
+    await auditJobEvent({
+      action: 'grace_period_expired',
+      eventType: 'scheduled_grace_expiry',
+      eventCategory: 'FINANCIAL',
+      operationType: 'UPDATE',
+      resourceType: 'Subscription',
+      resourceId: 'multiple',
+      outcome: 'SUCCESS',
+      severity: 'HIGH',
+      metadata: {
+        expiredCount: graceExpired.length,
+        subscriptions: graceExpired.map(s => ({
+          subscriptionId: s._id.toString(),
+          userId: s.userId.toString(),
+          tagId: s.tagId?.toString(),
+          planType: s.planType,
+          graceEndedAt: s.gracePeriodEndsAt,
+        })),
+      },
+    });
   }
 }
 
@@ -293,6 +466,7 @@ export async function sendGracePeriodReminders() {
     deletedAt: null,
   }).populate('userId', 'fullName email').populate('tagId', 'tagId');
 
+  let remindersSent = 0;
   for (const sub of graceSubs) {
     const user = sub.userId as any;
     const tag = sub.tagId as any;
@@ -317,7 +491,25 @@ export async function sendGracePeriodReminders() {
       reminderStates.lastGraceReminderAt = now;
       sub.reminderStates = reminderStates;
       await sub.save();
+      remindersSent++;
     }
+  }
+
+  if (remindersSent > 0) {
+    await auditJobEvent({
+      action: 'grace_period_reminders_sent',
+      eventType: 'scheduled_grace_reminders',
+      eventCategory: 'SYSTEM',
+      operationType: 'CREATE',
+      resourceType: 'Notification',
+      resourceId: 'multiple',
+      outcome: 'SUCCESS',
+      severity: 'MEDIUM',
+      metadata: {
+        remindersSent,
+        totalGraceSubs: graceSubs.length,
+      },
+    });
   }
 }
 

@@ -1,5 +1,32 @@
-import { Product, Setting, Notification } from '@pawtag/db';
+import { Product, Setting, Notification, User } from '@pawtag/db';
 import { sendMail } from '../services/email.service';
+import { auditService, type AuditContext } from '../services/audit';
+
+async function auditJobEvent(
+  input: Parameters<typeof auditService.log>[1],
+  overrides: Partial<AuditContext> = {},
+): Promise<void> {
+  // Fire and forget
+  const logAudit = async () => {
+    try {
+      await auditService.log({
+        actorType: 'SCHEDULED_JOB',
+        actorId: 'lowStockCheck',
+        actorUsername: 'low-stock-check-job',
+        sourceIp: 'system',
+        userAgent: 'scheduled-job',
+        applicationName: 'pawtag-api',
+        applicationVersion: '1.0.0',
+        apiVersion: 'v1',
+        environment: process.env.NODE_ENV || 'development',
+        ...overrides,
+      }, input);
+    } catch (err) {
+      console.error('[Audit] Failed to log job event:', err);
+    }
+  };
+  logAudit();
+}
 
 export async function checkLowStock(): Promise<{ alerted: boolean; count: number }> {
   const thresholdSetting = await Setting.findOne({ key: 'lowStockThreshold' }).lean();
@@ -45,9 +72,7 @@ export async function checkLowStock(): Promise<{ alerted: boolean; count: number
     await sendMail(adminEmail, `[PawTag] Low Stock Alert — ${lowStockProducts.length} product(s)`, html);
   }
 
-  const adminUser = await import('@pawtag/db').then((m) =>
-    m.User.findOne({ role: 'admin' }).select('_id').lean()
-  );
+  const adminUser = await User.findOne({ role: 'admin' }).select('_id').lean();
 
   if (adminUser) {
     await Notification.create({
@@ -65,6 +90,24 @@ export async function checkLowStock(): Promise<{ alerted: boolean; count: number
       },
     });
   }
+
+  await auditJobEvent({
+    action: 'low_stock_check',
+    eventType: 'scheduled_low_stock_check',
+    eventCategory: 'SYSTEM',
+    operationType: 'READ',
+    resourceType: 'Product',
+    resourceId: 'multiple',
+    outcome: 'SUCCESS',
+    severity: lowStockProducts.some(p => p.stock === 0) ? 'HIGH' : 'MEDIUM',
+    metadata: {
+      threshold,
+      productCount: lowStockProducts.length,
+      products: lowStockProducts.map(p => ({ name: p.name, sku: p.sku, stock: p.stock, price: p.price })),
+      emailSent: !!adminEmail,
+      notificationCreated: !!adminUser,
+    },
+  });
 
   return { alerted: true, count: lowStockProducts.length };
 }
