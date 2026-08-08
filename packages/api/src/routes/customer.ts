@@ -5,6 +5,8 @@ import { requirePermission } from '../middleware/permission';
 import { validate } from '../middleware/validation';
 import { createPetSchema, updatePetSchema } from '../middleware/schemas';
 import { Pet, Tag, Order, LocationEvent, Notification, FinderScan, User, generatePetId, Cart, Product, Subscription, Referral, Setting, AuditLog, Invoice } from '@pawtag/db';
+import { auditService, type AuditContext } from '../services/audit';
+import { createAuditContextFromRequest, type AuditRequest } from '../middleware/audit';
 import { calculateBundleDiscount } from '../services/bundle-pricing.service';
 import { validateReferralCode } from '../services/referral.service';
 import { createPaymentIntent } from '../services/stripe.service';
@@ -12,6 +14,25 @@ import { sendOrderConfirmation, sendSubscriptionWelcomeEmail } from '../services
 
 const router = Router();
 router.use(authenticate);
+
+async function auditCustomerEvent(
+  req: AuthRequest,
+  input: Parameters<typeof auditService.log>[1],
+  overrides: Partial<AuditContext> = {},
+): Promise<void> {
+  const reqContext = req.auditContext as AuditContext;
+  if (!reqContext) {
+    throw new Error('Audit middleware not applied - request has no audit context');
+  }
+  const context: AuditContext = {
+    ...reqContext,
+    actorType: 'USER',
+    actorId: req.user?.id,
+    actorEmail: req.user?.email,
+    ...overrides,
+  } as AuditContext;
+  await auditService.log(context, input);
+}
 
 // --- My Pets ---
 /**
@@ -155,6 +176,19 @@ router.post('/pets', requirePermission('pet.create'), validate(createPetSchema),
       req.body.color,
     );
     const pet = await Pet.create({ ...req.body, ownerId: req.user!.id, petId });
+
+    await auditCustomerEvent(req, {
+      action: 'create',
+      eventType: 'customer_pet_create',
+      eventCategory: 'CREATE',
+      operationType: 'CREATE',
+      resourceType: 'Pet',
+      resourceId: pet._id.toString(),
+      outcome: 'SUCCESS',
+      severity: 'MEDIUM',
+      metadata: { name: pet.name, petType: pet.petType, petId: pet.petId, breed: pet.breed },
+    });
+
     res.status(201).json({ success: true, data: pet });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to create pet' });
@@ -205,8 +239,29 @@ router.put('/pets/:id', requirePermission('pet.update'), validate(updatePetSchem
     const pet = await Pet.findOne({ _id: req.params.id, ownerId: req.user!.id, deletedAt: null });
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
 
+    const changedFields = Object.entries(updateData).map(([field, value]) => ({
+      field,
+      before: pet.get(field),
+      after: value,
+      sensitive: false,
+    }));
+
     Object.assign(pet, updateData);
     await pet.save();
+
+    await auditCustomerEvent(req, {
+      action: 'update',
+      eventType: 'customer_pet_update',
+      eventCategory: 'UPDATE',
+      operationType: 'UPDATE',
+      resourceType: 'Pet',
+      resourceId: pet._id.toString(),
+      outcome: 'SUCCESS',
+      severity: 'MEDIUM',
+      changedFields,
+      metadata: { petId: pet.petId, updatedFields: Object.keys(updateData) },
+    });
+
     res.json({ success: true, data: pet });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to update pet' });
@@ -255,6 +310,18 @@ router.delete('/pets/:id', requirePermission('pet.delete'), async (req: AuthRequ
 
     pet.deletedAt = new Date();
     await pet.save();
+
+    await auditCustomerEvent(req, {
+      action: 'soft_delete',
+      eventType: 'customer_pet_delete',
+      eventCategory: 'DELETE',
+      operationType: 'DELETE',
+      resourceType: 'Pet',
+      resourceId: pet._id.toString(),
+      outcome: 'SUCCESS',
+      severity: 'HIGH',
+      metadata: { name: pet.name, petId: pet.petId, petType: pet.petType, deletedAt: pet.deletedAt },
+    });
 
     res.json({ success: true, data: { message: 'Pet deleted' } });
   } catch {
@@ -387,6 +454,18 @@ router.post('/tags/redeem', requirePermission('tag.create'), async (req: AuthReq
 
     await tag.save();
 
+    await auditCustomerEvent(req, {
+      action: 'redeem',
+      eventType: 'customer_tag_redeem',
+      eventCategory: 'CREATE',
+      operationType: 'CREATE',
+      resourceType: 'Tag',
+      resourceId: tag._id.toString(),
+      outcome: 'SUCCESS',
+      severity: 'HIGH',
+      metadata: { tagId: tag.tagId, tagType: tag.tagType, petId: tag.petId?.toString(), replacedTagId: tag.replacesTagId?.toString(), orderId: tag.orderId?.toString() },
+    });
+
     res.json({ success: true, data: tag });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to redeem tag' });
@@ -455,13 +534,16 @@ router.post('/tags/:id/request-replacement', requirePermission('tag.create'), as
       },
     });
 
-    // Create audit log
-    await AuditLog.create({
-      userId: req.user!.id,
+    await auditCustomerEvent(req, {
       action: 'request_tag_replacement',
-      entity: 'Tag',
-      entityId: tag._id.toString(),
-      changes: { reason, replacementOrderNumber: orderNumber },
+      eventType: 'customer_tag_replacement_request',
+      eventCategory: 'FINANCIAL',
+      operationType: 'CREATE',
+      resourceType: 'Tag',
+      resourceId: tag._id.toString(),
+      outcome: 'SUCCESS',
+      severity: 'HIGH',
+      metadata: { reason, replacementOrderNumber: orderNumber, replacementPrice, originalTagId: tag.tagId, newOrderId: order._id.toString() },
     });
 
     res.json({ success: true, data: { order, replacementPrice } });
@@ -533,6 +615,7 @@ router.post('/pets/:id/mark-lost', requirePermission('pet.update'), async (req: 
     const pet = await Pet.findOne({ _id: req.params.id, ownerId: req.user!.id, deletedAt: null });
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
 
+    const oldStatus = pet.status;
     pet.status = 'lost';
     pet.lostCount = (pet.lostCount || 0) + 1;
     pet.foundByFinderAt = undefined;
@@ -544,6 +627,19 @@ router.post('/pets/:id/mark-lost', requirePermission('pet.update'), async (req: 
     await User.findByIdAndUpdate(req.user!.id, { responsibilityScore: totalLostCount });
 
     await Tag.updateMany({ petId: pet._id, deletedAt: null }, { status: 'lost' });
+
+    await auditCustomerEvent(req, {
+      action: 'mark_lost',
+      eventType: 'customer_pet_mark_lost',
+      eventCategory: 'TRANSITION',
+      operationType: 'UPDATE',
+      resourceType: 'Pet',
+      resourceId: pet._id.toString(),
+      outcome: 'SUCCESS',
+      severity: 'HIGH',
+      changedFields: [{ field: 'status', before: oldStatus, after: 'lost', sensitive: false }],
+      metadata: { petId: pet.petId, oldStatus, lostCount: pet.lostCount, 'totalOwnerLostCount': totalLostCount, tagsUpdated: true },
+    });
 
     res.json({ success: true, data: pet });
   } catch {
@@ -588,7 +684,8 @@ router.post('/pets/:id/mark-found', requirePermission('pet.update'), async (req:
     const pet = await Pet.findOne({ _id: req.params.id, ownerId: req.user!.id, deletedAt: null });
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
 
-    // Calculate time-to-found if pet was found by finder
+    const oldStatus = pet.status;
+    const wasFoundByFinder = !!pet.foundByFinderAt;
     let timeToFoundMs: number | null = null;
     if (pet.foundByFinderAt) {
       timeToFoundMs = Date.now() - new Date(pet.foundByFinderAt).getTime();
@@ -610,6 +707,19 @@ router.post('/pets/:id/mark-found', requirePermission('pet.update'), async (req:
     await User.findByIdAndUpdate(req.user!.id, { responsibilityScore: totalLostCount });
 
     await Tag.updateMany({ petId: pet._id, deletedAt: null }, { status: 'active' });
+
+    await auditCustomerEvent(req, {
+      action: 'mark_found',
+      eventType: 'customer_pet_mark_found',
+      eventCategory: 'TRANSITION',
+      operationType: 'UPDATE',
+      resourceType: 'Pet',
+      resourceId: pet._id.toString(),
+      outcome: 'SUCCESS',
+      severity: 'HIGH',
+      changedFields: [{ field: 'status', before: oldStatus, after: 'safe', sensitive: false }],
+      metadata: { petId: pet.petId, oldStatus, wasFoundByFinder, timeToFoundMs, 'totalOwnerLostCount': totalLostCount, tagsReactivated: true },
+    });
 
     res.json({ success: true, data: { ...pet.toObject(), timeToFoundMs } });
   } catch {
@@ -1022,6 +1132,32 @@ router.post('/orders', requirePermission('order.create'), async (req: AuthReques
 
     // Clear cart
     await Cart.findOneAndDelete({ userId: req.user!.id });
+
+    await auditCustomerEvent(req, {
+      action: 'create_order',
+      eventType: 'customer_order_create',
+      eventCategory: 'FINANCIAL',
+      operationType: 'CREATE',
+      resourceType: 'Order',
+      resourceId: order._id.toString(),
+      outcome: 'SUCCESS',
+      severity: 'HIGH',
+      metadata: {
+        orderNumber,
+        totalAmount: finalAmount,
+        discountAmount,
+        itemCount: orderItems.length,
+        paymentMethod,
+        paymentStatus: 'pending',
+        shippingAddress: orderData.shippingAddress,
+        items: orderItems.map((item) => ({
+          productId: item.productId.toString(),
+          productName: item.productName,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+        })),
+      },
+    });
 
     // NOTE: Subscription creation, referral processing, and order confirmation email
     // are now handled in the Stripe webhook handler (payment_intent.succeeded event)

@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 import request from 'supertest';
 import { setupTestDb, teardownTestDb, clearDb } from './setup';
 import app from '../../packages/api/src/index';
-import { Order, Tag, Setting, AuditLog } from '@pawtag/db';
+import { Order, Tag, Setting, AuditEvent } from '@pawtag/db';
 import { createSuperAdmin } from './helpers';
 
 beforeAll(async () => {
@@ -53,9 +53,9 @@ describe('Phase 13 — Replacement/Damaged Tag Flow', () => {
       expect(res.body.data.order.items[0].productName).toContain('Replacement');
 
       // Verify audit log
-      const auditLogs = await AuditLog.find({ entity: 'Tag', entityId: tag._id.toString() });
-      expect(auditLogs.length).toBe(1);
-      expect(auditLogs[0].action).toBe('request_tag_replacement');
+      const auditEvents = await AuditEvent.find({ resourceType: 'Tag', resourceId: tag._id.toString() });
+      expect(auditEvents.length).toBe(1);
+      expect(auditEvents[0].action).toBe('request_tag_replacement');
     });
 
     it('should reject replacement request for a tag not owned by the user', async () => {

@@ -1,35 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import { v7 as uuidv7 } from 'uuid';
 import { config } from '../config';
+import { AuthRequest, AuditContext, AuditRequest } from './auth';
 
-export interface AuditRequest extends Request {
-  auditContext?: {
-    requestId: string;
-    correlationId: string;
-    traceId: string;
-    transactionId: string;
-    startTime: number;
-    durationMs?: number;
-    actorType: string;
-    actorId?: string;
-    actorUsername?: string;
-    actorEmail?: string;
-    impersonatorId?: string;
-    delegatedById?: string;
-    sessionId?: string;
-    authenticationMethod?: string;
-    authenticationContext?: Record<string, unknown>;
-    sourceIp: string;
-    forwardedIp?: string;
-    userAgent: string;
-    deviceId?: string;
-    applicationName: string;
-    applicationVersion: string;
-    apiVersion: string;
-    environment: string;
-    tenantId?: string;
-  };
-}
+export type { AuditRequest, AuditContext } from './auth';
 
 function getClientIp(req: Request): string {
   return req.ip ||
@@ -54,7 +28,7 @@ function getDeviceId(req: Request): string | undefined {
     undefined;
 }
 
-export function auditMiddleware(req: AuditRequest, res: Response, next: NextFunction): void {
+export function auditMiddleware(req: AuthRequest, res: Response, next: NextFunction): void {
   const requestId = req.headers['x-request-id']?.toString() || uuidv7();
   const correlationId = req.headers['x-correlation-id']?.toString() || uuidv7();
   const traceId = req.headers['x-trace-id']?.toString() || uuidv7();
