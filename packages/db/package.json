@@ -10,11 +10,13 @@
     "lint": "eslint src --ext .ts"
   },
   "dependencies": {
+    "@pawtag/shared": "workspace:*",
+    "@types/uuid": "^11.0.0",
     "mongoose": "^7.0.3",
-    "@pawtag/shared": "workspace:*"
+    "uuid": "^14.0.1"
   },
   "devDependencies": {
-    "typescript": "^5.5.0",
-    "@types/node": "^20.0.0"
+    "@types/node": "^20.0.0",
+    "typescript": "^5.5.0"
   }
 }

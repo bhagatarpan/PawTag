@@ -24,6 +24,7 @@ import { connectDatabase } from '@pawtag/db';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { swaggerSpec } from './swagger';
 import logger from './lib/logger';
+import { auditMiddleware } from './middleware/audit';
 
 import QRCode from 'qrcode';
 import { Tag } from '@pawtag/db';
@@ -51,6 +52,7 @@ import webhookRoutes from './routes/webhooks';
 import invoiceAccessRoutes from './routes/invoice-access';
 import referralRoutes from './routes/referrals';
 import pushTokenRoutes from './routes/push-tokens';
+import auditRoutes from './routes/audit';
 import { publicRouter as supportPublicRoutes, adminRouter as supportAdminRoutes } from './routes/support';
 import { startReminderService } from './services/reminder.service';
 import { startSubscriptionService } from './services/subscription.service';
@@ -81,6 +83,9 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(morgan('dev'));
+
+// Audit middleware - must be early to capture all requests
+app.use(auditMiddleware);
 
 // Rate limiting
 const limiter = rateLimit({
@@ -172,6 +177,7 @@ app.use('/api/admin/support-requests', supportAdminRoutes);
 app.use('/api/public/cms', cmsPublicRoutes);
 app.use('/api/public/cms', cmsSettingsPublicRoutes);
 app.use('/api/public/cms', cmsPublicV2Routes);
+app.use('/api/admin/audit', auditRoutes);
 
 // --- Error Handling ---
 app.use(notFoundHandler);

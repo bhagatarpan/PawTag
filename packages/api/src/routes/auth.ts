@@ -34,7 +34,9 @@ import {
 import { sendVerificationEmail, sendPasswordResetEmail, sendPasswordChangedEmail, sendWelcomeEmail, sendLoginNotification, sendLoginOtpEmail } from '../services/email.service';
 import { sendPhoneOtpSMS } from '../services/sms.service';
 import { isRegistrationOtpDisabled } from '../services/otp-settings.service';
-import { User, Role, UserRole, VerificationToken, AuditLog, Setting } from '@pawtag/db';
+import { User, Role, UserRole, VerificationToken, AuditLog, Setting, AuditEvent } from '@pawtag/db';
+import { auditService, type AuditContext } from '../services/audit';
+import { createAuditContextFromRequest, type AuditRequest } from '../middleware/audit';
 import { config } from '../config';
 
 const router = Router();
@@ -91,6 +93,23 @@ const mfaVerifyLimiter = rateLimit({
 
 function getClientInfo(req: any) {
   return { ipAddress: req.ip || req.connection?.remoteAddress, userAgent: req.headers['user-agent'] };
+}
+
+async function auditAuthEvent(
+  req: AuditRequest,
+  input: Parameters<typeof auditService.log>[1],
+  overrides: Partial<Parameters<typeof auditService.log>[0]> = {},
+): Promise<void> {
+  const reqContext = req.auditContext as AuditContext;
+  if (!reqContext) {
+    throw new Error('Audit middleware not applied - request has no audit context');
+  }
+  const context: AuditContext = {
+    ...reqContext,
+    actorType: 'USER',
+    ...overrides,
+  } as AuditContext;
+  await auditService.log(context, input);
 }
 
 async function checkAndActivateUser(userId: string) {
@@ -175,13 +194,16 @@ router.post('/register', registerLimiter, validate(registerSchema), async (req, 
       console.log(`   ${config.frontendUrl}/verify-email?token=${emailToken}\n`);
     }
 
-    await AuditLog.create({
-      userId: user._id,
-      action: 'registration',
-      entity: 'user',
-      entityId: user._id.toString(),
-      ipAddress: clientInfo.ipAddress,
-      userAgent: clientInfo.userAgent,
+    await auditAuthEvent(req as AuditRequest, {
+      action: 'register',
+      eventType: 'user_registration',
+      eventCategory: 'AUTH',
+      operationType: 'CREATE',
+      resourceType: 'User',
+      resourceId: user._id.toString(),
+      outcome: 'SUCCESS',
+      severity: 'MEDIUM',
+      metadata: { email, fullName, role: 'customer', emailSent: emailResult.success },
     });
 
     res.status(201).json({
@@ -285,13 +307,17 @@ router.post('/login', loginLimiter, validate(loginSchema), async (req, res: Resp
       const LOCKOUT_MINUTES = 30;
       if (user.failedLoginAttempts >= MAX_ATTEMPTS) {
         user.lockedUntil = new Date(Date.now() + LOCKOUT_MINUTES * 60 * 1000);
-        await AuditLog.create({
-          userId: user._id.toString(),
+        await auditAuthEvent(req as AuditRequest, {
           action: 'account_locked',
-          entity: 'User',
-          entityId: user._id.toString(),
-          changes: { reason: 'too_many_failed_logins', attempts: user.failedLoginAttempts },
-        });
+          eventType: 'account_lockout',
+          eventCategory: 'SECURITY',
+          operationType: 'UPDATE',
+          resourceType: 'User',
+          resourceId: user._id.toString(),
+          outcome: 'SUCCESS',
+          severity: 'HIGH',
+          metadata: { reason: 'too_many_failed_logins', attempts: user.failedLoginAttempts, maxAttempts: MAX_ATTEMPTS },
+        }, { actorType: 'SYSTEM' });
       }
       await user.save();
 
@@ -397,14 +423,16 @@ router.post('/login', loginLimiter, validate(loginSchema), async (req, res: Resp
       const ua = req.headers['user-agent'] || 'unknown';
       sendLoginOtpEmail(recipient, user.fullName, otp, `${mfaOtpExpiry} minutes`).catch(() => {});
 
-      // Audit log
-      await AuditLog.create({
-        userId: user._id,
+      await auditAuthEvent(req as AuditRequest, {
         action: 'login_mfa_otp_sent',
-        entity: 'User',
-        entityId: user._id.toString(),
-        ipAddress: ip,
-        userAgent: ua,
+        eventType: 'mfa_otp_sent',
+        eventCategory: 'AUTH',
+        operationType: 'CREATE',
+        resourceType: 'User',
+        resourceId: user._id.toString(),
+        outcome: 'SUCCESS',
+        severity: 'MEDIUM',
+        metadata: { mfaType: 'email_otp', recipient: mfaTestMode ? 'test_email' : 'user_email', otpExpiryMinutes: mfaOtpExpiry },
       });
 
       // Mask email for response
@@ -428,6 +456,18 @@ router.post('/login', loginLimiter, validate(loginSchema), async (req, res: Resp
 
     const refreshTokens = generateRefreshToken();
     await storeRefreshToken(user._id.toString(), refreshTokens.tokenHash);
+
+    await auditAuthEvent(req as AuditRequest, {
+      action: 'login',
+      eventType: 'user_login',
+      eventCategory: 'AUTH',
+      operationType: 'CREATE',
+      resourceType: 'User',
+      resourceId: user._id.toString(),
+      outcome: 'SUCCESS',
+      severity: 'MEDIUM',
+      metadata: { mfaRequired: false, isAdmin, rbacRoles: rbacRoles.map((r: any) => r.name) },
+    }, { authenticationMethod: 'password' });
 
     // Send login notification for admin accounts
     if (isAdmin) {
@@ -517,15 +557,17 @@ router.get('/verify-email', async (req, res: Response) => {
     verificationToken.usedAt = new Date();
     await verificationToken.save();
 
-    const clientInfo = getClientInfo(req);
-    await AuditLog.create({
-      userId: user._id,
+    await auditAuthEvent(req as AuditRequest, {
       action: 'email_verified',
-      entity: 'user',
-      entityId: user._id.toString(),
-      ipAddress: clientInfo.ipAddress,
-      userAgent: clientInfo.userAgent,
-    });
+      eventType: 'email_verification',
+      eventCategory: 'AUTH',
+      operationType: 'UPDATE',
+      resourceType: 'User',
+      resourceId: user._id.toString(),
+      outcome: 'SUCCESS',
+      severity: 'MEDIUM',
+      metadata: { email: user.email, tokenId: verificationToken._id.toString() },
+    }, { actorType: 'USER' });
 
     await checkAndActivateUser(user._id.toString());
 
@@ -598,13 +640,16 @@ router.post('/resend-email-verification', validate(resendEmailVerificationSchema
       console.log(`   ${config.frontendUrl}/verify-email?token=${emailToken}\n`);
     }
 
-    await AuditLog.create({
-      userId: user._id,
+    await auditAuthEvent(req as AuditRequest, {
       action: 'email_verification_resent',
-      entity: 'user',
-      entityId: user._id.toString(),
-      ipAddress: clientInfo.ipAddress,
-      userAgent: clientInfo.userAgent,
+      eventType: 'email_verification_resend',
+      eventCategory: 'AUTH',
+      operationType: 'CREATE',
+      resourceType: 'User',
+      resourceId: user._id.toString(),
+      outcome: 'SUCCESS',
+      severity: 'LOW',
+      metadata: { email: user.email, resendCount: recentTokens + 1, emailSent: emailResult.success },
     });
 
     res.json({
@@ -641,14 +686,17 @@ router.post('/send-phone-otp', validate(sendPhoneOtpSchema), async (req, res: Re
       user.phoneVerified = true;
       await user.save();
 
-      await AuditLog.create({
-        userId: user._id,
+      await auditAuthEvent(req as AuditRequest, {
         action: 'phone_otp_skipped_system',
-        entity: 'user',
-        entityId: user._id.toString(),
-        ipAddress: getClientInfo(req).ipAddress,
-        userAgent: getClientInfo(req).userAgent,
-      });
+        eventType: 'phone_verification_skipped',
+        eventCategory: 'AUTH',
+        operationType: 'UPDATE',
+        resourceType: 'User',
+        resourceId: user._id.toString(),
+        outcome: 'SUCCESS',
+        severity: 'INFO',
+        metadata: { reason: 'registration_otp_disabled', phoneNumber },
+      }, { actorType: 'SYSTEM' });
 
       await checkAndActivateUser(user._id);
 
@@ -705,13 +753,16 @@ router.post('/send-phone-otp', validate(sendPhoneOtpSchema), async (req, res: Re
       console.log(`   OTP:   ${otp}\n`);
     }
 
-    await AuditLog.create({
-      userId: user._id,
+    await auditAuthEvent(req as AuditRequest, {
       action: 'phone_otp_sent',
-      entity: 'user',
-      entityId: user._id.toString(),
-      ipAddress: clientInfo.ipAddress,
-      userAgent: clientInfo.userAgent,
+      eventType: 'phone_otp_send',
+      eventCategory: 'AUTH',
+      operationType: 'CREATE',
+      resourceType: 'User',
+      resourceId: user._id.toString(),
+      outcome: 'SUCCESS',
+      severity: 'LOW',
+      metadata: { phoneNumber, smsSent: smsResult.success, testMode: !!testRecipient, otpExpiryMinutes: config.otpExpiryMinutes },
     });
 
     res.json({
@@ -843,15 +894,17 @@ router.post('/verify-phone', validate(verifyPhoneSchema), async (req: AuthReques
     verificationToken.attempts += 1;
     await verificationToken.save();
 
-    const clientInfo = getClientInfo(req);
-    await AuditLog.create({
-      userId: user._id,
+    await auditAuthEvent(req as AuditRequest, {
       action: 'phone_verified',
-      entity: 'user',
-      entityId: user._id.toString(),
-      ipAddress: clientInfo.ipAddress,
-      userAgent: clientInfo.userAgent,
-    });
+      eventType: 'phone_verification',
+      eventCategory: 'AUTH',
+      operationType: 'UPDATE',
+      resourceType: 'User',
+      resourceId: user._id.toString(),
+      outcome: 'SUCCESS',
+      severity: 'MEDIUM',
+      metadata: { phoneNumber: user.phoneNumber, tokenId: verificationToken._id.toString(), attempts: verificationToken.attempts },
+    }, { actorType: 'USER' });
 
     await checkAndActivateUser(user._id.toString());
 
@@ -927,13 +980,16 @@ router.post('/resend-phone-otp', validate(resendPhoneOtpSchema), async (req, res
       console.log(`   OTP:   ${otp}\n`);
     }
 
-    await AuditLog.create({
-      userId: user._id,
+    await auditAuthEvent(req as AuditRequest, {
       action: 'phone_otp_resent',
-      entity: 'user',
-      entityId: user._id.toString(),
-      ipAddress: clientInfo.ipAddress,
-      userAgent: clientInfo.userAgent,
+      eventType: 'phone_otp_resend',
+      eventCategory: 'AUTH',
+      operationType: 'CREATE',
+      resourceType: 'User',
+      resourceId: user._id.toString(),
+      outcome: 'SUCCESS',
+      severity: 'LOW',
+      metadata: { phoneNumber, smsSent: smsResult.success, resendCount: recentOtps + 1, testMode: !!testRecipient },
     });
 
     res.json({
@@ -1014,7 +1070,7 @@ router.post('/forgot-password', forgotPasswordLimiter, validate(forgotPasswordSc
     const resetExpiry = new Date(Date.now() + 60 * 60 * 1000);
     const clientInfo = getClientInfo(req);
 
-    await VerificationToken.create({
+    const verificationToken = await VerificationToken.create({
       userId: user._id,
       type: 'password_reset',
       tokenHash: resetTokenHash,
@@ -1030,13 +1086,16 @@ router.post('/forgot-password', forgotPasswordLimiter, validate(forgotPasswordSc
       console.log(`   ${config.frontendUrl}/reset-password?token=${resetToken}\n`);
     }
 
-    await AuditLog.create({
-      userId: user._id,
+    await auditAuthEvent(req as AuditRequest, {
       action: 'password_reset_requested',
-      entity: 'user',
-      entityId: user._id.toString(),
-      ipAddress: clientInfo.ipAddress,
-      userAgent: clientInfo.userAgent,
+      eventType: 'password_reset_request',
+      eventCategory: 'AUTH',
+      operationType: 'CREATE',
+      resourceType: 'User',
+      resourceId: user._id.toString(),
+      outcome: 'SUCCESS',
+      severity: 'HIGH',
+      metadata: { email: user.email, tokenId: verificationToken._id.toString(), resetExpiryHours: 1 },
     });
 
     res.json({ success: true, data: { message: 'If an account exists, a reset email has been sent.' } });
@@ -1080,14 +1139,17 @@ router.post('/reset-password', validate(resetPasswordSchema), async (req, res: R
     await verificationToken.save();
 
     const clientInfo = getClientInfo(req);
-    await AuditLog.create({
-      userId: user._id,
+    await auditAuthEvent(req as AuditRequest, {
       action: 'password_reset_completed',
-      entity: 'user',
-      entityId: user._id.toString(),
-      ipAddress: clientInfo.ipAddress,
-      userAgent: clientInfo.userAgent,
-    });
+      eventType: 'password_reset_complete',
+      eventCategory: 'AUTH',
+      operationType: 'UPDATE',
+      resourceType: 'User',
+      resourceId: user._id.toString(),
+      outcome: 'SUCCESS',
+      severity: 'HIGH',
+      metadata: { email: user.email, tokenId: verificationToken._id.toString() },
+    }, { actorType: 'USER', authenticationMethod: 'password_reset_token' });
 
     sendPasswordChangedEmail(user.email, user.fullName, 'self', clientInfo.ipAddress).catch((err) => {
       console.error('Failed to send password changed email:', err);
@@ -1145,8 +1207,19 @@ router.post('/change-password', authenticate, validate(changePasswordSchema), as
     user.passwordHash = await hashPassword(newPassword);
     await user.save();
 
-    const clientInfo = getClientInfo(req);
-    sendPasswordChangedEmail(user.email, user.fullName, 'self', clientInfo.ipAddress).catch((err) => {
+    await auditAuthEvent(req as AuditRequest, {
+      action: 'password_changed',
+      eventType: 'password_change',
+      eventCategory: 'AUTH',
+      operationType: 'UPDATE',
+      resourceType: 'User',
+      resourceId: user._id.toString(),
+      outcome: 'SUCCESS',
+      severity: 'HIGH',
+      metadata: { changedBy: 'self' },
+    }, { authenticationMethod: 'current_password' });
+
+    sendPasswordChangedEmail(user.email, user.fullName, 'self', getClientInfo(req).ipAddress).catch((err) => {
       console.error('Failed to send password changed email:', err);
     });
 
@@ -1184,6 +1257,18 @@ router.post('/refresh', async (req, res: Response) => {
 
     const newAccessToken = generateToken({ id: user._id.toString(), email: user.email, role: user.role });
 
+    await auditAuthEvent(req as AuditRequest, {
+      action: 'token_refreshed',
+      eventType: 'token_refresh',
+      eventCategory: 'AUTH',
+      operationType: 'CREATE',
+      resourceType: 'User',
+      resourceId: user._id.toString(),
+      outcome: 'SUCCESS',
+      severity: 'LOW',
+      metadata: { rotated: true },
+    }, { actorType: 'SERVICE', authenticationMethod: 'refresh_token' });
+
     res.json({
       success: true,
       data: {
@@ -1203,6 +1288,18 @@ router.post('/logout', async (req: AuthRequest, res: Response) => {
     if (refreshToken) {
       await revokeRefreshToken(refreshToken);
     }
+
+    await auditAuthEvent(req as AuditRequest, {
+      action: 'logout',
+      eventType: 'user_logout',
+      eventCategory: 'AUTH',
+      operationType: 'DELETE',
+      resourceType: 'User',
+      resourceId: req.user?.id,
+      outcome: 'SUCCESS',
+      severity: 'LOW',
+      metadata: { revokedRefreshToken: !!refreshToken },
+    }, { actorType: req.user ? 'USER' : 'UNKNOWN' });
 
     res.json({ success: true, data: { message: 'Logged out successfully' } });
   } catch {
@@ -1265,15 +1362,17 @@ router.post('/mfa/send-otp', mfaSendLimiter, async (req: AuthRequest, res: Respo
     const ua = req.headers['user-agent'] || 'unknown';
     sendLoginOtpEmail(recipient, user.fullName, otp, `${mfaOtpExpiry} minutes`).catch(() => {});
 
-    // Audit log
-    await AuditLog.create({
-      userId: user._id,
+    await auditAuthEvent(req as AuditRequest, {
       action: 'login_mfa_otp_sent',
-      entity: 'User',
-      entityId: user._id.toString(),
-      ipAddress: ip,
-      userAgent: ua,
-    });
+      eventType: 'mfa_otp_sent',
+      eventCategory: 'AUTH',
+      operationType: 'CREATE',
+      resourceType: 'User',
+      resourceId: user._id.toString(),
+      outcome: 'SUCCESS',
+      severity: 'MEDIUM',
+      metadata: { mfaType: 'email_otp', recipient: mfaTestMode ? 'test_email' : 'user_email', otpExpiryMinutes: mfaOtpExpiry, tempTokenUsed: true },
+    }, { actorType: 'USER', authenticationMethod: 'temp_token' });
 
     // Mask email
     const [localPart, domain] = user.email.split('@');
@@ -1400,20 +1499,23 @@ router.post('/mfa/verify', mfaVerifyLimiter, async (req: AuthRequest, res: Respo
       .populate('roleId', 'name displayName isSuperAdmin');
     const rbacRoles = userRoles.map((ur) => ur.roleId);
 
-    // Audit log
+    const isAdmin = rbacRoles.some((r: any) => r.isSuperAdmin || ['SUPER_ADMIN', 'ADMIN', 'CUSTOMER_SERVICE', 'WEBSITE_EDITOR'].includes(r.name));
     const ip = req.ip || req.connection?.remoteAddress || 'unknown';
     const ua = req.headers['user-agent'] || 'unknown';
-    await AuditLog.create({
-      userId: user._id,
+
+    await auditAuthEvent(req as AuditRequest, {
       action: 'login_mfa_verified',
-      entity: 'User',
-      entityId: user._id.toString(),
-      ipAddress: ip,
-      userAgent: ua,
-    });
+      eventType: 'mfa_verification',
+      eventCategory: 'AUTH',
+      operationType: 'CREATE',
+      resourceType: 'User',
+      resourceId: user._id.toString(),
+      outcome: 'SUCCESS',
+      severity: 'MEDIUM',
+      metadata: { mfaType: 'email_otp', isAdmin, rbacRoles: rbacRoles.map((r: any) => r.name) },
+    }, { authenticationMethod: 'mfa_email_otp' });
 
     // Send login notification for admin accounts
-    const isAdmin = rbacRoles.some((r: any) => r.isSuperAdmin || ['SUPER_ADMIN', 'ADMIN', 'CUSTOMER_SERVICE', 'WEBSITE_EDITOR'].includes(r.name));
     if (isAdmin) {
       sendLoginNotification(user.email, user.fullName, user.email, ip, ua, true).catch(() => {});
     }
