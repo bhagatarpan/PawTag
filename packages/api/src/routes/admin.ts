@@ -41,12 +41,31 @@ import {
   TagExpiryNotification,
   Notification,
 } from '@pawtag/db';
+import { auditService, type AuditContext } from '../services/audit';
+import { createAuditContextFromRequest, type AuditRequest } from '../middleware/audit';
 import { hashPassword } from '../services/auth.service';
 
 const router = Router();
 
 function getClientInfo(req: any) {
   return { ipAddress: req.ip || req.connection?.remoteAddress, userAgent: req.headers['user-agent'] };
+}
+
+async function auditAdminEvent(
+  req: AuditRequest,
+  input: Parameters<typeof auditService.log>[1],
+  overrides: Partial<AuditContext> = {},
+): Promise<void> {
+  const reqContext = req.auditContext as AuditContext;
+  if (!reqContext) {
+    throw new Error('Audit middleware not applied - request has no audit context');
+  }
+  const context: AuditContext = {
+    ...reqContext,
+    actorType: 'ADMIN',
+    ...overrides,
+  } as AuditContext;
+  await auditService.log(context, input);
 }
 
 // All admin routes require authentication
@@ -449,12 +468,16 @@ router.put('/users/:id/role', requirePermission('user.assign_role'), async (req:
     user.role = (legacyMap[roleLower] || 'customer') as any;
     await user.save();
 
-    await AuditLog.create({
-      userId: req.user!.id,
+    await auditAdminEvent(req, {
       action: 'update_role',
-      entity: 'User',
-      entityId: req.params.id,
-      changes: { roleId, roleName: role.name },
+      eventType: 'user_role_update',
+      eventCategory: 'AUTHZ',
+      operationType: 'UPDATE',
+      resourceType: 'User',
+      resourceId: req.params.id,
+      outcome: 'SUCCESS',
+      severity: 'HIGH',
+      metadata: { roleId, roleName: role.name, legacyRole: user.role },
     });
 
     res.json({ success: true, data: user });
@@ -510,12 +533,17 @@ router.put('/users/:id/status', requirePermission('user.update'), validate(updat
     user.status = req.body.status as any;
     await user.save();
 
-    await AuditLog.create({
-      userId: req.user!.id,
+    await auditAdminEvent(req, {
       action: 'update_status',
-      entity: 'User',
-      entityId: req.params.id,
-      changes: { status: { old: oldStatus, new: req.body.status } },
+      eventType: 'user_status_update',
+      eventCategory: 'AUTHZ',
+      operationType: 'UPDATE',
+      resourceType: 'User',
+      resourceId: req.params.id,
+      outcome: 'SUCCESS',
+      severity: 'HIGH',
+      changedFields: [{ field: 'status', before: oldStatus, after: req.body.status, sensitive: false }],
+      metadata: { oldStatus, newStatus: req.body.status },
     });
 
     res.json({ success: true, data: user });
@@ -533,12 +561,16 @@ router.post('/users/:id/reset-password', requirePermission('user.reset_password'
     user.passwordHash = await hashPassword(req.body.newPassword);
     await user.save();
 
-    await AuditLog.create({
-      userId: req.user!.id,
+    await auditAdminEvent(req, {
       action: 'reset_password',
-      entity: 'User',
-      entityId: req.params.id,
-      changes: { note: 'Admin reset password' },
+      eventType: 'admin_password_reset',
+      eventCategory: 'AUTH',
+      operationType: 'UPDATE',
+      resourceType: 'User',
+      resourceId: req.params.id,
+      outcome: 'SUCCESS',
+      severity: 'HIGH',
+      metadata: { targetUserId: req.params.id, targetEmail: user.email, resetBy: req.user!.id },
     });
 
     const clientInfo = { ipAddress: req.ip || req.connection?.remoteAddress, userAgent: req.headers['user-agent'] };
@@ -564,12 +596,17 @@ router.put('/users/:id/lock', requirePermission('user.deactivate'), async (req: 
     user.lockedUntil = undefined;
     await user.save();
 
-    await AuditLog.create({
-      userId: req.user!.id,
+    await auditAdminEvent(req, {
       action: 'lock_account',
-      entity: 'User',
-      entityId: req.params.id,
-      changes: { status: { old: oldStatus, new: 'suspended' } },
+      eventType: 'user_account_lock',
+      eventCategory: 'SECURITY',
+      operationType: 'UPDATE',
+      resourceType: 'User',
+      resourceId: req.params.id,
+      outcome: 'SUCCESS',
+      severity: 'HIGH',
+      changedFields: [{ field: 'status', before: oldStatus, after: 'suspended', sensitive: false }],
+      metadata: { oldStatus, newStatus: 'suspended', reason: 'admin_lock', failedAttemptsCleared: true },
     });
 
     res.json({ success: true, data: { message: 'Account locked' } });
@@ -590,12 +627,17 @@ router.put('/users/:id/unlock', requirePermission('user.activate'), async (req: 
     user.lockedUntil = undefined;
     await user.save();
 
-    await AuditLog.create({
-      userId: req.user!.id,
+    await auditAdminEvent(req, {
       action: 'unlock_account',
-      entity: 'User',
-      entityId: req.params.id,
-      changes: { status: { old: oldStatus, new: 'active' } },
+      eventType: 'user_account_unlock',
+      eventCategory: 'SECURITY',
+      operationType: 'UPDATE',
+      resourceType: 'User',
+      resourceId: req.params.id,
+      outcome: 'SUCCESS',
+      severity: 'HIGH',
+      changedFields: [{ field: 'status', before: oldStatus, after: 'active', sensitive: false }],
+      metadata: { oldStatus, newStatus: 'active', reason: 'admin_unlock', failedAttemptsCleared: true },
     });
 
     res.json({ success: true, data: { message: 'Account unlocked' } });
@@ -625,12 +667,24 @@ router.put('/users/:id', requirePermission('user.update'), validate(updateUserSc
 
     await user.save();
 
-    await AuditLog.create({
-      userId: req.user!.id,
+    const auditChanges = Object.entries(changes).map(([field, value]) => ({
+      field,
+      before: (value as any).old,
+      after: (value as any).new,
+      sensitive: ['email', 'phoneNumber', 'mfaEnabled'].includes(field),
+    }));
+
+    await auditAdminEvent(req, {
       action: 'update_user',
-      entity: 'User',
-      entityId: req.params.id,
-      changes,
+      eventType: 'user_profile_update',
+      eventCategory: 'ADMIN',
+      operationType: 'UPDATE',
+      resourceType: 'User',
+      resourceId: req.params.id,
+      outcome: 'SUCCESS',
+      severity: 'MEDIUM',
+      changedFields: auditChanges,
+      metadata: { targetUserId: req.params.id, updatedFields: Object.keys(changes) },
     });
 
     res.json({ success: true, data: user });
@@ -648,12 +702,16 @@ router.delete('/users/:id', requirePermission('user.delete'), async (req: AuthRe
     user.deletedAt = new Date();
     await user.save();
 
-    await AuditLog.create({
-      userId: req.user!.id,
+    await auditAdminEvent(req, {
       action: 'soft_delete',
-      entity: 'User',
-      entityId: req.params.id,
-      changes: { email: user.email, name: user.fullName, note: 'Soft deleted' },
+      eventType: 'user_delete',
+      eventCategory: 'ADMIN',
+      operationType: 'DELETE',
+      resourceType: 'User',
+      resourceId: req.params.id,
+      outcome: 'SUCCESS',
+      severity: 'HIGH',
+      metadata: { email: user.email, name: user.fullName, deletedAt: user.deletedAt },
     });
 
     res.json({ success: true, data: { message: 'User deleted' } });
@@ -755,12 +813,16 @@ router.post('/owners/register', requirePermission('user.create'), async (req: Au
       });
     }
 
-    await AuditLog.create({
-      userId: req.user!.id,
+    await auditAdminEvent(req, {
       action: 'create',
-      entity: 'User',
-      entityId: user._id.toString(),
-      changes: { email, fullName, roleId: assignedRole?._id, roleName: assignedRole?.name, note: 'Admin registered user' },
+      eventType: 'admin_user_create',
+      eventCategory: 'ADMIN',
+      operationType: 'CREATE',
+      resourceType: 'User',
+      resourceId: user._id.toString(),
+      outcome: 'SUCCESS',
+      severity: 'MEDIUM',
+      metadata: { email, fullName, phoneNumber, roleId: assignedRole?._id?.toString(), roleName: assignedRole?.name, legacyRole: user.role, registeredBy: req.user!.id },
     });
 
     const { passwordHash: _passwordHash, ...safeUser } = user.toObject();
@@ -824,12 +886,16 @@ router.post('/pets', requirePermission('pet.create'), async (req: AuthRequest, r
     );
     const pet = await Pet.create({ ...parsed.data, ownerId, petId });
 
-    await AuditLog.create({
-      userId: req.user!.id,
+    await auditAdminEvent(req, {
       action: 'create',
-      entity: 'Pet',
-      entityId: pet._id.toString(),
-      changes: { name: pet.name, petType: pet.petType, ownerId },
+      eventType: 'admin_pet_create',
+      eventCategory: 'ADMIN',
+      operationType: 'CREATE',
+      resourceType: 'Pet',
+      resourceId: pet._id.toString(),
+      outcome: 'SUCCESS',
+      severity: 'MEDIUM',
+      metadata: { name: pet.name, petType: pet.petType, petId: pet.petId, ownerId, ownerEmail: owner.email },
     });
 
     res.status(201).json({ success: true, data: pet });
@@ -881,12 +947,24 @@ router.put('/pets/:id', requirePermission('pet.update'), validate(updatePetSchem
     Object.assign(pet, req.body);
     await pet.save();
 
-    await AuditLog.create({
-      userId: req.user!.id,
+    const changedFields = Object.entries(req.body).map(([field, value]) => ({
+      field,
+      before: pet.get(field),
+      after: value,
+      sensitive: false,
+    }));
+
+    await auditAdminEvent(req, {
       action: 'update',
-      entity: 'Pet',
-      entityId: pet._id.toString(),
-      changes: req.body,
+      eventType: 'admin_pet_update',
+      eventCategory: 'ADMIN',
+      operationType: 'UPDATE',
+      resourceType: 'Pet',
+      resourceId: pet._id.toString(),
+      outcome: 'SUCCESS',
+      severity: 'MEDIUM',
+      changedFields,
+      metadata: { petId: pet.petId, updatedFields: Object.keys(req.body) },
     });
 
     res.json({ success: true, data: pet });
@@ -928,12 +1006,16 @@ router.delete('/pets/:id', requirePermission('pet.delete'), async (req: AuthRequ
     pet.deletedAt = new Date();
     await pet.save();
 
-    await AuditLog.create({
-      userId: req.user!.id,
+    await auditAdminEvent(req, {
       action: 'soft_delete',
-      entity: 'Pet',
-      entityId: req.params.id,
-      changes: { name: pet.name, petId: pet.petId, ownerId: pet.ownerId.toString(), note: 'Soft deleted' },
+      eventType: 'admin_pet_delete',
+      eventCategory: 'ADMIN',
+      operationType: 'DELETE',
+      resourceType: 'Pet',
+      resourceId: req.params.id,
+      outcome: 'SUCCESS',
+      severity: 'HIGH',
+      metadata: { name: pet.name, petId: pet.petId, ownerId: pet.ownerId.toString(), deletedAt: pet.deletedAt },
     });
 
     res.json({ success: true, data: { message: 'Pet deleted' } });
@@ -1126,15 +1208,24 @@ router.get('/pets', requirePermission('pet.read'), async (req, res: Response) =>
  */
 router.put('/pets/:id/status', requirePermission('pet.update'), async (req: AuthRequest, res: Response) => {
   try {
-    const pet = await Pet.findByIdAndUpdate(req.params.id, { status: req.body.status }, { new: true });
+    const pet = await Pet.findById(req.params.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
 
-    await AuditLog.create({
-      userId: req.user!.id,
+    const oldStatus = pet.status;
+    pet.status = req.body.status as any;
+    await pet.save();
+
+    await auditAdminEvent(req, {
       action: 'update_pet_status',
-      entity: 'Pet',
-      entityId: req.params.id,
-      changes: { status: { old: 'unknown', new: req.body.status } },
+      eventType: 'admin_pet_status_update',
+      eventCategory: 'ADMIN',
+      operationType: 'UPDATE',
+      resourceType: 'Pet',
+      resourceId: req.params.id,
+      outcome: 'SUCCESS',
+      severity: 'MEDIUM',
+      changedFields: [{ field: 'status', before: oldStatus, after: req.body.status, sensitive: false }],
+      metadata: { petId: pet.petId, oldStatus, newStatus: req.body.status },
     });
 
     res.json({ success: true, data: pet });
@@ -1309,7 +1400,17 @@ router.post('/tags', requirePermission('tag.create'), validate(createTagSchema),
       .populate('petId', 'name petId petType breed color')
       .populate('ownerId', 'fullName email phoneNumber');
 
-    await AuditLog.create({ userId: req.user!.id, action: 'create', entity: 'Tag', entityId: tag._id.toString(), changes: { tagId, tagType, petId, ownerId } });
+    await auditAdminEvent(req, {
+      action: 'create',
+      eventType: 'admin_tag_create',
+      eventCategory: 'ADMIN',
+      operationType: 'CREATE',
+      resourceType: 'Tag',
+      resourceId: tag._id.toString(),
+      outcome: 'SUCCESS',
+      severity: 'MEDIUM',
+      metadata: { tagId, tagType, petId, ownerId, petName: pet.name, ownerEmail: owner.email },
+    });
     res.status(201).json({ success: true, data: populated });
   } catch { res.status(500).json({ success: false, error: 'Failed to create tag' }); }
 });
@@ -1419,7 +1520,25 @@ router.put('/tags/:id', requirePermission('tag.update'), validate(updateTagSchem
       .populate('petId', 'name petId petType breed color')
       .populate('ownerId', 'fullName email');
 
-    await AuditLog.create({ userId: req.user!.id, action: 'update', entity: 'Tag', entityId: tag._id.toString(), changes: { old: oldValues, new: newValues } });
+    const changedFields = Object.entries(oldValues).map(([field, before]) => ({
+      field,
+      before,
+      after: newValues[field],
+      sensitive: false,
+    }));
+
+    await auditAdminEvent(req, {
+      action: 'update',
+      eventType: 'admin_tag_update',
+      eventCategory: 'ADMIN',
+      operationType: 'UPDATE',
+      resourceType: 'Tag',
+      resourceId: tag._id.toString(),
+      outcome: 'SUCCESS',
+      severity: 'MEDIUM',
+      changedFields,
+      metadata: { tagId: tag.tagId, oldValues, newValues },
+    });
     res.json({ success: true, data: updated });
   } catch { res.status(500).json({ success: false, error: 'Failed to update tag' }); }
 });
@@ -1452,7 +1571,17 @@ router.delete('/tags/:id', requirePermission('tag.delete'), async (req: AuthRequ
     tag.deletedAt = new Date();
     await tag.save();
 
-    await AuditLog.create({ userId: req.user!.id, action: 'soft_delete', entity: 'Tag', entityId: req.params.id, changes: { tagId: tag.tagId, note: 'Soft deleted' } });
+    await auditAdminEvent(req, {
+      action: 'soft_delete',
+      eventType: 'admin_tag_delete',
+      eventCategory: 'ADMIN',
+      operationType: 'DELETE',
+      resourceType: 'Tag',
+      resourceId: req.params.id,
+      outcome: 'SUCCESS',
+      severity: 'HIGH',
+      metadata: { tagId: tag.tagId, deletedAt: tag.deletedAt },
+    });
     res.json({ success: true, data: { message: 'Tag deleted' } });
   } catch { res.status(500).json({ success: false, error: 'Failed to delete tag' }); }
 });
@@ -1839,11 +1968,16 @@ router.post('/products', requirePermission('product.create'), validate(createPro
   try {
     const product = await Product.create(req.body);
 
-    await AuditLog.create({
-      userId: req.user!.id,
+    await auditAdminEvent(req, {
       action: 'create',
-      entity: 'Product',
-      entityId: product._id.toString(),
+      eventType: 'admin_product_create',
+      eventCategory: 'ADMIN',
+      operationType: 'CREATE',
+      resourceType: 'Product',
+      resourceId: product._id.toString(),
+      outcome: 'SUCCESS',
+      severity: 'MEDIUM',
+      metadata: { name: product.name, sku: product.sku, price: product.price, category: product.category },
     });
 
     res.status(201).json({ success: true, data: product });
@@ -1902,11 +2036,24 @@ router.put('/products/:id', requirePermission('product.update'), validate(update
     const product = await Product.findByIdAndUpdate(req.params.id, req.body, { new: true });
     if (!product) { res.status(404).json({ success: false, error: 'Product not found' }); return; }
 
-    await AuditLog.create({
-      userId: req.user!.id,
+    const changedFields = Object.entries(req.body).map(([field, value]) => ({
+      field,
+      before: product.get(field),
+      after: value,
+      sensitive: ['price'].includes(field),
+    }));
+
+    await auditAdminEvent(req, {
       action: 'update',
-      entity: 'Product',
-      entityId: req.params.id,
+      eventType: 'admin_product_update',
+      eventCategory: 'ADMIN',
+      operationType: 'UPDATE',
+      resourceType: 'Product',
+      resourceId: req.params.id,
+      outcome: 'SUCCESS',
+      severity: 'MEDIUM',
+      changedFields,
+      metadata: { sku: product.sku, updatedFields: Object.keys(req.body) },
     });
 
     res.json({ success: true, data: product });
@@ -1946,11 +2093,16 @@ router.delete('/products/:id', requirePermission('product.delete'), async (req: 
     const product = await Product.findByIdAndDelete(req.params.id);
     if (!product) { res.status(404).json({ success: false, error: 'Product not found' }); return; }
 
-    await AuditLog.create({
-      userId: req.user!.id,
+    await auditAdminEvent(req, {
       action: 'delete',
-      entity: 'Product',
-      entityId: req.params.id,
+      eventType: 'admin_product_delete',
+      eventCategory: 'ADMIN',
+      operationType: 'DELETE',
+      resourceType: 'Product',
+      resourceId: req.params.id,
+      outcome: 'SUCCESS',
+      severity: 'HIGH',
+      metadata: { name: product.name, sku: product.sku, price: product.price, category: product.category },
     });
 
     res.json({ success: true, data: { message: 'Product deleted' } });
@@ -2098,13 +2250,17 @@ router.put('/orders/:id/status', requirePermission('order.update'), async (req: 
     if (trackingNumber) order.trackingNumber = trackingNumber;
     await order.save();
 
-    await AuditLog.create({
-      userId: req.user!.id,
+    await auditAdminEvent(req, {
       action: 'update_order_status',
-      entity: 'Order',
-      entityId: req.params.id,
-      changes: { status: { old: previousStatus, new: status } },
-      ...getClientInfo(req),
+      eventType: 'admin_order_status_update',
+      eventCategory: 'FINANCIAL',
+      operationType: 'UPDATE',
+      resourceType: 'Order',
+      resourceId: req.params.id,
+      outcome: 'SUCCESS',
+      severity: 'HIGH',
+      changedFields: [{ field: 'status', before: previousStatus, after: status, sensitive: false }],
+      metadata: { orderNumber: order.orderNumber, previousStatus, newStatus: status, trackingNumber, amount: order.payment.amount },
     });
 
     // Notify customer of status change
@@ -2146,14 +2302,17 @@ router.post('/orders/:id/cancel', requirePermission('order.update'), async (req:
     const { restoreOrderStock } = await import('../services/inventory.service');
     await restoreOrderStock(order.items);
 
-    // Audit log
-    await AuditLog.create({
-      userId: req.user!.id,
+    await auditAdminEvent(req, {
       action: 'cancel_order',
-      entity: 'Order',
-      entityId: req.params.id,
-      changes: { status: { old: previousStatus, new: 'cancelled' }, reason },
-      ...getClientInfo(req),
+      eventType: 'admin_order_cancel',
+      eventCategory: 'FINANCIAL',
+      operationType: 'UPDATE',
+      resourceType: 'Order',
+      resourceId: req.params.id,
+      outcome: 'SUCCESS',
+      severity: 'HIGH',
+      changedFields: [{ field: 'status', before: previousStatus, after: 'cancelled', sensitive: false }],
+      metadata: { orderNumber: order.orderNumber, previousStatus, reason, amount: order.payment.amount, stockRestored: true },
     });
 
     // Notify customer
@@ -2205,14 +2364,17 @@ router.post('/orders/:id/refund', requirePermission('order.update'), async (req:
     order.payment.status = 'refunded';
     await order.save();
 
-    // Audit log
-    await AuditLog.create({
-      userId: req.user!.id,
+    await auditAdminEvent(req, {
       action: 'refund_order',
-      entity: 'Order',
-      entityId: req.params.id,
-      changes: { status: { old: previousStatus, new: 'refunded' }, reason, refundId: refundResult.refundId },
-      ...getClientInfo(req),
+      eventType: 'admin_order_refund',
+      eventCategory: 'FINANCIAL',
+      operationType: 'UPDATE',
+      resourceType: 'Order',
+      resourceId: req.params.id,
+      outcome: 'SUCCESS',
+      severity: 'CRITICAL',
+      changedFields: [{ field: 'status', before: previousStatus, after: 'refunded', sensitive: false }],
+      metadata: { orderNumber: order.orderNumber, previousStatus, reason, refundId: refundResult.refundId, amount: amount || order.payment.amount, paymentTransactionId: order.payment.transactionId },
     });
 
     // Notify customer
@@ -2261,14 +2423,21 @@ router.post('/orders/:id/create-shipment', requirePermission('order.update'), as
     order.shippingLabelUrl = result.labelUrl;
     await order.save();
 
-    // Audit log
-    await AuditLog.create({
-      userId: req.user!.id,
+    await auditAdminEvent(req, {
       action: 'create_shipment',
-      entity: 'Order',
-      entityId: req.params.id,
-      changes: { status: { old: previousStatus, new: 'shipped' }, trackingNumber: result.trackingNumber, carrier: result.carrier },
-      ...getClientInfo(req),
+      eventType: 'admin_order_shipment_create',
+      eventCategory: 'FINANCIAL',
+      operationType: 'UPDATE',
+      resourceType: 'Order',
+      resourceId: req.params.id,
+      outcome: 'SUCCESS',
+      severity: 'HIGH',
+      changedFields: [
+        { field: 'status', before: previousStatus, after: 'shipped', sensitive: false },
+        { field: 'trackingNumber', before: null, after: result.trackingNumber, sensitive: false },
+        { field: 'carrier', before: null, after: result.carrier, sensitive: false },
+      ],
+      metadata: { orderNumber: order.orderNumber, previousStatus, trackingNumber: result.trackingNumber, carrier: result.carrier, labelUrl: result.labelUrl, amount: order.payment.amount },
     });
 
     // Notify customer
@@ -2308,14 +2477,17 @@ router.post('/orders/:id/mark-delivered', requirePermission('order.update'), asy
     order.deliveredAt = new Date();
     await order.save();
 
-    // Audit log
-    await AuditLog.create({
-      userId: req.user!.id,
+    await auditAdminEvent(req, {
       action: 'mark_delivered',
-      entity: 'Order',
-      entityId: req.params.id,
-      changes: { status: { old: previousStatus, new: 'delivered' } },
-      ...getClientInfo(req),
+      eventType: 'admin_order_delivered',
+      eventCategory: 'FINANCIAL',
+      operationType: 'UPDATE',
+      resourceType: 'Order',
+      resourceId: req.params.id,
+      outcome: 'SUCCESS',
+      severity: 'HIGH',
+      changedFields: [{ field: 'status', before: previousStatus, after: 'delivered', sensitive: false }],
+      metadata: { orderNumber: order.orderNumber, previousStatus, deliveredAt: order.deliveredAt, amount: order.payment.amount },
     });
 
     // Notify customer
@@ -2347,13 +2519,17 @@ router.put('/users/:id/skip-invoice-otp', requirePermission('user.update'), asyn
     }
     await user.save();
 
-    await AuditLog.create({
-      userId: req.user!.id,
+    await auditAdminEvent(req, {
       action: skip ? 'skip_invoice_otp_enabled' : 'skip_invoice_otp_disabled',
-      entity: 'User',
-      entityId: req.params.id,
-      changes: { skipInvoiceOtp: { old: !skip, new: skip }, expiresAt: user.skipInvoiceOtpExpiresAt },
-      ...getClientInfo(req),
+      eventType: 'admin_invoice_otp_config',
+      eventCategory: 'CONFIG',
+      operationType: 'UPDATE',
+      resourceType: 'User',
+      resourceId: req.params.id,
+      outcome: 'SUCCESS',
+      severity: 'MEDIUM',
+      changedFields: [{ field: 'skipInvoiceOtp', before: !skip, after: skip, sensitive: false }],
+      metadata: { targetUserId: req.params.id, skipInvoiceOtp: skip, expiresAt: user.skipInvoiceOtpExpiresAt },
     });
 
     res.json({ success: true, data: { skipInvoiceOtp: user.skipInvoiceOtp, expiresAt: user.skipInvoiceOtpExpiresAt } });
