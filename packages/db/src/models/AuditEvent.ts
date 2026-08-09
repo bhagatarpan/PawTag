@@ -98,6 +98,7 @@ export interface IAuditEventDocument extends Document {
 
   metadata?: Record<string, unknown>;
 
+  streamKey?: string;
   eventHash?: string;
   previousEventHash?: string;
   hashAlgorithm: string;
@@ -209,6 +210,7 @@ const AuditEventSchema = new Schema<IAuditEventDocument>(
 
     metadata: { type: Schema.Types.Mixed },
 
+    streamKey: { type: String, index: true },
     eventHash: { type: String },
     previousEventHash: { type: String },
     hashAlgorithm: { type: String, default: 'SHA-256' },

@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { config } from '../config';
+import { setAuditActor } from './audit';
 
 export interface AuditContext {
   requestId: string;
@@ -57,6 +58,13 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
       role: string;
     };
     req.user = decoded;
+    setAuditActor(req, {
+      actorType: 'USER',
+      actorId: decoded.id,
+      actorEmail: decoded.email,
+      actorUsername: decoded.email,
+      authenticationMethod: 'jwt',
+    });
     next();
   } catch {
     res.status(401).json({ success: false, error: 'Invalid or expired token' });

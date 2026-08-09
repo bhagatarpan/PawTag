@@ -1,4 +1,27 @@
 import { Product } from '@pawtag/db';
+import { auditService, type AuditContext } from './audit';
+
+async function auditRestoreStockEvent(
+  input: Parameters<typeof auditService.log>[1],
+  overrides: Partial<AuditContext> = {},
+): Promise<void> {
+  try {
+    await auditService.log({
+      actorType: 'SYSTEM',
+      actorId: 'inventoryService',
+      actorUsername: 'inventory-restore-service',
+      sourceIp: 'system',
+      userAgent: 'inventory-service',
+      applicationName: 'pawtag-api',
+      applicationVersion: '1.0.0',
+      apiVersion: 'v1',
+      environment: process.env.NODE_ENV || 'development',
+      ...overrides,
+    }, input);
+  } catch (err) {
+    console.error('[Audit] Failed to log inventory event:', err);
+  }
+}
 
 /**
  * Restore stock for all items on an order.
@@ -19,6 +42,22 @@ export async function restoreOrderStock(orderItems: Array<{
         product.stock += item.quantity;
       }
       await product.save();
+
+      await auditRestoreStockEvent({
+        action: 'inventory_stock_restored',
+        eventType: 'inventory.stock_restored',
+        eventCategory: 'FINANCIAL',
+        operationType: 'UPDATE',
+        resourceType: 'Product',
+        resourceId: item.productId?.toString?.() || item.productId,
+        outcome: 'SUCCESS',
+        severity: 'MEDIUM',
+        metadata: {
+          productId: item.productId?.toString?.() || item.productId,
+          restoredQty: item.quantity,
+          variantName: item.variantName || 'default',
+        },
+      });
     }
   }
 }

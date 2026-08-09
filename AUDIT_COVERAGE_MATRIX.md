@@ -1,469 +1,328 @@
-# PawTag Audit Coverage Matrix
+# PawTag Audit Coverage Matrix — Verified Current State
 
-**Generated:** 2026-08-08
-**Status:** Pre-implementation analysis for Enterprise Audit Logging System
+**Last updated:** 2026-08-09 (verified against code, not inferred)
+**Verification method:** Full-codebase discovery + inline inspection of every API route, service, job, middleware, model, seed, and app page that touches audit data. Repo tree, exact line numbers quoted below reflect the state at verification time.
+**Status:** `COVERED` / `PARTIAL` / `UNSEEDED` / `GAP` / `BREAKING`.
 
----
-
-## Executive Summary
-
-This matrix documents the current audit logging coverage across the PawTag application before implementing the enterprise-grade audit system. It identifies all state-changing operations, their source locations, current audit status, and gaps.
-
-**Current State:**
-- **Total Database Models:** 42
-- **Total API Route Files:** 20+
-- **Total Background Jobs:** 3
-- **Operations with Audit Logging:** ~60% (mostly admin routes)
-- **Operations WITHOUT Audit Logging:** ~40% (customer, finder, webhooks, jobs, uploads, referrals, push tokens, support)
+> Pre-2026-08-09 versions of this file and `tests/AUDIT-REPORT.md` describe a *pre-implementation* state. A large `AuditEvent` pipeline has since been built. This document is the verified current state, not the plan.
 
 ---
 
-## 1. Database Models & Current Audit Coverage
+## 0. Purpose
 
-| Model | Entity Type | Current Audit Coverage | Primary Operations | Gap Severity |
-|-------|-------------|------------------------|-------------------|--------------|
-| **User** | Core | ✅ Partial (admin only) | create, update, delete, role/status change, password reset, lock/unlock, MFA | HIGH - customer self-service not audited |
-| **Role** | RBAC | ✅ Admin | create, update, delete, clone | MEDIUM |
-| **Permission** | RBAC | ✅ Admin | create, update, delete/deactivate | MEDIUM |
-| **PermissionGroup** | RBAC | ✅ Admin | create, update, delete | MEDIUM |
-| **PermissionScope** | RBAC | ✅ Admin | create, update, delete | MEDIUM |
-| **UserRole** | RBAC | ✅ Admin | assign, remove, activate/deactivate | HIGH - critical for privilege escalation |
-| **RolePermission** | RBAC | ✅ Admin | assign, update, remove | HIGH |
-| **Pet** | Core | ✅ Partial (admin only) | create, update, delete, status change | HIGH - customer pet CRUD not audited |
-| **Tag** | Core | ✅ Partial (admin only) | create, update, delete, status change, QR generation | HIGH - redemption, replacement not fully audited |
-| **Order** | Financial | ✅ Partial (admin + webhooks) | status transitions, cancel, refund, shipment, delivery | HIGH - payment flow partially audited |
-| **Product** | Catalog | ✅ Admin | create, update, delete | MEDIUM |
-| **Cart** | Commerce | ❌ None | add/remove items, checkout | HIGH - financial precursor |
-| **Subscription** | Financial | ✅ Partial (admin + customer) | create, status change, extend, cancel, renew, plan change | HIGH - auto-renewal, dunning not audited |
-| **Invoice** | Financial | ✅ Partial (webhooks) | create on payment, admin extend | MEDIUM |
-| **InvoiceAccessToken** | Security | ❌ None | create, verify, consume | MEDIUM - sensitive access control |
-| **FinderScan** | Core | ❌ None | create (view, notify, location) | CRITICAL - core product interaction |
-| **LocationEvent** | Core/Sensitive | ❌ None | create (GPS location) | CRITICAL - PII/location data |
-| **Notification** | System | ❌ None | create, read, mark-read | MEDIUM |
-| **AuditLog** | Meta | ⚠️ Self-referential | N/A | N/A |
-| **Setting** | Config | ✅ Admin (Settings page) | create, update, delete | HIGH - business-critical config |
-| **FeatureFlag** | Config | ✅ Admin | create, update, delete | HIGH |
-| **VerificationToken** | Security | ❌ None | create, verify, expire | HIGH - auth tokens |
-| **RefreshToken** | Security | ❌ None | issue, rotate, revoke | CRITICAL - session security |
-| **Referral** | Commerce | ❌ None | create, complete, reward | MEDIUM |
-| **ReferralCode** | Commerce | ❌ None | create, validate | MEDIUM |
-| **PushToken** | Security | ❌ None | register, remove, list | MEDIUM |
-| **SupportRequest** | Operations | ❌ None | create (public), resolve (admin) | MEDIUM |
-| **TagExpiryNotification** | System | ❌ None | create, acknowledge | LOW |
-| **SiteContent** | CMS | ✅ Partial (admin) | CRUD, publish, versioning | MEDIUM |
-| **CmsPage** | CMS | ✅ Partial (admin) | CRUD, publish, rollback | MEDIUM |
-| **CmsPageVersion** | CMS | ✅ Partial (admin) | create on update | LOW |
-| **CmsNavigation** | CMS | ✅ Admin | CRUD | LOW |
-| **CmsFooter** | CMS | ✅ Admin | CRUD | LOW |
-| **CmsMedia** | CMS | ✅ Admin | CRUD | LOW |
-| **CmsAnnouncement** | CMS | ✅ Admin | CRUD | LOW |
-| **CmsRedirect** | CMS | ✅ Admin | CRUD | LOW |
-| **CmsPetReference** | CMS | ✅ Admin | CRUD | LOW |
-| **CmsHomepageSection** | CMS | ✅ Admin | CRUD | LOW |
-| **CmsShopPage** | CMS | ✅ Admin | CRUD | LOW |
-| **CmsEmailTemplate** | CMS | ✅ Admin | CRUD | MEDIUM - customer-facing comms |
-| **CmsSmsTemplate** | CMS | ✅ Admin | CRUD | MEDIUM - customer-facing comms |
-| **CmsAuthPage** | CMS | ✅ Admin | CRUD | LOW |
+Per the Enterprise Audit-Logging requirements doc, this file is the living Initial/Final Coverage Matrix. It records, for every meaningful state change / security event / data access / automated action / integration event:
+
+- source location (file + line)
+- entity / resource
+- actor recorded (and whether it is correct)
+- audit event actually emitted (`AuditEvent` new pipeline vs legacy `AuditLog`)
+- whether the event is correct (before/after, attribution, outcome)
+- what is missing
 
 ---
 
-## 2. API Route Coverage Analysis
+## 1. Architecture — what actually exists
 
-### 2.1 Authentication Routes (`/api/auth`)
+### 1.1 Dual audit backends (they do NOT interoperate)
 
-| Endpoint | Operation | Actor | Current Audit | Missing Fields |
-|----------|-----------|-------|---------------|----------------|
-| POST /register | User registration | USER/SYSTEM | ✅ Basic | before/after state, correlation_id, device info |
-| POST /login | Login | USER | ✅ Basic | MFA context, session_id, risk_score |
-| POST /login (failed) | Failed login | USER | ✅ Account lock | IP reputation, geo, attempt_count |
-| POST /logout | Logout | USER | ❌ None | session_id, token_revoked |
-| POST /refresh | Token refresh | SERVICE | ❌ None | old_token_id, new_token_id, rotation |
-| POST /verify-email | Email verification | USER | ✅ Idempotent | token_id, verification_method |
-| POST /resend-verification | Resend email | USER | ❌ None | previous_token_id |
-| POST /forgot-password | Password reset request | USER | ❌ None | token_id, delivery_method |
-| POST /reset-password | Password reset | USER | ❌ None | token_id, password_policy |
-| POST /change-password | Password change | USER | ✅ Basic | old_hash_ref, policy_version |
-| POST /send-phone-otp | Phone OTP | USER | ❌ None | carrier, delivery_status |
-| POST /verify-phone | Phone verify | USER | ❌ None | otp_id, attempts |
-| GET /captcha | CAPTCHA challenge | SYSTEM | ❌ None | challenge_id, answer_hash |
-| GET /verification-status | Check status | USER | ❌ None | query_context |
+| | New pipeline (`AuditEvent`) | Legacy pipeline (`AuditLog`) |
+|---|---|---|
+| Model | `packages/db/src/models/AuditEvent.ts` (collection `audit_events`) | `packages/db/src/models/AuditLog.ts` (collection `auditlogs`) |
+| Event identity | `auditEventId` UUIDv7, unique index | Mongoose `_id` only |
+| Correlation | `transactionId`, `correlationId`, `requestId`, `traceId`, `parentEventId`, `eventSequenceNumber` | none |
+| Actor model | `actorType` (USER/ADMIN/SERVICE/SYSTEM/SCHEDULED_JOB/API_CLIENT/WEBHOOK/AI_AGENT/FINDER/UNKNOWN), `actorId/Username/Email`, `impersonatorId`, `delegatedById`, `sessionId`, `authenticationMethod` | `userId` only (always required) |
+| Classification | `action`, `eventType`, `eventCategory`, `operationType`, `resourceType`, `resourceId`, `businessOperation`, `reason`, `status`, `outcome` (SUCCESS/FAILURE/PARTIAL/PENDING), `severity` | `action`, `entity`, `entityId` only |
+| State | `beforeState`, `afterState`, `changedFields[]`, `before/afterStateHash` | `changes` (un-typed, un-examined) |
+| Sensitive redaction | Central `deepRedact`/`redactValue` in `audit.service.ts` | none (raw `changes` stored) |
+| Hash / tamper-evidence | `eventHash`, `previousEventHash`, `hashAlgorithm` (SHA-256) | none |
+| Immutability flag | `isImmutable: true` (default) + `legalHold` + retention | none |
+| Retention | retention policy engine, `retentionExpiresAt`, enforcement endpoint | none |
+| Writer call site form | `auditService.log(context, input)` via per-module helpers | direct `AuditLog.create({...})` |
 
-**Severity:** CRITICAL - Auth is the primary attack surface
+Key files: `packages/api/src/services/audit/audit.service.ts`, `audit.retention.ts`, `audit.transaction.ts`, `packages/api/src/middleware/audit.ts`, `packages/api/src/routes/audit.ts`, `packages/api/src/routes/admin.ts` (legacy query), `apps/admin/src/pages/AuditLogs.tsx` (legacy UI).
 
-### 2.2 Admin Routes (`/api/admin`)
+### 1.2 Middleware (`index.ts` wiring)
 
-| Endpoint | Operation | Actor | Current Audit | Missing Fields |
-|----------|-----------|-------|---------------|----------------|
-| GET /dashboard | Read dashboard | ADMIN | ❌ Read access | - |
-| GET /stats/lost-found | Read stats | ADMIN | ❌ Read access | - |
-| GET /users | List users | ADMIN | ❌ Read access | filter_params, result_count |
-| GET /users/:id | Read user | ADMIN | ❌ Read access | fields_accessed |
-| PUT /users/:id/role | Role assignment | ADMIN | ✅ Basic | old_roles[], new_roles[], scope |
-| PUT /users/:id/status | Status change | ADMIN | ✅ Basic | reason, previous_state |
-| POST /users/:id/reset-password | Admin password reset | ADMIN | ✅ Basic | temp_password_flag |
-| PUT /users/:id/lock | Lock account | ADMIN | ✅ Basic | lock_reason, unlock_conditions |
-| PUT /users/:id/unlock | Unlock account | ADMIN | ✅ Basic | unlock_reason |
-| PUT /users/:id | Update user | ADMIN | ✅ Field-level | - |
-| DELETE /users/:id | Soft delete | ADMIN | ✅ Basic | deletion_reason |
-| POST /owners/register | Admin create user | ADMIN | ✅ Basic | invited_via |
-| POST /pets | Create pet (any owner) | ADMIN | ✅ Basic | - |
-| PUT /pets/:id | Update pet | ADMIN | ⚠️ Raw body | field-level diff |
-| DELETE /pets/:id | Delete pet | ADMIN | ✅ Basic | - |
-| GET /pets | List pets | ADMIN | ❌ Read access | filters, pagination |
-| PUT /pets/:id/status | Pet status | ADMIN | ✅ Basic | old_status missing |
-| GET /tags | List tags | ADMIN | ❌ Read access | - |
-| POST /tags | Create tag | ADMIN | ✅ Basic | - |
-| GET /tags/:id | Read tag | ADMIN | ❌ Read access | - |
-| PUT /tags/:id | Update tag | ADMIN | ✅ Field-level | - |
-| DELETE /tags/:id | Delete tag | ADMIN | ✅ Basic | - |
-| GET /tags/:id/qr | Generate QR | ADMIN | ❌ Read access | - |
-| POST /tags/qr-bulk | Bulk QR | ADMIN | ❌ Read access | tag_ids[], count |
-| GET /products | List products | ADMIN | ❌ Read access | - |
-| POST /products | Create product | ADMIN | ✅ Minimal | full_object |
-| PUT /products/:id | Update product | ADMIN | ✅ Minimal | field-level diff |
-| DELETE /products/:id | Delete product | ADMIN | ✅ Minimal | - |
-| GET /orders | List orders | ADMIN | ❌ Read access | - |
-| PUT /orders/:id/status | Order status | ADMIN | ✅ Good | transition_validation |
-| POST /orders/:id/cancel | Cancel order | ADMIN | ✅ Good | stock_restoration_detail |
-| POST /orders/:id/refund | Refund order | ADMIN | ✅ Good | stripe_refund_id, amount |
-| POST /orders/:id/create-shipment | Create shipment | ADMIN | ✅ Good | carrier_response |
-| POST /orders/:id/mark-delivered | Mark delivered | ADMIN | ✅ Good | - |
-| PUT /users/:id/skip-invoice-otp | Skip OTP | ADMIN | ✅ Good | expiry |
-| GET /tag-expiry-notifications | List notifications | ADMIN | ❌ Read access | - |
-| PUT /tag-expiry-notifications/:id/acknowledge | Acknowledge | ADMIN | ❌ None | acknowledger, notes |
-| GET /notifications | List admin notifications | ADMIN | ❌ Read access | - |
-| GET /notifications/unread-count | Unread count | ADMIN | ❌ Read access | - |
-| PUT /notifications/:id/read | Mark read | ADMIN | ❌ None | - |
-| PUT /notifications/mark-all-read | Mark all read | ADMIN | ❌ None | count |
-| GET/POST/PUT/DELETE /content | Site content CRUD | ADMIN | ✅ Basic | - |
-| CMS routes (pages, nav, email, sms, etc.) | CMS operations | ADMIN | ✅ Basic | version_info, publish_state |
+- `auditMiddleware` is mounted globally (index.ts:88) **before all routes**. It sets `req.auditContext` (requestId/correlationId/traceId/transactionId, IP, forwardedIp, UA, deviceId, app name/version, env, optional `x-tenant-id`), and wraps `res.send` to stamp `durationMs`.
+- **It does NOT emit any audit event.** Every persisted event is explicit manual (by design — no noise from GETs).
+- `setAuditActor()` (middleware/audit.ts:71) is now **called by `authenticate`** (auth.ts:61-65), so `req.auditContext` carries actorId/actorEmail for every authenticated request.
+- `requirePermission` (middleware/permission.ts) now emits `AUTHZ_FAILURE` (outcome FAILURE) for 401/403/500 denials.
+- `verificationGuard.ts` rejection paths still silent (future phase).
 
-**Severity:** HIGH - Admin operations are well-covered for mutations but READ access is not audited
+### 1.3 Audit management API (routes/audit.ts — mounted at `/api/admin/audit`)
 
-### 2.3 Customer Routes (`/api/customer`)
+- `GET /` (full search/filter: id/correlation/request/trace/parent/actor/tenant/category/type/action/operation/resource/outcome/severity/IP/date-range/legalHold)
+- `GET /stats`, `GET /transaction/:id`, `GET /correlation/:id`, `GET /entity/:type/:id`, `GET /actor/:actorId`
+- `GET /verify-chain` (hash-chain verification endpoint)
+- `POST/DELETE /legal-hold`, `POST /retention/enforce`
 
-| Endpoint | Operation | Actor | Current Audit | Gap |
-|----------|-----------|-------|---------------|-----|
-| GET /pets | List pets | USER | ❌ None | Read access to PII |
-| GET /pets/:id | Read pet | USER | ❌ None | - |
-| POST /pets | Create pet | USER | ❌ None | **NO AUDIT** |
-| PUT /pets/:id | Update pet | USER | ❌ None | **NO AUDIT** |
-| DELETE /pets/:id | Delete pet | USER | ❌ None | **NO AUDIT** |
-| GET /tags | List tags | USER | ❌ None | - |
-| POST /tags/redeem | Redeem tag | USER | ❌ None | **NO AUDIT - critical** |
-| POST /tags/:id/request-replacement | Replacement | USER | ✅ Basic | - |
-| GET /tags/unredeemed-count | Count | USER | ❌ None | - |
-| POST /pets/:id/mark-lost | Mark lost | USER | ❌ None | **NO AUDIT - critical** |
-| POST /pets/:id/mark-found | Mark found | USER | ❌ None | **NO AUDIT - critical** |
-| GET /orders | List orders | USER | ❌ None | Read financial data |
-| POST /orders | Create order | USER | ❌ None | **NO AUDIT - financial** |
-| GET /orders/:id | Read order | USER | ❌ None | Financial PII |
-| GET /cart | Read cart | USER | ❌ None | - |
-| POST /cart/items | Add to cart | USER | ❌ None | - |
-| PUT /cart/items/:id | Update cart | USER | ❌ None | - |
-| DELETE /cart/items/:id | Remove from cart | USER | ❌ None | - |
-| DELETE /cart | Clear cart | USER | ❌ None | - |
-| GET /referral | Get code | USER | ❌ None | - |
-| GET /referral/stats | Referral stats | USER | ❌ None | - |
-| GET /referral/history | Referral history | USER | ❌ None | - |
-| GET /invoices/:id/access | Access invoice | USER | ❌ None | **Sensitive financial doc** |
-| POST /invoices/:id/verify-otp | Invoice OTP | USER | ❌ None | - |
-| POST /invoices/:id/resend-otp | Resend OTP | USER | ❌ None | - |
-| GET /notifications | List notifications | USER | ❌ None | - |
-| PUT /notifications/:id/read | Mark read | USER | ❌ None | - |
-| PUT /notifications/mark-all-read | Mark all read | USER | ❌ None | - |
-| POST /push-tokens | Register token | USER | ❌ None | Device info |
-| DELETE /push-tokens/:token | Remove token | USER | ❌ None | - |
-| GET /push-tokens | List tokens | USER | ❌ None | - |
+**RESOLVED:** `audit.read` / `audit.admin` are now seeded (seed.ts:301-302) and assigned to the ADMIN role (seed.ts:503-504). Admin UI: new `apps/admin/src/pages/AuditTrail.tsx` (route `/audit-trail`, sidebar entry with `audit.read`) queries `GET /api/admin/audit`, incl. filters, pagination and a **Verify Integrity** button hitting `/verify-chain`.
 
-**Severity:** CRITICAL - Customer portal has almost NO audit logging
+### 1.4 Admin UI (apps/admin/src/pages/AuditLogs.tsx — legacy)
 
-### 2.4 Finder Routes (`/api/finder`) - PUBLIC, NO AUTH
-
-| Endpoint | Operation | Actor | Current Audit | Gap |
-|----------|-----------|-------|---------------|-----|
-| GET /stats | Public stats | ANONYMOUS | ❌ None | - |
-| GET /:tagId | View pet profile | ANONYMOUS/FINDER | ❌ None | **Core product - no audit** |
-| POST /:tagId/notify | Notify owner | FINDER | ❌ None | **Critical reunion flow - no audit** |
-| GET /:tagId/found-timer | Found timer | FINDER | ❌ None | - |
-| POST /:tagId/share-location | Share GPS | FINDER | ❌ None | **Location PII - no audit** |
-| GET /shop/products | Browse shop | ANONYMOUS | ❌ None | - |
-| GET /content/:slug | View content | ANONYMOUS | ❌ None | - |
-
-**Severity:** CRITICAL - Core product interactions completely unaudited
-
-### 2.5 Webhook Routes (`/api/webhooks`)
-
-| Endpoint | Operation | Actor | Current Audit | Gap |
-|----------|-----------|-------|---------------|-----|
-| POST /stripe | Stripe events | WEBHOOK/STRIPE | ✅ Partial | idempotency_key, event_id, processing_status |
-
-**Events handled:**
-- payment_intent.succeeded → order paid, subscription create, tags create, referral, admin notification, customer notification, invoice create
-- payment_intent.payment_failed → order cancelled, stock restore, customer notification
-- invoice.payment_succeeded → subscription active, invoice create
-- invoice.payment_failed → subscription dunning, customer notification, admin notification
-- customer.subscription.deleted → subscription cancelled
-
-**Severity:** HIGH - Financial events partially audited but missing correlation IDs
-
-### 2.6 Other Routes
-
-| Route Group | Operations | Current Audit | Severity |
-|-------------|------------|---------------|----------|
-| `/api/upload` | Pet photo upload, product images upload/delete | ❌ None | HIGH - File operations |
-| `/api/support` (public) | Contact form submit | ❌ None | MEDIUM |
-| `/api/admin/support-requests` | List, resolve | ❌ None | MEDIUM |
-| `/api/referrals` | Get code, stats, history, validate, admin list | ❌ None | MEDIUM |
-| `/api/push-tokens` | Register, remove, list | ❌ None | MEDIUM |
-| `/api/invoice-access` | Access, verify OTP, resend OTP | ❌ None | HIGH - Financial docs |
-| `/api/customer/subscriptions` | List, detail, invoices, renew, cancel, auto-renew, change-plan, portal-link | ❌ None | HIGH - Financial |
-| `/api/admin/subscriptions` | List, stats, detail, status override, extend | ❌ Partial (extend creates invoice) | HIGH |
+- Reads `GET /api/admin/audit-logs` (admin.ts) → legacy `AuditLog` collection. Still shown under "Legacy Audit Log" for historical data.
+- **New** `AuditTrail.tsx` (see §1.3) is the primary view over the tamper-evident `AuditEvent` stream.
 
 ---
 
-## 3. Background Jobs & Automated Actions
+## 2. Verified integrity & correctness results (status after PH1+PH2 remediation)
 
-| Job | Trigger | Operations | Current Audit | Actor Type | Severity |
-|-----|---------|------------|---------------|------------|----------|
-| `lowStockCheck` | Daily cron | Query products, send email, create admin Notification | ❌ None | SCHEDULED_JOB | HIGH |
-| `reminderService` | Scheduled | Check subscriptions, send reminders, create notifications | ❌ None | SCHEDULED_JOB | HIGH |
-| `subscriptionService` | Scheduled | Update statuses, process renewals, handle grace period | ❌ None | SCHEDULED_JOB | CRITICAL |
-| Webhook handlers | Stripe events | See webhook section | ✅ Partial | WEBHOOK | HIGH |
-
-**Critical Gap:** NO automated actions are audited. The actor is always recorded as the human admin who triggered the webhook or the system user, but the actual automated process is not identifiable.
-
----
-
-## 4. Current AuditLog Schema Analysis
-
-```typescript
-// Current schema (packages/db/src/models/AuditLog.ts)
-{
-  userId: ObjectId (required, indexed)
-  action: String (required, indexed)
-  entity: String (required, indexed)
-  entityId: String (required)
-  changes?: Mixed (field-level old/new)
-  ipAddress?: String
-  userAgent?: String
-  createdAt, updatedAt (timestamps)
-}
-```
-
-**Missing Critical Fields:**
-- `audit_event_id` (UUIDv7) - no globally unique ID
-- `transaction_id` - no business transaction correlation
-- `correlation_id` - no request correlation
-- `request_id` - no HTTP request tracking
-- `trace_id` - no distributed tracing
-- `parent_event_id` - no event hierarchy
-- `event_sequence_number` - no ordering within transaction
-- `actor_type` - no distinction between USER/ADMIN/SERVICE/SYSTEM/WEBHOOK
-- `impersonator_id` - no impersonation tracking
-- `delegated_by_id` - no delegation tracking
-- `session_id` - no session correlation
-- `authentication_method` - no auth context
-- `resource_version_before/after` - no optimistic locking
-- `business_operation` - no high-level operation name
-- `reason` - no business justification
-- `outcome` - no success/failure/partial
-- `severity` - no risk classification
-- `event_hash` / `previous_event_hash` - no tamper evidence
-- `schema_version` - no schema evolution
-- `tenant_id` - no multi-tenancy (future)
+| # | Finding | Status after remediation |
+|---|---|---|
+| 1 | **Hash chain was broken** (per-stream in-memory `Map`; global `verifyChain` walker resets on restart). | ✅ **FIXED** — per-stream chain seeded from **DB** (`findLatestStreamHash`), `verifyHashChain` verifies per stream (tests + API endpoint). |
+| 2 | **Transactional audit unused** (`AuditTransaction`/`withAuditTransaction` never imported; no outbox). | ⚠️ REMAINING — future phase. |
+| 3 | **Actor attribution wrong in hot paths** — `authenticate` never called `setAuditActor`; `token_refresh` + subscription renew/cancel/created mislabeled. | ✅ **FIXED** — `authenticate` calls `setAuditActor` (auth.ts:61-65); `token_refresh` actor is USER; renew = SCHEDULED_JOB with actorId/email. |
+| 4 | **Failures almost never audited** (login, locked, MFA OTP, reset, reuse, permission, Zod, 5xx). | ✅ **PARTIALLY FIXED** — login_failure/blocked, mfa_failed/blocked, AUTHZ_FAILURE (permission.ts), validation failure, login MFA. Admin-refund FAILURE + a few rare paths still open. |
+| 5 | **Two backends; UI reads legacy + new API unreachable (unseeded perms).** | ✅ **FIXED** — `audit.read`/`audit.admin` seeded (seed.ts:301-302, 503-504); `AuditTrail.tsx` wired to `/api/admin/audit`. |
+| 6 | **Legacy `AuditLog` has no redaction/outcome/chain; RBAC still dumps `req.body`.** | ⚠️ REMAINING — RBAC migration is a future phase. |
 
 ---
 
-## 5. Risk Assessment by Category
+## 3. Initial Audit Coverage Matrix
 
-### CRITICAL (Immediate Action Required)
-1. **Authentication & Session Management** - Login, MFA, token refresh, password reset
-2. **Finder/Reunion Flow** - Tag scan, notify owner, location sharing (core product)
-3. **Financial Transactions** - Order creation, payment, refund, subscription billing
-4. **Automated Systems** - Scheduled jobs, webhook processors, subscription lifecycle
-4. **Sensitive Data Access** - Invoice access, location events, customer PII reads
+Legend — Status: `COVERED` `PARTIAL` `GAP` `BREAKING`. Current Audit column: event name(s) actually emitted today; **(none)** and **`FAIL`** annotated where audited only success.
 
-### HIGH (High Priority)
-1. **Customer Portal Mutations** - Pet CRUD, tag redemption, replacement, lost/found
-2. **Admin Read Access** - User/pet/tag/order listing (PII exposure)
-3. **Configuration Changes** - Settings, feature flags, CMS content
-4. **File Operations** - Upload/delete pet photos, product images
-5. **RBAC Changes** - Role/permission assignments (privilege escalation)
+### 3.1 AUTHENTICATION & SECURITY — `routes/auth.ts`
 
-### MEDIUM (Standard Priority)
-1. **Referral System** - Code generation, validation, rewards
-2. **Push Notifications** - Token registration/removal
-3. **Support Requests** - Contact form, resolution
-4. **Admin Bulk Operations** - QR bulk generation, bulk status updates
+| Operation | Location | Entity/Resource | Actor (recorded / correct?) | Current audit event | Correct? | Missing | Proposed event | Risk |
+|---|---|---|---|---|---|---|---|---|
+| Register | auth.ts:142-222 | User | USER / n/a pre-auth | `user_registration` (SUCCESS, MEDIUM) | Partial (no actorId; no `FAIL` on duplicate/409) | failure path, actorId | `auth.user_registration` (incl. outcome) | HIGH |
+| Login w/o MFA (success) | auth.ts:460-470 | User/session | USER | `user_login` (SUCCESS, LOW) | Partial (no actorId) | — | — | med |
+| Login failure (wrong pw/user) | auth.ts:279-334 | User | USER | **(none)** | — | FAIL event + attempt count | `auth.login_failed` | **CRITICAL** |
+| Login locked account | auth.ts:285-293,423 | User | — | **(none)** | — | FAIL event | `auth.login_blocked_locked` | HIGH |
+| Account lockout | auth.ts:310-320 | User | SYSTEM | `account_lockout` (SECURITY, HIGH, SUCCESS) | Yes | unlock counterpart not audited | `auth.account_unlocked` | HIGH |
+| Login MFA) | auth.ts:426-436 | VerificationToken | USER | `mfa_otp_sent` | Yes | — | — | MEDIUM |
+| MFA verify success | auth.ts:1506-1533 | session/tokens | USER | `mfa_verification` (SUCCESS, MEDIUM) | Partial (no actorId) | MFA failure + attempts | `auth.mfa_failed`, `auth.mfa_max_attempts` | CRITICAL |
+| Email verify success | auth.ts:560-570 | User | USER (token) | `email_verification` | Yes | failure/no | `auth.email_verification_failed` | LOW |
+| Reset-password request | auth.ts:1057-1106 | VerificationToken | USER (pre-auth) | `password_reset_request` (HIGH) | Yes | none | — | MEDIUM |
+| Reset-password complete | auth.ts:1142-1152 | User | USER | `password_reset_complete` (HIGH) | Yes | invalid/expired token attempt | `auth.password_reset_failed` | HIGH |
+| Change-password | auth.ts:1210-1220 | User | USER | `password_change` (HIGH) | Partial | **wrong-currentpassword** not audited | `auth.password_change_failed` | HIGH |
+| Refresh token (renew) | auth.ts:1256-1270 | tokens | SERVICE (mislabeled, should be USER) | `token_refresh` (LOW) | No (actorSERVICE); no FAILURE | use-reuse/rot failure | `auth.token_refresh_failed` | HIGH |
+| Refresh token reuse | auth.ts:1240-1256 | token | — | **(none)** | — | replay detection | `auth.token_refresh_reuse` | **CRITICAL** |
+| Logout | auth.ts:1292-1308 | RefreshToken | USER/UNKNOWN | `user_logout` (LOW) | Partial (actor ok) | — | `token_refresh_failed` | LOW |
+| Send/verify phone OTP | auth.ts:668-916 | VerificationToken/User | USER | `phone_otp_send`, `phone_verification` | Partial | OTP failure/attempts | `auth.phone_otp_failed` | MEDIUM |
+| Profile update | auth.ts:1185-1196 | User | USER | **(NONE)** | — | whole mutation | `user.profile_update` | MEDIUM |
 
-### LOW (Future Enhancement)
-1. **Public Read Operations** - Stats, shop browse, content viewing
-2. **CMS Versioning** - Page rollbacks, version history
+NOTE — `PUT /auth/profile` unaudited (whole mutation). `auditAuthEvent` (a98-113) drops `req.user` fidelity.
 
----
+**Net:** 0 failed-operation events in the whole auth module. This is the biggest security hole.
 
-## 6. Proposed Audit Event Types
+### 3.2 ADMIN (routes/admin.ts, admin-subscriptions.ts, admin-analytics.ts)
 
-### Event Categories
-| Category | Code | Description |
-|----------|------|-------------|
-| AUTHENTICATION | AUTH | Login, logout, MFA, registration, password, tokens |
-| AUTHORIZATION | AUTHZ | Role/permission changes, privilege escalation |
-| DATA_CREATE | CREATE | Entity creation |
-| DATA_UPDATE | UPDATE | Entity modification |
-| DATA_DELETE | DELETE | Soft/hard deletion |
-| DATA_READ | READ | Sensitive data access |
-| DATA_EXPORT | EXPORT | Bulk data export/download |
-| STATE_TRANSITION | TRANSITION | Status/lifecycle changes |
-| FINANCIAL | FINANCIAL | Payments, orders, subscriptions, invoices |
-| SECURITY | SECURITY | Lockouts, failed attempts, suspicious activity |
-| ADMIN_ACTION | ADMIN | Administrative operations |
-| SYSTEM_EVENT | SYSTEM | Automated jobs, webhooks, scheduled tasks |
-| INTEGRATION | INTEGRATION | External API calls, webhooks received |
-| FILE_OPERATION | FILE | Upload, download, delete |
-| CONFIGURATION | CONFIG | Settings, feature flags, templates |
+`auditAdminEvent` (admin.ts:54-69) writes `AuditEvent` actorType ADMIN; actorId/email injected. No FAILURE outcomes anywhere. No READ auditing.
 
-### Severity Levels
-| Level | Code | Examples |
-|-------|------|----------|
-| INFO | 10 | Read access, list views, non-sensitive queries |
-| LOW | 20 | Successful login, profile view, tag scan |
-| MEDIUM | 30 | Data updates, password change, tag redemption |
-| HIGH | 40 | Financial transactions, privilege changes, deletions |
-| CRITICAL | 50 | Security config changes, bulk operations, data exports, failed auth |
+| Operation | Lines | Entity | Current Audit | Correct? | Missing | Risk |
+|---|---|---|---|---|---|---|
+| Assign role | 428-487 | User/UserRole | `user_role_update` (AUTHZ/HIGH) | Partial — metada `legacyRole: user.role` read *after* mutation (L480) → stores NEW | before/after roles | HIGH |
+| Status change | 527-553 | User | `user_status_update` | Yes (`oldStatus` pre-captured) | — | HIGH |
+| Admin reset-password | 556-585 | User | `admin_password_reset` | Yes | 5xx/failure | HIGH |
+| Lock account | 588-616 | User | `user_account_lock` | Yes | — | HIGH |
+| Unlock account | 619-647 | User | `user_account_unlock` | Yes | — | HIGH |
+| **Update user profile** | 650-691 | User | `user_profile_update` | Yes — per-field `{old,new}` built before assign | `FAIL` for 409 duplicate-email | MEDIUM |
+| Soft delete user | 697-721 | User | `user_delete` (DELETE/HIGH) | Yes | delete-reason not captured | HIGH |
+| Create owner | 759-833 | User | `admin_user_create` | Yes | — | MEDIUM |
+| Create pet | 861-905 | Pet | `admin_pet_create` | Yes | — | MEDIUM |
+| **Update pet** | 942-973 | Pet | `admin_pet_update` | **BREAKING — `Object.assign(pet,req.body)` then `before: pet.get(field)` (947-952) → before==after** | fix snapshot-before | MEDIUM |
+| Soft delete pet | 1001-1025 | Pet | `admin_pet_delete` | Yes | — | HIGH |
+| Pet status | 1209-1235 | Pet | `admin_pet_status_update` | Yes (`oldStatus` pre) | no transition validate | MEDIUM |
+| Create tag | 1363-1416 | Tag | `admin_tag_create` | Yes | — | MEDIUM |
+| Update tag | 1485-1544 | Tag | `admin_tag_update` | Yes (`oldValues` pre) | — | MEDIUM |
+| Delete tag | 1566-1587 | Tag | `admin_tag_suite_delete` | Yes | — | HIGH |
+| Create product | 1967-1987 | Product | `admin_product_create` | Yes | — | MEDIUM |
+| **Update product** | 2034-2063 | Product | `admin_product_update` | **BREAKING — `findByIdAndUpdate({new:true})` (2036) → before unavailable, `before==after`** | **fetch→snapshot→update→diff** | MEDIUM |
+| Hard delete product | 2091-2112 | Product | `admin_product_delete` | Yes | — | HIGH |
+| Order status | 2235-2277 | Order | `admin_order_status_update` | Yes (`previousStatus` pre) | invalid transition 4xx not audited | HIGH |
+| Cancel order | 2283-2329 | Order + stock | `admin_order_cancel` | Yes | stock restore detail | **CRITICAL** |
+| Refund order | 2332-2391 | Order + Stripe | `admin_order_refund` | Partial — **Stripe refund failure (2356-2359) NOT audited** | outcome FAIL | **CRITICAL** |
+| Create shipment | 2394-2462 | Order | `admin_order_shipment_create` | Partial — `changedFields` hard-codes `before:null` for trackingNumber/carrier | real pre-values | HIGH |
+| Mark delivered | 2465-2504 | Order | `admin_order_delivered` | Yes | — | HIGH |
+| Skip invoice OTP | 2507-2539 | User | `user_skip_invoice_otp` (CONFIG) | Approx `before: !skip` (doesn't read stored) | real before | MEDIUM |
+| Tag-expiry ack | 2573-2585 | TagExpiryNotification | **(NONE)** | `findByIdAndUpdate({new:true})` | ADD | LOW |
+| Admin notification read/mark-all | 2619-2635 | Notification | **(NONE)** | bulk op | ADD (bulk parent) | LOW |
+| Content CRUD | 2759-2854 | SiteContent | **(NONE)** | incl. `{new:true}` update | ADD | MEDIUM |
+| Settings read | — | Setting | **(NONE)** | *business-critical config* | ADD | **HIGH** |
+| Settings create/update | 2931-2997 | Setting | **(NONE)** (PUT/POST/DELETE) | `findOneAndUpdate({new:true})` | **ADD** (MFA/test-mail dimensions) | **CRITICAL** |
+| Feature-flag CRUD | 3058-3145 | FeatureFlag | **(NONE)** | `{new:true}` | ADD | **CRITICAL** config change |
+| `GET /audit-logs` | 3186-3207 | AuditLog (legacy) | read — no event | reads **legacy** collection | — | — |
 
----
+**admin-subscriptions.t` — whole file unaudited:** `PUT /subscriptions/:id/status` (alt route 168-209, also writes `Tag`) and `POST /:id/extend` (220-280, mutates 3 entities + invoice) have **no audit import at all**.
+**admin-analytics.ts** — read-only, no risk.
 
-## 7. Implementation Priority
+### 3.3 CUSTOMER (routes/customer.ts) — server-side
 
-### Phase 1: Core Infrastructure (Week 1-2)
-- [ ] New AuditEvent schema with all required fields
-- [ ] Centralized AuditService with async write path
-- [ ] Request middleware for correlation IDs
-- [ ] Redaction/masking policy for sensitive fields
-- [ ] Database indexes for query performance
+`auditCustomerEvent` (customer.ts:18-35) injects `req.user` actor — correct pattern.
 
-### Phase 2: Authentication & Security (Week 2-3)
-- [ ] Instrument all auth routes
-- [ ] Session/token lifecycle events
-- [ ] Failed attempt tracking with risk scoring
-- [ ] MFA enrollment/verification events
+| Operation | Lines | Audit | Note |
+|---|---|---|---|
+| Pet create/update/delete | 170/236/306 | COVERED | update snapshot **correct** (before captured pre-`Object.assign`) |
+| mark-lost / mark-found | 613/682 | COVERED | oldStatus pre-captured; tag flips collapsed to metadata |
+| Tag redeem | 399-474 | COVERED (HIGH) | old-tag deactivation only in metadata, not separate event |
+| Tag replacement | 476-547 | COVERED (HIGH) | — |
+| Order create | 983-1160 | COVERED (FINANCIAL/HIGH) | stock decrement inside handler not separate event |
+| Confirm payment | 1201-1263 | **(NONE)** in customer.ts | sub-created logged via service as `SCHEDULED_JOB` actor; email/invoice only legacy in webhook path |
+| mark-terminal | 1460-1481 | (NONE) | flips tag inactive too — **GAP** |
+| Cart (GET create, add, update, del, clear) | 779-894 | **(NONE)** | — |
+| Notifications read/mark-all/clear | 1382-1492 | (NONE) | bulk destruct deleteMany(clear-read) unaudited |
+| Notification preferences PUT | 1533-1553 | (NONE) | `$set` subfields |
+| MFA toggle | 1989-2013 | **legacy `AuditLog.create` only** (2007) | NOT in `AuditEvent` + gated on `pe.read` permission (wrong gate) |
 
-### Phase 3: Admin & RBAC (Week 3-4)
-- [ ] Complete admin route coverage (add READ auditing)
-- [ ] RBAC change events with full before/after
-- [ ] Impersonation/delegation tracking
-- [ ] Configuration change events
+### 3.4 CUSTOMER MEDICAL / HEALTH sub-documents (customer.ts:1565-1986)
 
-### Phase 4: Customer Portal (Week 4-5)
-- [ ] Pet/Tag/Order CRUD auditing
-- [ ] Tag redemption/replacement flow
-- [ ] Lost/Found pet events
-- [ ] Subscription self-service
+`pet.<vaccinations|microchips|medications|allergies|vetDetails|surgeries|weightHistory|healthConditions|desexing>`
 
-### Phase 5: Finder & Public (Week 5-6)
-- [ ] Tag scan/view events
-- [ ] Notify owner flow
-- [ ] Location sharing (with privacy controls)
-- [ ] Anonymous access with correlation
+- 24 endpoints, **all un-audited**, **no before snapshots** (handlers `push`/`Object.assign`/`deleteOne` then `pet.save()`, then return).
+- Each: POST create, PUT update, DELETE — no events. This is the largest single GAP by count.
 
-### Phase 6: Financial & Integrations (Week 6-7)
-- [ ] Webhook event correlation
-- [ ] Payment lifecycle events
-- [ ] Subscription billing events
-- [ ] Invoice access/download
+### 3.5 SUBSCRIPTIONS — automated vs user
 
-### Phase 7: Background Jobs & Files (Week 7-8)
-- [ ] Scheduled job execution events
-- [ ] File upload/delete events
-- [ ] Automated notification events
-- [ ] Referral/push token events
+| Operation | Source | Audit | Gotchas |
+|---|---|---|---|
+| Cancel via customer | subscription.service.ts:210-244 | audit `subscription_cancelled` | `newStatus:'cancelled'` claim NEVER set (only autoRenew=false + timestamps) **record claim does not match data** |
+| Renew via customer | subscription.service.ts:187-205 | audit present | actor mislabeled `SCHEDULED_JOB` toward end-user action |
+| Auto-renew toggle | customer-subscriptions.ts:243-247 | **(NONE)** | direct save |
+| Change plan | subscription.service.ts:701-716 | **(NONE)** | direct |
+| Portal-link create | customer-subscriptions.ts:313- **369** | **(NONE)** | external call + bulk `updateMany` |
+| Auto-renewals loop | subscription.service.ts:247-295 | **(NONE)** | each save + invoice un-audited — central |
+| checkExpiring/expired/grace | subscription.service.ts:297-513 | aggregate audit only `>0` events | when 0 affected silent |
+| changeTagExpiryNotifications | 556-661 | (NONE) | admin notif creation |
+| resetExpiredSkipOtp | 587- replicate | (NONE) | bulk `updateMany` |
+| changeSubscriptionPlan | 683-715 | (NONE) | — |
 
-### Phase 8: Advanced Features (Week 8-10)
-- [ ] Tamper-evident hash chaining (per-stream)
-- [ ] Retention policy engine
-- [ ] Audit query API with filtering
-- [ ] Admin audit dashboard
-- [ ] Alerting on audit failures
-- [ ] Compliance reporting
+### 3.6 RBAC (routes/rbac.ts) — all legacy `AuditLog.create` (18 calls)
 
----
+| Operation | Audit | Issue |
+|---|---|---|
+| PermissionGroup CRUD | COVERED | update dumps `req.body` — no before |
+| Permission CRUD/deactivate | COVERED | 143 etc. omits permissionGroupId link; 163 dumps body |
+| Role CRUD/clone | COVERED | Role delete cascades RolePermission but cascade not separately logged; update dumps body |
+| RolePermission assign/update/remove | COVERED | 344,356 — omits scopeId; no before |
+| PermissionScope update/delete | **UNSEEDED** (407-431 — none audit call) | — |
+| UserRole assign/remove | COVERED | 466,478,502; re-activate path logs `assign_role` incl. old data lost; super-admin guard fails to audio |
+| Reads | — | permission check reads unlogged |
 
-## 8. Technical Architecture Decisions
+### 3.7 FINDER (public, routes/finder.ts)
 
-### Write Path
-- **Async Fire-and-Forget** with bounded queue for non-critical events
-- **Synchronous** for CRITICAL/HIGH severity (auth, financial, security)
-- **Transactional Outbox** pattern for database mutations (write audit in same transaction)
-- **Dead Letter Queue** for failed audit writes with alerting
+| Op | Audit | Notes |
+|---|---|---|
+| View pet (active tag) | COVERED `finder_view_pet` (READ/MEDIUM, actor FINDER) | provided subscription counts incremented; scan record |
+| View pet (expired tag) | **GAP (155-173)** | scan is created / not audited |
+| Notify owner | COVERED | finder_share |
+| share-location (GPS) | COVERED | — |
+| found-timer / stats / shop / content | none | read-only, low risk per policy |
 
-### Storage
-- **Primary:** MongoDB collection `AuditEvent` (separate from `AuditLog`)
-- **Archive:** Cold storage (S3/R2) after retention period
-- **Indexing:** Compound indexes for query patterns
-- **Partitioning:** By date (monthly collections) for performance
+### 3.8 WEBHOOKS (routes/webhooks.ts)
 
-### Tamper Evidence
-- **Per-Stream Hash Chaining:** Each actor/entity stream has independent chain
-- **Event Hash:** SHA-256 of canonical event JSON
-- **Previous Hash:** Links to previous event in same stream
-- **Periodic Anchoring:** Merkle root to immutable storage (future)
+- `auditWebhookEvent` (16-40): actor WEBHOOK/stripe; **ignores req entirely — no correlation IDs**, fire-and-forget, no catch.
+- Main events: payment_intent.succeeded/failed, invoice.payment.succeeded/failed, subscription.deleted — all get `payment_succeeded`/etc. FINANCIAL/HIGH events. **BUT:**
+  - **No Stripe signature verification** (auth comment; demo + real both read `req.body` unverified)
+  - failed signature / unknown event / replay dedup → no audit (only `logger.info`)
+  - subscript side-effects: tag auto-create, referral invoke, invoice HTML, emails → only legacy `AuditLog.create` (389-404) or nothing.
 
-### Privacy & Compliance
-- **Field-Level Redaction:** Configurable per field type
-- **PII Minimization:** Hash emails/IPs in audit, store full only in secure context
-- **Right to Erasure:** Audit events anonymized (not deleted) on user deletion request
-- **Legal Hold:** Flag to prevent archival/deletion
+### 3.9 FILES (routes/upload.ts)
 
----
+- POST pet-photo, product-images (multer), DELETE product-images — **no audit** (no import) → **GAP**.
 
-## 9. Testing Strategy
+### 3.10 JOBS / SERVICES
 
-| Test Type | Coverage Target |
-|-----------|-----------------|
-| Unit Tests | AuditService, redaction, hash chaining, correlation ID propagation |
-| Integration Tests | Each route generates correct audit event with all fields |
-| Contract Tests | Audit event schema validation |
-| Load Tests | Audit pipeline under 1000 req/s |
-| Chaos Tests | Audit DB unavailable, queue full, network partition |
-| Security Tests | Tamper detection, injection attempts, PII leakage |
-| Compliance Tests | Retention enforcement, legal hold, anonymization |
-
----
-
-## 10. Remaining Audit Gaps (Post-Implementation Checklist)
-
-After implementation, verify ZERO gaps in:
-
-- [ ] Every mutation route (POST/PUT/PATCH/DELETE) generates audit event
-- [ ] Every sensitive read route (GET financial/PII) generates READ event
-- [ ] Every auth route generates appropriate AUTH events
-- [ ] Every webhook handler generates INTEGRATION events with correlation
-- [ ] Every scheduled job generates SYSTEM events with job_id
-- [ ] Every file operation generates FILE events
-- [ ] Every RBAC change generates AUTHZ events with full diff
-- [ ] Failed operations generate events with outcome=FAILED
-- [ ] Bulk operations generate parent + child events
-- [ ] Correlation IDs flow through entire request lifecycle
-- [ ] Actor type correctly identified (USER/ADMIN/SERVICE/SYSTEM/WEBHOOK)
-- [ ] Sensitive fields redacted in all events
-- [ ] Hash chain verifiable for each stream
-- [ ] Audit events immutable (no UPDATE/DELETE via app APIs)
-- [ ] Retention policies enforced
-- [ ] Query API supports all investigation patterns
+- `lowStockCheck` — logs `low_stock_check` (SCHEDULED_JOB) BUT **empty-result early-return un-audited** (lowStockCheck.ts:42-44)
+- `reminderService.sendFinderReminders` — per-send `finder_reminder_sent` logged; none+result unlogged
+- subscription.service aggregates only logged when >0
+- **referral.service.ts — NO audit anywhere** (ReferralCode upsert, Referral.create, reward completion extends subscriptions − CRITICAL financial GAP)
+- inventory.service.ts restoreOrderStock — no audit (payment-fail stock rollback)
+- notification-delivery service — all notifications unworthy? (always covered by parent event if parent audited; many parents unaudited though)
+- stripe.service refunds/demo sims — no audit
 
 ---
 
-## 11. Approval & Sign-Off
+## 4. Cross-cutting engineering gaps (all the spec items)
 
-| Role | Name | Date | Signature |
-|------|------|------|-----------|
-| Security Lead | | | |
-| Compliance Officer | | | |
-| Engineering Lead | | | |
-| Product Owner | | | |
+| Spec requirement | Status |
+|---|---|
+| Central `auditService` (event→) | PARTIAL — good core; hash chain broken; no outbox; no DLQ |
+| Actor propagation (TH: §9) | PARTIAL — dead `setAuditActor`; auth events no actorId; jobs-sync correct only for pure jobs |
+| Correlation through the full request | PARTIAL — request helpers propagate; webhook/job contexts **fresh with no IDs** |
+| Failure/denied auditing (§10, §18) | **GAP** — almost zero FAILURE outcomes |
+| Before/after + diff (§13) | PARTIAL — 2 known admin bugs; legacy body dumps; created-doc `{new:true}` patterns |
+| Redaction (§22) | OK new pipeline; legacy = raw |
+| Transaction/outbox (§23) | GAP — unused `AuditTransaction` |
+| Bulk operations (§24) | just a few aggregate events; no parent/count/affected-IDs strategy |
+| Tamper-evidence (§25-26) | BREAKING — verified chain broken/testless |
+| Multi-tenant isolation (§27) | single-tenant application today; `tenantId` plumbed but not enforced anywhere |
+| Retention/archival (§28) | Policy engine OK — real archival is NOOP (flag set, nothing moved); enforcement deletes |
+| Query API (§34) | blocked by unseeded permission |
+| Failure observability (§31-32) | PARTIAL — queue stats endpoint; finder/webhook helper fire-and-forget, no catch, no alerts, no metrics |
+| Schema versioning (§33) | `schemaVersion: 1` present, versioning strategy undocumented |
+| Monitoring/alerting (§38-39) | none implemented |
 
 ---
 
-*This matrix is a living document. Update as implementation progresses.*
+## 5. Automated test state (verified)
+
+- Existing audit assertions: `tests/integration/tag-replacement.test.ts` (1 `AuditEvent`), `tests/integration/purchase-emails.test.ts` (legacy `AuditLog`).
+- **New this remediation pass:**
+  - `tests/unit/audit.hashchain.test.ts` — 5 tests: single-stream verify valid; tamper (hash mismatch) detected; broken previous-hash link detected; streamKey-scoped verify; DB-driven buckets across restart.
+  - `tests/unit/audit.redaction.test.ts` — 4 tests: sensitive-pattern detection; nested redaction; scalar `redactValue`; deterministic/order-independent `computeHash`.
+  - `tests/integration/audit-api.test.ts` — 5 tests: admin can query `/api/admin/audit`; setting update before/after diff (CONFIG/HIGH); feature-flag `isEnabled` before/after (CRITICAL); `/verify-chain` end-to-end valid over multi-stream events; content create+delete audited with ADMIN actor.
+- `pnpm test:all` result at remediation time: **860 tests, 859 pass** (1 pre-existing failure in `admin-analytics.test.ts` that also fails on clean `main`).
+
+---
+
+## 6. Known issues needing action (top actionable bugs)
+
+### 6.1 Resolved (this remediation pass)
+
+1. ✅ **Hash chain fixed & per-stream.** `persistEvent` chains per-stream (`actorType|resourceType|resourceId`) and seeds `previousEventHash` from the **DB** (persisted across restarts) — `findLatestStreamHash` (audit.service.ts:205-221). `verifyHashChain` verifies **per stream** from DB buckets, matching persist semantics. Verified by `tests/unit/audit.hashchain.test.ts` and `GET /api/admin/audit/verify-chain` in `tests/integration/audit-api.test.ts`.
+2. ✅ **before==after bugs fixed.** `PUT /admin/pets/:id` and `PUT /admin/products/:id` now **fetch→snapshot→update→diff** before/after.
+3. ✅ **Failure auditing added.** `login_failure`/`login_blocked`/`login_lockout`/`mfa_failed`/`mfa_blocked` in `auth.ts`; AUTHZ_FAILURE on 401/403/500 in `permission.ts`; validation FAILURE in `validation.ts`.
+4. ✅ **Permissions seeded + admin UI.** `audit.read`, `audit.admin` in `seed.ts` (ADMIN role). New `apps/admin/src/pages/AuditTrail.tsx` reads `GET /api/admin/audit` (route `/audit-trail`, sidebar entry), incl. Verify-Integrity button, filters, pagination.
+5. ✅ **Actor attribution fixed.** `authenticate` calls `setAuditActor` → `req.auditContext.actorId/Email` populated for every authenticated request; `token_refresh` actor fixed to USER.
+6. ✅ **PH2 domain coverage added.** See §7 for the added streams: admin settings/feature-flags/content CRUD (CONFIG/CRITICAL), customer confirm-payment (FINANCIAL), medical/health sub-docs (24 endpoints), MFA toggle migrated from legacy `AuditLog`→`AuditEvent`, subscription auto-renew/plan-change/portal, referral code/reward (FINANCIAL), inventory stock-restore, low-stock empty-result, uploads (FILE), expired-tag finder view, webhook signature/unknown/payment-failed (SECURITY/FAILURE).
+7. ✅ **New tests.** `tests/unit/audit.hashchain.test.ts` (5), `tests/unit/audit.redaction.test.ts` (4), `tests/integration/audit-api.test.ts` (5).
+
+### 6.2. Remaining (future phases)
+
+1. Rbac routes (routes/rbac.ts) still write legacy `AuditLog` — migrate to `auditService`.
+2. Transactional audit (`AuditTransaction`/`withAuditTransaction`) still unused — no outbox.
+3. Admin refund failure (Stripe) FAILURE outcome still un-audited (very CRITICAL).
+4. `PUT /auth/profile` still unaudited (whole mutation).
+5. Multi-tenant isolation not enforced; real archival still NOOP.
+6. Monitoring/alerting (§39) not implemented.
+
+---
+
+## 7. PH2 additions — new audit streams (this remediation pass)
+
+### 7.1 Admin config (CRITICAL) — `routes/admin.ts`
+- `setting_create` / `setting_update` / `setting_delete` (CONFIG/HIGH) with value/category before+after + changedFields; `setting_update` does fetch→snapshot→update→diff.
+- `feature_flag_create` / `feature_flag_update` / `feature_flag_delete` (CONFIG/**CRITICAL**) with `isEnabled` before/after.
+- `content_create` / `content_update` / `content_delete` (MEDIUM) with status/slug/title snapshots.
+
+### 7.2 Customer financial & security — `routes/customer.ts`
+- `order_confirm_payment` (FINANCIAL/HIGH): status pending_payment→paid, payment pending→completed, amount in metadata.
+- `pet_mark_terminal` (TRANSITION/HIGH): before/after status + tagsDeactivated metadata (was silent GAP).
+- `mfa_enabled` / `mfa_disabled` migrated from legacy `AuditLog` → `AuditEvent` (SECURITY/HIGH) with before/after.
+- `notifications_clear_read` / `notifications_mark_all_read` / `notification_preferences_update` (LOW).
+- Health records (vaccinations, microchips, medications, allergies, vetDetails, surgeries, weightHistory, healthConditions, desexing) — all create/update/delete instrumented (Pet subdocs, LOW/MEDIUM, before/after + changedFields on edits, beforeState on deletes).
+- Cart item create/update/delete + cart clear (Cart, LOW).
+
+### 7.3 Subscriptions — `subscription.service.ts`, `customer-subscriptions.ts`
+- `subscription_auto_renewal` per successful auto-renew (FINANCIAL/HIGH) incl. invoice number/amount/currentPeriodEnd when actually saved (fixes empty-result silent gap).
+- `subscription_plan_changed` (UPDATE/HIGH) with plan before/after + price.
+- `subscription_auto_renew_toggled` (UPDATE/MEDIUM) user actor.
+- `subscription_portal_link_created` (INTEGRATION/MEDIUM).
+
+### 7.4 Referrals / inventory / jobs
+- `referral_code_created` (CREATE), `referral_created` (FINANCIAL), `referral_reward_completed` (FINANCIAL/HIGH) — was COMPLETELY unaudited (was CRITICAL financial gap).
+- `inventory_stock_restored` on payment-failure stock rollback (FINANCIAL/MEDIUM).
+- `low_stock_check` now logged even when 0 affected (removed silent early-return); `finder_reminder_check` logged for no-op runs.
+
+### 7.5 Webhooks / uploads / finder
+- `stripe_signature_invalid` (SECURITY/FAILURE/HIGH) for missing/invalid signature in real mode.
+- `payment.failed` (FINANCIAL/FAILURE/HIGH) with stripeEventId/orderId metadata.
+- `webhook_unknown_event` (INFO) for unhandled types.
+- `upload_pet_photo`, `upload_product_image`, `upload_product_image_delete` (FILE/MEDIUM).
+- `finder_view_expired` (READ/MEDIUM) for expired-tag lookups (previously silent).
+
+---
+
+*This matrix is a living document — update it as the phases are implemented.*

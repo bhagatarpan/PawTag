@@ -161,6 +161,23 @@ router.get('/:tagId', async (req: Request, res: Response) => {
         action: 'viewed',
       });
 
+      await auditFinderEvent(req, {
+        action: 'view_expired_tag',
+        eventType: 'finder_view_expired',
+        eventCategory: 'READ',
+        operationType: 'READ',
+        resourceType: 'Tag',
+        resourceId: tag._id.toString(),
+        outcome: 'SUCCESS',
+        severity: 'MEDIUM',
+        metadata: {
+          tagId: tag.tagId,
+          subscriptionStatus: tag.subscriptionStatus,
+          message: 'This PawTag is no longer active. The owner needs to renew their subscription.',
+          petInfo: null,
+        },
+      });
+
       res.json({
         success: true,
         data: {

@@ -198,13 +198,35 @@ const BATCH_SIZE = 100;
 
 let lastEventHashByStream = new Map<string, string>();
 
-function getStreamKey(event: Partial<IAuditEventDocument>): string {
-  return `${event.actorType}:${event.resourceType}:${event.resourceId || 'global'}`;
+function buildStreamKey(actorType: string, resourceType: string, resourceId?: string): string {
+  return `${actorType}|${resourceType}|${resourceId || 'global'}`;
+}
+
+async function findLatestStreamHash(event: Partial<IAuditEventDocument>): Promise<string> {
+  const query: Record<string, unknown> = {
+    actorType: event.actorType,
+    resourceType: event.resourceType || 'GLOBAL',
+  };
+  if (event.resourceId) {
+    query.resourceId = event.resourceId;
+  } else {
+    query.resourceId = { $exists: false };
+  }
+  const last = await AuditEvent.findOne(query)
+    .sort({ occurredAt: -1, recordedAt: -1, eventSequenceNumber: -1 })
+    .select('eventHash actorType resourceType resourceId streamKey')
+    .lean();
+  if (!last?.eventHash) return '';
+  return last.eventHash as string;
 }
 
 async function persistEvent(event: Partial<IAuditEventDocument>): Promise<IAuditEventDocument> {
-  const streamKey = getStreamKey(event);
-  const previousHash = lastEventHashByStream.get(streamKey) || '';
+  const streamKey = buildStreamKey(event.actorType || 'UNKNOWN', event.resourceType || 'GLOBAL', event.resourceId);
+  let previousHash = lastEventHashByStream.get(streamKey);
+  if (previousHash === undefined || previousHash === null) {
+    previousHash = await findLatestStreamHash(event);
+  }
+  event.streamKey = streamKey;
   event.previousEventHash = previousHash;
   event.eventHash = computeEventHash(event);
   lastEventHashByStream.set(streamKey, event.eventHash);
@@ -259,6 +281,79 @@ function scheduleFlush(): void {
       processQueue();
     }
   }, FLUSH_INTERVAL_MS);
+}
+
+function parseStreamKey(streamKey: string): Record<string, unknown> {
+  const parts = streamKey.split('|');
+  const query: Record<string, unknown> = {};
+  if (parts[0]) query.actorType = parts[0];
+  if (parts[1] && parts[1] !== 'GLOBAL') query.resourceType = parts[1];
+  const resourceId = parts.slice(2).join('|');
+  if (resourceId && resourceId !== 'global') query.resourceId = resourceId;
+  return query;
+}
+
+async function verifyStream(query: Record<string, unknown>, limit: number): Promise<{ valid: boolean; brokenAt?: string; error?: string; checked: number }> {
+  const events = await AuditEvent.find(query)
+    .sort({ occurredAt: 1, recordedAt: 1, eventSequenceNumber: 1 })
+    .limit(limit)
+    .lean();
+
+  let previousHash = '';
+  let checkedCount = 0;
+  for (const event of events) {
+    if (event.previousEventHash !== previousHash) {
+      return { valid: false, checked: checkedCount, brokenAt: event.auditEventId, error: 'Hash chain broken' };
+    }
+    const computed = computeEventHash(event);
+    if (event.eventHash !== computed) {
+      return { valid: false, checked: checkedCount, brokenAt: event.auditEventId, error: 'Event hash mismatch' };
+    }
+    previousHash = event.eventHash as string;
+    checkedCount++;
+  }
+  return { valid: true, checked: events.length };
+}
+
+async function verifyHashChain(streamKey?: string, limit = 1000): Promise<{ valid: boolean; checked: number; brokenAt?: string; error?: string; streams?: number }> {
+  let streams: Array<{ streamKey: string; query: Record<string, unknown> }>;
+
+  if (streamKey) {
+    const query = parseStreamKey(streamKey);
+    streams = [{ streamKey, query }];
+  } else {
+    const buckets = await AuditEvent.aggregate([
+      {
+        $group: {
+          _id: { actorType: '$actorType', resourceType: '$resourceType', resourceId: { $ifNull: ['$resourceId', ''] } },
+        },
+      },
+    ]);
+    const bucketsByKey = new Map<string, Record<string, unknown>>();
+for (const bucket of buckets) {
+        const actorType = (bucket._id.actorType as string) || 'UNKNOWN';
+        const resourceType = (bucket._id.resourceType as string) || 'GLOBAL';
+        const resourceId = bucket._id.resourceId as string;
+        const query: Record<string, unknown> = { actorType };
+        if (resourceType === 'GLOBAL') query.resourceType = { $exists: false };
+        else query.resourceType = resourceType;
+        if (resourceId) query.resourceId = resourceId;
+        else query.resourceId = { $exists: false };
+      const key = buildStreamKey(actorType, resourceType, resourceId || undefined);
+      bucketsByKey.set(key, query);
+    }
+    streams = Array.from(bucketsByKey.entries()).map(([key, q]) => ({ streamKey: key, query: q }));
+  }
+
+  let checked = 0;
+  for (const { query } of streams) {
+    const result = await verifyStream(query, limit);
+    checked += result.checked;
+    if (!result.valid) {
+      return { valid: false, checked, brokenAt: result.brokenAt, error: result.error };
+    }
+  }
+  return { valid: true, checked };
 }
 
 export const auditService = {
@@ -375,26 +470,6 @@ export const auditService = {
     );
   },
 
-  async verifyHashChain(_streamKey: string, limit = 1000): Promise<{ valid: boolean; brokenAt?: string; error?: string }> {
-    const events = await AuditEvent.find({})
-      .sort({ occurredAt: 1 })
-      .limit(limit)
-      .lean();
-
-    let previousHash = '';
-    for (const event of events) {
-      if (event.previousEventHash !== previousHash) {
-        return { valid: false, brokenAt: event.auditEventId, error: 'Hash chain broken' };
-      }
-      const computedHash = computeEventHash(event);
-      if (event.eventHash !== computedHash) {
-        return { valid: false, brokenAt: event.auditEventId, error: 'Event hash mismatch' };
-      }
-      previousHash = event.eventHash;
-    }
-    return { valid: true };
-  },
-
   getQueueStats(): { size: number; isProcessing: boolean } {
     return { size: eventQueue.length, isProcessing };
   },
@@ -406,6 +481,7 @@ export const auditService = {
   isSensitiveField,
   deepRedact,
   computeHash,
+  verifyHashChain,
 };
 
-export { isSensitiveField, deepRedact, computeHash, redactValue };
+export { isSensitiveField, deepRedact, computeHash, redactValue, verifyHashChain };

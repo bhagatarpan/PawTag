@@ -2,10 +2,36 @@ import { Router, Response } from 'express';
 import multer from 'multer';
 import { AuthRequest, authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
+import { createAuditContextFromRequest, type AuditRequest } from '../middleware/audit';
+import { auditService, type AuditContext } from '../services/audit';
 import { uploadToR2, deleteFromR2, generateUniqueFilename, isR2Configured } from '../services/r2.service';
 import logger from '../lib/logger';
 
 const router = Router();
+
+async function auditUploadEvent(
+  req: AuditRequest,
+  input: Parameters<typeof auditService.log>[1],
+  overrides: Partial<AuditContext> = {},
+): Promise<void> {
+  // Fire and forget — never block the file response
+  const logAudit = async () => {
+    try {
+      const reqContext = createAuditContextFromRequest(req);
+      const context: AuditContext = {
+        ...reqContext,
+        actorType: 'USER',
+        actorId: req.user?.id,
+        actorUsername: req.user?.email,
+        ...overrides,
+      } as AuditContext;
+      await auditService.log(context, input);
+    } catch (err) {
+      console.error('[Audit] Failed to log upload event:', err);
+    }
+  };
+  logAudit();
+}
 
 // Configure multer for memory storage (R2 only — no local disk fallback)
 const memoryStorage = multer.memoryStorage();
@@ -104,6 +130,26 @@ router.post('/pet-photo', authenticate, async (req: AuthRequest, res: Response) 
         success: true,
         data: { url: photoUrl, filename },
       });
+
+      const petId = (req.query.petId as string) || (req.body?.petId as string) || undefined;
+      await auditUploadEvent(req, {
+        action: 'upload_pet_photo',
+        eventType: 'upload_pet_photo',
+        eventCategory: 'FILE',
+        operationType: 'CREATE',
+        resourceType: 'Pet',
+        resourceId: petId,
+        outcome: 'SUCCESS',
+        severity: 'MEDIUM',
+        metadata: {
+          file: filename,
+          filename,
+          size: req.file.size,
+          mimeType: req.file.mimetype,
+          petId,
+          url: photoUrl,
+        },
+      });
     } catch (uploadError) {
       logger.error({ err: uploadError }, 'Upload error');
       res.status(500).json({ success: false, error: 'Failed to upload photo' });
@@ -186,6 +232,24 @@ router.post('/product-images', authenticate, requirePermission('product.update')
         success: true,
         data: { images: uploaded },
       });
+
+      const productId = (req.query.productId as string) || (req.body?.productId as string) || undefined;
+      await auditUploadEvent(req, {
+        action: 'upload_product_image',
+        eventType: 'upload_product_image',
+        eventCategory: 'FILE',
+        operationType: 'CREATE',
+        resourceType: 'Product',
+        resourceId: productId,
+        outcome: 'SUCCESS',
+        severity: 'MEDIUM',
+        metadata: {
+          files: uploaded.map((u) => u.filename),
+          count: uploaded.length,
+          sizes: req.files.map((f) => ({ filename: f.originalname, size: f.size, mimeType: f.mimetype })),
+          productId,
+        },
+      });
     } catch (uploadError) {
       logger.error({ err: uploadError }, 'Upload error');
       res.status(500).json({ success: false, error: 'Failed to upload images' });
@@ -229,6 +293,22 @@ router.delete('/product-images/:filename', authenticate, requirePermission('prod
     await deleteFromR2(`products/${filename}`);
 
     res.json({ success: true, data: { message: 'Image deleted' } });
+
+    const productId = (req.query.productId as string) || (req.body?.productId as string) || undefined;
+    await auditUploadEvent(req, {
+      action: 'upload_product_image_delete',
+      eventType: 'upload_product_image_delete',
+      eventCategory: 'FILE',
+      operationType: 'DELETE',
+      resourceType: 'Product',
+      resourceId: productId || filename,
+      outcome: 'SUCCESS',
+      severity: 'MEDIUM',
+      metadata: {
+        filename,
+        productId,
+      },
+    });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to delete image' });
   }

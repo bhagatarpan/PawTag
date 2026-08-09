@@ -1,5 +1,28 @@
 import { ReferralCode, Referral, User, Subscription } from '@pawtag/db';
 import { sendMail } from './email.service';
+import { auditService, type AuditContext } from './audit';
+
+async function auditReferralEvent(
+  input: Parameters<typeof auditService.log>[1],
+  overrides: Partial<AuditContext> = {},
+): Promise<void> {
+  try {
+    await auditService.log({
+      actorType: 'SYSTEM',
+      actorId: 'referralService',
+      actorUsername: 'referral-service',
+      sourceIp: 'system',
+      userAgent: 'referral-service',
+      applicationName: 'pawtag-api',
+      applicationVersion: '1.0.0',
+      apiVersion: 'v1',
+      environment: process.env.NODE_ENV || 'development',
+      ...overrides,
+    }, input);
+  } catch (err) {
+    console.error('[Audit] Failed to log referral event:', err);
+  }
+}
 
 function generateCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -28,6 +51,23 @@ export async function getOrCreateReferralCode(userId: string): Promise<string> {
     { userId, code, isActive: true },
     { upsert: true, new: true },
   );
+
+  await auditReferralEvent({
+    action: 'referral_code_created',
+    eventType: 'referral.code_created',
+    eventCategory: 'CREATE',
+    operationType: 'CREATE',
+    resourceType: 'ReferralCode',
+    resourceId: referralCode?._id?.toString(),
+    outcome: 'SUCCESS',
+    severity: 'MEDIUM',
+    metadata: {
+      userId,
+      code,
+      isActive: true,
+    },
+  }, { actorType: 'USER', actorId: userId });
+
   return referralCode.code;
 }
 
@@ -54,6 +94,24 @@ export async function createReferralOnOrder(
     status: 'pending',
     orderId,
   });
+
+  await auditReferralEvent({
+    action: 'referral_created',
+    eventType: 'referral.created',
+    eventCategory: 'FINANCIAL',
+    operationType: 'CREATE',
+    resourceType: 'Referral',
+    resourceId: orderId,
+    outcome: 'SUCCESS',
+    severity: 'MEDIUM',
+    metadata: {
+      referrerId,
+      refereeId,
+      referralCode: referralCode.toUpperCase(),
+      orderId,
+      status: 'pending',
+    },
+  }, { actorType: 'SYSTEM', actorId: referrerId });
 }
 
 export async function completeReferralRewards(orderId: string): Promise<void> {
@@ -86,6 +144,32 @@ export async function completeReferralRewards(orderId: string): Promise<void> {
   referral.status = 'rewarded';
   referral.completedAt = new Date();
   await referral.save();
+
+  await auditReferralEvent({
+    action: 'referral_reward_completed',
+    eventType: 'referral.reward_completed',
+    eventCategory: 'FINANCIAL',
+    operationType: 'UPDATE',
+    resourceType: 'Referral',
+    resourceId: orderId,
+    outcome: 'SUCCESS',
+    severity: 'HIGH',
+    afterState: {
+      status: 'rewarded',
+      completedAt: referral.completedAt,
+    },
+    metadata: {
+      referrerId: referral.referrerId.toString(),
+      refereeId: referral.refereeId.toString(),
+      referralCode: referral.referralCode,
+      orderId,
+      rewardMonths,
+      referrerSubExtended: !!referrerSub,
+      referrerSubNewEnd: referrerSub?.currentPeriodEnd,
+      refereeSubExtended: !!refereeSub,
+      refereeSubNewEnd: refereeSub?.currentPeriodEnd,
+    },
+  });
 
   // Notify referrer
   const referrer = await User.findById(referral.referrerId).select('fullName email');

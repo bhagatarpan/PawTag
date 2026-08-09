@@ -944,12 +944,13 @@ router.put('/pets/:id', requirePermission('pet.update'), validate(updatePetSchem
     const pet = await Pet.findOne({ _id: req.params.id, deletedAt: null });
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
 
+    const beforeSnapshot = pet.toObject() as Record<string, unknown>;
     Object.assign(pet, req.body);
     await pet.save();
 
     const changedFields = Object.entries(req.body).map(([field, value]) => ({
       field,
-      before: pet.get(field),
+      before: beforeSnapshot[field],
       after: value,
       sensitive: false,
     }));
@@ -2033,12 +2034,16 @@ router.post('/products', requirePermission('product.create'), validate(createPro
  */
 router.put('/products/:id', requirePermission('product.update'), validate(updateProductSchema), async (req: AuthRequest, res: Response) => {
   try {
-    const product = await Product.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const product = await Product.findById(req.params.id);
     if (!product) { res.status(404).json({ success: false, error: 'Product not found' }); return; }
+
+    const beforeSnapshot = product.toObject() as Record<string, unknown>;
+    Object.assign(product, req.body);
+    await product.save();
 
     const changedFields = Object.entries(req.body).map(([field, value]) => ({
       field,
-      before: product.get(field),
+      before: beforeSnapshot[field],
       after: value,
       sensitive: ['price'].includes(field),
     }));
@@ -2759,6 +2764,17 @@ router.get('/content/:id', requirePermission('content.read'), async (req, res: R
 router.post('/content', requirePermission('content.create'), validate(createContentSchema), async (req: AuthRequest, res: Response) => {
   try {
     const content = await SiteContent.create({ ...req.body, createdBy: req.user!.id });
+    await auditAdminEvent(req, {
+      action: 'content_create',
+      eventType: 'content.created',
+      eventCategory: 'CREATE',
+      operationType: 'CREATE',
+      resourceType: 'SiteContent',
+      resourceId: content.id,
+      afterState: { title: content.title, slug: content.slug, status: content.status },
+      outcome: 'SUCCESS',
+      severity: 'MEDIUM',
+    });
     res.status(201).json({ success: true, data: content });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to create content' });
@@ -2808,12 +2824,29 @@ router.post('/content', requirePermission('content.create'), validate(createCont
  */
 router.put('/content/:id', requirePermission('content.update'), validate(updateContentSchema), async (req: AuthRequest, res: Response) => {
   try {
+    const existing = await SiteContent.findById(req.params.id);
+    if (!existing) { res.status(404).json({ success: false, error: 'Content not found' }); return; }
     const update = { ...req.body };
     if (update.status === 'published' && !update.publishedAt) {
       update.publishedAt = new Date();
     }
     const content = await SiteContent.findByIdAndUpdate(req.params.id, update, { new: true });
     if (!content) { res.status(404).json({ success: false, error: 'Content not found' }); return; }
+    const beforeState = { title: existing.title, slug: existing.slug, status: existing.status };
+    const changedFields = Object.keys(req.body).map((field) => ({ field, before: (existing as any)[field], after: update[field as keyof typeof update] }));
+    await auditAdminEvent(req, {
+      action: 'content_update',
+      eventType: 'content.updated',
+      eventCategory: 'UPDATE',
+      operationType: 'UPDATE',
+      resourceType: 'SiteContent',
+      resourceId: content.id,
+      beforeState,
+      afterState: { title: content.title, slug: content.slug, status: content.status },
+      changedFields,
+      outcome: 'SUCCESS',
+      severity: 'MEDIUM',
+    });
     res.json({ success: true, data: content });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to update content' });
@@ -2846,7 +2879,19 @@ router.put('/content/:id', requirePermission('content.update'), validate(updateC
  */
 router.delete('/content/:id', requirePermission('content.delete'), async (req: AuthRequest, res: Response) => {
   try {
-    await SiteContent.findByIdAndDelete(req.params.id);
+    const content = await SiteContent.findByIdAndDelete(req.params.id);
+    if (!content) { res.status(404).json({ success: false, error: 'Content not found' }); return; }
+    await auditAdminEvent(req, {
+      action: 'content_delete',
+      eventType: 'content.deleted',
+      eventCategory: 'DELETE',
+      operationType: 'DELETE',
+      resourceType: 'SiteContent',
+      resourceId: content.id,
+      beforeState: { title: content.title, slug: content.slug, status: content.status },
+      outcome: 'SUCCESS',
+      severity: 'MEDIUM',
+    });
     res.json({ success: true, data: { message: 'Content deleted' } });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to delete content' });
@@ -2930,12 +2975,29 @@ router.get('/settings', requirePermission('setting.read'), async (req, res: Resp
  */
 router.put('/settings/:key', requirePermission('setting.update'), async (req: AuthRequest, res: Response) => {
   try {
+    const existing = await Setting.findOne({ key: req.params.key });
+    if (!existing) { res.status(404).json({ success: false, error: 'Setting not found' }); return; }
+    const beforeState = { key: existing.key, value: existing.value, category: existing.category };
     const setting = await Setting.findOneAndUpdate(
       { key: req.params.key },
       { value: req.body.value, updatedBy: req.user!.id },
       { new: true },
     );
     if (!setting) { res.status(404).json({ success: false, error: 'Setting not found' }); return; }
+    const updatedSetting = setting as unknown as InstanceType<typeof Setting>;
+    await auditAdminEvent(req, {
+      action: 'setting_update',
+      eventType: 'setting.updated',
+      eventCategory: 'CONFIG',
+      operationType: 'UPDATE',
+      resourceType: 'Setting',
+      resourceId: updatedSetting.key,
+      beforeState,
+      afterState: { key: updatedSetting.key, value: updatedSetting.value, category: updatedSetting.category },
+      changedFields: [{ field: 'value', before: beforeState.value, after: updatedSetting.value }],
+      outcome: 'SUCCESS',
+      severity: 'HIGH',
+    });
     res.json({ success: true, data: setting });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to update setting' });
@@ -2980,6 +3042,17 @@ router.put('/settings/:key', requirePermission('setting.update'), async (req: Au
 router.post('/settings', requirePermission('setting.create'), validate(createSettingSchema), async (req: AuthRequest, res: Response) => {
   try {
     const setting = await Setting.create({ ...req.body, updatedBy: req.user!.id });
+    await auditAdminEvent(req, {
+      action: 'setting_create',
+      eventType: 'setting.created',
+      eventCategory: 'CONFIG',
+      operationType: 'CREATE',
+      resourceType: 'Setting',
+      resourceId: setting.key,
+      afterState: { key: setting.key, value: setting.value, category: setting.category },
+      outcome: 'SUCCESS',
+      severity: 'HIGH',
+    });
     res.status(201).json({ success: true, data: setting });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to create setting' });
@@ -2990,6 +3063,18 @@ router.delete('/settings/:key', requirePermission('setting.update'), async (req,
   try {
     const setting = await Setting.findOneAndDelete({ key: req.params.key });
     if (!setting) { res.status(404).json({ success: false, error: 'Setting not found' }); return; }
+    const deletedSetting = setting as unknown as InstanceType<typeof Setting>;
+    await auditAdminEvent(req, {
+      action: 'setting_delete',
+      eventType: 'setting.deleted',
+      eventCategory: 'CONFIG',
+      operationType: 'DELETE',
+      resourceType: 'Setting',
+      resourceId: deletedSetting.key,
+      beforeState: { key: deletedSetting.key, value: deletedSetting.value, category: deletedSetting.category },
+      outcome: 'SUCCESS',
+      severity: 'HIGH',
+    });
     res.json({ success: true, data: setting });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to delete setting' });
@@ -3058,6 +3143,17 @@ router.get('/feature-flags', requirePermission('feature_flag.read'), async (_req
 router.post('/feature-flags', requirePermission('feature_flag.create'), validate(createFeatureFlagSchema), async (req: AuthRequest, res: Response) => {
   try {
     const flag = await FeatureFlag.create(req.body);
+    await auditAdminEvent(req, {
+      action: 'feature_flag_create',
+      eventType: 'feature_flag.created',
+      eventCategory: 'CONFIG',
+      operationType: 'CREATE',
+      resourceType: 'FeatureFlag',
+      resourceId: (flag as unknown as InstanceType<typeof FeatureFlag>).key,
+      afterState: { key: flag.key, isEnabled: flag.isEnabled, description: flag.description },
+      outcome: 'SUCCESS',
+      severity: 'CRITICAL',
+    });
     res.status(201).json({ success: true, data: flag });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to create feature flag' });
@@ -3103,8 +3199,26 @@ router.post('/feature-flags', requirePermission('feature_flag.create'), validate
  */
 router.put('/feature-flags/:key', requirePermission('feature_flag.update'), async (req: AuthRequest, res: Response) => {
   try {
+    const existing = await FeatureFlag.findOne({ key: req.params.key });
+    if (!existing) { res.status(404).json({ success: false, error: 'Feature flag not found' }); return; }
+    const beforeState = { key: existing.key, isEnabled: existing.isEnabled, description: existing.description };
     const flag = await FeatureFlag.findOneAndUpdate({ key: req.params.key }, req.body, { new: true });
     if (!flag) { res.status(404).json({ success: false, error: 'Feature flag not found' }); return; }
+    const updatedFlag = flag as unknown as InstanceType<typeof FeatureFlag>;
+    const changedFields = Object.keys(req.body).map((field) => ({ field, before: (existing as any)[field], after: (updatedFlag as any)[field] }));
+    await auditAdminEvent(req, {
+      action: 'feature_flag_update',
+      eventType: 'feature_flag.updated',
+      eventCategory: 'CONFIG',
+      operationType: 'UPDATE',
+      resourceType: 'FeatureFlag',
+      resourceId: updatedFlag.key,
+      beforeState,
+      afterState: { key: updatedFlag.key, isEnabled: updatedFlag.isEnabled, description: updatedFlag.description },
+      changedFields,
+      outcome: 'SUCCESS',
+      severity: 'CRITICAL',
+    });
     res.json({ success: true, data: flag });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to update feature flag' });
@@ -3137,7 +3251,20 @@ router.put('/feature-flags/:key', requirePermission('feature_flag.update'), asyn
  */
 router.delete('/feature-flags/:key', requirePermission('feature_flag.delete'), async (req: AuthRequest, res: Response) => {
   try {
-    await FeatureFlag.findOneAndDelete({ key: req.params.key });
+    const flag = await FeatureFlag.findOneAndDelete({ key: req.params.key });
+    if (!flag) { res.status(404).json({ success: false, error: 'Feature flag not found' }); return; }
+    const deletedFlag = flag as unknown as InstanceType<typeof FeatureFlag>;
+    await auditAdminEvent(req, {
+      action: 'feature_flag_delete',
+      eventType: 'feature_flag.deleted',
+      eventCategory: 'CONFIG',
+      operationType: 'DELETE',
+      resourceType: 'FeatureFlag',
+      resourceId: deletedFlag.key,
+      beforeState: { key: deletedFlag.key, isEnabled: deletedFlag.isEnabled, description: deletedFlag.description },
+      outcome: 'SUCCESS',
+      severity: 'CRITICAL',
+    });
     res.json({ success: true, data: { message: 'Feature flag deleted' } });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to delete feature flag' });

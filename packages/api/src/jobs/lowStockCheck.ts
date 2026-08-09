@@ -40,6 +40,21 @@ export async function checkLowStock(): Promise<{ alerted: boolean; count: number
     .lean();
 
   if (lowStockProducts.length === 0) {
+    await auditJobEvent({
+      action: 'low_stock_check',
+      eventType: 'scheduled_low_stock_check',
+      eventCategory: 'SYSTEM',
+      operationType: 'READ',
+      resourceType: 'Product',
+      resourceId: 'multiple',
+      outcome: 'SUCCESS',
+      severity: 'LOW',
+      metadata: {
+        threshold,
+        productCount: 0,
+        products: [],
+      },
+    });
     return { alerted: false, count: 0 };
   }
 

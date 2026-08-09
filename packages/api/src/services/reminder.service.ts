@@ -53,6 +53,8 @@ async function sendFinderReminders() {
     deletedAt: null,
   }).populate('ownerId', 'fullName email');
 
+  let remindersSent = 0;
+
   for (const pet of pets) {
     const owner = pet.ownerId as any;
     if (!owner) continue;
@@ -107,6 +109,8 @@ async function sendFinderReminders() {
       petId: pet._id.toString(),
     }).catch(() => {});
 
+    remindersSent++;
+
     console.log(`[ReminderService] Sent reminder for pet ${pet.name} (${pet.petId}) to ${owner.email}`);
 
     await auditJobEvent({
@@ -129,6 +133,23 @@ async function sendFinderReminders() {
         finderPhone: scan?.finderPhone,
         finderEmail: scan?.finderEmail,
         reminderNumber: Math.floor(hoursSinceFound / 24),
+      },
+    });
+  }
+
+  if (remindersSent === 0) {
+    await auditJobEvent({
+      action: 'finder_reminder_check',
+      eventType: 'scheduled_finder_reminder_check',
+      eventCategory: 'SYSTEM',
+      operationType: 'READ',
+      resourceType: 'Pet',
+      resourceId: 'multiple',
+      outcome: 'SUCCESS',
+      severity: 'LOW',
+      metadata: {
+        petsEligible: pets.length,
+        remindersSent: 0,
       },
     });
   }

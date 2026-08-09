@@ -257,6 +257,8 @@ export async function processAutoRenewals() {
     try {
       if (sub.currentPeriodEnd > now) continue;
 
+      const oldStatus = sub.status;
+      const oldPeriodEnd = sub.currentPeriodEnd;
       const newPeriodEnd = new Date(sub.currentPeriodEnd);
       if (sub.renewalMethod === 'annual') {
         newPeriodEnd.setFullYear(newPeriodEnd.getFullYear() + 1);
@@ -278,7 +280,7 @@ export async function processAutoRenewals() {
 
       await sub.save();
 
-      await createInvoice({
+      const invoice = await createInvoice({
         subscriptionId: sub._id.toString(),
         userId: sub.userId.toString(),
         amount: sub.price,
@@ -288,6 +290,36 @@ export async function processAutoRenewals() {
       });
 
       console.log(`[SubscriptionService] Auto-renewed subscription ${sub._id}`);
+
+      await auditJobEvent({
+        action: 'subscription_auto_renewal',
+        eventType: 'subscription.auto_renewed',
+        eventCategory: 'FINANCIAL',
+        operationType: 'UPDATE',
+        resourceType: 'Subscription',
+        resourceId: sub._id.toString(),
+        outcome: 'SUCCESS',
+        severity: 'HIGH',
+        beforeState: {
+          status: oldStatus,
+          autoRenew: sub.autoRenew,
+          currentPeriodEnd: oldPeriodEnd,
+        },
+        afterState: {
+          status: 'active',
+          autoRenew: sub.autoRenew,
+          currentPeriodEnd: newPeriodEnd,
+        },
+        metadata: {
+          invoiceNumber: invoice.invoiceNumber,
+          amount: sub.price,
+          currency: 'NZD',
+          userId: sub.userId.toString(),
+          tagId: sub.tagId?.toString(),
+          planType: sub.planType,
+          planName: sub.planName,
+        },
+      });
     } catch (error) {
       console.error(`[SubscriptionService] Failed to auto-renew ${sub._id}:`, error);
     }
@@ -706,11 +738,46 @@ export async function changeSubscriptionPlan(subscriptionId: string, newPlanType
   const prices: Record<string, number> = { annual: 0.99, monthly: 1.99 };
   const planNames: Record<string, string> = { annual: 'PawTag Annual', monthly: 'PawTag Monthly' };
 
+  const oldPlanType = subscription.planType;
+  const oldPlanName = subscription.planName;
+  const oldPrice = subscription.price;
+
   subscription.planType = newPlanType;
   subscription.planName = planNames[newPlanType];
   subscription.price = prices[newPlanType];
   subscription.renewalMethod = newPlanType;
 
   await subscription.save();
+
+  await auditJobEvent({
+    action: 'subscription_plan_changed',
+    eventType: 'subscription.plan_changed',
+    eventCategory: 'UPDATE',
+    operationType: 'UPDATE',
+    resourceType: 'Subscription',
+    resourceId: subscription._id.toString(),
+    outcome: 'SUCCESS',
+    severity: 'HIGH',
+    beforeState: {
+      planType: oldPlanType,
+      planName: oldPlanName,
+      price: oldPrice,
+      status: subscription.status,
+      autoRenew: subscription.autoRenew,
+    },
+    afterState: {
+      planType: newPlanType,
+      planName: planNames[newPlanType],
+      price: prices[newPlanType],
+      status: subscription.status,
+      autoRenew: subscription.autoRenew,
+    },
+    metadata: {
+      userId: subscription.userId?.toString?.(),
+      tagId: subscription.tagId?.toString?.(),
+      actorSource: 'customer-api',
+    },
+  }, { actorType: 'SERVICE' });
+
   return subscription;
 }

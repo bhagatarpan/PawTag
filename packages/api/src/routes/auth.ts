@@ -38,6 +38,7 @@ import { User, Role, UserRole, VerificationToken, AuditLog, Setting, AuditEvent 
 import { auditService, type AuditContext } from '../services/audit';
 import { createAuditContextFromRequest, type AuditRequest } from '../middleware/audit';
 import { config } from '../config';
+import logger from '../lib/logger';
 
 const router = Router();
 
@@ -110,6 +111,45 @@ async function auditAuthEvent(
     ...overrides,
   } as AuditContext;
   await auditService.log(context, input);
+}
+
+/**
+ * Emit a FAILURE audit event for a denied/failed security flow (failed login,
+ * lockout attempt, blocked account, etc.). Failures in these paths must never
+ * change the HTTP response, but must never be silently dropped either.
+ */
+async function auditSecurityFailure(
+  req: AuditRequest,
+  payload: { action: string; eventType: string; reason: string; resourceId?: string; actorEmail?: string; metadata?: Record<string, unknown> },
+): Promise<void> {
+  const reqContext = req.auditContext as AuditContext;
+  if (!reqContext) return;
+  try {
+    await auditService.log(
+      {
+        ...reqContext,
+        actorType: 'UNKNOWN',
+        actorEmail: payload.actorEmail,
+        actorUsername: payload.actorEmail,
+        authenticationMethod: 'password',
+      } as AuditContext,
+      {
+        action: payload.action,
+        eventType: payload.eventType,
+        eventCategory: 'AUTH',
+        operationType: 'CREATE',
+        resourceType: 'User',
+        resourceId: payload.resourceId,
+        outcome: 'FAILURE',
+        severity: 'HIGH',
+        status: 'denied',
+        reason: payload.reason,
+        metadata: payload.metadata,
+      },
+    );
+  } catch (err) {
+    logger.error({ err, reason: payload.reason }, 'Failed to persist security failure audit event');
+  }
 }
 
 async function checkAndActivateUser(userId: string) {
@@ -277,6 +317,12 @@ router.post('/login', loginLimiter, validate(loginSchema), async (req, res: Resp
     }
 
     if (!user) {
+      await auditSecurityFailure(req as AuditRequest, {
+        action: 'login_failed',
+        eventType: 'login_failure',
+        reason: 'account_not_found',
+        metadata: { email, captchaRequired: false },
+      });
       res.status(401).json({ success: false, error: 'Invalid credentials' });
       return;
     }
@@ -284,6 +330,14 @@ router.post('/login', loginLimiter, validate(loginSchema), async (req, res: Resp
     // Check if account is locked due to too many failed attempts
     if (user.lockedUntil && user.lockedUntil > new Date()) {
       const minutesLeft = Math.ceil((user.lockedUntil.getTime() - Date.now()) / 60000);
+      await auditSecurityFailure(req as AuditRequest, {
+        action: 'login_blocked',
+        eventType: 'login_blocked_account_locked',
+        reason: 'account_locked',
+        resourceId: user._id.toString(),
+        actorEmail: user.email,
+        metadata: { minutesLeft },
+      });
       res.status(423).json({
         success: false,
         error: `Account locked due to too many failed login attempts. Try again in ${minutesLeft} minute${minutesLeft > 1 ? 's' : ''}.`,
@@ -305,7 +359,8 @@ router.post('/login', loginLimiter, validate(loginSchema), async (req, res: Resp
       user.failedLoginAttempts = (user.failedLoginAttempts || 0) + 1;
       const MAX_ATTEMPTS = 5;
       const LOCKOUT_MINUTES = 30;
-      if (user.failedLoginAttempts >= MAX_ATTEMPTS) {
+      const lockoutTriggered = user.failedLoginAttempts >= MAX_ATTEMPTS;
+      if (lockoutTriggered) {
         user.lockedUntil = new Date(Date.now() + LOCKOUT_MINUTES * 60 * 1000);
         await auditAuthEvent(req as AuditRequest, {
           action: 'account_locked',
@@ -320,6 +375,15 @@ router.post('/login', loginLimiter, validate(loginSchema), async (req, res: Resp
         }, { actorType: 'SYSTEM' });
       }
       await user.save();
+
+      await auditSecurityFailure(req as AuditRequest, {
+        action: 'login_failed',
+        eventType: 'login_failure',
+        reason: lockoutTriggered ? 'invalid_credentials_and_locked' : 'invalid_credentials',
+        resourceId: user._id.toString(),
+        actorEmail: user.email,
+        metadata: { attempts: user.failedLoginAttempts, maxAttempts: MAX_ATTEMPTS },
+      });
 
       // Send notification for failed admin login attempts
       const isAdminUser = user.role === 'admin' || user.role === 'customer_service';
@@ -340,7 +404,14 @@ router.post('/login', loginLimiter, validate(loginSchema), async (req, res: Resp
       await user.save();
     }
 
-    if (user.status === 'suspended') {
+if (user.status === 'suspended') {
+      await auditSecurityFailure(req as AuditRequest, {
+        action: 'login_blocked',
+        eventType: 'login_blocked_suspended',
+        reason: 'account_suspended',
+        resourceId: user._id.toString(),
+        actorEmail: user.email,
+      });
       res.status(403).json({
         success: false,
         error: 'Your account has been suspended. Please contact support.',
@@ -349,7 +420,14 @@ router.post('/login', loginLimiter, validate(loginSchema), async (req, res: Resp
       return;
     }
 
-    if (user.status === 'inactive') {
+if (user.status === 'inactive') {
+      await auditSecurityFailure(req as AuditRequest, {
+        action: 'login_blocked',
+        eventType: 'login_blocked_inactive',
+        reason: 'account_inactive',
+        resourceId: user._id.toString(),
+        actorEmail: user.email,
+      });
       res.status(403).json({
         success: false,
         error: 'Your account is inactive. Please contact support.',
@@ -365,6 +443,13 @@ router.post('/login', loginLimiter, validate(loginSchema), async (req, res: Resp
     const isAdmin = rbacRoles.some((r: any) => r.isSuperAdmin || ['SUPER_ADMIN', 'ADMIN', 'CUSTOMER_SERVICE', 'WEBSITE_EDITOR'].includes(r.name));
 
     if (user.status === 'pending_verification' && !isAdmin) {
+      await auditSecurityFailure(req as AuditRequest, {
+        action: 'login_blocked',
+        eventType: 'login_blocked_pending_verification',
+        reason: 'requires_verification',
+        resourceId: user._id.toString(),
+        actorEmail: user.email,
+      });
       res.status(403).json({
         success: false,
         error: 'Please verify your email and phone number to activate your account.',
@@ -1267,7 +1352,7 @@ router.post('/refresh', async (req, res: Response) => {
       outcome: 'SUCCESS',
       severity: 'LOW',
       metadata: { rotated: true },
-    }, { actorType: 'SERVICE', authenticationMethod: 'refresh_token' });
+    }, { actorType: 'USER', authenticationMethod: 'refresh_token' });
 
     res.json({
       success: true,
@@ -1406,6 +1491,11 @@ router.post('/mfa/verify', mfaVerifyLimiter, async (req: AuthRequest, res: Respo
     try {
       decoded = jwt.verify(tempToken, config.jwtSecret) as { userId: string; email: string; purpose: string; exp: number };
     } catch {
+      await auditSecurityFailure(req as AuditRequest, {
+        action: 'mfa_failed',
+        eventType: 'mfa_verification_failure',
+        reason: 'session_expired',
+      });
       res.status(401).json({ success: false, error: 'Session expired. Please log in again.' });
       return;
     }
@@ -1422,10 +1512,24 @@ router.post('/mfa/verify', mfaVerifyLimiter, async (req: AuthRequest, res: Respo
     }
 
     if (user.status === 'suspended') {
+      await auditSecurityFailure(req as AuditRequest, {
+        action: 'mfa_blocked',
+        eventType: 'mfa_blocked_suspended',
+        reason: 'account_suspended',
+        resourceId: user._id.toString(),
+        actorEmail: user.email,
+      });
       res.status(403).json({ success: false, error: 'Your account has been suspended.', code: 'ACCOUNT_SUSPENDED' });
       return;
     }
     if (user.status === 'inactive') {
+      await auditSecurityFailure(req as AuditRequest, {
+        action: 'mfa_blocked',
+        eventType: 'mfa_blocked_inactive',
+        reason: 'account_inactive',
+        resourceId: user._id.toString(),
+        actorEmail: user.email,
+      });
       res.status(403).json({ success: false, error: 'Your account is inactive.', code: 'ACCOUNT_INACTIVE' });
       return;
     }
@@ -1448,12 +1552,26 @@ router.post('/mfa/verify', mfaVerifyLimiter, async (req: AuthRequest, res: Respo
       }).sort({ createdAt: -1 });
 
       if (!anyToken) {
+        await auditSecurityFailure(req as AuditRequest, {
+          action: 'mfa_failed',
+          eventType: 'mfa_verification_failure',
+          reason: 'no_active_otp',
+          resourceId: user._id.toString(),
+          actorEmail: user.email,
+        });
         res.status(400).json({ success: false, error: 'No verification code found. Please request a new one.', code: 'OTP_MAX_ATTEMPTS' });
         return;
       }
 
       const maxAttempts = parseInt(process.env.MAX_OTP_ATTEMPTS || '5', 10);
       if (anyToken.attempts >= maxAttempts) {
+        await auditSecurityFailure(req as AuditRequest, {
+          action: 'mfa_failed',
+          eventType: 'mfa_verification_failure',
+          reason: 'otp_max_attempts',
+          resourceId: user._id.toString(),
+          actorEmail: user.email,
+        });
         res.status(400).json({ success: false, error: 'Too many attempts. Please request a new code.', code: 'OTP_MAX_ATTEMPTS' });
         return;
       }
@@ -1462,6 +1580,14 @@ router.post('/mfa/verify', mfaVerifyLimiter, async (req: AuthRequest, res: Respo
       await anyToken.save();
 
       const remaining = maxAttempts - anyToken.attempts;
+      await auditSecurityFailure(req as AuditRequest, {
+        action: 'mfa_failed',
+        eventType: 'mfa_verification_failure',
+        reason: 'invalid_otp',
+        resourceId: user._id.toString(),
+        actorEmail: user.email,
+        metadata: { remainingAttempts: remaining },
+      });
       res.status(400).json({
         success: false,
         error: 'Invalid verification code.',
@@ -1473,6 +1599,13 @@ router.post('/mfa/verify', mfaVerifyLimiter, async (req: AuthRequest, res: Respo
 
     // Check expiry
     if (token.expiresAt < new Date()) {
+      await auditSecurityFailure(req as AuditRequest, {
+        action: 'mfa_failed',
+        eventType: 'mfa_verification_failure',
+        reason: 'otp_expired',
+        resourceId: user._id.toString(),
+        actorEmail: user.email,
+      });
       res.status(400).json({ success: false, error: 'This code has expired. Please request a new one.', code: 'OTP_EXPIRED' });
       return;
     }
@@ -1480,6 +1613,13 @@ router.post('/mfa/verify', mfaVerifyLimiter, async (req: AuthRequest, res: Respo
     // Check max attempts
     const maxAttempts = parseInt(process.env.MAX_OTP_ATTEMPTS || '5', 10);
     if (token.attempts >= maxAttempts) {
+      await auditSecurityFailure(req as AuditRequest, {
+        action: 'mfa_failed',
+        eventType: 'mfa_verification_failure',
+        reason: 'otp_max_attempts',
+        resourceId: user._id.toString(),
+        actorEmail: user.email,
+      });
       res.status(400).json({ success: false, error: 'Too many attempts. Please request a new code.', code: 'OTP_MAX_ATTEMPTS' });
       return;
     }

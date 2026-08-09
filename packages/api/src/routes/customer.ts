@@ -841,6 +841,20 @@ router.post('/cart/items', requirePermission('order.create'), async (req: AuthRe
     cart.updatedAt = new Date();
     await cart.save();
 
+    const cartItem = existingItemIndex >= 0 ? cart.items[existingItemIndex] : cart.items[cart.items.length - 1];
+    await auditCustomerEvent(req, {
+      action: 'cart_item_create',
+      eventType: 'cart.item_created',
+      eventCategory: 'CREATE',
+      operationType: 'CREATE',
+      resourceType: 'Cart',
+      resourceId: cart._id.toString(),
+      afterState: (cartItem as any)?.toObject?.(),
+      metadata: { productId, quantity, cartItemId: (cartItem as any)?._id?.toString?.() },
+      outcome: 'SUCCESS',
+      severity: 'LOW',
+    });
+
     res.json({ success: true, data: cart });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to add item to cart' });
@@ -856,6 +870,7 @@ router.put('/cart/items/:itemId', requirePermission('order.create'), async (req:
     const item = cart.items.id(req.params.itemId);
     if (!item) { res.status(404).json({ success: false, error: 'Item not found' }); return; }
 
+    const itemBefore = { ...(item as any)?.toObject?.() };
     if (quantity <= 0) {
       item.deleteOne();
     } else {
@@ -864,6 +879,23 @@ router.put('/cart/items/:itemId', requirePermission('order.create'), async (req:
 
     cart.updatedAt = new Date();
     await cart.save();
+
+    const removed = quantity <= 0;
+    await auditCustomerEvent(req, {
+      action: 'cart_item_update',
+      eventType: 'cart.item_updated',
+      eventCategory: 'UPDATE',
+      operationType: 'UPDATE',
+      resourceType: 'Cart',
+      resourceId: cart._id.toString(),
+      beforeState: itemBefore,
+      afterState: removed ? {} : (item as any)?.toObject?.(),
+      changedFields: [{ field: 'quantity', before: itemBefore.quantity, after: removed ? 0 : quantity }],
+      metadata: { productId: (item as any)?.productId?.toString?.(), quantity, cartItemId: req.params.itemId, removed },
+      outcome: 'SUCCESS',
+      severity: 'LOW',
+    });
+
     res.json({ success: true, data: cart });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to update cart item' });
@@ -875,9 +907,24 @@ router.delete('/cart/items/:itemId', requirePermission('order.create'), async (r
     const cart = await Cart.findOne({ userId: req.user!.id });
     if (!cart) { res.status(404).json({ success: false, error: 'Cart not found' }); return; }
 
+    const removedItem = cart.items.find((item: any) => item._id.toString() === req.params.itemId);
     cart.items = cart.items.filter((item: any) => item._id.toString() !== req.params.itemId) as any;
     cart.updatedAt = new Date();
     await cart.save();
+
+    await auditCustomerEvent(req, {
+      action: 'cart_item_delete',
+      eventType: 'cart.item_deleted',
+      eventCategory: 'DELETE',
+      operationType: 'DELETE',
+      resourceType: 'Cart',
+      resourceId: cart._id.toString(),
+      beforeState: (removedItem as any)?.toObject?.(),
+      metadata: { productId: (removedItem as any)?.productId?.toString?.(), cartItemId: req.params.itemId },
+      outcome: 'SUCCESS',
+      severity: 'LOW',
+    });
+
     res.json({ success: true, data: cart });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to remove cart item' });
@@ -886,7 +933,22 @@ router.delete('/cart/items/:itemId', requirePermission('order.create'), async (r
 
 router.delete('/cart', requirePermission('order.create'), async (req: AuthRequest, res: Response) => {
   try {
+    const cart = await Cart.findOne({ userId: req.user!.id });
+    const itemCount = cart?.items?.length ?? 0;
     await Cart.findOneAndDelete({ userId: req.user!.id });
+
+    await auditCustomerEvent(req, {
+      action: 'cart_delete',
+      eventType: 'cart.cleared',
+      eventCategory: 'DELETE',
+      operationType: 'DELETE',
+      resourceType: 'Cart',
+      resourceId: cart?._id?.toString?.(),
+      metadata: { itemCount, bulk: true },
+      outcome: 'SUCCESS',
+      severity: 'LOW',
+    });
+
     res.json({ success: true, data: { message: 'Cart cleared' } });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to clear cart' });
@@ -1303,6 +1365,24 @@ router.post('/orders/:orderNumber/confirm-payment', requirePermission('order.cre
     // Re-fetch order to get updated status
     const updatedOrder = await Order.findOne({ orderNumber });
 
+    await auditCustomerEvent(req, {
+      action: 'order_confirm_payment',
+      eventType: 'order.payment_confirmed',
+      eventCategory: 'FINANCIAL',
+      operationType: 'UPDATE',
+      resourceType: 'Order',
+      resourceId: updatedOrder?._id?.toString() || orderNumber,
+      beforeState: { status: 'pending_payment', paymentStatus: 'pending' },
+      afterState: { status: updatedOrder?.status, paymentStatus: 'completed' },
+      changedFields: [
+        { field: 'status', before: 'pending_payment', after: updatedOrder?.status },
+        { field: 'payment.status', before: 'pending', after: 'completed' },
+      ],
+      metadata: { orderNumber, amount: order.payment.amount },
+      outcome: 'SUCCESS',
+      severity: 'HIGH',
+    });
+
     res.json({ success: true, data: updatedOrder });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to confirm payment' });
@@ -1468,6 +1548,7 @@ router.post('/pets/:id/mark-terminal', requirePermission('pet.update'), async (r
     const pet = await Pet.findOne({ _id: req.params.id, ownerId: req.user!.id, deletedAt: null });
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
 
+    const oldStatus = pet.status as any;
     pet.status = reason as any;
     pet.foundByFinderAt = undefined;
     await pet.save();
@@ -1480,6 +1561,21 @@ router.post('/pets/:id/mark-terminal', requirePermission('pet.update'), async (r
 
     await Tag.updateMany({ petId: pet._id, deletedAt: null }, { status: 'inactive' });
 
+    await auditCustomerEvent(req, {
+      action: 'pet_mark_terminal',
+      eventType: 'pet.status_terminal',
+      eventCategory: 'TRANSITION',
+      operationType: 'UPDATE',
+      resourceType: 'Pet',
+      resourceId: pet._id.toString(),
+      beforeState: { status: oldStatus },
+      afterState: { status: reason },
+      changedFields: [{ field: 'status', before: oldStatus, after: reason }],
+      metadata: { reason, tagsDeactivated: true },
+      outcome: 'SUCCESS',
+      severity: 'HIGH',
+    });
+
     res.json({ success: true, data: pet });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to update pet status' });
@@ -1490,6 +1586,16 @@ router.post('/pets/:id/mark-terminal', requirePermission('pet.update'), async (r
 router.delete('/notifications/clear-read', requirePermission('notification.delete'), async (req: AuthRequest, res: Response) => {
   try {
     const result = await Notification.deleteMany({ userId: req.user!.id, read: true });
+    await auditCustomerEvent(req, {
+      action: 'notifications_clear_read',
+      eventType: 'notification.clear_read',
+      eventCategory: 'DELETE',
+      operationType: 'DELETE',
+      resourceType: 'Notification',
+      metadata: { deletedCount: result.deletedCount, bulk: true },
+      outcome: 'SUCCESS',
+      severity: 'LOW',
+    });
     res.json({ success: true, data: { deletedCount: result.deletedCount } });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to clear notifications' });
@@ -1499,7 +1605,17 @@ router.delete('/notifications/clear-read', requirePermission('notification.delet
 // --- Mark All Notifications Read ---
 router.put('/notifications/mark-all-read', requirePermission('notification.update'), async (req: AuthRequest, res: Response) => {
   try {
-    await Notification.updateMany({ userId: req.user!.id, read: false }, { read: true });
+    const result = await Notification.updateMany({ userId: req.user!.id, read: false }, { read: true });
+    await auditCustomerEvent(req, {
+      action: 'notifications_mark_all_read',
+      eventType: 'notification.mark_all_read',
+      eventCategory: 'UPDATE',
+      operationType: 'UPDATE',
+      resourceType: 'Notification',
+      metadata: { modifiedCount: result.modifiedCount, bulk: true },
+      outcome: 'SUCCESS',
+      severity: 'LOW',
+    });
     res.json({ success: true, data: { message: 'All notifications marked as read' } });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to mark notifications' });
@@ -1545,7 +1661,22 @@ router.put('/notification-preferences', requirePermission('notification.update')
       if (channels.marketing !== undefined) update['notificationPreferences.channels.marketing'] = channels.marketing;
     }
 
+    const userBefore = await User.findById(req.user!.id).select('notificationPreferences');
     const user = await User.findByIdAndUpdate(req.user!.id, { $set: update }, { new: true }).select('notificationPreferences');
+    await auditCustomerEvent(req, {
+      action: 'notification_preferences_update',
+      eventType: 'notification.preferences_updated',
+      eventCategory: 'UPDATE',
+      operationType: 'UPDATE',
+      resourceType: 'User',
+      resourceId: req.user!.id,
+      beforeState: (userBefore as any)?.notificationPreferences,
+      afterState: (user as any)?.notificationPreferences,
+      changedFields: Object.keys(update).map((field) => ({ field: field.replace('notificationPreferences.', ''), before: undefined, after: update[field] })),
+      metadata: { fields: Object.keys(update) },
+      outcome: 'SUCCESS',
+      severity: 'LOW',
+    });
     res.json({ success: true, data: (user as any)?.notificationPreferences });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to update notification preferences' });
@@ -1578,6 +1709,21 @@ router.post('/pets/:id/vaccinations', requirePermission('vaccination.create'), a
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
     pet.vaccinations.push(req.body);
     await pet.save();
+
+    const createdVaccination = pet.vaccinations[pet.vaccinations.length - 1];
+    await auditCustomerEvent(req, {
+      action: 'vaccination_create',
+      eventType: 'pet.vaccination_created',
+      eventCategory: 'CREATE',
+      operationType: 'CREATE',
+      resourceType: 'Pet',
+      resourceId: pet._id.toString(),
+      afterState: (createdVaccination as any)?.toObject?.(),
+      metadata: { subResource: 'vaccination', subResourceId: (createdVaccination as any)?._id?.toString?.() },
+      outcome: 'SUCCESS',
+      severity: 'LOW',
+    });
+
     res.status(201).json({ success: true, data: pet.vaccinations[pet.vaccinations.length - 1] });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to add vaccination' });
@@ -1590,8 +1736,30 @@ router.put('/pets/:id/vaccinations/:vaxId', requirePermission('vaccination.updat
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
     const vax = (pet.vaccinations as any).id(req.params.vaxId);
     if (!vax) { res.status(404).json({ success: false, error: 'Vaccination not found' }); return; }
+    const beforeSnapshot = { ...vax.toObject() };
     Object.assign(vax, req.body);
     await pet.save();
+
+    const changedFields = Object.keys(req.body).map((field) => ({
+      field,
+      before: beforeSnapshot[field],
+      after: vax[field],
+    }));
+    await auditCustomerEvent(req, {
+      action: 'vaccination_update',
+      eventType: 'pet.vaccination_updated',
+      eventCategory: 'UPDATE',
+      operationType: 'UPDATE',
+      resourceType: 'Pet',
+      resourceId: pet._id.toString(),
+      beforeState: beforeSnapshot,
+      afterState: vax.toObject(),
+      changedFields,
+      metadata: { subResource: 'vaccination', subResourceId: vax._id?.toString?.() },
+      outcome: 'SUCCESS',
+      severity: 'LOW',
+    });
+
     res.json({ success: true, data: vax });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to update vaccination' });
@@ -1604,8 +1772,23 @@ router.delete('/pets/:id/vaccinations/:vaxId', requirePermission('vaccination.de
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
     const vax = (pet.vaccinations as any).id(req.params.vaxId);
     if (!vax) { res.status(404).json({ success: false, error: 'Vaccination not found' }); return; }
+    const removedVaccination = { ...vax.toObject() };
     vax.deleteOne();
     await pet.save();
+
+    await auditCustomerEvent(req, {
+      action: 'vaccination_delete',
+      eventType: 'pet.vaccination_deleted',
+      eventCategory: 'DELETE',
+      operationType: 'DELETE',
+      resourceType: 'Pet',
+      resourceId: pet._id.toString(),
+      beforeState: removedVaccination,
+      metadata: { subResource: 'vaccination', subResourceId: vax._id?.toString?.() },
+      outcome: 'SUCCESS',
+      severity: 'LOW',
+    });
+
     res.json({ success: true, data: { message: 'Vaccination deleted' } });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to delete vaccination' });
@@ -1629,6 +1812,21 @@ router.post('/pets/:id/microchips', requirePermission('microchip.create'), async
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
     pet.microchips.push(req.body);
     await pet.save();
+
+    const createdMicrochip = pet.microchips[pet.microchips.length - 1];
+    await auditCustomerEvent(req, {
+      action: 'microchip_create',
+      eventType: 'pet.microchip_created',
+      eventCategory: 'CREATE',
+      operationType: 'CREATE',
+      resourceType: 'Pet',
+      resourceId: pet._id.toString(),
+      afterState: (createdMicrochip as any)?.toObject?.(),
+      metadata: { subResource: 'microchip', subResourceId: (createdMicrochip as any)?._id?.toString?.() },
+      outcome: 'SUCCESS',
+      severity: 'LOW',
+    });
+
     res.status(201).json({ success: true, data: pet.microchips[pet.microchips.length - 1] });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to add microchip' });
@@ -1641,8 +1839,30 @@ router.put('/pets/:id/microchips/:chipId', requirePermission('microchip.update')
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
     const chip = (pet.microchips as any).id(req.params.chipId);
     if (!chip) { res.status(404).json({ success: false, error: 'Microchip not found' }); return; }
+    const chipBefore = { ...chip.toObject() };
     Object.assign(chip, req.body);
     await pet.save();
+
+    const changedFields = Object.keys(req.body).map((field) => ({
+      field,
+      before: chipBefore[field],
+      after: chip[field],
+    }));
+    await auditCustomerEvent(req, {
+      action: 'microchip_update',
+      eventType: 'pet.microchip_updated',
+      eventCategory: 'UPDATE',
+      operationType: 'UPDATE',
+      resourceType: 'Pet',
+      resourceId: pet._id.toString(),
+      beforeState: chipBefore,
+      afterState: chip.toObject(),
+      changedFields,
+      metadata: { subResource: 'microchip', subResourceId: chip._id?.toString?.() },
+      outcome: 'SUCCESS',
+      severity: 'LOW',
+    });
+
     res.json({ success: true, data: chip });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to update microchip' });
@@ -1655,8 +1875,23 @@ router.delete('/pets/:id/microchips/:chipId', requirePermission('microchip.delet
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
     const chip = (pet.microchips as any).id(req.params.chipId);
     if (!chip) { res.status(404).json({ success: false, error: 'Microchip not found' }); return; }
+    const removedMicrochip = { ...chip.toObject() };
     chip.deleteOne();
     await pet.save();
+
+    await auditCustomerEvent(req, {
+      action: 'microchip_delete',
+      eventType: 'pet.microchip_deleted',
+      eventCategory: 'DELETE',
+      operationType: 'DELETE',
+      resourceType: 'Pet',
+      resourceId: pet._id.toString(),
+      beforeState: removedMicrochip,
+      metadata: { subResource: 'microchip', subResourceId: chip._id?.toString?.() },
+      outcome: 'SUCCESS',
+      severity: 'LOW',
+    });
+
     res.json({ success: true, data: { message: 'Microchip deleted' } });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to delete microchip' });
@@ -1680,6 +1915,21 @@ router.post('/pets/:id/medications', requirePermission('medication.create'), asy
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
     pet.medications.push(req.body);
     await pet.save();
+
+    const createdMedication = pet.medications[pet.medications.length - 1];
+    await auditCustomerEvent(req, {
+      action: 'medication_create',
+      eventType: 'pet.medication_created',
+      eventCategory: 'CREATE',
+      operationType: 'CREATE',
+      resourceType: 'Pet',
+      resourceId: pet._id.toString(),
+      afterState: (createdMedication as any)?.toObject?.(),
+      metadata: { subResource: 'medication', subResourceId: (createdMedication as any)?._id?.toString?.() },
+      outcome: 'SUCCESS',
+      severity: 'LOW',
+    });
+
     res.status(201).json({ success: true, data: pet.medications[pet.medications.length - 1] });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to add medication' });
@@ -1692,8 +1942,30 @@ router.put('/pets/:id/medications/:medId', requirePermission('medication.update'
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
     const med = (pet.medications as any).id(req.params.medId);
     if (!med) { res.status(404).json({ success: false, error: 'Medication not found' }); return; }
+    const medBefore = { ...med.toObject() };
     Object.assign(med, req.body);
     await pet.save();
+
+    const changedFields = Object.keys(req.body).map((field) => ({
+      field,
+      before: medBefore[field],
+      after: med[field],
+    }));
+    await auditCustomerEvent(req, {
+      action: 'medication_update',
+      eventType: 'pet.medication_updated',
+      eventCategory: 'UPDATE',
+      operationType: 'UPDATE',
+      resourceType: 'Pet',
+      resourceId: pet._id.toString(),
+      beforeState: medBefore,
+      afterState: med.toObject(),
+      changedFields,
+      metadata: { subResource: 'medication', subResourceId: med._id?.toString?.() },
+      outcome: 'SUCCESS',
+      severity: 'LOW',
+    });
+
     res.json({ success: true, data: med });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to update medication' });
@@ -1706,8 +1978,23 @@ router.delete('/pets/:id/medications/:medId', requirePermission('medication.dele
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
     const med = (pet.medications as any).id(req.params.medId);
     if (!med) { res.status(404).json({ success: false, error: 'Medication not found' }); return; }
+    const removedMedication = { ...med.toObject() };
     med.deleteOne();
     await pet.save();
+
+    await auditCustomerEvent(req, {
+      action: 'medication_delete',
+      eventType: 'pet.medication_deleted',
+      eventCategory: 'DELETE',
+      operationType: 'DELETE',
+      resourceType: 'Pet',
+      resourceId: pet._id.toString(),
+      beforeState: removedMedication,
+      metadata: { subResource: 'medication', subResourceId: med._id?.toString?.() },
+      outcome: 'SUCCESS',
+      severity: 'LOW',
+    });
+
     res.json({ success: true, data: { message: 'Medication deleted' } });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to delete medication' });
@@ -1731,6 +2018,21 @@ router.post('/pets/:id/allergies', requirePermission('allergy.create'), async (r
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
     pet.allergies.push(req.body);
     await pet.save();
+
+    const createdAllergy = pet.allergies[pet.allergies.length - 1];
+    await auditCustomerEvent(req, {
+      action: 'allergy_create',
+      eventType: 'pet.allergy_created',
+      eventCategory: 'CREATE',
+      operationType: 'CREATE',
+      resourceType: 'Pet',
+      resourceId: pet._id.toString(),
+      afterState: (createdAllergy as any)?.toObject?.(),
+      metadata: { subResource: 'allergy', subResourceId: (createdAllergy as any)?._id?.toString?.() },
+      outcome: 'SUCCESS',
+      severity: 'LOW',
+    });
+
     res.status(201).json({ success: true, data: pet.allergies[pet.allergies.length - 1] });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to add allergy' });
@@ -1743,8 +2045,30 @@ router.put('/pets/:id/allergies/:allergyId', requirePermission('allergy.update')
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
     const allergy = (pet.allergies as any).id(req.params.allergyId);
     if (!allergy) { res.status(404).json({ success: false, error: 'Allergy not found' }); return; }
+    const allergyBefore = { ...allergy.toObject() };
     Object.assign(allergy, req.body);
     await pet.save();
+
+    const changedFields = Object.keys(req.body).map((field) => ({
+      field,
+      before: allergyBefore[field],
+      after: allergy[field],
+    }));
+    await auditCustomerEvent(req, {
+      action: 'allergy_update',
+      eventType: 'pet.allergy_updated',
+      eventCategory: 'UPDATE',
+      operationType: 'UPDATE',
+      resourceType: 'Pet',
+      resourceId: pet._id.toString(),
+      beforeState: allergyBefore,
+      afterState: allergy.toObject(),
+      changedFields,
+      metadata: { subResource: 'allergy', subResourceId: allergy._id?.toString?.() },
+      outcome: 'SUCCESS',
+      severity: 'LOW',
+    });
+
     res.json({ success: true, data: allergy });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to update allergy' });
@@ -1757,8 +2081,23 @@ router.delete('/pets/:id/allergies/:allergyId', requirePermission('allergy.delet
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
     const allergy = (pet.allergies as any).id(req.params.allergyId);
     if (!allergy) { res.status(404).json({ success: false, error: 'Allergy not found' }); return; }
+    const removedAllergy = { ...allergy.toObject() };
     allergy.deleteOne();
     await pet.save();
+
+    await auditCustomerEvent(req, {
+      action: 'allergy_delete',
+      eventType: 'pet.allergy_deleted',
+      eventCategory: 'DELETE',
+      operationType: 'DELETE',
+      resourceType: 'Pet',
+      resourceId: pet._id.toString(),
+      beforeState: removedAllergy,
+      metadata: { subResource: 'allergy', subResourceId: allergy._id?.toString?.() },
+      outcome: 'SUCCESS',
+      severity: 'LOW',
+    });
+
     res.json({ success: true, data: { message: 'Allergy deleted' } });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to delete allergy' });
@@ -1797,11 +2136,33 @@ router.put('/pets/:id/vet-details/:vetId', requirePermission('vet_visit.update')
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
     const vet = (pet.vetDetails as any).id(req.params.vetId);
     if (!vet) { res.status(404).json({ success: false, error: 'Vet detail not found' }); return; }
+    const vetBefore = { ...vet.toObject() };
     if (req.body.isPrimary) {
       for (const vd of pet.vetDetails) { vd.isPrimary = false; }
     }
     Object.assign(vet, req.body);
     await pet.save();
+
+    const changedFields = Object.keys(req.body).map((field) => ({
+      field,
+      before: vetBefore[field],
+      after: vet[field],
+    }));
+    await auditCustomerEvent(req, {
+      action: 'vet_detail_update',
+      eventType: 'pet.vet_detail_updated',
+      eventCategory: 'UPDATE',
+      operationType: 'UPDATE',
+      resourceType: 'Pet',
+      resourceId: pet._id.toString(),
+      beforeState: vetBefore,
+      afterState: vet.toObject(),
+      changedFields,
+      metadata: { subResource: 'vetDetail', subResourceId: vet._id?.toString?.() },
+      outcome: 'SUCCESS',
+      severity: 'LOW',
+    });
+
     res.json({ success: true, data: vet });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to update vet detail' });
@@ -1839,6 +2200,21 @@ router.post('/pets/:id/surgeries', requirePermission('surgery.create'), async (r
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
     pet.surgeries.push(req.body);
     await pet.save();
+
+    const createdSurgery = pet.surgeries[pet.surgeries.length - 1];
+    await auditCustomerEvent(req, {
+      action: 'surgery_create',
+      eventType: 'pet.surgery_created',
+      eventCategory: 'CREATE',
+      operationType: 'CREATE',
+      resourceType: 'Pet',
+      resourceId: pet._id.toString(),
+      afterState: (createdSurgery as any)?.toObject?.(),
+      metadata: { subResource: 'surgery', subResourceId: (createdSurgery as any)?._id?.toString?.() },
+      outcome: 'SUCCESS',
+      severity: 'LOW',
+    });
+
     res.status(201).json({ success: true, data: pet.surgeries[pet.surgeries.length - 1] });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to add surgery' });
@@ -1851,8 +2227,30 @@ router.put('/pets/:id/surgeries/:surgId', requirePermission('surgery.update'), a
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
     const surg = (pet.surgeries as any).id(req.params.surgId);
     if (!surg) { res.status(404).json({ success: false, error: 'Surgery not found' }); return; }
+    const surgBefore = { ...surg.toObject() };
     Object.assign(surg, req.body);
     await pet.save();
+
+    const changedFields = Object.keys(req.body).map((field) => ({
+      field,
+      before: surgBefore[field],
+      after: surg[field],
+    }));
+    await auditCustomerEvent(req, {
+      action: 'surgery_update',
+      eventType: 'pet.surgery_updated',
+      eventCategory: 'UPDATE',
+      operationType: 'UPDATE',
+      resourceType: 'Pet',
+      resourceId: pet._id.toString(),
+      beforeState: surgBefore,
+      afterState: surg.toObject(),
+      changedFields,
+      metadata: { subResource: 'surgery', subResourceId: surg._id?.toString?.() },
+      outcome: 'SUCCESS',
+      severity: 'LOW',
+    });
+
     res.json({ success: true, data: surg });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to update surgery' });
@@ -1865,8 +2263,23 @@ router.delete('/pets/:id/surgeries/:surgId', requirePermission('surgery.delete')
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
     const surg = (pet.surgeries as any).id(req.params.surgId);
     if (!surg) { res.status(404).json({ success: false, error: 'Surgery not found' }); return; }
+    const removedSurgery = { ...surg.toObject() };
     surg.deleteOne();
     await pet.save();
+
+    await auditCustomerEvent(req, {
+      action: 'surgery_delete',
+      eventType: 'pet.surgery_deleted',
+      eventCategory: 'DELETE',
+      operationType: 'DELETE',
+      resourceType: 'Pet',
+      resourceId: pet._id.toString(),
+      beforeState: removedSurgery,
+      metadata: { subResource: 'surgery', subResourceId: surg._id?.toString?.() },
+      outcome: 'SUCCESS',
+      severity: 'LOW',
+    });
+
     res.json({ success: true, data: { message: 'Surgery deleted' } });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to delete surgery' });
@@ -1891,6 +2304,21 @@ router.post('/pets/:id/weight-history', requirePermission('weight.create'), asyn
     pet.weightHistory.push(req.body);
     pet.weight = req.body.weight;
     await pet.save();
+
+    const createdWeight = pet.weightHistory[pet.weightHistory.length - 1];
+    await auditCustomerEvent(req, {
+      action: 'weight_create',
+      eventType: 'pet.weight_created',
+      eventCategory: 'CREATE',
+      operationType: 'CREATE',
+      resourceType: 'Pet',
+      resourceId: pet._id.toString(),
+      afterState: (createdWeight as any)?.toObject?.(),
+      metadata: { subResource: 'weight', subResourceId: (createdWeight as any)?._id?.toString?.() },
+      outcome: 'SUCCESS',
+      severity: 'LOW',
+    });
+
     res.status(201).json({ success: true, data: pet.weightHistory[pet.weightHistory.length - 1] });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to add weight record' });
@@ -1903,8 +2331,23 @@ router.delete('/pets/:id/weight-history/:wid', requirePermission('weight.delete'
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
     const rec = (pet.weightHistory as any).id(req.params.wid);
     if (!rec) { res.status(404).json({ success: false, error: 'Weight record not found' }); return; }
+    const removedWeight = { ...rec.toObject() };
     rec.deleteOne();
     await pet.save();
+
+    await auditCustomerEvent(req, {
+      action: 'weight_delete',
+      eventType: 'pet.weight_deleted',
+      eventCategory: 'DELETE',
+      operationType: 'DELETE',
+      resourceType: 'Pet',
+      resourceId: pet._id.toString(),
+      beforeState: removedWeight,
+      metadata: { subResource: 'weight', subResourceId: rec._id?.toString?.() },
+      outcome: 'SUCCESS',
+      severity: 'LOW',
+    });
+
     res.json({ success: true, data: { message: 'Weight record deleted' } });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to delete weight record' });
@@ -1928,6 +2371,21 @@ router.post('/pets/:id/health-conditions', requirePermission('medical_record.cre
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
     pet.healthConditions.push(req.body);
     await pet.save();
+
+    const createdCondition = pet.healthConditions[pet.healthConditions.length - 1];
+    await auditCustomerEvent(req, {
+      action: 'health_condition_create',
+      eventType: 'pet.health_condition_created',
+      eventCategory: 'CREATE',
+      operationType: 'CREATE',
+      resourceType: 'Pet',
+      resourceId: pet._id.toString(),
+      afterState: (createdCondition as any)?.toObject?.(),
+      metadata: { subResource: 'health_condition', subResourceId: (createdCondition as any)?._id?.toString?.() },
+      outcome: 'SUCCESS',
+      severity: 'LOW',
+    });
+
     res.status(201).json({ success: true, data: pet.healthConditions[pet.healthConditions.length - 1] });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to add health condition' });
@@ -1940,8 +2398,30 @@ router.put('/pets/:id/health-conditions/:condId', requirePermission('medical_rec
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
     const cond = (pet.healthConditions as any).id(req.params.condId);
     if (!cond) { res.status(404).json({ success: false, error: 'Health condition not found' }); return; }
+    const condBefore = { ...cond.toObject() };
     Object.assign(cond, req.body);
     await pet.save();
+
+    const changedFields = Object.keys(req.body).map((field) => ({
+      field,
+      before: condBefore[field],
+      after: cond[field],
+    }));
+    await auditCustomerEvent(req, {
+      action: 'health_condition_update',
+      eventType: 'pet.health_condition_updated',
+      eventCategory: 'UPDATE',
+      operationType: 'UPDATE',
+      resourceType: 'Pet',
+      resourceId: pet._id.toString(),
+      beforeState: condBefore,
+      afterState: cond.toObject(),
+      changedFields,
+      metadata: { subResource: 'health_condition', subResourceId: cond._id?.toString?.() },
+      outcome: 'SUCCESS',
+      severity: 'LOW',
+    });
+
     res.json({ success: true, data: cond });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to update health condition' });
@@ -1954,8 +2434,23 @@ router.delete('/pets/:id/health-conditions/:condId', requirePermission('medical_
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
     const cond = (pet.healthConditions as any).id(req.params.condId);
     if (!cond) { res.status(404).json({ success: false, error: 'Health condition not found' }); return; }
+    const removedCondition = { ...cond.toObject() };
     cond.deleteOne();
     await pet.save();
+
+    await auditCustomerEvent(req, {
+      action: 'health_condition_delete',
+      eventType: 'pet.health_condition_deleted',
+      eventCategory: 'DELETE',
+      operationType: 'DELETE',
+      resourceType: 'Pet',
+      resourceId: pet._id.toString(),
+      beforeState: removedCondition,
+      metadata: { subResource: 'health_condition', subResourceId: cond._id?.toString?.() },
+      outcome: 'SUCCESS',
+      severity: 'LOW',
+    });
+
     res.json({ success: true, data: { message: 'Health condition deleted' } });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to delete health condition' });
@@ -1977,8 +2472,30 @@ router.put('/pets/:id/desexing', requirePermission('desexing.update'), async (re
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
+    const desexingBefore = pet.desexing;
     pet.desexing = req.body;
     await pet.save();
+
+    const changedFields = Object.keys(req.body).map((field: any) => ({
+      field,
+      before: (desexingBefore as any)?.[field],
+      after: req.body[field],
+    }));
+    await auditCustomerEvent(req, {
+      action: 'desexing_update',
+      eventType: 'pet.desexing_updated',
+      eventCategory: 'UPDATE',
+      operationType: 'UPDATE',
+      resourceType: 'Pet',
+      resourceId: pet._id.toString(),
+      beforeState: desexingBefore ? { ...(desexingBefore as any) } : {},
+      afterState: req.body,
+      changedFields,
+      metadata: { subResource: 'desexing' },
+      outcome: 'SUCCESS',
+      severity: 'LOW',
+    });
+
     res.json({ success: true, data: pet.desexing });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to update desexing info' });
@@ -2004,13 +2521,19 @@ router.put('/settings/mfa', requirePermission('pet.read'), async (req: AuthReque
     user.mfaEnabled = enabled;
     await user.save();
 
-    await AuditLog.create({
-      userId: req.user!.id,
+    await auditCustomerEvent(req, {
       action: enabled ? 'mfa_enabled' : 'mfa_disabled',
-      entity: 'User',
-      entityId: req.user!.id,
-      changes: { mfaEnabled: { old: oldValue, new: enabled } },
-    });
+      eventType: 'mfa_setting_changed',
+      eventCategory: 'SECURITY',
+      operationType: 'UPDATE',
+      resourceType: 'User',
+      resourceId: req.user!.id,
+      beforeState: { mfaEnabled: oldValue },
+      afterState: { mfaEnabled: enabled },
+      changedFields: [{ field: 'mfaEnabled', before: oldValue, after: enabled, sensitive: true }],
+      outcome: 'SUCCESS',
+      severity: 'HIGH',
+    }, { actorType: 'USER' });
 
     res.json({ success: true, data: { mfaEnabled: enabled } });
   } catch {

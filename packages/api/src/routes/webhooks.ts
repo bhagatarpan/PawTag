@@ -59,14 +59,44 @@ router.post('/stripe', async (req: Request, res: Response) => {
       await handleInvoicePaymentFailed(event.data?.object);
     } else if (event.type === 'customer.subscription.deleted') {
       await handleSubscriptionDeleted(event.data?.object);
+    } else {
+      await auditWebhookEvent({
+        action: 'unknown_event',
+        eventType: 'webhook_unknown_event',
+        eventCategory: 'INTEGRATION',
+        operationType: 'READ',
+        resourceType: 'Webhook',
+        outcome: 'SUCCESS',
+        severity: 'INFO',
+        metadata: { eventType: event.type },
+      });
     }
 
     res.json({ received: true });
     return;
   }
 
-  // Real Stripe verification would go here
-  // For now, process the event directly
+  // Real Stripe verification — signature handling is stubbed, so only
+  // missing/invalid signatures are rejectable until real verification lands.
+  if (!sig) {
+    await auditWebhookEvent({
+      action: 'stripe_signature_invalid',
+      eventType: 'stripe_signature_invalid',
+      eventCategory: 'SECURITY',
+      operationType: 'READ',
+      resourceType: 'Webhook',
+      outcome: 'FAILURE',
+      severity: 'HIGH',
+      metadata: {
+        stripeEventId: req.body?.id,
+        eventType: req.body?.type,
+        hasStripeSignature: false,
+      },
+    });
+    res.status(400).json({ success: false, error: 'Invalid signature' });
+    return;
+  }
+
   try {
     const event = req.body;
 
@@ -85,6 +115,18 @@ router.post('/stripe', async (req: Request, res: Response) => {
         break;
       case 'customer.subscription.deleted':
         await handleSubscriptionDeleted(event.data?.object);
+        break;
+      default:
+        await auditWebhookEvent({
+          action: 'unknown_event',
+          eventType: 'webhook_unknown_event',
+          eventCategory: 'INTEGRATION',
+          operationType: 'READ',
+          resourceType: 'Webhook',
+          outcome: 'SUCCESS',
+          severity: 'INFO',
+          metadata: { eventType: event.type },
+        });
         break;
     }
 
@@ -429,7 +471,7 @@ async function handlePaymentIntentFailed(paymentIntent: any) {
 
   await auditWebhookEvent({
     action: 'payment_failed',
-    eventType: 'stripe_payment_intent_failed',
+    eventType: 'payment.failed',
     eventCategory: 'FINANCIAL',
     operationType: 'UPDATE',
     resourceType: 'Order',
@@ -437,6 +479,8 @@ async function handlePaymentIntentFailed(paymentIntent: any) {
     outcome: 'FAILURE',
     severity: 'HIGH',
     metadata: {
+      stripeEventId: paymentIntent.id,
+      orderId: order._id.toString(),
       orderNumber,
       paymentIntentId: paymentIntent.id,
       amount: order.payment.amount,

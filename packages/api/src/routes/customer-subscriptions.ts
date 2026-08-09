@@ -3,6 +3,7 @@ import { AuthRequest, authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
 import { Subscription, Invoice, Tag, User, Pet } from '@pawtag/db';
 import Stripe from 'stripe';
+import { auditService, type AuditContext } from '../services/audit';
 import {
   renewSubscription,
   cancelSubscription,
@@ -12,6 +13,38 @@ import {
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_demo_key', {
   apiVersion: '2024-06-20' as any,
 });
+
+async function auditSubscriptionEvent(
+  req: AuthRequest,
+  input: Parameters<typeof auditService.log>[1],
+  overrides: Partial<AuditContext> = {},
+): Promise<void> {
+  try {
+    const ctx = req.auditContext as Partial<AuditContext> | undefined;
+    const context: AuditContext = {
+      requestId: ctx?.requestId || 'unknown',
+      correlationId: ctx?.correlationId || 'unknown',
+      traceId: ctx?.traceId || 'unknown',
+      transactionId: ctx?.transactionId || 'unknown',
+      sourceIp: ctx?.sourceIp || req.ip || 'unknown',
+      forwardedIp: ctx?.forwardedIp,
+      userAgent: ctx?.userAgent || 'unknown',
+      deviceId: ctx?.deviceId,
+      applicationName: 'pawtag-api',
+      applicationVersion: '1.0.0',
+      apiVersion: 'v1',
+      environment: process.env.NODE_ENV || 'development',
+      tenantId: ctx?.tenantId,
+      actorType: 'USER',
+      actorId: req.user?.id,
+      actorEmail: req.user?.email,
+      ...overrides,
+    };
+    await auditService.log(context, input);
+  } catch (err) {
+    console.error('[Audit] Failed to log subscription event:', err);
+  }
+}
 
 const router = Router();
 router.use(authenticate);
@@ -243,8 +276,22 @@ router.put('/:id/auto-renew', requirePermission('customer.read'), async (req: Au
       return;
     }
 
+    const oldAutoRenew = subscription.autoRenew;
     subscription.autoRenew = autoRenew;
     await subscription.save();
+
+    await auditSubscriptionEvent(req, {
+      action: 'subscription_auto_renew_toggled',
+      eventType: 'subscription.auto_renew_toggled',
+      eventCategory: 'UPDATE',
+      operationType: 'UPDATE',
+      resourceType: 'Subscription',
+      resourceId: subscription._id.toString(),
+      outcome: 'SUCCESS',
+      severity: 'MEDIUM',
+      beforeState: { autoRenew: oldAutoRenew },
+      afterState: { autoRenew: subscription.autoRenew },
+    });
 
     res.json({ success: true, data: subscription });
   } catch {
@@ -339,10 +386,24 @@ router.post('/portal-link', requirePermission('customer.read'), async (req: Auth
 
     // Demo mode: if no real Stripe key, return a demo URL
     if (!process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY === 'sk_test_demo_key') {
-      res.json({
-        success: true,
-        data: { url: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/subscriptions?demo=portal` },
+      const url = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/subscriptions?demo=portal`;
+      await auditSubscriptionEvent(req, {
+        action: 'subscription_portal_link_created',
+        eventType: 'subscription.portal_link_created',
+        eventCategory: 'INTEGRATION',
+        operationType: 'CREATE',
+        resourceType: 'Subscription',
+        resourceId: subscriptionId,
+        outcome: 'SUCCESS',
+        severity: 'MEDIUM',
+        metadata: {
+          userId: req.user?.id,
+          subscriptionId,
+          stripeCustomerId,
+          demoMode: true,
+        },
       });
+      res.json({ success: true, data: { url } });
       return;
     }
 
@@ -372,6 +433,24 @@ router.post('/portal-link', requirePermission('customer.read'), async (req: Auth
     const session = await stripe.billingPortal.sessions.create({
       customer: stripeCustomerId,
       return_url: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/subscriptions`,
+    });
+
+    await auditSubscriptionEvent(req, {
+      action: 'subscription_portal_link_created',
+      eventType: 'subscription.portal_link_created',
+      eventCategory: 'INTEGRATION',
+      operationType: 'CREATE',
+      resourceType: 'Subscription',
+      resourceId: subscriptionId,
+      outcome: 'SUCCESS',
+      severity: 'MEDIUM',
+      metadata: {
+        userId: req.user?.id,
+        subscriptionId,
+        stripeCustomerId,
+        portalSessionId: session.id,
+        demoMode: false,
+      },
     });
 
     res.json({ success: true, data: { url: session.url } });
