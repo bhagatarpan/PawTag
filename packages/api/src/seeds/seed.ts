@@ -296,8 +296,6 @@ async function seed() {
       { name: 'system_config.update', displayName: 'Update System Config', description: 'Update system configuration', resource: 'system_config', action: 'update', groupIndex: groupDefs.findIndex(g => g.name === 'SYSTEM_CONFIGURATION') },
 
       // Audit & Security
-      { name: 'audit_log.read', displayName: 'Read Audit Logs', description: 'View audit log entries', resource: 'audit_log', action: 'read', groupIndex: groupDefs.findIndex(g => g.name === 'AUDIT_SECURITY') },
-      { name: 'audit_log.export', displayName: 'Export Audit Logs', description: 'Export audit log data', resource: 'audit_log', action: 'export', groupIndex: groupDefs.findIndex(g => g.name === 'AUDIT_SECURITY') },
       { name: 'audit.read', displayName: 'Read Audit Trail', description: 'Query the tamper-evident audit event stream', resource: 'audit', action: 'read', groupIndex: groupDefs.findIndex(g => g.name === 'AUDIT_SECURITY') },
       { name: 'audit.admin', displayName: 'Manage Audit Trail', description: 'Administer audit events (legal hold, retention)', resource: 'audit', action: 'admin', groupIndex: groupDefs.findIndex(g => g.name === 'AUDIT_SECURITY') },
       { name: 'security_log.read', displayName: 'Read Security Logs', description: 'View security log entries', resource: 'security_log', action: 'read', groupIndex: groupDefs.findIndex(g => g.name === 'AUDIT_SECURITY') },
@@ -499,7 +497,6 @@ async function seed() {
         { permissionName: 'feature_flag.create' },
         { permissionName: 'feature_flag.update' },
         // Audit
-        { permissionName: 'audit_log.read' },
         { permissionName: 'audit.read' },
         { permissionName: 'audit.admin' },
         // Finder Scans

@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 import request from 'supertest';
 import { setupTestDb, teardownTestDb, clearDb } from './setup';
 import app from '../../packages/api/src/index';
-import { Order, Invoice, InvoiceAccessToken, Notification, AuditLog, User } from '@pawtag/db';
+import { Order, Invoice, InvoiceAccessToken, Notification, AuditEvent, User } from '@pawtag/db';
 import { createSuperAdmin } from './helpers';
 
 vi.mock('../../packages/api/src/services/email.service', () => ({
@@ -196,7 +196,7 @@ describe('Phase 15 — Purchase Confirmation & Invoice Emails', () => {
       expect(paidNotif!.data?.invoiceUrl).toContain('/invoice/');
     });
 
-    it('should create AuditLog entries for both email sends', async () => {
+    it('should create audit trail events for both email sends', async () => {
       const user = await createTestUser();
       const order = await createPaidOrder(user._id);
 
@@ -214,18 +214,18 @@ describe('Phase 15 — Purchase Confirmation & Invoice Emails', () => {
 
       await new Promise((r) => setTimeout(r, 500));
 
-      const auditLogs = await AuditLog.find({
-        userId: user._id,
-        entity: { $in: ['Order', 'Invoice'] },
+      const auditEvents = await AuditEvent.find({
+        action: { $in: ['order_confirmation_sent', 'invoice_sent'] },
       });
 
-      const orderAudit = auditLogs.find((a) => a.action === 'order_confirmation_sent');
+      const orderAudit = auditEvents.find((a) => a.action === 'order_confirmation_sent');
       expect(orderAudit).toBeTruthy();
-      expect(orderAudit!.entityId).toBe(order._id.toString());
+      expect(orderAudit!.resourceType).toBe('Order');
+      expect(orderAudit!.resourceId).toBe(order._id.toString());
 
-      const invoiceAudit = auditLogs.find((a) => a.action === 'invoice_sent');
+      const invoiceAudit = auditEvents.find((a) => a.action === 'invoice_sent');
       expect(invoiceAudit).toBeTruthy();
-      expect(invoiceAudit!.entity).toBe('Invoice');
+      expect(invoiceAudit!.resourceType).toBe('Invoice');
     });
   });
 

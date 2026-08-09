@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { Subscription, Invoice, InvoiceAccessToken, Tag, Order, User, Product, Cart, Notification, AuditLog, AuditEvent } from '@pawtag/db';
+import { Subscription, Invoice, InvoiceAccessToken, Tag, Order, User, Product, Cart, Notification, AuditEvent } from '@pawtag/db';
 import { notifyCustomerOfStatusChange } from '../services/orderNotification.service';
 import { sendOrderConfirmation, sendInvoiceEmail, sendMail } from '../services/email.service';
 import { generateInvoiceHtml } from '../services/invoice-html.service';
@@ -426,23 +426,28 @@ async function handlePaymentIntentSucceeded(paymentIntent: any) {
       status: 'paid',
     }).catch(() => {});
 
-    // 6. Audit log both email sends
-    const clientInfo = { ipAddress: 'system', userAgent: 'webhook' };
-    await AuditLog.create({
-      userId: order.userId,
+    // 6. Audit both email sends in the tamper-evident event stream.
+    await auditWebhookEvent({
       action: 'order_confirmation_sent',
-      entity: 'Order',
-      entityId: order._id.toString(),
-      changes: { orderNumber, emailSentTo: customerEmail },
-      ...clientInfo,
+      eventType: 'order.confirmation_sent',
+      eventCategory: 'INTEGRATION',
+      operationType: 'NOTIFY',
+      resourceType: 'Order',
+      resourceId: order._id.toString(),
+      metadata: { orderNumber, emailSentTo: customerEmail },
+      outcome: 'SUCCESS',
+      severity: 'MEDIUM',
     });
-    await AuditLog.create({
-      userId: order.userId,
+    await auditWebhookEvent({
       action: 'invoice_sent',
-      entity: 'Invoice',
-      entityId: invoice._id.toString(),
-      changes: { invoiceNumber, emailSentTo: customerEmail, invoiceUrl },
-      ...clientInfo,
+      eventType: 'invoice.sent',
+      eventCategory: 'INTEGRATION',
+      operationType: 'NOTIFY',
+      resourceType: 'Invoice',
+      resourceId: invoice._id.toString(),
+      metadata: { invoiceNumber, emailSentTo: customerEmail, invoiceUrl },
+      outcome: 'SUCCESS',
+      severity: 'MEDIUM',
     });
 
     logger.info({ orderNumber }, 'Customer notifications and audit logs created');

@@ -13,7 +13,6 @@ vi.mock('@pawtag/db', () => ({
   SiteContent: {},
   Setting: {},
   FeatureFlag: {},
-  AuditLog: { create: vi.fn() },
   UserRole: { find: vi.fn().mockResolvedValue([]) },
   Role: { findOne: vi.fn() },
   Permission: {},

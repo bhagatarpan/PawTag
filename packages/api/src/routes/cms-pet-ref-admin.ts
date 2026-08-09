@@ -1,10 +1,31 @@
 import { Router, Response } from 'express';
 import { AuthRequest, authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
-import { CmsPetReference, AuditLog } from '@pawtag/db';
+import { CmsPetReference } from '@pawtag/db';
+import { auditService, type AuditContext } from '../services/audit';
+import { type AuditRequest } from '../middleware/audit';
 
 const router = Router();
 router.use(authenticate);
+
+async function auditCmsEvent(
+  req: AuditRequest,
+  input: Parameters<typeof auditService.log>[1],
+  overrides: Partial<AuditContext> = {},
+): Promise<void> {
+  const reqContext = req.auditContext as AuditContext;
+  if (!reqContext) {
+    throw new Error('Audit middleware not applied - request has no audit context');
+  }
+  const context: AuditContext = {
+    ...reqContext,
+    actorType: 'ADMIN',
+    actorId: req.user?.id,
+    actorEmail: req.user?.email,
+    ...overrides,
+  } as AuditContext;
+  await auditService.log(context, input);
+}
 
 // ═══════════════════════════════════════════
 // PET REFERENCE DATA
@@ -83,9 +104,16 @@ router.post('/pet-references', requirePermission('cms.pet_reference.create'), as
       createdBy: req.user!.id, updatedBy: req.user!.id,
     });
 
-    await AuditLog.create({
-      userId: req.user!.id, action: 'create', entity: 'CmsPetReference', entityId: reference._id.toString(),
-      changes: { type, label, value },
+    await auditCmsEvent(req, {
+      action: 'cms_pet_reference_create',
+      eventType: 'cms_pet_reference.created',
+      eventCategory: 'CONFIG',
+      operationType: 'CREATE',
+      resourceType: 'CmsPetReference',
+      resourceId: reference._id.toString(),
+      metadata: { type, label, value },
+      outcome: 'SUCCESS',
+      severity: 'MEDIUM',
     });
 
     res.status(201).json({ success: true, data: reference });
@@ -104,8 +132,15 @@ router.put('/pet-references/:id', requirePermission('cms.pet_reference.update'),
 
     const updated = await CmsPetReference.findByIdAndUpdate(req.params.id, updateData, { new: true });
 
-    await AuditLog.create({
-      userId: req.user!.id, action: 'update', entity: 'CmsPetReference', entityId: req.params.id,
+    await auditCmsEvent(req, {
+      action: 'cms_pet_reference_update',
+      eventType: 'cms_pet_reference.updated',
+      eventCategory: 'CONFIG',
+      operationType: 'UPDATE',
+      resourceType: 'CmsPetReference',
+      resourceId: req.params.id,
+      outcome: 'SUCCESS',
+      severity: 'MEDIUM',
     });
 
     res.json({ success: true, data: updated });
@@ -122,9 +157,16 @@ router.delete('/pet-references/:id', requirePermission('cms.pet_reference.delete
     reference.deletedAt = new Date();
     await reference.save();
 
-    await AuditLog.create({
-      userId: req.user!.id, action: 'soft_delete', entity: 'CmsPetReference', entityId: req.params.id,
-      changes: { type: reference.type, label: reference.label },
+    await auditCmsEvent(req, {
+      action: 'cms_pet_reference_soft_delete',
+      eventType: 'cms_pet_reference.soft_deleted',
+      eventCategory: 'CONFIG',
+      operationType: 'DELETE',
+      resourceType: 'CmsPetReference',
+      resourceId: req.params.id,
+      metadata: { type: reference.type, label: reference.label },
+      outcome: 'SUCCESS',
+      severity: 'MEDIUM',
     });
 
     res.json({ success: true, data: { message: 'Reference deleted' } });
@@ -165,9 +207,15 @@ router.post('/pet-references/bulk', requirePermission('cms.pet_reference.create'
       }
     }
 
-    await AuditLog.create({
-      userId: req.user!.id, action: 'bulk_create', entity: 'CmsPetReference',
-      changes: { created: created.length, errors: errors.length },
+    await auditCmsEvent(req, {
+      action: 'cms_pet_reference_bulk_create',
+      eventType: 'cms_pet_reference.bulk_created',
+      eventCategory: 'CONFIG',
+      operationType: 'CREATE',
+      resourceType: 'CmsPetReference',
+      metadata: { created: created.length, errors: errors.length },
+      outcome: errors.length === 0 ? 'SUCCESS' : 'PARTIAL',
+      severity: 'MEDIUM',
     });
 
     res.json({ success: true, data: { created: created.length, errors: errors.length, details: errors } });

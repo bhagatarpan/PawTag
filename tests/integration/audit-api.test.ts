@@ -19,6 +19,16 @@ beforeEach(async () => {
 });
 
 describe('Audit API & config event coverage (PH1/PH2)', () => {
+  it('does not expose the removed legacy audit-log endpoint', async () => {
+    const { token } = await createSuperAdmin();
+
+    const res = await request(app)
+      .get('/api/admin/audit-logs')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(404);
+  });
+
   it('admin can query the new audit stream via /api/admin/audit', async () => {
     const { token } = await createSuperAdmin();
 

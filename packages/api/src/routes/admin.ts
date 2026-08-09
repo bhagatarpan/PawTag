@@ -32,7 +32,6 @@ import {
   SiteContent,
   Setting,
   FeatureFlag,
-  AuditLog,
   generatePetId,
   UserRole,
   Role,
@@ -3279,68 +3278,6 @@ router.delete('/feature-flags/:key', requirePermission('feature_flag.delete'), a
     res.json({ success: true, data: { message: 'Feature flag deleted' } });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to delete feature flag' });
-  }
-});
-
-// --- Audit Logs ---
-/**
- * @swagger
- * /api/admin/audit-logs:
- *   get:
- *     tags: [Admin - Audit Logs]
- *     summary: Get all audit logs with pagination and filtering
- *     description: Returns a paginated list of audit logs with optional entity and user filters.
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *         description: Page number
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *         description: Items per page
- *       - in: query
- *         name: entity
- *         schema:
- *           type: string
- *         description: Filter by entity type
- *       - in: query
- *         name: userId
- *         schema:
- *           type: string
- *         description: Filter by user ID
- *     responses:
- *       200:
- *         description: Paginated list of audit logs
- *       401:
- *         description: Not authenticated
- *       403:
- *         description: Insufficient permissions
- */
-router.get('/audit-logs', requirePermission('audit_log.read'), async (req, res: Response) => {
-  try {
-    const { page = 1, limit = 50, entity, userId } = req.query;
-    const query: any = {};
-    if (entity) query.entity = entity;
-    if (userId) query.userId = userId;
-
-    const total = await AuditLog.countDocuments(query);
-    const logs = await AuditLog.find(query)
-      .populate('userId', 'fullName email')
-      .sort({ createdAt: -1 })
-      .skip((Number(page) - 1) * Number(limit))
-      .limit(Number(limit));
-
-    res.json({
-      success: true,
-      data: { items: logs, total, page: Number(page), limit: Number(limit), totalPages: Math.ceil(total / Number(limit)) },
-    });
-  } catch {
-    res.status(500).json({ success: false, error: 'Failed to fetch audit logs' });
   }
 });
 

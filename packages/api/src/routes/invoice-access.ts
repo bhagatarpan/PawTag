@@ -1,15 +1,36 @@
 import { Router, Response } from 'express';
 import { AuthRequest, authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
-import { InvoiceAccessToken, Invoice, Subscription, User, AuditLog } from '@pawtag/db';
+import { InvoiceAccessToken, Invoice, Subscription, User } from '@pawtag/db';
 import { generateOtp, generateSecureToken, hashToken } from '../services/auth.service';
 import { sendInvoiceOtpEmail, sendInvoiceEmail } from '../services/email.service';
 import { generateInvoiceHtml } from '../services/invoice-html.service';
 import { isInvoiceOtpDisabled } from '../services/otp-settings.service';
 import { config } from '../config';
+import { auditService, type AuditContext } from '../services/audit';
+import { type AuditRequest } from '../middleware/audit';
 
 const router = Router();
 const FRONTEND_URL = config.frontendUrl || 'http://localhost:3000';
+
+async function auditInvoiceEvent(req: AuditRequest, action: string, resourceId: string, metadata: Record<string, unknown>): Promise<void> {
+  await auditService.log({
+    ...(req.auditContext as AuditContext),
+    actorType: req.path.startsWith('/admin/') ? 'ADMIN' : 'USER',
+    actorId: req.user?.id,
+    actorEmail: req.user?.email,
+  }, {
+    action,
+    eventType: `invoice.${action}`,
+    eventCategory: 'READ',
+    operationType: 'READ',
+    resourceType: 'Invoice',
+    resourceId,
+    metadata,
+    outcome: 'SUCCESS',
+    severity: 'MEDIUM',
+  });
+}
 
 function getClientInfo(req: any) {
   return { ipAddress: req.ip || req.connection?.remoteAddress, userAgent: req.headers['user-agent'] };
@@ -46,13 +67,8 @@ router.post('/customer/invoices/:invoiceId/access', authenticate, async (req: Au
         ...clientInfo,
       });
 
-      await AuditLog.create({
-        userId: req.user!.id,
-        action: 'invoice_otp_skipped',
-        entity: 'Invoice',
-        entityId: invoice._id.toString(),
-        changes: { reason: systemOtpDisabled ? 'system otp.noOtpForInvoice enabled' : 'user skipInvoiceOtp enabled' },
-        ...clientInfo,
+      await auditInvoiceEvent(req, 'invoice_otp_skipped', invoice._id.toString(), {
+        reason: systemOtpDisabled ? 'system otp.noOtpForInvoice enabled' : 'user skipInvoiceOtp enabled',
       });
 
       res.json({ success: true, data: { secureUrl: `${FRONTEND_URL}/invoice/${secureToken}?admin=1`, skipOtp: true } });
@@ -218,13 +234,8 @@ router.get('/admin/invoices/:invoiceId/view', authenticate, requirePermission('s
     });
 
     // Audit log
-    await AuditLog.create({
-      userId: req.user!.id,
-      action: 'invoice_viewed',
-      entity: 'Invoice',
-      entityId: invoice._id.toString(),
-      changes: { viewedBy: req.user!.email, customerUserId: invoice.userId.toString() },
-      ...clientInfo,
+    await auditInvoiceEvent(req, 'invoice_viewed', invoice._id.toString(), {
+      viewedBy: req.user!.email, customerUserId: invoice.userId.toString(), ...clientInfo,
     });
 
     res.json({ success: true, data: { secureUrl: `${FRONTEND_URL}/invoice/${secureToken}?admin=1` } });
@@ -262,13 +273,8 @@ router.post('/admin/invoices/:invoiceId/email', authenticate, requirePermission(
 
     // Audit log
     const clientInfo = getClientInfo(req);
-    await AuditLog.create({
-      userId: req.user!.id,
-      action: 'invoice_emailed',
-      entity: 'Invoice',
-      entityId: invoice._id.toString(),
-      changes: { emailedTo: recipientEmail, customerUserId: invoice.userId.toString() },
-      ...clientInfo,
+    await auditInvoiceEvent(req, 'invoice_emailed', invoice._id.toString(), {
+      emailedTo: recipientEmail, customerUserId: invoice.userId.toString(), ...clientInfo,
     });
 
     res.json({ success: true, data: { message: `Invoice emailed to ${recipientEmail}` } });
@@ -287,13 +293,8 @@ router.get('/admin/invoices/:invoiceId/print', authenticate, requirePermission('
 
     // Audit log
     const clientInfo = getClientInfo(req);
-    await AuditLog.create({
-      userId: req.user!.id,
-      action: 'invoice_printed',
-      entity: 'Invoice',
-      entityId: invoice._id.toString(),
-      changes: { printedBy: req.user!.email, customerUserId: invoice.userId.toString() },
-      ...clientInfo,
+    await auditInvoiceEvent(req, 'invoice_printed', invoice._id.toString(), {
+      printedBy: req.user!.email, customerUserId: invoice.userId.toString(), ...clientInfo,
     });
 
     res.setHeader('Content-Type', 'text/html');

@@ -20,7 +20,6 @@ vi.mock('@pawtag/db', () => ({
     countDocuments: vi.fn().mockResolvedValue(0),
     updateMany: vi.fn(),
   },
-  AuditLog: { create: vi.fn() },
 }));
 
 import { hashPassword, verifyPassword, generateToken, hashToken, generateSecureToken, normalizeEmail, normalizePhone } from '../../packages/api/src/services/auth.service';

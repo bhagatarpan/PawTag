@@ -522,18 +522,6 @@ export interface FeatureFlag {
   updatedAt: string;
 }
 
-export interface AuditLog {
-  _id: string;
-  userId: string;
-  action: string;
-  entity: string;
-  entityId: string;
-  changes?: Record<string, { old: unknown; new: unknown }>;
-  ipAddress?: string;
-  userAgent?: string;
-  createdAt: string;
-}
-
 // --- RBAC Types ---
 
 export interface RoleType {

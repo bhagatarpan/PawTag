@@ -34,7 +34,7 @@ import {
 import { sendVerificationEmail, sendPasswordResetEmail, sendPasswordChangedEmail, sendWelcomeEmail, sendLoginNotification, sendLoginOtpEmail } from '../services/email.service';
 import { sendPhoneOtpSMS } from '../services/sms.service';
 import { isRegistrationOtpDisabled } from '../services/otp-settings.service';
-import { User, Role, UserRole, VerificationToken, AuditLog, Setting, AuditEvent } from '@pawtag/db';
+import { User, Role, UserRole, VerificationToken, Setting, AuditEvent } from '@pawtag/db';
 import { auditService, type AuditContext } from '../services/audit';
 import { createAuditContextFromRequest, type AuditRequest } from '../middleware/audit';
 import { config } from '../config';

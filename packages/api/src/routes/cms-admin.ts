@@ -9,11 +9,31 @@ import {
   CmsMedia,
   CmsAnnouncement,
   CmsRedirect,
-  AuditLog,
 } from '@pawtag/db';
+import { auditService, type AuditContext } from '../services/audit';
+import { type AuditRequest } from '../middleware/audit';
 
 const router = Router();
 router.use(authenticate);
+
+async function auditCmsEvent(req: AuditRequest, action: string, resourceType: string, resourceId: string, metadata?: Record<string, unknown>): Promise<void> {
+  await auditService.log({
+    ...(req.auditContext as AuditContext),
+    actorType: 'ADMIN',
+    actorId: req.user?.id,
+    actorEmail: req.user?.email,
+  }, {
+    action: `cms_${action}`,
+    eventType: `cms.${resourceType}.${action}`,
+    eventCategory: action === 'create' ? 'CREATE' : action === 'update' || action === 'publish' || action === 'rollback' ? 'UPDATE' : action === 'upload' ? 'FILE' : 'DELETE',
+    operationType: action === 'create' ? 'CREATE' : action === 'update' || action === 'publish' || action === 'rollback' ? 'UPDATE' : action === 'upload' ? 'UPLOAD' : 'DELETE',
+    resourceType,
+    resourceId,
+    metadata,
+    outcome: 'SUCCESS',
+    severity: 'MEDIUM',
+  });
+}
 
 // ═══════════════════════════════════════════
 // PAGES
@@ -97,13 +117,7 @@ router.post('/pages', requirePermission('cms.page.create'), async (req: AuthRequ
       updatedBy: req.user!.id,
     });
 
-    await AuditLog.create({
-      userId: req.user!.id,
-      action: 'create',
-      entity: 'CmsPage',
-      entityId: page._id.toString(),
-      changes: { slug, title },
-    });
+    await auditCmsEvent(req, 'create', 'CmsPage', page._id.toString(), { slug, title });
 
     res.status(201).json({ success: true, data: page });
   } catch {
@@ -133,13 +147,7 @@ router.put('/pages/:id', requirePermission('cms.page.update'), async (req: AuthR
 
     const updated = await CmsPage.findByIdAndUpdate(req.params.id, updateData, { new: true });
 
-    await AuditLog.create({
-      userId: req.user!.id,
-      action: 'update',
-      entity: 'CmsPage',
-      entityId: req.params.id,
-      changes: { slug: { old: oldSlug, new: req.body.slug || oldSlug } },
-    });
+    await auditCmsEvent(req, 'update', 'CmsPage', req.params.id, { slug: { old: oldSlug, new: req.body.slug || oldSlug } });
 
     res.json({ success: true, data: updated });
   } catch {
@@ -157,12 +165,7 @@ router.put('/pages/:id/publish', requirePermission('cms.page.publish'), async (r
     page.updatedBy = req.user!.id as any;
     await page.save();
 
-    await AuditLog.create({
-      userId: req.user!.id,
-      action: 'publish',
-      entity: 'CmsPage',
-      entityId: req.params.id,
-    });
+    await auditCmsEvent(req, 'publish', 'CmsPage', req.params.id);
 
     res.json({ success: true, data: page });
   } catch {
@@ -178,13 +181,7 @@ router.delete('/pages/:id', requirePermission('cms.page.delete'), async (req: Au
     page.deletedAt = new Date();
     await page.save();
 
-    await AuditLog.create({
-      userId: req.user!.id,
-      action: 'soft_delete',
-      entity: 'CmsPage',
-      entityId: req.params.id,
-      changes: { slug: page.slug },
-    });
+    await auditCmsEvent(req, 'soft_delete', 'CmsPage', req.params.id, { slug: page.slug });
 
     res.json({ success: true, data: { message: 'Page deleted' } });
   } catch {
@@ -229,13 +226,7 @@ router.post('/pages/:id/rollback', requirePermission('cms.page.update'), async (
       updatedBy: req.user!.id,
     });
 
-    await AuditLog.create({
-      userId: req.user!.id,
-      action: 'rollback',
-      entity: 'CmsPage',
-      entityId: req.params.id,
-      changes: { rolledBackToVersion: version.version },
-    });
+    await auditCmsEvent(req, 'rollback', 'CmsPage', req.params.id, { rolledBackToVersion: version.version });
 
     const updated = await CmsPage.findById(req.params.id);
     res.json({ success: true, data: updated });
@@ -293,7 +284,7 @@ router.post('/navigation', requirePermission('cms.navigation.create'), async (re
       createdBy: req.user!.id, updatedBy: req.user!.id,
     });
 
-    await AuditLog.create({ userId: req.user!.id, action: 'create', entity: 'CmsNavigation', entityId: menu._id.toString(), changes: { name, slug, location } });
+    await auditCmsEvent(req, 'create', 'CmsNavigation', menu._id.toString(), { name, slug, location });
     res.status(201).json({ success: true, data: menu });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to create navigation' });
@@ -309,7 +300,7 @@ router.put('/navigation/:id', requirePermission('cms.navigation.update'), async 
     );
     if (!menu) { res.status(404).json({ success: false, error: 'Navigation not found' }); return; }
 
-    await AuditLog.create({ userId: req.user!.id, action: 'update', entity: 'CmsNavigation', entityId: req.params.id });
+    await auditCmsEvent(req, 'update', 'CmsNavigation', req.params.id);
     res.json({ success: true, data: menu });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to update navigation' });
@@ -322,7 +313,7 @@ router.delete('/navigation/:id', requirePermission('cms.navigation.delete'), asy
     if (!menu) { res.status(404).json({ success: false, error: 'Navigation not found' }); return; }
     menu.deletedAt = new Date();
     await menu.save();
-    await AuditLog.create({ userId: req.user!.id, action: 'soft_delete', entity: 'CmsNavigation', entityId: req.params.id, changes: { name: menu.name } });
+    await auditCmsEvent(req, 'soft_delete', 'CmsNavigation', req.params.id, { name: menu.name });
     res.json({ success: true, data: { message: 'Navigation deleted' } });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to delete navigation' });
@@ -367,7 +358,7 @@ router.post('/footer', requirePermission('cms.footer.create'), async (req: AuthR
       name, groups: groups || [], copyright, socialLinks, status: status || 'draft',
       createdBy: req.user!.id, updatedBy: req.user!.id,
     });
-    await AuditLog.create({ userId: req.user!.id, action: 'create', entity: 'CmsFooter', entityId: footer._id.toString(), changes: { name } });
+    await auditCmsEvent(req, 'create', 'CmsFooter', footer._id.toString(), { name });
     res.status(201).json({ success: true, data: footer });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to create footer' });
@@ -382,7 +373,7 @@ router.put('/footer/:id', requirePermission('cms.footer.update'), async (req: Au
       { new: true },
     );
     if (!footer) { res.status(404).json({ success: false, error: 'Footer not found' }); return; }
-    await AuditLog.create({ userId: req.user!.id, action: 'update', entity: 'CmsFooter', entityId: req.params.id });
+    await auditCmsEvent(req, 'update', 'CmsFooter', req.params.id);
     res.json({ success: true, data: footer });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to update footer' });
@@ -395,7 +386,7 @@ router.delete('/footer/:id', requirePermission('cms.footer.delete'), async (req:
     if (!footer) { res.status(404).json({ success: false, error: 'Footer not found' }); return; }
     footer.deletedAt = new Date();
     await footer.save();
-    await AuditLog.create({ userId: req.user!.id, action: 'soft_delete', entity: 'CmsFooter', entityId: req.params.id, changes: { name: footer.name } });
+    await auditCmsEvent(req, 'soft_delete', 'CmsFooter', req.params.id, { name: footer.name });
     res.json({ success: true, data: { message: 'Footer deleted' } });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to delete footer' });
@@ -461,7 +452,7 @@ router.put('/media/:id', requirePermission('cms.media.update'), async (req: Auth
     if (tags !== undefined) media.tags = tags;
     await media.save();
 
-    await AuditLog.create({ userId: req.user!.id, action: 'update', entity: 'CmsMedia', entityId: req.params.id });
+    await auditCmsEvent(req, 'update', 'CmsMedia', req.params.id);
     res.json({ success: true, data: media });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to update media' });
@@ -474,7 +465,7 @@ router.delete('/media/:id', requirePermission('cms.media.delete'), async (req: A
     if (!media) { res.status(404).json({ success: false, error: 'Media not found' }); return; }
     media.deletedAt = new Date();
     await media.save();
-    await AuditLog.create({ userId: req.user!.id, action: 'soft_delete', entity: 'CmsMedia', entityId: req.params.id, changes: { filename: media.filename } });
+    await auditCmsEvent(req, 'soft_delete', 'CmsMedia', req.params.id, { filename: media.filename });
     res.json({ success: true, data: { message: 'Media deleted' } });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to delete media' });
@@ -533,7 +524,7 @@ router.post('/announcements', requirePermission('cms.announcement.create'), asyn
       targetAudience: targetAudience || 'all',
       createdBy: req.user!.id, updatedBy: req.user!.id,
     });
-    await AuditLog.create({ userId: req.user!.id, action: 'create', entity: 'CmsAnnouncement', entityId: announcement._id.toString(), changes: { title, type } });
+    await auditCmsEvent(req, 'create', 'CmsAnnouncement', announcement._id.toString(), { title, type });
     res.status(201).json({ success: true, data: announcement });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to create announcement' });
@@ -548,7 +539,7 @@ router.put('/announcements/:id', requirePermission('cms.announcement.update'), a
       { new: true },
     );
     if (!announcement) { res.status(404).json({ success: false, error: 'Announcement not found' }); return; }
-    await AuditLog.create({ userId: req.user!.id, action: 'update', entity: 'CmsAnnouncement', entityId: req.params.id });
+    await auditCmsEvent(req, 'update', 'CmsAnnouncement', req.params.id);
     res.json({ success: true, data: announcement });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to update announcement' });
@@ -561,7 +552,7 @@ router.delete('/announcements/:id', requirePermission('cms.announcement.delete')
     if (!announcement) { res.status(404).json({ success: false, error: 'Announcement not found' }); return; }
     announcement.deletedAt = new Date();
     await announcement.save();
-    await AuditLog.create({ userId: req.user!.id, action: 'soft_delete', entity: 'CmsAnnouncement', entityId: req.params.id, changes: { title: announcement.title } });
+    await auditCmsEvent(req, 'soft_delete', 'CmsAnnouncement', req.params.id, { title: announcement.title });
     res.json({ success: true, data: { message: 'Announcement deleted' } });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to delete announcement' });
@@ -616,7 +607,7 @@ router.post('/redirects', requirePermission('cms.redirect.create'), async (req: 
       from, to, type: type || 'permanent', status: redirectStatus || 'active',
       createdBy: req.user!.id, updatedBy: req.user!.id,
     });
-    await AuditLog.create({ userId: req.user!.id, action: 'create', entity: 'CmsRedirect', entityId: redirect._id.toString(), changes: { from, to } });
+    await auditCmsEvent(req, 'create', 'CmsRedirect', redirect._id.toString(), { from, to });
     res.status(201).json({ success: true, data: redirect });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to create redirect' });
@@ -631,7 +622,7 @@ router.put('/redirects/:id', requirePermission('cms.redirect.update'), async (re
       { new: true },
     );
     if (!redirect) { res.status(404).json({ success: false, error: 'Redirect not found' }); return; }
-    await AuditLog.create({ userId: req.user!.id, action: 'update', entity: 'CmsRedirect', entityId: req.params.id });
+    await auditCmsEvent(req, 'update', 'CmsRedirect', req.params.id);
     res.json({ success: true, data: redirect });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to update redirect' });
@@ -644,7 +635,7 @@ router.delete('/redirects/:id', requirePermission('cms.redirect.delete'), async 
     if (!redirect) { res.status(404).json({ success: false, error: 'Redirect not found' }); return; }
     redirect.deletedAt = new Date();
     await redirect.save();
-    await AuditLog.create({ userId: req.user!.id, action: 'soft_delete', entity: 'CmsRedirect', entityId: req.params.id, changes: { from: redirect.from } });
+    await auditCmsEvent(req, 'soft_delete', 'CmsRedirect', req.params.id, { from: redirect.from });
     res.json({ success: true, data: { message: 'Redirect deleted' } });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to delete redirect' });
@@ -721,7 +712,7 @@ router.post('/media/upload', requirePermission('cms.media.upload'), (req: AuthRe
           uploadedBy: req.user!.id,
         });
 
-        await AuditLog.create({ userId: req.user!.id, action: 'upload', entity: 'CmsMedia', entityId: media._id.toString(), changes: { filename: file.filename } });
+        await auditCmsEvent(req, 'upload', 'CmsMedia', media._id.toString(), { filename: file.filename });
         uploaded.push(media);
       }
 

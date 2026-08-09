@@ -7,7 +7,6 @@ vi.mock('@pawtag/db', () => ({
   Role: { findOne: vi.fn() },
   Permission: { findOne: vi.fn() },
   RolePermission: { find: vi.fn().mockResolvedValue([]) },
-  AuditLog: { create: vi.fn() },
 }));
 
 import { authenticate } from '../../packages/api/src/middleware/auth';

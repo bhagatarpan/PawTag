@@ -13,7 +13,6 @@ export { Notification, type INotificationDocument } from './models/Notification'
 export { SiteContent, type ISiteContentDocument } from './models/SiteContent';
 export { Setting, type ISettingDocument } from './models/Setting';
 export { FeatureFlag, type IFeatureFlagDocument } from './models/FeatureFlag';
-export { AuditLog, type IAuditLogDocument } from './models/AuditLog';
 export { AuditEvent, type IAuditEventDocument, type ActorType, type EventCategory, type EventSeverity, type EventOutcome, type IChangedField, createAuditEventId } from './models/AuditEvent';
 export { Role, type IRoleDocument } from './models/Role';
 export { PermissionGroup, type IPermissionGroupDocument } from './models/PermissionGroup';

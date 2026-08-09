@@ -10,7 +10,6 @@ import {
   Newspaper,
   Settings,
   Flag,
-  ScrollText,
   BarChart3,
   Shield,
   Key,
@@ -70,7 +69,6 @@ const adminLinks: SidebarLink[] = [
   { to: '/settings', label: 'Settings', icon: Settings, permission: 'setting.read' },
   { to: '/feature-flags', label: 'Feature Flags', icon: Flag, permission: 'feature_flag.read' },
   { to: '/audit-trail', label: 'Audit Trail', icon: FileSignature, permission: 'audit.read' },
-  { to: '/audit-logs', label: 'Legacy Audit Log', icon: ScrollText, permission: 'audit_log.read' },
 ];
 
 const cmsLinks: SidebarLink[] = [

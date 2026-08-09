@@ -1,10 +1,31 @@
 import { Router, Response } from 'express';
 import { AuthRequest, authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
-import { CmsEmailTemplate, AuditLog } from '@pawtag/db';
+import { CmsEmailTemplate } from '@pawtag/db';
+import { auditService, type AuditContext } from '../services/audit';
+import { type AuditRequest } from '../middleware/audit';
 
 const router = Router();
 router.use(authenticate);
+
+async function auditCmsEvent(
+  req: AuditRequest,
+  input: Parameters<typeof auditService.log>[1],
+  overrides: Partial<AuditContext> = {},
+): Promise<void> {
+  const reqContext = req.auditContext as AuditContext;
+  if (!reqContext) {
+    throw new Error('Audit middleware not applied - request has no audit context');
+  }
+  const context: AuditContext = {
+    ...reqContext,
+    actorType: 'ADMIN',
+    actorId: req.user?.id,
+    actorEmail: req.user?.email,
+    ...overrides,
+  } as AuditContext;
+  await auditService.log(context, input);
+}
 
 // ═══════════════════════════════════════════
 // EMAIL TEMPLATES
@@ -83,9 +104,16 @@ router.post('/email-templates', requirePermission('cms.email_template.create'), 
       createdBy: req.user!.id, updatedBy: req.user!.id,
     });
 
-    await AuditLog.create({
-      userId: req.user!.id, action: 'create', entity: 'CmsEmailTemplate', entityId: template._id.toString(),
-      changes: { name, slug },
+    await auditCmsEvent(req, {
+      action: 'cms_email_template_create',
+      eventType: 'cms_email_template.created',
+      eventCategory: 'CONFIG',
+      operationType: 'CREATE',
+      resourceType: 'CmsEmailTemplate',
+      resourceId: template._id.toString(),
+      metadata: { name, slug },
+      outcome: 'SUCCESS',
+      severity: 'MEDIUM',
     });
 
     res.status(201).json({ success: true, data: template });
@@ -104,9 +132,16 @@ router.put('/email-templates/:id', requirePermission('cms.email_template.update'
 
     const updated = await CmsEmailTemplate.findByIdAndUpdate(req.params.id, updateData, { new: true });
 
-    await AuditLog.create({
-      userId: req.user!.id, action: 'update', entity: 'CmsEmailTemplate', entityId: req.params.id,
-      changes: { slug: { old: oldSlug, new: req.body.slug || oldSlug } },
+    await auditCmsEvent(req, {
+      action: 'cms_email_template_update',
+      eventType: 'cms_email_template.updated',
+      eventCategory: 'CONFIG',
+      operationType: 'UPDATE',
+      resourceType: 'CmsEmailTemplate',
+      resourceId: req.params.id,
+      metadata: { slug: { old: oldSlug, new: req.body.slug || oldSlug } },
+      outcome: 'SUCCESS',
+      severity: 'MEDIUM',
     });
 
     res.json({ success: true, data: updated });
@@ -123,9 +158,16 @@ router.delete('/email-templates/:id', requirePermission('cms.email_template.dele
     template.deletedAt = new Date();
     await template.save();
 
-    await AuditLog.create({
-      userId: req.user!.id, action: 'soft_delete', entity: 'CmsEmailTemplate', entityId: req.params.id,
-      changes: { slug: template.slug },
+    await auditCmsEvent(req, {
+      action: 'cms_email_template_soft_delete',
+      eventType: 'cms_email_template.soft_deleted',
+      eventCategory: 'CONFIG',
+      operationType: 'DELETE',
+      resourceType: 'CmsEmailTemplate',
+      resourceId: req.params.id,
+      metadata: { slug: template.slug },
+      outcome: 'SUCCESS',
+      severity: 'MEDIUM',
     });
 
     res.json({ success: true, data: { message: 'Template deleted' } });
