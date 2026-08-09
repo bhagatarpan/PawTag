@@ -2359,6 +2359,17 @@ router.post('/orders/:id/refund', requirePermission('order.update'), async (req:
     const refundResult = await createRefund(order.payment.transactionId, amount);
 
     if (!refundResult.success) {
+      await auditAdminEvent(req, {
+        action: 'refund_order_failed',
+        eventType: 'admin_order_refund_failed',
+        eventCategory: 'FINANCIAL',
+        operationType: 'UPDATE',
+        resourceType: 'Order',
+        resourceId: req.params.id,
+        outcome: 'FAILURE',
+        severity: 'CRITICAL',
+        metadata: { orderNumber: order.orderNumber, previousStatus: order.status, reason, amount: amount || order.payment.amount, paymentTransactionId: order.payment.transactionId, stripeError: refundResult.error },
+      });
       res.status(400).json({ success: false, error: `Stripe refund failed: ${refundResult.error}` });
       return;
     }

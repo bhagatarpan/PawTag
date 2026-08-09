@@ -29,6 +29,10 @@ describe('Phase 18 — Admin Analytics Dashboard', () => {
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
 
+      // Mirror the analytics route's window boundaries (week starts Sunday, per getDay()).
+      const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
       await Order.create([
         {
           orderNumber: 'PT-ANALYTICS-001',
@@ -70,10 +74,16 @@ describe('Phase 18 — Admin Analytics Dashboard', () => {
 
       expect(data.orders.today).toBe(2);
       expect(data.revenue.today).toBeCloseTo(49.98, 1);
-      expect(data.orders.thisWeek).toBe(3);
-      expect(data.revenue.thisWeek).toBeCloseTo(59.97, 1);
-      expect(data.orders.thisMonth).toBe(3);
-      expect(data.revenue.thisMonth).toBeCloseTo(59.97, 1);
+      // Yesterday's order may or may not fall inside the current week/month
+      // depending on the day of the week the suite runs on (week starts Sunday).
+      const expectedThisWeek = yesterday >= startOfWeek ? 3 : 2;
+      const expectedThisWeekRevenue = yesterday >= startOfWeek ? 59.97 : 49.98;
+      const expectedThisMonth = yesterday >= startOfMonth ? 3 : 2;
+      const expectedThisMonthRevenue = yesterday >= startOfMonth ? 59.97 : 49.98;
+      expect(data.orders.thisWeek).toBe(expectedThisWeek);
+      expect(data.revenue.thisWeek).toBeCloseTo(expectedThisWeekRevenue, 1);
+      expect(data.orders.thisMonth).toBe(expectedThisMonth);
+      expect(data.revenue.thisMonth).toBeCloseTo(expectedThisMonthRevenue, 1);
     });
 
     it('should return correct tag counts', async () => {

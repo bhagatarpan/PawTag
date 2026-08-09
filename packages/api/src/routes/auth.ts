@@ -1269,11 +1269,45 @@ router.get('/me', authenticate, async (req: AuthRequest, res: Response) => {
 
 router.put('/profile', authenticate, validate(updateProfileSchema), async (req: AuthRequest, res: Response) => {
   try {
-    const user = await User.findByIdAndUpdate(req.user!.id, req.body, { new: true }).select('-passwordHash');
-    if (!user) {
-      res.status(404).json({ success: false, error: 'User not found' });
-      return;
+    const existing = await User.findById(req.user!.id);
+    if (!existing) { res.status(404).json({ success: false, error: 'User not found' }); return; }
+    const beforeState = { fullName: existing.fullName, email: existing.email, phoneNumber: existing.phoneNumber, profilePicture: existing.profilePicture };
+    const update = { ...req.body };
+    if (update.email && update.email !== existing.email) {
+      const inUse = await User.findOne({ email: update.email, _id: { $ne: existing._id }, deletedAt: null });
+      if (inUse) {
+        await auditAuthEvent(req as AuditRequest, {
+          action: 'profile_update_failed',
+          eventType: 'profile_update_failed',
+          eventCategory: 'AUTH',
+          operationType: 'UPDATE',
+          resourceType: 'User',
+          resourceId: existing._id.toString(),
+          outcome: 'FAILURE',
+          severity: 'MEDIUM',
+          metadata: { reason: 'email_taken', attemptedEmail: update.email },
+        }, { actorType: 'USER' });
+        res.status(400).json({ success: false, error: 'Email already in use' });
+        return;
+      }
     }
+    const user = await User.findByIdAndUpdate(req.user!.id, update, { new: true }).select('-passwordHash');
+    if (!user) { res.status(404).json({ success: false, error: 'User not found' }); return; }
+    const afterState = { fullName: user.fullName, email: user.email, phoneNumber: user.phoneNumber, profilePicture: user.profilePicture };
+    const changedFields = Object.keys(update).map((field) => ({ field, before: (beforeState as any)[field], after: (user as any)[field] }));
+    await auditAuthEvent(req as AuditRequest, {
+      action: 'profile_updated',
+      eventType: 'profile_update',
+      eventCategory: 'AUTH',
+      operationType: 'UPDATE',
+      resourceType: 'User',
+      resourceId: user._id.toString(),
+      beforeState,
+      afterState,
+      changedFields,
+      outcome: 'SUCCESS',
+      severity: 'MEDIUM',
+    }, { actorType: 'USER' });
     res.json({ success: true, data: user });
   } catch {
     res.status(500).json({ success: false, error: 'Update failed' });
