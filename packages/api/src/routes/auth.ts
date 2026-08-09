@@ -36,7 +36,7 @@ import { sendPhoneOtpSMS } from '../services/sms.service';
 import { isRegistrationOtpDisabled } from '../services/otp-settings.service';
 import { User, Role, UserRole, VerificationToken, Setting, AuditEvent } from '@pawtag/db';
 import { auditService, type AuditContext } from '../services/audit';
-import { createAuditContextFromRequest, type AuditRequest } from '../middleware/audit';
+import { createAuditContextFromRequest, setAuditActor, type AuditRequest } from '../middleware/audit';
 import { config } from '../config';
 import logger from '../lib/logger';
 
@@ -1271,7 +1271,14 @@ router.put('/profile', authenticate, validate(updateProfileSchema), async (req: 
   try {
     const existing = await User.findById(req.user!.id);
     if (!existing) { res.status(404).json({ success: false, error: 'User not found' }); return; }
-    const beforeState = { fullName: existing.fullName, email: existing.email, phoneNumber: existing.phoneNumber, profilePicture: existing.profilePicture };
+    const beforeState = {
+      fullName: existing.fullName,
+      email: existing.email,
+      phoneNumber: existing.phoneNumber,
+      profilePicture: existing.profilePicture,
+      address: existing.address,
+      emergencyContact: existing.emergencyContact,
+    };
     const update = { ...req.body };
     if (update.email && update.email !== existing.email) {
       const inUse = await User.findOne({ email: update.email, _id: { $ne: existing._id }, deletedAt: null });
@@ -1293,7 +1300,14 @@ router.put('/profile', authenticate, validate(updateProfileSchema), async (req: 
     }
     const user = await User.findByIdAndUpdate(req.user!.id, update, { new: true }).select('-passwordHash');
     if (!user) { res.status(404).json({ success: false, error: 'User not found' }); return; }
-    const afterState = { fullName: user.fullName, email: user.email, phoneNumber: user.phoneNumber, profilePicture: user.profilePicture };
+    const afterState = {
+      fullName: user.fullName,
+      email: user.email,
+      phoneNumber: user.phoneNumber,
+      profilePicture: user.profilePicture,
+      address: user.address,
+      emergencyContact: user.emergencyContact,
+    };
     const changedFields = Object.keys(update).map((field) => ({ field, before: (beforeState as any)[field], after: (user as any)[field] }));
     await auditAuthEvent(req as AuditRequest, {
       action: 'profile_updated',
@@ -1403,6 +1417,25 @@ router.post('/refresh', async (req, res: Response) => {
 router.post('/logout', async (req: AuthRequest, res: Response) => {
   try {
     const { refreshToken } = req.body;
+
+    // Logout intentionally remains usable without an access token, but a valid
+    // refresh token still gives us enough identity to attribute the event.
+    if (!req.user && refreshToken) {
+      const refreshPayload = await verifyRefreshToken(refreshToken);
+      if (refreshPayload) {
+        const logoutUser = await User.findById(refreshPayload.userId).select('_id email role');
+        if (logoutUser) {
+          setAuditActor(req as AuditRequest, {
+            actorType: ['admin', 'super_admin', 'customer_service', 'support'].includes(logoutUser.role) ? 'ADMIN' : 'USER',
+            actorId: logoutUser._id.toString(),
+            actorEmail: logoutUser.email,
+            actorUsername: logoutUser.email,
+            authenticationMethod: 'refresh_token',
+          });
+          req.user = { id: logoutUser._id.toString(), email: logoutUser.email, role: logoutUser.role };
+        }
+      }
+    }
 
     if (refreshToken) {
       await revokeRefreshToken(refreshToken);

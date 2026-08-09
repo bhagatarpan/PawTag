@@ -45,7 +45,7 @@ export class AuditTransaction {
       };
 
       const auditEvent = await auditService.log(mergedContext, event);
-      results.push(auditEvent);
+      if (auditEvent) results.push(auditEvent);
     }
 
     return results;

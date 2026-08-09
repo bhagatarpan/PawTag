@@ -2,6 +2,8 @@ import { Request, Response, NextFunction } from 'express';
 import { v7 as uuidv7 } from 'uuid';
 import { config } from '../config';
 import { AuthRequest, AuditContext, AuditRequest } from './auth';
+import { auditService } from '../services/audit';
+import logger from '../lib/logger';
 
 export type { AuditRequest, AuditContext } from './auth';
 
@@ -26,6 +28,72 @@ function getDeviceId(req: Request): string | undefined {
   return req.headers['x-device-id']?.toString() ||
     req.headers['sec-ch-ua-platform']?.toString() ||
     undefined;
+}
+
+function getRequestPath(req: Request): string {
+  return req.originalUrl.split('?')[0];
+}
+
+function shouldAuditRequest(req: Request): boolean {
+  const path = getRequestPath(req);
+  if (path === '/health' || path === '/favicon.ico' || path.startsWith('/api/docs')) return false;
+  if (path.startsWith('/api/admin/audit')) return false;
+  if (path.startsWith('/api/public/cms') || path.startsWith('/api/finder/shop') || path.startsWith('/api/finder/content')) return false;
+  return path.startsWith('/api/');
+}
+
+function requestCategory(req: Request): string {
+  const path = getRequestPath(req);
+  if (path.startsWith('/api/auth')) return 'AUTH';
+  if (path.startsWith('/api/webhooks')) return 'INTEGRATION';
+  if (/\/(export|print|download|qr|sticker)(\/|$)/i.test(path)) return 'EXPORT';
+  if (path.includes('/upload')) return 'FILE';
+  if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') return 'READ';
+  if (req.method === 'POST') return 'CREATE';
+  if (req.method === 'PUT' || req.method === 'PATCH') return 'UPDATE';
+  if (req.method === 'DELETE') return 'DELETE';
+  return 'SYSTEM';
+}
+
+function requestActor(req: AuthRequest): string {
+  const path = getRequestPath(req);
+  if (req.auditContext?.actorType && req.auditContext.actorType !== 'UNKNOWN') return req.auditContext.actorType;
+  if (path.startsWith('/api/finder')) return 'FINDER';
+  if (path.startsWith('/api/webhooks')) return 'WEBHOOK';
+  return 'UNKNOWN';
+}
+
+function auditCompletedRequest(req: AuthRequest, res: Response): void {
+  if (!shouldAuditRequest(req)) return;
+  const path = getRequestPath(req);
+  const category = requestCategory(req);
+  const actorType = requestActor(req);
+  const outcome = res.statusCode >= 400 ? 'FAILURE' : 'SUCCESS';
+  const queryKeys = Object.keys(req.query || {});
+  const bodyFields = req.body && typeof req.body === 'object' ? Object.keys(req.body) : [];
+
+  auditService.log({
+    ...(req.auditContext as AuditContext),
+    actorType: actorType as any,
+  }, {
+    action: `http_${req.method.toLowerCase()}`,
+    eventType: 'http.request.completed',
+    eventCategory: category as any,
+    operationType: req.method,
+    resourceType: 'HTTP_ENDPOINT',
+    resourceId: path,
+    outcome,
+    status: String(res.statusCode),
+    severity: outcome === 'FAILURE' ? 'MEDIUM' : 'INFO',
+    durationMs: req.auditContext?.durationMs,
+    metadata: {
+      method: req.method,
+      path,
+      queryKeys,
+      bodyFields,
+      responseStatus: res.statusCode,
+    },
+  }).catch((error) => logger.error({ err: error, path }, 'Failed to persist request audit event'));
 }
 
 export function auditMiddleware(req: AuthRequest, res: Response, next: NextFunction): void {
@@ -64,6 +132,8 @@ export function auditMiddleware(req: AuthRequest, res: Response, next: NextFunct
     }
     return originalSend.call(this, body);
   };
+
+  res.once('finish', () => auditCompletedRequest(req, res));
 
   next();
 }

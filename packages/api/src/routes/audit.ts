@@ -3,13 +3,83 @@ import { AuthRequest, authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
 import { validate } from '../middleware/validation';
 import { z } from 'zod';
-import { AuditEvent, type IAuditEventDocument } from '@pawtag/db';
+import { AuditEvent, Setting, type IAuditEventDocument } from '@pawtag/db';
 import { auditService } from '../services/audit/audit.service';
+import { AUDIT_ACTORS, AUDIT_CATEGORIES, auditPolicyKey, getAuditPolicy, invalidateAuditPolicyCache } from '../services/audit/audit.policy';
 import { enforceRetention, getRetentionStats, placeLegalHold, removeLegalHold } from '../services/audit/audit.retention';
 import logger from '../lib/logger';
 
 const router = Router();
 router.use(authenticate);
+
+const policyUpdateSchema = z.object({ enabled: z.boolean() });
+
+router.get('/settings', requirePermission('audit.admin'), async (_req: AuthRequest, res: Response) => {
+  try {
+    const policy = await getAuditPolicy(true);
+    res.json({
+      success: true,
+      data: {
+        categories: AUDIT_CATEGORIES.map((key) => ({ key, enabled: policy.categories[key] })),
+        actors: AUDIT_ACTORS.map((key) => ({ key, enabled: policy.actors[key] })),
+      },
+    });
+  } catch (error) {
+    logger.error({ err: error }, 'Audit policy query failed');
+    res.status(500).json({ success: false, error: 'Failed to get audit settings' });
+  }
+});
+
+router.put('/settings/:kind/:value', requirePermission('audit.admin'), validate(policyUpdateSchema), async (req: AuthRequest, res: Response) => {
+  const kind = req.params.kind;
+  const value = req.params.value.toUpperCase();
+  const validValues = kind === 'category' ? AUDIT_CATEGORIES : kind === 'actor' ? AUDIT_ACTORS : [];
+  if (!validValues.includes(value as never)) {
+    res.status(400).json({ success: false, error: 'Invalid audit setting' });
+    return;
+  }
+
+  try {
+    const key = auditPolicyKey(kind as 'category' | 'actor', value);
+    const previous = await Setting.findOne({ key }).lean();
+    const setting = await Setting.findOneAndUpdate(
+      { key },
+      {
+        key,
+        value: String(req.body.enabled),
+        category: 'audit',
+        description: `Enable audit logging for ${kind} ${value}`,
+        updatedBy: req.user!.id,
+      },
+      { new: true, upsert: true, setDefaultsOnInsert: true },
+    );
+    invalidateAuditPolicyCache();
+
+    await auditService.log({
+      ...(req.auditContext as any),
+      actorType: 'ADMIN',
+      actorId: req.user!.id,
+      actorEmail: req.user!.email,
+    }, {
+      action: 'audit_policy_updated',
+      eventType: 'audit.policy_updated',
+      eventCategory: 'CONFIG',
+      operationType: 'UPDATE',
+      resourceType: 'AuditPolicy',
+      resourceId: `${kind}:${value}`,
+      changedFields: [{ field: 'enabled', before: previous?.value === 'true', after: req.body.enabled, sensitive: false }],
+      metadata: { kind, value, enabled: req.body.enabled },
+      outcome: 'SUCCESS',
+      severity: 'HIGH',
+      forceAudit: true,
+    });
+
+    res.json({ success: true, data: { kind, key: value, enabled: setting!.value === 'true' } });
+  } catch (error) {
+    logger.error({ err: error }, 'Audit policy update failed');
+    res.status(500).json({ success: false, error: 'Failed to update audit setting' });
+  }
+});
 
 const querySchema = z.object({
   page: z.coerce.number().int().positive().default(1),

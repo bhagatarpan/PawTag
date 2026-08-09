@@ -69,6 +69,7 @@ const adminLinks: SidebarLink[] = [
   { to: '/settings', label: 'Settings', icon: Settings, permission: 'setting.read' },
   { to: '/feature-flags', label: 'Feature Flags', icon: Flag, permission: 'feature_flag.read' },
   { to: '/audit-trail', label: 'Audit Trail', icon: FileSignature, permission: 'audit.read' },
+  { to: '/audit-settings', label: 'Audit Settings', icon: FileSignature, permission: 'audit.admin' },
 ];
 
 const cmsLinks: SidebarLink[] = [

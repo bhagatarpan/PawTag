@@ -1,6 +1,7 @@
 import { createAuditEventId, AuditEvent, type IAuditEventDocument, type ActorType, type EventCategory, type EventSeverity, type EventOutcome, type IChangedField } from '@pawtag/db';
 import { createHash } from 'crypto';
 import logger from '../../lib/logger';
+import { isAuditEnabled } from './audit.policy';
 
 export interface AuditContext {
   actorType: ActorType;
@@ -54,6 +55,8 @@ export interface AuditEventInput {
   legalHold?: boolean;
   retentionPolicy?: string;
   retentionExpiresAt?: Date;
+  /** Policy changes remain auditable even when the changed policy disables a category or actor. */
+  forceAudit?: boolean;
 }
 
 const SENSITIVE_FIELD_PATTERNS = [
@@ -196,7 +199,7 @@ const MAX_QUEUE_SIZE = 10000;
 const FLUSH_INTERVAL_MS = 100;
 const BATCH_SIZE = 100;
 
-let lastEventHashByStream = new Map<string, string>();
+const streamWriteTails = new Map<string, Promise<void>>();
 
 function buildStreamKey(actorType: string, resourceType: string, resourceId?: string): string {
   return `${actorType}|${resourceType}|${resourceId || 'global'}`;
@@ -213,7 +216,7 @@ async function findLatestStreamHash(event: Partial<IAuditEventDocument>): Promis
     query.resourceId = { $exists: false };
   }
   const last = await AuditEvent.findOne(query)
-    .sort({ occurredAt: -1, recordedAt: -1, eventSequenceNumber: -1 })
+    .sort({ recordedAt: -1, eventSequenceNumber: -1, occurredAt: -1 })
     .select('eventHash actorType resourceType resourceId streamKey')
     .lean();
   if (!last?.eventHash) return '';
@@ -222,18 +225,31 @@ async function findLatestStreamHash(event: Partial<IAuditEventDocument>): Promis
 
 async function persistEvent(event: Partial<IAuditEventDocument>): Promise<IAuditEventDocument> {
   const streamKey = buildStreamKey(event.actorType || 'UNKNOWN', event.resourceType || 'GLOBAL', event.resourceId);
-  let previousHash = lastEventHashByStream.get(streamKey);
-  if (previousHash === undefined || previousHash === null) {
-    previousHash = await findLatestStreamHash(event);
-  }
-  event.streamKey = streamKey;
-  event.previousEventHash = previousHash;
-  event.eventHash = computeEventHash(event);
-  lastEventHashByStream.set(streamKey, event.eventHash);
+  const previousWrite = streamWriteTails.get(streamKey);
+  let release!: () => void;
+  const currentWrite = new Promise<void>((resolve) => { release = resolve; });
+  streamWriteTails.set(streamKey, currentWrite);
 
-  const doc = new AuditEvent(event as any);
-  await doc.save();
-  return doc;
+  try {
+    // Requests are persisted in batches. Serialize events within a stream so
+    // concurrent writes cannot produce competing previous hashes.
+    if (previousWrite) await previousWrite.catch(() => {});
+
+    // The database is authoritative. This also handles restore/test workflows
+    // where an in-memory cache may outlive the corresponding collection data.
+    const previousHash = await findLatestStreamHash(event);
+    event.recordedAt = new Date();
+    event.streamKey = streamKey;
+    event.previousEventHash = previousHash;
+    event.eventHash = computeEventHash(event);
+
+    const doc = new AuditEvent(event as any);
+    await doc.save();
+    return doc;
+  } finally {
+    release();
+    if (streamWriteTails.get(streamKey) === currentWrite) streamWriteTails.delete(streamKey);
+  }
 }
 
 async function processQueue(): Promise<void> {
@@ -295,7 +311,7 @@ function parseStreamKey(streamKey: string): Record<string, unknown> {
 
 async function verifyStream(query: Record<string, unknown>, limit: number): Promise<{ valid: boolean; brokenAt?: string; error?: string; checked: number }> {
   const events = await AuditEvent.find(query)
-    .sort({ occurredAt: 1, recordedAt: 1, eventSequenceNumber: 1 })
+    .sort({ recordedAt: 1, eventSequenceNumber: 1, occurredAt: 1 })
     .limit(limit)
     .lean();
 
@@ -357,7 +373,8 @@ for (const bucket of buckets) {
 }
 
 export const auditService = {
-  async log(context: AuditContext, input: AuditEventInput): Promise<IAuditEventDocument> {
+  async log(context: AuditContext, input: AuditEventInput): Promise<IAuditEventDocument | undefined> {
+    if (!input.forceAudit && !(await isAuditEnabled(input.eventCategory, context.actorType))) return undefined;
     const auditEventId = createAuditEventId();
     const now = new Date();
 
@@ -447,7 +464,7 @@ export const auditService = {
     });
   },
 
-  async logSync(context: AuditContext, input: AuditEventInput): Promise<IAuditEventDocument> {
+  async logSync(context: AuditContext, input: AuditEventInput): Promise<IAuditEventDocument | undefined> {
     return this.log(context, input);
   },
 
@@ -455,7 +472,7 @@ export const auditService = {
     parentEvent: IAuditEventDocument,
     context: Partial<AuditContext> & { actorType: ActorType },
     input: AuditEventInput,
-  ): Promise<IAuditEventDocument> {
+  ): Promise<IAuditEventDocument | undefined> {
     return this.log(
       {
         ...context,

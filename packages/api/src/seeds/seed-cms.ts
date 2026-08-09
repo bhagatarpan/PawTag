@@ -42,6 +42,8 @@ async function run() {
       // 1. SETTINGS
       // ═══════════════════════════════════════
       console.log('--- Seeding Settings ---');
+      const auditCategories = ['AUTH', 'AUTHZ', 'CREATE', 'UPDATE', 'DELETE', 'READ', 'EXPORT', 'TRANSITION', 'FINANCIAL', 'SECURITY', 'ADMIN', 'SYSTEM', 'INTEGRATION', 'FILE', 'CONFIG'];
+      const auditActors = ['USER', 'ADMIN', 'SERVICE', 'SYSTEM', 'SCHEDULED_JOB', 'API_CLIENT', 'WEBHOOK', 'AI_AGENT', 'FINDER', 'UNKNOWN'];
       const settings: Array<{ key: string; value: string; category: string; description?: string }> = [
         { key: 'site.name', value: 'PawTag', category: 'site' },
         { key: 'site.tagline', value: 'Never Lose Your Pet Again', category: 'site' },
@@ -69,6 +71,8 @@ async function run() {
         { key: 'mfa.customerEnabled', value: 'true', category: 'mfa', description: 'Default MFA setting for new customer registrations' },
         { key: 'mfa.testMode', value: 'false', category: 'mfa', description: 'Send MFA OTP to test email instead of actual user' },
         { key: 'mfa.testEmail', value: 'arpanbhagat@yahoo.com', category: 'mfa', description: 'Test email address for MFA in dev mode' },
+        ...auditCategories.map((value) => ({ key: `audit.policy.category.${value.toLowerCase()}`, value: 'true', category: 'audit', description: `Enable audit logging for ${value} events` })),
+        ...auditActors.map((value) => ({ key: `audit.policy.actor.${value.toLowerCase()}`, value: 'true', category: 'audit', description: `Enable audit logging for ${value} actors` })),
       ];
 
       let settingsCreated = 0;

@@ -50,6 +50,54 @@ describe('Audit API & config event coverage (PH1/PH2)', () => {
     expect(event.resourceId).toBe('test.auditKey');
   });
 
+  it('admin can view and change audit category policy', async () => {
+    const { token } = await createSuperAdmin();
+
+    const initial = await request(app)
+      .get('/api/admin/audit/settings')
+      .set('Authorization', `Bearer ${token}`);
+    expect(initial.status).toBe(200);
+    expect(initial.body.data.categories.find((item: any) => item.key === 'READ').enabled).toBe(true);
+    expect(initial.body.data.actors.find((item: any) => item.key === 'USER').enabled).toBe(true);
+
+    const update = await request(app)
+      .put('/api/admin/audit/settings/category/READ')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ enabled: false });
+    expect(update.status).toBe(200);
+    expect(update.body.data.enabled).toBe(false);
+
+    const policyEvent = await AuditEvent.findOne({
+      action: 'audit_policy_updated',
+      resourceId: 'category:READ',
+    }).lean();
+    expect(policyEvent).toBeDefined();
+    expect(policyEvent!.outcome).toBe('SUCCESS');
+
+    await request(app)
+      .get('/api/admin/settings')
+      .set('Authorization', `Bearer ${token}`);
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    const disabledReadRequest = await AuditEvent.findOne({ action: 'http_get', resourceId: '/api/admin/settings' }).lean();
+    expect(disabledReadRequest).toBeNull();
+
+    const restore = await request(app)
+      .put('/api/admin/audit/settings/category/READ')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ enabled: true });
+    expect(restore.status).toBe(200);
+    expect(restore.body.data.enabled).toBe(true);
+
+    await request(app)
+      .get('/api/admin/settings')
+      .set('Authorization', `Bearer ${token}`);
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    const readEvent = await AuditEvent.findOne({ eventType: 'http.request.completed', action: 'http_get' }).sort({ occurredAt: -1 }).lean();
+    expect(readEvent).toBeDefined();
+    expect(readEvent!.actorType).toBe('ADMIN');
+    expect(readEvent!.eventCategory).toBe('READ');
+  });
+
   it('records before/after on setting update (CONFIG threat model)', async () => {
     const { token } = await createSuperAdmin();
     await Setting.create({ key: 'mfa.testMode', value: 'true', category: 'mfa', updatedBy: new mongoose.Types.ObjectId() });
@@ -65,6 +113,25 @@ describe('Audit API & config event coverage (PH1/PH2)', () => {
     expect((event! as any).beforeState.value).toBe('true');
     expect((event! as any).afterState.value).toBe('false');
     expect(event!.severity).toBe('HIGH');
+  });
+
+  it('records nested profile fields before and after an actor update', async () => {
+    const { token } = await createSuperAdmin();
+
+    const res = await request(app)
+      .put('/api/auth/profile')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        address: { line1: '1 New Street', city: 'Auckland', country: 'NZ' },
+        emergencyContact: { name: 'Emergency Person', phone: '+64210000000', relationship: 'Friend' },
+      });
+    expect(res.status).toBe(200);
+
+    const event = await AuditEvent.findOne({ action: 'profile_updated' }).lean();
+    expect(event).toBeDefined();
+    expect((event!.afterState as any).address.line1).toBe('1 New Street');
+    expect((event!.afterState as any).emergencyContact.relationship).toBe('Friend');
+    expect(event!.changedFields?.map((field) => field.field)).toEqual(['address', 'emergencyContact']);
   });
 
   it('records feature-flag changes with correct isEnabled before/after', async () => {

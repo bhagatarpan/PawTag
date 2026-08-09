@@ -59,7 +59,7 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
     };
     req.user = decoded;
     setAuditActor(req, {
-      actorType: 'USER',
+      actorType: ['admin', 'super_admin', 'customer_service', 'support'].includes(decoded.role.toLowerCase()) ? 'ADMIN' : 'USER',
       actorId: decoded.id,
       actorEmail: decoded.email,
       actorUsername: decoded.email,

@@ -4,7 +4,7 @@
 **Verification method:** Full-codebase discovery + inline inspection of every API route, service, job, middleware, model, seed, and app page that touches audit data. Repo tree, exact line numbers quoted below reflect the state at verification time.
 **Status:** `COVERED` / `PARTIAL` / `UNSEEDED` / `GAP` / `BREAKING`.
 
-> Pre-2026-08-09 versions of this file and `tests/AUDIT-REPORT.md` describe a *pre-implementation* state. A large `AuditEvent` pipeline has since been built. This document is the verified current state, not the plan.
+> The current implementation also includes completed-request auditing for business/security API traffic and configurable category/actor policy controls. References below to the removed legacy `AuditLog` pipeline are historical notes and should not be treated as active code paths.
 
 ---
 

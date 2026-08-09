@@ -14,6 +14,7 @@ import Content from './pages/Content';
 import Settings from './pages/Settings';
 import FeatureFlags from './pages/FeatureFlags';
 import AuditTrail from './pages/AuditTrail';
+import AuditSettings from './pages/AuditSettings';
 import Statistics from './pages/Statistics';
 import RbacRoles from './pages/RbacRoles';
 import RbacPermissions from './pages/RbacPermissions';
@@ -137,6 +138,14 @@ export default function App() {
         element={
           <ProtectedRoute>
             <AuditTrail />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/audit-settings"
+        element={
+          <ProtectedRoute>
+            <AuditSettings />
           </ProtectedRoute>
         }
       />
