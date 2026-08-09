@@ -57,7 +57,6 @@ router.put('/settings/:kind/:value', requirePermission('audit.admin'), validate(
 
     await auditService.log({
       ...(req.auditContext as any),
-      actorType: 'ADMIN',
       actorId: req.user!.id,
       actorEmail: req.user!.email,
     }, {

@@ -43,7 +43,7 @@ async function run() {
       // ═══════════════════════════════════════
       console.log('--- Seeding Settings ---');
       const auditCategories = ['AUTH', 'AUTHZ', 'CREATE', 'UPDATE', 'DELETE', 'READ', 'EXPORT', 'TRANSITION', 'FINANCIAL', 'SECURITY', 'ADMIN', 'SYSTEM', 'INTEGRATION', 'FILE', 'CONFIG'];
-      const auditActors = ['USER', 'ADMIN', 'SERVICE', 'SYSTEM', 'SCHEDULED_JOB', 'API_CLIENT', 'WEBHOOK', 'AI_AGENT', 'FINDER', 'UNKNOWN'];
+      const auditActors = ['USER', 'ADMIN', 'CSR', 'WEB_EDITOR', 'DESIGNER', 'AUTHOR', 'SERVICE', 'SYSTEM', 'SCHEDULED_JOB', 'API_CLIENT', 'WEBHOOK', 'AI_AGENT', 'FINDER', 'UNKNOWN'];
       const settings: Array<{ key: string; value: string; category: string; description?: string }> = [
         { key: 'site.name', value: 'PawTag', category: 'site' },
         { key: 'site.tagline', value: 'Never Lose Your Pet Again', category: 'site' },

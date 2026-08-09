@@ -61,7 +61,6 @@ async function auditAdminEvent(
   }
   const context: AuditContext = {
     ...reqContext,
-    actorType: 'ADMIN',
     ...overrides,
   } as AuditContext;
   await auditService.log(context, input);

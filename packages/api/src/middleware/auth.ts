@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { config } from '../config';
 import { setAuditActor } from './audit';
+import { resolveActorType } from '../services/audit';
 
 export interface AuditContext {
   requestId: string;
@@ -59,7 +60,7 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
     };
     req.user = decoded;
     setAuditActor(req, {
-      actorType: ['admin', 'super_admin', 'customer_service', 'support'].includes(decoded.role.toLowerCase()) ? 'ADMIN' : 'USER',
+      actorType: resolveActorType(decoded.role),
       actorId: decoded.id,
       actorEmail: decoded.email,
       actorUsername: decoded.email,

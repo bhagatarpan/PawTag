@@ -19,7 +19,6 @@ async function auditCmsEvent(
   }
   const context: AuditContext = {
     ...reqContext,
-    actorType: 'ADMIN',
     actorId: req.user?.id,
     actorEmail: req.user?.email,
     ...overrides,

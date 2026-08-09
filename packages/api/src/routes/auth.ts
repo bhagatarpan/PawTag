@@ -35,7 +35,7 @@ import { sendVerificationEmail, sendPasswordResetEmail, sendPasswordChangedEmail
 import { sendPhoneOtpSMS } from '../services/sms.service';
 import { isRegistrationOtpDisabled } from '../services/otp-settings.service';
 import { User, Role, UserRole, VerificationToken, Setting, AuditEvent } from '@pawtag/db';
-import { auditService, type AuditContext } from '../services/audit';
+import { auditService, resolveActorType, type AuditContext } from '../services/audit';
 import { createAuditContextFromRequest, setAuditActor, type AuditRequest } from '../middleware/audit';
 import { config } from '../config';
 import logger from '../lib/logger';
@@ -552,7 +552,7 @@ if (user.status === 'inactive') {
       outcome: 'SUCCESS',
       severity: 'MEDIUM',
       metadata: { mfaRequired: false, isAdmin, rbacRoles: rbacRoles.map((r: any) => r.name) },
-    }, { authenticationMethod: 'password' });
+    }, { actorType: resolveActorType(user.role), authenticationMethod: 'password' });
 
     // Send login notification for admin accounts
     if (isAdmin) {
@@ -1426,7 +1426,7 @@ router.post('/logout', async (req: AuthRequest, res: Response) => {
         const logoutUser = await User.findById(refreshPayload.userId).select('_id email role');
         if (logoutUser) {
           setAuditActor(req as AuditRequest, {
-            actorType: ['admin', 'super_admin', 'customer_service', 'support'].includes(logoutUser.role) ? 'ADMIN' : 'USER',
+            actorType: resolveActorType(logoutUser.role),
             actorId: logoutUser._id.toString(),
             actorEmail: logoutUser.email,
             actorUsername: logoutUser.email,
@@ -1451,7 +1451,7 @@ router.post('/logout', async (req: AuthRequest, res: Response) => {
       outcome: 'SUCCESS',
       severity: 'LOW',
       metadata: { revokedRefreshToken: !!refreshToken },
-    }, { actorType: req.user ? 'USER' : 'UNKNOWN' });
+    }, { actorType: req.user ? resolveActorType(req.user.role) : 'UNKNOWN' });
 
     res.json({ success: true, data: { message: 'Logged out successfully' } });
   } catch {
@@ -1720,7 +1720,7 @@ router.post('/mfa/verify', mfaVerifyLimiter, async (req: AuthRequest, res: Respo
       outcome: 'SUCCESS',
       severity: 'MEDIUM',
       metadata: { mfaType: 'email_otp', isAdmin, rbacRoles: rbacRoles.map((r: any) => r.name) },
-    }, { authenticationMethod: 'mfa_email_otp' });
+    }, { actorType: resolveActorType(user.role), authenticationMethod: 'mfa_email_otp' });
 
     // Send login notification for admin accounts
     if (isAdmin) {

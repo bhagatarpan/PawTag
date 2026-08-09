@@ -19,7 +19,6 @@ router.use(authenticate);
 async function auditCmsEvent(req: AuditRequest, action: string, resourceType: string, resourceId: string, metadata?: Record<string, unknown>): Promise<void> {
   await auditService.log({
     ...(req.auditContext as AuditContext),
-    actorType: 'ADMIN',
     actorId: req.user?.id,
     actorEmail: req.user?.email,
   }, {

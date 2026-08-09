@@ -94,7 +94,7 @@ export default function AuditTrail() {
         </select>
         <select value={filters.actorType} onChange={(e) => setFilter('actorType', e.target.value)} className="border border-gray-300 rounded-md px-3 py-2 text-sm">
           <option value="">All Actors</option>
-          {['USER', 'ADMIN', 'SERVICE', 'SYSTEM', 'SCHEDULED_JOB', 'API_CLIENT', 'WEBHOOK', 'FINDER', 'UNKNOWN'].map((a) => <option key={a} value={a}>{a}</option>)}
+          {['USER', 'ADMIN', 'CSR', 'WEB_EDITOR', 'DESIGNER', 'AUTHOR', 'SERVICE', 'SYSTEM', 'SCHEDULED_JOB', 'API_CLIENT', 'WEBHOOK', 'AI_AGENT', 'FINDER', 'UNKNOWN'].map((a) => <option key={a} value={a}>{a}</option>)}
         </select>
         <select value={filters.severity} onChange={(e) => setFilter('severity', e.target.value)} className="border border-gray-300 rounded-md px-3 py-2 text-sm">
           <option value="">All Severity</option>

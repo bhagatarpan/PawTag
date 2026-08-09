@@ -16,7 +16,6 @@ const FRONTEND_URL = config.frontendUrl || 'http://localhost:3000';
 async function auditInvoiceEvent(req: AuditRequest, action: string, resourceId: string, metadata: Record<string, unknown>): Promise<void> {
   await auditService.log({
     ...(req.auditContext as AuditContext),
-    actorType: req.path.startsWith('/admin/') ? 'ADMIN' : 'USER',
     actorId: req.user?.id,
     actorEmail: req.user?.email,
   }, {

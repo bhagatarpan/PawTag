@@ -6,7 +6,8 @@ export const AUDIT_CATEGORIES = [
 ] as const;
 
 export const AUDIT_ACTORS = [
-  'USER', 'ADMIN', 'SERVICE', 'SYSTEM', 'SCHEDULED_JOB', 'API_CLIENT', 'WEBHOOK', 'AI_AGENT', 'FINDER', 'UNKNOWN',
+  'USER', 'ADMIN', 'CSR', 'WEB_EDITOR', 'DESIGNER', 'AUTHOR',
+  'SERVICE', 'SYSTEM', 'SCHEDULED_JOB', 'API_CLIENT', 'WEBHOOK', 'AI_AGENT', 'FINDER', 'UNKNOWN',
 ] as const;
 
 export type AuditCategory = typeof AUDIT_CATEGORIES[number];

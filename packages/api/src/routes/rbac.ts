@@ -31,7 +31,6 @@ async function auditRbacEvent(
   }
   const context: AuditContext = {
     ...reqContext,
-    actorType: 'ADMIN',
     ...overrides,
   } as AuditContext;
   await auditService.log(context, input);

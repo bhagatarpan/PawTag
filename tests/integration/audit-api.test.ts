@@ -1,10 +1,48 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import request from 'supertest';
 import mongoose from 'mongoose';
+import jwt from 'jsonwebtoken';
 import { setupTestDb, teardownTestDb, clearDb } from './setup';
 import app from '../../packages/api/src/index';
+import { config } from '../../packages/api/src/config';
 import { AuditEvent, Setting, FeatureFlag } from '@pawtag/db';
 import { createSuperAdmin } from './helpers';
+
+/** Create an admin-portal user with a specific legacy role (for actor-type classification tests). */
+async function createPortalActor(email: string, legacyRole: string, roleName: string) {
+  const user = await mongoose.connection.collections.users.insertOne({
+    email,
+    passwordHash: 'x',
+    fullName: email,
+    phoneNumber: '+64210000000',
+    role: legacyRole,
+    status: 'active',
+    emailVerified: true,
+    phoneVerified: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+  const userId = user.insertedId.toString();
+  const role = await mongoose.connection.collections.roles.insertOne({
+    name: roleName,
+    displayName: roleName,
+    roleType: 'system',
+    isSystemRole: true,
+    isSuperAdmin: true,
+    isActive: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+  await mongoose.connection.collections.userroles.insertOne({
+    userId: new mongoose.Types.ObjectId(userId),
+    roleId: role.insertedId,
+    isActive: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+  const token = jwt.sign({ id: userId, email, role: legacyRole }, config.jwtSecret, { expiresIn: '1h' });
+  return { userId, token, email };
+}
 
 beforeAll(async () => {
   await setupTestDb();
@@ -96,6 +134,31 @@ describe('Audit API & config event coverage (PH1/PH2)', () => {
     expect(readEvent).toBeDefined();
     expect(readEvent!.actorType).toBe('ADMIN');
     expect(readEvent!.eventCategory).toBe('READ');
+  });
+
+  it('classifies CSR and web editor activity under their own actor types, not ADMIN', async () => {
+    const csr = await createPortalActor('csr@example.com', 'customer_service', 'SUPER_ADMIN_CSR');
+    await Setting.create({ key: 'mfa.testMode', value: 'true', category: 'mfa', updatedBy: new mongoose.Types.ObjectId() });
+
+    const res = await request(app)
+      .put('/api/admin/settings/mfa.testMode')
+      .set('Authorization', `Bearer ${csr.token}`)
+      .send({ value: 'false' });
+    expect(res.status).toBe(200);
+
+    const domainEvent = await AuditEvent.findOne({ action: 'setting_update', resourceId: 'mfa.testMode' }).lean();
+    expect(domainEvent).toBeDefined();
+    expect(domainEvent!.actorType).toBe('CSR');
+
+    const editor = await createPortalActor('editor@example.com', 'website_editor', 'SUPER_ADMIN_EDITOR');
+    await request(app)
+      .get('/api/admin/settings')
+      .set('Authorization', `Bearer ${editor.token}`);
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    const requestEvent = await AuditEvent.findOne({ eventType: 'http.request.completed', actorId: editor.userId }).lean();
+    expect(requestEvent).toBeDefined();
+    expect(requestEvent!.actorType).toBe('WEB_EDITOR');
   });
 
   it('records before/after on setting update (CONFIG threat model)', async () => {

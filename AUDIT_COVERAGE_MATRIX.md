@@ -30,7 +30,7 @@ Per the Enterprise Audit-Logging requirements doc, this file is the living Initi
 | Model | `packages/db/src/models/AuditEvent.ts` (collection `audit_events`) | `packages/db/src/models/AuditLog.ts` (collection `auditlogs`) |
 | Event identity | `auditEventId` UUIDv7, unique index | Mongoose `_id` only |
 | Correlation | `transactionId`, `correlationId`, `requestId`, `traceId`, `parentEventId`, `eventSequenceNumber` | none |
-| Actor model | `actorType` (USER/ADMIN/SERVICE/SYSTEM/SCHEDULED_JOB/API_CLIENT/WEBHOOK/AI_AGENT/FINDER/UNKNOWN), `actorId/Username/Email`, `impersonatorId`, `delegatedById`, `sessionId`, `authenticationMethod` | `userId` only (always required) |
+| Actor model | `actorType` (USER/ADMIN/CSR/WEB_EDITOR/DESIGNER/AUTHOR/SERVICE/SYSTEM/SCHEDULED_JOB/API_CLIENT/WEBHOOK/AI_AGENT/FINDER/UNKNOWN), `actorId/Username/Email`, `impersonatorId`, `delegatedById`, `sessionId`, `authenticationMethod` | `userId` only (always required) |
 | Classification | `action`, `eventType`, `eventCategory`, `operationType`, `resourceType`, `resourceId`, `businessOperation`, `reason`, `status`, `outcome` (SUCCESS/FAILURE/PARTIAL/PENDING), `severity` | `action`, `entity`, `entityId` only |
 | State | `beforeState`, `afterState`, `changedFields[]`, `before/afterStateHash` | `changes` (un-typed, un-examined) |
 | Sensitive redaction | Central `deepRedact`/`redactValue` in `audit.service.ts` | none (raw `changes` stored) |

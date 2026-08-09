@@ -21,6 +21,11 @@ describe('audit policy', () => {
     expect(policy.categories.READ).toBe(true);
     expect(policy.categories.SECURITY).toBe(true);
     expect(policy.actors.USER).toBe(true);
+    expect(policy.actors.ADMIN).toBe(true);
+    expect(policy.actors.CSR).toBe(true);
+    expect(policy.actors.WEB_EDITOR).toBe(true);
+    expect(policy.actors.DESIGNER).toBe(true);
+    expect(policy.actors.AUTHOR).toBe(true);
     expect(policy.actors.FINDER).toBe(true);
   });
 

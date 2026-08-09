@@ -27,6 +27,10 @@ const descriptions: Record<string, string> = {
 const labels: Record<string, string> = {
   USER: 'Customer / User',
   ADMIN: 'Administrator',
+  CSR: 'Customer Service (CSR)',
+  WEB_EDITOR: 'Web Editor',
+  DESIGNER: 'Designer',
+  AUTHOR: 'Author',
   SERVICE: 'Application Service',
   SYSTEM: 'System',
   SCHEDULED_JOB: 'Scheduled Job',

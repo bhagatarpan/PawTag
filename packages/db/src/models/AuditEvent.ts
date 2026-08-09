@@ -4,6 +4,10 @@ import { v7 as uuidv7 } from 'uuid';
 export type ActorType =
   | 'USER'
   | 'ADMIN'
+  | 'CSR'
+  | 'WEB_EDITOR'
+  | 'DESIGNER'
+  | 'AUTHOR'
   | 'SERVICE'
   | 'SYSTEM'
   | 'SCHEDULED_JOB'
@@ -146,7 +150,7 @@ const AuditEventSchema = new Schema<IAuditEventDocument>(
     actorType: {
       type: String,
       required: true,
-      enum: ['USER', 'ADMIN', 'SERVICE', 'SYSTEM', 'SCHEDULED_JOB', 'API_CLIENT', 'WEBHOOK', 'AI_AGENT', 'FINDER', 'UNKNOWN'],
+      enum: ['USER', 'ADMIN', 'CSR', 'WEB_EDITOR', 'DESIGNER', 'AUTHOR', 'SERVICE', 'SYSTEM', 'SCHEDULED_JOB', 'API_CLIENT', 'WEBHOOK', 'AI_AGENT', 'FINDER', 'UNKNOWN'],
       index: true,
     },
     actorId: { type: String, index: true },
