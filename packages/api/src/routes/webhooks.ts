@@ -7,11 +7,7 @@ import { sendPushToUser } from '../services/push-notification.service';
 import { generateSecureToken, hashToken } from '../services/auth.service';
 import logger from '../lib/logger';
 import { auditService, type AuditContext } from '../services/audit';
-
-function generateTagId(): string {
-  const digits = Math.floor(100000 + Math.random() * 900000).toString();
-  return `PT-${digits}`;
-}
+import { generateTagId } from '../lib/tag-id';
 
 async function auditWebhookEvent(
   input: Parameters<typeof auditService.log>[1],
@@ -237,7 +233,7 @@ async function handlePaymentIntentSucceeded(paymentIntent: any) {
       const product = await Product.findById(item.productId);
       if (product && product.isTagProduct) {
         for (let i = 0; i < item.quantity; i++) {
-          const tagId = generateTagId();
+          const tagId = await generateTagId();
           await Tag.create({
             tagId,
             tagType: 'qr',

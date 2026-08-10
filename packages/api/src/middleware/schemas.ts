@@ -18,6 +18,8 @@ export const registerSchema = z.object({
 export const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
   password: z.string().min(1, 'Password is required'),
+  captchaToken: z.string().optional(),
+  captchaAnswer: z.number().int().optional(),
 });
 
 export const verifyEmailSchema = z.object({
@@ -231,7 +233,7 @@ export const updateUserSchema = z.object({
 export const createTagSchema = z.object({
   petId: z.string().min(1, 'Pet ID is required'),
   ownerId: z.string().min(1, 'Owner ID is required'),
-  tagId: z.string().regex(/^PT-\d{6}$/, 'Tag ID must be in format PT-NNNNNN').optional(),
+  tagId: z.string().min(1).optional(),
   tagType: z.enum(['qr', 'nfc']).optional(),
   status: z.enum(['active', 'inactive', 'lost']).optional(),
 });

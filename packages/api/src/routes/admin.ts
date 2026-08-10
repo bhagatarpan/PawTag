@@ -1327,10 +1327,7 @@ router.get('/tags', requirePermission('tag.read'), async (req, res: Response) =>
 
 // --- Tag CRUD ---
 
-function generateTagId(): string {
-  const digits = Math.floor(100000 + Math.random() * 900000).toString();
-  return `PT-${digits}`;
-}
+import { generateTagId, isValidTagId, getTagIdFormat } from '../lib/tag-id';
 
 /**
  * @swagger
@@ -1383,10 +1380,13 @@ router.post('/tags', requirePermission('tag.create'), validate(createTagSchema),
 
     let tagId = customTagId;
     if (!tagId) {
-      let attempts = 0;
-      do { tagId = generateTagId(); attempts++; } while (await Tag.findOne({ tagId }) && attempts < 10);
+      tagId = await generateTagId();
     } else {
-      if (!/^PT-\d{6}$/.test(tagId)) { res.status(400).json({ success: false, error: 'Tag ID must be in format PT-NNNNNN' }); return; }
+      if (!await isValidTagId(tagId)) {
+        const format = await getTagIdFormat();
+        res.status(400).json({ success: false, error: `Tag ID must be in format ${format}` });
+        return;
+      }
       if (await Tag.findOne({ tagId })) { res.status(400).json({ success: false, error: 'Tag ID already exists' }); return; }
     }
 

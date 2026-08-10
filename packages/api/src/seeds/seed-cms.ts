@@ -71,6 +71,7 @@ async function run() {
         { key: 'mfa.customerEnabled', value: 'true', category: 'mfa', description: 'Default MFA setting for new customer registrations' },
         { key: 'mfa.testMode', value: 'false', category: 'mfa', description: 'Send MFA OTP to test email instead of actual user' },
         { key: 'mfa.testEmail', value: 'arpanbhagat@yahoo.com', category: 'mfa', description: 'Test email address for MFA in dev mode' },
+        { key: 'tag.idPrefix', value: 'PT', category: 'tag', description: 'Prefix for auto-generated tag IDs (e.g. PT → PT-NNNNNN)' },
         ...auditCategories.map((value) => ({ key: `audit.policy.category.${value.toLowerCase()}`, value: 'true', category: 'audit', description: `Enable audit logging for ${value} events` })),
         ...auditActors.map((value) => ({ key: `audit.policy.actor.${value.toLowerCase()}`, value: 'true', category: 'audit', description: `Enable audit logging for ${value} actors` })),
       ];
