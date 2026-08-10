@@ -3,32 +3,8 @@ import '@puckeditor/core/puck.css';
 import { pawtagConfig } from '../components/puck/config';
 import { useCmsPage, useSiteSettings } from '../hooks/useCms';
 import SeoHead from '../components/SeoHead';
-
-function sectionsToPuckData(sections: any[]) {
-  const typeMap: Record<string, string> = {
-    hero: 'HeroBanner', features: 'FeaturesGrid', rich_text: 'RichTextBlock',
-    gallery: 'ImageGallery', cards: 'CardsGrid', pricing: 'PricingTable',
-    testimonials: 'TestimonialsSection', faq: 'FaqAccordion',
-    timeline: 'TimelineSection', statistics: 'StatsCounter',
-    video: 'VideoEmbed', cta: 'CtaBanner', partners: 'PartnersLogos',
-    map: 'MapBlock', custom: 'CustomHtml', contact_form: 'ContactForm',
-  };
-
-  const content = (sections || [])
-    .filter((s: any) => s.visible !== false && s.status === 'published')
-    .sort((a: any, b: any) => (a.order || 0) - (b.order || 0))
-    .map((section: any, idx: number) => {
-      const props = { ...section.content };
-      return {
-        type: typeMap[section.type] || section.type,
-        props: {
-          id: section.sectionId || `section_${idx}`,
-          ...props,
-        },
-      };
-    });
-  return { content, root: {} };
-}
+import PageHero from '../components/PageHero';
+import { sectionsToPuckData } from '../utils/puckData';
 
 export default function Terms() {
   const { page, loading } = useCmsPage('terms-of-service');
@@ -58,12 +34,10 @@ export default function Terms() {
         description={`${companyName} Terms of Service - Read our terms and conditions for using our pet recovery services.`}
         keywords={['terms of service', 'terms and conditions', 'user agreement', companyName]}
       />
-      <div className="bg-gradient-to-r from-teal-700 to-teal-600 text-white py-16">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h1 className="text-4xl font-bold mb-4">{page?.title || `Terms of Service - ${companyName}`}</h1>
-          <p className="text-teal-100 text-lg">Our terms and conditions for using PawTag services.</p>
-        </div>
-      </div>
+      <PageHero
+        title={page?.title || `Terms of Service - ${companyName}`}
+        subtitle="Our terms and conditions for using PawTag services."
+      />
 
       <div className="py-12">
         <Render config={pawtagConfig} data={puckData} />

@@ -1,17 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ShoppingCart, PawPrint, Check, Smartphone, Wifi, Shield, Zap } from 'lucide-react';
+import { ShoppingCart, PawPrint, Check, Shield, Smartphone, Wifi, Zap } from 'lucide-react';
 import api from '../lib/api';
 import { useCart } from '../context/CartContext';
 import { Product } from '../types';
 import SeoHead from '../components/SeoHead';
 import { useShopPage, useSiteSettings } from '../hooks/useCms';
-
-const PRODUCT_BADGES: Record<string, { label: string; color: string }> = {
-  'PT-SCAN-001': { label: 'Essential', color: 'bg-blue-100 text-blue-700' },
-  'PT-CLASSIC-001': { label: 'Most Ordered', color: 'bg-amber-100 text-amber-700' },
-  'PT-PLUS-001': { label: 'Premium', color: 'bg-purple-100 text-purple-700' },
-};
+import { getProductBadge, getProductIcon } from '../utils/productHelpers';
 
 const COMPARISON_FEATURES = [
   { key: 'technology', label: 'Technology', scan: 'QR Code', classic: 'NFC + QR', plus: 'NFC + QR' },
@@ -60,12 +55,8 @@ export default function Shop() {
     setTimeout(() => setAddingId(null), 1000);
   };
 
-  const getBadge = (sku: string) => PRODUCT_BADGES[sku];
-  const getProductIcon = (sku: string) => {
-    if (sku === 'PT-SCAN-001') return <Smartphone className="h-6 w-6" />;
-    if (sku === 'PT-PLUS-001') return <Zap className="h-6 w-6" />;
-    return <Wifi className="h-6 w-6" />;
-  };
+  const getBadge = (sku: string) => getProductBadge(sku);
+  const getProductIconForSku = (sku: string) => getProductIcon(sku, 'sm');
 
   const shopTitle = (shopPage?.content as Record<string, unknown>)?.heroTitle as string || shopPage?.title || `Shop ${companyName}`;
   const shopDesc = (shopPage?.content as Record<string, unknown>)?.heroDescription as string || shopPage?.subtitle || 'Choose the right PawTag for your pet. Each tag comes with 12 months free subscription.';
@@ -122,7 +113,7 @@ export default function Shop() {
                       <img src={product.images[0]} alt={product.name} className="w-full h-full object-cover" />
                     ) : (
                       <div className="flex flex-col items-center gap-2 text-teal-300">
-                        {getProductIcon(product.sku)}
+                        {getProductIconForSku(product.sku)}
                         <PawPrint className="h-20 w-20" />
                       </div>
                     )}

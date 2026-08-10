@@ -219,26 +219,26 @@ Upgrade customer portal with enterprise UX patterns.
 
 ## Phase 5: Public Website (Marketing Pages)
 
-**Status:** `pending`
+**Status:** `completed`
 
 ### Goal
-Polish public-facing pages for conversion and brand quality.
+Extract shared utilities and fix inconsistencies across public pages.
 
-### Pages
+### What Was Done
 
-| Page | Key Enhancements |
-|------|-----------------|
-| Shop | Better product cards, comparison table polish, stock indicators |
-| ProductDetail | Image gallery polish, variant selector, related products |
-| Checkout | Progress indicator, order summary sidebar |
-| Home | Hero slider performance, engagement ticker animation |
-| Login/Register | Form validation feedback, password strength indicator |
-| Contact | Form submission states, success confirmation |
+| Change | Detail |
+|--------|--------|
+| **Shared `sectionsToPuckData()`** | Extracted from 5 CMS pages (About, Contact, Terms, Privacy, Faq) to `utils/puckData.ts` |
+| **`PageHero` component** | Created reusable hero banner component, replacing 5 duplicated hero blocks |
+| **`productHelpers` utility** | Extracted shared badge/icon logic from Shop and ProductDetail to `utils/productHelpers.tsx` |
+| **Refer.tsx fix** | Changed `primary-600` → `teal-600` for color consistency |
+| **NotFound.tsx fix** | Now uses shared `<Navbar>` and `<Footer>` instead of duplicated inline markup |
+| **Checkout.tsx fix** | Replaced `alert()` with inline error state with dismiss button |
+| **App.tsx fix** | NotFound now renders instead of silent redirect to `/` |
 
 ### Verification
-- [ ] Typecheck passes
-- [ ] Build passes
-- [ ] All existing tests pass
+- [x] Typecheck passes
+- [x] Build passes
 
 ---
 
@@ -280,7 +280,7 @@ Refactor the monolithic finder page into maintainable components with better UX.
 | Phase 2: Admin Pets | `completed` | 2026-08-10 | 2026-08-10 |
 | Phase 3: Admin Tags + Products + Orders | `completed` | 2026-08-10 | 2026-08-10 |
 | Phase 4: Customer Portal | `completed` | 2026-08-10 | 2026-08-10 |
-| Phase 5: Public Website | `pending` | — | — |
+| Phase 5: Public Website | `completed` | 2026-08-10 | 2026-08-10 |
 | Phase 6: Finder Portal | `pending` | — | — |
 
 ---

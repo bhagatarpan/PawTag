@@ -33,6 +33,7 @@ export default function Checkout() {
   const [referralApplied, setReferralApplied] = useState(false);
   const [bundleSettings, setBundleSettings] = useState<Record<string, string>>({});
   const [paymentStep, setPaymentStep] = useState<'form' | 'processing' | 'success'>('form');
+  const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
     line1: '',
     line2: '',
@@ -95,7 +96,7 @@ export default function Checkout() {
       setPaymentStep('success');
       clearCart();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to place order');
+      setError(err.response?.data?.error || 'Failed to place order');
       setPaymentStep('form');
     } finally {
       setLoading(false);
@@ -144,6 +145,13 @@ export default function Checkout() {
         </Link>
 
         <h1 className="text-3xl font-bold text-gray-900 mb-8">Checkout</h1>
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700 flex items-center justify-between mb-6">
+            <span>{error}</span>
+            <button onClick={() => setError(null)} className="text-red-500 hover:text-red-700 font-medium">Dismiss</button>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Shipping Form */}

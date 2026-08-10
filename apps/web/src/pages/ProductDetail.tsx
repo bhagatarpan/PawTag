@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ShoppingCart, ArrowLeft, PawPrint, Shield, Truck, Check, Wifi, Smartphone, Zap, AlertCircle } from 'lucide-react';
+import { ShoppingCart, ArrowLeft, PawPrint, Shield, Truck, Check, AlertCircle } from 'lucide-react';
 import api from '../lib/api';
 import { useCart } from '../context/CartContext';
 import { Product } from '../types';
+import { getProductBadge, getProductIcon } from '../utils/productHelpers';
 
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
@@ -37,18 +38,8 @@ export default function ProductDetail() {
     setTimeout(() => setAdded(false), 2000);
   };
 
-  const getProductIcon = (sku: string) => {
-    if (sku === 'PT-SCAN-001') return <Smartphone className="h-12 w-12" />;
-    if (sku === 'PT-PLUS-001') return <Zap className="h-12 w-12" />;
-    return <Wifi className="h-12 w-12" />;
-  };
-
-  const getBadge = (sku: string) => {
-    if (sku === 'PT-SCAN-001') return { label: 'Essential', color: 'bg-blue-100 text-blue-700' };
-    if (sku === 'PT-CLASSIC-001') return { label: 'Most Ordered', color: 'bg-amber-100 text-amber-700' };
-    if (sku === 'PT-PLUS-001') return { label: 'Premium', color: 'bg-purple-100 text-purple-700' };
-    return null;
-  };
+  const getProductIconForSku = (sku: string) => getProductIcon(sku, 'lg');
+  const getBadge = (sku: string) => getProductBadge(sku);
 
   if (loading) {
     return (
@@ -97,7 +88,7 @@ export default function ProductDetail() {
                 />
               ) : (
                 <div className="flex flex-col items-center gap-3 text-teal-300">
-                  {getProductIcon(product.sku)}
+                  {getProductIconForSku(product.sku)}
                   <PawPrint className="h-40 w-40" />
                 </div>
               )}

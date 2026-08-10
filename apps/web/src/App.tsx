@@ -78,7 +78,7 @@ export default function App() {
       <Route path="/invoice/:token" element={<InvoiceView />} />
 
       {/* Catch-all */}
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<NotFound />} />
     </Routes>
   );
 }

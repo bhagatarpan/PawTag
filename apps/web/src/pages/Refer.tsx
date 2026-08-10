@@ -21,8 +21,8 @@ export default function Refer() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-16 text-center">
-      <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-6">
-        <Gift size={32} className="text-primary-600" />
+      <div className="w-16 h-16 bg-teal-100 rounded-full flex items-center justify-center mx-auto mb-6">
+        <Gift size={32} className="text-teal-600" />
       </div>
 
       <h1 className="text-3xl font-bold mb-4">Refer Friends, Earn Rewards</h1>
@@ -52,27 +52,27 @@ export default function Refer() {
       )}
 
       <div className="flex flex-col sm:flex-row gap-4 justify-center">
-        <Link to="/shop" className="inline-flex items-center justify-center gap-2 bg-primary-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-primary-700 transition-colors">
+        <Link to="/shop" className="inline-flex items-center justify-center gap-2 bg-teal-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-teal-700 transition-colors">
           Shop Now <ArrowRight size={18} />
         </Link>
-        <Link to="/register" className="inline-flex items-center justify-center gap-2 bg-white text-primary-600 border-2 border-primary-600 px-8 py-3 rounded-lg font-semibold hover:bg-primary-50 transition-colors">
+        <Link to="/register" className="inline-flex items-center justify-center gap-2 bg-white text-teal-600 border-2 border-teal-600 px-8 py-3 rounded-lg font-semibold hover:bg-teal-50 transition-colors">
           Create Account
         </Link>
       </div>
 
       <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
         <div className="bg-white rounded-xl border p-5">
-          <div className="text-2xl font-bold text-primary-600 mb-2">1</div>
+          <div className="text-2xl font-bold text-teal-600 mb-2">1</div>
           <h3 className="font-semibold mb-1">Share Your Code</h3>
           <p className="text-sm text-gray-500">Send your unique referral code to friends and family.</p>
         </div>
         <div className="bg-white rounded-xl border p-5">
-          <div className="text-2xl font-bold text-primary-600 mb-2">2</div>
+          <div className="text-2xl font-bold text-teal-600 mb-2">2</div>
           <h3 className="font-semibold mb-1">Friend Purchases</h3>
           <p className="text-sm text-gray-500">They buy any PawTag using your code at checkout.</p>
         </div>
         <div className="bg-white rounded-xl border p-5">
-          <div className="text-2xl font-bold text-primary-600 mb-2">3</div>
+          <div className="text-2xl font-bold text-teal-600 mb-2">3</div>
           <h3 className="font-semibold mb-1">Both Earn Rewards</h3>
           <p className="text-sm text-gray-500">You both get 1 month free on your subscription!</p>
         </div>
