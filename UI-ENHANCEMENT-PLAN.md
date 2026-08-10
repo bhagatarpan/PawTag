@@ -112,7 +112,7 @@ and eliminating duplicated UI code.
 
 ## Phase 2: Admin — Pets Page
 
-**Status:** `pending`
+**Status:** `completed`
 
 ### Goal
 Rewrite `apps/admin/src/pages/Pets.tsx` with enterprise-grade UX.
@@ -271,7 +271,7 @@ Refactor the monolithic finder page into maintainable components with better UX.
 |-------|--------|---------|-----------|
 | Phase 0: Shared UI Library | `completed` | 2026-08-10 | 2026-08-10 |
 | Phase 1: Admin Users | `completed` | 2026-08-10 | 2026-08-10 |
-| Phase 2: Admin Pets | `pending` | — | — |
+| Phase 2: Admin Pets | `completed` | 2026-08-10 | 2026-08-10 |
 | Phase 3: Admin Tags + Products | `pending` | — | — |
 | Phase 4: Customer Portal | `pending` | — | — |
 | Phase 5: Public Website | `pending` | — | — |
