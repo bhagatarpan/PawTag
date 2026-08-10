@@ -150,12 +150,12 @@ Rewrite `apps/admin/src/pages/Pets.tsx` with enterprise-grade UX.
 
 ---
 
-## Phase 3: Admin — Tags + Products Pages
+## Phase 3: Admin — Tags + Products + Orders Pages
 
-**Status:** `pending`
+**Status:** `completed`
 
 ### Goal
-Enhance both pages to enterprise quality.
+Enhance all three admin entity pages to enterprise quality.
 
 ### Tags Enhancements
 - Summary cards: Total, Active, QR, NFC, Lost, Expiring Soon
@@ -169,6 +169,14 @@ Enhance both pages to enterprise quality.
 - Detail drawer: Full product info, images gallery, variants table, stock levels
 - Filter chips (not just count)
 - Stock level visual indicator
+
+### Orders Enhancements
+- Summary cards: Total, Pending, Paid, Shipped, Delivered
+- Detail drawer: Order Info (details, invoice, actions), Items table, Shipping & Payment tabs
+- Status transition buttons (Start Packing, Create Shipment, Mark Delivered, Cancel, Refund)
+- Invoice actions: View, Email, Print
+- CSV export
+- Filter chips for status and search
 
 ### Backend Changes
 - `GET /admin/tags/summary`
@@ -272,7 +280,7 @@ Refactor the monolithic finder page into maintainable components with better UX.
 | Phase 0: Shared UI Library | `completed` | 2026-08-10 | 2026-08-10 |
 | Phase 1: Admin Users | `completed` | 2026-08-10 | 2026-08-10 |
 | Phase 2: Admin Pets | `completed` | 2026-08-10 | 2026-08-10 |
-| Phase 3: Admin Tags + Products | `completed` | 2026-08-10 | 2026-08-10 |
+| Phase 3: Admin Tags + Products + Orders | `completed` | 2026-08-10 | 2026-08-10 |
 | Phase 4: Customer Portal | `pending` | — | — |
 | Phase 5: Public Website | `pending` | — | — |
 | Phase 6: Finder Portal | `pending` | — | — |
