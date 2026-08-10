@@ -20,7 +20,9 @@
     "baseUrl": ".",
     "paths": {
       "@pawtag/shared": ["./packages/shared/src"],
-      "@pawtag/db": ["./packages/db/src"]
+      "@pawtag/db": ["./packages/db/src"],
+      "@pawtag/ui": ["./packages/ui/src"],
+      "@pawtag/ui/*": ["./packages/ui/src/*"]
     }
   },
   "exclude": ["node_modules", "dist", "build"]
