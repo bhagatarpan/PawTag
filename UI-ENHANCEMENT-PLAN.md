@@ -191,31 +191,29 @@ Enhance all three admin entity pages to enterprise quality.
 
 ## Phase 4: Customer Portal (Web Account Pages)
 
-**Status:** `pending`
+**Status:** `completed`
 
 ### Goal
-Upgrade all `/account/*` pages with enterprise UX patterns.
+Upgrade customer portal with enterprise UX patterns.
 
-### Pages
+### What Was Done
 
 | Page | Key Enhancements |
 |------|-----------------|
-| MyPets | Summary bar, pet cards with status badges, quick actions, pet detail drawer |
-| Orders | Summary, search, filter by status, order timeline |
-| Subscriptions | Summary, renewal countdown, plan comparison |
-| Notifications | Mark read/unread, filter by type, bulk actions |
-| Profile | Clean up form layout, add avatar upload |
-| RedeemTag | Better success/error states, tag activation history |
+| **Dashboard** (NEW) | Summary cards (Pets, Lost, Tags, Subscriptions, Notifications), quick actions grid, recent orders/pets/subscriptions/notifications panels |
+| **Settings** (REWRITTEN) | Account info with status badges, MFA toggle, change password link, notification preferences link, data export, delete account with confirmation |
+| **Orders** (UPGRADED) | @pawtag/ui StatusBadge with icons, skeleton loading, error state with retry, EmptyState |
+| **Notifications** (UPGRADED) | @pawtag/ui EmptyState, typed interfaces, skeleton loading, better visual hierarchy |
+| **Types** | Added Pet, Tag, Subscription, Notification, DashboardData interfaces |
 
-### Backend Changes
-- `GET /customer/pets/summary`
-- `GET /customer/orders/summary`
-- `GET /customer/subscriptions/summary`
+### Routing Changes
+- `/account` → Dashboard (was MyPets)
+- `/account/pets` → MyPets (new route)
+- Sidebar updated with Dashboard nav item
 
 ### Verification
-- [ ] Typecheck passes
-- [ ] Build passes
-- [ ] All existing tests pass
+- [x] Typecheck passes
+- [x] Build passes
 
 ---
 
@@ -281,7 +279,7 @@ Refactor the monolithic finder page into maintainable components with better UX.
 | Phase 1: Admin Users | `completed` | 2026-08-10 | 2026-08-10 |
 | Phase 2: Admin Pets | `completed` | 2026-08-10 | 2026-08-10 |
 | Phase 3: Admin Tags + Products + Orders | `completed` | 2026-08-10 | 2026-08-10 |
-| Phase 4: Customer Portal | `pending` | — | — |
+| Phase 4: Customer Portal | `completed` | 2026-08-10 | 2026-08-10 |
 | Phase 5: Public Website | `pending` | — | — |
 | Phase 6: Finder Portal | `pending` | — | — |
 

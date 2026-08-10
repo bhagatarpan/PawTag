@@ -44,16 +44,20 @@ export interface Order {
   items: Array<{
     productId: string;
     productName: string;
+    variantName?: string;
+    petName?: string;
     quantity: number;
     unitPrice: number;
     totalPrice: number;
   }>;
-  status: 'pending' | 'paid' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
+  status: 'pending' | 'pending_payment' | 'paid' | 'packing' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
   payment: {
-    method: string;
-    status: string;
+    method: 'card' | 'paypal' | 'bank_transfer';
+    status: 'pending' | 'completed' | 'failed' | 'refunded';
+    transactionId?: string;
     amount: number;
     currency: string;
+    paidAt?: string;
   };
   shippingAddress: {
     line1: string;
@@ -63,6 +67,8 @@ export interface Order {
     zip: string;
     country: string;
   };
+  trackingNumber?: string;
+  carrier?: string;
   createdAt: string;
 }
 
@@ -87,5 +93,92 @@ export interface User {
     relationship: string;
   };
   status?: string;
+  mfaEnabled?: boolean;
   rbacRoles?: Array<{ name: string; displayName: string }>;
+}
+
+export interface Pet {
+  _id: string;
+  name: string;
+  petId: string;
+  petType: string;
+  breed: string;
+  secondaryBreed?: string;
+  color: string;
+  pattern?: string;
+  gender?: string;
+  birthday?: string;
+  age?: string;
+  favouriteFood?: string;
+  medicalAlerts?: string;
+  status: 'safe' | 'lost' | 'found' | 'deceased' | 'stolen' | 'transferred' | 'donated' | 'sold';
+  photos: Array<{ url: string; caption?: string; isMain?: boolean }>;
+  mainPhoto?: string;
+  tagId?: { _id: string; tagId: string; status: string; tagType: string };
+  subscription?: { status: string; planName: string; currentPeriodEnd: string };
+  lostSince?: string;
+  foundAt?: string;
+  createdAt: string;
+}
+
+export interface Tag {
+  _id: string;
+  tagId: string;
+  tagType: 'qr' | 'nfc';
+  status: 'active' | 'inactive' | 'lost' | 'unredeemed';
+  petId?: { _id: string; name: string; petType: string };
+  subscription?: { status: string; planName: string; currentPeriodEnd: string };
+  lastScannedAt?: string;
+  createdAt: string;
+}
+
+export interface Subscription {
+  _id: string;
+  tagId: { tagId: string; status: string; tagType: string };
+  planName: string;
+  planType: string;
+  status: string;
+  price: number;
+  startDate: string;
+  freePeriodEndsAt?: string;
+  currentPeriodEnd: string;
+  gracePeriodEndsAt?: string;
+  cancelledAt?: string;
+  autoRenew: boolean;
+  renewalMethod: string;
+  totalScans: number;
+  lastScannedAt?: string;
+  nextPaymentDate?: string;
+  petName?: string;
+  petType?: string;
+  productName?: string;
+  createdAt: string;
+}
+
+export interface Notification {
+  _id: string;
+  type: 'pet_lost' | 'pet_found' | 'finder_reminder' | 'finder_scan' | 'order_update' | 'subscription_reminder' | 'referral' | 'system';
+  title: string;
+  message: string;
+  read: boolean;
+  priority?: 'high' | 'normal';
+  data?: {
+    petId?: string;
+    petName?: string;
+    finderPhone?: string;
+    finderEmail?: string;
+    finderName?: string;
+    foundAt?: string;
+    location?: { lat: number; lng: number; address?: string };
+  };
+  createdAt: string;
+}
+
+export interface DashboardData {
+  pets: Pet[];
+  tags: Tag[];
+  subscriptions: Subscription[];
+  recentOrders: Order[];
+  unreadNotifications: number;
+  responsibilityScore?: number;
 }

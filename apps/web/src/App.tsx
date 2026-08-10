@@ -32,6 +32,7 @@ import RedeemTag from './pages/account/RedeemTag';
 import Referrals from './pages/account/Referrals';
 import NotificationPreferences from './pages/account/NotificationPreferences';
 import InvoiceView from './pages/InvoiceView';
+import AccountDashboard from './pages/account/Dashboard';
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const token = localStorage.getItem('pawtag_token');
@@ -61,7 +62,8 @@ export default function App() {
       <Route path="/refer" element={<div className="min-h-screen flex flex-col"><Navbar /><main className="flex-1"><Refer /></main><Footer /></div>} />
 
       {/* Account routes — no public Navbar/Footer, uses AccountLayout sidebar */}
-      <Route path="/account" element={<ProtectedRoute><AccountLayout><MyPets /></AccountLayout></ProtectedRoute>} />
+      <Route path="/account" element={<ProtectedRoute><AccountLayout><AccountDashboard /></AccountLayout></ProtectedRoute>} />
+      <Route path="/account/pets" element={<ProtectedRoute><AccountLayout><MyPets /></AccountLayout></ProtectedRoute>} />
       <Route path="/account/profile" element={<ProtectedRoute><AccountLayout><Profile /></AccountLayout></ProtectedRoute>} />
       <Route path="/account/orders" element={<ProtectedRoute><AccountLayout><Orders /></AccountLayout></ProtectedRoute>} />
       <Route path="/account/orders/:id" element={<ProtectedRoute><AccountLayout><OrderDetail /></AccountLayout></ProtectedRoute>} />
