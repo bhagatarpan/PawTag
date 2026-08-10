@@ -54,7 +54,7 @@ export default function NotifyOwnerForm({ tagId, location, locationConsent, cons
           onClick={() => setShowForm(true)}
           className="w-full bg-gradient-to-r from-teal-500 to-teal-600 text-white py-3.5 rounded-xl font-semibold flex items-center justify-center gap-2 hover:from-teal-600 hover:to-teal-700 transition-all duration-200 shadow-lg shadow-teal-500/25"
         >
-          <MessageCircle size={18} /> I Found This Pet
+          <MessageCircle size={18} /> Notify Owner I Found Their Pet
         </button>
       ) : (
         <div className="bg-white border border-gray-200 rounded-2xl p-5 space-y-4 shadow-lg">
