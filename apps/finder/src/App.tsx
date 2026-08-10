@@ -3,7 +3,7 @@ import { useParams, Routes, Route } from 'react-router-dom';
 import { Phone, PawPrint } from 'lucide-react';
 import { useSiteSettings } from './hooks/useSiteSettings';
 import { fetchTagData, fetchFoundTimer } from './lib/finderApi';
-import type { FinderData, FoundTimerData, LocationData, PetPhoto } from './types';
+import type { FinderData, FoundTimerData, LocationData } from './types';
 import StatusBanner from './components/StatusBanner';
 import PetPhotoCarousel from './components/PetPhotoCarousel';
 import PetDetailsCard from './components/PetDetailsCard';
@@ -87,68 +87,85 @@ function FinderPage() {
   if (error) return <FinderErrorState message={error} />;
   if (!data) return null;
 
-  const bgColor = data.pet.status === 'lost' ? 'bg-red-50' : data.pet.status === 'found' ? 'bg-amber-50' : 'bg-gray-50';
+  const bgClass = data.pet.status === 'lost' 
+    ? 'bg-gradient-to-br from-red-50 via-white to-red-50' 
+    : data.pet.status === 'found' 
+      ? 'bg-gradient-to-br from-amber-50 via-white to-amber-50' 
+      : 'bg-gradient-to-br from-emerald-50 via-white to-emerald-50';
 
   return (
-    <div className={`min-h-screen py-8 px-4 ${bgColor}`}>
-      <div className="max-w-md mx-auto">
-        <StatusBanner status={data.pet.status} />
+    <div className={`min-h-screen ${bgClass}`}>
+      <div className="max-w-md mx-auto pb-8">
+        {/* Status Banner */}
+        <div className="px-4 pt-6">
+          <StatusBanner status={data.pet.status} />
+        </div>
 
+        {/* Tag Info */}
         <TagInfoHeader tagId={data.tagId} tagStatus={data.tagStatus} />
 
-        <div className="bg-white rounded-xl shadow-md overflow-hidden">
-          <PetPhotoCarousel
-            photos={data.pet.photos}
-            fallbackUrl={data.pet.photoUrl}
-            petName={data.pet.name}
-          />
+        {/* Photo */}
+        <PetPhotoCarousel
+          photos={data.pet.photos}
+          fallbackUrl={data.pet.photoUrl}
+          petName={data.pet.name}
+        />
 
-          <PetDetailsCard data={data} />
+        {/* Pet Details (Floating Card) */}
+        <PetDetailsCard data={data} />
 
-          {data.pet.medicalAlerts && (
-            <MedicalAlertBanner message={data.pet.medicalAlerts} />
+        {/* Medical Alert */}
+        {data.pet.medicalAlerts && (
+          <MedicalAlertBanner message={data.pet.medicalAlerts} />
+        )}
+
+        {/* Actions Section */}
+        <div className="px-4 mt-6 space-y-3">
+          {foundTimer && <FoundTimer timer={foundTimer} />}
+
+          {!notified && !foundTimer?.active && (
+            <LocationConsentBanner
+              consent={locationConsent}
+              hasLocation={!!finderLocation}
+              onGrant={handleLocationGrant}
+              onDecline={handleLocationDecline}
+            />
           )}
 
-          <div className="px-6 pb-6 space-y-3">
-            {foundTimer && <FoundTimer timer={foundTimer} />}
+          {!notified && !foundTimer?.active ? (
+            <NotifyOwnerForm
+              tagId={tagId!}
+              location={finderLocation}
+              locationConsent={locationConsent}
+              consentTimestamp={consentTimestamp}
+              onNotified={handleNotified}
+            />
+          ) : notified ? (
+            <div className="mx-4 bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-200 text-emerald-700 py-4 rounded-xl text-center flex items-center justify-center gap-2 shadow-sm">
+              <Phone size={18} /> 
+              <span className="font-semibold">Owner notified! Thank you for helping.</span>
+            </div>
+          ) : null}
 
-            {!notified && !foundTimer?.active && (
-              <LocationConsentBanner
-                consent={locationConsent}
-                hasLocation={!!finderLocation}
-                onGrant={handleLocationGrant}
-                onDecline={handleLocationDecline}
-              />
-            )}
-
-            {!notified && !foundTimer?.active ? (
-              <NotifyOwnerForm
-                tagId={tagId!}
-                location={finderLocation}
-                locationConsent={locationConsent}
-                consentTimestamp={consentTimestamp}
-                onNotified={handleNotified}
-              />
-            ) : notified ? (
-              <div className="bg-green-50 text-green-700 py-3 rounded-lg text-center flex items-center justify-center gap-2">
-                <Phone size={18} /> Owner has been notified! Thank you for helping.
-              </div>
-            ) : null}
-
-            {data.ownerPhone && (
+          {data.ownerPhone && (
+            <div className="px-4">
               <a
                 href={`tel:${data.ownerPhone}`}
-                className="block w-full border border-gray-300 text-gray-700 py-3 rounded-lg font-medium text-center hover:bg-gray-50 transition-colors"
+                className="block w-full border-2 border-gray-200 text-gray-700 py-3.5 rounded-xl font-semibold text-center hover:bg-gray-50 hover:border-gray-300 transition-all duration-200"
               >
                 Call Owner: {data.ownerPhone}
               </a>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
-        <p className="text-center text-xs text-gray-400 mt-6">
-          Powered by {companyName} - Helping reunite lost pets with their families
-        </p>
+        {/* Footer */}
+        <div className="mt-8 text-center">
+          <div className="inline-flex items-center gap-1.5 text-xs text-gray-400">
+            <PawPrint size={12} />
+            Powered by {companyName}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -161,11 +178,13 @@ export default function App() {
     <Routes>
       <Route path="/:tagId" element={<FinderPage />} />
       <Route path="*" element={
-        <div className="min-h-screen flex items-center justify-center">
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
           <div className="text-center">
-            <PawPrint size={48} className="text-primary-600 mx-auto mb-4" />
-            <h1 className="text-xl font-bold mb-2">{companyName} Finder</h1>
-            <p className="text-gray-500">Scan a QR code to view a lost pet's information.</p>
+            <div className="w-20 h-20 bg-white rounded-3xl shadow-xl flex items-center justify-center mx-auto mb-6">
+              <PawPrint size={40} className="text-teal-500" />
+            </div>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">{companyName} Finder</h1>
+            <p className="text-gray-500">Scan a QR code to view a pet's information.</p>
           </div>
         </div>
       } />
