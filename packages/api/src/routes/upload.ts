@@ -1,5 +1,7 @@
 import { Router, Response } from 'express';
 import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
 import { AuthRequest, authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
 import { createAuditContextFromRequest, type AuditRequest } from '../middleware/audit';
@@ -9,6 +11,15 @@ import { User } from '@pawtag/db';
 import logger from '../lib/logger';
 
 const router = Router();
+
+// Local storage fallback for development
+const LOCAL_UPLOAD_DIR = path.join(__dirname, '../../uploads/avatars');
+
+function ensureLocalDir(dir: string) {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+}
 
 async function auditUploadEvent(
   req: AuditRequest,
@@ -222,14 +233,21 @@ router.post('/profile-picture', authenticate, async (req: AuthRequest, res: Resp
     }
 
     try {
-      if (!isR2Configured()) {
-        res.status(500).json({ success: false, error: 'File storage is not configured. Please set R2 environment variables.' });
-        return;
-      }
-
       const filename = generateUniqueFilename(req.file.originalname);
-      const key = `avatars/${filename}`;
-      const photoUrl = await uploadToR2(key, req.file.buffer, req.file.mimetype);
+      let photoUrl: string;
+
+      if (isR2Configured()) {
+        // Use R2 storage in production
+        const key = `avatars/${filename}`;
+        photoUrl = await uploadToR2(key, req.file.buffer, req.file.mimetype);
+      } else {
+        // Use local storage fallback in development
+        ensureLocalDir(LOCAL_UPLOAD_DIR);
+        const filePath = path.join(LOCAL_UPLOAD_DIR, filename);
+        fs.writeFileSync(filePath, req.file.buffer);
+        photoUrl = `/api/uploads/avatars/${filename}`;
+        logger.info({ filename }, 'Profile picture saved to local storage (development mode)');
+      }
 
       // Update user's profilePicture in database
       const user = await User.findByIdAndUpdate(
