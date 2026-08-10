@@ -1,6 +1,7 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
+import { ConfirmDialog } from '@pawtag/ui';
 import {
   Plus, X, Save, Trash2, Search, Globe, Loader2,
   Pencil, Info, Layers,
@@ -32,6 +33,34 @@ export default function RbacScopes() {
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState<{
+    open: boolean;
+    title: string;
+    message: string;
+    variant: 'danger' | 'warning';
+    onConfirm: () => void;
+    loading: boolean;
+  }>({ open: false, title: '', message: '', variant: 'danger', onConfirm: () => {}, loading: false });
+
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+K / Cmd+K to focus search
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+      // Escape to close modals
+      if (e.key === 'Escape') {
+        if (editingScope) setEditingScope(null);
+        if (confirm.open) setConfirm(prev => ({ ...prev, open: false }));
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [editingScope, confirm.open]);
 
   const fetchScopes = () => {
     setLoading(true);
@@ -104,18 +133,26 @@ export default function RbacScopes() {
     }
   };
 
-  const deleteScope = async (scope: Scope) => {
-    if (!window.confirm(`Delete scope "${scope.code}"? This cannot be undone.`)) return;
-    setDeleting(scope._id);
-    try {
-      await api.delete(`/admin/rbac/scopes/${scope._id}`);
-      toast.success(`"${scope.code}" deleted`);
-      fetchScopes();
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Failed to delete — scope may be in use');
-    } finally {
-      setDeleting(null);
-    }
+  const deleteScope = (scope: Scope) => {
+    setConfirm({
+      open: true,
+      title: 'Delete Access Scope',
+      message: `Are you sure you want to delete scope "${scope.code}"? This action cannot be undone and may affect permissions using this scope.`,
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirm(prev => ({ ...prev, loading: true }));
+        try {
+          await api.delete(`/admin/rbac/scopes/${scope._id}`);
+          toast.success(`"${scope.code}" deleted`);
+          fetchScopes();
+        } catch (err: any) {
+          toast.error(err.response?.data?.error || 'Failed to delete — scope may be in use');
+        } finally {
+          setConfirm({ open: false, title: '', message: '', variant: 'danger', onConfirm: () => {}, loading: false });
+        }
+      },
+      loading: false,
+    });
   };
 
   const openEdit = (scope: Scope) => {
@@ -205,9 +242,10 @@ export default function RbacScopes() {
         <div className="relative max-w-md">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
+            ref={searchInputRef}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search scopes..."
+            placeholder="Search scopes... (Ctrl+K)"
             className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
           />
           {search && (
@@ -308,7 +346,7 @@ export default function RbacScopes() {
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1.5">Name *</label>
-              <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none" />
+              <input id="edit-scope-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none" />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1.5">Description</label>
@@ -325,6 +363,18 @@ export default function RbacScopes() {
           </div>
         </div>
       )}
+
+      {/* Confirm Dialog */}
+      <ConfirmDialog
+        open={confirm.open}
+        onClose={() => setConfirm({ open: false, title: '', message: '', variant: 'danger', onConfirm: () => {}, loading: false })}
+        onConfirm={confirm.onConfirm}
+        title={confirm.title}
+        message={confirm.message}
+        variant={confirm.variant}
+        loading={confirm.loading}
+        confirmLabel="Delete"
+      />
     </div>
   );
 }

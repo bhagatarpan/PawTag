@@ -1,6 +1,7 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
+import { ConfirmDialog } from '@pawtag/ui';
 import {
   Shield, Plus, X, Save, Copy, Trash2, Check, ChevronDown, ChevronRight,
   Search, Loader2, Users, Crown, Settings, Key, Eye, EyeOff, Pencil,
@@ -67,6 +68,16 @@ export default function RbacRoles() {
   const [saving, setSaving] = useState(false);
   const [cloning, setCloning] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState<{
+    open: boolean;
+    title: string;
+    message: string;
+    variant: 'danger' | 'warning';
+    onConfirm: () => void;
+    loading: boolean;
+  }>({ open: false, title: '', message: '', variant: 'danger', onConfirm: () => {}, loading: false });
+
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Permission assignment state
   const [permRole, setPermRole] = useState<Role | null>(null);
@@ -77,6 +88,25 @@ export default function RbacRoles() {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [permSearch, setPermSearch] = useState('');
   const [permLoading, setPermLoading] = useState(false);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+K / Cmd+K to focus search
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+      // Escape to close modals
+      if (e.key === 'Escape') {
+        if (editingRole) setEditingRole(null);
+        if (permRole) setPermRole(null);
+        if (confirm.open) setConfirm(prev => ({ ...prev, open: false }));
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [editingRole, permRole, confirm.open]);
 
   const fetchRoles = () => {
     setLoading(true);
@@ -137,18 +167,26 @@ export default function RbacRoles() {
     }
   };
 
-  const deleteRole = async (role: Role) => {
-    if (!window.confirm(`Delete "${role.displayName}"? This cannot be undone.`)) return;
-    setDeleting(role._id);
-    try {
-      await api.delete(`/admin/rbac/roles/${role._id}`);
-      toast.success(`"${role.displayName}" deleted`);
-      fetchRoles();
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Failed to delete');
-    } finally {
-      setDeleting(null);
-    }
+  const deleteRole = (role: Role) => {
+    setConfirm({
+      open: true,
+      title: 'Delete Role',
+      message: `Are you sure you want to delete "${role.displayName}"? This action cannot be undone and may affect users with this role.`,
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirm(prev => ({ ...prev, loading: true }));
+        try {
+          await api.delete(`/admin/rbac/roles/${role._id}`);
+          toast.success(`"${role.displayName}" deleted`);
+          fetchRoles();
+        } catch (err: any) {
+          toast.error(err.response?.data?.error || 'Failed to delete');
+        } finally {
+          setConfirm({ open: false, title: '', message: '', variant: 'danger', onConfirm: () => {}, loading: false });
+        }
+      },
+      loading: false,
+    });
   };
 
   const cloneRole = async (role: Role) => {
@@ -322,9 +360,10 @@ export default function RbacRoles() {
         <div className="relative max-w-md">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
+            ref={searchInputRef}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search roles..."
+            placeholder="Search roles... (Ctrl+K)"
             className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
           />
           {search && (
@@ -578,7 +617,7 @@ export default function RbacRoles() {
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1.5">Display Name *</label>
-              <input value={form.displayName} onChange={(e) => setForm({ ...form, displayName: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none" />
+              <input id="edit-role-display-name" value={form.displayName} onChange={(e) => setForm({ ...form, displayName: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none" />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1.5">Description</label>
@@ -607,6 +646,18 @@ export default function RbacRoles() {
           </div>
         </div>
       )}
+
+      {/* Confirm Dialog */}
+      <ConfirmDialog
+        open={confirm.open}
+        onClose={() => setConfirm({ open: false, title: '', message: '', variant: 'danger', onConfirm: () => {}, loading: false })}
+        onConfirm={confirm.onConfirm}
+        title={confirm.title}
+        message={confirm.message}
+        variant={confirm.variant}
+        loading={confirm.loading}
+        confirmLabel="Delete"
+      />
     </div>
   );
 }

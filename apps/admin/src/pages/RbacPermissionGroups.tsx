@@ -1,6 +1,7 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
+import { ConfirmDialog } from '@pawtag/ui';
 import {
   Plus, X, Save, Trash2, Search, Shield, Loader2,
   ChevronDown, ChevronUp, LayoutGrid, Package,
@@ -21,6 +22,21 @@ interface PermissionGroup {
   icon?: string;
   sortOrder: number;
   isActive: boolean;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Utilities                                                          */
+/* ------------------------------------------------------------------ */
+
+function HighlightText({ text, query }: { text: string; query: string }) {
+  if (!query) return <>{text}</>;
+  const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const parts = text.split(new RegExp(`(${escapedQuery})`, 'gi'));
+  return <>{parts.map((part, i) => 
+    part.toLowerCase() === query.toLowerCase() 
+      ? <mark key={i} className="bg-yellow-200 rounded px-0.5">{part}</mark>
+      : part
+  )}</>;
 }
 
 /* ------------------------------------------------------------------ */
@@ -104,6 +120,34 @@ export default function RbacPermissionGroups() {
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState<{
+    open: boolean;
+    title: string;
+    message: string;
+    variant: 'danger' | 'warning';
+    onConfirm: () => void;
+    loading: boolean;
+  }>({ open: false, title: '', message: '', variant: 'danger', onConfirm: () => {}, loading: false });
+
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+K / Cmd+K to focus search
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+      // Escape to close modals
+      if (e.key === 'Escape') {
+        if (editingGroup) setEditingGroup(null);
+        if (confirm.open) setConfirm(prev => ({ ...prev, open: false }));
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [editingGroup, confirm.open]);
 
   const fetchGroups = () => {
     setLoading(true);
@@ -173,18 +217,26 @@ export default function RbacPermissionGroups() {
     }
   };
 
-  const deleteGroup = async (group: PermissionGroup) => {
-    if (!window.confirm(`Delete "${group.displayName}"? This cannot be undone.`)) return;
-    setDeleting(group._id);
-    try {
-      await api.delete(`/admin/rbac/permission-groups/${group._id}`);
-      toast.success(`"${group.displayName}" deleted`);
-      fetchGroups();
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Failed to delete — group may have permissions assigned');
-    } finally {
-      setDeleting(null);
-    }
+  const deleteGroup = (group: PermissionGroup) => {
+    setConfirm({
+      open: true,
+      title: 'Delete Permission Group',
+      message: `Are you sure you want to delete "${group.displayName}"? This action cannot be undone and may affect assigned permissions.`,
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirm(prev => ({ ...prev, loading: true }));
+        try {
+          await api.delete(`/admin/rbac/permission-groups/${group._id}`);
+          toast.success(`"${group.displayName}" deleted`);
+          fetchGroups();
+        } catch (err: any) {
+          toast.error(err.response?.data?.error || 'Failed to delete — group may have permissions assigned');
+        } finally {
+          setConfirm({ open: false, title: '', message: '', variant: 'danger', onConfirm: () => {}, loading: false });
+        }
+      },
+      loading: false,
+    });
   };
 
   const openEdit = (group: PermissionGroup) => {
@@ -272,9 +324,10 @@ export default function RbacPermissionGroups() {
         <div className="relative max-w-md">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
+            ref={searchInputRef}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search groups..."
+            placeholder="Search groups... (Ctrl+K)"
             className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
           />
           {search && (
@@ -331,7 +384,9 @@ export default function RbacPermissionGroups() {
                         {GroupIcon ? <GroupIcon size={18} className={group.isActive ? 'text-primary-600' : 'text-gray-400'} /> : <Package size={18} className="text-gray-400" />}
                       </div>
                       <div>
-                        <p className={`font-semibold text-sm ${group.isActive ? 'text-gray-900' : 'text-gray-400'}`}>{group.displayName}</p>
+                        <p className={`font-semibold text-sm ${group.isActive ? 'text-gray-900' : 'text-gray-400'}`}>
+                          <HighlightText text={group.displayName} query={search} />
+                        </p>
                         <p className="text-xs text-gray-400 font-mono">{group.name}</p>
                       </div>
                     </div>
@@ -379,7 +434,7 @@ export default function RbacPermissionGroups() {
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1.5">Display Name</label>
-              <input value={form.displayName} onChange={(e) => setForm({ ...form, displayName: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none" />
+              <input id="edit-display-name" value={form.displayName} onChange={(e) => setForm({ ...form, displayName: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none" />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1.5">Description</label>
@@ -406,6 +461,18 @@ export default function RbacPermissionGroups() {
           </div>
         </div>
       )}
+
+      {/* Confirm Dialog */}
+      <ConfirmDialog
+        open={confirm.open}
+        onClose={() => setConfirm({ open: false, title: '', message: '', variant: 'danger', onConfirm: () => {}, loading: false })}
+        onConfirm={confirm.onConfirm}
+        title={confirm.title}
+        message={confirm.message}
+        variant={confirm.variant}
+        loading={confirm.loading}
+        confirmLabel="Delete"
+      />
     </div>
   );
 }
