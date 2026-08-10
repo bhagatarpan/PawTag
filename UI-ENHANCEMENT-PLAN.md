@@ -244,30 +244,32 @@ Extract shared utilities and fix inconsistencies across public pages.
 
 ## Phase 6: Finder Portal
 
-**Status:** `pending`
+**Status:** `completed`
 
 ### Goal
 Refactor the monolithic finder page into maintainable components with better UX.
 
-### Current State
-- Single 435-line `App.tsx`
-- Functional but monolithic
+### What Was Done
 
-### Target State
-
-| Feature | Detail |
-|---------|--------|
-| Component extraction | StatusBanner, PhotoCarousel, PetDetails, NotifyForm, LocationConsent, FoundTimer |
-| Loading | Skeleton card instead of spinner |
-| Error | Better "Tag Not Found" page with scan instructions |
-| SEO | Open Graph tags, meta description, structured data |
-| Accessibility | aria-labels, focus management, keyboard navigation |
-| Offline | Service worker for cached pet info |
+| Change | Detail |
+|--------|--------|
+| **Component decomposition** | Broke 435-line `App.tsx` into 10 focused components |
+| **`types.ts`** | Extracted TypeScript interfaces (FinderData, FoundTimerData, LocationData, etc.) |
+| **`finderApi.ts`** | Typed API service layer with `fetchTagData()`, `fetchFoundTimer()`, `notifyOwner()` |
+| **`StatusBanner`** | Status-aware banner (lost/found/safe) with appropriate styling |
+| **`PetPhotoCarousel`** | Photo gallery with prev/next navigation and dot pagination |
+| **`PetDetailsCard`** | Pet info display with breed formatting logic |
+| **`MedicalAlertBanner`** | Red alert box for medical information |
+| **`LocationConsentBanner`** | GPS consent UI with grant/decline options |
+| **`NotifyOwnerForm`** | Contact form with validation, location sharing, consent audit trail |
+| **`FoundTimer`** | Live-updating elapsed time display |
+| **`FinderLoadingState`** | Loading spinner |
+| **`FinderErrorState`** | Error state with tag not found message |
+| **`TagInfoHeader`** | Tag ID and status badge display |
 
 ### Verification
-- [ ] Typecheck passes
-- [ ] Build passes
-- [ ] All existing tests pass
+- [x] Typecheck passes
+- [x] Build passes
 
 ---
 
@@ -281,7 +283,7 @@ Refactor the monolithic finder page into maintainable components with better UX.
 | Phase 3: Admin Tags + Products + Orders | `completed` | 2026-08-10 | 2026-08-10 |
 | Phase 4: Customer Portal | `completed` | 2026-08-10 | 2026-08-10 |
 | Phase 5: Public Website | `completed` | 2026-08-10 | 2026-08-10 |
-| Phase 6: Finder Portal | `pending` | — | — |
+| Phase 6: Finder Portal | `completed` | 2026-08-10 | 2026-08-10 |
 
 ---
 

@@ -1,72 +1,42 @@
 import { useState, useEffect } from 'react';
 import { useParams, Routes, Route } from 'react-router-dom';
-import axios from 'axios';
-import { PawPrint, Phone, MapPin, AlertTriangle, Loader2, CheckCircle, ChevronLeft, ChevronRight, ShieldAlert, ShieldCheck, Clock, Mail, User } from 'lucide-react';
+import { Phone, PawPrint } from 'lucide-react';
 import { useSiteSettings } from './hooks/useSiteSettings';
-
-interface PetPhoto {
-  url: string;
-  caption?: string;
-  isMain: boolean;
-}
-
-interface FinderData {
-  pet: {
-    name: string;
-    petId?: string;
-    petType?: string;
-    species: string;
-    breed: string;
-    breedOrigin?: string;
-    secondaryBreed?: string;
-    color: string;
-    pattern?: string;
-    gender?: string;
-    age?: number;
-    favouriteFood?: string;
-    photos: PetPhoto[];
-    photoUrl?: string;
-    medicalAlerts?: string;
-    status: string;
-  };
-  tagId: string;
-  tagStatus?: string;
-  ownerName: string;
-  ownerPhone?: string;
-}
+import { fetchTagData, fetchFoundTimer } from './lib/finderApi';
+import type { FinderData, FoundTimerData, LocationData, PetPhoto } from './types';
+import StatusBanner from './components/StatusBanner';
+import PetPhotoCarousel from './components/PetPhotoCarousel';
+import PetDetailsCard from './components/PetDetailsCard';
+import MedicalAlertBanner from './components/MedicalAlertBanner';
+import LocationConsentBanner from './components/LocationConsentBanner';
+import NotifyOwnerForm from './components/NotifyOwnerForm';
+import FoundTimer from './components/FoundTimer';
+import FinderLoadingState from './components/FinderLoadingState';
+import FinderErrorState from './components/FinderErrorState';
+import TagInfoHeader from './components/TagInfoHeader';
 
 function FinderPage() {
   const { tagId } = useParams<{ tagId: string }>();
   const { settings } = useSiteSettings();
   const companyName = settings?.['company.name'] || 'PawTag';
+
   const [data, setData] = useState<FinderData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notified, setNotified] = useState(false);
-  const [photoIdx, setPhotoIdx] = useState(0);
-  const [showContactForm, setShowContactForm] = useState(false);
-  const [finderName, setFinderName] = useState('');
-  const [finderPhone, setFinderPhone] = useState('');
-  const [finderEmail, setFinderEmail] = useState('');
-  const [contactError, setContactError] = useState('');
-  const [notifyLoading, setNotifyLoading] = useState(false);
-  const [foundTimer, setFoundTimer] = useState<{ active: boolean; foundAt?: string; elapsed?: number; finderPhone?: string; finderEmail?: string; finderName?: string } | null>(null);
-  const [timerDisplay, setTimerDisplay] = useState('');
+  const [foundTimer, setFoundTimer] = useState<FoundTimerData | null>(null);
 
-  // Location consent & capture state
+  // Location state
   const [locationConsent, setLocationConsent] = useState<'pending' | 'granted' | 'denied' | 'unavailable'>('pending');
-  const [finderLocation, setFinderLocation] = useState<{ latitude: number; longitude: number; accuracy?: number } | null>(null);
+  const [finderLocation, setFinderLocation] = useState<LocationData | null>(null);
   const [consentTimestamp, setConsentTimestamp] = useState<Date | null>(null);
-
-  const apiBase = import.meta.env.VITE_API_URL || '/api';
 
   useEffect(() => {
     if (!tagId) { setError('No tag ID provided'); setLoading(false); return; }
-    axios
-      .get(`${apiBase}/finder/${tagId}`)
+    fetchTagData(tagId)
       .then((res) => {
-        setData(res.data.data);
-        if (res.data.data.pet.status === 'found') {
+        setData(res);
+        if (res.pet.status === 'found') {
           loadFoundTimer();
         }
       })
@@ -77,28 +47,12 @@ function FinderPage() {
   const loadFoundTimer = async () => {
     if (!tagId) return;
     try {
-      const res = await axios.get(`${apiBase}/finder/${tagId}/found-timer`);
-      setFoundTimer(res.data.data);
+      const timer = await fetchFoundTimer(tagId);
+      setFoundTimer(timer);
     } catch { /* ignore */ }
   };
 
-  // Timer display updater
-  useEffect(() => {
-    if (!foundTimer?.active || !foundTimer.foundAt) return;
-    const updateTimer = () => {
-      const elapsed = Date.now() - new Date(foundTimer.foundAt!).getTime();
-      const hours = Math.floor(elapsed / (1000 * 60 * 60));
-      const mins = Math.floor((elapsed % (1000 * 60 * 60)) / (1000 * 60));
-      const secs = Math.floor((elapsed % (1000 * 60)) / 1000);
-      setTimerDisplay(`${hours}h ${mins}m ${secs}s`);
-    };
-    updateTimer();
-    const interval = setInterval(updateTimer, 1000);
-    return () => clearInterval(interval);
-  }, [foundTimer]);
-
-  // Request GPS location after consent
-  const requestLocation = () => {
+  const handleLocationGrant = () => {
     if (!navigator.geolocation) {
       setLocationConsent('unavailable');
       setConsentTimestamp(new Date());
@@ -114,296 +68,81 @@ function FinderPage() {
           accuracy: pos.coords.accuracy,
         });
       },
-      () => {
-        setLocationConsent('denied');
-      },
+      () => { setLocationConsent('denied'); },
       { enableHighAccuracy: true, timeout: 10000 },
     );
   };
 
-  const declineLocation = () => {
+  const handleLocationDecline = () => {
     setLocationConsent('denied');
     setConsentTimestamp(new Date());
   };
 
-  const notifyOwner = async () => {
-    if (!tagId) return;
-    if (!finderPhone && !finderEmail) {
-      setContactError('Please provide at least a phone number or email so the owner can contact you.');
-      return;
-    }
-    setNotifyLoading(true);
-    setContactError('');
-    try {
-      const payload: any = { finderName, finderPhone, finderEmail };
-      if (finderLocation) {
-        payload.latitude = finderLocation.latitude;
-        payload.longitude = finderLocation.longitude;
-        payload.accuracy = finderLocation.accuracy;
-      }
-      // Send consent info for audit trail
-      payload.consent = {
-        locationConsent: locationConsent === 'pending' ? 'skipped' : locationConsent,
-        consentedAt: consentTimestamp?.toISOString() || new Date().toISOString(),
-        consentVersion: '1.0',
-      };
-      await axios.post(`${apiBase}/finder/${tagId}/notify`, payload);
-      setNotified(true);
-      setShowContactForm(false);
-      loadFoundTimer();
-    } catch (err: any) {
-      setContactError(err.response?.data?.error || 'Failed to notify owner. Please try again.');
-    } finally { setNotifyLoading(false); }
+  const handleNotified = () => {
+    setNotified(true);
+    loadFoundTimer();
   };
 
-  // Resolve photos and main photo
-  const petPhotos: PetPhoto[] = data?.pet?.photos || [];
-  const hasPhotos = petPhotos.length > 0;
-  const mainPhoto = hasPhotos
-    ? (petPhotos.find((p) => p.isMain) || petPhotos[0])
-    : null;
-  const displayPhotoUrl = mainPhoto?.url || data?.pet?.photoUrl;
-  const _currentPhoto = hasPhotos ? petPhotos[photoIdx] : null;
-
-  const formatBreed = () => {
-    if (!data) return '';
-    const origin = data.pet.breedOrigin || 'Purebred';
-    const breed = data.pet.breed || '';
-    const secondary = data.pet.secondaryBreed || '';
-    if (origin === 'Unknown') return 'Unknown';
-    if ((origin === 'Mixed Breed' || origin === 'Designer Breed') && secondary && secondary !== 'Unknown') {
-      return `${origin === 'Designer Breed' ? 'Designer' : 'Mixed'} (${breed} × ${secondary})`;
-    }
-    if (origin === 'Landrace') return `${breed} (Landrace)`;
-    return breed;
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="animate-spin text-primary-600" size={32} />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="bg-white rounded-xl shadow-md p-8 max-w-md text-center">
-          <PawPrint size={48} className="text-gray-300 mx-auto mb-4" />
-          <h1 className="text-xl font-bold mb-2">Tag Not Found</h1>
-          <p className="text-gray-500">{error}</p>
-        </div>
-      </div>
-    );
-  }
-
+  if (loading) return <FinderLoadingState />;
+  if (error) return <FinderErrorState message={error} />;
   if (!data) return null;
 
+  const bgColor = data.pet.status === 'lost' ? 'bg-red-50' : data.pet.status === 'found' ? 'bg-amber-50' : 'bg-gray-50';
+
   return (
-    <div className={`min-h-screen py-8 px-4 ${data.pet.status === 'lost' ? 'bg-red-50' : data.pet.status === 'found' ? 'bg-amber-50' : 'bg-gray-50'}`}>
+    <div className={`min-h-screen py-8 px-4 ${bgColor}`}>
       <div className="max-w-md mx-auto">
+        <StatusBanner status={data.pet.status} />
 
-        {/* BIG STATUS BANNER */}
-        {data.pet.status === 'lost' && (
-          <div className="bg-red-600 text-white rounded-xl p-6 mb-6 text-center shadow-lg animate-pulse">
-            <ShieldAlert size={56} className="mx-auto mb-2" />
-            <h1 className="text-4xl font-extrabold tracking-wide">THIS PET IS LOST</h1>
-            <p className="text-red-100 text-base mt-2">If you know this pet, please contact the owner immediately or use the options below.</p>
-          </div>
-        )}
-        {data.pet.status === 'found' && (
-          <div className="bg-amber-500 text-white rounded-xl p-6 mb-6 text-center shadow-lg">
-            <ShieldCheck size={56} className="mx-auto mb-2" />
-            <h1 className="text-4xl font-extrabold tracking-wide">PET FOUND</h1>
-            <p className="text-amber-100 text-base mt-2">This pet has been reported as found. Please help reunite it with its owner.</p>
-          </div>
-        )}
-        {data.pet.status === 'safe' && (
-          <div className="bg-green-600 text-white rounded-xl p-6 mb-6 text-center shadow-lg">
-            <ShieldCheck size={56} className="mx-auto mb-2" />
-            <h1 className="text-3xl font-bold">Pet Information</h1>
-            <p className="text-green-100 text-base mt-1">This pet is safe and with its owner.</p>
-          </div>
-        )}
-
-        <div className="text-center mb-4">
-          <PawPrint size={28} className="text-primary-600 mx-auto mb-1" />
-          <p className="text-sm text-gray-500">Tag: <span className="font-mono font-medium">{data.tagId}</span>
-            {data.tagStatus && (
-              <span className={`ml-2 inline-block px-2 py-0.5 text-xs font-bold rounded-full ${
-                data.tagStatus === 'active' ? 'bg-green-100 text-green-700' :
-                data.tagStatus === 'lost' ? 'bg-red-200 text-red-800' :
-                'bg-gray-200 text-gray-700'
-              }`}>{data.tagStatus.toUpperCase()}</span>
-            )}
-          </p>
-        </div>
+        <TagInfoHeader tagId={data.tagId} tagStatus={data.tagStatus} />
 
         <div className="bg-white rounded-xl shadow-md overflow-hidden">
-          {/* Photo section */}
-          {displayPhotoUrl && (
-            <div className="relative">
-              <img
-                src={displayPhotoUrl}
-                alt={data.pet.name}
-                className="w-full h-56 object-cover"
-                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-              />
-              {/* Photo navigation */}
-              {hasPhotos && petPhotos.length > 1 && (
-                <>
-                  <button
-                    onClick={() => setPhotoIdx((i) => (i === 0 ? petPhotos.length - 1 : i - 1))}
-                    className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white rounded-full p-1 transition-colors"
-                  >
-                    <ChevronLeft size={20} />
-                  </button>
-                  <button
-                    onClick={() => setPhotoIdx((i) => (i === petPhotos.length - 1 ? 0 : i + 1))}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white rounded-full p-1 transition-colors"
-                  >
-                    <ChevronRight size={20} />
-                  </button>
-                  <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5">
-                    {petPhotos.map((_, i) => (
-                      <button
-                        key={i}
-                        onClick={() => setPhotoIdx(i)}
-                        className={`w-2 h-2 rounded-full transition-colors ${i === photoIdx ? 'bg-white' : 'bg-white/50'}`}
-                      />
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
+          <PetPhotoCarousel
+            photos={data.pet.photos}
+            fallbackUrl={data.pet.photoUrl}
+            petName={data.pet.name}
+          />
+
+          <PetDetailsCard data={data} />
+
+          {data.pet.medicalAlerts && (
+            <MedicalAlertBanner message={data.pet.medicalAlerts} />
           )}
 
-          <div className="p-6">
-            <h2 className="text-2xl font-bold mb-1">{data.pet.name}</h2>
-            {data.pet.petId && <p className="text-sm font-mono text-gray-400 mb-1">ID: {data.pet.petId}</p>}
-            <p className="text-base text-gray-600 mb-2">{data.pet.petType || data.pet.species} — {formatBreed()} ({data.pet.color}{data.pet.pattern ? `, ${data.pet.pattern}` : ''})</p>
-            <div className="flex flex-wrap gap-2 mb-4 text-base text-gray-500">
-              {data.pet.gender && data.pet.gender !== 'unknown' && <span>Gender: {data.pet.gender === 'male' ? 'Male' : 'Female'}</span>}
-              {data.pet.age != null && <span>Age: {data.pet.age} yrs</span>}
-              {data.pet.favouriteFood && <span>Fav Food: {data.pet.favouriteFood}</span>}
-            </div>
+          <div className="px-6 pb-6 space-y-3">
+            {foundTimer && <FoundTimer timer={foundTimer} />}
 
-            {data.pet.medicalAlerts && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4 flex items-start gap-2">
-                <AlertTriangle size={20} className="text-red-500 mt-0.5 shrink-0" />
-                <div>
-                  <p className="text-base font-medium text-red-700">Medical Alert</p>
-                  <p className="text-base text-red-600">{data.pet.medicalAlerts}</p>
-                </div>
-              </div>
+            {!notified && !foundTimer?.active && (
+              <LocationConsentBanner
+                consent={locationConsent}
+                hasLocation={!!finderLocation}
+                onGrant={handleLocationGrant}
+                onDecline={handleLocationDecline}
+              />
             )}
 
-            <p className="text-base text-gray-500 mb-4">Owner: {data.ownerName}</p>
+            {!notified && !foundTimer?.active ? (
+              <NotifyOwnerForm
+                tagId={tagId!}
+                location={finderLocation}
+                locationConsent={locationConsent}
+                consentTimestamp={consentTimestamp}
+                onNotified={handleNotified}
+              />
+            ) : notified ? (
+              <div className="bg-green-50 text-green-700 py-3 rounded-lg text-center flex items-center justify-center gap-2">
+                <Phone size={18} /> Owner has been notified! Thank you for helping.
+              </div>
+            ) : null}
 
-            <div className="space-y-3">
-              {/* Found Timer */}
-              {foundTimer?.active && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
-                  <div className="flex items-center justify-center gap-2 text-blue-700 mb-1">
-                    <Clock size={18} />
-                    <span className="font-semibold">Pet Found — Waiting for Owner</span>
-                  </div>
-                  <p className="text-2xl font-mono font-bold text-blue-800">{timerDisplay}</p>
-                  <p className="text-xs text-blue-600 mt-1">since notification was sent</p>
-                  {foundTimer.finderName && (
-                    <p className="text-xs text-blue-500 mt-2">Finder: {foundTimer.finderName}</p>
-                  )}
-                </div>
-              )}
-
-              {/* Location Consent Banner */}
-              {!notified && !foundTimer?.active && locationConsent === 'pending' && navigator.geolocation && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <div className="flex items-start gap-3">
-                    <MapPin size={20} className="text-blue-600 mt-0.5 shrink-0" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-blue-800">Share your location to help reunite this pet?</p>
-                      <p className="text-xs text-blue-600 mt-1">Your approximate location will be shared with the pet's owner so they know where to find their pet. Location is only used for this purpose.</p>
-                      <div className="flex gap-2 mt-3">
-                        <button onClick={requestLocation} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors flex items-center gap-1.5">
-                          <MapPin size={14} /> Share Location
-                        </button>
-                        <button onClick={declineLocation} className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors">
-                          Skip
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Location captured indicator */}
-              {finderLocation && (
-                <div className="bg-green-50 text-green-700 py-2 px-3 rounded-lg text-sm flex items-center gap-2">
-                  <CheckCircle size={14} /> Location captured — will be shared with owner
-                </div>
-              )}
-              {locationConsent === 'denied' && (
-                <div className="bg-gray-50 text-gray-500 py-2 px-3 rounded-lg text-sm flex items-center gap-2">
-                  <MapPin size={14} /> Location not shared
-                </div>
-              )}
-
-              {/* Notify Owner */}
-              {!notified && !foundTimer?.active ? (
-                <>
-                  {!showContactForm ? (
-                    <button onClick={() => setShowContactForm(true)} className="w-full bg-primary-600 text-white py-3 rounded-lg font-medium flex items-center justify-center gap-2 hover:bg-primary-700 transition-colors">
-                      <Phone size={18} /> Notify Owner I Found Their Pet
-                    </button>
-                  ) : (
-                    <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-3">
-                      <h3 className="font-semibold text-gray-800 flex items-center gap-2">
-                        <Phone size={16} /> How will the owner contact you?
-                      </h3>
-                      <p className="text-sm text-gray-500">Please provide at least one way for the owner to reach you.</p>
-                      {contactError && <div className="bg-red-50 text-red-600 text-sm p-2 rounded">{contactError}</div>}
-                      <div className="space-y-2">
-                        <div>
-                          <label className="block text-xs text-gray-500 mb-1 flex items-center gap-1"><User size={12} /> Your Name (optional)</label>
-                          <input type="text" value={finderName} onChange={(e) => setFinderName(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" placeholder="e.g. John" />
-                        </div>
-                        <div>
-                          <label className="block text-xs text-gray-500 mb-1 flex items-center gap-1"><Phone size={12} /> Mobile Number</label>
-                          <input type="tel" value={finderPhone} onChange={(e) => setFinderPhone(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" placeholder="e.g. 021 123 4567" />
-                        </div>
-                        <div>
-                          <label className="block text-xs text-gray-500 mb-1 flex items-center gap-1"><Mail size={12} /> Email Address</label>
-                          <input type="email" value={finderEmail} onChange={(e) => setFinderEmail(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" placeholder="e.g. john@example.com" />
-                        </div>
-                      </div>
-                      {finderLocation && (
-                        <div className="bg-blue-50 border border-blue-100 rounded-md p-2 text-xs text-blue-700 flex items-center gap-1.5">
-                          <MapPin size={12} /> Your location will be shared with the owner
-                        </div>
-                      )}
-                      <div className="flex gap-2">
-                        <button onClick={notifyOwner} disabled={notifyLoading || (!finderPhone && !finderEmail)} className="flex-1 bg-primary-600 text-white py-2.5 rounded-lg font-medium flex items-center justify-center gap-2 hover:bg-primary-700 transition-colors disabled:opacity-50">
-                          {notifyLoading ? <><Loader2 size={16} className="animate-spin" /> Sending...</> : <><CheckCircle size={16} /> Send Notification{finderLocation ? ' + Location' : ''}</>}
-                        </button>
-                        <button onClick={() => { setShowContactForm(false); setContactError(''); }} className="px-4 py-2.5 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50">Cancel</button>
-                      </div>
-                    </div>
-                  )}
-                </>
-              ) : notified ? (
-                <div className="bg-green-50 text-green-700 py-3 rounded-lg text-center flex items-center justify-center gap-2">
-                  <CheckCircle size={18} /> Owner has been notified! Thank you for helping.
-                </div>
-              ) : null}
-
-              {data.ownerPhone && (
-                <a href={`tel:${data.ownerPhone}`} className="block w-full border border-gray-300 text-gray-700 py-3 rounded-lg font-medium text-center hover:bg-gray-50 transition-colors">
-                  Call Owner: {data.ownerPhone}
-                </a>
-              )}
-            </div>
+            {data.ownerPhone && (
+              <a
+                href={`tel:${data.ownerPhone}`}
+                className="block w-full border border-gray-300 text-gray-700 py-3 rounded-lg font-medium text-center hover:bg-gray-50 transition-colors"
+              >
+                Call Owner: {data.ownerPhone}
+              </a>
+            )}
           </div>
         </div>
 
