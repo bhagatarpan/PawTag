@@ -4,6 +4,7 @@ import { PawPrint, LogOut, User, ShoppingBag, Bell, Settings, ChevronRight, Cred
 import { useAuth } from '../context/AuthContext';
 import { useSiteSettings } from '../hooks/useCms';
 import api from '../lib/api';
+import AvatarUpload from './AvatarUpload';
 
 const NAV_ITEMS = [
   { path: '/account', label: 'Dashboard', icon: LayoutDashboard },
@@ -33,7 +34,7 @@ function formatLastLogin(dateStr: string): string {
 }
 
 export default function AccountLayout({ children }: { children: ReactNode }) {
-  const { user, logout } = useAuth();
+  const { user, logout, refreshUser } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [unreadCount, setUnreadCount] = useState(0);
@@ -110,15 +111,12 @@ export default function AccountLayout({ children }: { children: ReactNode }) {
 
               {/* Avatar Dropdown */}
               <div className="relative group">
-                <button className="flex items-center gap-2 focus:outline-none">
-                  {user?.profilePicture ? (
-                    <img src={user.profilePicture} alt={user.fullName || ''} className="w-10 h-10 rounded-full object-cover ring-2 ring-white shadow-sm" />
-                  ) : (
-                    <div className="w-10 h-10 bg-teal-100 rounded-full flex items-center justify-center text-teal-700 font-bold text-sm ring-2 ring-white shadow-sm">
-                      {user?.fullName?.charAt(0) || '?'}
-                    </div>
-                  )}
-                </button>
+                <AvatarUpload
+                  currentPicture={user?.profilePicture}
+                  userName={user?.fullName || ''}
+                  onUploadComplete={() => refreshUser()}
+                  size="sm"
+                />
 
                 {/* Dropdown Menu */}
                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-200 py-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">

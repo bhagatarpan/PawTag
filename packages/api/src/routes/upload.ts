@@ -5,6 +5,7 @@ import { requirePermission } from '../middleware/permission';
 import { createAuditContextFromRequest, type AuditRequest } from '../middleware/audit';
 import { auditService, type AuditContext } from '../services/audit';
 import { uploadToR2, deleteFromR2, generateUniqueFilename, isR2Configured } from '../services/r2.service';
+import { User } from '@pawtag/db';
 import logger from '../lib/logger';
 
 const router = Router();
@@ -153,6 +154,119 @@ router.post('/pet-photo', authenticate, async (req: AuthRequest, res: Response) 
     } catch (uploadError) {
       logger.error({ err: uploadError }, 'Upload error');
       res.status(500).json({ success: false, error: 'Failed to upload photo' });
+    }
+  });
+});
+
+/**
+ * @swagger
+ * /api/upload/profile-picture:
+ *   post:
+ *     tags: [Upload]
+ *     summary: Upload a profile picture
+ *     description: Upload a profile picture for the authenticated user. Returns the URL to access the uploaded image.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [photo]
+ *             properties:
+ *               photo:
+ *                 type: string
+ *                 format: binary
+ *                 description: Image file (jpg, png, gif, webp, max 5MB)
+ *     responses:
+ *       200:
+ *         description: Profile picture uploaded successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     url:
+ *                       type: string
+ *                       description: URL to access the uploaded profile picture
+ *       400:
+ *         description: No file uploaded or invalid file type
+ *       401:
+ *         description: Not authenticated
+ *       413:
+ *         description: File too large (max 5MB)
+ */
+router.post('/profile-picture', authenticate, async (req: AuthRequest, res: Response) => {
+  upload.single('photo')(req, res, async (err) => {
+    if (err instanceof multer.MulterError) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        res.status(413).json({ success: false, error: 'File too large. Maximum size is 5MB.' });
+        return;
+      }
+      res.status(400).json({ success: false, error: err.message });
+      return;
+    }
+    if (err) {
+      res.status(400).json({ success: false, error: err.message });
+      return;
+    }
+    if (!req.file) {
+      res.status(400).json({ success: false, error: 'No photo uploaded' });
+      return;
+    }
+
+    try {
+      if (!isR2Configured()) {
+        res.status(500).json({ success: false, error: 'File storage is not configured. Please set R2 environment variables.' });
+        return;
+      }
+
+      const filename = generateUniqueFilename(req.file.originalname);
+      const key = `avatars/${filename}`;
+      const photoUrl = await uploadToR2(key, req.file.buffer, req.file.mimetype);
+
+      // Update user's profilePicture in database
+      const user = await User.findByIdAndUpdate(
+        req.user!.id,
+        { profilePicture: photoUrl },
+        { new: true }
+      ).select('-passwordHash');
+
+      if (!user) {
+        res.status(404).json({ success: false, error: 'User not found' });
+        return;
+      }
+
+      res.json({
+        success: true,
+        data: { url: photoUrl, user },
+      });
+
+      await auditUploadEvent(req, {
+        action: 'upload_profile_picture',
+        eventType: 'upload_profile_picture',
+        eventCategory: 'FILE',
+        operationType: 'CREATE',
+        resourceType: 'User',
+        resourceId: req.user!.id,
+        outcome: 'SUCCESS',
+        severity: 'MEDIUM',
+        metadata: {
+          filename,
+          size: req.file.size,
+          mimeType: req.file.mimetype,
+          url: photoUrl,
+        },
+      });
+    } catch (uploadError) {
+      logger.error({ err: uploadError }, 'Profile picture upload error');
+      res.status(500).json({ success: false, error: 'Failed to upload profile picture' });
     }
   });
 });
