@@ -83,6 +83,7 @@ router.put('/settings/:kind/:value', requirePermission('audit.admin'), validate(
 const querySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(100).default(50),
+  search: z.string().optional(),
   auditEventId: z.string().optional(),
   transactionId: z.string().optional(),
   correlationId: z.string().optional(),
@@ -110,67 +111,72 @@ const querySchema = z.object({
   sortDir: z.enum(['asc', 'desc']).default('desc'),
 });
 
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** Build the Mongo query shared by the list and export endpoints. */
+function buildAuditQuery(params: Record<string, unknown>): Record<string, unknown> {
+  const {
+    search, auditEventId, transactionId, correlationId, requestId, traceId, parentEventId,
+    actorType, actorId, actorEmail, impersonatorId, tenantId, eventCategory, eventType, action,
+    operationType, resourceType, resourceId, outcome, severity, sourceIp, startDate, endDate, legalHold,
+  } = params;
+
+  const query: Record<string, unknown> = {};
+
+  if (search && typeof search === 'string') {
+    const rx = { $regex: escapeRegex(search), $options: 'i' };
+    query.$or = [
+      { auditEventId: rx }, { transactionId: rx }, { correlationId: rx }, { requestId: rx }, { traceId: rx },
+      { actorId: rx }, { actorEmail: rx }, { actorUsername: rx },
+      { action: rx }, { eventType: rx }, { resourceType: rx }, { resourceId: rx }, { sourceIp: rx },
+    ];
+  }
+  if (auditEventId) query.auditEventId = auditEventId;
+  if (transactionId) query.transactionId = transactionId;
+  if (correlationId) query.correlationId = correlationId;
+  if (requestId) query.requestId = requestId;
+  if (traceId) query.traceId = traceId;
+  if (parentEventId) query.parentEventId = parentEventId;
+  if (actorType) query.actorType = actorType;
+  if (actorId) query.actorId = actorId;
+  if (actorEmail) query.actorEmail = { $regex: escapeRegex(String(actorEmail)), $options: 'i' };
+  if (impersonatorId) query.impersonatorId = impersonatorId;
+  if (tenantId) query.tenantId = tenantId;
+  if (eventCategory) query.eventCategory = eventCategory;
+  if (eventType) query.eventType = eventType;
+  if (action) query.action = { $regex: action, $options: 'i' };
+  if (operationType) query.operationType = operationType;
+  if (resourceType) query.resourceType = resourceType;
+  if (resourceId) query.resourceId = resourceId;
+  if (outcome) query.outcome = outcome;
+  if (severity) {
+    const values = String(severity).split(',').map((s) => s.trim()).filter(Boolean);
+    query.severity = values.length > 1 ? { $in: values } : values[0];
+  }
+  if (sourceIp) query.sourceIp = sourceIp;
+  if (legalHold !== undefined) query.legalHold = legalHold;
+
+  if (startDate || endDate) {
+    query.occurredAt = {};
+    if (startDate) (query.occurredAt as Record<string, Date>).$gte = new Date(startDate as string);
+    if (endDate) (query.occurredAt as Record<string, Date>).$lte = new Date(endDate as string);
+  }
+
+  return query;
+}
+
+function csvCell(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  const str = typeof value === 'object' ? JSON.stringify(value) : String(value);
+  return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+}
+
 router.get('/', requirePermission('audit.read'), validate(querySchema), async (req: AuthRequest, res: Response) => {
   try {
-    const {
-      page,
-      limit,
-      auditEventId,
-      transactionId,
-      correlationId,
-      requestId,
-      traceId,
-      parentEventId,
-      actorType,
-      actorId,
-      actorEmail,
-      impersonatorId,
-      tenantId,
-      eventCategory,
-      eventType,
-      action,
-      operationType,
-      resourceType,
-      resourceId,
-      outcome,
-      severity,
-      sourceIp,
-      startDate,
-      endDate,
-      legalHold,
-      sortBy,
-      sortDir,
-    } = req.query;
-
-    const query: Record<string, unknown> = {};
-
-    if (auditEventId) query.auditEventId = auditEventId;
-    if (transactionId) query.transactionId = transactionId;
-    if (correlationId) query.correlationId = correlationId;
-    if (requestId) query.requestId = requestId;
-    if (traceId) query.traceId = traceId;
-    if (parentEventId) query.parentEventId = parentEventId;
-    if (actorType) query.actorType = actorType;
-    if (actorId) query.actorId = actorId;
-    if (actorEmail) query.actorEmail = { $regex: actorEmail, $options: 'i' };
-    if (impersonatorId) query.impersonatorId = impersonatorId;
-    if (tenantId) query.tenantId = tenantId;
-    if (eventCategory) query.eventCategory = eventCategory;
-    if (eventType) query.eventType = eventType;
-    if (action) query.action = { $regex: action, $options: 'i' };
-    if (operationType) query.operationType = operationType;
-    if (resourceType) query.resourceType = resourceType;
-    if (resourceId) query.resourceId = resourceId;
-    if (outcome) query.outcome = outcome;
-    if (severity) query.severity = severity;
-    if (sourceIp) query.sourceIp = sourceIp;
-    if (legalHold !== undefined) query.legalHold = legalHold;
-
-    if (startDate || endDate) {
-      query.occurredAt = {};
-      if (startDate) (query.occurredAt as Record<string, Date>).$gte = new Date(startDate as string);
-      if (endDate) (query.occurredAt as Record<string, Date>).$lte = new Date(endDate as string);
-    }
+    const { page, limit, sortBy, sortDir } = req.query;
+    const query = buildAuditQuery(req.query as Record<string, unknown>);
 
     const sort: Record<string, 1 | -1> = {};
     sort[sortBy as string] = sortDir === 'asc' ? 1 : -1;
@@ -195,6 +201,60 @@ router.get('/', requirePermission('audit.read'), validate(querySchema), async (r
   } catch (error) {
     logger.error({ err: error }, 'Audit query failed');
     res.status(500).json({ success: false, error: 'Failed to query audit events' });
+  }
+});
+
+router.get('/summary', requirePermission('audit.read'), async (_req: AuthRequest, res: Response) => {
+  try {
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const [total, today, failed, highRisk, actorIds] = await Promise.all([
+      AuditEvent.countDocuments(),
+      AuditEvent.countDocuments({ occurredAt: { $gte: startOfToday } }),
+      AuditEvent.countDocuments({ outcome: 'FAILURE' }),
+      AuditEvent.countDocuments({ severity: { $in: ['HIGH', 'CRITICAL'] } }),
+      AuditEvent.distinct('actorId'),
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        total,
+        today,
+        failed,
+        highRisk,
+        uniqueActors: actorIds.filter(Boolean).length,
+      },
+    });
+  } catch (error) {
+    logger.error({ err: error }, 'Audit summary failed');
+    res.status(500).json({ success: false, error: 'Failed to get audit summary' });
+  }
+});
+
+router.get('/export', requirePermission('audit.read'), async (req: AuthRequest, res: Response) => {
+  try {
+    const format = req.query.format === 'json' ? 'json' : 'csv';
+    const query = buildAuditQuery(req.query as Record<string, unknown>);
+    const events = await AuditEvent.find(query).sort({ occurredAt: -1 }).limit(5000).lean();
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+
+    if (format === 'json') {
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', `attachment; filename="audit-events-${stamp}.json"`);
+      res.send(JSON.stringify(events, null, 2));
+      return;
+    }
+
+    const header = ['occurredAt', 'actorType', 'actorEmail', 'actorId', 'action', 'eventType', 'eventCategory', 'resourceType', 'resourceId', 'outcome', 'severity', 'sourceIp', 'auditEventId', 'transactionId', 'correlationId', 'requestId'];
+    const rows = events.map((e) => header.map((key) => csvCell((e as Record<string, unknown>)[key])).join(','));
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="audit-events-${stamp}.csv"`);
+    res.send([header.join(','), ...rows].join('\n'));
+  } catch (error) {
+    logger.error({ err: error }, 'Audit export failed');
+    res.status(500).json({ success: false, error: 'Failed to export audit events' });
   }
 });
 

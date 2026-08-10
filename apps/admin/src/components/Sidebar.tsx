@@ -68,7 +68,7 @@ const adminLinks: SidebarLink[] = [
   { to: '/rbac/scopes', label: 'Access Scopes', icon: Target, permission: 'permission.read' },
   { to: '/settings', label: 'Settings', icon: Settings, permission: 'setting.read' },
   { to: '/feature-flags', label: 'Feature Flags', icon: Flag, permission: 'feature_flag.read' },
-  { to: '/audit-trail', label: 'Audit Trail', icon: FileSignature, permission: 'audit.read' },
+  { to: '/audit-trail', label: 'Audit Logs', icon: FileSignature, permission: 'audit.read' },
   { to: '/audit-settings', label: 'Audit Settings', icon: FileSignature, permission: 'audit.admin' },
 ];
 

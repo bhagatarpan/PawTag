@@ -161,6 +161,90 @@ describe('Audit API & config event coverage (PH1/PH2)', () => {
     expect(requestEvent!.actorType).toBe('WEB_EDITOR');
   });
 
+  it('supports free-text search across actors, actions, resources and IDs', async () => {
+    const { token } = await createSuperAdmin();
+    await request(app)
+      .post('/api/admin/settings')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ key: 'test.searchKey', value: 'v1', category: 'test' });
+
+    const byAction = await request(app)
+      .get('/api/admin/audit?search=setting_create')
+      .set('Authorization', `Bearer ${token}`);
+    expect(byAction.status).toBe(200);
+    expect(byAction.body.data.items.some((e: any) => e.action === 'setting_create')).toBe(true);
+
+    const byResource = await request(app)
+      .get('/api/admin/audit?search=test.searchKey')
+      .set('Authorization', `Bearer ${token}`);
+    expect(byResource.body.data.items.some((e: any) => e.resourceId === 'test.searchKey')).toBe(true);
+
+    const byActor = await request(app)
+      .get('/api/admin/audit?search=admin@example.com')
+      .set('Authorization', `Bearer ${token}`);
+    expect(byActor.body.data.items.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('returns summary metrics for the investigation header', async () => {
+    const { token } = await createSuperAdmin();
+    await request(app)
+      .post('/api/admin/settings')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ key: 'test.summaryKey', value: 'v1', category: 'test' });
+
+    const res = await request(app)
+      .get('/api/admin/audit/summary')
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.data.total).toBeGreaterThanOrEqual(1);
+    expect(res.body.data.today).toBeGreaterThanOrEqual(1);
+    expect(typeof res.body.data.failed).toBe('number');
+    expect(typeof res.body.data.highRisk).toBe('number');
+    expect(res.body.data.uniqueActors).toBeGreaterThanOrEqual(1);
+  });
+
+  it('exports filtered events as CSV and JSON', async () => {
+    const { token } = await createSuperAdmin();
+    await request(app)
+      .post('/api/admin/settings')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ key: 'test.exportKey', value: 'v1', category: 'test' });
+
+    const csv = await request(app)
+      .get('/api/admin/audit/export?format=csv&resourceId=test.exportKey')
+      .set('Authorization', `Bearer ${token}`);
+    expect(csv.status).toBe(200);
+    expect(csv.headers['content-type']).toContain('text/csv');
+    expect(csv.headers['content-disposition']).toContain('audit-events');
+    expect(csv.text).toContain('occurredAt,actorType');
+    expect(csv.text).toContain('test.exportKey');
+    expect(csv.text).not.toContain('some-unrelated-resource');
+
+    const json = await request(app)
+      .get('/api/admin/audit/export?format=json&resourceId=test.exportKey')
+      .set('Authorization', `Bearer ${token}`);
+    expect(json.status).toBe(200);
+    const exported = JSON.parse(json.text);
+    expect(Array.isArray(exported)).toBe(true);
+    expect(exported.every((e: any) => e.resourceId === 'test.exportKey')).toBe(true);
+    expect(exported.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('supports multi-severity filtering for high-risk investigations', async () => {
+    const { token } = await createSuperAdmin();
+    await request(app)
+      .post('/api/admin/settings')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ key: 'test.severityKey', value: 'v1', category: 'test' });
+
+    const res = await request(app)
+      .get('/api/admin/audit?severity=HIGH,CRITICAL')
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.data.items.length).toBeGreaterThanOrEqual(1);
+    expect(res.body.data.items.every((e: any) => ['HIGH', 'CRITICAL'].includes(e.severity))).toBe(true);
+  });
+
   it('records before/after on setting update (CONFIG threat model)', async () => {
     const { token } = await createSuperAdmin();
     await Setting.create({ key: 'mfa.testMode', value: 'true', category: 'mfa', updatedBy: new mongoose.Types.ObjectId() });

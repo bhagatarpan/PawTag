@@ -141,6 +141,7 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+      <Route path="/audit-logs" element={<Navigate to="/audit-trail" replace />} />
       <Route
         path="/audit-settings"
         element={
