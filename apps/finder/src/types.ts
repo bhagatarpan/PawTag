@@ -4,6 +4,26 @@ export interface PetPhoto {
   isMain: boolean;
 }
 
+export interface Vaccination {
+  vaccine: string;
+  vaccineType?: 'core' | 'non-core' | 'other';
+  dateGiven: string;
+  nextDueDate?: string;
+  vetClinic?: string;
+  batchLotNumber?: string;
+  veterinarian?: string;
+  notes?: string;
+}
+
+export interface Microchip {
+  chipNumber: string;
+  brand?: string;
+  implantDate?: string;
+  implantLocation?: string;
+  implantedBy?: string;
+  notes?: string;
+}
+
 export interface FinderData {
   pet: {
     name: string;
@@ -21,6 +41,8 @@ export interface FinderData {
     photos: PetPhoto[];
     photoUrl?: string;
     medicalAlerts?: string;
+    vaccinations?: Vaccination[];
+    microchips?: Microchip[];
     status: string;
   };
   tagId: string;

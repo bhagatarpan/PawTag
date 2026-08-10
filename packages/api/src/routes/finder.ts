@@ -228,6 +228,8 @@ router.get('/:tagId', async (req: Request, res: Response) => {
           photos: pet.photos,
           photoUrl: pet.photoUrl,
           medicalAlerts: pet.medicalAlerts,
+          vaccinations: pet.vaccinations || [],
+          microchips: pet.microchips || [],
           status: pet.status,
         },
         tagId: tag.tagId,

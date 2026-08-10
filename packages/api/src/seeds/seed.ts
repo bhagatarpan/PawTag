@@ -621,32 +621,43 @@ async function seed() {
         { permissionName: 'pet.delete', scopeCode: 'OWN' },
         // Tags (own)
         { permissionName: 'tag.read', scopeCode: 'OWN' },
-        // Health Records (own)
+        // Health Records (own) — full CRUD
         { permissionName: 'medical_record.read', scopeCode: 'OWN' },
         { permissionName: 'medical_record.create', scopeCode: 'OWN' },
         { permissionName: 'medical_record.update', scopeCode: 'OWN' },
-        // Vaccinations (own)
+        { permissionName: 'medical_record.delete', scopeCode: 'OWN' },
+        // Vaccinations (own) — full CRUD
         { permissionName: 'vaccination.read', scopeCode: 'OWN' },
         { permissionName: 'vaccination.create', scopeCode: 'OWN' },
         { permissionName: 'vaccination.update', scopeCode: 'OWN' },
-        // Medications (own)
+        { permissionName: 'vaccination.delete', scopeCode: 'OWN' },
+        // Medications (own) — full CRUD
         { permissionName: 'medication.read', scopeCode: 'OWN' },
         { permissionName: 'medication.create', scopeCode: 'OWN' },
         { permissionName: 'medication.update', scopeCode: 'OWN' },
-        // Allergies (own)
+        { permissionName: 'medication.delete', scopeCode: 'OWN' },
+        // Allergies (own) — full CRUD
         { permissionName: 'allergy.read', scopeCode: 'OWN' },
         { permissionName: 'allergy.create', scopeCode: 'OWN' },
         { permissionName: 'allergy.update', scopeCode: 'OWN' },
-        // Vet Visits (own)
+        { permissionName: 'allergy.delete', scopeCode: 'OWN' },
+        // Vet Visits (own) — full CRUD
         { permissionName: 'vet_visit.read', scopeCode: 'OWN' },
         { permissionName: 'vet_visit.create', scopeCode: 'OWN' },
         { permissionName: 'vet_visit.update', scopeCode: 'OWN' },
-        // Surgeries (own)
+        { permissionName: 'vet_visit.delete', scopeCode: 'OWN' },
+        // Surgeries (own) — full CRUD
         { permissionName: 'surgery.read', scopeCode: 'OWN' },
+        { permissionName: 'surgery.create', scopeCode: 'OWN' },
+        { permissionName: 'surgery.update', scopeCode: 'OWN' },
+        { permissionName: 'surgery.delete', scopeCode: 'OWN' },
         // Desexing (own)
         { permissionName: 'desexing.read', scopeCode: 'OWN' },
-        // Microchips (own)
+        // Microchips (own) — full CRUD
         { permissionName: 'microchip.read', scopeCode: 'OWN' },
+        { permissionName: 'microchip.create', scopeCode: 'OWN' },
+        { permissionName: 'microchip.update', scopeCode: 'OWN' },
+        { permissionName: 'microchip.delete', scopeCode: 'OWN' },
         // Weight (own)
         { permissionName: 'weight.read', scopeCode: 'OWN' },
         { permissionName: 'weight.create', scopeCode: 'OWN' },
@@ -663,9 +674,10 @@ async function seed() {
         // Finder — scan tags when finding pets
         { permissionName: 'finder_scan.read' },
         { permissionName: 'location_event.read' },
-        // Notifications (own)
+        // Notifications (own) — full CRUD
         { permissionName: 'notification.read', scopeCode: 'OWN' },
         { permissionName: 'notification.update', scopeCode: 'OWN' },
+        { permissionName: 'notification.delete', scopeCode: 'OWN' },
       ],
 
       WEBSITE_EDITOR: [
