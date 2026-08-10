@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Phone, Mail, User, MapPin, CheckCircle, Loader2, MessageCircle } from 'lucide-react';
+import { Phone, Mail, User, MapPin, CheckCircle, Loader2 } from 'lucide-react';
 import type { LocationData } from '../types';
 import { notifyOwner as apiNotifyOwner } from '../lib/finderApi';
 
@@ -48,99 +48,48 @@ export default function NotifyOwnerForm({ tagId, location, locationConsent, cons
   };
 
   return (
-    <div className="mx-4 mt-4 space-y-3">
+    <>
       {!showForm ? (
         <button
           onClick={() => setShowForm(true)}
-          className="w-full bg-gradient-to-r from-teal-500 to-teal-600 text-white py-3.5 rounded-xl font-semibold flex items-center justify-center gap-2 hover:from-teal-600 hover:to-teal-700 transition-all duration-200 shadow-lg shadow-teal-500/25"
+          className="w-full bg-primary-600 text-white py-3 rounded-lg font-medium flex items-center justify-center gap-2 hover:bg-primary-700 transition-colors"
         >
-          <MessageCircle size={18} /> Notify Owner I Found Their Pet
+          <Phone size={18} /> Notify Owner I Found Their Pet
         </button>
       ) : (
-        <div className="bg-white border border-gray-200 rounded-2xl p-5 space-y-4 shadow-lg">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-teal-100 rounded-xl flex items-center justify-center">
-              <Phone size={18} className="text-teal-600" />
+        <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-3">
+          <h3 className="font-semibold text-gray-800 flex items-center gap-2">
+            <Phone size={16} /> How will the owner contact you?
+          </h3>
+          <p className="text-sm text-gray-500">Please provide at least one way for the owner to reach you.</p>
+          {error && <div className="bg-red-50 text-red-600 text-sm p-2 rounded">{error}</div>}
+          <div className="space-y-2">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1 flex items-center gap-1"><User size={12} /> Your Name (optional)</label>
+              <input type="text" value={finderName} onChange={(e) => setFinderName(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" placeholder="e.g. John" />
             </div>
             <div>
-              <h3 className="font-semibold text-gray-800">Contact the Owner</h3>
-              <p className="text-xs text-gray-500">Provide at least one way to reach you</p>
+              <label className="block text-xs text-gray-500 mb-1 flex items-center gap-1"><Phone size={12} /> Mobile Number</label>
+              <input type="tel" value={finderPhone} onChange={(e) => setFinderPhone(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" placeholder="e.g. 021 123 4567" />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1 flex items-center gap-1"><Mail size={12} /> Email Address</label>
+              <input type="email" value={finderEmail} onChange={(e) => setFinderEmail(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" placeholder="e.g. john@example.com" />
             </div>
           </div>
-
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-600 text-sm p-3 rounded-xl flex items-center gap-2">
-              <span className="text-red-500">!</span> {error}
-            </div>
-          )}
-
-          <div className="space-y-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1.5 flex items-center gap-1.5">
-                <User size={12} /> Your Name
-              </label>
-              <input 
-                type="text" 
-                value={finderName} 
-                onChange={(e) => setFinderName(e.target.value)} 
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all" 
-                placeholder="e.g. John" 
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1.5 flex items-center gap-1.5">
-                <Phone size={12} /> Mobile Number
-              </label>
-              <input 
-                type="tel" 
-                value={finderPhone} 
-                onChange={(e) => setFinderPhone(e.target.value)} 
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all" 
-                placeholder="e.g. 021 123 4567" 
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1.5 flex items-center gap-1.5">
-                <Mail size={12} /> Email Address
-              </label>
-              <input 
-                type="email" 
-                value={finderEmail} 
-                onChange={(e) => setFinderEmail(e.target.value)} 
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all" 
-                placeholder="e.g. john@example.com" 
-              />
-            </div>
-          </div>
-
           {location && (
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs text-blue-700 flex items-center gap-2">
-              <MapPin size={14} className="text-blue-500" /> 
-              <span className="font-medium">Your location will be shared with the owner</span>
+            <div className="bg-blue-50 border border-blue-100 rounded-md p-2 text-xs text-blue-700 flex items-center gap-1.5">
+              <MapPin size={12} /> Your location will be shared with the owner
             </div>
           )}
-
           <div className="flex gap-2">
-            <button 
-              onClick={handleSubmit} 
-              disabled={loading || (!finderPhone && !finderEmail)} 
-              className="flex-1 bg-gradient-to-r from-teal-500 to-teal-600 text-white py-3 rounded-xl font-semibold flex items-center justify-center gap-2 hover:from-teal-600 hover:to-teal-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-            >
-              {loading ? (
-                <><Loader2 size={16} className="animate-spin" /> Sending...</>
-              ) : (
-                <><CheckCircle size={16} /> Send{location ? ' + Location' : ''}</>
-              )}
+            <button onClick={handleSubmit} disabled={loading || (!finderPhone && !finderEmail)} className="flex-1 bg-primary-600 text-white py-2.5 rounded-lg font-medium flex items-center justify-center gap-2 hover:bg-primary-700 transition-colors disabled:opacity-50">
+              {loading ? <><Loader2 size={16} className="animate-spin" /> Sending...</> : <><CheckCircle size={16} /> Send Notification{location ? ' + Location' : ''}</>}
             </button>
-            <button 
-              onClick={() => { setShowForm(false); setError(''); }} 
-              className="px-5 py-3 border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors font-medium"
-            >
-              Cancel
-            </button>
+            <button onClick={() => { setShowForm(false); setError(''); }} className="px-4 py-2.5 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50">Cancel</button>
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
