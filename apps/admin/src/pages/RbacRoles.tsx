@@ -22,6 +22,21 @@ interface Role {
   isActive: boolean;
 }
 
+/* ------------------------------------------------------------------ */
+/*  Utilities                                                          */
+/* ------------------------------------------------------------------ */
+
+function HighlightText({ text, query }: { text: string; query: string }) {
+  if (!query) return <>{text}</>;
+  const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const parts = text.split(new RegExp(`(${escapedQuery})`, 'gi'));
+  return <>{parts.map((part, i) => 
+    part.toLowerCase() === query.toLowerCase() 
+      ? <mark key={i} className="bg-yellow-200 rounded px-0.5">{part}</mark>
+      : part
+  )}</>;
+}
+
 interface PermissionGroup {
   _id: string;
   name: string;
@@ -107,6 +122,13 @@ export default function RbacRoles() {
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [editingRole, permRole, confirm.open]);
+
+  // Auto-focus first input when edit modal opens
+  useEffect(() => {
+    if (editingRole) {
+      setTimeout(() => document.getElementById('edit-role-display-name')?.focus(), 100);
+    }
+  }, [editingRole]);
 
   const fetchRoles = () => {
     setLoading(true);
@@ -417,7 +439,9 @@ export default function RbacRoles() {
                       {role.isSuperAdmin ? <Crown size={18} className={role.isActive ? 'text-amber-600' : 'text-gray-400'} /> : <Shield size={18} className={role.isActive ? 'text-primary-600' : 'text-gray-400'} />}
                     </div>
                     <div>
-                      <p className={`font-semibold text-sm ${role.isActive ? 'text-gray-900' : 'text-gray-400'}`}>{role.displayName}</p>
+                      <p className={`font-semibold text-sm ${role.isActive ? 'text-gray-900' : 'text-gray-400'}`}>
+                        <HighlightText text={role.displayName} query={search} />
+                      </p>
                       <p className="text-xs text-gray-400 font-mono">{role.name}</p>
                       {role.description && <p className="text-xs text-gray-500 mt-0.5 max-w-xs truncate">{role.description}</p>}
                     </div>

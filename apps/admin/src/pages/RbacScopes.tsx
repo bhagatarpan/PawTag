@@ -20,6 +20,21 @@ interface Scope {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Utilities                                                          */
+/* ------------------------------------------------------------------ */
+
+function HighlightText({ text, query }: { text: string; query: string }) {
+  if (!query) return <>{text}</>;
+  const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const parts = text.split(new RegExp(`(${escapedQuery})`, 'gi'));
+  return <>{parts.map((part, i) => 
+    part.toLowerCase() === query.toLowerCase() 
+      ? <mark key={i} className="bg-yellow-200 rounded px-0.5">{part}</mark>
+      : part
+  )}</>;
+}
+
+/* ------------------------------------------------------------------ */
 /*  Main Component                                                     */
 /* ------------------------------------------------------------------ */
 
@@ -61,6 +76,13 @@ export default function RbacScopes() {
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [editingScope, confirm.open]);
+
+  // Auto-focus first input when edit modal opens
+  useEffect(() => {
+    if (editingScope) {
+      setTimeout(() => document.getElementById('edit-scope-name')?.focus(), 100);
+    }
+  }, [editingScope]);
 
   const fetchScopes = () => {
     setLoading(true);
@@ -295,10 +317,12 @@ export default function RbacScopes() {
               <tr key={scope._id} className="hover:bg-gray-50/50 transition-colors">
                 <td className="px-5 py-3">
                   <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-gray-100 font-mono text-sm font-bold text-gray-800">
-                    {scope.code}
+                    <HighlightText text={scope.code} query={search} />
                   </span>
                 </td>
-                <td className="px-5 py-3 font-medium text-gray-900">{scope.name}</td>
+                <td className="px-5 py-3 font-medium text-gray-900">
+                  <HighlightText text={scope.name} query={search} />
+                </td>
                 <td className="px-5 py-3 text-gray-500 text-sm max-w-xs truncate">{scope.description || '—'}</td>
                 <td className="px-5 py-3 text-center">
                   <button

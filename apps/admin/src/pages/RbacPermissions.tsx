@@ -32,6 +32,17 @@ interface Permission {
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
 
+function HighlightText({ text, query }: { text: string; query: string }) {
+  if (!query) return <>{text}</>;
+  const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const parts = text.split(new RegExp(`(${escapedQuery})`, 'gi'));
+  return <>{parts.map((part, i) => 
+    part.toLowerCase() === query.toLowerCase() 
+      ? <mark key={i} className="bg-yellow-200 rounded px-0.5">{part}</mark>
+      : part
+  )}</>;
+}
+
 function groupName(groupRef: any, groups: PermissionGroup[]): string {
   if (!groupRef) return '—';
   const groupId = typeof groupRef === 'string' ? groupRef : groupRef?._id;
@@ -94,6 +105,13 @@ export default function RbacPermissions() {
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [editingPerm, confirm.open]);
+
+  // Auto-focus first input when edit modal opens
+  useEffect(() => {
+    if (editingPerm) {
+      setTimeout(() => document.getElementById('edit-display-name')?.focus(), 100);
+    }
+  }, [editingPerm]);
 
   const fetchData = () => {
     setLoading(true);
@@ -369,8 +387,12 @@ export default function RbacPermissions() {
                 <tr key={perm._id} className="hover:bg-gray-50/50 transition-colors">
                   <td className="px-5 py-3">
                     <div>
-                      <p className="font-mono text-sm font-medium text-gray-900">{perm.name}</p>
-                      <p className="text-xs text-gray-500">{perm.displayName}</p>
+                      <p className="font-mono text-sm font-medium text-gray-900">
+                        <HighlightText text={perm.name} query={search} />
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        <HighlightText text={perm.displayName} query={search} />
+                      </p>
                     </div>
                   </td>
                   <td className="px-5 py-3 text-sm text-gray-600">{groupName(perm.permissionGroupId, groups)}</td>

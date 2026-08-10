@@ -149,6 +149,13 @@ export default function RbacPermissionGroups() {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [editingGroup, confirm.open]);
 
+  // Auto-focus first input when edit modal opens
+  useEffect(() => {
+    if (editingGroup) {
+      setTimeout(() => document.getElementById('edit-display-name')?.focus(), 100);
+    }
+  }, [editingGroup]);
+
   const fetchGroups = () => {
     setLoading(true);
     api.get('/admin/rbac/permission-groups')
