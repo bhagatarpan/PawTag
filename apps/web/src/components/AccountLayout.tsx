@@ -17,6 +17,21 @@ const NAV_ITEMS = [
   { path: '/account/settings', label: 'Settings', icon: Settings },
 ];
 
+function formatLastLogin(dateStr: string): string {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return 'Just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return date.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
 export default function AccountLayout({ children }: { children: ReactNode }) {
   const { user, logout } = useAuth();
   const location = useLocation();
@@ -42,6 +57,7 @@ export default function AccountLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
+      {/* Sidebar */}
       <div className="w-64 bg-white border-r border-gray-200 min-h-screen flex flex-col sticky top-16">
         <div className="p-4 border-b border-gray-100">
           <div className="flex items-center gap-2">
@@ -66,18 +82,69 @@ export default function AccountLayout({ children }: { children: ReactNode }) {
             );
           })}
         </nav>
-        <div className="p-3 border-t border-gray-100">
-          <div className="flex items-center gap-3 px-3 py-2">
-            <div className="w-8 h-8 bg-teal-100 rounded-full flex items-center justify-center text-teal-700 font-bold text-sm">{user?.fullName?.charAt(0) || '?'}</div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate text-gray-900">{user?.fullName}</p>
-              <p className="text-xs text-gray-400 truncate">{user?.email}</p>
+      </div>
+
+      {/* Main Content Area */}
+      <div className="flex-1 overflow-auto">
+        {/* Header Bar */}
+        <div className="bg-white border-b border-gray-200 px-6 py-3 sticky top-0 z-10">
+          <div className="max-w-4xl mx-auto flex items-center justify-end gap-4">
+            {/* Notification Bell */}
+            <Link to="/account/notifications" className="relative p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
+              <Bell size={20} />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
+            </Link>
+
+            {/* Avatar + User Info */}
+            <div className="flex items-center gap-3">
+              <div className="text-right hidden sm:block">
+                <p className="text-sm font-medium text-gray-900">{user?.fullName}</p>
+                {user?.lastLogin && (
+                  <p className="text-xs text-gray-400">Last login: {formatLastLogin(user.lastLogin)}</p>
+                )}
+              </div>
+
+              {/* Avatar Dropdown */}
+              <div className="relative group">
+                <button className="flex items-center gap-2 focus:outline-none">
+                  {user?.profilePicture ? (
+                    <img src={user.profilePicture} alt={user.fullName || ''} className="w-10 h-10 rounded-full object-cover ring-2 ring-white shadow-sm" />
+                  ) : (
+                    <div className="w-10 h-10 bg-teal-100 rounded-full flex items-center justify-center text-teal-700 font-bold text-sm ring-2 ring-white shadow-sm">
+                      {user?.fullName?.charAt(0) || '?'}
+                    </div>
+                  )}
+                </button>
+
+                {/* Dropdown Menu */}
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-200 py-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                  <div className="px-4 py-2 border-b border-gray-100 sm:hidden">
+                    <p className="text-sm font-medium text-gray-900">{user?.fullName}</p>
+                    {user?.lastLogin && (
+                      <p className="text-xs text-gray-400">Last login: {formatLastLogin(user.lastLogin)}</p>
+                    )}
+                  </div>
+                  <Link to="/account/profile" className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                    <User size={16} /> Profile
+                  </Link>
+                  <Link to="/account/settings" className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                    <Settings size={16} /> Settings
+                  </Link>
+                  <hr className="my-1 border-gray-100" />
+                  <button onClick={handleLogout} className="flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 w-full">
+                    <LogOut size={16} /> Sign out
+                  </button>
+                </div>
+              </div>
             </div>
-            <button onClick={handleLogout} className="text-gray-400 hover:text-red-600 p-1" title="Sign out"><LogOut size={16} /></button>
           </div>
         </div>
-      </div>
-      <div className="flex-1 overflow-auto">
+
+        {/* Page Content */}
         <div className="max-w-4xl mx-auto px-6 py-8">
           <div className="flex items-center gap-2 text-sm text-gray-500 mb-6">
             <Link to="/" className="hover:text-teal-600">Home</Link>

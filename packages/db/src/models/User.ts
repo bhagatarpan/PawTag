@@ -13,6 +13,7 @@ export interface IUserDocument extends Document {
   phoneVerified: boolean;
   phoneVerifiedAt?: Date;
   profilePicture?: string;
+  lastLogin?: Date;
   address?: {
     line1: string;
     line2?: string;
@@ -66,6 +67,7 @@ const UserSchema = new Schema<IUserDocument>(
     phoneVerified: { type: Boolean, default: false },
     phoneVerifiedAt: { type: Date },
     profilePicture: { type: String },
+    lastLogin: { type: Date },
     address: {
       line1: String,
       line2: String,

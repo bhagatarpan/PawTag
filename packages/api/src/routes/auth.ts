@@ -397,12 +397,13 @@ router.post('/login', loginLimiter, validate(loginSchema), async (req, res: Resp
       return;
     }
 
-    // Successful login — reset failed attempts
+    // Successful login — reset failed attempts and update lastLogin
     if (user.failedLoginAttempts > 0) {
       user.failedLoginAttempts = 0;
       user.lockedUntil = undefined;
-      await user.save();
     }
+    user.lastLogin = new Date();
+    await user.save();
 
 if (user.status === 'suspended') {
       await auditSecurityFailure(req as AuditRequest, {

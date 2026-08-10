@@ -95,6 +95,8 @@ export interface User {
   status?: string;
   mfaEnabled?: boolean;
   rbacRoles?: Array<{ name: string; displayName: string }>;
+  profilePicture?: string;
+  lastLogin?: string;
 }
 
 export interface Pet {
