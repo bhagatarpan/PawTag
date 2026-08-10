@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PawPrint, Plus, AlertTriangle, CheckCircle, Star, X, Edit2, Save, Upload, ShieldAlert, ShieldCheck, ShoppingBag, ChevronRight, Skull, EyeOff, Clock, Activity, Camera, Info, CreditCard, QrCode } from 'lucide-react';
+import { PawPrint, Plus, CheckCircle, X, Save, Upload, Info, QrCode, Camera, Sparkles } from 'lucide-react';
 import api from '../../lib/api';
 import HealthRecords from './HealthRecords';
 import SaveToast from '../../components/SaveToast';
+import PetCard, { PetCardSkeleton } from '../../components/PetCard';
 import { BREED_ORIGINS, getBreedsForOrigin } from '@pawtag/shared';
 import type { PetType } from '@pawtag/shared';
 
@@ -25,61 +26,6 @@ const PET_PATTERNS: Record<string, string[]> = {
   Hamster: ['Solid', 'Banded', 'Sanded', 'Ticked', 'Agouti', 'Spotted'],
   'Guinea Pig': ['Solid', 'Roan', 'Dalmatian', 'Brindle', 'Himalayan', 'Dutch', 'Orange', 'Ticked', 'Agouti'],
   Bird: ['Solid', 'Pied', 'Lutino', 'Albino', 'Opaline', 'Spangle', 'Clearwing', 'Crested', 'Dominant Pied'],
-};
-
-const PET_BREEDS: Record<string, string[]> = {
-  Dog: [
-    'Mixed Breed', 'Labrador Retriever', 'German Shepherd', 'Golden Retriever', 'French Bulldog',
-    'Bulldog', 'Poodle', 'Beagle', 'Rottweiler', 'Dachshund', 'German Shorthaired Pointer',
-    'Pembroke Welsh Corgi', 'Australian Shepherd', 'Yorkshire Terrier', 'Cavalier King Charles Spaniel',
-    'Doberman Pinscher', 'Boxer', 'Miniature Schnauzer', 'Cocker Spaniel', 'Shih Tzu',
-    'Border Collie', 'Belgian Malinois', 'Alaskan Malamute', 'Siberian Husky',
-    'Bernese Mountain Dog', 'Great Dane', 'Saint Bernard', 'Old English Sheepdog',
-    'Samoyed', 'Akita', 'Mastiff', 'Newfoundland',
-    'West Highland White Terrier', 'Scottish Terrier', 'Bull Terrier', 'Jack Russell Terrier',
-    'Staffordshire Bull Terrier', 'Airedale Terrier',
-    'Chihuahua', 'Pomeranian', 'Maltese', 'Pug', 'Papillon',
-    'Italian Greyhound', 'Chinese Crested',
-    'Basset Hound', 'Bloodhound', 'Greyhound', 'Whippet',
-    'Rhodesian Ridgeback', 'Afghan Hound', 'Basenji',
-    'Shiba Inu', 'Shar Pei', 'Chow Chow', 'Lhasa Apso',
-    'Sheltie', 'Collie', 'Dalmatian', 'Weimaraner',
-    'Vizsla', 'Brittany Spaniel', 'Setter (Irish)', 'Setter (English)',
-    'Pointer', 'Havanese', 'Bichon Frise', 'Maltepoo',
-    'Goldendoodle', 'Labradoodle', 'Cockapoo', 'Pomsky',
-  ],
-  Cat: [
-    'Mixed Breed', 'Domestic Shorthair', 'Domestic Longhair', 'Ragdoll', 'Maine Coon',
-    'Persian', 'British Shorthair', 'Bengal', 'Abyssinian',
-    'Siamese', 'Russian Blue', 'Scottish Fold', 'Sphynx',
-    'Birman', 'Norwegian Forest Cat', 'Ragamuffin', 'Himalayan',
-    'American Shorthair', 'Exotic Shorthair', 'Oriental Shorthair',
-    'Tonkinese', 'Burmese', 'Cornish Rex', 'Devon Rex', 'Selkirk Rex',
-    'Somali', 'Balinese', 'Chartreux', 'Korat',
-    'LaPerm', 'Manx', 'Munchkin', 'Singapura',
-    'Snowshoe', 'Turkish Angora', 'Turkish Van',
-  ],
-  Rabbit: [
-    'Mixed Breed', 'Holland Lop', 'Mini Lop', 'English Lop', 'French Lop',
-    'Netherland Dwarf', 'Mini Rex', 'Standard Rex', 'Velveteen Lop',
-    'Himalayan', 'Dutch', 'English Spot', 'Checkered Giant',
-    'Flemish Giant', 'Lionhead', 'Angora', 'Jersey Wooly',
-    'Californian', 'New Zealand', 'American', 'Chinchilla',
-    'Argente', 'Belgian Hare', 'English Angora', 'French Angora',
-  ],
-  Hamster: ['Syrian (Golden)', 'Dwarf Campbell', 'Dwarf Winter White', 'Roborovski', 'Chinese'],
-  'Guinea Pig': [
-    'American', 'Peruvian', 'Silkie (Sheltie)', 'Teddy',
-    'Texel', 'Rex', 'American Crested', 'Peruvian Crested',
-    'Skinny Pig', 'Baldwin', 'Sheba', 'White Crested', 'Merino', 'Lunkarya',
-  ],
-  Bird: [
-    'Budgerigar (Budgie)', 'Cockatiel', 'Lovebird', 'African Grey',
-    'Amazon Parrot', 'Macaw', 'Cockatoo', 'Conure',
-    'Canary', 'Finch', 'Parrotlet', 'Quaker Parrot',
-    'Ringneck Dove', 'Pionus', 'Caique', 'Lorikeet',
-    'Mynah', "Bourke's Parakeet", 'Lineolated Parakeet',
-  ],
 };
 
 const PET_GENDERS = [
@@ -138,21 +84,21 @@ function PhotoManager({ photos, onChange }: { photos: PhotoItem[]; onChange: (ph
     <div className="space-y-3">
       <label className="block text-xs text-gray-500 font-medium">Pet Photos (up to 5)</label>
       {mainPhoto && (
-        <div className="relative w-full h-48 rounded-lg overflow-hidden border-2 border-teal-300 bg-gray-100">
+        <div className="relative w-full h-48 rounded-xl overflow-hidden border-2 border-teal-300 bg-gray-100">
           <img src={mainPhoto.url} alt="Main photo" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-          <span className="absolute top-2 left-2 bg-teal-600 text-white text-xs px-2 py-0.5 rounded-full flex items-center gap-1"><Star size={10} fill="currentColor" /> Main Photo</span>
+          <span className="absolute top-2 left-2 bg-teal-600 text-white text-xs px-2.5 py-1 rounded-full flex items-center gap-1 shadow-lg"><span className="text-yellow-300">★</span> Main Photo</span>
         </div>
       )}
       {photos.length > 0 && (
         <div className="grid grid-cols-5 gap-2">
           {photos.map((photo, idx) => (
-            <div key={idx} className={`relative group rounded-lg overflow-hidden border-2 ${photo.isMain ? 'border-teal-500' : 'border-gray-200'} aspect-square`}>
+            <div key={idx} className={`relative group rounded-xl overflow-hidden border-2 ${photo.isMain ? 'border-teal-500' : 'border-gray-200'} aspect-square`}>
               <img src={photo.url} alt={photo.caption || `Photo ${idx + 1}`} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect width="80" height="80" fill="%23f3f4f6"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="%239ca3af" font-size="10">Error</text></svg>'; }} />
               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100">
-                {!photo.isMain && <button type="button" onClick={() => setMain(idx)} className="bg-white/90 rounded-full p-1 hover:bg-yellow-400" title="Set as main"><Star size={12} /></button>}
-                <button type="button" onClick={() => removePhoto(idx)} className="bg-white/90 rounded-full p-1 hover:bg-red-500 hover:text-white" title="Remove"><X size={12} /></button>
+                {!photo.isMain && <button type="button" onClick={() => setMain(idx)} className="bg-white/90 rounded-full p-1.5 hover:bg-yellow-400 shadow-lg" title="Set as main"><span className="text-yellow-500">★</span></button>}
+                <button type="button" onClick={() => removePhoto(idx)} className="bg-white/90 rounded-full p-1.5 hover:bg-red-500 hover:text-white shadow-lg" title="Remove"><X size={12} /></button>
               </div>
-              {photo.isMain && <span className="absolute top-1 right-1"><Star size={10} className="text-yellow-500" fill="currentColor" /></span>}
+              {photo.isMain && <span className="absolute top-1.5 right-1.5 text-yellow-400 drop-shadow-lg">★</span>}
             </div>
           ))}
         </div>
@@ -160,14 +106,14 @@ function PhotoManager({ photos, onChange }: { photos: PhotoItem[]; onChange: (ph
       {photos.length < 5 && (
         <div className="space-y-2">
           <div className="flex gap-2 items-end">
-            <div className="flex-1"><input type="url" placeholder="Paste image URL" value={urlInput} onChange={(e) => { setUrlInput(e.target.value); setError(''); }} className="w-full border rounded-md px-3 py-2 text-sm" /></div>
-            <div className="w-40"><input type="text" placeholder="Caption (optional)" value={captionInput} onChange={(e) => setCaptionInput(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" /></div>
-            <button type="button" onClick={handleAddUrl} disabled={!urlInput.trim()} className="bg-gray-100 border rounded-md px-3 py-2 text-sm hover:bg-gray-200 flex items-center gap-1 disabled:opacity-50"><Camera size={14} /> Add URL</button>
+            <div className="flex-1"><input type="url" placeholder="Paste image URL" value={urlInput} onChange={(e) => { setUrlInput(e.target.value); setError(''); }} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all" /></div>
+            <div className="w-40"><input type="text" placeholder="Caption (optional)" value={captionInput} onChange={(e) => setCaptionInput(e.target.value)} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all" /></div>
+            <button type="button" onClick={handleAddUrl} disabled={!urlInput.trim()} className="bg-gray-100 border border-gray-200 rounded-xl px-4 py-2.5 text-sm hover:bg-gray-200 flex items-center gap-1.5 disabled:opacity-50 transition-colors font-medium"><Camera size={14} /> Add</button>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs text-gray-400">or</span>
             <input ref={fileInputRef} type="file" accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,image/avif" onChange={handleFileUpload} className="hidden" />
-            <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading} className="bg-teal-50 border border-teal-200 rounded-md px-3 py-2 text-sm text-teal-700 hover:bg-teal-100 flex items-center gap-1 disabled:opacity-50"><Upload size={14} /> {uploading ? 'Uploading...' : 'Upload from Device'}</button>
+            <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading} className="bg-teal-50 border border-teal-200 rounded-xl px-4 py-2.5 text-sm text-teal-700 hover:bg-teal-100 flex items-center gap-1.5 disabled:opacity-50 transition-colors font-medium"><Upload size={14} /> {uploading ? 'Uploading...' : 'Upload from Device'}</button>
           </div>
         </div>
       )}
@@ -179,6 +125,7 @@ function PhotoManager({ photos, onChange }: { photos: PhotoItem[]; onChange: (ph
 export default function MyPets() {
   const navigate = useNavigate();
   const [pets, setPets] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingPet, setEditingPet] = useState<any>(null);
   const [form, setForm] = useState(emptyForm);
@@ -189,7 +136,13 @@ export default function MyPets() {
   const [showSaved, setShowSaved] = useState(false);
   const [unredeemedCount, setUnredeemedCount] = useState(0);
 
-  const refreshPets = () => api.get('/customer/pets').then((r) => setPets(r.data.data)).catch(console.error);
+  const refreshPets = () => {
+    setLoading(true);
+    api.get('/customer/pets')
+      .then((r) => setPets(r.data.data))
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  };
   useEffect(() => { refreshPets(); }, []);
 
   useEffect(() => {
@@ -283,205 +236,139 @@ export default function MyPets() {
     if (!confirm(`Mark pet as ${reason}? This action cannot be undone from the portal.`)) return;
     try { await api.post(`/customer/pets/${id}/mark-terminal`, { reason }); refreshPets(); } catch {}
   };
-  const deletePet = async (id: string) => { if (confirm('Delete this pet?')) { try { await api.delete(`/customer/pets/${id}`); refreshPets(); } catch {} } };
-
-  const getMainPhoto = (pet: any): string | null => {
-    if (pet.photos?.length > 0) { const m = pet.photos.find((p: any) => p.isMain); return m ? m.url : pet.photos[0].url; }
-    return pet.photoUrl || null;
-  };
-
-  const formatBreed = (pet: any) => {
-    const origin = pet.breedOrigin || 'Purebred';
-    const breed = pet.breed || '';
-    const secondary = pet.secondaryBreed || '';
-    if (origin === 'Unknown') return 'Unknown';
-    if ((origin === 'Mixed Breed' || origin === 'Designer Breed') && secondary && secondary !== 'Unknown') {
-      return `${origin === 'Designer Breed' ? 'Designer' : 'Mixed'} (${breed} × ${secondary})`;
-    }
-    if (origin === 'Landrace') return `${breed} (Landrace)`;
-    return breed;
-  };
-
-  const genderLabel = (g: string) => g === 'male' ? 'Male' : g === 'female' ? 'Female' : 'Unknown';
+  const deletePet = async (id: string) => { if (confirm('Delete this pet? This cannot be undone.')) { try { await api.delete(`/customer/pets/${id}`); refreshPets(); } catch {} } };
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">My Pets</h1>
-        <button onClick={startAdd} className="bg-teal-600 text-white px-4 py-2 rounded-md text-sm flex items-center gap-2 hover:bg-teal-700"><Plus size={16} /> Add Pet</button>
+    <div className="max-w-5xl">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">My Pets</h1>
+          <p className="text-sm text-gray-500 mt-0.5">{pets.length} pet{pets.length !== 1 ? 's' : ''} registered</p>
+        </div>
+        <button
+          onClick={startAdd}
+          className="bg-gradient-to-r from-teal-600 to-cyan-600 text-white px-5 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 hover:from-teal-700 hover:to-cyan-700 shadow-lg shadow-teal-500/25 transition-all hover:shadow-xl hover:shadow-teal-500/30"
+        >
+          <Plus size={18} /> Add Pet
+        </button>
       </div>
+
       {showSaved && <SaveToast message="Pet saved successfully" onDone={() => setShowSaved(false)} />}
 
+      {/* Unredeemed Tags Banner */}
       {unredeemedCount > 0 && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 flex items-center gap-4">
-          <QrCode size={24} className="text-blue-600 flex-shrink-0" />
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-5 mb-6 flex items-center gap-4 animate-fade-in">
+          <div className="w-12 h-12 rounded-2xl bg-blue-100 flex items-center justify-center flex-shrink-0">
+            <QrCode size={24} className="text-blue-600" />
+          </div>
           <div className="flex-1">
-            <p className="font-medium text-blue-800">You have {unredeemedCount} unredeemed tag{unredeemedCount > 1 ? 's' : ''}</p>
-            <p className="text-sm text-blue-600">Activate your tag to link it to a pet profile and start protecting them.</p>
+            <p className="font-semibold text-blue-800">You have {unredeemedCount} unredeemed tag{unredeemedCount > 1 ? 's' : ''}</p>
+            <p className="text-sm text-blue-600 mt-0.5">Activate your tag to link it to a pet profile and start protecting them.</p>
           </div>
           <button
             onClick={() => navigate('/account/redeem-tag')}
-            className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700"
+            className="bg-blue-600 text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-blue-700 shadow-lg shadow-blue-500/25 transition-all flex-shrink-0"
           >
             Activate Now
           </button>
         </div>
       )}
 
+      {/* Form */}
       {showForm && (
-        <form onSubmit={handleSubmit} className="bg-white rounded-lg border p-6 mb-6 space-y-4">
-          <h2 className="text-lg font-semibold">{editingPet ? `Edit ${editingPet.name}` : 'Add New Pet'}</h2>
-          <div className="grid grid-cols-2 gap-4">
-            <div><label className="block text-xs text-gray-500 mb-1">Pet Name *</label><input placeholder="Pet Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm" required disabled={!!editingPet} />{editingPet && <p className="text-xs text-gray-400 mt-1">Name cannot be changed after creation</p>}</div>
-            <div><label className="block text-xs text-gray-500 mb-1">Pet Type *</label><select value={form.petType} onChange={(e) => handleTypeChange(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" required>{PET_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}</select></div>
+        <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-gray-100 shadow-xl p-6 mb-8 space-y-5 animate-slide-up">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-bold">{editingPet ? `Edit ${editingPet.name}` : 'Add New Pet'}</h2>
+            <button type="button" onClick={cancelForm} className="p-2 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"><X size={18} /></button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div><label className="block text-xs text-gray-500 mb-1.5 font-medium">Pet Name *</label><input placeholder="Pet Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all" required disabled={!!editingPet} />{editingPet && <p className="text-xs text-gray-400 mt-1">Name cannot be changed after creation</p>}</div>
+            <div><label className="block text-xs text-gray-500 mb-1.5 font-medium">Pet Type *</label><select value={form.petType} onChange={(e) => handleTypeChange(e.target.value)} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all" required>{PET_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}</select></div>
             <div className="relative">
-              <label className="block text-xs text-gray-500 mb-1">Breed Origin *</label>
+              <label className="block text-xs text-gray-500 mb-1.5 font-medium">Breed Origin *</label>
               <div className="flex items-center gap-1">
-                <select value={form.breedOrigin} onChange={(e) => handleBreedOriginChange(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" required>
+                <select value={form.breedOrigin} onChange={(e) => handleBreedOriginChange(e.target.value)} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all" required>
                   {BREED_ORIGINS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
                 <span className="group relative flex-shrink-0">
                   <Info size={14} className="text-gray-400 cursor-help" />
-                  <span className="absolute right-0 top-6 z-50 w-64 p-2 text-xs text-white bg-gray-800 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
+                  <span className="absolute right-0 top-6 z-50 w-64 p-2.5 text-xs text-white bg-gray-800 rounded-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
                     {BREED_ORIGINS.find((o) => o.value === form.breedOrigin)?.tooltip}
                   </span>
                 </span>
               </div>
             </div>
-            <div><label className="block text-xs text-gray-500 mb-1">{showSecondaryBreed ? 'Primary Breed *' : 'Breed *'}</label><select value={form.breed} onChange={(e) => handleBreedChange(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" required><option value="">{form.breedOrigin === 'Unknown' ? 'Unknown' : 'Select breed...'}</option>{availableBreeds.map((b) => <option key={b} value={b}>{b}</option>)}</select></div>
-            {showSecondaryBreed && <div><label className="block text-xs text-gray-500 mb-1">Secondary Breed *</label><select value={form.secondaryBreed} onChange={(e) => setForm({ ...form, secondaryBreed: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm" required><option value="">Select...</option>{availableBreeds.filter((b) => b !== form.breed).map((b) => <option key={b} value={b}>{b}</option>)}</select></div>}
-            <div><label className="block text-xs text-gray-500 mb-1">Color *</label><select value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm" required><option value="">Select color...</option>{availableColors.map((c) => <option key={c} value={c}>{c}</option>)}</select></div>
-            <div><label className="block text-xs text-gray-500 mb-1">Pattern</label><select value={form.pattern} onChange={(e) => setForm({ ...form, pattern: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm"><option value="">Select pattern...</option>{availablePatterns.map((p) => <option key={p} value={p}>{p}</option>)}</select></div>
-            <div><label className="block text-xs text-gray-500 mb-1">Gender</label><select value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm">{PET_GENDERS.map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}</select></div>
-            <div><label className="block text-xs text-gray-500 mb-1">Birthday</label><input type="date" value={form.dateOfBirth} onChange={(e) => setForm({ ...form, dateOfBirth: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm" /></div>
-            <div><label className="block text-xs text-gray-500 mb-1">Age (years)</label><input type="number" min="0" max="30" step="0.5" value={form.age} onChange={(e) => setForm({ ...form, age: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm" placeholder="e.g. 3" /></div>
-            <div><label className="block text-xs text-gray-500 mb-1">Favourite Food</label><input placeholder="e.g. Chicken, Salmon..." value={form.favouriteFood} onChange={(e) => setForm({ ...form, favouriteFood: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm" /></div>
-            <div><label className="block text-xs text-gray-500 mb-1">Medical Alerts</label><input placeholder="Allergies, conditions..." value={form.medicalAlerts} onChange={(e) => setForm({ ...form, medicalAlerts: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm" /></div>
+            <div><label className="block text-xs text-gray-500 mb-1.5 font-medium">{showSecondaryBreed ? 'Primary Breed *' : 'Breed *'}</label><select value={form.breed} onChange={(e) => handleBreedChange(e.target.value)} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all" required><option value="">{form.breedOrigin === 'Unknown' ? 'Unknown' : 'Select breed...'}</option>{availableBreeds.map((b) => <option key={b} value={b}>{b}</option>)}</select></div>
+            {showSecondaryBreed && <div><label className="block text-xs text-gray-500 mb-1.5 font-medium">Secondary Breed *</label><select value={form.secondaryBreed} onChange={(e) => setForm({ ...form, secondaryBreed: e.target.value })} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all" required><option value="">Select...</option>{availableBreeds.filter((b) => b !== form.breed).map((b) => <option key={b} value={b}>{b}</option>)}</select></div>}
+            <div><label className="block text-xs text-gray-500 mb-1.5 font-medium">Color *</label><select value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all" required><option value="">Select color...</option>{availableColors.map((c) => <option key={c} value={c}>{c}</option>)}</select></div>
+            <div><label className="block text-xs text-gray-500 mb-1.5 font-medium">Pattern</label><select value={form.pattern} onChange={(e) => setForm({ ...form, pattern: e.target.value })} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all"><option value="">Select pattern...</option>{availablePatterns.map((p) => <option key={p} value={p}>{p}</option>)}</select></div>
+            <div><label className="block text-xs text-gray-500 mb-1.5 font-medium">Gender</label><select value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all">{PET_GENDERS.map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}</select></div>
+            <div><label className="block text-xs text-gray-500 mb-1.5 font-medium">Birthday</label><input type="date" value={form.dateOfBirth} onChange={(e) => setForm({ ...form, dateOfBirth: e.target.value })} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all" /></div>
+            <div><label className="block text-xs text-gray-500 mb-1.5 font-medium">Age (years)</label><input type="number" min="0" max="30" step="0.5" value={form.age} onChange={(e) => setForm({ ...form, age: e.target.value })} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all" placeholder="e.g. 3" /></div>
+            <div><label className="block text-xs text-gray-500 mb-1.5 font-medium">Favourite Food</label><input placeholder="e.g. Chicken, Salmon..." value={form.favouriteFood} onChange={(e) => setForm({ ...form, favouriteFood: e.target.value })} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all" /></div>
+            <div><label className="block text-xs text-gray-500 mb-1.5 font-medium">Medical Alerts</label><input placeholder="Allergies, conditions..." value={form.medicalAlerts} onChange={(e) => setForm({ ...form, medicalAlerts: e.target.value })} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all" /></div>
           </div>
-          <div className="border-t pt-4"><PhotoManager photos={photos} onChange={setPhotos} /></div>
-          <div className="flex gap-2">
-            <button type="submit" className="bg-teal-600 text-white px-4 py-2 rounded-md text-sm hover:bg-teal-700 flex items-center gap-1"><Save size={14} /> {editingPet ? 'Update Pet' : 'Save Pet'}</button>
-            <button type="button" onClick={cancelForm} className="border px-4 py-2 rounded-md text-sm">Cancel</button>
+          <div className="border-t border-gray-100 pt-5"><PhotoManager photos={photos} onChange={setPhotos} /></div>
+          <div className="flex gap-3">
+            <button type="submit" className="bg-gradient-to-r from-teal-600 to-cyan-600 text-white px-6 py-2.5 rounded-xl text-sm font-semibold hover:from-teal-700 hover:to-cyan-700 shadow-lg shadow-teal-500/25 transition-all flex items-center gap-2"><Save size={16} /> {editingPet ? 'Update Pet' : 'Save Pet'}</button>
+            <button type="button" onClick={cancelForm} className="border border-gray-200 px-6 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors">Cancel</button>
           </div>
         </form>
       )}
 
-      {pets.length === 0 ? (
-        <div className="text-center py-12 text-gray-500">No pets yet. Add your first pet above.</div>
-      ) : (
-        <div className="space-y-4">
-          {timeToFoundMsg && (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center gap-3">
-              <CheckCircle size={20} className="text-green-600" />
-              <p className="text-green-800 font-medium">{timeToFoundMsg}</p>
-            </div>
-          )}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {pets.map((pet) => {
-            const mainPhoto = getMainPhoto(pet);
-            return (
-              <div key={pet._id} className={`bg-white rounded-lg border overflow-hidden ${pet.status === 'lost' ? 'border-red-300 ring-2 ring-red-200' : pet.status === 'found' ? 'border-amber-300 ring-2 ring-amber-200' : ''}`}>
-                {pet.status === 'lost' && <div className="bg-red-600 text-white px-4 py-3 flex items-center gap-2"><ShieldAlert size={24} /><span className="font-extrabold text-base tracking-wide">LOST PET</span>{pet.lostCount > 0 && <span className="ml-auto bg-red-800 text-red-100 text-sm px-2 py-0.5 rounded-full">Lost {pet.lostCount}x</span>}</div>}
-                {pet.status === 'found' && (
-                  <div className="bg-amber-500 text-white px-4 py-3">
-                    <div className="flex items-center gap-2"><ShieldCheck size={24} /><span className="font-bold text-base tracking-wide">FOUND — Needs owner pickup</span></div>
-                    {(foundTimers[pet._id] as any)?.display && (
-                      <div className="flex items-center gap-1.5 mt-1 text-amber-100 text-sm">
-                        <Clock size={14} />
-                        <span className="font-mono">{(foundTimers[pet._id] as any).display}</span>
-                        <span>since found</span>
-                      </div>
-                    )}
-                  </div>
-                )}
-                {pet.status === 'safe' && <div className="bg-green-500 text-white px-4 py-2.5 flex items-center gap-2"><ShieldCheck size={20} /><span className="font-semibold text-sm">Safe</span>{pet.lostCount > 0 && <span className="ml-auto bg-green-700 text-green-100 text-sm px-2 py-0.5 rounded-full">Lost {pet.lostCount}x</span>}</div>}
-                {pet.status === 'deceased' && <div className="bg-gray-600 text-white px-4 py-2.5 flex items-center gap-2"><Skull size={20} /><span className="font-semibold text-sm">Deceased</span></div>}
-                {pet.status === 'stolen' && <div className="bg-purple-600 text-white px-4 py-2.5 flex items-center gap-2"><EyeOff size={20} /><span className="font-semibold text-sm">Stolen — Report to police</span></div>}
-                {pet.status === 'transferred' && <div className="bg-blue-600 text-white px-4 py-2.5 flex items-center gap-2"><ChevronRight size={20} /><span className="font-semibold text-sm">Transferred</span></div>}
-                {pet.status === 'donated' && <div className="bg-teal-600 text-white px-4 py-2.5 flex items-center gap-2"><Star size={20} /><span className="font-semibold text-sm">Donated</span></div>}
-                {pet.status === 'sold' && <div className="bg-amber-600 text-white px-4 py-2.5 flex items-center gap-2"><ShoppingBag size={20} /><span className="font-semibold text-sm">Sold</span></div>}
-                {mainPhoto ? <div className="h-40 bg-gray-100 relative"><img src={mainPhoto} alt={pet.name} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} /></div> : <button type="button" onClick={() => startEdit(pet)} className="h-40 bg-gradient-to-br from-teal-50 to-teal-100 flex flex-col items-center justify-center gap-1.5 px-4 text-center hover:from-teal-100 hover:to-teal-200 transition-colors cursor-pointer w-full"><PawPrint size={28} className="text-teal-400 mb-1" /><p className="text-sm text-teal-700 font-semibold">Add a photo of {pet.name}</p><p className="text-xs text-amber-600 font-medium italic">A clear photo helps finders identify and reunite your pet faster</p><p className="text-[10px] text-teal-500 mt-1 underline">Click to edit</p></button>}
-                <div className="p-5">
-                  <div className="flex justify-between items-start mb-3">
-                    <div className="flex-1">
-                      <h3 className="text-xl font-bold">{pet.name}</h3>
-                      {pet.petId && <p className="text-sm text-gray-400 font-mono">ID: {pet.petId}</p>}
-                      {pet.linkedTag && <p className="text-sm text-teal-600 font-mono mt-0.5">Tag: {pet.linkedTag.tagId} <span className="text-[10px] uppercase bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded font-sans font-medium">{pet.linkedTag.tagType || 'qr'}</span><span className={`ml-1.5 inline-block w-2 h-2 rounded-full ${pet.linkedTag.status === 'active' ? 'bg-green-500' : pet.linkedTag.status === 'lost' ? 'bg-red-500' : 'bg-gray-400'}`} /><span className="ml-1 text-gray-400 font-sans">({pet.linkedTag.status})</span></p>}
-                      {!pet.linkedTag && <p className="text-sm text-gray-300 mt-0.5">No tag linked</p>}
-                      {pet.linkedTag?.subscription && (
-                        <div className="mt-2 p-2 bg-teal-50 rounded-lg border border-teal-100">
-                          <div className="flex items-center gap-1.5 text-xs text-teal-700 font-medium">
-                            <CreditCard size={12} />
-                            <span>{pet.linkedTag.subscription.productName}</span>
-                            <span className={`ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-                              pet.linkedTag.subscription.status === 'active' ? 'bg-green-100 text-green-700' :
-                              pet.linkedTag.subscription.status === 'grace_period' ? 'bg-yellow-100 text-yellow-700' :
-                              'bg-red-100 text-red-700'
-                            }`}>
-                              {pet.linkedTag.subscription.status === 'active' ? 'Active' :
-                               pet.linkedTag.subscription.status === 'grace_period' ? 'Expiring Soon' : 'Expired'}
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-teal-600 mt-0.5">
-                            ${pet.linkedTag.subscription.price}/mo · {pet.linkedTag.subscription.autoRenew ? 'Auto-renew on' : 'Auto-renew off'}
-                          </p>
-                        </div>
-                      )}
-                      {pet.linkedTag && !pet.linkedTag.subscription && (
-                        <p className="text-xs text-gray-400 mt-1 italic">No active subscription</p>
-                      )}
-                      {pet.linkedTag && pet.linkedTag.status === 'active' && (
-                        <button
-                          onClick={async () => {
-                            const reason = prompt('Why do you need a replacement? (e.g., lost, damaged)');
-                            if (reason) {
-                              try {
-                                await api.post(`/customer/tags/${pet.linkedTag._id}/request-replacement`, { reason });
-                                alert('Replacement request submitted! Check your orders for the replacement tag.');
-                              } catch (err: any) {
-                                alert(err.response?.data?.error || 'Failed to request replacement');
-                              }
-                            }
-                          }}
-                          className="text-xs text-red-500 hover:text-red-700 mt-1 underline"
-                        >
-                          Report lost or damaged tag
-                        </button>
-                      )}
-                      <p className="text-base text-gray-600 mt-1">{pet.petType || pet.species} — {formatBreed(pet)}</p>
-                      <p className="text-sm text-gray-400">Origin: {pet.breedOrigin || 'Purebred'}</p>
-                      {pet.secondaryBreed && pet.secondaryBreed !== 'Unknown' && <p className="text-sm text-gray-400">Secondary: {pet.secondaryBreed}</p>}
-                      <p className="text-base text-gray-500">Color: {pet.color}{pet.pattern ? ` | Pattern: ${pet.pattern}` : ''}</p>
-                      <p className="text-base text-gray-500">Gender: {genderLabel(pet.gender)}{pet.age != null ? ` | Age: ${pet.age} yrs` : ''}</p>
-                      {pet.favouriteFood && <p className="text-base text-gray-500">Fav Food: {pet.favouriteFood}</p>}
-                      {pet.photos?.length > 1 && <p className="text-sm text-gray-400 mt-1">{pet.photos.length} photos</p>}
-                      {pet.medicalAlerts && <p className="text-base text-red-600 mt-1 flex items-center gap-1"><AlertTriangle size={16} /> {pet.medicalAlerts}</p>}
-                    </div>
-                  </div>
-                  <div className="flex gap-2 pt-3 border-t flex-wrap">
-                    <button onClick={() => startEdit(pet)} className="bg-teal-50 text-teal-700 hover:bg-teal-100 px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-1.5 border border-teal-200"><Edit2 size={14} /> Edit</button>
-                    <button onClick={() => setHealthPet(pet)} className="bg-blue-50 text-blue-700 hover:bg-blue-100 px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-1.5 border border-blue-200"><Activity size={14} /> Health Records</button>
-                    {pet.status === 'safe' ? (
-                      <button onClick={() => markLost(pet._id)} className="bg-red-50 text-red-700 hover:bg-red-100 px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-1.5 border border-red-200"><ShieldAlert size={14} /> Mark as Lost</button>
-                    ) : pet.status === 'lost' || pet.status === 'found' ? (
-                      <>
-                        <button onClick={() => markFound(pet._id)} className="bg-green-50 text-green-700 hover:bg-green-100 px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-1.5 border border-green-200"><CheckCircle size={14} /> Mark as Found</button>
-                        <button onClick={() => markTerminal(pet._id, 'stolen')} className="bg-purple-50 text-purple-700 hover:bg-purple-100 px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-1.5 border border-purple-200"><EyeOff size={14} /> Stolen</button>
-                        <button onClick={() => markTerminal(pet._id, 'deceased')} className="bg-gray-100 text-gray-700 hover:bg-gray-200 px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-1.5 border border-gray-300"><Skull size={14} /> Deceased</button>
-                        <button onClick={() => markTerminal(pet._id, 'transferred')} className="bg-blue-50 text-blue-700 hover:bg-blue-100 px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-1.5 border border-blue-200"><ChevronRight size={14} /> Transferred</button>
-                        <button onClick={() => markTerminal(pet._id, 'donated')} className="bg-teal-50 text-teal-700 hover:bg-teal-100 px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-1.5 border border-teal-200"><Star size={14} /> Donated</button>
-                        <button onClick={() => markTerminal(pet._id, 'sold')} className="bg-amber-50 text-amber-700 hover:bg-amber-100 px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-1.5 border border-amber-200"><ShoppingBag size={14} /> Sold</button>
-                      </>
-                    ) : null}
-                    <button onClick={() => deletePet(pet._id)} className="text-gray-400 hover:text-red-600 text-sm ml-auto px-3 py-1.5">Delete</button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-          </div>
+      {/* Found Reunited Toast */}
+      {timeToFoundMsg && (
+        <div className="bg-green-50 border border-green-200 rounded-2xl p-4 flex items-center gap-3 mb-6 animate-fade-in">
+          <CheckCircle size={22} className="text-green-600" />
+          <p className="text-green-800 font-semibold">{timeToFoundMsg}</p>
         </div>
       )}
+
+      {/* Loading State */}
+      {loading && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {[1, 2, 3, 4].map((i) => <PetCardSkeleton key={i} />)}
+        </div>
+      )}
+
+      {/* Empty State */}
+      {!loading && pets.length === 0 && (
+        <div className="text-center py-20 animate-fade-in">
+          <div className="w-24 h-24 mx-auto mb-6 rounded-3xl bg-gradient-to-br from-teal-50 to-cyan-50 flex items-center justify-center shadow-inner">
+            <PawPrint size={48} className="text-teal-400" />
+          </div>
+          <h2 className="text-xl font-bold text-gray-800 mb-2">No pets yet</h2>
+          <p className="text-gray-500 mb-6 max-w-sm mx-auto">Add your first pet to get started. Link a QR tag to protect them and help them get home safely.</p>
+          <button
+            onClick={startAdd}
+            className="bg-gradient-to-r from-teal-600 to-cyan-600 text-white px-6 py-3 rounded-xl text-sm font-semibold inline-flex items-center gap-2 hover:from-teal-700 hover:to-cyan-700 shadow-lg shadow-teal-500/25 transition-all"
+          >
+            <Plus size={18} /> Add Your First Pet
+          </button>
+        </div>
+      )}
+
+      {/* Pet Cards Grid */}
+      {!loading && pets.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {pets.map((pet, index) => (
+            <PetCard
+              key={pet._id}
+              pet={pet}
+              index={index}
+              foundTimer={foundTimers[pet._id] as any}
+              onEdit={startEdit}
+              onHealth={setHealthPet}
+              onMarkLost={markLost}
+              onMarkFound={markFound}
+              onMarkTerminal={markTerminal}
+              onDelete={deletePet}
+            />
+          ))}
+        </div>
+      )}
+
       {healthPet && <HealthRecords pet={healthPet} onClose={() => setHealthPet(null)} />}
     </div>
   );
