@@ -74,10 +74,7 @@ and eliminating duplicated UI code.
 
 ## Phase 1: Admin — Users Page
 
-**Status:** `pending`
-
-### Goal
-Rewrite `apps/admin/src/pages/Users.tsx` with enterprise-grade UX.
+**Status:** `completed`
 
 ### Current State
 - 438 lines, 10-column dense table
@@ -106,8 +103,8 @@ Rewrite `apps/admin/src/pages/Users.tsx` with enterprise-grade UX.
 - `GET /admin/users/export` — CSV/JSON
 
 ### Verification
-- [ ] Typecheck passes
-- [ ] Build passes
+- [x] Typecheck passes
+- [x] Build passes
 - [ ] All existing tests pass
 - [ ] New summary/export endpoints tested
 
@@ -273,7 +270,7 @@ Refactor the monolithic finder page into maintainable components with better UX.
 | Phase | Status | Started | Completed |
 |-------|--------|---------|-----------|
 | Phase 0: Shared UI Library | `completed` | 2026-08-10 | 2026-08-10 |
-| Phase 1: Admin Users | `pending` | — | — |
+| Phase 1: Admin Users | `completed` | 2026-08-10 | 2026-08-10 |
 | Phase 2: Admin Pets | `pending` | — | — |
 | Phase 3: Admin Tags + Products | `pending` | — | — |
 | Phase 4: Customer Portal | `pending` | — | — |
