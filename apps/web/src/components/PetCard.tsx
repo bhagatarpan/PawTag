@@ -33,7 +33,7 @@ interface PetCardProps {
 }
 
 const STATUS_CONFIG: Record<string, { label: string; icon: any; gradient: string; badge: string; ring: string; bg: string; text: string; iconBg: string; pulse?: boolean; description?: string }> = {
-  safe: { label: 'Safe', icon: ShieldCheck, gradient: 'from-emerald-500 to-green-500', badge: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200', ring: 'ring-emerald-200', bg: 'bg-emerald-50', text: 'text-emerald-700', iconBg: 'bg-emerald-100', description: 'All good' },
+  safe: { label: 'Safe', icon: ShieldCheck, gradient: 'from-emerald-500 to-green-500', badge: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200', ring: 'ring-emerald-200', bg: 'bg-gradient-to-r from-emerald-50 to-green-50', text: 'text-emerald-700', iconBg: 'bg-emerald-100', description: 'All good' },
   lost: { label: 'LOST', icon: ShieldAlert, gradient: 'from-red-500 to-rose-600', badge: 'bg-red-50 text-red-700 ring-1 ring-red-200', ring: 'ring-red-200', bg: 'bg-gradient-to-r from-red-500 to-rose-600', text: 'text-white', iconBg: 'bg-red-400/30', pulse: true, description: 'Actively searching' },
   found: { label: 'FOUND', icon: ShieldCheck, gradient: 'from-amber-400 to-orange-500', badge: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200', ring: 'ring-amber-200', bg: 'bg-gradient-to-r from-amber-400 to-orange-500', text: 'text-white', iconBg: 'bg-amber-300/30', description: 'Awaiting pickup' },
   deceased: { label: 'Deceased', icon: Skull, gradient: 'from-gray-500 to-gray-600', badge: 'bg-gray-100 text-gray-600 ring-1 ring-gray-200', ring: 'ring-gray-200', bg: 'bg-gray-100', text: 'text-gray-600', iconBg: 'bg-gray-200' },
@@ -99,7 +99,8 @@ export default function PetCard({
     <div
       className={`pet-card bg-white rounded-2xl overflow-hidden border border-gray-100 animate-stagger-in relative group ${
         pet.status === 'lost' ? `ring-2 ${status.ring} border-red-200` :
-        pet.status === 'found' ? `ring-2 ${status.ring} border-amber-200` : ''
+        pet.status === 'found' ? `ring-2 ${status.ring} border-amber-200` :
+        pet.status === 'safe' ? `ring-1 ${status.ring}` : ''
       }`}
       style={{ animationDelay: `${index * 80}ms` }}
     >
@@ -154,32 +155,30 @@ export default function PetCard({
       </div>
 
       {/* Status Management Banner */}
-      {pet.status !== 'safe' && (
-        <div className={`flex items-center gap-3 px-4 py-3 ${status.bg} ${status.pulse ? 'animate-status-pulse' : ''}`}>
-          <div className={`w-9 h-9 rounded-xl ${status.iconBg} flex items-center justify-center flex-shrink-0`}>
-            <StatusIcon size={18} className={status.text} />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <span className={`text-sm font-bold ${status.text}`}>{status.label}</span>
-              {pet.status === 'lost' && pet.lostCount > 0 && (
-                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${status.text} bg-white/20`}>
-                  Lost {pet.lostCount}×
-                </span>
-              )}
-            </div>
-            {status.description && (
-              <p className={`text-[11px] ${status.text} opacity-80`}>{status.description}</p>
+      <div className={`flex items-center gap-3 px-4 py-3 ${status.bg} ${status.pulse ? 'animate-status-pulse' : ''}`}>
+        <div className={`w-9 h-9 rounded-xl ${status.iconBg} flex items-center justify-center flex-shrink-0`}>
+          <StatusIcon size={18} className={status.text} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className={`text-sm font-bold ${status.text}`}>{status.label}</span>
+            {pet.status === 'lost' && pet.lostCount > 0 && (
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${status.text} bg-white/20`}>
+                Lost {pet.lostCount}×
+              </span>
             )}
           </div>
-          {pet.status === 'found' && foundTimer?.display && (
-            <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/20 ${status.text}`}>
-              <Clock size={12} />
-              <span className="text-xs font-mono font-bold">{foundTimer.display}</span>
-            </div>
+          {status.description && (
+            <p className={`text-[11px] ${status.text} opacity-80`}>{status.description}</p>
           )}
         </div>
-      )}
+        {pet.status === 'found' && foundTimer?.display && (
+          <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/20 ${status.text}`}>
+            <Clock size={12} />
+            <span className="text-xs font-mono font-bold">{foundTimer.display}</span>
+          </div>
+        )}
+      </div>
 
       {/* Content Section */}
       <div className="p-5">
