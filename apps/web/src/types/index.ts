@@ -97,6 +97,7 @@ export interface User {
   rbacRoles?: Array<{ name: string; displayName: string }>;
   profilePicture?: string;
   lastLogin?: string;
+  onboardingCompleted?: boolean;
 }
 
 export interface Pet {

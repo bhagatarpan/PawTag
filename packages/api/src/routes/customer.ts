@@ -4,7 +4,7 @@ import { AuthRequest, authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
 import { validate } from '../middleware/validation';
 import { createPetSchema, updatePetSchema } from '../middleware/schemas';
-import { Pet, Tag, Order, LocationEvent, Notification, FinderScan, User, generatePetId, Cart, Product, Subscription, Referral, Setting, Invoice } from '@pawtag/db';
+import { Pet, Tag, Order, LocationEvent, Notification, FinderScan, User, generatePetId, Cart, Product, Subscription, Referral, Setting, Invoice, EscalationRecord } from '@pawtag/db';
 import { auditService, type AuditContext } from '../services/audit';
 import { createAuditContextFromRequest, type AuditRequest } from '../middleware/audit';
 import { calculateBundleDiscount } from '../services/bundle-pricing.service';
@@ -2595,6 +2595,174 @@ router.put('/settings/finder-privacy', requirePermission('pet.read'), async (req
     res.json({ success: true, data: { showOwnerNameInFinder } });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to update finder privacy settings' });
+  }
+});
+
+// --- Onboarding ---
+router.put('/settings/onboarding-complete', requirePermission('pet.read'), async (req: AuthRequest, res: Response) => {
+  try {
+    const user = await User.findById(req.user!.id);
+    if (!user || user.deletedAt) {
+      res.status(404).json({ success: false, error: 'User not found' });
+      return;
+    }
+
+    user.onboardingCompleted = true;
+    await user.save();
+
+    await auditCustomerEvent(req, {
+      action: 'onboarding_completed',
+      eventType: 'onboarding_completed',
+      eventCategory: 'SYSTEM',
+      operationType: 'UPDATE',
+      resourceType: 'User',
+      resourceId: req.user!.id,
+      beforeState: { onboardingCompleted: false },
+      afterState: { onboardingCompleted: true },
+      changedFields: [{ field: 'onboardingCompleted', before: false, after: true, sensitive: false }],
+      outcome: 'SUCCESS',
+      severity: 'LOW',
+    }, { actorType: 'USER' });
+
+    res.json({ success: true, data: { onboardingCompleted: true } });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to mark onboarding as complete' });
+  }
+});
+
+// ─── Escalation Routes ──────────────────────────────────────────────
+
+/**
+ * GET /api/customer/escalations — List escalation records for the current user
+ */
+router.get('/escalations', requirePermission('pet.read'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { status } = req.query;
+    const filter: Record<string, unknown> = { ownerId: req.user!.id };
+    if (status) filter.status = status;
+
+    const records = await EscalationRecord.find(filter)
+      .populate('petId', 'name petId status photos')
+      .populate('tagId', 'tagId')
+      .sort({ foundAt: -1 })
+      .limit(50);
+
+    res.json({ success: true, data: records });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to fetch escalations' });
+  }
+});
+
+/**
+ * GET /api/customer/escalations/:id — Get a single escalation record
+ */
+router.get('/escalations/:id', requirePermission('pet.read'), async (req: AuthRequest, res: Response) => {
+  try {
+    const record = await EscalationRecord.findOne({ _id: req.params.id, ownerId: req.user!.id })
+      .populate('petId', 'name petId status photos')
+      .populate('tagId', 'tagId');
+
+    if (!record) {
+      return res.status(404).json({ success: false, error: 'Escalation record not found' });
+    }
+
+    res.json({ success: true, data: record });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to fetch escalation' });
+  }
+});
+
+/**
+ * POST /api/customer/escalations/:id/resolve — Mark escalation as resolved (owner responded)
+ */
+router.post('/escalations/:id/resolve', requirePermission('pet.update'), async (req: AuthRequest, res: Response) => {
+  try {
+    const record = await EscalationRecord.findOne({ _id: req.params.id, ownerId: req.user!.id });
+    if (!record) {
+      return res.status(404).json({ success: false, error: 'Escalation record not found' });
+    }
+
+    if (record.status !== 'pending') {
+      return res.status(400).json({ success: false, error: 'This escalation has already been resolved' });
+    }
+
+    record.status = 'resolved';
+    record.resolvedAt = new Date();
+    record.resolvedBy = 'owner';
+    await record.save();
+
+    await auditCustomerEvent(req, {
+      action: 'escalation_resolved',
+      eventType: 'escalation_resolved',
+      eventCategory: 'SYSTEM',
+      operationType: 'UPDATE',
+      resourceType: 'EscalationRecord',
+      resourceId: record._id.toString(),
+      beforeState: { status: 'pending' },
+      afterState: { status: 'resolved' },
+      changedFields: [{ field: 'status', before: 'pending', after: 'resolved', sensitive: false }],
+      outcome: 'SUCCESS',
+      severity: 'LOW',
+    }, { actorType: 'USER' });
+
+    res.json({ success: true, data: { status: 'resolved' } });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to resolve escalation' });
+  }
+});
+
+/**
+ * POST /api/customer/escalations/:id/forward — Forward to emergency contact immediately
+ */
+router.post('/escalations/:id/forward', requirePermission('pet.update'), async (req: AuthRequest, res: Response) => {
+  try {
+    const record = await EscalationRecord.findOne({ _id: req.params.id, ownerId: req.user!.id })
+      .populate('ownerId', 'fullName email emergencyContact')
+      .populate('petId', 'name petId')
+      .populate('tagId', 'tagId');
+
+    if (!record) {
+      return res.status(404).json({ success: false, error: 'Escalation record not found' });
+    }
+
+    if (record.status !== 'pending') {
+      return res.status(400).json({ success: false, error: 'This escalation has already been processed' });
+    }
+
+    const owner = record.ownerId as any;
+    if (!owner?.emergencyContact?.name || !owner?.emergencyContact?.phone) {
+      return res.status(400).json({ success: false, error: 'No emergency contact configured. Please add one in your profile settings.' });
+    }
+
+    // Import and use the escalation service
+    const { forwardToEmergencyContact } = await import('../services/escalation.service');
+    const result = await forwardToEmergencyContact(record._id.toString());
+
+    if (!result.success) {
+      return res.status(400).json({ success: false, error: result.message });
+    }
+
+    record.status = 'forwarded';
+    record.forwardedAt = new Date();
+    await record.save();
+
+    await auditCustomerEvent(req, {
+      action: 'escalation_forwarded',
+      eventType: 'escalation_forwarded',
+      eventCategory: 'SYSTEM',
+      operationType: 'UPDATE',
+      resourceType: 'EscalationRecord',
+      resourceId: record._id.toString(),
+      beforeState: { status: 'pending' },
+      afterState: { status: 'forwarded' },
+      changedFields: [{ field: 'status', before: 'pending', after: 'forwarded', sensitive: false }],
+      outcome: 'SUCCESS',
+      severity: 'MEDIUM',
+    }, { actorType: 'USER' });
+
+    res.json({ success: true, data: { message: 'Emergency contact has been notified' } });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to forward to emergency contact' });
   }
 });
 

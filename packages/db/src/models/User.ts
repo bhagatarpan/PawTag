@@ -35,6 +35,7 @@ export interface IUserDocument extends Document {
   skipInvoiceOtp: boolean;
   skipInvoiceOtpExpiresAt?: Date;
   showOwnerNameInFinder: boolean;
+  onboardingCompleted: boolean;
   notificationPreferences?: {
     email: boolean;
     push: boolean;
@@ -90,6 +91,7 @@ const UserSchema = new Schema<IUserDocument>(
     skipInvoiceOtp: { type: Boolean, default: false },
     skipInvoiceOtpExpiresAt: { type: Date, default: null },
     showOwnerNameInFinder: { type: Boolean, default: true },
+    onboardingCompleted: { type: Boolean, default: false },
     notificationPreferences: {
       email: { type: Boolean, default: true },
       push: { type: Boolean, default: true },

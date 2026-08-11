@@ -289,8 +289,11 @@ export default function Settings() {
                   {finderPrivacyLoading
                     ? 'Loading...'
                     : finderPrivacy?.showOwnerNameInFinder
-                      ? 'Your name is visible to finders. Your suburb and city will be shown instead if turned off.'
-                      : 'Your name is hidden — finders will see your suburb and city instead.'}
+                      ? 'ON: Your name is visible to finders. Your suburb and city will also be shown.'
+                      : 'OFF: Your name is hidden — finders will see your suburb and city instead.'}
+                </p>
+                <p className="text-xs text-gray-400 mt-1">
+                  Your street address, phone, and email are never shown to finders.
                 </p>
               </div>
             </div>

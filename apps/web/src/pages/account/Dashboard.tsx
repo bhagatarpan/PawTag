@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   PawPrint, Tag, CreditCard, ShoppingBag, Bell, AlertTriangle,
-  CheckCircle, Clock, ChevronRight, Shield, QrCode,
+  CheckCircle, Clock, ChevronRight, Shield, QrCode, Phone, Forward,
 } from 'lucide-react';
 import { SummaryCards, EmptyState, StatusBadge } from '@pawtag/ui';
 import api from '../../lib/api';
@@ -18,6 +18,19 @@ interface DashboardData {
   subscriptions: Subscription[];
   recentOrders: Order[];
   notifications: Notification[];
+  escalations: EscalationRecord[];
+}
+
+interface EscalationRecord {
+  _id: string;
+  petId: { name: string; petId: string; photos?: Array<{ url: string }> };
+  tagId: { tagId: string };
+  status: 'pending' | 'owner_responded' | 'escalated' | 'forwarded' | 'resolved';
+  foundAt: string;
+  escalationDeadline: string;
+  finderName?: string;
+  finderPhone?: string;
+  finderEmail?: string;
 }
 
 /* ------------------------------------------------------------------ */
@@ -100,12 +113,13 @@ export default function AccountDashboard() {
   useEffect(() => {
     async function fetchDashboard() {
       try {
-        const [petsRes, tagsRes, subsRes, ordersRes, notifsRes] = await Promise.all([
+        const [petsRes, tagsRes, subsRes, ordersRes, notifsRes, escRes] = await Promise.all([
           api.get('/customer/pets').catch(() => ({ data: { data: [] } })),
           api.get('/customer/tags').catch(() => ({ data: { data: [] } })),
           api.get('/customer/subscriptions').catch(() => ({ data: { data: [] } })),
           api.get('/customer/orders').catch(() => ({ data: { data: [] } })),
           api.get('/customer/notifications').catch(() => ({ data: { data: [] } })),
+          api.get('/customer/escalations?status=pending').catch(() => ({ data: { data: [] } })),
         ]);
         setData({
           pets: petsRes.data.data || [],
@@ -113,6 +127,7 @@ export default function AccountDashboard() {
           subscriptions: subsRes.data.data || [],
           recentOrders: (ordersRes.data.data || []).slice(0, 5),
           notifications: notifsRes.data.data || [],
+          escalations: escRes.data.data || [],
         });
       } catch (err: any) {
         setError(err.message || 'Failed to load dashboard');
@@ -191,6 +206,72 @@ export default function AccountDashboard() {
           <span className="text-sm font-medium text-gray-700">Referrals</span>
         </Link>
       </div>
+
+      {/* Pending Escalations */}
+      {data?.escalations && data.escalations.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-3 border-b border-amber-200 bg-amber-100">
+            <h2 className="text-sm font-semibold text-amber-800 flex items-center gap-2">
+              <AlertTriangle size={16} /> Pending Pet Found Alerts
+            </h2>
+          </div>
+          <div className="divide-y divide-amber-200">
+            {data.escalations.map((esc) => {
+              const timeLeft = Math.max(0, Math.floor((new Date(esc.escalationDeadline).getTime() - Date.now()) / 60000));
+              return (
+                <div key={esc._id} className="px-5 py-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+                      {esc.petId?.photos?.[0]?.url ? (
+                        <img src={esc.petId.photos[0].url} alt="" className="w-full h-full object-cover rounded-full" />
+                      ) : (
+                        <PawPrint size={18} className="text-amber-600" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900">
+                        {esc.petId?.name || 'Pet'} was found!
+                      </p>
+                      <p className="text-xs text-gray-600 mt-0.5">
+                        {esc.finderName ? `By ${esc.finderName}` : 'Finder notified you'}
+                        {esc.finderPhone && ` · ${esc.finderPhone}`}
+                      </p>
+                      <p className="text-xs text-amber-700 mt-1">
+                        <Clock size={10} className="inline mr-1" />
+                        {timeLeft > 0 ? `${timeLeft} min until emergency contact is notified` : 'Emergency contact will be notified soon'}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={async () => {
+                          if (confirm('Mark as resolved? This means you have made contact with the finder.')) {
+                            await api.post(`/customer/escalations/${esc._id}/resolve`);
+                            setData((prev) => prev ? { ...prev, escalations: prev.escalations.filter((e) => e._id !== esc._id) } : prev);
+                          }
+                        }}
+                        className="flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded-lg hover:bg-green-700 transition-colors"
+                      >
+                        <CheckCircle size={14} /> I Made Contact
+                      </button>
+                      <button
+                        onClick={async () => {
+                          if (confirm('Forward this alert to your emergency contact now?')) {
+                            await api.post(`/customer/escalations/${esc._id}/forward`);
+                            setData((prev) => prev ? { ...prev, escalations: prev.escalations.filter((e) => e._id !== esc._id) } : prev);
+                          }
+                        }}
+                        className="flex items-center gap-1 px-3 py-1.5 bg-amber-600 text-white text-xs font-medium rounded-lg hover:bg-amber-700 transition-colors"
+                      >
+                        <Forward size={14} /> Forward to EC
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

@@ -33,6 +33,7 @@ import {
   AlertTriangle,
   Bell,
   Wifi,
+  ClipboardCheck,
 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import api from '../lib/api';
@@ -86,6 +87,7 @@ const cmsLinks: SidebarLink[] = [
   { to: '/cms/shop-pages', label: 'Shop Pages', icon: ShoppingCart, permission: 'cms.shop_page.read' },
   { to: '/cms/auth-pages', label: 'Auth Pages', icon: LogIn, permission: 'cms.auth_page.read' },
   { to: '/cms/invoice-template', label: 'Invoice Template', icon: FileSignature, permission: 'cms.email_template.read' },
+  { to: '/cms/onboarding', label: 'Customer Onboarding', icon: ClipboardCheck, permission: 'cms.onboarding.read' },
 ];
 
 export default function Sidebar() {

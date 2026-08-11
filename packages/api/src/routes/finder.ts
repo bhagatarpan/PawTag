@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
-import { Tag, FinderScan, LocationEvent, Notification, Subscription, User, Pet, SiteContent, Product, Setting } from '@pawtag/db';
+import { Tag, FinderScan, LocationEvent, Notification, Subscription, User, Pet, SiteContent, Product, Setting, EscalationRecord } from '@pawtag/db';
 import { sendPushToUser } from '../services/push-notification.service';
+import { sendPetFoundEmail } from '../services/email.service';
 import { auditService, type AuditContext } from '../services/audit';
 
 const router = Router();
@@ -439,6 +440,42 @@ router.post('/:tagId/notify', async (req: Request, res: Response) => {
         petId: pet?._id?.toString() || '',
         tagId: tag.tagId,
       }).catch(() => {});
+
+      // Send email notification to owner
+      if (owner.email) {
+        const scanLocation = locationSaved
+          ? `${latitude}, ${longitude}${accuracy ? ` (±${Math.round(accuracy)}m)` : ''}`
+          : undefined;
+        await sendPetFoundEmail(
+          owner.email,
+          owner.fullName || 'Pet Owner',
+          pet?.name || 'your pet',
+          contactInfo,
+          contactInfo,
+          scanLocation,
+        ).catch(() => {});
+      }
+
+      // Create escalation record for 30-minute follow-up
+      const escalationDelaySetting = await Setting.findOne({ key: 'escalation.delayMinutes' });
+      const delayMinutes = parseInt(escalationDelaySetting?.value || '30', 10);
+      const escalationDeadline = new Date(Date.now() + delayMinutes * 60 * 1000);
+
+      await EscalationRecord.create({
+        petId: pet?._id,
+        ownerId: owner._id,
+        tagId: tag._id,
+        finderScanId: scan?._id || tag._id,
+        status: 'pending',
+        foundAt: new Date(),
+        ownerNotifiedAt: new Date(),
+        escalationDeadline,
+        finderName: finderName || null,
+        finderPhone: finderPhone || null,
+        finderEmail: finderEmail || null,
+        finderMessage: contactInfo || null,
+        scanLocation: locationSaved ? { latitude, longitude, accuracy } : undefined,
+      });
     }
 
     res.json({

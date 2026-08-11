@@ -34,6 +34,7 @@ import CmsHomepageSectionsPage from './pages/cms/CmsHomepageSections';
 import CmsShopPagesPage from './pages/cms/CmsShopPages';
 import CmsAuthPagesPage from './pages/cms/CmsAuthPages';
 import CmsInvoiceTemplatePage from './pages/cms/CmsInvoiceTemplate';
+import CmsOnboardingStepsPage from './pages/cms/CmsOnboardingSteps';
 import SubscriptionsPage from './pages/SubscriptionsPage';
 import SubscriptionDetailPage from './pages/SubscriptionDetailPage';
 import Referrals from './pages/Referrals';
@@ -176,6 +177,7 @@ export default function App() {
       <Route path="/cms/shop-pages" element={<ProtectedRoute><CmsShopPagesPage /></ProtectedRoute>} />
       <Route path="/cms/auth-pages" element={<ProtectedRoute><CmsAuthPagesPage /></ProtectedRoute>} />
       <Route path="/cms/invoice-template" element={<ProtectedRoute><CmsInvoiceTemplatePage /></ProtectedRoute>} />
+      <Route path="/cms/onboarding" element={<ProtectedRoute><CmsOnboardingStepsPage /></ProtectedRoute>} />
       <Route path="/subscriptions" element={<ProtectedRoute><SubscriptionsPage /></ProtectedRoute>} />
       <Route path="/subscriptions/:id" element={<ProtectedRoute><SubscriptionDetailPage /></ProtectedRoute>} />
       <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />

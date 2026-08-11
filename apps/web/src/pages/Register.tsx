@@ -67,12 +67,6 @@ export default function Register() {
           >
             Verify My Account
           </button>
-          <button
-            onClick={() => navigate('/login')}
-            className="w-full mt-3 py-3 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-all"
-          >
-            Sign In Instead
-          </button>
         </div>
       </div>
     );

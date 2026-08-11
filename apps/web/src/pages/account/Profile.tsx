@@ -63,10 +63,15 @@ export default function Profile() {
         </div>
         <div className="bg-white rounded-lg border p-6 space-y-4">
           <h2 className="text-lg font-semibold flex items-center gap-2"><MapPin size={18} /> Address</h2>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+            <p className="text-xs text-blue-700">
+              <strong>Privacy:</strong> Your street address is never shown to finders. Only your suburb and city are visible when someone finds your pet.
+            </p>
+          </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2"><label className="block text-xs text-gray-500 mb-1">Street Address</label><input value={form.address.line1} onChange={(e) => setForm({ ...form, address: { ...form.address, line1: e.target.value } })} className="w-full border rounded-md px-3 py-2 text-sm" /></div>
-            <div className="col-span-2"><label className="block text-xs text-gray-500 mb-1">Address Line 2</label><input value={form.address.line2} onChange={(e) => setForm({ ...form, address: { ...form.address, line2: e.target.value } })} className="w-full border rounded-md px-3 py-2 text-sm" /></div>
-            <div><label className="block text-xs text-gray-500 mb-1">City</label><input value={form.address.city} onChange={(e) => setForm({ ...form, address: { ...form.address, city: e.target.value } })} className="w-full border rounded-md px-3 py-2 text-sm" /></div>
+            <div className="col-span-2"><label className="block text-xs text-gray-500 mb-1">Suburb</label><input value={form.address.line2} onChange={(e) => setForm({ ...form, address: { ...form.address, line2: e.target.value } })} className="w-full border rounded-md px-3 py-2 text-sm" placeholder="e.g. Ponsonby" /><p className="text-xs text-gray-400 mt-1">Shown to finders when your pet is found</p></div>
+            <div><label className="block text-xs text-gray-500 mb-1">City</label><input value={form.address.city} onChange={(e) => setForm({ ...form, address: { ...form.address, city: e.target.value } })} className="w-full border rounded-md px-3 py-2 text-sm" /><p className="text-xs text-gray-400 mt-1">Shown to finders when your pet is found</p></div>
             <div><label className="block text-xs text-gray-500 mb-1">State / Region</label><input value={form.address.state} onChange={(e) => setForm({ ...form, address: { ...form.address, state: e.target.value } })} className="w-full border rounded-md px-3 py-2 text-sm" /></div>
             <div><label className="block text-xs text-gray-500 mb-1">Postal Code</label><input value={form.address.zip} onChange={(e) => setForm({ ...form, address: { ...form.address, zip: e.target.value } })} className="w-full border rounded-md px-3 py-2 text-sm" /></div>
             <div><label className="block text-xs text-gray-500 mb-1">Country</label><input value={form.address.country} onChange={(e) => setForm({ ...form, address: { ...form.address, country: e.target.value } })} className="w-full border rounded-md px-3 py-2 text-sm" /></div>

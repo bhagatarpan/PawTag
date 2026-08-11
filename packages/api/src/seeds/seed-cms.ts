@@ -17,6 +17,7 @@ import {
   CmsPetReference,
   CmsShopPage,
   CmsAuthPage,
+  CmsOnboarding,
 } from '@pawtag/db';
 
 async function run() {
@@ -73,6 +74,9 @@ async function run() {
         { key: 'mfa.testEmail', value: 'arpanbhagat@yahoo.com', category: 'mfa', description: 'Test email address for MFA in dev mode' },
         { key: 'tag.idPrefix', value: 'PT', category: 'tag', description: 'Prefix for auto-generated tag IDs (e.g. PT → PT-NNNNNN)' },
         { key: 'finder.showOwnerName', value: 'true', category: 'finder', description: 'Global toggle: show pet owner name in finder portal. When off, suburb and city are shown instead.' },
+        { key: 'escalation.delayMinutes', value: '30', category: 'escalation', description: 'Minutes to wait before auto-notifying emergency contact if owner does not respond' },
+        { key: 'escalation.notifyEmergencyContact', value: 'true', category: 'escalation', description: 'Auto-notify emergency contact when escalation delay expires' },
+        { key: 'escalation.enableManualForward', value: 'true', category: 'escalation', description: 'Allow owner to manually forward found notification to emergency contact' },
         ...auditCategories.map((value) => ({ key: `audit.policy.category.${value.toLowerCase()}`, value: 'true', category: 'audit', description: `Enable audit logging for ${value} events` })),
         ...auditActors.map((value) => ({ key: `audit.policy.actor.${value.toLowerCase()}`, value: 'true', category: 'audit', description: `Enable audit logging for ${value} actors` })),
       ];
@@ -982,6 +986,167 @@ async function run() {
         }
       }
       console.log(`  ${authCreated} new auth pages created (${authPages.length} total)\n`);
+
+      // ═══════════════════════════════════════
+      // 9. ONBOARDING STEPS
+      // ═══════════════════════════════════════
+      console.log('--- Seeding Onboarding Steps ---');
+      const existingOnboarding = await CmsOnboarding.findOne().session(session);
+      if (!existingOnboarding) {
+        await CmsOnboarding.create([{
+          steps: [
+            {
+              stepId: 'welcome',
+              title: 'Welcome to PawTag!',
+              subtitle: "You've taken the first step to keeping your pet safe. Let's make sure your profile is ready so finders can reunite you fast.",
+              icon: 'Heart',
+              order: 0,
+              isActive: true,
+              type: 'info',
+              content: {
+                storyHeading: 'Your journey to pet safety starts here',
+                storyText: "Welcome aboard! You're now part of a community of pet owners who are serious about keeping their furry family members safe. Let's take a few minutes to make sure your profile is complete — it could make all the difference when it matters most.",
+                callout: {
+                  icon: 'Shield',
+                  title: 'Your Privacy Is Protected',
+                  text: "Everything you enter here is securely stored. Your personal details are never shared with finders — only you decide who can contact you.",
+                  variant: 'info',
+                },
+              },
+            },
+            {
+              stepId: 'reality',
+              title: 'Imagine This...',
+              subtitle: "It happens faster than you think. Here's why being prepared matters.",
+              icon: 'AlertTriangle',
+              order: 1,
+              isActive: true,
+              type: 'info',
+              content: {
+                stats: [
+                  { number: '1 in 3', label: 'pets get lost in their lifetime' },
+                  { number: 'Only 20%', label: 'are reunited without identification' },
+                  { number: 'Minutes', label: 'matter — the sooner, the better' },
+                ],
+                storyHeading: "Your pet slips out the gate. A kind stranger finds them.",
+                storyText: "They scan the PawTag and instantly see your pet's profile. You get a call within minutes. Your pet is home before dinner.\n\nBut this only works if your details are complete. The finder doesn't have your phone number memorized. They don't know where you live. The ONLY way they can reach you is through the information YOU provide.",
+                whyItMatters: "Every field you complete is another lifeline for your pet. A phone number means a finder can call you right now. An address means they know how far away you are. An emergency contact means someone gets notified even if you're busy.",
+              },
+            },
+            {
+              stepId: 'how-it-works',
+              title: 'How PawTag Works',
+              subtitle: 'Reunited in minutes, not days.',
+              icon: 'Zap',
+              order: 2,
+              isActive: true,
+              type: 'info',
+              content: {
+                flowSteps: [
+                  { icon: 'PawPrint', label: 'Someone Finds Your Pet', description: 'A kind stranger finds your lost pet' },
+                  { icon: 'Scan', label: 'They Scan the QR Tag', description: 'No app needed — just their phone camera' },
+                  { icon: 'Phone', label: 'You Get Notified', description: 'Instantly via app, SMS, and email' },
+                ],
+                callout: {
+                  icon: 'AlertTriangle',
+                  title: "Important: Finders Don't Have the App",
+                  text: "When someone finds your pet, they don't need to download anything. They simply scan the QR code with their phone camera and see your pet's profile instantly. The ONLY way they can contact you is through the phone number and email you provide. No app. No account. Just your details.",
+                  variant: 'warning',
+                },
+                whyItMatters: "The simpler it is for finders, the faster your pet gets home. That's why PawTag works with any smartphone camera — no app download required. But it also means your contact details are the ONLY bridge between you and your pet.",
+              },
+            },
+            {
+              stepId: 'contact-details',
+              title: 'How Finders Will Reach You',
+              subtitle: "Finders don't have the PawTag app — your phone and email are their only way to contact you.",
+              icon: 'Phone',
+              order: 3,
+              isActive: true,
+              type: 'form',
+              formFields: ['phoneNumber', 'email'],
+              content: {
+                privacyNote: {
+                  icon: 'Lock',
+                  title: 'Your Details Are Private',
+                  text: "Your phone number and email are NEVER shown to finders. They are only used to notify YOU when your pet is found. The finder provides THEIR details to YOU. You decide when and how to contact them.",
+                },
+                callout: {
+                  icon: 'Info',
+                  title: 'Why We Need Both',
+                  text: "A phone call is fastest when time matters. An email gives finders a written way to reach you with photos and location details. Having both means no matter how a finder prefers to contact you, they can.",
+                  variant: 'tip',
+                },
+              },
+            },
+            {
+              stepId: 'address',
+              title: 'Help Finders Know Where You Are',
+              subtitle: "When someone finds your pet, they'll see your suburb and city. The closer they know you are, the faster your pet gets home.",
+              icon: 'MapPin',
+              order: 4,
+              isActive: true,
+              type: 'form',
+              formFields: ['address.line1', 'address.line2', 'address.city', 'address.state', 'address.zip'],
+              content: {
+                privacyNote: {
+                  icon: 'Lock',
+                  title: 'Only Your Suburb Is Shown',
+                  text: "Your full street address is NEVER shared with finders. Only your suburb and city appear on your pet's profile. You can turn this off entirely in Settings.",
+                },
+                whyItMatters: "When a finder sees that you're only 5 minutes away, they're more likely to wait or bring your pet to you. Location builds trust and speeds up reunions.",
+              },
+            },
+            {
+              stepId: 'emergency-contact',
+              title: 'Add Your Backup Lifeline',
+              subtitle: "What if you miss the alert? Your emergency contact is the person who gets notified if you can't.",
+              icon: 'PhoneCall',
+              order: 5,
+              isActive: true,
+              type: 'form',
+              formFields: ['emergencyContact.name', 'emergencyContact.relationship', 'emergencyContact.phone', 'emergencyContact.email'],
+              content: {
+                privacyNote: {
+                  icon: 'Lock',
+                  title: 'Your Emergency Contact Is Also Private',
+                  text: "Their details are never shared with finders. They're only contacted automatically if you can't respond within 30 minutes.",
+                },
+                whyItMatters: "Imagine this: Your phone is on silent. You're in a meeting. You're asleep. Hours pass. A kind finder scanned your pet's tag 30 minutes ago but hasn't heard back from you. Without an emergency contact, your pet waits. WITH an emergency contact: they get an SMS immediately, they get an email with all the details, if they use PawTag they get a push notification too, and they can act while you're unavailable. This is your safety net. Don't skip it.",
+                callout: {
+                  icon: 'Info',
+                  title: 'Who Should You Add?',
+                  text: "Choose someone who lives nearby or can reach your pet quickly, will always have their phone on, and you trust to handle this situation. Common choices: partner, neighbour, family member, or close friend.",
+                  variant: 'tip',
+                },
+              },
+            },
+            {
+              stepId: 'completion',
+              title: "You're All Set!",
+              subtitle: "Your pet now has the best chance of finding their way home.",
+              icon: 'CheckCircle',
+              order: 6,
+              isActive: true,
+              type: 'info',
+              content: {
+                storyText: "If your pet is ever found, here's what happens:\n1. The finder scans the tag and sees your pet's profile\n2. You get notified instantly via app, SMS, and email\n3. If you don't respond in 30 minutes, your emergency contact is automatically alerted\n4. The finder can always reach someone who can help",
+                callout: {
+                  icon: 'Shield',
+                  title: 'Your Privacy Is Protected',
+                  text: "Your phone, email, and street address are NEVER shown to finders. Only your suburb/city is visible (if enabled). Finders provide THEIR details to YOU. Your emergency contact is only notified if you're unreachable. All data is encrypted and securely stored.",
+                  variant: 'info',
+                },
+              },
+            },
+          ],
+          updatedBy: adminId,
+        }], { session });
+        console.log('  Created 7 onboarding steps');
+      } else {
+        console.log('  Onboarding steps already exist');
+      }
+      console.log('');
 
     });
 

@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useSiteSettings } from '../hooks/useCms';
 import api from '../lib/api';
 import AvatarUpload from './AvatarUpload';
+import OnboardingWizard from './OnboardingWizard';
 
 const NAV_ITEMS = [
   { path: '/account', label: 'Dashboard', icon: LayoutDashboard },
@@ -55,6 +56,11 @@ export default function AccountLayout({ children }: { children: ReactNode }) {
 
   const { settings } = useSiteSettings();
   const companyName = settings?.['company.name'] || 'PawTag';
+
+  // Show onboarding wizard if user hasn't completed it
+  if (user?.onboardingCompleted === false) {
+    return <OnboardingWizard />;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex">

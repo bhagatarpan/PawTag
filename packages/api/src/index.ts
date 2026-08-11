@@ -44,6 +44,7 @@ import cmsSettingsPublicRoutes from './routes/cms-settings-public';
 import cmsHomepageAdminRoutes from './routes/cms-homepage-admin';
 import cmsShopAdminRoutes from './routes/cms-shop-admin';
 import cmsAuthAdminRoutes from './routes/cms-auth-admin';
+import cmsOnboardingAdminRoutes from './routes/cms-onboarding-admin';
 import cmsPublicV2Routes from './routes/cms-public-v2';
 import customerSubscriptionRoutes from './routes/customer-subscriptions';
 import adminSubscriptionRoutes from './routes/admin-subscriptions';
@@ -56,6 +57,7 @@ import auditRoutes from './routes/audit';
 import { publicRouter as supportPublicRoutes, adminRouter as supportAdminRoutes } from './routes/support';
 import { startReminderService } from './services/reminder.service';
 import { startSubscriptionService } from './services/subscription.service';
+import { startEscalationService } from './services/escalation.service';
 import { startLowStockService } from './jobs/lowStockCheck';
 
 const app = express();
@@ -162,6 +164,7 @@ app.use('/api/admin/cms/pet-refs', cmsPetRefAdminRoutes);
 app.use('/api/admin/cms/homepage', cmsHomepageAdminRoutes);
 app.use('/api/admin/cms/shop-pages', cmsShopAdminRoutes);
 app.use('/api/admin/cms/auth-pages', cmsAuthAdminRoutes);
+app.use('/api/admin/cms/onboarding', cmsOnboardingAdminRoutes);
 app.use('/api/customer', customerRoutes);
 app.use('/api/customer/subscriptions', customerSubscriptionRoutes);
 app.use('/api/admin/subscriptions', adminSubscriptionRoutes);
@@ -197,6 +200,9 @@ async function start() {
 
     // Start subscription lifecycle service
     startSubscriptionService();
+
+    // Start escalation polling service
+    startEscalationService();
 
     // Start daily low stock check service
     startLowStockService();

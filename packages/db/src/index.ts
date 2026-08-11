@@ -42,3 +42,5 @@ export { TagExpiryNotification, type ITagExpiryNotificationDocument } from './mo
 export { SupportRequest, type ISupportRequestDocument } from './models/SupportRequest';
 export { PushToken, type IPushTokenDocument } from './models/PushToken';
 export { RefreshToken, type IRefreshTokenDocument } from './models/RefreshToken';
+export { default as CmsOnboarding, type ICmsOnboardingDocument, type ICmsOnboardingStep } from './models/CmsOnboarding';
+export { default as EscalationRecord, type IEscalationRecord } from './models/EscalationRecord';
