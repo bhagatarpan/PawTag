@@ -398,12 +398,13 @@ router.post('/login', loginLimiter, validate(loginSchema), async (req, res: Resp
     }
 
     // Successful login — reset failed attempts and update lastLogin
+    // Use findOneAndUpdate to skip validation (some users may lack phoneNumber)
+    const updateFields: Record<string, unknown> = { lastLogin: new Date() };
     if (user.failedLoginAttempts > 0) {
-      user.failedLoginAttempts = 0;
-      user.lockedUntil = undefined;
+      updateFields.failedLoginAttempts = 0;
+      updateFields.lockedUntil = undefined;
     }
-    user.lastLogin = new Date();
-    await user.save();
+    await User.findByIdAndUpdate(user._id, { $set: updateFields });
 
 if (user.status === 'suspended') {
       await auditSecurityFailure(req as AuditRequest, {

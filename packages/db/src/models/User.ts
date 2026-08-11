@@ -54,7 +54,7 @@ const UserSchema = new Schema<IUserDocument>(
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     passwordHash: { type: String, required: true },
     fullName: { type: String, required: true, trim: true },
-    phoneNumber: { type: String, required: true },
+    phoneNumber: { type: String, default: '' },
     role: { type: String, default: 'customer', lowercase: true }, // Legacy compatibility
     roles: [{ type: Schema.Types.ObjectId, ref: 'Role' }],
     status: {
