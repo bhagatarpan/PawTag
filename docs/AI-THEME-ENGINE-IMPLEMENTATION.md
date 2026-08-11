@@ -1,1519 +1,1028 @@
-Absolutely. Based on your existing `DESIGN.md`, your PawTag architecture, and your goal of being the **SME/Vision Owner rather than the developer**, I would create a separate implementation specification specifically for AI coding agents.
+# AI-THEME-ENGINE-IMPLEMENTATION.md
 
-I would **not** replace `DESIGN.md`. This should sit alongside it and tell VS Code + OpenCode + coding LLMs **exactly how to transform the existing system into a runtime, no-code Theme/Brand/Appearance platform**.
+# PawTag Theme Engine & Theme Studio
 
-Below is the complete file. You can save it as:
+## AI Implementation Specification
 
-`docs/AI-THEME-ENGINE-IMPLEMENTATION.md`
-
-It is intentionally written as an **AI execution contract**, not as a conceptual design document.
-
-# PawTag Theme Engine & No-Code Appearance System
-
-## AI Vibe-Coding Implementation Specification
-
-**Document:** `docs/AI-THEME-ENGINE-IMPLEMENTATION.md`
 **Project:** PawTag
+**Document:** `AI-THEME-ENGINE-IMPLEMENTATION.md`
 **Status:** Implementation Specification
-**Audience:** AI coding agents, senior developers, architects, UI/UX engineers
-**Primary execution environment:** VS Code + OpenCode + capable coding LLM
-**Owner:** PawTag SME / Product Vision Owner
-**Authority:** This document + existing `DESIGN.md` + existing architecture are the implementation contract.
+**Audience:** AI coding agents, senior developers, architects, UI/UX agents
+**Primary environments:** VS Code, OpenCode, Claude Code, Codex and equivalent coding agents
+**Frontend:** React 18 + TypeScript + Vite + Tailwind CSS
+**Backend:** Node.js + Express + TypeScript
+**Database:** MongoDB + Mongoose
+**Shared UI:** `packages/ui`
+**Shared types/validation:** `packages/shared`
+**CMS:** Tiptap + Puck
+**Authorization:** Existing PawTag RBAC
+**Audit:** Existing enterprise audit logging
+**Design intelligence:** UI/UX Pro Max skill
+**Authoritative design reference:** `DESIGN.md`
 
 ---
 
-# 1. AI EXECUTION DIRECTIVE
+# 1. PURPOSE
 
-You are acting as the **Senior Principal Engineer, Software Architect, UI/UX Architect, Design Systems Engineer, Product Engineer, QA Engineer, and Technical Lead** for PawTag.
+PawTag must provide a production-grade Theme Engine and Theme Studio that allows a non-technical administrator to significantly change the visual appearance and branding of the PawTag web platform without editing source code.
 
-The human product owner is an SME and vision owner, not a developer.
+The experience should be conceptually similar to the customization experience found in mature WordPress/ThemeForest products:
 
-Therefore:
+* choose a visual preset
+* change brand colors
+* change typography
+* change component appearance
+* change layout density
+* change corner radius
+* change shadows
+* change navigation appearance
+* upload/change logo
+* preview changes immediately
+* save as draft
+* compare changes
+* publish with one deliberate action
+* revert to a previous theme
+* restore the default PawTag theme
 
-* Do not assume the product owner understands implementation details.
-* Do not ask the product owner to make unnecessary technical decisions.
-* Do not expose low-level implementation choices unless they materially affect product behavior.
-* Make technically sound decisions independently.
-* Prefer maintainable, boring, explicit architecture over clever abstractions.
-* Preserve existing functionality.
-* Do not rewrite unrelated systems.
-* Do not introduce unnecessary dependencies.
-* Do not replace existing technologies without a compelling architectural reason.
-* Do not invent requirements.
-* Do not silently change business behavior.
-* Do not silently remove existing features.
-* Do not make destructive repository-wide changes without first inspecting dependencies.
-* Treat existing production functionality as valuable and fragile.
-* Make changes incrementally.
-* Validate every phase before proceeding.
-* Keep the system usable after every phase.
+The administrator must NOT need:
 
-The ultimate goal is:
+* CSS knowledge
+* Tailwind knowledge
+* React knowledge
+* JavaScript knowledge
+* developer assistance
+* source-code access
 
-> A non-technical PawTag administrator must be able to completely change the visual identity and UI appearance of the PawTag web experience from the Admin Panel without editing code, rebuilding the frontend, or deploying a new version.
-
-The system must provide a controlled, professional, ThemeForest/WordPress-like visual customization experience while maintaining PawTag's UX, accessibility, security, semantic meaning, and functional integrity.
+The Theme Engine must be designed so that future visual changes can be made through configuration rather than source-code modifications.
 
 ---
 
-# 2. PRODUCT VISION
+# 2. CORE PRODUCT PRINCIPLE
 
-PawTag currently has a documented design system in:
+The Theme Engine is a **configuration-driven design system**, not a CSS editor.
 
-`DESIGN.md`
+The system must NOT expose arbitrary CSS or JavaScript to ordinary administrators.
 
-That design system is currently mostly static.
-
-The objective of this project is to transform the static design system into a:
-
-> **Runtime, database-backed, versioned, previewable, publishable, no-code Theme Engine.**
-
-The system must allow administrators to modify:
-
-* Brand colors
-* Color palettes
-* Typography
-* Font selection from approved fonts
-* Border radius
-* Buttons
-* Cards
-* Inputs
-* Badges
-* Alerts
-* Shadows
-* Spacing density
-* Layout width
-* Header style
-* Footer style
-* Navigation style
-* Dark mode
-* Motion intensity
-* Brand assets
-* Visual presets
-
-without changing application source code.
-
-The system must support:
+The architecture must instead be:
 
 ```text
-Preset
-   ↓
-Theme configuration
-   ↓
-Live preview
-   ↓
-Draft
-   ↓
+Admin Theme Studio
+        ↓
+Theme Configuration
+        ↓
 Validation
-   ↓
-Publish
-   ↓
-Runtime theme
-   ↓
-Web / Finder / Customer Portal
+        ↓
+Theme Compiler / Token Resolver
+        ↓
+CSS Variables
+        ↓
+Shared UI Components
+        ↓
+Web / Admin / Finder experiences
 ```
+
+The administrator controls a safe, predefined design space.
 
 ---
 
-# 3. IMPORTANT: THIS IS NOT A CSS EDITOR
+# 3. AUTHORITY HIERARCHY
 
-Do NOT implement this as an arbitrary CSS editor.
+The AI MUST follow this hierarchy.
 
-Do NOT expose:
+## Level 1 — Product Owner / SME
 
-```text
-Custom CSS
-Custom JavaScript
-Arbitrary Tailwind classes
-Arbitrary HTML
-```
+The product owner determines:
 
-to normal administrators.
+* product vision
+* business requirements
+* desired user experience
+* acceptable visual directions
+* brand positioning
+* which changes are appropriate for PawTag
 
-The system must expose a **controlled design vocabulary**.
-
-The administrator chooses from safe design options.
-
-For example:
-
-```text
-Button style:
-- Solid
-- Outline
-- Soft
-- Ghost
-
-Card style:
-- Flat
-- Bordered
-- Elevated
-
-Radius:
-- Sharp
-- Compact
-- Rounded
-- Very Rounded
-- Pill
-```
-
-The administrator gets broad visual freedom without being able to destroy the design system.
+The product owner is the final authority on product intent.
 
 ---
 
-# 4. EXISTING PAWTAG TECHNOLOGY STACK
+## Level 2 — `DESIGN.md`
 
-Do not replace the existing stack unless absolutely necessary.
+`DESIGN.md` is the authoritative PawTag design system.
 
-## Monorepo
+It defines:
 
-* pnpm workspaces
+* brand character
+* accessibility philosophy
+* color philosophy
+* typography
+* spacing
+* component principles
+* motion
+* states
+* logo treatment
+* tone of voice
+* emotional requirements
+* lost-pet UX principles
 
-## Backend
-
-* Node.js
-* Express
-* TypeScript
-* MongoDB
-* Mongoose
-
-## Authentication
-
-* JWT
-* rotating refresh tokens
-* bcrypt
-* email OTP MFA
-* CAPTCHA
-* brute-force protection
-
-## Frontends
-
-* React 18
-* TypeScript
-* Vite
-* React Router
-* Tailwind CSS
-
-## Shared UI
-
-```text
-packages/ui
-```
-
-This is the primary foundation of the theme system.
-
-## CMS
-
-* Tiptap
-* Puck
-
-## Mobile
-
-* React Native
-* Expo
-
-## Validation
-
-* Zod
-
-## Logging
-
-* Pino
-
-## Audit
-
-Existing enterprise audit logging system.
-
-## Testing
-
-* Vitest
-* Testing Library
-* Supertest
-* MongoDB Memory Server
+The Theme Engine MUST NOT undermine these principles.
 
 ---
 
-# 5. EXISTING APPLICATION STRUCTURE
+## Level 3 — UI/UX Pro Max
 
-The repository currently contains:
+The UI/UX Pro Max skill is an auxiliary design-intelligence system.
 
-```text
-apps/
-├── web/
-├── admin/
-├── finder/
-└── mobile/
+Repository:
 
-packages/
-├── api/
-├── db/
-├── shared/
-└── ui/
-```
+`https://github.com/nextlevelbuilder/ui-ux-pro-max-skill`
 
-Important:
+Use it to assist with:
 
-`apps/customer` no longer exists as a separate application.
+* visual design exploration
+* design-system recommendations
+* UX patterns
+* typography combinations
+* dashboard patterns
+* component styling
+* accessibility recommendations
+* responsive layout recommendations
+* theme preset exploration
+* design consistency
 
-The customer portal is part of:
+UI/UX Pro Max is NOT the source of truth.
 
-```text
-apps/web
-```
-
-Do not recreate `apps/customer`.
+If its recommendations conflict with PawTag requirements, PawTag requirements win.
 
 ---
 
-# 6. EXISTING DESIGN SYSTEM IS AUTHORITATIVE
+## Level 4 — AI Coding Agent
 
-Read the existing:
+The AI coding agent is responsible for:
 
-```text
-DESIGN.md
-```
-
-before implementing anything.
-
-Do not replace it.
-
-Do not rewrite it unless explicitly required.
-
-The existing design system contains:
-
-* Brand character
-* Teal palette
-* Gray palette
-* Semantic colors
-* Typography
-* Spacing
-* Radius
-* Shadows
-* Buttons
-* Cards
-* Inputs
-* Badges
-* Alerts
-* Motion
-* States
-* Logo
-* Imagery
-* Tone of voice
-* Existing inconsistencies
-
-The new system must preserve the existing PawTag design as the:
-
-> **PawTag Classic / Default Theme**
-
----
-
-# 7. CORE ARCHITECTURAL PRINCIPLE
-
-Separate:
-
-```text
-DESIGN PRINCIPLES
-```
-
-from:
-
-```text
-DESIGN TOKENS
-```
-
-and:
-
-```text
-CONTENT
-```
-
-and:
-
-```text
-BUSINESS LOGIC
-```
-
-These are different systems.
-
----
-
-# 8. DESIGN PRINCIPLES
-
-These should remain authoritative and should not be freely overridden by an administrator.
-
-PawTag must remain:
-
-* Warm
-* Reassuring
-* Modern
-* Professional
-* Approachable
-* Clear
-* Trustworthy
-* Accessible
-* Calm
-* Action-oriented
-
-Especially for lost-pet experiences.
-
-A theme must never compromise:
-
-* readability
-* contrast
-* touch target size
-* critical CTA visibility
-* semantic status meanings
-* lost-pet recovery flow
+* architecture
+* implementation
+* testing
+* migration
+* refactoring
+* documentation
+* regression prevention
 * accessibility
-* mobile usability
+* visual QA
+
+The AI must never interpret a design recommendation as permission to rewrite unrelated application functionality.
 
 ---
 
-# 9. DESIGN TOKEN ARCHITECTURE
+# 4. NON-NEGOTIABLE SAFETY PRINCIPLE
 
-Implement three layers.
+The Theme Engine is a visual system.
 
-## Layer 1 — Primitive tokens
+It must not modify:
 
-Examples:
+* authentication logic
+* authorization logic
+* payment logic
+* subscription state machines
+* tag activation logic
+* finder scan logic
+* pet recovery workflows
+* audit-log integrity
+* database business rules
+* notification logic
+* Stripe webhook handling
+* security controls
+* API authorization
+* RBAC permissions
+
+unless a specific theme-related requirement genuinely requires a change.
+
+Theme work must remain isolated from business logic.
+
+---
+
+# 5. CURRENT PAWTAG ARCHITECTURE
+
+The existing repository is a pnpm monorepo:
 
 ```text
-teal-50
-teal-100
-...
-teal-900
-
-gray-50
-gray-100
-...
-gray-900
+pawtag/
+├── apps/
+│   ├── web/
+│   ├── admin/
+│   ├── finder/
+│   └── mobile/
+│
+├── packages/
+│   ├── api/
+│   ├── db/
+│   ├── shared/
+│   └── ui/
+│
+├── docs/
+├── tests/
+├── DESIGN.md
+├── ARCHITECTURE.md
+└── PawTag-Enterprise-Roadmap.md
 ```
 
-These represent raw values.
+Important architectural rule:
+
+`packages/ui` is the shared visual foundation for the web applications.
+
+New reusable visual components SHOULD be implemented in `packages/ui`, not separately inside every application.
 
 ---
 
-## Layer 2 — Semantic tokens
+# 6. APPLICATION SCOPE
 
-Examples:
+The initial Theme Engine scope is:
+
+### Included
+
+* `apps/web`
+* `apps/admin`
+* `apps/finder`
+* `packages/ui`
+
+### Partially included
+
+* CMS/Puck-rendered pages
+
+### Mobile
+
+The React Native application should NOT blindly consume web CSS variables.
+
+Mobile should eventually consume shared semantic theme configuration through a platform-appropriate adapter.
+
+Initial implementation may focus on web applications unless the existing architecture already supports shared mobile theme tokens.
+
+Do not destabilize mobile merely to complete web theming.
+
+---
+
+# 7. REQUIRED USER EXPERIENCE
+
+The administrator should eventually see:
 
 ```text
-color.primary
-color.primaryHover
-color.primaryActive
-
-color.background
-color.surface
-color.surfaceMuted
-
-color.foreground
-color.foregroundMuted
-
-color.border
-color.borderStrong
-
-color.success
-color.warning
-color.danger
-color.info
+Admin
+│
+├── Appearance
+│   └── Theme Studio
+│
+├── Content
+├── Commerce
+├── Pets
+├── Tags
+├── Customers
+└── Settings
 ```
 
-Components should prefer semantic tokens.
-
----
-
-## Layer 3 — Component tokens
-
-Examples:
+Theme Studio should provide:
 
 ```text
-button.primary.background
-button.primary.foreground
-button.primary.hover
-button.primary.active
+Theme Studio
 
-button.radius
-button.paddingX
-button.paddingY
-
-card.background
-card.border
-card.radius
-card.shadow
-
-input.background
-input.border
-input.focus
-input.radius
+┌──────────────────────────────────────────────┐
+│ Theme                                        │
+│                                              │
+│ [ PawTag Classic ▼ ]                         │
+│                                              │
+│ Status: Draft                                │
+│                                              │
+│ [Save Draft]              [Publish]          │
+└──────────────────────────────────────────────┘
 ```
 
-This gives the theme engine control without coupling components directly to brand colors.
-
----
-
-# 10. THEME CONFIGURATION MODEL
-
-Create a strongly typed `ThemeConfig`.
-
-Recommended location:
+Sections:
 
 ```text
-packages/ui/theme/types.ts
+Brand
+Colors
+Typography
+Buttons
+Cards
+Forms
+Navigation
+Layout
+Radius
+Shadows
+Motion
+Accessibility
+Logo & Assets
+Presets
+Advanced
 ```
 
-Initial conceptual model:
-
-```ts
-interface ThemeConfig {
-  meta: {
-    id: string;
-    name: string;
-    version: number;
-  };
-
-  brand: {
-    logoMode: "default" | "custom";
-    primaryColor: string;
-    secondaryColor: string;
-    accentColor: string;
-  };
-
-  colors: {
-    primary: ColorScale;
-    secondary: ColorScale;
-
-    background: string;
-    surface: string;
-    surfaceMuted: string;
-
-    foreground: string;
-    foregroundMuted: string;
-    foregroundSubtle: string;
-
-    border: string;
-    borderStrong: string;
-
-    success: ColorScale;
-    warning: ColorScale;
-    danger: ColorScale;
-    info: ColorScale;
-  };
-
-  typography: {
-    headingFont: string;
-    bodyFont: string;
-    monoFont: string;
-
-    display: TypeStyle;
-    h1: TypeStyle;
-    h2: TypeStyle;
-    h3: TypeStyle;
-
-    bodyLg: TypeStyle;
-    body: TypeStyle;
-    bodySm: TypeStyle;
-    caption: TypeStyle;
-    mono: TypeStyle;
-  };
-
-  shape: {
-    radiusSm: string;
-    radiusMd: string;
-    radiusLg: string;
-    radiusXl: string;
-    radius2xl: string;
-    radius3xl: string;
-    radiusFull: string;
-
-    buttonRadius: string;
-    cardRadius: string;
-    inputRadius: string;
-  };
-
-  elevation: {
-    none: string;
-    subtle: string;
-    medium: string;
-    elevated: string;
-    high: string;
-  };
-
-  spacing: {
-    density: "compact" | "comfortable" | "spacious";
-  };
-
-  components: {
-    button: ButtonTheme;
-    card: CardTheme;
-    input: InputTheme;
-    badge: BadgeTheme;
-    alert: AlertTheme;
-    navigation: NavigationTheme;
-  };
-
-  layout: {
-    container: "compact" | "standard" | "wide";
-    header: "standard" | "centered" | "minimal";
-    sidebar: "standard" | "compact" | "floating";
-  };
-
-  motion: {
-    enabled: boolean;
-    speed: "reduced" | "normal" | "expressive";
-  };
-
-  darkMode: {
-    enabled: boolean;
-    default: "light" | "dark" | "system";
-  };
-}
-```
-
-The exact TypeScript types may be refined during implementation.
-
-Do not over-engineer the first version.
+The exact visual layout should be designed using the PawTag design system and UI/UX Pro Max recommendations.
 
 ---
 
-# 11. ZOD VALIDATION
+# 8. THEME MODEL
 
-The backend and frontend must share a validation contract.
-
-Use Zod.
-
-Create a schema equivalent to:
-
-```text
-ThemeConfigSchema
-```
-
-The backend must reject invalid themes.
-
-The frontend must provide friendly validation feedback.
-
-Never trust theme data received from the client.
-
----
-
-# 12. DEFAULT THEME
-
-Create:
-
-```text
-packages/ui/theme/presets/pawtag-classic.ts
-```
-
-This preset must reproduce the existing PawTag design documented in `DESIGN.md`.
-
-The default theme must preserve:
-
-* teal primary
-* existing typography
-* existing radius
-* existing shadows
-* existing spacing
-* existing component behavior
-* existing semantic colors
-* existing motion behavior
-
-The first objective is:
-
-> Introduce the theme engine without visually changing PawTag.
-
-This is a critical acceptance criterion.
-
----
-
-# 13. CSS VARIABLE STRATEGY
-
-Use CSS custom properties for runtime theme values.
-
-Example:
-
-```css
-:root {
-  --pt-color-primary: #0d9488;
-  --pt-color-primary-hover: #0f766e;
-  --pt-color-primary-active: #115e59;
-
-  --pt-color-background: #ffffff;
-  --pt-color-surface: #f8fafc;
-
-  --pt-color-foreground: #111827;
-  --pt-color-foreground-muted: #6b7280;
-
-  --pt-color-border: #e5e7eb;
-
-  --pt-radius-button: 12px;
-  --pt-radius-card: 16px;
-  --pt-radius-input: 8px;
-}
-```
-
-Do not hardcode theme values throughout components.
-
----
-
-# 14. THEME PROVIDER
-
-Create a shared theme provider.
+A theme is a structured configuration object.
 
 Conceptually:
 
-```tsx
-<ThemeProvider theme={theme}>
-  <App />
-</ThemeProvider>
-```
-
-The provider must convert the theme configuration into CSS custom properties.
-
-Create something equivalent to:
-
 ```text
-themeToCssVariables(theme)
+Theme
+│
+├── metadata
+├── brand
+├── colors
+├── typography
+├── spacing
+├── radius
+├── shadows
+├── buttons
+├── cards
+├── forms
+├── navigation
+├── layout
+├── motion
+├── accessibility
+├── assets
+└── versioning
 ```
 
-This must be deterministic and testable.
+Do NOT store compiled CSS as the primary source of truth.
+
+The source of truth is the structured theme configuration.
 
 ---
 
-# 15. WEB APPLICATIONS
+# 9. THEME DOCUMENT
 
-The runtime theme must work across:
+Create a Mongoose model appropriate to the existing database architecture.
+
+Suggested conceptual structure:
 
 ```text
-apps/web
-apps/finder
-apps/admin
+Theme
+├── _id
+├── name
+├── slug
+├── description
+├── status
+├── isSystemTheme
+├── isDefault
+├── version
+├── config
+├── createdBy
+├── updatedBy
+├── publishedBy
+├── publishedAt
+├── createdAt
+└── updatedAt
 ```
 
-However, do not automatically assume that the same theme should control every part of every application.
+Possible statuses:
+
+```text
+draft
+published
+archived
+```
+
+Do not invent unnecessary states.
+
+Use existing project conventions where available.
 
 ---
 
-# 16. PUBLIC THEME VS ADMIN THEME
+# 10. THEME CONFIGURATION
 
-Support separate conceptual themes:
+The configuration should be strongly typed.
 
-```text
-Public Theme
-Admin Theme
-```
-
-The public theme controls:
+Example conceptual structure:
 
 ```text
-web
-finder
-public CMS pages
-customer portal where appropriate
+config:
+  brand:
+    primary
+    secondary
+    accent
+    logo
+    favicon
+
+  colors:
+    background
+    surface
+    surfaceMuted
+    text
+    textMuted
+    border
+
+    success
+    warning
+    error
+    info
+
+  typography:
+    fontFamily
+    headingFontFamily
+    bodyFontFamily
+    baseSize
+    headingWeight
+    bodyWeight
+
+  radius:
+    button
+    card
+    input
+    modal
+    badge
+
+  shadows:
+    card
+    dropdown
+    modal
+    elevated
+
+  buttons:
+    style
+    size
+    weight
+    radius
+
+  cards:
+    style
+    border
+    shadow
+    radius
+
+  navigation:
+    style
+    sidebarWidth
+    activeIndicator
+    headerStyle
+
+  layout:
+    density
+    contentWidth
+    pageSpacing
+
+  motion:
+    enabled
+    durationScale
+    reducedMotionRespect
+
+  accessibility:
+    minimumContrast
+    focusRing
+    highContrastMode
+
+  assets:
+    logo
+    logoDark
+    favicon
+    loginBackground
 ```
 
-The admin interface should retain a professional administrative appearance.
-
-The public branding system must not accidentally make the administrative back office unusable.
-
-Initially, implementation may share infrastructure while maintaining separate configuration scopes.
+The final schema must follow actual project conventions.
 
 ---
 
-# 17. FINDER EXPERIENCE SAFETY
+# 11. DESIGN TOKENS
 
-The Finder application is a critical recovery workflow.
+The Theme Engine must be based on semantic design tokens.
 
-A Finder theme must never compromise:
+Do not make components depend directly on arbitrary theme configuration properties.
 
-* contrast
-* readability
-* primary CTA
-* lost status visibility
-* owner contact action
-* notification action
-* touch target size
-* emergency/recovery information
+Bad:
 
-The Finder theme may change:
+```text
+button.background = theme.primaryColor
+```
 
-* colors
-* brand appearance
-* typography within safe limits
-* radius
-* card style
-* approved layout variants
+Preferred:
 
-Do not allow arbitrary visual customization that can make the recovery experience confusing.
+```text
+button.background = var(--pt-color-action-primary)
+```
+
+The Theme Engine maps theme configuration into semantic tokens.
 
 ---
 
-# 18. COMPONENT MIGRATION
+# 12. TOKEN ARCHITECTURE
 
-Audit `packages/ui`.
+Use three conceptual layers.
 
-Identify components containing hardcoded:
+## Layer 1 — Raw theme values
 
-```text
-teal-*
-gray-*
-blue-*
-green-*
-red-*
-amber-*
-purple-*
-```
-
-Determine whether each usage is:
-
-1. semantic
-2. brand
-3. structural
-4. decorative
-
-Replace brand-related hardcoding with semantic theme tokens.
-
-Do not blindly replace semantic colors.
-
-For example:
+Example:
 
 ```text
-danger
-success
-warning
-info
+brand.primary = #0D9488
 ```
 
-must remain semantically meaningful.
+## Layer 2 — Semantic tokens
+
+Example:
+
+```text
+--pt-color-action-primary
+--pt-color-action-primary-hover
+--pt-color-action-primary-active
+--pt-color-action-primary-text
+```
+
+## Layer 3 — Components
+
+Components consume semantic tokens.
+
+Example:
+
+```text
+Button
+  ↓
+--pt-color-action-primary
+```
+
+not:
+
+```text
+Button
+  ↓
+#0D9488
+```
 
 ---
 
-# 19. IMPORTANT COLOR RULE
+# 13. COLOR SYSTEM
 
-An administrator may change the visual shade of:
+Do not simply replace `teal-600`.
 
-```text
-primary
-secondary
-accent
-success
-warning
-danger
-info
-```
+A theme's primary color must be transformed into a usable color family.
 
-but may not change the semantic meaning.
-
-Never allow:
+Given:
 
 ```text
-danger = success
+primary = #0D9488
 ```
 
-or:
-
-```text
-lost = decorative pink
-```
-
-if that compromises meaning.
-
----
-
-# 20. ACCESSIBILITY
-
-Every theme must be validated for accessibility.
-
-At minimum:
-
-* WCAG AA contrast where applicable
-* readable text
-* visible focus states
-* keyboard navigation
-* sufficient touch targets
-* visible disabled states
-* error states distinguishable without color alone
-
-When an administrator selects a primary color, calculate or validate appropriate foreground contrast.
-
-If a selected color produces poor contrast:
-
-1. warn the administrator
-2. suggest an accessible foreground
-3. prevent publishing if critical accessibility rules fail
-
-Do not silently publish an unsafe theme.
-
----
-
-# 21. AUTOMATIC COLOR DERIVATION
-
-The administrator should not have to manually define:
+the system should derive or explicitly store:
 
 ```text
 primary-50
 primary-100
 primary-200
-...
+primary-300
+primary-400
+primary-500
+primary-600
+primary-700
+primary-800
 primary-900
 ```
 
-The admin experience should ideally be:
+The implementation may use a proven color-generation algorithm or predefined palette mappings.
 
-```text
-Primary Color
-[ color picker ]
-```
+Do not invent mathematically poor color transformations.
 
-The system derives the required shades.
+The resulting palette must be tested for:
 
-For example:
-
-```text
-primary
-primaryHover
-primaryActive
-primarySubtle
-primaryBorder
-primaryForeground
-```
-
-Use a deterministic color-generation strategy.
-
-Do not add a large color manipulation library unless necessary.
+* readability
+* contrast
+* visual consistency
+* hover states
+* active states
+* disabled states
+* focus states
 
 ---
 
-# 22. SEMANTIC COLOR SAFETY
+# 14. ACCESSIBILITY IS AUTOMATIC
 
-The system should support:
+A non-technical administrator must not be able to accidentally create an unusable theme.
+
+The Theme Engine must validate:
+
+* text/background contrast
+* button text/background contrast
+* link contrast
+* focus indicators
+* semantic status colors
+* disabled states
+* dark/light combinations
+
+If the selected color combination fails accessibility requirements:
 
 ```text
+Do not silently publish.
+```
+
+Instead display:
+
+```text
+Accessibility issue
+
+This color combination may make text difficult to read.
+
+Recommended alternatives:
+[Use accessible teal]
+[Darken primary]
+[Lighten background]
+
+Learn why
+```
+
+Where possible, provide automatic correction suggestions.
+
+---
+
+# 15. SEMANTIC COLORS MUST REMAIN SEMANTIC
+
+Administrators may customize the overall visual identity.
+
+However:
+
+```text
+error
 success
 warning
-danger
 info
 ```
 
-with controlled palettes.
+must remain distinguishable.
 
-For accessibility and clarity, do not rely exclusively on color.
+Do not allow a theme to make:
 
-Statuses should also have:
+```text
+success = red
+error = green
+```
 
-* icons
-* labels
-* appropriate text
-* consistent patterns
+unless there is a very deliberate advanced configuration and accessibility validation.
+
+The safest default is to preserve semantic meaning.
 
 ---
 
-# 23. TYPOGRAPHY
+# 16. TYPOGRAPHY
 
-The default remains the existing PawTag system font stack.
+Typography customization should be controlled.
 
-Allow administrators to choose from an approved font registry.
+Do not allow arbitrary external font URLs by default.
 
-Do not allow arbitrary external font URLs.
-
-Recommended conceptual options:
+Preferred options:
 
 ```text
 System
 Inter
-DM Sans
+Roboto
+Open Sans
 Nunito Sans
-Plus Jakarta Sans
-Source Sans 3
+DM Sans
+Other approved fonts
 ```
 
-The exact available fonts may be adjusted based on licensing and implementation.
+The exact available list should be based on:
 
-Typography must remain within safe limits.
+* licensing
+* performance
+* accessibility
+* browser support
+* project infrastructure
 
-Do not allow:
-
-```text
-body font = 8px
-```
-
-or other destructive settings.
+The AI must not introduce an external font service without explicit approval.
 
 ---
 
-# 24. TYPE SCALE
-
-The existing type scale should become the default.
-
-Default:
-
-```text
-display: 36px / 800 / 1.2
-h1:      30px / 700 / 1.3
-h2:      24px / 700 / 1.35
-h3:      20px / 600 / 1.4
-body-lg: 18px / 400 / 1.6
-body:    16px / 400 / 1.5
-body-sm: 14px / 400 / 1.5
-caption: 12px / 500 / 1.4
-mono:    14px / 400 / 1.5
-```
-
-Allow controlled scaling rather than arbitrary values.
-
----
-
-# 25. RADIUS SYSTEM
-
-Preserve the existing radius vocabulary:
-
-```text
-none
-sm
-md
-lg
-xl
-2xl
-3xl
-full
-```
-
-Provide administrator-friendly presets:
-
-```text
-Sharp
-Compact
-Rounded
-Very Rounded
-Pill
-```
-
-Map these to safe radius values.
-
----
-
-# 26. SHADOW SYSTEM
-
-Preserve:
-
-```text
-None
-Subtle
-Medium
-Elevated
-High
-```
-
-Allow administrators to choose an overall elevation style.
-
-Do not expose raw CSS shadow syntax in the initial version.
-
----
-
-# 27. BUTTON THEMING
+# 17. FONT ROLES
 
 Support at minimum:
 
 ```text
-Primary
-Secondary
-Ghost
-Destructive
+Heading font
+Body font
+Monospace font
 ```
 
-Add optional visual styles:
-
-```text
-Solid
-Outline
-Soft
-Ghost
-```
-
-The button component must maintain:
-
-* loading state
-* disabled state
-* keyboard focus
-* accessibility
-* touch target
-* semantic behavior
-
-Theme customization must never break those states.
+Do not allow arbitrary typography per component unless there is a demonstrated product need.
 
 ---
 
-# 28. CARD THEMING
+# 18. BORDER RADIUS
 
-Support:
+Provide controlled presets.
+
+Example:
+
+```text
+Sharp
+Balanced
+Soft
+Rounded
+```
+
+Internally:
+
+```text
+radius.none
+radius.sm
+radius.md
+radius.lg
+radius.xl
+radius.2xl
+radius.full
+```
+
+The UI should use human-friendly names.
+
+The administrator should not need to understand `12px`.
+
+---
+
+# 19. SHADOW PRESETS
+
+Provide:
+
+```text
+Flat
+Subtle
+Soft
+Elevated
+Strong
+```
+
+Internally map to:
+
+```text
+shadow-sm
+shadow-md
+shadow-lg
+shadow-xl
+```
+
+or CSS variables.
+
+---
+
+# 20. BUTTON STYLES
+
+Allow controlled choices:
+
+```text
+Solid
+Soft
+Outline
+Minimal
+Pill
+```
+
+Do not allow arbitrary CSS.
+
+The selected button style must propagate through shared components.
+
+---
+
+# 21. CARD STYLES
+
+Possible options:
 
 ```text
 Flat
 Bordered
+Soft Shadow
 Elevated
+Minimal
 ```
 
-Optional:
+The AI must ensure cards remain consistent across:
 
-```text
-Glass
-```
+* web
+* admin
+* finder
 
-only if the implementation remains accessible and performant.
+unless application-specific behavior requires an intentional difference.
 
 ---
 
-# 29. INPUT THEMING
+# 22. NAVIGATION THEMING
 
-Inputs must preserve:
+Allow controlled navigation styles.
 
-* focus ring
-* error state
-* disabled state
-* placeholder contrast
-* label association
-* helper text
-* validation feedback
-
-Theme settings may control:
-
-* radius
-* border color
-* focus color
-* background
-* density
-
-Do not allow unsafe removal of focus indicators.
-
----
-
-# 30. BADGES
-
-Support:
+Examples:
 
 ```text
-Primary
-Success
-Warning
-Error
-Info
-```
+Sidebar:
+- Light
+- Dark
+- Brand
+- Soft
 
-Use semantic colors.
-
-Do not allow the theme editor to break badge readability.
-
----
-
-# 31. ALERTS
-
-Support:
-
-```text
-Error
-Success
-Warning
-Info
-```
-
-Preserve the semantic hierarchy.
-
----
-
-# 32. LAYOUT THEMING
-
-Allow controlled options for:
-
-```text
-Container width:
-- Compact
-- Standard
-- Wide
-
-Spacing density:
-- Compact
-- Comfortable
-- Spacious
+Active state:
+- Filled
+- Indicator
+- Background
+- Accent
 
 Header:
+- Minimal
 - Standard
-- Centered
+- Brand
+```
+
+Do not allow theme configuration to alter navigation routes.
+
+Theme controls appearance only.
+
+---
+
+# 23. LAYOUT DENSITY
+
+Provide:
+
+```text
+Compact
+Comfortable
+Spacious
+```
+
+This affects:
+
+* table row height
+* card padding
+* form spacing
+* navigation spacing
+* page spacing
+
+It must NOT break responsive layouts.
+
+---
+
+# 24. CONTENT WIDTH
+
+Provide safe presets:
+
+```text
+Narrow
+Standard
+Wide
+Full
+```
+
+Do not expose arbitrary pixel values to normal administrators.
+
+---
+
+# 25. MOTION
+
+The Theme Engine may provide:
+
+```text
+Motion:
+- Full
+- Reduced
 - Minimal
 ```
 
-Do not expose arbitrary pixel-level page layout controls initially.
+But accessibility must always take precedence.
 
----
-
-# 33. DARK MODE
-
-The existing design documentation states that dark mode is configured in admin but not actually implemented.
-
-Treat this as a separate capability.
-
-Do not claim dark mode is complete merely because CSS classes exist.
-
-Dark mode must be implemented systematically across:
-
-* backgrounds
-* surfaces
-* text
-* borders
-* buttons
-* inputs
-* cards
-* alerts
-* navigation
-* Finder if applicable
-
-If implementing dark mode is too large for the initial theme-engine milestone, leave it behind a clearly documented phase.
-
----
-
-# 34. MOTION
-
-Preserve the existing motion specification.
-
-Default:
-
-```text
-micro: 150ms
-small: 200ms
-screen: 300ms
-page: 500ms
-```
-
-Allow only controlled options:
-
-```text
-Reduced
-Normal
-Expressive
-```
-
-Always respect:
+Respect:
 
 ```text
 prefers-reduced-motion
 ```
 
-Do not introduce excessive animations.
-
-PawTag is a lost-pet recovery product.
-
-Motion must feel reassuring, not playful or distracting.
+The theme cannot override a user's operating-system accessibility preference.
 
 ---
 
-# 35. BRANDING SYSTEM
+# 26. BRAND ASSETS
 
-Separate branding from general appearance.
+Theme Studio should support:
 
-Branding includes:
+* primary logo
+* dark-background logo
+* favicon
+* optional login image
+* optional brand icon
 
-```text
-Logo
-Favicon
-Primary brand color
-Secondary brand color
-Accent color
-Approved fonts
-Brand imagery
-```
+Use the existing R2/object-storage architecture.
 
-Appearance includes:
+Do not store large binary assets directly in MongoDB.
+
+Store:
 
 ```text
-Radius
-Shadows
-Buttons
-Cards
-Inputs
-Navigation
-Spacing
-Layout
-Motion
+asset ID
+URL/reference
+metadata
+alt text
 ```
 
-Content includes:
-
-```text
-Pages
-Hero
-Features
-FAQ
-Testimonials
-CTA
-Navigation labels
-Footer content
-```
-
-These must remain separate systems.
+Use the existing media library where possible rather than creating a second asset-management system.
 
 ---
 
-# 36. LOGO
+# 27. LOGO SAFETY
 
-The existing PawTag logo is code-based.
-
-Do not break the existing default logo.
-
-Support:
+The logo area should provide:
 
 ```text
-Default PawTag Logo
-Custom Uploaded Logo
+Upload
+Replace
+Remove
+Preview
+Reset to default
 ```
 
-Future support may include:
+Validate:
 
-```text
-Light-background logo
-Dark-background logo
-Favicon
-Mobile icon
-```
+* file type
+* file size
+* dimensions
+* SVG safety
+* malicious content
 
-Images must be stored using the existing object-storage infrastructure.
+Do not blindly accept arbitrary SVG.
 
-Do not introduce a second image storage system.
+Use the existing media-security conventions.
 
 ---
 
-# 37. DATABASE MODEL
+# 28. THEME PRESETS
 
-Create a theme model using MongoDB/Mongoose.
-
-Recommended conceptual entities:
-
-```text
-Theme
-ThemeVersion
-ThemePreset
-```
-
----
-
-# 38. THEME MODEL
-
-Conceptual structure:
-
-```ts
-{
-  _id,
-  name,
-  description,
-
-  scope: "public" | "admin",
-
-  config,
-
-  status: "draft" | "published" | "archived",
-
-  version,
-
-  createdBy,
-  updatedBy,
-
-  createdAt,
-  updatedAt
-}
-```
-
-Use existing project conventions for:
-
-* IDs
-* timestamps
-* audit metadata
-* validation
-* indexing
-
-Do not blindly copy this schema if existing conventions differ.
-
-Inspect the repository first.
-
----
-
-# 39. THEME VERSION MODEL
-
-Every published theme should be recoverable.
-
-Conceptual:
-
-```ts
-{
-  themeId,
-  version,
-  config,
-  changeSummary,
-
-  publishedBy,
-  publishedAt,
-
-  createdAt
-}
-```
-
-A theme version should be immutable.
-
-Do not mutate historical versions.
-
----
-
-# 40. THEME PRESETS
-
-System presets may be stored in code initially.
-
-Example:
-
-```text
-PawTag Classic
-PawTag Modern
-PawTag Natural
-PawTag Playful
-PawTag Premium
-PawTag Dark
-```
-
-Later they may be stored in MongoDB.
-
-Do not over-engineer preset management in the first phase.
-
----
-
-# 41. API DESIGN
-
-Implement APIs consistent with existing PawTag API conventions.
-
-Conceptual endpoints:
-
-```text
-GET    /api/themes/active
-
-GET    /api/admin/themes
-
-GET    /api/admin/themes/:id
-
-POST   /api/admin/themes
-
-PUT    /api/admin/themes/:id
-
-POST   /api/admin/themes/:id/validate
-
-POST   /api/admin/themes/:id/publish
-
-GET    /api/admin/themes/:id/versions
-
-POST   /api/admin/themes/:id/restore/:version
-```
-
-Use existing authentication and RBAC.
-
-Do not create a separate authentication mechanism.
-
----
-
-# 42. RBAC
-
-Only authorized administrators may:
-
-* view theme configuration
-* edit theme configuration
-* create themes
-* publish themes
-* restore themes
-
-Recommended permissions:
-
-```text
-theme.read
-theme.create
-theme.update
-theme.publish
-theme.restore
-```
-
-Use the existing RBAC system.
-
-Do not create a second permission system.
-
----
-
-# 43. AUDIT LOGGING
-
-Every significant theme operation must be audited.
+The system must support presets.
 
 At minimum:
 
 ```text
-theme.created
-theme.updated
-theme.validated
-theme.published
-theme.restored
-theme.archived
-preset.applied
-brand.asset.updated
+PawTag Classic
+PawTag Modern
+PawTag Professional
+PawTag Soft
+PawTag Premium
 ```
 
-Audit logs must include existing project-standard metadata:
+These are examples.
 
-* actor
-* timestamp
-* entity
-* entity ID
-* action
-* relevant changes
-* request context where appropriate
+The actual presets must be validated against PawTag's product identity.
 
-Never log secrets.
-
-Never log raw uploaded credentials.
+Each preset should simply be a valid theme configuration.
 
 ---
 
-# 44. DRAFT / PREVIEW / PUBLISH MODEL
+# 29. ONE-CLICK PRESET APPLICATION
 
-The theme workflow must be:
+When an administrator selects:
 
 ```text
-Draft
-  ↓
-Validate
-  ↓
+PawTag Modern
+```
+
+the system should immediately populate the Theme Studio controls.
+
+It should NOT immediately publish.
+
+Correct flow:
+
+```text
+Select preset
+     ↓
+Theme changes in editor
+     ↓
 Preview
-  ↓
+     ↓
+Save Draft
+     ↓
 Publish
 ```
 
-Never directly overwrite the published theme when the administrator is editing.
-
-The administrator must be able to experiment safely.
+This prevents accidental production changes.
 
 ---
 
-# 45. LIVE PREVIEW
+# 30. LIVE PREVIEW
 
-The appearance editor must provide a live preview.
+Theme Studio must support live preview.
 
 Preferred approach:
 
 ```text
-Admin Editor
+Theme Editor
       │
-      ├── controls
+      ├── current draft configuration
       │
-      └── preview
+      ▼
+Theme Provider
+      │
+      ▼
+CSS variables
+      │
+      ▼
+Preview UI
 ```
 
-Use an iframe or isolated preview environment where practical.
-
-The preview should represent the actual public application as closely as possible.
-
-Do not create a fake preview that uses different components from production.
+The preview should not require saving to the database.
 
 ---
 
-# 46. PREVIEW REQUIREMENT
+# 31. PREVIEW MODES
 
-Preview should support at least:
+Provide:
 
 ```text
 Desktop
@@ -1521,282 +1030,126 @@ Tablet
 Mobile
 ```
 
-The administrator should be able to inspect:
+At minimum the AI should implement responsive preview if the existing UI architecture allows it without introducing excessive complexity.
+
+---
+
+# 32. PREVIEW PAGES
+
+Theme Studio should include representative preview components:
 
 ```text
-Header
-Hero
+Dashboard
 Buttons
-Cards
 Forms
+Cards
+Tables
+Badges
 Alerts
 Navigation
-Footer
+Modal
+Empty State
+Error State
+Success State
+```
+
+This lets an administrator understand the impact of a theme before publishing.
+
+---
+
+# 33. DO NOT PREVIEW ONLY THEME CONTROLS
+
+The preview must show actual PawTag-like UI.
+
+Example:
+
+```text
+Theme Studio
+│
+├── Controls
+│
+└── Live Preview
+    ├── Dashboard card
+    ├── Pet card
+    ├── Order table
+    ├── Buttons
+    ├── Form
+    ├── Status badges
+    └── Navigation
 ```
 
 ---
 
-# 47. PREVIEW SECURITY
+# 34. THEME DRAFTS
 
-Never treat preview configuration as trusted production configuration.
+Theme editing must use drafts.
 
-Preview data may originate from unsaved client state.
-
-Do not:
-
-* execute arbitrary JavaScript
-* inject arbitrary HTML
-* execute arbitrary CSS
-* bypass authentication
-* expose privileged data
-
-The preview must use the same safe component system.
-
----
-
-# 48. ADMIN APPEARANCE UX
-
-Create:
+The administrator should be able to:
 
 ```text
-/admin/appearance
-```
-
-The UI should feel like a professional theme builder.
-
-Recommended structure:
-
-```text
-Appearance
-
-├── Presets
-├── Brand
-├── Colors
-├── Typography
-├── Shape
-├── Elevation
-├── Components
-├── Layout
-├── Motion
-└── Dark Mode
-```
-
-Right side:
-
-```text
-Live Preview
-```
-
-Top-level actions:
-
-```text
+Start editing
+      ↓
+Make changes
+      ↓
 Save Draft
-Preview
-Publish
-Reset
+      ↓
+Leave
+      ↓
+Return later
+      ↓
+Continue editing
 ```
+
+Drafts must not affect the public application.
 
 ---
 
-# 49. PRESET EXPERIENCE
+# 35. PUBLISHING
 
-Presets should be visually represented.
+Publishing is an explicit action.
 
-Example:
+Before publish:
 
 ```text
+Publish Theme?
+
+This will change the visual appearance of the selected PawTag experiences.
+
+Current theme:
 PawTag Classic
-PawTag Modern
-PawTag Natural
-PawTag Playful
-PawTag Premium
-```
 
-Each preset should have:
-
-* preview thumbnail
-* name
-* short description
-* Apply button
-
-Applying a preset must modify the draft, not immediately publish it.
-
----
-
-# 50. COLOR EDITOR UX
-
-Do not expose raw implementation complexity.
-
-Administrator experience:
-
-```text
-Brand Colors
-
-Primary
-[ color picker ]
-
-Secondary
-[ color picker ]
-
-Accent
-[ color picker ]
-```
-
-Advanced controls may be collapsible.
-
-Show:
-
-```text
-Preview
-Contrast status
-Suggested accessible text color
-```
-
----
-
-# 51. TYPOGRAPHY EDITOR UX
-
-Show:
-
-```text
-Heading Font
-Body Font
-
-Scale
-Compact / Standard / Large
-
-Weight
-```
-
-Provide preview text.
-
-Do not require the administrator to understand CSS.
-
----
-
-# 52. SHAPE EDITOR UX
-
-Provide a simple visual choice:
-
-```text
-Sharp
-Compact
-Rounded
-Very Rounded
-```
-
-Show visual examples.
-
-Do not require the administrator to enter:
-
-```text
-border-radius: 13px
-```
-
----
-
-# 53. COMPONENT EDITOR UX
-
-Show component previews.
-
-For example:
-
-```text
-Buttons
-
-[ Solid ]
-[ Outline ]
-[ Soft ]
-[ Ghost ]
-```
-
-Cards:
-
-```text
-[ Flat Card ]
-[ Bordered Card ]
-[ Elevated Card ]
-```
-
-The user should understand the visual outcome without technical knowledge.
-
----
-
-# 54. THEME PREVIEW COMPONENT
-
-Create reusable preview components.
-
-Example:
-
-```text
-ThemePreviewButton
-ThemePreviewCard
-ThemePreviewInput
-ThemePreviewAlert
-ThemePreviewBadge
-```
-
-However, wherever possible, preview actual production components rather than duplicating styles.
-
----
-
-# 55. RESET BEHAVIOR
-
-Provide:
-
-```text
-Reset section
-Reset entire draft
-Reset to PawTag Classic
-```
-
-Reset must affect draft only until published.
-
----
-
-# 56. PUBLISH CONFIRMATION
-
-Before publishing:
-
-Show:
-
-```text
-Publish theme?
-
-This will change the appearance of the public PawTag experience.
-
-Your previous theme will remain available for rollback.
+New theme:
+My Modern PawTag
 
 [Cancel]
 [Publish]
 ```
 
-This is especially important for a non-technical administrator.
+If possible, display a summary:
+
+```text
+12 color changes
+2 typography changes
+1 navigation change
+3 component-style changes
+```
 
 ---
 
-# 57. VERSION HISTORY
+# 36. ROLLBACK
 
-Add:
+Every published theme must be versioned.
 
-```text
-Appearance → Version History
-```
-
-Show:
+Administrators with the appropriate permission must be able to:
 
 ```text
-Version 7
-Published Aug 11
-By Admin
+Theme History
 
-Version 6
-Published Aug 09
-By Admin
-
-Version 5
-Published Aug 03
-By Admin
+v8  Current
+v7  Previous
+v6
+v5
+Default
 ```
 
 Actions:
@@ -1804,944 +1157,1325 @@ Actions:
 ```text
 Preview
 Restore
+Compare
 ```
 
-Never delete history as part of normal operation.
+Restoring a theme should create a new version rather than destroying historical records.
 
 ---
 
-# 58. ROLLBACK
+# 37. VERSIONING MODEL
 
-Rollback must create a new version.
+Do not mutate historical published theme versions.
 
-Do not mutate history.
-
-For example:
+Preferred model:
 
 ```text
-v7 current
-v6 old
-
-Restore v6
-
-creates:
-
-v8 = v6 configuration
+Theme
+   ↓
+Version 1
+Version 2
+Version 3
+Version 4
 ```
 
-This preserves the audit trail.
+Publishing creates a new immutable version.
+
+Rollback means:
+
+```text
+Version 4 active
+       ↓
+Restore Version 2
+       ↓
+Create Version 5
+       ↓
+Version 5 contains Version 2 configuration
+```
+
+This preserves auditability.
 
 ---
 
-# 59. PUBLISHING SAFETY
+# 38. THEME SCOPE
 
-Before publish:
+The architecture should support future theme scopes.
 
-1. Validate schema.
-2. Validate required values.
-3. Validate accessibility constraints.
-4. Validate supported component variants.
-5. Validate uploaded assets.
-6. Validate fonts.
-7. Validate dark mode if enabled.
-8. Ensure no arbitrary CSS/JS exists.
-9. Create version.
-10. Publish.
-11. Update cache.
-12. Write audit log.
-
-If any critical step fails:
-
-> Do not partially publish.
-
----
-
-# 60. CACHE
-
-Do not query MongoDB for theme configuration on every component render.
-
-Use a cached published configuration.
-
-Use existing project infrastructure if a cache already exists.
-
-If no cache exists, begin with a safe application-level cache and design the abstraction so it can later be replaced.
-
-Cache invalidation must occur on publish/rollback.
-
----
-
-# 61. WEB RUNTIME
-
-Public web applications should load the active theme.
-
-Conceptually:
+Potential scopes:
 
 ```text
-Application boot
-    ↓
-Fetch active theme
-    ↓
-Validate
-    ↓
-ThemeProvider
-    ↓
-CSS variables
-    ↓
-Application
-```
-
-If the theme API fails:
-
-> Fall back safely to the built-in PawTag Classic theme.
-
-Never render an unusable site because the theme API is unavailable.
-
----
-
-# 62. OFFLINE / FAILURE FALLBACK
-
-The application must have a local default theme.
-
-Do not make the entire UI dependent on successful theme API retrieval.
-
-Fallback order:
-
-```text
-Published server theme
-        ↓
-Cached theme
-        ↓
-Built-in PawTag Classic
-```
-
----
-
-# 63. Puck CMS INTEGRATION
-
-Puck controls:
-
-```text
-content
-sections
-page structure
-CMS composition
-```
-
-The theme engine controls:
-
-```text
-visual language
-colors
-typography
-spacing
-components
-appearance
-```
-
-Do not mix these responsibilities.
-
----
-
-# 64. PUCK COMPONENT RULE
-
-Puck components must consume the shared:
-
-```text
-packages/ui
-```
-
-components wherever possible.
-
-Do not create a second design system inside Puck.
-
-For example:
-
-```tsx
-<Hero>
-  <Heading />
-  <Button />
-</Hero>
-```
-
-should ultimately use the same themed Button/Heading system as the rest of the application.
-
----
-
-# 65. PAGE BUILDER SAFETY
-
-Do not allow Puck to bypass theme constraints.
-
-A page editor may choose:
-
-```text
-content
-layout
-section variants
-```
-
-but should not inject arbitrary CSS/JS into production.
-
----
-
-# 66. TENANT / WHITE-LABEL PREPARATION
-
-Do not implement full multi-tenant branding unless required.
-
-However, architect the theme system so that future scopes are possible.
-
-Potential future model:
-
-```text
-Platform Theme
-      ↓
-Organization Theme
-      ↓
-Site Theme
-      ↓
-Page overrides
-```
-
-Do not implement unnecessary tenant complexity now.
-
----
-
-# 67. MOBILE ARCHITECTURE
-
-React Native cannot directly use browser CSS variables.
-
-Therefore:
-
-```text
-ThemeConfig
-     ↓
-Web Theme Adapter
-     ↓
-CSS variables
-
-ThemeConfig
-     ↓
-Mobile Theme Adapter
-     ↓
-React Native style objects
-```
-
-Do not duplicate the actual theme configuration.
-
-There must be one conceptual theme contract.
-
-Mobile implementation can be phased later if necessary.
-
----
-
-# 68. MOBILE SAFETY
-
-The mobile app must not become dependent on the web theme API during startup.
-
-Use:
-
-```text
-bundled default theme
-```
-
-and optionally:
-
-```text
-remote published theme
-```
-
-with local fallback.
-
-Never block mobile startup waiting for theme configuration.
-
----
-
-# 69. DESIGN SYSTEM MIGRATION STRATEGY
-
-Do not migrate the entire repository in one giant change.
-
-Use incremental migration.
-
-Recommended order:
-
-```text
-packages/ui
-    ↓
+global
 web
-    ↓
-finder
-    ↓
 admin
-    ↓
-Puck components
-    ↓
-mobile
+finder
+tenant
+brand
 ```
 
----
-
-# 70. MIGRATION RULE
-
-For every hardcoded visual value ask:
-
-> Is this a theme value, semantic value, structural value, or business-state value?
-
-Examples:
+Initial implementation may use:
 
 ```text
-Primary teal
-→ theme
-
-Danger red
-→ semantic theme
-
-Grid gap
-→ structural/design token
-
-Lost status
-→ business semantic
+global
 ```
 
-Do not blindly replace everything with variables.
+Do not over-engineer multi-tenancy unless required by the current product.
+
+However, structure the schema so this possibility is not blocked.
 
 ---
 
-# 71. DO NOT BREAK BUSINESS LOGIC
+# 39. ADMIN VS PUBLIC THEMING
 
-Theme work must never modify:
+The Theme Engine must explicitly distinguish between:
 
-* authentication
-* payments
-* Stripe webhook logic
-* tag activation
-* QR scanning
-* NFC
-* pet recovery workflows
-* subscription state machine
-* notifications
-* audit logging
-* RBAC behavior
-* order lifecycle
-* health record logic
+### Product/Admin UI theme
 
-unless explicitly required by the theme feature.
+The internal admin back office.
+
+### Public site theme
+
+Marketing/shop/customer experience.
+
+### Finder theme
+
+The public QR/NFC recovery experience.
+
+These may eventually have separate theme configurations.
+
+Do not assume that a dashboard theme and missing-pet finder theme should always look identical.
 
 ---
 
-# 72. DO NOT REWRITE WORKING COMPONENTS WITHOUT REASON
+# 40. FINDER SAFETY
 
-If an existing component works:
+The finder experience has special priority.
+
+It is often used when:
+
+* someone finds a missing pet
+* the finder is on a phone
+* the user may be unfamiliar with PawTag
+* the owner may be under stress
+
+Theme customization MUST NOT compromise:
+
+* scan-result readability
+* emergency/contact actions
+* lost-pet status
+* owner notification actions
+* location consent
+* accessibility
+* mobile usability
+
+The finder must remain extremely clear regardless of theme.
+
+---
+
+# 41. CSS ARCHITECTURE
+
+The preferred architecture is:
 
 ```text
-Preserve behavior.
-Refactor styling.
+Theme Configuration
+        ↓
+Theme Resolver
+        ↓
+CSS Custom Properties
+        ↓
+packages/ui components
 ```
 
-Do not rewrite business logic merely because you are migrating styles.
-
----
-
-# 73. TESTING REQUIREMENTS
-
-Every implementation phase must include appropriate tests.
-
-At minimum:
-
-## Unit
-
-Test:
+Example conceptual variables:
 
 ```text
-theme validation
-theme merging
-theme defaults
-color generation
-contrast validation
-CSS variable generation
-preset application
+--pt-color-primary
+--pt-color-primary-hover
+--pt-color-primary-active
+--pt-color-primary-soft
+
+--pt-color-background
+--pt-color-surface
+--pt-color-surface-muted
+
+--pt-color-text
+--pt-color-text-muted
+--pt-color-border
+
+--pt-color-success
+--pt-color-warning
+--pt-color-error
+--pt-color-info
+
+--pt-radius-button
+--pt-radius-card
+--pt-radius-input
+
+--pt-shadow-card
+--pt-shadow-dropdown
+--pt-shadow-modal
+
+--pt-font-body
+--pt-font-heading
+
+--pt-layout-content-width
+--pt-layout-density
 ```
 
-## Integration
+The exact token list should be finalized after inspecting the current implementation.
 
-Test:
+---
+
+# 42. TAILWIND INTEGRATION
+
+Do not attempt to dynamically regenerate Tailwind configuration in production for every theme.
+
+Avoid:
 
 ```text
-theme CRUD
-theme publishing
-theme rollback
-RBAC
-audit logging
+theme change
+→ edit tailwind.config
+→ rebuild application
 ```
 
-## UI
-
-Test:
-
-```text
-theme editor
-preset selection
-draft save
-publish
-reset
-preview
-```
-
-## Regression
-
-Ensure existing functionality remains operational.
-
----
-
-# 74. THEME MERGING
-
-Support sensible defaults.
-
-For example:
-
-```text
-Default Theme
-       +
-User overrides
-       =
-Resolved Theme
-```
-
-Do not require every theme configuration to contain every possible value.
-
-Use safe defaults.
-
----
-
-# 75. IMMUTABILITY
-
-Never mutate the original default theme.
-
-Never mutate historical published versions.
-
-Use immutable configuration snapshots.
-
----
-
-# 76. THEME RESOLUTION
-
-Conceptually:
-
-```ts
-const resolvedTheme = resolveTheme(
-  pawTagClassic,
-  draftOverrides
-);
-```
-
-The result should be complete enough for rendering.
-
----
-
-# 77. THEME VALIDATION LEVELS
-
-Implement three levels:
-
-### Level 1 — Schema
-
-Is the configuration structurally valid?
-
-### Level 2 — Design safety
-
-Are values within safe ranges?
-
-### Level 3 — Accessibility
-
-Does the theme meet required contrast and usability rules?
-
-Only a valid theme may be published.
-
----
-
-# 78. ADMIN ERROR MESSAGES
-
-Never expose technical errors such as:
-
-```text
-ZodError: path components.button.radius...
-```
+That defeats the purpose of runtime theming.
 
 Instead:
 
 ```text
-"The button style could not be saved. Please choose another button shape."
-```
-
-Technical details should go to logs.
-
----
-
-# 79. UX WRITING
-
-Use plain language.
-
-Good:
-
-```text
-Save draft
-Preview changes
-Publish theme
-Restore previous version
-```
-
-Bad:
-
-```text
-Persist configuration
-Compile tokens
-Hydrate theme
-Mutate schema
-```
-
-The admin is not a developer.
-
----
-
-# 80. ADMIN CONFIRMATIONS
-
-When publishing:
-
-```text
-Your new appearance is ready.
-
-Publishing will update the public PawTag experience.
-
-Your current appearance will be saved as a previous version.
-
-[Cancel] [Publish]
-```
-
-When restoring:
-
-```text
-Restore this appearance?
-
-A new version will be created, so you can undo this later.
-
-[Cancel] [Restore]
-```
-
----
-
-# 81. "ONE CLICK REVAMP" FEATURE
-
-Provide a prominent preset experience.
-
-Example:
-
-```text
-Revamp your website
-
-Choose a design direction:
-
-Modern
-Natural
-Playful
-Premium
-Classic
-```
-
-Clicking a preset should:
-
-1. load preset configuration
-2. apply it to current draft
-3. show live preview
-4. allow further customization
-5. never publish automatically
-
----
-
-# 82. PRESET REQUIREMENTS
-
-Every preset must be complete enough to create a coherent experience.
-
-Do not create presets that only change the primary color.
-
-A real preset should change a combination of:
-
-```text
-colors
-typography
-radius
-shadows
-button style
-card style
-spacing
-layout
-```
-
----
-
-# 83. INITIAL PRESETS
-
-Create at least:
-
-## PawTag Classic
-
-The existing PawTag design.
-
-## PawTag Modern
-
-Characteristics:
-
-* clean
-* SaaS-like
-* restrained radius
-* subtle shadows
-* strong whitespace
-
-## PawTag Natural
-
-Characteristics:
-
-* organic
-* calming
-* earthy palette
-* soft visual language
-
-## PawTag Playful
-
-Characteristics:
-
-* brighter palette
-* larger radius
-* friendlier visual language
-* still professional
-
-## PawTag Premium
-
-Characteristics:
-
-* elegant
-* restrained
-* premium contrast
-* sophisticated typography
-
-Do not compromise PawTag's trustworthiness.
-
----
-
-# 84. DO NOT OVERDESIGN
-
-PawTag is not a gaming application.
-
-Avoid:
-
-* excessive gradients
-* excessive glassmorphism
-* giant animations
-* cartoon UI
-* excessive shadows
-* excessive rounded shapes
-* visual clutter
-
-Especially in:
-
-```text
-Finder
-Lost mode
-Tag activation
-Emergency contact
-Pet recovery
-```
-
----
-
-# 85. RESPONSIVE DESIGN
-
-The theme system must work across:
-
-```text
-Mobile
-Tablet
-Desktop
-Large desktop
-```
-
-Theme settings must not create horizontal overflow.
-
-Test:
-
-```text
-320px
-375px
-390px
-768px
-1024px
-1280px
-1440px+
-```
-
----
-
-# 86. PERFORMANCE
-
-The theme system must be lightweight.
-
-Avoid:
-
-* generating huge CSS files
-* runtime recompilation
-* unnecessary rerenders
-* loading dozens of fonts
-* unnecessary API calls
-
-Prefer:
-
-```text
-Theme JSON
+Tailwind
 +
 CSS variables
 ```
 
-rather than dynamically generating large stylesheets.
+Use Tailwind for structural utilities and CSS variables for runtime theme values.
 
 ---
 
-# 87. SECURITY
+# 43. MIGRATION FROM CURRENT DESIGN
 
-Theme data is admin-controlled but still untrusted input.
+The existing system contains hardcoded values such as:
+
+```text
+teal-600
+teal-700
+gray-900
+rounded-xl
+```
+
+Do NOT perform a massive blind replacement.
+
+Perform migration incrementally.
+
+Recommended sequence:
+
+```text
+Phase 1
+Create token architecture.
+
+Phase 2
+Modify shared UI components.
+
+Phase 3
+Migrate common primitives.
+
+Phase 4
+Migrate admin.
+
+Phase 5
+Migrate web.
+
+Phase 6
+Migrate finder.
+
+Phase 7
+Handle CMS/Puck.
+
+Phase 8
+Remove remaining unnecessary hardcoded theme values.
+```
+
+---
+
+# 44. SHARED UI COMPONENT MIGRATION
+
+Prioritize:
+
+```text
+Button
+Input
+Select
+Textarea
+Checkbox
+Radio
+Switch
+Badge
+Alert
+Card
+Modal
+Dialog
+Dropdown
+Tooltip
+Tabs
+Table
+Pagination
+Navigation
+Sidebar
+Header
+EmptyState
+LoadingState
+ErrorState
+```
+
+Each should consume semantic theme tokens.
+
+---
+
+# 45. COMPONENT CONTRACT
+
+Every shared UI component must:
+
+1. consume semantic tokens
+2. support accessibility
+3. preserve existing behavior
+4. preserve existing public APIs where possible
+5. avoid application-specific business logic
+6. remain usable without Theme Studio
+7. fall back safely to PawTag defaults
+
+---
+
+# 46. DEFAULT FALLBACK
+
+If:
+
+* theme API fails
+* database unavailable
+* theme is malformed
+* configuration missing
+* browser loads before theme request completes
+
+the application must use:
+
+```text
+PawTag Default Theme
+```
+
+The application must never render unstyled or broken UI because the Theme API is unavailable.
+
+---
+
+# 47. THEME LOADING STRATEGY
+
+Avoid noticeable theme flashing.
+
+Preferred sequence:
+
+```text
+Application starts
+      ↓
+Default theme immediately available
+      ↓
+Fetch active theme
+      ↓
+Apply validated theme
+```
+
+If practical, preload the active theme configuration.
+
+Do not block the entire application indefinitely waiting for theme configuration.
+
+---
+
+# 48. API DESIGN
+
+Follow existing Express architecture.
+
+Potential endpoints:
+
+```text
+GET    /api/admin/themes
+POST   /api/admin/themes
+GET    /api/admin/themes/:id
+PATCH  /api/admin/themes/:id
+DELETE /api/admin/themes/:id
+
+POST   /api/admin/themes/:id/publish
+POST   /api/admin/themes/:id/duplicate
+
+GET    /api/admin/themes/:id/versions
+GET    /api/admin/themes/:id/versions/:version
+
+POST   /api/admin/themes/:id/restore/:version
+
+GET    /api/theme/active
+```
+
+Do not create endpoints that duplicate existing CMS or media functionality.
+
+Follow current route naming conventions.
+
+---
+
+# 49. API VALIDATION
+
+All Theme API input must use Zod.
 
 Validate:
 
-* strings
-* URLs
-* image references
-* font identifiers
-* enum values
-* color values
-* numeric values
+* colors
+* enums
+* numeric limits
+* font selections
+* radius options
+* shadow options
+* asset references
+* theme status
+* version identifiers
 
-Never execute:
+Never trust client-side validation.
+
+---
+
+# 50. SECURITY
+
+Theme configuration is admin-controlled data.
+
+Protect it using existing RBAC.
+
+Suggested permissions:
 
 ```text
-JavaScript from theme configuration
+theme.view
+theme.create
+theme.edit
+theme.publish
+theme.restore
+theme.delete
 ```
 
-Never render arbitrary HTML from theme configuration.
+Use the project's existing permission naming conventions if different.
+
+Do not invent a second authorization mechanism.
 
 ---
 
-# 88. MEDIA
+# 51. PUBLISH PERMISSION
 
-Use the existing R2/object-storage system for uploaded:
+Editing and publishing should preferably be separate permissions.
 
-* logos
-* favicons
-* brand images
-
-Do not store large binary files directly in MongoDB unless the existing architecture already requires it.
-
----
-
-# 89. SEO
-
-Theme changes must not alter:
-
-* page metadata
-* structured data
-* canonical URLs
-* sitemap
-* SEO content
-
-unless explicitly intended.
-
----
-
-# 90. ACCESSIBILITY REGRESSION
-
-After theme migration, run accessibility checks on:
+Example:
 
 ```text
-Homepage
-Shop
-Product
-Checkout
-Customer dashboard
-Pet profile
-Finder
-Login
-Admin appearance
+Designer/Admin:
+theme.edit
+
+Senior Admin:
+theme.publish
+theme.restore
 ```
 
-At minimum verify:
-
-* keyboard navigation
-* focus visibility
-* color contrast
-* labels
-* headings
-* buttons
-* links
-* form errors
+This allows a safe workflow where one person creates a theme and another approves production changes.
 
 ---
 
-# 91. DOCUMENTATION
+# 52. AUDIT LOGGING
 
-Update documentation after implementation.
+Every important theme operation must be audited.
 
-Create/update:
+At minimum:
 
 ```text
-docs/theme-engine.md
+theme.created
+theme.updated
+theme.published
+theme.restored
+theme.deleted
+theme.preset_applied
+theme.assets_changed
 ```
 
-Document:
+Audit entries should identify:
 
-* architecture
-* ThemeConfig
-* theme lifecycle
-* API
-* database models
-* preset system
-* component integration
-* preview
-* publishing
-* rollback
-* troubleshooting
+* actor
+* action
+* theme
+* version
+* timestamp
+* relevant metadata
+* before/after summary where appropriate
 
-Do not let documentation describe functionality that does not exist.
+Do not log secrets or sensitive data.
 
----
+Use the existing enterprise audit system.
 
-# 92. PHASED IMPLEMENTATION PLAN
-
-The implementation MUST be phased.
-
-Do not attempt the entire system in one prompt or one coding session.
+Do not create a second audit-log implementation.
 
 ---
 
-# PHASE 0 — REPOSITORY DISCOVERY
+# 53. CHANGE SUMMARY
 
-## Goal
+When publishing a theme, generate a human-readable summary.
 
-Understand the existing system before changing it.
+Example:
 
-AI must inspect:
+```text
+Theme published
+
+Changes:
+• Primary color changed
+• Button style changed from Solid to Soft
+• Border radius changed from Soft to Rounded
+• Heading font changed
+• Navigation changed to Dark
+```
+
+This helps non-technical administrators understand what they did.
+
+---
+
+# 54. THEME COMPARISON
+
+Provide a simple comparison view.
+
+Example:
+
+```text
+Current
+PawTag Classic
+
+vs.
+
+Draft
+PawTag Modern
+```
+
+Show:
+
+```text
+Primary color
+Typography
+Button style
+Card style
+Navigation
+Radius
+Density
+```
+
+Do not expose raw JSON to normal users.
+
+---
+
+# 55. ADVANCED VIEW
+
+A future advanced view may expose:
+
+```text
+Theme JSON
+```
+
+but this should:
+
+* be hidden behind an advanced permission
+* be read-only by default
+* validate all changes
+* never permit arbitrary code
+* never permit JavaScript injection
+* never permit arbitrary CSS injection
+
+Normal administrators should never need it.
+
+---
+
+# 56. PRESET ARCHITECTURE
+
+Presets should be stored as structured configuration.
+
+Example:
+
+```text
+preset:
+  id: pawtag-classic
+  name: PawTag Classic
+  description: Warm, trustworthy PawTag default
+  config: {...}
+```
+
+Presets should not be implemented as:
+
+```text
+if theme === "modern":
+   add CSS class
+```
+
+That approach becomes unmaintainable.
+
+---
+
+# 57. UI/UX PRO MAX ROLE IN PRESETS
+
+When creating or reviewing a preset:
+
+1. Identify intended personality.
+2. Consult UI/UX Pro Max.
+3. Analyze appropriate patterns.
+4. Generate candidate design direction.
+5. Check against `DESIGN.md`.
+6. Convert the approved direction into theme tokens.
+7. Validate accessibility.
+8. Build a preview.
+9. Test across representative screens.
+10. Store the final preset as configuration.
+
+UI/UX Pro Max should influence the design process, not become a runtime dependency.
+
+---
+
+# 58. DESIGN INTELLIGENCE DOCUMENT
+
+Create:
+
+```text
+docs/design/PAWTAG-DESIGN-INTELLIGENCE.md
+```
+
+It should record:
+
+* PawTag visual personality
+* user emotional context
+* preferred visual patterns
+* forbidden patterns
+* accessibility priorities
+* approved typography
+* approved theme styles
+* UI/UX Pro Max recommendations adopted
+* recommendations rejected and why
+
+This prevents future AI agents from repeatedly making the same design mistakes.
+
+---
+
+# 59. THEME ENGINE DESIGN RULES
+
+The AI MUST follow these principles:
+
+### Rule 1
+
+Configuration over source-code modification.
+
+### Rule 2
+
+Semantic tokens over hardcoded colors.
+
+### Rule 3
+
+Shared components over duplicated styles.
+
+### Rule 4
+
+Safe presets over arbitrary CSS.
+
+### Rule 5
+
+Draft before publish.
+
+### Rule 6
+
+Every published theme is versioned.
+
+### Rule 7
+
+Every important change is audited.
+
+### Rule 8
+
+Accessibility is mandatory.
+
+### Rule 9
+
+Existing application functionality must remain unchanged.
+
+### Rule 10
+
+PawTag Default Theme must always be recoverable.
+
+---
+
+# 60. BRANCHING AND CHANGE ISOLATION
+
+Theme Engine development MUST NOT happen directly on the production/main branch.
+
+Before implementation:
+
+```text
+git status
+git branch
+git log -n 10
+```
+
+Confirm the repository is clean or understand existing changes.
+
+Create an isolated feature branch.
+
+Recommended naming:
+
+```text
+feature/theme-engine-foundation
+feature/theme-engine-tokens
+feature/theme-engine-admin
+feature/theme-engine-presets
+feature/theme-engine-publishing
+feature/theme-engine-migration
+feature/theme-engine-qa
+```
+
+Do not create one enormous uncontrolled branch if the work can be safely divided.
+
+---
+
+# 61. CRITICAL BRANCHING RULE
+
+Never modify unrelated working code merely because it looks old.
+
+If an existing implementation works:
+
+```text
+LEAVE IT ALONE
+```
+
+unless the Theme Engine specifically requires the change.
+
+Document unrelated technical debt instead of fixing it opportunistically.
+
+---
+
+# 62. BASELINE BEFORE CHANGES
+
+Before each phase:
+
+```text
+pnpm typecheck
+pnpm test
+pnpm build
+```
+
+Use the actual repository scripts if they differ.
+
+Record baseline results.
+
+If the baseline already has failures:
+
+```text
+DO NOT CLAIM THEY WERE CAUSED BY THE THEME WORK.
+```
+
+Document them.
+
+---
+
+# 63. SMALL COMMITS
+
+Prefer commits such as:
+
+```text
+feat(theme): add theme schema
+feat(theme): add semantic token resolver
+feat(theme): add runtime theme provider
+feat(theme): migrate Button component
+feat(theme): add theme API
+feat(theme): add Theme Studio
+feat(theme): add theme publishing
+feat(theme): add theme history
+feat(theme): add presets
+```
+
+Avoid:
+
+```text
+feat: completely redesign PawTag
+```
+
+---
+
+# 64. PHASED IMPLEMENTATION
+
+The AI must implement the system in phases.
+
+Do not attempt the entire Theme Engine in one uncontrolled pass.
+
+---
+
+# PHASE 0 — DISCOVERY
+
+Before changing code:
+
+Inspect:
 
 ```text
 DESIGN.md
 ARCHITECTURE.md
-apps/web
-apps/admin
-apps/finder
-apps/mobile
 packages/ui
-packages/shared
+apps/admin
+apps/web
+apps/finder
 packages/api
 packages/db
-```
-
-Also inspect:
-
-```text
+packages/shared
+CMS/Puck implementation
+existing theme-related code
 Tailwind configuration
-Vite configuration
-existing theme providers
-existing CSS
-existing component patterns
-existing CMS implementation
+global CSS
+existing CSS variables
 existing RBAC
 existing audit logging
-existing API conventions
-existing database conventions
+media library
 ```
 
-## Deliverable
-
-Create:
+Search for:
 
 ```text
-docs/theme-engine-discovery.md
+teal-
+primary-
+gray-
+rounded-
+shadow-
+font-
+bg-
+text-
+border-
+dark:
 ```
 
-containing:
+Identify where visual values are hardcoded.
 
-* existing architecture
-* current styling strategy
-* hardcoded color locations
-* existing UI components
-* current theme-like infrastructure
-* risks
-* recommended migration order
+Deliver:
 
-## Acceptance
+```text
+docs/design/THEME-ENGINE-DISCOVERY.md
+```
 
-No code changes required except documentation.
+Do not implement yet.
 
 ---
 
-# PHASE 1 — THEME CONTRACT
-
-## Goal
-
-Create the canonical theme data model.
-
-Implement:
-
-```text
-packages/ui/theme/types.ts
-packages/ui/theme/schema.ts
-packages/ui/theme/defaults.ts
-packages/ui/theme/presets/pawtag-classic.ts
-```
+# PHASE 1 — ARCHITECTURE
 
 Create:
 
 ```text
+docs/design/THEME-ENGINE-ARCHITECTURE.md
+```
+
+Document:
+
+* theme model
+* configuration schema
+* semantic tokens
+* runtime strategy
+* API
+* permissions
+* publishing
+* versioning
+* preview
+* rollback
+* fallback
+* migration strategy
+
+Get architecture internally consistent before implementation.
+
+---
+
+# PHASE 2 — THEME CONTRACT
+
+Create shared TypeScript types.
+
+Prefer:
+
+```text
+packages/shared
+```
+
+Define:
+
+```text
+Theme
 ThemeConfig
+ThemeColors
+ThemeTypography
+ThemeRadius
+ThemeShadows
+ThemeNavigation
+ThemeLayout
+ThemeMotion
+ThemeAccessibility
+ThemeAssets
+ThemeVersion
 ```
 
-and Zod schema.
+Add Zod schemas.
 
-## Acceptance
-
-* TypeScript compiles.
-* Zod validation works.
-* PawTag Classic represents the existing design.
-* No application behavior changes.
+Ensure frontend and backend share the same validation contract where practical.
 
 ---
 
-# PHASE 2 — CSS VARIABLE ENGINE
+# PHASE 3 — DEFAULT THEME
 
-## Goal
-
-Convert ThemeConfig into runtime CSS variables.
-
-Implement:
+Convert the current PawTag design into a formal:
 
 ```text
-themeToCssVariables()
+PawTag Default Theme
+```
+
+The current visual appearance should remain as close as possible to the existing production UI.
+
+This is critical.
+
+The first Theme Engine milestone must NOT be a redesign.
+
+It is a formalization of the existing design.
+
+---
+
+# PHASE 4 — SEMANTIC TOKEN SYSTEM
+
+Implement the semantic CSS variable architecture.
+
+Start with:
+
+```text
+colors
+radius
+shadows
+typography
+layout
+motion
+```
+
+Create a centralized theme resolver.
+
+Do not scatter token-generation logic across components.
+
+---
+
+# PHASE 5 — THEME PROVIDER
+
+Create the runtime theme mechanism.
+
+Conceptually:
+
+```text
 ThemeProvider
 ```
 
-Add tests.
+Responsibilities:
 
-## Acceptance
+* receive theme configuration
+* validate configuration
+* resolve semantic tokens
+* apply CSS variables
+* provide current theme state
+* provide fallback defaults
+* prevent malformed values from reaching DOM styles
 
-Given:
-
-```text
-PawTag Classic
-```
-
-the rendered site looks visually equivalent to the existing implementation.
+Do not place API/business logic inside every UI component.
 
 ---
 
-# PHASE 3 — SHARED UI MIGRATION
+# PHASE 6 — SHARED UI MIGRATION
 
-## Goal
+Migrate shared components gradually.
 
-Make `packages/ui` theme-aware.
+Order:
 
-Migrate:
+```text
+Button
+Input
+Badge
+Alert
+Card
+Modal
+Dropdown
+Table
+Tabs
+Navigation
+```
+
+After each group:
+
+```text
+typecheck
+tests
+build
+visual review
+```
+
+Do not migrate every screen at once.
+
+---
+
+# PHASE 7 — THEME API
+
+Implement backend theme management.
+
+Include:
+
+```text
+CRUD
+validation
+permissions
+active theme
+drafts
+publishing
+versioning
+rollback
+```
+
+Use:
+
+```text
+Express
+TypeScript
+Zod
+Mongoose
+existing auth
+existing RBAC
+existing audit logging
+```
+
+Do not introduce another backend framework.
+
+---
+
+# PHASE 8 — ACTIVE THEME
+
+Implement:
+
+```text
+GET /api/theme/active
+```
+
+or the project's equivalent.
+
+The public application should receive the currently published theme.
+
+Ensure caching can be introduced later.
+
+Do not query MongoDB independently from every React component.
+
+---
+
+# PHASE 9 — THEME STUDIO
+
+Create:
+
+```text
+apps/admin
+    Appearance
+        Theme Studio
+```
+
+Build the UI using:
+
+```text
+packages/ui
+```
+
+Do not create a separate design system for Theme Studio.
+
+---
+
+# PHASE 10 — THEME STUDIO CONTROLS
+
+Implement controls in this order:
+
+### Brand
+
+* logo
+* favicon
+* brand name if product requirements permit
+
+### Colors
+
+* primary
+* secondary
+* accent
+* background
+* surface
+
+### Typography
+
+* heading
+* body
+* scale
+
+### Shape
+
+* radius preset
+
+### Shadows
+
+* elevation preset
+
+### Buttons
+
+* style
+
+### Cards
+
+* style
+
+### Navigation
+
+* style
+
+### Layout
+
+* density
+* width
+
+### Motion
+
+* motion preference
+
+---
+
+# PHASE 11 — LIVE PREVIEW
+
+Implement the preview environment.
+
+It should use the same shared components as the real application.
+
+Do NOT create fake CSS-only preview components that behave differently from production components.
+
+---
+
+# PHASE 12 — PRESETS
+
+Create initial presets.
+
+Each must:
+
+* be valid configuration
+* pass schema validation
+* pass accessibility validation
+* render correctly
+* not modify source code
+* be reversible
+
+---
+
+# PHASE 13 — DRAFT / PUBLISH
+
+Implement:
+
+```text
+Draft
+Published
+```
+
+Publishing must:
+
+* require permission
+* create a version
+* create an audit record
+* validate configuration
+* validate accessibility
+* preserve previous version
+
+---
+
+# PHASE 14 — VERSION HISTORY
+
+Implement:
+
+```text
+Theme History
+```
+
+Features:
+
+```text
+View
+Preview
+Compare
+Restore
+```
+
+Restoration creates a new version.
+
+---
+
+# PHASE 15 — ADMIN / WEB / FINDER MIGRATION
+
+Migrate remaining application-level hardcoded theme values.
+
+Priority:
+
+```text
+packages/ui
+      ↓
+apps/admin
+      ↓
+apps/web
+      ↓
+apps/finder
+```
+
+Avoid a big-bang rewrite.
+
+---
+
+# PHASE 16 — CMS / PUCK
+
+Inspect how Puck components currently receive styles.
+
+Theme-aware Puck components should use semantic tokens.
+
+Do NOT allow Puck content authors to bypass Theme Engine constraints.
+
+Puck should control:
+
+```text
+content
+layout
+approved component options
+```
+
+Theme Engine controls:
+
+```text
+brand
+colors
+typography
+component appearance
+```
+
+Maintain this separation.
+
+---
+
+# PHASE 17 — MOBILE
+
+Only after web theming is stable:
+
+Investigate a shared semantic theme model for React Native.
+
+Use:
+
+```text
+ThemeConfig
+      ↓
+Web Theme Adapter
+      ↓
+CSS variables
+
+ThemeConfig
+      ↓
+Mobile Theme Adapter
+      ↓
+React Native styles
+```
+
+Do not force web CSS into React Native.
+
+---
+
+# PHASE 18 — ACCESSIBILITY QA
+
+Test:
+
+* keyboard navigation
+* focus states
+* color contrast
+* screen reader labels
+* reduced motion
+* form states
+* error states
+* status indicators
+
+Test multiple presets.
+
+A theme is not complete merely because it looks good.
+
+---
+
+# PHASE 19 — RESPONSIVE QA
+
+Test:
+
+```text
+mobile
+tablet
+desktop
+large desktop
+```
+
+At minimum test:
+
+* navigation
+* dashboard
+* forms
+* tables
+* cards
+* finder
+* shop
+* customer portal
+
+---
+
+# PHASE 20 — REGRESSION QA
+
+Verify:
+
+```text
+authentication
+RBAC
+orders
+checkout
+Stripe
+subscriptions
+pets
+tags
+finder scans
+notifications
+CMS
+media
+audit logs
+mobile API
+```
+
+Theme changes must not alter functionality.
+
+---
+
+# 65. TESTING REQUIREMENTS
+
+Add unit tests for:
+
+```text
+theme validation
+theme normalization
+color generation
+token generation
+fallback logic
+preset validation
+version creation
+rollback
+access control
+```
+
+Add API integration tests for:
+
+```text
+create theme
+update theme
+publish theme
+restore theme
+get active theme
+unauthorized access
+invalid theme
+```
+
+Add component tests for:
 
 ```text
 Button
@@ -2749,909 +2483,977 @@ Card
 Input
 Badge
 Alert
-Modal
-Tabs
 Navigation
-Table
-etc.
-```
-
-Do not migrate the entire application yet.
-
-## Acceptance
-
-Shared components respond correctly when theme values change.
-
----
-
-# PHASE 4 — PUBLIC WEB MIGRATION
-
-Migrate:
-
-```text
-apps/web
-```
-
-from hardcoded brand colors to semantic theme tokens.
-
-Priority:
-
-```text
-Header
-Footer
-Homepage
-Shop
-Product pages
-Checkout
-Customer portal
-```
-
-## Acceptance
-
-Changing the runtime theme changes the public website without source-code changes.
-
----
-
-# PHASE 5 — FINDER MIGRATION
-
-Migrate:
-
-```text
-apps/finder
-```
-
-with strict UX/accessibility safeguards.
-
-## Acceptance
-
-Finder responds to theme changes without compromising:
-
-* recovery CTA
-* readability
-* accessibility
-* lost status
-* owner notification
-
----
-
-# PHASE 6 — THEME DATABASE
-
-Implement:
-
-```text
-Theme
-ThemeVersion
-```
-
-using existing MongoDB/Mongoose patterns.
-
-Add indexes as appropriate.
-
-## Acceptance
-
-Themes can be:
-
-```text
-created
-read
-updated
-versioned
-published
-restored
 ```
 
 ---
 
-# PHASE 7 — THEME API
+# 66. VISUAL REGRESSION
 
-Implement secure API endpoints.
+If the project has screenshot tooling, use it.
 
-Integrate:
+Otherwise create a repeatable manual visual QA procedure.
 
-```text
-JWT authentication
-RBAC
-Zod
-audit logging
-```
+Every major preset must be tested against representative screens.
 
-## Acceptance
-
-Unauthorized users cannot modify themes.
-
-Authorized users can create/update/publish according to permissions.
-
----
-
-# PHASE 8 — ADMIN APPEARANCE EDITOR
-
-Build:
+Compare:
 
 ```text
-/admin/appearance
-```
-
-Sections:
-
-```text
-Presets
-Brand
-Colors
-Typography
-Shape
-Elevation
-Components
-Layout
-Motion
-Dark Mode
-```
-
-## Acceptance
-
-A non-technical person can understand the interface without developer assistance.
-
----
-
-# PHASE 9 — LIVE PREVIEW
-
-Add:
-
-```text
-Desktop
-Tablet
-Mobile
-```
-
-preview.
-
-Preview must use real production components.
-
-## Acceptance
-
-Changes appear immediately without publishing.
-
----
-
-# PHASE 10 — PRESETS
-
-Implement:
-
-```text
-Classic
+Default
 Modern
-Natural
-Playful
+Professional
+Soft
 Premium
 ```
 
-Applying a preset changes the draft.
+---
 
-## Acceptance
+# 67. PERFORMANCE REQUIREMENTS
 
-One click completely changes the visual style.
+Theme switching must not cause:
+
+* full page reload
+* unnecessary API requests
+* component remount storms
+* excessive DOM updates
+* layout thrashing
+
+Prefer updating CSS variables at the appropriate root level.
+
+Do not make every component subscribe independently to theme changes.
 
 ---
 
-# PHASE 11 — PUBLISH / VERSION / ROLLBACK
+# 68. CACHING
 
-Implement:
+The active published theme is relatively stable.
+
+The architecture should permit:
 
 ```text
-Draft
-Publish
-Version history
-Restore
-Audit
+memory cache
+HTTP cache
+server cache
+client cache
 ```
 
-## Acceptance
+but do not prematurely introduce complex infrastructure.
 
-Every published theme is recoverable.
-
----
-
-# PHASE 12 — PUCK INTEGRATION
-
-Ensure Puck components consume shared themed UI components.
-
-## Acceptance
-
-Changing the theme changes the appearance of CMS-created pages.
+Correctness comes first.
 
 ---
 
-# PHASE 13 — DARK MODE
+# 69. THEME INVALIDATION
 
-Implement only after the core theme system is stable.
-
-## Acceptance
-
-Dark mode is complete and consistent, not partially implemented.
-
----
-
-# PHASE 14 — MOBILE THEME ADAPTER
-
-Implement shared ThemeConfig consumption in React Native.
-
-## Acceptance
-
-Mobile can consume the same conceptual theme contract while retaining a bundled fallback.
-
----
-
-# PHASE 15 — FINAL QA
-
-Perform:
+After publish:
 
 ```text
-unit tests
-integration tests
-UI tests
-typecheck
-lint
-build
-accessibility review
-responsive review
-security review
-performance review
+new theme version
+      ↓
+invalidate active-theme cache
+      ↓
+clients receive new configuration
 ```
 
-Then run existing regression suites.
+Ensure stale themes do not remain active indefinitely.
 
 ---
 
-# 93. DEFINITION OF DONE
+# 70. FAILURE HANDLING
 
-The feature is not complete until all of the following are true.
-
-## Functional
-
-An admin can:
-
-* select a preset
-* modify colors
-* modify typography
-* modify radius
-* modify shadows
-* modify buttons
-* modify cards
-* modify inputs
-* modify layout
-* preview changes
-* save draft
-* publish
-* restore previous versions
-
-## Technical
-
-* ThemeConfig exists.
-* Zod schema exists.
-* ThemeProvider exists.
-* CSS variables exist.
-* Shared components use semantic tokens.
-* Theme API exists.
-* Database models exist.
-* RBAC exists.
-* Audit logging exists.
-* Version history exists.
-* Rollback exists.
-
-## UX
-
-A non-technical administrator can use the system without knowing:
-
-* CSS
-* Tailwind
-* React
-* JavaScript
-* HTML
-* design tokens
-
-## Safety
-
-Theme changes cannot:
-
-* execute JavaScript
-* inject arbitrary CSS
-* break accessibility
-* destroy critical Finder UX
-* bypass RBAC
-* modify business logic
-
----
-
-# 94. AI CODING RULES
-
-When using OpenCode, VS Code agents, Claude Code, GPT-based coding agents, or other LLM coding tools, follow these rules.
-
-## Rule 1
-
-Always inspect the repository before coding.
-
-## Rule 2
-
-Never assume a file exists.
-
-## Rule 3
-
-Never assume an API exists.
-
-## Rule 4
-
-Search before creating duplicate utilities.
-
-## Rule 5
-
-Use existing project conventions.
-
-## Rule 6
-
-Prefer shared abstractions over app-specific duplication.
-
-## Rule 7
-
-Do not introduce dependencies without justification.
-
-## Rule 8
-
-Do not rewrite unrelated files.
-
-## Rule 9
-
-Do not change business logic while changing presentation.
-
-## Rule 10
-
-Run tests after meaningful changes.
-
-## Rule 11
-
-Run TypeScript checks after TypeScript architecture changes.
-
-## Rule 12
-
-Never claim success without verification.
-
----
-
-# 95. AI AGENT WORKFLOW
-
-For every implementation task, follow:
+If publishing fails:
 
 ```text
-1. Read relevant documentation
-2. Inspect repository
-3. Identify existing implementation
-4. Identify affected files
-5. Explain intended change internally
-6. Implement smallest coherent change
-7. Run targeted tests
-8. Run typecheck
-9. Inspect diff
-10. Fix regressions
-11. Update documentation
-12. Report exactly what changed
+Previous theme remains active.
+```
+
+If theme retrieval fails:
+
+```text
+PawTag Default Theme remains active.
+```
+
+If a malformed theme somehow reaches the frontend:
+
+```text
+Reject malformed values.
+Use defaults.
+Report error.
+```
+
+Never allow malformed theme configuration to break the application.
+
+---
+
+# 71. OBSERVABILITY
+
+Theme operations should be observable through the existing logging infrastructure.
+
+Useful events:
+
+```text
+theme_load_failed
+theme_validation_failed
+theme_publish_failed
+theme_restore_failed
+theme_asset_upload_failed
+```
+
+Use Pino and existing error tracking conventions.
+
+Do not introduce a separate logging system.
+
+---
+
+# 72. AI CODING AGENT RULES
+
+The AI coding agent must behave as a senior engineer.
+
+Before editing:
+
+```text
+inspect
+understand
+plan
+```
+
+Do not immediately code.
+
+Before creating a new component:
+
+```text
+search for existing component
+```
+
+Before creating a utility:
+
+```text
+search for existing utility
+```
+
+Before creating a model:
+
+```text
+inspect existing models
+```
+
+Before creating a permission:
+
+```text
+inspect existing RBAC
+```
+
+Before creating an audit event:
+
+```text
+inspect existing audit implementation
 ```
 
 ---
 
-# 96. NEVER DO THIS
+# 73. NO DUPLICATION
 
-Do not:
-
-```text
-Rewrite the entire frontend
-Replace Tailwind
-Replace React
-Replace MongoDB
-Replace Express
-Replace Puck
-Replace packages/ui
-Create a second API
-Create a second CMS
-Create a second authentication system
-Create arbitrary CSS injection
-```
-
-unless explicitly required by a future architecture decision.
-
----
-
-# 97. AI DECISION PRIORITY
-
-When requirements conflict, prioritize:
+Do not create:
 
 ```text
-1. Security
-2. Data integrity
-3. Existing business functionality
-4. Accessibility
-5. Recovery/lost-pet UX
-6. Architecture consistency
-7. Maintainability
-8. Performance
-9. Visual flexibility
-10. Developer convenience
+ThemeButton
+ThemeCard
+ThemeInput
 ```
 
-Visual customization must never override safety.
-
----
-
-# 98. WHEN REQUIREMENTS ARE UNCLEAR
-
-If a decision is minor:
-
-> Choose the most maintainable implementation.
-
-If a decision affects:
-
-* business logic
-* customer experience
-* data integrity
-* security
-* pricing
-* subscriptions
-* recovery workflow
-
-do not invent business behavior.
-
-Document the ambiguity and choose the safest non-destructive behavior.
-
----
-
-# 99. SME COMMUNICATION RULE
-
-The product owner is not expected to understand:
-
-```text
-React
-TypeScript
-MongoDB
-CSS variables
-Tailwind
-Mongoose
-API contracts
-component architecture
-```
-
-When reporting progress, explain outcomes in product language.
-
-Good:
-
-> "The website's colors are now controlled centrally. We can change the primary brand color from the admin panel without editing code."
-
-Bad:
-
-> "I implemented a CSS custom-property provider with a token resolver."
-
-Technical details may be included afterward if useful.
-
----
-
-# 100. AI SHOULD NOT ASK THE SME TO CHOOSE TECHNICAL DETAILS
-
-Do not ask:
-
-> "Should we use Context API or Zustand?"
-
-Choose the appropriate implementation.
-
-Do not ask:
-
-> "Should the theme be stored in MongoDB or local storage?"
-
-The architecture already indicates MongoDB for persistent configuration.
-
-Do not ask:
-
-> "Should I use CSS variables?"
-
-Yes.
-
-Do not ask:
-
-> "Should I create a ThemeConfig?"
-
-Yes.
-
-The SME should primarily make:
-
-* product decisions
-* visual decisions
-* business decisions
-* branding decisions
-
-The AI should make implementation decisions.
-
----
-
-# 101. VISUAL QA RULE
-
-When changing visual components, inspect the actual UI.
-
-Do not rely solely on TypeScript compilation.
-
-A component can compile perfectly and still look broken.
-
-Where browser tooling is available:
-
-1. start application
-2. open relevant page
-3. inspect desktop
-4. inspect mobile
-5. change theme
-6. inspect again
-7. verify no layout regression
-
----
-
-# 102. REGRESSION RULE
-
-Before declaring completion, verify:
-
-```text
-Login works
-Admin login works
-Homepage works
-Shop works
-Checkout works
-Pet profile works
-Tag activation works
-Finder works
-Customer portal works
-CMS works
-```
-
-Theme changes must not affect business behavior.
-
----
-
-# 103. GIT / DIFF DISCIPLINE
-
-Keep changes reviewable.
+if existing shared components can be made theme-aware.
 
 Prefer:
 
 ```text
-Phase 1 commit
-Phase 2 commit
-Phase 3 commit
-...
+Button
+Card
+Input
 ```
 
-Avoid giant commits containing unrelated changes.
+with theme support.
 
-Suggested commit style:
+---
+
+# 74. NO HARD-CODED COLORS
+
+After migration, avoid introducing:
 
 ```text
-feat(theme): add ThemeConfig contract
+#0D9488
+#14B8A6
+#0F766E
+```
 
-feat(theme): add runtime CSS variable engine
+directly into components.
 
-refactor(ui): migrate Button to semantic theme tokens
+Use semantic tokens.
 
-feat(admin): add appearance editor
+Exceptions:
 
-feat(theme): add theme publishing and rollback
+* source theme definitions
+* brand asset processing
+* validated preset definitions
+* charts where a dedicated token system exists
+
+---
+
+# 75. NO RANDOM TAILWIND OVERRIDES
+
+Do not solve theme problems with:
+
+```text
+!important
+```
+
+or giant conditional class strings.
+
+If the issue is systemic, fix the token/component architecture.
+
+---
+
+# 76. NO ARBITRARY CSS EDITOR
+
+Do not implement:
+
+```text
+Custom CSS
+```
+
+as the primary Theme Studio mechanism.
+
+The system must remain structured and safe.
+
+---
+
+# 77. NO SOURCE-CODE REWRITING FOR THEMES
+
+Changing:
+
+```text
+Primary color
+```
+
+must NOT cause the AI or application to modify React source code.
+
+Correct:
+
+```text
+Theme configuration changes.
+```
+
+Incorrect:
+
+```text
+AI edits 127 files to replace teal with purple.
 ```
 
 ---
 
-# 104. DOCUMENTATION UPDATE RULE
+# 78. THEME APPLICATION BOUNDARY
 
-After each major phase update:
+The runtime application should know:
 
 ```text
-docs/theme-engine.md
+active theme configuration
 ```
 
-with actual implementation status.
+It should NOT know:
 
-Do not document planned features as completed.
+```text
+who created the theme
+why the theme exists
+what AI recommended
+what UI/UX Pro Max suggested
+```
+
+Those belong to admin/design-development processes.
+
+---
+
+# 79. AI / UIUX PRO MAX BOUNDARY
+
+UI/UX Pro Max belongs to the development/design workflow.
+
+It is not part of:
+
+```text
+runtime API
+runtime database
+production browser bundle
+```
+
+unless a future explicit requirement changes this.
+
+---
+
+# 80. THEME STUDIO SHOULD BE NON-TECHNICAL
+
+Do not expose terminology like:
+
+```text
+CSS variable
+semantic token
+Tailwind class
+hex value
+HSL
+RGB
+```
+
+to normal administrators.
 
 Use:
 
 ```text
-Implemented
-Partial
-Planned
+Primary Brand Color
+Button Style
+Corner Style
+Interface Density
+Navigation Style
 ```
 
-where appropriate.
+Advanced technical information can be hidden.
 
 ---
 
-# 105. FINAL USER EXPERIENCE
+# 81. HUMAN-FRIENDLY DESCRIPTIONS
 
-The final experience should feel like this:
+Every major control should explain itself.
+
+Example:
 
 ```text
-Admin Panel
-    ↓
-Appearance
-    ↓
-Choose "Modern"
-    ↓
-Preview
-    ↓
-Website changes visually
-    ↓
-Adjust Primary Color
-    ↓
-Preview
-    ↓
-Adjust Buttons
-    ↓
-Preview
-    ↓
-Adjust Typography
-    ↓
-Preview
-    ↓
-Save Draft
-    ↓
-Publish
-    ↓
-Entire public experience updates
+Interface Density
+
+Controls how much information is displayed
+on screen at once.
+
+Compact
+More information, less spacing
+
+Comfortable
+Balanced spacing
+
+Spacious
+More breathing room
 ```
 
-No code.
-
-No developer.
-
-No deployment.
-
-No Tailwind knowledge.
-
-No CSS knowledge.
+The UI should teach the administrator what a setting does.
 
 ---
 
-# 106. FINAL PRODUCT PRINCIPLE
+# 82. PREVIEW BEFORE PUBLISH
 
-The system should make this statement true:
+Every potentially high-impact setting should visibly update the preview.
 
-> **"If a non-technical PawTag administrator wants the website to look completely different tomorrow, they should be able to do it from the Admin Panel without asking a developer to change code."**
+The administrator should be able to experiment without fear.
 
-But it must simultaneously remain true that:
-
-> **"A theme change cannot break PawTag's core UX, accessibility, security, pet-recovery workflow, or business logic."**
-
-That balance is the central architectural requirement.
+This is one of the most important parts of the experience.
 
 ---
 
-# 107. REFERENCE ARCHITECTURE
+# 83. UNSAVED CHANGES
 
-The intended final architecture is:
+If the user has unsaved changes:
 
 ```text
-                         PAWTAG
-                           │
-                           ▼
-                    ┌───────────────┐
-                    │  Admin Panel  │
-                    │               │
-                    │ Appearance    │
-                    │ Presets       │
-                    │ Brand         │
-                    │ Colors        │
-                    │ Typography    │
-                    │ Components    │
-                    │ Layout        │
-                    │ Preview       │
-                    └───────┬───────┘
-                            │
-                            ▼
-                    ┌───────────────┐
-                    │ Theme API     │
-                    │               │
-                    │ RBAC          │
-                    │ Validation    │
-                    │ Audit         │
-                    │ Publishing    │
-                    └───────┬───────┘
-                            │
-                            ▼
-                    ┌───────────────┐
-                    │ MongoDB       │
-                    │               │
-                    │ Theme         │
-                    │ Versions      │
-                    │ Presets       │
-                    └───────┬───────┘
-                            │
-                            ▼
-                    ┌───────────────┐
-                    │ ThemeConfig   │
-                    │               │
-                    │ Design Tokens  │
-                    └───────┬───────┘
-                            │
-                ┌───────────┼───────────┐
-                ▼           ▼           ▼
-          Web Adapter  Finder Adapter  Mobile Adapter
-                │           │           │
-                ▼           ▼           ▼
-          CSS Variables   CSS Vars    RN Styles
-                │           │           │
-                └───────────┼───────────┘
-                            ▼
-                    ┌───────────────┐
-                    │ packages/ui   │
-                    │               │
-                    │ Button        │
-                    │ Card          │
-                    │ Input         │
-                    │ Modal         │
-                    │ Badge         │
-                    │ Table         │
-                    │ Navigation    │
-                    └───────┬───────┘
-                            │
-                ┌───────────┼────────────┐
-                ▼           ▼            ▼
-               WEB        FINDER       ADMIN
-                │
-                ▼
-             Puck CMS
-                │
-                ▼
-          Public Experience
+Unsaved changes
+```
+
+must be clearly visible.
+
+If navigating away:
+
+```text
+You have unsaved theme changes.
+
+[Stay]
+[Discard]
+```
+
+Do not silently lose work.
+
+---
+
+# 84. DRAFT AUTOSAVE
+
+Autosave may be implemented later.
+
+If implemented:
+
+* save drafts only
+* never auto-publish
+* debounce requests
+* show save state
+
+Example:
+
+```text
+Saving...
+Saved just now
 ```
 
 ---
 
-# 108. FINAL IMPLEMENTATION CHECKLIST
+# 85. RESET CONTROLS
 
-Before marking the project complete:
+Provide:
 
 ```text
-[ ] Repository inspected
-[ ] Existing DESIGN.md preserved
-[ ] ThemeConfig created
-[ ] Zod schema created
-[ ] PawTag Classic preset created
-[ ] CSS variable engine created
-[ ] ThemeProvider created
-[ ] Shared UI migrated
-[ ] Web migrated
-[ ] Finder migrated
-[ ] Admin appearance editor created
-[ ] Theme database models created
-[ ] Theme API created
-[ ] RBAC integrated
-[ ] Audit logging integrated
-[ ] Draft system implemented
-[ ] Preview implemented
-[ ] Presets implemented
-[ ] Publish implemented
-[ ] Version history implemented
-[ ] Rollback implemented
-[ ] Accessibility validation implemented
-[ ] Puck integration verified
-[ ] Dark mode implemented or explicitly deferred
-[ ] Mobile adapter implemented or explicitly deferred
-[ ] Tests added
-[ ] Existing tests pass
-[ ] Typecheck passes
-[ ] Lint passes
-[ ] Production build passes
-[ ] Responsive QA completed
-[ ] Documentation updated
-[ ] No arbitrary CSS/JS injection
-[ ] No business logic regressions
-[ ] Finder recovery UX preserved
-[ ] Default PawTag appearance preserved
+Reset section
+Reset theme
+Restore PawTag Default
 ```
 
----
-
-# 109. MASTER AI PROMPT
-
-When beginning implementation with an AI coding agent, use this instruction:
-
-> You are the Senior Principal Engineer responsible for implementing the PawTag Theme Engine according to `docs/AI-THEME-ENGINE-IMPLEMENTATION.md`.
->
-> Before making changes, read:
->
-> * `docs/AI-THEME-ENGINE-IMPLEMENTATION.md`
-> * `DESIGN.md`
-> * `ARCHITECTURE.md`
-> * relevant package documentation
-> * existing implementation files
->
-> Inspect the repository before coding.
->
-> Determine which phase is currently complete.
->
-> Do not skip phases unless the repository already satisfies their acceptance criteria.
->
-> Do not rewrite unrelated systems.
->
-> Do not change business logic.
->
-> Do not introduce arbitrary CSS or JavaScript injection.
->
-> Do not replace existing technologies without strong justification.
->
-> Use existing PawTag architecture and conventions.
->
-> Implement the smallest coherent increment.
->
-> After implementation:
->
-> 1. run relevant tests
-> 2. run TypeScript validation
-> 3. inspect the diff
-> 4. fix regressions
-> 5. update documentation
-> 6. report what was implemented
-> 7. report what remains
->
-> Do not claim a feature is complete without verification.
->
-> The product owner is an SME, not a developer. Explain the final result in business/product language.
->
-> The ultimate goal is a safe, professional, no-code, WordPress/ThemeForest-style visual customization system where an authorized PawTag administrator can completely change the public visual identity of the application without code changes or redeployment.
+Require confirmation for destructive reset operations.
 
 ---
 
-# 110. END STATE
+# 86. THEME DUPLICATION
 
-When this specification has been successfully implemented, PawTag should have evolved from:
+Allow:
 
 ```text
-Static Design System
-        +
-Hardcoded UI styling
+Duplicate theme
+```
+
+Example:
+
+```text
+PawTag Modern
+      ↓
+Duplicate
+      ↓
+My Brand
+```
+
+This is useful for organizations that want variations.
+
+---
+
+# 87. THEME NAMING
+
+Theme names must be human-friendly.
+
+Examples:
+
+```text
+PawTag Classic
+Spring Campaign
+Corporate Brand
+Partner Brand
+Holiday Campaign
+```
+
+Avoid exposing internal IDs.
+
+---
+
+# 88. FUTURE CAMPAIGN SUPPORT
+
+Do not implement campaign scheduling unless specifically required.
+
+However, the schema may eventually support:
+
+```text
+publishAt
+unpublishAt
+```
+
+Do not add scheduling complexity prematurely.
+
+---
+
+# 89. FUTURE MULTI-BRAND SUPPORT
+
+Design the system so that themes can eventually belong to:
+
+```text
+organization
+brand
+tenant
+```
+
+But do not implement multi-tenant theme isolation unless the current product requires it.
+
+---
+
+# 90. DATA MODEL PRINCIPLE
+
+Do not store every CSS property imaginable.
+
+Store meaningful product-level decisions.
+
+Good:
+
+```text
+density: comfortable
+buttonStyle: soft
+radiusPreset: rounded
+```
+
+Bad:
+
+```text
+buttonBorderRadius: 11px
+buttonPaddingLeft: 23px
+buttonPaddingRight: 27px
+```
+
+The first creates a maintainable design system.
+
+The second creates a visual mess.
+
+---
+
+# 91. DESIGN TOKEN NORMALIZATION
+
+The Theme Engine may internally convert:
+
+```text
+rounded
 ```
 
 into:
 
 ```text
-                    PAWTAG DESIGN PLATFORM
-
-                         Theme Engine
-                              │
-            ┌─────────────────┼─────────────────┐
-            │                 │                 │
-         Branding          Appearance        Content
-            │                 │                 │
-         Logo              Colors             Puck
-         Fonts             Typography         Pages
-         Identity          Components         Sections
-                           Layout
-                           Motion
-                              │
-                              ▼
-                         Live Preview
-                              │
-                              ▼
-                         Draft Version
-                              │
-                              ▼
-                           Publish
-                              │
-                              ▼
-                      Version + Audit
-                              │
-                              ▼
-                   Entire Website Updates
+button = 12px
+card = 16px
+input = 10px
 ```
 
-The administrator controls the **visual identity**.
+The administrator sees:
 
-The developer controls the **design system boundaries**.
+```text
+Rounded
+```
 
-The product owner controls the **vision and business rules**.
+The application receives deterministic values.
 
-The application retains control of **security, accessibility, semantics, and core pet-recovery functionality**.
+---
 
-That is the intended architecture for PawTag's next-generation no-code appearance system.
+# 92. DESIGN SYSTEM GOVERNANCE
 
-I would use this as the **master implementation contract**, while keeping your existing `DESIGN.md` as the visual/design reference.
+Every new theme option must answer:
+
+```text
+Why does this need to be configurable?
+```
+
+If the answer is:
+
+```text
+Because technically we can make it configurable.
+```
+
+do not add it.
+
+Configuration should exist where it provides meaningful product value.
+
+---
+
+# 93. WHAT SHOULD NOT BE THEMED
+
+Avoid exposing these as normal settings:
+
+* individual component margins
+* individual component widths
+* individual page layouts
+* arbitrary z-index
+* arbitrary CSS
+* arbitrary animations
+* arbitrary breakpoints
+* arbitrary icon sets
+* arbitrary HTML
+* arbitrary JavaScript
+* arbitrary Tailwind classes
+
+These are developer-level implementation details.
+
+---
+
+# 94. THEME ENGINE VS PAGE BUILDER
+
+Maintain a strict distinction.
+
+### Theme Engine
+
+Controls:
+
+```text
+How the application looks.
+```
+
+### Puck/Page Builder
+
+Controls:
+
+```text
+What content/layout the page contains.
+```
+
+Example:
+
+Theme:
+
+```text
+button = rounded
+primary = teal
+font = Inter
+```
+
+Puck:
+
+```text
+Hero
+Heading
+Image
+CTA
+Feature grid
+```
+
+Do not merge these systems into one uncontrolled editor.
+
+---
+
+# 95. THEME ENGINE VS CMS
+
+CMS controls:
+
+```text
+content
+```
+
+Theme Engine controls:
+
+```text
+presentation system
+```
+
+The CMS should automatically inherit the active theme.
+
+---
+
+# 96. DESIGN TOKEN DOCUMENTATION
+
+Update `DESIGN.md` once the Theme Engine architecture is established.
+
+Document:
+
+* semantic token system
+* runtime theming
+* default theme
+* theme configuration
+* accessibility rules
+* approved presets
+
+Do not delete the existing design philosophy.
+
+The existing `DESIGN.md` remains the conceptual design authority.
+
+The Theme Engine becomes its implementation mechanism.
+
+---
+
+# 97. MIGRATION SUCCESS CRITERIA
+
+Migration is successful when:
+
+```text
+Changing primary brand color
+```
+
+updates:
+
+* buttons
+* links
+* active navigation
+* focus states
+* badges where appropriate
+* progress indicators
+* relevant finder UI
+* relevant customer UI
+* relevant admin UI
+
+without modifying source code.
+
+---
+
+# 98. TRUE SUCCESS TEST
+
+A non-technical administrator should be able to:
+
+```text
+Open Theme Studio
+        ↓
+Choose "Modern"
+        ↓
+Change primary color
+        ↓
+Choose rounded corners
+        ↓
+Change typography
+        ↓
+Preview
+        ↓
+Save
+        ↓
+Publish
+```
+
+and the application should visually update.
+
+No developer.
+
+No code change.
+
+No deployment required.
+
+No Tailwind rebuild.
+
+No manual CSS.
+
+---
+
+# 99. DEFINITION OF DONE
+
+The Theme Engine is NOT complete until all of the following are true.
+
+## Architecture
+
+* [ ] Theme configuration exists
+* [ ] Semantic token system exists
+* [ ] Default theme exists
+* [ ] Runtime theme resolver exists
+* [ ] Fallback exists
+
+## Backend
+
+* [ ] Theme model exists
+* [ ] API exists
+* [ ] Zod validation exists
+* [ ] RBAC exists
+* [ ] Audit logging exists
+* [ ] Publishing exists
+* [ ] Versioning exists
+* [ ] Rollback exists
+
+## Frontend
+
+* [ ] Theme Provider exists
+* [ ] CSS variables work
+* [ ] Shared UI components consume tokens
+* [ ] Admin Theme Studio exists
+* [ ] Live preview exists
+* [ ] Presets exist
+* [ ] Unsaved-change handling exists
+
+## Accessibility
+
+* [ ] Contrast validation exists
+* [ ] Focus states work
+* [ ] Reduced motion works
+* [ ] Keyboard navigation works
+
+## Reliability
+
+* [ ] Theme API failure falls back
+* [ ] Invalid theme falls back
+* [ ] Previous theme remains active if publish fails
+* [ ] Rollback works
+
+## Regression
+
+* [ ] Existing authentication works
+* [ ] Existing RBAC works
+* [ ] Orders work
+* [ ] Payments work
+* [ ] Subscriptions work
+* [ ] Pets work
+* [ ] Tags work
+* [ ] Finder works
+* [ ] CMS works
+* [ ] Audit logs work
+
+---
+
+# 100. FINAL AI EXECUTION INSTRUCTION
+
+When asked to implement the PawTag Theme Engine, do NOT immediately start editing files.
+
+First:
+
+```text
+1. Inspect repository.
+2. Inspect DESIGN.md.
+3. Inspect ARCHITECTURE.md.
+4. Inspect packages/ui.
+5. Inspect existing CSS/Tailwind configuration.
+6. Inspect existing theme-related code.
+7. Inspect RBAC.
+8. Inspect audit logging.
+9. Inspect media management.
+10. Inspect CMS/Puck.
+11. Inspect tests.
+12. Inspect git status and current branch.
+```
+
+Then produce:
+
+```text
+A. Current-state assessment
+B. Risks
+C. Proposed architecture
+D. Files likely to change
+E. Files that should NOT change
+F. Migration plan
+G. Testing plan
+H. Rollback strategy
+```
+
+Do not begin broad implementation until the plan is internally consistent.
+
+---
+
+# 101. IMPLEMENTATION SAFETY RULE
+
+If implementation requires changing a working subsystem unrelated to theming:
+
+STOP.
+
+Explain:
+
+```text
+Why the dependency exists
+What would change
+What regression risk exists
+What safer alternatives exist
+```
+
+Then proceed only if the change is necessary.
+
+---
+
+# 102. FINAL PRODUCT VISION
+
+The end result should feel like:
+
+```text
+WordPress Theme Customizer
++
+Modern SaaS Design System
++
+Enterprise Configuration Management
++
+Live Visual Preview
++
+Version Control
++
+Accessibility Guardrails
++
+PawTag-specific UX
+```
+
+without becoming:
+
+```text
+A dangerous arbitrary CSS editor
+```
+
+---
+
+# 103. THE GOLDEN RULE
+
+The Theme Engine exists so that:
+
+> **A non-technical PawTag administrator can change the visual identity of the product without changing the product itself.**
+
+The system must separate:
+
+```text
+WHAT THE PRODUCT DOES
+```
+
+from:
+
+```text
+HOW THE PRODUCT LOOKS
+```
+
+The Theme Engine controls the second.
+
+It must never accidentally break the first.
+
+---
+
+# 104. FINAL ARCHITECTURAL MODEL
+
+The completed architecture should conceptually look like:
+
+```text
+                         PAWTAG
+                           │
+              ┌────────────┴────────────┐
+              │                         │
+        PRODUCT LOGIC              PRESENTATION
+              │                         │
+       Express/API                Theme Engine
+              │                         │
+       MongoDB/Models              Theme Config
+              │                         │
+       Business Rules             Semantic Tokens
+              │                         │
+        Auth / RBAC                CSS Variables
+              │                         │
+       Payments / Tags             packages/ui
+              │                         │
+       Pet Recovery               Web/Admin/Finder
+                                        │
+                                        │
+                                ┌───────┴────────┐
+                                │                │
+                           Theme Studio       Puck CMS
+                                │                │
+                           Admin controls      Content
+                                │                │
+                                └───────┬────────┘
+                                        │
+                                      User
+                                        │
+                               Non-technical SME
+```
+
+And the development-time design intelligence layer sits outside production:
+
+```text
+                    DEVELOPMENT TIME
+
+                  Product Owner / SME
+                          │
+                          ▼
+                     DESIGN.md
+                          │
+                          ▼
+                UI/UX Pro Max Skill
+                          │
+                          ▼
+               AI Coding Agent
+                          │
+                          ▼
+                Theme Engine Code
+                          │
+                          ▼
+                   PawTag Runtime
+```
+
+The key architectural decision is:
+
+**UI/UX Pro Max helps the AI decide what good design could look like.
+`DESIGN.md` defines what good PawTag design means.
+Theme Studio lets the SME control approved visual decisions.
+The Theme Engine converts those decisions into runtime design tokens.
+`packages/ui` renders those tokens consistently.**
+
+That separation should remain intact throughout the implementation.
 
 One important recommendation: **do not give the AI this document and tell it “build everything.”** Give it this document and instruct it to start at **Phase 0 only**, inspect the repository, produce `theme-engine-discovery.md`, and stop. Then let the agent execute one phase at a time. That will dramatically reduce the chance of an LLM doing a giant destructive rewrite of your existing PawTag codebase.
