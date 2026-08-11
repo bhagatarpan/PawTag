@@ -13,7 +13,7 @@ import NotifyOwnerForm from './components/NotifyOwnerForm';
 import FoundTimer from './components/FoundTimer';
 import FinderLoadingState from './components/FinderLoadingState';
 import FinderErrorState from './components/FinderErrorState';
-import TagInfoHeader from './components/TagInfoHeader';
+
 
 function FinderPage() {
   const { tagId } = useParams<{ tagId: string }>();
@@ -92,9 +92,7 @@ function FinderPage() {
   return (
     <div className={`min-h-screen py-8 px-4 ${bgColor}`}>
       <div className="max-w-md mx-auto">
-        <StatusBanner status={data.pet.status} />
-
-        <TagInfoHeader tagId={data.tagId} tagStatus={data.tagStatus} />
+        <StatusBanner status={data.pet.status} tagId={data.tagId} tagStatus={data.tagStatus} />
 
         <div className="bg-white rounded-xl shadow-md overflow-hidden">
           <PetPhotoCarousel
