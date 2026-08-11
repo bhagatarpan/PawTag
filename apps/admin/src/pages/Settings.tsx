@@ -39,6 +39,7 @@ const CATEGORY_META: Record<string, { label: string; icon: React.ElementType; de
   emails: { label: 'Email', icon: Mail, description: 'Sender and support email addresses.' },
   checkout: { label: 'Checkout', icon: ShoppingBag, description: 'Defaults used during checkout.' },
   mfa: { label: 'Security', icon: ShieldCheck, description: 'Two-factor and verification behavior.' },
+  finder: { label: 'Finder', icon: Search, description: 'Finder portal behavior and privacy settings.' },
 };
 
 function humanizeKey(key: string) {

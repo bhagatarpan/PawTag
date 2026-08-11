@@ -47,7 +47,8 @@ export interface FinderData {
   };
   tagId: string;
   tagStatus?: string;
-  ownerName: string;
+  ownerName: string | null;
+  ownerLocation: string | null;
   ownerPhone?: string;
 }
 

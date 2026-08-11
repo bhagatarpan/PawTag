@@ -36,9 +36,13 @@ export default function Settings() {
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [exportLoading, setExportLoading] = useState(false);
+  const [finderPrivacy, setFinderPrivacy] = useState<{ showOwnerNameInFinder: boolean } | null>(null);
+  const [finderPrivacyLoading, setFinderPrivacyLoading] = useState(true);
+  const [finderPrivacyActionLoading, setFinderPrivacyActionLoading] = useState(false);
 
   useEffect(() => {
     fetchMFA();
+    fetchFinderPrivacy();
   }, []);
 
   async function fetchMFA() {
@@ -49,6 +53,32 @@ export default function Settings() {
       // MFA endpoint may not exist yet — fail silently
     } finally {
       setMfaLoading(false);
+    }
+  }
+
+  async function fetchFinderPrivacy() {
+    try {
+      const res = await api.get('/customer/settings/finder-privacy');
+      setFinderPrivacy(res.data.data);
+    } catch {
+      // fail silently
+    } finally {
+      setFinderPrivacyLoading(false);
+    }
+  }
+
+  async function handleToggleFinderPrivacy() {
+    if (!finderPrivacy) return;
+    setFinderPrivacyActionLoading(true);
+    try {
+      const newValue = !finderPrivacy.showOwnerNameInFinder;
+      await api.put('/customer/settings/finder-privacy', { showOwnerNameInFinder: newValue });
+      setFinderPrivacy({ showOwnerNameInFinder: newValue });
+      setShowSaved(true);
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Failed to update privacy setting');
+    } finally {
+      setFinderPrivacyActionLoading(false);
     }
   }
 
@@ -250,6 +280,32 @@ export default function Settings() {
             </div>
             <ChevronRight size={16} className="text-gray-400" />
           </Link>
+          <div className="px-5 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Eye size={16} className="text-gray-400" />
+              <div>
+                <p className="text-sm font-medium text-gray-900">Show Pet Owner's Name When Lost Pet Is Found</p>
+                <p className="text-xs text-gray-500">
+                  {finderPrivacyLoading
+                    ? 'Loading...'
+                    : finderPrivacy?.showOwnerNameInFinder
+                      ? 'Your name is visible to finders. Your suburb and city will be shown instead if turned off.'
+                      : 'Your name is hidden — finders will see your suburb and city instead.'}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={handleToggleFinderPrivacy}
+              disabled={finderPrivacyLoading || finderPrivacyActionLoading}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                finderPrivacy?.showOwnerNameInFinder ? 'bg-teal-600' : 'bg-gray-200'
+              } disabled:opacity-50`}
+            >
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                finderPrivacy?.showOwnerNameInFinder ? 'translate-x-6' : 'translate-x-1'
+              }`} />
+            </button>
+          </div>
         </div>
       </div>
 

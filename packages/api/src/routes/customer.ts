@@ -2541,4 +2541,61 @@ router.put('/settings/mfa', requirePermission('pet.read'), async (req: AuthReque
   }
 });
 
+// --- Finder Privacy Settings ---
+router.get('/settings/finder-privacy', requirePermission('pet.read'), async (req: AuthRequest, res: Response) => {
+  try {
+    const user = await User.findById(req.user!.id).select('showOwnerNameInFinder address');
+    if (!user || user.deletedAt) {
+      res.status(404).json({ success: false, error: 'User not found' });
+      return;
+    }
+    res.json({
+      success: true,
+      data: {
+        showOwnerNameInFinder: user.showOwnerNameInFinder,
+      },
+    });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to fetch finder privacy settings' });
+  }
+});
+
+router.put('/settings/finder-privacy', requirePermission('pet.read'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { showOwnerNameInFinder } = req.body;
+    if (typeof showOwnerNameInFinder !== 'boolean') {
+      res.status(400).json({ success: false, error: 'showOwnerNameInFinder must be a boolean' });
+      return;
+    }
+
+    const user = await User.findById(req.user!.id);
+    if (!user || user.deletedAt) {
+      res.status(404).json({ success: false, error: 'User not found' });
+      return;
+    }
+
+    const oldValue = user.showOwnerNameInFinder;
+    user.showOwnerNameInFinder = showOwnerNameInFinder;
+    await user.save();
+
+    await auditCustomerEvent(req, {
+      action: showOwnerNameInFinder ? 'finder_privacy_name_shown' : 'finder_privacy_name_hidden',
+      eventType: 'finder_privacy_changed',
+      eventCategory: 'SECURITY',
+      operationType: 'UPDATE',
+      resourceType: 'User',
+      resourceId: req.user!.id,
+      beforeState: { showOwnerNameInFinder: oldValue },
+      afterState: { showOwnerNameInFinder },
+      changedFields: [{ field: 'showOwnerNameInFinder', before: oldValue, after: showOwnerNameInFinder, sensitive: false }],
+      outcome: 'SUCCESS',
+      severity: 'MEDIUM',
+    }, { actorType: 'USER' });
+
+    res.json({ success: true, data: { showOwnerNameInFinder } });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to update finder privacy settings' });
+  }
+});
+
 export default router;

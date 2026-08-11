@@ -34,6 +34,7 @@ export interface IUserDocument extends Document {
   lockedUntil?: Date;
   skipInvoiceOtp: boolean;
   skipInvoiceOtpExpiresAt?: Date;
+  showOwnerNameInFinder: boolean;
   notificationPreferences?: {
     email: boolean;
     push: boolean;
@@ -88,6 +89,7 @@ const UserSchema = new Schema<IUserDocument>(
     lockedUntil: { type: Date, default: null },
     skipInvoiceOtp: { type: Boolean, default: false },
     skipInvoiceOtpExpiresAt: { type: Date, default: null },
+    showOwnerNameInFinder: { type: Boolean, default: true },
     notificationPreferences: {
       email: { type: Boolean, default: true },
       push: { type: Boolean, default: true },

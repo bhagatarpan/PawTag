@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { Tag, FinderScan, LocationEvent, Notification, Subscription, User, Pet, SiteContent, Product } from '@pawtag/db';
+import { Tag, FinderScan, LocationEvent, Notification, Subscription, User, Pet, SiteContent, Product, Setting } from '@pawtag/db';
 import { sendPushToUser } from '../services/push-notification.service';
 import { auditService, type AuditContext } from '../services/audit';
 
@@ -136,7 +136,7 @@ router.get('/:tagId', async (req: Request, res: Response) => {
   try {
     const tag = await Tag.findOne({ tagId: req.params.tagId, deletedAt: null })
       .populate({ path: 'petId', match: { deletedAt: null }, select: '-__v' })
-      .populate({ path: 'ownerId', select: 'fullName phone' });
+      .populate({ path: 'ownerId', select: 'fullName phone showOwnerNameInFinder address' });
 
     if (!tag) {
       res.status(404).json({ success: false, error: 'Tag not found' });
@@ -210,6 +210,26 @@ router.get('/:tagId', async (req: Request, res: Response) => {
       });
     }
 
+    // Check admin CMS setting for finder name visibility
+    const adminSetting = await Setting.findOne({ key: 'finder.showOwnerName' });
+    const adminShowName = adminSetting?.value !== 'false'; // default true
+    const ownerShowName = owner.showOwnerNameInFinder !== false; // default true
+    const showOwnerName = adminShowName && ownerShowName;
+
+    // Build owner info based on privacy settings
+    let ownerName: string | null = null;
+    let ownerLocation: string | null = null;
+    if (showOwnerName) {
+      ownerName = owner.fullName;
+      if (owner.address?.city) {
+        const parts = [owner.address.line2, owner.address.city].filter(Boolean);
+        ownerLocation = parts.join(', ');
+      }
+    } else if (owner.address?.city) {
+      const parts = [owner.address.line2, owner.address.city].filter(Boolean);
+      ownerLocation = `located in ${parts.join(', ')}`;
+    }
+
     res.json({
       success: true,
       data: {
@@ -235,7 +255,8 @@ router.get('/:tagId', async (req: Request, res: Response) => {
         tagId: tag.tagId,
         tagStatus: tag.status,
         subscriptionStatus: tag.subscriptionStatus || 'none',
-        ownerName: owner.fullName,
+        ownerName,
+        ownerLocation,
         ownerPhone: owner.phone,
       },
     });
@@ -256,7 +277,8 @@ router.get('/:tagId', async (req: Request, res: Response) => {
         petStatus: pet.status,
         subscriptionStatus: tag.subscriptionStatus,
         ownerId: owner?._id?.toString(),
-        ownerName: owner?.fullName,
+        ownerName: ownerName || '(hidden)',
+        showOwnerName,
         fieldsAccessed: ['pet.name', 'pet.petId', 'pet.species', 'pet.breed', 'pet.medicalAlerts', 'pet.status', 'ownerName', 'ownerPhone'],
         subscriptionActive: isActiveForFinder,
       },
