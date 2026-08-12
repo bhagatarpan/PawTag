@@ -2986,10 +2986,12 @@ router.put('/settings/:key', requirePermission('setting.update'), async (req: Au
   try {
     const existing = await Setting.findOne({ key: req.params.key });
     if (!existing) { res.status(404).json({ success: false, error: 'Setting not found' }); return; }
-    const beforeState = { key: existing.key, value: existing.value, category: existing.category };
+    const beforeState = { key: existing.key, value: existing.value, displayValue: existing.displayValue, category: existing.category };
+    const updateFields: any = { value: req.body.value, updatedBy: req.user!.id };
+    if (req.body.displayValue !== undefined) updateFields.displayValue = req.body.displayValue;
     const setting = await Setting.findOneAndUpdate(
       { key: req.params.key },
-      { value: req.body.value, updatedBy: req.user!.id },
+      updateFields,
       { new: true },
     );
     if (!setting) { res.status(404).json({ success: false, error: 'Setting not found' }); return; }
@@ -3002,7 +3004,7 @@ router.put('/settings/:key', requirePermission('setting.update'), async (req: Au
       resourceType: 'Setting',
       resourceId: updatedSetting.key,
       beforeState,
-      afterState: { key: updatedSetting.key, value: updatedSetting.value, category: updatedSetting.category },
+      afterState: { key: updatedSetting.key, value: updatedSetting.value, displayValue: updatedSetting.displayValue, category: updatedSetting.category },
       changedFields: [{ field: 'value', before: beforeState.value, after: updatedSetting.value }],
       outcome: 'SUCCESS',
       severity: 'HIGH',

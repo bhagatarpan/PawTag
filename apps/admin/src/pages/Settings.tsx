@@ -25,6 +25,7 @@ interface Setting {
   _id: string;
   key: string;
   value: string;
+  displayValue?: string;
   category: string;
   description?: string;
 }
@@ -101,7 +102,7 @@ function ToggleRow({
           <ShieldCheck className="h-4 w-4" />
         </span>
         <div>
-          <p className="text-sm font-medium text-gray-900">{humanizeKey(setting.key)}</p>
+          <p className="text-sm font-medium text-gray-900">{setting.displayValue || humanizeKey(setting.key)}</p>
           <p className="text-xs text-gray-500 mt-0.5">{setting.description || setting.key}</p>
         </div>
       </div>
@@ -158,7 +159,7 @@ function TextRow({
   return (
     <div className="px-5 py-4 flex items-center justify-between gap-4 hover:bg-gray-50/70 transition-colors">
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-gray-900">{humanizeKey(setting.key)}</p>
+        <p className="text-sm font-medium text-gray-900">{setting.displayValue || humanizeKey(setting.key)}</p>
         <p className="text-xs text-gray-500 mt-0.5">{setting.description || setting.key}</p>
       </div>
       <div className="flex items-center gap-2 flex-shrink-0">
@@ -221,6 +222,7 @@ export default function Settings() {
   const [showCreate, setShowCreate] = useState(false);
   const [newKey, setNewKey] = useState('');
   const [newValue, setNewValue] = useState('');
+  const [newDisplayValue, setNewDisplayValue] = useState('');
   const [newCategory, setNewCategory] = useState('site');
   const [newDescription, setNewDescription] = useState('');
   const [creating, setCreating] = useState(false);
@@ -259,12 +261,14 @@ export default function Settings() {
       await api.post('/admin/settings', {
         key: newKey.trim(),
         value: newValue.trim(),
+        displayValue: newDisplayValue.trim() || undefined,
         category: newCategory,
         description: newDescription.trim() || undefined,
       });
       setShowCreate(false);
       setNewKey('');
       setNewValue('');
+      setNewDisplayValue('');
       setNewCategory('site');
       setNewDescription('');
       setActiveCategory(newCategory);
@@ -352,6 +356,16 @@ export default function Settings() {
               placeholder="Setting value"
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Display Label (optional)</label>
+            <input
+              value={newDisplayValue}
+              onChange={(e) => setNewDisplayValue(e.target.value)}
+              placeholder="Human-readable label shown in the UI"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+            />
+            <p className="text-xs text-gray-400 mt-1">Friendly label displayed in the settings panel instead of the key name</p>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Description (optional)</label>

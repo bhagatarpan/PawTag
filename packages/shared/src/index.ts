@@ -504,6 +504,7 @@ export interface Setting {
   _id: string;
   key: string;
   value: string;
+  displayValue?: string;
   category: string;
   description?: string;
   updatedBy: string;
