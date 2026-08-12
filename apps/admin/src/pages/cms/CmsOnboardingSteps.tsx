@@ -103,6 +103,31 @@ export default function CmsOnboardingStepsPage() {
     }));
   }
 
+  function updateFlowStep(stepId: string, idx: number, patch: Record<string, string>) {
+    setSteps((prev) => prev.map((s) => {
+      if (s.stepId !== stepId) return s;
+      const flowSteps = [...(s.content?.flowSteps || [])];
+      flowSteps[idx] = { ...flowSteps[idx], ...patch };
+      return { ...s, content: { ...s.content, flowSteps } };
+    }));
+  }
+
+  function addFlowStep(stepId: string) {
+    setSteps((prev) => prev.map((s) => {
+      if (s.stepId !== stepId) return s;
+      const flowSteps = [...(s.content?.flowSteps || []), { icon: 'Heart', label: '', description: '' }];
+      return { ...s, content: { ...s.content, flowSteps } };
+    }));
+  }
+
+  function removeFlowStep(stepId: string, idx: number) {
+    setSteps((prev) => prev.map((s) => {
+      if (s.stepId !== stepId) return s;
+      const flowSteps = (s.content?.flowSteps || []).filter((_, i) => i !== idx);
+      return { ...s, content: { ...s.content, flowSteps } };
+    }));
+  }
+
   function updateCallout(stepId: string, patch: Record<string, unknown>) {
     setSteps((prev) => prev.map((s) => {
       if (s.stepId !== stepId) return s;
@@ -287,6 +312,46 @@ export default function CmsOnboardingStepsPage() {
                             <input value={stat.number} onChange={(e) => updateStat(step.stepId, idx, { number: e.target.value })} className="w-24 border border-gray-300 rounded-lg px-3 py-1.5 text-sm" placeholder="e.g. 1 in 3" />
                             <input value={stat.label} onChange={(e) => updateStat(step.stepId, idx, { label: e.target.value })} className="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-sm" placeholder="e.g. pets get lost in their lifetime" />
                             <button onClick={() => removeStat(step.stepId, idx)} className="p-1 text-gray-400 hover:text-red-500"><Trash2 size={12} /></button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Flow Steps */}
+                  <div className="border-t border-gray-100 pt-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Flow Steps (How It Works)</h4>
+                      <button onClick={() => addFlowStep(step.stepId)} className="text-xs text-primary-600 hover:text-primary-800 font-medium flex items-center gap-1">
+                        <Plus size={12} /> Add Step
+                      </button>
+                    </div>
+                    {(step.content?.flowSteps || []).length === 0 ? (
+                      <p className="text-xs text-gray-400">No flow steps configured. Click "Add Step" to create a how-it-works flow.</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {(step.content?.flowSteps || []).map((fs, idx) => (
+                          <div key={idx} className="bg-gray-50 rounded-lg p-3 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-medium text-gray-500">Step {idx + 1}</span>
+                              <button onClick={() => removeFlowStep(step.stepId, idx)} className="p-1 text-gray-400 hover:text-red-500"><Trash2 size={12} /></button>
+                            </div>
+                            <div className="grid grid-cols-3 gap-2">
+                              <div>
+                                <label className="block text-xs text-gray-500 mb-1">Icon</label>
+                                <select value={fs.icon} onChange={(e) => updateFlowStep(step.stepId, idx, { icon: e.target.value })} className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
+                                  {ICON_OPTIONS.map((ic) => <option key={ic} value={ic}>{ic}</option>)}
+                                </select>
+                              </div>
+                              <div className="col-span-2">
+                                <label className="block text-xs text-gray-500 mb-1">Label</label>
+                                <input value={fs.label} onChange={(e) => updateFlowStep(step.stepId, idx, { label: e.target.value })} className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs" placeholder="e.g. Someone Finds Your Pet" />
+                              </div>
+                            </div>
+                            <div>
+                              <label className="block text-xs text-gray-500 mb-1">Description</label>
+                              <input value={fs.description} onChange={(e) => updateFlowStep(step.stepId, idx, { description: e.target.value })} className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs" placeholder="e.g. A kind stranger finds your lost pet" />
+                            </div>
                           </div>
                         ))}
                       </div>
