@@ -86,6 +86,8 @@ async function run() {
         { key: 'escalation.delayMinutes', value: '30', displayValue: 'Escalation Delay (minutes)', category: 'escalation', description: 'Minutes to wait before auto-notifying emergency contact if owner does not respond' },
         { key: 'escalation.notifyEmergencyContact', value: 'true', displayValue: 'Auto-Notify Emergency Contact', category: 'escalation', description: 'Auto-notify emergency contact when escalation delay expires' },
         { key: 'escalation.enableManualForward', value: 'true', displayValue: 'Manual Forward to Emergency Contact', category: 'escalation', description: 'Allow owner to manually forward found notification to emergency contact' },
+        { key: 'otp.skipOtpDuringRegistration', value: 'false', displayValue: 'Skip Phone OTP During Registration', category: 'otp', description: 'When true, system-wide registration phone OTP is skipped. Use during SMS service outages.' },
+        { key: 'otp.skipOtpForInvoice', value: 'false', displayValue: 'Skip OTP for Invoice Access', category: 'otp', description: 'When true, system-wide invoice OTP is skipped. Use during OTP service outages.' },
         ...auditCategories.map((value) => ({ key: `audit.policy.category.${value.toLowerCase()}`, value: 'true', displayValue: `Audit: ${value}`, category: 'audit', description: `Enable audit logging for ${value} events` })),
         ...auditActors.map((value) => ({ key: `audit.policy.actor.${value.toLowerCase()}`, value: 'true', displayValue: `Audit: ${value} Actor`, category: 'audit', description: `Enable audit logging for ${value} actors` })),
       ];

@@ -16,12 +16,12 @@ async function getSetting(key: string): Promise<string> {
 }
 
 export async function isInvoiceOtpDisabled(): Promise<boolean> {
-  const val = await getSetting('otp.noOtpForInvoice');
+  const val = await getSetting('otp.skipOtpForInvoice');
   return val === 'true';
 }
 
 export async function isRegistrationOtpDisabled(): Promise<boolean> {
-  const val = await getSetting('otp.noOtpDuringRegistration');
+  const val = await getSetting('otp.skipOtpDuringRegistration');
   return val === 'true';
 }
 

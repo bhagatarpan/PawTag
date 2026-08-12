@@ -67,7 +67,7 @@ router.post('/customer/invoices/:invoiceId/access', authenticate, async (req: Au
       });
 
       await auditInvoiceEvent(req, 'invoice_otp_skipped', invoice._id.toString(), {
-        reason: systemOtpDisabled ? 'system otp.noOtpForInvoice enabled' : 'user skipInvoiceOtp enabled',
+        reason: systemOtpDisabled ? 'system otp.skipOtpForInvoice enabled' : 'user skipInvoiceOtp enabled',
       });
 
       res.json({ success: true, data: { secureUrl: `${FRONTEND_URL}/invoice/${secureToken}?admin=1`, skipOtp: true } });
