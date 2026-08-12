@@ -49,7 +49,7 @@ export default function StatusBanner({ status, tagId, tagStatus }: StatusBannerP
       <div className="flex flex-col items-center gap-2 shrink-0 pt-1">
         <div className="flex items-center gap-2">
           <PawPrint size={20} className="text-white/70 shrink-0" />
-          <span className="font-mono font-bold text-lg tracking-wide">{tagId}</span>
+          <span className="font-mono font-bold text-base tracking-tight whitespace-nowrap">{tagId}</span>
         </div>
         {tagStatus && (
           <span className={`px-3 py-1 text-xs font-bold rounded-full uppercase ${config.badgeBg}`}>
