@@ -91,16 +91,20 @@ async function run() {
       ];
 
       let settingsCreated = 0;
+      let settingsUpdated = 0;
       for (const s of settings) {
         const existing = await Setting.findOne({ key: s.key }).session(session);
         if (!existing) {
           await Setting.create([{ ...s, updatedBy: adminId }], { session });
           settingsCreated++;
+        } else if (s.displayValue && !existing.displayValue) {
+          await Setting.updateOne({ key: s.key }, { $set: { displayValue: s.displayValue } }).session(session);
+          settingsUpdated++;
         }
       }
       // Remove duplicate contact.* keys (use company.* instead)
       await Setting.deleteMany({ key: { $in: ['contact.email', 'contact.phone', 'contact.address'] } }).session(session);
-      console.log(`  ${settingsCreated} new settings created (${settings.length} total)\n`);
+      console.log(`  ${settingsCreated} new settings created, ${settingsUpdated} existing settings updated with displayValue (${settings.length} total)\n`);
 
       // ═══════════════════════════════════════
       // 2. NAVIGATION
