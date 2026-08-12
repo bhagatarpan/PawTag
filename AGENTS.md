@@ -2,6 +2,7 @@
 
 ## Project Overview
 PawTag is a pet recovery platform using QR code tags. Built as a pnpm monorepo.
+Full overview at README.md file
 
 ## AI Software Development Operating Instructions
 
