@@ -2503,11 +2503,24 @@ router.put('/pets/:id/desexing', requirePermission('desexing.update'), async (re
 });
 
 // --- MFA Settings ---
+router.get('/settings/mfa', requirePermission('pet.read'), async (req: AuthRequest, res: Response) => {
+  try {
+    const user = await User.findById(req.user!.id).select('mfaEnabled').lean();
+    if (!user) {
+      res.status(404).json({ success: false, error: 'User not found' });
+      return;
+    }
+    res.json({ success: true, data: { mfaEnabled: user.mfaEnabled } });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to fetch MFA settings' });
+  }
+});
+
 router.put('/settings/mfa', requirePermission('pet.read'), async (req: AuthRequest, res: Response) => {
   try {
-    const { enabled } = req.body;
-    if (typeof enabled !== 'boolean') {
-      res.status(400).json({ success: false, error: 'enabled must be a boolean' });
+    const { mfaEnabled } = req.body;
+    if (typeof mfaEnabled !== 'boolean') {
+      res.status(400).json({ success: false, error: 'mfaEnabled must be a boolean' });
       return;
     }
 
@@ -2518,24 +2531,24 @@ router.put('/settings/mfa', requirePermission('pet.read'), async (req: AuthReque
     }
 
     const oldValue = user.mfaEnabled;
-    user.mfaEnabled = enabled;
+    user.mfaEnabled = mfaEnabled;
     await user.save();
 
     await auditCustomerEvent(req, {
-      action: enabled ? 'mfa_enabled' : 'mfa_disabled',
+      action: mfaEnabled ? 'mfa_enabled' : 'mfa_disabled',
       eventType: 'mfa_setting_changed',
       eventCategory: 'SECURITY',
       operationType: 'UPDATE',
       resourceType: 'User',
       resourceId: req.user!.id,
       beforeState: { mfaEnabled: oldValue },
-      afterState: { mfaEnabled: enabled },
-      changedFields: [{ field: 'mfaEnabled', before: oldValue, after: enabled, sensitive: true }],
+      afterState: { mfaEnabled },
+      changedFields: [{ field: 'mfaEnabled', before: oldValue, after: mfaEnabled, sensitive: true }],
       outcome: 'SUCCESS',
       severity: 'HIGH',
     }, { actorType: 'USER' });
 
-    res.json({ success: true, data: { mfaEnabled: enabled } });
+    res.json({ success: true, data: { mfaEnabled } });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to update MFA settings' });
   }
