@@ -106,6 +106,8 @@ async function run() {
       }
       // Remove duplicate contact.* keys (use company.* instead)
       await Setting.deleteMany({ key: { $in: ['contact.email', 'contact.phone', 'contact.address'] } }).session(session);
+      // Remove deprecated OTP keys (replaced by otp.skipOtp*)
+      await Setting.deleteMany({ key: { $in: ['otp.noOtpForInvoice', 'otp.noOtpDuringRegistration'] } }).session(session);
       console.log(`  ${settingsCreated} new settings created, ${settingsUpdated} existing settings updated with displayValue (${settings.length} total)\n`);
 
       // ═══════════════════════════════════════
