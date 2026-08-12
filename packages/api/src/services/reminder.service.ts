@@ -1,4 +1,4 @@
-import { Pet, Notification } from '@pawtag/db';
+import { Pet, Notification, User } from '@pawtag/db';
 import { sendPushToUser } from './push-notification.service';
 import { auditService, type AuditContext } from './audit';
 
@@ -35,12 +35,13 @@ export function startReminderService() {
   setInterval(async () => {
     try {
       await sendFinderReminders();
+      await sendOnboardingNudges();
     } catch (error) {
       console.error('[ReminderService] Error:', error);
     }
   }, REMINDER_CHECK_INTERVAL_MS);
 
-  console.log('[ReminderService] Started — checks every hour for pets in "found" status > 24h');
+  console.log('[ReminderService] Started — checks every hour for pets in "found" status > 24h + onboarding nudges');
 }
 
 async function sendFinderReminders() {
@@ -150,6 +151,77 @@ async function sendFinderReminders() {
       metadata: {
         petsEligible: pets.length,
         remindersSent: 0,
+      },
+    });
+  }
+}
+
+/**
+ * Send onboarding reminder notifications to users who skipped onboarding 3+ days ago.
+ * Only sends one notification per user (checks if already notified).
+ */
+async function sendOnboardingNudges() {
+  const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
+  const cutoff = new Date(Date.now() - THREE_DAYS_MS);
+
+  // Find users who:
+  // 1. Skipped onboarding more than 3 days ago
+  // 2. Haven't completed onboarding
+  // 3. Haven't been nudged yet (no onboarding_reminder notification)
+  const skippedUsers = await User.find({
+    onboardingSkipped: true,
+    onboardingCompleted: false,
+    onboardingSkippedAt: { $lte: cutoff, $ne: null },
+    deletedAt: null,
+  }).select('_id fullName onboardingSkippedAt');
+
+  if (skippedUsers.length === 0) return;
+
+  let nudgesSent = 0;
+
+  for (const user of skippedUsers) {
+    // Check if already nudged (look for existing onboarding_reminder notification)
+    const alreadyNudged = await Notification.findOne({
+      userId: user._id,
+      type: 'onboarding_reminder',
+    }).select('_id');
+
+    if (alreadyNudged) continue;
+
+    // Send in-app notification
+    await Notification.create({
+      userId: user._id,
+      type: 'onboarding_reminder',
+      title: 'Complete your pet profile',
+      message: `Hi ${user.fullName || 'there'}! Quick reminder: completing your profile helps finders contact you faster when your pet is found. It only takes 2 minutes.`,
+      priority: 'normal',
+      data: {},
+    });
+
+    // Send push notification
+    await sendPushToUser(
+      user._id.toString(),
+      'Complete your pet profile',
+      'Completing your profile helps finders contact you faster. It only takes 2 minutes.',
+      { type: 'onboarding_reminder' },
+    ).catch(() => {});
+
+    nudgesSent++;
+  }
+
+  if (nudgesSent > 0) {
+    await auditJobEvent({
+      action: 'onboarding_nudge_check',
+      eventType: 'scheduled_onboarding_nudge',
+      eventCategory: 'SYSTEM',
+      operationType: 'CREATE',
+      resourceType: 'Notification',
+      resourceId: 'multiple',
+      outcome: 'SUCCESS',
+      severity: 'LOW',
+      metadata: {
+        usersEligible: skippedUsers.length,
+        nudgesSent,
       },
     });
   }

@@ -2608,6 +2608,7 @@ router.put('/settings/onboarding-complete', requirePermission('pet.read'), async
     }
 
     user.onboardingCompleted = true;
+    user.onboardingSkipped = false;
     await user.save();
 
     await auditCustomerEvent(req, {
@@ -2617,16 +2618,97 @@ router.put('/settings/onboarding-complete', requirePermission('pet.read'), async
       operationType: 'UPDATE',
       resourceType: 'User',
       resourceId: req.user!.id,
-      beforeState: { onboardingCompleted: false },
-      afterState: { onboardingCompleted: true },
-      changedFields: [{ field: 'onboardingCompleted', before: false, after: true, sensitive: false }],
+      beforeState: { onboardingCompleted: false, onboardingSkipped: user.onboardingSkipped },
+      afterState: { onboardingCompleted: true, onboardingSkipped: false },
+      changedFields: [
+        { field: 'onboardingCompleted', before: false, after: true, sensitive: false },
+        { field: 'onboardingSkipped', before: user.onboardingSkipped, after: false, sensitive: false },
+      ],
       outcome: 'SUCCESS',
       severity: 'LOW',
     }, { actorType: 'USER' });
 
-    res.json({ success: true, data: { onboardingCompleted: true } });
+    res.json({ success: true, data: { onboardingCompleted: true, onboardingSkipped: false } });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to mark onboarding as complete' });
+  }
+});
+
+/**
+ * PUT /api/customer/settings/onboarding-skip — Mark onboarding as skipped (maybe later)
+ * User will see the wizard again on next login.
+ */
+router.put('/settings/onboarding-skip', requirePermission('pet.read'), async (req: AuthRequest, res: Response) => {
+  try {
+    const user = await User.findById(req.user!.id);
+    if (!user || user.deletedAt) {
+      res.status(404).json({ success: false, error: 'User not found' });
+      return;
+    }
+
+    user.onboardingSkipped = true;
+    user.onboardingSkippedAt = new Date();
+    await user.save();
+
+    await auditCustomerEvent(req, {
+      action: 'onboarding_skipped',
+      eventType: 'onboarding_skipped',
+      eventCategory: 'SYSTEM',
+      operationType: 'UPDATE',
+      resourceType: 'User',
+      resourceId: req.user!.id,
+      beforeState: { onboardingSkipped: false },
+      afterState: { onboardingSkipped: true, onboardingSkippedAt: user.onboardingSkippedAt },
+      changedFields: [
+        { field: 'onboardingSkipped', before: false, after: true, sensitive: false },
+        { field: 'onboardingSkippedAt', before: null, after: user.onboardingSkippedAt, sensitive: false },
+      ],
+      outcome: 'SUCCESS',
+      severity: 'LOW',
+    }, { actorType: 'USER' });
+
+    res.json({ success: true, data: { onboardingSkipped: true } });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to skip onboarding' });
+  }
+});
+
+/**
+ * PUT /api/customer/settings/onboarding-dismiss — Don't show me again
+ * Sets onboardingCompleted = true + onboardingSkipped = true
+ */
+router.put('/settings/onboarding-dismiss', requirePermission('pet.read'), async (req: AuthRequest, res: Response) => {
+  try {
+    const user = await User.findById(req.user!.id);
+    if (!user || user.deletedAt) {
+      res.status(404).json({ success: false, error: 'User not found' });
+      return;
+    }
+
+    user.onboardingCompleted = true;
+    user.onboardingSkipped = true;
+    await user.save();
+
+    await auditCustomerEvent(req, {
+      action: 'onboarding_dismissed',
+      eventType: 'onboarding_dismissed',
+      eventCategory: 'SYSTEM',
+      operationType: 'UPDATE',
+      resourceType: 'User',
+      resourceId: req.user!.id,
+      beforeState: { onboardingCompleted: false, onboardingSkipped: false },
+      afterState: { onboardingCompleted: true, onboardingSkipped: true },
+      changedFields: [
+        { field: 'onboardingCompleted', before: false, after: true, sensitive: false },
+        { field: 'onboardingSkipped', before: false, after: true, sensitive: false },
+      ],
+      outcome: 'SUCCESS',
+      severity: 'LOW',
+    }, { actorType: 'USER' });
+
+    res.json({ success: true, data: { onboardingCompleted: true, onboardingSkipped: true } });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to dismiss onboarding' });
   }
 });
 

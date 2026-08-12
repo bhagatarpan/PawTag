@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   PawPrint, Tag, CreditCard, ShoppingBag, Bell, AlertTriangle,
-  CheckCircle, Clock, ChevronRight, Shield, QrCode, Phone, Forward,
+  CheckCircle, Clock, ChevronRight, Shield, QrCode, Phone, Forward, X,
 } from 'lucide-react';
 import { SummaryCards, EmptyState, StatusBadge } from '@pawtag/ui';
 import api from '../../lib/api';
+import { useAuth } from '../../context/AuthContext';
 import type { Pet, Tag as TagType, Subscription, Order, Notification } from '../../types';
 
 /* ------------------------------------------------------------------ */
@@ -106,9 +107,12 @@ function SkeletonRow() {
 /* ------------------------------------------------------------------ */
 
 export default function AccountDashboard() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [nudgeDismissed, setNudgeDismissed] = useState(false);
 
   useEffect(() => {
     async function fetchDashboard() {
@@ -177,6 +181,41 @@ export default function AccountDashboard() {
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
         <p className="text-sm text-gray-500 mt-1">Welcome back! Here's an overview of your pets and account.</p>
       </div>
+
+      {/* Onboarding Nudge Banner */}
+      {user?.onboardingSkipped && !user?.onboardingCompleted && !nudgeDismissed && (
+        <div className="bg-gradient-to-r from-primary-50 to-teal-50 border border-primary-200 rounded-xl p-4 flex items-start gap-3">
+          <div className="h-10 w-10 bg-primary-100 rounded-full flex items-center justify-center shrink-0 mt-0.5">
+            <AlertTriangle size={18} className="text-primary-600" />
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-gray-900">Your profile is incomplete</p>
+            <p className="text-sm text-gray-600 mt-0.5">
+              Complete your profile so finders can reach you faster when your pet is found. It only takes 2 minutes.
+            </p>
+            <div className="flex items-center gap-3 mt-3">
+              <button
+                onClick={() => navigate('/account/profile')}
+                className="px-4 py-1.5 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors"
+              >
+                Complete Now
+              </button>
+              <button
+                onClick={() => setNudgeDismissed(true)}
+                className="px-4 py-1.5 text-sm text-gray-500 hover:text-gray-700 transition-colors"
+              >
+                Dismiss for today
+              </button>
+            </div>
+          </div>
+          <button
+            onClick={() => setNudgeDismissed(true)}
+            className="p-1 text-gray-400 hover:text-gray-600 shrink-0"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
 
       {/* Summary Cards */}
       <SummaryCards cards={[

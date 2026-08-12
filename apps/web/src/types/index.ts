@@ -98,6 +98,8 @@ export interface User {
   profilePicture?: string;
   lastLogin?: string;
   onboardingCompleted?: boolean;
+  onboardingSkipped?: boolean;
+  onboardingSkippedAt?: string;
   createdAt?: string;
 }
 

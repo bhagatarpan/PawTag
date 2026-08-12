@@ -1324,6 +1324,17 @@ router.put('/profile', authenticate, validate(updateProfileSchema), async (req: 
       outcome: 'SUCCESS',
       severity: 'MEDIUM',
     }, { actorType: 'USER' });
+
+    // Auto-complete onboarding if user has filled all required fields
+    if (!user.onboardingCompleted && user.phoneNumber && user.address?.line1 && user.address?.city && user.emergencyContact?.name && user.emergencyContact?.phone) {
+      await User.findByIdAndUpdate(user._id, {
+        onboardingCompleted: true,
+        onboardingSkipped: false,
+      });
+      user.onboardingCompleted = true;
+      user.onboardingSkipped = false;
+    }
+
     res.json({ success: true, data: user });
   } catch {
     res.status(500).json({ success: false, error: 'Update failed' });

@@ -133,6 +133,30 @@ export default function OnboardingWizard() {
     }
   }
 
+  async function skipOnboarding() {
+    setSaving(true);
+    try {
+      await api.put('/customer/settings/onboarding-skip');
+      await refreshUser();
+    } catch {
+      // Silently handle
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function dismissOnboarding() {
+    setSaving(true);
+    try {
+      await api.put('/customer/settings/onboarding-dismiss');
+      await refreshUser();
+    } catch {
+      // Silently handle
+    } finally {
+      setSaving(false);
+    }
+  }
+
   function renderFormFields() {
     if (!step.formFields) return null;
 
@@ -406,12 +430,22 @@ export default function OnboardingWizard() {
               {!isLast && !saving && <ArrowRight size={16} />}
             </button>
           </div>
-          <button
-            onClick={completeOnboarding}
-            className="w-full mt-3 text-sm text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            Skip for now
-          </button>
+          <div className="flex items-center justify-between mt-3">
+            <button
+              onClick={skipOnboarding}
+              disabled={saving}
+              className="text-sm text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              Maybe later
+            </button>
+            <button
+              onClick={dismissOnboarding}
+              disabled={saving}
+              className="text-xs text-gray-300 hover:text-gray-500 transition-colors"
+            >
+              Don't show me again
+            </button>
+          </div>
         </div>
       </div>
     </div>
