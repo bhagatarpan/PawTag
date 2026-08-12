@@ -245,7 +245,24 @@ export default function OnboardingWizard() {
   }
 
   if (steps.length === 0) {
-    return null;
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-primary-50 to-white flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-lg w-full text-center">
+          <div className="h-20 w-20 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <CheckCircle size={40} className="text-primary-600" />
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Welcome to PawTag!</h1>
+          <p className="text-gray-500 mb-6">Your account is ready. Head to your dashboard to get started.</p>
+          <button
+            onClick={completeOnboarding}
+            disabled={saving}
+            className="w-full py-3 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 disabled:opacity-50 transition-colors"
+          >
+            {saving ? 'Saving...' : 'Go to My Dashboard'}
+          </button>
+        </div>
+      </div>
+    );
   }
 
   if (!step) return null;
@@ -373,19 +390,27 @@ export default function OnboardingWizard() {
         </div>
 
         {/* Navigation */}
-        <div className="px-8 pb-6 flex items-center gap-3">
-          {!isFirst && (
-            <button onClick={handleBack} className="flex items-center gap-2 px-5 py-3 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
-              <ArrowLeft size={16} /> Back
+        <div className="px-8 pb-6">
+          <div className="flex items-center gap-3">
+            {!isFirst && (
+              <button onClick={handleBack} className="flex items-center gap-2 px-5 py-3 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                <ArrowLeft size={16} /> Back
+              </button>
+            )}
+            <button
+              onClick={handleNext}
+              disabled={saving}
+              className="flex-1 flex items-center justify-center gap-2 py-3 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 disabled:opacity-50 transition-colors"
+            >
+              {saving ? 'Saving...' : isLast ? 'Complete Setup' : 'Continue'}
+              {!isLast && !saving && <ArrowRight size={16} />}
             </button>
-          )}
+          </div>
           <button
-            onClick={handleNext}
-            disabled={saving}
-            className="flex-1 flex items-center justify-center gap-2 py-3 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 disabled:opacity-50 transition-colors"
+            onClick={completeOnboarding}
+            className="w-full mt-3 text-sm text-gray-400 hover:text-gray-600 transition-colors"
           >
-            {saving ? 'Saving...' : isLast ? 'Complete Setup' : 'Continue'}
-            {!isLast && !saving && <ArrowRight size={16} />}
+            Skip for now
           </button>
         </div>
       </div>

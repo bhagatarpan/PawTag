@@ -57,8 +57,10 @@ export default function AccountLayout({ children }: { children: ReactNode }) {
   const { settings } = useSiteSettings();
   const companyName = settings?.['company.name'] || 'PawTag';
 
-  // Show onboarding wizard if user hasn't completed it
-  if (user?.onboardingCompleted === false) {
+  // Show onboarding wizard only for newly registered users (created within 24 hours)
+  // who haven't completed onboarding yet. Existing users skip the wizard.
+  const isRecentUser = user?.createdAt && (Date.now() - new Date(user.createdAt).getTime()) < 24 * 60 * 60 * 1000;
+  if (user?.onboardingCompleted === false && isRecentUser) {
     return <OnboardingWizard />;
   }
 

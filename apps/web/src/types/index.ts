@@ -98,6 +98,7 @@ export interface User {
   profilePicture?: string;
   lastLogin?: string;
   onboardingCompleted?: boolean;
+  createdAt?: string;
 }
 
 export interface Pet {
