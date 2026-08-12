@@ -346,6 +346,33 @@ Example commit messages:
 
 Avoid messages such as: update, fixes, changes, misc, work, test.
 
+### Git Synchronisation and Build Verification
+
+**Before starting implementation:**
+
+- Check the current Git branch and repository status.
+- Pull the latest changes from the appropriate remote branch.
+- Review any changes that were pulled in.
+- Build the application.
+- If the build fails, investigate the errors.
+- Fix the build errors before proceeding with new implementation.
+- Run the relevant tests after fixing the build.
+- Continue with the requested task only when the existing application is in a working state, unless the requested task itself is specifically to fix the existing failures.
+
+**After implementation:**
+
+- Build the application again.
+- Check for build errors.
+- If the build fails, investigate and fix the errors.
+- Run all relevant tests.
+- Fix any test failures caused by the changes.
+- Re-run the build and tests until they pass.
+- Review the final Git diff before committing.
+
+**Never ignore existing build failures.**
+
+If a build or test failure is unrelated to the requested task, do not silently ignore it. Clearly identify the failure, determine whether it was pre-existing or caused by the changes, and report it in the final summary.
+
 ### Definition of Done
 
 A task is only complete when all of the following are true:
