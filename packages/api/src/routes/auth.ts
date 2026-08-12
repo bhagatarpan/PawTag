@@ -1,6 +1,5 @@
 import { Router, Response } from 'express';
 import jwt from 'jsonwebtoken';
-import rateLimit from 'express-rate-limit';
 import { AuthRequest, authenticate } from '../middleware/auth';
 import { validate } from '../middleware/validation';
 import {
@@ -39,57 +38,49 @@ import { auditService, resolveActorType, type AuditContext } from '../services/a
 import { createAuditContextFromRequest, setAuditActor, type AuditRequest } from '../middleware/audit';
 import { config } from '../config';
 import logger from '../lib/logger';
+import { createDbRateLimiter } from '../lib/rate-limiter';
 
 const router = Router();
 
-// Brute-force protection: 5 login attempts per 15 minutes per IP
-const loginLimiter = rateLimit({
+// Rate limiters — values read from DB settings
+const loginLimiter = createDbRateLimiter({
+  settingKey: 'rateLimit.auth.login.max',
+  defaultValue: 5,
   windowMs: 15 * 60 * 1000,
-  max: parseInt(process.env.LOGIN_RATE_LIMIT_MAX || '5', 10),
-  message: { success: false, error: 'Too many login attempts. Please try again in 15 minutes.' },
-  skip: () => process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development',
-  standardHeaders: true,
-  legacyHeaders: false,
+  message: 'Too many login attempts. Please try again in 15 minutes.',
+  keySuffix: 'auth:login',
 });
 
-// Prevent spam account creation: 3 registrations per hour per IP
-const registerLimiter = rateLimit({
+const registerLimiter = createDbRateLimiter({
+  settingKey: 'rateLimit.auth.register.max',
+  defaultValue: 3,
   windowMs: 60 * 60 * 1000,
-  max: parseInt(process.env.REGISTER_RATE_LIMIT_MAX || '3', 10),
-  message: { success: false, error: 'Too many registration attempts. Please try again later.' },
-  skip: () => process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development',
-  standardHeaders: true,
-  legacyHeaders: false,
+  message: 'Too many registration attempts. Please try again later.',
+  keySuffix: 'auth:register',
 });
 
-// Prevent email bombing: 3 password resets per hour per IP
-const forgotPasswordLimiter = rateLimit({
+const forgotPasswordLimiter = createDbRateLimiter({
+  settingKey: 'rateLimit.auth.forgotPassword.max',
+  defaultValue: 3,
   windowMs: 60 * 60 * 1000,
-  max: parseInt(process.env.FORGOT_PASSWORD_RATE_LIMIT_MAX || '3', 10),
-  message: { success: false, error: 'Too many password reset attempts. Please try again later.' },
-  skip: () => process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development',
-  standardHeaders: true,
-  legacyHeaders: false,
+  message: 'Too many password reset attempts. Please try again later.',
+  keySuffix: 'auth:forgotPassword',
 });
 
-// MFA: 1 OTP send per 30 seconds
-const mfaSendLimiter = rateLimit({
+const mfaSendLimiter = createDbRateLimiter({
+  settingKey: 'rateLimit.auth.mfaSend.max',
+  defaultValue: 1,
   windowMs: 30 * 1000,
-  max: parseInt(process.env.MFA_SEND_RATE_LIMIT_MAX || '1', 10),
-  message: { success: false, error: 'Please wait before requesting a new code.' },
-  skip: () => process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development',
-  standardHeaders: true,
-  legacyHeaders: false,
+  message: 'Please wait before requesting a new code.',
+  keySuffix: 'auth:mfaSend',
 });
 
-// MFA: 5 verify attempts per 15 minutes
-const mfaVerifyLimiter = rateLimit({
+const mfaVerifyLimiter = createDbRateLimiter({
+  settingKey: 'rateLimit.auth.mfaVerify.max',
+  defaultValue: 5,
   windowMs: 15 * 60 * 1000,
-  max: parseInt(process.env.MFA_VERIFY_RATE_LIMIT_MAX || '5', 10),
-  message: { success: false, error: 'Too many verification attempts. Please try again later.' },
-  skip: () => process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development',
-  standardHeaders: true,
-  legacyHeaders: false,
+  message: 'Too many verification attempts. Please try again later.',
+  keySuffix: 'auth:mfaVerify',
 });
 
 function getClientInfo(req: any) {

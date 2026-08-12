@@ -3,8 +3,26 @@ import { Tag, FinderScan, LocationEvent, Notification, Subscription, User, Pet, 
 import { sendPushToUser } from '../services/push-notification.service';
 import { sendPetFoundEmail } from '../services/email.service';
 import { auditService, type AuditContext } from '../services/audit';
+import { createDbRateLimiter } from '../lib/rate-limiter';
+import { requireCaptcha } from '../middleware/captcha';
 
 const router = Router();
+
+// Finder-specific rate limiters — values from DB settings
+const finderNotifyLimiter = createDbRateLimiter({
+  settingKey: 'rateLimit.finder.notify.max',
+  defaultValue: 5,
+  windowMs: 60 * 60 * 1000,
+  message: 'Too many notification requests. Please try again later.',
+  keySuffix: 'finder:notify',
+});
+const finderLocationLimiter = createDbRateLimiter({
+  settingKey: 'rateLimit.finder.location.max',
+  defaultValue: 10,
+  windowMs: 60 * 60 * 1000,
+  message: 'Too many location requests. Please try again later.',
+  keySuffix: 'finder:location',
+});
 
 // No auth required — this is the public finder portal
 
@@ -137,7 +155,7 @@ router.get('/:tagId', async (req: Request, res: Response) => {
   try {
     const tag = await Tag.findOne({ tagId: req.params.tagId, deletedAt: null })
       .populate({ path: 'petId', match: { deletedAt: null }, select: '-__v' })
-      .populate({ path: 'ownerId', select: 'fullName phone showOwnerNameInFinder address' });
+      .populate({ path: 'ownerId', select: 'fullName phone showOwnerNameInFinder address.line2 address.city' });
 
     if (!tag) {
       res.status(404).json({ success: false, error: 'Tag not found' });
@@ -258,7 +276,7 @@ router.get('/:tagId', async (req: Request, res: Response) => {
         subscriptionStatus: tag.subscriptionStatus || 'none',
         ownerName,
         ownerLocation,
-        ownerPhone: owner.phone,
+        ownerPhone: showOwnerName ? owner.phone : null,
       },
     });
 
@@ -322,7 +340,7 @@ router.get('/:tagId', async (req: Request, res: Response) => {
  *       500:
  *         description: Failed to notify owner
  */
-router.post('/:tagId/notify', async (req: Request, res: Response) => {
+router.post('/:tagId/notify', finderNotifyLimiter, requireCaptcha, async (req: Request, res: Response) => {
   try {
     const { finderPhone, finderEmail, finderName, latitude, longitude, accuracy, consent } = req.body;
 
@@ -530,17 +548,12 @@ router.get('/:tagId/found-timer', async (req: Request, res: Response) => {
       return;
     }
 
-    const scan = await FinderScan.findOne({ petId: pet._id, action: 'notified_owner' }).sort({ notifiedAt: -1 });
-
     res.json({
       success: true,
       data: {
         active: true,
         foundAt: pet.foundByFinderAt,
         elapsed: Date.now() - new Date(pet.foundByFinderAt).getTime(),
-        finderPhone: scan?.finderPhone || null,
-        finderEmail: scan?.finderEmail || null,
-        finderName: scan?.finderName || null,
       },
     });
   } catch {
@@ -601,7 +614,7 @@ router.get('/:tagId/found-timer', async (req: Request, res: Response) => {
  *       500:
  *         description: Failed to share location
  */
-router.post('/:tagId/share-location', async (req: Request, res: Response) => {
+router.post('/:tagId/share-location', finderLocationLimiter, requireCaptcha, async (req: Request, res: Response) => {
   try {
     const { latitude, longitude, accuracy } = req.body;
     if (!latitude || !longitude) {

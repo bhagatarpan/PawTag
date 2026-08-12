@@ -1,7 +1,9 @@
+import crypto from 'crypto';
 import { Setting, Tag } from '@pawtag/db';
 
 const DEFAULT_PREFIX = 'PT';
-const DEFAULT_DIGITS = 6;
+const TAG_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no I/O/0/1 to avoid confusion
+const TAG_LENGTH = 8;
 
 /**
  * Read the tag ID prefix from CMS settings (tag.idPrefix).
@@ -20,12 +22,16 @@ async function getTagPrefix(): Promise<string> {
 }
 
 /**
- * Generate a random tag ID using the DB-configured prefix.
- * Format: {PREFIX}-{NNNNNN}  (6 random digits, range 100000–999999)
+ * Generate a cryptographically secure random tag ID.
+ * Format: {PREFIX}-{XXXXXXXX} (8 alphanumeric chars, ~2.8T combinations)
  */
 function randomTagId(prefix: string): string {
-  const digits = Math.floor(100000 + Math.random() * 900000).toString();
-  return `${prefix}-${digits}`;
+  const bytes = crypto.randomBytes(TAG_LENGTH);
+  let id = '';
+  for (let i = 0; i < TAG_LENGTH; i++) {
+    id += TAG_CHARS[bytes[i] % TAG_CHARS.length];
+  }
+  return `${prefix}-${id}`;
 }
 
 /**
@@ -43,13 +49,16 @@ export async function generateTagId(): Promise<string> {
 }
 
 /**
- * Validate a custom tag ID against the current DB-configured prefix.
- * Format: {PREFIX}-{NNNNNN}
+ * Validate a tag ID. Accepts both old format (PT-NNNNNN) and new format (PT-XXXXXXXX).
  */
 export async function isValidTagId(tagId: string): Promise<boolean> {
   const prefix = await getTagPrefix();
-  const regex = new RegExp(`^${prefix}-\\d{${DEFAULT_DIGITS}}$`);
-  return regex.test(tagId);
+  // New format: PT-XXXXXXXX (8 alphanumeric)
+  const newRegex = new RegExp(`^${prefix}-[A-Z2-9]{${TAG_LENGTH}}$`);
+  if (newRegex.test(tagId.toUpperCase())) return true;
+  // Legacy format: PT-NNNNNN (6 digits) — still valid for existing tags
+  const legacyRegex = new RegExp(`^${prefix}-\\d{6}$`);
+  return legacyRegex.test(tagId);
 }
 
 /**
@@ -57,5 +66,5 @@ export async function isValidTagId(tagId: string): Promise<boolean> {
  */
 export async function getTagIdFormat(): Promise<string> {
   const prefix = await getTagPrefix();
-  return `${prefix}-${'N'.repeat(DEFAULT_DIGITS)}`;
+  return `${prefix}-${'X'.repeat(TAG_LENGTH)}`;
 }

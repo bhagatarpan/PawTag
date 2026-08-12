@@ -15,7 +15,6 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
-import rateLimit from 'express-rate-limit';
 import swaggerUi from 'swagger-ui-express';
 import path from 'path';
 
@@ -25,6 +24,7 @@ import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { swaggerSpec } from './swagger';
 import logger from './lib/logger';
 import { auditMiddleware } from './middleware/audit';
+import { createDbRateLimiter } from './lib/rate-limiter';
 
 import QRCode from 'qrcode';
 import { Tag } from '@pawtag/db';
@@ -89,21 +89,20 @@ app.use(morgan('dev'));
 // Audit middleware - must be early to capture all requests
 app.use(auditMiddleware);
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX || '1000', 10),
-  message: { success: false, error: 'Too many requests, please try again later' },
-  skip: () => process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development',
+// Rate limiting — all values read from DB settings (see seed-cms.ts)
+const limiter = createDbRateLimiter({
+  settingKey: 'rateLimit.global.max',
+  defaultValue: 1000,
+  windowMs: 15 * 60 * 1000,
+  message: 'Too many requests, please try again later',
 });
 app.use('/api', limiter);
 
-// Stricter rate limit for auth routes
-const authLimiter = rateLimit({
+const authLimiter = createDbRateLimiter({
+  settingKey: 'rateLimit.auth.login.max',
+  defaultValue: 20,
   windowMs: 15 * 60 * 1000,
-  max: parseInt(process.env.AUTH_RATE_LIMIT_MAX || '20', 10),
-  message: { success: false, error: 'Too many auth attempts, please try again later' },
-  skip: () => process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development',
+  message: 'Too many auth attempts, please try again later',
 });
 app.use('/api/auth', authLimiter);
 
