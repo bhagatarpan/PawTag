@@ -219,13 +219,13 @@ router.get('/onboarding', async (_req: Request, res: Response) => {
   try {
     const config = await CmsOnboarding.findOne();
     if (!config) {
-      res.json({ success: true, data: { steps: [] } });
+      res.json({ success: true, data: { steps: [], globalSettings: {} } });
       return;
     }
     const activeSteps = config.steps
       .filter((s: ICmsOnboardingStep) => s.isActive)
       .sort((a: ICmsOnboardingStep, b: ICmsOnboardingStep) => a.order - b.order);
-    res.json({ success: true, data: { steps: activeSteps } });
+    res.json({ success: true, data: { steps: activeSteps, globalSettings: config.globalSettings || {} } });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch onboarding' });
   }

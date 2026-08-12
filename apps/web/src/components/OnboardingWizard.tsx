@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import {
   Heart, AlertTriangle, Zap, Phone, MapPin, PhoneCall, CheckCircle,
   Shield, Info, Star, Gift, Bell, ArrowRight, ArrowLeft, Lock,
+  PawPrint, Scan,
 } from 'lucide-react';
 import api from '../lib/api';
 import { useAuth } from '../context/AuthContext';
@@ -23,12 +24,21 @@ interface OnboardingStep {
     callout?: { icon: string; title: string; text: string; variant: 'warning' | 'info' | 'tip' };
     privacyNote?: { icon: string; title: string; text: string };
     whyItMatters?: string;
+    whyItMattersHeading?: string;
   };
+}
+
+interface GlobalSettings {
+  emptyStateTitle?: string;
+  emptyStateText?: string;
+  emptyStateButtonText?: string;
+  completionButtonText?: string;
+  relationshipOptions?: string[];
 }
 
 const ICON_MAP: Record<string, React.ElementType> = {
   Heart, AlertTriangle, Zap, Phone, MapPin, PhoneCall, CheckCircle,
-  Shield, Info, Star, Gift, Bell,
+  Shield, Info, Star, Gift, Bell, PawPrint, Scan,
 };
 
 const CALLOUT_STYLES = {
@@ -37,14 +47,33 @@ const CALLOUT_STYLES = {
   tip: 'bg-green-50 border-green-200 text-green-800',
 };
 
-const RELATIONSHIP_OPTIONS = ['Spouse', 'Partner', 'Parent', 'Sibling', 'Friend', 'Neighbour', 'Other'];
+const DEFAULT_RELATIONSHIP_OPTIONS = ['Spouse', 'Partner', 'Parent', 'Sibling', 'Friend', 'Neighbour', 'Other'];
+
+const CONFETTI_COLORS = ['bg-primary-400', 'bg-primary-600', 'bg-amber-400', 'bg-emerald-400', 'bg-rose-400', 'bg-violet-400', 'bg-sky-400'];
+
+function ConfettiParticle({ color, delay, x, size }: { color: string; delay: number; x: number; size: number }) {
+  return (
+    <div
+      className={`absolute ${color} rounded-full opacity-0`}
+      style={{
+        width: size,
+        height: size,
+        left: `${x}%`,
+        top: '-8px',
+        animation: `confetti-fall 1.8s ease-out ${delay}s forwards`,
+      }}
+    />
+  );
+}
 
 export default function OnboardingWizard() {
   const { user, refreshUser } = useAuth();
   const [steps, setSteps] = useState<OnboardingStep[]>([]);
+  const [globalSettings, setGlobalSettings] = useState<GlobalSettings>({});
   const [currentIdx, setCurrentIdx] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [completed, setCompleted] = useState(false);
 
   // Form state
   const [phoneNumber, setPhoneNumber] = useState(user?.phoneNumber || '');
@@ -61,7 +90,10 @@ export default function OnboardingWizard() {
 
   useEffect(() => {
     api.get('/public/cms/onboarding')
-      .then((res) => setSteps(res.data.data?.steps || []))
+      .then((res) => {
+        setSteps(res.data.data?.steps || []);
+        setGlobalSettings(res.data.data?.globalSettings || {});
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -70,6 +102,7 @@ export default function OnboardingWizard() {
   const isFirst = currentIdx === 0;
   const isLast = currentIdx === steps.length - 1;
   const progress = steps.length > 0 ? ((currentIdx + 1) / steps.length) * 100 : 0;
+  const relationshipOptions = globalSettings.relationshipOptions || DEFAULT_RELATIONSHIP_OPTIONS;
 
   async function handleNext() {
     if (step?.type === 'form') {
@@ -125,7 +158,10 @@ export default function OnboardingWizard() {
     setSaving(true);
     try {
       await api.put('/customer/settings/onboarding-complete');
-      await refreshUser();
+      // Don't refreshUser() here — it would update onboardingCompleted=true
+      // in the context, causing AccountLayout to unmount us before the
+      // success screen can render. Refresh happens on "Go to Dashboard" click.
+      setCompleted(true);
     } catch {
       // Silently handle
     } finally {
@@ -212,7 +248,7 @@ export default function OnboardingWizard() {
               <label className="block text-sm font-medium text-gray-700 mb-1">Relationship</label>
               <select value={ecRelationship} onChange={(e) => setEcRelationship(e.target.value)} className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
                 <option value="">Select...</option>
-                {RELATIONSHIP_OPTIONS.map((r) => <option key={r} value={r}>{r}</option>)}
+                {relationshipOptions.map((r) => <option key={r} value={r}>{r}</option>)}
               </select>
             </div>
             <div>
@@ -268,6 +304,156 @@ export default function OnboardingWizard() {
     );
   }
 
+  // ── Completion success screen ──
+  if (completed) {
+    const confettiParticles = Array.from({ length: 32 }, (_, i) => ({
+      color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+      delay: Math.random() * 0.6,
+      x: Math.random() * 100,
+      size: 6 + Math.random() * 6,
+    }));
+
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-emerald-50 flex items-center justify-center p-4 relative overflow-hidden">
+        {/* Confetti layer */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          {confettiParticles.map((p, i) => (
+            <ConfettiParticle key={i} {...p} />
+          ))}
+        </div>
+
+        <style>{`
+          @keyframes confetti-fall {
+            0% { opacity: 1; transform: translateY(0) rotate(0deg) scale(1); }
+            50% { opacity: 1; }
+            100% { opacity: 0; transform: translateY(70vh) rotate(720deg) scale(0.5); }
+          }
+          @keyframes success-pop {
+            0% { transform: scale(0); opacity: 0; }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); opacity: 1; }
+          }
+          @keyframes check-draw {
+            0% { stroke-dashoffset: 24; }
+            100% { stroke-dashoffset: 0; }
+          }
+          @keyframes shimmer-ring {
+            0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+            70% { box-shadow: 0 0 0 16px rgba(16, 185, 129, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+          }
+          @keyframes fade-up {
+            0% { opacity: 0; transform: translateY(12px); }
+            100% { opacity: 1; transform: translateY(0); }
+          }
+          @keyframes badge-pop {
+            0% { transform: scale(0) rotate(-12deg); opacity: 0; }
+            60% { transform: scale(1.15) rotate(3deg); }
+            100% { transform: scale(1) rotate(0deg); opacity: 1; }
+          }
+        `}</style>
+
+        <div className="bg-white rounded-3xl shadow-2xl p-10 max-w-md w-full text-center relative z-10">
+          {/* Animated checkmark */}
+          <div
+            className="mx-auto mb-6 relative"
+            style={{ width: 88, height: 88, animation: 'success-pop 0.5s cubic-bezier(0.34,1.56,0.64,1) forwards' }}
+          >
+            <div
+              className="absolute inset-0 rounded-full bg-emerald-100"
+              style={{ animation: 'shimmer-ring 1.5s ease-out 0.5s' }}
+            />
+            <div className="absolute inset-0 rounded-full bg-emerald-500 flex items-center justify-center">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <polyline
+                  points="6 12 10 16 18 8"
+                  style={{
+                    strokeDasharray: 24,
+                    strokeDashoffset: 24,
+                    animation: 'check-draw 0.4s ease-out 0.4s forwards',
+                  }}
+                />
+              </svg>
+            </div>
+          </div>
+
+          {/* Heading */}
+          <h1
+            className="text-3xl font-bold text-gray-900 mb-2"
+            style={{ animation: 'fade-up 0.5s ease-out 0.3s both' }}
+          >
+            You're All Set!
+          </h1>
+          <p
+            className="text-gray-500 mb-8"
+            style={{ animation: 'fade-up 0.5s ease-out 0.45s both' }}
+          >
+            Your pet now has the best chance of finding their way home.
+          </p>
+
+          {/* Security confirmation card */}
+          <div
+            className="bg-gradient-to-br from-emerald-50 to-primary-50 border border-emerald-200 rounded-2xl p-6 mb-6 text-left"
+            style={{ animation: 'fade-up 0.5s ease-out 0.6s both' }}
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="h-10 w-10 bg-emerald-500 rounded-xl flex items-center justify-center shrink-0">
+                <Shield size={20} className="text-white" />
+              </div>
+              <div>
+                <p className="font-bold text-gray-900 text-sm">Your Pet Is Protected</p>
+                <p className="text-xs text-gray-500">Active 24/7 — even when you can't be</p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {[
+                { icon: Bell, label: 'Instant alerts', desc: 'App + email notifications the moment someone finds your pet' },
+                { icon: Phone, label: 'Backup contacts', desc: 'Emergency contact notified if you don\'t respond in 30 min' },
+                { icon: Shield, label: 'Privacy first', desc: 'Your personal details stay hidden — only suburb shown' },
+                { icon: Lock, label: 'Secure data', desc: 'Encrypted storage, never shared with third parties' },
+              ].map(({ icon: Icon, label, desc }, i) => (
+                <div key={label} className="flex items-start gap-3">
+                  <Icon size={16} className="text-emerald-600 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">{label}</p>
+                    <p className="text-xs text-gray-500">{desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* PawTag badge */}
+          <div
+            className="inline-flex items-center gap-2 bg-primary-50 border border-primary-200 text-primary-700 rounded-full px-4 py-2 mb-8"
+            style={{ animation: 'badge-pop 0.6s ease-out 0.9s both' }}
+          >
+            <CheckCircle size={16} />
+            <span className="text-sm font-semibold">PawTag Active</span>
+          </div>
+
+          <button
+            onClick={async () => {
+              await refreshUser();
+              window.location.href = '/account';
+            }}
+            className="w-full py-3.5 bg-emerald-500 text-white rounded-xl font-bold text-base hover:bg-emerald-600 transition-all duration-200 shadow-lg shadow-emerald-200"
+            style={{ animation: 'fade-up 0.5s ease-out 1s both' }}
+          >
+            Go to My Dashboard
+          </button>
+          <p
+            className="text-xs text-gray-400 mt-3"
+            style={{ animation: 'fade-up 0.5s ease-out 1.1s both' }}
+          >
+            You can always update your details later in Settings
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (steps.length === 0) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-primary-50 to-white flex items-center justify-center p-4">
@@ -275,14 +461,14 @@ export default function OnboardingWizard() {
           <div className="h-20 w-20 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-6">
             <CheckCircle size={40} className="text-primary-600" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Welcome to PawTag!</h1>
-          <p className="text-gray-500 mb-6">Your account is ready. Head to your dashboard to get started.</p>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">{globalSettings.emptyStateTitle || 'Welcome to PawTag!'}</h1>
+          <p className="text-gray-500 mb-6">{globalSettings.emptyStateText || 'Your account is ready. Head to your dashboard to get started.'}</p>
           <button
             onClick={completeOnboarding}
             disabled={saving}
             className="w-full py-3 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 disabled:opacity-50 transition-colors"
           >
-            {saving ? 'Saving...' : 'Go to My Dashboard'}
+            {saving ? 'Saving...' : globalSettings.emptyStateButtonText || 'Go to My Dashboard'}
           </button>
         </div>
       </div>
@@ -317,7 +503,7 @@ export default function OnboardingWizard() {
             disabled={saving}
             className="mt-8 w-full py-3 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 disabled:opacity-50 transition-colors"
           >
-            {saving ? 'Saving...' : 'Go to My Dashboard'}
+            {saving ? 'Saving...' : globalSettings.completionButtonText || 'Complete Setup'}
           </button>
         </div>
       </div>
@@ -374,20 +560,21 @@ export default function OnboardingWizard() {
 
           {/* Flow steps (for how-it-works) */}
           {step.content?.flowSteps && step.content.flowSteps.length > 0 && (
-            <div className="flex items-center justify-between gap-2 my-6">
+            <div className="flex items-start justify-between gap-1 my-6">
               {step.content.flowSteps.map((fs, i) => {
                 const FsIcon = ICON_MAP[fs.icon] || Heart;
+                const isLast = i === (step.content?.flowSteps?.length ?? 0) - 1;
                 return (
-                  <div key={i} className="flex items-center gap-2 flex-1">
-                    <div className="flex flex-col items-center text-center flex-1">
-                      <div className="h-12 w-12 bg-primary-100 rounded-xl flex items-center justify-center mb-2">
+                  <div key={i} className="flex items-center flex-1 last:flex-none">
+                    <div className="flex flex-col items-center text-center flex-1 min-w-0">
+                      <div className="h-12 w-12 bg-primary-100 rounded-xl flex items-center justify-center mb-2 shrink-0">
                         <FsIcon size={20} className="text-primary-600" />
                       </div>
-                      <p className="text-xs font-semibold text-gray-800">{fs.label}</p>
-                      <p className="text-xs text-gray-500 mt-0.5">{fs.description}</p>
+                      <p className="text-xs font-semibold text-gray-800 leading-tight">{fs.label}</p>
+                      <p className="text-[10px] text-gray-500 mt-0.5 leading-tight">{fs.description}</p>
                     </div>
-                    {i < (step.content?.flowSteps?.length ?? 0) - 1 && (
-                      <ArrowRight size={16} className="text-gray-300 shrink-0 mt-[-16px]" />
+                    {!isLast && (
+                      <ArrowRight size={14} className="text-gray-300 shrink-0 mt-[-20px] mx-0.5" />
                     )}
                   </div>
                 );
@@ -398,7 +585,7 @@ export default function OnboardingWizard() {
           {/* Why it matters */}
           {step.content?.whyItMatters && (
             <div className="mt-6 p-4 bg-gray-50 rounded-xl">
-              <p className="text-sm font-semibold text-gray-700 mb-1">Why This Matters</p>
+              <p className="text-sm font-semibold text-gray-700 mb-1">{step.content.whyItMattersHeading || 'Why This Matters'}</p>
               <p className="text-sm text-gray-600 whitespace-pre-line leading-relaxed">{step.content.whyItMatters}</p>
             </div>
           )}
@@ -426,7 +613,7 @@ export default function OnboardingWizard() {
               disabled={saving}
               className="flex-1 flex items-center justify-center gap-2 py-3 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 disabled:opacity-50 transition-colors"
             >
-              {saving ? 'Saving...' : isLast ? 'Complete Setup' : 'Continue'}
+              {saving ? 'Saving...' : isLast ? (globalSettings.completionButtonText || 'Complete Setup') : 'Continue'}
               {!isLast && !saving && <ArrowRight size={16} />}
             </button>
           </div>

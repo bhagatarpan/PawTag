@@ -26,6 +26,7 @@ export interface ICmsOnboardingStep {
       text: string;
     };
     whyItMatters?: string;
+    whyItMattersHeading?: string;
     imageUrl?: string;
     imageAlt?: string;
   };
@@ -33,6 +34,13 @@ export interface ICmsOnboardingStep {
 
 export interface ICmsOnboardingDocument extends Document {
   steps: ICmsOnboardingStep[];
+  globalSettings?: {
+    emptyStateTitle?: string;
+    emptyStateText?: string;
+    emptyStateButtonText?: string;
+    completionButtonText?: string;
+    relationshipOptions?: string[];
+  };
   updatedBy: mongoose.Types.ObjectId;
 }
 
@@ -70,6 +78,7 @@ const CmsOnboardingStepSchema = new Schema<ICmsOnboardingStep>(
         text: String,
       },
       whyItMatters: String,
+      whyItMattersHeading: String,
       imageUrl: String,
       imageAlt: String,
     },
@@ -80,6 +89,13 @@ const CmsOnboardingStepSchema = new Schema<ICmsOnboardingStep>(
 const CmsOnboardingSchema = new Schema<ICmsOnboardingDocument>(
   {
     steps: { type: [CmsOnboardingStepSchema], default: [] },
+    globalSettings: {
+      emptyStateTitle: { type: String, default: 'Welcome to PawTag!' },
+      emptyStateText: { type: String, default: 'Your account is ready. Head to your dashboard to get started.' },
+      emptyStateButtonText: { type: String, default: 'Go to My Dashboard' },
+      completionButtonText: { type: String, default: 'Go to My Dashboard' },
+      relationshipOptions: { type: [String], default: ['Spouse', 'Partner', 'Parent', 'Sibling', 'Friend', 'Neighbour', 'Other'] },
+    },
     updatedBy: { type: Schema.Types.ObjectId, ref: 'User' },
   },
   { timestamps: true }

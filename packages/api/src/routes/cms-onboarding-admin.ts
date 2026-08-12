@@ -19,19 +19,22 @@ router.get('/', requirePermission('cms.onboarding.read'), async (_req: AuthReque
   }
 });
 
-// PUT /api/admin/cms/onboarding - Replace all steps (full save)
+// PUT /api/admin/cms/onboarding - Replace all steps + global settings (full save)
 router.put('/', requirePermission('cms.onboarding.update'), async (req: AuthRequest, res: Response) => {
   try {
-    const { steps } = req.body;
+    const { steps, globalSettings } = req.body;
     if (!Array.isArray(steps)) {
       return res.status(400).json({ success: false, error: 'steps must be an array' });
     }
 
     let config = await CmsOnboarding.findOne();
     if (!config) {
-      config = new CmsOnboarding({ steps });
+      config = new CmsOnboarding({ steps, globalSettings });
     } else {
       config.steps = steps;
+      if (globalSettings) {
+        config.globalSettings = { ...config.globalSettings, ...globalSettings };
+      }
     }
     config.updatedBy = req.user!.id;
     await config.save();

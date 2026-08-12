@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import {
   Plus, Trash2, GripVertical, Save, Eye, EyeOff, ChevronDown, ChevronUp,
   Heart, AlertTriangle, Zap, Phone, MapPin, PhoneCall, CheckCircle,
-  Shield, Info, Star, Gift, Bell,
+  Shield, Info, Star, Gift, Bell, Settings,
 } from 'lucide-react';
 import api from '../../lib/api';
 import { toast } from '../../lib/toast';
@@ -22,9 +22,18 @@ interface OnboardingStep {
     callout?: { icon: string; title: string; text: string; variant: 'warning' | 'info' | 'tip' };
     privacyNote?: { icon: string; title: string; text: string };
     whyItMatters?: string;
+    whyItMattersHeading?: string;
     stats?: Array<{ number: string; label: string }>;
     flowSteps?: Array<{ icon: string; label: string; description: string }>;
   };
+}
+
+interface GlobalSettings {
+  emptyStateTitle?: string;
+  emptyStateText?: string;
+  emptyStateButtonText?: string;
+  completionButtonText?: string;
+  relationshipOptions?: string[];
 }
 
 const ICON_OPTIONS = ['Heart', 'AlertTriangle', 'Zap', 'Phone', 'MapPin', 'PhoneCall', 'CheckCircle', 'Shield', 'Info', 'Star', 'Gift', 'Bell'];
@@ -59,13 +68,18 @@ function defaultStep(order: number): OnboardingStep {
 
 export default function CmsOnboardingStepsPage() {
   const [steps, setSteps] = useState<OnboardingStep[]>([]);
+  const [globalSettings, setGlobalSettings] = useState<GlobalSettings>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [expandedStep, setExpandedStep] = useState<string | null>(null);
+  const [showGlobalSettings, setShowGlobalSettings] = useState(false);
 
   useEffect(() => {
     api.get('/admin/cms/onboarding')
-      .then((res) => setSteps(res.data.data?.steps || []))
+      .then((res) => {
+        setSteps(res.data.data?.steps || []);
+        setGlobalSettings(res.data.data?.globalSettings || {});
+      })
       .catch(() => toast.error('Failed to load onboarding config'))
       .finally(() => setLoading(false));
   }, []);
@@ -175,8 +189,8 @@ export default function CmsOnboardingStepsPage() {
   async function handleSave() {
     setSaving(true);
     try {
-      await api.put('/admin/cms/onboarding', { steps });
-      toast.success('Onboarding steps saved');
+      await api.put('/admin/cms/onboarding', { steps, globalSettings });
+      toast.success('Onboarding config saved');
     } catch {
       toast.error('Failed to save');
     } finally {
@@ -201,6 +215,54 @@ export default function CmsOnboardingStepsPage() {
             <Save size={16} /> {saving ? 'Saving...' : 'Save Changes'}
           </button>
         </div>
+      </div>
+
+      {/* Global Settings */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm mb-4">
+        <button
+          onClick={() => setShowGlobalSettings(!showGlobalSettings)}
+          className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50/70 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <Settings size={16} className="text-gray-400" />
+            <div className="text-left">
+              <p className="text-sm font-medium text-gray-900">Global Settings</p>
+              <p className="text-xs text-gray-500">Empty state text, completion button, relationship options</p>
+            </div>
+          </div>
+          {showGlobalSettings ? <ChevronUp size={14} className="text-gray-400" /> : <ChevronDown size={14} className="text-gray-400" />}
+        </button>
+        {showGlobalSettings && (
+          <div className="px-5 pb-5 pt-2 border-t border-gray-100 space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Empty State Title</label>
+                <input value={globalSettings.emptyStateTitle || ''} onChange={(e) => setGlobalSettings({ ...globalSettings, emptyStateTitle: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="Welcome to PawTag!" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Empty State Button Text</label>
+                <input value={globalSettings.emptyStateButtonText || ''} onChange={(e) => setGlobalSettings({ ...globalSettings, emptyStateButtonText: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="Go to My Dashboard" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Empty State Text</label>
+              <input value={globalSettings.emptyStateText || ''} onChange={(e) => setGlobalSettings({ ...globalSettings, emptyStateText: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="Your account is ready. Head to your dashboard to get started." />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Completion Button Text</label>
+              <input value={globalSettings.completionButtonText || ''} onChange={(e) => setGlobalSettings({ ...globalSettings, completionButtonText: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="Go to My Dashboard" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Relationship Options (comma-separated)</label>
+              <input
+                value={(globalSettings.relationshipOptions || []).join(', ')}
+                onChange={(e) => setGlobalSettings({ ...globalSettings, relationshipOptions: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                placeholder="Spouse, Partner, Parent, Sibling, Friend, Neighbour, Other"
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="space-y-3">
@@ -291,6 +353,11 @@ export default function CmsOnboardingStepsPage() {
                       <div>
                         <label className="block text-xs font-medium text-gray-500 mb-1">Why It Matters</label>
                         <textarea value={step.content?.whyItMatters || ''} onChange={(e) => updateContent(step.stepId, { whyItMatters: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" rows={2} placeholder="Explanation of why this step is important..." />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">Why It Matters Heading</label>
+                        <input value={step.content?.whyItMattersHeading || ''} onChange={(e) => updateContent(step.stepId, { whyItMattersHeading: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="e.g. Why This Matters" />
+                        <p className="text-xs text-gray-400 mt-1">Defaults to "Why This Matters" if empty</p>
                       </div>
                     </div>
                   </div>
