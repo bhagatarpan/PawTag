@@ -353,6 +353,9 @@ async function seed() {
       { name: 'cms.sms_template.create', displayName: 'Create SMS Templates', description: 'Create SMS templates', resource: 'cms.sms_template', action: 'create', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
       { name: 'cms.sms_template.update', displayName: 'Update SMS Templates', description: 'Update SMS templates', resource: 'cms.sms_template', action: 'update', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
       { name: 'cms.sms_template.delete', displayName: 'Delete SMS Templates', description: 'Delete SMS templates', resource: 'cms.sms_template', action: 'delete', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
+      // CMS — Onboarding
+      { name: 'cms.onboarding.read', displayName: 'Read Onboarding Config', description: 'View customer onboarding configuration', resource: 'cms.onboarding', action: 'read', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
+      { name: 'cms.onboarding.update', displayName: 'Update Onboarding Config', description: 'Update customer onboarding configuration', resource: 'cms.onboarding', action: 'update', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
       // CMS — Pet References
       { name: 'cms.pet_reference.read', displayName: 'Read Pet References', description: 'View pet reference data', resource: 'cms.pet_reference', action: 'read', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
       { name: 'cms.pet_reference.create', displayName: 'Create Pet References', description: 'Create pet reference data', resource: 'cms.pet_reference', action: 'create', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },

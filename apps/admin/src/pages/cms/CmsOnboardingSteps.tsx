@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import {
   Plus, Trash2, GripVertical, Save, Eye, EyeOff, ChevronDown, ChevronUp,
   Heart, AlertTriangle, Zap, Phone, MapPin, PhoneCall, CheckCircle,
+  Shield, Info, Star, Gift, Bell,
 } from 'lucide-react';
 import api from '../../lib/api';
 import { toast } from '../../lib/toast';
@@ -15,48 +16,110 @@ interface OnboardingStep {
   isActive: boolean;
   type: 'info' | 'form';
   formFields?: string[];
-  content?: Record<string, unknown>;
+  content?: {
+    storyHeading?: string;
+    storyText?: string;
+    callout?: { icon: string; title: string; text: string; variant: 'warning' | 'info' | 'tip' };
+    privacyNote?: { icon: string; title: string; text: string };
+    whyItMatters?: string;
+    stats?: Array<{ number: string; label: string }>;
+    flowSteps?: Array<{ icon: string; label: string; description: string }>;
+  };
 }
 
-const ICON_MAP: Record<string, React.ElementType> = {
-  Heart, AlertTriangle, Zap, Phone, MapPin, PhoneCall, CheckCircle,
-};
-
-const AVAILABLE_ICONS = ['Heart', 'AlertTriangle', 'Zap', 'Phone', 'MapPin', 'PhoneCall', 'CheckCircle', 'Shield', 'Info', 'Star', 'Gift', 'Bell'];
-
+const ICON_OPTIONS = ['Heart', 'AlertTriangle', 'Zap', 'Phone', 'MapPin', 'PhoneCall', 'CheckCircle', 'Shield', 'Info', 'Star', 'Gift', 'Bell'];
 const FORM_FIELD_OPTIONS = [
   { value: 'phoneNumber', label: 'Phone Number' },
-  { value: 'email', label: 'Email Address' },
+  { value: 'email', label: 'Email' },
   { value: 'address.line1', label: 'Street Address' },
   { value: 'address.line2', label: 'Suburb' },
   { value: 'address.city', label: 'City' },
-  { value: 'address.state', label: 'State / Region' },
+  { value: 'address.state', label: 'State/Region' },
   { value: 'address.zip', label: 'Postal Code' },
-  { value: 'emergencyContact.name', label: 'Contact Name' },
-  { value: 'emergencyContact.relationship', label: 'Relationship' },
-  { value: 'emergencyContact.phone', label: 'Contact Phone' },
-  { value: 'emergencyContact.email', label: 'Contact Email' },
+  { value: 'emergencyContact.name', label: 'EC Name' },
+  { value: 'emergencyContact.relationship', label: 'EC Relationship' },
+  { value: 'emergencyContact.phone', label: 'EC Phone' },
+  { value: 'emergencyContact.email', label: 'EC Email' },
 ];
 
-export default function CmsOnboardingSteps() {
+const CALLOUT_VARIANTS = ['warning', 'info', 'tip'];
+
+function defaultStep(order: number): OnboardingStep {
+  return {
+    stepId: `step-${Date.now()}`,
+    title: 'New Step',
+    subtitle: '',
+    icon: 'Heart',
+    order,
+    isActive: true,
+    type: 'info',
+    content: {},
+  };
+}
+
+export default function CmsOnboardingStepsPage() {
   const [steps, setSteps] = useState<OnboardingStep[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [expandedStep, setExpandedStep] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchConfig();
+    api.get('/admin/cms/onboarding')
+      .then((res) => setSteps(res.data.data?.steps || []))
+      .catch(() => toast.error('Failed to load onboarding config'))
+      .finally(() => setLoading(false));
   }, []);
 
-  async function fetchConfig() {
-    try {
-      const res = await api.get('/admin/cms/onboarding');
-      setSteps(res.data.data?.steps || []);
-    } catch {
-      toast.error('Failed to load onboarding config');
-    } finally {
-      setLoading(false);
-    }
+  function updateStep(stepId: string, patch: Partial<OnboardingStep>) {
+    setSteps((prev) => prev.map((s) => s.stepId === stepId ? { ...s, ...patch } : s));
+  }
+
+  function updateContent(stepId: string, patch: Record<string, unknown>) {
+    setSteps((prev) => prev.map((s) => s.stepId === stepId ? { ...s, content: { ...s.content, ...patch } } : s));
+  }
+
+  function updateCallout(stepId: string, patch: Record<string, unknown>) {
+    setSteps((prev) => prev.map((s) => {
+      if (s.stepId !== stepId) return s;
+      const callout = s.content?.callout || { icon: 'Info', title: '', text: '', variant: 'info' as const };
+      return { ...s, content: { ...s.content, callout: { ...callout, ...patch } } };
+    }));
+  }
+
+  function updatePrivacyNote(stepId: string, patch: Record<string, unknown>) {
+    setSteps((prev) => prev.map((s) => {
+      if (s.stepId !== stepId) return s;
+      const note = s.content?.privacyNote || { icon: 'Lock', title: '', text: '' };
+      return { ...s, content: { ...s.content, privacyNote: { ...note, ...patch } } };
+    }));
+  }
+
+  function toggleFormField(stepId: string, field: string) {
+    setSteps((prev) => prev.map((s) => {
+      if (s.stepId !== stepId) return s;
+      const fields = s.formFields || [];
+      return { ...s, formFields: fields.includes(field) ? fields.filter((f) => f !== field) : [...fields, field] };
+    }));
+  }
+
+  function addStep() {
+    setSteps((prev) => [...prev, defaultStep(prev.length)]);
+  }
+
+  function removeStep(stepId: string) {
+    setSteps((prev) => prev.filter((s) => s.stepId !== stepId));
+  }
+
+  function moveStep(stepId: string, dir: 'up' | 'down') {
+    setSteps((prev) => {
+      const idx = prev.findIndex((s) => s.stepId === stepId);
+      if (idx === -1) return prev;
+      const swap = dir === 'up' ? idx - 1 : idx + 1;
+      if (swap < 0 || swap >= prev.length) return prev;
+      const next = [...prev];
+      [next[idx], next[swap]] = [next[swap], next[idx]];
+      return next.map((s, i) => ({ ...s, order: i }));
+    });
   }
 
   async function handleSave() {
@@ -65,67 +128,23 @@ export default function CmsOnboardingSteps() {
       await api.put('/admin/cms/onboarding', { steps });
       toast.success('Onboarding steps saved');
     } catch {
-      toast.error('Failed to save onboarding config');
+      toast.error('Failed to save');
     } finally {
       setSaving(false);
     }
   }
 
-  function addStep() {
-    const newStep: OnboardingStep = {
-      stepId: `step-${Date.now()}`,
-      title: 'New Step',
-      subtitle: '',
-      icon: 'Heart',
-      order: steps.length,
-      isActive: true,
-      type: 'info',
-    };
-    setSteps([...steps, newStep]);
-    setExpandedStep(newStep.stepId);
-  }
-
-  function removeStep(stepId: string) {
-    if (!confirm('Remove this step?')) return;
-    setSteps(steps.filter((s) => s.stepId !== stepId));
-  }
-
-  function updateStep(stepId: string, updates: Partial<OnboardingStep>) {
-    setSteps(steps.map((s) => (s.stepId === stepId ? { ...s, ...updates } : s)));
-  }
-
-  function moveStep(stepId: string, direction: 'up' | 'down') {
-    const idx = steps.findIndex((s) => s.stepId === stepId);
-    if (idx === -1) return;
-    const newSteps = [...steps];
-    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
-    if (swapIdx < 0 || swapIdx >= newSteps.length) return;
-    [newSteps[idx].order, newSteps[swapIdx].order] = [newSteps[swapIdx].order, newSteps[idx].order];
-    [newSteps[idx], newSteps[swapIdx]] = [newSteps[swapIdx], newSteps[idx]];
-    setSteps(newSteps);
-  }
-
-  function toggleFormField(stepId: string, field: string) {
-    const step = steps.find((s) => s.stepId === stepId);
-    if (!step) return;
-    const fields = step.formFields || [];
-    const updated = fields.includes(field) ? fields.filter((f) => f !== field) : [...fields, field];
-    updateStep(stepId, { formFields: updated });
-  }
-
-  if (loading) {
-    return <div className="flex items-center justify-center py-20 text-gray-500">Loading...</div>;
-  }
+  if (loading) return <div className="p-8 text-center text-gray-400">Loading...</div>;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="max-w-4xl mx-auto px-6 py-8">
+      <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Customer Onboarding</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Configure the onboarding wizard shown to new customers after registration.</p>
+          <p className="text-sm text-gray-500 mt-1">Configure the onboarding wizard shown to new customers after registration.</p>
         </div>
-        <div className="flex gap-2">
-          <button onClick={addStep} className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
+        <div className="flex items-center gap-3">
+          <button onClick={addStep} className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
             <Plus size={16} /> Add Step
           </button>
           <button onClick={handleSave} disabled={saving} className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 disabled:opacity-50">
@@ -136,7 +155,6 @@ export default function CmsOnboardingSteps() {
 
       <div className="space-y-3">
         {steps.map((step, idx) => {
-          const IconComp = ICON_MAP[step.icon] || Heart;
           const isExpanded = expandedStep === step.stepId;
           return (
             <div key={step.stepId} className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
@@ -147,7 +165,7 @@ export default function CmsOnboardingSteps() {
                 <GripVertical size={16} className="text-gray-300 shrink-0" />
                 <span className="text-xs text-gray-400 font-mono w-6 text-center">{idx + 1}</span>
                 <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${step.isActive ? 'bg-primary-50 text-primary-600' : 'bg-gray-100 text-gray-400'}`}>
-                  <IconComp size={16} />
+                  <span className="text-sm">{step.icon === 'Heart' ? '❤️' : step.icon === 'AlertTriangle' ? '⚠️' : step.icon === 'Zap' ? '⚡' : step.icon === 'Phone' ? '📞' : step.icon === 'MapPin' ? '📍' : step.icon === 'PhoneCall' ? '📲' : step.icon === 'CheckCircle' ? '✅' : step.icon === 'Shield' ? '🛡️' : step.icon === 'Star' ? '⭐' : step.icon === 'Gift' ? '🎁' : step.icon === 'Bell' ? '🔔' : 'ℹ️'}</span>
                 </span>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-900 truncate">{step.title}</p>
@@ -168,6 +186,7 @@ export default function CmsOnboardingSteps() {
 
               {isExpanded && (
                 <div className="px-5 pb-5 pt-2 border-t border-gray-100 space-y-4">
+                  {/* Basic Fields */}
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-medium text-gray-500 mb-1">Step ID</label>
@@ -176,7 +195,7 @@ export default function CmsOnboardingSteps() {
                     <div>
                       <label className="block text-xs font-medium text-gray-500 mb-1">Icon</label>
                       <select value={step.icon} onChange={(e) => updateStep(step.stepId, { icon: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
-                        {AVAILABLE_ICONS.map((ic) => <option key={ic} value={ic}>{ic}</option>)}
+                        {ICON_OPTIONS.map((ic) => <option key={ic} value={ic}>{ic}</option>)}
                       </select>
                     </div>
                   </div>
@@ -207,9 +226,77 @@ export default function CmsOnboardingSteps() {
                     </div>
                   </div>
 
+                  {/* Content Fields */}
+                  <div className="border-t border-gray-100 pt-4">
+                    <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-3">Content</h4>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">Story Heading</label>
+                        <input value={step.content?.storyHeading || ''} onChange={(e) => updateContent(step.stepId, { storyHeading: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="e.g. Your journey to pet safety starts here" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">Story Text</label>
+                        <textarea value={step.content?.storyText || ''} onChange={(e) => updateContent(step.stepId, { storyText: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" rows={3} placeholder="Main body text for this step..." />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">Why It Matters</label>
+                        <textarea value={step.content?.whyItMatters || ''} onChange={(e) => updateContent(step.stepId, { whyItMatters: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" rows={2} placeholder="Explanation of why this step is important..." />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Callout */}
+                  <div className="border-t border-gray-100 pt-4">
+                    <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-3">Callout Box</h4>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">Icon</label>
+                        <select value={step.content?.callout?.icon || 'Info'} onChange={(e) => updateCallout(step.stepId, { icon: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                          {ICON_OPTIONS.map((ic) => <option key={ic} value={ic}>{ic}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">Variant</label>
+                        <select value={step.content?.callout?.variant || 'info'} onChange={(e) => updateCallout(step.stepId, { variant: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                          {CALLOUT_VARIANTS.map((v) => <option key={v} value={v}>{v}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">Title</label>
+                        <input value={step.content?.callout?.title || ''} onChange={(e) => updateCallout(step.stepId, { title: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="Callout title" />
+                      </div>
+                    </div>
+                    <div className="mt-2">
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Callout Text</label>
+                      <textarea value={step.content?.callout?.text || ''} onChange={(e) => updateCallout(step.stepId, { text: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" rows={2} placeholder="Callout body text..." />
+                    </div>
+                  </div>
+
+                  {/* Privacy Note */}
+                  <div className="border-t border-gray-100 pt-4">
+                    <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-3">Privacy Note</h4>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">Title</label>
+                        <input value={step.content?.privacyNote?.title || ''} onChange={(e) => updatePrivacyNote(step.stepId, { title: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="e.g. Your Privacy Is Protected" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">Icon</label>
+                        <select value={step.content?.privacyNote?.icon || 'Shield'} onChange={(e) => updatePrivacyNote(step.stepId, { icon: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                          {ICON_OPTIONS.map((ic) => <option key={ic} value={ic}>{ic}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="mt-2">
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Text</label>
+                      <textarea value={step.content?.privacyNote?.text || ''} onChange={(e) => updatePrivacyNote(step.stepId, { text: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" rows={2} placeholder="Privacy assurance text..." />
+                    </div>
+                  </div>
+
+                  {/* Form Fields (only for form type) */}
                   {step.type === 'form' && (
-                    <div>
-                      <label className="block text-xs font-medium text-gray-500 mb-2">Form Fields</label>
+                    <div className="border-t border-gray-100 pt-4">
+                      <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-3">Form Fields</h4>
                       <div className="flex flex-wrap gap-2">
                         {FORM_FIELD_OPTIONS.map((opt) => (
                           <button
