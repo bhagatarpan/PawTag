@@ -78,6 +78,31 @@ export default function CmsOnboardingStepsPage() {
     setSteps((prev) => prev.map((s) => s.stepId === stepId ? { ...s, content: { ...s.content, ...patch } } : s));
   }
 
+  function updateStat(stepId: string, idx: number, patch: Record<string, string>) {
+    setSteps((prev) => prev.map((s) => {
+      if (s.stepId !== stepId) return s;
+      const stats = [...(s.content?.stats || [])];
+      stats[idx] = { ...stats[idx], ...patch };
+      return { ...s, content: { ...s.content, stats } };
+    }));
+  }
+
+  function addStat(stepId: string) {
+    setSteps((prev) => prev.map((s) => {
+      if (s.stepId !== stepId) return s;
+      const stats = [...(s.content?.stats || []), { number: '', label: '' }];
+      return { ...s, content: { ...s.content, stats } };
+    }));
+  }
+
+  function removeStat(stepId: string, idx: number) {
+    setSteps((prev) => prev.map((s) => {
+      if (s.stepId !== stepId) return s;
+      const stats = (s.content?.stats || []).filter((_, i) => i !== idx);
+      return { ...s, content: { ...s.content, stats } };
+    }));
+  }
+
   function updateCallout(stepId: string, patch: Record<string, unknown>) {
     setSteps((prev) => prev.map((s) => {
       if (s.stepId !== stepId) return s;
@@ -243,6 +268,29 @@ export default function CmsOnboardingStepsPage() {
                         <textarea value={step.content?.whyItMatters || ''} onChange={(e) => updateContent(step.stepId, { whyItMatters: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" rows={2} placeholder="Explanation of why this step is important..." />
                       </div>
                     </div>
+                  </div>
+
+                  {/* Stats Cards */}
+                  <div className="border-t border-gray-100 pt-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Stats Cards</h4>
+                      <button onClick={() => addStat(step.stepId)} className="text-xs text-primary-600 hover:text-primary-800 font-medium flex items-center gap-1">
+                        <Plus size={12} /> Add Stat
+                      </button>
+                    </div>
+                    {(step.content?.stats || []).length === 0 ? (
+                      <p className="text-xs text-gray-400">No stats configured. Click "Add Stat" to create stat cards.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {(step.content?.stats || []).map((stat, idx) => (
+                          <div key={idx} className="flex items-center gap-2">
+                            <input value={stat.number} onChange={(e) => updateStat(step.stepId, idx, { number: e.target.value })} className="w-24 border border-gray-300 rounded-lg px-3 py-1.5 text-sm" placeholder="e.g. 1 in 3" />
+                            <input value={stat.label} onChange={(e) => updateStat(step.stepId, idx, { label: e.target.value })} className="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-sm" placeholder="e.g. pets get lost in their lifetime" />
+                            <button onClick={() => removeStat(step.stepId, idx)} className="p-1 text-gray-400 hover:text-red-500"><Trash2 size={12} /></button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {/* Callout */}
