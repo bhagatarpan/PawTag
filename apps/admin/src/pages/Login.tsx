@@ -75,8 +75,11 @@ export default function Login() {
         tempToken: mfaTempToken,
         otp: mfaOtp,
       });
-      const { token: newToken, user: userData } = res.data.data;
+      const { token: newToken, refreshToken: newRefreshToken, user: userData } = res.data.data;
       localStorage.setItem('admin_token', newToken);
+      if (newRefreshToken) {
+        localStorage.setItem('admin_refresh_token', newRefreshToken);
+      }
       window.location.href = '/dashboard';
     } catch (err: any) {
       const code = err.response?.data?.code;

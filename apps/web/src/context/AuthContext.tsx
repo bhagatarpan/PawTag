@@ -22,7 +22,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (token) {
       api.get('/auth/me')
         .then((res) => setUser(res.data.data))
-        .catch(() => { localStorage.removeItem('pawtag_token'); setToken(null); })
+        .catch(() => {
+          localStorage.removeItem('pawtag_token');
+          localStorage.removeItem('pawtag_refresh_token');
+          setToken(null);
+        })
         .finally(() => setIsLoading(false));
     } else {
       setIsLoading(false);
@@ -50,8 +54,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return data.data;
     }
 
-    const { token: newToken, user: userData } = data.data;
+    const { token: newToken, refreshToken: newRefreshToken, user: userData } = data.data;
     localStorage.setItem('pawtag_token', newToken);
+    if (newRefreshToken) {
+      localStorage.setItem('pawtag_refresh_token', newRefreshToken);
+    }
     setToken(newToken);
     setUser(userData);
     return userData;
@@ -59,6 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = () => {
     localStorage.removeItem('pawtag_token');
+    localStorage.removeItem('pawtag_refresh_token');
     setToken(null);
     setUser(null);
   };

@@ -47,6 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           );
           if (!isAdmin) {
             localStorage.removeItem('admin_token');
+            localStorage.removeItem('admin_refresh_token');
             setToken(null);
             setUser(null);
           } else {
@@ -62,6 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         })
         .catch(() => {
           localStorage.removeItem('admin_token');
+          localStorage.removeItem('admin_refresh_token');
           setToken(null);
           setUser(null);
           setPermissions([]);
@@ -90,7 +92,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return data;
     }
 
-    const { token: newToken, user: userData } = data;
+    const { token: newToken, refreshToken: newRefreshToken, user: userData } = data;
     const isAdmin = userData.rbacRoles?.some((r: any) =>
       ['SUPER_ADMIN', 'ADMIN', 'CUSTOMER_SERVICE', 'WEBSITE_EDITOR'].includes(r.name)
     );
@@ -98,6 +100,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error('Access denied. Admin accounts only.');
     }
     localStorage.setItem('admin_token', newToken);
+    if (newRefreshToken) {
+      localStorage.setItem('admin_refresh_token', newRefreshToken);
+    }
     setToken(newToken);
     setUser(userData);
     return data;
@@ -105,6 +110,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = () => {
     localStorage.removeItem('admin_token');
+    localStorage.removeItem('admin_refresh_token');
     setToken(null);
     setUser(null);
     setPermissions([]);
