@@ -419,7 +419,7 @@ function DetailDrawer({
               <Section title="Quick Status" icon={<Activity size={16} />}>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="flex items-center justify-between p-3 rounded-lg bg-gray-50">
-                    <span className="text-sm text-gray-600">MFA</span>
+                    <span className="text-sm text-gray-600">Enable Customers MFA</span>
                     <button
                       onClick={handleToggleMfa}
                       disabled={actionLoading === 'mfa'}
