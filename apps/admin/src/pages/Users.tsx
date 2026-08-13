@@ -432,7 +432,7 @@ function DetailDrawer({
                     </button>
                   </div>
                   <div className="flex items-center justify-between p-3 rounded-lg bg-gray-50">
-                    <span className="text-sm text-gray-600">Skip OTP</span>
+                    <span className="text-sm text-gray-600">Skip Invoice OTP</span>
                     {user.skipInvoiceOtp && user.skipInvoiceOtpExpiresAt && new Date(user.skipInvoiceOtpExpiresAt) > new Date() ? (
                       <button
                         onClick={() => handleToggleSkipOtp(false)}
