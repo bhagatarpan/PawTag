@@ -454,10 +454,10 @@ pnpm typecheck
 
 ### Default Admin Account
 - Email: `admin@pawtag.co.nz`
-- Password: `PawTagAdmin2024!`
+- Password: `<ask user for password>`
 
 ### Default Test Customer
-- Email: `john@example.com`
+- Email: `arpanbhagat@yahoo.com`
 
 ## Dev-Time Email Routing
 

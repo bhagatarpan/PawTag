@@ -26,7 +26,7 @@ Used during database seeding to create initial accounts. Required in production 
 |----------|---------|-------------|
 | `BOOTSTRAP_ADMIN_EMAIL` | `admin@pawtag.co.nz` | Admin account email |
 | `BOOTSTRAP_ADMIN_PASSWORD` | *(random if unset in dev)* | Admin account password |
-| `BOOTSTRAP_TEST_EMAIL` | `john@example.com` | Test customer email |
+| `BOOTSTRAP_TEST_EMAIL` | `arpanbhagat@yahoo.com` | Test customer email |
 | `BOOTSTRAP_TEST_PASSWORD` | *(random if unset in dev)* | Test customer password |
 
 ## Frontend URLs

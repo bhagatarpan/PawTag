@@ -42,8 +42,8 @@ After seeding, these accounts are available:
 
 | Role | Email | Password |
 |------|-------|----------|
-| Admin | admin@pawtag.co.nz | PawTagAdmin2024! |
-| Test Customer | john@example.com | TestPass123! |
+| Admin | admin@pawtag.co.nz | *<set via BOOTSTRAP_ADMIN_PASSWORD>* |
+| Test Customer | arpanbhagat@yahoo.com | *<set via BOOTSTRAP_TEST_PASSWORD>* |
 
 ## Environment Variables
 

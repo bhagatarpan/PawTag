@@ -335,8 +335,8 @@ pnpm dev:all
 
 | Role | Email | Password |
 |------|-------|----------|
-| Admin | admin@pawtag.co.nz | PawTagAdmin2024! |
-| Test Customer | john@example.com | TestPass123! |
+| Admin | admin@pawtag.co.nz | |
+| Test Customer | arpanbhagat@yahoo.com | |
 
 ---
 
@@ -364,7 +364,7 @@ Copy `packages/api/.env.example` to `packages/api/.env` and configure:
 |----------|---------|-------------|
 | `BOOTSTRAP_ADMIN_EMAIL` | `admin@pawtag.co.nz` | Admin account email |
 | `BOOTSTRAP_ADMIN_PASSWORD` | *(random if unset)* | Admin account password |
-| `BOOTSTRAP_TEST_EMAIL` | `john@example.com` | Test customer email |
+| `BOOTSTRAP_TEST_EMAIL` | `arpanbhagat@yahoo.com` | Test customer email |
 
 ### Frontend URLs
 

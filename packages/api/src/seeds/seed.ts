@@ -842,7 +842,7 @@ async function seed() {
 
     // ── 7. Bootstrap Test Customer ──
     console.log('\n--- Bootstrapping Test Customer ---');
-    const testCustomerEmail = process.env.BOOTSTRAP_TEST_EMAIL || 'john@example.com';
+    const testCustomerEmail = process.env.BOOTSTRAP_TEST_EMAIL || 'arpanbhagat@yahoo.com';
     const testCustomerPassword = process.env.BOOTSTRAP_TEST_PASSWORD;
     if (!testCustomerPassword) {
       if (process.env.NODE_ENV === 'production') {
