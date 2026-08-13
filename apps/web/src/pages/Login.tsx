@@ -23,6 +23,7 @@ export default function Login() {
   const [mfaOtp, setMfaOtp] = useState('');
   const [mfaExpiry, setMfaExpiry] = useState(300);
   const [mfaLoading, setMfaLoading] = useState(false);
+  const [mfaSuccess, setMfaSuccess] = useState(false);
 
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -104,18 +105,28 @@ export default function Login() {
         tempToken: mfaTempToken,
         otp: mfaOtp,
       });
-      const { token: newToken, user: userData } = res.data.data;
+      const { token: newToken, refreshToken: newRefreshToken, user: userData } = res.data.data;
       localStorage.setItem('pawtag_token', newToken);
+      if (newRefreshToken) {
+        localStorage.setItem('pawtag_refresh_token', newRefreshToken);
+      }
+
+      // Show success animation
+      setMfaSuccess(true);
+      setMfaLoading(false);
 
       // Determine redirect based on RBAC role
       const roles: string[] = userData.rbacRoles?.map((r: any) => r.name) || [];
       const isAdmin = roles.some((r) => adminRoles.includes(r));
 
-      if (isAdmin) {
-        window.location.href = import.meta.env.VITE_ADMIN_URL || 'http://localhost:3001';
-      } else {
-        navigate('/account');
-      }
+      // Redirect after success animation
+      setTimeout(() => {
+        if (isAdmin) {
+          window.location.href = import.meta.env.VITE_ADMIN_URL || 'http://localhost:3001';
+        } else {
+          navigate('/account');
+        }
+      }, 1800);
     } catch (err: any) {
       const code = err.response?.data?.code;
       if (code === 'OTP_EXPIRED' || code === 'OTP_MAX_ATTEMPTS') {
@@ -138,6 +149,68 @@ export default function Login() {
       setError(err.response?.data?.error || 'Failed to resend code.');
     }
   };
+
+  // MFA Success screen
+  if (mfaSuccess) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          <div className="text-center mb-8">
+            <Link to="/" className="inline-flex items-center gap-2 mb-6">
+              <div className="h-12 w-12 bg-gradient-to-br from-teal-600 to-teal-700 rounded-xl flex items-center justify-center">
+                <PawPrint className="h-7 w-7 text-white" />
+              </div>
+            </Link>
+          </div>
+
+          <div className="bg-white rounded-2xl shadow-sm p-8">
+            <div className="flex flex-col items-center justify-center py-6">
+              {/* Animated checkmark circle */}
+              <div className="relative mb-6">
+                <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center animate-[scale-in_0.3s_cubic-bezier(0.34,1.56,0.64,1)]">
+                  <svg
+                    className="w-10 h-10 text-green-500"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2.5}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M5 13l4 4L19 7"
+                      className="animate-[draw-check_0.4s_ease-out_0.2s_both]"
+                      style={{
+                        strokeDasharray: 24,
+                        strokeDashoffset: 24,
+                        animation: 'draw-check 0.4s ease-out 0.2s forwards',
+                      }}
+                    />
+                  </svg>
+                </div>
+                {/* Pulse ring effect */}
+                <div className="absolute inset-0 rounded-full bg-green-200 animate-[ping_1s_cubic-bezier(0,0,0.2,1)_0.5s]" style={{ opacity: 0.4 }} />
+              </div>
+
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">Verification Successful</h2>
+              <p className="text-gray-500 text-center">Redirecting you to your account...</p>
+            </div>
+          </div>
+        </div>
+
+        <style>{`
+          @keyframes scale-in {
+            0% { transform: scale(0); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+          }
+          @keyframes draw-check {
+            0% { stroke-dashoffset: 24; }
+            100% { stroke-dashoffset: 0; }
+          }
+        `}</style>
+      </div>
+    );
+  }
 
   // MFA OTP screen
   if (mfaRequired) {
