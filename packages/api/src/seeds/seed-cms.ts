@@ -1157,11 +1157,21 @@ async function run() {
               },
             },
           ],
+          globalSettings: {
+            relationshipOptions: ['Spouse', 'Partner', 'Fiancé', 'Ex-Spouse', 'Ex-Partner', 'Parent', 'Stepparent', 'Parent-in-law', 'Grandparent', 'Sibling', 'Step-Sibling', 'Sibling-in-law', 'Child', 'Stepchild', 'Child-in-law', 'Grandchild', 'Uncle', 'Aunt', 'Cousin', 'Godparent', 'Godchild', 'Friend', 'Neighbour', 'Housemate', 'Work Colleague', 'Manager', 'Client', 'Mentor', 'Teacher', 'Caregiver', 'Other'],
+          },
           updatedBy: adminId,
         }], { session });
         console.log('  Created 7 onboarding steps');
       } else {
-        console.log('  Onboarding steps already exist');
+        if (!existingOnboarding.globalSettings?.relationshipOptions?.length) {
+          existingOnboarding.globalSettings = existingOnboarding.globalSettings || {};
+          existingOnboarding.globalSettings.relationshipOptions = ['Spouse', 'Partner', 'Fiancé', 'Ex-Spouse', 'Ex-Partner', 'Parent', 'Stepparent', 'Parent-in-law', 'Grandparent', 'Sibling', 'Step-Sibling', 'Sibling-in-law', 'Child', 'Stepchild', 'Child-in-law', 'Grandchild', 'Uncle', 'Aunt', 'Cousin', 'Godparent', 'Godchild', 'Friend', 'Neighbour', 'Housemate', 'Work Colleague', 'Manager', 'Client', 'Mentor', 'Teacher', 'Caregiver', 'Other'];
+          await existingOnboarding.save({ session });
+          console.log('  Added relationship options to existing onboarding config');
+        } else {
+          console.log('  Onboarding steps already exist');
+        }
       }
       console.log('');
 
