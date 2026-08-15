@@ -404,20 +404,20 @@ function DetailDrawer({
           {activeTab === 'profile' && (
             <div className="space-y-6">
               {/* Profile Action Bar */}
-              <div className="flex items-center justify-between p-3 rounded-lg bg-gray-50 border border-gray-200">
-                <span className="text-sm text-gray-600">
-                  {editMode ? 'Editing customer profile — all sections below are editable' : 'Viewing customer profile'}
-                </span>
+              <div className="flex items-center justify-end gap-2">
                 {editMode ? (
-                  <div className="flex gap-2">
-                    <button onClick={handleEditSave} disabled={editSaving} className="bg-primary-600 text-white px-4 py-2 rounded-md text-sm hover:bg-primary-700 flex items-center gap-1 disabled:opacity-50">
-                      {editSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Save All Changes
+                  <>
+                    <span className="text-xs text-gray-400 mr-auto">Editing all sections below</span>
+                    <button onClick={() => { setEditMode(false); setEditError(''); }} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
+                      Cancel
                     </button>
-                    <button onClick={() => { setEditMode(false); setEditError(''); }} className="border px-4 py-2 rounded-md text-sm">Cancel</button>
-                  </div>
+                    <button onClick={handleEditSave} disabled={editSaving} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary-600 bg-primary-50 hover:bg-primary-100 rounded-lg transition-colors disabled:opacity-50">
+                      {editSaving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />} Save
+                    </button>
+                  </>
                 ) : (
-                  <button onClick={() => setEditMode(true)} className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors">
-                    <Edit2 size={14} /> Edit Profile
+                  <button onClick={() => setEditMode(true)} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary-600 bg-primary-50 hover:bg-primary-100 rounded-lg transition-colors">
+                    <Edit2 size={13} /> Edit Profile
                   </button>
                 )}
               </div>
