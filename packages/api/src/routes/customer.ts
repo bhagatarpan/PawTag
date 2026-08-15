@@ -90,6 +90,17 @@ router.get('/pets', requirePermission('pet.read'), async (req: AuthRequest, res:
         } : null,
       };
     });
+    auditCustomerEvent(req, {
+      action: 'view',
+      eventType: 'navigation',
+      eventCategory: 'READ',
+      operationType: 'GET',
+      resourceType: 'Navigation',
+      outcome: 'SUCCESS',
+      severity: 'INFO',
+      businessOperation: 'Viewed pets list',
+    }).catch(() => {});
+
     res.json({ success: true, data: petsWithTag });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch pets' });
@@ -132,6 +143,17 @@ router.get('/pets/:id', requirePermission('pet.read'), async (req: AuthRequest, 
   try {
     const pet = await Pet.findOne({ _id: req.params.id, ownerId: req.user!.id, deletedAt: null });
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
+    auditCustomerEvent(req, {
+      action: 'view',
+      eventType: 'navigation',
+      eventCategory: 'READ',
+      operationType: 'GET',
+      resourceType: 'Navigation',
+      resourceId: pet._id.toString(),
+      outcome: 'SUCCESS',
+      severity: 'INFO',
+      businessOperation: `Viewed pet '${pet.name}'`,
+    }).catch(() => {});
     res.json({ success: true, data: pet });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch pet' });
@@ -186,6 +208,7 @@ router.post('/pets', requirePermission('pet.create'), validate(createPetSchema),
       resourceId: pet._id.toString(),
       outcome: 'SUCCESS',
       severity: 'MEDIUM',
+      businessOperation: `Created pet '${pet.name}'`,
       metadata: { name: pet.name, petType: pet.petType, petId: pet.petId, breed: pet.breed },
     });
 
@@ -258,6 +281,7 @@ router.put('/pets/:id', requirePermission('pet.update'), validate(updatePetSchem
       resourceId: pet._id.toString(),
       outcome: 'SUCCESS',
       severity: 'MEDIUM',
+      businessOperation: `Edited pet '${pet.name}'`,
       changedFields,
       metadata: { petId: pet.petId, updatedFields: Object.keys(updateData) },
     });
@@ -320,6 +344,7 @@ router.delete('/pets/:id', requirePermission('pet.delete'), async (req: AuthRequ
       resourceId: pet._id.toString(),
       outcome: 'SUCCESS',
       severity: 'HIGH',
+      businessOperation: `Deleted pet '${pet.name}'`,
       metadata: { name: pet.name, petId: pet.petId, petType: pet.petType, deletedAt: pet.deletedAt },
     });
 
@@ -463,6 +488,7 @@ router.post('/tags/redeem', requirePermission('tag.create'), async (req: AuthReq
       resourceId: tag._id.toString(),
       outcome: 'SUCCESS',
       severity: 'HIGH',
+      businessOperation: `Activated tag '${tag.tagId}'`,
       metadata: { tagId: tag.tagId, tagType: tag.tagType, petId: tag.petId?.toString(), replacedTagId: tag.replacesTagId?.toString(), orderId: tag.orderId?.toString() },
     });
 
@@ -543,6 +569,7 @@ router.post('/tags/:id/request-replacement', requirePermission('tag.create'), as
       resourceId: tag._id.toString(),
       outcome: 'SUCCESS',
       severity: 'HIGH',
+      businessOperation: `Requested tag replacement for '${tag.tagId}'`,
       metadata: { reason, replacementOrderNumber: orderNumber, replacementPrice, originalTagId: tag.tagId, newOrderId: order._id.toString() },
     });
 
@@ -637,6 +664,7 @@ router.post('/pets/:id/mark-lost', requirePermission('pet.update'), async (req: 
       resourceId: pet._id.toString(),
       outcome: 'SUCCESS',
       severity: 'HIGH',
+      businessOperation: `Marked '${pet.name}' as lost`,
       changedFields: [{ field: 'status', before: oldStatus, after: 'lost', sensitive: false }],
       metadata: { petId: pet.petId, oldStatus, lostCount: pet.lostCount, 'totalOwnerLostCount': totalLostCount, tagsUpdated: true },
     });
@@ -717,6 +745,7 @@ router.post('/pets/:id/mark-found', requirePermission('pet.update'), async (req:
       resourceId: pet._id.toString(),
       outcome: 'SUCCESS',
       severity: 'HIGH',
+      businessOperation: `Marked '${pet.name}' as found`,
       changedFields: [{ field: 'status', before: oldStatus, after: 'safe', sensitive: false }],
       metadata: { petId: pet.petId, oldStatus, wasFoundByFinder, timeToFoundMs, 'totalOwnerLostCount': totalLostCount, tagsReactivated: true },
     });
@@ -853,6 +882,7 @@ router.post('/cart/items', requirePermission('order.create'), async (req: AuthRe
       metadata: { productId, quantity, cartItemId: (cartItem as any)?._id?.toString?.() },
       outcome: 'SUCCESS',
       severity: 'LOW',
+      businessOperation: `Added item to cart`,
     });
 
     res.json({ success: true, data: cart });
@@ -894,6 +924,7 @@ router.put('/cart/items/:itemId', requirePermission('order.create'), async (req:
       metadata: { productId: (item as any)?.productId?.toString?.(), quantity, cartItemId: req.params.itemId, removed },
       outcome: 'SUCCESS',
       severity: 'LOW',
+      businessOperation: `Updated cart item quantity`,
     });
 
     res.json({ success: true, data: cart });
@@ -923,6 +954,7 @@ router.delete('/cart/items/:itemId', requirePermission('order.create'), async (r
       metadata: { productId: (removedItem as any)?.productId?.toString?.(), cartItemId: req.params.itemId },
       outcome: 'SUCCESS',
       severity: 'LOW',
+      businessOperation: `Removed item from cart`,
     });
 
     res.json({ success: true, data: cart });
@@ -947,6 +979,7 @@ router.delete('/cart', requirePermission('order.create'), async (req: AuthReques
       metadata: { itemCount, bulk: true },
       outcome: 'SUCCESS',
       severity: 'LOW',
+      businessOperation: `Cleared cart`,
     });
 
     res.json({ success: true, data: { message: 'Cart cleared' } });
@@ -984,6 +1017,16 @@ router.delete('/cart', requirePermission('order.create'), async (req: AuthReques
 router.get('/orders', requirePermission('order.read'), async (req: AuthRequest, res: Response) => {
   try {
     const orders = await Order.find({ userId: req.user!.id }).sort({ createdAt: -1 });
+    auditCustomerEvent(req, {
+      action: 'view',
+      eventType: 'navigation',
+      eventCategory: 'READ',
+      operationType: 'GET',
+      resourceType: 'Navigation',
+      outcome: 'SUCCESS',
+      severity: 'INFO',
+      businessOperation: 'Viewed orders',
+    }).catch(() => {});
     res.json({ success: true, data: orders });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch orders' });
@@ -1026,6 +1069,17 @@ router.get('/orders/:id', requirePermission('order.read'), async (req: AuthReque
   try {
     const order = await Order.findOne({ _id: req.params.id, userId: req.user!.id });
     if (!order) { res.status(404).json({ success: false, error: 'Order not found' }); return; }
+    auditCustomerEvent(req, {
+      action: 'view',
+      eventType: 'navigation',
+      eventCategory: 'READ',
+      operationType: 'GET',
+      resourceType: 'Navigation',
+      resourceId: order._id.toString(),
+      outcome: 'SUCCESS',
+      severity: 'INFO',
+      businessOperation: 'Viewed order details',
+    }).catch(() => {});
     res.json({ success: true, data: order });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch order' });
@@ -1204,6 +1258,7 @@ router.post('/orders', requirePermission('order.create'), async (req: AuthReques
       resourceId: order._id.toString(),
       outcome: 'SUCCESS',
       severity: 'HIGH',
+      businessOperation: `Placed order`,
       metadata: {
         orderNumber,
         totalAmount: finalAmount,
@@ -1378,6 +1433,7 @@ router.post('/orders/:orderNumber/confirm-payment', requirePermission('order.cre
         { field: 'status', before: 'pending_payment', after: updatedOrder?.status },
         { field: 'payment.status', before: 'pending', after: 'completed' },
       ],
+      businessOperation: `Confirmed payment for order`,
       metadata: { orderNumber, amount: order.payment.amount },
       outcome: 'SUCCESS',
       severity: 'HIGH',
@@ -1420,6 +1476,16 @@ router.get('/notifications', requirePermission('notification.read'), async (req:
     const notifications = await Notification.find({ userId: req.user!.id })
       .sort({ createdAt: -1 })
       .limit(50);
+    auditCustomerEvent(req, {
+      action: 'view',
+      eventType: 'navigation',
+      eventCategory: 'READ',
+      operationType: 'GET',
+      resourceType: 'Navigation',
+      outcome: 'SUCCESS',
+      severity: 'INFO',
+      businessOperation: 'Viewed notifications',
+    }).catch(() => {});
     res.json({ success: true, data: notifications });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch notifications' });
@@ -1517,6 +1583,17 @@ router.get('/responsibility', requirePermission('customer.read'), async (req: Au
     else if (totalLostCount <= 4) { rating = 'Needs Improvement'; color = 'orange'; }
     else { rating = 'At Risk'; color = 'red'; }
 
+    auditCustomerEvent(req, {
+      action: 'view',
+      eventType: 'navigation',
+      eventCategory: 'READ',
+      operationType: 'GET',
+      resourceType: 'Navigation',
+      outcome: 'SUCCESS',
+      severity: 'INFO',
+      businessOperation: 'Viewed responsibility score',
+    }).catch(() => {});
+
     res.json({
       success: true,
       data: {
@@ -1571,6 +1648,7 @@ router.post('/pets/:id/mark-terminal', requirePermission('pet.update'), async (r
       beforeState: { status: oldStatus },
       afterState: { status: reason },
       changedFields: [{ field: 'status', before: oldStatus, after: reason }],
+      businessOperation: `Marked '${pet.name}' as ${reason}`,
       metadata: { reason, tagsDeactivated: true },
       outcome: 'SUCCESS',
       severity: 'HIGH',
@@ -1595,6 +1673,7 @@ router.delete('/notifications/clear-read', requirePermission('notification.delet
       metadata: { deletedCount: result.deletedCount, bulk: true },
       outcome: 'SUCCESS',
       severity: 'LOW',
+      businessOperation: `Cleared read notifications`,
     });
     res.json({ success: true, data: { deletedCount: result.deletedCount } });
   } catch {
@@ -1615,6 +1694,7 @@ router.put('/notifications/mark-all-read', requirePermission('notification.updat
       metadata: { modifiedCount: result.modifiedCount, bulk: true },
       outcome: 'SUCCESS',
       severity: 'LOW',
+      businessOperation: `Marked all notifications as read`,
     });
     res.json({ success: true, data: { message: 'All notifications marked as read' } });
   } catch {
@@ -1673,6 +1753,7 @@ router.put('/notification-preferences', requirePermission('notification.update')
       beforeState: (userBefore as any)?.notificationPreferences,
       afterState: (user as any)?.notificationPreferences,
       changedFields: Object.keys(update).map((field) => ({ field: field.replace('notificationPreferences.', ''), before: undefined, after: update[field] })),
+      businessOperation: `Updated notification preferences`,
       metadata: { fields: Object.keys(update) },
       outcome: 'SUCCESS',
       severity: 'LOW',
@@ -1719,6 +1800,7 @@ router.post('/pets/:id/vaccinations', requirePermission('vaccination.create'), a
       resourceType: 'Pet',
       resourceId: pet._id.toString(),
       afterState: (createdVaccination as any)?.toObject?.(),
+      businessOperation: `Added vaccination for '${pet.name}'`,
       metadata: { subResource: 'vaccination', subResourceId: (createdVaccination as any)?._id?.toString?.() },
       outcome: 'SUCCESS',
       severity: 'LOW',
@@ -1755,6 +1837,7 @@ router.put('/pets/:id/vaccinations/:vaxId', requirePermission('vaccination.updat
       beforeState: beforeSnapshot,
       afterState: vax.toObject(),
       changedFields,
+      businessOperation: `Updated vaccination for '${pet.name}'`,
       metadata: { subResource: 'vaccination', subResourceId: vax._id?.toString?.() },
       outcome: 'SUCCESS',
       severity: 'LOW',
@@ -1784,6 +1867,7 @@ router.delete('/pets/:id/vaccinations/:vaxId', requirePermission('vaccination.de
       resourceType: 'Pet',
       resourceId: pet._id.toString(),
       beforeState: removedVaccination,
+      businessOperation: `Deleted vaccination for '${pet.name}'`,
       metadata: { subResource: 'vaccination', subResourceId: vax._id?.toString?.() },
       outcome: 'SUCCESS',
       severity: 'LOW',
@@ -1822,6 +1906,7 @@ router.post('/pets/:id/microchips', requirePermission('microchip.create'), async
       resourceType: 'Pet',
       resourceId: pet._id.toString(),
       afterState: (createdMicrochip as any)?.toObject?.(),
+      businessOperation: `Added microchip for '${pet.name}'`,
       metadata: { subResource: 'microchip', subResourceId: (createdMicrochip as any)?._id?.toString?.() },
       outcome: 'SUCCESS',
       severity: 'LOW',
@@ -1858,6 +1943,7 @@ router.put('/pets/:id/microchips/:chipId', requirePermission('microchip.update')
       beforeState: chipBefore,
       afterState: chip.toObject(),
       changedFields,
+      businessOperation: `Updated microchip for '${pet.name}'`,
       metadata: { subResource: 'microchip', subResourceId: chip._id?.toString?.() },
       outcome: 'SUCCESS',
       severity: 'LOW',
@@ -1887,6 +1973,7 @@ router.delete('/pets/:id/microchips/:chipId', requirePermission('microchip.delet
       resourceType: 'Pet',
       resourceId: pet._id.toString(),
       beforeState: removedMicrochip,
+      businessOperation: `Deleted microchip for '${pet.name}'`,
       metadata: { subResource: 'microchip', subResourceId: chip._id?.toString?.() },
       outcome: 'SUCCESS',
       severity: 'LOW',
@@ -1925,6 +2012,7 @@ router.post('/pets/:id/medications', requirePermission('medication.create'), asy
       resourceType: 'Pet',
       resourceId: pet._id.toString(),
       afterState: (createdMedication as any)?.toObject?.(),
+      businessOperation: `Added medication for '${pet.name}'`,
       metadata: { subResource: 'medication', subResourceId: (createdMedication as any)?._id?.toString?.() },
       outcome: 'SUCCESS',
       severity: 'LOW',
@@ -1961,6 +2049,7 @@ router.put('/pets/:id/medications/:medId', requirePermission('medication.update'
       beforeState: medBefore,
       afterState: med.toObject(),
       changedFields,
+      businessOperation: `Updated medication for '${pet.name}'`,
       metadata: { subResource: 'medication', subResourceId: med._id?.toString?.() },
       outcome: 'SUCCESS',
       severity: 'LOW',
@@ -1990,6 +2079,7 @@ router.delete('/pets/:id/medications/:medId', requirePermission('medication.dele
       resourceType: 'Pet',
       resourceId: pet._id.toString(),
       beforeState: removedMedication,
+      businessOperation: `Deleted medication for '${pet.name}'`,
       metadata: { subResource: 'medication', subResourceId: med._id?.toString?.() },
       outcome: 'SUCCESS',
       severity: 'LOW',
@@ -2028,6 +2118,7 @@ router.post('/pets/:id/allergies', requirePermission('allergy.create'), async (r
       resourceType: 'Pet',
       resourceId: pet._id.toString(),
       afterState: (createdAllergy as any)?.toObject?.(),
+      businessOperation: `Added allergy for '${pet.name}'`,
       metadata: { subResource: 'allergy', subResourceId: (createdAllergy as any)?._id?.toString?.() },
       outcome: 'SUCCESS',
       severity: 'LOW',
@@ -2064,6 +2155,7 @@ router.put('/pets/:id/allergies/:allergyId', requirePermission('allergy.update')
       beforeState: allergyBefore,
       afterState: allergy.toObject(),
       changedFields,
+      businessOperation: `Updated allergy for '${pet.name}'`,
       metadata: { subResource: 'allergy', subResourceId: allergy._id?.toString?.() },
       outcome: 'SUCCESS',
       severity: 'LOW',
@@ -2093,6 +2185,7 @@ router.delete('/pets/:id/allergies/:allergyId', requirePermission('allergy.delet
       resourceType: 'Pet',
       resourceId: pet._id.toString(),
       beforeState: removedAllergy,
+      businessOperation: `Deleted allergy for '${pet.name}'`,
       metadata: { subResource: 'allergy', subResourceId: allergy._id?.toString?.() },
       outcome: 'SUCCESS',
       severity: 'LOW',
@@ -2158,6 +2251,7 @@ router.put('/pets/:id/vet-details/:vetId', requirePermission('vet_visit.update')
       beforeState: vetBefore,
       afterState: vet.toObject(),
       changedFields,
+      businessOperation: `Updated vet details for '${pet.name}'`,
       metadata: { subResource: 'vetDetail', subResourceId: vet._id?.toString?.() },
       outcome: 'SUCCESS',
       severity: 'LOW',
@@ -2210,6 +2304,7 @@ router.post('/pets/:id/surgeries', requirePermission('surgery.create'), async (r
       resourceType: 'Pet',
       resourceId: pet._id.toString(),
       afterState: (createdSurgery as any)?.toObject?.(),
+      businessOperation: `Added surgery record for '${pet.name}'`,
       metadata: { subResource: 'surgery', subResourceId: (createdSurgery as any)?._id?.toString?.() },
       outcome: 'SUCCESS',
       severity: 'LOW',
@@ -2246,6 +2341,7 @@ router.put('/pets/:id/surgeries/:surgId', requirePermission('surgery.update'), a
       beforeState: surgBefore,
       afterState: surg.toObject(),
       changedFields,
+      businessOperation: `Updated surgery record for '${pet.name}'`,
       metadata: { subResource: 'surgery', subResourceId: surg._id?.toString?.() },
       outcome: 'SUCCESS',
       severity: 'LOW',
@@ -2275,6 +2371,7 @@ router.delete('/pets/:id/surgeries/:surgId', requirePermission('surgery.delete')
       resourceType: 'Pet',
       resourceId: pet._id.toString(),
       beforeState: removedSurgery,
+      businessOperation: `Deleted surgery record for '${pet.name}'`,
       metadata: { subResource: 'surgery', subResourceId: surg._id?.toString?.() },
       outcome: 'SUCCESS',
       severity: 'LOW',
@@ -2314,6 +2411,7 @@ router.post('/pets/:id/weight-history', requirePermission('weight.create'), asyn
       resourceType: 'Pet',
       resourceId: pet._id.toString(),
       afterState: (createdWeight as any)?.toObject?.(),
+      businessOperation: `Recorded weight for '${pet.name}'`,
       metadata: { subResource: 'weight', subResourceId: (createdWeight as any)?._id?.toString?.() },
       outcome: 'SUCCESS',
       severity: 'LOW',
@@ -2343,6 +2441,7 @@ router.delete('/pets/:id/weight-history/:wid', requirePermission('weight.delete'
       resourceType: 'Pet',
       resourceId: pet._id.toString(),
       beforeState: removedWeight,
+      businessOperation: `Deleted weight record for '${pet.name}'`,
       metadata: { subResource: 'weight', subResourceId: rec._id?.toString?.() },
       outcome: 'SUCCESS',
       severity: 'LOW',
@@ -2381,6 +2480,7 @@ router.post('/pets/:id/health-conditions', requirePermission('medical_record.cre
       resourceType: 'Pet',
       resourceId: pet._id.toString(),
       afterState: (createdCondition as any)?.toObject?.(),
+      businessOperation: `Added health condition for '${pet.name}'`,
       metadata: { subResource: 'health_condition', subResourceId: (createdCondition as any)?._id?.toString?.() },
       outcome: 'SUCCESS',
       severity: 'LOW',
@@ -2417,6 +2517,7 @@ router.put('/pets/:id/health-conditions/:condId', requirePermission('medical_rec
       beforeState: condBefore,
       afterState: cond.toObject(),
       changedFields,
+      businessOperation: `Updated health condition for '${pet.name}'`,
       metadata: { subResource: 'health_condition', subResourceId: cond._id?.toString?.() },
       outcome: 'SUCCESS',
       severity: 'LOW',
@@ -2446,6 +2547,7 @@ router.delete('/pets/:id/health-conditions/:condId', requirePermission('medical_
       resourceType: 'Pet',
       resourceId: pet._id.toString(),
       beforeState: removedCondition,
+      businessOperation: `Deleted health condition for '${pet.name}'`,
       metadata: { subResource: 'health_condition', subResourceId: cond._id?.toString?.() },
       outcome: 'SUCCESS',
       severity: 'LOW',
@@ -2491,6 +2593,7 @@ router.put('/pets/:id/desexing', requirePermission('desexing.update'), async (re
       beforeState: desexingBefore ? { ...(desexingBefore as any) } : {},
       afterState: req.body,
       changedFields,
+      businessOperation: `Updated desexing status for '${pet.name}'`,
       metadata: { subResource: 'desexing' },
       outcome: 'SUCCESS',
       severity: 'LOW',
@@ -2544,6 +2647,7 @@ router.put('/settings/mfa', requirePermission('pet.read'), async (req: AuthReque
       beforeState: { mfaEnabled: oldValue },
       afterState: { mfaEnabled },
       changedFields: [{ field: 'mfaEnabled', before: oldValue, after: mfaEnabled, sensitive: true }],
+      businessOperation: `${mfaEnabled ? 'Enabled' : 'Disabled'} two-factor authentication`,
       outcome: 'SUCCESS',
       severity: 'HIGH',
     }, { actorType: 'USER' });
@@ -2601,6 +2705,7 @@ router.put('/settings/finder-privacy', requirePermission('pet.read'), async (req
       beforeState: { showOwnerNameInFinder: oldValue },
       afterState: { showOwnerNameInFinder },
       changedFields: [{ field: 'showOwnerNameInFinder', before: oldValue, after: showOwnerNameInFinder, sensitive: false }],
+      businessOperation: `${showOwnerNameInFinder ? 'Showed' : 'Hid'} name from finders`,
       outcome: 'SUCCESS',
       severity: 'MEDIUM',
     }, { actorType: 'USER' });
@@ -2637,6 +2742,7 @@ router.put('/settings/onboarding-complete', requirePermission('pet.read'), async
         { field: 'onboardingCompleted', before: false, after: true, sensitive: false },
         { field: 'onboardingSkipped', before: user.onboardingSkipped, after: false, sensitive: false },
       ],
+      businessOperation: `Completed onboarding`,
       outcome: 'SUCCESS',
       severity: 'LOW',
     }, { actorType: 'USER' });
@@ -2676,6 +2782,7 @@ router.put('/settings/onboarding-skip', requirePermission('pet.read'), async (re
         { field: 'onboardingSkipped', before: false, after: true, sensitive: false },
         { field: 'onboardingSkippedAt', before: null, after: user.onboardingSkippedAt, sensitive: false },
       ],
+      businessOperation: `Skipped onboarding`,
       outcome: 'SUCCESS',
       severity: 'LOW',
     }, { actorType: 'USER' });
@@ -2715,6 +2822,7 @@ router.put('/settings/onboarding-dismiss', requirePermission('pet.read'), async 
         { field: 'onboardingCompleted', before: false, after: true, sensitive: false },
         { field: 'onboardingSkipped', before: false, after: true, sensitive: false },
       ],
+      businessOperation: `Dismissed onboarding`,
       outcome: 'SUCCESS',
       severity: 'LOW',
     }, { actorType: 'USER' });
@@ -2796,6 +2904,7 @@ router.post('/escalations/:id/resolve', requirePermission('pet.update'), async (
       beforeState: { status: 'pending' },
       afterState: { status: 'resolved' },
       changedFields: [{ field: 'status', before: 'pending', after: 'resolved', sensitive: false }],
+      businessOperation: `Resolved escalation`,
       outcome: 'SUCCESS',
       severity: 'LOW',
     }, { actorType: 'USER' });
@@ -2851,6 +2960,7 @@ router.post('/escalations/:id/forward', requirePermission('pet.update'), async (
       beforeState: { status: 'pending' },
       afterState: { status: 'forwarded' },
       changedFields: [{ field: 'status', before: 'pending', after: 'forwarded', sensitive: false }],
+      businessOperation: `Forwarded escalation to emergency contact`,
       outcome: 'SUCCESS',
       severity: 'MEDIUM',
     }, { actorType: 'USER' });

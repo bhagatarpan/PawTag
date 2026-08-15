@@ -289,6 +289,7 @@ router.put('/:id/auto-renew', requirePermission('customer.read'), async (req: Au
       resourceId: subscription._id.toString(),
       outcome: 'SUCCESS',
       severity: 'MEDIUM',
+      businessOperation: `${autoRenew ? 'Enabled' : 'Disabled'} auto-renew for subscription '${subscription._id}'`,
       beforeState: { autoRenew: oldAutoRenew },
       afterState: { autoRenew: subscription.autoRenew },
     });
@@ -396,6 +397,7 @@ router.post('/portal-link', requirePermission('customer.read'), async (req: Auth
         resourceId: subscriptionId,
         outcome: 'SUCCESS',
         severity: 'MEDIUM',
+        businessOperation: 'Generated Stripe billing portal link (demo mode)',
         metadata: {
           userId: req.user?.id,
           subscriptionId,
@@ -444,6 +446,7 @@ router.post('/portal-link', requirePermission('customer.read'), async (req: Auth
       resourceId: subscriptionId,
       outcome: 'SUCCESS',
       severity: 'MEDIUM',
+      businessOperation: 'Generated Stripe billing portal link',
       metadata: {
         userId: req.user?.id,
         subscriptionId,

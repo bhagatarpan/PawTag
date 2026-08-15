@@ -92,6 +92,7 @@ interface AuditEvent {
   metadata?: Record<string, unknown>;
   beforeState?: Record<string, unknown>;
   afterState?: Record<string, unknown>;
+  businessOperation?: string;
   changedFields?: Array<{ field: string; before: unknown; after: unknown; sensitive?: boolean }>;
 }
 
@@ -443,10 +444,14 @@ function DetailDrawer({
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50">
           <div className="flex items-center gap-3 min-w-0">
-            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${getActionColor(event.action)}`}>
-              {getActionIcon(event.action)}
-              {event.action}
-            </span>
+            {event.businessOperation ? (
+              <span className="text-sm font-semibold text-gray-900 truncate">{event.businessOperation}</span>
+            ) : (
+              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${getActionColor(event.action)}`}>
+                {getActionIcon(event.action)}
+                {event.action}
+              </span>
+            )}
             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${getOutcomeBadge(event.outcome)}`}>
               {getOutcomeIcon(event.outcome)}
               {event.outcome}
@@ -478,8 +483,19 @@ function DetailDrawer({
         <div className="flex-1 overflow-y-auto px-6 py-5">
           {activeTab === 'details' && (
             <div className="space-y-6">
+              {/* What Happened - Narrative */}
+              {event.businessOperation && (
+                <div className="bg-gradient-to-br from-primary-50 to-primary-100/50 rounded-xl p-5 border border-primary-200">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-xs text-primary-600 uppercase tracking-wider font-medium">What Happened</span>
+                  </div>
+                  <p className="text-base font-semibold text-primary-900">{event.businessOperation}</p>
+                </div>
+              )}
+
               {/* Event Details */}
               <Section title="Event Details" icon={<FileText size={16} />}>
+                {event.businessOperation && <DetailRow label="Narrative" value={event.businessOperation} />}
                 <DetailRow label="Action" value={event.action} />
                 <DetailRow label="Event Type" value={event.eventType} />
                 <DetailRow label="Category" value={event.eventCategory} />
@@ -1427,12 +1443,26 @@ export default function AuditTrail() {
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border ${getActionColor(ev.action)}`}>
-                          {getActionIcon(ev.action)}
-                          {ev.action}
-                        </span>
-                        {ev.eventType && (
-                          <div className="text-xs text-gray-400 mt-1 truncate max-w-[200px]">{ev.eventType}</div>
+                        {ev.businessOperation ? (
+                          <div>
+                            <div className="text-sm text-gray-900 font-medium">{ev.businessOperation}</div>
+                            <div className="flex items-center gap-1.5 mt-1">
+                              <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium border ${getActionColor(ev.action)}`}>
+                                {getActionIcon(ev.action)}
+                                {ev.action}
+                              </span>
+                            </div>
+                          </div>
+                        ) : (
+                          <div>
+                            <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border ${getActionColor(ev.action)}`}>
+                              {getActionIcon(ev.action)}
+                              {ev.action}
+                            </span>
+                            {ev.eventType && (
+                              <div className="text-xs text-gray-400 mt-1 truncate max-w-[200px]">{ev.eventType}</div>
+                            )}
+                          </div>
                         )}
                       </td>
                       <td className="px-4 py-3 hidden lg:table-cell">
