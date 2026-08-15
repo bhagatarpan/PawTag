@@ -854,7 +854,7 @@ router.get('/users/:id/subscriptions', requirePermission('user.read'), async (re
 });
 
 // GET /api/admin/users/:id/referrals — fetch referral info for a specific user
-router.get('/users/:id/referrals', requirePermission('user.read'), async (req, res: Response) => {
+router.get('/users/:id/referrals', requirePermission('user.read'), async (req: AuthRequest, res: Response) => {
   try {
     const user = await User.findOne({ _id: req.params.id, deletedAt: null }).select('_id');
     if (!user) { res.status(404).json({ success: false, error: 'User not found' }); return; }
@@ -872,6 +872,20 @@ router.get('/users/:id/referrals', requirePermission('user.read'), async (req, r
     const referredByRecord = await Referral.findOne({ refereeId: req.params.id })
       .populate('referrerId', 'fullName email')
       .lean();
+
+    // Audit log: CSR viewed customer referral data
+    await auditAdminEvent(req, {
+      action: 'referral_data_viewed',
+      eventType: 'referral_data_access',
+      eventCategory: 'ADMIN',
+      operationType: 'READ',
+      resourceType: 'Referral',
+      resourceId: req.params.id,
+      outcome: 'SUCCESS',
+      severity: 'MEDIUM',
+      changedFields: [],
+      metadata: { targetUserId: req.params.id, hadCode: !!referralCode },
+    });
 
     res.json({
       success: true,

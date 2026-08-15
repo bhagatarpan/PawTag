@@ -204,6 +204,9 @@ function DetailDrawer({
   const [selectedAdminOrder, setSelectedAdminOrder] = useState<Order | null>(null);
   const [userReferrals, setUserReferrals] = useState<any>(null);
   const [userReferralsLoading, setUserReferralsLoading] = useState(false);
+  const [codeRevealed, setCodeRevealed] = useState(false);
+  const [codeCountdown, setCodeCountdown] = useState(0);
+  const codeTimerRef = useRef<NodeJS.Timeout | null>(null);
   const navigate = useNavigate();
   const drawerRef = useRef<HTMLDivElement>(null);
 
@@ -286,6 +289,37 @@ function DetailDrawer({
       setUserReferrals(res.data.data);
     } catch { /* non-critical */ } finally { setUserReferralsLoading(false); }
   }, [user]);
+
+  const revealCode = useCallback(() => {
+    setCodeRevealed(true);
+    setCodeCountdown(30);
+    if (codeTimerRef.current) clearInterval(codeTimerRef.current);
+    codeTimerRef.current = setInterval(() => {
+      setCodeCountdown((prev) => {
+        if (prev <= 1) {
+          setCodeRevealed(false);
+          if (codeTimerRef.current) clearInterval(codeTimerRef.current);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  }, []);
+
+  const hideCode = useCallback(() => {
+    setCodeRevealed(false);
+    setCodeCountdown(0);
+    if (codeTimerRef.current) { clearInterval(codeTimerRef.current); codeTimerRef.current = null; }
+  }, []);
+
+  // Cleanup timer on unmount or tab change
+  useEffect(() => {
+    return () => { if (codeTimerRef.current) clearInterval(codeTimerRef.current); };
+  }, []);
+
+  useEffect(() => {
+    if (activeTab !== 'referrals') hideCode();
+  }, [activeTab, hideCode]);
 
   useEffect(() => {
     if (activeTab === 'orders') fetchUserOrders();
@@ -916,17 +950,43 @@ function DetailDrawer({
                   <Section title="Referral Code" icon={<Gift size={16} />}>
                     {userReferrals.code ? (
                       <div className="bg-gradient-to-br from-teal-600 to-teal-700 rounded-xl p-5 text-white">
-                        <p className="text-xs text-white/70 uppercase tracking-wider mb-2">Your Referral Code</p>
-                        <div className="flex items-center gap-3">
-                          <span className="font-mono text-2xl font-bold tracking-wider">{userReferrals.code}</span>
-                          <button
-                            onClick={() => { navigator.clipboard.writeText(userReferrals.code); toast.success('Copied to clipboard'); }}
-                            className="p-2 rounded-lg bg-white/20 hover:bg-white/30 transition-colors"
-                          >
-                            <Copy size={16} />
-                          </button>
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-xs text-white/70 uppercase tracking-wider">Customer Referral Code</p>
+                          {codeRevealed && (
+                            <span className="text-xs text-white/50">Hides in {codeCountdown}s</span>
+                          )}
                         </div>
-                        <p className="text-xs text-white/60 mt-2">Share this code with friends to earn rewards</p>
+                        <div className="flex items-center gap-3">
+                          <span className="font-mono text-2xl font-bold tracking-wider">
+                            {codeRevealed ? userReferrals.code : '••••••••'}
+                          </span>
+                          {codeRevealed ? (
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => { navigator.clipboard.writeText(userReferrals.code); toast.success('Copied to clipboard'); }}
+                                className="p-2 rounded-lg bg-white/20 hover:bg-white/30 transition-colors"
+                                title="Copy code"
+                              >
+                                <Copy size={16} />
+                              </button>
+                              <button
+                                onClick={hideCode}
+                                className="p-2 rounded-lg bg-white/20 hover:bg-white/30 transition-colors"
+                                title="Hide code"
+                              >
+                                <EyeOff size={16} />
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={revealCode}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/20 hover:bg-white/30 text-sm font-medium transition-colors"
+                            >
+                              <Eye size={14} /> Reveal
+                            </button>
+                          )}
+                        </div>
+                        <p className="text-xs text-white/60 mt-2">Code is hidden for security. Click Reveal to view.</p>
                       </div>
                     ) : (
                       <p className="text-sm text-gray-500">No referral code generated yet</p>
