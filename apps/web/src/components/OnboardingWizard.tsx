@@ -47,7 +47,7 @@ const CALLOUT_STYLES = {
   tip: 'bg-green-50 border-green-200 text-green-800',
 };
 
-const DEFAULT_RELATIONSHIP_OPTIONS = ['Spouse', 'Partner', 'Parent', 'Sibling', 'Child', 'Uncle', 'Aunt', 'Cousin', 'Friend', 'Neighbour', 'Work Colleague', 'Other'];
+const DEFAULT_RELATIONSHIP_OPTIONS = ['Spouse', 'Partner', 'Fiancé', 'Ex-Spouse', 'Ex-Partner', 'Parent', 'Stepparent', 'Parent-in-law', 'Grandparent', 'Sibling', 'Step-Sibling', 'Sibling-in-law', 'Child', 'Stepchild', 'Child-in-law', 'Grandchild', 'Uncle', 'Aunt', 'Cousin', 'Godparent', 'Godchild', 'Friend', 'Neighbour', 'Housemate', 'Work Colleague', 'Manager', 'Client', 'Mentor', 'Teacher', 'Caregiver', 'Other'];
 
 const CONFETTI_COLORS = ['bg-primary-400', 'bg-primary-600', 'bg-amber-400', 'bg-emerald-400', 'bg-rose-400', 'bg-violet-400', 'bg-sky-400'];
 

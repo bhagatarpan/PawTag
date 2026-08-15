@@ -94,7 +94,7 @@ const CmsOnboardingSchema = new Schema<ICmsOnboardingDocument>(
       emptyStateText: { type: String, default: 'Your account is ready. Head to your dashboard to get started.' },
       emptyStateButtonText: { type: String, default: 'Go to My Dashboard' },
       completionButtonText: { type: String, default: 'Go to My Dashboard' },
-      relationshipOptions: { type: [String], default: ['Spouse', 'Partner', 'Parent', 'Sibling', 'Child', 'Uncle', 'Aunt', 'Cousin', 'Friend', 'Neighbour', 'Work Colleague', 'Other'] },
+      relationshipOptions: { type: [String], default: ['Spouse', 'Partner', 'Fiancé', 'Ex-Spouse', 'Ex-Partner', 'Parent', 'Stepparent', 'Parent-in-law', 'Grandparent', 'Sibling', 'Step-Sibling', 'Sibling-in-law', 'Child', 'Stepchild', 'Child-in-law', 'Grandchild', 'Uncle', 'Aunt', 'Cousin', 'Godparent', 'Godchild', 'Friend', 'Neighbour', 'Housemate', 'Work Colleague', 'Manager', 'Client', 'Mentor', 'Teacher', 'Caregiver', 'Other'] },
     },
     updatedBy: { type: Schema.Types.ObjectId, ref: 'User' },
   },
