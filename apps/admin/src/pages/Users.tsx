@@ -161,12 +161,16 @@ function DetailDrawer({
   const [resetLoading, setResetLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
+  const [relationshipOptions, setRelationshipOptions] = useState<string[]>([]);
   const drawerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!user) return;
     const handleEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', handleEsc);
+    api.get('/public/cms/onboarding').then((r) => {
+      setRelationshipOptions(r.data.data?.globalSettings?.relationshipOptions || ['Spouse', 'Partner', 'Parent', 'Sibling', 'Child', 'Uncle', 'Aunt', 'Cousin', 'Friend', 'Neighbour', 'Work Colleague', 'Other']);
+    }).catch(() => {});
     return () => document.removeEventListener('keydown', handleEsc);
   }, [user, onClose]);
 
@@ -399,6 +403,25 @@ function DetailDrawer({
         <div className="flex-1 overflow-y-auto px-6 py-5">
           {activeTab === 'profile' && (
             <div className="space-y-6">
+              {/* Profile Action Bar */}
+              <div className="flex items-center justify-between p-3 rounded-lg bg-gray-50 border border-gray-200">
+                <span className="text-sm text-gray-600">
+                  {editMode ? 'Editing customer profile — all sections below are editable' : 'Viewing customer profile'}
+                </span>
+                {editMode ? (
+                  <div className="flex gap-2">
+                    <button onClick={handleEditSave} disabled={editSaving} className="bg-primary-600 text-white px-4 py-2 rounded-md text-sm hover:bg-primary-700 flex items-center gap-1 disabled:opacity-50">
+                      {editSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Save All Changes
+                    </button>
+                    <button onClick={() => { setEditMode(false); setEditError(''); }} className="border px-4 py-2 rounded-md text-sm">Cancel</button>
+                  </div>
+                ) : (
+                  <button onClick={() => setEditMode(true)} className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors">
+                    <Edit2 size={14} /> Edit Profile
+                  </button>
+                )}
+              </div>
+
               {/* Identity */}
               <Section title="Identity" icon={<User size={16} />}>
                 {editMode ? (
@@ -420,12 +443,6 @@ function DetailDrawer({
                       <label className="block text-xs text-gray-500 mb-1">Responsibility Score (0-10)</label>
                       <input type="number" min={0} max={10} value={editForm.responsibilityScore} onChange={(e) => setEditForm({ ...editForm, responsibilityScore: parseInt(e.target.value) || 0 })} className="w-full border rounded-md px-3 py-2 text-sm" />
                     </div>
-                    <div className="flex gap-2 pt-1">
-                      <button onClick={handleEditSave} disabled={editSaving} className="bg-primary-600 text-white px-4 py-2 rounded-md text-sm hover:bg-primary-700 flex items-center gap-1 disabled:opacity-50">
-                        {editSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Save
-                      </button>
-                      <button onClick={() => { setEditMode(false); setEditError(''); }} className="border px-4 py-2 rounded-md text-sm">Cancel</button>
-                    </div>
                   </div>
                 ) : (
                   <>
@@ -444,9 +461,6 @@ function DetailDrawer({
                       </span>
                     } />
                     <DetailRow label="Joined" value={formatDate(user.createdAt)} />
-                    <button onClick={() => setEditMode(true)} className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary-600 bg-primary-50 hover:bg-primary-100 rounded-lg transition-colors">
-                      <Edit2 size={13} /> Edit Profile
-                    </button>
                   </>
                 )}
               </Section>
@@ -507,7 +521,10 @@ function DetailDrawer({
                       </div>
                       <div>
                         <label className="block text-xs text-gray-500 mb-1">Relationship</label>
-                        <input value={editForm.emergencyContact.relationship} onChange={(e) => setEditForm({ ...editForm, emergencyContact: { ...editForm.emergencyContact, relationship: e.target.value } })} className="w-full border rounded-md px-3 py-2 text-sm" />
+                        <select value={editForm.emergencyContact.relationship} onChange={(e) => setEditForm({ ...editForm, emergencyContact: { ...editForm.emergencyContact, relationship: e.target.value } })} className="w-full border rounded-md px-3 py-2 text-sm">
+                          <option value="">Select...</option>
+                          {relationshipOptions.map((r) => <option key={r} value={r}>{r}</option>)}
+                        </select>
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-3">

@@ -12,6 +12,7 @@ export default function Profile() {
   const [error, setError] = useState('');
   const [showSaved, setShowSaved] = useState(false);
   const [responsibility, setResponsibility] = useState<any>(null);
+  const [relationshipOptions, setRelationshipOptions] = useState<string[]>([]);
 
   useEffect(() => {
     if (user) {
@@ -22,6 +23,9 @@ export default function Profile() {
       });
     }
     api.get('/customer/responsibility').then((r) => setResponsibility(r.data.data)).catch(() => {});
+    api.get('/public/cms/onboarding').then((r) => {
+      setRelationshipOptions(r.data.data?.globalSettings?.relationshipOptions || ['Spouse', 'Partner', 'Parent', 'Sibling', 'Child', 'Uncle', 'Aunt', 'Cousin', 'Friend', 'Neighbour', 'Work Colleague', 'Other']);
+    }).catch(() => {});
   }, [user]);
 
   const handleSave = async (e: FormEvent) => {
@@ -81,7 +85,7 @@ export default function Profile() {
           <h2 className="text-lg font-semibold flex items-center gap-2"><Phone size={18} /> Emergency Contact</h2>
           <div className="grid grid-cols-2 gap-4">
             <div><label className="block text-xs text-gray-500 mb-1">Contact Name</label><input value={form.emergencyContact.name} onChange={(e) => setForm({ ...form, emergencyContact: { ...form.emergencyContact, name: e.target.value } })} className="w-full border rounded-md px-3 py-2 text-sm" /></div>
-            <div><label className="block text-xs text-gray-500 mb-1">Relationship</label><input value={form.emergencyContact.relationship} onChange={(e) => setForm({ ...form, emergencyContact: { ...form.emergencyContact, relationship: e.target.value } })} className="w-full border rounded-md px-3 py-2 text-sm" placeholder="e.g. Spouse, Parent" /></div>
+            <div><label className="block text-xs text-gray-500 mb-1">Relationship</label><select value={form.emergencyContact.relationship} onChange={(e) => setForm({ ...form, emergencyContact: { ...form.emergencyContact, relationship: e.target.value } })} className="w-full border rounded-md px-3 py-2 text-sm"><option value="">Select...</option>{relationshipOptions.map((r) => <option key={r} value={r}>{r}</option>)}</select></div>
             <div><label className="block text-xs text-gray-500 mb-1">Phone</label><input type="tel" value={form.emergencyContact.phone} onChange={(e) => setForm({ ...form, emergencyContact: { ...form.emergencyContact, phone: e.target.value } })} className="w-full border rounded-md px-3 py-2 text-sm" /></div>
             <div><label className="block text-xs text-gray-500 mb-1">Email</label><input type="email" value={form.emergencyContact.email} onChange={(e) => setForm({ ...form, emergencyContact: { ...form.emergencyContact, email: e.target.value } })} className="w-full border rounded-md px-3 py-2 text-sm" /></div>
           </div>
