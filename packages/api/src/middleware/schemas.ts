@@ -228,6 +228,33 @@ export const updateUserSchema = z.object({
   phoneNumber: z.string().optional(),
   responsibilityScore: z.number().min(0).max(10).optional(),
   mfaEnabled: z.boolean().optional(),
+  address: z.object({
+    line1: z.string().optional(),
+    line2: z.string().optional(),
+    city: z.string().optional(),
+    state: z.string().optional(),
+    zip: z.string().optional(),
+    country: z.string().optional(),
+  }).optional(),
+  emergencyContact: z.object({
+    name: z.string().optional(),
+    phone: z.string().optional(),
+    email: z.string().email().optional(),
+    relationship: z.string().optional(),
+  }).optional(),
+  showOwnerNameInFinder: z.boolean().optional(),
+  notificationPreferences: z.object({
+    email: z.boolean().optional(),
+    push: z.boolean().optional(),
+    inApp: z.boolean().optional(),
+    channels: z.object({
+      petFound: z.boolean().optional(),
+      orderUpdate: z.boolean().optional(),
+      subscriptionReminder: z.boolean().optional(),
+      referral: z.boolean().optional(),
+      marketing: z.boolean().optional(),
+    }).optional(),
+  }).optional(),
 });
 
 // --- Tag Schemas ---

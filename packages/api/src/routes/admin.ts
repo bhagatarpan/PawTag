@@ -651,7 +651,7 @@ router.put('/users/:id', requirePermission('user.update'), validate(updateUserSc
     if (!user) { res.status(404).json({ success: false, error: 'User not found' }); return; }
 
     const changes: Record<string, unknown> = {};
-    const { fullName, email, phoneNumber, responsibilityScore, mfaEnabled } = req.body;
+    const { fullName, email, phoneNumber, responsibilityScore, mfaEnabled, address, emergencyContact, showOwnerNameInFinder, notificationPreferences } = req.body;
 
     if (fullName !== undefined && fullName !== user.fullName) { changes.fullName = { old: user.fullName, new: fullName }; user.fullName = fullName; }
     if (email !== undefined && email !== user.email) {
@@ -663,13 +663,74 @@ router.put('/users/:id', requirePermission('user.update'), validate(updateUserSc
     if (responsibilityScore !== undefined) { changes.responsibilityScore = { old: (user as any).responsibilityScore, new: responsibilityScore }; (user as any).responsibilityScore = responsibilityScore; }
     if (mfaEnabled !== undefined) { changes.mfaEnabled = { old: (user as any).mfaEnabled, new: mfaEnabled }; (user as any).mfaEnabled = mfaEnabled; }
 
+    if (address) {
+      const oldAddress = (user as any).address || {};
+      const addressChanges: string[] = [];
+      for (const field of ['line1', 'line2', 'city', 'state', 'zip', 'country'] as const) {
+        if (address[field] !== undefined && address[field] !== oldAddress[field]) {
+          addressChanges.push(field);
+          if (!(user as any).address) (user as any).address = {};
+          (user as any).address[field] = address[field];
+        }
+      }
+      if (addressChanges.length > 0) {
+        changes.address = { old: { line1: oldAddress.line1, line2: oldAddress.line2, city: oldAddress.city, state: oldAddress.state, zip: oldAddress.zip, country: oldAddress.country }, new: { line1: (user as any).address.line1, line2: (user as any).address.line2, city: (user as any).address.city, state: (user as any).address.state, zip: (user as any).address.zip, country: (user as any).address.country }, changedFields: addressChanges };
+      }
+    }
+
+    if (emergencyContact) {
+      const oldEc = (user as any).emergencyContact || {};
+      const ecChanges: string[] = [];
+      for (const field of ['name', 'phone', 'email', 'relationship'] as const) {
+        if (emergencyContact[field] !== undefined && emergencyContact[field] !== oldEc[field]) {
+          ecChanges.push(field);
+          if (!(user as any).emergencyContact) (user as any).emergencyContact = {};
+          (user as any).emergencyContact[field] = emergencyContact[field];
+        }
+      }
+      if (ecChanges.length > 0) {
+        changes.emergencyContact = { old: { name: oldEc.name, phone: oldEc.phone, email: oldEc.email, relationship: oldEc.relationship }, new: { name: (user as any).emergencyContact.name, phone: (user as any).emergencyContact.phone, email: (user as any).emergencyContact.email, relationship: (user as any).emergencyContact.relationship }, changedFields: ecChanges };
+      }
+    }
+
+    if (showOwnerNameInFinder !== undefined && showOwnerNameInFinder !== (user as any).showOwnerNameInFinder) {
+      changes.showOwnerNameInFinder = { old: (user as any).showOwnerNameInFinder, new: showOwnerNameInFinder };
+      (user as any).showOwnerNameInFinder = showOwnerNameInFinder;
+    }
+
+    if (notificationPreferences) {
+      const oldPrefs = (user as any).notificationPreferences || {};
+      const prefChanges: string[] = [];
+      for (const field of ['email', 'push', 'inApp'] as const) {
+        if (notificationPreferences[field] !== undefined && notificationPreferences[field] !== oldPrefs[field]) {
+          prefChanges.push(field);
+          if (!(user as any).notificationPreferences) (user as any).notificationPreferences = {};
+          (user as any).notificationPreferences[field] = notificationPreferences[field];
+        }
+      }
+      if (notificationPreferences.channels) {
+        const oldChannels = oldPrefs.channels || {};
+        for (const ch of ['petFound', 'orderUpdate', 'subscriptionReminder', 'referral', 'marketing'] as const) {
+          if (notificationPreferences.channels[ch] !== undefined && notificationPreferences.channels[ch] !== oldChannels[ch]) {
+            prefChanges.push(`channels.${ch}`);
+            if (!(user as any).notificationPreferences) (user as any).notificationPreferences = {};
+            if (!(user as any).notificationPreferences.channels) (user as any).notificationPreferences.channels = {};
+            (user as any).notificationPreferences.channels[ch] = notificationPreferences.channels[ch];
+          }
+        }
+      }
+      if (prefChanges.length > 0) {
+        changes.notificationPreferences = { changedFields: prefChanges };
+      }
+    }
+
     await user.save();
 
     const auditChanges = Object.entries(changes).map(([field, value]) => ({
       field,
       before: (value as any).old,
       after: (value as any).new,
-      sensitive: ['email', 'phoneNumber', 'mfaEnabled'].includes(field),
+      sensitive: ['email', 'phoneNumber', 'mfaEnabled', 'emergencyContact'].includes(field),
     }));
 
     await auditAdminEvent(req, {

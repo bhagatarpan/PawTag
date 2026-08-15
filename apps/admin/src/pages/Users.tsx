@@ -36,6 +36,11 @@ import {
   ShieldCheck,
   RotateCcw,
   UserPlus,
+  MapPin,
+  Phone,
+  Bell,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 
 /* ------------------------------------------------------------------ */
@@ -54,6 +59,10 @@ interface UserRecord {
   skipInvoiceOtpExpiresAt?: string;
   lockedUntil?: string;
   createdAt: string;
+  address?: { line1?: string; line2?: string; city?: string; state?: string; zip?: string; country?: string };
+  emergencyContact?: { name?: string; phone?: string; email?: string; relationship?: string };
+  showOwnerNameInFinder?: boolean;
+  notificationPreferences?: { email?: boolean; push?: boolean; inApp?: boolean; channels?: { petFound?: boolean; orderUpdate?: boolean; subscriptionReminder?: boolean; referral?: boolean; marketing?: boolean } };
   rbacRoles: Array<{
     _id: string;
     roleId?: { _id: string; name: string; displayName: string; isSuperAdmin?: boolean };
@@ -144,7 +153,7 @@ function DetailDrawer({
 }) {
   const [activeTab, setActiveTab] = useState<'profile' | 'rbac' | 'settings'>('profile');
   const [editMode, setEditMode] = useState(false);
-  const [editForm, setEditForm] = useState({ fullName: '', email: '', phoneNumber: '', responsibilityScore: 0 });
+  const [editForm, setEditForm] = useState({ fullName: '', email: '', phoneNumber: '', responsibilityScore: 0, address: { line1: '', line2: '', city: '', state: '', zip: '', country: '' }, emergencyContact: { name: '', phone: '', email: '', relationship: '' }, showOwnerNameInFinder: true, notificationPreferences: { email: true, push: true, inApp: true, channels: { petFound: true, orderUpdate: true, subscriptionReminder: true, referral: true, marketing: false } } });
   const [editError, setEditError] = useState('');
   const [editSaving, setEditSaving] = useState(false);
   const [resetPw, setResetPw] = useState('');
@@ -168,6 +177,33 @@ function DetailDrawer({
         email: user.email || '',
         phoneNumber: user.phoneNumber || '',
         responsibilityScore: user.responsibilityScore || 0,
+        address: {
+          line1: user.address?.line1 || '',
+          line2: user.address?.line2 || '',
+          city: user.address?.city || '',
+          state: user.address?.state || '',
+          zip: user.address?.zip || '',
+          country: user.address?.country || '',
+        },
+        emergencyContact: {
+          name: user.emergencyContact?.name || '',
+          phone: user.emergencyContact?.phone || '',
+          email: user.emergencyContact?.email || '',
+          relationship: user.emergencyContact?.relationship || '',
+        },
+        showOwnerNameInFinder: user.showOwnerNameInFinder !== false,
+        notificationPreferences: {
+          email: user.notificationPreferences?.email !== false,
+          push: user.notificationPreferences?.push !== false,
+          inApp: user.notificationPreferences?.inApp !== false,
+          channels: {
+            petFound: user.notificationPreferences?.channels?.petFound !== false,
+            orderUpdate: user.notificationPreferences?.channels?.orderUpdate !== false,
+            subscriptionReminder: user.notificationPreferences?.channels?.subscriptionReminder !== false,
+            referral: user.notificationPreferences?.channels?.referral !== false,
+            marketing: user.notificationPreferences?.channels?.marketing === true,
+          },
+        },
       });
       setEditMode(false);
       setEditError('');
@@ -415,6 +451,86 @@ function DetailDrawer({
                 )}
               </Section>
 
+              {/* Address */}
+              <Section title="Address" icon={<MapPin size={16} />}>
+                {editMode ? (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Street Address</label>
+                      <input value={editForm.address.line1} onChange={(e) => setEditForm({ ...editForm, address: { ...editForm.address, line1: e.target.value } })} className="w-full border rounded-md px-3 py-2 text-sm" />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Suburb</label>
+                      <input value={editForm.address.line2} onChange={(e) => setEditForm({ ...editForm, address: { ...editForm.address, line2: e.target.value } })} className="w-full border rounded-md px-3 py-2 text-sm" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">City</label>
+                        <input value={editForm.address.city} onChange={(e) => setEditForm({ ...editForm, address: { ...editForm.address, city: e.target.value } })} className="w-full border rounded-md px-3 py-2 text-sm" />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">State / Region</label>
+                        <input value={editForm.address.state} onChange={(e) => setEditForm({ ...editForm, address: { ...editForm.address, state: e.target.value } })} className="w-full border rounded-md px-3 py-2 text-sm" />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Postal Code</label>
+                        <input value={editForm.address.zip} onChange={(e) => setEditForm({ ...editForm, address: { ...editForm.address, zip: e.target.value } })} className="w-full border rounded-md px-3 py-2 text-sm" />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Country</label>
+                        <input value={editForm.address.country} onChange={(e) => setEditForm({ ...editForm, address: { ...editForm.address, country: e.target.value } })} className="w-full border rounded-md px-3 py-2 text-sm" />
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <DetailRow label="Street" value={user.address?.line1 || '—'} />
+                    <DetailRow label="Suburb" value={user.address?.line2 || '—'} />
+                    <DetailRow label="City" value={user.address?.city || '—'} />
+                    <DetailRow label="State" value={user.address?.state || '—'} />
+                    <DetailRow label="Postal Code" value={user.address?.zip || '—'} />
+                    <DetailRow label="Country" value={user.address?.country || '—'} />
+                  </>
+                )}
+              </Section>
+
+              {/* Emergency Contact */}
+              <Section title="Emergency Contact" icon={<Phone size={16} />}>
+                {editMode ? (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Contact Name</label>
+                        <input value={editForm.emergencyContact.name} onChange={(e) => setEditForm({ ...editForm, emergencyContact: { ...editForm.emergencyContact, name: e.target.value } })} className="w-full border rounded-md px-3 py-2 text-sm" />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Relationship</label>
+                        <input value={editForm.emergencyContact.relationship} onChange={(e) => setEditForm({ ...editForm, emergencyContact: { ...editForm.emergencyContact, relationship: e.target.value } })} className="w-full border rounded-md px-3 py-2 text-sm" />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Phone</label>
+                        <input type="tel" value={editForm.emergencyContact.phone} onChange={(e) => setEditForm({ ...editForm, emergencyContact: { ...editForm.emergencyContact, phone: e.target.value } })} className="w-full border rounded-md px-3 py-2 text-sm" />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Email</label>
+                        <input type="email" value={editForm.emergencyContact.email} onChange={(e) => setEditForm({ ...editForm, emergencyContact: { ...editForm.emergencyContact, email: e.target.value } })} className="w-full border rounded-md px-3 py-2 text-sm" />
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <DetailRow label="Name" value={user.emergencyContact?.name || '—'} />
+                    <DetailRow label="Relationship" value={user.emergencyContact?.relationship || '—'} />
+                    <DetailRow label="Phone" value={user.emergencyContact?.phone || '—'} />
+                    <DetailRow label="Email" value={user.emergencyContact?.email || '—'} />
+                  </>
+                )}
+              </Section>
+
               {/* Quick Status */}
               <Section title="Quick Status" icon={<Activity size={16} />}>
                 <div className="grid grid-cols-2 gap-3">
@@ -558,6 +674,111 @@ function DetailDrawer({
                       {formatStatusLabel(s)}
                     </button>
                   ))}
+                </div>
+              </Section>
+
+              {/* Finder Privacy */}
+              <Section title="Finder Privacy" icon={<Eye size={16} />}>
+                <div className="flex items-center justify-between p-3 rounded-lg bg-gray-50">
+                  <div>
+                    <span className="text-sm text-gray-600">Show name to finders</span>
+                    <p className="text-xs text-gray-400 mt-0.5">When someone finds this user's pet, show the owner's name</p>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      setActionLoading('privacy');
+                      try {
+                        const newVal = editForm.showOwnerNameInFinder === false;
+                        setEditForm({ ...editForm, showOwnerNameInFinder: newVal });
+                        await api.put(`/admin/users/${user._id}`, { showOwnerNameInFinder: newVal });
+                        toast.success(newVal ? 'Name visible to finders' : 'Name hidden from finders');
+                        onRefresh();
+                      } catch (err: any) {
+                        toast.error(err.response?.data?.error || 'Failed to update privacy');
+                        setEditForm({ ...editForm, showOwnerNameInFinder: user.showOwnerNameInFinder !== false });
+                      } finally {
+                        setActionLoading(null);
+                      }
+                    }}
+                    disabled={actionLoading === 'privacy'}
+                    className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium disabled:opacity-50 ${
+                      editForm.showOwnerNameInFinder ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                    }`}
+                  >
+                    {actionLoading === 'privacy' ? <Loader2 size={12} className="animate-spin" /> : editForm.showOwnerNameInFinder ? <Eye size={12} /> : <EyeOff size={12} />}
+                    {editForm.showOwnerNameInFinder ? 'Visible' : 'Hidden'}
+                  </button>
+                </div>
+              </Section>
+
+              {/* Notification Preferences */}
+              <Section title="Notification Preferences" icon={<Bell size={16} />}>
+                <div className="space-y-3">
+                  <div className="grid grid-cols-3 gap-3">
+                    {([
+                      { key: 'email' as const, label: 'Email' },
+                      { key: 'push' as const, label: 'Push' },
+                      { key: 'inApp' as const, label: 'In-App' },
+                    ]).map(({ key, label }) => (
+                      <div key={key} className="flex items-center justify-between p-3 rounded-lg bg-gray-50">
+                        <span className="text-sm text-gray-600">{label}</span>
+                        <button
+                          onClick={async () => {
+                            const newVal = !editForm.notificationPreferences[key];
+                            setEditForm({ ...editForm, notificationPreferences: { ...editForm.notificationPreferences, [key]: newVal } });
+                            try {
+                              await api.put(`/admin/users/${user._id}`, { notificationPreferences: { [key]: newVal } });
+                              toast.success(`${label} notifications ${newVal ? 'enabled' : 'disabled'}`);
+                              onRefresh();
+                            } catch (err: any) {
+                              toast.error(err.response?.data?.error || 'Failed to update');
+                              setEditForm({ ...editForm, notificationPreferences: { ...editForm.notificationPreferences, [key]: !newVal } });
+                            }
+                          }}
+                          className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                            editForm.notificationPreferences[key] ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                          }`}
+                        >
+                          {editForm.notificationPreferences[key] ? 'On' : 'Off'}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="pl-1">
+                    <p className="text-xs text-gray-400 mb-2">Channel preferences</p>
+                    <div className="space-y-2">
+                      {([
+                        { key: 'petFound' as const, label: 'Pet Found' },
+                        { key: 'orderUpdate' as const, label: 'Order Updates' },
+                        { key: 'subscriptionReminder' as const, label: 'Subscription Reminders' },
+                        { key: 'referral' as const, label: 'Referral' },
+                        { key: 'marketing' as const, label: 'Marketing' },
+                      ]).map(({ key, label }) => (
+                        <div key={key} className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50">
+                          <span className="text-sm text-gray-600">{label}</span>
+                          <button
+                            onClick={async () => {
+                              const newVal = !editForm.notificationPreferences.channels[key];
+                              setEditForm({ ...editForm, notificationPreferences: { ...editForm.notificationPreferences, channels: { ...editForm.notificationPreferences.channels, [key]: newVal } } });
+                              try {
+                                await api.put(`/admin/users/${user._id}`, { notificationPreferences: { channels: { [key]: newVal } } });
+                                toast.success(`${label} ${newVal ? 'enabled' : 'disabled'}`);
+                                onRefresh();
+                              } catch (err: any) {
+                                toast.error(err.response?.data?.error || 'Failed to update');
+                                setEditForm({ ...editForm, notificationPreferences: { ...editForm.notificationPreferences, channels: { ...editForm.notificationPreferences.channels, [key]: !newVal } } });
+                              }
+                            }}
+                            className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                              editForm.notificationPreferences.channels[key] ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                            }`}
+                          >
+                            {editForm.notificationPreferences.channels[key] ? 'On' : 'Off'}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </Section>
 

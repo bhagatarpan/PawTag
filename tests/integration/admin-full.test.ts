@@ -81,6 +81,110 @@ describe('Admin - User Management', () => {
     expect(res.body.data.fullName).toBe('Updated Name');
   });
 
+  it('PUT /api/admin/users/:id updates address fields', async () => {
+    const customer = await createCustomer({ email: 'addruser@example.com' });
+
+    const res = await request(app)
+      .put(`/api/admin/users/${customer.userId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        address: {
+          line1: '123 Test Street',
+          line2: 'Ponsonby',
+          city: 'Auckland',
+          state: 'Auckland',
+          zip: '1011',
+          country: 'NZ',
+        },
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.address.line1).toBe('123 Test Street');
+    expect(res.body.data.address.line2).toBe('Ponsonby');
+    expect(res.body.data.address.city).toBe('Auckland');
+    expect(res.body.data.address.state).toBe('Auckland');
+    expect(res.body.data.address.zip).toBe('1011');
+    expect(res.body.data.address.country).toBe('NZ');
+  });
+
+  it('PUT /api/admin/users/:id updates emergency contact fields', async () => {
+    const customer = await createCustomer({ email: 'ecuser@example.com' });
+
+    const res = await request(app)
+      .put(`/api/admin/users/${customer.userId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        emergencyContact: {
+          name: 'Jane Doe',
+          phone: '+64 21 987 6543',
+          email: 'jane@example.com',
+          relationship: 'Spouse',
+        },
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.emergencyContact.name).toBe('Jane Doe');
+    expect(res.body.data.emergencyContact.phone).toBe('+64 21 987 6543');
+    expect(res.body.data.emergencyContact.email).toBe('jane@example.com');
+    expect(res.body.data.emergencyContact.relationship).toBe('Spouse');
+  });
+
+  it('PUT /api/admin/users/:id updates showOwnerNameInFinder', async () => {
+    const customer = await createCustomer({ email: 'privacyuser@example.com' });
+
+    const res = await request(app)
+      .put(`/api/admin/users/${customer.userId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ showOwnerNameInFinder: false });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.showOwnerNameInFinder).toBe(false);
+  });
+
+  it('PUT /api/admin/users/:id updates notification preferences', async () => {
+    const customer = await createCustomer({ email: 'notifuser@example.com' });
+
+    const res = await request(app)
+      .put(`/api/admin/users/${customer.userId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        notificationPreferences: {
+          email: false,
+          push: true,
+          channels: { petFound: true, marketing: true },
+        },
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.notificationPreferences.email).toBe(false);
+    expect(res.body.data.notificationPreferences.push).toBe(true);
+    expect(res.body.data.notificationPreferences.channels.petFound).toBe(true);
+    expect(res.body.data.notificationPreferences.channels.marketing).toBe(true);
+  });
+
+  it('PUT /api/admin/users/:id updates address and emergency contact together', async () => {
+    const customer = await createCustomer({ email: 'combined@example.com' });
+
+    const res = await request(app)
+      .put(`/api/admin/users/${customer.userId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        fullName: 'Combined Update',
+        address: { city: 'Wellington', country: 'NZ' },
+        emergencyContact: { name: 'Bob', relationship: 'Brother' },
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.fullName).toBe('Combined Update');
+    expect(res.body.data.address.city).toBe('Wellington');
+    expect(res.body.data.emergencyContact.name).toBe('Bob');
+  });
+
   it('PUT /api/admin/users/:id/status changes user status', async () => {
     const customer = await createCustomer({ email: 'statususer@example.com' });
 
