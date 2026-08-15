@@ -779,6 +779,58 @@ router.delete('/users/:id', requirePermission('user.delete'), async (req: AuthRe
   }
 });
 
+// GET /api/admin/users/:id/orders — fetch orders for a specific user
+router.get('/users/:id/orders', requirePermission('user.read'), requirePermission('order.read'), async (req, res: Response) => {
+  try {
+    const user = await User.findOne({ _id: req.params.id, deletedAt: null }).select('_id');
+    if (!user) { res.status(404).json({ success: false, error: 'User not found' }); return; }
+
+    const { page = 1, limit = 20, status } = req.query;
+    const query: any = { userId: req.params.id, deletedAt: null };
+    if (status) query.status = status;
+
+    const total = await Order.countDocuments(query);
+    const orders = await Order.find(query)
+      .sort({ createdAt: -1 })
+      .skip((Number(page) - 1) * Number(limit))
+      .limit(Number(limit));
+
+    res.json({
+      success: true,
+      data: { items: orders, total, page: Number(page), limit: Number(limit), totalPages: Math.ceil(total / Number(limit)) },
+    });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to fetch user orders' });
+  }
+});
+
+// GET /api/admin/users/:id/subscriptions — fetch subscriptions for a specific user
+router.get('/users/:id/subscriptions', requirePermission('user.read'), async (req, res: Response) => {
+  try {
+    const user = await User.findOne({ _id: req.params.id, deletedAt: null }).select('_id');
+    if (!user) { res.status(404).json({ success: false, error: 'User not found' }); return; }
+
+    const { page = 1, limit = 20, status } = req.query;
+    const query: any = { userId: req.params.id };
+    if (status) query.status = status;
+
+    const total = await Subscription.countDocuments(query);
+    const subscriptions = await Subscription.find(query)
+      .populate('tagId', 'tagId tagType status')
+      .populate('planId', 'name price')
+      .sort({ createdAt: -1 })
+      .skip((Number(page) - 1) * Number(limit))
+      .limit(Number(limit));
+
+    res.json({
+      success: true,
+      data: { items: subscriptions, total, page: Number(page), limit: Number(limit), totalPages: Math.ceil(total / Number(limit)) },
+    });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to fetch user subscriptions' });
+  }
+});
+
 // --- Admin: Register Owner on Behalf ---
 /**
  * @swagger

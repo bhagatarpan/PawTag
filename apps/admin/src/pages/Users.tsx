@@ -151,7 +151,7 @@ function DetailDrawer({
   onRefresh: () => void;
   rbacRoles: any[];
 }) {
-  const [activeTab, setActiveTab] = useState<'profile' | 'rbac' | 'settings'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'rbac' | 'orders' | 'subscriptions' | 'settings'>('profile');
   const [editMode, setEditMode] = useState(false);
   const [editForm, setEditForm] = useState({ fullName: '', email: '', phoneNumber: '', responsibilityScore: 0, address: { line1: '', line2: '', city: '', state: '', zip: '', country: '' }, emergencyContact: { name: '', phone: '', email: '', relationship: '' }, showOwnerNameInFinder: true, notificationPreferences: { email: true, push: true, inApp: true, channels: { petFound: true, orderUpdate: true, subscriptionReminder: true, referral: true, marketing: false } } });
   const [editError, setEditError] = useState('');
@@ -162,6 +162,12 @@ function DetailDrawer({
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
   const [relationshipOptions, setRelationshipOptions] = useState<string[]>([]);
+  const [userOrders, setUserOrders] = useState<any[]>([]);
+  const [userOrdersTotal, setUserOrdersTotal] = useState(0);
+  const [userOrdersLoading, setUserOrdersLoading] = useState(false);
+  const [userSubscriptions, setUserSubscriptions] = useState<any[]>([]);
+  const [userSubscriptionsTotal, setUserSubscriptionsTotal] = useState(0);
+  const [userSubscriptionsLoading, setUserSubscriptionsLoading] = useState(false);
   const drawerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -214,6 +220,31 @@ function DetailDrawer({
       setActiveTab('profile');
     }
   }, [user]);
+
+  const fetchUserOrders = useCallback(async () => {
+    if (!user) return;
+    setUserOrdersLoading(true);
+    try {
+      const res = await api.get(`/admin/users/${user._id}/orders`, { params: { limit: 50 } });
+      setUserOrders(res.data.data?.items || []);
+      setUserOrdersTotal(res.data.data?.total || 0);
+    } catch { /* non-critical */ } finally { setUserOrdersLoading(false); }
+  }, [user]);
+
+  const fetchUserSubscriptions = useCallback(async () => {
+    if (!user) return;
+    setUserSubscriptionsLoading(true);
+    try {
+      const res = await api.get(`/admin/users/${user._id}/subscriptions`, { params: { limit: 50 } });
+      setUserSubscriptions(res.data.data?.items || []);
+      setUserSubscriptionsTotal(res.data.data?.total || 0);
+    } catch { /* non-critical */ } finally { setUserSubscriptionsLoading(false); }
+  }, [user]);
+
+  useEffect(() => {
+    if (activeTab === 'orders') fetchUserOrders();
+    if (activeTab === 'subscriptions') fetchUserSubscriptions();
+  }, [activeTab, fetchUserOrders, fetchUserSubscriptions]);
 
   if (!user) return null;
 
@@ -346,6 +377,8 @@ function DetailDrawer({
   const tabs = [
     { key: 'profile' as const, label: 'Profile' },
     { key: 'rbac' as const, label: `Roles (${user.rbacRoles?.length || 0})` },
+    { key: 'orders' as const, label: `Orders (${userOrdersTotal})` },
+    { key: 'subscriptions' as const, label: `Subscriptions (${userSubscriptionsTotal})` },
     { key: 'settings' as const, label: 'Settings' },
   ];
 
@@ -669,6 +702,90 @@ function DetailDrawer({
                   )}
                 </div>
               </Section>
+            </div>
+          )}
+
+          {activeTab === 'orders' && (
+            <div className="space-y-4">
+              {userOrdersLoading ? (
+                <div className="flex items-center gap-2 text-sm text-gray-500 py-8 justify-center">
+                  <Loader2 size={16} className="animate-spin" /> Loading orders...
+                </div>
+              ) : userOrders.length === 0 ? (
+                <p className="text-sm text-gray-500 py-8 text-center">No orders found</p>
+              ) : (
+                <div className="space-y-2">
+                  {userOrders.map((order: any) => (
+                    <div key={order._id} className="flex items-center justify-between p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                          <FileText size={14} className="text-blue-600" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">{order.orderNumber || order._id.slice(-8).toUpperCase()}</p>
+                          <p className="text-xs text-gray-400">{formatDate(order.createdAt)} · {order.items?.length || 0} item{(order.items?.length || 0) !== 1 ? 's' : ''}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <span className="text-sm font-medium text-gray-700">${order.payment?.amount?.toFixed(2) || '0.00'}</span>
+                        {(() => {
+                          const badge = getStatusBadge(order.status);
+                          return (
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${badge.className}`}>
+                              {badge.icon} {formatStatusLabel(order.status)}
+                            </span>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'subscriptions' && (
+            <div className="space-y-4">
+              {userSubscriptionsLoading ? (
+                <div className="flex items-center gap-2 text-sm text-gray-500 py-8 justify-center">
+                  <Loader2 size={16} className="animate-spin" /> Loading subscriptions...
+                </div>
+              ) : userSubscriptions.length === 0 ? (
+                <p className="text-sm text-gray-500 py-8 text-center">No subscriptions found</p>
+              ) : (
+                <div className="space-y-2">
+                  {userSubscriptions.map((sub: any) => (
+                    <div key={sub._id} className="flex items-center justify-between p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center shrink-0">
+                          <Activity size={14} className="text-purple-600" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">{sub.tagId?.tagId || 'No tag'}</p>
+                          <p className="text-xs text-gray-400">{sub.planId?.name || 'Unknown plan'} · {sub.totalScans || 0} scans</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <span className="text-sm font-medium text-gray-700">${sub.planId?.price?.toFixed(2) || '0.00'}/mo</span>
+                        {(() => {
+                          const statusColors: Record<string, string> = {
+                            active: 'bg-emerald-100 text-emerald-700',
+                            grace_period: 'bg-amber-100 text-amber-700',
+                            expired: 'bg-gray-100 text-gray-500',
+                            cancelled: 'bg-red-100 text-red-700',
+                            pending_payment: 'bg-blue-100 text-blue-700',
+                          };
+                          return (
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[sub.status] || 'bg-gray-100 text-gray-500'}`}>
+                              {formatStatusLabel(sub.status)}
+                            </span>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

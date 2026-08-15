@@ -231,6 +231,82 @@ describe('Admin - User Management', () => {
 
     expect(res.status).toBe(403);
   });
+
+  it('GET /api/admin/users/:id/orders returns user orders', async () => {
+    const customer = await createCustomer({ email: 'orderuser@example.com' });
+
+    // Create an order for this user
+    await mongoose.connection.collections.orders.insertOne({
+      userId: new mongoose.Types.ObjectId(customer.userId),
+      orderNumber: 'ORD-TEST-001',
+      status: 'paid',
+      items: [{ productId: new mongoose.Types.ObjectId(), productName: 'Test Product', quantity: 1, unitPrice: 29.99, totalPrice: 29.99 }],
+      payment: { method: 'card', status: 'paid', amount: 29.99, currency: 'NZD' },
+      shippingAddress: { line1: '123 Test St', city: 'Auckland', state: 'Auckland', zip: '1011', country: 'NZ' },
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const res = await request(app)
+      .get(`/api/admin/users/${customer.userId}/orders`)
+      .set('Authorization', `Bearer ${adminToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.items).toHaveLength(1);
+    expect(res.body.data.items[0].orderNumber).toBe('ORD-TEST-001');
+    expect(res.body.data.total).toBe(1);
+  });
+
+  it('GET /api/admin/users/:id/orders returns 404 for non-existent user', async () => {
+    const fakeId = new mongoose.Types.ObjectId().toString();
+    const res = await request(app)
+      .get(`/api/admin/users/${fakeId}/orders`)
+      .set('Authorization', `Bearer ${adminToken}`);
+
+    expect(res.status).toBe(404);
+    expect(res.body.success).toBe(false);
+  });
+
+  it('GET /api/admin/users/:id/subscriptions returns user subscriptions', async () => {
+    const customer = await createCustomer({ email: 'subuser@example.com' });
+
+    // Create a subscription for this user
+    await mongoose.connection.collections.subscriptions.insertOne({
+      userId: new mongoose.Types.ObjectId(customer.userId),
+      tagId: new mongoose.Types.ObjectId(),
+      status: 'active',
+      planType: 'monthly',
+      pricePerPeriod: 9.99,
+      currency: 'NZD',
+      totalScans: 5,
+      autoRenew: true,
+      startDate: new Date(),
+      currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const res = await request(app)
+      .get(`/api/admin/users/${customer.userId}/subscriptions`)
+      .set('Authorization', `Bearer ${adminToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.items).toHaveLength(1);
+    expect(res.body.data.items[0].status).toBe('active');
+    expect(res.body.data.total).toBe(1);
+  });
+
+  it('GET /api/admin/users/:id/subscriptions returns 404 for non-existent user', async () => {
+    const fakeId = new mongoose.Types.ObjectId().toString();
+    const res = await request(app)
+      .get(`/api/admin/users/${fakeId}/subscriptions`)
+      .set('Authorization', `Bearer ${adminToken}`);
+
+    expect(res.status).toBe(404);
+    expect(res.body.success).toBe(false);
+  });
 });
 
 // ──────────────────────────────────────────────────────────────────────────────
