@@ -1,7 +1,9 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api, { PaginatedData } from '../lib/api';
 import { toast } from '../lib/toast';
 import { StatusBadge } from '@pawtag/ui';
+import { OrderDetailDrawer, type Order } from './Orders';
 import {
   Search,
   X,
@@ -198,6 +200,8 @@ function DetailDrawer({
   const [userSubscriptions, setUserSubscriptions] = useState<any[]>([]);
   const [userSubscriptionsTotal, setUserSubscriptionsTotal] = useState(0);
   const [userSubscriptionsLoading, setUserSubscriptionsLoading] = useState(false);
+  const [selectedAdminOrder, setSelectedAdminOrder] = useState<Order | null>(null);
+  const navigate = useNavigate();
   const drawerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -750,7 +754,7 @@ function DetailDrawer({
                 </div>
               ) : (
                 userOrders.map((order: any) => (
-                  <div key={order._id} className="bg-white rounded-xl border border-gray-100 p-5 hover:border-gray-200 hover:shadow-sm transition-all duration-200 cursor-pointer">
+                  <div key={order._id} onClick={() => setSelectedAdminOrder(order)} className="bg-white rounded-xl border border-gray-100 p-5 hover:border-gray-200 hover:shadow-sm transition-all duration-200 cursor-pointer">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
@@ -804,7 +808,7 @@ function DetailDrawer({
                   const isExpired = sub.status === 'expired';
                   return (
                     <div key={sub._id} className="bg-white rounded-xl border border-gray-100 overflow-hidden hover:border-gray-200 hover:shadow-sm transition-all duration-200">
-                      <div className="p-5">
+                      <div onClick={() => { onClose(); navigate(`/subscriptions/${sub._id}`); }} className="p-5 cursor-pointer">
                         <div className="flex items-start justify-between mb-3">
                           <div className="flex items-center gap-3">
                             <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isActive ? 'bg-emerald-50' : isGrace ? 'bg-amber-50' : 'bg-gray-50'}`}>
@@ -858,6 +862,22 @@ function DetailDrawer({
                             <AlertTriangle size={14} />
                             <span>{isGrace && sub.gracePeriodEndsAt ? `Grace period ends ${formatDate(sub.gracePeriodEndsAt)}` : 'Subscription expired'}</span>
                           </div>
+                          <button
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              if (!confirm('Renew this subscription now?')) return;
+                              try {
+                                await api.put(`/admin/subscriptions/${sub._id}/status`, { status: 'active' });
+                                toast.success('Subscription renewed');
+                                fetchUserSubscriptions();
+                              } catch (err: any) {
+                                toast.error(err.response?.data?.error || 'Failed to renew');
+                              }
+                            }}
+                            className="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-lg text-sm font-semibold hover:from-emerald-700 hover:to-teal-700 shadow-sm transition-all"
+                          >
+                            Renew — ${sub.planId?.price?.toFixed(2) || '0.00'}{sub.renewalMethod === 'annual' ? '/yr' : '/mo'}
+                          </button>
                         </div>
                       )}
                     </div>
@@ -1061,6 +1081,7 @@ function DetailDrawer({
           )}
         </div>
       </div>
+      <OrderDetailDrawer order={selectedAdminOrder} onClose={() => setSelectedAdminOrder(null)} onRefresh={() => { fetchUserOrders(); onRefresh(); }} />
     </div>
   );
 }

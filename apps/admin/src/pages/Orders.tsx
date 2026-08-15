@@ -26,7 +26,7 @@ interface OrderItem {
   customizationTotal?: number;
 }
 
-interface Order {
+export interface Order {
   _id: string;
   orderNumber: string;
   userId: { _id: string; fullName: string; email: string } | null;
@@ -204,7 +204,7 @@ function SkeletonRow() {
 /*  Detail Drawer                                                      */
 /* ------------------------------------------------------------------ */
 
-function OrderDetailDrawer({
+export function OrderDetailDrawer({
   order,
   onClose,
   onRefresh,
