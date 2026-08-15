@@ -307,6 +307,39 @@ describe('Admin - User Management', () => {
     expect(res.status).toBe(404);
     expect(res.body.success).toBe(false);
   });
+
+  it('GET /api/admin/users/:id/referrals returns user referral info', async () => {
+    const customer = await createCustomer({ email: 'refuser@example.com' });
+
+    // Create a referral code for this user
+    await mongoose.connection.collections.referralcodes.insertOne({
+      userId: new mongoose.Types.ObjectId(customer.userId),
+      code: 'TESTCODE1',
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const res = await request(app)
+      .get(`/api/admin/users/${customer.userId}/referrals`)
+      .set('Authorization', `Bearer ${adminToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.code).toBe('TESTCODE1');
+    expect(res.body.data.stats).toBeDefined();
+    expect(res.body.data.history).toBeDefined();
+  });
+
+  it('GET /api/admin/users/:id/referrals returns 404 for non-existent user', async () => {
+    const fakeId = new mongoose.Types.ObjectId().toString();
+    const res = await request(app)
+      .get(`/api/admin/users/${fakeId}/referrals`)
+      .set('Authorization', `Bearer ${adminToken}`);
+
+    expect(res.status).toBe(404);
+    expect(res.body.success).toBe(false);
+  });
 });
 
 // ──────────────────────────────────────────────────────────────────────────────

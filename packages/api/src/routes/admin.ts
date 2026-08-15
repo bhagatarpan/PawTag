@@ -39,10 +39,13 @@ import {
   Invoice,
   TagExpiryNotification,
   Notification,
+  ReferralCode,
+  Referral,
 } from '@pawtag/db';
 import { auditService, type AuditContext } from '../services/audit';
 import { createAuditContextFromRequest, type AuditRequest } from '../middleware/audit';
 import { hashPassword } from '../services/auth.service';
+import { getReferralStats, getReferralHistory } from '../services/referral.service';
 
 const router = Router();
 
@@ -847,6 +850,40 @@ router.get('/users/:id/subscriptions', requirePermission('user.read'), async (re
     });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch user subscriptions' });
+  }
+});
+
+// GET /api/admin/users/:id/referrals — fetch referral info for a specific user
+router.get('/users/:id/referrals', requirePermission('user.read'), async (req, res: Response) => {
+  try {
+    const user = await User.findOne({ _id: req.params.id, deletedAt: null }).select('_id');
+    if (!user) { res.status(404).json({ success: false, error: 'User not found' }); return; }
+
+    // Get referral code
+    const referralCode = await ReferralCode.findOne({ userId: req.params.id, isActive: true }).lean();
+
+    // Get referral stats
+    const stats = await getReferralStats(req.params.id);
+
+    // Get referral history (people this user referred)
+    const history = await getReferralHistory(req.params.id);
+
+    // Get referred-by info (who referred this user)
+    const referredByRecord = await Referral.findOne({ refereeId: req.params.id })
+      .populate('referrerId', 'fullName email')
+      .lean();
+
+    res.json({
+      success: true,
+      data: {
+        code: referralCode?.code || null,
+        stats,
+        history,
+        referredBy: referredByRecord?.referrerId || null,
+      },
+    });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to fetch user referrals' });
   }
 });
 

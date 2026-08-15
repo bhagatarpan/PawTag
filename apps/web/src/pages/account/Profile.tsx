@@ -1,5 +1,5 @@
 import { useState, useEffect, FormEvent } from 'react';
-import { User, MapPin, Phone, Lock, Save } from 'lucide-react';
+import { User, MapPin, Phone, Lock, Save, Gift } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../lib/api';
 import SaveToast from '../../components/SaveToast';
@@ -13,6 +13,7 @@ export default function Profile() {
   const [showSaved, setShowSaved] = useState(false);
   const [responsibility, setResponsibility] = useState<any>(null);
   const [relationshipOptions, setRelationshipOptions] = useState<string[]>([]);
+  const [referredBy, setReferredBy] = useState<any>(null);
 
   useEffect(() => {
     if (user) {
@@ -23,6 +24,7 @@ export default function Profile() {
       });
     }
     api.get('/customer/responsibility').then((r) => setResponsibility(r.data.data)).catch(() => {});
+    api.get('/customer/referral/referred-by').then((r) => setReferredBy(r.data.data)).catch(() => {});
     api.get('/public/cms/onboarding').then((r) => {
       setRelationshipOptions(r.data.data?.globalSettings?.relationshipOptions || ['Spouse', 'Partner', 'Parent', 'Sibling', 'Child', 'Uncle', 'Aunt', 'Cousin', 'Friend', 'Neighbour', 'Work Colleague', 'Other']);
     }).catch(() => {});
@@ -56,6 +58,17 @@ export default function Profile() {
       )}
       {showSaved && <SaveToast message="Profile updated successfully" onDone={() => setShowSaved(false)} />}
       {error && <div className="bg-red-50 text-red-600 text-sm p-3 rounded mb-4">{error}</div>}
+      {referredBy && (
+        <div className="bg-teal-50 border border-teal-200 rounded-lg p-4 mb-6 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-teal-100 flex items-center justify-center shrink-0">
+            <Gift size={18} className="text-teal-600" />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-teal-800">Referred by {referredBy.fullName}</p>
+            <p className="text-xs text-teal-600">You were invited to join PawTag</p>
+          </div>
+        </div>
+      )}
       <form onSubmit={handleSave} className="space-y-6">
         <div className="bg-white rounded-lg border p-6 space-y-4">
           <h2 className="text-lg font-semibold flex items-center gap-2"><User size={18} /> Personal Information</h2>

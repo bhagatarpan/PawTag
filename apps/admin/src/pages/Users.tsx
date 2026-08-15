@@ -45,6 +45,7 @@ import {
   Eye,
   EyeOff,
   Package,
+  Gift,
 } from 'lucide-react';
 
 /* ------------------------------------------------------------------ */
@@ -183,7 +184,7 @@ function DetailDrawer({
   onRefresh: () => void;
   rbacRoles: any[];
 }) {
-  const [activeTab, setActiveTab] = useState<'profile' | 'rbac' | 'orders' | 'subscriptions' | 'settings'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'rbac' | 'orders' | 'subscriptions' | 'referrals' | 'settings'>('profile');
   const [editMode, setEditMode] = useState(false);
   const [editForm, setEditForm] = useState({ fullName: '', email: '', phoneNumber: '', responsibilityScore: 0, address: { line1: '', line2: '', city: '', state: '', zip: '', country: '' }, emergencyContact: { name: '', phone: '', email: '', relationship: '' }, showOwnerNameInFinder: true, notificationPreferences: { email: true, push: true, inApp: true, channels: { petFound: true, orderUpdate: true, subscriptionReminder: true, referral: true, marketing: false } } });
   const [editError, setEditError] = useState('');
@@ -201,6 +202,8 @@ function DetailDrawer({
   const [userSubscriptionsTotal, setUserSubscriptionsTotal] = useState(0);
   const [userSubscriptionsLoading, setUserSubscriptionsLoading] = useState(false);
   const [selectedAdminOrder, setSelectedAdminOrder] = useState<Order | null>(null);
+  const [userReferrals, setUserReferrals] = useState<any>(null);
+  const [userReferralsLoading, setUserReferralsLoading] = useState(false);
   const navigate = useNavigate();
   const drawerRef = useRef<HTMLDivElement>(null);
 
@@ -275,10 +278,20 @@ function DetailDrawer({
     } catch { /* non-critical */ } finally { setUserSubscriptionsLoading(false); }
   }, [user]);
 
+  const fetchUserReferrals = useCallback(async () => {
+    if (!user) return;
+    setUserReferralsLoading(true);
+    try {
+      const res = await api.get(`/admin/users/${user._id}/referrals`);
+      setUserReferrals(res.data.data);
+    } catch { /* non-critical */ } finally { setUserReferralsLoading(false); }
+  }, [user]);
+
   useEffect(() => {
     if (activeTab === 'orders') fetchUserOrders();
     if (activeTab === 'subscriptions') fetchUserSubscriptions();
-  }, [activeTab, fetchUserOrders, fetchUserSubscriptions]);
+    if (activeTab === 'referrals') fetchUserReferrals();
+  }, [activeTab, fetchUserOrders, fetchUserSubscriptions, fetchUserReferrals]);
 
   if (!user) return null;
 
@@ -413,6 +426,7 @@ function DetailDrawer({
     { key: 'rbac' as const, label: `Roles (${user.rbacRoles?.length || 0})` },
     { key: 'orders' as const, label: `Orders (${userOrdersTotal})` },
     { key: 'subscriptions' as const, label: `Subscriptions (${userSubscriptionsTotal})` },
+    { key: 'referrals' as const, label: 'Referrals' },
     { key: 'settings' as const, label: 'Settings' },
   ];
 
@@ -883,6 +897,110 @@ function DetailDrawer({
                     </div>
                   );
                 })
+              )}
+            </div>
+          )}
+
+          {activeTab === 'referrals' && (
+            <div className="space-y-6">
+              {userReferralsLoading ? (
+                <div className="flex items-center gap-3 text-gray-400 py-12 justify-center">
+                  <Loader2 size={18} className="animate-spin" />
+                  <span className="text-sm">Loading referrals...</span>
+                </div>
+              ) : !userReferrals ? (
+                <p className="text-sm text-gray-500 py-8 text-center">Failed to load referral data</p>
+              ) : (
+                <>
+                  {/* Referral Code */}
+                  <Section title="Referral Code" icon={<Gift size={16} />}>
+                    {userReferrals.code ? (
+                      <div className="bg-gradient-to-br from-teal-600 to-teal-700 rounded-xl p-5 text-white">
+                        <p className="text-xs text-white/70 uppercase tracking-wider mb-2">Your Referral Code</p>
+                        <div className="flex items-center gap-3">
+                          <span className="font-mono text-2xl font-bold tracking-wider">{userReferrals.code}</span>
+                          <button
+                            onClick={() => { navigator.clipboard.writeText(userReferrals.code); toast.success('Copied to clipboard'); }}
+                            className="p-2 rounded-lg bg-white/20 hover:bg-white/30 transition-colors"
+                          >
+                            <Copy size={16} />
+                          </button>
+                        </div>
+                        <p className="text-xs text-white/60 mt-2">Share this code with friends to earn rewards</p>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-500">No referral code generated yet</p>
+                    )}
+                  </Section>
+
+                  {/* Referred By */}
+                  {userReferrals.referredBy && (
+                    <Section title="Referred By" icon={<UserCheck size={16} />}>
+                      <div className="flex items-center gap-3 p-3 rounded-lg bg-gray-50">
+                        <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center shrink-0">
+                          <User size={16} className="text-primary-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">{userReferrals.referredBy.fullName}</p>
+                          <p className="text-xs text-gray-400">{userReferrals.referredBy.email}</p>
+                        </div>
+                      </div>
+                    </Section>
+                  )}
+
+                  {/* Stats */}
+                  <Section title="Referral Stats" icon={<Activity size={16} />}>
+                    <div className="grid grid-cols-2 gap-3">
+                      {[
+                        { label: 'Total Referrals', value: userReferrals.stats?.totalReferrals || 0 },
+                        { label: 'Completed', value: userReferrals.stats?.completedReferrals || 0 },
+                        { label: 'Pending', value: userReferrals.stats?.pendingReferrals || 0 },
+                        { label: 'Rewards Earned', value: `${userReferrals.stats?.totalRewardMonths || 0}mo` },
+                      ].map(({ label, value }) => (
+                        <div key={label} className="flex items-center justify-between p-3 rounded-lg bg-gray-50">
+                          <span className="text-sm text-gray-600">{label}</span>
+                          <span className="text-sm font-semibold text-gray-900">{value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </Section>
+
+                  {/* History */}
+                  {userReferrals.history?.length > 0 && (
+                    <Section title="Referral History" icon={<Clock size={16} />}>
+                      <div className="space-y-2">
+                        {userReferrals.history.map((ref: any) => (
+                          <div key={ref._id} className="flex items-center justify-between p-3 rounded-lg bg-gray-50">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center shrink-0">
+                                <User size={14} className="text-primary-600" />
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium text-gray-900">{ref.refereeId?.fullName || 'Unknown'}</p>
+                                <p className="text-xs text-gray-400">{ref.refereeId?.email}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className="text-xs text-gray-400">{formatDate(ref.createdAt)}</span>
+                              {(() => {
+                                const colors: Record<string, string> = {
+                                  pending: 'bg-amber-100 text-amber-700',
+                                  completed: 'bg-blue-100 text-blue-700',
+                                  rewarded: 'bg-emerald-100 text-emerald-700',
+                                };
+                                return (
+                                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${colors[ref.status] || 'bg-gray-100 text-gray-500'}`}>
+                                    {formatStatusLabel(ref.status)}
+                                  </span>
+                                );
+                              })()}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </Section>
+                  )}
+                </>
               )}
             </div>
           )}

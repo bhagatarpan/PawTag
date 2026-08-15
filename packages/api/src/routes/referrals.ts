@@ -40,6 +40,18 @@ router.get('/customer/referral/history', authenticate, async (req: AuthRequest, 
   }
 });
 
+// Customer: Get referred-by info
+router.get('/customer/referral/referred-by', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const referral = await Referral.findOne({ refereeId: req.user!.id })
+      .populate('referrerId', 'fullName')
+      .lean();
+    res.json({ success: true, data: referral?.referrerId || null });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to get referred-by info' });
+  }
+});
+
 // Public: Validate referral code
 router.get('/finder/referral/:code', async (req, res: Response) => {
   try {
