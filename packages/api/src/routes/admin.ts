@@ -816,15 +816,34 @@ router.get('/users/:id/subscriptions', requirePermission('user.read'), async (re
 
     const total = await Subscription.countDocuments(query);
     const subscriptions = await Subscription.find(query)
-      .populate('tagId', 'tagId tagType status')
+      .populate('tagId', 'tagId tagType status petId')
       .populate('planId', 'name price')
       .sort({ createdAt: -1 })
       .skip((Number(page) - 1) * Number(limit))
       .limit(Number(limit));
 
+    // Enrich with pet info from tags
+    const petIds = subscriptions
+      .map((s: any) => s.tagId?.petId)
+      .filter(Boolean);
+    const pets = petIds.length > 0
+      ? await Pet.find({ _id: { $in: petIds } }).select('name petType breed')
+      : [];
+    const petMap = new Map<string, any>();
+    for (const pet of pets) { petMap.set((pet as any)._id.toString(), pet); }
+
+    const enriched = subscriptions.map((s: any) => {
+      const pet = s.tagId?.petId ? petMap.get(s.tagId.petId.toString()) : null;
+      return {
+        ...s.toObject(),
+        petName: pet?.name || null,
+        petType: pet?.petType || null,
+      };
+    });
+
     res.json({
       success: true,
-      data: { items: subscriptions, total, page: Number(page), limit: Number(limit), totalPages: Math.ceil(total / Number(limit)) },
+      data: { items: enriched, total, page: Number(page), limit: Number(limit), totalPages: Math.ceil(total / Number(limit)) },
     });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch user subscriptions' });

@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import api, { PaginatedData } from '../lib/api';
 import { toast } from '../lib/toast';
+import { StatusBadge } from '@pawtag/ui';
 import {
   Search,
   X,
@@ -41,6 +42,7 @@ import {
   Bell,
   Eye,
   EyeOff,
+  Package,
 } from 'lucide-react';
 
 /* ------------------------------------------------------------------ */
@@ -117,6 +119,34 @@ function getStatusBadge(status: string): { className: string; icon: React.ReactN
 
 function formatStatusLabel(status: string): string {
   return status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function getOrderStatusVariant(status: string): 'success' | 'danger' | 'warning' | 'info' | 'neutral' | 'primary' {
+  switch (status) {
+    case 'delivered': return 'success';
+    case 'shipped': return 'primary';
+    case 'paid': return 'info';
+    case 'packing': return 'info';
+    case 'pending': return 'warning';
+    case 'pending_payment': return 'warning';
+    case 'cancelled': return 'danger';
+    case 'refunded': return 'danger';
+    default: return 'neutral';
+  }
+}
+
+function getOrderStatusIcon(status: string) {
+  switch (status) {
+    case 'delivered': return <CheckCircle size={13} />;
+    case 'shipped': return <Activity size={13} />;
+    case 'paid': return <Package size={13} />;
+    case 'packing': return <Package size={13} />;
+    case 'pending': return <Clock size={13} />;
+    case 'pending_payment': return <Clock size={13} />;
+    case 'cancelled': return <AlertCircle size={13} />;
+    case 'refunded': return <RotateCcw size={13} />;
+    default: return <Clock size={13} />;
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -706,85 +736,133 @@ function DetailDrawer({
           )}
 
           {activeTab === 'orders' && (
-            <div className="space-y-4">
+            <div className="space-y-3">
               {userOrdersLoading ? (
-                <div className="flex items-center gap-2 text-sm text-gray-500 py-8 justify-center">
-                  <Loader2 size={16} className="animate-spin" /> Loading orders...
+                <div className="flex items-center gap-3 text-gray-400 py-12 justify-center">
+                  <Loader2 size={18} className="animate-spin" />
+                  <span className="text-sm">Loading orders...</span>
                 </div>
               ) : userOrders.length === 0 ? (
-                <p className="text-sm text-gray-500 py-8 text-center">No orders found</p>
+                <div className="text-center py-12 bg-white rounded-xl border border-gray-100">
+                  <FileText size={32} className="mx-auto mb-2 text-gray-300" />
+                  <p className="text-gray-500 font-medium">No orders yet</p>
+                  <p className="text-sm text-gray-400 mt-1">Orders will appear here after purchases.</p>
+                </div>
               ) : (
-                <div className="space-y-2">
-                  {userOrders.map((order: any) => (
-                    <div key={order._id} className="flex items-center justify-between p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-                          <FileText size={14} className="text-blue-600" />
+                userOrders.map((order: any) => (
+                  <div key={order._id} className="bg-white rounded-xl border border-gray-100 p-5 hover:border-gray-200 hover:shadow-sm transition-all duration-200 cursor-pointer">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
+                          <FileText size={18} className="text-blue-600" />
                         </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">{order.orderNumber || order._id.slice(-8).toUpperCase()}</p>
-                          <p className="text-xs text-gray-400">{formatDate(order.createdAt)} · {order.items?.length || 0} item{(order.items?.length || 0) !== 1 ? 's' : ''}</p>
+                        <div>
+                          <p className="font-mono text-sm font-medium text-gray-900">
+                            {order.orderNumber || `#${order._id.slice(-8).toUpperCase()}`}
+                          </p>
+                          <p className="text-xs text-gray-400 mt-0.5">{formatDate(order.createdAt)}</p>
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            {order.items?.length || 0} item{(order.items?.length || 0) !== 1 ? 's' : ''}
+                          </p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-3 shrink-0">
-                        <span className="text-sm font-medium text-gray-700">${order.payment?.amount?.toFixed(2) || '0.00'}</span>
-                        {(() => {
-                          const badge = getStatusBadge(order.status);
-                          return (
-                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${badge.className}`}>
-                              {badge.icon} {formatStatusLabel(order.status)}
-                            </span>
-                          );
-                        })()}
+                      <div className="flex items-center gap-3">
+                        <StatusBadge
+                          label={formatStatusLabel(order.status)}
+                          variant={getOrderStatusVariant(order.status)}
+                          icon={getOrderStatusIcon(order.status)}
+                        />
+                        <span className="text-sm font-semibold text-gray-900">
+                          ${order.payment?.amount?.toFixed(2) || '0.00'}
+                        </span>
+                        <ChevronRight size={16} className="text-gray-400" />
                       </div>
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ))
               )}
             </div>
           )}
 
           {activeTab === 'subscriptions' && (
-            <div className="space-y-4">
+            <div className="space-y-3">
               {userSubscriptionsLoading ? (
-                <div className="flex items-center gap-2 text-sm text-gray-500 py-8 justify-center">
-                  <Loader2 size={16} className="animate-spin" /> Loading subscriptions...
+                <div className="flex items-center gap-3 text-gray-400 py-12 justify-center">
+                  <Loader2 size={18} className="animate-spin" />
+                  <span className="text-sm">Loading subscriptions...</span>
                 </div>
               ) : userSubscriptions.length === 0 ? (
-                <p className="text-sm text-gray-500 py-8 text-center">No subscriptions found</p>
-              ) : (
-                <div className="space-y-2">
-                  {userSubscriptions.map((sub: any) => (
-                    <div key={sub._id} className="flex items-center justify-between p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center shrink-0">
-                          <Activity size={14} className="text-purple-600" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">{sub.tagId?.tagId || 'No tag'}</p>
-                          <p className="text-xs text-gray-400">{sub.planId?.name || 'Unknown plan'} · {sub.totalScans || 0} scans</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3 shrink-0">
-                        <span className="text-sm font-medium text-gray-700">${sub.planId?.price?.toFixed(2) || '0.00'}/mo</span>
-                        {(() => {
-                          const statusColors: Record<string, string> = {
-                            active: 'bg-emerald-100 text-emerald-700',
-                            grace_period: 'bg-amber-100 text-amber-700',
-                            expired: 'bg-gray-100 text-gray-500',
-                            cancelled: 'bg-red-100 text-red-700',
-                            pending_payment: 'bg-blue-100 text-blue-700',
-                          };
-                          return (
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[sub.status] || 'bg-gray-100 text-gray-500'}`}>
-                              {formatStatusLabel(sub.status)}
-                            </span>
-                          );
-                        })()}
-                      </div>
-                    </div>
-                  ))}
+                <div className="text-center py-12 bg-white rounded-xl border border-gray-100">
+                  <Shield size={32} className="mx-auto mb-2 text-gray-300" />
+                  <p className="text-gray-500 font-medium">No subscriptions yet</p>
+                  <p className="text-sm text-gray-400 mt-1">Subscriptions appear after purchasing a PawTag product.</p>
                 </div>
+              ) : (
+                userSubscriptions.map((sub: any) => {
+                  const isActive = sub.status === 'active';
+                  const isGrace = sub.status === 'grace_period';
+                  const isExpired = sub.status === 'expired';
+                  return (
+                    <div key={sub._id} className="bg-white rounded-xl border border-gray-100 overflow-hidden hover:border-gray-200 hover:shadow-sm transition-all duration-200">
+                      <div className="p-5">
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isActive ? 'bg-emerald-50' : isGrace ? 'bg-amber-50' : 'bg-gray-50'}`}>
+                              <Shield size={18} className={isActive ? 'text-emerald-600' : isGrace ? 'text-amber-600' : 'text-gray-400'} />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono font-bold text-gray-900 text-sm">{sub.tagId?.tagId || 'N/A'}</span>
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${isActive ? 'bg-emerald-50 text-emerald-700' : isGrace ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700'}`}>
+                                  {sub.status.replace('_', ' ')}
+                                </span>
+                              </div>
+                              {(sub.petName || sub.planId?.name) && (
+                                <p className="text-sm text-gray-500 mt-0.5">
+                                  {sub.petName && <span className="font-medium text-gray-700">{sub.petName}</span>}
+                                  {sub.petType && <span className="text-gray-400"> · {sub.petType}</span>}
+                                  {(sub.petName || sub.petType) && sub.planId?.name && <span className="text-gray-300 mx-1">·</span>}
+                                  {sub.planId?.name && <span>{sub.planId.name}</span>}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-sm font-semibold text-gray-900">${sub.planId?.price?.toFixed(2) || '0.00'}<span className="text-xs font-normal text-gray-400">{sub.renewalMethod === 'annual' ? '/yr' : '/mo'}</span></div>
+                            <div className="text-xs text-gray-400 mt-0.5">{sub.totalScans || 0} scans</div>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between pt-3 border-t border-gray-50">
+                          <div className="flex items-center gap-4 text-xs text-gray-400">
+                            <span className="flex items-center gap-1">
+                              <Clock size={12} />
+                              {formatDate(sub.startDate)}
+                            </span>
+                            <span className={`flex items-center gap-1 ${sub.autoRenew ? 'text-emerald-500' : ''}`}>
+                              <Activity size={12} />
+                              {sub.autoRenew ? 'Auto-renew on' : 'Auto-renew off'}
+                            </span>
+                            {sub.gracePeriodEndsAt && (
+                              <span className="flex items-center gap-1 text-amber-600 font-medium">
+                                <AlertTriangle size={12} />
+                                Grace ends {formatDate(sub.gracePeriodEndsAt)}
+                              </span>
+                            )}
+                          </div>
+                          <ChevronRight size={16} className="text-gray-400" />
+                        </div>
+                      </div>
+                      {(isGrace || isExpired) && (
+                        <div className="px-5 py-3 bg-gradient-to-r from-amber-50 to-orange-50 border-t border-amber-100/60 flex items-center justify-between">
+                          <div className="flex items-center gap-2 text-sm text-amber-700">
+                            <AlertTriangle size={14} />
+                            <span>{isGrace && sub.gracePeriodEndsAt ? `Grace period ends ${formatDate(sub.gracePeriodEndsAt)}` : 'Subscription expired'}</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
               )}
             </div>
           )}
