@@ -535,7 +535,8 @@ function DetailDrawer({
                       <>
                         <DetailRow label="Owner" value={
                           <button
-                            onClick={() => setSelectedOwner(pet.ownerId as any)}
+                            type="button"
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedOwner(pet.ownerId as any); }}
                             className="text-primary-600 hover:underline font-medium inline-flex items-center gap-1"
                           >
                             {pet.ownerId.fullName}
@@ -545,7 +546,8 @@ function DetailDrawer({
                         <DetailRow label="Email" value={
                           <span className="flex items-center gap-2">
                             <button
-                              onClick={() => setSelectedOwner(pet.ownerId as any)}
+                              type="button"
+                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedOwner(pet.ownerId as any); }}
                               className="text-primary-600 hover:underline text-left"
                             >
                               {pet.ownerId.email}
@@ -561,7 +563,8 @@ function DetailDrawer({
                     {pet.linkedTag ? (
                       <DetailRow label="Tag" value={
                         <button
-                          onClick={() => handleTagClick(pet.linkedTag!._id)}
+                          type="button"
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleTagClick(pet.linkedTag!._id); }}
                           disabled={selectedTagLoading}
                           className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-mono rounded bg-primary-50 text-primary-700 border border-primary-200 hover:bg-primary-100 transition-colors disabled:opacity-50"
                         >
