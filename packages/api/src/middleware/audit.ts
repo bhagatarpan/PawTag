@@ -1,9 +1,30 @@
 import { Request, Response, NextFunction } from 'express';
 import { v7 as uuidv7 } from 'uuid';
+import jwt from 'jsonwebtoken';
 import { config } from '../config';
 import { AuthRequest, AuditContext, AuditRequest } from './auth';
 import { auditService } from '../services/audit';
+import { Setting } from '@pawtag/db';
 import logger from '../lib/logger';
+
+// Cache for identifyAnonymousActors setting (5 second TTL)
+let cachedIdentifySetting: string | null = null;
+let cachedIdentifyAt = 0;
+const IDENTIFY_CACHE_TTL_MS = 5000;
+
+async function shouldIdentifyAnonymousActors(): Promise<boolean> {
+  if (cachedIdentifySetting !== null && Date.now() - cachedIdentifyAt < IDENTIFY_CACHE_TTL_MS) {
+    return cachedIdentifySetting !== 'false';
+  }
+  try {
+    const setting = await Setting.findOne({ key: 'audit.settings.identifyAnonymousActors' }).lean();
+    cachedIdentifySetting = setting?.value || 'true';
+    cachedIdentifyAt = Date.now();
+    return cachedIdentifySetting !== 'false';
+  } catch {
+    return true; // Default to enabled
+  }
+}
 
 export type { AuditRequest, AuditContext } from './auth';
 
@@ -32,6 +53,29 @@ function getDeviceId(req: Request): string | undefined {
 
 function getRequestPath(req: Request): string {
   return req.originalUrl.split('?')[0];
+}
+
+/**
+ * Try to identify the user from the JWT token without verifying it.
+ * This is used for audit logging when auth middleware fails.
+ */
+function identifyFromToken(req: Request): { actorId?: string; actorEmail?: string; actorUsername?: string } | null {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) return null;
+
+  const token = authHeader.split(' ')[1];
+  try {
+    // Decode without verification to get user info for audit logging
+    const decoded = jwt.decode(token) as { id?: string; email?: string } | null;
+    if (decoded?.id && decoded?.email) {
+      return {
+        actorId: decoded.id,
+        actorEmail: decoded.email,
+        actorUsername: decoded.email.split('@')[0],
+      };
+    }
+  } catch { /* token is malformed, ignore */ }
+  return null;
 }
 
 function shouldAuditRequest(req: Request): boolean {
@@ -63,7 +107,7 @@ function requestActor(req: AuthRequest): string {
   return 'UNKNOWN';
 }
 
-function auditCompletedRequest(req: AuthRequest, res: Response): void {
+async function auditCompletedRequest(req: AuthRequest, res: Response): Promise<void> {
   if (!shouldAuditRequest(req)) return;
   const path = getRequestPath(req);
   const category = requestCategory(req);
@@ -72,9 +116,23 @@ function auditCompletedRequest(req: AuthRequest, res: Response): void {
   const queryKeys = Object.keys(req.query || {});
   const bodyFields = req.body && typeof req.body === 'object' ? Object.keys(req.body) : [];
 
+  // If actor is UNKNOWN, check if we can identify from JWT token (if setting is enabled)
+  let identifiedActor = {};
+  if (actorType === 'UNKNOWN' && (req.auditContext as any)?.potentialActorId) {
+    const identifyEnabled = await shouldIdentifyAnonymousActors();
+    if (identifyEnabled) {
+      identifiedActor = {
+        actorId: (req.auditContext as any).potentialActorId,
+        actorEmail: (req.auditContext as any).potentialActorEmail,
+        actorUsername: (req.auditContext as any).potentialActorUsername,
+      };
+    }
+  }
+
   auditService.log({
     ...(req.auditContext as AuditContext),
     actorType: actorType as any,
+    ...identifiedActor,
   }, {
     action: `http_${req.method.toLowerCase()}`,
     eventType: 'http.request.completed',
@@ -102,6 +160,9 @@ export function auditMiddleware(req: AuthRequest, res: Response, next: NextFunct
   const traceId = req.headers['x-trace-id']?.toString() || uuidv7();
   const transactionId = req.headers['x-transaction-id']?.toString() || uuidv7();
 
+  // Try to identify user from JWT token (even if auth fails)
+  const potentialActor = identifyFromToken(req);
+
   req.auditContext = {
     requestId,
     correlationId,
@@ -118,7 +179,11 @@ export function auditMiddleware(req: AuthRequest, res: Response, next: NextFunct
     apiVersion: req.headers['x-api-version']?.toString() || 'v1',
     environment: config.nodeEnv || 'development',
     tenantId: req.headers['x-tenant-id']?.toString(),
-  };
+    // Store potential actor info for audit logging if auth fails
+    potentialActorId: potentialActor?.actorId,
+    potentialActorEmail: potentialActor?.actorEmail,
+    potentialActorUsername: potentialActor?.actorUsername,
+  } as any;
 
   res.setHeader('X-Request-ID', requestId);
   res.setHeader('X-Correlation-ID', correlationId);

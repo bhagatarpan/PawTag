@@ -90,6 +90,7 @@ async function run() {
         { key: 'otp.skipOtpForInvoice', value: 'false', displayValue: 'Skip OTP for Invoice Access', category: 'otp', description: 'When true, system-wide invoice OTP is skipped. Use during OTP service outages.' },
         ...auditCategories.map((value) => ({ key: `audit.policy.category.${value.toLowerCase()}`, value: 'true', displayValue: `Audit: ${value}`, category: 'audit', description: `Enable audit logging for ${value} events` })),
         ...auditActors.map((value) => ({ key: `audit.policy.actor.${value.toLowerCase()}`, value: 'true', displayValue: `Audit: ${value} Actor`, category: 'audit', description: `Enable audit logging for ${value} actors` })),
+        { key: 'audit.settings.identifyAnonymousActors', value: 'true', displayValue: 'Identify Anonymous Actors', category: 'audit', description: 'When enabled, attempts to identify anonymous users from JWT tokens even when auth fails' },
       ];
 
       let settingsCreated = 0;
