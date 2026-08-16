@@ -208,6 +208,15 @@ export function DetailDrawer({
     }
   };
 
+  const handlePetClick = async (petId: string) => {
+    try {
+      const res = await api.get(`/admin/pets/${petId}`);
+      setSelectedPet(res.data.data);
+    } catch {
+      toast.error('Failed to load pet details');
+    }
+  };
+
   const apiBase = import.meta.env.VITE_API_URL || '/api';
 
   useEffect(() => {
@@ -357,7 +366,7 @@ export function DetailDrawer({
                   <DetailRow label="Name" value={
                     <button
                       type="button"
-                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedPet(tag.petId as any); }}
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); handlePetClick(tag.petId!._id); }}
                       className="text-primary-600 hover:underline font-medium inline-flex items-center gap-1"
                     >
                       {tag.petId.name}
@@ -368,7 +377,7 @@ export function DetailDrawer({
                     <span className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedPet(tag.petId as any); }}
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); handlePetClick(tag.petId!._id); }}
                         className="font-mono text-xs text-primary-600 hover:underline"
                       >
                         {tag.petId.petId}
