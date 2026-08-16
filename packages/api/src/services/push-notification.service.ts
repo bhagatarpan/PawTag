@@ -1,4 +1,5 @@
 import { PushToken } from '@pawtag/db';
+import logger from '../lib/logger';
 
 // Firebase Admin SDK — loaded dynamically when configured
 let firebaseInitialized = false;
@@ -12,7 +13,7 @@ async function getFirebaseMessaging() {
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
 
   if (!projectId || !privateKey || !clientEmail) {
-    console.log('[PushService] Firebase not configured — running in demo mode (console log only)');
+    logger.info('[PushService] Firebase not configured — running in demo mode');
     firebaseInitialized = true;
     return null;
   }
@@ -30,10 +31,10 @@ async function getFirebaseMessaging() {
     }
     firebaseMessaging = (admin as any).messaging();
     firebaseInitialized = true;
-    console.log('[PushService] Firebase initialized successfully');
+    logger.info('[PushService] Firebase initialized successfully');
     return firebaseMessaging;
   } catch (error) {
-    console.error('[PushService] Failed to initialize Firebase:', error);
+    logger.error({ err: error }, '[PushService] Failed to initialize Firebase');
     firebaseInitialized = true;
     return null;
   }
@@ -73,10 +74,7 @@ export async function sendPushToUser(
 
   if (!messaging) {
     // Demo mode — log to console
-    console.log(`[PushService] DEMO PUSH to user ${userId}:`);
-    console.log(`  Title: ${title}`);
-    console.log(`  Body: ${body}`);
-    console.log(`  Tokens: ${tokens.length}`);
+    logger.info({ userId, title, tokenCount: tokens.length }, '[PushService] DEMO PUSH');
     return { sent: tokens.length, failed: 0 };
   }
 
@@ -92,7 +90,7 @@ export async function sendPushToUser(
       });
       sent++;
     } catch (error: any) {
-      console.error(`[PushService] Failed to send to token ${token.substring(0, 20)}...:`, error.message);
+      logger.error({ err: error, token: token.substring(0, 20) }, '[PushService] Failed to send to token');
       // Remove invalid tokens
       if (error.code === 'messaging/registration-token-not-registered' ||
           error.code === 'messaging/invalid-registration-token') {

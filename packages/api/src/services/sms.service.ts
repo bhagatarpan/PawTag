@@ -1,4 +1,5 @@
 import { CmsSmsTemplate } from '@pawtag/db';
+import logger from '../lib/logger';
 
 interface SMSResult {
   success: boolean;
@@ -12,28 +13,8 @@ interface SMSProvider {
 
 class DemoSMSProvider implements SMSProvider {
   async send(to: string, message: string): Promise<SMSResult> {
-    // Extract OTP code if present (6-digit number)
     const otpMatch = message.match(/\b(\d{6})\b/);
-
-    console.log('\n');
-    console.log('╔══════════════════════════════════════════════╗');
-    console.log('║          📱 SMS SENT (DEMO MODE)            ║');
-    console.log('╠══════════════════════════════════════════════╣');
-    console.log(`║  To:      ${to}`);
-    console.log('║');
-    console.log(`║  Message: ${message.substring(0, 50)}${message.length > 50 ? '...' : ''}`);
-
-    if (otpMatch) {
-      console.log('║');
-      console.log('║  ┌────────────────────────────────────────┐');
-      console.log(`║  │  OTP CODE:  ${otpMatch[1]}                      │`);
-      console.log('║  └────────────────────────────────────────┘');
-      console.log('║');
-      console.log('║  ⏱️  Expires in 10 minutes');
-    }
-
-    console.log('╚══════════════════════════════════════════════╝');
-    console.log('\n');
+    logger.debug({ to, messagePreview: message.substring(0, 50), otp: otpMatch?.[1] }, 'DEMO SMS — No SMS_PROVIDER set');
     return { success: true, messageId: `demo_sms_${Date.now()}` };
   }
 }
@@ -73,13 +54,13 @@ class TwilioSMSProvider implements SMSProvider {
       const data = await response.json() as { sid?: string; error_code?: string; error_message?: string };
 
       if (!response.ok) {
-        console.error('SMS send failed:', data.error_message);
+        logger.error({ to, errorCode: data.error_code, errorMessage: data.error_message }, 'Twilio SMS send failed');
         return { success: false, error: data.error_message || 'SMS send failed' };
       }
 
       return { success: true, messageId: data.sid };
     } catch (error: any) {
-      console.error('SMS send failed:', error.message);
+      logger.error({ err: error, to }, 'Twilio SMS send failed');
       return { success: false, error: error.message };
     }
   }
@@ -118,7 +99,7 @@ async function renderCmsSms(slug: string, variables: Record<string, string>): Pr
     msg = replaceVariables(msg, variables);
     return msg;
   } catch (err) {
-    console.error(`CMS SMS template "${slug}" fetch failed, using fallback:`, err);
+    logger.error({ err, template: slug }, 'CMS SMS template fetch failed, using fallback');
     return null;
   }
 }

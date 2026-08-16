@@ -1,6 +1,7 @@
 import { ReferralCode, Referral, User, Subscription } from '@pawtag/db';
 import { sendMail } from './email.service';
 import { auditService, type AuditContext } from './audit';
+import logger from '../lib/logger';
 
 async function auditReferralEvent(
   input: Parameters<typeof auditService.log>[1],
@@ -20,7 +21,7 @@ async function auditReferralEvent(
       ...overrides,
     }, input);
   } catch (err) {
-    console.error('[Audit] Failed to log referral event:', err);
+    logger.error({ err }, '[Audit] Failed to log referral event');
   }
 }
 

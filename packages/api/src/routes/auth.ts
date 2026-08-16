@@ -248,7 +248,7 @@ router.post('/register', registerLimiter, validate(registerSchema), async (req, 
       },
     });
   } catch (error) {
-    console.error('Register error:', error);
+    logger.error({ err: error, email: req.body?.email }, 'Register error');
     res.status(500).json({ success: false, error: 'Registration failed' });
   }
 });
@@ -574,7 +574,7 @@ if (user.status === 'inactive') {
       },
     });
   } catch (error) {
-    console.error('Login error:', error);
+    logger.error({ err: error, email: req.body?.email }, 'Login error');
     res.status(500).json({ success: false, error: 'Login failed' });
   }
 });
@@ -660,7 +660,7 @@ router.get('/verify-email', async (req, res: Response) => {
     }
     res.redirect(`${config.frontendUrl}/verify-account?email_status=verified`);
   } catch (error) {
-    console.error('Email verification error:', error);
+    logger.error({ err: error }, 'Email verification error');
     res.redirect(`${config.frontendUrl}/verify-account?email_status=error`);
   }
 });
@@ -744,7 +744,7 @@ router.post('/resend-email-verification', validate(resendEmailVerificationSchema
       },
     });
   } catch (error) {
-    console.error('Resend email verification error:', error);
+    logger.error({ err: error, email: req.body?.email }, 'Resend email verification error');
     res.status(500).json({ success: false, error: 'Failed to resend verification email' });
   }
 });
@@ -859,7 +859,7 @@ router.post('/send-phone-otp', validate(sendPhoneOtpSchema), async (req, res: Re
       },
     });
   } catch (error) {
-    console.error('Send phone OTP error:', error);
+    logger.error({ err: error }, 'Send phone OTP error');
     res.status(500).json({ success: false, error: 'Failed to send OTP' });
   }
 });
@@ -997,7 +997,7 @@ router.post('/verify-phone', validate(verifyPhoneSchema), async (req: AuthReques
 
     res.json({ success: true, data: { message: 'Phone number verified successfully.' } });
   } catch (error) {
-    console.error('Verify phone error:', error);
+    logger.error({ err: error }, 'Verify phone error');
     res.status(500).json({ success: false, error: 'Verification failed' });
   }
 });
@@ -1088,7 +1088,7 @@ router.post('/resend-phone-otp', validate(resendPhoneOtpSchema), async (req, res
       },
     });
   } catch (error) {
-    console.error('Resend phone OTP error:', error);
+    logger.error({ err: error }, 'Resend phone OTP error');
     res.status(500).json({ success: false, error: 'Failed to resend OTP' });
   }
 });
@@ -1137,7 +1137,7 @@ router.get('/verification-status', async (req: AuthRequest, res: Response) => {
       },
     });
   } catch (error) {
-    console.error('Verification status error:', error);
+    logger.error({ err: error }, 'Verification status error');
     res.status(500).json({ success: false, error: 'Failed to get verification status' });
   }
 });
@@ -1189,7 +1189,7 @@ router.post('/forgot-password', forgotPasswordLimiter, validate(forgotPasswordSc
 
     res.json({ success: true, data: { message: 'If an account exists, a reset email has been sent.' } });
   } catch (error) {
-    console.error('Forgot password error:', error);
+    logger.error({ err: error, email: req.body?.email }, 'Forgot password error');
     res.status(500).json({ success: false, error: 'Request failed' });
   }
 });
@@ -1242,12 +1242,12 @@ router.post('/reset-password', validate(resetPasswordSchema), async (req, res: R
     }, { actorType: 'USER', authenticationMethod: 'password_reset_token' });
 
     sendPasswordChangedEmail(user.email, user.fullName, 'self', clientInfo.ipAddress).catch((err) => {
-      console.error('Failed to send password changed email:', err);
+      logger.error({ err, email: user.email }, 'Failed to send password changed email');
     });
 
     res.json({ success: true, data: { message: 'Password has been reset successfully. You can now log in.' } });
   } catch (error) {
-    console.error('Reset password error:', error);
+    logger.error({ err: error }, 'Reset password error');
     res.status(500).json({ success: false, error: 'Failed to reset password' });
   }
 });
@@ -1373,7 +1373,7 @@ router.post('/change-password', authenticate, validate(changePasswordSchema), as
     }, { authenticationMethod: 'current_password' });
 
     sendPasswordChangedEmail(user.email, user.fullName, 'self', getClientInfo(req).ipAddress).catch((err) => {
-      console.error('Failed to send password changed email:', err);
+      logger.error({ err, email: user.email }, 'Failed to send password changed email');
     });
 
     res.json({ success: true, data: { message: 'Password changed successfully' } });
@@ -1562,7 +1562,7 @@ router.post('/mfa/send-otp', mfaSendLimiter, async (req: AuthRequest, res: Respo
       },
     });
   } catch (error) {
-    console.error('MFA send-otp error:', error);
+    logger.error({ err: error }, 'MFA send-otp error');
     res.status(500).json({ success: false, error: 'Failed to send verification code.' });
   }
 });
@@ -1767,7 +1767,7 @@ router.post('/mfa/verify', mfaVerifyLimiter, async (req: AuthRequest, res: Respo
       },
     });
   } catch (error) {
-    console.error('MFA verify error:', error);
+    logger.error({ err: error }, 'MFA verify error');
     res.status(500).json({ success: false, error: 'Verification failed.' });
   }
 });

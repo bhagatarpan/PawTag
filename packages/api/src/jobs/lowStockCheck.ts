@@ -1,6 +1,7 @@
 import { Product, Setting, Notification, User } from '@pawtag/db';
 import { sendMail } from '../services/email.service';
 import { auditService, type AuditContext } from '../services/audit';
+import logger from '../lib/logger';
 
 async function auditJobEvent(
   input: Parameters<typeof auditService.log>[1],
@@ -22,7 +23,7 @@ async function auditJobEvent(
         ...overrides,
       }, input);
     } catch (err) {
-      console.error('[Audit] Failed to log job event:', err);
+      logger.error({ err }, '[Audit] Failed to log job event');
     }
   };
   logAudit();
@@ -60,7 +61,7 @@ export async function checkLowStock(): Promise<{ alerted: boolean; count: number
 
   const adminEmail = process.env.ADMIN_ALERT_EMAIL;
   if (!adminEmail) {
-    console.log('[LowStockCheck] No ADMIN_ALERT_EMAIL configured, skipping email alert');
+    logger.info('[LowStockCheck] No ADMIN_ALERT_EMAIL configured, skipping email alert');
   } else {
     const rows = lowStockProducts
       .map((p) => `<tr><td style="padding:8px;border:1px solid #e5e7eb;">${p.name}</td><td style="padding:8px;border:1px solid #e5e7eb;text-align:center;">${p.sku}</td><td style="padding:8px;border:1px solid #e5e7eb;text-align:center;font-weight:bold;color:${p.stock === 0 ? '#dc2626' : '#d97706'};">${p.stock}</td><td style="padding:8px;border:1px solid #e5e7eb;text-align:right;">$${p.price.toFixed(2)}</td></tr>`)
@@ -134,21 +135,21 @@ let lowStockTimer: ReturnType<typeof setInterval> | null = null;
 
 export function startLowStockService(): void {
   if (process.env.NODE_ENV === 'test') {
-    console.log('[LowStockCheck] Skipping scheduler in test mode');
+    logger.info('[LowStockCheck] Skipping scheduler in test mode');
     return;
   }
 
-  console.log('[LowStockCheck] Starting daily low stock check service');
+  logger.info('[LowStockCheck] Starting daily low stock check service');
 
   setTimeout(() => {
     checkLowStock().catch((err) => {
-      console.error('[LowStockCheck] Error during low stock check:', err);
+      logger.error({ err }, '[LowStockCheck] Error during low stock check');
     });
   }, LOW_STOCK_INITIAL_DELAY_MS);
 
   lowStockTimer = setInterval(() => {
     checkLowStock().catch((err) => {
-      console.error('[LowStockCheck] Error during low stock check:', err);
+      logger.error({ err }, '[LowStockCheck] Error during low stock check');
     });
   }, LOW_STOCK_CHECK_INTERVAL_MS);
 }
@@ -157,6 +158,6 @@ export function stopLowStockService(): void {
   if (lowStockTimer) {
     clearInterval(lowStockTimer);
     lowStockTimer = null;
-    console.log('[LowStockCheck] Stopped low stock check service');
+    logger.info('[LowStockCheck] Stopped low stock check service');
   }
 }

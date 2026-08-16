@@ -14,7 +14,7 @@ if (process.env.SENTRY_DSN && process.env.NODE_ENV !== 'test') {
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import morgan from 'morgan';
+import pinoHttp from 'pino-http';
 import swaggerUi from 'swagger-ui-express';
 import path from 'path';
 
@@ -84,7 +84,22 @@ app.use(cors({
   credentials: true,
 }));
 app.use(express.json({ limit: '10mb' }));
-app.use(morgan('dev'));
+
+// Structured HTTP request logging via pino-http
+const isTest = process.env.NODE_ENV === 'test';
+const httpLogger = pinoHttp({
+  logger,
+  // Skip health checks and docs in production
+  autoLogging: !isTest && {
+    ignore: (req) => {
+      const url = req.url || '';
+      return url === '/health' || url.startsWith('/api/docs') || url === '/favicon.ico';
+    },
+  },
+  // Redact sensitive headers
+  redact: ['req.headers.authorization', 'req.headers.cookie', 'res.headers.authorization'],
+});
+app.use(httpLogger);
 
 // Audit middleware - must be early to capture all requests
 app.use(auditMiddleware);
@@ -212,8 +227,22 @@ async function start() {
     });
 
     process.on('SIGTERM', () => {
-      logger.info('SIGTERM received, shutting down...');
+      logger.info('SIGTERM received, shutting down gracefully...');
+      server.close(() => {
+        logger.info('HTTP server closed');
+        process.exit(0);
+      });
+      // Force exit after 10 seconds if graceful shutdown fails
+      setTimeout(() => {
+        logger.error('Forced shutdown after timeout');
+        process.exit(1);
+      }, 10000);
+    });
+
+    process.on('SIGINT', () => {
+      logger.info('SIGINT received, shutting down...');
       server.close(() => process.exit(0));
+      setTimeout(() => process.exit(1), 10000);
     });
   } catch (error: any) {
     logger.error({ err: error }, 'Failed to start server');
@@ -228,5 +257,16 @@ const isDirectRun = process.argv[1] && (
 if (isDirectRun || process.env.NODE_ENV !== 'test') {
   start();
 }
+
+// --- Process-level exception handlers ---
+process.on('unhandledRejection', (reason: unknown) => {
+  logger.fatal({ err: reason }, 'Unhandled promise rejection');
+  process.exit(1);
+});
+
+process.on('uncaughtException', (err: Error) => {
+  logger.fatal({ err }, 'Uncaught exception — process may be in undefined state');
+  process.exit(1);
+});
 
 export default app;

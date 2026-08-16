@@ -1,6 +1,7 @@
 import { EscalationRecord, User, Notification, Setting } from '@pawtag/db';
 import { sendMail } from './email.service';
 import { sendPushToUser } from './push-notification.service';
+import logger from '../lib/logger';
 
 const POLL_INTERVAL_MS = 60_000; // Check every minute
 let pollingTimer: ReturnType<typeof setInterval> | null = null;
@@ -12,7 +13,7 @@ let pollingTimer: ReturnType<typeof setInterval> | null = null;
 export function startEscalationService(): void {
   if (pollingTimer) return;
 
-  console.log('[Escalation] Starting escalation polling service');
+  logger.info('[Escalation] Starting escalation polling service');
   pollingTimer = setInterval(processOverdueEscalations, POLL_INTERVAL_MS);
 }
 
@@ -23,7 +24,7 @@ export function stopEscalationService(): void {
   if (pollingTimer) {
     clearInterval(pollingTimer);
     pollingTimer = null;
-    console.log('[Escalation] Stopped escalation polling service');
+    logger.info('[Escalation] Stopped escalation polling service');
   }
 }
 
@@ -49,13 +50,13 @@ async function processOverdueEscalations(): Promise<void> {
 
     if (overdueRecords.length === 0) return;
 
-    console.log(`[Escalation] Processing ${overdueRecords.length} overdue escalations`);
+    logger.info({ count: overdueRecords.length }, '[Escalation] Processing overdue escalations');
 
     for (const record of overdueRecords) {
       await processEscalation(record);
     }
   } catch (err) {
-    console.error('[Escalation] Error processing overdue escalations:', err);
+    logger.error({ err }, '[Escalation] Error processing overdue escalations');
   }
 }
 
@@ -69,7 +70,7 @@ async function processEscalation(record: any): Promise<void> {
     const tag = record.tagId as any;
 
     if (!owner?.emergencyContact?.name || !owner?.emergencyContact?.phone) {
-      console.log(`[Escalation] No emergency contact for owner ${owner?._id}, skipping`);
+      logger.info({ ownerId: owner?._id }, '[Escalation] No emergency contact for owner, skipping');
       // Mark as escalated but note no emergency contact
       await EscalationRecord.findByIdAndUpdate(record._id, {
         status: 'escalated',
@@ -163,9 +164,9 @@ async function processEscalation(record: any): Promise<void> {
       emergencyContactNotificationType: ecUser ? 'in_app' : 'email',
     });
 
-    console.log(`[Escalation] Escalated pet ${petName} for owner ${ownerName}`);
+    logger.info({ petName, ownerName }, '[Escalation] Escalated pet for owner');
   } catch (err) {
-    console.error(`[Escalation] Error processing escalation ${record._id}:`, err);
+    logger.error({ err, recordId: record._id }, '[Escalation] Error processing escalation');
   }
 }
 

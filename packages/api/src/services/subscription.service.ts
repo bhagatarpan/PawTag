@@ -2,6 +2,7 @@ import { Subscription, Tag, Invoice, User, Notification, Product, TagExpiryNotif
 import { sendMail } from './email.service';
 import { createAndDeliverNotification } from './notification-delivery.service';
 import { auditService, type AuditContext } from './audit';
+import logger from '../lib/logger';
 
 const GRACE_PERIOD_WEEKS = 4;
 const FREE_PERIOD_MONTHS = 12;
@@ -27,7 +28,7 @@ async function auditJobEvent(
         ...overrides,
       }, input);
     } catch (err) {
-      console.error('[Audit] Failed to log job event:', err);
+      logger.error({ err }, '[Audit] Failed to log job event');
     }
   };
   logAudit();
@@ -38,11 +39,11 @@ export function startSubscriptionService() {
     try {
       await runSubscriptionChecks();
     } catch (error) {
-      console.error('[SubscriptionService] Error:', error);
+      logger.error({ err: error }, '[SubscriptionService] Error');
     }
   }, REMINDER_CHECK_INTERVAL_MS);
 
-  console.log('[SubscriptionService] Started — checks every hour for subscription lifecycle events');
+  logger.info('[SubscriptionService] Started — checks every hour for subscription lifecycle events');
 }
 
 export async function createSubscription(data: {
@@ -289,7 +290,7 @@ export async function processAutoRenewals() {
         status: 'paid',
       });
 
-      console.log(`[SubscriptionService] Auto-renewed subscription ${sub._id}`);
+      logger.info({ subscriptionId: sub._id }, '[SubscriptionService] Auto-renewed subscription');
 
       await auditJobEvent({
         action: 'subscription_auto_renewal',
@@ -321,7 +322,7 @@ export async function processAutoRenewals() {
         },
       });
     } catch (error) {
-      console.error(`[SubscriptionService] Failed to auto-renew ${sub._id}:`, error);
+      logger.error({ err: error, subscriptionId: sub._id }, '[SubscriptionService] Failed to auto-renew');
     }
   }
 }
@@ -417,7 +418,7 @@ export async function checkExpiredSubscriptions() {
 
     await Tag.findByIdAndUpdate(sub.tagId, { subscriptionStatus: 'grace_period' });
 
-    console.log(`[SubscriptionService] Subscription ${sub._id} moved to grace period until ${graceEnd}`);
+    logger.info({ subscriptionId: sub._id, graceEnd }, '[SubscriptionService] Subscription moved to grace period');
   }
 
   if (expiredSubs.length > 0) {
@@ -464,7 +465,7 @@ export async function checkGracePeriodExpiry() {
       subscriptionStatus: 'expired',
     });
 
-    console.log(`[SubscriptionService] Subscription ${sub._id} expired — tag deactivated (Subscription Expired)`);
+    logger.info({ subscriptionId: sub._id }, '[SubscriptionService] Subscription expired — tag deactivated');
   }
 
   if (graceExpired.length > 0) {
@@ -581,7 +582,7 @@ async function resetExpiredSkipOtp() {
     { $set: { skipInvoiceOtp: false }, $unset: { skipInvoiceOtpExpiresAt: 1 } },
   );
   if (result.modifiedCount > 0) {
-    console.log(`[SubscriptionService] Auto-reset skipInvoiceOtp for ${result.modifiedCount} expired user(s)`);
+    logger.info({ modifiedCount: result.modifiedCount }, '[SubscriptionService] Auto-reset skipInvoiceOtp for expired users');
   }
 }
 
@@ -649,12 +650,12 @@ async function checkTagExpiryNotifications() {
   }
 
   if (notifiedCount > 0) {
-    console.log(`[SubscriptionService] Created ${notifiedCount} tag expiry notification(s)`);
+    logger.info({ notifiedCount }, '[SubscriptionService] Created tag expiry notifications');
   }
 }
 
 async function runSubscriptionChecks() {
-  console.log('[SubscriptionService] Running subscription checks...');
+  logger.info('[SubscriptionService] Running subscription checks');
 
   await checkExpiringSubscriptions();
   await checkExpiredSubscriptions();
@@ -664,7 +665,7 @@ async function runSubscriptionChecks() {
   await resetExpiredSkipOtp();
   await checkTagExpiryNotifications();
 
-  console.log('[SubscriptionService] Subscription checks complete');
+  logger.info('[SubscriptionService] Subscription checks complete');
 }
 
 async function sendReminderEmail(to: string, name: string, tagId: string, daysLeft: number, type: '30-day' | '7-day' | '1-day') {

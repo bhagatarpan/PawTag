@@ -9,6 +9,7 @@ import {
   cancelSubscription,
   changeSubscriptionPlan,
 } from '../services/subscription.service';
+import logger from '../lib/logger';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_demo_key', {
   apiVersion: '2024-06-20' as any,
@@ -42,7 +43,7 @@ async function auditSubscriptionEvent(
     };
     await auditService.log(context, input);
   } catch (err) {
-    console.error('[Audit] Failed to log subscription event:', err);
+    logger.error({ err }, '[Audit] Failed to log subscription event');
   }
 }
 
@@ -458,7 +459,7 @@ router.post('/portal-link', requirePermission('customer.read'), async (req: Auth
 
     res.json({ success: true, data: { url: session.url } });
   } catch (error: any) {
-    console.error('[Subscriptions] Portal link error:', error);
+    logger.error({ err: error, userId: req.user?.id }, '[Subscriptions] Portal link error');
     res.status(500).json({ success: false, error: error.message || 'Failed to create portal session' });
   }
 });

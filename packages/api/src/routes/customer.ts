@@ -11,6 +11,7 @@ import { calculateBundleDiscount } from '../services/bundle-pricing.service';
 import { validateReferralCode } from '../services/referral.service';
 import { createPaymentIntent } from '../services/stripe.service';
 import { sendOrderConfirmation, sendSubscriptionWelcomeEmail } from '../services/email.service';
+import logger from '../lib/logger';
 
 const router = Router();
 router.use(authenticate);
@@ -575,7 +576,7 @@ router.post('/tags/:id/request-replacement', requirePermission('tag.create'), as
 
     res.json({ success: true, data: { order, replacementPrice } });
   } catch (err: any) {
-    console.error('Replacement request error:', err.message, err.stack);
+    logger.error({ err, userId: req.user!.id }, 'Replacement request error');
     res.status(500).json({ success: false, error: 'Failed to request replacement' });
   }
 });
@@ -1368,7 +1369,7 @@ router.post('/orders/:orderNumber/confirm-payment', requirePermission('order.cre
                 tag.tagId,
                 subscription.planName,
                 subscription.freePeriodEndsAt || new Date(),
-              ).catch((err: any) => console.error('Subscription email error:', err));
+              ).catch((err: any) => logger.error({ err, tagId: tag.tagId, orderId: order._id.toString() }, 'Subscription email error'));
 
               break;
             }
@@ -1376,7 +1377,7 @@ router.post('/orders/:orderNumber/confirm-payment', requirePermission('order.cre
         }
       }
     } catch (subError) {
-      console.error('Subscription creation error:', subError);
+      logger.error({ err: subError, orderId: order._id.toString(), orderNumber }, 'Subscription creation error');
     }
 
     // Process referral rewards
@@ -1386,7 +1387,7 @@ router.post('/orders/:orderNumber/confirm-payment', requirePermission('order.cre
         await createReferralOnOrder(order.referredByCode, order.userId.toString(), order.referredByCode, order._id.toString());
         await completeReferralRewards(order._id.toString());
       } catch (refError) {
-        console.error('Referral processing error:', refError);
+        logger.error({ err: refError, orderId: order._id.toString(), orderNumber, referralCode: order.referredByCode }, 'Referral processing error');
       }
     }
 
@@ -1414,7 +1415,7 @@ router.post('/orders/:orderNumber/confirm-payment', requirePermission('order.cre
       });
       console.log(`[Demo Payment] Confirmation email sent for order ${orderNumber}`);
     } catch (emailError) {
-      console.error('Email send error:', emailError);
+      logger.error({ err: emailError, orderNumber }, 'Email send error');
     }
 
     // Re-fetch order to get updated status

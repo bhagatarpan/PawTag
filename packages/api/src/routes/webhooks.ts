@@ -29,7 +29,7 @@ async function auditWebhookEvent(
         ...overrides,
       }, input);
     } catch (err) {
-      console.error('[Audit] Failed to log webhook event:', err);
+      logger.error({ err }, 'Failed to log webhook event');
     }
   };
   logAudit();
