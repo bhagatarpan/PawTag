@@ -1583,17 +1583,6 @@ router.get('/responsibility', requirePermission('customer.read'), async (req: Au
     else if (totalLostCount <= 4) { rating = 'Needs Improvement'; color = 'orange'; }
     else { rating = 'At Risk'; color = 'red'; }
 
-    auditCustomerEvent(req, {
-      action: 'view',
-      eventType: 'navigation',
-      eventCategory: 'READ',
-      operationType: 'GET',
-      resourceType: 'Navigation',
-      outcome: 'SUCCESS',
-      severity: 'INFO',
-      businessOperation: 'Viewed responsibility score',
-    }).catch(() => {});
-
     res.json({
       success: true,
       data: {

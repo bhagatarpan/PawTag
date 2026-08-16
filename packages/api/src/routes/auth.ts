@@ -235,6 +235,7 @@ router.post('/register', registerLimiter, validate(registerSchema), async (req, 
       outcome: 'SUCCESS',
       severity: 'MEDIUM',
       metadata: { email, fullName, role: 'customer', emailSent: emailResult.success },
+      businessOperation: 'Created new account',
     });
 
     res.status(201).json({
@@ -363,6 +364,7 @@ router.post('/login', loginLimiter, validate(loginSchema), async (req, res: Resp
           outcome: 'SUCCESS',
           severity: 'HIGH',
           metadata: { reason: 'too_many_failed_logins', attempts: user.failedLoginAttempts, maxAttempts: MAX_ATTEMPTS },
+          businessOperation: 'Account locked after too many failed login attempts',
         }, { actorType: 'SYSTEM' });
       }
       await user.save();
@@ -511,6 +513,7 @@ if (user.status === 'inactive') {
         outcome: 'SUCCESS',
         severity: 'MEDIUM',
         metadata: { mfaType: 'email_otp', recipient: mfaTestMode ? 'test_email' : 'user_email', otpExpiryMinutes: mfaOtpExpiry },
+        businessOperation: 'Sent verification code',
       });
 
       // Mask email for response
@@ -545,6 +548,7 @@ if (user.status === 'inactive') {
       outcome: 'SUCCESS',
       severity: 'MEDIUM',
       metadata: { mfaRequired: false, isAdmin, rbacRoles: rbacRoles.map((r: any) => r.name) },
+      businessOperation: 'Logged in successfully',
     }, { actorType: resolveActorType(user.role), authenticationMethod: 'password' });
 
     // Send login notification for admin accounts
@@ -645,6 +649,7 @@ router.get('/verify-email', async (req, res: Response) => {
       outcome: 'SUCCESS',
       severity: 'MEDIUM',
       metadata: { email: user.email, tokenId: verificationToken._id.toString() },
+      businessOperation: 'Verified email address',
     }, { actorType: 'USER' });
 
     await checkAndActivateUser(user._id.toString());
@@ -728,6 +733,7 @@ router.post('/resend-email-verification', validate(resendEmailVerificationSchema
       outcome: 'SUCCESS',
       severity: 'LOW',
       metadata: { email: user.email, resendCount: recentTokens + 1, emailSent: emailResult.success },
+      businessOperation: 'Resent verification email',
     });
 
     res.json({
@@ -774,6 +780,7 @@ router.post('/send-phone-otp', validate(sendPhoneOtpSchema), async (req, res: Re
         outcome: 'SUCCESS',
         severity: 'INFO',
         metadata: { reason: 'registration_otp_disabled', phoneNumber },
+        businessOperation: 'Phone verified (system override)',
       }, { actorType: 'SYSTEM' });
 
       await checkAndActivateUser(user._id);
@@ -841,6 +848,7 @@ router.post('/send-phone-otp', validate(sendPhoneOtpSchema), async (req, res: Re
       outcome: 'SUCCESS',
       severity: 'LOW',
       metadata: { phoneNumber, smsSent: smsResult.success, testMode: !!testRecipient, otpExpiryMinutes: config.otpExpiryMinutes },
+      businessOperation: 'Sent phone verification code',
     });
 
     res.json({
@@ -982,6 +990,7 @@ router.post('/verify-phone', validate(verifyPhoneSchema), async (req: AuthReques
       outcome: 'SUCCESS',
       severity: 'MEDIUM',
       metadata: { phoneNumber: user.phoneNumber, tokenId: verificationToken._id.toString(), attempts: verificationToken.attempts },
+      businessOperation: 'Verified phone number',
     }, { actorType: 'USER' });
 
     await checkAndActivateUser(user._id.toString());
@@ -1068,6 +1077,7 @@ router.post('/resend-phone-otp', validate(resendPhoneOtpSchema), async (req, res
       outcome: 'SUCCESS',
       severity: 'LOW',
       metadata: { phoneNumber, smsSent: smsResult.success, resendCount: recentOtps + 1, testMode: !!testRecipient },
+      businessOperation: 'Resent phone verification code',
     });
 
     res.json({
@@ -1174,6 +1184,7 @@ router.post('/forgot-password', forgotPasswordLimiter, validate(forgotPasswordSc
       outcome: 'SUCCESS',
       severity: 'HIGH',
       metadata: { email: user.email, tokenId: verificationToken._id.toString(), resetExpiryHours: 1 },
+      businessOperation: 'Requested password reset',
     });
 
     res.json({ success: true, data: { message: 'If an account exists, a reset email has been sent.' } });
@@ -1227,6 +1238,7 @@ router.post('/reset-password', validate(resetPasswordSchema), async (req, res: R
       outcome: 'SUCCESS',
       severity: 'HIGH',
       metadata: { email: user.email, tokenId: verificationToken._id.toString() },
+      businessOperation: 'Reset password',
     }, { actorType: 'USER', authenticationMethod: 'password_reset_token' });
 
     sendPasswordChangedEmail(user.email, user.fullName, 'self', clientInfo.ipAddress).catch((err) => {
@@ -1286,6 +1298,7 @@ router.put('/profile', authenticate, validate(updateProfileSchema), async (req: 
           outcome: 'FAILURE',
           severity: 'MEDIUM',
           metadata: { reason: 'email_taken', attemptedEmail: update.email },
+          businessOperation: 'Failed to update profile — email already in use',
         }, { actorType: 'USER' });
         res.status(400).json({ success: false, error: 'Email already in use' });
         return;
@@ -1302,6 +1315,17 @@ router.put('/profile', authenticate, validate(updateProfileSchema), async (req: 
       emergencyContact: user.emergencyContact,
     };
     const changedFields = Object.keys(update).map((field) => ({ field, before: (beforeState as any)[field], after: (user as any)[field] }));
+
+    // Generate human-readable narrative
+    const fieldLabels: Record<string, string> = {
+      fullName: 'full name', email: 'email', phoneNumber: 'phone number',
+      address: 'address', emergencyContact: 'emergency contact', profilePicture: 'profile picture',
+    };
+    const changedLabels = changedFields.map((f) => fieldLabels[f.field] || f.field);
+    const narrative = changedLabels.length === 1
+      ? `Updated ${changedLabels[0]}`
+      : `Updated ${changedLabels.slice(0, -1).join(', ')} and ${changedLabels[changedLabels.length - 1]}`;
+
     await auditAuthEvent(req as AuditRequest, {
       action: 'profile_updated',
       eventType: 'profile_update',
@@ -1314,6 +1338,7 @@ router.put('/profile', authenticate, validate(updateProfileSchema), async (req: 
       changedFields,
       outcome: 'SUCCESS',
       severity: 'MEDIUM',
+      businessOperation: narrative,
     }, { actorType: 'USER' });
 
     res.json({ success: true, data: user });
@@ -1344,6 +1369,7 @@ router.post('/change-password', authenticate, validate(changePasswordSchema), as
       outcome: 'SUCCESS',
       severity: 'HIGH',
       metadata: { changedBy: 'self' },
+      businessOperation: 'Changed password',
     }, { authenticationMethod: 'current_password' });
 
     sendPasswordChangedEmail(user.email, user.fullName, 'self', getClientInfo(req).ipAddress).catch((err) => {
@@ -1394,6 +1420,7 @@ router.post('/refresh', async (req, res: Response) => {
       outcome: 'SUCCESS',
       severity: 'LOW',
       metadata: { rotated: true },
+      businessOperation: 'Refreshed authentication token',
     }, { actorType: 'USER', authenticationMethod: 'refresh_token' });
 
     res.json({
@@ -1445,6 +1472,7 @@ router.post('/logout', async (req: AuthRequest, res: Response) => {
       outcome: 'SUCCESS',
       severity: 'LOW',
       metadata: { revokedRefreshToken: !!refreshToken },
+      businessOperation: 'Logged out',
     }, { actorType: req.user ? resolveActorType(req.user.role) : 'UNKNOWN' });
 
     res.json({ success: true, data: { message: 'Logged out successfully' } });
@@ -1518,6 +1546,7 @@ router.post('/mfa/send-otp', mfaSendLimiter, async (req: AuthRequest, res: Respo
       outcome: 'SUCCESS',
       severity: 'MEDIUM',
       metadata: { mfaType: 'email_otp', recipient: mfaTestMode ? 'test_email' : 'user_email', otpExpiryMinutes: mfaOtpExpiry, tempTokenUsed: true },
+      businessOperation: 'Sent verification code',
     }, { actorType: 'USER', authenticationMethod: 'temp_token' });
 
     // Mask email
@@ -1714,6 +1743,7 @@ router.post('/mfa/verify', mfaVerifyLimiter, async (req: AuthRequest, res: Respo
       outcome: 'SUCCESS',
       severity: 'MEDIUM',
       metadata: { mfaType: 'email_otp', isAdmin, rbacRoles: rbacRoles.map((r: any) => r.name) },
+      businessOperation: 'Verified two-factor code',
     }, { actorType: resolveActorType(user.role), authenticationMethod: 'mfa_email_otp' });
 
     // Send login notification for admin accounts
