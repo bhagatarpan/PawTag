@@ -412,16 +412,19 @@ If something could not be completed, clearly explain why and what is required.
 ```
 PawTag/
 ├── packages/
-│   ├── api/       → Express backend (port 5000)
-│   ├── db/        → MongoDB models & connection
-│   ├── shared/    → Shared TypeScript types
-│   └── ui/        → Shared UI component library
+│   ├── api/       → Express backend (port 5000, 26 route files, 19+ services)
+│   ├── db/        → MongoDB models & connection (44 models)
+│   ├── shared/    → Shared TypeScript types, enums, constants
+│   └── ui/        → Shared React component library (9 components)
 ├── apps/
-│   ├── admin/     → Admin portal (port 3001) - god-mode CRUD
-│   ├── web/       → Public site, shop, auth & customer portal (port 3000)
-│   ├── mobile/    → React Native (Expo) app
-│   └── finder/    → Finder portal (port 3003)
-└── docker/        → Docker configs
+│   ├── admin/     → Admin portal (port 3001) - 42 pages, god-mode CRUD
+│   ├── web/       → Public site, shop, auth & customer portal (port 3000) - 31 pages
+│   ├── mobile/    → React Native (Expo) app - 12 screens, Maestro E2E tests
+│   └── finder/    → Finder portal (port 3003) - 10 purpose-built components
+├── tests/         → 60 test files (25 unit, 32 integration, 1 smoke, 2 regression)
+├── docker/        → Docker configs (4 services)
+├── docs/          → 15 documentation files
+└── scripts/       → Build and utility scripts
 ```
 
 ## Development Commands
@@ -619,6 +622,64 @@ All admin and finder actions are logged to `AuditEvent` model with:
 - **Public pages:** `apps/web` — no auth required
 - **Finder portal:** `apps/finder` — standalone, no auth, decomposed into 10 components
 - **Admin portal:** `apps/admin` — full CRUD with RBAC, toast notifications, enterprise UI
+- **PuckEditor CMS:** Visual page builder with 30+ block types in both admin and web apps
+- **Rich Text Editing:** TipTap-based editor in admin with 13 extensions
+- **Monaco Editor:** JSON editor in admin for advanced content editing
+
+### PuckEditor CMS Page Builder
+
+Visual page builder using `@puckeditor/core` in both admin and web apps:
+- **Admin:** `apps/admin/src/components/puck/` — `PuckPageBuilder.tsx` + `config.tsx`
+- **Web:** `apps/web/src/components/puck/config.tsx`
+- **Block Types (30+):** HeroBanner, CtaBanner, FeaturesGrid, CardsGrid, ColumnsBlock, ImageTextBlock, RichTextBlock, TextBlock, ImageBlock, ImageGallery, VideoEmbed, CustomHtml, AccordionBlock, TabsBlock, IconListBlock, BadgeBlock, PricingTable, TestimonialsSection, TeamBlock, PartnersLogos, SocialLinksBlock, FaqAccordion, ContactForm, NewsletterSignupBlock, ButtonBlock, SpacerBlock, DividerBlock, EmbedBlock, BackToTopBlock, MarqueeBlock, AlertBlock, TimelineSection, StatsCounter, MapBlock, CountdownBlock, AnnouncementBarBlock
+
+### Support & Contact System
+
+- **Public contact form:** `apps/web` → `/api/support` routes
+- **Admin management:** `apps/admin` → SupportRequests page → `/api/admin/support-requests`
+- **Model:** `SupportRequest` in `packages/db/src/models/SupportRequest.ts`
+
+### Tag Sticker & QR Code Generation
+
+- **QR code PNG:** `GET /api/tags/:tagId/qr` — generates QR code on-demand
+- **Printable sticker:** `GET /api/tags/:tagId/sticker` — HTML sticker with QR code for physical tags
+
+### CI/CD Pipeline (GitHub Actions)
+
+**File:** `.github/workflows/ci.yml`
+
+Triggers on push/PR to `main` and `develop`. **6 jobs:**
+1. Smoke Tests (5 min timeout)
+2. Unit Tests (10 min timeout)
+3. Integration Tests (15 min timeout, MongoDB service container)
+4. Regression Tests (10 min timeout)
+5. Type Check (10 min timeout)
+6. Build All Packages (15 min timeout)
+7. Test Coverage (main branch only, depends on smoke+unit+regression)
+
+### Email Templates (13)
+
+Located in `packages/api/src/services/email/templates/`:
+- `welcome.ts` — Welcome email
+- `verification-email.ts` — Email verification link
+- `mfa-otp.ts` — MFA OTP code
+- `phone-otp.ts` — Phone OTP code
+- `password-reset.ts` — Password reset link
+- `password-changed.ts` — Password change confirmation
+- `login-notification.ts` — New login alert
+- `account-status.ts` — Account status change
+- `order-confirmation.ts` — Order placed confirmation
+- `shipping-notification.ts` — Shipping notification
+- `pet-found.ts` — Pet found notification
+- `base.ts` — Base email wrapper
+- `index.ts` — Template registry
+
+### Mobile App (Maestro E2E Tests)
+
+Located in `apps/mobile/e2e/`:
+- `qr-activation.yaml` — QR code scanning and tag activation
+- `nfc-activation.yaml` — NFC tag scanning and activation
+- `lost-mode.yaml` — Lost mode toggle flow
 
 ---
 

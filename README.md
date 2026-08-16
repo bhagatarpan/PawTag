@@ -17,6 +17,11 @@ A comprehensive pet recovery platform using QR code and NFC tags. When a pet goe
 - [Application Workflows](#application-workflows)
 - [User Roles and Permissions](#user-roles-and-permissions)
 - [Admin Portal](#admin-portal)
+- [PuckEditor CMS Page Builder](#puckeditor-cms-page-builder)
+- [Support & Contact System](#support--contact-system)
+- [Tag Sticker & QR Code Generation](#tag-sticker--qr-code-generation)
+- [CI/CD Pipeline (GitHub Actions)](#cicd-pipeline-github-actions)
+- [Email Templates (13)](#email-templates-13)
 - [API Documentation](#api-documentation)
 - [Authentication and Security](#authentication-and-security)
 - [Testing](#testing)
@@ -165,6 +170,14 @@ The mobile app (`apps/mobile`) is a React Native (Expo) app for pet owners with:
 - NFC tag activation
 - Push notifications
 - Secure token storage via `expo-secure-store`
+- 12 screens across auth, home, pets, tags, health, orders, and subscriptions
+
+### Mobile E2E Tests (Maestro)
+
+Located in `apps/mobile/e2e/`:
+- `qr-activation.yaml` — QR code scanning and tag activation flow
+- `nfc-activation.yaml` — NFC tag scanning and activation flow
+- `lost-mode.yaml` — Lost mode toggle flow
 
 ---
 
@@ -201,9 +214,10 @@ The mobile app (`apps/mobile`) is a React Native (Expo) app for pet owners with:
 - **Secure Storage:** expo-secure-store
 
 ### Database
+
 - **Database:** MongoDB Atlas
 - **ODM:** Mongoose 7
-- **Models:** 43+ models
+- **Models:** 44 models
 
 ### Package Management
 - **Package Manager:** pnpm 9+
@@ -217,7 +231,7 @@ The mobile app (`apps/mobile`) is a React Native (Expo) app for pet owners with:
 ### Build & Deployment
 - **Containerization:** Docker
 - **Web Server:** Nginx (for frontend static files)
-- **CI/CD:** GitHub Actions (pending)
+- **CI/CD:** GitHub Actions (implemented)
 
 ---
 
@@ -226,30 +240,30 @@ The mobile app (`apps/mobile`) is a React Native (Expo) app for pet owners with:
 ```text
 PawTag/
 ├── apps/
-│   ├── admin/          → Admin portal (port 3001)
+│   ├── admin/          → Admin portal (port 3001) - 42 pages
 │   │   └── src/
 │   │       ├── components/
 │   │       ├── context/
 │   │       ├── lib/
 │   │       └── pages/
-│   ├── finder/         → Finder portal (port 3003)
+│   ├── finder/         → Finder portal (port 3003) - 10 components
 │   │   └── src/
 │   │       └── components/
-│   ├── mobile/         → React Native (Expo) app
+│   ├── mobile/         → React Native (Expo) app - 12 screens
 │   │   ├── src/
 │   │   │   ├── components/
 │   │   │   ├── context/
 │   │   │   ├── screens/
 │   │   │   └── theme/
-│   │   ├── e2e/        → Maestro E2E tests
+│   │   ├── e2e/        → Maestro E2E tests (3 files)
 │   │   └── app.json
-│   └── web/            → Public site, shop, auth & customer portal (port 3000)
+│   └── web/            → Public site, shop, auth & customer portal (port 3000) - 31 pages
 │       └── src/
 │           ├── components/
 │           ├── context/
 │           └── pages/
 ├── packages/
-│   ├── api/            → Express backend (port 5000)
+│   ├── api/            → Express backend (port 5000) - 26 route files, 19+ services
 │   │   └── src/
 │   │       ├── config/
 │   │       ├── lib/
@@ -257,22 +271,23 @@ PawTag/
 │   │       ├── routes/
 │   │       ├── seeds/
 │   │       └── services/
-│   ├── db/             → MongoDB models & connection
+│   ├── db/             → MongoDB models & connection (44 models)
 │   │   └── src/
 │   │       └── models/
 │   ├── shared/         → Shared TypeScript types & validation
 │   │   └── src/
-│   └── ui/             → Shared React component library
+│   └── ui/             → Shared React component library (9 components)
 │       └── src/
 │           └── components/
-├── tests/
+├── tests/              → 60 test files (25 unit, 32 integration, 1 smoke, 2 regression)
 │   ├── integration/    → Integration tests (MongoDB Memory Server)
 │   ├── regression/     → Regression tests
 │   ├── smoke/          → API smoke tests
 │   └── unit/           → Unit tests
-├── docker/             → Docker configurations
-├── docs/               → Documentation
+├── docker/             → Docker configurations (4 services)
+├── docs/               → Documentation (15 files)
 ├── scripts/            → Build and utility scripts
+├── .github/workflows/  → GitHub Actions CI/CD pipeline
 ├── ARCHITECTURE.md     → System architecture
 ├── DESIGN.md           → Design system
 ├── AGENTS.md           → AI development guide
@@ -665,6 +680,11 @@ The Admin Portal is the operational control centre of the application. It provid
 | **Orders** | Order fulfillment, shipping, refunds |
 | **Subscriptions** | Subscription lifecycle management |
 | **Invoices** | Invoice generation and access |
+| **Referrals** | Referral program management |
+| **Support** | Support request management |
+| **Statistics** | Detailed analytics and reporting |
+| **Notifications** | System notification management |
+| **Tag Expiry** | Tag expiry notification management |
 | **CMS Pages** | Content pages with versioning and rollback |
 | **CMS Navigation** | Header, footer, sidebar navigation |
 | **CMS Email Templates** | Email template management |
@@ -677,11 +697,12 @@ The Admin Portal is the operational control centre of the application. It provid
 | **CMS Announcements** | Banner and popup announcements |
 | **CMS Media** | Media library management |
 | **CMS Redirects** | URL redirect management |
+| **CMS Invoice Template** | Invoice template customization |
 | **Feature Flags** | Feature flag management |
 | **Settings** | System configuration (DB-driven) |
 | **Audit Trail** | Enterprise audit logging with hash chain |
-| **Support** | Support request management |
-| **Roles & Permissions** | RBAC configuration |
+| **Audit Settings** | Audit policy configuration |
+| **Roles & Permissions** | RBAC configuration (Roles, Permissions, Groups, Scopes) |
 
 ### Admin Portal Features
 
@@ -693,6 +714,124 @@ The Admin Portal is the operational control centre of the application. It provid
 - Detail drawers for entity inspection
 - Confirmation dialogs for destructive actions
 - Responsive design
+- PuckEditor visual page builder (30+ block types)
+- TipTap rich text editor (13 extensions)
+- Monaco JSON editor for advanced content editing
+
+---
+
+## PuckEditor CMS Page Builder
+
+Both admin and web apps include a visual page builder using `@puckeditor/core`:
+
+### Block Types (30+)
+
+| Category | Blocks |
+|----------|--------|
+| **Layout** | HeroBanner, CtaBanner, FeaturesGrid, CardsGrid, ColumnsBlock, ImageTextBlock |
+| **Content** | RichTextBlock, TextBlock, ImageBlock, ImageGallery, VideoEmbed, CustomHtml, AccordionBlock, TabsBlock, IconListBlock, BadgeBlock |
+| **Commerce** | PricingTable |
+| **Social** | TestimonialsSection, TeamBlock, PartnersLogos, SocialLinksBlock |
+| **Interactive** | FaqAccordion, ContactForm, NewsletterSignupBlock |
+| **Utility** | ButtonBlock, SpacerBlock, DividerBlock, EmbedBlock, BackToTopBlock, MarqueeBlock, AlertBlock |
+| **Data** | TimelineSection, StatsCounter, MapBlock, CountdownBlock, AnnouncementBarBlock |
+
+### Implementation
+
+- **Admin:** `apps/admin/src/components/puck/PuckPageBuilder.tsx` + `config.tsx`
+- **Web:** `apps/web/src/components/puck/config.tsx`
+- **CMS Pages:** Pages are stored as Puck JSON in `CmsPage.content` field
+- **Rendering:** Public pages rendered via Puck renderer in `apps/web`
+
+---
+
+## Support & Contact System
+
+### Public Contact Form
+
+- **Route:** `POST /api/support/contact`
+- **Page:** `apps/web/src/pages/Contact.tsx`
+- **Model:** `SupportRequest` in `packages/db/src/models/SupportRequest.ts`
+- **Fields:** name, email, subject, message, category, priority
+- **Notifications:** Admin receives in-app notification for new requests
+
+### Admin Support Management
+
+- **Page:** `apps/admin/src/pages/SupportRequests.tsx`
+- **Route:** `/api/admin/support-requests`
+- **Features:** List, filter, update status, assign staff, add internal notes
+
+---
+
+## Tag Sticker & QR Code Generation
+
+### QR Code Generation
+
+- **Endpoint:** `GET /api/tags/:tagId/qr`
+- **Output:** PNG image of QR code
+- **Usage:** Dynamic QR codes for tags, can be embedded in web pages
+
+### Printable Sticker
+
+- **Endpoint:** `GET /api/tags/:tagId/sticker`
+- **Output:** HTML page with QR code and tag info
+- **Usage:** Physical tag stickers for pet collars
+
+---
+
+## CI/CD Pipeline (GitHub Actions)
+
+**File:** `.github/workflows/ci.yml`
+
+Triggers on push/PR to `main` and `develop` branches.
+
+### Pipeline Jobs
+
+| Job | Timeout | Description |
+|-----|---------|-------------|
+| Smoke Tests | 5 min | Basic API health and endpoint checks |
+| Unit Tests | 10 min | Unit test suite (25 files) |
+| Integration Tests | 15 min | Integration tests with MongoDB service container (32 files) |
+| Regression Tests | 10 min | Auth and security regression tests (2 files) |
+| Type Check | 10 min | TypeScript type checking across all packages |
+| Build All Packages | 15 min | Build API, admin, web, and finder |
+| Test Coverage | - | Coverage report (main branch only, depends on smoke+unit+regression) |
+
+### Test Configuration
+
+- **Test Runner:** Vitest 4.1
+- **Database:** MongoDB Memory Server (in-memory)
+- **Coverage Provider:** v8
+- **Coverage Thresholds:** 15% lines, 15% functions, 10% branches, 15% statements
+
+---
+
+## Email Templates (13)
+
+All email templates are located in `packages/api/src/services/email/templates/`:
+
+| Template | Purpose |
+|----------|---------|
+| `welcome.ts` | Welcome email for new users |
+| `verification-email.ts` | Email verification link |
+| `mfa-otp.ts` | MFA OTP code |
+| `phone-otp.ts` | Phone OTP code |
+| `password-reset.ts` | Password reset link |
+| `password-changed.ts` | Password change confirmation |
+| `login-notification.ts` | New login alert |
+| `account-status.ts` | Account status change |
+| `order-confirmation.ts` | Order placed confirmation |
+| `shipping-notification.ts` | Shipping notification |
+| `pet-found.ts` | Pet found notification |
+| `base.ts` | Base email wrapper (HTML structure) |
+| `index.ts` | Template registry |
+
+### Dev-Time Email Routing
+
+In development, when `mfa.testMode` is `true` (default):
+- All emails routed to test email (`mfa.testEmail`)
+- SMS OTPs printed in API terminal + emailed to test email
+- Production uses real recipient addresses
 
 ---
 
@@ -791,6 +930,70 @@ or on error:
 | POST | `/orders/:orderNumber/cancel` | Cancel order | Yes (RBAC) |
 | POST | `/orders/:orderNumber/refund` | Refund order | Yes (RBAC) |
 | GET | `/analytics/overview` | Dashboard analytics | Yes (RBAC) |
+| GET | `/subscriptions` | List all subscriptions | Yes (RBAC) |
+| GET | `/subscriptions/:id` | Get subscription details | Yes (RBAC) |
+| PUT | `/subscriptions/:id` | Update subscription | Yes (RBAC) |
+| GET | `/support-requests` | List support requests | Yes (RBAC) |
+| PUT | `/support-requests/:id` | Update support request | Yes (RBAC) |
+| GET | `/audit` | View audit trail | Yes (RBAC) |
+| GET | `/audit/settings` | Get audit settings | Yes (RBAC) |
+| PUT | `/audit/settings` | Update audit settings | Yes (RBAC) |
+
+#### Admin RBAC (`/api/admin/rbac`)
+
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| GET | `/roles` | List all roles | Yes (RBAC) |
+| POST | `/roles` | Create role | Yes (RBAC) |
+| PUT | `/roles/:id` | Update role | Yes (RBAC) |
+| DELETE | `/roles/:id` | Delete role | Yes (RBAC) |
+| GET | `/permissions` | List all permissions | Yes (RBAC) |
+| GET | `/permission-groups` | List permission groups | Yes (RBAC) |
+| GET | `/scopes` | List permission scopes | Yes (RBAC) |
+
+#### Admin CMS (`/api/admin/cms`)
+
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| GET | `/pages` | List CMS pages | Yes (RBAC) |
+| POST | `/pages` | Create CMS page | Yes (RBAC) |
+| PUT | `/pages/:id` | Update CMS page | Yes (RBAC) |
+| DELETE | `/pages/:id` | Delete CMS page | Yes (RBAC) |
+| GET | `/navigation` | List navigation items | Yes (RBAC) |
+| POST | `/navigation` | Create navigation | Yes (RBAC) |
+| PUT | `/navigation/:id` | Update navigation | Yes (RBAC) |
+| GET | `/footer` | List footer groups | Yes (RBAC) |
+| POST | `/footer` | Create footer group | Yes (RBAC) |
+| PUT | `/footer/:id` | Update footer group | Yes (RBAC) |
+| GET | `/email` | List email templates | Yes (RBAC) |
+| POST | `/email` | Create email template | Yes (RBAC) |
+| PUT | `/email/:id` | Update email template | Yes (RBAC) |
+| GET | `/sms` | List SMS templates | Yes (RBAC) |
+| POST | `/sms` | Create SMS template | Yes (RBAC) |
+| PUT | `/sms/:id` | Update SMS template | Yes (RBAC) |
+| GET | `/pet-refs` | List pet references | Yes (RBAC) |
+| POST | `/pet-refs` | Create pet reference | Yes (RBAC) |
+| PUT | `/pet-refs/:id` | Update pet reference | Yes (RBAC) |
+| GET | `/homepage` | List homepage sections | Yes (RBAC) |
+| POST | `/homepage` | Create homepage section | Yes (RBAC) |
+| PUT | `/homepage/:id` | Update homepage section | Yes (RBAC) |
+| GET | `/shop-pages` | List shop pages | Yes (RBAC) |
+| POST | `/shop-pages` | Create shop page | Yes (RBAC) |
+| PUT | `/shop-pages/:id` | Update shop page | Yes (RBAC) |
+| GET | `/auth-pages` | List auth pages | Yes (RBAC) |
+| PUT | `/auth-pages/:id` | Update auth page | Yes (RBAC) |
+| GET | `/onboarding` | Get onboarding config | Yes (RBAC) |
+| PUT | `/onboarding` | Update onboarding config | Yes (RBAC) |
+| GET | `/announcements` | List announcements | Yes (RBAC) |
+| POST | `/announcements` | Create announcement | Yes (RBAC) |
+| PUT | `/announcements/:id` | Update announcement | Yes (RBAC) |
+| GET | `/media` | List media files | Yes (RBAC) |
+| POST | `/media` | Upload media | Yes (RBAC) |
+| DELETE | `/media/:id` | Delete media | Yes (RBAC) |
+| GET | `/redirects` | List redirects | Yes (RBAC) |
+| POST | `/redirects` | Create redirect | Yes (RBAC) |
+| PUT | `/redirects/:id` | Update redirect | Yes (RBAC) |
+| DELETE | `/redirects/:id` | Delete redirect | Yes (RBAC) |
 
 #### Finder (`/api/finder`)
 
@@ -881,11 +1084,12 @@ This allows registration with any email while receiving links/codes in a real in
 
 ```text
 tests/
-├── unit/              → Unit tests
-├── integration/       → Integration tests (MongoDB Memory Server)
-├── smoke/             → API smoke tests
-├── regression/        → Regression tests
-└── setup.ts           → Test setup
+├── unit/              → Unit tests (25 files)
+├── integration/       → Integration tests (32 files, MongoDB Memory Server)
+├── smoke/             → API smoke tests (1 file)
+├── regression/        → Regression tests (2 files)
+├── setup.ts           → Test setup
+└── AUDIT-REPORT.md    → Audit report
 ```
 
 ### Test Commands
@@ -895,10 +1099,10 @@ tests/
 pnpm test
 
 # Run specific suites
-pnpm test:unit
-pnpm test:integration
-pnpm test:smoke
-pnpm test:regression
+pnpm test:unit           # 25 unit test files
+pnpm test:integration    # 32 integration test files
+pnpm test:smoke          # 1 smoke test file
+pnpm test:regression     # 2 regression test files
 
 # Run with coverage
 pnpm test:coverage
@@ -917,8 +1121,8 @@ pnpm test:watch
 
 ### Test Statistics
 
-- **Test Files:** 54
-- **Tests:** 799 passing
+- **Test Files:** 60 (25 unit, 32 integration, 1 smoke, 2 regression)
+- **Tests:** 799+ passing
 - **Duration:** ~38 seconds
 
 ---
@@ -1038,6 +1242,19 @@ flowchart TD
     Render --> Sentry
 ```
 
+### CI/CD Pipeline (GitHub Actions)
+
+**File:** `.github/workflows/ci.yml`
+
+Triggers on push/PR to `main` and `develop`. **7 jobs:**
+1. Smoke Tests (5 min timeout)
+2. Unit Tests (10 min timeout)
+3. Integration Tests (15 min timeout, MongoDB service container)
+4. Regression Tests (10 min timeout)
+5. Type Check (10 min timeout)
+6. Build All Packages (15 min timeout)
+7. Test Coverage (main branch only, depends on smoke+unit+regression)
+
 ---
 
 ## Background Jobs and Scheduled Tasks
@@ -1046,7 +1263,7 @@ flowchart TD
 
 | Service | Interval | Purpose |
 |---------|----------|---------|
-| `startReminderService()` | 1 hour | Finder reminders (24h after scan) + onboarding nudges |
+| `startReminderService()` | 1 hour | Finder reminders (24h after scan) + onboarding nudges (3+ days skipped) |
 | `startSubscriptionService()` | 1 minute | Subscription expiry checks, grace period transitions, auto-renewal |
 | `startEscalationService()` | 1 minute | Overdue escalation detection (30-min deadline after pet found) |
 | `startLowStockService()` | 24 hours (1h initial delay) | Low stock alerts via email + in-app notification to admin |
@@ -1116,13 +1333,16 @@ flowchart TD
 | `pet_lost` | Owner marks pet as lost | In-app, Push, Email |
 | `pet_found` | Finder reports found pet | In-app, Push, Email |
 | `finder_scan` | Finder scans tag | In-app, Push |
-| `order_update` | Order status changes | In-app, Push, Email |
-| `system` | System announcements | In-app |
 | `finder_reminder` | 24h after finder scan | In-app, Email |
-| `subscription_expiring` | Subscription expiring | In-app, Email |
-| `referral_reward` | Referral bonus | In-app, Email |
-| `tag_expiry_warning` | Tag expiring | In-app, Email |
+| `order_update` | Order status changes | In-app, Push, Email |
 | `new_order` | New order placed | In-app, Email (admin) |
+| `subscription_expiring` | Subscription expiring | In-app, Email |
+| `tag_expiry_warning` | Tag expiring | In-app, Email |
+| `referral_reward` | Referral bonus | In-app, Email |
+| `escalation` | Pet found, owner unresponsive | In-app, Push, Email |
+| `support_request` | New support request | In-app (admin) |
+| `low_stock` | Product low stock | In-app (admin) |
+| `system` | System announcements | In-app |
 
 ### Notification Delivery
 
@@ -1171,6 +1391,7 @@ Enterprise-grade audit system with:
 - **Policy engine:** Configurable per-category and per-actor toggles
 - **Retention policies:** Configurable per category (90 days standard, 7 years for auth/financial)
 - **Legal holds:** Place/remove holds on specific events
+- **Audit subsystem files:** `packages/api/src/services/audit/` (6 files)
 
 ### Error Tracking
 
@@ -1310,13 +1531,12 @@ chore: maintenance tasks
 2. **Password Rules:** Minimum 8 characters (industry best practice is 12+)
 3. **No HIBP Integration:** Breached passwords not checked
 4. **Rate Limiting:** Per-process in-memory (not Redis-backed for multi-instance)
-5. **E2E Tests:** Playwright E2E tests not implemented
-6. **Frontend Sentry:** API-side Sentry done, frontend error boundaries pending
+5. **Frontend Sentry:** API-side Sentry done, frontend error boundaries pending
 
 ### Pending Implementation
 
-1. **CI/CD Pipeline:** Requires Render/Vercel accounts (Phase 16)
-2. **E2E Tests:** Playwright test suite (Phase 21)
+1. **CI/CD Pipeline:** GitHub Actions implemented, Render/Vercel deployment pending
+2. **E2E Tests:** Maestro tests for mobile, Playwright for web pending
 3. **Frontend Sentry:** Error boundaries for all frontend apps
 4. **Affiliate Marketplace:** Phases 27-32 not started
 
@@ -1362,7 +1582,7 @@ Not currently documented / unable to determine from the repository.
 | `AGENTS.md` | AI development guide |
 | `docs/developer-setup.md` | Local development setup |
 | `docs/environments.md` | Environment variable reference |
-| `docs/database-schema.md` | All 43+ Mongoose models |
+| `docs/database-schema.md` | All 44 Mongoose models |
 | `docs/business-workflows.md` | Business logic flows |
 | `docs/security_improvement.md` | Security audit and improvement plan |
 | `docs/launch-checklist.md` | Pre-launch verification |
@@ -1371,6 +1591,7 @@ Not currently documented / unable to determine from the repository.
 | `docs/mobile-ux-audit.md` | Mobile UX quality audit |
 | `docs/release-process.md` | How to ship safely |
 | `docs/rollback.md` | How to undo deployments |
+| `docs/AI-THEME-ENGINE-IMPLEMENTATION.md` | AI theme engine implementation details |
 | `docs/deployment/staging.md` | Staging deployment guide |
 | `docs/deployment/production.md` | Production deployment guide |
 | `docs/deployment/mobile-release.md` | Mobile app store submission |
