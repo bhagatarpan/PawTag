@@ -279,6 +279,15 @@ function DetailDrawer({
     }
   };
 
+  const handleOwnerClick = async (ownerId: string) => {
+    try {
+      const res = await api.get(`/admin/users/${ownerId}`);
+      setSelectedOwner(res.data.data);
+    } catch {
+      toast.error('Failed to load owner details');
+    }
+  };
+
   useEffect(() => {
     if (!pet) return;
     const handleEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -536,7 +545,7 @@ function DetailDrawer({
                         <DetailRow label="Owner" value={
                           <button
                             type="button"
-                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedOwner(pet.ownerId as any); }}
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleOwnerClick(pet.ownerId!._id); }}
                             className="text-primary-600 hover:underline font-medium inline-flex items-center gap-1"
                           >
                             {pet.ownerId.fullName}
@@ -547,7 +556,7 @@ function DetailDrawer({
                           <span className="flex items-center gap-2">
                             <button
                               type="button"
-                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedOwner(pet.ownerId as any); }}
+                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleOwnerClick(pet.ownerId!._id); }}
                               className="text-primary-600 hover:underline text-left"
                             >
                               {pet.ownerId.email}
