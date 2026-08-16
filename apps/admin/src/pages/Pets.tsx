@@ -7,9 +7,12 @@ import {
   Loader2, AlertTriangle, Users as UsersIcon, Dog, Cat,
   Activity, CheckCircle, AlertCircle, Clock, Copy, Settings,
   Database, FileText, User, Shield, Lock, Unlock, RotateCcw,
+  ExternalLink,
 } from 'lucide-react';
 import { BREED_ORIGINS, getBreedsForOrigin, PET_BREEDS } from '@pawtag/shared';
 import type { PetType } from '@pawtag/shared';
+import { DetailDrawer as UserDetailDrawer, type UserRecord } from './Users';
+import { DetailDrawer as TagDetailDrawer, type TagItem } from './Tags';
 
 /* ------------------------------------------------------------------ */
 /*  Pet attribute options                                              */
@@ -254,6 +257,14 @@ function DetailDrawer({
   const [editSaving, setEditSaving] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const drawerRef = useRef<HTMLDivElement>(null);
+  const [selectedOwner, setSelectedOwner] = useState<UserRecord | null>(null);
+  const [selectedTag, setSelectedTag] = useState<TagItem | null>(null);
+  const [rbacRoles, setRbacRoles] = useState<any[]>([]);
+
+  // Fetch RBAC roles for user drawer
+  useEffect(() => {
+    api.get('/admin/rbac/roles').then((r) => setRbacRoles(r.data.data || [])).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!pet) return;
@@ -509,10 +520,23 @@ function DetailDrawer({
                   <Section title="Owner & Tag" icon={<User size={16} />}>
                     {pet.ownerId ? (
                       <>
-                        <DetailRow label="Owner" value={pet.ownerId.fullName} />
+                        <DetailRow label="Owner" value={
+                          <button
+                            onClick={() => setSelectedOwner(pet.ownerId as any)}
+                            className="text-primary-600 hover:underline font-medium inline-flex items-center gap-1"
+                          >
+                            {pet.ownerId.fullName}
+                            <ExternalLink size={11} className="opacity-50" />
+                          </button>
+                        } />
                         <DetailRow label="Email" value={
                           <span className="flex items-center gap-2">
-                            {pet.ownerId.email}
+                            <button
+                              onClick={() => setSelectedOwner(pet.ownerId as any)}
+                              className="text-primary-600 hover:underline text-left"
+                            >
+                              {pet.ownerId.email}
+                            </button>
                             <button onClick={() => copyToClipboard(pet.ownerId!.email)} className="text-gray-400 hover:text-gray-600"><Copy size={12} /></button>
                           </span>
                         } />
@@ -523,10 +547,14 @@ function DetailDrawer({
                     )}
                     {pet.linkedTag ? (
                       <DetailRow label="Tag" value={
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-mono rounded bg-primary-50 text-primary-700 border border-primary-200">
+                        <button
+                          onClick={() => setSelectedTag(pet.linkedTag as any)}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-mono rounded bg-primary-50 text-primary-700 border border-primary-200 hover:bg-primary-100 transition-colors"
+                        >
                           {pet.linkedTag.tagId}
                           <span className={`w-1.5 h-1.5 rounded-full ${pet.linkedTag.status === 'active' ? 'bg-green-500' : pet.linkedTag.status === 'lost' ? 'bg-red-500' : 'bg-gray-400'}`} />
-                        </span>
+                          <ExternalLink size={10} className="opacity-50" />
+                        </button>
                       } />
                     ) : (
                       <DetailRow label="Tag" value={<span className="text-gray-400 italic">No tag linked</span>} />
@@ -612,6 +640,21 @@ function DetailDrawer({
           )}
         </div>
       </div>
+
+      {/* Nested Drawer: Owner */}
+      <UserDetailDrawer
+        user={selectedOwner}
+        onClose={() => setSelectedOwner(null)}
+        onRefresh={() => { setSelectedOwner(null); onRefresh(); }}
+        rbacRoles={rbacRoles}
+      />
+
+      {/* Nested Drawer: Tag */}
+      <TagDetailDrawer
+        tag={selectedTag}
+        onClose={() => setSelectedTag(null)}
+        onRefresh={() => { setSelectedTag(null); onRefresh(); }}
+      />
     </div>
   );
 }

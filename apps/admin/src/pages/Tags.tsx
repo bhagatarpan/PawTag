@@ -13,7 +13,7 @@ import {
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
 
-interface TagItem {
+export interface TagItem {
   _id: string;
   tagId: string;
   tagType?: string;
@@ -176,7 +176,7 @@ function SkeletonRow() {
 /*  Detail Drawer                                                      */
 /* ------------------------------------------------------------------ */
 
-function DetailDrawer({
+export function DetailDrawer({
   tag,
   onClose,
   onRefresh,

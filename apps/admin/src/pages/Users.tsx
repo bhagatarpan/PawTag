@@ -52,7 +52,7 @@ import {
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
 
-interface UserRecord {
+export interface UserRecord {
   _id: string;
   fullName: string;
   email: string;
@@ -173,7 +173,7 @@ function SkeletonRow() {
 /*  Detail Drawer                                                      */
 /* ------------------------------------------------------------------ */
 
-function DetailDrawer({
+export function DetailDrawer({
   user,
   onClose,
   onRefresh,

@@ -1334,7 +1334,7 @@ router.get('/pets', requirePermission('pet.read'), async (req, res: Response) =>
 
     // Attach linked tag info for each pet
     const petIds = pets.map((p) => p._id);
-    const tags = await Tag.find({ petId: { $in: petIds }, deletedAt: null }).select('tagId petId status');
+    const tags = await Tag.find({ petId: { $in: petIds }, deletedAt: null }).select('_id tagId petId status');
     const tagMap = new Map(tags.filter((t) => t.petId).map((t) => [t.petId!.toString(), t]));
     const petsWithTag = pets.map((pet) => ({
       ...pet.toObject(),
