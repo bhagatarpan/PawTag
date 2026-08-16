@@ -52,7 +52,7 @@ const emptyForm = {
 
 interface PhotoItem { url: string; caption?: string; isMain: boolean; }
 
-interface PetRecord {
+export interface PetRecord {
   _id: string;
   petId?: string;
   name: string;
@@ -238,7 +238,7 @@ function PhotoManager({ photos, onChange }: { photos: PhotoItem[]; onChange: (p:
 /*  Detail Drawer                                                      */
 /* ------------------------------------------------------------------ */
 
-function DetailDrawer({
+export function DetailDrawer({
   pet,
   onClose,
   onRefresh,

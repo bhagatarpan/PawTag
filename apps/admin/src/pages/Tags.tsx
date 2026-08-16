@@ -8,6 +8,8 @@ import {
   Database, FileText, User, Settings, Activity, CheckCircle,
   AlertCircle, Info, Clock, ExternalLink, Eye,
 } from 'lucide-react';
+import { DetailDrawer as PetDetailDrawer, type PetRecord } from './Pets';
+import { DetailDrawer as UserDetailDrawer, type UserRecord } from './Users';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -188,6 +190,14 @@ export function DetailDrawer({
   const [activeTab, setActiveTab] = useState<'info' | 'qr'>('info');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const drawerRef = useRef<HTMLDivElement>(null);
+  const [selectedPet, setSelectedPet] = useState<PetRecord | null>(null);
+  const [selectedOwner, setSelectedOwner] = useState<UserRecord | null>(null);
+  const [rbacRoles, setRbacRoles] = useState<any[]>([]);
+
+  // Fetch RBAC roles for user drawer
+  useEffect(() => {
+    api.get('/admin/rbac/roles').then((r) => setRbacRoles(r.data.data || [])).catch(() => {});
+  }, []);
 
   const apiBase = import.meta.env.VITE_API_URL || '/api';
 
@@ -335,10 +345,25 @@ export function DetailDrawer({
 
               {tag.petId && (
                 <Section title="Linked Pet" icon={<span className="text-base">🐾</span>}>
-                  <DetailRow label="Name" value={tag.petId.name} />
+                  <DetailRow label="Name" value={
+                    <button
+                      type="button"
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedPet(tag.petId as any); }}
+                      className="text-primary-600 hover:underline font-medium inline-flex items-center gap-1"
+                    >
+                      {tag.petId.name}
+                      <ExternalLink size={11} className="opacity-50" />
+                    </button>
+                  } />
                   <DetailRow label="Pet ID" value={
                     <span className="flex items-center gap-2">
-                      <span className="font-mono text-xs">{tag.petId.petId}</span>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedPet(tag.petId as any); }}
+                        className="font-mono text-xs text-primary-600 hover:underline"
+                      >
+                        {tag.petId.petId}
+                      </button>
                       <button onClick={() => copyToClipboard(tag.petId!.petId)} className="text-gray-400 hover:text-gray-600"><Copy size={12} /></button>
                     </span>
                   } />
@@ -359,10 +384,25 @@ export function DetailDrawer({
 
               {tag.ownerId && (
                 <Section title="Owner" icon={<User size={16} />}>
-                  <DetailRow label="Name" value={tag.ownerId.fullName} />
+                  <DetailRow label="Name" value={
+                    <button
+                      type="button"
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedOwner(tag.ownerId as any); }}
+                      className="text-primary-600 hover:underline font-medium inline-flex items-center gap-1"
+                    >
+                      {tag.ownerId.fullName}
+                      <ExternalLink size={11} className="opacity-50" />
+                    </button>
+                  } />
                   <DetailRow label="Email" value={
                     <span className="flex items-center gap-2">
-                      {tag.ownerId.email}
+                      <button
+                        type="button"
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedOwner(tag.ownerId as any); }}
+                        className="text-primary-600 hover:underline text-left"
+                      >
+                        {tag.ownerId.email}
+                      </button>
                       <button onClick={() => copyToClipboard(tag.ownerId!.email)} className="text-gray-400 hover:text-gray-600"><Copy size={12} /></button>
                     </span>
                   } />
@@ -469,6 +509,22 @@ export function DetailDrawer({
           )}
         </div>
       </div>
+
+      {/* Nested Drawer: Pet */}
+      <PetDetailDrawer
+        pet={selectedPet}
+        onClose={() => setSelectedPet(null)}
+        onRefresh={() => { setSelectedPet(null); onRefresh(); }}
+        owners={[]}
+      />
+
+      {/* Nested Drawer: Owner */}
+      <UserDetailDrawer
+        user={selectedOwner}
+        onClose={() => setSelectedOwner(null)}
+        onRefresh={() => { setSelectedOwner(null); onRefresh(); }}
+        rbacRoles={rbacRoles}
+      />
     </div>
   );
 }
