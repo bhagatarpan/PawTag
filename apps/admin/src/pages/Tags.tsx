@@ -199,6 +199,15 @@ export function DetailDrawer({
     api.get('/admin/rbac/roles').then((r) => setRbacRoles(r.data.data || [])).catch(() => {});
   }, []);
 
+  const handleOwnerClick = async (ownerId: string) => {
+    try {
+      const res = await api.get(`/admin/users/${ownerId}`);
+      setSelectedOwner(res.data.data);
+    } catch {
+      toast.error('Failed to load owner details');
+    }
+  };
+
   const apiBase = import.meta.env.VITE_API_URL || '/api';
 
   useEffect(() => {
@@ -387,7 +396,7 @@ export function DetailDrawer({
                   <DetailRow label="Name" value={
                     <button
                       type="button"
-                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedOwner(tag.ownerId as any); }}
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleOwnerClick(tag.ownerId!._id); }}
                       className="text-primary-600 hover:underline font-medium inline-flex items-center gap-1"
                     >
                       {tag.ownerId.fullName}
@@ -398,7 +407,7 @@ export function DetailDrawer({
                     <span className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedOwner(tag.ownerId as any); }}
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleOwnerClick(tag.ownerId!._id); }}
                         className="text-primary-600 hover:underline text-left"
                       >
                         {tag.ownerId.email}
