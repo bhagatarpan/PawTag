@@ -325,10 +325,10 @@ function SkeletonRow() {
       <td className="px-4 py-3"><div className="h-4 bg-gray-200 rounded w-24 mb-1" /><div className="h-3 bg-gray-200 rounded w-32" /></td>
       <td className="px-4 py-3"><div className="h-5 bg-gray-200 rounded-full w-24" /></td>
       <td className="px-4 py-3 hidden lg:table-cell"><div className="h-4 bg-gray-200 rounded w-28 mb-1" /><div className="h-3 bg-gray-200 rounded w-20" /></td>
-      <td className="px-4 py-3 hidden xl:table-cell"><div className="h-4 bg-gray-200 rounded w-20 mb-1" /><div className="h-3 bg-gray-200 rounded w-24" /></td>
-      <td className="px-4 py-3 hidden xl:table-cell"><div className="h-4 bg-gray-200 rounded w-20 mb-1" /><div className="h-3 bg-gray-200 rounded w-24" /></td>
-      <td className="px-4 py-3 hidden md:table-cell"><div className="h-5 bg-gray-200 rounded-full w-16" /></td>
-      <td className="px-4 py-3 hidden xl:table-cell"><div className="h-5 bg-gray-200 rounded-full w-16" /></td>
+      <td className="px-4 py-3 hidden xl:table-cell min-w-[200px]"><div className="h-4 bg-gray-200 rounded w-24 mb-1" /><div className="h-3 bg-gray-200 rounded w-32" /></td>
+      <td className="px-4 py-3 hidden xl:table-cell min-w-[200px]"><div className="h-4 bg-gray-200 rounded w-24 mb-1" /><div className="h-3 bg-gray-200 rounded w-32" /></td>
+      <td className="px-4 py-3 hidden md:table-cell"><div className="h-5 bg-gray-200 rounded-full w-8" /></td>
+      <td className="px-4 py-3 hidden xl:table-cell"><div className="h-5 bg-gray-200 rounded-full w-8" /></td>
     </tr>
   );
 }
@@ -1358,6 +1358,17 @@ export default function AuditTrail() {
               {filters.sortDir === 'desc' ? 'Newest first' : 'Oldest first'}
             </button>
 
+            {/* Refresh */}
+            <button
+              onClick={fetchEvents}
+              disabled={loading}
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+              title="Refresh audit logs"
+            >
+              <RotateCcw size={14} className={loading ? 'animate-spin' : ''} />
+              Refresh
+            </button>
+
             {activeFilters.length > 0 && (
               <button
                 onClick={clearFilters}
@@ -1568,14 +1579,14 @@ export default function AuditTrail() {
                       </td>
 
                       {/* Before */}
-                      <td className="px-4 py-3 hidden xl:table-cell">
+                      <td className="px-4 py-3 hidden xl:table-cell min-w-[200px]">
                         {actualChanges.length > 0 ? (
                           <div className="space-y-1.5">
                             {visibleChanges.map((c) => (
                               <div key={c.field}>
                                 <div className="text-[10px] text-gray-400 leading-none">{c.label}</div>
                                 <div className={`text-xs leading-tight mt-0.5 ${c.type === 'removed' ? 'text-red-600 line-through' : 'text-gray-600'}`}>
-                                  {c.before === '—' ? '—' : c.before.length > 30 ? c.before.slice(0, 30) + '…' : c.before}
+                                  {c.before === '—' ? '—' : c.before.length > 50 ? c.before.slice(0, 50) + '…' : c.before}
                                 </div>
                               </div>
                             ))}
@@ -1586,14 +1597,14 @@ export default function AuditTrail() {
                       </td>
 
                       {/* After */}
-                      <td className="px-4 py-3 hidden xl:table-cell">
+                      <td className="px-4 py-3 hidden xl:table-cell min-w-[200px]">
                         {actualChanges.length > 0 ? (
                           <div className="space-y-1.5">
                             {visibleChanges.map((c) => (
                               <div key={c.field}>
                                 <div className="text-[10px] text-gray-400 leading-none">{c.label}</div>
                                 <div className={`text-xs leading-tight mt-0.5 ${c.type === 'added' ? 'text-emerald-600 font-medium' : c.type === 'removed' ? 'text-gray-400' : 'text-emerald-700'}`}>
-                                  {c.after === '—' ? '—' : c.after.length > 30 ? c.after.slice(0, 30) + '…' : c.after}
+                                  {c.after === '—' ? '—' : c.after.length > 50 ? c.after.slice(0, 50) + '…' : c.after}
                                 </div>
                               </div>
                             ))}
@@ -1605,21 +1616,19 @@ export default function AuditTrail() {
 
                       {/* Result */}
                       <td className="px-4 py-3 hidden md:table-cell">
-                        <span className={`inline-flex items-center gap-1 ${getOutcomeBadge(ev.outcome)}`} title={ev.outcome}>
+                        <span className={`${getOutcomeBadge(ev.outcome)}`} title={ev.outcome}>
                           {getOutcomeIcon(ev.outcome)}
-                          <span className="text-xs">{ev.outcome}</span>
                         </span>
                       </td>
 
                       {/* Severity */}
                       <td className="px-4 py-3 hidden xl:table-cell">
-                        <span className={`inline-flex items-center gap-1 ${getSeverityBadge(ev.severity)}`} title={ev.severity}>
-                          {ev.severity === 'CRITICAL' && <OctagonAlert size={12} />}
-                          {ev.severity === 'HIGH' && <AlertTriangle size={12} />}
-                          {ev.severity === 'MEDIUM' && <AlertTriangle size={12} />}
-                          {ev.severity === 'INFO' && <Info size={12} />}
-                          {ev.severity === 'LOW' && <Circle size={12} />}
-                          <span className="text-xs">{ev.severity}</span>
+                        <span className={`${getSeverityBadge(ev.severity)}`} title={ev.severity}>
+                          {ev.severity === 'CRITICAL' && <OctagonAlert size={14} />}
+                          {ev.severity === 'HIGH' && <AlertTriangle size={14} />}
+                          {ev.severity === 'MEDIUM' && <AlertTriangle size={14} />}
+                          {ev.severity === 'INFO' && <Info size={14} />}
+                          {ev.severity === 'LOW' && <Circle size={14} />}
                         </span>
                       </td>
                     </tr>
