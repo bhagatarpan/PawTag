@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
-import { buildChangeRows, formatAuditValue, type AuditChangeRow } from '../lib/audit-diff';
+import { buildChangeRows, formatAuditValue, type AuditChangeRow, getActualChanges, getFieldDisplayName, getEntityDisplayName, getActionDisplayName, type ActualChange } from '../lib/audit-diff';
 import {
   Search,
   Filter,
@@ -56,6 +56,8 @@ import {
   MapPin,
   Smartphone,
   Laptop,
+  OctagonAlert,
+  Circle,
 } from 'lucide-react';
 
 /* ------------------------------------------------------------------ */
@@ -319,12 +321,14 @@ function getActionGroup(action: string): string {
 function SkeletonRow() {
   return (
     <tr className="animate-pulse">
-      <td className="px-4 py-3"><div className="h-4 bg-gray-200 rounded w-24" /></td>
-      <td className="px-4 py-3"><div className="h-4 bg-gray-200 rounded w-32" /></td>
-      <td className="px-4 py-3"><div className="h-5 bg-gray-200 rounded-full w-20" /></td>
-      <td className="px-4 py-3 hidden lg:table-cell"><div className="h-4 bg-gray-200 rounded w-24" /></td>
+      <td className="px-4 py-3"><div className="h-4 bg-gray-200 rounded w-20 mb-1" /><div className="h-3 bg-gray-200 rounded w-16" /></td>
+      <td className="px-4 py-3"><div className="h-4 bg-gray-200 rounded w-24 mb-1" /><div className="h-3 bg-gray-200 rounded w-32" /></td>
+      <td className="px-4 py-3"><div className="h-5 bg-gray-200 rounded-full w-24" /></td>
+      <td className="px-4 py-3 hidden lg:table-cell"><div className="h-4 bg-gray-200 rounded w-28 mb-1" /><div className="h-3 bg-gray-200 rounded w-20" /></td>
+      <td className="px-4 py-3 hidden xl:table-cell"><div className="h-4 bg-gray-200 rounded w-20 mb-1" /><div className="h-3 bg-gray-200 rounded w-24" /></td>
+      <td className="px-4 py-3 hidden xl:table-cell"><div className="h-4 bg-gray-200 rounded w-20 mb-1" /><div className="h-3 bg-gray-200 rounded w-24" /></td>
       <td className="px-4 py-3 hidden md:table-cell"><div className="h-5 bg-gray-200 rounded-full w-16" /></td>
-      <td className="px-4 py-3 hidden xl:table-cell"><div className="h-5 bg-gray-200 rounded-full w-14" /></td>
+      <td className="px-4 py-3 hidden xl:table-cell"><div className="h-5 bg-gray-200 rounded-full w-16" /></td>
     </tr>
   );
 }
@@ -1460,16 +1464,18 @@ export default function AuditTrail() {
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="text-left px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wider">Time</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wider">Actor</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wider">Action</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wider hidden lg:table-cell">Entity</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wider hidden md:table-cell">Result</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wider hidden xl:table-cell">Severity</th>
-                </tr>
-              </thead>
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className="text-left px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wider">Time</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wider">Actor</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wider">Action</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wider hidden lg:table-cell">Entity</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wider hidden xl:table-cell">Before</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wider hidden xl:table-cell">After</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wider hidden md:table-cell">Result</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wider hidden xl:table-cell">Severity</th>
+              </tr>
+            </thead>
               <tbody className="divide-y divide-gray-100">
                 {loading ? (
                   Array.from({ length: 8 }).map((_, i) => <SkeletonRow key={i} />)
@@ -1493,69 +1499,132 @@ export default function AuditTrail() {
                     </td>
                   </tr>
                 ) : (
-                  events.map((ev) => (
+                  events.map((ev) => {
+                  const actualChanges = getActualChanges(ev.beforeState, ev.afterState, ev.changedFields);
+                  const maxVisibleChanges = 2;
+                  const visibleChanges = actualChanges.slice(0, maxVisibleChanges);
+                  const extraCount = actualChanges.length - maxVisibleChanges;
+
+                  return (
                     <tr
                       key={ev.auditEventId}
                       onClick={() => setSelectedEvent(ev)}
                       className="hover:bg-gray-50 cursor-pointer transition-colors"
                     >
+                      {/* Time */}
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="text-xs text-gray-500">{formatDateShort(ev.occurredAt)}</div>
+                        <div className="text-xs text-gray-900 font-medium">{formatDateShort(ev.occurredAt)}</div>
                         <div className="text-xs text-gray-400">{formatTime(ev.occurredAt)}</div>
                       </td>
+
+                      {/* Actor */}
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${getActorTypeBadge(ev.actorType)}`}>
-                            {getActorTypeIcon(ev.actorType)}
-                            {formatLabel(ev.actorType)}
+                          <div className="w-7 h-7 rounded-full bg-primary-100 flex items-center justify-center shrink-0">
+                            <User size={13} className="text-primary-600" />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-sm font-medium text-gray-900 truncate max-w-[160px]">
+                              {ev.actorUsername || ev.actorEmail?.split('@')[0] || 'Unknown'}
+                            </div>
+                            {ev.actorEmail && (
+                              <div className="text-xs text-gray-400 truncate max-w-[160px]" title={ev.actorEmail}>{ev.actorEmail}</div>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Action */}
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1.5">
+                          <span className={`shrink-0 ${getActionColor(ev.action)}`}>
+                            {getActionIcon(ev.action)}
+                          </span>
+                          <span className="text-sm text-gray-900">
+                            {ev.businessOperation || getActionDisplayName(ev.action)}
                           </span>
                         </div>
-                        {ev.actorEmail && (
-                          <div className="text-xs text-gray-500 mt-1 truncate max-w-[180px]">{ev.actorEmail}</div>
+                        {ev.eventType && !ev.businessOperation && (
+                          <div className="text-[10px] text-gray-400 mt-0.5 font-mono truncate max-w-[180px]">{ev.eventType}</div>
                         )}
                       </td>
-                      <td className="px-4 py-3">
-                        {ev.businessOperation ? (
-                          <div>
-                            <div className="text-sm text-gray-900 font-medium">{ev.businessOperation}</div>
-                            <div className="flex items-center gap-1.5 mt-1">
-                              <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium border ${getActionColor(ev.action)}`}>
-                                {getActionIcon(ev.action)}
-                                {ev.action}
-                              </span>
-                            </div>
-                          </div>
-                        ) : (
-                          <div>
-                            <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border ${getActionColor(ev.action)}`}>
-                              {getActionIcon(ev.action)}
-                              {ev.action}
-                            </span>
-                            {ev.eventType && (
-                              <div className="text-xs text-gray-400 mt-1 truncate max-w-[200px]">{ev.eventType}</div>
+
+                      {/* Entity */}
+                      <td className="px-4 py-3 hidden lg:table-cell">
+                        <div className="text-sm font-medium text-gray-900">{getEntityDisplayName(ev.resourceType)}</div>
+                        {ev.resourceId && (
+                          <div className="text-[10px] text-gray-400 font-mono mt-0.5 truncate max-w-[140px]" title={ev.resourceId}>#{ev.resourceId}</div>
+                        )}
+                        {actualChanges.length > 0 && (
+                          <div className="mt-1 space-y-0.5">
+                            {visibleChanges.map((c) => (
+                              <div key={c.field} className="text-[10px] text-gray-500 truncate max-w-[140px]">{c.label}</div>
+                            ))}
+                            {extraCount > 0 && (
+                              <div className="text-[10px] text-primary-500 font-medium">+{extraCount} more</div>
                             )}
                           </div>
                         )}
                       </td>
-                      <td className="px-4 py-3 hidden lg:table-cell">
-                        <span className="text-xs text-gray-600">{ev.resourceType || '—'}</span>
-                        {ev.resourceId && (
-                          <div className="text-xs text-gray-400 font-mono mt-0.5">#{ev.resourceId}</div>
+
+                      {/* Before */}
+                      <td className="px-4 py-3 hidden xl:table-cell">
+                        {actualChanges.length > 0 ? (
+                          <div className="space-y-1.5">
+                            {visibleChanges.map((c) => (
+                              <div key={c.field}>
+                                <div className="text-[10px] text-gray-400 leading-none">{c.label}</div>
+                                <div className={`text-xs leading-tight mt-0.5 ${c.type === 'removed' ? 'text-red-600 line-through' : 'text-gray-600'}`}>
+                                  {c.before === '—' ? '—' : c.before.length > 30 ? c.before.slice(0, 30) + '…' : c.before}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-300">—</span>
                         )}
                       </td>
+
+                      {/* After */}
+                      <td className="px-4 py-3 hidden xl:table-cell">
+                        {actualChanges.length > 0 ? (
+                          <div className="space-y-1.5">
+                            {visibleChanges.map((c) => (
+                              <div key={c.field}>
+                                <div className="text-[10px] text-gray-400 leading-none">{c.label}</div>
+                                <div className={`text-xs leading-tight mt-0.5 ${c.type === 'added' ? 'text-emerald-600 font-medium' : c.type === 'removed' ? 'text-gray-400' : 'text-emerald-700'}`}>
+                                  {c.after === '—' ? '—' : c.after.length > 30 ? c.after.slice(0, 30) + '…' : c.after}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-300">—</span>
+                        )}
+                      </td>
+
+                      {/* Result */}
                       <td className="px-4 py-3 hidden md:table-cell">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${getOutcomeBadge(ev.outcome)}`}>
+                        <span className={`inline-flex items-center gap-1 ${getOutcomeBadge(ev.outcome)}`} title={ev.outcome}>
                           {getOutcomeIcon(ev.outcome)}
-                          {ev.outcome}
+                          <span className="text-xs">{ev.outcome}</span>
                         </span>
                       </td>
+
+                      {/* Severity */}
                       <td className="px-4 py-3 hidden xl:table-cell">
-                        <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${getSeverityBadge(ev.severity)}`}>
-                          {ev.severity}
+                        <span className={`inline-flex items-center gap-1 ${getSeverityBadge(ev.severity)}`} title={ev.severity}>
+                          {ev.severity === 'CRITICAL' && <OctagonAlert size={12} />}
+                          {ev.severity === 'HIGH' && <AlertTriangle size={12} />}
+                          {ev.severity === 'MEDIUM' && <AlertTriangle size={12} />}
+                          {ev.severity === 'INFO' && <Info size={12} />}
+                          {ev.severity === 'LOW' && <Circle size={12} />}
+                          <span className="text-xs">{ev.severity}</span>
                         </span>
                       </td>
                     </tr>
-                  ))
+                  );
+                })
                 )}
               </tbody>
             </table>
