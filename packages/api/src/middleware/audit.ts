@@ -83,6 +83,8 @@ function shouldAuditRequest(req: Request): boolean {
   if (path === '/health' || path === '/favicon.ico' || path.startsWith('/api/docs')) return false;
   if (path.startsWith('/api/admin/audit')) return false;
   if (path.startsWith('/api/public/cms') || path.startsWith('/api/finder/shop') || path.startsWith('/api/finder/content')) return false;
+  // Skip automated polling endpoints (notification badge checks, etc.)
+  if (path.includes('/unread-count') || path.includes('/poll')) return false;
   return path.startsWith('/api/');
 }
 
