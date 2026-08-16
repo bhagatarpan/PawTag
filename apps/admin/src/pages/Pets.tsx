@@ -71,7 +71,7 @@ interface PetRecord {
   photoUrl?: string;
   photos?: PhotoItem[];
   ownerId?: { _id: string; fullName: string; email: string; phoneNumber?: string };
-  linkedTag?: { tagId: string; status: string } | null;
+  linkedTag?: { _id: string; tagId: string; status: string } | null;
   createdAt: string;
 }
 
@@ -259,12 +259,25 @@ function DetailDrawer({
   const drawerRef = useRef<HTMLDivElement>(null);
   const [selectedOwner, setSelectedOwner] = useState<UserRecord | null>(null);
   const [selectedTag, setSelectedTag] = useState<TagItem | null>(null);
+  const [selectedTagLoading, setSelectedTagLoading] = useState(false);
   const [rbacRoles, setRbacRoles] = useState<any[]>([]);
 
   // Fetch RBAC roles for user drawer
   useEffect(() => {
     api.get('/admin/rbac/roles').then((r) => setRbacRoles(r.data.data || [])).catch(() => {});
   }, []);
+
+  const handleTagClick = async (tagId: string) => {
+    setSelectedTagLoading(true);
+    try {
+      const res = await api.get(`/admin/tags/${tagId}`);
+      setSelectedTag(res.data.data);
+    } catch {
+      toast.error('Failed to load tag details');
+    } finally {
+      setSelectedTagLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!pet) return;
@@ -548,12 +561,14 @@ function DetailDrawer({
                     {pet.linkedTag ? (
                       <DetailRow label="Tag" value={
                         <button
-                          onClick={() => setSelectedTag(pet.linkedTag as any)}
-                          className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-mono rounded bg-primary-50 text-primary-700 border border-primary-200 hover:bg-primary-100 transition-colors"
+                          onClick={() => handleTagClick(pet.linkedTag!._id)}
+                          disabled={selectedTagLoading}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-mono rounded bg-primary-50 text-primary-700 border border-primary-200 hover:bg-primary-100 transition-colors disabled:opacity-50"
                         >
+                          {selectedTagLoading ? <Loader2 size={10} className="animate-spin" /> : null}
                           {pet.linkedTag.tagId}
                           <span className={`w-1.5 h-1.5 rounded-full ${pet.linkedTag.status === 'active' ? 'bg-green-500' : pet.linkedTag.status === 'lost' ? 'bg-red-500' : 'bg-gray-400'}`} />
-                          <ExternalLink size={10} className="opacity-50" />
+                          {!selectedTagLoading && <ExternalLink size={10} className="opacity-50" />}
                         </button>
                       } />
                     ) : (
