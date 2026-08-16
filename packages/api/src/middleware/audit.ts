@@ -12,6 +12,10 @@ let cachedIdentifySetting: string | null = null;
 let cachedIdentifyAt = 0;
 const IDENTIFY_CACHE_TTL_MS = 5000;
 
+// Cache for skipPollingEndpoints setting (5 second TTL)
+let cachedSkipPollingSetting: string | null = null;
+let cachedSkipPollingAt = 0;
+
 async function shouldIdentifyAnonymousActors(): Promise<boolean> {
   if (cachedIdentifySetting !== null && Date.now() - cachedIdentifyAt < IDENTIFY_CACHE_TTL_MS) {
     return cachedIdentifySetting !== 'false';
@@ -23,6 +27,20 @@ async function shouldIdentifyAnonymousActors(): Promise<boolean> {
     return cachedIdentifySetting !== 'false';
   } catch {
     return true; // Default to enabled
+  }
+}
+
+async function shouldSkipPollingEndpoints(): Promise<boolean> {
+  if (cachedSkipPollingSetting !== null && Date.now() - cachedSkipPollingAt < IDENTIFY_CACHE_TTL_MS) {
+    return cachedSkipPollingSetting !== 'false';
+  }
+  try {
+    const setting = await Setting.findOne({ key: 'audit.settings.skipPollingEndpoints' }).lean();
+    cachedSkipPollingSetting = setting?.value || 'true';
+    cachedSkipPollingAt = Date.now();
+    return cachedSkipPollingSetting !== 'false';
+  } catch {
+    return true; // Default to skip
   }
 }
 
@@ -78,13 +96,13 @@ function identifyFromToken(req: Request): { actorId?: string; actorEmail?: strin
   return null;
 }
 
-function shouldAuditRequest(req: Request): boolean {
+async function shouldAuditRequest(req: Request): Promise<boolean> {
   const path = getRequestPath(req);
   if (path === '/health' || path === '/favicon.ico' || path.startsWith('/api/docs')) return false;
   if (path.startsWith('/api/admin/audit')) return false;
   if (path.startsWith('/api/public/cms') || path.startsWith('/api/finder/shop') || path.startsWith('/api/finder/content')) return false;
-  // Skip automated polling endpoints (notification badge checks, etc.)
-  if (path.includes('/unread-count') || path.includes('/poll')) return false;
+  // Skip automated polling endpoints if setting is enabled
+  if ((path.includes('/unread-count') || path.includes('/poll')) && await shouldSkipPollingEndpoints()) return false;
   return path.startsWith('/api/');
 }
 
