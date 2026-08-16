@@ -1350,6 +1350,23 @@ router.get('/pets', requirePermission('pet.read'), async (req, res: Response) =>
   }
 });
 
+// GET /api/admin/pets/:id — get single pet by ID
+router.get('/pets/:id', requirePermission('pet.read'), async (req, res: Response) => {
+  try {
+    const pet = await Pet.findOne({ _id: req.params.id, deletedAt: null })
+      .populate('ownerId', 'fullName email phoneNumber');
+    if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
+
+    // Attach linked tag
+    const tag = await Tag.findOne({ petId: pet._id, deletedAt: null }).select('_id tagId status');
+    const petWithTag = { ...pet.toObject(), linkedTag: tag || null };
+
+    res.json({ success: true, data: petWithTag });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to fetch pet' });
+  }
+});
+
 /**
  * @swagger
  * /api/admin/pets/{id}/status:
