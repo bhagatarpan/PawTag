@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
@@ -921,8 +921,64 @@ export default function AuditTrail() {
   const [exportLoading, setExportLoading] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [activeDatePreset, setActiveDatePreset] = useState<number | null>(null);
+  const [searchSuggestions, setSearchSuggestions] = useState<string[]>([]);
+  const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
+  const [searchHighlightIdx, setSearchHighlightIdx] = useState(-1);
+  const [searchInputValue, setSearchInputValue] = useState(filters.search);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchWrapperRef = useRef<HTMLDivElement>(null);
+  const searchDebounceRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Generate search suggestions from available actions and event types
+  const allSearchSuggestions = useMemo(() => {
+    const actions = Object.values(ACTION_GROUPS).flat();
+    const eventTypes = ['navigation', 'profile_update', 'profile_update_failed', 'login', 'logout', 'register', 'forgot_password', 'reset_password', 'password_changed', 'token_refreshed', 'email_verified', 'phone_verified', 'mfa_otp_sent', 'mfa_verified', 'pet_create', 'pet_update', 'pet_delete', 'pet_mark_lost', 'pet_mark_found', 'tag_redeem', 'order_create', 'order_payment_confirmed', 'cart_item_create', 'cart_item_update', 'cart_item_delete', 'notification_clear_read', 'notification_mark_all_read', 'notification_preferences_update', 'vaccination_create', 'vaccination_update', 'vaccination_delete', 'allergy_create', 'allergy_update', 'allergy_delete', 'medication_create', 'medication_update', 'medication_delete', 'microchip_create', 'microchip_update', 'microchip_delete', 'surgery_create', 'surgery_update', 'surgery_delete', 'weight_create', 'weight_delete', 'health_condition_create', 'health_condition_update', 'health_condition_delete', 'vet_detail_update', 'desexing_update', 'mfa_setting_changed', 'finder_privacy_changed', 'onboarding_completed', 'onboarding_skipped', 'escalation_resolved', 'escalation_forwarded', 'referral_data_viewed', 'referral_data_access'];
+    return [...new Set([...actions, ...eventTypes])].sort();
+  }, []);
+
+  // Debounced search filter
+  const handleSearchChange = (value: string) => {
+    setSearchInputValue(value);
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = setTimeout(() => {
+      updateFilter('search', value);
+    }, 300);
+    // Generate suggestions
+    if (value.trim().length > 0) {
+      const matches = allSearchSuggestions.filter((s) => s.toLowerCase().includes(value.toLowerCase())).slice(0, 8);
+      setSearchSuggestions(matches);
+      setShowSearchSuggestions(matches.length > 0);
+    } else {
+      setSearchSuggestions([]);
+      setShowSearchSuggestions(false);
+    }
+    setSearchHighlightIdx(-1);
+  };
+
+  const handleSearchSelect = (suggestion: string) => {
+    setSearchInputValue(suggestion);
+    updateFilter('search', suggestion);
+    setShowSearchSuggestions(false);
+  };
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent) => {
+    if (!showSearchSuggestions) return;
+    if (e.key === 'ArrowDown') { e.preventDefault(); setSearchHighlightIdx((i) => Math.min(i + 1, searchSuggestions.length - 1)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setSearchHighlightIdx((i) => Math.max(i - 1, 0)); }
+    else if (e.key === 'Enter' && searchHighlightIdx >= 0) { e.preventDefault(); handleSearchSelect(searchSuggestions[searchHighlightIdx]); }
+    else if (e.key === 'Tab' && searchHighlightIdx >= 0) { e.preventDefault(); handleSearchSelect(searchSuggestions[searchHighlightIdx]); }
+    else if (e.key === 'Escape') { setShowSearchSuggestions(false); }
+  };
+
+  // Close search suggestions on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (searchWrapperRef.current && !searchWrapperRef.current.contains(e.target as Node)) setShowSearchSuggestions(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Sync URL params
   useEffect(() => {
@@ -1217,23 +1273,39 @@ export default function AuditTrail() {
 
         {/* Search Bar */}
         <div className="mb-4">
-          <div className="relative">
+          <div ref={searchWrapperRef} className="relative">
             <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               ref={searchInputRef}
               type="text"
-              value={filters.search}
-              onChange={(e) => updateFilter('search', e.target.value)}
+              value={searchInputValue}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              onFocus={() => { if (searchInputValue.trim().length > 0 && searchSuggestions.length > 0) setShowSearchSuggestions(true); }}
+              onKeyDown={handleSearchKeyDown}
               placeholder="Search by user, action, entity, ID, transaction, IP, or event type..."
               className="w-full pl-11 pr-4 py-3 text-sm bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors placeholder:text-gray-400"
             />
-            {filters.search && (
+            {searchInputValue && (
               <button
-                onClick={() => updateFilter('search', '')}
+                onClick={() => { setSearchInputValue(''); updateFilter('search', ''); setSearchSuggestions([]); setShowSearchSuggestions(false); }}
                 className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 rounded-full"
               >
                 <X size={14} className="text-gray-400" />
               </button>
+            )}
+            {showSearchSuggestions && searchSuggestions.length > 0 && (
+              <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-y-auto">
+                {searchSuggestions.map((suggestion, i) => (
+                  <button
+                    key={suggestion}
+                    onClick={() => handleSearchSelect(suggestion)}
+                    className={`w-full text-left px-4 py-2 text-sm flex items-center gap-2 transition-colors ${i === searchHighlightIdx ? 'bg-primary-50 text-primary-700' : 'text-gray-700 hover:bg-gray-50'}`}
+                  >
+                    <Search size={12} className="text-gray-400 shrink-0" />
+                    <span dangerouslySetInnerHTML={{ __html: suggestion.replace(new RegExp(`(${searchInputValue.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi'), '<mark class="bg-yellow-200">$1</mark>') }} />
+                  </button>
+                ))}
+              </div>
             )}
           </div>
         </div>
@@ -1316,12 +1388,12 @@ export default function AuditTrail() {
                   options={ACTOR_TYPES.map((t) => ({ value: t, label: formatLabel(t) }))}
                   placeholder="All Actors"
                 />
-                <FilterSelect
-                  label="Action Group"
+                <FilterAutocomplete
+                  label="Action"
                   value={filters.action}
                   onChange={(v) => updateFilter('action', v)}
                   options={Object.keys(ACTION_GROUPS).map((g) => ({ value: g, label: g }))}
-                  placeholder="All Actions"
+                  placeholder="Type to search actions..."
                 />
                 <FilterSelect
                   label="Category"
@@ -1614,6 +1686,81 @@ function FilterSelect({
           <option key={o.value} value={o.value}>{o.label}</option>
         ))}
       </select>
+    </div>
+  );
+}
+
+function FilterAutocomplete({
+  label, value, onChange, options, placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: Array<{ value: string; label: string }>;
+  placeholder: string;
+}) {
+  const [inputValue, setInputValue] = useState(value);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [highlightIdx, setHighlightIdx] = useState(-1);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => { setInputValue(value); }, [value]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) setShowSuggestions(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const filtered = inputValue.trim()
+    ? options.filter((o) => o.label.toLowerCase().includes(inputValue.toLowerCase()) || o.value.toLowerCase().includes(inputValue.toLowerCase()))
+    : options;
+
+  const handleSelect = (val: string) => {
+    onChange(val);
+    setInputValue(val);
+    setShowSuggestions(false);
+    setHighlightIdx(-1);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!showSuggestions) return;
+    if (e.key === 'ArrowDown') { e.preventDefault(); setHighlightIdx((i) => Math.min(i + 1, filtered.length - 1)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setHighlightIdx((i) => Math.max(i - 1, 0)); }
+    else if (e.key === 'Enter' && highlightIdx >= 0) { e.preventDefault(); handleSelect(filtered[highlightIdx].value); }
+    else if (e.key === 'Escape') { setShowSuggestions(false); }
+    else if (e.key === 'Tab' && highlightIdx >= 0) { e.preventDefault(); handleSelect(filtered[highlightIdx].value); }
+  };
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      <label className="block text-xs font-medium text-gray-500 mb-1">{label}</label>
+      <input
+        ref={inputRef}
+        type="text"
+        value={inputValue}
+        onChange={(e) => { setInputValue(e.target.value); setShowSuggestions(true); setHighlightIdx(-1); if (!e.target.value) onChange(''); }}
+        onFocus={() => setShowSuggestions(true)}
+        onKeyDown={handleKeyDown}
+        placeholder={placeholder}
+        className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+      />
+      {showSuggestions && filtered.length > 0 && (
+        <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+          {filtered.map((o, i) => (
+            <button
+              key={o.value}
+              onClick={() => handleSelect(o.value)}
+              className={`w-full text-left px-3 py-2 text-sm transition-colors ${i === highlightIdx ? 'bg-primary-50 text-primary-700' : 'text-gray-700 hover:bg-gray-50'}`}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
