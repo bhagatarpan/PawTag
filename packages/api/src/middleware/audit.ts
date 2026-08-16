@@ -6,6 +6,7 @@ import { AuthRequest, AuditContext, AuditRequest } from './auth';
 import { auditService } from '../services/audit';
 import { Setting } from '@pawtag/db';
 import logger from '../lib/logger';
+import { runWithContext, RequestContext } from '../lib/request-context';
 
 // Cache for identifyAnonymousActors setting (5 second TTL)
 let cachedIdentifySetting: string | null = null;
@@ -210,17 +211,33 @@ export function auditMiddleware(req: AuthRequest, res: Response, next: NextFunct
   res.setHeader('X-Trace-ID', traceId);
   res.setHeader('X-Transaction-ID', transactionId);
 
-  const originalSend = res.send;
-  res.send = function (body?: unknown): Response {
-    if (req.auditContext) {
-      req.auditContext.durationMs = Date.now() - req.auditContext.startTime;
-    }
-    return originalSend.call(this, body);
+  // Propagate request context via AsyncLocalStorage
+  const requestContext: RequestContext = {
+    requestId,
+    correlationId,
+    traceId,
+    transactionId,
+    startTime: Date.now(),
+    method: req.method,
+    route: req.route?.path || req.path,
+    service: 'pawtag-api',
+    environment: config.nodeEnv || 'development',
+    ip: getClientIp(req),
   };
 
-  res.once('finish', () => auditCompletedRequest(req, res));
+  runWithContext(requestContext, () => {
+    const originalSend = res.send;
+    res.send = function (body?: unknown): Response {
+      if (req.auditContext) {
+        req.auditContext.durationMs = Date.now() - req.auditContext.startTime;
+      }
+      return originalSend.call(this, body);
+    };
 
-  next();
+    res.once('finish', () => auditCompletedRequest(req, res));
+
+    next();
+  });
 }
 
 export function setAuditActor(

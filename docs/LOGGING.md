@@ -114,6 +114,45 @@ The logger automatically redacts these fields:
 8. Database credentials
 9. Environment variable contents
 
+## Request Context
+
+Every API request automatically gets a request context with:
+- `requestId` — unique identifier for the request
+- `correlationId` — cross-service correlation
+- `traceId` — distributed trace identifier
+- `transactionId` — transaction grouping
+
+These IDs are:
+- Generated or accepted from incoming headers (`X-Request-ID`, etc.)
+- Stored in `AsyncLocalStorage` for access anywhere in the call stack
+- Set in response headers
+- Included in structured log output
+- Used to correlate logs, traces, and audit events
+
+### Accessing Request Context
+
+```typescript
+import { getRequestContext } from '../lib/request-context';
+
+const ctx = getRequestContext();
+if (ctx) {
+  logger.info({ requestId: ctx.requestId }, 'Processing request');
+}
+```
+
+## Error Handling
+
+PawTag uses a central error model (`lib/app-errors.ts`) with typed error classes:
+
+```typescript
+import { AppError, NotFoundError, ValidationError } from '../lib/app-errors';
+
+throw new NotFoundError('Pet');
+throw new ValidationError('Invalid input', [{ field: 'name', message: 'Required' }]);
+```
+
+All errors are converted to consistent `{ success, error, code, requestId }` responses.
+
 ## Migration from console.*
 
 When migrating existing code:

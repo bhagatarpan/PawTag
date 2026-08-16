@@ -11,7 +11,7 @@ function createRes() {
 }
 
 function createReq() {
-  return {} as Request;
+  return { originalUrl: '/api/test', method: 'GET' } as unknown as Request;
 }
 
 function createNext() {
@@ -46,7 +46,9 @@ describe('errorHandler', () => {
     errorHandler(err, req, res, next);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ success: false, error: 'Invalid ID format' });
+    const jsonCall = (res.json as any).mock.calls[0][0];
+    expect(jsonCall.success).toBe(false);
+    expect(jsonCall.error).toBe('Invalid ID format');
   });
 
   it('returns 409 for duplicate key error (code 11000)', () => {
@@ -57,7 +59,9 @@ describe('errorHandler', () => {
     errorHandler(err, req, res, next);
 
     expect(res.status).toHaveBeenCalledWith(409);
-    expect(res.json).toHaveBeenCalledWith({ success: false, error: 'Duplicate value' });
+    const jsonCall = (res.json as any).mock.calls[0][0];
+    expect(jsonCall.success).toBe(false);
+    expect(jsonCall.error).toBe('Duplicate value');
   });
 
   it('returns 500 for unknown errors', () => {
@@ -67,10 +71,9 @@ describe('errorHandler', () => {
     errorHandler(err, req, res, next);
 
     expect(res.status).toHaveBeenCalledWith(500);
-    expect(res.json).toHaveBeenCalledWith({
-      success: false,
-      error: 'Something broke',
-    });
+    const jsonCall = (res.json as any).mock.calls[0][0];
+    expect(jsonCall.success).toBe(false);
+    expect(jsonCall.error).toBe('Something broke');
   });
 
   it('hides error details in production', () => {
@@ -83,10 +86,9 @@ describe('errorHandler', () => {
     errorHandler(err, req, res, next);
 
     expect(res.status).toHaveBeenCalledWith(500);
-    expect(res.json).toHaveBeenCalledWith({
-      success: false,
-      error: 'Internal server error',
-    });
+    const jsonCall = (res.json as any).mock.calls[0][0];
+    expect(jsonCall.success).toBe(false);
+    expect(jsonCall.error).toBe('Internal server error');
 
     process.env.NODE_ENV = originalEnv;
   });
@@ -100,6 +102,9 @@ describe('notFoundHandler', () => {
     notFoundHandler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(404);
-    expect(res.json).toHaveBeenCalledWith({ success: false, error: 'Route not found' });
+    const jsonCall = (res.json as any).mock.calls[0][0];
+    expect(jsonCall.success).toBe(false);
+    expect(jsonCall.error).toBe('Route not found');
+    expect(jsonCall.path).toBeDefined();
   });
 });
