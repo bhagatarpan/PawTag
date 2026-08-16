@@ -1362,7 +1362,7 @@ export default function AuditTrail() {
             <button
               onClick={fetchEvents}
               disabled={loading}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-primary-700 bg-primary-50 border border-primary-200 rounded-lg hover:bg-primary-100 transition-colors disabled:opacity-50"
               title="Refresh audit logs"
             >
               <RotateCcw size={14} className={loading ? 'animate-spin' : ''} />
@@ -1536,7 +1536,9 @@ export default function AuditTrail() {
                           </div>
                           <div className="min-w-0">
                             <div className="text-sm font-medium text-gray-900 truncate max-w-[160px]">
-                              {ev.actorUsername || ev.actorEmail?.split('@')[0] || 'Unknown'}
+                              {ev.actorUsername && ev.actorUsername !== ev.actorEmail
+                                ? ev.actorUsername
+                                : ev.actorEmail?.split('@')[0] || 'Unknown'}
                             </div>
                             {ev.actorEmail && (
                               <div className="text-xs text-gray-400 truncate max-w-[160px]" title={ev.actorEmail}>{ev.actorEmail}</div>

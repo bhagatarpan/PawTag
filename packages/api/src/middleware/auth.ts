@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { config } from '../config';
 import { setAuditActor } from './audit';
 import { resolveActorType } from '../services/audit';
+import { User } from '@pawtag/db';
 
 export interface AuditContext {
   requestId: string;
@@ -43,7 +44,7 @@ export interface AuthRequest extends Request {
 // Re-export AuditRequest as alias for backward compatibility
 export type AuditRequest = AuthRequest;
 
-export function authenticate(req: AuthRequest, res: Response, next: NextFunction): void {
+export async function authenticate(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith('Bearer ')) {
     res.status(401).json({ success: false, error: 'No token provided' });
@@ -59,11 +60,19 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
       role: string;
     };
     req.user = decoded;
+
+    // Fetch user's fullName for audit trail display
+    let actorName = decoded.email;
+    try {
+      const user = await User.findById(decoded.id).select('fullName').lean();
+      if (user?.fullName) actorName = user.fullName;
+    } catch { /* non-critical */ }
+
     setAuditActor(req, {
       actorType: resolveActorType(decoded.role),
       actorId: decoded.id,
       actorEmail: decoded.email,
-      actorUsername: decoded.email,
+      actorUsername: actorName,
       authenticationMethod: 'jwt',
     });
     next();
