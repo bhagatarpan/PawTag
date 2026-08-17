@@ -5,6 +5,7 @@ import { sendPetFoundEmail } from '../services/email.service';
 import { auditService, type AuditContext } from '../services/audit';
 import { createDbRateLimiter } from '../lib/rate-limiter';
 import { requireCaptcha } from '../middleware/captcha';
+import logger from '../lib/logger';
 
 const router = Router();
 
@@ -59,7 +60,7 @@ async function auditFinderEvent(
       await auditService.log(context, input);
     } catch (err) {
       // Log audit failure but don't break the response
-      console.error('[Audit] Failed to log finder event:', err);
+      logger.error({ err }, '[Audit] Failed to log finder event');
     }
   };
   

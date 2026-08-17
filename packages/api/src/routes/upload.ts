@@ -39,7 +39,7 @@ async function auditUploadEvent(
       } as AuditContext;
       await auditService.log(context, input);
     } catch (err) {
-      console.error('[Audit] Failed to log upload event:', err);
+      logger.error({ err }, '[Audit] Failed to log upload event');
     }
   };
   logAudit();

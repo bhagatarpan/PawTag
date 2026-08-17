@@ -46,6 +46,7 @@ import { auditService, type AuditContext } from '../services/audit';
 import { createAuditContextFromRequest, type AuditRequest } from '../middleware/audit';
 import { hashPassword } from '../services/auth.service';
 import { getReferralStats, getReferralHistory } from '../services/referral.service';
+import logger from '../lib/logger';
 
 const router = Router();
 
@@ -576,7 +577,7 @@ router.post('/users/:id/reset-password', requirePermission('user.reset_password'
 
     const clientInfo = { ipAddress: req.ip || req.connection?.remoteAddress, userAgent: req.headers['user-agent'] };
     sendPasswordChangedEmail(user.email, user.fullName, req.user!.id, clientInfo.ipAddress).catch((err) => {
-      console.error('Failed to send password changed email:', err);
+      logger.error({ err, targetUserId: req.params.id, targetEmail: user.email }, 'Failed to send password changed email');
     });
 
     res.json({ success: true, data: { message: 'Password reset successfully' } });
@@ -2470,7 +2471,7 @@ router.put('/orders/:id/status', requirePermission('order.update'), async (req: 
     try {
       await notifyCustomerOfStatusChange(order, status, { trackingNumber });
     } catch (notifError) {
-      console.error('Status update notification error:', notifError);
+      logger.error({ err: notifError, orderId: req.params.id, orderNumber: order.orderNumber }, 'Status update notification error');
     }
 
     res.json({ success: true, data: order });
@@ -2522,7 +2523,7 @@ router.post('/orders/:id/cancel', requirePermission('order.update'), async (req:
     try {
       await notifyCustomerOfStatusChange(order, 'cancelled', { reason });
     } catch (notifError) {
-      console.error('Cancel notification error:', notifError);
+      logger.error({ err: notifError, orderId: req.params.id, orderNumber: order.orderNumber }, 'Cancel notification error');
     }
 
     res.json({ success: true, data: order });
@@ -2595,7 +2596,7 @@ router.post('/orders/:id/refund', requirePermission('order.update'), async (req:
     try {
       await notifyCustomerOfStatusChange(order, 'refunded', { reason });
     } catch (notifError) {
-      console.error('Refund notification error:', notifError);
+      logger.error({ err: notifError, orderId: req.params.id, orderNumber: order.orderNumber }, 'Refund notification error');
     }
 
     res.json({ success: true, data: { order, refundId: refundResult.refundId } });
@@ -2658,7 +2659,7 @@ router.post('/orders/:id/create-shipment', requirePermission('order.update'), as
     try {
       await notifyCustomerOfStatusChange(order, 'shipped', { trackingNumber: result.trackingNumber, carrier: result.carrier });
     } catch (notifError) {
-      console.error('Shipment notification error:', notifError);
+      logger.error({ err: notifError, orderId: req.params.id, orderNumber: order.orderNumber }, 'Shipment notification error');
     }
 
     res.json({
@@ -2708,7 +2709,7 @@ router.post('/orders/:id/mark-delivered', requirePermission('order.update'), asy
     try {
       await notifyCustomerOfStatusChange(order, 'delivered');
     } catch (notifError) {
-      console.error('Delivered notification error:', notifError);
+      logger.error({ err: notifError, orderId: req.params.id, orderNumber: order.orderNumber }, 'Delivered notification error');
     }
 
     res.json({ success: true, data: order });

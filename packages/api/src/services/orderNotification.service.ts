@@ -1,6 +1,7 @@
 import { Notification, type IOrderDocument } from '@pawtag/db';
 import { sendMail } from './email.service';
 import { sendPushToUser } from './push-notification.service';
+import logger from '../lib/logger';
 
 interface StatusChangeExtra {
   trackingNumber?: string;
@@ -119,7 +120,7 @@ export async function notifyCustomerOfStatusChange(
         emailConfig.html(order.orderNumber, extra),
       );
     } catch (err) {
-      console.error(`Order ${newStatus} email error:`, err);
+      logger.error({ err, orderNumber: order.orderNumber, status: newStatus }, 'Order status email error');
     }
   }
 

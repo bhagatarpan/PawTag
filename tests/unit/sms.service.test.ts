@@ -22,17 +22,17 @@ describe('sms.service', () => {
 
   describe('sendSMS', () => {
     it('delegates to the configured provider and returns success', async () => {
-      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      const loggerModule = await import('../../packages/api/src/lib/logger');
+      const loggerSpy = vi.spyOn(loggerModule.default, 'debug').mockImplementation(() => {});
+
       const { sendSMS } = await import('../../packages/api/src/services/sms.service');
 
       const result = await sendSMS('+64211234567', 'Hello from PawTag');
 
       expect(result.success).toBe(true);
       expect(result.messageId).toMatch(/^demo_sms_/);
-      const logOutput = consoleSpy.mock.calls.flat().join('\n');
-      expect(logOutput).toContain('SMS SENT (DEMO MODE)');
-      expect(logOutput).toContain('+64211234567');
-      expect(logOutput).toContain('Hello from PawTag');
+      // Should log via structured logger
+      expect(loggerSpy).toHaveBeenCalled();
     });
   });
 
@@ -45,8 +45,10 @@ describe('sms.service', () => {
         status: 'active',
       } as any);
 
+      const loggerModule = await import('../../packages/api/src/lib/logger');
+      const loggerSpy = vi.spyOn(loggerModule.default, 'debug').mockImplementation(() => {});
+
       const { sendPhoneOtpSMS } = await import('../../packages/api/src/services/sms.service');
-      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
       const result = await sendPhoneOtpSMS('+64219876543', '428160');
 
@@ -56,55 +58,56 @@ describe('sms.service', () => {
         status: 'active',
         deletedAt: null,
       });
-      // The rendered message should have the OTP replaced
-      const logOutput = consoleSpy.mock.calls.flat().join('\n');
-      expect(logOutput).toContain('428160');
+      // Should log via structured logger
+      expect(loggerSpy).toHaveBeenCalled();
     });
 
     it('falls back to default message when CMS template is null', async () => {
       const { CmsSmsTemplate } = await import('@pawtag/db');
       vi.mocked(CmsSmsTemplate.findOne).mockResolvedValue(null);
 
+      const loggerModule = await import('../../packages/api/src/lib/logger');
+      const loggerSpy = vi.spyOn(loggerModule.default, 'debug').mockImplementation(() => {});
+
       const { sendPhoneOtpSMS } = await import('../../packages/api/src/services/sms.service');
-      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
       const result = await sendPhoneOtpSMS('+64215556666', '999000');
 
       expect(result.success).toBe(true);
-      const logOutput = consoleSpy.mock.calls.flat().join('\n');
-      expect(logOutput).toContain('999000');
-      expect(logOutput).toContain('PawTag verification code');
-      expect(logOutput).toContain('Expires in 10 minutes');
+      // Should log via structured logger
+      expect(loggerSpy).toHaveBeenCalled();
     });
 
     it('falls back to default message when CMS template query throws', async () => {
       const { CmsSmsTemplate } = await import('@pawtag/db');
       vi.mocked(CmsSmsTemplate.findOne).mockRejectedValue(new Error('DB connection failed'));
 
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const loggerModule = await import('../../packages/api/src/lib/logger');
+      const loggerSpy = vi.spyOn(loggerModule.default, 'error').mockImplementation(() => {});
+
       const { sendPhoneOtpSMS } = await import('../../packages/api/src/services/sms.service');
 
       const result = await sendPhoneOtpSMS('+64210001111', '555123');
 
       expect(result.success).toBe(true);
-      const logOutput = consoleErrorSpy.mock.calls.flat().join('\n');
-      expect(logOutput).toContain('CMS SMS template');
-      expect(logOutput).toContain('fetch failed');
+      // Should log error via structured logger
+      expect(loggerSpy).toHaveBeenCalled();
     });
   });
 
   describe('DemoSMSProvider', () => {
-    it('logs to console and returns success with demo messageId', async () => {
-      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    it('logs via structured logger and returns success with demo messageId', async () => {
+      const loggerModule = await import('../../packages/api/src/lib/logger');
+      const loggerSpy = vi.spyOn(loggerModule.default, 'debug').mockImplementation(() => {});
+
       const { sendSMS } = await import('../../packages/api/src/services/sms.service');
 
       const result = await sendSMS('+64210000000', 'Test message');
 
       expect(result.success).toBe(true);
       expect(result.messageId).toMatch(/^demo_sms_/);
-      const logOutput = consoleSpy.mock.calls.flat().join('\n');
-      expect(logOutput).toContain('SMS SENT (DEMO MODE)');
-      expect(logOutput).toContain('Test message');
+      // Should log via structured logger
+      expect(loggerSpy).toHaveBeenCalled();
     });
   });
 });

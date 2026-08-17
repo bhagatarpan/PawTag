@@ -5,3 +5,4 @@ allowBuilds:
   '@scarf/scarf': true
   esbuild: true
   mongodb-memory-server: true
+  protobufjs: true

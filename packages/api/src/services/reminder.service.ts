@@ -1,6 +1,7 @@
 import { Pet, Notification, User } from '@pawtag/db';
 import { sendPushToUser } from './push-notification.service';
 import { auditService, type AuditContext } from './audit';
+import logger from '../lib/logger';
 
 const REMINDER_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const REMINDER_CHECK_INTERVAL_MS = 60 * 60 * 1000; // Check every hour
@@ -25,7 +26,7 @@ async function auditJobEvent(
         ...overrides,
       }, input);
     } catch (err) {
-      console.error('[Audit] Failed to log job event:', err);
+      logger.error({ err }, '[Audit] Failed to log job event');
     }
   };
   logAudit();
@@ -37,11 +38,11 @@ export function startReminderService() {
       await sendFinderReminders();
       await sendOnboardingNudges();
     } catch (error) {
-      console.error('[ReminderService] Error:', error);
+      logger.error({ err: error }, '[ReminderService] Error');
     }
   }, REMINDER_CHECK_INTERVAL_MS);
 
-  console.log('[ReminderService] Started — checks every hour for pets in "found" status > 24h + onboarding nudges');
+  logger.info('[ReminderService] Started — checks every hour for pets in "found" status > 24h + onboarding nudges');
 }
 
 async function sendFinderReminders() {
@@ -112,7 +113,7 @@ async function sendFinderReminders() {
 
     remindersSent++;
 
-    console.log(`[ReminderService] Sent reminder for pet ${pet.name} (${pet.petId}) to ${owner.email}`);
+    logger.info({ petName: pet.name, petId: pet.petId, ownerEmail: owner.email }, '[ReminderService] Sent reminder');
 
     await auditJobEvent({
       action: 'finder_reminder_sent',

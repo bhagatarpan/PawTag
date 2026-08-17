@@ -1,6 +1,8 @@
 import { Resend } from 'resend';
 import { CmsEmailTemplate } from '@pawtag/db';
 import { renderBase, renderCtaButton } from './email/templates/base';
+import logger from '../lib/logger';
+import { logIntegration } from '../lib/timing';
 import {
   renderVerificationEmail,
   renderWelcomeEmail,
@@ -79,7 +81,7 @@ async function renderCmsEmail(slug: string, variables: Record<string, string>): 
 
     return { html, subject, from };
   } catch (err) {
-    console.error(`CMS email template "${slug}" fetch failed, using fallback:`, err);
+    logger.error({ err, template: slug }, 'CMS email template fetch failed, using fallback');
     return null;
   }
 }
@@ -90,22 +92,12 @@ export async function sendMail(to: string, subject: string, html: string, from?:
   const fromAddress = process.env.NODE_ENV === 'production' ? (from || defaultFrom) : defaultFrom;
 
   if (isDemoMode) {
-    console.log('\n========================================');
-    console.log('📧 [DEMO EMAIL — No RESEND_API_KEY set]');
-    console.log('========================================');
-    console.log(`To:      ${to}`);
-    console.log(`From:    ${fromAddress}`);
-    console.log(`Subject: ${subject}`);
-    console.log('----------------------------------------');
     const urlMatch = html.match(/href="(http[^"]*verify[^"]*|http[^"]*reset[^"]*|http[^"]*token[^"]*)"/i);
-    if (urlMatch) {
-      console.log('🔗 LINK:', urlMatch[1]);
-    }
-    console.log('========================================\n');
+    logger.debug({ to, from: fromAddress, subject, link: urlMatch?.[1] }, 'DEMO EMAIL — No RESEND_API_KEY set');
     return { success: true, messageId: `demo_${Date.now()}` };
   }
 
-  try {
+  return logIntegration('Resend', 'sendEmail', async () => {
     const { data, error } = await resend!.emails.send({
       from: fromAddress,
       to: [to],
@@ -114,16 +106,13 @@ export async function sendMail(to: string, subject: string, html: string, from?:
     });
 
     if (error) {
-      console.error('Resend email failed:', error.message);
+      logger.error({ err: error, to, subject }, 'Resend email send failed');
       return { success: false, error: error.message };
     }
 
-    console.log(`📧 Email sent to ${to} — ID: ${data?.id}`);
+    logger.info({ to, messageId: data?.id }, 'Email sent successfully');
     return { success: true, messageId: data?.id };
-  } catch (error: any) {
-    console.error('Email send failed:', error.message);
-    return { success: false, error: error.message };
-  }
+  }, { to, subject: subject.substring(0, 50) });
 }
 
 export async function sendVerificationEmail(

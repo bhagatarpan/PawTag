@@ -1,4 +1,6 @@
 import Stripe from 'stripe';
+import { logIntegration } from '../lib/timing';
+import { ExternalServiceError } from '../lib/app-errors';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_demo_key', {
   apiVersion: '2024-06-20' as any,
@@ -30,29 +32,31 @@ export async function createPaymentIntent(data: PaymentIntentData): Promise<Paym
     };
   }
 
-  try {
-    const intent = await stripe.paymentIntents.create({
-      amount: Math.round(data.amount * 100), // Convert NZD to cents
-      currency: data.currency.toLowerCase(),
-      automatic_payment_methods: { enabled: true },
-      metadata: {
-        orderId: data.orderId,
-        ...data.metadata,
-      },
-      receipt_email: data.customerEmail,
-    });
+  return logIntegration('Stripe', 'createPaymentIntent', async () => {
+    try {
+      const intent = await stripe.paymentIntents.create({
+        amount: Math.round(data.amount * 100),
+        currency: data.currency.toLowerCase(),
+        automatic_payment_methods: { enabled: true },
+        metadata: {
+          orderId: data.orderId,
+          ...data.metadata,
+        },
+        receipt_email: data.customerEmail,
+      });
 
-    return {
-      success: true,
-      clientSecret: intent.client_secret || undefined,
-      paymentIntentId: intent.id,
-    };
-  } catch (error: any) {
-    return {
-      success: false,
-      error: error.message || 'Payment processing failed',
-    };
-  }
+      return {
+        success: true,
+        clientSecret: intent.client_secret || undefined,
+        paymentIntentId: intent.id,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message || 'Payment processing failed',
+      };
+    }
+  }, { orderId: data.orderId, amount: data.amount, currency: data.currency });
 }
 
 export async function confirmPayment(paymentIntentId: string): Promise<{ status: string; error?: string }> {
@@ -142,13 +146,15 @@ export async function createRefund(paymentIntentId: string, amount?: number): Pr
     return { success: true, refundId: `re_demo_${Date.now()}` };
   }
 
-  try {
-    const refund = await stripe.refunds.create({
-      payment_intent: paymentIntentId,
-      amount: amount ? Math.round(amount * 100) : undefined,
-    });
-    return { success: true, refundId: refund.id };
-  } catch (error: any) {
-    return { success: false, error: error.message };
-  }
+  return logIntegration('Stripe', 'createRefund', async () => {
+    try {
+      const refund = await stripe.refunds.create({
+        payment_intent: paymentIntentId,
+        amount: amount ? Math.round(amount * 100) : undefined,
+      });
+      return { success: true, refundId: refund.id };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  }, { paymentIntentId, amount });
 }

@@ -1,22 +1,38 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
-// Initialize Sentry before any other imports
-import * as Sentry from '@sentry/node';
-if (process.env.SENTRY_DSN && process.env.NODE_ENV !== 'test') {
-  Sentry.init({
+// Initialize OpenTelemetry tracing before any other imports
+import { initTracing } from './lib/tracing';
+if (process.env.NODE_ENV !== 'test') {
+  initTracing({
+    serviceName: 'pawtag-api',
+    serviceVersion: process.env.SERVICE_VERSION || '0.1.0',
+    environment: process.env.NODE_ENV || 'development',
+    otlpEndpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
+    consoleExporter: process.env.OTEL_CONSOLE_EXPORTER === 'true',
+    sampleRate: parseFloat(process.env.OTEL_SAMPLE_RATE || '1.0'),
+  });
+}
+
+// Initialize error monitoring before any other imports
+import { initMonitoring } from './lib/monitoring';
+if (process.env.NODE_ENV !== 'test') {
+  initMonitoring({
     dsn: process.env.SENTRY_DSN,
     environment: process.env.NODE_ENV || 'development',
-    tracesSampleRate: 0.1,
+    release: process.env.SENTRY_RELEASE || process.env.SERVICE_VERSION,
+    sampleRate: parseFloat(process.env.SENTRY_SAMPLE_RATE || '1.0'),
+    tracesSampleRate: parseFloat(process.env.SENTRY_TRACES_SAMPLE_RATE || '0.1'),
   });
 }
 
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import morgan from 'morgan';
+import pinoHttp from 'pino-http';
 import swaggerUi from 'swagger-ui-express';
 import path from 'path';
+import * as Sentry from '@sentry/node';
 
 import { config } from './config';
 import { connectDatabase } from '@pawtag/db';
@@ -24,6 +40,8 @@ import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { swaggerSpec } from './swagger';
 import logger from './lib/logger';
 import { auditMiddleware } from './middleware/audit';
+import { metricsMiddleware } from './middleware/metrics';
+import { tracingMiddleware } from './middleware/tracing';
 import { createDbRateLimiter } from './lib/rate-limiter';
 
 import QRCode from 'qrcode';
@@ -55,6 +73,9 @@ import referralRoutes from './routes/referrals';
 import pushTokenRoutes from './routes/push-tokens';
 import auditRoutes from './routes/audit';
 import { publicRouter as supportPublicRoutes, adminRouter as supportAdminRoutes } from './routes/support';
+import healthRoutes from './routes/health';
+import { shutdownTracing } from './lib/tracing';
+import { flushMonitoring } from './lib/monitoring';
 import { startReminderService } from './services/reminder.service';
 import { startSubscriptionService } from './services/subscription.service';
 import { startEscalationService } from './services/escalation.service';
@@ -84,7 +105,28 @@ app.use(cors({
   credentials: true,
 }));
 app.use(express.json({ limit: '10mb' }));
-app.use(morgan('dev'));
+
+// Structured HTTP request logging via pino-http
+const isTest = process.env.NODE_ENV === 'test';
+const httpLogger = pinoHttp({
+  logger,
+  // Skip health checks and docs in production
+  autoLogging: !isTest && {
+    ignore: (req) => {
+      const url = req.url || '';
+      return url.startsWith('/health') || url.startsWith('/api/docs') || url === '/favicon.ico';
+    },
+  },
+  // Redact sensitive headers
+  redact: ['req.headers.authorization', 'req.headers.cookie', 'res.headers.authorization'],
+});
+app.use(httpLogger);
+
+// Metrics middleware - track HTTP request counts and durations
+app.use(metricsMiddleware);
+
+// Tracing middleware - enriches request context with OpenTelemetry trace IDs
+app.use(tracingMiddleware);
 
 // Audit middleware - must be early to capture all requests
 app.use(auditMiddleware);
@@ -116,10 +158,8 @@ app.get('/api/docs.json', (_req, res) => {
   res.send(swaggerSpec);
 });
 
-// --- Health Check ---
-app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
+// --- Health & Metrics ---
+app.use('/health', healthRoutes);
 
 // --- Public Tag QR Routes (no auth needed) ---
 const FINDER_BASE_URL = process.env.FINDER_BASE_URL || 'http://localhost:3003';
@@ -212,8 +252,28 @@ async function start() {
     });
 
     process.on('SIGTERM', () => {
-      logger.info('SIGTERM received, shutting down...');
-      server.close(() => process.exit(0));
+      logger.info('SIGTERM received, shutting down gracefully...');
+      server.close(async () => {
+        logger.info('HTTP server closed');
+        await flushMonitoring();
+        await shutdownTracing();
+        process.exit(0);
+      });
+      // Force exit after 10 seconds if graceful shutdown fails
+      setTimeout(() => {
+        logger.error('Forced shutdown after timeout');
+        process.exit(1);
+      }, 10000);
+    });
+
+    process.on('SIGINT', () => {
+      logger.info('SIGINT received, shutting down...');
+      server.close(async () => {
+        await flushMonitoring();
+        await shutdownTracing();
+        process.exit(0);
+      });
+      setTimeout(() => process.exit(1), 10000);
     });
   } catch (error: any) {
     logger.error({ err: error }, 'Failed to start server');
@@ -228,5 +288,24 @@ const isDirectRun = process.argv[1] && (
 if (isDirectRun || process.env.NODE_ENV !== 'test') {
   start();
 }
+
+// --- Process-level exception handlers ---
+process.on('unhandledRejection', (reason: unknown) => {
+  logger.fatal({ err: reason }, 'Unhandled promise rejection');
+  // Capture in monitoring if available
+  if (reason instanceof Error) {
+    const { captureException } = require('./lib/monitoring');
+    captureException(reason, { severity: 'fatal', operation: 'unhandledRejection' });
+  }
+  process.exit(1);
+});
+
+process.on('uncaughtException', (err: Error) => {
+  logger.fatal({ err }, 'Uncaught exception — process may be in undefined state');
+  // Capture in monitoring if available
+  const { captureException } = require('./lib/monitoring');
+  captureException(err, { severity: 'fatal', operation: 'uncaughtException' });
+  process.exit(1);
+});
 
 export default app;

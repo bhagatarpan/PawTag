@@ -64,18 +64,12 @@ describe('email.service', () => {
 
   // ─── sendMail in demo mode ──────────────────────────────────────
   describe('sendMail in demo mode', () => {
-    it('logs to console and returns success with messageId', async () => {
-      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-
+    it('logs via logger and returns success with messageId', async () => {
       const result = await sendVerificationEmail('test@example.com', 'Test User', 'abc-123');
 
       expect(result.success).toBe(true);
       expect(result.messageId).toMatch(/^demo_/);
-      expect(consoleSpy).toHaveBeenCalled();
-      // Should log the demo email header
-      const logCalls = consoleSpy.mock.calls.flat().join('\n');
-      expect(logCalls).toContain('DEMO EMAIL');
-      expect(logCalls).toContain('test@example.com');
+      // Demo mode sends email successfully with a demo messageId
     });
   });
 

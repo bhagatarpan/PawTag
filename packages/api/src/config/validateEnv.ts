@@ -1,3 +1,5 @@
+import logger from '../lib/logger';
+
 const REQUIRED_IN_PRODUCTION = ['DB_URL', 'JWT_SECRET'] as const;
 
 const RECOMMENDED = ['BOOTSTRAP_ADMIN_PASSWORD', 'STRIPE_SECRET_KEY', 'ADMIN_ALERT_EMAIL'] as const;
@@ -21,7 +23,7 @@ export function validateEnv(): void {
 
   if (nodeEnv !== 'production') {
     for (const key of missingRequired) {
-      console.warn(`⚠ [config] ${key} is not set — using defaults for ${nodeEnv} mode`);
+      logger.warn({ variable: key, environment: nodeEnv }, `Config: ${key} is not set — using defaults`);
     }
   }
 
@@ -33,6 +35,6 @@ export function validateEnv(): void {
   }
 
   if (missingRecommended.length > 0) {
-    console.warn(`⚠ [config] Optional but recommended variables not set: ${missingRecommended.join(', ')}`);
+    logger.warn({ variables: missingRecommended }, 'Config: Optional but recommended variables not set');
   }
 }

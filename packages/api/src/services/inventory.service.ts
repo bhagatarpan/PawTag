@@ -1,5 +1,6 @@
 import { Product } from '@pawtag/db';
 import { auditService, type AuditContext } from './audit';
+import logger from '../lib/logger';
 
 async function auditRestoreStockEvent(
   input: Parameters<typeof auditService.log>[1],
@@ -19,7 +20,7 @@ async function auditRestoreStockEvent(
       ...overrides,
     }, input);
   } catch (err) {
-    console.error('[Audit] Failed to log inventory event:', err);
+    logger.error({ err }, '[Audit] Failed to log inventory event');
   }
 }
 
