@@ -339,6 +339,10 @@ export default function SystemLogs() {
   const clearPurge = () => {
     setPurgeRange(null);
     setPurgeConfirmOpen(false);
+    setStartDate('');
+    setEndDate('');
+    setPage(1);
+    updateParams({ startDate: '', endDate: '', page: '1' });
   };
 
   const handlePurge = async () => {
@@ -435,9 +439,14 @@ export default function SystemLogs() {
 
           {/* Purge action button — visible when a range is selected */}
           {purgeRange && (
-            <button type="button" onClick={() => setPurgeConfirmOpen(true)} className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700">
-              <Trash2 size={15} /> Purge {total.toLocaleString()} log{total !== 1 ? 's' : ''}
-            </button>
+            <div className="inline-flex items-center gap-1">
+              <button type="button" onClick={() => setPurgeConfirmOpen(true)} className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700">
+                <Trash2 size={15} /> Purge {total.toLocaleString()} log{total !== 1 ? 's' : ''}
+              </button>
+              <button type="button" onClick={clearPurge} className="rounded-lg border border-gray-200 p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50" title="Cancel purge">
+                <X size={15} />
+              </button>
+            </div>
           )}
 
           <button type="button" onClick={() => navigate('/system-log-settings')} className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
