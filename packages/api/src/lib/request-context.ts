@@ -26,6 +26,9 @@ export interface RequestContext {
   userId?: string;
   email?: string;
   ip?: string;
+  // OpenTelemetry trace context
+  otelTraceId?: string;
+  otelSpanId?: string;
 }
 
 const asyncLocalStorage = new AsyncLocalStorage<RequestContext>();
@@ -56,6 +59,8 @@ export function createContextLogger(logger: pino.Logger): pino.Logger {
     requestId: ctx.requestId,
     correlationId: ctx.correlationId,
     traceId: ctx.traceId,
+    otelTraceId: ctx.otelTraceId,
+    otelSpanId: ctx.otelSpanId,
     method: ctx.method,
     route: ctx.route,
     ...(ctx.userId ? { userId: ctx.userId } : {}),

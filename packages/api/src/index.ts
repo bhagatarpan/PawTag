@@ -1,6 +1,19 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
+// Initialize OpenTelemetry tracing before any other imports
+import { initTracing } from './lib/tracing';
+if (process.env.NODE_ENV !== 'test') {
+  initTracing({
+    serviceName: 'pawtag-api',
+    serviceVersion: process.env.SERVICE_VERSION || '0.1.0',
+    environment: process.env.NODE_ENV || 'development',
+    otlpEndpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
+    consoleExporter: process.env.OTEL_CONSOLE_EXPORTER === 'true',
+    sampleRate: parseFloat(process.env.OTEL_SAMPLE_RATE || '1.0'),
+  });
+}
+
 // Initialize Sentry before any other imports
 import * as Sentry from '@sentry/node';
 if (process.env.SENTRY_DSN && process.env.NODE_ENV !== 'test') {
@@ -25,6 +38,7 @@ import { swaggerSpec } from './swagger';
 import logger from './lib/logger';
 import { auditMiddleware } from './middleware/audit';
 import { metricsMiddleware } from './middleware/metrics';
+import { tracingMiddleware } from './middleware/tracing';
 import { createDbRateLimiter } from './lib/rate-limiter';
 
 import QRCode from 'qrcode';
@@ -57,6 +71,7 @@ import pushTokenRoutes from './routes/push-tokens';
 import auditRoutes from './routes/audit';
 import { publicRouter as supportPublicRoutes, adminRouter as supportAdminRoutes } from './routes/support';
 import healthRoutes from './routes/health';
+import { shutdownTracing } from './lib/tracing';
 import { startReminderService } from './services/reminder.service';
 import { startSubscriptionService } from './services/subscription.service';
 import { startEscalationService } from './services/escalation.service';
@@ -105,6 +120,9 @@ app.use(httpLogger);
 
 // Metrics middleware - track HTTP request counts and durations
 app.use(metricsMiddleware);
+
+// Tracing middleware - enriches request context with OpenTelemetry trace IDs
+app.use(tracingMiddleware);
 
 // Audit middleware - must be early to capture all requests
 app.use(auditMiddleware);
@@ -231,8 +249,9 @@ async function start() {
 
     process.on('SIGTERM', () => {
       logger.info('SIGTERM received, shutting down gracefully...');
-      server.close(() => {
+      server.close(async () => {
         logger.info('HTTP server closed');
+        await shutdownTracing();
         process.exit(0);
       });
       // Force exit after 10 seconds if graceful shutdown fails
@@ -244,7 +263,10 @@ async function start() {
 
     process.on('SIGINT', () => {
       logger.info('SIGINT received, shutting down...');
-      server.close(() => process.exit(0));
+      server.close(async () => {
+        await shutdownTracing();
+        process.exit(0);
+      });
       setTimeout(() => process.exit(1), 10000);
     });
   } catch (error: any) {
