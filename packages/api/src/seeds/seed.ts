@@ -377,8 +377,8 @@ async function seed() {
       { name: 'cms.auth_page.update', displayName: 'Update Auth Pages', description: 'Update auth pages', resource: 'cms.auth_page', action: 'update', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
 
       // System Logging
-      { name: 'systemLogs.read', displayName: 'Read System Logs', description: 'View system application logs', resource: 'systemLogs', action: 'read', groupIndex: groupDefs.findIndex(g => g.name === 'SYSTEM_LOGGING') },
-      { name: 'systemLogs.admin', displayName: 'Manage System Log Settings', description: 'Configure system log storage, levels, and retention', resource: 'systemLogs', action: 'admin', groupIndex: groupDefs.findIndex(g => g.name === 'SYSTEM_LOGGING') },
+      { name: 'systemlogs.read', displayName: 'Read System Logs', description: 'View system application logs', resource: 'systemlogs', action: 'read', groupIndex: groupDefs.findIndex(g => g.name === 'SYSTEM_LOGGING') },
+      { name: 'systemlogs.admin', displayName: 'Manage System Log Settings', description: 'Configure system log storage, levels, and retention', resource: 'systemlogs', action: 'admin', groupIndex: groupDefs.findIndex(g => g.name === 'SYSTEM_LOGGING') },
     ];
 
     const permMap: Record<string, string> = {};
@@ -508,8 +508,8 @@ async function seed() {
         { permissionName: 'audit.read' },
         { permissionName: 'audit.admin' },
         // System Logs
-        { permissionName: 'systemLogs.read' },
-        { permissionName: 'systemLogs.admin' },
+        { permissionName: 'systemlogs.read' },
+        { permissionName: 'systemlogs.admin' },
         // Finder Scans
         { permissionName: 'finder_scan.read' },
         // Location Events
@@ -593,7 +593,7 @@ async function seed() {
         { permissionName: 'user.read' },
         { permissionName: 'order.read' },
         { permissionName: 'finder_scan.read' },
-        { permissionName: 'systemLogs.read' },
+        { permissionName: 'systemlogs.read' },
       ],
 
       PET_OWNER: [

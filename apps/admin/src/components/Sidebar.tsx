@@ -72,8 +72,8 @@ const adminLinks: SidebarLink[] = [
   { to: '/feature-flags', label: 'Feature Flags', icon: Flag, permission: 'feature_flag.read' },
   { to: '/audit-trail', label: 'Audit Logs', icon: FileSignature, permission: 'audit.read' },
   { to: '/audit-settings', label: 'Audit Settings', icon: FileSignature, permission: 'audit.admin' },
-  { to: '/system-logs', label: 'System Logs', icon: Terminal, permission: 'systemLogs.read' },
-  { to: '/system-log-settings', label: 'System Log Settings', icon: Terminal, permission: 'systemLogs.admin' },
+  { to: '/system-logs', label: 'System Logs', icon: Terminal, permission: 'systemlogs.read' },
+  { to: '/system-log-settings', label: 'System Log Settings', icon: Terminal, permission: 'systemlogs.admin' },
 ];
 
 const cmsLinks: SidebarLink[] = [

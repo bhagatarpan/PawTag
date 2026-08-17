@@ -7,91 +7,27 @@ const isTest = process.env.NODE_ENV === 'test';
 const SERVICE_NAME = process.env.SERVICE_NAME || 'pawtag-api';
 const SERVICE_VERSION = process.env.SERVICE_VERSION || 'unknown';
 
-/**
- * Fields that must never appear in logs.
- * Pino's redaction replaces values with '[REDACTED]'.
- */
 const REDACT_PATHS = [
-  'password',
-  'passwordHash',
-  'hashedPassword',
-  'token',
-  'accessToken',
-  'refreshToken',
-  'secret',
-  'jwtSecret',
-  'apiKey',
-  'api_key',
-  'authorization',
-  'cookie',
-  'otp',
-  'otpCode',
-  'creditCard',
-  'cardNumber',
-  'cvv',
-  'ssn',
-  'privateKey',
-  '*.password',
-  '*.token',
-  '*.secret',
-  '*.apiKey',
-  '*.otp',
-  '*.authorization',
-  'req.headers.authorization',
-  'req.headers.cookie',
-  'finderPhone',
-  'finderEmail',
-  'emergencyContact',
-  'emergencyPhone',
-  'location.latitude',
-  'location.longitude',
+  'password', 'passwordHash', 'hashedPassword', 'token', 'accessToken',
+  'refreshToken', 'secret', 'jwtSecret', 'apiKey', 'api_key',
+  'authorization', 'cookie', 'otp', 'otpCode', 'creditCard',
+  'cardNumber', 'cvv', 'ssn', 'privateKey',
+  '*.password', '*.token', '*.secret', '*.apiKey', '*.otp', '*.authorization',
+  'req.headers.authorization', 'req.headers.cookie',
+  'finderPhone', 'finderEmail', 'emergencyContact', 'emergencyPhone',
+  'location.latitude', 'location.longitude',
 ];
 
-/**
- * Core structured logger for PawTag.
- *
- * Usage:
- *   import { logger } from '../lib/logger';
- *   logger.info({ userId: '123', action: 'login' }, 'User logged in');
- *   logger.error({ err: error, requestId }, 'Operation failed');
- *
- * Child loggers:
- *   const child = logger.child({ requestId, feature: 'auth' });
- *   child.info('Processing login');
- */
-export const logger = pino({
+const LEVEL_MAP: Record<string, number> = { debug: 20, info: 30, warn: 40, error: 50, fatal: 60 };
+
+const baseLogger = pino({
   level: isTest ? 'silent' : (process.env.LOG_LEVEL || 'info'),
   name: SERVICE_NAME,
-  redact: {
-    paths: REDACT_PATHS,
-    censor: '[REDACTED]',
-  },
+  redact: { paths: REDACT_PATHS, censor: '[REDACTED]' },
   base: {
     service: SERVICE_NAME,
     version: SERVICE_VERSION,
     environment: process.env.NODE_ENV || 'development',
-  },
-  hooks: {
-    logMethod(args: unknown[], method: (...methodArgs: unknown[]) => void) {
-      // Fire-and-forget: send log entry to MongoDB writer
-      if (!isTest) {
-        try {
-          const entry = args[0];
-          if (entry && typeof entry === 'object') {
-            const levelNum = (this as unknown as { level?: { value?: number } }).level?.value ?? 30;
-            writeLog({
-              level: levelNum,
-              time: Date.now(),
-              ...entry as Record<string, unknown>,
-            });
-          }
-        } catch {
-          // Never break logging
-        }
-      }
-      // Call the original Pino method
-      method.apply(this, args);
-    },
   },
   ...(isDev && !isTest
     ? {
@@ -114,28 +50,51 @@ export const logger = pino({
 });
 
 /**
- * Create a child logger with pre-bound context fields.
- *
- * @example
- *   const reqLogger = createChildLogger({ requestId: req.id, feature: 'auth' });
- *   reqLogger.info('Processing login attempt');
+ * Wrap each log level method to capture the level and forward to the MongoDB writer.
+ * This is more reliable than Pino's logMethod hook which doesn't expose the level.
  */
+function wrapLogMethods(loggerInstance: pino.Logger): void {
+  for (const levelName of ['debug', 'info', 'warn', 'error', 'fatal'] as const) {
+    const original = (loggerInstance as any)[levelName];
+    if (typeof original === 'function') {
+      (loggerInstance as any)[levelName] = function (...args: unknown[]) {
+        if (!isTest) {
+          try {
+            const first = args[0];
+            const entry = (first && typeof first === 'object' && typeof first !== 'string')
+              ? first as Record<string, unknown>
+              : {};
+            writeLog({
+              level: LEVEL_MAP[levelName] || 30,
+              time: Date.now(),
+              ...entry,
+              msg: typeof first === 'string' ? first : (args[1] as string) || (entry.msg as string),
+            });
+          } catch {
+            // Never break logging
+          }
+        }
+        return original.apply(this, args);
+      };
+    }
+  }
+}
+
+wrapLogMethods(baseLogger);
+
+export const logger = baseLogger;
+
 export function createChildLogger(context: Record<string, unknown>): pino.Logger {
-  return logger.child(context);
+  const child = baseLogger.child(context);
+  wrapLogMethods(child);
+  return child;
 }
 
-/**
- * Create a scoped logger for a specific feature or workflow.
- *
- * @example
- *   const authLogger = createScopedLogger('auth');
- *   authLogger.info({ userId }, 'Login attempt');
- */
 export function createScopedLogger(scope: string): pino.Logger {
-  return logger.child({ feature: scope });
+  const child = baseLogger.child({ feature: scope });
+  wrapLogMethods(child);
+  return child;
 }
 
-/** Flush pending system logs to MongoDB. Call before process exit. */
 export { flushSystemLogs };
-
 export default logger;

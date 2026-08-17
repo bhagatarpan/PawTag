@@ -17,7 +17,7 @@ router.use(authenticate);
 
 // ── Settings ────────────────────────────────────────────────────────
 
-router.get('/settings', requirePermission('systemLogs.admin'), async (_req: AuthRequest, res: Response) => {
+router.get('/settings', requirePermission('systemlogs.admin'), async (_req: AuthRequest, res: Response) => {
   try {
     const settings = await getAllSystemLogSettings();
     res.json({
@@ -40,7 +40,7 @@ const settingUpdateSchema = z.object({
   value: z.string().min(1),
 });
 
-router.put('/settings/:key', requirePermission('systemLogs.admin'), validate(settingUpdateSchema), async (req: AuthRequest, res: Response) => {
+router.put('/settings/:key', requirePermission('systemlogs.admin'), validate(settingUpdateSchema), async (req: AuthRequest, res: Response) => {
   const keyParam = req.params.key;
   const validKeys = [
     'systemLog.enabled',
@@ -142,7 +142,7 @@ function buildSystemLogQuery(params: Record<string, unknown>): Record<string, un
   return query;
 }
 
-router.get('/', requirePermission('systemLogs.read'), validate(querySchema), async (req: AuthRequest, res: Response) => {
+router.get('/', requirePermission('systemlogs.read'), validate(querySchema), async (req: AuthRequest, res: Response) => {
   try {
     const { page, limit, sortBy, sortDir } = req.query;
     const query = buildSystemLogQuery(req.query as Record<string, unknown>);
@@ -175,7 +175,7 @@ router.get('/', requirePermission('systemLogs.read'), validate(querySchema), asy
 
 // ── Summary ─────────────────────────────────────────────────────────
 
-router.get('/summary', requirePermission('systemLogs.read'), async (_req: AuthRequest, res: Response) => {
+router.get('/summary', requirePermission('systemlogs.read'), async (_req: AuthRequest, res: Response) => {
   try {
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
@@ -224,7 +224,7 @@ function csvCell(value: unknown): string {
   return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
 }
 
-router.get('/export', requirePermission('systemLogs.read'), async (req: AuthRequest, res: Response) => {
+router.get('/export', requirePermission('systemlogs.read'), async (req: AuthRequest, res: Response) => {
   try {
     const format = req.query.format === 'json' ? 'json' : 'csv';
     const query = buildSystemLogQuery(req.query as Record<string, unknown>);
@@ -261,7 +261,7 @@ router.get('/export', requirePermission('systemLogs.read'), async (req: AuthRequ
 
 // ── Correlation ─────────────────────────────────────────────────────
 
-router.get('/request/:requestId', requirePermission('systemLogs.read'), async (req: AuthRequest, res: Response) => {
+router.get('/request/:requestId', requirePermission('systemlogs.read'), async (req: AuthRequest, res: Response) => {
   try {
     const logs = await SystemLog.find({ requestId: req.params.requestId })
       .sort({ timestamp: 1 })
@@ -273,7 +273,7 @@ router.get('/request/:requestId', requirePermission('systemLogs.read'), async (r
   }
 });
 
-router.get('/correlation/:correlationId', requirePermission('systemLogs.read'), async (req: AuthRequest, res: Response) => {
+router.get('/correlation/:correlationId', requirePermission('systemlogs.read'), async (req: AuthRequest, res: Response) => {
   try {
     const logs = await SystemLog.find({ correlationId: req.params.correlationId })
       .sort({ timestamp: 1 })
@@ -285,7 +285,7 @@ router.get('/correlation/:correlationId', requirePermission('systemLogs.read'), 
   }
 });
 
-router.get('/trace/:traceId', requirePermission('systemLogs.read'), async (req: AuthRequest, res: Response) => {
+router.get('/trace/:traceId', requirePermission('systemlogs.read'), async (req: AuthRequest, res: Response) => {
   try {
     const logs = await SystemLog.find({ traceId: req.params.traceId })
       .sort({ timestamp: 1 })
