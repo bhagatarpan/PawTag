@@ -14,13 +14,15 @@ if (process.env.NODE_ENV !== 'test') {
   });
 }
 
-// Initialize Sentry before any other imports
-import * as Sentry from '@sentry/node';
-if (process.env.SENTRY_DSN && process.env.NODE_ENV !== 'test') {
-  Sentry.init({
+// Initialize error monitoring before any other imports
+import { initMonitoring } from './lib/monitoring';
+if (process.env.NODE_ENV !== 'test') {
+  initMonitoring({
     dsn: process.env.SENTRY_DSN,
     environment: process.env.NODE_ENV || 'development',
-    tracesSampleRate: 0.1,
+    release: process.env.SENTRY_RELEASE || process.env.SERVICE_VERSION,
+    sampleRate: parseFloat(process.env.SENTRY_SAMPLE_RATE || '1.0'),
+    tracesSampleRate: parseFloat(process.env.SENTRY_TRACES_SAMPLE_RATE || '0.1'),
   });
 }
 
@@ -30,6 +32,7 @@ import helmet from 'helmet';
 import pinoHttp from 'pino-http';
 import swaggerUi from 'swagger-ui-express';
 import path from 'path';
+import * as Sentry from '@sentry/node';
 
 import { config } from './config';
 import { connectDatabase } from '@pawtag/db';
@@ -72,6 +75,7 @@ import auditRoutes from './routes/audit';
 import { publicRouter as supportPublicRoutes, adminRouter as supportAdminRoutes } from './routes/support';
 import healthRoutes from './routes/health';
 import { shutdownTracing } from './lib/tracing';
+import { flushMonitoring } from './lib/monitoring';
 import { startReminderService } from './services/reminder.service';
 import { startSubscriptionService } from './services/subscription.service';
 import { startEscalationService } from './services/escalation.service';
@@ -251,6 +255,7 @@ async function start() {
       logger.info('SIGTERM received, shutting down gracefully...');
       server.close(async () => {
         logger.info('HTTP server closed');
+        await flushMonitoring();
         await shutdownTracing();
         process.exit(0);
       });
@@ -264,6 +269,7 @@ async function start() {
     process.on('SIGINT', () => {
       logger.info('SIGINT received, shutting down...');
       server.close(async () => {
+        await flushMonitoring();
         await shutdownTracing();
         process.exit(0);
       });
@@ -286,11 +292,19 @@ if (isDirectRun || process.env.NODE_ENV !== 'test') {
 // --- Process-level exception handlers ---
 process.on('unhandledRejection', (reason: unknown) => {
   logger.fatal({ err: reason }, 'Unhandled promise rejection');
+  // Capture in monitoring if available
+  if (reason instanceof Error) {
+    const { captureException } = require('./lib/monitoring');
+    captureException(reason, { severity: 'fatal', operation: 'unhandledRejection' });
+  }
   process.exit(1);
 });
 
 process.on('uncaughtException', (err: Error) => {
   logger.fatal({ err }, 'Uncaught exception — process may be in undefined state');
+  // Capture in monitoring if available
+  const { captureException } = require('./lib/monitoring');
+  captureException(err, { severity: 'fatal', operation: 'uncaughtException' });
   process.exit(1);
 });
 
