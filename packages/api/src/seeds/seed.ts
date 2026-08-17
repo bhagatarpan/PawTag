@@ -593,6 +593,8 @@ async function seed() {
         { permissionName: 'user.read' },
         { permissionName: 'order.read' },
         { permissionName: 'finder_scan.read' },
+        { permissionName: 'systemlogs.read' },
+        { permissionName: 'audit.read' },
       ],
 
       PET_OWNER: [
@@ -701,6 +703,8 @@ async function seed() {
         { permissionName: 'content.archive' },
         { permissionName: 'content.restore' },
         { permissionName: 'content.upload_media' },
+        { permissionName: 'systemlogs.read' },
+        { permissionName: 'audit.read' },
         // CMS
         { permissionName: 'cms.page.read' },
         { permissionName: 'cms.page.create' },
