@@ -254,4 +254,64 @@ describe('System Logs API', () => {
       expect(res.body.data.length).toBe(5);
     });
   });
+
+  describe('POST /api/admin/system-logs/purge', () => {
+    it('purges logs within date range', async () => {
+      const { token } = await seedSettings();
+      await insertTestLogs(10);
+
+      const now = new Date();
+      const start = new Date(now.getTime() - 60000).toISOString();
+      const end = new Date(now.getTime() + 60000).toISOString();
+
+      const res = await request(app)
+        .post('/api/admin/system-logs/purge')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ startDate: start, endDate: end });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.deleted).toBe(10);
+
+      const remaining = await request(app)
+        .get('/api/admin/system-logs')
+        .set('Authorization', `Bearer ${token}`);
+      expect(remaining.body.data.total).toBe(0);
+    });
+
+    it('returns 0 when no logs match', async () => {
+      const { token } = await seedSettings();
+
+      const start = new Date('2020-01-01').toISOString();
+      const end = new Date('2020-01-02').toISOString();
+
+      const res = await request(app)
+        .post('/api/admin/system-logs/purge')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ startDate: start, endDate: end });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.deleted).toBe(0);
+    });
+
+    it('rejects when startDate >= endDate', async () => {
+      const { token } = await seedSettings();
+      const now = new Date().toISOString();
+
+      const res = await request(app)
+        .post('/api/admin/system-logs/purge')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ startDate: now, endDate: now });
+
+      expect(res.status).toBe(400);
+    });
+
+    it('requires authentication', async () => {
+      const res = await request(app)
+        .post('/api/admin/system-logs/purge')
+        .send({ startDate: new Date().toISOString(), endDate: new Date().toISOString() });
+
+      expect(res.status).toBe(401);
+    });
+  });
 });

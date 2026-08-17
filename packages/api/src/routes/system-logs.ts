@@ -297,4 +297,44 @@ router.get('/trace/:traceId', requirePermission('systemlogs.read'), async (req: 
   }
 });
 
+// ── Purge ───────────────────────────────────────────────────────────
+
+const purgeSchema = z.object({
+  startDate: z.string().datetime(),
+  endDate: z.string().datetime(),
+});
+
+router.post('/purge', requirePermission('systemlogs.admin'), validate(purgeSchema), async (req: AuthRequest, res: Response) => {
+  try {
+    const { startDate, endDate } = req.body;
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    if (start >= end) {
+      res.status(400).json({ success: false, error: 'startDate must be before endDate' });
+      return;
+    }
+
+    const query = { timestamp: { $gte: start, $lte: end } };
+    const count = await SystemLog.countDocuments(query);
+
+    if (count === 0) {
+      res.json({ success: true, data: { deleted: 0 } });
+      return;
+    }
+
+    const result = await SystemLog.deleteMany(query);
+
+    logger.info(
+      { deleted: result.deletedCount, startDate, endDate, userId: req.user!.id },
+      'System logs purged',
+    );
+
+    res.json({ success: true, data: { deleted: result.deletedCount } });
+  } catch (error) {
+    logger.error({ err: error }, 'System log purge failed');
+    res.status(500).json({ success: false, error: 'Failed to purge system logs' });
+  }
+});
+
 export default router;
