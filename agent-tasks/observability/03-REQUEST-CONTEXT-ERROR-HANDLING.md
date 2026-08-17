@@ -119,7 +119,7 @@ Mark COMPLETE only after successful validation and push.
 ```text
 STATUS: COMPLETE
 COMPLETED_AT: 2026-08-17
-COMMIT_SHA: pending
+COMMIT_SHA: 78d63fc
 REMOTE_BRANCH: feat/enterprise-observability
 TEST_RESULT: typecheck pass, build pass, 927/928 tests pass (1 pre-existing failure)
 NOTES: Created request-context.ts with AsyncLocalStorage for request ID propagation. Created app-errors.ts with typed error classes (AppError, AuthenticationError, ValidationError, NotFoundError, etc.). Updated errorHandler to use centralized error model with request context logging. Updated audit middleware to populate request context. Added docs/LOGGING.md documentation. Added unit tests for request context and error model.

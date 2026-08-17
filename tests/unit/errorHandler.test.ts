@@ -2,6 +2,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Request, Response, NextFunction } from 'express';
 import { errorHandler, notFoundHandler } from '../../packages/api/src/middleware/errorHandler';
 
+vi.mock('../../packages/api/src/lib/logger', () => ({
+  default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(), fatal: vi.fn() },
+}));
+
+vi.mock('../../packages/api/src/lib/request-context', () => ({
+  getRequestContext: vi.fn().mockReturnValue(undefined),
+}));
+
 function createRes() {
   const res = {
     status: vi.fn().mockReturnThis(),
@@ -11,7 +19,7 @@ function createRes() {
 }
 
 function createReq() {
-  return { originalUrl: '/api/test', method: 'GET' } as unknown as Request;
+  return { originalUrl: '/api/test', method: 'GET', headers: {}, ip: '127.0.0.1' } as unknown as Request;
 }
 
 function createNext() {
@@ -35,7 +43,10 @@ describe('errorHandler', () => {
     errorHandler(err, req, res, next);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ success: false, error: 'Validation failed' });
+    const jsonCall = (res.json as any).mock.calls[0][0];
+    expect(jsonCall.success).toBe(false);
+    expect(jsonCall.error).toBe('Validation failed');
+    expect(jsonCall.code).toBe('VALIDATION_ERROR');
   });
 
   it('returns 400 for CastError', () => {
@@ -49,6 +60,7 @@ describe('errorHandler', () => {
     const jsonCall = (res.json as any).mock.calls[0][0];
     expect(jsonCall.success).toBe(false);
     expect(jsonCall.error).toBe('Invalid ID format');
+    expect(jsonCall.code).toBe('VALIDATION_ERROR');
   });
 
   it('returns 409 for duplicate key error (code 11000)', () => {
@@ -62,6 +74,7 @@ describe('errorHandler', () => {
     const jsonCall = (res.json as any).mock.calls[0][0];
     expect(jsonCall.success).toBe(false);
     expect(jsonCall.error).toBe('Duplicate value');
+    expect(jsonCall.code).toBe('CONFLICT_ERROR');
   });
 
   it('returns 500 for unknown errors', () => {
@@ -74,6 +87,7 @@ describe('errorHandler', () => {
     const jsonCall = (res.json as any).mock.calls[0][0];
     expect(jsonCall.success).toBe(false);
     expect(jsonCall.error).toBe('Something broke');
+    expect(jsonCall.code).toBe('SYSTEM_ERROR');
   });
 
   it('hides error details in production', () => {
@@ -89,6 +103,7 @@ describe('errorHandler', () => {
     const jsonCall = (res.json as any).mock.calls[0][0];
     expect(jsonCall.success).toBe(false);
     expect(jsonCall.error).toBe('Internal server error');
+    expect(jsonCall.code).toBe('SYSTEM_ERROR');
 
     process.env.NODE_ENV = originalEnv;
   });

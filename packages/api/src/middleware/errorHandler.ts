@@ -1,13 +1,14 @@
 import { Request, Response, NextFunction } from 'express';
 import logger from '../lib/logger';
-import { isAppError, toAppError } from '../lib/app-errors';
+import { isAppError, toAppError, AppError } from '../lib/app-errors';
 import { getRequestContext } from '../lib/request-context';
 
 export function errorHandler(err: Error, req: Request, res: Response, _next: NextFunction): void {
   const appError = toAppError(err);
   const ctx = getRequestContext();
+  const isProd = process.env.NODE_ENV === 'production';
 
-  // Log with request context
+  // Log with request context and error taxonomy
   logger.error({
     err,
     requestId: ctx?.requestId,
@@ -16,38 +17,40 @@ export function errorHandler(err: Error, req: Request, res: Response, _next: Nex
     url: req.originalUrl,
     httpStatus: appError.httpStatus,
     errorCode: appError.code,
+    severity: appError.severity,
+    retryable: appError.retryable,
+    fingerprint: appError.fingerprint,
+    operation: appError.operation,
     isOperational: appError.isOperational,
+    userAgent: req.headers?.['user-agent'],
+    ip: req.ip,
   }, appError.message);
 
-  // Send response
-  // Show error message only for operational errors (user-facing errors)
-  // In production, hide internal/system error details
+  // Only show user-facing message for operational errors that were originally AppErrors.
+  // Generic errors wrapped by toAppError should not leak details.
+  // In development, always show the error message for debugging.
   const isOriginalAppError = isAppError(err);
-  const showDetails = appError.isOperational && isOriginalAppError;
+  const showDetails = isProd
+    ? (appError.isOperational && isOriginalAppError)
+    : true;
 
   const response: Record<string, unknown> = {
     success: false,
     error: showDetails
-      ? appError.message
-      : process.env.NODE_ENV === 'production'
-        ? 'Internal server error'
-        : appError.message,
+      ? (isOriginalAppError ? appError.userMessage : appError.message)
+      : 'Internal server error',
+    code: appError.code,
   };
 
-  // Include error code for AppErrors
-  if (isAppError(err)) {
-    response.code = err.code;
-  }
-
   // Include details for validation errors
-  if (appError.name === 'ValidationError' && 'details' in appError) {
+  if (showDetails && appError.name === 'ValidationError' && 'details' in appError) {
     response.details = (appError as any).details;
   }
 
   // Include request IDs for debugging
   if (ctx) {
     response.requestId = ctx.requestId;
-    if (process.env.NODE_ENV !== 'production') {
+    if (!isProd) {
       response.correlationId = ctx.correlationId;
     }
   }

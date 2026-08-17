@@ -153,6 +153,81 @@ throw new ValidationError('Invalid input', [{ field: 'name', message: 'Required'
 
 All errors are converted to consistent `{ success, error, code, requestId }` responses.
 
+### Error Taxonomy
+
+Each error has:
+- **code**: Stable category (e.g., `AUTHENTICATION_ERROR`, `DATABASE_ERROR`)
+- **severity**: `INFO | LOW | MEDIUM | HIGH | CRITICAL` (auto-assigned by default)
+- **retryable**: Whether the operation can be retried (auto-assigned by default)
+- **fingerprint**: Stable hash for grouping repeated errors
+- **userMessage**: Safe message shown to users (internal message stays in logs)
+- **operation**: Context about what operation failed
+
+### Error Codes
+
+| Code | HTTP Status | Severity | Retryable |
+|------|-------------|----------|-----------|
+| `VALIDATION_ERROR` | 400 | LOW | No |
+| `AUTHENTICATION_ERROR` | 401 | MEDIUM | No |
+| `AUTHORIZATION_ERROR` | 403 | MEDIUM | No |
+| `NOT_FOUND_ERROR` | 404 | LOW | No |
+| `CONFLICT_ERROR` | 409 | MEDIUM | No |
+| `BUSINESS_RULE_ERROR` | 422 | MEDIUM | No |
+| `RATE_LIMIT_ERROR` | 429 | LOW | Yes |
+| `DATABASE_ERROR` | 500 | HIGH | Yes |
+| `EXTERNAL_SERVICE_ERROR` | 502 | HIGH | Yes |
+| `NETWORK_ERROR` | 502 | HIGH | Yes |
+| `INTEGRATION_ERROR` | 502 | HIGH | Yes |
+| `TIMEOUT_ERROR` | 504 | HIGH | Yes |
+| `CONFIGURATION_ERROR` | 500 | HIGH | No |
+| `SYSTEM_ERROR` | 500 | CRITICAL | No |
+| `UNEXPECTED_ERROR` | 500 | CRITICAL | No |
+
+### Error Fingerprints
+
+Errors are fingerprinted by hashing `code + normalized_message`. This allows grouping repeated incidents without losing unique request context. IDs (MongoDB ObjectIds, UUIDs, numbers) are normalized before hashing.
+
+## Redaction
+
+PawTag uses a central redaction policy (`lib/redaction.ts`) to prevent sensitive data from appearing in logs.
+
+### What Is Redacted
+
+| Category | Fields |
+|----------|--------|
+| Passwords | `password`, `passwordHash`, `hashedPassword`, `passwd` |
+| Tokens | `token`, `accessToken`, `refreshToken`, `sessionToken` |
+| Secrets | `secret`, `jwtSecret`, `secretKey`, `privateKey` |
+| API Keys | `apiKey`, `api_key`, `apiSecret` |
+| HTTP Headers | `authorization`, `cookie`, `set-cookie` |
+| OTP/MFA | `otp`, `otpCode`, `mfaSecret`, `mfaCode` |
+| Payment | `creditCard`, `cardNumber`, `cvv`, `cvc`, `ssn` |
+| PawTag-Specific | `finderPhone`, `finderEmail`, `emergencyContact`, `emergencyPhone` |
+
+### Usage
+
+```typescript
+import { deepRedact, sanitizeRequestBody, sanitizeHeaders } from '../lib/redaction';
+
+// Redact sensitive fields in objects
+const safeData = deepRedact({ password: 'secret', name: 'John' });
+// { password: '[REDACTED]', name: 'John' }
+
+// Sanitize request body for logging
+const safeBody = sanitizeRequestBody(req.body);
+
+// Sanitize headers for logging
+const safeHeaders = sanitizeHeaders(req.headers);
+```
+
+### What Must Never Be Logged
+
+1. Raw environment variables or `.env` contents
+2. Complete request headers (use `sanitizeHeaders`)
+3. Complete request bodies (use `sanitizeRequestBody`)
+4. Database connection strings
+5. Private keys or certificates
+
 ## Migration from console.*
 
 When migrating existing code:
