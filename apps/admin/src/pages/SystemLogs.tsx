@@ -31,6 +31,8 @@ import {
   Link2,
   Info,
   Trash2,
+  FileText,
+  Database,
 } from 'lucide-react';
 
 interface SystemLogEntry {
@@ -127,6 +129,7 @@ export default function SystemLogs() {
 
   const [selectedLog, setSelectedLog] = useState<SystemLogEntry | null>(null);
   const [relatedLogs, setRelatedLogs] = useState<SystemLogEntry[]>([]);
+  const [showExportMenu, setShowExportMenu] = useState(false);
 
   // Purge state
   const [purgeMenuOpen, setPurgeMenuOpen] = useState(false);
@@ -241,14 +244,31 @@ export default function SystemLogs() {
     updateParams({ sortDir: next });
   };
 
-  const handleExport = async (format: 'csv' | 'json') => {
+  const handleExport = async (format: 'csv' | 'json' | 'pdf') => {
+    setShowExportMenu(false);
     try {
-      const params: Record<string, string> = { format };
+      const params: Record<string, string> = { format: format === 'pdf' ? 'json' : format };
       if (search) params.search = search;
       if (levelFilter) params.level = levelFilter;
       if (categoryFilter) params.category = categoryFilter;
       if (startDate) params.startDate = new Date(startDate).toISOString();
       if (endDate) params.endDate = new Date(endDate + 'T23:59:59').toISOString();
+
+      if (format === 'pdf') {
+        const res = await api.get('/admin/system-logs/export', { params });
+        const data = res.data.data || res.data;
+        const logs = Array.isArray(data) ? data : [];
+        const win = window.open('', '_blank');
+        if (!win) { toast.error('Popup blocked — allow popups for this site'); return; }
+        win.document.write(`<!DOCTYPE html><html><head><title>System Logs Export</title>
+          <style>body{font-family:system-ui,sans-serif;padding:20px}h1{font-size:18px}table{width:100%;border-collapse:collapse;font-size:11px;margin-top:12px}th,td{border:1px solid #e5e7eb;padding:6px 8px;text-align:left}th{background:#f9fafb;font-weight:600}.error{color:#dc2626}.warn{color:#d97706}.info{color:#2563eb}</style>
+          </head><body><h1>System Logs — ${new Date().toLocaleDateString()}</h1><p style="color:#6b7280;font-size:12px">${logs.length} records exported</p>
+          <table><thead><tr><th>Time</th><th>Level</th><th>Category</th><th>Message</th><th>Service</th><th>Request ID</th></tr></thead><tbody>
+          ${logs.map((l: Record<string, unknown>) => `<tr><td>${new Date(l.timestamp as string).toLocaleString()}</td><td class="${l.level}">${l.level}</td><td>${l.category}</td><td>${(l.message as string || '').replace(/</g, '&lt;')}</td><td>${l.service || ''}</td><td style="font-family:monospace;font-size:10px">${(l.requestId as string || '').slice(0, 8)}</td></tr>`).join('')}
+          </tbody></table><script>window.print();</script></body></html>`);
+        win.document.close();
+        return;
+      }
 
       const res = await api.get('/admin/system-logs/export', { params, responseType: 'blob' });
       const url = URL.createObjectURL(res.data);
@@ -380,12 +400,28 @@ export default function SystemLogs() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button type="button" onClick={() => handleExport('csv')} className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
-            <Download size={15} /> CSV
-          </button>
-          <button type="button" onClick={() => handleExport('json')} className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
-            <Download size={15} /> JSON
-          </button>
+          {/* Export dropdown */}
+          <div className="relative">
+            <button type="button" onClick={() => setShowExportMenu(!showExportMenu)} className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+              <Download size={15} /> Export <ChevronDown size={14} />
+            </button>
+            {showExportMenu && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowExportMenu(false)} />
+                <div className="absolute right-0 mt-1 w-40 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1">
+                  <button onClick={() => handleExport('csv')} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
+                    <FileText size={14} /> Export CSV
+                  </button>
+                  <button onClick={() => handleExport('json')} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
+                    <Database size={14} /> Export JSON
+                  </button>
+                  <button onClick={() => handleExport('pdf')} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
+                    <FileText size={14} /> Export PDF
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
 
           {/* Purge dropdown */}
           <div className="relative">
