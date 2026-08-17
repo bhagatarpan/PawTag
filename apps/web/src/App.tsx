@@ -4,6 +4,9 @@ import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import EmergencyLostPet from './components/EmergencyLostPet';
 import AccountLayout from './components/AccountLayout';
+import MaintenanceBanner from './components/MaintenanceBanner';
+import OfflinePage from './pages/OfflinePage';
+import { useSiteAvailability } from './components/SiteAvailabilityProvider';
 import Home from './pages/Home';
 import Shop from './pages/Shop';
 import ProductDetail from './pages/ProductDetail';
@@ -40,26 +43,57 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+function PublicLayout({ children, showEmergency = true }: { children: ReactNode; showEmergency?: boolean }) {
+  return (
+    <div className="min-h-screen flex flex-col">
+      <MaintenanceBanner />
+      <Navbar />
+      <main className="flex-1">{children}</main>
+      <Footer />
+      {showEmergency && <EmergencyLostPet />}
+    </div>
+  );
+}
+
 export default function App() {
+  const { status, loading } = useSiteAvailability();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600" />
+      </div>
+    );
+  }
+
+  // Offline — show dedicated offline page for all routes
+  if (status === 'OFFLINE') {
+    return (
+      <Routes>
+        <Route path="*" element={<OfflinePage />} />
+      </Routes>
+    );
+  }
+
   return (
     <Routes>
-      {/* Public routes with Navbar + Footer */}
-      <Route path="/" element={<div className="min-h-screen flex flex-col"><Navbar /><main className="flex-1"><Home /></main><Footer /><EmergencyLostPet /></div>} />
-      <Route path="/shop" element={<div className="min-h-screen flex flex-col"><Navbar /><main className="flex-1"><Shop /></main><Footer /><EmergencyLostPet /></div>} />
-      <Route path="/shop/:id" element={<div className="min-h-screen flex flex-col"><Navbar /><main className="flex-1"><ProductDetail /></main><Footer /><EmergencyLostPet /></div>} />
-      <Route path="/checkout" element={<div className="min-h-screen flex flex-col"><Navbar /><main className="flex-1"><Checkout /></main><Footer /><EmergencyLostPet /></div>} />
-      <Route path="/login" element={<div className="min-h-screen flex flex-col"><Navbar /><main className="flex-1"><Login /></main><Footer /></div>} />
-      <Route path="/register" element={<div className="min-h-screen flex flex-col"><Navbar /><main className="flex-1"><Register /></main><Footer /></div>} />
+      {/* Public routes with Navbar + Footer + Maintenance Banner */}
+      <Route path="/" element={<PublicLayout><Home /></PublicLayout>} />
+      <Route path="/shop" element={<PublicLayout><Shop /></PublicLayout>} />
+      <Route path="/shop/:id" element={<PublicLayout><ProductDetail /></PublicLayout>} />
+      <Route path="/checkout" element={<PublicLayout><Checkout /></PublicLayout>} />
+      <Route path="/login" element={<PublicLayout><Login /></PublicLayout>} />
+      <Route path="/register" element={<PublicLayout><Register /></PublicLayout>} />
       <Route path="/verify-account" element={<VerifyAccount />} />
       <Route path="/verify-email" element={<VerifyEmail />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
-      <Route path="/about" element={<div className="min-h-screen flex flex-col"><Navbar /><main className="flex-1"><About /></main><Footer /><EmergencyLostPet /></div>} />
-      <Route path="/privacy" element={<div className="min-h-screen flex flex-col"><Navbar /><main className="flex-1"><Privacy /></main><Footer /><EmergencyLostPet /></div>} />
-      <Route path="/terms" element={<div className="min-h-screen flex flex-col"><Navbar /><main className="flex-1"><Terms /></main><Footer /><EmergencyLostPet /></div>} />
-      <Route path="/faq" element={<div className="min-h-screen flex flex-col"><Navbar /><main className="flex-1"><Faq /></main><Footer /><EmergencyLostPet /></div>} />
-      <Route path="/contact" element={<div className="min-h-screen flex flex-col"><Navbar /><main className="flex-1"><Contact /></main><Footer /><EmergencyLostPet /></div>} />
-      <Route path="/refer" element={<div className="min-h-screen flex flex-col"><Navbar /><main className="flex-1"><Refer /></main><Footer /></div>} />
+      <Route path="/about" element={<PublicLayout><About /></PublicLayout>} />
+      <Route path="/privacy" element={<PublicLayout><Privacy /></PublicLayout>} />
+      <Route path="/terms" element={<PublicLayout><Terms /></PublicLayout>} />
+      <Route path="/faq" element={<PublicLayout><Faq /></PublicLayout>} />
+      <Route path="/contact" element={<PublicLayout><Contact /></PublicLayout>} />
+      <Route path="/refer" element={<PublicLayout showEmergency={false}><Refer /></PublicLayout>} />
 
       {/* Account routes — no public Navbar/Footer, uses AccountLayout sidebar */}
       <Route path="/account" element={<ProtectedRoute><AccountLayout><AccountDashboard /></AccountLayout></ProtectedRoute>} />
