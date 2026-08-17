@@ -421,7 +421,7 @@ PawTag/
 │   ├── web/       → Public site, shop, auth & customer portal (port 3000) - 31 pages
 │   ├── mobile/    → React Native (Expo) app - 12 screens, Maestro E2E tests
 │   └── finder/    → Finder portal (port 3003) - 10 purpose-built components
-├── tests/         → 60 test files (25 unit, 32 integration, 1 smoke, 2 regression)
+├── tests/         → 77 test files (25 unit, 32 integration, 1 smoke, 2 regression)
 ├── docker/        → Docker configs (4 services)
 ├── docs/          → 15 documentation files
 └── scripts/       → Build and utility scripts
@@ -608,6 +608,20 @@ All admin and finder actions are logged to `AuditEvent` model with:
 - Audit service: `packages/api/src/services/audit/audit.service.ts` (queue-based, async)
 - Audit middleware: `packages/api/src/middleware/audit.ts` (auto-captures all `/api/*` requests)
 
+### System Logging (Pino → MongoDB)
+
+Application logs are written to MongoDB via Pino with a wrapper-based level interception:
+- **Logger:** `packages/api/src/lib/logger.ts` — wraps each level method to fire `writeLog()`
+- **Log writer:** `packages/api/src/lib/log-writer.ts` — batched async writes to `SystemLog` collection
+- **Settings cache:** `packages/api/src/lib/system-log-settings.ts` — 60s TTL cache for level/category/sampling/retention
+- **Model:** `packages/db/src/models/SystemLog.ts` — TTL index + 8 compound indexes
+- **Admin UI:** `apps/admin/src/pages/SystemLogs.tsx` — viewer with search, filters, pagination, detail drawer, purge, export (CSV/JSON/PDF)
+- **Settings UI:** `apps/admin/src/pages/SystemLogSettings.tsx` — master toggle, level/category toggles, sampling sliders, retention
+- **RBAC:** `systemlogs.read` (ADMIN, CUSTOMER_SERVICE, WEBSITE_EDITOR), `systemlogs.admin` (ADMIN only)
+- **Manual purge:** `POST /admin/system-logs/purge` with date range presets + custom range + confirmation dialog
+- **Settings:** 22 `systemLog.*` settings seeded in `seed-cms.ts`
+- **Tests:** `tests/unit/system-log-settings.test.ts`, `tests/unit/system-log-utils.test.ts`, `tests/integration/system-logs-api.test.ts`
+
 ### Auth & Permissions
 
 - JWT-based auth with refresh tokens
@@ -699,7 +713,14 @@ Located in `apps/mobile/e2e/`:
 | `packages/api/src/services/escalation.service.ts` | 30-min escalation polling |
 | `packages/db/src/models/CmsOnboarding.ts` | Onboarding wizard config model |
 | `packages/db/src/models/EscalationRecord.ts` | Escalation tracking model |
+| `packages/db/src/models/SystemLog.ts` | System log model with TTL + indexes |
 | `packages/db/src/models/User.ts` | User model (includes onboarding + privacy fields) |
+| `packages/api/src/lib/logger.ts` | Pino logger with MongoDB write hook |
+| `packages/api/src/lib/log-writer.ts` | Batched MongoDB log writer |
+| `packages/api/src/lib/system-log-settings.ts` | System log settings cache |
+| `packages/api/src/routes/system-logs.ts` | System log API routes |
+| `apps/admin/src/pages/SystemLogs.tsx` | System log viewer with purge UI |
+| `apps/admin/src/pages/SystemLogSettings.tsx` | System log settings page |
 | `apps/web/src/components/OnboardingWizard.tsx` | Dynamic onboarding wizard with success screen |
 | `apps/web/src/components/AccountLayout.tsx` | Customer portal layout + wizard gating |
 | `apps/finder/src/App.tsx` | Finder portal (decomposed into components) |

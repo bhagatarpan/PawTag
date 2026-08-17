@@ -702,6 +702,8 @@ The Admin Portal is the operational control centre of the application. It provid
 | **Settings** | System configuration (DB-driven) |
 | **Audit Trail** | Enterprise audit logging with hash chain |
 | **Audit Settings** | Audit policy configuration |
+| **System Logs** | Application log viewer with search, filters, pagination, purge, export |
+| **System Log Settings** | Log level/category toggles, sampling, retention |
 | **Roles & Permissions** | RBAC configuration (Roles, Permissions, Groups, Scopes) |
 
 ### Admin Portal Features
@@ -938,6 +940,12 @@ or on error:
 | GET | `/audit` | View audit trail | Yes (RBAC) |
 | GET | `/audit/settings` | Get audit settings | Yes (RBAC) |
 | PUT | `/audit/settings` | Update audit settings | Yes (RBAC) |
+| GET | `/system-logs` | List system logs | Yes (RBAC) |
+| GET | `/system-logs/summary` | System log summary | Yes (RBAC) |
+| GET | `/system-logs/export` | Export system logs | Yes (RBAC) |
+| GET | `/system-logs/settings` | Get system log settings | Yes (RBAC) |
+| PUT | `/system-logs/settings/:key` | Update system log setting | Yes (RBAC) |
+| POST | `/system-logs/purge` | Purge system logs | Yes (RBAC) |
 
 #### Admin RBAC (`/api/admin/rbac`)
 
@@ -1121,9 +1129,9 @@ pnpm test:watch
 
 ### Test Statistics
 
-- **Test Files:** 60 (25 unit, 32 integration, 1 smoke, 2 regression)
-- **Tests:** 799+ passing
-- **Duration:** ~38 seconds
+- **Test Files:** 77 (25 unit, 32 integration, 1 smoke, 2 regression)
+- **Tests:** 1100+ passing
+- **Duration:** ~60 seconds
 
 ---
 
@@ -1378,6 +1386,19 @@ The `notification-delivery.service.ts` handles unified delivery:
 - **API Logging:** Pino (structured JSON logging)
 - **HTTP Logging:** Morgan (request/response logging)
 - **Log Levels:** `silent`, `fatal`, `error`, `warn`, `info`, `debug`, `trace`
+
+### System Logging (MongoDB)
+
+All application logs are stored in MongoDB via Pino with a wrapper-based level interception:
+- **Logger:** `packages/api/src/lib/logger.ts` — wraps each level method to fire `writeLog()`
+- **Log writer:** `packages/api/src/lib/log-writer.ts` — batched async writes to `SystemLog` collection
+- **Settings cache:** `packages/api/src/lib/system-log-settings.ts` — 60s TTL cache
+- **Model:** `packages/db/src/models/SystemLog.ts` — TTL index + 8 compound indexes
+- **Admin UI:** Viewer with search, filters, pagination, detail drawer, purge, export (CSV/JSON/PDF)
+- **Settings UI:** Master toggle, level/category toggles, sampling sliders, retention
+- **RBAC:** `systemlogs.read` (ADMIN, CUSTOMER_SERVICE, WEBSITE_EDITOR), `systemlogs.admin` (ADMIN only)
+- **Manual purge:** `POST /admin/system-logs/purge` with date range presets + custom range
+- **Settings:** 22 `systemLog.*` settings (seeded in `seed-cms.ts`)
 
 ### Audit Logging
 
