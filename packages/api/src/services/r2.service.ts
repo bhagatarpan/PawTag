@@ -1,5 +1,7 @@
 import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { logIntegration } from '../lib/timing';
+import logger from '../lib/logger';
 
 const r2Config = {
   region: 'auto',
@@ -26,16 +28,18 @@ export async function uploadToR2(
   buffer: Buffer,
   contentType: string,
 ): Promise<string> {
-  await r2Client.send(
-    new PutObjectCommand({
-      Bucket: bucketName,
-      Key: key,
-      Body: buffer,
-      ContentType: contentType,
-    }),
-  );
+  return logIntegration('CloudflareR2', 'upload', async () => {
+    await r2Client.send(
+      new PutObjectCommand({
+        Bucket: bucketName,
+        Key: key,
+        Body: buffer,
+        ContentType: contentType,
+      }),
+    );
 
-  return `${publicUrl}/${key}`;
+    return `${publicUrl}/${key}`;
+  }, { key, contentType, size: buffer.length });
 }
 
 /**
@@ -43,12 +47,14 @@ export async function uploadToR2(
  * @param key - The object key to delete
  */
 export async function deleteFromR2(key: string): Promise<void> {
-  await r2Client.send(
-    new DeleteObjectCommand({
-      Bucket: bucketName,
-      Key: key,
-    }),
-  );
+  return logIntegration('CloudflareR2', 'delete', async () => {
+    await r2Client.send(
+      new DeleteObjectCommand({
+        Bucket: bucketName,
+        Key: key,
+      }),
+    );
+  }, { key });
 }
 
 /**

@@ -1338,7 +1338,7 @@ router.post('/orders/:orderNumber/confirm-payment', requirePermission('order.cre
     order.payment.paidAt = new Date();
     await order.save();
 
-    console.log(`[Demo Payment] Order ${orderNumber} marked as paid`);
+    logger.info({ orderNumber }, 'Demo payment: Order marked as paid');
 
     // Get user info for emails
     const user = await User.findById(order.userId);
@@ -1413,7 +1413,7 @@ router.post('/orders/:orderNumber/confirm-payment', requirePermission('order.cre
           zip: order.shippingAddress.zip,
         },
       });
-      console.log(`[Demo Payment] Confirmation email sent for order ${orderNumber}`);
+      logger.info({ orderNumber }, 'Demo payment: Confirmation email sent');
     } catch (emailError) {
       logger.error({ err: emailError, orderNumber }, 'Email send error');
     }

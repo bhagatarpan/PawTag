@@ -1,5 +1,6 @@
 import { PushToken } from '@pawtag/db';
 import logger from '../lib/logger';
+import { logIntegration } from '../lib/timing';
 
 // Firebase Admin SDK — loaded dynamically when configured
 let firebaseInitialized = false;
@@ -78,29 +79,31 @@ export async function sendPushToUser(
     return { sent: tokens.length, failed: 0 };
   }
 
-  let sent = 0;
-  let failed = 0;
+  return logIntegration('Firebase', 'sendPush', async () => {
+    let sent = 0;
+    let failed = 0;
 
-  for (const { token } of tokens) {
-    try {
-      await messaging.send({
-        token,
-        notification: { title, body },
-        data: data || {},
-      });
-      sent++;
-    } catch (error: any) {
-      logger.error({ err: error, token: token.substring(0, 20) }, '[PushService] Failed to send to token');
-      // Remove invalid tokens
-      if (error.code === 'messaging/registration-token-not-registered' ||
-          error.code === 'messaging/invalid-registration-token') {
-        await PushToken.findOneAndUpdate({ token }, { isActive: false });
+    for (const { token } of tokens) {
+      try {
+        await messaging.send({
+          token,
+          notification: { title, body },
+          data: data || {},
+        });
+        sent++;
+      } catch (error: any) {
+        logger.error({ err: error, token: token.substring(0, 20) }, '[PushService] Failed to send to token');
+        // Remove invalid tokens
+        if (error.code === 'messaging/registration-token-not-registered' ||
+            error.code === 'messaging/invalid-registration-token') {
+          await PushToken.findOneAndUpdate({ token }, { isActive: false });
+        }
+        failed++;
       }
-      failed++;
     }
-  }
 
-  return { sent, failed };
+    return { sent, failed };
+  }, { userId, title, tokenCount: tokens.length });
 }
 
 export async function sendPushToUsers(

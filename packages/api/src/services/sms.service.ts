@@ -1,5 +1,6 @@
 import { CmsSmsTemplate } from '@pawtag/db';
 import logger from '../lib/logger';
+import { logIntegration } from '../lib/timing';
 
 interface SMSResult {
   success: boolean;
@@ -31,7 +32,7 @@ class TwilioSMSProvider implements SMSProvider {
   }
 
   async send(to: string, message: string): Promise<SMSResult> {
-    try {
+    return logIntegration('Twilio', 'sendSMS', async () => {
       const credentials = Buffer.from(`${this.accountSid}:${this.authToken}`).toString('base64');
       const params = new URLSearchParams({
         To: to,
@@ -59,10 +60,7 @@ class TwilioSMSProvider implements SMSProvider {
       }
 
       return { success: true, messageId: data.sid };
-    } catch (error: any) {
-      logger.error({ err: error, to }, 'Twilio SMS send failed');
-      return { success: false, error: error.message };
-    }
+    }, { to });
   }
 }
 

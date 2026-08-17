@@ -1,6 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from './auth';
 import { User } from '@pawtag/db';
+import logger from '../lib/logger';
 
 export async function requireVerifiedAccount(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -48,7 +49,7 @@ export async function requireVerifiedAccount(req: AuthRequest, res: Response, ne
 
     next();
   } catch (error) {
-    console.error('Verification guard error:', error);
+    logger.error({ err: error }, 'Verification guard error');
     res.status(500).json({ success: false, error: 'Internal server error' });
   }
 }

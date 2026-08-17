@@ -2,6 +2,7 @@ import { EscalationRecord, User, Notification, Setting } from '@pawtag/db';
 import { sendMail } from './email.service';
 import { sendPushToUser } from './push-notification.service';
 import logger from '../lib/logger';
+import { logJob } from '../lib/timing';
 
 const POLL_INTERVAL_MS = 60_000; // Check every minute
 let pollingTimer: ReturnType<typeof setInterval> | null = null;
@@ -50,11 +51,13 @@ async function processOverdueEscalations(): Promise<void> {
 
     if (overdueRecords.length === 0) return;
 
-    logger.info({ count: overdueRecords.length }, '[Escalation] Processing overdue escalations');
+    await logJob('escalation-check', async () => {
+      logger.info({ count: overdueRecords.length }, 'Processing overdue escalations');
 
-    for (const record of overdueRecords) {
-      await processEscalation(record);
-    }
+      for (const record of overdueRecords) {
+        await processEscalation(record);
+      }
+    }, { overdueCount: overdueRecords.length });
   } catch (err) {
     logger.error({ err }, '[Escalation] Error processing overdue escalations');
   }

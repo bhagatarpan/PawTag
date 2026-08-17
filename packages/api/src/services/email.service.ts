@@ -2,6 +2,7 @@ import { Resend } from 'resend';
 import { CmsEmailTemplate } from '@pawtag/db';
 import { renderBase, renderCtaButton } from './email/templates/base';
 import logger from '../lib/logger';
+import { logIntegration } from '../lib/timing';
 import {
   renderVerificationEmail,
   renderWelcomeEmail,
@@ -96,7 +97,7 @@ export async function sendMail(to: string, subject: string, html: string, from?:
     return { success: true, messageId: `demo_${Date.now()}` };
   }
 
-  try {
+  return logIntegration('Resend', 'sendEmail', async () => {
     const { data, error } = await resend!.emails.send({
       from: fromAddress,
       to: [to],
@@ -111,10 +112,7 @@ export async function sendMail(to: string, subject: string, html: string, from?:
 
     logger.info({ to, messageId: data?.id }, 'Email sent successfully');
     return { success: true, messageId: data?.id };
-  } catch (error: any) {
-    logger.error({ err: error, to, subject }, 'Email send failed');
-    return { success: false, error: error.message };
-  }
+  }, { to, subject: subject.substring(0, 50) });
 }
 
 export async function sendVerificationEmail(

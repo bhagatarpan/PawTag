@@ -221,8 +221,7 @@ router.post('/register', registerLimiter, validate(registerSchema), async (req, 
     const emailResult = await sendVerificationEmail(await resolveVerificationRecipient(email), fullName, emailToken);
 
     if (config.nodeEnv === 'development') {
-      console.log('\n🔑 [DEV] Email verification URL:');
-      console.log(`   ${config.frontendUrl}/verify-email?token=${emailToken}\n`);
+      logger.debug({ verificationUrl: `${config.frontendUrl}/verify-email?token=${emailToken}` }, 'DEV: Email verification URL');
     }
 
     await auditAuthEvent(req as AuditRequest, {
@@ -719,8 +718,7 @@ router.post('/resend-email-verification', validate(resendEmailVerificationSchema
     const emailResult = await sendVerificationEmail(await resolveVerificationRecipient(email), user.fullName, emailToken);
 
     if (config.nodeEnv === 'development') {
-      console.log('\n🔑 [DEV] Email verification URL (resent):');
-      console.log(`   ${config.frontendUrl}/verify-email?token=${emailToken}\n`);
+      logger.debug({ verificationUrl: `${config.frontendUrl}/verify-email?token=${emailToken}` }, 'DEV: Email verification URL (resent)');
     }
 
     await auditAuthEvent(req as AuditRequest, {
@@ -833,9 +831,7 @@ router.post('/send-phone-otp', validate(sendPhoneOtpSchema), async (req, res: Re
     }
 
     if (config.nodeEnv === 'development') {
-      console.log('\n🔑 [DEV] Phone OTP:');
-      console.log(`   Phone: ${phoneNumber}`);
-      console.log(`   OTP:   ${otp}\n`);
+      logger.debug({ phoneNumber, otp }, 'DEV: Phone OTP');
     }
 
     await auditAuthEvent(req as AuditRequest, {
@@ -1062,9 +1058,7 @@ router.post('/resend-phone-otp', validate(resendPhoneOtpSchema), async (req, res
     }
 
     if (config.nodeEnv === 'development') {
-      console.log('\n🔑 [DEV] Phone OTP (resent):');
-      console.log(`   Phone: ${phoneNumber}`);
-      console.log(`   OTP:   ${otp}\n`);
+      logger.debug({ phoneNumber, otp }, 'DEV: Phone OTP (resent)');
     }
 
     await auditAuthEvent(req as AuditRequest, {
@@ -1170,8 +1164,7 @@ router.post('/forgot-password', forgotPasswordLimiter, validate(forgotPasswordSc
     await sendPasswordResetEmail(email, user.fullName, resetToken);
 
     if (config.nodeEnv === 'development') {
-      console.log('\n🔑 [DEV] Password reset URL:');
-      console.log(`   ${config.frontendUrl}/reset-password?token=${resetToken}\n`);
+      logger.debug({ resetUrl: `${config.frontendUrl}/reset-password?token=${resetToken}` }, 'DEV: Password reset URL');
     }
 
     await auditAuthEvent(req as AuditRequest, {
