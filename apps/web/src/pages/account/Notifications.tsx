@@ -28,7 +28,7 @@ function formatDateTime(iso: string): string {
 
 function SkeletonRow() {
   return (
-    <div className="bg-white rounded-lg border p-4 animate-pulse">
+    <div className="bg-white rounded-lg border p-4 animate-shimmer">
       <div className="flex items-start gap-3">
         <div className="w-8 h-8 rounded-full bg-gray-200" />
         <div className="flex-1">

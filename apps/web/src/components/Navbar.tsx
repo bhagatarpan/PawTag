@@ -10,11 +10,20 @@ export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
+  const [removingId, setRemovingId] = useState<string | null>(null);
   const location = useLocation();
   const { itemCount, items, total, removeItem, updateQuantity, clearCart } = useCart();
   const { user, logout } = useAuth();
   const { menus, loading } = useNavigation('header');
   const cartButtonRef = useRef<HTMLButtonElement>(null);
+
+  const handleRemoveItem = (productId: string) => {
+    setRemovingId(productId);
+    setTimeout(() => {
+      removeItem(productId);
+      setRemovingId(null);
+    }, 350);
+  };
 
   // Fallback nav links when CMS not available
   const fallbackLinks = [
@@ -146,8 +155,9 @@ export default function Navbar() {
             <div className="flex-1 overflow-y-auto p-6">
               {items.length === 0 ? (
                 <div className="text-center py-16">
-                  <ShoppingCart className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                  <p className="text-gray-500">Your cart is empty</p>
+                  <PawPrint className="h-16 w-16 text-gray-300 mx-auto mb-4 animate-sad-paw" />
+                  <p className="text-gray-500 font-medium">Your cart feels lonely...</p>
+                  <p className="text-gray-400 text-sm mt-1">Your pet deserves a PawTag!</p>
                   <button onClick={() => setCartOpen(false)} className="mt-4 text-teal-600 font-medium hover:text-teal-700">
                     Continue Shopping
                   </button>
@@ -155,7 +165,7 @@ export default function Navbar() {
               ) : (
                 <div className="space-y-4">
                   {items.map((item) => (
-                    <div key={item.productId} className="flex gap-4 p-4 bg-gray-50 rounded-xl">
+                    <div key={item.productId} className={`flex gap-4 p-4 bg-gray-50 rounded-xl transition-all ${removingId === item.productId ? 'animate-cart-item-remove' : ''}`}>
                       <div className="h-20 w-20 bg-teal-100 rounded-lg flex-shrink-0 flex items-center justify-center">
                         {item.image ? <img src={item.image} alt="" className="h-full w-full object-cover rounded-lg" /> : <PawPrint className="h-8 w-8 text-teal-300" />}
                       </div>
@@ -167,7 +177,7 @@ export default function Navbar() {
                           <button onClick={() => updateQuantity(item.productId, item.quantity - 1)} className="h-6 w-6 rounded border border-gray-300 flex items-center justify-center text-xs hover:bg-gray-100">-</button>
                           <span className="text-sm font-medium w-6 text-center">{item.quantity}</span>
                           <button onClick={() => updateQuantity(item.productId, item.quantity + 1)} className="h-6 w-6 rounded border border-gray-300 flex items-center justify-center text-xs hover:bg-gray-100">+</button>
-                          <button onClick={() => removeItem(item.productId)} className="ml-auto text-xs text-red-500 hover:text-red-700">Remove</button>
+                          <button onClick={() => handleRemoveItem(item.productId)} className="ml-auto text-xs text-red-500 hover:text-red-700">Remove</button>
                         </div>
                       </div>
                     </div>

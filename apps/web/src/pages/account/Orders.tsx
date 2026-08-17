@@ -58,7 +58,7 @@ function formatDate(iso: string): string {
 
 function SkeletonRow() {
   return (
-    <div className="bg-white rounded-lg border p-4 animate-pulse">
+    <div className="bg-white rounded-lg border p-4 animate-shimmer">
       <div className="flex justify-between items-center">
         <div className="flex-1">
           <div className="h-4 bg-gray-200 rounded w-24 mb-2" />

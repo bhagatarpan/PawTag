@@ -31,16 +31,18 @@ export default function FlyToCart({ cartRef }: { cartRef: React.RefObject<HTMLEl
     cartEl.classList.remove('animate-cart-bump');
     void cartEl.offsetWidth; // force reflow
     cartEl.classList.add('animate-cart-bump');
-    setTimeout(() => cartEl.classList.remove('animate-cart-bump'), 400);
+    setTimeout(() => cartEl.classList.remove('animate-cart-bump'), 500);
 
-    // Pop the badge
-    const badge = cartEl.querySelector('[data-cart-badge]');
-    if (badge) {
-      badge.classList.remove('animate-badge-pop');
-      void (badge as HTMLElement).offsetWidth;
-      badge.classList.add('animate-badge-pop');
-      setTimeout(() => badge.classList.remove('animate-badge-pop'), 500);
-    }
+    // Pop the badge after a small delay
+    setTimeout(() => {
+      const badge = cartEl.querySelector('[data-cart-badge]');
+      if (badge) {
+        badge.classList.remove('animate-badge-pop');
+        void (badge as HTMLElement).offsetWidth;
+        badge.classList.add('animate-badge-pop');
+        setTimeout(() => badge.classList.remove('animate-badge-pop'), 600);
+      }
+    }, 200);
   }, [cartRef]);
 
   useEffect(() => {
@@ -58,9 +60,9 @@ export default function FlyToCart({ cartRef }: { cartRef: React.RefObject<HTMLEl
       const flyItem: FlyItem = {
         id,
         image,
-        fromX: rect.left + rect.width / 2 - 25,
-        fromY: rect.top + rect.height / 2 - 25,
-        fromSize: 50,
+        fromX: rect.left + rect.width / 2 - 30,
+        fromY: rect.top + rect.height / 2 - 30,
+        fromSize: 60,
       };
 
       setItems((prev) => [...prev, flyItem]);
@@ -69,7 +71,7 @@ export default function FlyToCart({ cartRef }: { cartRef: React.RefObject<HTMLEl
       setTimeout(() => {
         setItems((prev) => prev.filter((i) => i.id !== id));
         triggerBump();
-      }, 650);
+      }, 900);
     };
 
     window.addEventListener('cart:add', handler);

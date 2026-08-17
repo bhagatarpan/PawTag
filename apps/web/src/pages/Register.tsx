@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { PawPrint, Mail, Lock, User, Phone, Eye, EyeOff, CheckCircle } from 'lucide-react';
+import { PawPrint, Mail, Lock, User, Phone, Eye, EyeOff, CheckCircle, Loader2 } from 'lucide-react';
 import api from '../lib/api';
 import { useAuthPage } from '../hooks/useCms';
 import { validatePassword } from '@pawtag/shared';
@@ -152,8 +152,8 @@ export default function Register() {
               </label>
             </div>
 
-            <button type="submit" disabled={loading} className="w-full py-3 bg-teal-600 text-white rounded-lg font-semibold hover:bg-teal-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all">
-              {loading ? 'Creating account...' : 'Create Account'}
+            <button type="submit" disabled={loading} className="w-full py-3 bg-teal-600 text-white rounded-lg font-semibold hover:bg-teal-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2">
+              {loading ? <><Loader2 className="animate-spin h-4 w-4" /> Creating account...</> : 'Create Account'}
             </button>
           </form>
 

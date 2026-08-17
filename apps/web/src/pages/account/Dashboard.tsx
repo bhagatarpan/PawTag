@@ -81,7 +81,7 @@ function getNotifIcon(type: string) {
 
 function SkeletonCard() {
   return (
-    <div className="bg-white rounded-lg border border-gray-200 px-4 py-3 shadow-sm animate-pulse">
+    <div className="bg-white rounded-lg border border-gray-200 px-4 py-3 shadow-sm animate-shimmer">
       <div className="h-3 bg-gray-200 rounded w-20 mb-2" />
       <div className="h-7 bg-gray-200 rounded w-12" />
     </div>
@@ -90,7 +90,7 @@ function SkeletonCard() {
 
 function SkeletonRow() {
   return (
-    <div className="bg-white rounded-lg border p-4 animate-pulse">
+    <div className="bg-white rounded-lg border p-4 animate-shimmer">
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-full bg-gray-200" />
         <div className="flex-1">
@@ -152,8 +152,8 @@ export default function AccountDashboard() {
     return (
       <div className="space-y-6">
         <div>
-          <div className="h-8 bg-gray-200 rounded w-48 mb-2 animate-pulse" />
-          <div className="h-4 bg-gray-200 rounded w-64 animate-pulse" />
+          <div className="h-8 bg-gray-200 rounded w-48 mb-2 animate-shimmer" />
+          <div className="h-4 bg-gray-200 rounded w-64 animate-shimmer" />
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
           {[1, 2, 3, 4, 5].map((i) => <SkeletonCard key={i} />)}

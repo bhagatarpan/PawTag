@@ -159,7 +159,9 @@ export default function AccountLayout({ children }: { children: ReactNode }) {
             <ChevronRight size={14} />
             <span className="text-gray-900 font-medium">{currentLabel}</span>
           </div>
-          {children}
+          <div key={location.pathname} className="animate-fade-in">
+            {children}
+          </div>
         </div>
       </div>
     </div>

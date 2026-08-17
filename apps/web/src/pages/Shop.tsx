@@ -92,7 +92,7 @@ export default function Shop() {
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="bg-white rounded-2xl shadow-sm overflow-hidden animate-pulse">
+              <div key={i} className="bg-white rounded-2xl shadow-sm overflow-hidden animate-shimmer">
                 <div className="h-48 bg-gray-200" />
                 <div className="p-6 space-y-3">
                   <div className="h-6 bg-gray-200 rounded w-3/4" />

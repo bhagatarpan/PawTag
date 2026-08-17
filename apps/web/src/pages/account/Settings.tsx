@@ -381,9 +381,9 @@ export default function Settings() {
         loading={deleteLoading}
       />
       {showDeleteAccount && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center animate-fade-in">
           <div className="absolute inset-0 bg-black/40" onClick={() => { setShowDeleteAccount(false); setDeleteConfirmText(''); }} />
-          <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-md p-6 mx-4">
+          <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-md p-6 mx-4 animate-slide-up">
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Confirm Deletion</h3>
             <p className="text-sm text-gray-500 mb-4">Type your email to confirm:</p>
             <input

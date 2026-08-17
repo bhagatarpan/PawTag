@@ -81,9 +81,9 @@ export default function HealthRecords({ pet, onClose }: { pet: Pet; onClose: () 
   const severityColor = (s: string) => s === 'severe' || s === 'chronic' ? 'bg-red-100 text-red-700' : s === 'moderate' ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700';
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fade-in">
       {showSaved && <SaveToast message="Record saved successfully" onDone={() => setShowSaved(false)} />}
-      <div className="bg-white rounded-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+      <div className="bg-white rounded-xl w-full max-w-4xl max-h-[90vh] flex flex-col animate-slide-up">
         <div className="flex items-center justify-between border-b px-6 py-4">
           <div><h2 className="text-xl font-bold">{pet.name} — Health Records</h2><p className="text-sm text-gray-500">{pet.petType} · {pet.breed}</p></div>
           <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg"><X size={20} /></button>

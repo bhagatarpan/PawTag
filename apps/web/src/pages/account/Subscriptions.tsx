@@ -410,8 +410,8 @@ function SubscriptionsInner() {
 
         {/* Change Plan Modal */}
         {showChangePlan && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-            <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
+            <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl animate-slide-up">
               <h3 className="text-lg font-bold text-gray-900 mb-1">Change Plan</h3>
               <p className="text-sm text-gray-500 mb-5">Choose your new plan. Changes take effect at the next billing cycle.</p>
               <div className="space-y-3">

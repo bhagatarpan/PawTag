@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { PawPrint, Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { PawPrint, Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useAuthPage, useSiteSettings } from '../hooks/useCms';
 import api from '../lib/api';
@@ -379,8 +379,8 @@ export default function Login() {
               </div>
             )}
 
-            <button type="submit" disabled={loading || (captchaRequired && !captchaAnswer)} className="w-full py-3 bg-teal-600 text-white rounded-lg font-semibold hover:bg-teal-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all">
-              {loading ? 'Signing in...' : 'Sign In'}
+            <button type="submit" disabled={loading || (captchaRequired && !captchaAnswer)} className="w-full py-3 bg-teal-600 text-white rounded-lg font-semibold hover:bg-teal-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2">
+              {loading ? <><Loader2 className="animate-spin h-4 w-4" /> Signing in...</> : 'Sign In'}
             </button>
           </form>
 
