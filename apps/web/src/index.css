@@ -108,3 +108,60 @@ body { @apply bg-white text-gray-900; }
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }
+
+/* Fly-to-cart animation — the flying clone uses CSS custom properties set via JS */
+@keyframes fly-to-cart {
+  0% {
+    left: var(--fly-from-x);
+    top: var(--fly-from-y);
+    width: var(--fly-from-size);
+    height: var(--fly-from-size);
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(0.7) rotate(-8deg);
+  }
+  100% {
+    left: var(--fly-to-x);
+    top: var(--fly-to-y);
+    width: 28px;
+    height: 28px;
+    opacity: 0;
+    transform: scale(0.3) rotate(12deg);
+  }
+}
+
+.animate-fly-to-cart {
+  animation: fly-to-cart 0.65s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  pointer-events: none;
+  z-index: 9999;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+/* Cart icon bump */
+@keyframes cart-bump {
+  0% { transform: scale(1); }
+  25% { transform: scale(1.2); }
+  50% { transform: scale(0.92); }
+  75% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+
+.animate-cart-bump {
+  animation: cart-bump 0.35s ease-out;
+}
+
+/* Badge pop */
+@keyframes badge-pop {
+  0% { transform: scale(0); opacity: 0; }
+  50% { transform: scale(1.35); opacity: 1; }
+  75% { transform: scale(0.9); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.animate-badge-pop {
+  animation: badge-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}

@@ -25,7 +25,7 @@ export default function ProductDetail() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  const handleAddToCart = () => {
+  const handleAddToCart = (e: React.MouseEvent<HTMLButtonElement>) => {
     if (!product) return;
     addItem({
       productId: product._id,
@@ -34,6 +34,13 @@ export default function ProductDetail() {
       quantity,
       image: product.images?.[0],
     });
+
+    // Fire fly-to-cart animation
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    window.dispatchEvent(new CustomEvent('cart:add', {
+      detail: { image: product.images?.[0], rect },
+    }));
+
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
   };

@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Menu, X, ShoppingCart, PawPrint, User, LogOut, ChevronDown } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useNavigation } from '../hooks/useCms';
+import FlyToCart from './FlyToCart';
 
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -13,6 +14,7 @@ export default function Navbar() {
   const { itemCount, items, total, removeItem, updateQuantity, clearCart } = useCart();
   const { user, logout } = useAuth();
   const { menus, loading } = useNavigation('header');
+  const cartButtonRef = useRef<HTMLButtonElement>(null);
 
   // Fallback nav links when CMS not available
   const fallbackLinks = [
@@ -58,10 +60,10 @@ export default function Navbar() {
             {/* Right Side */}
             <div className="flex items-center gap-3">
               {/* Cart Button */}
-              <button onClick={() => setCartOpen(!cartOpen)} className="relative p-2 rounded-lg text-gray-600 hover:text-teal-600 hover:bg-teal-50 transition-all">
+              <button ref={cartButtonRef} onClick={() => setCartOpen(!cartOpen)} className="relative p-2 rounded-lg text-gray-600 hover:text-teal-600 hover:bg-teal-50 transition-all">
                 <ShoppingCart className="h-5 w-5" />
                 {itemCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-teal-600 text-white text-xs font-bold h-5 w-5 rounded-full flex items-center justify-center">
+                  <span data-cart-badge className="absolute -top-1 -right-1 bg-teal-600 text-white text-xs font-bold h-5 w-5 rounded-full flex items-center justify-center">
                     {itemCount}
                   </span>
                 )}
@@ -188,6 +190,8 @@ export default function Navbar() {
           </div>
         </>
       )}
+      {/* Fly-to-cart animation */}
+      <FlyToCart cartRef={cartButtonRef} />
     </>
   );
 }

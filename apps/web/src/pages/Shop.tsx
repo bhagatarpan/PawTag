@@ -43,7 +43,7 @@ export default function Shop() {
     }
   };
 
-  const handleAddToCart = (product: Product) => {
+  const handleAddToCart = (product: Product, e: React.MouseEvent<HTMLButtonElement>) => {
     setAddingId(product._id);
     addItem({
       productId: product._id,
@@ -52,6 +52,13 @@ export default function Shop() {
       quantity: 1,
       image: product.images?.[0],
     });
+
+    // Fire fly-to-cart animation
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    window.dispatchEvent(new CustomEvent('cart:add', {
+      detail: { image: product.images?.[0], rect },
+    }));
+
     setTimeout(() => setAddingId(null), 1000);
   };
 
@@ -156,7 +163,7 @@ export default function Shop() {
                         Details
                       </Link>
                       <button
-                        onClick={() => handleAddToCart(product)}
+                        onClick={(e) => handleAddToCart(product, e)}
                         disabled={product.stock <= 0 || addingId === product._id}
                         className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-medium transition-all text-sm ${
                           addingId === product._id
