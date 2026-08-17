@@ -24,6 +24,7 @@ import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { swaggerSpec } from './swagger';
 import logger from './lib/logger';
 import { auditMiddleware } from './middleware/audit';
+import { metricsMiddleware } from './middleware/metrics';
 import { createDbRateLimiter } from './lib/rate-limiter';
 
 import QRCode from 'qrcode';
@@ -55,6 +56,7 @@ import referralRoutes from './routes/referrals';
 import pushTokenRoutes from './routes/push-tokens';
 import auditRoutes from './routes/audit';
 import { publicRouter as supportPublicRoutes, adminRouter as supportAdminRoutes } from './routes/support';
+import healthRoutes from './routes/health';
 import { startReminderService } from './services/reminder.service';
 import { startSubscriptionService } from './services/subscription.service';
 import { startEscalationService } from './services/escalation.service';
@@ -93,13 +95,16 @@ const httpLogger = pinoHttp({
   autoLogging: !isTest && {
     ignore: (req) => {
       const url = req.url || '';
-      return url === '/health' || url.startsWith('/api/docs') || url === '/favicon.ico';
+      return url.startsWith('/health') || url.startsWith('/api/docs') || url === '/favicon.ico';
     },
   },
   // Redact sensitive headers
   redact: ['req.headers.authorization', 'req.headers.cookie', 'res.headers.authorization'],
 });
 app.use(httpLogger);
+
+// Metrics middleware - track HTTP request counts and durations
+app.use(metricsMiddleware);
 
 // Audit middleware - must be early to capture all requests
 app.use(auditMiddleware);
@@ -131,10 +136,8 @@ app.get('/api/docs.json', (_req, res) => {
   res.send(swaggerSpec);
 });
 
-// --- Health Check ---
-app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
+// --- Health & Metrics ---
+app.use('/health', healthRoutes);
 
 // --- Public Tag QR Routes (no auth needed) ---
 const FINDER_BASE_URL = process.env.FINDER_BASE_URL || 'http://localhost:3003';
