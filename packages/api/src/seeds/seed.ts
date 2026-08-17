@@ -593,7 +593,6 @@ async function seed() {
         { permissionName: 'user.read' },
         { permissionName: 'order.read' },
         { permissionName: 'finder_scan.read' },
-        { permissionName: 'systemlogs.read' },
       ],
 
       PET_OWNER: [

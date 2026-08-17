@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
+import { useAuth } from '../lib/auth';
 import {
   LEVEL_COLORS,
   LEVEL_DOT_COLORS,
@@ -110,6 +111,7 @@ function SkeletonRow() {
 export default function SystemLogs() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { hasPermission } = useAuth();
   const [items, setItems] = useState<SystemLogEntry[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -423,58 +425,60 @@ export default function SystemLogs() {
             )}
           </div>
 
-          {/* Purge dropdown */}
-          <div className="relative">
-            <button type="button" onClick={() => { setPurgeMenuOpen(!purgeMenuOpen); setCustomRangeOpen(false); }} className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50">
-              <Trash2 size={15} /> Purge <ChevronDown size={14} />
-            </button>
-            {purgeMenuOpen && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => { setPurgeMenuOpen(false); setCustomRangeOpen(false); }} />
-                <div className="absolute right-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
-                  {[
-                    { key: 'today', label: 'Today' },
-                    { key: 'yesterday', label: 'Yesterday' },
-                    { key: 'week', label: 'Last 7 Days' },
-                    { key: 'month', label: 'Last 30 Days' },
-                  ].map((opt) => (
-                    <button key={opt.key} type="button" onClick={() => selectPurgeOption(opt.key)} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                      {opt.label}
-                    </button>
-                  ))}
-                  <div className="border-t border-gray-100" />
-                  <button type="button" onClick={() => selectPurgeOption('custom')} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                    Custom Range...
-                  </button>
-                </div>
-              </>
-            )}
-            {/* Custom range popover */}
-            {customRangeOpen && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setCustomRangeOpen(false)} />
-                <div className="absolute right-0 mt-1 w-64 bg-white rounded-lg shadow-lg border border-gray-200 p-4 z-50">
-                  <p className="text-sm font-medium text-gray-900 mb-3">Custom Date Range</p>
-                  <div className="space-y-2">
-                    <div>
-                      <label className="text-xs text-gray-500">From</label>
-                      <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} className="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm" />
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-500">To</label>
-                      <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} className="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm" />
-                    </div>
-                    <button type="button" onClick={applyCustomRange} disabled={!customStart || !customEnd} className="w-full rounded-lg bg-teal-600 text-white py-1.5 text-sm font-medium hover:bg-teal-700 disabled:opacity-50">
-                      Apply
+          {/* Purge dropdown — admin only */}
+          {hasPermission('systemlogs.admin') && (
+            <div className="relative">
+              <button type="button" onClick={() => { setPurgeMenuOpen(!purgeMenuOpen); setCustomRangeOpen(false); }} className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50">
+                <Trash2 size={15} /> Purge <ChevronDown size={14} />
+              </button>
+              {purgeMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => { setPurgeMenuOpen(false); setCustomRangeOpen(false); }} />
+                  <div className="absolute right-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                    {[
+                      { key: 'today', label: 'Today' },
+                      { key: 'yesterday', label: 'Yesterday' },
+                      { key: 'week', label: 'Last 7 Days' },
+                      { key: 'month', label: 'Last 30 Days' },
+                    ].map((opt) => (
+                      <button key={opt.key} type="button" onClick={() => selectPurgeOption(opt.key)} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                        {opt.label}
+                      </button>
+                    ))}
+                    <div className="border-t border-gray-100" />
+                    <button type="button" onClick={() => selectPurgeOption('custom')} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                      Custom Range...
                     </button>
                   </div>
-                </div>
-              </>
-            )}
-          </div>
+                </>
+              )}
+              {/* Custom range popover */}
+              {customRangeOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setCustomRangeOpen(false)} />
+                  <div className="absolute right-0 mt-1 w-64 bg-white rounded-lg shadow-lg border border-gray-200 p-4 z-50">
+                    <p className="text-sm font-medium text-gray-900 mb-3">Custom Date Range</p>
+                    <div className="space-y-2">
+                      <div>
+                        <label className="text-xs text-gray-500">From</label>
+                        <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} className="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500">To</label>
+                        <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} className="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm" />
+                      </div>
+                      <button type="button" onClick={applyCustomRange} disabled={!customStart || !customEnd} className="w-full rounded-lg bg-teal-600 text-white py-1.5 text-sm font-medium hover:bg-teal-700 disabled:opacity-50">
+                        Apply
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
 
           {/* Purge action button — visible when a range is selected */}
-          {purgeRange && (
+          {purgeRange && hasPermission('systemlogs.admin') && (
             <div className="inline-flex items-center gap-1">
               <button type="button" onClick={() => setPurgeConfirmOpen(true)} className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700">
                 <Trash2 size={15} /> Purge {total.toLocaleString()} log{total !== 1 ? 's' : ''}
