@@ -83,15 +83,6 @@ body { @apply bg-white text-gray-900; }
   animation: status-pulse 2s ease-in-out infinite;
 }
 
-@keyframes maintenance-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.85; }
-}
-
-.animate-maintenance-pulse {
-  animation: maintenance-pulse 3s ease-in-out infinite;
-}
-
 .pet-card {
   transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease;
 }

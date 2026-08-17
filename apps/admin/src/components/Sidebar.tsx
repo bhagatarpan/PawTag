@@ -74,7 +74,6 @@ const adminLinks: SidebarLink[] = [
   { to: '/audit-settings', label: 'Audit Settings', icon: FileSignature, permission: 'audit.admin' },
   { to: '/system-logs', label: 'System Logs', icon: Terminal, permission: 'systemlogs.read' },
   { to: '/system-log-settings', label: 'System Log Settings', icon: Terminal, permission: 'systemlogs.admin' },
-  { to: '/site-availability', label: 'Site Availability', icon: Wifi, permission: 'site_availability.read' },
 ];
 
 const cmsLinks: SidebarLink[] = [

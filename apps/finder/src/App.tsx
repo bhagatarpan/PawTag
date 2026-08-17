@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, Routes, Route } from 'react-router-dom';
-import { Phone, PawPrint, WifiOff } from 'lucide-react';
+import { Phone, PawPrint } from 'lucide-react';
 import { useSiteSettings } from './hooks/useSiteSettings';
-import { fetchTagData, fetchFoundTimer, fetchSiteStatus } from './lib/finderApi';
+import { fetchTagData, fetchFoundTimer } from './lib/finderApi';
 import type { FinderData, FoundTimerData, LocationData, PetPhoto } from './types';
 import StatusBanner from './components/StatusBanner';
 import PetPhotoCarousel from './components/PetPhotoCarousel';
@@ -13,27 +13,6 @@ import NotifyOwnerForm from './components/NotifyOwnerForm';
 import FoundTimer from './components/FoundTimer';
 import FinderLoadingState from './components/FinderLoadingState';
 import FinderErrorState from './components/FinderErrorState';
-
-
-function FinderOfflinePage() {
-  const { settings } = useSiteSettings();
-  const companyName = settings?.['company.name'] || 'PawTag';
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center px-4">
-      <div className="max-w-md w-full text-center">
-        <div className="mx-auto w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mb-6">
-          <WifiOff size={40} className="text-red-600" />
-        </div>
-        <h1 className="text-3xl font-bold text-gray-900 mb-3">{companyName} is currently offline</h1>
-        <p className="text-lg text-gray-600 mb-8">Please come back later.</p>
-        <p className="text-sm text-gray-500">
-          If this is an emergency, please contact local animal control or the SPCA.
-        </p>
-      </div>
-    </div>
-  );
-}
 
 
 function FinderPage() {
@@ -176,32 +155,6 @@ function FinderPage() {
 export default function App() {
   const { settings } = useSiteSettings();
   const companyName = settings?.['company.name'] || 'PawTag';
-  const [siteStatus, setSiteStatus] = useState<string>('ONLINE');
-  const [statusLoading, setStatusLoading] = useState(true);
-
-  useEffect(() => {
-    fetchSiteStatus().then((status) => {
-      setSiteStatus(status);
-      setStatusLoading(false);
-    });
-  }, []);
-
-  if (statusLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
-      </div>
-    );
-  }
-
-  if (siteStatus === 'OFFLINE') {
-    return (
-      <Routes>
-        <Route path="*" element={<FinderOfflinePage />} />
-      </Routes>
-    );
-  }
-
   return (
     <Routes>
       <Route path="/:tagId" element={<FinderPage />} />

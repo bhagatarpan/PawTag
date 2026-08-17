@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useAuth } from '../lib/auth-context';
-import { getSiteStatus } from '../lib/site-status';
 import { LoginScreen } from '../screens/LoginScreen';
 import { RegisterScreen } from '../screens/RegisterScreen';
 import { ForgotPasswordScreen } from '../screens/ForgotPasswordScreen';
@@ -19,7 +18,6 @@ import { SubscriptionScreen } from '../screens/subscriptions/SubscriptionScreen'
 import { OrderHistoryScreen } from '../screens/orders/OrderHistoryScreen';
 import { LostModeScreen } from '../screens/pets/LostModeScreen';
 import { FullScreenSpinner } from '../components/states/Spinner';
-import { OfflineScreen } from '../components/OfflineScreen';
 import { colors, typography } from '../theme/tokens';
 import { Text } from 'react-native';
 
@@ -101,30 +99,9 @@ const authScreenOptions = {
 
 export function RootNavigator() {
   const { user, loading } = useAuth();
-  const [siteStatus, setSiteStatus] = useState<string>('ONLINE');
-  const [statusLoading, setStatusLoading] = useState(true);
 
-  const checkStatus = useCallback(async () => {
-    setStatusLoading(true);
-    const status = await getSiteStatus();
-    setSiteStatus(status);
-    setStatusLoading(false);
-  }, []);
-
-  useEffect(() => {
-    checkStatus();
-    // Poll every 30 seconds
-    const interval = setInterval(checkStatus, 30_000);
-    return () => clearInterval(interval);
-  }, [checkStatus]);
-
-  if (loading || statusLoading) {
+  if (loading) {
     return <FullScreenSpinner label="Loading PawTag..." />;
-  }
-
-  // Offline — show dedicated offline screen
-  if (siteStatus === 'OFFLINE') {
-    return <OfflineScreen onRetry={checkStatus} />;
   }
 
   return (

@@ -114,10 +114,6 @@ async function run() {
         { key: 'systemLog.sampling.error', value: '100', displayValue: 'Error Sampling %', category: 'systemLog', description: 'Percentage of error logs to store (0-100). 100 = store all.' },
         { key: 'systemLog.sampling.fatal', value: '100', displayValue: 'Fatal Sampling %', category: 'systemLog', description: 'Percentage of fatal logs to store (0-100). 100 = store all.' },
         { key: 'systemLog.retentionDays', value: '30', displayValue: 'Log Retention (days)', category: 'systemLog', description: 'Number of days to keep system logs before automatic deletion.' },
-
-        // Site Availability
-        { key: 'site.maintenanceMode', value: 'false', displayValue: 'Site Under Maintenance', category: 'site', description: 'When enabled, visitors can browse but actions are blocked. Shows maintenance banner.' },
-        { key: 'site.offlineMode', value: 'false', displayValue: 'Site Offline', category: 'site', description: 'When enabled, the site is unavailable to all visitors except administrators.' },
       ];
 
       let settingsCreated = 0;

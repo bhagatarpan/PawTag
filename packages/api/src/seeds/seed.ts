@@ -379,10 +379,6 @@ async function seed() {
       // System Logging
       { name: 'systemlogs.read', displayName: 'Read System Logs', description: 'View system application logs', resource: 'systemlogs', action: 'read', groupIndex: groupDefs.findIndex(g => g.name === 'SYSTEM_LOGGING') },
       { name: 'systemlogs.admin', displayName: 'Manage System Log Settings', description: 'Configure system log storage, levels, and retention', resource: 'systemlogs', action: 'admin', groupIndex: groupDefs.findIndex(g => g.name === 'SYSTEM_LOGGING') },
-
-      // Site Availability
-      { name: 'site_availability.read', displayName: 'Read Site Availability', description: 'View site maintenance and offline status', resource: 'site_availability', action: 'read', groupIndex: groupDefs.findIndex(g => g.name === 'SYSTEM_CONFIGURATION') },
-      { name: 'site_availability.update', displayName: 'Update Site Availability', description: 'Toggle maintenance and offline modes', resource: 'site_availability', action: 'update', groupIndex: groupDefs.findIndex(g => g.name === 'SYSTEM_CONFIGURATION') },
     ];
 
     const permMap: Record<string, string> = {};
@@ -514,9 +510,6 @@ async function seed() {
         // System Logs
         { permissionName: 'systemlogs.read' },
         { permissionName: 'systemlogs.admin' },
-        // Site Availability
-        { permissionName: 'site_availability.read' },
-        { permissionName: 'site_availability.update' },
         // Finder Scans
         { permissionName: 'finder_scan.read' },
         // Location Events
@@ -712,9 +705,6 @@ async function seed() {
         { permissionName: 'content.upload_media' },
         { permissionName: 'systemlogs.read' },
         { permissionName: 'audit.read' },
-        // Site Availability
-        { permissionName: 'site_availability.read' },
-        { permissionName: 'site_availability.update' },
         // CMS
         { permissionName: 'cms.page.read' },
         { permissionName: 'cms.page.create' },

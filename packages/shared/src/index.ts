@@ -98,12 +98,6 @@ export enum InvoiceStatus {
   REFUNDED = 'refunded',
 }
 
-export enum SiteAvailabilityStatus {
-  ONLINE = 'ONLINE',
-  MAINTENANCE = 'MAINTENANCE',
-  OFFLINE = 'OFFLINE',
-}
-
 // --- Core Models ---
 
 export interface User {

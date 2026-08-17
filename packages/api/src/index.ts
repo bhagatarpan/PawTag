@@ -73,11 +73,8 @@ import referralRoutes from './routes/referrals';
 import pushTokenRoutes from './routes/push-tokens';
 import auditRoutes from './routes/audit';
 import systemLogRoutes from './routes/system-logs';
-import siteAvailabilityRoutes from './routes/site-availability';
-import systemStatusRoutes from './routes/system-status';
 import { publicRouter as supportPublicRoutes, adminRouter as supportAdminRoutes } from './routes/support';
 import healthRoutes from './routes/health';
-import { siteAvailabilityMiddleware } from './middleware/site-availability';
 import { shutdownTracing } from './lib/tracing';
 import { flushMonitoring } from './lib/monitoring';
 import { flushSystemLogs } from './lib/logger';
@@ -166,12 +163,6 @@ app.get('/api/docs.json', (_req, res) => {
 // --- Health & Metrics ---
 app.use('/health', healthRoutes);
 
-// --- Public System Status (must be accessible even when offline) ---
-app.use('/api/public/system', systemStatusRoutes);
-
-// --- Site Availability Middleware (enforces maintenance/offline modes) ---
-app.use('/api', siteAvailabilityMiddleware);
-
 // --- Public Tag QR Routes (no auth needed) ---
 const FINDER_BASE_URL = process.env.FINDER_BASE_URL || 'http://localhost:3003';
 
@@ -232,7 +223,6 @@ app.use('/api/public/cms', cmsSettingsPublicRoutes);
 app.use('/api/public/cms', cmsPublicV2Routes);
 app.use('/api/admin/audit', auditRoutes);
 app.use('/api/admin/system-logs', systemLogRoutes);
-app.use('/api/admin/site-availability', siteAvailabilityRoutes);
 
 // --- Error Handling ---
 app.use(notFoundHandler);
