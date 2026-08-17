@@ -84,6 +84,7 @@ async function seed() {
       { name: 'AUDIT_SECURITY', displayName: 'Audit & Security', description: 'View audit logs and security events', icon: 'ScrollText', sortOrder: 200 },
       { name: 'NOTIFICATION_MANAGEMENT', displayName: 'Notification Management', description: 'Manage notifications and templates', icon: 'Bell', sortOrder: 210 },
       { name: 'CMS_MANAGEMENT', displayName: 'CMS Management', description: 'Manage website pages, navigation, footer, media, and announcements', icon: 'Layout', sortOrder: 220 },
+      { name: 'SYSTEM_LOGGING', displayName: 'System Logging', description: 'View and manage system application logs', icon: 'Terminal', sortOrder: 230 },
     ];
 
     const groupMap: Record<string, string> = {};
@@ -374,6 +375,10 @@ async function seed() {
       // CMS — Auth Pages
       { name: 'cms.auth_page.read', displayName: 'Read Auth Pages', description: 'View auth pages', resource: 'cms.auth_page', action: 'read', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
       { name: 'cms.auth_page.update', displayName: 'Update Auth Pages', description: 'Update auth pages', resource: 'cms.auth_page', action: 'update', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
+
+      // System Logging
+      { name: 'systemLogs.read', displayName: 'Read System Logs', description: 'View system application logs', resource: 'systemLogs', action: 'read', groupIndex: groupDefs.findIndex(g => g.name === 'SYSTEM_LOGGING') },
+      { name: 'systemLogs.admin', displayName: 'Manage System Log Settings', description: 'Configure system log storage, levels, and retention', resource: 'systemLogs', action: 'admin', groupIndex: groupDefs.findIndex(g => g.name === 'SYSTEM_LOGGING') },
     ];
 
     const permMap: Record<string, string> = {};
@@ -502,6 +507,9 @@ async function seed() {
         // Audit
         { permissionName: 'audit.read' },
         { permissionName: 'audit.admin' },
+        // System Logs
+        { permissionName: 'systemLogs.read' },
+        { permissionName: 'systemLogs.admin' },
         // Finder Scans
         { permissionName: 'finder_scan.read' },
         // Location Events
@@ -585,6 +593,7 @@ async function seed() {
         { permissionName: 'user.read' },
         { permissionName: 'order.read' },
         { permissionName: 'finder_scan.read' },
+        { permissionName: 'systemLogs.read' },
       ],
 
       PET_OWNER: [

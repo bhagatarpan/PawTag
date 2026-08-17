@@ -92,6 +92,28 @@ async function run() {
         ...auditActors.map((value) => ({ key: `audit.policy.actor.${value.toLowerCase()}`, value: 'true', displayValue: `Audit: ${value} Actor`, category: 'audit', description: `Enable audit logging for ${value} actors` })),
         { key: 'audit.settings.identifyAnonymousActors', value: 'true', displayValue: 'Identify Anonymous Actors', category: 'audit', description: 'When enabled, attempts to identify anonymous users from JWT tokens even when auth fails' },
         { key: 'audit.settings.skipPollingEndpoints', value: 'true', displayValue: 'Skip Polling Endpoints', category: 'audit', description: 'When enabled, skips audit logging for automated polling endpoints (e.g., notification badge checks)' },
+        // System Log Settings
+        { key: 'systemLog.enabled', value: 'true', displayValue: 'System Logging Enabled', category: 'systemLog', description: 'Master toggle for system log storage in MongoDB' },
+        { key: 'systemLog.level.debug', value: 'false', displayValue: 'Log Level: Debug', category: 'systemLog', description: 'Store debug-level logs. High volume. Enable only when troubleshooting.' },
+        { key: 'systemLog.level.info', value: 'true', displayValue: 'Log Level: Info', category: 'systemLog', description: 'Store info-level logs. General operational events.' },
+        { key: 'systemLog.level.warn', value: 'true', displayValue: 'Log Level: Warning', category: 'systemLog', description: 'Store warning-level logs. Potential issues and degraded operations.' },
+        { key: 'systemLog.level.error', value: 'true', displayValue: 'Log Level: Error', category: 'systemLog', description: 'Store error-level logs. Application errors and failures.' },
+        { key: 'systemLog.level.fatal', value: 'true', displayValue: 'Log Level: Fatal', category: 'systemLog', description: 'Store fatal-level logs. Critical failures causing process exit.' },
+        { key: 'systemLog.category.HTTP', value: 'true', displayValue: 'Category: HTTP', category: 'systemLog', description: 'Store HTTP request/response logs.' },
+        { key: 'systemLog.category.DATABASE', value: 'true', displayValue: 'Category: Database', category: 'systemLog', description: 'Store database operation and slow query logs.' },
+        { key: 'systemLog.category.AUTH', value: 'true', displayValue: 'Category: Auth', category: 'systemLog', description: 'Store authentication and identity event logs.' },
+        { key: 'systemLog.category.INTEGRATION', value: 'true', displayValue: 'Category: Integration', category: 'systemLog', description: 'Store external service call logs (Stripe, Resend, Twilio, etc.).' },
+        { key: 'systemLog.category.JOB', value: 'true', displayValue: 'Category: Job', category: 'systemLog', description: 'Store background job and scheduled task logs.' },
+        { key: 'systemLog.category.SECURITY', value: 'true', displayValue: 'Category: Security', category: 'systemLog', description: 'Store rate limiting, CAPTCHA, and security event logs.' },
+        { key: 'systemLog.category.NOTIFICATION', value: 'true', displayValue: 'Category: Notification', category: 'systemLog', description: 'Store notification delivery logs.' },
+        { key: 'systemLog.category.CONFIG', value: 'true', displayValue: 'Category: Config', category: 'systemLog', description: 'Store configuration and settings change logs.' },
+        { key: 'systemLog.category.GENERAL', value: 'true', displayValue: 'Category: General', category: 'systemLog', description: 'Store uncategorized logs.' },
+        { key: 'systemLog.sampling.debug', value: '100', displayValue: 'Debug Sampling %', category: 'systemLog', description: 'Percentage of debug logs to store (0-100). 100 = store all.' },
+        { key: 'systemLog.sampling.info', value: '100', displayValue: 'Info Sampling %', category: 'systemLog', description: 'Percentage of info logs to store (0-100). 100 = store all.' },
+        { key: 'systemLog.sampling.warn', value: '100', displayValue: 'Warning Sampling %', category: 'systemLog', description: 'Percentage of warning logs to store (0-100). 100 = store all.' },
+        { key: 'systemLog.sampling.error', value: '100', displayValue: 'Error Sampling %', category: 'systemLog', description: 'Percentage of error logs to store (0-100). 100 = store all.' },
+        { key: 'systemLog.sampling.fatal', value: '100', displayValue: 'Fatal Sampling %', category: 'systemLog', description: 'Percentage of fatal logs to store (0-100). 100 = store all.' },
+        { key: 'systemLog.retentionDays', value: '30', displayValue: 'Log Retention (days)', category: 'systemLog', description: 'Number of days to keep system logs before automatic deletion.' },
       ];
 
       let settingsCreated = 0;

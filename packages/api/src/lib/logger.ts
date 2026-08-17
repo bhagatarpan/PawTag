@@ -1,8 +1,8 @@
 import pino from 'pino';
+import { writeLog, flushSystemLogs } from './log-writer';
 
 const isDev = process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
 const isTest = process.env.NODE_ENV === 'test';
-const isProd = process.env.NODE_ENV === 'production';
 
 const SERVICE_NAME = process.env.SERVICE_NAME || 'pawtag-api';
 const SERVICE_VERSION = process.env.SERVICE_VERSION || 'unknown';
@@ -39,7 +39,6 @@ const REDACT_PATHS = [
   '*.authorization',
   'req.headers.authorization',
   'req.headers.cookie',
-  // PawTag-specific sensitive fields
   'finderPhone',
   'finderEmail',
   'emergencyContact',
@@ -72,6 +71,28 @@ export const logger = pino({
     version: SERVICE_VERSION,
     environment: process.env.NODE_ENV || 'development',
   },
+  hooks: {
+    logMethod(args: unknown[], method: (...methodArgs: unknown[]) => void) {
+      // Fire-and-forget: send log entry to MongoDB writer
+      if (!isTest) {
+        try {
+          const entry = args[0];
+          if (entry && typeof entry === 'object') {
+            const levelNum = (this as unknown as { level?: { value?: number } }).level?.value ?? 30;
+            writeLog({
+              level: levelNum,
+              time: Date.now(),
+              ...entry as Record<string, unknown>,
+            });
+          }
+        } catch {
+          // Never break logging
+        }
+      }
+      // Call the original Pino method
+      method.apply(this, args);
+    },
+  },
   ...(isDev && !isTest
     ? {
         transport: {
@@ -84,8 +105,6 @@ export const logger = pino({
         },
       }
     : {}),
-  // In production: JSON output, no stack trace hiding
-  // In development: pretty-printed for readability
   formatters: {
     level(label: string) {
       return { level: label };
@@ -115,5 +134,8 @@ export function createChildLogger(context: Record<string, unknown>): pino.Logger
 export function createScopedLogger(scope: string): pino.Logger {
   return logger.child({ feature: scope });
 }
+
+/** Flush pending system logs to MongoDB. Call before process exit. */
+export { flushSystemLogs };
 
 export default logger;

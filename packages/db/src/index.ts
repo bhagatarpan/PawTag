@@ -44,3 +44,4 @@ export { PushToken, type IPushTokenDocument } from './models/PushToken';
 export { RefreshToken, type IRefreshTokenDocument } from './models/RefreshToken';
 export { default as CmsOnboarding, type ICmsOnboardingDocument, type ICmsOnboardingStep } from './models/CmsOnboarding';
 export { default as EscalationRecord, type IEscalationRecord } from './models/EscalationRecord';
+export { SystemLog, type ISystemLogDocument, type LogLevel, type LogCategory, createSystemLogId } from './models/SystemLog';

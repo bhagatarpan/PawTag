@@ -42,6 +42,8 @@ import TagExpiryNotifications from './pages/TagExpiryNotifications';
 import Notifications from './pages/Notifications';
 import WriteNfcTag from './pages/WriteNfcTag';
 import SupportRequests from './pages/SupportRequests';
+import SystemLogs from './pages/SystemLogs';
+import SystemLogSettings from './pages/SystemLogSettings';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
@@ -185,6 +187,8 @@ export default function App() {
       <Route path="/tag-expiry-notifications" element={<ProtectedRoute><TagExpiryNotifications /></ProtectedRoute>} />
       <Route path="/write-nfc" element={<ProtectedRoute><WriteNfcTag /></ProtectedRoute>} />
       <Route path="/support-requests" element={<ProtectedRoute><SupportRequests /></ProtectedRoute>} />
+      <Route path="/system-logs" element={<ProtectedRoute><SystemLogs /></ProtectedRoute>} />
+      <Route path="/system-log-settings" element={<ProtectedRoute><SystemLogSettings /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

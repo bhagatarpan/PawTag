@@ -72,10 +72,12 @@ import invoiceAccessRoutes from './routes/invoice-access';
 import referralRoutes from './routes/referrals';
 import pushTokenRoutes from './routes/push-tokens';
 import auditRoutes from './routes/audit';
+import systemLogRoutes from './routes/system-logs';
 import { publicRouter as supportPublicRoutes, adminRouter as supportAdminRoutes } from './routes/support';
 import healthRoutes from './routes/health';
 import { shutdownTracing } from './lib/tracing';
 import { flushMonitoring } from './lib/monitoring';
+import { flushSystemLogs } from './lib/logger';
 import { startReminderService } from './services/reminder.service';
 import { startSubscriptionService } from './services/subscription.service';
 import { startEscalationService } from './services/escalation.service';
@@ -220,6 +222,7 @@ app.use('/api/public/cms', cmsPublicRoutes);
 app.use('/api/public/cms', cmsSettingsPublicRoutes);
 app.use('/api/public/cms', cmsPublicV2Routes);
 app.use('/api/admin/audit', auditRoutes);
+app.use('/api/admin/system-logs', systemLogRoutes);
 
 // --- Error Handling ---
 app.use(notFoundHandler);
@@ -255,11 +258,11 @@ async function start() {
       logger.info('SIGTERM received, shutting down gracefully...');
       server.close(async () => {
         logger.info('HTTP server closed');
+        await flushSystemLogs();
         await flushMonitoring();
         await shutdownTracing();
         process.exit(0);
       });
-      // Force exit after 10 seconds if graceful shutdown fails
       setTimeout(() => {
         logger.error('Forced shutdown after timeout');
         process.exit(1);
@@ -269,6 +272,7 @@ async function start() {
     process.on('SIGINT', () => {
       logger.info('SIGINT received, shutting down...');
       server.close(async () => {
+        await flushSystemLogs();
         await flushMonitoring();
         await shutdownTracing();
         process.exit(0);
