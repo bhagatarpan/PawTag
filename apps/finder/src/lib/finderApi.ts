@@ -1,7 +1,17 @@
 import axios from 'axios';
+import { SiteAvailabilityStatus } from '@pawtag/shared';
 import type { FinderData, FoundTimerData, NotifyPayload } from '../types';
 
 const apiBase = import.meta.env.VITE_API_URL || '/api';
+
+export async function fetchSystemStatus(): Promise<SiteAvailabilityStatus> {
+  try {
+    const res = await axios.get(`${apiBase}/public/system/status`);
+    return res.data.data.status || SiteAvailabilityStatus.ONLINE;
+  } catch {
+    return SiteAvailabilityStatus.ONLINE;
+  }
+}
 
 export async function fetchTagData(tagId: string): Promise<FinderData> {
   const res = await axios.get(`${apiBase}/finder/${tagId}`);

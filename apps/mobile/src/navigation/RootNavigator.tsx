@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { SiteAvailabilityStatus } from '@pawtag/shared';
 import { useAuth } from '../lib/auth-context';
+import { fetchSiteAvailability } from '../lib/site-availability';
 import { LoginScreen } from '../screens/LoginScreen';
 import { RegisterScreen } from '../screens/RegisterScreen';
 import { ForgotPasswordScreen } from '../screens/ForgotPasswordScreen';
@@ -18,6 +20,7 @@ import { SubscriptionScreen } from '../screens/subscriptions/SubscriptionScreen'
 import { OrderHistoryScreen } from '../screens/orders/OrderHistoryScreen';
 import { LostModeScreen } from '../screens/pets/LostModeScreen';
 import { FullScreenSpinner } from '../components/states/Spinner';
+import { OfflineScreen } from '../components/OfflineScreen';
 import { colors, typography } from '../theme/tokens';
 import { Text } from 'react-native';
 
@@ -99,9 +102,38 @@ const authScreenOptions = {
 
 export function RootNavigator() {
   const { user, loading } = useAuth();
+  const [siteStatus, setSiteStatus] = useState<SiteAvailabilityStatus>(SiteAvailabilityStatus.ONLINE);
+  const [offlineMessages, setOfflineMessages] = useState({
+    offlineTitle: 'PawTag is currently offline',
+    offlineMessage: 'Please come back later.',
+  });
+  const [statusLoading, setStatusLoading] = useState(true);
 
-  if (loading) {
+  const checkStatus = useCallback(async () => {
+    const result = await fetchSiteAvailability();
+    setSiteStatus(result.status);
+    setOfflineMessages(result.messages);
+    setStatusLoading(false);
+  }, []);
+
+  useEffect(() => {
+    checkStatus();
+    const interval = setInterval(checkStatus, 30000);
+    return () => clearInterval(interval);
+  }, [checkStatus]);
+
+  if (loading || statusLoading) {
     return <FullScreenSpinner label="Loading PawTag..." />;
+  }
+
+  // Offline — show dedicated offline screen
+  if (siteStatus === SiteAvailabilityStatus.OFFLINE) {
+    return (
+      <OfflineScreen
+        title={offlineMessages.offlineTitle}
+        message={offlineMessages.offlineMessage}
+      />
+    );
   }
 
   return (

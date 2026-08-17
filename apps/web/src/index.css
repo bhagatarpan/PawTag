@@ -200,3 +200,25 @@ body { @apply bg-white text-gray-900; }
 .animate-sad-paw {
   animation: sad-paw-bounce 2s ease-in-out infinite;
 }
+
+/* Maintenance banner pulse — slow dissolve/flash */
+@keyframes maintenance-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.maintenance-banner {
+  animation: maintenance-pulse 3s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .maintenance-banner {
+    animation: none;
+    opacity: 1;
+  }
+}
+
+/* Offset body content when maintenance banner is visible */
+body.has-maintenance-banner {
+  padding-top: 80px;
+}

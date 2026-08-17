@@ -196,6 +196,9 @@ importers:
 
   apps/finder:
     dependencies:
+      '@pawtag/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@pawtag/ui':
         specifier: workspace:*
         version: link:../../packages/ui

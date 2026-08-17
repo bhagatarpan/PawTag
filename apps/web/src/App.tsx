@@ -1,5 +1,9 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
+import { SiteAvailabilityStatus } from '@pawtag/shared';
+import { useSiteAvailability } from './components/SiteAvailabilityProvider';
+import MaintenanceBanner from './components/MaintenanceBanner';
+import OfflinePage from './pages/OfflinePage';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import EmergencyLostPet from './components/EmergencyLostPet';
@@ -40,45 +44,84 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
-export default function App() {
+function PublicLayout({ children, showEmergency = true }: { children: ReactNode; showEmergency?: boolean }) {
   return (
-    <Routes>
-      {/* Public routes with Navbar + Footer */}
-      <Route path="/" element={<div className="min-h-screen flex flex-col"><Navbar /><main className="flex-1"><Home /></main><Footer /><EmergencyLostPet /></div>} />
-      <Route path="/shop" element={<div className="min-h-screen flex flex-col"><Navbar /><main className="flex-1"><Shop /></main><Footer /><EmergencyLostPet /></div>} />
-      <Route path="/shop/:id" element={<div className="min-h-screen flex flex-col"><Navbar /><main className="flex-1"><ProductDetail /></main><Footer /><EmergencyLostPet /></div>} />
-      <Route path="/checkout" element={<div className="min-h-screen flex flex-col"><Navbar /><main className="flex-1"><Checkout /></main><Footer /><EmergencyLostPet /></div>} />
-      <Route path="/login" element={<div className="min-h-screen flex flex-col"><Navbar /><main className="flex-1"><Login /></main><Footer /></div>} />
-      <Route path="/register" element={<div className="min-h-screen flex flex-col"><Navbar /><main className="flex-1"><Register /></main><Footer /></div>} />
-      <Route path="/verify-account" element={<VerifyAccount />} />
-      <Route path="/verify-email" element={<VerifyEmail />} />
-      <Route path="/forgot-password" element={<ForgotPassword />} />
-      <Route path="/reset-password" element={<ResetPassword />} />
-      <Route path="/about" element={<div className="min-h-screen flex flex-col"><Navbar /><main className="flex-1"><About /></main><Footer /><EmergencyLostPet /></div>} />
-      <Route path="/privacy" element={<div className="min-h-screen flex flex-col"><Navbar /><main className="flex-1"><Privacy /></main><Footer /><EmergencyLostPet /></div>} />
-      <Route path="/terms" element={<div className="min-h-screen flex flex-col"><Navbar /><main className="flex-1"><Terms /></main><Footer /><EmergencyLostPet /></div>} />
-      <Route path="/faq" element={<div className="min-h-screen flex flex-col"><Navbar /><main className="flex-1"><Faq /></main><Footer /><EmergencyLostPet /></div>} />
-      <Route path="/contact" element={<div className="min-h-screen flex flex-col"><Navbar /><main className="flex-1"><Contact /></main><Footer /><EmergencyLostPet /></div>} />
-      <Route path="/refer" element={<div className="min-h-screen flex flex-col"><Navbar /><main className="flex-1"><Refer /></main><Footer /></div>} />
+    <div className="min-h-screen flex flex-col">
+      <Navbar />
+      <main className="flex-1">{children}</main>
+      <Footer />
+      {showEmergency && <EmergencyLostPet />}
+    </div>
+  );
+}
 
-      {/* Account routes — no public Navbar/Footer, uses AccountLayout sidebar */}
-      <Route path="/account" element={<ProtectedRoute><AccountLayout><AccountDashboard /></AccountLayout></ProtectedRoute>} />
-      <Route path="/account/pets" element={<ProtectedRoute><AccountLayout><MyPets /></AccountLayout></ProtectedRoute>} />
-      <Route path="/account/profile" element={<ProtectedRoute><AccountLayout><Profile /></AccountLayout></ProtectedRoute>} />
-      <Route path="/account/orders" element={<ProtectedRoute><AccountLayout><Orders /></AccountLayout></ProtectedRoute>} />
-      <Route path="/account/orders/:id" element={<ProtectedRoute><AccountLayout><OrderDetail /></AccountLayout></ProtectedRoute>} />
-      <Route path="/account/subscriptions" element={<ProtectedRoute><AccountLayout><Subscriptions /></AccountLayout></ProtectedRoute>} />
-      <Route path="/account/notifications" element={<ProtectedRoute><AccountLayout><Notifications /></AccountLayout></ProtectedRoute>} />
-      <Route path="/account/notification-preferences" element={<ProtectedRoute><AccountLayout><NotificationPreferences /></AccountLayout></ProtectedRoute>} />
-      <Route path="/account/redeem-tag" element={<ProtectedRoute><AccountLayout><RedeemTag /></AccountLayout></ProtectedRoute>} />
-      <Route path="/account/referrals" element={<ProtectedRoute><AccountLayout><Referrals /></AccountLayout></ProtectedRoute>} />
-      <Route path="/account/settings" element={<ProtectedRoute><AccountLayout><Settings /></AccountLayout></ProtectedRoute>} />
+export default function App() {
+  const { status, messages, loading } = useSiteAvailability();
 
-      {/* Invoice view — no Navbar/Footer, standalone page */}
-      <Route path="/invoice/:token" element={<InvoiceView />} />
+  // Add/remove body class for maintenance banner offset
+  useEffect(() => {
+    if (status === SiteAvailabilityStatus.MAINTENANCE) {
+      document.body.classList.add('has-maintenance-banner');
+    } else {
+      document.body.classList.remove('has-maintenance-banner');
+    }
+    return () => document.body.classList.remove('has-maintenance-banner');
+  }, [status]);
 
-      {/* Catch-all */}
-      <Route path="*" element={<NotFound />} />
-    </Routes>
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
+      </div>
+    );
+  }
+
+  // OFFLINE — show dedicated offline page for all routes
+  if (status === SiteAvailabilityStatus.OFFLINE) {
+    return <OfflinePage title={messages.offlineTitle} message={messages.offlineMessage} />;
+  }
+
+  return (
+    <>
+      {status === SiteAvailabilityStatus.MAINTENANCE && <MaintenanceBanner />}
+      <Routes>
+        {/* Public routes with Navbar + Footer */}
+        <Route path="/" element={<PublicLayout><Home /></PublicLayout>} />
+        <Route path="/shop" element={<PublicLayout><Shop /></PublicLayout>} />
+        <Route path="/shop/:id" element={<PublicLayout><ProductDetail /></PublicLayout>} />
+        <Route path="/checkout" element={<PublicLayout><Checkout /></PublicLayout>} />
+        <Route path="/login" element={<PublicLayout><Login /></PublicLayout>} />
+        <Route path="/register" element={<PublicLayout><Register /></PublicLayout>} />
+        <Route path="/verify-account" element={<VerifyAccount />} />
+        <Route path="/verify-email" element={<VerifyEmail />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/about" element={<PublicLayout><About /></PublicLayout>} />
+        <Route path="/privacy" element={<PublicLayout><Privacy /></PublicLayout>} />
+        <Route path="/terms" element={<PublicLayout><Terms /></PublicLayout>} />
+        <Route path="/faq" element={<PublicLayout><Faq /></PublicLayout>} />
+        <Route path="/contact" element={<PublicLayout><Contact /></PublicLayout>} />
+        <Route path="/refer" element={<PublicLayout showEmergency={false}><Refer /></PublicLayout>} />
+
+        {/* Account routes */}
+        <Route path="/account" element={<ProtectedRoute><AccountLayout><AccountDashboard /></AccountLayout></ProtectedRoute>} />
+        <Route path="/account/pets" element={<ProtectedRoute><AccountLayout><MyPets /></AccountLayout></ProtectedRoute>} />
+        <Route path="/account/profile" element={<ProtectedRoute><AccountLayout><Profile /></AccountLayout></ProtectedRoute>} />
+        <Route path="/account/orders" element={<ProtectedRoute><AccountLayout><Orders /></AccountLayout></ProtectedRoute>} />
+        <Route path="/account/orders/:id" element={<ProtectedRoute><AccountLayout><OrderDetail /></AccountLayout></ProtectedRoute>} />
+        <Route path="/account/subscriptions" element={<ProtectedRoute><AccountLayout><Subscriptions /></AccountLayout></ProtectedRoute>} />
+        <Route path="/account/notifications" element={<ProtectedRoute><AccountLayout><Notifications /></AccountLayout></ProtectedRoute>} />
+        <Route path="/account/notification-preferences" element={<ProtectedRoute><AccountLayout><NotificationPreferences /></AccountLayout></ProtectedRoute>} />
+        <Route path="/account/redeem-tag" element={<ProtectedRoute><AccountLayout><RedeemTag /></AccountLayout></ProtectedRoute>} />
+        <Route path="/account/referrals" element={<ProtectedRoute><AccountLayout><Referrals /></AccountLayout></ProtectedRoute>} />
+        <Route path="/account/settings" element={<ProtectedRoute><AccountLayout><Settings /></AccountLayout></ProtectedRoute>} />
+
+        {/* Invoice view */}
+        <Route path="/invoice/:token" element={<InvoiceView />} />
+
+        {/* Catch-all */}
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </>
   );
 }
