@@ -220,5 +220,5 @@ body { @apply bg-white text-gray-900; }
 
 /* Offset body content when maintenance banner is visible */
 body.has-maintenance-banner {
-  padding-top: 80px;
+  padding-top: 96px;
 }
