@@ -170,7 +170,7 @@ The mobile app (`apps/mobile`) is a React Native (Expo) app for pet owners with:
 - NFC tag activation
 - Push notifications
 - Secure token storage via `expo-secure-store`
-- 12 screens across auth, home, pets, tags, health, orders, and subscriptions
+- 14 screens across auth, home, pets, tags, health, orders, subscriptions, settings, and offline support
 
 ### Mobile E2E Tests (Maestro)
 
@@ -240,7 +240,7 @@ Located in `apps/mobile/e2e/`:
 ```text
 PawTag/
 ├── apps/
-│   ├── admin/          → Admin portal (port 3001) - 42 pages
+│   ├── admin/          → Admin portal (port 3001) - 44 pages
 │   │   └── src/
 │   │       ├── components/
 │   │       ├── context/
@@ -249,7 +249,7 @@ PawTag/
 │   ├── finder/         → Finder portal (port 3003) - 10 components
 │   │   └── src/
 │   │       └── components/
-│   ├── mobile/         → React Native (Expo) app - 12 screens
+│   ├── mobile/         → React Native (Expo) app - 14 screens
 │   │   ├── src/
 │   │   │   ├── components/
 │   │   │   ├── context/
@@ -263,7 +263,7 @@ PawTag/
 │           ├── context/
 │           └── pages/
 ├── packages/
-│   ├── api/            → Express backend (port 5000) - 26 route files, 19+ services
+│   ├── api/            → Express backend (port 5000) - 30 route files, 21+ services
 │   │   └── src/
 │   │       ├── config/
 │   │       ├── lib/
@@ -271,7 +271,7 @@ PawTag/
 │   │       ├── routes/
 │   │       ├── seeds/
 │   │       └── services/
-│   ├── db/             → MongoDB models & connection (44 models)
+│   ├── db/             → MongoDB models & connection (45 models)
 │   │   └── src/
 │   │       └── models/
 │   ├── shared/         → Shared TypeScript types & validation
@@ -279,7 +279,7 @@ PawTag/
 │   └── ui/             → Shared React component library (9 components)
 │       └── src/
 │           └── components/
-├── tests/              → 60 test files (25 unit, 32 integration, 1 smoke, 2 regression)
+├── tests/              → 77 test files (25 unit, 32 integration, 1 smoke, 2 regression)
 │   ├── integration/    → Integration tests (MongoDB Memory Server)
 │   ├── regression/     → Regression tests
 │   ├── smoke/          → API smoke tests
@@ -453,7 +453,7 @@ Copy `packages/api/.env.example` to `packages/api/.env` and configure:
 
 ### MongoDB Atlas
 
-PawTag uses MongoDB Atlas with Mongoose ODM. The database contains 43+ models covering:
+PawTag uses MongoDB Atlas with Mongoose ODM. The database contains 45 models covering:
 
 - **Core Business:** Users, Pets, Tags, Orders, Products, Subscriptions, Invoices
 - **Finder & Escalation:** FinderScan, LocationEvent, EscalationRecord
@@ -717,7 +717,7 @@ The Admin Portal is the operational control centre of the application. It provid
 - Detail drawers for entity inspection
 - Confirmation dialogs for destructive actions
 - Responsive design
-- PuckEditor visual page builder (30+ block types)
+- PuckEditor visual page builder (36 block types)
 - TipTap rich text editor (13 extensions)
 - Monaco JSON editor for advanced content editing
 
@@ -727,7 +727,7 @@ The Admin Portal is the operational control centre of the application. It provid
 
 Both admin and web apps include a visual page builder using `@puckeditor/core`:
 
-### Block Types (30+)
+### Block Types (36)
 
 | Category | Blocks |
 |----------|--------|
@@ -1131,7 +1131,7 @@ pnpm test:watch
 ### Test Statistics
 
 - **Test Files:** 77 (25 unit, 32 integration, 1 smoke, 2 regression)
-- **Tests:** 1100+ passing
+- **Tests:** 1100+ passing (99% pass rate)
 - **Duration:** ~60 seconds
 
 ---
@@ -1604,7 +1604,7 @@ Not currently documented / unable to determine from the repository.
 | `AGENTS.md` | AI development guide |
 | `docs/developer-setup.md` | Local development setup |
 | `docs/environments.md` | Environment variable reference |
-| `docs/database-schema.md` | All 44 Mongoose models |
+| `docs/database-schema.md` | All 45 Mongoose models |
 | `docs/business-workflows.md` | Business logic flows |
 | `docs/security_improvement.md` | Security audit and improvement plan |
 | `docs/launch-checklist.md` | Pre-launch verification |
@@ -1617,3 +1617,6 @@ Not currently documented / unable to determine from the repository.
 | `docs/deployment/staging.md` | Staging deployment guide |
 | `docs/deployment/production.md` | Production deployment guide |
 | `docs/deployment/mobile-release.md` | Mobile app store submission |
+| `docs/site-availability.md` | Maintenance/offline mode controls |
+| `docs/LOGGING.md` | Structured logging setup |
+| `docs/OBSERVABILITY-ARCHITECTURE.md` | Observability stack architecture |

@@ -412,14 +412,14 @@ If something could not be completed, clearly explain why and what is required.
 ```
 PawTag/
 ├── packages/
-│   ├── api/       → Express backend (port 5000, 26 route files, 19+ services)
-│   ├── db/        → MongoDB models & connection (44 models)
+│   ├── api/       → Express backend (port 5000, 30 route files, 21+ services)
+│   ├── db/        → MongoDB models & connection (45 models)
 │   ├── shared/    → Shared TypeScript types, enums, constants
 │   └── ui/        → Shared React component library (9 components)
 ├── apps/
-│   ├── admin/     → Admin portal (port 3001) - 42 pages, god-mode CRUD
+│   ├── admin/     → Admin portal (port 3001) - 44 pages, god-mode CRUD
 │   ├── web/       → Public site, shop, auth & customer portal (port 3000) - 31 pages
-│   ├── mobile/    → React Native (Expo) app - 12 screens, Maestro E2E tests
+│   ├── mobile/    → React Native (Expo) app - 14 screens, Maestro E2E tests
 │   └── finder/    → Finder portal (port 3003) - 10 purpose-built components
 ├── tests/         → 77 test files (25 unit, 32 integration, 1 smoke, 2 regression)
 ├── docker/        → Docker configs (4 services)
@@ -654,7 +654,7 @@ Two global system controls for maintenance and offline modes:
 - **Public pages:** `apps/web` — no auth required
 - **Finder portal:** `apps/finder` — standalone, no auth, decomposed into 10 components
 - **Admin portal:** `apps/admin` — full CRUD with RBAC, toast notifications, enterprise UI
-- **PuckEditor CMS:** Visual page builder with 30+ block types in both admin and web apps
+- **PuckEditor CMS:** Visual page builder with 36 block types in both admin and web apps
 - **Rich Text Editing:** TipTap-based editor in admin with 13 extensions
 - **Monaco Editor:** JSON editor in admin for advanced content editing
 
@@ -736,7 +736,11 @@ Located in `apps/mobile/e2e/`:
 | `packages/api/src/lib/logger.ts` | Pino logger with MongoDB write hook |
 | `packages/api/src/lib/log-writer.ts` | Batched MongoDB log writer |
 | `packages/api/src/lib/system-log-settings.ts` | System log settings cache |
+| `packages/api/src/lib/site-availability.service.ts` | Site availability service (10s cache) |
+| `packages/api/src/middleware/site-availability.ts` | Maintenance/offline mode middleware |
 | `packages/api/src/routes/system-logs.ts` | System log API routes |
+| `packages/api/src/routes/site-availability.ts` | Admin site availability routes |
+| `packages/api/src/routes/system-status.ts` | Public system status endpoint |
 | `apps/admin/src/pages/SystemLogs.tsx` | System log viewer with purge UI |
 | `apps/admin/src/pages/SystemLogSettings.tsx` | System log settings page |
 | `apps/web/src/components/OnboardingWizard.tsx` | Dynamic onboarding wizard with success screen |

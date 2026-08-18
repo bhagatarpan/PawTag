@@ -49,8 +49,9 @@ The web app consolidates the public site, shop, auth, and the customer portal in
 | App | Port | Audience | Auth | Purpose |
 |-----|------|----------|------|---------|
 | `apps/web` | 3000 | Public/Pet owners | Optional | Marketing site, shop, checkout, auth, customer portal (pets, orders, subscriptions, tags, referrals) |
-| `apps/admin` | 3001 | Staff | Admin RBAC | Full CRUD, dashboard, order management, CMS |
+| `apps/admin` | 3001 | Staff | Admin RBAC | Full CRUD, dashboard, order management, CMS, system logs, site availability |
 | `apps/finder` | 3003 | Strangers | None | Public tag lookup — must be tiny and fast |
+| `apps/mobile` | — | Pet owners | JWT + refresh | React Native (Expo) — pet management, QR/NFC scanning, push notifications |
 
 The finder page is intentionally kept minimal — it's the page a stressed stranger opens on their phone with poor signal to report a found pet. Bundling it with heavier apps would hurt the one interaction that matters most for reunions.
 
@@ -81,6 +82,8 @@ The finder role gets **no app** — both NFC taps and QR scans open the existing
 | HealthRecords | 7-tab health records (vaccinations, microchips, etc.) |
 | SubscriptionScreen | View/manage subscriptions |
 | OrderHistory | Order list with tracking |
+| Settings | App settings and account management |
+| OfflineScreen | Branded offline/maintenance experience |
 
 ## Shared Package
 
@@ -88,7 +91,7 @@ The finder role gets **no app** — both NFC taps and QR scans open the existing
 
 ## Database
 
-MongoDB Atlas with Mongoose ODM. 35+ models covering users, pets, tags, orders, subscriptions, invoices, notifications, CMS content, and more. See `docs/database-schema.md` for the full model reference.
+MongoDB Atlas with Mongoose ODM. 45 models covering users, pets, tags, orders, subscriptions, invoices, notifications, CMS content, system logs, audit events, escalation records, and more. See `docs/database-schema.md` for the full model reference.
 
 ## Authentication
 
@@ -125,11 +128,10 @@ Access tokens are short-lived (30 min). Refresh tokens (30-day, rotating) suppor
 |---------|---------|---------|----------------|
 | MongoDB Atlas | Database — stores all application data | `DB_URL` | **Critical** — entire app down |
 | Stripe | Payments, subscriptions, customer portal | `STRIPE_SECRET_KEY` | **Critical** — no purchases or subscriptions |
-| Postmark | Transactional email (receipts, verification, notifications) | `SMTP_*` | **High** — emails logged to console, users can't verify/reset |
+| Resend | Transactional email (receipts, verification, notifications) | `RESEND_API_KEY` | **High** — emails logged to console, users can't verify/reset |
 | Twilio | SMS/OTP for phone verification | `TWILIO_*` | **Medium** — OTP falls back to demo mode (logged to console) |
 | Cloudflare R2 | Object storage (pet photos, product images, PDFs) | `R2_*` | **Low** — falls back to local disk in dev |
 | Sentry | Error tracking and performance monitoring | `SENTRY_DSN` | **Low** — errors only visible in server logs |
-| Better Stack | Logging, uptime monitoring | — | **Low** — monitoring gap only |
 | Expo | Mobile push notifications, EAS Build | — | **Medium** — push notifications fail silently, no new mobile builds |
 | Apple APNs | iOS push notification delivery | (configured in Expo) | **Medium** — iOS notifications fail |
 | Google FCM | Android push notification delivery | (configured in Expo) | **Medium** — Android notifications fail |
@@ -144,13 +146,58 @@ Three environments with complete separation:
 
 See `docs/deployment/staging.md` and `docs/deployment/production.md` for deployment procedures.
 
+## Site Availability Controls
+
+Two global system controls for maintenance and offline modes:
+
+- **Service:** `packages/api/src/lib/site-availability.service.ts` — 10s TTL cache, precedence logic (OFFLINE > MAINTENANCE > ONLINE)
+- **Middleware:** `packages/api/src/middleware/site-availability.ts` — blocks mutations during maintenance, blocks all during offline
+- **Admin routes:** `GET/PUT /api/admin/site-availability/status` — requires `setting.read`/`setting.update`
+- **Public endpoint:** `GET /api/public/system/status` — always accessible, returns effective status
+- **Settings:** 7 `site.*` settings in `seed-cms.ts` (maintenanceMode, offlineMode, messages, pollingInterval)
+- **Web:** `SiteAvailabilityProvider` (30s polling), `MaintenanceBanner`, `OfflinePage`
+- **Finder:** Shows pet info read-only during maintenance, offline screen when offline
+- **Mobile:** `OfflineScreen` component, 30s polling
+
+## System Logging
+
+Application logs written to MongoDB via Pino with structured output:
+
+- **Logger:** `packages/api/src/lib/logger.ts` — wraps each level method to fire `writeLog()`
+- **Log writer:** `packages/api/src/lib/log-writer.ts` — batched async writes to `SystemLog` collection
+- **Settings cache:** `packages/api/src/lib/system-log-settings.ts` — 60s TTL cache for level/category/sampling/retention
+- **Admin UI:** `apps/admin/src/pages/SystemLogs.tsx` — viewer with search, filters, pagination, detail drawer, purge, export (CSV/JSON/PDF)
+- **Settings UI:** `apps/admin/src/pages/SystemLogSettings.tsx` — master toggle, level/category toggles, sampling sliders, retention
+- **RBAC:** `systemlogs.read` (ADMIN, CUSTOMER_SERVICE, WEBSITE_EDITOR), `systemlogs.admin` (ADMIN only)
+- **Tests:** `tests/unit/system-log-settings.test.ts`, `tests/unit/system-log-utils.test.ts`, `tests/integration/system-logs-api.test.ts`
+
+## Audit Logging
+
+Enterprise-grade audit trail with integrity verification:
+
+- **Service:** `packages/api/src/services/audit/audit.service.ts` — queue-based, async
+- **Middleware:** `packages/api/src/middleware/audit.ts` — auto-captures all `/api/*` requests
+- **Model:** `AuditEvent` with SHA-256 hash chain (each event links to previous via `previousEventHash`)
+- **Features:** Actor tracking (USER, ADMIN, CSR, FINDER, SYSTEM), field-level diffs with sensitive field redaction
+- **Policy engine:** `audit.policy.category.*` and `audit.policy.actor.*` settings control what's logged
+
+## Observability Stack
+
+Full observability infrastructure (built as unplanned addition):
+
+- **Structured logging:** Pino → MongoDB (`SystemLog` collection with TTL index)
+- **Distributed tracing:** OpenTelemetry with request correlation IDs
+- **Metrics:** Request duration, error rates, DB connectivity health
+- **Health endpoints:** `GET /api/health` (MongoDB connectivity check)
+- **Documentation:** `docs/OBSERVABILITY-ARCHITECTURE.md`, `docs/OBSERVABILITY-RUNBOOK.md`
+
 ## Key Documentation
 
 | Document | Purpose |
 |----------|---------|
 | `docs/developer-setup.md` | Local development setup |
 | `docs/environments.md` | Environment variable reference |
-| `docs/database-schema.md` | All 35+ Mongoose models |
+| `docs/database-schema.md` | All 45 Mongoose models |
 | `docs/business-workflows.md` | Business logic flows |
 | `docs/deployment/staging.md` | Staging deployment guide |
 | `docs/deployment/production.md` | Production deployment guide |
@@ -161,3 +208,7 @@ See `docs/deployment/staging.md` and `docs/deployment/production.md` for deploym
 | `docs/disaster-recovery.md` | Infrastructure failure recovery |
 | `docs/mobile-ux-audit.md` | Mobile UX quality audit |
 | `docs/launch-checklist.md` | Pre-launch verification |
+| `docs/site-availability.md` | Maintenance/offline mode controls |
+| `docs/LOGGING.md` | Structured logging setup |
+| `docs/OBSERVABILITY-ARCHITECTURE.md` | Observability stack architecture |
+| `docs/OBSERVABILITY-RUNBOOK.md` | Observability operations runbook |

@@ -1619,6 +1619,82 @@ table in your response.
 
 ---
 
+### Unplanned Addition — Enterprise Observability System ✅ COMPLETE
+
+**This was not part of the original 26-phase plan.** It was implemented as a 12-phase feature branch (`feat/enterprise-observability`) and is documented here after the fact so the roadmap stays an accurate record of what the repository actually contains.
+
+**What was built**, across 12 commits:
+
+- **Phase 1:** Established logging baseline — Pino logger with structured JSON output
+- **Phase 2:** Structured application logger with level methods wrapping `writeLog()`
+- **Phase 3:** Request context and central error taxonomy (`app-errors.ts`)
+- **Phase 4:** Error taxonomy hardening and sensitive field redaction (`redaction.ts`)
+- **Phase 5:** Service and integration boundary instrumentation
+- **Phase 6:** Metrics and health signals (`metrics.ts`, `monitoring.ts`)
+- **Phase 7:** OpenTelemetry tracing (`tracing.ts`, `correlation.ts`)
+- **Phase 8:** Production error monitoring
+- **Phase 9:** Log correlation and audit documentation
+- **Phase 10:** Operational reporting
+- **Phase 11:** Failure testing and hardening
+- **Phase 12:** Production hardening and runbook
+
+**Files created/modified:** `packages/api/src/lib/logger.ts`, `log-writer.ts`, `system-log-settings.ts`, `app-errors.ts`, `reporting.ts`, `correlation.ts`, `monitoring.ts`, `redaction.ts`, `tracing.ts`, `timing.ts`, `metrics.ts`, `request-context.ts`, `packages/api/src/middleware/metrics.ts`, `tracing.ts`, `packages/db/src/models/SystemLog.ts`. Documentation: `docs/LOGGING.md`, `docs/LOGGING-OBSERVABILITY-BASELINE.md`, `docs/OBSERVABILITY-ARCHITECTURE.md`, `docs/OBSERVABILITY-RUNBOOK.md`, `docs/OBSERVABILITY-TESTING.md`.
+
+**Scope:** Full observability stack — structured logging (Pino → MongoDB), OpenTelemetry distributed tracing, request correlation IDs, metrics collection, health signal endpoints, sensitive field redaction, operational reporting, failure testing, and production hardening. This is enterprise-grade infrastructure that was identified as a gap during the original audit (Part 4, items 21-22: "No structured logging" and "No DB-connectivity health check").
+
+---
+
+### Unplanned Addition — System Logs Feature ✅ COMPLETE
+
+**This was not part of the original 26-phase plan.** It was implemented as a feature branch (`feat/system-logs`) and is documented here after the fact.
+
+**What was built:**
+
+- **Admin UI:** `apps/admin/src/pages/SystemLogs.tsx` — full log viewer with search, filters, pagination, detail drawer, purge, and export (CSV/JSON/PDF)
+- **Settings UI:** `apps/admin/src/pages/SystemLogSettings.tsx` — master toggle, level/category toggles, sampling sliders, retention configuration
+- **API Routes:** `packages/api/src/routes/system-logs.ts` — `GET /admin/system-logs`, `GET /admin/system-logs/summary`, `GET /admin/system-logs/export`, `GET /admin/system-logs/settings`, `PUT /admin/system-logs/settings/:key`, `POST /admin/system-logs/purge`
+- **RBAC:** `systemlogs.read` (ADMIN, CUSTOMER_SERVICE, WEBSITE_EDITOR), `systemlogs.admin` (ADMIN only)
+- **Settings:** 22 `systemLog.*` settings seeded in `seed-cms.ts`
+- **Manual purge:** Date range presets + custom range + confirmation dialog
+- **Export:** Dropdown with CSV, JSON, and PDF options
+
+**Tests:** `tests/unit/system-log-settings.test.ts`, `tests/unit/system-log-utils.test.ts`, `tests/integration/system-logs-api.test.ts`
+
+---
+
+### Unplanned Addition — Site Availability Controls (Maintenance + Offline Modes) ✅ COMPLETE
+
+**This was not part of the original 26-phase plan.** It was implemented as a feature branch (`feat/site-availability`) and is documented here after the fact.
+
+**What was built:**
+
+- **Service:** `packages/api/src/lib/site-availability.service.ts` — 10s TTL cache, reads 7 DB settings, precedence logic (OFFLINE > MAINTENANCE > ONLINE)
+- **Middleware:** `packages/api/src/middleware/site-availability.ts` — blocks mutations during maintenance, blocks all during offline. Exempts `/health`, `/api/public/system/status`, `/api/admin`, `/api/auth`, `/api/tags`
+- **Admin routes:** `GET/PUT /api/admin/site-availability/status` — requires `setting.read`/`setting.update`, Zod validation, audit logging with severity (OFFLINE=CRITICAL, MAINTENANCE=HIGH)
+- **Public endpoint:** `GET /api/public/system/status` — always accessible, returns effective status
+- **Settings:** 7 `site.*` settings in `seed-cms.ts` (maintenanceMode, offlineMode, maintenanceTitle, maintenanceMessage, offlineTitle, offlineMessage, availabilityPollingInterval)
+- **RBAC:** `setting.read`/`setting.update` assigned to ADMIN, WEBSITE_EDITOR (CUSTOMER_SERVICE excluded)
+- **Web:** `SiteAvailabilityProvider` (30s polling), `MaintenanceBanner` (fixed, red, pulsing animation, non-dismissible, respects `prefers-reduced-motion`), `OfflinePage` (full-page branded experience)
+- **Finder:** Shows pet info read-only during maintenance, offline screen when offline
+- **Mobile:** `OfflineScreen` component, 30s polling
+- **Admin UI:** `apps/admin/src/pages/SiteAvailabilitySettings.tsx` — toggles with confirmation dialogs, message editors, polling interval, precedence info
+
+**Tests:** `tests/unit/site-availability.test.ts` (9 tests), `tests/integration/site-availability-api.test.ts`
+
+**Documentation:** `docs/site-availability.md`, `DESIGN.md` (System Availability Components section)
+
+---
+
+### Unplanned Addition — Admin UX Improvements ✅ COMPLETE
+
+**This was not part of the original 26-phase plan.** A series of incremental admin portal improvements were implemented:
+
+- **Clickable relationships:** Pet detail drawer tags are clickable, tag detail drawer owners/pets are clickable, pet drawer owners are clickable — all navigating to the relevant detail view
+- **Enhanced data fetching:** Admin pet/tag/user drawers fetch full entity data on click rather than showing partial information
+- **GET /admin/pets/:id:** Dedicated endpoint for fetching full pet details from admin
+
+---
+
 ### Phase 21 — End-to-end test suite (Playwright)
 
 **Objective:** Automate the five critical user journeys identified in Part 6, so no future change can silently break checkout, tag activation, the recovery flow, admin fulfillment, or subscription renewal without CI catching it.
