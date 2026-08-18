@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, Routes, Route } from 'react-router-dom';
-import { Phone, PawPrint } from 'lucide-react';
+import { Phone, PawPrint, WifiOff, AlertTriangle } from 'lucide-react';
+import { SiteAvailabilityStatus } from '@pawtag/shared';
 import { useSiteSettings } from './hooks/useSiteSettings';
-import { fetchTagData, fetchFoundTimer } from './lib/finderApi';
+import { fetchTagData, fetchFoundTimer, fetchSystemStatus } from './lib/finderApi';
 import type { FinderData, FoundTimerData, LocationData, PetPhoto } from './types';
 import StatusBanner from './components/StatusBanner';
 import PetPhotoCarousel from './components/PetPhotoCarousel';
@@ -15,6 +16,21 @@ import FinderLoadingState from './components/FinderLoadingState';
 import FinderErrorState from './components/FinderErrorState';
 
 
+function OfflineScreen({ title, message }: { title: string; message: string }) {
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+      <div className="max-w-md w-full text-center">
+        <div className="mx-auto w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mb-6">
+          <WifiOff size={40} className="text-red-600" />
+        </div>
+        <h1 className="text-2xl font-bold text-gray-900 mb-3">{title}</h1>
+        <p className="text-lg text-gray-600 mb-6">{message}</p>
+        <p className="text-sm text-gray-400">PawTag — Reuniting lost pets with their families</p>
+      </div>
+    </div>
+  );
+}
+
 function FinderPage() {
   const { tagId } = useParams<{ tagId: string }>();
   const { settings } = useSiteSettings();
@@ -25,11 +41,23 @@ function FinderPage() {
   const [error, setError] = useState('');
   const [notified, setNotified] = useState(false);
   const [foundTimer, setFoundTimer] = useState<FoundTimerData | null>(null);
+  const [siteStatus, setSiteStatus] = useState<SiteAvailabilityStatus>(SiteAvailabilityStatus.ONLINE);
 
   // Location state
   const [locationConsent, setLocationConsent] = useState<'pending' | 'granted' | 'denied' | 'unavailable'>('pending');
   const [finderLocation, setFinderLocation] = useState<LocationData | null>(null);
   const [consentTimestamp, setConsentTimestamp] = useState<Date | null>(null);
+
+  const checkSiteStatus = useCallback(async () => {
+    const status = await fetchSystemStatus();
+    setSiteStatus(status);
+  }, []);
+
+  useEffect(() => {
+    checkSiteStatus();
+    const interval = setInterval(checkSiteStatus, 30000);
+    return () => clearInterval(interval);
+  }, [checkSiteStatus]);
 
   useEffect(() => {
     if (!tagId) { setError('No tag ID provided'); setLoading(false); return; }
@@ -87,11 +115,25 @@ function FinderPage() {
   if (error) return <FinderErrorState message={error} />;
   if (!data) return null;
 
+  const isMaintenance = siteStatus === SiteAvailabilityStatus.MAINTENANCE;
   const bgColor = data.pet.status === 'lost' ? 'bg-red-50' : data.pet.status === 'found' ? 'bg-amber-50' : 'bg-gray-50';
 
   return (
     <div className={`min-h-screen py-8 px-4 ${bgColor}`}>
       <div className="max-w-md mx-auto">
+        {/* Maintenance warning for finder */}
+        {isMaintenance && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4 flex items-start gap-3">
+            <AlertTriangle size={20} className="text-amber-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-medium text-amber-800">PawTag is under maintenance</p>
+              <p className="text-sm text-amber-700 mt-1">
+                You can view pet information, but actions like notifying the owner are temporarily unavailable.
+              </p>
+            </div>
+          </div>
+        )}
+
         <StatusBanner status={data.pet.status} tagId={data.tagId} tagStatus={data.tagStatus} />
 
         <div className="bg-white rounded-xl shadow-md overflow-hidden">
@@ -110,7 +152,8 @@ function FinderPage() {
           <div className="px-6 pb-6 space-y-3">
             {foundTimer && <FoundTimer timer={foundTimer} />}
 
-            {!notified && !foundTimer?.active && (
+            {/* Location and notify actions — blocked during maintenance */}
+            {!isMaintenance && !notified && !foundTimer?.active && (
               <LocationConsentBanner
                 consent={locationConsent}
                 hasLocation={!!finderLocation}
@@ -119,7 +162,7 @@ function FinderPage() {
               />
             )}
 
-            {!notified && !foundTimer?.active ? (
+            {!isMaintenance && !notified && !foundTimer?.active ? (
               <NotifyOwnerForm
                 tagId={tagId!}
                 location={finderLocation}
@@ -130,6 +173,10 @@ function FinderPage() {
             ) : notified ? (
               <div className="bg-green-50 text-green-700 py-3 rounded-lg text-center flex items-center justify-center gap-2">
                 <Phone size={18} /> Owner has been notified! Thank you for helping.
+              </div>
+            ) : isMaintenance ? (
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center text-gray-500 text-sm">
+                Actions are temporarily unavailable during maintenance.
               </div>
             ) : null}
 
@@ -152,9 +199,43 @@ function FinderPage() {
   );
 }
 
+function FinderOfflineScreen() {
+  return (
+    <Routes>
+      <Route path="*" element={
+        <OfflineScreen
+          title="PawTag is currently offline"
+          message="Please come back later."
+        />
+      } />
+    </Routes>
+  );
+}
+
 export default function App() {
   const { settings } = useSiteSettings();
   const companyName = settings?.['company.name'] || 'PawTag';
+  const [siteStatus, setSiteStatus] = useState<SiteAvailabilityStatus>(SiteAvailabilityStatus.ONLINE);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchSystemStatus()
+      .then((status) => setSiteStatus(status))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
+      </div>
+    );
+  }
+
+  if (siteStatus === SiteAvailabilityStatus.OFFLINE) {
+    return <FinderOfflineScreen />;
+  }
+
   return (
     <Routes>
       <Route path="/:tagId" element={<FinderPage />} />

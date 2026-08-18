@@ -705,6 +705,9 @@ async function seed() {
         { permissionName: 'content.upload_media' },
         { permissionName: 'systemlogs.read' },
         { permissionName: 'audit.read' },
+        // Site availability settings
+        { permissionName: 'setting.read' },
+        { permissionName: 'setting.update' },
         // CMS
         { permissionName: 'cms.page.read' },
         { permissionName: 'cms.page.create' },

@@ -44,6 +44,7 @@ import WriteNfcTag from './pages/WriteNfcTag';
 import SupportRequests from './pages/SupportRequests';
 import SystemLogs from './pages/SystemLogs';
 import SystemLogSettings from './pages/SystemLogSettings';
+import SiteAvailabilitySettings from './pages/SiteAvailabilitySettings';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
@@ -189,6 +190,7 @@ export default function App() {
       <Route path="/support-requests" element={<ProtectedRoute><SupportRequests /></ProtectedRoute>} />
       <Route path="/system-logs" element={<ProtectedRoute><SystemLogs /></ProtectedRoute>} />
       <Route path="/system-log-settings" element={<ProtectedRoute><SystemLogSettings /></ProtectedRoute>} />
+      <Route path="/site-availability" element={<ProtectedRoute><SiteAvailabilitySettings /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

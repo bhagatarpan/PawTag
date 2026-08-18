@@ -622,6 +622,23 @@ Application logs are written to MongoDB via Pino with a wrapper-based level inte
 - **Settings:** 22 `systemLog.*` settings seeded in `seed-cms.ts`
 - **Tests:** `tests/unit/system-log-settings.test.ts`, `tests/unit/system-log-utils.test.ts`, `tests/integration/system-logs-api.test.ts`
 
+### Site Availability Controls
+
+Two global system controls for maintenance and offline modes:
+- **Service:** `packages/api/src/lib/site-availability.service.ts` — 10s TTL cache, precedence logic (OFFLINE > MAINTENANCE > ONLINE)
+- **Middleware:** `packages/api/src/middleware/site-availability.ts` — blocks mutations during maintenance, blocks all during offline
+- **Admin routes:** `GET/PUT /api/admin/site-availability/status` — requires `setting.read`/`setting.update`
+- **Public endpoint:** `GET /api/public/system/status` — always accessible, returns effective status
+- **Settings:** 7 `site.*` settings in `seed-cms.ts` (maintenanceMode, offlineMode, messages, pollingInterval)
+- **RBAC:** `setting.read`/`setting.update` assigned to ADMIN, WEBSITE_EDITOR (CUSTOMER_SERVICE excluded)
+- **Web:** `SiteAvailabilityProvider` (30s polling), `MaintenanceBanner` (top, 10-15% height, red, pulsing, non-dismissible), `OfflinePage`
+- **Finder:** Shows pet info read-only during maintenance, offline screen when offline
+- **Mobile:** `OfflineScreen` component, 30s polling
+- **Admin UI:** `apps/admin/src/pages/SiteAvailabilitySettings.tsx` — toggles, message editors, polling interval
+- **Audit:** All changes logged with appropriate severity (OFFLINE=CRITICAL, MAINTENANCE=HIGH)
+- **Tests:** `tests/unit/site-availability.test.ts`, `tests/integration/site-availability-api.test.ts`
+- **Docs:** `docs/site-availability.md`, DESIGN.md (System Availability Components section)
+
 ### Auth & Permissions
 
 - JWT-based auth with refresh tokens

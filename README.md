@@ -704,6 +704,7 @@ The Admin Portal is the operational control centre of the application. It provid
 | **Audit Settings** | Audit policy configuration |
 | **System Logs** | Application log viewer with search, filters, pagination, purge, export |
 | **System Log Settings** | Log level/category toggles, sampling, retention |
+| **Site Availability** | Maintenance mode and offline mode controls |
 | **Roles & Permissions** | RBAC configuration (Roles, Permissions, Groups, Scopes) |
 
 ### Admin Portal Features

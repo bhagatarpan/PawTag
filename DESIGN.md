@@ -347,6 +347,52 @@ The PawTag logo is code-based — a **PawPrint icon** inside a **teal gradient r
 
 ---
 
+## System Availability Components
+
+### Maintenance Banner
+
+A full-width, fixed-position banner displayed at the top of the page when the site is in Maintenance Mode.
+
+**Design Rules:**
+- **Position:** `fixed; top: 0; left: 0; right: 0; z-index: 50`
+- **Height:** 10-15% of viewport height (minimum 80px)
+- **Background:** `red-600` (`#dc2626`)
+- **Text:** White (`#ffffff`)
+- **Icon:** `AlertTriangle` from Lucide, `red-200` color
+- **Animation:** Slow dissolve pulse — opacity cycles between 1 and 0.7 over 3 seconds, infinite
+- **Reduced motion:** `@media (prefers-reduced-motion: reduce)` — static, no animation
+- **Non-dismissible:** No close button, no dismiss action, no localStorage/sessionStorage
+- **Content:** Title and message from CMS settings (`site.maintenanceTitle`, `site.maintenanceMessage`)
+- **Responsive:** Full-width on all screen sizes, text size adapts
+
+**Body Offset:** When the maintenance banner is visible, add `padding-top: 80px` to `body.has-maintenance-banner` to prevent content from being hidden behind the banner.
+
+### System Offline Page
+
+A full-page branded experience displayed when the site is in Offline Mode.
+
+**Design Rules:**
+- **Layout:** Centered content, full viewport height
+- **Background:** `gray-50` (`#f9fafb`)
+- **Icon:** PawPrint (Lucide), 40px, `primary-600` color, inside a `primary-100` circle (80px diameter)
+- **Title:** `h2` (24px, bold, `gray-900`)
+- **Message:** `body-lg` (18px, regular, `gray-600`)
+- **Footer:** `caption` (12px, `gray-400`) — "PawTag — Reuniting lost pets with their families"
+- **No Navbar/Footer:** The offline page replaces the entire normal application chrome
+- **Content from CMS:** Title and message from `site.offlineTitle`, `site.offlineMessage`
+
+### Status Badge Usage
+
+Use the existing `StatusBadge` component from `@pawtag/ui` to display the current availability state:
+
+| State | Variant | Label |
+|-------|---------|-------|
+| Online | `success` | ONLINE |
+| Maintenance | `warning` | MAINTENANCE |
+| Offline | `danger` | OFFLINE |
+
+---
+
 ## Findings — Web App Inconsistencies
 
 The following inconsistencies exist between the four web apps. These are documented here for a future deliberate decision — they were NOT fixed in this phase to avoid an unplanned redesign of working apps.

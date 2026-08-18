@@ -73,8 +73,11 @@ import referralRoutes from './routes/referrals';
 import pushTokenRoutes from './routes/push-tokens';
 import auditRoutes from './routes/audit';
 import systemLogRoutes from './routes/system-logs';
+import siteAvailabilityRoutes from './routes/site-availability';
+import systemStatusRoutes from './routes/system-status';
 import { publicRouter as supportPublicRoutes, adminRouter as supportAdminRoutes } from './routes/support';
 import healthRoutes from './routes/health';
+import { siteAvailabilityMiddleware } from './middleware/site-availability';
 import { shutdownTracing } from './lib/tracing';
 import { flushMonitoring } from './lib/monitoring';
 import { flushSystemLogs } from './lib/logger';
@@ -132,6 +135,9 @@ app.use(tracingMiddleware);
 
 // Audit middleware - must be early to capture all requests
 app.use(auditMiddleware);
+
+// Site availability middleware - enforces maintenance/offline modes
+app.use(siteAvailabilityMiddleware);
 
 // Rate limiting — all values read from DB settings (see seed-cms.ts)
 const limiter = createDbRateLimiter({
@@ -223,6 +229,8 @@ app.use('/api/public/cms', cmsSettingsPublicRoutes);
 app.use('/api/public/cms', cmsPublicV2Routes);
 app.use('/api/admin/audit', auditRoutes);
 app.use('/api/admin/system-logs', systemLogRoutes);
+app.use('/api/admin/site-availability', siteAvailabilityRoutes);
+app.use('/api/public/system', systemStatusRoutes);
 
 // --- Error Handling ---
 app.use(notFoundHandler);
