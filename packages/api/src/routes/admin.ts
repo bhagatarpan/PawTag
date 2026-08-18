@@ -3186,27 +3186,27 @@ router.get('/settings', requirePermission('setting.read'), async (req, res: Resp
 router.put('/settings/:key', requirePermission('setting.update'), async (req: AuthRequest, res: Response) => {
   try {
     const existing = await Setting.findOne({ key: req.params.key });
-    if (!existing) { res.status(404).json({ success: false, error: 'Setting not found' }); return; }
-    const beforeState = { key: existing.key, value: existing.value, displayValue: existing.displayValue, category: existing.category };
+    const beforeState = existing ? { key: existing.key, value: existing.value, displayValue: existing.displayValue, category: existing.category } : undefined;
     const updateFields: any = { value: req.body.value, updatedBy: req.user!.id };
     if (req.body.displayValue !== undefined) updateFields.displayValue = req.body.displayValue;
+    if (req.body.category !== undefined) updateFields.category = req.body.category;
+    if (req.body.description !== undefined) updateFields.description = req.body.description;
     const setting = await Setting.findOneAndUpdate(
       { key: req.params.key },
-      updateFields,
-      { new: true },
+      { $set: updateFields, $setOnInsert: { key: req.params.key, category: req.body.category || 'general' } },
+      { new: true, upsert: true },
     );
-    if (!setting) { res.status(404).json({ success: false, error: 'Setting not found' }); return; }
     const updatedSetting = setting as unknown as InstanceType<typeof Setting>;
     await auditAdminEvent(req, {
-      action: 'setting_update',
-      eventType: 'setting.updated',
+      action: existing ? 'setting_update' : 'setting_create',
+      eventType: existing ? 'setting.updated' : 'setting.created',
       eventCategory: 'CONFIG',
-      operationType: 'UPDATE',
+      operationType: existing ? 'UPDATE' : 'CREATE',
       resourceType: 'Setting',
       resourceId: updatedSetting.key,
       beforeState,
       afterState: { key: updatedSetting.key, value: updatedSetting.value, displayValue: updatedSetting.displayValue, category: updatedSetting.category },
-      changedFields: [{ field: 'value', before: beforeState.value, after: updatedSetting.value }],
+      changedFields: [{ field: 'value', before: beforeState?.value || '', after: updatedSetting.value }],
       outcome: 'SUCCESS',
       severity: 'HIGH',
     });
