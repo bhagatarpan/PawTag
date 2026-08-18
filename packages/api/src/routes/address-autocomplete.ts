@@ -32,6 +32,10 @@ let settingsCache: Record<string, string> = {};
 let settingsCacheTime = 0;
 const SETTINGS_CACHE_TTL = 60_000;
 
+// NZ Post OAuth token cache
+let nzpostToken: string | null = null;
+let nzpostTokenExpiry = 0;
+
 async function getSettings(): Promise<Record<string, string>> {
   const now = Date.now();
   if (settingsCacheTime && now - settingsCacheTime < SETTINGS_CACHE_TTL) {
@@ -54,6 +58,41 @@ async function getSettings(): Promise<Record<string, string>> {
   return settingsCache;
 }
 
+async function getNzpostToken(clientId: string, clientSecret: string): Promise<string> {
+  const now = Date.now();
+
+  // Return cached token if still valid (with 5-minute buffer)
+  if (nzpostToken && now < nzpostTokenExpiry - 300_000) {
+    return nzpostToken;
+  }
+
+  // Fetch new token using OAuth 2.0 Client Credentials
+  const body = new URLSearchParams({
+    grant_type: 'client_credentials',
+    client_id: clientId,
+    client_secret: clientSecret,
+  });
+
+  const response = await fetch('https://oauth.nzpost.co.nz/as/token.oauth2', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: body.toString(),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`OAuth failed: ${response.status} - ${errorText}`);
+  }
+
+  const data = await response.json();
+  nzpostToken = data.access_token as string;
+  nzpostTokenExpiry = now + (data.expires_in || 86399) * 1000;
+
+  return nzpostToken;
+}
+
 function mapPhotonToAddress(feature: PhotonFeature): NormalizedAddress {
   const p = feature.properties;
   return {
@@ -67,33 +106,21 @@ function mapPhotonToAddress(feature: PhotonFeature): NormalizedAddress {
 }
 
 function parseNzpostAddress(fullAddress: string): NormalizedAddress {
-  // NZ Post returns a full address string like:
-  // "8 Water Lane, New Plymouth 4310"
-  // or "392 Ellerslie-Panmure Highway, Mount Wellington, Auckland 1060"
   const parts = fullAddress.split(',').map((p) => p.trim());
 
   if (parts.length === 1) {
     return { line1: parts[0], line2: '', city: '', state: '', zip: '', country: 'NZ' };
   }
 
-  // Last part contains city and postcode (e.g., "New Plymouth 4310")
   const lastPart = parts[parts.length - 1];
   const postcodeMatch = lastPart.match(/\s+(\d{4})$/);
   const city = postcodeMatch ? lastPart.slice(0, -postcodeMatch[1].length).trim() : lastPart;
   const zip = postcodeMatch ? postcodeMatch[1] : '';
 
-  // Everything before the last part is the street address
   const streetParts = parts.slice(0, -1);
   const line1 = streetParts.join(', ');
 
-  return {
-    line1,
-    line2: '',
-    city,
-    state: '',
-    zip,
-    country: 'NZ',
-  };
+  return { line1, line2: '', city, state: '', zip, country: 'NZ' };
 }
 
 router.get('/suggest', async (req: Request, res: Response) => {
@@ -118,18 +145,18 @@ router.get('/suggest', async (req: Request, res: Response) => {
       }
 
       try {
-        // Use query parameter authentication (simpler, no OAuth token needed)
+        const token = await getNzpostToken(clientId, clientSecret);
+
         const params = new URLSearchParams({
           q: q.trim(),
           max: limit.toString(),
-          client_id: clientId,
-          client_secret: clientSecret,
         });
         const apiUrl = `https://api.nzpost.co.nz/addresschecker/1.0/suggest?${params}`;
         const startTime = Date.now();
         const response = await fetch(apiUrl, {
           headers: {
             'Accept': 'application/json',
+            'Authorization': `Bearer ${token}`,
           },
         });
 
@@ -138,15 +165,7 @@ router.get('/suggest', async (req: Request, res: Response) => {
         try {
           data = JSON.parse(responseText);
         } catch {
-          writeLog({
-            level: 50,
-            time: Date.now(),
-            msg: 'NZ Post API returned non-JSON response',
-            provider: 'nzpost',
-            operation: 'address.suggest',
-            statusCode: response.status,
-            responsePreview: responseText.substring(0, 200),
-          });
+          writeLog({ level: 50, time: Date.now(), msg: 'NZ Post API returned non-JSON', provider: 'nzpost', operation: 'address.suggest', statusCode: response.status });
           res.status(502).json({ success: false, error: 'NZ Post API returned invalid response' });
           return;
         }
@@ -166,15 +185,7 @@ router.get('/suggest', async (req: Request, res: Response) => {
         });
 
         if (!response.ok || !data.success) {
-          writeLog({
-            level: 40,
-            time: Date.now(),
-            msg: 'NZ Post Address API error',
-            provider: 'nzpost',
-            operation: 'address.suggest',
-            errors: data.errors,
-            response: data,
-          });
+          writeLog({ level: 40, time: Date.now(), msg: 'NZ Post Address API error', provider: 'nzpost', operation: 'address.suggest', errors: data.errors, response: data });
           res.status(502).json({ success: false, error: 'NZ Post API error', details: data.errors || data });
           return;
         }
@@ -187,15 +198,15 @@ router.get('/suggest', async (req: Request, res: Response) => {
         res.json({ success: true, addresses });
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : String(err);
-        writeLog({
-          level: 50,
-          time: Date.now(),
-          msg: 'Failed to call NZ Post Address API',
-          provider: 'nzpost',
-          operation: 'address.suggest',
-          err: { message: errMsg },
-        });
-        res.status(502).json({ success: false, error: 'Failed to reach NZ Post API' });
+        writeLog({ level: 50, time: Date.now(), msg: 'Failed to call NZ Post API', provider: 'nzpost', operation: 'address.suggest', err: { message: errMsg } });
+
+        if (errMsg.includes('unauthorized_client')) {
+          res.status(502).json({ success: false, error: 'NZ Post OAuth error: Client Credentials grant type not enabled. Contact NZ Post API Support (api@nzpost.co.nz).' });
+        } else if (errMsg.includes('invalid_client')) {
+          res.status(502).json({ success: false, error: 'NZ Post OAuth error: Invalid client credentials. Check your Client ID and Client Secret.' });
+        } else {
+          res.status(502).json({ success: false, error: 'Failed to reach NZ Post API' });
+        }
       }
     } else {
       // Photon (OpenStreetMap) - free, no key needed
@@ -225,14 +236,7 @@ router.get('/suggest', async (req: Request, res: Response) => {
         res.json({ success: true, addresses });
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : String(err);
-        writeLog({
-          level: 50,
-          time: Date.now(),
-          msg: 'Failed to call Photon Address API',
-          provider: 'photon',
-          operation: 'address.suggest',
-          err: { message: errMsg },
-        });
+        writeLog({ level: 50, time: Date.now(), msg: 'Failed to call Photon API', provider: 'photon', operation: 'address.suggest', err: { message: errMsg } });
         res.status(502).json({ success: false, error: 'Failed to reach Photon API' });
       }
     }
@@ -245,6 +249,8 @@ router.get('/suggest', async (req: Request, res: Response) => {
 router.post('/invalidate-cache', async (_req: Request, res: Response) => {
   settingsCacheTime = 0;
   settingsCache = {};
+  nzpostToken = null;
+  nzpostTokenExpiry = 0;
   res.json({ success: true });
 });
 
