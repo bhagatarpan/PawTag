@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { Setting } from '@pawtag/db';
+import logger from '../lib/logger';
 
 const router = Router();
 
@@ -72,6 +73,7 @@ async function getNzpostToken(clientId: string, clientSecret: string): Promise<s
     client_secret: clientSecret,
   });
 
+  logger.info('Fetching NZ Post OAuth token...');
   const response = await fetch('https://oauth.nzpost.co.nz/as/token.oauth2', {
     method: 'POST',
     headers: {
@@ -81,12 +83,15 @@ async function getNzpostToken(clientId: string, clientSecret: string): Promise<s
   });
 
   if (!response.ok) {
-    throw new Error(`NZ Post OAuth failed: ${response.status}`);
+    const errorText = await response.text();
+    logger.error({ status: response.status, error: errorText }, 'NZ Post OAuth failed');
+    throw new Error(`NZ Post OAuth failed: ${response.status} - ${errorText}`);
   }
 
   const data = await response.json();
   nzpostToken = data.access_token as string;
   nzpostTokenExpiry = now + (data.expires_in || 86399) * 1000;
+  logger.info('NZ Post OAuth token obtained successfully');
 
   return nzpostToken;
 }
@@ -162,7 +167,9 @@ router.get('/suggest', async (req: Request, res: Response) => {
           q: q.trim(),
           max: limit.toString(),
         });
-        const response = await fetch(`https://api.nzpost.co.nz/addresschecker/1.0/suggest?${params}`, {
+        const apiUrl = `https://api.nzpost.co.nz/addresschecker/1.0/suggest?${params}`;
+        logger.info({ query: q.trim(), apiUrl }, 'Calling NZ Post Address API');
+        const response = await fetch(apiUrl, {
           headers: {
             'Accept': 'application/json',
             'Authorization': `Bearer ${token}`,
@@ -170,6 +177,8 @@ router.get('/suggest', async (req: Request, res: Response) => {
         });
 
         const data = await response.json();
+        logger.info({ status: response.status, success: data.success, addressCount: (data.addresses || []).length, errors: data.errors }, 'NZ Post API response');
+
         if (!data.success) {
           res.status(502).json({ success: false, error: 'NZ Post API error', details: data.errors });
           return;
@@ -182,7 +191,17 @@ router.get('/suggest', async (req: Request, res: Response) => {
 
         res.json({ success: true, addresses });
       } catch (err) {
-        res.status(502).json({ success: false, error: 'Failed to reach NZ Post API' });
+        const errMsg = err instanceof Error ? err.message : String(err);
+        logger.error({ error: errMsg }, 'Failed to call NZ Post API');
+        // If OAuth fails with unauthorized_client, suggest switching to Photon
+        if (errMsg.includes('unauthorized_client')) {
+          res.status(502).json({
+            success: false,
+            error: 'NZ Post OAuth error: Client Credentials grant type not enabled. Contact NZ Post API Support (api@nzpost.co.nz) to enable it, or switch to Photon provider in Admin → Address Autocomplete.',
+          });
+        } else {
+          res.status(502).json({ success: false, error: 'Failed to reach NZ Post API' });
+        }
       }
     } else {
       // Photon (OpenStreetMap) - free, no key needed
