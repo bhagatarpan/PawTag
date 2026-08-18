@@ -16,6 +16,8 @@ export type {
   BadgeVariant,
   StatusBadgeProps,
   ConfirmDialogProps,
+  AddressComponents,
+  AddressAutocompleteProps,
 } from './types';
 
 // Components
@@ -28,3 +30,4 @@ export { Pagination } from './components/Pagination';
 export { EmptyState, ErrorState } from './components/EmptyState';
 export { StatusBadge } from './components/StatusBadge';
 export { ConfirmDialog } from './components/ConfirmDialog';
+export { AddressAutocomplete } from './components/AddressAutocomplete';

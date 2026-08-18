@@ -170,3 +170,31 @@ export interface ConfirmDialogProps {
   variant?: 'danger' | 'warning' | 'primary';
   loading?: boolean;
 }
+
+/* ------------------------------------------------------------------ */
+/*  AddressAutocomplete                                                 */
+/* ------------------------------------------------------------------ */
+
+export interface AddressComponents {
+  line1: string;
+  line2: string;
+  city: string;
+  state: string;
+  zip: string;
+  country: string;
+}
+
+export interface AddressAutocompleteProps {
+  /** Called when user selects an address from the dropdown */
+  onAddressSelect: (address: AddressComponents) => void;
+  /** Current value of the input */
+  value: string;
+  /** Called when input value changes */
+  onChange: (value: string) => void;
+  /** Placeholder text */
+  placeholder?: string;
+  /** ISO country code to bias results (default: 'NZ'). Not a restriction — international addresses still work. */
+  defaultCountry?: string;
+  /** Additional CSS classes for the input */
+  className?: string;
+}

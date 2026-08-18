@@ -2,7 +2,8 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api, { PaginatedData } from '../lib/api';
 import { toast } from '../lib/toast';
-import { StatusBadge } from '@pawtag/ui';
+import { StatusBadge, AddressAutocomplete } from '@pawtag/ui';
+import type { AddressComponents } from '@pawtag/ui';
 import { OrderDetailDrawer, type Order } from './Orders';
 import {
   Search,
@@ -344,6 +345,20 @@ export function DetailDrawer({
     }
   };
 
+  const handleAddressSelect = (address: AddressComponents) => {
+    setEditForm(prev => ({
+      ...prev,
+      address: {
+        line1: address.line1,
+        line2: address.line2,
+        city: address.city,
+        state: address.state,
+        zip: address.zip,
+        country: address.country || prev.address.country,
+      },
+    }));
+  };
+
   const handleResetPassword = async () => {
     if (!resetPw || resetPw.length < 8) return;
     setResetLoading(true);
@@ -586,7 +601,12 @@ export function DetailDrawer({
                   <div className="space-y-3">
                     <div>
                       <label className="block text-xs text-gray-500 mb-1">Street Address</label>
-                      <input value={editForm.address.line1} onChange={(e) => setEditForm({ ...editForm, address: { ...editForm.address, line1: e.target.value } })} className="w-full border rounded-md px-3 py-2 text-sm" />
+                      <AddressAutocomplete
+                        value={editForm.address.line1}
+                        onChange={(val) => setEditForm(prev => ({ ...prev, address: { ...prev.address, line1: val } }))}
+                        onAddressSelect={handleAddressSelect}
+                        placeholder="123 Main St"
+                      />
                     </div>
                     <div>
                       <label className="block text-xs text-gray-500 mb-1">Suburb</label>

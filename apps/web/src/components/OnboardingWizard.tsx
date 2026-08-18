@@ -4,6 +4,8 @@ import {
   Shield, Info, Star, Gift, Bell, ArrowRight, ArrowLeft, Lock,
   PawPrint, Scan,
 } from 'lucide-react';
+import { AddressAutocomplete } from '@pawtag/ui';
+import type { AddressComponents } from '@pawtag/ui';
 import api from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 
@@ -119,6 +121,14 @@ export default function OnboardingWizard() {
     if (!isFirst) setCurrentIdx(currentIdx - 1);
   }
 
+  function handleAddressSelect(address: AddressComponents) {
+    setAddressLine1(address.line1);
+    setAddressLine2(address.line2);
+    setAddressCity(address.city);
+    setAddressState(address.state);
+    setAddressZip(address.zip);
+  }
+
   async function saveStepData() {
     setSaving(true);
     try {
@@ -218,7 +228,12 @@ export default function OnboardingWizard() {
           <>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Street Address</label>
-              <input type="text" value={addressLine1} onChange={(e) => setAddressLine1(e.target.value)} className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500" placeholder="123 Main St" />
+              <AddressAutocomplete
+                value={addressLine1}
+                onChange={setAddressLine1}
+                onAddressSelect={handleAddressSelect}
+                placeholder="123 Main St"
+              />
               <p className="text-xs text-gray-400 mt-1">Private — not shown to finders</p>
             </div>
             <div>

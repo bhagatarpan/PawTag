@@ -1,5 +1,7 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { User, MapPin, Phone, Lock, Save, Gift } from 'lucide-react';
+import { AddressAutocomplete } from '@pawtag/ui';
+import type { AddressComponents } from '@pawtag/ui';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../lib/api';
 import SaveToast from '../../components/SaveToast';
@@ -29,6 +31,20 @@ export default function Profile() {
       setRelationshipOptions(r.data.data?.globalSettings?.relationshipOptions || ['Spouse', 'Partner', 'Parent', 'Sibling', 'Child', 'Uncle', 'Aunt', 'Cousin', 'Friend', 'Neighbour', 'Work Colleague', 'Other']);
     }).catch(() => {});
   }, [user]);
+
+  const handleAddressSelect = (address: AddressComponents) => {
+    setForm(prev => ({
+      ...prev,
+      address: {
+        line1: address.line1,
+        line2: address.line2,
+        city: address.city,
+        state: address.state,
+        zip: address.zip,
+        country: address.country || prev.address.country,
+      },
+    }));
+  };
 
   const handleSave = async (e: FormEvent) => {
     e.preventDefault(); setSaving(true); setError('');
@@ -86,7 +102,15 @@ export default function Profile() {
             </p>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2"><label className="block text-xs text-gray-500 mb-1">Street Address</label><input value={form.address.line1} onChange={(e) => setForm({ ...form, address: { ...form.address, line1: e.target.value } })} className="w-full border rounded-md px-3 py-2 text-sm" /></div>
+            <div className="col-span-2">
+              <label className="block text-xs text-gray-500 mb-1">Street Address</label>
+              <AddressAutocomplete
+                value={form.address.line1}
+                onChange={(val) => setForm(prev => ({ ...prev, address: { ...prev.address, line1: val } }))}
+                onAddressSelect={handleAddressSelect}
+                placeholder="123 Main St"
+              />
+            </div>
             <div className="col-span-2"><label className="block text-xs text-gray-500 mb-1">Suburb</label><input value={form.address.line2} onChange={(e) => setForm({ ...form, address: { ...form.address, line2: e.target.value } })} className="w-full border rounded-md px-3 py-2 text-sm" placeholder="e.g. Ponsonby" /><p className="text-xs text-gray-400 mt-1">Shown to finders when your pet is found</p></div>
             <div><label className="block text-xs text-gray-500 mb-1">City</label><input value={form.address.city} onChange={(e) => setForm({ ...form, address: { ...form.address, city: e.target.value } })} className="w-full border rounded-md px-3 py-2 text-sm" /><p className="text-xs text-gray-400 mt-1">Shown to finders when your pet is found</p></div>
             <div><label className="block text-xs text-gray-500 mb-1">State / Region</label><input value={form.address.state} onChange={(e) => setForm({ ...form, address: { ...form.address, state: e.target.value } })} className="w-full border rounded-md px-3 py-2 text-sm" /></div>

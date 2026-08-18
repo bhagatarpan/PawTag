@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Lock, CreditCard, PawPrint, CheckCircle, Truck, Tag, Loader2 } from 'lucide-react';
+import { AddressAutocomplete } from '@pawtag/ui';
+import type { AddressComponents } from '@pawtag/ui';
 import api from '../lib/api';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
@@ -62,6 +64,18 @@ export default function Checkout() {
   const shippingCost = SHIPPING_ZONES.find((z) => z.value === shippingZone)?.cost || 7.99;
   const discountedSubtotal = total - bundleDiscountAmount;
   const orderTotal = discountedSubtotal + shippingCost;
+
+  const handleAddressSelect = (address: AddressComponents) => {
+    setForm(prev => ({
+      ...prev,
+      line1: address.line1,
+      line2: address.line2,
+      city: address.city,
+      state: address.state,
+      zip: address.zip,
+      country: address.country || 'NZ',
+    }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -163,14 +177,21 @@ export default function Checkout() {
 
               {!user && (
                 <p className="text-sm text-amber-600 bg-amber-50 rounded-lg p-3">
-                  Please <Link to="/login" className="underline font-medium">sign in</Link> to complete your order.
+                  Please <Link to="/login" className="underline font-medium">sign in</Link> to complete your order.{' '}
+                  Don't have an account?{' '}
+                  <Link to="/register" className="underline font-medium">Create one</Link>
                 </p>
               )}
 
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Address Line 1 *</label>
-                  <input type="text" required value={form.line1} onChange={(e) => setForm({ ...form, line1: e.target.value })} className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-teal-500 focus:border-teal-500" placeholder="123 Main Street" />
+                  <AddressAutocomplete
+                    value={form.line1}
+                    onChange={(val) => setForm(prev => ({ ...prev, line1: val }))}
+                    onAddressSelect={handleAddressSelect}
+                    placeholder="123 Main Street"
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Address Line 2</label>
@@ -193,7 +214,7 @@ export default function Checkout() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
-                    <input type="text" value={form.country} disabled className="w-full px-4 py-3 rounded-lg border border-gray-200 bg-gray-50 text-gray-500" />
+                    <input type="text" value={form.country} onChange={(e) => setForm(prev => ({ ...prev, country: e.target.value }))} className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-teal-500 focus:border-teal-500" placeholder="NZ" />
                   </div>
                 </div>
 
