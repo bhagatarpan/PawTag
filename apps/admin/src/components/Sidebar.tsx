@@ -1,5 +1,5 @@
-import { NavLink } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
+import { useState, useEffect, useMemo } from 'react';
 import {
   LayoutDashboard,
   Users,
@@ -7,7 +7,6 @@ import {
   QrCode,
   ShoppingBag,
   FileText,
-  Newspaper,
   Settings,
   Flag,
   BarChart3,
@@ -37,68 +36,123 @@ import {
   ClipboardCheck,
   Terminal,
   MapPin,
+  ChevronRight,
+  ChevronDown,
 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
+import { useTheme } from '../hooks/useTheme';
+import { useSidebarCollapse } from '../hooks/useSidebarCollapse';
 import api from '../lib/api';
 
 interface SidebarLink {
   to: string;
   label: string;
-  icon: any;
+  icon: React.ElementType;
   permission?: string;
 }
 
-const mainLinks: SidebarLink[] = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard, permission: 'dashboard.read' },
-  { to: '/users', label: 'Users', icon: Users, permission: 'user.read' },
-  { to: '/pets', label: 'Pets', icon: PawPrint, permission: 'pet.read' },
-  { to: '/tags', label: 'Tags', icon: QrCode, permission: 'tag.read' },
-  { to: '/products', label: 'Products', icon: ShoppingBag, permission: 'product.read' },
-  { to: '/orders', label: 'Orders', icon: FileText, permission: 'order.read' },
-  { to: '/subscriptions', label: 'Subscriptions', icon: CreditCard, permission: 'subscription.read' },
-  { to: '/statistics', label: 'Statistics', icon: BarChart3, permission: 'stats.read' },
-  { to: '/content', label: 'Content', icon: Newspaper, permission: 'content.read' },
-];
+interface SidebarSection {
+  id: string;
+  label: string;
+  icon: React.ElementType;
+  links: SidebarLink[];
+}
 
-const adminLinks: SidebarLink[] = [
-  { to: '/support-requests', label: 'Support Requests', icon: MessageSquare },
-  { to: '/notifications', label: 'Notifications', icon: Bell },
-  { to: '/referrals', label: 'Referrals', icon: Gift },
-  { to: '/tag-expiry-notifications', label: 'Tag Expiry Alerts', icon: AlertTriangle },
-  { to: '/write-nfc', label: 'Write NFC Tag', icon: Wifi },
-  { to: '/rbac/roles', label: 'Roles', icon: Shield, permission: 'role.read' },
-  { to: '/rbac/permissions', label: 'Permissions', icon: Key, permission: 'permission.read' },
-  { to: '/rbac/permission-groups', label: 'Permission Groups', icon: FolderTree, permission: 'permission_group.read' },
-  { to: '/rbac/scopes', label: 'Access Scopes', icon: Target, permission: 'permission.read' },
-  { to: '/settings', label: 'Settings', icon: Settings, permission: 'setting.read' },
-  { to: '/site-availability', label: 'Site Availability', icon: Globe, permission: 'setting.read' },
-  { to: '/address-autocomplete', label: 'Address Autocomplete', icon: MapPin, permission: 'setting.read' },
-  { to: '/feature-flags', label: 'Feature Flags', icon: Flag, permission: 'feature_flag.read' },
-  { to: '/audit-trail', label: 'Audit Logs', icon: FileSignature, permission: 'audit.read' },
-  { to: '/audit-settings', label: 'Audit Settings', icon: FileSignature, permission: 'audit.admin' },
-  { to: '/system-logs', label: 'System Logs', icon: Terminal, permission: 'systemlogs.read' },
-  { to: '/system-log-settings', label: 'System Log Settings', icon: Terminal, permission: 'systemlogs.admin' },
-];
-
-const cmsLinks: SidebarLink[] = [
-  { to: '/cms/pages', label: 'Pages', icon: Layout, permission: 'cms.page.read' },
-  { to: '/cms/navigation', label: 'Navigation', icon: Navigation, permission: 'cms.navigation.read' },
-  { to: '/cms/footer', label: 'Footer', icon: PanelBottom, permission: 'cms.footer.read' },
-  { to: '/cms/media', label: 'Media Library', icon: Image, permission: 'cms.media.read' },
-  { to: '/cms/announcements', label: 'Announcements', icon: Megaphone, permission: 'cms.announcement.read' },
-  { to: '/cms/redirects', label: 'Redirects', icon: ArrowRightLeft, permission: 'cms.redirect.read' },
-  { to: '/cms/email-templates', label: 'Email Templates', icon: Mail, permission: 'cms.email_template.read' },
-  { to: '/cms/sms-templates', label: 'SMS Templates', icon: MessageSquare, permission: 'cms.sms_template.read' },
-  { to: '/cms/pet-references', label: 'Pet References', icon: Database, permission: 'cms.pet_reference.read' },
-  { to: '/cms/homepage', label: 'Homepage Sections', icon: Monitor, permission: 'cms.homepage.read' },
-  { to: '/cms/shop-pages', label: 'Shop Pages', icon: ShoppingCart, permission: 'cms.shop_page.read' },
-  { to: '/cms/auth-pages', label: 'Auth Pages', icon: LogIn, permission: 'cms.auth_page.read' },
-  { to: '/cms/invoice-template', label: 'Invoice Template', icon: FileSignature, permission: 'cms.email_template.read' },
-  { to: '/cms/onboarding', label: 'Customer Onboarding', icon: ClipboardCheck, permission: 'cms.onboarding.read' },
+const sections: SidebarSection[] = [
+  {
+    id: 'overview',
+    label: 'Overview',
+    icon: LayoutDashboard,
+    links: [
+      { to: '/', label: 'Dashboard', icon: LayoutDashboard, permission: 'dashboard.read' },
+      { to: '/statistics', label: 'Statistics', icon: BarChart3, permission: 'stats.read' },
+    ],
+  },
+  {
+    id: 'business',
+    label: 'Business',
+    icon: ShoppingBag,
+    links: [
+      { to: '/orders', label: 'Orders', icon: FileText, permission: 'order.read' },
+      { to: '/products', label: 'Products', icon: ShoppingBag, permission: 'product.read' },
+      { to: '/pets', label: 'Pets', icon: PawPrint, permission: 'pet.read' },
+      { to: '/subscriptions', label: 'Subscriptions', icon: CreditCard, permission: 'subscription.read' },
+      { to: '/tags', label: 'Tags', icon: QrCode, permission: 'tag.read' },
+      { to: '/users', label: 'Users', icon: Users, permission: 'user.read' },
+    ],
+  },
+  {
+    id: 'communication',
+    label: 'Communication',
+    icon: MessageSquare,
+    links: [
+      { to: '/notifications', label: 'Notifications', icon: Bell },
+      { to: '/support-requests', label: 'Support Requests', icon: MessageSquare },
+      { to: '/referrals', label: 'Referrals', icon: Gift },
+      { to: '/tag-expiry-notifications', label: 'Tag Expiry Alerts', icon: AlertTriangle },
+    ],
+  },
+  {
+    id: 'content',
+    label: 'Content',
+    icon: Layout,
+    links: [
+      { to: '/cms/announcements', label: 'Announcements', icon: Megaphone, permission: 'cms.announcement.read' },
+      { to: '/cms/auth-pages', label: 'Auth Pages', icon: LogIn, permission: 'cms.auth_page.read' },
+      { to: '/cms/onboarding', label: 'Customer Onboarding', icon: ClipboardCheck, permission: 'cms.onboarding.read' },
+      { to: '/cms/footer', label: 'Footer', icon: PanelBottom, permission: 'cms.footer.read' },
+      { to: '/cms/homepage', label: 'Homepage Sections', icon: Monitor, permission: 'cms.homepage.read' },
+      { to: '/cms/invoice-template', label: 'Invoice Template', icon: FileSignature, permission: 'cms.email_template.read' },
+      { to: '/cms/media', label: 'Media Library', icon: Image, permission: 'cms.media.read' },
+      { to: '/cms/navigation', label: 'Navigation', icon: Navigation, permission: 'cms.navigation.read' },
+      { to: '/cms/pages', label: 'Pages', icon: Layout, permission: 'cms.page.read' },
+      { to: '/cms/redirects', label: 'Redirects', icon: ArrowRightLeft, permission: 'cms.redirect.read' },
+      { to: '/cms/shop-pages', label: 'Shop Pages', icon: ShoppingCart, permission: 'cms.shop_page.read' },
+      { to: '/cms/email-templates', label: 'Email Templates', icon: Mail, permission: 'cms.email_template.read' },
+      { to: '/cms/sms-templates', label: 'SMS Templates', icon: MessageSquare, permission: 'cms.sms_template.read' },
+    ],
+  },
+  {
+    id: 'settings',
+    label: 'Settings',
+    icon: Settings,
+    links: [
+      { to: '/address-autocomplete', label: 'Address Autocomplete', icon: MapPin, permission: 'setting.read' },
+      { to: '/feature-flags', label: 'Feature Flags', icon: Flag, permission: 'feature_flag.read' },
+      { to: '/settings', label: 'General Settings', icon: Settings, permission: 'setting.read' },
+      { to: '/cms/pet-references', label: 'Pet References', icon: Database, permission: 'cms.pet_reference.read' },
+      { to: '/site-availability', label: 'Site Availability', icon: Globe, permission: 'setting.read' },
+    ],
+  },
+  {
+    id: 'security',
+    label: 'Security',
+    icon: Shield,
+    links: [
+      { to: '/rbac/scopes', label: 'Access Scopes', icon: Target, permission: 'permission.read' },
+      { to: '/audit-settings', label: 'Audit Settings', icon: FileSignature, permission: 'audit.admin' },
+      { to: '/audit-trail', label: 'Audit Trail', icon: FileSignature, permission: 'audit.read' },
+      { to: '/rbac/permission-groups', label: 'Permission Groups', icon: FolderTree, permission: 'permission_group.read' },
+      { to: '/rbac/roles', label: 'Roles & Permissions', icon: Shield, permission: 'role.read' },
+    ],
+  },
+  {
+    id: 'operations',
+    label: 'Operations',
+    icon: Terminal,
+    links: [
+      { to: '/system-log-settings', label: 'System Log Settings', icon: Terminal, permission: 'systemlogs.admin' },
+      { to: '/system-logs', label: 'System Logs', icon: Terminal, permission: 'systemlogs.read' },
+      { to: '/write-nfc', label: 'Write NFC Tag', icon: Wifi },
+    ],
+  },
 ];
 
 export default function Sidebar() {
   const { hasPermission } = useAuth();
+  const { theme, toggleTheme, isDark } = useTheme();
+  const { isCollapsed, toggleSection, expandSection } = useSidebarCollapse();
+  const location = useLocation();
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
@@ -112,99 +166,138 @@ export default function Sidebar() {
     return () => clearInterval(interval);
   }, []);
 
-  const filteredMainLinks = mainLinks.filter(
-    (link) => !link.permission || hasPermission(link.permission),
-  );
+  // Auto-expand section containing active route
+  useEffect(() => {
+    for (const section of sections) {
+      const isActive = section.links.some(
+        (link) => link.to === '/' ? location.pathname === '/' : location.pathname.startsWith(link.to),
+      );
+      if (isActive && isCollapsed(section.id)) {
+        expandSection(section.id);
+      }
+    }
+  }, [location.pathname, isCollapsed, expandSection]);
 
-  const filteredAdminLinks = adminLinks.filter(
-    (link) => !link.permission || hasPermission(link.permission),
-  );
+  const filteredSections = useMemo(() => {
+    return sections
+      .map((section) => ({
+        ...section,
+        links: section.links.filter(
+          (link) => !link.permission || hasPermission(link.permission),
+        ),
+      }))
+      .filter((section) => section.links.length > 0);
+  }, [hasPermission]);
 
-  const filteredCmsLinks = cmsLinks.filter(
-    (link) => !link.permission || hasPermission(link.permission),
-  );
+  const isLinkActive = (to: string) => {
+    if (to === '/') return location.pathname === '/';
+    return location.pathname.startsWith(to);
+  };
+
+  const isSectionActive = (section: SidebarLink[]) => {
+    return section.some((link) => isLinkActive(link.to));
+  };
+
+  // Theme classes
+  const sidebarBg = isDark ? 'bg-gray-900' : 'bg-white';
+  const headerBg = isDark ? 'bg-gray-900' : 'bg-white';
+  const headerBorder = isDark ? 'border-gray-700' : 'border-gray-200';
+  const sectionBg = isDark ? 'hover:bg-gray-800' : 'hover:bg-gray-50';
+  const sectionActiveBg = isDark ? 'bg-gray-800/50' : 'bg-gray-50';
+  const linkBg = isDark ? 'hover:bg-gray-800' : 'hover:bg-gray-50';
+  const linkActiveBg = isDark ? 'bg-primary-600' : 'bg-primary-50';
+  const linkActiveText = isDark ? 'text-white' : 'text-primary-700';
+  const linkText = isDark ? 'text-gray-300' : 'text-gray-600';
+  const linkHoverText = isDark ? 'hover:text-white' : 'hover:text-gray-900';
+  const chevronColor = isDark ? 'text-gray-500' : 'text-gray-400';
+  const sectionLabel = isDark ? 'text-gray-500' : 'text-gray-400';
+  const footerBorder = isDark ? 'border-gray-700' : 'border-gray-200';
+  const footerText = isDark ? 'text-gray-500' : 'text-gray-400';
 
   return (
-    <aside className="w-64 bg-gray-900 text-white flex flex-col">
-      <div className="px-6 py-5 border-b border-gray-700">
-        <h1 className="text-xl font-bold tracking-tight">
-          <span className="text-primary-400">Paw</span>Tag
-        </h1>
-        <p className="text-xs text-gray-400 mt-0.5">Admin Portal</p>
+    <aside className={`w-64 ${sidebarBg} flex flex-col transition-colors duration-200`}>
+      {/* Header */}
+      <div className={`px-6 py-5 border-b ${headerBorder} flex items-center justify-between transition-colors duration-200`}>
+        <div>
+          <h1 className="text-xl font-bold tracking-tight">
+            <span className="text-primary-400">Paw</span>
+            <span className={isDark ? 'text-white' : 'text-gray-900'}>Tag</span>
+          </h1>
+          <p className={`text-xs ${sectionLabel} mt-0.5`}>Admin Portal</p>
+        </div>
+        <button
+          onClick={toggleTheme}
+          className={`p-2 rounded-lg ${sectionBg} ${linkText} transition-colors duration-150`}
+          title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+        >
+          {isDark ? (
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+            </svg>
+          ) : (
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+            </svg>
+          )}
+        </button>
       </div>
-      <nav className="flex-1 py-4 overflow-y-auto">
-        {filteredMainLinks.length > 0 && (
-          <>
-            <div className="px-6 pb-1 text-xs font-semibold text-gray-500 uppercase tracking-wider">Main</div>
-            {filteredMainLinks.map((link) => (
-              <NavLink
-                key={link.to}
-                to={link.to}
-                end={link.to === '/'}
-                className={({ isActive }) =>
-                  `flex items-center gap-3 px-6 py-2.5 text-sm transition-colors ${
-                    isActive
-                      ? 'bg-primary-600 text-white'
-                      : 'text-gray-300 hover:bg-gray-800 hover:text-white'
-                  }`
-                }
+
+      {/* Navigation */}
+      <nav className="flex-1 py-3 overflow-y-auto">
+        {filteredSections.map((section) => {
+          const collapsed = isCollapsed(section.id);
+          const active = isSectionActive(section.links);
+
+          return (
+            <div key={section.id} className="mb-1">
+              {/* Section Header */}
+              <button
+                onClick={() => toggleSection(section.id)}
+                className={`w-full flex items-center gap-3 px-6 py-2 text-xs font-semibold uppercase tracking-wider transition-colors duration-150 ${
+                  active ? sectionActiveBg : ''
+                } ${sectionLabel} hover:${isDark ? 'text-gray-300' : 'text-gray-600'}`}
               >
-                <link.icon size={18} />
-                {link.label}
-              </NavLink>
-            ))}
-          </>
-        )}
-        {filteredAdminLinks.length > 0 && (
-          <>
-            <div className="px-6 pt-4 pb-1 text-xs font-semibold text-gray-500 uppercase tracking-wider">Administration</div>
-            {filteredAdminLinks.map((link) => (
-              <NavLink
-                key={link.to}
-                to={link.to}
-                end={link.to === '/'}
-                className={({ isActive }) =>
-                  `flex items-center gap-3 px-6 py-2.5 text-sm transition-colors ${
-                    isActive
-                      ? 'bg-primary-600 text-white'
-                      : 'text-gray-300 hover:bg-gray-800 hover:text-white'
-                  }`
-                }
-              >
-                <link.icon size={18} />
-                <span className="flex-1">{link.label}</span>
-                {link.to === '/notifications' && unreadCount > 0 && (
-                  <span className="bg-red-500 text-white text-xs font-bold rounded-full px-1.5 py-0.5 min-w-[18px] text-center">
-                    {unreadCount > 99 ? '99+' : unreadCount}
-                  </span>
+                {collapsed ? (
+                  <ChevronRight size={14} className={chevronColor} />
+                ) : (
+                  <ChevronDown size={14} className={chevronColor} />
                 )}
-              </NavLink>
-            ))}
-          </>
-        )}
-        {filteredCmsLinks.length > 0 && (
-          <>
-            <div className="px-6 pt-4 pb-1 text-xs font-semibold text-gray-500 uppercase tracking-wider">CMS</div>
-            {filteredCmsLinks.map((link) => (
-              <NavLink
-                key={link.to}
-                to={link.to}
-                className={({ isActive }) =>
-                  `flex items-center gap-3 px-6 py-2.5 text-sm transition-colors ${
-                    isActive
-                      ? 'bg-primary-600 text-white'
-                      : 'text-gray-300 hover:bg-gray-800 hover:text-white'
-                  }`
-                }
-              >
-                <link.icon size={18} />
-                {link.label}
-              </NavLink>
-            ))}
-          </>
-        )}
+                <section.icon size={14} className={chevronColor} />
+                {section.label}
+              </button>
+
+              {/* Section Links */}
+              {!collapsed && (
+                <div>
+                  {section.links.map((link) => (
+                    <NavLink
+                      key={link.to}
+                      to={link.to}
+                      end={link.to === '/'}
+                      className={`flex items-center gap-3 pl-10 pr-6 py-2 text-sm transition-colors duration-150 ${
+                        isLinkActive(link.to)
+                          ? `${linkActiveBg} ${linkActiveText}`
+                          : `${linkText} ${linkBg} ${linkHoverText}`
+                      }`}
+                    >
+                      <link.icon size={16} className={isLinkActive(link.to) ? (isDark ? 'text-white' : 'text-primary-600') : chevronColor} />
+                      <span className="flex-1">{link.label}</span>
+                      {link.to === '/notifications' && unreadCount > 0 && (
+                        <span className="bg-red-500 text-white text-xs font-bold rounded-full px-1.5 py-0.5 min-w-[18px] text-center">
+                          {unreadCount > 99 ? '99+' : unreadCount}
+                        </span>
+                      )}
+                    </NavLink>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </nav>
-      <div className="px-6 py-4 border-t border-gray-700 text-xs text-gray-500">
+
+      {/* Footer */}
+      <div className={`px-6 py-4 border-t ${footerBorder} text-xs ${footerText} transition-colors duration-200`}>
         PawTag v0.1.0
       </div>
     </aside>

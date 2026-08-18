@@ -393,6 +393,86 @@ Use the existing `StatusBadge` component from `@pawtag/ui` to display the curren
 
 ---
 
+## Admin Portal Design System
+
+### Sidebar Navigation
+
+The admin sidebar is the primary navigation control. It uses a collapsible section pattern with 8 logical groups.
+
+#### Section Structure
+
+| Section | Purpose | Items |
+|---------|---------|-------|
+| **Overview** | Dashboard and analytics | Dashboard, Statistics |
+| **Business** | Core business operations | Orders, Products, Pets, Subscriptions, Tags, Users |
+| **Communication** | User engagement | Notifications, Support Requests, Referrals, Tag Expiry Alerts |
+| **Content** | CMS management | 13 CMS items (Announcements, Pages, Templates, etc.) |
+| **Settings** | System configuration | Address Autocomplete, Feature Flags, General Settings, Pet References, Site Availability |
+| **Security** | Access control and audit | Access Scopes, Audit Settings, Audit Trail, Permission Groups, Roles & Permissions |
+| **Operations** | Technical operations | System Log Settings, System Logs, Write NFC Tag |
+
+#### Behavior Rules
+
+- **Collapsible sections:** Click section header to expand/collapse
+- **Chevron indicators:** `ChevronRight` (collapsed) / `ChevronDown` (expanded)
+- **Collapse persistence:** State saved in `localStorage` key: `pawtag-admin-sidebar-collapsed`
+- **Active section auto-expand:** Section containing active route auto-expands on navigation
+- **ASC ordering:** Items sorted alphabetically within each section
+- **Badges:** Notification count (red), Support request count (red)
+
+#### Theme Support
+
+The sidebar supports dark and light modes:
+
+| Element | Dark Mode (default) | Light Mode |
+|---------|---------------------|------------|
+| Background | `gray-900` | `white` |
+| Link text | `gray-300` | `gray-600` |
+| Link hover | `gray-800` bg, `white` text | `gray-50` bg, `gray-900` text |
+| Active link | `primary-600` bg, `white` text | `primary-50` bg, `primary-700` text |
+| Section header | `gray-500` text | `gray-400` text |
+| Section hover | `gray-800` bg (dark), `gray-50` bg (light) | — |
+| Chevron/icon | `gray-500` (dark), `gray-400` (light) | — |
+| Border | `gray-700` | `gray-200` |
+| Footer | `gray-500` text, `gray-700` border | `gray-40` text, `gray-200` border |
+
+**Theme toggle:** Sun/Moon icon button in sidebar header (top-right)
+**Persistence:** `localStorage` key: `pawtag-admin-sidebar-theme`
+**Default:** Dark
+
+#### Active State Styling
+
+When a link is active:
+- Background: `primary-600` (dark) / `primary-50` (light)
+- Text: `white` (dark) / `primary-700` (light)
+- Icon: `white` (dark) / `primary-600` (light)
+
+#### Layout Structure
+
+```
+┌─────────────────────────────────────────┐
+│ PawTag Admin Portal          [Sun/Moon] │  ← Header
+├─────────────────────────────────────────┤
+│ ▸ Overview                              │
+│ ▾ Business                              │  ← Collapsible sections
+│     Orders                              │
+│     Products                            │
+│     Pets                                │
+│     Subscriptions                       │
+│     Tags                                │
+│     Users                               │
+│ ▸ Communication                         │
+│ ▸ Content                               │
+│ ▸ Settings                              │
+│ ▸ Security                              │
+│ ▸ Operations                            │
+├─────────────────────────────────────────┤
+│ PawTag v0.1.0                           │  ← Footer
+└─────────────────────────────────────────┘
+```
+
+---
+
 ## Findings — Web App Inconsistencies
 
 The following inconsistencies exist between the four web apps. These are documented here for a future deliberate decision — they were NOT fixed in this phase to avoid an unplanned redesign of working apps.
