@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { Setting } from '@pawtag/db';
-import logger from '../lib/logger';
+import { writeLog } from '../lib/log-writer';
 
 const router = Router();
 
@@ -126,7 +126,7 @@ router.get('/suggest', async (req: Request, res: Response) => {
           client_secret: clientSecret,
         });
         const apiUrl = `https://api.nzpost.co.nz/addresschecker/1.0/suggest?${params}`;
-        logger.info({ query: q.trim() }, 'Calling NZ Post Address API');
+        const startTime = Date.now();
         const response = await fetch(apiUrl, {
           headers: {
             'Accept': 'application/json',
@@ -134,9 +134,29 @@ router.get('/suggest', async (req: Request, res: Response) => {
         });
 
         const data = await response.json();
-        logger.info({ status: response.status, success: data.success, addressCount: (data.addresses || []).length, errors: data.errors }, 'NZ Post API response');
+        const durationMs = Date.now() - startTime;
+        writeLog({
+          level: 30,
+          time: Date.now(),
+          msg: 'NZ Post Address API request',
+          provider: 'nzpost',
+          operation: 'address.suggest',
+          query: q.trim(),
+          statusCode: response.status,
+          success: data.success,
+          addressCount: (data.addresses || []).length,
+          durationMs,
+        });
 
         if (!data.success) {
+          writeLog({
+            level: 40,
+            time: Date.now(),
+            msg: 'NZ Post Address API error',
+            provider: 'nzpost',
+            operation: 'address.suggest',
+            errors: data.errors,
+          });
           res.status(502).json({ success: false, error: 'NZ Post API error', details: data.errors });
           return;
         }
@@ -149,7 +169,14 @@ router.get('/suggest', async (req: Request, res: Response) => {
         res.json({ success: true, addresses });
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : String(err);
-        logger.error({ error: errMsg }, 'Failed to call NZ Post API');
+        writeLog({
+          level: 50,
+          time: Date.now(),
+          msg: 'Failed to call NZ Post Address API',
+          provider: 'nzpost',
+          operation: 'address.suggest',
+          err: { message: errMsg },
+        });
         res.status(502).json({ success: false, error: 'Failed to reach NZ Post API' });
       }
     } else {
@@ -161,11 +188,33 @@ router.get('/suggest', async (req: Request, res: Response) => {
           lang: 'en',
           countrycode: defaultCountry,
         });
+        const startTime = Date.now();
         const response = await fetch(`https://photon.komoot.io/api/?${params}`);
         const data = await response.json();
+        const durationMs = Date.now() - startTime;
+        writeLog({
+          level: 30,
+          time: Date.now(),
+          msg: 'Photon Address API request',
+          provider: 'photon',
+          operation: 'address.suggest',
+          query: q.trim(),
+          statusCode: response.status,
+          addressCount: (data.features || []).length,
+          durationMs,
+        });
         const addresses = (data.features || []).map(mapPhotonToAddress);
         res.json({ success: true, addresses });
       } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        writeLog({
+          level: 50,
+          time: Date.now(),
+          msg: 'Failed to call Photon Address API',
+          provider: 'photon',
+          operation: 'address.suggest',
+          err: { message: errMsg },
+        });
         res.status(502).json({ success: false, error: 'Failed to reach Photon API' });
       }
     }
