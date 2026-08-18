@@ -75,7 +75,7 @@ async function run() {
         { key: 'emails.supportEmail', value: 'support@pawtag.co.nz', displayValue: 'Support Email', category: 'emails' },
         { key: 'checkout.defaultCountry', value: 'NZ', displayValue: 'Default Country', category: 'checkout' },
         { key: 'checkout.currencyLabel', value: 'NZD', displayValue: 'Currency', category: 'checkout' },
-        { key: 'addressAutocomplete.provider', value: 'nzpost', displayValue: 'Address Provider', category: 'addressAutocomplete', description: 'Address autocomplete provider: nzpost (authoritative NZ data, free 1000/mo) or photon (global, free, less accurate)' },
+        { key: 'addressAutocomplete.provider', value: 'photon', displayValue: 'Address Provider', category: 'addressAutocomplete', description: 'Address autocomplete provider: nzpost (authoritative NZ data, free 1000/mo) or photon (global, free, less accurate)' },
         { key: 'addressAutocomplete.nzpostClientId', value: '', displayValue: 'NZ Post Client ID', category: 'addressAutocomplete', description: 'OAuth 2.0 Client ID for NZ Post Addressing API (get from nzpost.co.nz/business/ecommerce/developer-resource-centre)' },
         { key: 'addressAutocomplete.nzpostClientSecret', value: '', displayValue: 'NZ Post Client Secret', category: 'addressAutocomplete', description: 'OAuth 2.0 Client Secret for NZ Post Addressing API' },
         { key: 'addressAutocomplete.defaultCountry', value: 'NZ', displayValue: 'Default Country', category: 'addressAutocomplete', description: 'Default country code for address autocomplete (ISO 3166-1 alpha-2)' },
