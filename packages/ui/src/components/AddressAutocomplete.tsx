@@ -2,30 +2,13 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { MapPin, Loader2 } from 'lucide-react';
 import type { AddressAutocompleteProps, AddressComponents } from '../types';
 
-interface PhotonFeature {
-  properties: {
-    housenumber?: string;
-    street?: string;
-    name?: string;
-    district?: string;
-    city?: string;
-    state?: string;
-    postcode?: string;
-    country?: string;
-    countrycode?: string;
-  };
-}
-
-function mapPhotonToAddress(feature: PhotonFeature): AddressComponents {
-  const p = feature.properties;
-  return {
-    line1: [p.housenumber, p.street].filter(Boolean).join(' ') || p.name || '',
-    line2: p.district || '',
-    city: p.city || '',
-    state: p.state || '',
-    zip: p.postcode || '',
-    country: p.countrycode || 'NZ',
-  };
+interface NormalizedAddress {
+  line1: string;
+  line2: string;
+  city: string;
+  state: string;
+  zip: string;
+  country: string;
 }
 
 export function AddressAutocomplete({
@@ -57,15 +40,19 @@ export function AddressAutocomplete({
       const params = new URLSearchParams({
         q: query,
         limit: '5',
-        lang: 'en',
-        countrycode: defaultCountry,
       });
-      const res = await fetch(`https://photon.komoot.io/api/?${params}`);
+      const res = await fetch(`/api/address/suggest?${params}`);
       const data = await res.json();
-      const mapped = (data.features || []).map(mapPhotonToAddress);
-      setSuggestions(mapped);
-      setIsOpen(mapped.length > 0);
-      setNoResults(mapped.length === 0);
+      if (data.success) {
+        const addresses: NormalizedAddress[] = data.addresses || [];
+        setSuggestions(addresses);
+        setIsOpen(addresses.length > 0);
+        setNoResults(addresses.length === 0);
+      } else {
+        setSuggestions([]);
+        setIsOpen(false);
+        setNoResults(false);
+      }
     } catch {
       setSuggestions([]);
       setIsOpen(false);
@@ -73,7 +60,7 @@ export function AddressAutocomplete({
     } finally {
       setIsLoading(false);
     }
-  }, [defaultCountry]);
+  }, []);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);

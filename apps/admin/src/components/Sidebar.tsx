@@ -36,6 +36,7 @@ import {
   Wifi,
   ClipboardCheck,
   Terminal,
+  MapPin,
 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import api from '../lib/api';
@@ -71,6 +72,7 @@ const adminLinks: SidebarLink[] = [
   { to: '/rbac/scopes', label: 'Access Scopes', icon: Target, permission: 'permission.read' },
   { to: '/settings', label: 'Settings', icon: Settings, permission: 'setting.read' },
   { to: '/site-availability', label: 'Site Availability', icon: Globe, permission: 'setting.read' },
+  { to: '/address-autocomplete', label: 'Address Autocomplete', icon: MapPin, permission: 'setting.read' },
   { to: '/feature-flags', label: 'Feature Flags', icon: Flag, permission: 'feature_flag.read' },
   { to: '/audit-trail', label: 'Audit Logs', icon: FileSignature, permission: 'audit.read' },
   { to: '/audit-settings', label: 'Audit Settings', icon: FileSignature, permission: 'audit.admin' },

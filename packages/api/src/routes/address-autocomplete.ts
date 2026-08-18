@@ -1,0 +1,172 @@
+import { Router, Request, Response } from 'express';
+import { Setting } from '@pawtag/db';
+
+const router = Router();
+
+interface PhotonFeature {
+  properties: {
+    housenumber?: string;
+    street?: string;
+    name?: string;
+    district?: string;
+    city?: string;
+    state?: string;
+    postcode?: string;
+    country?: string;
+    countrycode?: string;
+  };
+}
+
+interface NormalizedAddress {
+  line1: string;
+  line2: string;
+  city: string;
+  state: string;
+  zip: string;
+  country: string;
+}
+
+// Cache settings for 60 seconds
+let settingsCache: Record<string, string> = {};
+let settingsCacheTime = 0;
+const SETTINGS_CACHE_TTL = 60_000;
+
+async function getSettings(): Promise<Record<string, string>> {
+  const now = Date.now();
+  if (settingsCacheTime && now - settingsCacheTime < SETTINGS_CACHE_TTL) {
+    return settingsCache;
+  }
+
+  const keys = [
+    'addressAutocomplete.provider',
+    'addressAutocomplete.nzpostApiKey',
+    'addressAutocomplete.defaultCountry',
+  ];
+
+  const settings = await Setting.find({ key: { $in: keys } }).lean();
+  settingsCache = {};
+  for (const s of settings) {
+    settingsCache[s.key] = s.value;
+  }
+  settingsCacheTime = now;
+  return settingsCache;
+}
+
+function mapPhotonToAddress(feature: PhotonFeature): NormalizedAddress {
+  const p = feature.properties;
+  return {
+    line1: [p.housenumber, p.street].filter(Boolean).join(' ') || p.name || '',
+    line2: p.district || '',
+    city: p.city || '',
+    state: p.state || '',
+    zip: p.postcode || '',
+    country: (p.countrycode || 'NZ').toUpperCase(),
+  };
+}
+
+function parseNzpostAddress(fullAddress: string): NormalizedAddress {
+  // NZ Post returns a full address string like:
+  // "8 Water Lane, New Plymouth 4310"
+  // or "392 Ellerslie-Panmure Highway, Mount Wellington, Auckland 1060"
+  const parts = fullAddress.split(',').map((p) => p.trim());
+
+  if (parts.length === 1) {
+    return { line1: parts[0], line2: '', city: '', state: '', zip: '', country: 'NZ' };
+  }
+
+  // Last part contains city and postcode (e.g., "New Plymouth 4310")
+  const lastPart = parts[parts.length - 1];
+  const postcodeMatch = lastPart.match(/\s+(\d{4})$/);
+  const city = postcodeMatch ? lastPart.slice(0, -postcodeMatch[1].length).trim() : lastPart;
+  const zip = postcodeMatch ? postcodeMatch[1] : '';
+
+  // Everything before the last part is the street address
+  const streetParts = parts.slice(0, -1);
+  const line1 = streetParts.join(', ');
+
+  return {
+    line1,
+    line2: '',
+    city,
+    state: '',
+    zip,
+    country: 'NZ',
+  };
+}
+
+router.get('/suggest', async (req: Request, res: Response) => {
+  try {
+    const { q, limit = '5' } = req.query;
+    if (!q || typeof q !== 'string' || q.trim().length < 2) {
+      res.json({ success: true, addresses: [] });
+      return;
+    }
+
+    const settings = await getSettings();
+    const provider = settings['addressAutocomplete.provider'] || 'nzpost';
+    const defaultCountry = settings['addressAutocomplete.defaultCountry'] || 'NZ';
+
+    if (provider === 'nzpost') {
+      const apiKey = settings['addressAutocomplete.nzpostApiKey'];
+      if (!apiKey) {
+        res.status(500).json({ success: false, error: 'NZ Post API key not configured' });
+        return;
+      }
+
+      try {
+        const params = new URLSearchParams({
+          q: q.trim(),
+          max: limit.toString(),
+        });
+        const response = await fetch(`https://api.nzpost.co.nz/addresschecker/1.0/suggest?${params}`, {
+          headers: {
+            'Accept': 'application/json',
+            'Authorization': `Bearer ${apiKey}`,
+          },
+        });
+
+        const data = await response.json();
+        if (!data.success) {
+          res.status(502).json({ success: false, error: 'NZ Post API error', details: data.errors });
+          return;
+        }
+
+        const addresses = (data.addresses || []).map((addr: { FullAddress: string; DPID: number }) => ({
+          ...parseNzpostAddress(addr.FullAddress),
+          dpid: addr.DPID,
+        }));
+
+        res.json({ success: true, addresses });
+      } catch (err) {
+        res.status(502).json({ success: false, error: 'Failed to reach NZ Post API' });
+      }
+    } else {
+      // Photon (OpenStreetMap) - free, no key needed
+      try {
+        const params = new URLSearchParams({
+          q: q.trim(),
+          limit: limit.toString(),
+          lang: 'en',
+          countrycode: defaultCountry,
+        });
+        const response = await fetch(`https://photon.komoot.io/api/?${params}`);
+        const data = await response.json();
+        const addresses = (data.features || []).map(mapPhotonToAddress);
+        res.json({ success: true, addresses });
+      } catch (err) {
+        res.status(502).json({ success: false, error: 'Failed to reach Photon API' });
+      }
+    }
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+// Invalidate cache when settings are updated
+router.post('/invalidate-cache', async (_req: Request, res: Response) => {
+  settingsCacheTime = 0;
+  settingsCache = {};
+  res.json({ success: true });
+});
+
+export default router;
