@@ -133,10 +133,27 @@ router.get('/suggest', async (req: Request, res: Response) => {
           },
         });
 
-        const data = await response.json();
+        const responseText = await response.text();
+        let data: Record<string, unknown>;
+        try {
+          data = JSON.parse(responseText);
+        } catch {
+          writeLog({
+            level: 50,
+            time: Date.now(),
+            msg: 'NZ Post API returned non-JSON response',
+            provider: 'nzpost',
+            operation: 'address.suggest',
+            statusCode: response.status,
+            responsePreview: responseText.substring(0, 200),
+          });
+          res.status(502).json({ success: false, error: 'NZ Post API returned invalid response' });
+          return;
+        }
+
         const durationMs = Date.now() - startTime;
         writeLog({
-          level: 30,
+          level: response.ok ? 30 : 40,
           time: Date.now(),
           msg: 'NZ Post Address API request',
           provider: 'nzpost',
@@ -144,11 +161,11 @@ router.get('/suggest', async (req: Request, res: Response) => {
           query: q.trim(),
           statusCode: response.status,
           success: data.success,
-          addressCount: (data.addresses || []).length,
+          addressCount: ((data.addresses as unknown[]) || []).length,
           durationMs,
         });
 
-        if (!data.success) {
+        if (!response.ok || !data.success) {
           writeLog({
             level: 40,
             time: Date.now(),
@@ -156,12 +173,13 @@ router.get('/suggest', async (req: Request, res: Response) => {
             provider: 'nzpost',
             operation: 'address.suggest',
             errors: data.errors,
+            response: data,
           });
-          res.status(502).json({ success: false, error: 'NZ Post API error', details: data.errors });
+          res.status(502).json({ success: false, error: 'NZ Post API error', details: data.errors || data });
           return;
         }
 
-        const addresses = (data.addresses || []).map((addr: { FullAddress: string; DPID: number }) => ({
+        const addresses = ((data.addresses as Array<{ FullAddress: string; DPID: number }>) || []).map((addr) => ({
           ...parseNzpostAddress(addr.FullAddress),
           dpid: addr.DPID,
         }));
