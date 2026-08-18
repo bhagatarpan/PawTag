@@ -705,6 +705,7 @@ The Admin Portal is the operational control centre of the application. It provid
 | **System Logs** | Application log viewer with search, filters, pagination, purge, export |
 | **System Log Settings** | Log level/category toggles, sampling, retention |
 | **Site Availability** | Maintenance mode and offline mode controls |
+| **Address Autocomplete** | Address autocomplete provider configuration (Photon/NZ Post) |
 | **Roles & Permissions** | RBAC configuration (Roles, Permissions, Groups, Scopes) |
 
 ### Admin Portal Features
@@ -720,6 +721,8 @@ The Admin Portal is the operational control centre of the application. It provid
 - PuckEditor visual page builder (36 block types)
 - TipTap rich text editor (13 extensions)
 - Monaco JSON editor for advanced content editing
+- Enterprise-grade sidebar with collapsible sections
+- Dark/light mode toggle with persistence
 
 ---
 
@@ -1330,6 +1333,17 @@ Triggers on push/PR to `main` and `develop`. **7 jobs:**
 - **Communication:** Sentry SDK
 - **Authentication:** DSN
 - **Failure Impact:** **Low** — errors only visible in server logs
+
+### Address Autocomplete (Photon/NZ Post)
+
+- **Purpose:** Address autocomplete for checkout, profile, onboarding
+- **Communication:** Backend proxy to provider API
+- **Authentication:** NZ Post requires OAuth 2.0; Photon is free (no key)
+- **Failure Impact:** **Low** — manual address entry fallback
+- **Default Provider:** Photon (free, ~80-85% NZ accuracy)
+- **Admin Config:** `/address-autocomplete` — provider selector, credentials, default country
+- **Settings:** `addressAutocomplete.provider`, `addressAutocomplete.nzpostClientId`, `addressAutocomplete.nzpostClientSecret`, `addressAutocomplete.defaultCountry`
+- **Integration:** Used in Checkout, Profile, OnboardingWizard, Admin Users pages
 
 ---
 

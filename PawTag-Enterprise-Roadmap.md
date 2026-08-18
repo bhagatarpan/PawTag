@@ -1695,6 +1695,36 @@ table in your response.
 
 ---
 
+### Unplanned Addition — Address Autocomplete ✅ COMPLETE
+
+**This was not part of the original 26-phase plan.** Address autocomplete with configurable provider:
+
+- **Component:** `packages/ui/src/components/AddressAutocomplete.tsx` — reusable across all apps
+- **Backend proxy:** `packages/api/src/routes/address-autocomplete.ts` — proxies to provider API
+- **Providers:** Photon (free, no key, ~80-85% NZ accuracy) and NZ Post (OAuth 2.0, contact `api@nzpost.co.nz`)
+- **Admin settings:** `/address-autocomplete` — provider selector, NZ Post OAuth config, default country
+- **Settings:** `addressAutocomplete.provider` (default: `photon`), `addressAutocomplete.nzpostClientId`, `addressAutocomplete.nzpostClientSecret`, `addressAutocomplete.defaultCountry` (default: `NZ`)
+- **Integration:** Used in Checkout, Profile, OnboardingWizard, Admin Users pages
+- **System logging:** All requests logged via `writeLog()` with INTEGRATION category
+- **Default:** Photon (free, works immediately) while NZ Post OAuth is sorted
+
+---
+
+### Unplanned Addition — Admin Sidebar Redesign ✅ COMPLETE
+
+**This was not part of the original 26-phase plan.** Enterprise-grade admin sidebar redesign:
+
+- **7 logical sections:** Overview, Business, Communication, Content, Settings, Security, Operations
+- **Collapsible sections:** Click section header to expand/collapse, state persists in localStorage
+- **Theme toggle:** Sun/Moon icon in sidebar header, dark/light mode with persistence
+- **Active state:** Section auto-expands when child route is active
+- **Badges:** Notification unread count, Support request count
+- **Items:** Sorted alphabetically within each section
+- **Files:** `apps/admin/src/components/Sidebar.tsx`, `apps/admin/src/hooks/useTheme.ts`, `apps/admin/src/hooks/useSidebarCollapse.ts`
+- **Design system:** Admin Portal Design System section added to `DESIGN.md`
+
+---
+
 ### Phase 21 — End-to-end test suite (Playwright)
 
 **Objective:** Automate the five critical user journeys identified in Part 6, so no future change can silently break checkout, tag activation, the recovery flow, admin fulfillment, or subscription renewal without CI catching it.

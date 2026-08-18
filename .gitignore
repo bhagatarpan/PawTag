@@ -66,3 +66,6 @@ packages/api/seed-test.js
 packages/api/create-tags.js
 packages/api/fix-ownership.js
 packages/api/promote-admin.js
+
+# External API reference docs (not part of the codebase)
+docs/nzpost/

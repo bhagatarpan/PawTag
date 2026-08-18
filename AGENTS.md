@@ -500,6 +500,7 @@ Production uses the configured domain sender.
 - `/api/customer/*` — Pet management, orders, notifications, onboarding, escalations
 - `/api/finder/*` — Public tag lookup, location sharing (no auth required)
 - `/api/public/cms/*` — Public CMS content (pages, navigation, footer, settings, onboarding config)
+- `/api/address/*` — Address autocomplete proxy (Photon or NZ Post provider)
 
 ---
 
@@ -639,6 +640,31 @@ Two global system controls for maintenance and offline modes:
 - **Tests:** `tests/unit/site-availability.test.ts`, `tests/integration/site-availability-api.test.ts`
 - **Docs:** `docs/site-availability.md`, DESIGN.md (System Availability Components section)
 
+### Address Autocomplete
+
+Address autocomplete with configurable provider (Photon or NZ Post):
+
+- **Component:** `packages/ui/src/components/AddressAutocomplete.tsx` — reusable across all apps
+- **Backend proxy:** `packages/api/src/routes/address-autocomplete.ts` — proxies to provider API
+- **Admin settings:** `/address-autocomplete` — provider selector, NZ Post OAuth config, default country
+- **Settings:** `addressAutocomplete.provider` (default: `photon`), `addressAutocomplete.nzpostClientId`, `addressAutocomplete.nzpostClientSecret`, `addressAutocomplete.defaultCountry` (default: `NZ`)
+- **Photon:** Free, no API key required, ~80-85% NZ address accuracy
+- **NZ Post:** Requires OAuth 2.0 Client Credentials (contact `api@nzpost.co.nz` to enable)
+- **Integration:** Used in Checkout, Profile, OnboardingWizard, Admin Users pages
+- **System logging:** All requests logged via `writeLog()` with INTEGRATION category
+
+### Admin Portal Sidebar
+
+Enterprise-grade sidebar with collapsible sections and dark/light mode:
+
+- **Sections:** 7 logical groups (Overview, Business, Communication, Content, Settings, Security, Operations)
+- **Collapsible:** Click section header to expand/collapse, state persists in localStorage
+- **Theme toggle:** Sun/Moon icon in sidebar header, persists in localStorage
+- **Active state:** Section auto-expands when child route is active
+- **Badges:** Notification unread count, Support request count
+- **Items:** Sorted alphabetically within each section
+- **Files:** `apps/admin/src/components/Sidebar.tsx`, `apps/admin/src/hooks/useTheme.ts`, `apps/admin/src/hooks/useSidebarCollapse.ts`
+
 ### Auth & Permissions
 
 - JWT-based auth with refresh tokens
@@ -741,8 +767,11 @@ Located in `apps/mobile/e2e/`:
 | `packages/api/src/routes/system-logs.ts` | System log API routes |
 | `packages/api/src/routes/site-availability.ts` | Admin site availability routes |
 | `packages/api/src/routes/system-status.ts` | Public system status endpoint |
+| `packages/api/src/routes/address-autocomplete.ts` | Address autocomplete proxy (Photon/NZ Post) |
 | `apps/admin/src/pages/SystemLogs.tsx` | System log viewer with purge UI |
 | `apps/admin/src/pages/SystemLogSettings.tsx` | System log settings page |
+| `apps/admin/src/pages/AddressAutocompleteSettings.tsx` | Address autocomplete provider config |
+| `packages/ui/src/components/AddressAutocomplete.tsx` | Reusable address autocomplete component |
 | `apps/web/src/components/OnboardingWizard.tsx` | Dynamic onboarding wizard with success screen |
 | `apps/web/src/components/AccountLayout.tsx` | Customer portal layout + wizard gating |
 | `apps/finder/src/App.tsx` | Finder portal (decomposed into components) |
