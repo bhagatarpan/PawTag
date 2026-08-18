@@ -26,10 +26,14 @@ interface NormalizedAddress {
   country: string;
 }
 
-// Cache settings for 60 seconds
+// Settings cache (60s TTL)
 let settingsCache: Record<string, string> = {};
 let settingsCacheTime = 0;
 const SETTINGS_CACHE_TTL = 60_000;
+
+// NZ Post OAuth token cache
+let nzpostToken: string | null = null;
+let nzpostTokenExpiry = 0;
 
 async function getSettings(): Promise<Record<string, string>> {
   const now = Date.now();
@@ -39,7 +43,8 @@ async function getSettings(): Promise<Record<string, string>> {
 
   const keys = [
     'addressAutocomplete.provider',
-    'addressAutocomplete.nzpostApiKey',
+    'addressAutocomplete.nzpostClientId',
+    'addressAutocomplete.nzpostClientSecret',
     'addressAutocomplete.defaultCountry',
   ];
 
@@ -50,6 +55,40 @@ async function getSettings(): Promise<Record<string, string>> {
   }
   settingsCacheTime = now;
   return settingsCache;
+}
+
+async function getNzpostToken(clientId: string, clientSecret: string): Promise<string> {
+  const now = Date.now();
+
+  // Return cached token if still valid (with 5-minute buffer)
+  if (nzpostToken && now < nzpostTokenExpiry - 300_000) {
+    return nzpostToken;
+  }
+
+  // Fetch new token using OAuth 2.0 Client Credentials
+  const body = new URLSearchParams({
+    grant_type: 'client_credentials',
+    client_id: clientId,
+    client_secret: clientSecret,
+  });
+
+  const response = await fetch('https://oauth.nzpost.co.nz/as/token.oauth2', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: body.toString(),
+  });
+
+  if (!response.ok) {
+    throw new Error(`NZ Post OAuth failed: ${response.status}`);
+  }
+
+  const data = await response.json();
+  nzpostToken = data.access_token as string;
+  nzpostTokenExpiry = now + (data.expires_in || 86399) * 1000;
+
+  return nzpostToken;
 }
 
 function mapPhotonToAddress(feature: PhotonFeature): NormalizedAddress {
@@ -107,13 +146,18 @@ router.get('/suggest', async (req: Request, res: Response) => {
     const defaultCountry = settings['addressAutocomplete.defaultCountry'] || 'NZ';
 
     if (provider === 'nzpost') {
-      const apiKey = settings['addressAutocomplete.nzpostApiKey'];
-      if (!apiKey) {
-        res.status(500).json({ success: false, error: 'NZ Post API key not configured' });
+      const clientId = settings['addressAutocomplete.nzpostClientId'];
+      const clientSecret = settings['addressAutocomplete.nzpostClientSecret'];
+
+      if (!clientId || !clientSecret) {
+        res.status(500).json({ success: false, error: 'NZ Post credentials not configured. Please set Client ID and Client Secret in Admin → Address Autocomplete.' });
         return;
       }
 
       try {
+        // Get OAuth token
+        const token = await getNzpostToken(clientId, clientSecret);
+
         const params = new URLSearchParams({
           q: q.trim(),
           max: limit.toString(),
@@ -121,7 +165,7 @@ router.get('/suggest', async (req: Request, res: Response) => {
         const response = await fetch(`https://api.nzpost.co.nz/addresschecker/1.0/suggest?${params}`, {
           headers: {
             'Accept': 'application/json',
-            'Authorization': `Bearer ${apiKey}`,
+            'Authorization': `Bearer ${token}`,
           },
         });
 
@@ -166,6 +210,8 @@ router.get('/suggest', async (req: Request, res: Response) => {
 router.post('/invalidate-cache', async (_req: Request, res: Response) => {
   settingsCacheTime = 0;
   settingsCache = {};
+  nzpostToken = null;
+  nzpostTokenExpiry = 0;
   res.json({ success: true });
 });
 

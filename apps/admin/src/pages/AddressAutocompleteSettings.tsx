@@ -1,18 +1,20 @@
 import { useEffect, useState } from 'react';
-import { MapPin, Key, Globe, Info, Save, Loader2, CheckCircle } from 'lucide-react';
+import { MapPin, Key, Globe, Info, Save, Loader2, CheckCircle, Shield } from 'lucide-react';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
 
 interface SettingsData {
   provider: string;
-  nzpostApiKey: string;
+  nzpostClientId: string;
+  nzpostClientSecret: string;
   defaultCountry: string;
 }
 
 export default function AddressAutocompleteSettings() {
   const [settings, setSettings] = useState<SettingsData>({
     provider: 'nzpost',
-    nzpostApiKey: '',
+    nzpostClientId: '',
+    nzpostClientSecret: '',
     defaultCountry: 'NZ',
   });
   const [loading, setLoading] = useState(true);
@@ -31,7 +33,8 @@ export default function AddressAutocompleteSettings() {
       }
       setSettings({
         provider: map.provider || 'nzpost',
-        nzpostApiKey: map.nzpostApiKey || '',
+        nzpostClientId: map.nzpostClientId || '',
+        nzpostClientSecret: map.nzpostClientSecret || '',
         defaultCountry: map.defaultCountry || 'NZ',
       });
     } catch {
@@ -62,8 +65,9 @@ export default function AddressAutocompleteSettings() {
     await saveSetting('provider', provider);
   };
 
-  const handleApiKeySave = async () => {
-    await saveSetting('nzpostApiKey', settings.nzpostApiKey);
+  const handleCredentialsSave = async () => {
+    await saveSetting('nzpostClientId', settings.nzpostClientId);
+    await saveSetting('nzpostClientSecret', settings.nzpostClientSecret);
   };
 
   const handleCountrySave = async () => {
@@ -228,16 +232,17 @@ export default function AddressAutocompleteSettings() {
         </div>
       </div>
 
-      {/* NZ Post API Key */}
+      {/* NZ Post Credentials */}
       {settings.provider === 'nzpost' && (
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm mb-6">
           <div className="px-6 py-4 border-b border-gray-100">
             <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-              <Key className="w-5 h-5 text-gray-400" />
-              NZ Post API Key
+              <Shield className="w-5 h-5 text-gray-400" />
+              NZ Post OAuth 2.0 Credentials
             </h2>
             <p className="text-sm text-gray-500 mt-1">
-              Required for NZ Post address lookup. Get your API key from the{' '}
+              Required for NZ Post address lookup. Uses OAuth 2.0 Client Credentials flow.
+              Get your credentials from the{' '}
               <a
                 href="https://www.nzpost.co.nz/business/ecommerce/developer-resource-centre/get-started"
                 target="_blank"
@@ -248,30 +253,43 @@ export default function AddressAutocompleteSettings() {
               </a>.
             </p>
           </div>
-          <div className="p-6">
-            <div className="flex items-center gap-3">
+          <div className="p-6 space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Client ID</label>
+              <input
+                type="text"
+                value={settings.nzpostClientId}
+                onChange={(e) => setSettings((s) => ({ ...s, nzpostClientId: e.target.value }))}
+                placeholder="Enter your NZ Post Client ID"
+                className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Client Secret</label>
               <input
                 type="password"
-                value={settings.nzpostApiKey}
-                onChange={(e) => setSettings((s) => ({ ...s, nzpostApiKey: e.target.value }))}
-                placeholder="Enter your NZ Post API key"
-                className="flex-1 border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                value={settings.nzpostClientSecret}
+                onChange={(e) => setSettings((s) => ({ ...s, nzpostClientSecret: e.target.value }))}
+                placeholder="Enter your NZ Post Client Secret"
+                className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
               />
+            </div>
+            <div className="flex items-center gap-3">
               <button
-                onClick={handleApiKeySave}
+                onClick={handleCredentialsSave}
                 disabled={saving}
                 className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors disabled:opacity-50"
               >
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                Save
+                Save Credentials
               </button>
+              {settings.nzpostClientId && settings.nzpostClientSecret && (
+                <div className="flex items-center gap-2 text-sm text-green-600">
+                  <CheckCircle className="w-4 h-4" />
+                  Credentials configured
+                </div>
+              )}
             </div>
-            {settings.nzpostApiKey && (
-              <div className="mt-2 flex items-center gap-2 text-sm text-green-600">
-                <CheckCircle className="w-4 h-4" />
-                API key configured
-              </div>
-            )}
           </div>
         </div>
       )}
