@@ -207,18 +207,7 @@ body { @apply bg-white text-gray-900; }
   50% { opacity: 0.7; }
 }
 
-.maintenance-banner {
-  animation: maintenance-pulse 3s ease-in-out infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .maintenance-banner {
-    animation: none;
-    opacity: 1;
-  }
-}
-
 /* Offset body content when maintenance banner is visible */
 body.has-maintenance-banner {
-  padding-top: 96px;
+  padding-top: 84px;
 }

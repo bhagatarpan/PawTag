@@ -2,6 +2,9 @@ import { useSiteAvailability } from './SiteAvailabilityProvider';
 import { SiteAvailabilityStatus } from '@pawtag/shared';
 import { AlertTriangle } from 'lucide-react';
 
+const prefersReducedMotion = typeof window !== 'undefined'
+  && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 export default function MaintenanceBanner() {
   const { status, messages } = useSiteAvailability();
 
@@ -11,9 +14,10 @@ export default function MaintenanceBanner() {
     <div
       role="alert"
       aria-live="assertive"
-      className="fixed top-0 left-0 right-0 z-50 bg-red-600 text-white shadow-lg maintenance-banner"
+      className="fixed top-0 left-0 right-0 z-50 bg-red-600 text-white shadow-lg"
+      style={prefersReducedMotion ? undefined : { animation: 'maintenance-pulse 3s ease-in-out infinite' }}
     >
-      <div className="max-w-7xl mx-auto px-6 py-5 sm:py-7 flex items-center gap-4">
+      <div className="max-w-7xl mx-auto px-6 py-4 sm:py-5 flex items-center gap-4">
         <AlertTriangle size={24} className="shrink-0 text-red-200" />
         <div>
           <h2 className="text-lg sm:text-xl font-bold leading-tight">{messages.maintenanceTitle}</h2>
