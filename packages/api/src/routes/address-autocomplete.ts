@@ -32,10 +32,6 @@ let settingsCache: Record<string, string> = {};
 let settingsCacheTime = 0;
 const SETTINGS_CACHE_TTL = 60_000;
 
-// NZ Post OAuth token cache
-let nzpostToken: string | null = null;
-let nzpostTokenExpiry = 0;
-
 async function getSettings(): Promise<Record<string, string>> {
   const now = Date.now();
   if (settingsCacheTime && now - settingsCacheTime < SETTINGS_CACHE_TTL) {
@@ -56,44 +52,6 @@ async function getSettings(): Promise<Record<string, string>> {
   }
   settingsCacheTime = now;
   return settingsCache;
-}
-
-async function getNzpostToken(clientId: string, clientSecret: string): Promise<string> {
-  const now = Date.now();
-
-  // Return cached token if still valid (with 5-minute buffer)
-  if (nzpostToken && now < nzpostTokenExpiry - 300_000) {
-    return nzpostToken;
-  }
-
-  // Fetch new token using OAuth 2.0 Client Credentials
-  const body = new URLSearchParams({
-    grant_type: 'client_credentials',
-    client_id: clientId,
-    client_secret: clientSecret,
-  });
-
-  logger.info('Fetching NZ Post OAuth token...');
-  const response = await fetch('https://oauth.nzpost.co.nz/as/token.oauth2', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: body.toString(),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    logger.error({ status: response.status, error: errorText }, 'NZ Post OAuth failed');
-    throw new Error(`NZ Post OAuth failed: ${response.status} - ${errorText}`);
-  }
-
-  const data = await response.json();
-  nzpostToken = data.access_token as string;
-  nzpostTokenExpiry = now + (data.expires_in || 86399) * 1000;
-  logger.info('NZ Post OAuth token obtained successfully');
-
-  return nzpostToken;
 }
 
 function mapPhotonToAddress(feature: PhotonFeature): NormalizedAddress {
@@ -160,19 +118,18 @@ router.get('/suggest', async (req: Request, res: Response) => {
       }
 
       try {
-        // Get OAuth token
-        const token = await getNzpostToken(clientId, clientSecret);
-
+        // Use query parameter authentication (simpler, no OAuth token needed)
         const params = new URLSearchParams({
           q: q.trim(),
           max: limit.toString(),
+          client_id: clientId,
+          client_secret: clientSecret,
         });
         const apiUrl = `https://api.nzpost.co.nz/addresschecker/1.0/suggest?${params}`;
-        logger.info({ query: q.trim(), apiUrl }, 'Calling NZ Post Address API');
+        logger.info({ query: q.trim() }, 'Calling NZ Post Address API');
         const response = await fetch(apiUrl, {
           headers: {
             'Accept': 'application/json',
-            'Authorization': `Bearer ${token}`,
           },
         });
 
@@ -193,15 +150,7 @@ router.get('/suggest', async (req: Request, res: Response) => {
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : String(err);
         logger.error({ error: errMsg }, 'Failed to call NZ Post API');
-        // If OAuth fails with unauthorized_client, suggest switching to Photon
-        if (errMsg.includes('unauthorized_client')) {
-          res.status(502).json({
-            success: false,
-            error: 'NZ Post OAuth error: Client Credentials grant type not enabled. Contact NZ Post API Support (api@nzpost.co.nz) to enable it, or switch to Photon provider in Admin → Address Autocomplete.',
-          });
-        } else {
-          res.status(502).json({ success: false, error: 'Failed to reach NZ Post API' });
-        }
+        res.status(502).json({ success: false, error: 'Failed to reach NZ Post API' });
       }
     } else {
       // Photon (OpenStreetMap) - free, no key needed
@@ -229,8 +178,6 @@ router.get('/suggest', async (req: Request, res: Response) => {
 router.post('/invalidate-cache', async (_req: Request, res: Response) => {
   settingsCacheTime = 0;
   settingsCache = {};
-  nzpostToken = null;
-  nzpostTokenExpiry = 0;
   res.json({ success: true });
 });
 
