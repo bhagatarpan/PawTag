@@ -410,7 +410,7 @@ async function seed() {
     console.log('\n--- Seeding Roles ---');
     const roleDefs = [
       { name: 'SUPER_ADMIN', displayName: 'Super Admin', description: 'Full unrestricted platform access', roleType: 'system', isSystemRole: true, isSuperAdmin: true },
-      { name: 'ADMIN', displayName: 'Admin', description: 'Manage platform and business operations', roleType: 'system', isSystemRole: true, isSuperAdmin: false },
+      { name: 'ADMIN', displayName: 'Admin', description: 'Full unrestricted platform access (same as Super Admin)', roleType: 'system', isSystemRole: true, isSuperAdmin: true },
       { name: 'CUSTOMER_SERVICE', displayName: 'Customer Service', description: 'Manage customer support operations', roleType: 'system', isSystemRole: true, isSuperAdmin: false },
       { name: 'PET_OWNER', displayName: 'Pet Owner', description: 'Manage own pets and data', roleType: 'system', isSystemRole: true, isSuperAdmin: false },
       { name: 'CUSTOMER', displayName: 'Customer', description: 'Site visitor who becomes a customer — manages own pets, browses shop, and places orders', roleType: 'system', isSystemRole: true, isSuperAdmin: false },
@@ -421,6 +421,20 @@ async function seed() {
     for (const r of roleDefs) {
       const existing = await Role.findOne({ name: r.name }).session(session);
       if (existing) {
+        // Update existing role if key fields changed (e.g., isSuperAdmin)
+        let needsUpdate = false;
+        if (existing.isSuperAdmin !== r.isSuperAdmin) {
+          existing.isSuperAdmin = r.isSuperAdmin;
+          needsUpdate = true;
+        }
+        if (existing.description !== r.description) {
+          existing.description = r.description;
+          needsUpdate = true;
+        }
+        if (needsUpdate) {
+          await existing.save({ session });
+          console.log(`  Updated role: ${r.name} (isSuperAdmin: ${r.isSuperAdmin})`);
+        }
         roleMap[r.name] = existing._id.toString();
       } else {
         const created = await Role.create([r], { session });

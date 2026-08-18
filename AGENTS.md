@@ -646,6 +646,7 @@ Two global system controls for maintenance and offline modes:
 - RBAC: Roles → Permissions → Scopes (OWN or ALL)
 - Permission check: `requirePermission('resource.action')` middleware
 - Admin permissions seeded in `packages/api/src/seeds/seed.ts`
+- **Super Admin bypass:** Both `SUPER_ADMIN` and `ADMIN` roles have `isSuperAdmin: true`, which bypasses ALL permission checks (unrestricted "GOD mode" access)
 
 ### Frontend Patterns
 

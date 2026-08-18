@@ -621,13 +621,13 @@ flowchart LR
 
 ### Available Roles
 
-| Role | Description | Access Level |
-|------|-------------|--------------|
-| `SUPER_ADMIN` | Full system access | All resources, all scopes |
-| `ADMIN` | Administrative access | Most resources, configurable scopes |
-| `CUSTOMER_SERVICE` | Customer support | User management, orders, support |
-| `WEBSITE_EDITOR` | Content management | CMS content, pages, navigation |
-| `CUSTOMER` | Pet owner | Own pets, orders, subscriptions |
+| Role | Description | Access Level | Super Admin |
+|------|-------------|--------------|-------------|
+| `SUPER_ADMIN` | Full system access | All resources, all scopes | ✅ Yes |
+| `ADMIN` | Full system access (same as Super Admin) | All resources, all scopes | ✅ Yes |
+| `CUSTOMER_SERVICE` | Customer support | User management, orders, support | ❌ No |
+| `WEBSITE_EDITOR` | Content management | CMS content, pages, navigation | ❌ No |
+| `CUSTOMER` | Pet owner | Own pets, orders, subscriptions | ❌ No |
 
 ### Permission Structure
 
@@ -660,7 +660,7 @@ Permissions follow the pattern `resource.action` with optional scope:
 
 ### Super Admin Bypass
 
-Roles with `isSuperAdmin: true` bypass all permission checks entirely.
+Roles with `isSuperAdmin: true` bypass all permission checks entirely. Both `SUPER_ADMIN` and `ADMIN` roles have this flag set, giving them unrestricted "GOD mode" access to all functionality.
 
 ---
 
