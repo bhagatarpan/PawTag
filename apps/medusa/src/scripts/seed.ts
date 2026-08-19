@@ -171,6 +171,7 @@ export default async function seedPawTag({ container }: ExecArgs) {
 
     const taxRegion = await taxModuleService.createTaxRegions({
       country_code: "nz",
+      provider_id: "tp_system",
     });
 
     await taxModuleService.createTaxRates({
@@ -281,6 +282,14 @@ export default async function seedPawTag({ container }: ExecArgs) {
     await link.create({
       [Modules.STOCK_LOCATION]: { stock_location_id: stockLocation.id },
       [Modules.FULFILLMENT]: { fulfillment_set_id: fulfillmentSet.id },
+    });
+  });
+
+  // Link sales channel ↔ stock location (required for inventory)
+  await run("Link sales channel ↔ stock location", async () => {
+    await link.create({
+      [Modules.SALES_CHANNEL]: { sales_channel_id: defaultSalesChannel.id },
+      [Modules.STOCK_LOCATION]: { stock_location_id: stockLocation.id },
     });
   });
 
@@ -644,37 +653,33 @@ export default async function seedPawTag({ container }: ExecArgs) {
   const stockLocationId = stockLocation.id;
 
   await run("Seed inventory levels", async () => {
-    const inventoryModuleService = container.resolve(Modules.INVENTORY);
+    const inventoryModuleService = container.resolve(Modules.INVENTORY) as any;
     const existingLevels =
       await inventoryModuleService.listInventoryLevels({});
     const existingItemIds = new Set(
       existingLevels.map((l: any) => l.inventory_item_id)
     );
 
+    // Get all inventory items directly
+    const allInventoryItems = await inventoryModuleService.listInventoryItems({});
+    console.log(`  Found ${allInventoryItems.length} inventory items`);
+
     const newLevels: any[] = [];
 
-    for (const product of allProducts) {
+    for (const invItem of allInventoryItems) {
+      if (existingItemIds.has(invItem.id)) continue;
+
+      // Find the product that owns this inventory item via SKU
       const mongo = mongoProducts.find(
-        (m: any) => slug(m.sku || m.name) === product.handle
+        (m: any) => m.sku === invItem.sku
       );
-      for (const variant of product.variants || []) {
-        // Find inventory item linked to this variant
-        const { data: inventoryItems } = await query.graph({
-          entity: "inventory_item",
-          fields: ["id", "sku"],
-          filters: { sku: variant.sku },
-        });
+      const stockedQty = mongo?.stock ?? 0;
 
-        if (inventoryItems.length === 0) continue;
-        const invItem = inventoryItems[0];
-        if (existingItemIds.has(invItem.id)) continue;
-
-        newLevels.push({
-          inventory_item_id: invItem.id,
-          location_id: stockLocationId,
-          stocked_quantity: mongo?.stock ?? 0,
-        });
-      }
+      newLevels.push({
+        inventory_item_id: invItem.id,
+        location_id: stockLocationId,
+        stocked_quantity: stockedQty,
+      });
     }
 
     if (newLevels.length === 0) {
@@ -682,6 +687,7 @@ export default async function seedPawTag({ container }: ExecArgs) {
       return undefined;
     }
 
+    console.log(`  Creating ${newLevels.length} inventory levels`);
     return createInventoryLevelsWorkflow(container).run({
       input: { inventory_levels: newLevels },
     });
