@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Lock, CreditCard, PawPrint, CheckCircle, Truck, Tag, Loader2 } from 'lucide-react';
+import { ArrowLeft, Lock, CreditCard, PawPrint, CheckCircle, Truck, Tag, Loader2, Percent } from 'lucide-react';
 import { AddressAutocomplete } from '@pawtag/ui';
 import type { AddressComponents } from '@pawtag/ui';
 import api from '../lib/api';
+import { sdk } from '../lib/medusa';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 
@@ -24,7 +25,7 @@ function getBundleDiscountFromSettings(itemCount: number, settings: Record<strin
 }
 
 export default function Checkout() {
-  const { items, total, clearCart } = useCart();
+  const { items, total, clearCart, cart } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -33,6 +34,10 @@ export default function Checkout() {
   const [shippingZone, setShippingZone] = useState<'city' | 'rural'>('city');
   const [referralCode, setReferralCode] = useState('');
   const [referralApplied, setReferralApplied] = useState(false);
+  const [promoCode, setPromoCode] = useState('');
+  const [promoApplied, setPromoApplied] = useState(false);
+  const [promoLoading, setPromoLoading] = useState(false);
+  const [promoDiscount, setPromoDiscount] = useState(0);
   const [bundleSettings, setBundleSettings] = useState<Record<string, string>>({});
   const [paymentStep, setPaymentStep] = useState<'form' | 'processing' | 'success'>('form');
   const [error, setError] = useState<string | null>(null);
@@ -62,8 +67,35 @@ export default function Checkout() {
     : 0;
 
   const shippingCost = SHIPPING_ZONES.find((z) => z.value === shippingZone)?.cost || 7.99;
-  const discountedSubtotal = total - bundleDiscountAmount;
-  const orderTotal = discountedSubtotal + shippingCost;
+  const discountedSubtotal = total - bundleDiscountAmount - promoDiscount;
+  const orderTotal = Math.max(0, discountedSubtotal + shippingCost);
+
+  const applyPromoCode = async () => {
+    if (!promoCode || promoCode.length < 3) return;
+    setPromoLoading(true);
+    try {
+      const { cart: updatedCart } = await sdk.store.cart.addPromotions(cart.id, {
+        promo_codes: [promoCode],
+      } as any);
+      setPromoApplied(true);
+      setPromoDiscount(updatedCart?.discount_total || 0);
+    } catch (err: any) {
+      setError(err.message || 'Invalid promo code');
+    } finally {
+      setPromoLoading(false);
+    }
+  };
+
+  const removePromoCode = async () => {
+    try {
+      await sdk.store.cart.removePromotions(cart.id, { promo_codes: [promoCode] } as any);
+      setPromoApplied(false);
+      setPromoDiscount(0);
+      setPromoCode('');
+    } catch (err: any) {
+      setError(err.message || 'Failed to remove promo code');
+    }
+  };
 
   const handleAddressSelect = (address: AddressComponents) => {
     setForm(prev => ({
@@ -298,6 +330,35 @@ export default function Checkout() {
                 <div className="flex justify-between text-sm text-gray-500">
                   <span>Shipping ({SHIPPING_ZONES.find((z) => z.value === shippingZone)?.label})</span>
                   <span>${shippingCost.toFixed(2)}</span>
+                </div>
+
+                {/* Promo Code */}
+                <div className="pt-2">
+                  {promoApplied ? (
+                    <div className="flex items-center justify-between text-sm text-green-600">
+                      <span className="flex items-center gap-1"><Percent size={14} /> Promo code applied (-${promoDiscount.toFixed(2)})</span>
+                      <button onClick={removePromoCode} className="text-xs text-gray-400 hover:text-red-500">Remove</button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={promoCode}
+                        onChange={e => setPromoCode(e.target.value.toUpperCase())}
+                        placeholder="Promo code"
+                        className="flex-1 px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-teal-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={applyPromoCode}
+                        disabled={promoCode.length < 3 || promoLoading}
+                        className="px-3 py-1.5 text-sm text-teal-600 border border-teal-200 rounded-lg hover:bg-teal-50 disabled:opacity-50 flex items-center gap-1"
+                      >
+                        {promoLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+                        Apply
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {/* Referral Code */}
