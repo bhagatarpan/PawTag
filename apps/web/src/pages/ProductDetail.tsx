@@ -31,7 +31,7 @@ export default function ProductDetail() {
       productId: product.id,
       variantId: variant.id,
       name: product.title,
-      price: (variant.prices?.[0]?.amount || 0) / 100,
+      price: variant.prices?.[0]?.amount || 0,
       quantity,
       image: product.thumbnail || undefined,
     });
@@ -64,7 +64,7 @@ export default function ProductDetail() {
 
   const badge = getBadge(product.handle || '');
   const variant = product.variants?.[0];
-  const price = variant ? (variant.prices?.[0]?.amount || 0) / 100 : 0;
+  const price = variant ? (variant.prices?.[0]?.amount || 0) : 0;
   const monthlyPrice = (product.metadata as any)?.subscriptionConfig?.monthlyPrice || 0;
   const images = (product.images || []).map((img: any) => img.url).filter(Boolean);
 

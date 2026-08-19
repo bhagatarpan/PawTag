@@ -60,7 +60,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     productId: item.product_id || '',
     variantId: item.variant_id || '',
     name: item.title || '',
-    price: (item.unit_price || 0) / 100, // Medusa stores in minor units (cents)
+    price: item.unit_price || 0,
     quantity: item.quantity,
     image: item.thumbnail || item.variant?.product?.thumbnail || undefined,
   }));
@@ -175,7 +175,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, [cart]);
 
   // Totals in major units (cents → dollars)
-  const total = ((cart as any)?.total || 0) / 100;
+  const total = (cart as any)?.total || 0;
   const itemCount = ((cart as any)?.items || []).reduce((sum: number, i: any) => sum + i.quantity, 0);
 
   return (

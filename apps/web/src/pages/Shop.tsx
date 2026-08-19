@@ -53,7 +53,7 @@ export default function Shop() {
       productId: product.id,
       variantId: variant.id,
       name: product.title,
-      price: (variant.prices?.[0]?.amount || 0) / 100,
+      price: variant.prices?.[0]?.amount || 0,
       quantity: 1,
       image: product.thumbnail || undefined,
     });
@@ -108,7 +108,7 @@ export default function Shop() {
             {products.map((product) => {
               const badge = getBadge(product.handle || '');
               const variant = product.variants?.[0];
-              const price = variant ? (variant.prices?.[0]?.amount || 0) / 100 : 0;
+              const price = variant ? (variant.prices?.[0]?.amount || 0) : 0;
               const monthlyPrice = getMonthlyPrice(product);
               const isMostOrdered = badge?.label === 'Most Ordered';
               return (
