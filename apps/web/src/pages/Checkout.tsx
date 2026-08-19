@@ -111,7 +111,11 @@ export default function Checkout() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) { navigate('/login'); return; }
+    if (!user) {
+      localStorage.setItem('pawtag_return_url', '/checkout');
+      navigate('/login');
+      return;
+    }
     if (items.length === 0) return;
 
     setLoading(true);

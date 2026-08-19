@@ -22,6 +22,10 @@ export default function CheckoutVerificationGate({ children }: CheckoutVerificat
 
   // If not logged in, show login prompt instead of dead-end verification
   if (!user && !loading) {
+    // Save checkout as return URL so login redirects back here
+    const returnUrl = '/checkout';
+    localStorage.setItem('pawtag_return_url', returnUrl);
+
     return (
       <div className="max-w-lg mx-auto py-12 px-4">
         <div className="text-center mb-8">

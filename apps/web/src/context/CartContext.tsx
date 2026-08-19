@@ -45,10 +45,28 @@ export function CartProvider({ children }: { children: ReactNode }) {
           const { cart: retrieved } = await sdk.store.cart.retrieve(savedCartId);
           setCart(retrieved);
         } catch {
-          // Cart no longer exists — clear ID
+          // Cart no longer exists — clear ID and create new one
           localStorage.removeItem(CART_ID_KEY);
+          try {
+            const regionId = await getNzRegionId();
+            const { cart: newCart } = await sdk.store.cart.create({ region_id: regionId });
+            localStorage.setItem(CART_ID_KEY, (newCart as any).id);
+            setCart(newCart);
+          } catch {
+            // Non-critical — cart will be created on first addItem
+          }
         } finally {
           setLoading(false);
+        }
+      } else {
+        // No saved cart — create one proactively so addItem is instant
+        try {
+          const regionId = await getNzRegionId();
+          const { cart: newCart } = await sdk.store.cart.create({ region_id: regionId });
+          localStorage.setItem(CART_ID_KEY, (newCart as any).id);
+          setCart(newCart);
+        } catch {
+          // Non-critical — cart will be created on first addItem
         }
       }
     };

@@ -32,6 +32,7 @@ export default function Login() {
   const companyName = settings?.['company.name'] || 'PawTag';
 
   const adminRoles = ['SUPER_ADMIN', 'ADMIN', 'CUSTOMER_SERVICE', 'WEBSITE_EDITOR'];
+  const RETURN_URL_KEY = 'pawtag_return_url';
 
   const fetchCaptcha = async () => {
     try {
@@ -68,7 +69,13 @@ export default function Login() {
       if (isAdmin) {
         window.location.href = import.meta.env.VITE_ADMIN_URL || 'http://localhost:3001';
       } else {
-        navigate('/account');
+        const returnUrl = localStorage.getItem(RETURN_URL_KEY);
+        if (returnUrl) {
+          localStorage.removeItem(RETURN_URL_KEY);
+          navigate(returnUrl);
+        } else {
+          navigate('/account');
+        }
       }
     } catch (err: any) {
       const responseCode = err.response?.data?.code;
@@ -124,7 +131,13 @@ export default function Login() {
         if (isAdmin) {
           window.location.href = import.meta.env.VITE_ADMIN_URL || 'http://localhost:3001';
         } else {
-          navigate('/account');
+          const returnUrl = localStorage.getItem(RETURN_URL_KEY);
+          if (returnUrl) {
+            localStorage.removeItem(RETURN_URL_KEY);
+            navigate(returnUrl);
+          } else {
+            navigate('/account');
+          }
         }
       }, 1800);
     } catch (err: any) {
