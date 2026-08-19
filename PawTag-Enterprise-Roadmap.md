@@ -26,11 +26,11 @@ Reasoning:
 
 **What the finder gets:** nothing installable. A URL. Confirmed in Part 2 below — this is already how `apps/finder` works today, and it stays that way. NFC for the finder is a **tag-side** feature (the physical NFC chip is programmed to open the same finder URL when tapped) — no finder-side app or download is needed for NFC either.
 
-### 1.2 Backend strategy — keep one Express API, no changes
+### 1.2 Backend strategy — Express API + MedusaJS commerce engine
 
-**Decision: keep `packages/api` as the single backend for web, admin, customer portal, finder page, and the new mobile app.**
+**Decision: `packages/api` (Express) remains the primary backend for auth, users, pets, tags, CMS, and notifications. MedusaJS v2.19.0 (`apps/medusa`) was added as the commerce engine for products, carts, orders, payments, and shipping.**
 
-There is no duplication to remove here — this is correctly built as one API serving multiple clients. The only change: mobile needs a couple of API additions (see 1.3) that don't exist for a browser client (e.g., push token registration — which already has a `PushToken` model, encouragingly).
+The two systems are linked via customer sync (PawTag User ↔ Medusa Customer) and webhooks (Medusa events → PawTag webhook endpoint). This separation keeps PawTag's domain logic (pet recovery, subscriptions) separate from generic commerce logic, while leveraging Medusa's production-grade cart, checkout, and payment handling.
 
 ### 1.3 Authentication strategy — one JWT-based auth, extended with refresh tokens
 
@@ -3043,6 +3043,67 @@ by actually using it to add one real new block type.
 - If something ever does look wrong after publishing, you click "Restore this version" and it's back to how it was, no developer needed.
 - Adding new content is picking from a gallery of good-looking, on-brand blocks and filling in a few fields — never staring at a blank page wondering where to start.
 - None of this locks your future developers in: every block is one small, self-contained, documented component, and the guide in Phase 36 means adding the next one doesn't require reverse-engineering how the last one was built.
+
+---
+
+## Part 10 — MedusaJS v2 Commerce Integration ✅ COMPLETE
+
+**Completed:** 2026-08-19
+**Branch:** `feat/medusa-integration`
+**Plan file:** `MEDUSA-INTEGRATION-PLAN.md`
+
+### Overview
+
+MedusaJS v2.19.0 was integrated as the commerce engine, replacing the custom cart/checkout system with a production-grade commerce platform. PawTag maintains dual databases (MongoDB + PostgreSQL) with sync via webhooks.
+
+### Architecture
+
+| Component | Port | Database | Purpose |
+|-----------|------|----------|---------|
+| `apps/medusa` | 9000 | PostgreSQL (Neon) | Products, carts, orders, payments, shipping |
+| `packages/api` | 5000 | MongoDB Atlas | Users, pets, tags, CMS, audit, subscriptions |
+
+### Integration Points
+
+- **Customer sync:** PawTag User ↔ Medusa Customer (via `medusaCustomerId` field)
+- **Webhooks:** Medusa `order.placed`/`payment.captured` → PawTag webhook endpoint
+- **Cart:** Medusa server-side cart via `@medusajs/js-sdk` in `apps/web`
+- **Admin:** Medusa dashboard linked from PawTag admin sidebar
+
+### Phases Completed
+
+| Phase | Description | Status |
+|-------|-------------|--------|
+| 1 | MedusaJS v2 Setup & Infrastructure | ✅ |
+| 2 | Seed Data & Commerce Config | ✅ |
+| 2B | DESIGN.md Audit & Component Library | ✅ |
+| 3 | Dual OTP Checkout Gatekeeper | ✅ |
+| 4 | Medusa SDK Integration in apps/web | ✅ |
+| 5 | Customer Sync (PawTag ↔ Medusa) | ✅ |
+| 6 | Webhooks (Medusa → PawTag) | ✅ |
+| 7 | Admin → Medusa Dashboard | ✅ |
+| 8 | Remove Legacy Code | ✅ |
+| 9 | Full E2E Test & Visual Consistency | ✅ |
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `apps/medusa/src/scripts/seed.ts` | Migrates products from MongoDB to Medusa |
+| `apps/medusa/src/subscribers/pawtag-webhook.ts` | Forwards Medusa events to PawTag |
+| `packages/api/src/routes/medusa-webhooks.ts` | Receives Medusa events, creates PawTag orders |
+| `packages/api/src/services/medusa-sync.service.ts` | Syncs PawTag users to Medusa customers |
+| `packages/api/src/routes/checkout-otp.ts` | Dual OTP checkout verification |
+| `packages/api/src/routes/medusa-sync.ts` | Customer sync API endpoint |
+| `apps/web/src/context/CartContext.tsx` | Medusa cart integration |
+| `apps/web/src/lib/medusa.ts` | Medusa SDK client config |
+| `apps/web/src/components/CheckoutVerificationGate.tsx` | OTP verification gatekeeper |
+| `packages/ui/src/components/ProductCard.tsx` | Shared product card component |
+| `packages/ui/src/components/CartDrawer.tsx` | Shared cart drawer component |
+| `packages/ui/src/components/PriceDisplay.tsx` | Shared price display component |
+| `packages/ui/src/components/ProductBadge.tsx` | Shared badge component |
+| `apps/admin/src/components/MedusaStatusCard.tsx` | Dashboard status widget |
+| `apps/medusa/src/links/*.ts` | Module link definitions (6 files) |
 
 ---
 

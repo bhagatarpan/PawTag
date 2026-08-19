@@ -411,21 +411,48 @@ If something could not be completed, clearly explain why and what is required.
 
 ```
 PawTag/
-├── packages/
-│   ├── api/       → Express backend (port 5000, 30 route files, 21+ services)
-│   ├── db/        → MongoDB models & connection (45 models)
-│   ├── shared/    → Shared TypeScript types, enums, constants
-│   └── ui/        → Shared React component library (9 components)
 ├── apps/
-│   ├── admin/     → Admin portal (port 3001) - 44 pages, god-mode CRUD
-│   ├── web/       → Public site, shop, auth & customer portal (port 3000) - 31 pages
-│   ├── mobile/    → React Native (Expo) app - 14 screens, Maestro E2E tests
-│   └── finder/    → Finder portal (port 3003) - 10 purpose-built components
-├── tests/         → 77 test files (25 unit, 32 integration, 1 smoke, 2 regression)
-├── docker/        → Docker configs (4 services)
-├── docs/          → 15 documentation files
-└── scripts/       → Build and utility scripts
+│   ├── admin/       → Admin portal (port 3001) - 44 pages, god-mode CRUD
+│   ├── web/         → Public site, shop, auth & customer portal (port 3000) - 31 pages
+│   ├── finder/      → Finder portal (port 3003) - 10 purpose-built components
+│   ├── mobile/      → React Native (Expo) app - 14 screens, Maestro E2E tests
+│   └── medusa/      → MedusaJS v2 (PostgreSQL) - commerce backend, port 9000
+├── packages/
+│   ├── api/         → Express backend (port 5000, 30+ route files, 21+ services)
+│   ├── db/          → MongoDB models & connection (45+ models)
+│   ├── shared/      → Shared TypeScript types, enums, constants
+│   └── ui/          → Shared React component library (13 components)
+├── tests/           → 77+ test files (41 unit, 35 integration, 1 smoke, 2 regression)
+├── docker/          → Docker configs (4 services + PostgreSQL)
+├── docs/            → 15 documentation files
+└── scripts/         → Build and utility scripts
 ```
+
+### Dual Database Architecture
+
+PawTag uses **two databases**:
+
+- **MongoDB Atlas** — PawTag's primary data store (users, pets, tags, orders, CMS, audit logs, subscriptions)
+- **PostgreSQL (Neon)** — MedusaJS commerce engine (products, carts, customers, orders, payments, shipping)
+
+The two systems are linked via:
+- **Customer sync:** PawTag User ↔ Medusa Customer (via `medusaCustomerId` field)
+- **Webhooks:** Medusa events → PawTag webhook endpoint (order.placed, payment.captured)
+- **Cart association:** Medusa cart linked to PawTag user via `customer_id`
+
+### MedusaJS Integration
+
+MedusaJS v2.19.0 runs in `apps/medusa` (port 9000). Key components:
+
+| Component | File | Purpose |
+|-----------|------|---------|
+| Config | `apps/medusa/medusa-config.ts` | Database, CORS, Stripe, plugins |
+| Seed script | `apps/medusa/src/scripts/seed.ts` | Migrates products from MongoDB, sets up regions/shipping/tax |
+| Webhook subscriber | `apps/medusa/src/subscribers/pawtag-webhook.ts` | Forwards events to PawTag |
+| Link definitions | `apps/medusa/src/links/*.ts` | Module link registrations |
+
+PawTag API webhooks: `packages/api/src/routes/medusa-webhooks.ts`
+Customer sync: `packages/api/src/services/medusa-sync.service.ts`
 
 ## Development Commands
 
@@ -441,6 +468,7 @@ pnpm dev:api       # API on :5000
 pnpm dev:admin     # Admin on :3001
 pnpm dev:web       # Public site, shop, auth & customer portal on :3000
 pnpm dev:finder    # Finder portal on :3003
+pnpm dev:medusa    # MedusaJS commerce backend on :9000
 
 # Build everything
 pnpm build
@@ -772,6 +800,16 @@ Located in `apps/mobile/e2e/`:
 | `apps/admin/src/pages/SystemLogSettings.tsx` | System log settings page |
 | `apps/admin/src/pages/AddressAutocompleteSettings.tsx` | Address autocomplete provider config |
 | `packages/ui/src/components/AddressAutocomplete.tsx` | Reusable address autocomplete component |
+| `packages/ui/src/components/ProductCard.tsx` | Shared product card component (primary-* tokens) |
+| `packages/ui/src/components/CartDrawer.tsx` | Shared cart drawer component |
+| `packages/api/src/routes/medusa-webhooks.ts` | Medusa webhook endpoint (order.placed, payment.captured) |
+| `packages/api/src/routes/checkout-otp.ts` | Dual OTP checkout verification |
+| `packages/api/src/services/medusa-sync.service.ts` | PawTag ↔ Medusa customer sync |
+| `apps/medusa/src/scripts/seed.ts` | Commerce data migration from MongoDB |
+| `apps/medusa/src/subscribers/pawtag-webhook.ts` | Medusa event forwarding to PawTag |
+| `apps/web/src/components/CheckoutVerificationGate.tsx` | OTP verification gatekeeper |
+| `apps/web/src/lib/medusa.ts` | Medusa SDK client config |
+| `apps/admin/src/components/MedusaStatusCard.tsx` | Medusa connection status widget |
 | `apps/web/src/components/OnboardingWizard.tsx` | Dynamic onboarding wizard with success screen |
 | `apps/web/src/components/AccountLayout.tsx` | Customer portal layout + wizard gating |
 | `apps/finder/src/App.tsx` | Finder portal (decomposed into components) |

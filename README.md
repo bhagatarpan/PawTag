@@ -69,9 +69,10 @@ PawTag is a pet recovery platform that solves the problem of reuniting lost pets
 - Health conditions and surgery history
 - Weight tracking
 
-### E-Commerce
-- Product catalog with variants
-- Shopping cart and checkout
+### E-Commerce (MedusaJS v2)
+- Product catalog with variants (Medusa commerce engine)
+- Server-side cart via Medusa SDK
+- Dual OTP checkout gatekeeper (email + SMS)
 - Stripe payment processing
 - Order lifecycle management
 - Subscription management
@@ -115,10 +116,12 @@ flowchart TD
 
     subgraph Backend
         API["packages/api<br/>Express API<br/>:5000"]
+        Medusa["apps/medusa<br/>MedusaJS v2<br/>:9000"]
     end
 
     subgraph Database
         MongoDB[(MongoDB Atlas)]
+        PostgreSQL[(PostgreSQL<br/>Neon)]
     end
 
     subgraph External Services
@@ -131,17 +134,21 @@ flowchart TD
     end
 
     Web --> API
+    Web --> Medusa
     Admin --> API
+    Admin --> Medusa
     Finder --> API
     Mobile --> API
 
     API --> MongoDB
+    Medusa --> PostgreSQL
     API --> Stripe
     API --> Resend
     API --> Twilio
     API --> Firebase
     API --> R2
     API --> Sentry
+    Medusa -->|"webhooks"| API
 ```
 
 ### One Backend
@@ -160,6 +167,7 @@ A single Express API (`packages/api`) serves all clients. There is no API duplic
 | `apps/web` | 3000 | Public/Pet owners | Optional | Marketing site, shop, checkout, auth, customer portal |
 | `apps/admin` | 3001 | Staff | Admin RBAC | Full CRUD, dashboard, order management, CMS |
 | `apps/finder` | 3003 | Strangers | None | Public tag lookup — must be tiny and fast |
+| `apps/medusa` | 9000 | System | API key | MedusaJS commerce engine (products, carts, payments) |
 
 The finder page is intentionally kept minimal — it's the page a stressed stranger opens on their phone with poor signal to report a found pet.
 
@@ -188,6 +196,7 @@ Located in `apps/mobile/e2e/`:
 - **Framework:** Express.js 4.18
 - **Language:** TypeScript 5.5 (strict mode)
 - **Database:** MongoDB Atlas with Mongoose 7
+- **Commerce:** MedusaJS v2.19.0 (PostgreSQL via Neon)
 - **Authentication:** JWT (jsonwebtoken) + bcryptjs
 - **Validation:** Zod 3.23
 - **Rate Limiting:** express-rate-limit (DB-driven)
@@ -249,6 +258,11 @@ PawTag/
 │   ├── finder/         → Finder portal (port 3003) - 10 components
 │   │   └── src/
 │   │       └── components/
+│   ├── medusa/         → MedusaJS v2 commerce backend (port 9000)
+│   │   └── src/
+│   │       ├── links/
+│   │       ├── scripts/
+│   │       └── subscribers/
 │   ├── mobile/         → React Native (Expo) app - 14 screens
 │   │   ├── src/
 │   │   │   ├── components/
@@ -276,21 +290,22 @@ PawTag/
 │   │       └── models/
 │   ├── shared/         → Shared TypeScript types & validation
 │   │   └── src/
-│   └── ui/             → Shared React component library (9 components)
+│   └── ui/             → Shared React component library (13 components)
 │       └── src/
 │           └── components/
-├── tests/              → 77 test files (25 unit, 32 integration, 1 smoke, 2 regression)
+├── tests/              → 77+ test files (41 unit, 35 integration, 1 smoke, 2 regression)
 │   ├── integration/    → Integration tests (MongoDB Memory Server)
 │   ├── regression/     → Regression tests
 │   ├── smoke/          → API smoke tests
 │   └── unit/           → Unit tests
-├── docker/             → Docker configurations (4 services)
+├── docker/             → Docker configurations (4 services + PostgreSQL)
 ├── docs/               → Documentation (15 files)
 ├── scripts/            → Build and utility scripts
 ├── .github/workflows/  → GitHub Actions CI/CD pipeline
 ├── ARCHITECTURE.md     → System architecture
 ├── DESIGN.md           → Design system
 ├── AGENTS.md           → AI development guide
+├── MEDUSA-INTEGRATION-PLAN.md → MedusaJS integration plan (Phases 1-9)
 └── package.json        → Root package.json
 ```
 
@@ -502,6 +517,7 @@ pnpm dev:api       # API on :5000
 pnpm dev:admin     # Admin on :3001
 pnpm dev:web       # Public site on :3000
 pnpm dev:finder    # Finder on :3003
+pnpm dev:medusa    # MedusaJS commerce on :9000
 ```
 
 ### Mobile App
@@ -527,6 +543,7 @@ pnpm build:api
 pnpm build:admin
 pnpm build:web
 pnpm build:finder
+pnpm build:medusa
 ```
 
 ### Production Start
@@ -566,9 +583,9 @@ sequenceDiagram
 
 ### E-Commerce Flow
 
-1. Browse shop → add to cart
-2. Checkout → Stripe payment
-3. Order confirmed → admin notified
+1. Browse shop (Medusa products) → add to cart (Medusa SDK)
+2. Checkout → dual OTP verification → Stripe payment
+3. Order confirmed → Medusa webhook → PawTag order created
 4. Fulfillment → shipping label → tracking
 5. Delivered → customer activates tag
 
