@@ -20,6 +20,11 @@ export type {
   AddressAutocompleteProps,
 } from './types';
 
+export type { ProductCardProduct, ProductCardProps } from './components/ProductCard';
+export type { PriceDisplayProps } from './components/PriceDisplay';
+export type { ProductBadgeProps } from './components/ProductBadge';
+export type { CartItem, CartDrawerProps } from './components/CartDrawer';
+
 // Components
 export { SummaryCards } from './components/SummaryCards';
 export { DataTable } from './components/DataTable';
@@ -31,3 +36,9 @@ export { EmptyState, ErrorState } from './components/EmptyState';
 export { StatusBadge } from './components/StatusBadge';
 export { ConfirmDialog } from './components/ConfirmDialog';
 export { AddressAutocomplete } from './components/AddressAutocomplete';
+
+// Commerce components
+export { ProductCard } from './components/ProductCard';
+export { PriceDisplay } from './components/PriceDisplay';
+export { ProductBadge, getProductBadgeVariant } from './components/ProductBadge';
+export { CartDrawer } from './components/CartDrawer';

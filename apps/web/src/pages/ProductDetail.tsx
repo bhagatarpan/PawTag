@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ShoppingCart, ArrowLeft, PawPrint, Shield, Truck, Check, AlertCircle } from 'lucide-react';
-import api from '../lib/api';
+import { sdk } from '../lib/medusa';
 import { useCart } from '../context/CartContext';
-import { Product } from '../types';
 import { getProductBadge, getProductIcon } from '../utils/productHelpers';
+import type { StoreProduct } from '@medusajs/types';
 
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
-  const [product, setProduct] = useState<Product | null>(null);
+  const [product, setProduct] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState(false);
@@ -17,41 +17,35 @@ export default function ProductDetail() {
 
   useEffect(() => {
     if (!id) return;
-    api.get(`/finder/shop/products/${id}`)
-      .then((res) => {
-        setProduct(res.data.data || null);
-      })
+    sdk.store.product.retrieve(id, { fields: '*variants.prices,*images,*type,*tags' })
+      .then(({ product: p }) => setProduct(p))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [id]);
 
-  const handleAddToCart = (e: React.MouseEvent<HTMLButtonElement>) => {
+  const handleAddToCart = () => {
     if (!product) return;
+    const variant = product.variants?.[0];
+    if (!variant) return;
     addItem({
-      productId: product._id,
-      name: product.name,
-      price: product.price,
+      productId: product.id,
+      variantId: variant.id,
+      name: product.title,
+      price: (variant.prices?.[0]?.amount || 0) / 100,
       quantity,
-      image: product.images?.[0],
+      image: product.thumbnail || undefined,
     });
-
-    // Fire fly-to-cart animation
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    window.dispatchEvent(new CustomEvent('cart:add', {
-      detail: { image: product.images?.[0], rect },
-    }));
-
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
   };
 
   const getProductIconForSku = (sku: string) => getProductIcon(sku, 'lg');
-  const getBadge = (sku: string) => getProductBadge(sku);
+  const getBadge = (handle: string) => getProductBadge(handle);
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600" />
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600" />
       </div>
     );
   }
@@ -61,15 +55,18 @@ export default function ProductDetail() {
       <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-4">
         <PawPrint className="h-16 w-16 text-gray-300" />
         <h2 className="text-xl font-semibold text-gray-700">Product not found</h2>
-        <Link to="/shop" className="text-teal-600 hover:text-teal-700 font-medium">
+        <Link to="/shop" className="text-primary-600 hover:text-primary-700 font-medium">
           ← Back to Shop
         </Link>
       </div>
     );
   }
 
-  const badge = getBadge(product.sku);
-  const monthlyPrice = product.subscriptionConfig?.monthlyPrice || 0;
+  const badge = getBadge(product.handle || '');
+  const variant = product.variants?.[0];
+  const price = variant ? (variant.prices?.[0]?.amount || 0) / 100 : 0;
+  const monthlyPrice = (product.metadata as any)?.subscriptionConfig?.monthlyPrice || 0;
+  const images = (product.images || []).map((img: any) => img.url).filter(Boolean);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -86,16 +83,16 @@ export default function ProductDetail() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
           {/* Image / Placeholder */}
           <div className="space-y-4">
-            <div className="relative bg-gradient-to-br from-teal-50 to-teal-100 rounded-2xl overflow-hidden aspect-square flex items-center justify-center">
-              {product.images && product.images.length > 0 ? (
+            <div className="relative bg-gradient-to-br from-primary-50 to-primary-100 rounded-2xl overflow-hidden aspect-square flex items-center justify-center">
+              {images.length > 0 ? (
                 <img
-                  src={product.images[selectedImage] || product.images[0]}
-                  alt={product.name}
+                  src={images[selectedImage] || images[0]}
+                  alt={product.title}
                   className="w-full h-full object-cover"
                 />
               ) : (
-                <div className="flex flex-col items-center gap-3 text-teal-300">
-                  {getProductIconForSku(product.sku)}
+                <div className="flex flex-col items-center gap-3 text-primary-300">
+                  {getProductIconForSku(product.handle || '')}
                   <PawPrint className="h-40 w-40" />
                 </div>
               )}
@@ -104,26 +101,26 @@ export default function ProductDetail() {
                   {badge.label}
                 </div>
               )}
-              {product.images && product.images.length > 1 && (
+              {images.length > 1 && (
                 <div className="absolute bottom-4 right-4 bg-black/50 text-white text-xs px-2 py-1 rounded-full">
-                  {selectedImage + 1} / {product.images.length}
+                  {selectedImage + 1} / {images.length}
                 </div>
               )}
             </div>
             {/* Thumbnails */}
-            {product.images && product.images.length > 1 && (
+            {images.length > 1 && (
               <div className="flex gap-2 overflow-x-auto pb-1">
-                {product.images.map((img, i) => (
+                {images.map((img: string, i: number) => (
                   <button
                     key={i}
                     onClick={() => setSelectedImage(i)}
                     className={`flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-all ${
                       i === selectedImage
-                        ? 'border-teal-500 ring-2 ring-teal-200'
+                        ? 'border-primary-500 ring-2 ring-primary-200'
                         : 'border-gray-200 hover:border-gray-300 opacity-70 hover:opacity-100'
                     }`}
                   >
-                    <img src={img} alt={`${product.name} ${i + 1}`} className="w-full h-full object-cover" />
+                    <img src={img} alt={`${product.title} ${i + 1}`} className="w-full h-full object-cover" />
                   </button>
                 ))}
               </div>
@@ -133,18 +130,22 @@ export default function ProductDetail() {
           {/* Product Info */}
           <div className="space-y-6">
             <div>
-              <span className="text-sm font-medium text-teal-600 uppercase tracking-wide">{product.category}</span>
-              <h1 className="text-3xl font-bold text-gray-900 mt-2">{product.name}</h1>
-              <p className="text-sm text-gray-500 mt-1">{product.shortDescription}</p>
+              {product.type && (
+                <span className="text-sm font-medium text-primary-600 uppercase tracking-wide">{product.type.value}</span>
+              )}
+              <h1 className="text-3xl font-bold text-gray-900 mt-2">{product.title}</h1>
+              {product.subtitle && (
+                <p className="text-sm text-gray-500 mt-1">{product.subtitle}</p>
+              )}
             </div>
 
             {/* Price */}
-            <div className="bg-teal-50 rounded-xl p-4">
+            <div className="bg-primary-50 rounded-xl p-4">
               <div className="flex items-baseline gap-2">
-                <span className="text-4xl font-bold text-teal-700">${product.price.toFixed(2)}</span>
+                <span className="text-4xl font-bold text-primary-700">${price.toFixed(2)}</span>
                 <span className="text-base text-gray-500">NZD</span>
               </div>
-              <p className="text-sm text-teal-600 mt-1">
+              <p className="text-sm text-primary-600 mt-1">
                 Includes 12 months free subscription
                 {monthlyPrice > 0 && (
                   <> — then ${monthlyPrice.toFixed(2)}/month billed annually</>
@@ -159,9 +160,9 @@ export default function ProductDetail() {
 
             {/* Stock Status */}
             <div className="flex items-center gap-2">
-              <div className={`h-3 w-3 rounded-full ${product.stock > 0 ? 'bg-green-500' : 'bg-red-500'}`} />
-              <span className={`text-sm font-medium ${product.stock > 0 ? 'text-green-700' : 'text-red-600'}`}>
-                {product.stock > 0 ? `${product.stock} in stock` : 'Out of stock'}
+              <div className={`h-3 w-3 rounded-full ${variant ? 'bg-green-500' : 'bg-red-500'}`} />
+              <span className={`text-sm font-medium ${variant ? 'text-green-700' : 'text-red-600'}`}>
+                {variant ? 'In stock' : 'Out of stock'}
               </span>
             </div>
 
@@ -178,31 +179,31 @@ export default function ProductDetail() {
 
               <button
                 onClick={handleAddToCart}
-                disabled={product.stock <= 0 || added}
+                disabled={!variant || added}
                 className={`w-full flex items-center justify-center gap-3 py-4 rounded-xl font-semibold text-lg transition-all ${
                   added
                     ? 'bg-green-500 text-white'
-                    : product.stock <= 0
+                    : !variant
                     ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                    : 'bg-teal-600 text-white hover:bg-teal-700 active:scale-[0.98] shadow-lg shadow-teal-200'
+                    : 'bg-primary-600 text-white hover:bg-primary-700 active:scale-[0.98] shadow-lg shadow-primary-200'
                 }`}
               >
                 <ShoppingCart className="h-6 w-6" />
-                {added ? 'Added to Cart!' : product.stock <= 0 ? 'Out of Stock' : `Add to Cart — $${(product.price * quantity).toFixed(2)}`}
+                {added ? 'Added to Cart!' : !variant ? 'Out of Stock' : `Add to Cart — $${(price * quantity).toFixed(2)}`}
               </button>
             </div>
 
             {/* Info Badges */}
             <div className="grid grid-cols-2 gap-4 pt-4">
               <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl">
-                <Shield className="h-8 w-8 text-teal-600 flex-shrink-0" />
+                <Shield className="h-8 w-8 text-primary-600 flex-shrink-0" />
                 <div>
                   <p className="font-medium text-gray-900 text-sm">12 Month Warranty</p>
                   <p className="text-gray-500 text-xs">Normal wear & tear</p>
                 </div>
               </div>
               <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl">
-                <Truck className="h-8 w-8 text-teal-600 flex-shrink-0" />
+                <Truck className="h-8 w-8 text-primary-600 flex-shrink-0" />
                 <div>
                   <p className="font-medium text-gray-900 text-sm">NZ-Wide Shipping</p>
                   <p className="text-gray-500 text-xs">From $7.99</p>

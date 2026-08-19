@@ -9,6 +9,17 @@ vi.mock('../../packages/api/src/config', () => ({
   },
 }));
 
+// Mock DB so the middleware's fullName lookup resolves without a Mongo connection
+vi.mock('@pawtag/db', () => ({
+  User: {
+    findById: vi.fn().mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        lean: vi.fn().mockResolvedValue(null),
+      }),
+    }),
+  },
+}));
+
 const SECRET = 'test-secret';
 
 function createReq(token?: string): AuthRequest {
@@ -32,13 +43,13 @@ function createNext() {
 }
 
 describe('authenticate middleware', () => {
-  it('calls next() with valid token', () => {
+  it('calls next() with valid token', async () => {
     const token = jwt.sign({ id: 'u1', email: 'a@b.com', role: 'user' }, SECRET, { expiresIn: '1h' });
     const req = createReq(`Bearer ${token}`);
     const res = createRes();
     const next = createNext();
 
-    authenticate(req, res, next);
+    await authenticate(req, res, next);
 
     expect(next).toHaveBeenCalledTimes(1);
     expect(next).toHaveBeenCalledWith();
@@ -79,14 +90,14 @@ describe('authenticate middleware', () => {
     expect(res.status).toHaveBeenCalledWith(401);
   });
 
-  it('sets req.user with decoded token data', () => {
+  it('sets req.user with decoded token data', async () => {
     const payload = { id: 'u1', email: 'a@b.com', role: 'user' };
     const token = jwt.sign(payload, SECRET, { expiresIn: '1h' });
     const req = createReq(`Bearer ${token}`);
     const res = createRes();
     const next = createNext();
 
-    authenticate(req, res, next);
+    await authenticate(req, res, next);
 
     expect(req.user).toBeDefined();
     expect(req.user!.id).toBe('u1');

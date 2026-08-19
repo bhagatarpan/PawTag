@@ -295,3 +295,12 @@ export const adminExtendSubscriptionSchema = z.object({
   days: z.number().min(1, 'Days must be at least 1').max(365, 'Days cannot exceed 365'),
   reason: z.string().optional(),
 });
+
+export const sendCheckoutOtpSchema = z.object({
+  channel: z.enum(['email', 'sms'], { errorMap: () => ({ message: 'Channel must be "email" or "sms"' }) }),
+});
+
+export const verifyCheckoutOtpSchema = z.object({
+  channel: z.enum(['email', 'sms'], { errorMap: () => ({ message: 'Channel must be "email" or "sms"' }) }),
+  otp: z.string().regex(/^\d{6}$/, 'OTP must be exactly 6 digits'),
+});

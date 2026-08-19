@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import api from '../lib/api';
 import { Users, PawPrint, QrCode, ShoppingBag, AlertTriangle, Activity, TrendingUp, Package, Repeat } from 'lucide-react';
+import MedusaStatusCard from '../components/MedusaStatusCard';
 
 interface AnalyticsData {
   revenue: { today: number; thisWeek: number; thisMonth: number };
@@ -73,6 +74,9 @@ export default function Dashboard() {
           subtext={`${analytics.orders.thisMonth} order${analytics.orders.thisMonth !== 1 ? 's' : ''}`}
         />
       </div>
+
+      {/* Medusa Integration Status */}
+      <MedusaStatusCard />
 
       {/* Operations Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

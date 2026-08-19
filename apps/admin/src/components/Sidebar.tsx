@@ -38,6 +38,7 @@ import {
   MapPin,
   ChevronRight,
   ChevronDown,
+  ExternalLink,
 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { useTheme } from '../hooks/useTheme';
@@ -49,6 +50,8 @@ interface SidebarLink {
   label: string;
   icon: React.ElementType;
   permission?: string;
+  external?: boolean;
+  href?: string;
 }
 
 interface SidebarSection {
@@ -75,6 +78,7 @@ const sections: SidebarSection[] = [
     links: [
       { to: '/orders', label: 'Orders', icon: FileText, permission: 'order.read' },
       { to: '/products', label: 'Products', icon: ShoppingBag, permission: 'product.read' },
+      { to: '/medusa', label: 'Medusa Dashboard', icon: ExternalLink, external: true, href: import.meta.env.VITE_MEDUSA_ADMIN_URL || 'http://localhost:9000/app' },
       { to: '/pets', label: 'Pets', icon: PawPrint, permission: 'pet.read' },
       { to: '/subscriptions', label: 'Subscriptions', icon: CreditCard, permission: 'subscription.read' },
       { to: '/tags', label: 'Tags', icon: QrCode, permission: 'tag.read' },
@@ -270,6 +274,19 @@ export default function Sidebar() {
               {!collapsed && (
                 <div>
                   {section.links.map((link) => (
+                    link.external ? (
+                      <a
+                        key={link.to}
+                        href={link.href || link.to}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`flex items-center gap-3 pl-10 pr-6 py-2 text-sm transition-colors duration-150 ${linkText} ${linkBg} ${linkHoverText}`}
+                      >
+                        <link.icon size={16} className={chevronColor} />
+                        <span className="flex-1">{link.label}</span>
+                        <ExternalLink size={12} className="opacity-50" />
+                      </a>
+                    ) : (
                     <NavLink
                       key={link.to}
                       to={link.to}
@@ -288,6 +305,7 @@ export default function Sidebar() {
                         </span>
                       )}
                     </NavLink>
+                    )
                   ))}
                 </div>
               )}
