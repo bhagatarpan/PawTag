@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { Subscription, Invoice, InvoiceAccessToken, Tag, Order, User, Product, Notification, AuditEvent } from '@pawtag/db';
+import { Subscription, Invoice, InvoiceAccessToken, Tag, Order, User, Notification, AuditEvent } from '@pawtag/db';
 import { notifyCustomerOfStatusChange } from '../services/orderNotification.service';
 import { sendOrderConfirmation, sendInvoiceEmail, sendMail } from '../services/email.service';
 import { generateInvoiceHtml } from '../services/invoice-html.service';
@@ -194,22 +194,32 @@ async function handlePaymentIntentSucceeded(paymentIntent: any) {
     const { createSubscription } = await import('../services/subscription.service');
     const { sendSubscriptionWelcomeEmail } = await import('../services/email.service');
 
+    // Fetch product metadata from Medusa for subscription/tag checks
+    const MEDUSA_URL = process.env.MEDUSA_BACKEND_URL || 'http://localhost:9000';
     for (const item of order.items) {
-      const product = await Product.findById(item.productId);
-      if (product && product.isSubscription && product.subscriptionConfig) {
-        const userTags = await Tag.find({ ownerId: order.userId, deletedAt: null });
+      let productMetadata: any = null;
+      try {
+        const response = await fetch(`${MEDUSA_URL}/store/products/${item.productId}`, {
+          headers: { 'x-publishable-api-key': process.env.MEDUSA_PUBLISHABLE_KEY || '' },
+        });
+        if (response.ok) {
+          const { product } = await response.json() as any;
+          productMetadata = product?.metadata;
+        }
+      } catch { /* non-critical */ }
 
+      if (productMetadata?.isSubscription && productMetadata?.subscriptionConfig) {
+        const userTags = await Tag.find({ ownerId: order.userId, deletedAt: null });
         for (const tag of userTags) {
           if (tag.subscriptionStatus === 'none' || !tag.subscriptionId) {
             const subscription = await createSubscription({
               userId: order.userId.toString(),
               tagId: tag._id.toString(),
               orderId: order._id.toString(),
-              planType: product.subscriptionConfig.type || 'annual',
-              planId: product._id.toString(),
-              price: product.price,
+              planType: productMetadata.subscriptionConfig.type || 'annual',
+              planId: String(item.productId),
+              price: item.unitPrice,
             });
-
             sendSubscriptionWelcomeEmail(
               user?.email || '',
               user?.fullName || 'Customer',
@@ -217,21 +227,12 @@ async function handlePaymentIntentSucceeded(paymentIntent: any) {
               subscription.planName,
               subscription.freePeriodEndsAt || new Date(),
             ).catch((err: any) => logger.error({ err }, 'Subscription email error'));
-
             break;
           }
         }
       }
-    }
-  } catch (subError) {
-    logger.error({ err: subError }, 'Subscription creation error');
-  }
 
-  // Auto-create tags for tag products
-  try {
-    for (const item of order.items) {
-      const product = await Product.findById(item.productId);
-      if (product && product.isTagProduct) {
+      if (productMetadata?.isTagProduct) {
         for (let i = 0; i < item.quantity; i++) {
           const tagId = await generateTagId();
           await Tag.create({
@@ -245,8 +246,8 @@ async function handlePaymentIntentSucceeded(paymentIntent: any) {
         }
       }
     }
-  } catch (tagError) {
-    logger.error({ err: tagError }, 'Tag auto-creation error');
+  } catch (subError) {
+    logger.error({ err: subError }, 'Subscription creation error');
   }
 
   // Process referral rewards
@@ -343,17 +344,12 @@ async function handlePaymentIntentSucceeded(paymentIntent: any) {
     // Find the subscription ID if this order has subscription products
     let subscriptionId: any = undefined;
     let billingPeriod: { start: Date; end: Date } | undefined = undefined;
-    for (const item of order.items) {
-      const product = await Product.findById(item.productId);
-      if (product?.isSubscription && product.subscriptionConfig) {
-        const sub = await Subscription.findOne({ userId: order.userId, orderId: order._id });
-        if (sub) {
-          subscriptionId = sub._id;
-          if (sub.currentPeriodStart && sub.currentPeriodEnd) {
-            billingPeriod = { start: sub.currentPeriodStart, end: sub.currentPeriodEnd };
-          }
-          break;
-        }
+    // Check if order has subscription (look up subscription directly)
+    const sub = await Subscription.findOne({ userId: order.userId, orderId: order._id });
+    if (sub) {
+      subscriptionId = sub._id;
+      if (sub.currentPeriodStart && sub.currentPeriodEnd) {
+        billingPeriod = { start: sub.currentPeriodStart, end: sub.currentPeriodEnd };
       }
     }
 

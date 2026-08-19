@@ -4,7 +4,7 @@ import { AuthRequest, authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
 import { validate } from '../middleware/validation';
 import { createPetSchema, updatePetSchema } from '../middleware/schemas';
-import { Pet, Tag, Order, LocationEvent, Notification, FinderScan, User, generatePetId, Cart, Product, Subscription, Referral, Setting, Invoice, EscalationRecord } from '@pawtag/db';
+import { Pet, Tag, Order, LocationEvent, Notification, FinderScan, User, generatePetId, Cart, Subscription, Referral, Setting, Invoice, EscalationRecord } from '@pawtag/db';
 import { auditService, type AuditContext } from '../services/audit';
 import { createAuditContextFromRequest, type AuditRequest } from '../middleware/audit';
 import { calculateBundleDiscount } from '../services/bundle-pricing.service';
@@ -518,28 +518,17 @@ router.post('/tags/:id/request-replacement', requirePermission('tag.create'), as
     const priceSetting = await Setting.findOne({ key: 'replacement_tag_price_nzd' });
     const replacementPrice = priceSetting ? parseFloat(priceSetting.value) : 0;
 
-    // Find a tag product to use for the replacement order (or use a generic replacement item)
-    const tagProduct = await Product.findOne({ isTagProduct: true, isActive: true });
-
     // Create a replacement order
     const orderCount = await Order.countDocuments();
     const orderNumber = `PT-${String(orderCount + 1).padStart(6, '0')}`;
 
-    const orderItems = tagProduct
-      ? [{
-          productId: tagProduct._id,
-          productName: `${tagProduct.name} (Replacement)`,
-          quantity: 1,
-          unitPrice: replacementPrice,
-          totalPrice: replacementPrice,
-        }]
-      : [{
-          productId: new mongoose.Types.ObjectId(),
-          productName: 'PawTag Replacement',
-          quantity: 1,
-          unitPrice: replacementPrice,
-          totalPrice: replacementPrice,
-        }];
+    const orderItems = [{
+        productId: '',
+        productName: 'PawTag Replacement',
+        quantity: 1,
+        unitPrice: replacementPrice,
+        totalPrice: replacementPrice,
+      }];
 
     const order = await Order.create({
       orderNumber,
@@ -938,22 +927,8 @@ router.post('/orders', requirePermission('order.create'), async (req: AuthReques
     let totalAmount = 0;
 
     for (const cartItem of cart.items) {
-      const product = await Product.findById(cartItem.productId);
-      if (!product || !product.isActive) {
-        res.status(400).json({ success: false, error: `Product "${cartItem.productName}" is no longer available` });
-        return;
-      }
-
-      if (cartItem.variantName && product.variants?.length) {
-        const variant = product.variants.find((v: any) => v.name === cartItem.variantName);
-        if (!variant || variant.stock < cartItem.quantity) {
-          res.status(400).json({ success: false, error: `Insufficient stock for "${cartItem.productName} - ${cartItem.variantName}"` });
-          return;
-        }
-      } else if (product.stock < cartItem.quantity) {
-        res.status(400).json({ success: false, error: `Insufficient stock for "${cartItem.productName}"` });
-        return;
-      }
+      // Stock validation removed — Medusa handles inventory via Medusa carts
+      // This old checkout flow is superseded by Medusa SDK checkout
 
       const itemTotal = (cartItem.unitPrice + (cartItem.customizationTotal || 0)) * cartItem.quantity;
       totalAmount += itemTotal;
@@ -969,13 +944,6 @@ router.post('/orders', requirePermission('order.create'), async (req: AuthReques
         customizationTotal: cartItem.customizationTotal || 0,
       });
 
-      if (cartItem.variantName && product.variants?.length) {
-        const variant = product.variants.find((v: any) => v.name === cartItem.variantName);
-        if (variant) variant.stock -= cartItem.quantity;
-      } else {
-        product.stock -= cartItem.quantity;
-      }
-      await product.save();
     }
 
     // Calculate bundle discount for subscription products
@@ -986,11 +954,8 @@ router.post('/orders', requirePermission('order.create'), async (req: AuthReques
       quantity: item.quantity,
     }));
 
-    // Resolve subscription status for each item
-    for (let i = 0; i < bundleItems.length; i++) {
-      const product = await Product.findById(bundleItems[i].productId);
-      bundleItems[i].isSubscription = !!(product?.isSubscription);
-    }
+    // Subscription status resolved from Medusa product metadata (handled in webhook)
+    // Bundle discount calculation works with cart item data directly
 
     const bundleDiscount = await calculateBundleDiscount(bundleItems);
 
@@ -1160,34 +1125,42 @@ router.post('/orders/:orderNumber/confirm-payment', requirePermission('order.cre
     // Get user info for emails
     const user = await User.findById(order.userId);
 
-    // Create subscriptions for tag products
+    // Create subscriptions for tag products (fetch metadata from Medusa)
     try {
       const { createSubscription } = await import('../services/subscription.service');
+      const MEDUSA_URL = process.env.MEDUSA_BACKEND_URL || 'http://localhost:9000';
 
       for (const item of order.items) {
-        const product = await Product.findById(item.productId);
-        if (product && product.isSubscription && product.subscriptionConfig) {
-          const userTags = await Tag.find({ ownerId: order.userId, deletedAt: null });
+        let productMetadata: any = null;
+        try {
+          const response = await fetch(`${MEDUSA_URL}/store/products/${item.productId}`, {
+            headers: { 'x-publishable-api-key': process.env.MEDUSA_PUBLISHABLE_KEY || '' },
+          });
+          if (response.ok) {
+            const { product } = await response.json() as any;
+            productMetadata = product?.metadata;
+          }
+        } catch { /* non-critical */ }
 
+        if (productMetadata?.isSubscription && productMetadata?.subscriptionConfig) {
+          const userTags = await Tag.find({ ownerId: order.userId, deletedAt: null });
           for (const tag of userTags) {
             if (tag.subscriptionStatus === 'none' || !tag.subscriptionId) {
               const subscription = await createSubscription({
                 userId: order.userId.toString(),
                 tagId: tag._id.toString(),
                 orderId: order._id.toString(),
-                planType: product.subscriptionConfig.type || 'annual',
-                planId: product._id.toString(),
-                price: product.price,
+                planType: productMetadata.subscriptionConfig.type || 'annual',
+                planId: String(item.productId),
+                price: item.unitPrice,
               });
-
               sendSubscriptionWelcomeEmail(
                 user?.email || '',
                 user?.fullName || 'Customer',
                 tag.tagId,
-                subscription.planName,
-                subscription.freePeriodEndsAt || new Date(),
+                String(subscription.planName),
+                (subscription.freePeriodEndsAt as Date) || new Date(),
               ).catch((err: any) => logger.error({ err, tagId: tag.tagId, orderId: order._id.toString() }, 'Subscription email error'));
-
               break;
             }
           }

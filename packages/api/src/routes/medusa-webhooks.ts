@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
-import { Order, Subscription, Tag, Product, User, Notification } from '@pawtag/db';
+import { Order, Subscription, Tag, User, Notification } from '@pawtag/db';
 import { createSubscription } from '../services/subscription.service';
 import { sendOrderConfirmation } from '../services/email.service';
 import { generateTagId } from '../lib/tag-id';
@@ -194,7 +194,7 @@ async function handleOrderPlaced(data: { id: string }) {
   logger.info({ orderNumber, medusaOrderId }, 'Created PawTag order from Medusa');
 
   // Process subscriptions for subscription products
-  await processSubscriptions(order, pawtagUser);
+  await processSubscriptions(order, pawtagUser, medusaOrder);
 
   // Send order confirmation email
   try {
@@ -273,10 +273,31 @@ async function handleOrderCanceled(data: { id: string }) {
 }
 
 // Process subscriptions for subscription products
-async function processSubscriptions(order: any, user: any) {
+async function processSubscriptions(order: any, user: any, medusaOrder: any) {
+  const MEDUSA_URL = process.env.MEDUSA_BACKEND_URL || 'http://localhost:9000';
+
   for (const item of order.items) {
-    const product = await Product.findById(item.productId);
-    if (!product?.isSubscription || !product.subscriptionConfig) continue;
+    // Find the Medusa product ID from the order items
+    const medusaItem = (medusaOrder.items || []).find((mi: any) =>
+      mi.product_id === item.productId || mi.title === item.productName
+    );
+    if (!medusaItem?.product_id) continue;
+
+    // Fetch product metadata from Medusa
+    let productMetadata: any = null;
+    try {
+      const response = await fetch(`${MEDUSA_URL}/store/products/${medusaItem.product_id}`, {
+        headers: { 'x-publishable-api-key': process.env.MEDUSA_PUBLISHABLE_KEY || '' },
+      });
+      if (response.ok) {
+        const { product } = await response.json() as any;
+        productMetadata = product?.metadata;
+      }
+    } catch {
+      // Non-critical — skip subscription if product fetch fails
+    }
+
+    if (!productMetadata?.isSubscription || !productMetadata?.subscriptionConfig) continue;
 
     // Find user's unlinked tags
     const userTags = await Tag.find({ ownerId: user._id, deletedAt: null });
@@ -287,9 +308,9 @@ async function processSubscriptions(order: any, user: any) {
             userId: user._id.toString(),
             tagId: tag._id.toString(),
             orderId: order._id.toString(),
-            planType: product.subscriptionConfig.type || 'annual',
-            planId: product._id.toString(),
-            price: product.price,
+            planType: productMetadata.subscriptionConfig.type || 'annual',
+            planId: medusaItem.product_id,
+            price: item.unitPrice,
           });
           logger.info({ orderNumber: order.orderNumber, tagId: tag._id }, 'Subscription created');
           break; // One subscription per order item

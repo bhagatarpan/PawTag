@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { Tag, FinderScan, LocationEvent, Notification, Subscription, User, Pet, SiteContent, Product, Setting, EscalationRecord } from '@pawtag/db';
+import { Tag, FinderScan, LocationEvent, Notification, Subscription, User, Pet, SiteContent, Setting, EscalationRecord } from '@pawtag/db';
 import { sendPushToUser } from '../services/push-notification.service';
 import { sendPetFoundEmail } from '../services/email.service';
 import { auditService, type AuditContext } from '../services/audit';
@@ -698,44 +698,8 @@ router.post('/:tagId/share-location', finderLocationLimiter, requireCaptcha, asy
  *       500:
  *         description: Failed to fetch products
  */
-router.get('/shop/products', async (req: Request, res: Response) => {
-  try {
-    const { page = 1, limit = 50, category, search } = req.query;
-    const query: any = { isActive: true };
-    
-    if (category && category !== 'all') query.category = category;
-    if (search) {
-      query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } },
-        { tags: { $regex: search, $options: 'i' } },
-      ];
-    }
-
-    const total = await Product.countDocuments(query);
-    const products = await Product.find(query)
-      .sort({ name: 1 })
-      .skip((Number(page) - 1) * Number(limit))
-      .limit(Number(limit));
-
-    res.json({ success: true, data: products, total, page: Number(page), totalPages: Math.ceil(total / Number(limit)) });
-  } catch {
-    res.status(500).json({ success: false, error: 'Failed to fetch products' });
-  }
-});
-
-router.get('/shop/products/:id', async (req: Request, res: Response) => {
-  try {
-    const product = await Product.findById(req.params.id);
-    if (!product) {
-      res.status(404).json({ success: false, error: 'Product not found' });
-      return;
-    }
-    res.json({ success: true, data: product });
-  } catch {
-    res.status(500).json({ success: false, error: 'Failed to fetch product' });
-  }
-});
+// Product routes removed — products now served by Medusa Store API
+// Frontend uses sdk.store.product.list() and sdk.store.product.retrieve()
 
 /**
  * @swagger
