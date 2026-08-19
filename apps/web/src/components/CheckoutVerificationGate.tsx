@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Mail, Smartphone, CheckCircle, Loader2, ArrowRight, Shield } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Mail, Smartphone, CheckCircle, Loader2, ArrowRight, Shield, LogIn } from 'lucide-react';
 import api from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 
@@ -18,6 +19,38 @@ export default function CheckoutVerificationGate({ children }: CheckoutVerificat
   const { user } = useAuth();
   const [status, setStatus] = useState<VerificationStatus | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // If not logged in, show login prompt instead of dead-end verification
+  if (!user && !loading) {
+    return (
+      <div className="max-w-lg mx-auto py-12 px-4">
+        <div className="text-center mb-8">
+          <div className="w-16 h-16 bg-primary-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <Shield className="h-8 w-8 text-primary-600" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Sign in to Checkout</h2>
+          <p className="text-gray-500">
+            Please sign in or create an account to complete your purchase.
+          </p>
+        </div>
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-4">
+          <Link
+            to="/login"
+            className="flex items-center justify-center gap-2 w-full bg-primary-600 text-white rounded-xl font-semibold px-6 py-3 hover:bg-primary-700 active:bg-primary-800 transition-all"
+          >
+            <LogIn className="h-5 w-5" />
+            Sign In
+          </Link>
+          <Link
+            to="/register"
+            className="flex items-center justify-center gap-2 w-full border border-primary-600 text-primary-600 rounded-xl font-semibold px-6 py-3 hover:bg-primary-50 transition-all"
+          >
+            Create Account
+          </Link>
+        </div>
+      </div>
+    );
+  }
   const [emailStep, setEmailStep] = useState<'idle' | 'sending' | 'entered' | 'verified'>('idle');
   const [smsStep, setSmsStep] = useState<'idle' | 'sending' | 'entered' | 'verified'>('idle');
   const [emailOtp, setEmailOtp] = useState('');

@@ -66,7 +66,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }));
 
   const addItem = useCallback(async (item: CartItem) => {
-    console.log('[Cart] addItem called:', item);
     setError(null);
     try {
       setLoading(true);
@@ -75,9 +74,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
       // Create cart if none exists
       if (!currentCart) {
-        console.log('[Cart] Creating new cart...');
         const regionId = await getNzRegionId();
-        console.log('[Cart] Region ID:', regionId);
         const { cart: newCart } = await sdk.store.cart.create({ region_id: regionId });
         currentCart = newCart;
         localStorage.setItem(CART_ID_KEY, (newCart as any).id);
@@ -102,10 +99,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
         quantity: item.quantity,
       });
 
-      console.log('[Cart] Item added. Cart total:', withItem?.total);
       setCart(withItem);
     } catch (err: any) {
-      console.error('[Cart] addItem error:', err?.message, err?.status, err);
       setError(err?.message || err?.statusText || 'Failed to add item to cart');
     } finally {
       setLoading(false);
