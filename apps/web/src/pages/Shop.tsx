@@ -47,7 +47,11 @@ export default function Shop() {
 
   const handleAddToCart = (product: any) => {
     const variant = product.variants?.[0];
-    if (!variant) return;
+    if (!variant) {
+      console.warn('[Shop] No variant for product:', product.title);
+      return;
+    }
+    console.log('[Shop] Adding to cart:', product.title, 'variant:', variant.id);
     setAddingId(product.id);
     addItem({
       productId: product.id,
