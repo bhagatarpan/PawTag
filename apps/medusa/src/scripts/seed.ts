@@ -544,6 +544,8 @@ export default async function seedPawTag({ container }: ExecArgs) {
           sku: mongo.sku,
           manage_inventory: !!mongo.stock,
           prices: [{ currency_code: "nzd", amount: mongo.price }],
+          // Note: Medusa v2 stores prices in major units (dollars), not cents
+          // mongo.price is already in dollars (e.g., 19.99)
           options: { Default: "Default" },
         },
       ],
@@ -562,10 +564,78 @@ export default async function seedPawTag({ container }: ExecArgs) {
     for (const p of createdProducts) {
       console.log(`    - ${p.title} (handle: ${p.handle})`);
     }
+
+    // Explicitly create price sets for each variant via pricing module
+    console.log("\n💰  Creating price sets...");
+    const pricingModuleService = container.resolve(Modules.PRICING) as any;
+    for (const p of createdProducts) {
+      for (const v of p.variants || []) {
+        const mongoProduct = mongoProducts.find(
+          (mp: any) => slug(mp.sku || mp.name) === p.handle
+        );
+        const priceAmount = mongoProduct?.price || 0;
+        if (priceAmount > 0) {
+          const priceSet = await pricingModuleService.createPriceSets({
+            prices: [{ currency_code: "nzd", amount: priceAmount }],
+          });
+          // Link price set to variant
+          await link.create({
+            [Modules.PRODUCT]: { variant_id: v.id },
+            [Modules.PRICING]: { price_set_id: priceSet.id },
+          });
+          console.log(
+            `    ✓ ${p.title}: $${(priceAmount / 100).toFixed(2)} NZD linked to variant`
+          );
+        }
+      }
+    }
   }
 
   // -------------------------------------------------------------------
-  // 9. Inventory levels (stock for each variant)
+  // 9. Ensure prices are set for ALL products (idempotent)
+  // -------------------------------------------------------------------
+  console.log("\n💰  Ensuring prices are set...");
+  const pricingModuleService = container.resolve(Modules.PRICING) as any;
+  console.log("  Pricing module:", typeof pricingModuleService);
+  console.log("  Pricing methods:", pricingModuleService ? Object.getOwnPropertyNames(Object.getPrototypeOf(pricingModuleService)).filter((m: string) => m.includes("price") || m.includes("create")).slice(0, 10) : "none");
+  const allProductsForPrices = await productModuleService.listProducts({}, { relations: ["variants"] });
+  console.log(`  Found ${allProductsForPrices.length} products in Medusa`);
+  console.log(`  Found ${mongoProducts.length} products in MongoDB`);
+  for (const p of allProductsForPrices) {
+    console.log(`  Processing: ${p.title} (handle: ${p.handle}, variants: ${p.variants?.length || 0})`);
+    if (!p.variants || p.variants.length === 0) {
+      console.log(`    ⚠  No variants found for ${p.title}`);
+    }
+    for (const v of p.variants || []) {
+      // Find the price from MongoDB
+      const mongoProduct = mongoProducts.find(
+        (mp: any) => slug(mp.sku || mp.name) === p.handle
+      );
+      const priceAmount = mongoProduct?.price || 0;
+      console.log(`    Variant ${v.sku}: mongo price = ${mongoProduct?.price}, priceAmount = ${priceAmount}`);
+      if (priceAmount > 0) {
+        try {
+          console.log(`    Creating price set for ${p.title} (${v.sku}): ${priceAmount} cents`);
+          const priceSet = await pricingModuleService.createPriceSets({
+            prices: [{ currency_code: "nzd", amount: priceAmount }],
+          });
+          console.log(`    Price set created: ${priceSet?.id || "no id"}`);
+          await link.create({
+            [Modules.PRODUCT]: { variant_id: v.id },
+            [Modules.PRICING]: { price_set_id: priceSet.id },
+          });
+          console.log(
+            `    ✓ ${p.title}: $${(priceAmount / 100).toFixed(2)} NZD`
+          );
+        } catch (e: any) {
+          console.log(`    ⚠  ${p.title}: ${e.message || e}`);
+        }
+      }
+    }
+  }
+
+  // -------------------------------------------------------------------
+  // 10. Inventory levels (stock for each variant)
   // -------------------------------------------------------------------
   console.log("\n📦  Inventory…");
 
