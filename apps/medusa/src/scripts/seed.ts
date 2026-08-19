@@ -529,6 +529,11 @@ export default async function seedPawTag({ container }: ExecArgs) {
         subscriptionConfig: mongo.subscriptionConfig || null,
         warrantyMonths: mongo.warrantyMonths ?? 12,
         mongoId: mongo._id.toString(),
+        // Affiliate fields (for future use)
+        affiliateSource: null,  // 'amazon', 'partner', etc.
+        affiliateId: null,      // External product ID
+        affiliateUrl: null,     // Affiliate product URL
+        affiliateCommission: null, // Commission percentage
       },
       options: [{ title: "Default", values: ["Default"] }],
       shipping_profile_id: defaultShippingProfile.id,
