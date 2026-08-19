@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ShoppingCart, PawPrint, Check, Shield, Smartphone, Wifi, Zap } from 'lucide-react';
 import { sdk } from '../lib/medusa';
 import { useCart } from '../context/CartContext';
+import { ProductCard, type ProductCardProduct } from '@pawtag/ui';
 import SeoHead from '../components/SeoHead';
 import { useShopPage, useSiteSettings } from '../hooks/useCms';
 import { getProductBadge, getProductIcon } from '../utils/productHelpers';
@@ -19,51 +20,60 @@ const COMPARISON_FEATURES = [
   { key: 'shipping', label: 'Shipping', scan: 'Free NZ-wide', classic: 'Free NZ-wide', plus: 'Free NZ-wide' },
 ];
 
+function toCardProduct(p: StoreProduct): ProductCardProduct {
+  const variant = p.variants?.[0] as any;
+  const price = variant?.prices?.[0]?.amount || 0;
+  const monthlyPrice = (p.metadata as any)?.subscriptionConfig?.monthlyPrice || 0;
+  const badge = getProductBadge(p.handle || '');
+  return {
+    id: p.id,
+    name: p.title,
+    shortDescription: (p as any).subtitle || undefined,
+    price,
+    currency: 'NZD',
+    image: p.thumbnail || undefined,
+    sku: variant?.sku || '',
+    stock: 999,
+    monthlyPrice: monthlyPrice > 0 ? monthlyPrice : undefined,
+    badge: badge ? { label: badge.label, color: badge.color } : null,
+    features: [
+      '12 months free subscription included',
+      '12 month warranty',
+      'Free NZ-wide shipping',
+    ],
+  };
+}
+
 export default function Shop() {
-  const [products, setProducts] = useState<any[]>([]);
+  const [products, setProducts] = useState<StoreProduct[]>([]);
   const [loading, setLoading] = useState(true);
-  const [addingId, setAddingId] = useState<string | null>(null);
+  const [addedId, setAddedId] = useState<string | null>(null);
   const { addItem } = useCart();
   const { page: shopPage } = useShopPage('shop');
   const { settings } = useSiteSettings();
   const companyName = settings?.['company.name'] || 'PawTag';
 
   useEffect(() => {
-    fetchProducts();
+    sdk.store.product
+      .list({ fields: '*variants.prices,*images,*type,*tags' })
+      .then(({ products: p }) => setProducts(p || []))
+      .catch(console.error)
+      .finally(() => setLoading(false));
   }, []);
 
-  const fetchProducts = async () => {
-    try {
-      const { products: medusaProducts } = await sdk.store.product.list({
-        fields: '*variants.prices,*images,*type,*tags',
-      });
-      setProducts(medusaProducts || []);
-    } catch (err) {
-      console.error('Failed to fetch products:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleAddToCart = (product: any) => {
-    const variant = product.variants?.[0];
+  const handleAddToCart = (cardProduct: ProductCardProduct) => {
+    const variant = products.find((p) => p.id === cardProduct.id)?.variants?.[0];
     if (!variant) return;
-    setAddingId(product.id);
+    setAddedId(cardProduct.id);
     addItem({
-      productId: product.id,
+      productId: cardProduct.id,
       variantId: variant.id,
-      name: product.title,
-      price: variant.prices?.[0]?.amount || 0,
+      name: cardProduct.name,
+      price: cardProduct.price,
       quantity: 1,
-      image: product.thumbnail || undefined,
+      image: cardProduct.image,
     });
-    setTimeout(() => setAddingId(null), 1000);
-  };
-
-  const getBadge = (handle: string) => getProductBadge(handle);
-  const getMonthlyPrice = (product: StoreProduct) => {
-    // Subscription price from metadata
-    return (product.metadata as any)?.subscriptionConfig?.monthlyPrice || 0;
+    setTimeout(() => setAddedId(null), 1000);
   };
 
   const shopTitle = (shopPage?.content as Record<string, unknown>)?.heroTitle as string || shopPage?.title || `Shop ${companyName}`;
@@ -71,24 +81,17 @@ export default function Shop() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <SeoHead
-        title="Shop"
-        description={shopDesc}
-        keywords={['shop', 'pet tags', 'QR code tags', 'NFC tags', 'pet recovery', 'buy tags']}
-      />
+      <SeoHead title="Shop" description={shopDesc} keywords={['shop', 'pet tags', 'QR code tags', 'NFC tags', 'pet recovery', 'buy tags']} />
 
       {/* Hero Banner */}
       <div className="bg-gradient-to-r from-primary-700 to-primary-600 text-white py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h1 className="text-4xl font-bold mb-4">{shopTitle}</h1>
-          <p className="text-primary-100 text-lg max-w-2xl mx-auto">
-            {shopDesc}
-          </p>
+          <p className="text-primary-100 text-lg max-w-2xl mx-auto">{shopDesc}</p>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-
         {/* Product Cards */}
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
@@ -105,90 +108,15 @@ export default function Shop() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
-            {products.map((product) => {
-              const badge = getBadge(product.handle || '');
-              const variant = product.variants?.[0];
-              const price = variant ? (variant.prices?.[0]?.amount || 0) : 0;
-              const monthlyPrice = getMonthlyPrice(product);
-              const isMostOrdered = badge?.label === 'Most Ordered';
-              return (
-                <div key={product.id} className={`bg-white rounded-2xl shadow-sm border border-gray-100 hover:border-primary-200 hover:shadow-lg transition-all duration-300 overflow-hidden relative ${isMostOrdered ? 'ring-2 ring-amber-400 scale-[1.02]' : ''}`}>
-                  {badge && (
-                    <div className={`absolute top-4 left-4 z-10 px-3 py-1 rounded-full text-xs font-bold ${badge.color}`}>
-                      {badge.label}
-                    </div>
-                  )}
-
-                  <div className="relative h-48 bg-gradient-to-br from-primary-50 to-primary-100 flex items-center justify-center">
-                    {product.thumbnail ? (
-                      <img src={product.thumbnail} alt={product.title} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="flex flex-col items-center gap-2 text-primary-300">
-                        {getProductIcon(product.handle || '', 'sm')}
-                        <PawPrint className="h-20 w-20" />
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="p-6">
-                    <h3 className="text-xl font-bold text-gray-900 mb-1">{product.title}</h3>
-                    {product.subtitle && (
-                      <p className="text-sm text-gray-500 mb-4">{product.subtitle}</p>
-                    )}
-
-                    <div className="mb-4">
-                      <div className="flex items-baseline gap-1">
-                        <span className="text-3xl font-bold text-primary-700">${price.toFixed(2)}</span>
-                        <span className="text-sm text-gray-500">NZD</span>
-                      </div>
-                      {monthlyPrice > 0 && (
-                        <p className="text-xs text-gray-400 mt-1">
-                          + ${monthlyPrice.toFixed(2)}/mo after 12 months free
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="space-y-2 mb-6">
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
-                        <span>12 months free subscription included</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
-                        <span>12 month warranty</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
-                        <span>Free NZ-wide shipping</span>
-                      </div>
-                    </div>
-
-                    <div className="flex gap-2">
-                      <Link
-                        to={`/shop/${product.id}`}
-                        className="flex-1 py-3 border border-primary-600 text-primary-600 rounded-xl font-medium hover:bg-primary-50 transition-all text-center text-sm"
-                      >
-                        Details
-                      </Link>
-                      <button
-                        onClick={() => handleAddToCart(product)}
-                        disabled={!variant || addingId === product.id}
-                        className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-medium transition-all text-sm ${
-                          addingId === product.id
-                            ? 'bg-green-500 text-white'
-                            : !variant
-                            ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                            : 'bg-primary-600 text-white hover:bg-primary-700 active:scale-[0.98]'
-                        }`}
-                      >
-                        <ShoppingCart className="h-4 w-4" />
-                        {addingId === product.id ? 'Added!' : !variant ? 'Unavailable' : 'Add to Cart'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+            {products.map((product) => (
+              <ProductCard
+                key={product.id}
+                product={toCardProduct(product)}
+                onAddToCart={handleAddToCart}
+                onDetails={(p) => window.location.href = `/shop/${p.id}`}
+                added={addedId === product.id}
+              />
+            ))}
           </div>
         )}
 
@@ -238,15 +166,9 @@ export default function Shop() {
                   ))}
                   <tr className="border-t border-gray-200">
                     <td className="px-6 py-4 text-sm font-bold text-gray-900">Price</td>
-                    <td className="px-4 py-4 text-center">
-                      <span className="text-lg font-bold text-primary-700">$9.99</span>
-                    </td>
-                    <td className="px-4 py-4 text-center bg-amber-50/30">
-                      <span className="text-lg font-bold text-primary-700">$19.99</span>
-                    </td>
-                    <td className="px-4 py-4 text-center">
-                      <span className="text-lg font-bold text-primary-700">$39.99</span>
-                    </td>
+                    <td className="px-4 py-4 text-center"><span className="text-lg font-bold text-primary-700">$9.99</span></td>
+                    <td className="px-4 py-4 text-center bg-amber-50/30"><span className="text-lg font-bold text-primary-700">$19.99</span></td>
+                    <td className="px-4 py-4 text-center"><span className="text-lg font-bold text-primary-700">$39.99</span></td>
                   </tr>
                 </tbody>
               </table>
@@ -254,37 +176,26 @@ export default function Shop() {
           </div>
         )}
 
-        {/* Warranty & Shipping Info */}
+        {/* Info Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
             <div className="flex items-center gap-3 mb-4">
               <Shield className="h-8 w-8 text-primary-600" />
               <h3 className="text-lg font-bold text-gray-900">12 Month Warranty</h3>
             </div>
-            <p className="text-sm text-gray-600 leading-relaxed">
-              Every PawTag comes with a <strong>12 month warranty</strong> covering normal wear and tear.
-              Physical damage such as chewing, bending, or key holder breakage is not covered.
-              Warranty replacements are shipped free.
-            </p>
+            <p className="text-sm text-gray-600 leading-relaxed">Every PawTag comes with a <strong>12 month warranty</strong> covering normal wear and tear.</p>
           </div>
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
             <div className="flex items-center gap-3 mb-4">
               <PawPrint className="h-8 w-8 text-primary-600" />
               <h3 className="text-lg font-bold text-gray-900">NZ-Wide Shipping</h3>
             </div>
-            <p className="text-sm text-gray-600 leading-relaxed">
-              Shipping is <strong>free</strong> for all New Zealand addresses — city, suburb, and rural.
-              All PawTag products are shipped from Auckland.
-            </p>
+            <p className="text-sm text-gray-600 leading-relaxed">Shipping is <strong>free</strong> for all New Zealand addresses.</p>
           </div>
         </div>
 
-        {/* Replacement Note */}
         <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 text-center">
-          <p className="text-sm text-amber-800">
-            <strong>Lost or damaged your PawTag?</strong> Replacement tags are available at full cost as new.
-            Your subscription continues on your replacement tag.
-          </p>
+          <p className="text-sm text-amber-800"><strong>Lost or damaged your PawTag?</strong> Replacement tags are available at full cost as new.</p>
         </div>
       </div>
     </div>

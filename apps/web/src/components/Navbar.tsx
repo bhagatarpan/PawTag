@@ -1,37 +1,28 @@
-import { useState, useEffect, useRef } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { useState, useRef } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, X, ShoppingCart, PawPrint, User, LogOut, ChevronDown } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useNavigation } from '../hooks/useCms';
+import { CartDrawer } from '@pawtag/ui';
 
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
-  const [removingId, setRemovingId] = useState<string | null>(null);
   const location = useLocation();
+  const navigate = useNavigate();
   const { itemCount, items, total, removeItem, updateQuantity, clearCart } = useCart();
   const { user, logout } = useAuth();
   const { menus, loading } = useNavigation('header');
   const cartButtonRef = useRef<HTMLButtonElement>(null);
 
-  const handleRemoveItem = (variantId: string) => {
-    setRemovingId(variantId);
-    setTimeout(() => {
-      removeItem(variantId);
-      setRemovingId(null);
-    }, 350);
-  };
-
-  // Fallback nav links when CMS not available
   const fallbackLinks = [
     { to: '/', label: 'Home' },
     { to: '/shop', label: 'Shop' },
     { to: '/about', label: 'About' },
   ];
 
-  // Get nav links from CMS or fallback
   const navLinks = loading || !menus.length ? fallbackLinks : menus[0]?.items?.map(item => ({
     to: item.url,
     label: item.label,
@@ -56,9 +47,7 @@ export default function Navbar() {
             <div className="hidden md:flex items-center gap-1">
               {navLinks.map((link) => (
                 <Link key={link.to} to={link.to} className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  isActive(link.to)
-                    ? 'bg-primary-50 text-primary-700'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                  isActive(link.to) ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                 }`}>
                   {link.label}
                 </Link>
@@ -81,8 +70,8 @@ export default function Navbar() {
               {user ? (
                 <div className="relative">
                   <button onClick={() => setUserMenuOpen(!userMenuOpen)} className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-all">
-                    <div className="h-8 w-8 bg-teal-100 rounded-full flex items-center justify-center">
-                      <span className="text-teal-700 font-semibold text-sm">{user.fullName?.[0] || 'U'}</span>
+                    <div className="h-8 w-8 bg-primary-100 rounded-full flex items-center justify-center">
+                      <span className="text-primary-700 font-semibold text-sm">{user.fullName?.[0] || 'U'}</span>
                     </div>
                     <span className="hidden sm:block">{user.fullName}</span>
                     <ChevronDown className="h-4 w-4" />
@@ -106,7 +95,7 @@ export default function Navbar() {
                   )}
                 </div>
               ) : (
-                <Link to="/login" className="hidden md:flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 transition-all">
+                <Link to="/login" className="hidden md:flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition-all">
                   <User className="h-4 w-4" /> Sign In
                 </Link>
               )}
@@ -125,13 +114,13 @@ export default function Navbar() {
             <div className="px-4 py-4 space-y-2">
               {navLinks.map((link) => (
                 <Link key={link.to} to={link.to} onClick={() => setMobileOpen(false)} className={`block px-4 py-3 rounded-lg font-medium transition-all ${
-                  isActive(link.to) ? 'bg-teal-50 text-teal-700' : 'text-gray-700 hover:bg-gray-50'
+                  isActive(link.to) ? 'bg-primary-50 text-primary-700' : 'text-gray-700 hover:bg-gray-50'
                 }`}>
                   {link.label}
                 </Link>
               ))}
               {!user && (
-                <Link to="/login" onClick={() => setMobileOpen(false)} className="block px-4 py-3 bg-teal-600 text-white rounded-lg font-medium text-center mt-4">
+                <Link to="/login" onClick={() => setMobileOpen(false)} className="block px-4 py-3 bg-primary-600 text-white rounded-lg font-medium text-center mt-4">
                   Sign In
                 </Link>
               )}
@@ -140,65 +129,17 @@ export default function Navbar() {
         )}
       </nav>
 
-      {/* Cart Drawer — rendered outside nav to avoid stacking context issue */}
-      {cartOpen && (
-        <>
-          <div className="fixed inset-0 bg-black/40 z-40" onClick={() => setCartOpen(false)} />
-          <div className="fixed right-0 top-0 h-full w-full max-w-md bg-white shadow-2xl z-50 flex flex-col">
-            <div className="flex items-center justify-between p-6 border-b border-gray-100">
-              <h2 className="text-lg font-bold text-gray-900">Your Cart ({itemCount})</h2>
-              <button onClick={() => setCartOpen(false)} className="p-2 rounded-lg hover:bg-gray-100">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-6">
-              {items.length === 0 ? (
-                <div className="text-center py-16">
-                  <PawPrint className="h-16 w-16 text-gray-300 mx-auto mb-4 animate-sad-paw" />
-                  <p className="text-gray-500 font-medium">Your cart feels lonely...</p>
-                  <p className="text-gray-400 text-sm mt-1">Your pet deserves a PawTag!</p>
-                  <button onClick={() => setCartOpen(false)} className="mt-4 text-primary-600 font-medium hover:text-primary-700">
-                    Continue Shopping
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {items.map((item) => (
-                    <div key={item.variantId} className={`flex gap-4 p-4 bg-gray-50 rounded-xl transition-all ${removingId === item.variantId ? 'animate-cart-item-remove' : ''}`}>
-                      <div className="h-20 w-20 bg-primary-100 rounded-lg flex-shrink-0 flex items-center justify-center">
-                        {item.image ? <img src={item.image} alt="" className="h-full w-full object-cover rounded-lg" /> : <PawPrint className="h-8 w-8 text-primary-300" />}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-medium text-gray-900 text-sm truncate">{item.name}</h3>
-                        {item.petName && <p className="text-xs text-primary-600">For: {item.petName}</p>}
-                        <p className="text-sm font-semibold text-primary-700 mt-1">${item.price.toFixed(2)}</p>
-                        <div className="flex items-center gap-2 mt-2">
-                          <button onClick={() => updateQuantity(item.variantId, item.quantity - 1)} className="h-6 w-6 rounded border border-gray-300 flex items-center justify-center text-xs hover:bg-gray-100">-</button>
-                          <span className="text-sm font-medium w-6 text-center">{item.quantity}</span>
-                          <button onClick={() => updateQuantity(item.variantId, item.quantity + 1)} className="h-6 w-6 rounded border border-gray-300 flex items-center justify-center text-xs hover:bg-gray-100">+</button>
-                          <button onClick={() => handleRemoveItem(item.variantId)} className="ml-auto text-xs text-red-500 hover:text-red-700">Remove</button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            {items.length > 0 && (
-              <div className="border-t border-gray-100 p-6 space-y-4">
-                <div className="flex justify-between text-base font-semibold">
-                  <span>Total</span>
-                  <span className="text-primary-700">${total.toFixed(2)}</span>
-                </div>
-                <Link to="/checkout" onClick={() => setCartOpen(false)} className="block w-full py-3 bg-primary-600 text-white text-center rounded-xl font-semibold hover:bg-primary-700 transition-all">
-                  Checkout
-                </Link>
-                <button onClick={clearCart} className="w-full text-sm text-gray-500 hover:text-red-500">Clear Cart</button>
-              </div>
-            )}
-          </div>
-        </>
-      )}
+      {/* Cart Drawer from @pawtag/ui */}
+      <CartDrawer
+        open={cartOpen}
+        onClose={() => setCartOpen(false)}
+        items={items}
+        total={total}
+        onUpdateQuantity={updateQuantity}
+        onRemoveItem={removeItem}
+        onClearCart={clearCart}
+        onCheckout={() => { setCartOpen(false); navigate('/checkout'); }}
+      />
     </>
   );
 }
