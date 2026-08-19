@@ -583,11 +583,24 @@ sequenceDiagram
 
 ### E-Commerce Flow
 
-1. Browse shop (Medusa products) → add to cart (Medusa SDK)
+1. Browse shop (Medusa products via SDK) → add to cart (Medusa server-side cart)
 2. Checkout → dual OTP verification → Stripe payment
 3. Order confirmed → Medusa webhook → PawTag order created
 4. Fulfillment → shipping label → tracking
 5. Delivered → customer activates tag
+
+### Product Management
+
+Products are managed exclusively through Medusa (`localhost:9000/app`). The PawTag MongoDB Product model is deprecated. All product/pricing/inventory operations go through Medusa.
+
+| What | Where | Purpose |
+|------|-------|---------|
+| Product catalog | Medusa admin (`:9000/app`) | Create/edit/delete products, prices, variants |
+| Product metadata | Medusa product metadata | Subscription config, tag flags, warranty, affiliate fields |
+| Inventory | Medusa inventory module | Stock levels at PawTag Warehouse |
+| Prices | Medusa pricing module | Per-variant, per-region pricing |
+| Shop page | `apps/web` | Fetches from Medusa SDK, displays with PawTag UI |
+| Subscription logic | `packages/api` (MongoDB) | Reads Medusa product metadata for subscription config |
 
 ### Order Lifecycle
 

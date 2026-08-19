@@ -28,9 +28,9 @@ Reasoning:
 
 ### 1.2 Backend strategy — Express API + MedusaJS commerce engine
 
-**Decision: `packages/api` (Express) remains the primary backend for auth, users, pets, tags, CMS, and notifications. MedusaJS v2.19.0 (`apps/medusa`) was added as the commerce engine for products, carts, orders, payments, and shipping.**
+**Decision: `packages/api` (Express) remains the primary backend for auth, users, pets, tags, CMS, and notifications. MedusaJS v2.19.0 (`apps/medusa`) is the single source of truth for all product/commerce data.**
 
-The two systems are linked via customer sync (PawTag User ↔ Medusa Customer) and webhooks (Medusa events → PawTag webhook endpoint). This separation keeps PawTag's domain logic (pet recovery, subscriptions) separate from generic commerce logic, while leveraging Medusa's production-grade cart, checkout, and payment handling.
+Products, prices, inventory, carts, orders, and payments live exclusively in Medusa. PawTag MongoDB stores users, pets, tags, subscriptions, CMS, and audit logs. The two systems are linked via customer sync (PawTag User ↔ Medusa Customer), webhooks (Medusa events → PawTag webhook endpoint), and product metadata (subscription config, tag flags stored in Medusa product metadata).
 
 ### 1.3 Authentication strategy — one JWT-based auth, extended with refresh tokens
 
@@ -3104,6 +3104,28 @@ MedusaJS v2.19.0 was integrated as the commerce engine, replacing the custom car
 | `packages/ui/src/components/ProductBadge.tsx` | Shared badge component |
 | `apps/admin/src/components/MedusaStatusCard.tsx` | Dashboard status widget |
 | `apps/medusa/src/links/*.ts` | Module link definitions (6 files) |
+
+### Product Consolidation (Completed 2026-08-19)
+
+Medusa is now the **single source of truth** for all product/commerce data. The PawTag MongoDB Product model is deprecated.
+
+| What changed | Before | After |
+|--------------|--------|-------|
+| Product catalog | MongoDB (PawTag admin) | Medusa (`:9000/app`) |
+| Prices | MongoDB Product.price | Medusa pricing module |
+| Stock | MongoDB Product.stock | Medusa inventory module |
+| Subscription config | MongoDB Product.subscriptionConfig | Medusa product metadata |
+| Shop page | MongoDB via `/finder/shop/products` | Medusa SDK |
+| Cart | localStorage (PawTag) | Medusa server-side cart |
+| Checkout | POST `/customer/orders` | Medusa cart.complete() |
+
+**Key changes:**
+- Webhook handlers fetch product metadata from Medusa API (not MongoDB)
+- Subscription logic reads `metadata.isSubscription`/`metadata.subscriptionConfig` from Medusa
+- Finder shop routes removed (frontend uses Medusa SDK)
+- Old cart routes removed (frontend uses Medusa SDK)
+- Seed script creates prices via pricing module + links to variants
+- Seed script creates inventory levels, sales channel ↔ stock location link, tax provider
 
 ---
 

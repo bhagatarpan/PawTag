@@ -432,13 +432,16 @@ PawTag/
 
 PawTag uses **two databases**:
 
-- **MongoDB Atlas** — PawTag's primary data store (users, pets, tags, orders, CMS, audit logs, subscriptions)
-- **PostgreSQL (Neon)** — MedusaJS commerce engine (products, carts, customers, orders, payments, shipping)
+- **MongoDB Atlas** — PawTag's primary data store (users, pets, tags, subscriptions, CMS, audit logs, settings)
+- **PostgreSQL (Neon)** — MedusaJS commerce engine (products, prices, carts, customers, orders, payments, shipping, inventory)
 
 The two systems are linked via:
 - **Customer sync:** PawTag User ↔ Medusa Customer (via `medusaCustomerId` field)
 - **Webhooks:** Medusa events → PawTag webhook endpoint (order.placed, payment.captured)
 - **Cart association:** Medusa cart linked to PawTag user via `customer_id`
+- **Product metadata:** Subscription config, tag flags, warranty stored in Medusa product metadata
+
+**Products are single-sourced in Medusa.** The PawTag MongoDB Product model is deprecated. All product/pricing/inventory operations go through Medusa.
 
 ### MedusaJS Integration
 
@@ -814,6 +817,45 @@ Located in `apps/mobile/e2e/`:
 | `apps/web/src/components/AccountLayout.tsx` | Customer portal layout + wizard gating |
 | `apps/finder/src/App.tsx` | Finder portal (decomposed into components) |
 
+## Product Management
+
+Products are managed exclusively through **Medusa** (`localhost:9000/app`). The PawTag MongoDB Product model is deprecated.
+
+### How Products Work
+
+| What | Where | Purpose |
+|------|-------|---------|
+| **Product catalog** | Medusa admin (`:9000/app`) | Create/edit/delete products, prices, variants |
+| **Product metadata** | Medusa product metadata | Subscription config, tag flags, warranty, affiliate fields |
+| **Inventory** | Medusa inventory module | Stock levels at PawTag Warehouse |
+| **Prices** | Medusa pricing module | Per-variant, per-region pricing |
+| **Shop page** | `apps/web` | Fetches from Medusa SDK, displays with PawTag UI |
+| **Subscription logic** | `packages/api` (MongoDB) | Reads Medusa product metadata for subscription config |
+
+### Adding/Editing Products
+
+1. Go to `http://localhost:9000/app` (Medusa admin)
+2. Products → Add Product or click existing product
+3. Fill details, set variant prices, assign to "Default Sales Channel"
+4. Save → product appears in shop immediately on refresh
+
+### Price Format
+
+Medusa v2 stores prices in **major units (dollars)**, not cents.
+- `$19.99` = stored as `19.99` (not `1999`)
+- The shop page displays prices directly without division
+
+### Seed Script
+
+The seed script (`apps/medusa/src/scripts/seed.ts`) is idempotent and handles:
+- Product creation from MongoDB
+- Price set creation + linking to variants
+- Inventory levels at PawTag Warehouse
+- Sales channel ↔ stock location link
+- Tax region with system provider
+
+Run: `pnpm --filter @pawtag/medusa seed`
+
 ## Next Move
 
-See `ARCHITECTURE.md` for the full system architecture and `PawTag-Enterprise-Roadmap.md` for the 26-phase production roadmap. Work phases in order — later phases assume earlier ones are complete.
+See `ARCHITECTURE.md` for the full system architecture and `PawTag-Enterprise-Roadmap.md` for the production roadmap. Work phases in order — later phases assume earlier ones are complete.
