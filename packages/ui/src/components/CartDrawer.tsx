@@ -22,7 +22,7 @@ export interface CartDrawerProps {
   className?: string;
 }
 
-export function CartDrawer({
+export const CartDrawer = React.memo(function CartDrawer({
   open,
   onClose,
   items,
@@ -146,4 +146,4 @@ export function CartDrawer({
       </div>
     </>
   );
-}
+});

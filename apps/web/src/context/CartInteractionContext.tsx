@@ -1,10 +1,10 @@
-import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useMemo, ReactNode } from 'react';
 import { CART_ANIM, CART_ANIM_REDUCED } from '../lib/cart-animation-tokens';
 
 export interface FlyRequest {
-  id: string;             // Unique ID for this animation
-  imageUrl: string;       // Product image URL
-  sourceRect: DOMRect;    // Where the image is on screen
+  id: string;
+  imageUrl: string;
+  sourceRect: DOMRect;
   onComplete?: () => void;
 }
 
@@ -46,16 +46,13 @@ export function CartInteractionProvider({ children }: { children: ReactNode }) {
     setCartBump(false);
   }, []);
 
+  // Memoize context value — stable reference prevents unnecessary re-renders
+  const value = useMemo(() => ({
+    flyRequest, triggerFly, clearFly, cartBump, clearCartBump, reducedMotion, tokens,
+  }), [flyRequest, triggerFly, clearFly, cartBump, clearCartBump, reducedMotion, tokens]);
+
   return (
-    <CartInteractionContext.Provider value={{
-      flyRequest,
-      triggerFly,
-      clearFly,
-      cartBump,
-      clearCartBump: () => setCartBump(false),
-      reducedMotion,
-      tokens,
-    }}>
+    <CartInteractionContext.Provider value={value}>
       {children}
     </CartInteractionContext.Provider>
   );

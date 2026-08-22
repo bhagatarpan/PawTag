@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback, memo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, X, ShoppingCart, PawPrint, User, LogOut, ChevronDown } from 'lucide-react';
 import { useCart } from '../context/CartContext';
@@ -7,20 +7,13 @@ import { useNavigation } from '../hooks/useCms';
 import { CartDrawer } from '@pawtag/ui';
 import { useCartInteraction } from '../context/CartInteractionContext';
 
-export default function Navbar() {
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [cartOpen, setCartOpen] = useState(false);
-  const location = useLocation();
-  const navigate = useNavigate();
-  const { itemCount, items, total, removeItem, updateQuantity, clearCart } = useCart();
-  const { user, logout } = useAuth();
-  const { menus, loading } = useNavigation('header');
+// Memoized cart icon — only re-renders when itemCount changes
+const CartIcon = memo(function CartIcon({ onClick }: { onClick: () => void }) {
+  const { itemCount } = useCart();
   const cartButtonRef = useRef<HTMLButtonElement>(null);
-  const { cartBump, clearCartBump, tokens } = useCartInteraction();
+  const { tokens } = useCartInteraction();
   const prevItemCount = useRef(itemCount);
 
-  // Cart icon bump animation when item count changes
   useEffect(() => {
     if (itemCount > prevItemCount.current && cartButtonRef.current) {
       const el = cartButtonRef.current;
@@ -36,6 +29,28 @@ export default function Navbar() {
     prevItemCount.current = itemCount;
   }, [itemCount, tokens]);
 
+  return (
+    <button ref={cartButtonRef} data-cart-icon onClick={onClick} className="relative p-2 rounded-lg text-gray-600 hover:text-primary-600 hover:bg-primary-50 transition-all">
+      <ShoppingCart className="h-5 w-5" />
+      {itemCount > 0 && (
+        <span data-cart-badge className="absolute -top-1 -right-1 bg-primary-600 text-white text-xs font-bold h-5 w-5 rounded-full flex items-center justify-center">
+          {itemCount}
+        </span>
+      )}
+    </button>
+  );
+});
+
+export default function Navbar() {
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [cartOpen, setCartOpen] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { items, total, removeItem, updateQuantity, clearCart } = useCart();
+  const { user, logout } = useAuth();
+  const { menus, loading } = useNavigation('header');
+
   const fallbackLinks = [
     { to: '/', label: 'Home' },
     { to: '/shop', label: 'Shop' },
@@ -48,6 +63,11 @@ export default function Navbar() {
   })) || fallbackLinks;
 
   const isActive = (path: string) => location.pathname === path;
+
+  const handleCheckout = useCallback(() => {
+    setCartOpen(false);
+    navigate('/checkout');
+  }, [navigate]);
 
   return (
     <>
@@ -75,15 +95,8 @@ export default function Navbar() {
 
             {/* Right Side */}
             <div className="flex items-center gap-3">
-              {/* Cart Button */}
-              <button ref={cartButtonRef} data-cart-icon onClick={() => setCartOpen(!cartOpen)} className="relative p-2 rounded-lg text-gray-600 hover:text-primary-600 hover:bg-primary-50 transition-all">
-                <ShoppingCart className="h-5 w-5" />
-                {itemCount > 0 && (
-                  <span data-cart-badge className="absolute -top-1 -right-1 bg-primary-600 text-white text-xs font-bold h-5 w-5 rounded-full flex items-center justify-center">
-                    {itemCount}
-                  </span>
-                )}
-              </button>
+              {/* Memoized Cart Icon */}
+              <CartIcon onClick={() => setCartOpen(!cartOpen)} />
 
               {/* User Menu / Sign In */}
               {user ? (
@@ -148,17 +161,19 @@ export default function Navbar() {
         )}
       </nav>
 
-      {/* Cart Drawer from @pawtag/ui */}
-      <CartDrawer
-        open={cartOpen}
-        onClose={() => setCartOpen(false)}
-        items={items}
-        total={total}
-        onUpdateQuantity={updateQuantity}
-        onRemoveItem={removeItem}
-        onClearCart={clearCart}
-        onCheckout={() => { setCartOpen(false); navigate('/checkout'); }}
-      />
+      {/* Cart Drawer — only rendered when open */}
+      {cartOpen && (
+        <CartDrawer
+          open={true}
+          onClose={() => setCartOpen(false)}
+          items={items}
+          total={total}
+          onUpdateQuantity={updateQuantity}
+          onRemoveItem={removeItem}
+          onClearCart={clearCart}
+          onCheckout={handleCheckout}
+        />
+      )}
     </>
   );
 }

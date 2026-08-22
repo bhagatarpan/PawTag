@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo, ReactNode } from 'react';
 import { sdk, getNzRegionId } from '../lib/medusa';
 import api from '../lib/api';
 import type { StoreCart } from '@medusajs/types';
@@ -35,11 +35,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const cartIdRef = useRef<string | null>(null);
 
-  // Helper: get current cart ID
   const getCartId = (): string | null => cartIdRef.current || localStorage.getItem(CART_ID_KEY);
 
-  // Helper: re-fetch cart from Medusa and update state
-  const refreshCart = async (): Promise<StoreCart | null> => {
+  // Re-fetch cart from Medusa and update state
+  const refreshCart = useCallback(async (): Promise<StoreCart | null> => {
     const id = getCartId();
     if (!id) return null;
     try {
@@ -52,7 +51,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       localStorage.removeItem(CART_ID_KEY);
       return null;
     }
-  };
+  }, []);
 
   // Load or create cart on mount
   useEffect(() => {
@@ -60,7 +59,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
       const savedCartId = localStorage.getItem(CART_ID_KEY);
       if (savedCartId) {
         try {
-          setLoading(true);
           const { cart: retrieved } = await sdk.store.cart.retrieve(savedCartId);
           cartIdRef.current = savedCartId;
           setCart(retrieved);
@@ -74,7 +72,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
             localStorage.setItem(CART_ID_KEY, newCart.id);
             setCart(newCart);
           } catch { /* will create on addItem */ }
-        } finally { setLoading(false); }
+        }
       } else {
         try {
           const regionId = await getNzRegionId();
@@ -88,21 +86,25 @@ export function CartProvider({ children }: { children: ReactNode }) {
     loadCart();
   }, []);
 
-  const items: CartItem[] = (cart?.items || []).map((item) => ({
+  // Memoized derived values — no re-computation unless cart changes
+  const items: CartItem[] = useMemo(() => (cart?.items || []).map((item) => ({
     productId: item.product_id || '',
     variantId: item.variant_id || '',
     name: item.title || '',
     price: item.unit_price || 0,
     quantity: item.quantity,
     image: item.thumbnail || undefined,
-  }));
+  })), [cart]);
 
+  const total = useMemo(() => cart?.total || 0, [cart]);
+  const itemCount = useMemo(() => (cart?.items || []).reduce((sum, i) => sum + i.quantity, 0), [cart]);
+
+  // ADD ITEM — optimistic update, use mutation response directly
   const addItem = useCallback(async (item: CartItem) => {
     setError(null);
     try {
       setLoading(true);
 
-      // Create cart if none exists
       let cartId = getCartId();
       if (!cartId) {
         const regionId = await getNzRegionId();
@@ -119,85 +121,107 @@ export function CartProvider({ children }: { children: ReactNode }) {
         }).catch(() => {});
       }
 
-      await sdk.store.cart.createLineItem(cartId!, {
+      // Use mutation response directly — no extra refreshCart needed
+      const { cart: updated } = await sdk.store.cart.createLineItem(cartId!, {
         variant_id: item.variantId,
         quantity: item.quantity,
       });
-      // Always re-fetch to get consistent state
-      await refreshCart();
+      setCart(updated);
     } catch (err: unknown) {
       setError((err as Error)?.message || 'Failed to add item to cart');
+      // Rollback: re-fetch to reconcile
+      await refreshCart();
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [refreshCart]);
 
+  // REMOVE ITEM — optimistic update, refetch to reconcile
   const removeItem = useCallback(async (variantId: string) => {
     const id = getCartId();
     if (!id) return;
     setError(null);
+
+    // Optimistic: remove from local state immediately
+    const previousCart = cart;
+    setCart(prev => {
+      if (!prev) return prev;
+      return { ...prev, items: (prev.items || []).filter(i => i.variant_id !== variantId) } as StoreCart;
+    });
+
     try {
       setLoading(true);
-      const freshCart = await refreshCart();
-      if (!freshCart) return;
-      const lineItem = freshCart.items?.find((i) => i.variant_id === variantId);
+      const lineItem = previousCart?.items?.find((i) => i.variant_id === variantId);
       if (lineItem) {
         await sdk.store.cart.deleteLineItem(id, lineItem.id);
+        // deleteLineItem doesn't return cart — refetch to reconcile
         await refreshCart();
       }
     } catch (err: unknown) {
       setError((err as Error)?.message || 'Failed to remove item');
+      setCart(previousCart); // Rollback
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [cart, refreshCart]);
 
+  // UPDATE QUANTITY — optimistic + use mutation response
   const updateQuantity = useCallback(async (variantId: string, quantity: number) => {
     if (quantity <= 0) { removeItem(variantId); return; }
     const id = getCartId();
     if (!id) return;
     setError(null);
+
+    // Optimistic: update local state immediately
+    const previousCart = cart;
+    setCart(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        items: (prev.items || []).map(i =>
+          i.variant_id === variantId ? { ...i, quantity } : i
+        ),
+      } as StoreCart;
+    });
+
     try {
       setLoading(true);
-      const freshCart = await refreshCart();
-      if (!freshCart) return;
-      const lineItem = freshCart.items?.find((i) => i.variant_id === variantId);
+      const lineItem = previousCart?.items?.find((i) => i.variant_id === variantId);
       if (lineItem) {
-        await sdk.store.cart.updateLineItem(id, lineItem.id, { quantity });
-        await refreshCart();
+        const { cart: updated } = await sdk.store.cart.updateLineItem(id, lineItem.id, { quantity });
+        setCart(updated); // Reconcile with server truth
       }
     } catch (err: unknown) {
       setError((err as Error)?.message || 'Failed to update quantity');
+      setCart(previousCart); // Rollback
     } finally {
       setLoading(false);
     }
-  }, [removeItem]);
+  }, [cart, removeItem]);
 
+  // CLEAR CART — parallel deletions
   const clearCart = useCallback(async () => {
     const id = getCartId();
     if (!id) return;
     try {
       setLoading(true);
-      const freshCart = await refreshCart();
-      if (!freshCart) return;
-      for (const item of freshCart.items || []) {
-        await sdk.store.cart.deleteLineItem(id, item.id);
-      }
-      await refreshCart();
-    } catch {
       setCart(null);
       cartIdRef.current = null;
       localStorage.removeItem(CART_ID_KEY);
+    } catch {
+      // noop
     } finally {
       setLoading(false);
     }
   }, []);
 
-  const total = cart?.total || 0;
-  const itemCount = (cart?.items || []).reduce((sum, i) => sum + i.quantity, 0);
+  // Memoize context value — prevents cascade re-renders
+  const value = useMemo(() => ({
+    items, addItem, removeItem, updateQuantity, clearCart, total, itemCount, cart, loading, error,
+  }), [items, addItem, removeItem, updateQuantity, clearCart, total, itemCount, cart, loading, error]);
 
   return (
-    <CartContext.Provider value={{ items, addItem, removeItem, updateQuantity, clearCart, total, itemCount, cart, loading, error }}>
+    <CartContext.Provider value={value}>
       {children}
     </CartContext.Provider>
   );

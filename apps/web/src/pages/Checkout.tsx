@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Lock, CreditCard, PawPrint, CheckCircle, Truck, Tag, Loader2,
@@ -61,12 +61,12 @@ export default function Checkout() {
   // CMS settings for trust badges
   const { settings } = useSiteSettings();
   const trustBadgeTitle = settings?.['checkout.trustBadges.title'] || 'All PawTag devices come with';
-  const trustBadgeItems: string[] = (() => {
+  const trustBadgeItems: string[] = useMemo(() => {
     try {
       const raw = settings?.['checkout.trustBadges.items'];
       return raw ? JSON.parse(raw) : ['Lifetime activation', 'Replace if lost', '24/7 support'];
     } catch { return ['Lifetime activation', 'Replace if lost', '24/7 support']; }
-  })();
+  }, [settings]);
 
   // Check verification status on mount
   useEffect(() => {

@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { ShoppingCart, PawPrint, Check, Shield, Smartphone, Wifi, Zap } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { PawPrint, Shield } from 'lucide-react';
 import { sdk } from '../lib/medusa';
 import { useCart } from '../context/CartContext';
 import { useCartInteraction } from '../context/CartInteractionContext';
@@ -70,6 +70,7 @@ export default function Shop() {
   const { settings } = useSiteSettings();
   const companyName = settings?.['company.name'] || 'PawTag';
   const navigate = useNavigate();
+  const { triggerFly } = useCartInteraction();
 
   useEffect(() => {
     sdk.store.product
@@ -79,13 +80,24 @@ export default function Shop() {
       .finally(() => setLoading(false));
   }, []);
 
-  const { triggerFly } = useCartInteraction();
+  // Memoized derived data — no recomputation unless products change
+  const cardProducts = useMemo(() => products.map(toCardProduct), [products]);
+  const features = useMemo(() => getComparisonFeatures(products), [products]);
 
+  const shopTitle = useMemo(() =>
+    (shopPage?.content as Record<string, unknown>)?.heroTitle as string || shopPage?.title || `Shop ${companyName}`,
+    [shopPage, companyName]
+  );
+  const shopDesc = useMemo(() =>
+    (shopPage?.content as Record<string, unknown>)?.heroDescription as string || shopPage?.subtitle || 'Choose the right PawTag for your pet. Each tag comes with 12 months free subscription.',
+    [shopPage]
+  );
+
+  // Stable callbacks — no new references unless dependencies change
   const handleAddToCart = useCallback((cardProduct: ProductCardProduct, e?: React.MouseEvent) => {
     const variant = products.find((p) => p.id === cardProduct.id)?.variants?.[0];
     if (!variant) return;
 
-    // Find the product image element for flying animation
     if (e) {
       const btn = e.currentTarget as HTMLElement;
       let parent = btn.parentElement;
@@ -112,8 +124,9 @@ export default function Shop() {
     setTimeout(() => setAddedId(null), 1000);
   }, [products, addItem, triggerFly]);
 
-  const shopTitle = (shopPage?.content as Record<string, unknown>)?.heroTitle as string || shopPage?.title || `Shop ${companyName}`;
-  const shopDesc = (shopPage?.content as Record<string, unknown>)?.heroDescription as string || shopPage?.subtitle || 'Choose the right PawTag for your pet. Each tag comes with 12 months free subscription.';
+  const handleDetails = useCallback((p: ProductCardProduct) => {
+    navigate(`/shop/${p.id}`);
+  }, [navigate]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -144,13 +157,13 @@ export default function Shop() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
-            {products.map((product) => (
+            {cardProducts.map((cp, i) => (
               <ProductCard
-                key={product.id}
-                product={toCardProduct(product)}
-                onAddToCart={(p, e) => handleAddToCart(p, e)}
-                onDetails={(p) => navigate(`/shop/${p.id}`)}
-                added={addedId === product.id}
+                key={products[i].id}
+                product={cp}
+                onAddToCart={handleAddToCart}
+                onDetails={handleDetails}
+                added={addedId === products[i].id}
               />
             ))}
           </div>
@@ -170,9 +183,6 @@ export default function Shop() {
                     <th className="text-left px-6 py-4 text-sm font-semibold text-gray-500 w-1/4">Feature</th>
                     {products.map((p) => {
                       const badge = getProductBadge(p.handle || '');
-                      const variant = p.variants?.[0] as Record<string, unknown> | undefined;
-                      const prices = variant?.prices as Array<{ amount?: number }> | undefined;
-                      const price = prices?.[0]?.amount || 0;
                       return (
                         <th key={p.id} className="text-center px-4 py-4 w-1/4">
                           <div className="flex flex-col items-center gap-1">
@@ -187,7 +197,7 @@ export default function Shop() {
                   </tr>
                 </thead>
                 <tbody>
-                  {getComparisonFeatures(products).map((feat, i) => (
+                  {features.map((feat, i) => (
                     <tr key={feat.key} className={i % 2 === 0 ? 'bg-gray-50/50' : ''}>
                       <td className="px-6 py-3 text-sm font-medium text-gray-700">{feat.label}</td>
                       <td className="px-4 py-3 text-center text-sm text-gray-600">{feat.scan}</td>

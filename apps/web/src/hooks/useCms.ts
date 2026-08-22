@@ -192,19 +192,35 @@ export function useCmsPage(slug: string) {
   return { page, loading, error };
 }
 
+// In-memory cache for settings — prevents 3 duplicate API calls per page load
+let _settingsCache: { data: SiteSettings; timestamp: number } | null = null;
+const SETTINGS_CACHE_TTL = 60_000; // 60 seconds
+
 // Hook for public settings
 export function useSiteSettings() {
-  const [settings, setSettings] = useState<SiteSettings>({});
-  const [loading, setLoading] = useState(true);
+  const [settings, setSettings] = useState<SiteSettings>(() =>
+    _settingsCache && Date.now() - _settingsCache.timestamp < SETTINGS_CACHE_TTL
+      ? _settingsCache.data
+      : {}
+  );
+  const [loading, setLoading] = useState(!_settingsCache || Date.now() - _settingsCache.timestamp >= SETTINGS_CACHE_TTL);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Skip fetch if cache is fresh
+    if (_settingsCache && Date.now() - _settingsCache.timestamp < SETTINGS_CACHE_TTL) {
+      setSettings(_settingsCache.data);
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
     setLoading(true);
     api.get('/public/cms/settings')
       .then((res) => {
         if (!cancelled) {
-          setSettings(res.data.data || {});
+          const data = res.data.data || {};
+          setSettings(data);
+          _settingsCache = { data, timestamp: Date.now() };
           setError(null);
         }
       })

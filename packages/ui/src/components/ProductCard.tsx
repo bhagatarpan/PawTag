@@ -24,7 +24,7 @@ export interface ProductCardProps {
   className?: string;
 }
 
-export function ProductCard({
+export const ProductCard = React.memo(function ProductCard({
   product,
   onAddToCart,
   onDetails,
@@ -111,4 +111,4 @@ export function ProductCard({
       </div>
     </div>
   );
-}
+});

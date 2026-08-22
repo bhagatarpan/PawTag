@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useMemo, useCallback, ReactNode } from 'react';
 import api from '../lib/api';
 import { User } from '../types';
 
@@ -33,7 +33,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [token]);
 
-  const login = async (email: string, password: string, captchaToken?: string, captchaAnswer?: string): Promise<any> => {
+  const login = useCallback(async (email: string, password: string, captchaToken?: string, captchaAnswer?: string): Promise<any> => {
     const payload: any = { email, password };
     if (captchaToken && captchaAnswer) {
       payload.captchaToken = captchaToken;
@@ -49,7 +49,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw error;
     }
 
-    // If MFA is required, return the data for the login page to handle
     if (data.data?.code === 'MFA_REQUIRED') {
       return data.data;
     }
@@ -62,16 +61,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(newToken);
     setUser(userData);
     return userData;
-  };
+  }, []);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     localStorage.removeItem('pawtag_token');
     localStorage.removeItem('pawtag_refresh_token');
     setToken(null);
     setUser(null);
-  };
+  }, []);
 
-  const refreshUser = async () => {
+  const refreshUser = useCallback(async () => {
     if (!token) return;
     try {
       const res = await api.get('/auth/me');
@@ -79,10 +78,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       // silently fail — token may be expired
     }
-  };
+  }, [token]);
+
+  // Memoize context value — prevents cascade re-renders to CartProvider and below
+  const value = useMemo(() => ({
+    user, token, login, logout, refreshUser, isLoading,
+  }), [user, token, isLoading, login, logout, refreshUser]);
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, refreshUser, isLoading }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
