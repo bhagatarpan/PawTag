@@ -91,6 +91,12 @@ export interface SiteSettings {
   'seo.defaultKeywords'?: string;
   'contact.businessHours'?: string;
   'contact.businessHoliday'?: string;
+  'checkout.trustBadges.title'?: string;
+  'checkout.trustBadges.items'?: string;
+  'checkout.otp.enabled'?: string;
+  'checkout.otp.expiryMinutes'?: string;
+  'checkout.otp.requireEmail'?: string;
+  'checkout.otp.requireSms'?: string;
 }
 
 // Hook for navigation

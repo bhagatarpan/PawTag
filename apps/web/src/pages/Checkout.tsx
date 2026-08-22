@@ -11,6 +11,7 @@ import api from '../lib/api';
 import { sdk } from '../lib/medusa';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
+import { useSiteSettings } from '../hooks/useCms';
 
 type Step = 'cart' | 'checkout' | 'payment' | 'confirmed';
 
@@ -56,6 +57,16 @@ export default function Checkout() {
   const [cardExpiry, setCardExpiry] = useState('');
   const [cardCvc, setCardCvc] = useState('');
   const [cardName, setCardName] = useState('');
+
+  // CMS settings for trust badges
+  const { settings } = useSiteSettings();
+  const trustBadgeTitle = settings?.['checkout.trustBadges.title'] || 'All PawTag devices come with';
+  const trustBadgeItems: string[] = (() => {
+    try {
+      const raw = settings?.['checkout.trustBadges.items'];
+      return raw ? JSON.parse(raw) : ['Lifetime activation', 'Replace if lost', '24/7 support'];
+    } catch { return ['Lifetime activation', 'Replace if lost', '24/7 support']; }
+  })();
 
   // Check verification status on mount
   useEffect(() => {
@@ -210,12 +221,15 @@ export default function Checkout() {
             <h1 className="text-2xl font-bold text-gray-900 mb-6">Your Cart</h1>
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="p-6 border-b border-gray-100">
-                <div className="flex items-center gap-2 text-sm text-gray-500 mb-4">
-                  <ShieldCheck className="h-4 w-4 text-primary-600" />
-                  <span>All PawTag devices come with</span>
-                  <Check className="h-3 w-3 text-green-500" /> <span className="text-gray-600">Lifetime activation</span>
-                  <Check className="h-3 w-3 text-green-500" /> <span className="text-gray-600">Replace if lost</span>
-                  <Check className="h-3 w-3 text-green-500" /> <span className="text-gray-600">24/7 support</span>
+                <div className="flex flex-wrap items-center gap-2 text-sm text-gray-500">
+                  <ShieldCheck className="h-4 w-4 text-primary-600 flex-shrink-0" />
+                  <span>{trustBadgeTitle}</span>
+                  {trustBadgeItems.map((item, i) => (
+                    <span key={i} className="flex items-center gap-1">
+                      <Check className="h-3 w-3 text-green-500 flex-shrink-0" />
+                      <span className="text-gray-600">{item}</span>
+                    </span>
+                  ))}
                 </div>
               </div>
 
@@ -255,16 +269,22 @@ export default function Checkout() {
 
               {/* Summary */}
               <div className="px-6 py-4 border-t border-gray-100">
-                <div className="flex gap-2 mb-4">
-                  <input type="text" value={promoCode} onChange={e => setPromoCode(e.target.value.toUpperCase())} placeholder="Add promo code" className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-primary-500" />
-                  <button onClick={applyPromoCode} disabled={!promoCode || promoLoading} className="px-4 py-2 text-sm text-primary-600 border border-primary-200 rounded-lg hover:bg-primary-50 disabled:opacity-50">
-                    {promoLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Apply'}
-                  </button>
-                </div>
-                {promoApplied && (
-                  <div className="flex items-center justify-between text-sm text-green-600 mb-2">
-                    <span>Promo applied: -NZ${discountAmount.toFixed(2)}</span>
-                    <button onClick={removePromoCode} className="text-xs text-gray-400 hover:text-red-500">Remove</button>
+                {/* Promo code section */}
+                {promoApplied ? (
+                  <div className="flex items-center justify-between text-sm mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <Tag className="h-4 w-4 text-green-600" />
+                      <span className="font-medium text-green-700">{promoCode}</span>
+                      <span className="text-green-600">applied — saved NZ${discountAmount.toFixed(2)}</span>
+                    </div>
+                    <button onClick={removePromoCode} className="text-xs text-gray-500 hover:text-red-500 font-medium ml-2">Remove</button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2 mb-4">
+                    <input type="text" value={promoCode} onChange={e => setPromoCode(e.target.value.toUpperCase())} placeholder="Add promo code" disabled={promoApplied} className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-primary-500 disabled:bg-gray-50 disabled:text-gray-400" />
+                    <button onClick={applyPromoCode} disabled={!promoCode || promoLoading || promoApplied} className="px-4 py-2 text-sm text-primary-600 border border-primary-200 rounded-lg hover:bg-primary-50 disabled:opacity-50">
+                      {promoLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Apply'}
+                    </button>
                   </div>
                 )}
                 <div className="space-y-2 pt-2">

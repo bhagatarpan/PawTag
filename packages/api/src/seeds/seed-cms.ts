@@ -75,6 +75,8 @@ async function run() {
         { key: 'emails.supportEmail', value: 'support@pawtag.co.nz', displayValue: 'Support Email', category: 'emails' },
         { key: 'checkout.defaultCountry', value: 'NZ', displayValue: 'Default Country', category: 'checkout' },
         { key: 'checkout.currencyLabel', value: 'NZD', displayValue: 'Currency', category: 'checkout' },
+        { key: 'checkout.trustBadges.title', value: 'All PawTag devices come with', displayValue: 'Trust Badge Title', category: 'checkout', description: 'Title shown in the trust badge section on cart/checkout' },
+        { key: 'checkout.trustBadges.items', value: JSON.stringify(['Lifetime activation', 'Replace if lost', '24/7 support']), displayValue: 'Trust Badge Items', category: 'checkout', description: 'JSON array of trust badge items shown on cart/checkout' },
         { key: 'checkout.otp.enabled', value: 'true', displayValue: 'Checkout OTP Verification', category: 'checkout', description: 'When true, users must verify via email + SMS OTP before checkout' },
         { key: 'checkout.otp.expiryMinutes', value: '15', displayValue: 'Checkout OTP Expiry (minutes)', category: 'checkout', description: 'How long checkout verification remains valid after both OTPs are verified' },
         { key: 'checkout.otp.requireEmail', value: 'true', displayValue: 'Require Email OTP', category: 'checkout', description: 'When true, email OTP is required for checkout verification' },
