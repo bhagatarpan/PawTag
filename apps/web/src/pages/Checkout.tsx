@@ -1,6 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Lock, CreditCard, PawPrint, CheckCircle, Truck, Tag, Loader2, Percent } from 'lucide-react';
+import {
+  ArrowLeft, Lock, CreditCard, PawPrint, CheckCircle, Truck, Tag, Loader2,
+  Mail, Smartphone, Shield, ChevronRight, Edit3, Check, Package, Clock,
+  ShieldCheck, Headphones, RefreshCw
+} from 'lucide-react';
 import { AddressAutocomplete } from '@pawtag/ui';
 import type { AddressComponents } from '@pawtag/ui';
 import api from '../lib/api';
@@ -8,77 +12,85 @@ import { sdk } from '../lib/medusa';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 
-const SHIPPING_ZONES = [
-  { value: 'city', label: 'NZ City / Suburb', cost: 7.99 },
-  { value: 'rural', label: 'Rural / Village', cost: 10.99 },
-] as const;
+type Step = 'cart' | 'checkout' | 'payment' | 'confirmed';
 
-const DEFAULT_BUNDLE_DISCOUNTS: Record<number, number> = {
-  2: 10,
-  3: 15,
-};
-
-function getBundleDiscountFromSettings(itemCount: number, settings: Record<string, string>): number {
-  if (itemCount >= 3) return parseInt(settings['pricing.bundle3Discount'] || '15', 10);
-  if (itemCount >= 2) return parseInt(settings['pricing.bundle2Discount'] || '10', 10);
-  return 0;
-}
+const STEPS = [
+  { key: 'cart' as Step, label: 'Cart', icon: Package },
+  { key: 'checkout' as Step, label: 'Checkout', icon: Truck },
+  { key: 'payment' as Step, label: 'Payment', icon: CreditCard },
+  { key: 'confirmed' as Step, label: 'Confirmed', icon: CheckCircle },
+];
 
 export default function Checkout() {
-  const { items, total, clearCart, cart } = useCart();
+  const { items, total, cart, clearCart } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
+
+  // Step management
+  const [currentStep, setCurrentStep] = useState<Step>('cart');
+
+  // Form state
   const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [orderNumber, setOrderNumber] = useState('');
-  const [shippingZone, setShippingZone] = useState<'city' | 'rural'>('city');
-  const [referralCode, setReferralCode] = useState('');
-  const [referralApplied, setReferralApplied] = useState(false);
+  const [success, setSuccess] = useState(false);
+
+  // Promo code
   const [promoCode, setPromoCode] = useState('');
   const [promoApplied, setPromoApplied] = useState(false);
   const [promoLoading, setPromoLoading] = useState(false);
   const [promoDiscount, setPromoDiscount] = useState(0);
-  const [bundleSettings, setBundleSettings] = useState<Record<string, string>>({});
-  const [paymentStep, setPaymentStep] = useState<'form' | 'processing' | 'success'>('form');
-  const [error, setError] = useState<string | null>(null);
+
+  // Verification status
+  const [emailVerified, setEmailVerified] = useState(false);
+  const [mobileVerified, setMobileVerified] = useState(false);
+
+  // Shipping address
   const [form, setForm] = useState({
-    line1: '',
-    line2: '',
-    city: '',
-    state: '',
-    zip: '',
-    country: 'NZ',
+    line1: '', line2: '', city: '', state: '', zip: '', country: 'NZ',
   });
+  const [useDifferentAddress, setUseDifferentAddress] = useState(false);
 
+  // Card details (demo mode)
+  const [cardNumber, setCardNumber] = useState('');
+  const [cardExpiry, setCardExpiry] = useState('');
+  const [cardCvc, setCardCvc] = useState('');
+  const [cardName, setCardName] = useState('');
+
+  // Check verification status on mount
   useEffect(() => {
-    api.get('/public/cms/settings')
-      .then((res) => setBundleSettings(res.data.data || {}))
-      .catch(() => {});
-  }, []);
+    if (user) {
+      setEmailVerified(!!user.emailVerified);
+      setMobileVerified(!!user.phoneVerified);
+    }
+  }, [user]);
 
-  // Calculate bundle discount using settings from admin panel
-  const tagItemCount = items.filter(i =>
-    i.name.toLowerCase().includes('pawtag') || i.name.toLowerCase().includes('tag')
-  ).reduce((sum, i) => sum + i.quantity, 0);
-  const bundleDiscountPercent = getBundleDiscountFromSettings(tagItemCount, bundleSettings);
-  const bundleDiscountAmount = bundleDiscountPercent > 0
-    ? Math.round(items.filter(i => i.name.toLowerCase().includes('pawtag') || i.name.toLowerCase().includes('tag'))
-        .reduce((sum, i) => sum + (i.price * i.quantity), 0) * (bundleDiscountPercent / 100) * 100) / 100
-    : 0;
+  // Derived values
+  const shippingCost = 0; // Free NZ shipping
+  const discountedSubtotal = total - promoDiscount;
+  const taxEstimate = Math.round(discountedSubtotal * 0.15 * 100) / 100;
+  const orderTotal = discountedSubtotal; // Tax included in NZ
 
-  const shippingCost = SHIPPING_ZONES.find((z) => z.value === shippingZone)?.cost || 7.99;
-  const discountedSubtotal = total - bundleDiscountAmount - promoDiscount;
-  const orderTotal = Math.max(0, discountedSubtotal + shippingCost);
+  const canProceedToCheckout = items.length > 0;
+  const canProceedToPayment = emailVerified && mobileVerified && form.line1 && form.city && form.zip;
+  const canPay = cardNumber.length >= 16 && cardExpiry.length >= 4 && cardCvc.length >= 3 && cardName.length > 2;
 
+  // Step navigation
+  const goToStep = (step: Step) => {
+    if (step === 'checkout' && !canProceedToCheckout) return;
+    if (step === 'payment' && !canProceedToPayment) return;
+    setCurrentStep(step);
+    setError(null);
+  };
+
+  // Promo code handlers
   const applyPromoCode = async () => {
-    if (!promoCode || promoCode.length < 3) return;
+    if (!promoCode || !cart) return;
     setPromoLoading(true);
     try {
-      const { cart: updatedCart } = await sdk.store.cart.addPromotions(cart.id, {
-        promo_codes: [promoCode],
-      } as any);
+      const { cart: updated } = await sdk.store.cart.addPromotions(cart.id, { promo_codes: [promoCode] } as any);
       setPromoApplied(true);
-      setPromoDiscount(updatedCart?.discount_total || 0);
+      setPromoDiscount(updated?.discount_total || 0);
     } catch (err: any) {
       setError(err.message || 'Invalid promo code');
     } finally {
@@ -87,6 +99,7 @@ export default function Checkout() {
   };
 
   const removePromoCode = async () => {
+    if (!cart) return;
     try {
       await sdk.store.cart.removePromotions(cart.id, { promo_codes: [promoCode] } as any);
       setPromoApplied(false);
@@ -97,92 +110,51 @@ export default function Checkout() {
     }
   };
 
+  // Address handler
   const handleAddressSelect = (address: AddressComponents) => {
     setForm(prev => ({
       ...prev,
-      line1: address.line1,
-      line2: address.line2,
-      city: address.city,
-      state: address.state,
-      zip: address.zip,
-      country: address.country || 'NZ',
+      line1: address.line1, line2: address.line2 || '',
+      city: address.city, state: address.state,
+      zip: address.zip, country: address.country || 'NZ',
     }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user) {
-      localStorage.setItem('pawtag_return_url', '/checkout');
-      navigate('/login');
-      return;
-    }
-    if (items.length === 0) return;
-
+  // Payment handler
+  const handlePayment = async () => {
+    if (!user || !canPay) return;
     setLoading(true);
-    setPaymentStep('processing');
+    setError(null);
     try {
-      // Step 1: Create order (returns pending_payment status + clientSecret)
       const res = await api.post('/customer/orders', {
-        shippingAddress: { ...form, shippingZone },
+        shippingAddress: form,
         paymentMethod: 'card',
-        referralCode: referralApplied ? referralCode : undefined,
       });
-
       const orderData = res.data.data;
       setOrderNumber(orderData.orderNumber);
 
-      // Step 2: In demo mode, simulate payment confirmation
-      // In real mode, this would use Stripe.js to confirmCardPayment(clientSecret)
+      // Demo mode: confirm payment
       if (orderData.clientSecret?.includes('demo')) {
-        // Demo mode: call confirm-payment endpoint
         await api.post(`/customer/orders/${orderData.orderNumber}/confirm-payment`);
-      } else {
-        // Real Stripe mode: would use Stripe.js here
-        // const stripe = await loadStripe(process.env.REACT_APP_STRIPE_PUBLIC_KEY!);
-        // await stripe?.confirmCardPayment(orderData.clientSecret, { ... });
       }
 
       setSuccess(true);
-      setPaymentStep('success');
+      setCurrentStep('confirmed');
       clearCart();
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to place order');
-      setPaymentStep('form');
+      setError(err.response?.data?.error || 'Payment failed');
     } finally {
       setLoading(false);
     }
   };
 
-  if (success || paymentStep === 'success') {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full text-center">
-          <div className="h-16 w-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <CheckCircle className="h-10 w-10 text-green-600" />
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Payment Confirmed!</h1>
-          <p className="text-gray-500 mb-4">Thank you for your order.</p>
-          <p className="text-lg font-mono font-semibold text-teal-700 mb-6">{orderNumber}</p>
-          <p className="text-sm text-gray-400 mb-6">We'll send you an email confirmation shortly.</p>
-          <div className="flex gap-3">
-            <Link to="/" className="flex-1 py-3 border border-gray-300 rounded-xl text-gray-700 font-medium hover:bg-gray-50 transition-all text-center">
-              Back to Home
-            </Link>
-            <Link to="/shop" className="flex-1 py-3 bg-teal-600 text-white rounded-xl font-medium hover:bg-teal-700 transition-all text-center">
-              Continue Shopping
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (items.length === 0) {
+  // Empty cart
+  if (items.length === 0 && !success) {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-4 p-4">
         <PawPrint className="h-16 w-16 text-gray-300" />
         <h2 className="text-xl font-semibold text-gray-700">Your cart is empty</h2>
-        <Link to="/shop" className="text-teal-600 hover:text-teal-700 font-medium">← Back to Shop</Link>
+        <Link to="/shop" className="text-primary-600 hover:text-primary-700 font-medium">← Back to Shop</Link>
       </div>
     );
   }
@@ -190,11 +162,35 @@ export default function Checkout() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Link to="/shop" className="inline-flex items-center gap-2 text-gray-500 hover:text-teal-600 mb-8">
-          <ArrowLeft className="h-4 w-4" /> Back to Shop
-        </Link>
-
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">Checkout</h1>
+        {/* Step Indicator */}
+        <div className="flex items-center justify-center mb-8">
+          {STEPS.map((step, i) => {
+            const isActive = currentStep === step.key;
+            const isComplete = STEPS.findIndex(s => s.key === currentStep) > i;
+            const StepIcon = step.icon;
+            return (
+              <div key={step.key} className="flex items-center">
+                <button
+                  onClick={() => goToStep(step.key)}
+                  disabled={!isComplete && !isActive}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                    isActive
+                      ? 'bg-primary-600 text-white'
+                      : isComplete
+                      ? 'bg-primary-100 text-primary-700'
+                      : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  }`}
+                >
+                  {isComplete ? <Check className="h-4 w-4" /> : <StepIcon className="h-4 w-4" />}
+                  <span className="hidden sm:inline">{step.label}</span>
+                </button>
+                {i < STEPS.length - 1 && (
+                  <div className={`w-8 h-px mx-2 ${isComplete ? 'bg-primary-300' : 'bg-gray-200'}`} />
+                )}
+              </div>
+            );
+          })}
+        </div>
 
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700 flex items-center justify-between mb-6">
@@ -203,205 +199,267 @@ export default function Checkout() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Shipping Form */}
-          <div className="lg:col-span-2">
-            <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm p-8 space-y-6">
-              <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
-                <Lock className="h-5 w-5 text-teal-600" /> Shipping Address
-              </h2>
+        {/* Step 1: Cart Review */}
+        {currentStep === 'cart' && (
+          <div className="max-w-4xl mx-auto">
+            <h1 className="text-2xl font-bold text-gray-900 mb-6">Your Cart</h1>
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="p-6 border-b border-gray-100">
+                <div className="flex items-center gap-2 text-sm text-gray-500 mb-4">
+                  <ShieldCheck className="h-4 w-4 text-primary-600" />
+                  <span>All PawTag devices come with</span>
+                  <Check className="h-3 w-3 text-green-500" /> <span className="text-gray-600">Lifetime activation</span>
+                  <Check className="h-3 w-3 text-green-500" /> <span className="text-gray-600">Replace if lost</span>
+                  <Check className="h-3 w-3 text-green-500" /> <span className="text-gray-600">24/7 support</span>
+                </div>
+              </div>
 
-              {!user && (
-                <p className="text-sm text-amber-600 bg-amber-50 rounded-lg p-3">
-                  Please <Link to="/login" className="underline font-medium">sign in</Link> to complete your order.{' '}
-                  Don't have an account?{' '}
-                  <Link to="/register" className="underline font-medium">Create one</Link>
-                </p>
-              )}
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Address Line 1 *</label>
-                  <AddressAutocomplete
-                    value={form.line1}
-                    onChange={(val) => setForm(prev => ({ ...prev, line1: val }))}
-                    onAddressSelect={handleAddressSelect}
-                    placeholder="123 Main Street"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Address Line 2</label>
-                  <input type="text" value={form.line2} onChange={(e) => setForm({ ...form, line2: e.target.value })} className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-teal-500 focus:border-teal-500" placeholder="Apartment, suite, etc." />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">City *</label>
-                    <input type="text" required value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-teal-500 focus:border-teal-500" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Region *</label>
-                    <input type="text" required value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-teal-500 focus:border-teal-500" placeholder="e.g. Auckland" />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Postcode *</label>
-                    <input type="text" required value={form.zip} onChange={(e) => setForm({ ...form, zip: e.target.value })} className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-teal-500 focus:border-teal-500" placeholder="e.g. 6011" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
-                    <input type="text" value={form.country} onChange={(e) => setForm(prev => ({ ...prev, country: e.target.value }))} className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-teal-500 focus:border-teal-500" placeholder="NZ" />
-                  </div>
-                </div>
-
-                {/* Shipping Zone */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    <Truck className="inline h-4 w-4 mr-1" /> Shipping Zone *
-                  </label>
-                  <div className="grid grid-cols-2 gap-3">
-                    {SHIPPING_ZONES.map((zone) => (
-                      <button
-                        key={zone.value}
-                        type="button"
-                        onClick={() => setShippingZone(zone.value)}
-                        className={`p-4 rounded-xl border-2 text-left transition-all ${
-                          shippingZone === zone.value
-                            ? 'border-teal-500 bg-teal-50 ring-2 ring-teal-200'
-                            : 'border-gray-200 hover:border-gray-300'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium text-gray-900">{zone.label}</span>
-                          <span className="text-sm font-bold text-teal-700">${zone.cost.toFixed(2)}</span>
-                        </div>
-                      </button>
+              {/* Items Table */}
+              <div className="px-6">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-gray-100">
+                      <th className="text-left py-3 text-sm font-semibold text-gray-500">Item</th>
+                      <th className="text-right py-3 text-sm font-semibold text-gray-500">Price</th>
+                      <th className="text-center py-3 text-sm font-semibold text-gray-500">Qty</th>
+                      <th className="text-right py-3 text-sm font-semibold text-gray-500">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {items.map((item) => (
+                      <tr key={item.variantId} className="border-b border-gray-50">
+                        <td className="py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="h-14 w-14 bg-primary-50 rounded-lg flex-shrink-0 flex items-center justify-center overflow-hidden">
+                              {item.image ? <img src={item.image} alt="" className="h-full w-full object-cover" /> : <PawPrint className="h-6 w-6 text-primary-300" />}
+                            </div>
+                            <div>
+                              <p className="font-medium text-gray-900">{item.name}</p>
+                              <p className="text-xs text-gray-500">{item.quantity > 1 ? `Qty: ${item.quantity}` : ''}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="text-right text-sm text-gray-600">NZ${item.price.toFixed(2)}</td>
+                        <td className="text-center text-sm text-gray-600">{item.quantity}</td>
+                        <td className="text-right text-sm font-semibold text-gray-900">NZ${(item.price * item.quantity).toFixed(2)}</td>
+                      </tr>
                     ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Summary */}
+              <div className="px-6 py-4 border-t border-gray-100">
+                <div className="flex gap-2 mb-4">
+                  <input type="text" value={promoCode} onChange={e => setPromoCode(e.target.value.toUpperCase())} placeholder="Add promo code" className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-primary-500" />
+                  <button onClick={applyPromoCode} disabled={!promoCode || promoLoading} className="px-4 py-2 text-sm text-primary-600 border border-primary-200 rounded-lg hover:bg-primary-50 disabled:opacity-50">
+                    {promoLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Apply'}
+                  </button>
+                </div>
+                {promoApplied && (
+                  <div className="flex items-center justify-between text-sm text-green-600 mb-2">
+                    <span>Promo applied: -NZ${promoDiscount.toFixed(2)}</span>
+                    <button onClick={removePromoCode} className="text-xs text-gray-400 hover:text-red-500">Remove</button>
                   </div>
+                )}
+                <div className="space-y-2 pt-2">
+                  <div className="flex justify-between text-sm text-gray-600"><span>Subtotal</span><span>NZ${total.toFixed(2)}</span></div>
+                  {promoDiscount > 0 && <div className="flex justify-between text-sm text-green-600"><span>Discount</span><span>-NZ${promoDiscount.toFixed(2)}</span></div>}
+                  <div className="flex justify-between text-sm text-gray-600"><span>Shipping</span><span className="text-green-600 font-medium">FREE</span></div>
+                  <div className="flex justify-between text-sm text-gray-600"><span>Tax (Included)</span><span>NZ${taxEstimate.toFixed(2)}</span></div>
+                  <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-100"><span>Total (NZD)</span><span className="text-primary-700">NZ${orderTotal.toFixed(2)}</span></div>
                 </div>
               </div>
 
-              <button type="submit" disabled={loading || !user || items.length === 0} className="w-full py-4 bg-teal-600 text-white rounded-xl font-semibold text-lg hover:bg-teal-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2">
-                {paymentStep === 'processing' ? (
-                  <>
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                    Processing Payment...
-                  </>
-                ) : (
-                  <>
-                    <CreditCard className="h-5 w-5" />
-                    {`Pay $${orderTotal.toFixed(2)}`}
-                  </>
-                )}
-              </button>
-
-              <p className="text-xs text-gray-400 text-center">
-                Secure payment powered by Stripe. Demo mode for testing.
-              </p>
-            </form>
-          </div>
-
-          {/* Order Summary */}
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-2xl shadow-sm p-6 sticky top-24">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Order Summary</h2>
-              <div className="space-y-4 mb-6">
-                {items.map((item) => (
-                  <div key={item.productId} className="flex gap-3">
-                    <div className="h-16 w-16 bg-teal-50 rounded-lg flex-shrink-0 flex items-center justify-center">
-                      {item.image ? <img src={item.image} alt="" className="h-full w-full object-cover rounded-lg" /> : <PawPrint className="h-6 w-6 text-teal-300" />}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 truncate">{item.name}</p>
-                      {item.petName && <p className="text-xs text-teal-600">For: {item.petName}</p>}
-                      <p className="text-sm text-gray-500">Qty: {item.quantity}</p>
-                    </div>
-                    <p className="text-sm font-semibold text-gray-900">${(item.price * item.quantity).toFixed(2)}</p>
-                  </div>
-                ))}
-              </div>
-              <div className="border-t border-gray-100 pt-4 space-y-2">
-                <div className="flex justify-between text-sm text-gray-500">
-                  <span>Subtotal</span>
-                  <span>${total.toFixed(2)}</span>
+              <div className="px-6 py-4 border-t border-gray-100 bg-gray-50">
+                <div className="flex items-center gap-2 text-xs text-gray-500 mb-4">
+                  <Lock className="h-4 w-4" /> <span>Secure & Trusted Checkout</span>
                 </div>
-                {bundleDiscountAmount > 0 && (
-                  <div className="flex justify-between text-sm text-green-600 font-medium">
-                    <span className="flex items-center gap-1"><Tag size={14} /> Bundle Discount ({bundleDiscountPercent}%)</span>
-                    <span>-${bundleDiscountAmount.toFixed(2)}</span>
-                  </div>
-                )}
-                <div className="flex justify-between text-sm text-gray-500">
-                  <span>Shipping ({SHIPPING_ZONES.find((z) => z.value === shippingZone)?.label})</span>
-                  <span>${shippingCost.toFixed(2)}</span>
+                <p className="text-xs text-gray-400 mb-4">Your information is encrypted and safe with us. We never store your card details.</p>
+                <div className="flex items-center gap-4 text-xs text-gray-400 mb-4">
+                  <span className="flex items-center gap-1"><Lock className="h-3 w-3" /> SSL Encrypted</span>
+                  <span className="flex items-center gap-1"><Shield className="h-3 w-3" /> PCI DSS Compliant</span>
+                  <span className="flex items-center gap-1">Powered by medusa</span>
                 </div>
-
-                {/* Promo Code */}
-                <div className="pt-2">
-                  {promoApplied ? (
-                    <div className="flex items-center justify-between text-sm text-green-600">
-                      <span className="flex items-center gap-1"><Percent size={14} /> Promo code applied (-${promoDiscount.toFixed(2)})</span>
-                      <button onClick={removePromoCode} className="text-xs text-gray-400 hover:text-red-500">Remove</button>
-                    </div>
-                  ) : (
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={promoCode}
-                        onChange={e => setPromoCode(e.target.value.toUpperCase())}
-                        placeholder="Promo code"
-                        className="flex-1 px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-teal-500"
-                      />
-                      <button
-                        type="button"
-                        onClick={applyPromoCode}
-                        disabled={promoCode.length < 3 || promoLoading}
-                        className="px-3 py-1.5 text-sm text-teal-600 border border-teal-200 rounded-lg hover:bg-teal-50 disabled:opacity-50 flex items-center gap-1"
-                      >
-                        {promoLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
-                        Apply
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                {/* Referral Code */}
-                <div className="pt-2">
-                  {referralApplied ? (
-                    <div className="flex items-center justify-between text-sm text-green-600">
-                      <span className="flex items-center gap-1"><Tag size={14} /> Referral code applied</span>
-                      <button onClick={() => { setReferralApplied(false); setReferralCode(''); }} className="text-xs text-gray-400 hover:text-red-500">Remove</button>
-                    </div>
-                  ) : (
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={referralCode}
-                        onChange={e => setReferralCode(e.target.value.toUpperCase())}
-                        placeholder="Referral code"
-                        className="flex-1 px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-teal-500"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => { if (referralCode.length >= 6) setReferralApplied(true); }}
-                        disabled={referralCode.length < 6}
-                        className="px-3 py-1.5 text-sm text-teal-600 border border-teal-200 rounded-lg hover:bg-teal-50 disabled:opacity-50"
-                      >Apply</button>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-100">
-                  <span>Total</span>
-                  <span className="text-teal-700">${orderTotal.toFixed(2)}</span>
-                </div>
-                {bundleDiscountAmount > 0 && (
-                  <p className="text-xs text-green-600 text-right">You save ${bundleDiscountAmount.toFixed(2)} with bundle pricing!</p>
-                )}
+                <button onClick={() => goToStep('checkout')} className="w-full py-3 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 transition-all flex items-center justify-center gap-2">
+                  Proceed to Checkout <ChevronRight className="h-4 w-4" />
+                </button>
               </div>
             </div>
           </div>
-        </div>
+        )}
+
+        {/* Step 2: Checkout (Verification + Address) */}
+        {currentStep === 'checkout' && (
+          <div className="max-w-4xl mx-auto">
+            <div className="flex items-center justify-between mb-6">
+              <Link to="/shop" className="inline-flex items-center gap-2 text-gray-500 hover:text-primary-600 text-sm"><ArrowLeft className="h-4 w-4" /> Back to Shop</Link>
+              <button onClick={() => goToStep('cart')} className="text-sm text-primary-600 hover:text-primary-700">Edit Cart</button>
+            </div>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">Checkout</h1>
+            <p className="text-gray-500 mb-6">Verify your contact details and shipping address</p>
+
+            <div className="max-w-2xl">
+              {/* Contact Verification */}
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-4">
+                <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2"><Mail className="h-5 w-5 text-primary-600" /> Contact Verification</h2>
+
+                <div className={`flex items-center justify-between p-4 rounded-xl mb-3 ${emailVerified ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'}`}>
+                  <div className="flex items-center gap-3">
+                    <Mail className={`h-5 w-5 ${emailVerified ? 'text-green-600' : 'text-gray-400'}`} />
+                    <div><p className="font-medium text-gray-900">Email Verification</p><p className="text-xs text-gray-500">{user?.email || 'Not set'}</p></div>
+                  </div>
+                  {emailVerified ? <span className="text-sm text-green-600 font-medium flex items-center gap-1"><Check className="h-4 w-4" /> Verified</span> : <span className="text-sm text-amber-600 font-medium">Not Verified</span>}
+                </div>
+
+                <div className={`flex items-center justify-between p-4 rounded-xl mb-4 ${mobileVerified ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'}`}>
+                  <div className="flex items-center gap-3">
+                    <Smartphone className={`h-5 w-5 ${mobileVerified ? 'text-green-600' : 'text-gray-400'}`} />
+                    <div><p className="font-medium text-gray-900">Mobile Verification</p><p className="text-xs text-gray-500">{user?.phoneNumber || 'Not set'}</p></div>
+                  </div>
+                  {mobileVerified ? <span className="text-sm text-green-600 font-medium flex items-center gap-1"><Check className="h-4 w-4" /> Verified</span> : <span className="text-sm text-amber-600 font-medium">Not Verified</span>}
+                </div>
+
+                {!emailVerified && <Link to="/verify-account" className="block w-full py-2 text-center text-sm text-primary-600 border border-primary-200 rounded-lg hover:bg-primary-50 mb-2">Verify Email</Link>}
+                {!mobileVerified && <Link to="/verify-account" className="block w-full py-2 text-center text-sm text-primary-600 border border-primary-200 rounded-lg hover:bg-primary-50">Verify Mobile</Link>}
+
+                <div className="bg-primary-50 border border-primary-100 rounded-xl p-4 mt-4">
+                  <div className="flex items-start gap-2"><Shield className="h-4 w-4 text-primary-600 mt-0.5" /><p className="text-xs text-primary-700"><strong>Why do we verify?</strong> We use verified email & mobile to secure your account, send important updates and help reunite pets faster.</p></div>
+                </div>
+              </div>
+
+              {/* Shipping Address */}
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2"><Truck className="h-5 w-5 text-primary-600" /> Shipping Address</h2>
+                  {form.line1 && <button onClick={() => setUseDifferentAddress(!useDifferentAddress)} className="text-sm text-primary-600 hover:text-primary-700 flex items-center gap-1"><Edit3 className="h-3 w-3" /> Edit</button>}
+                </div>
+
+                {!useDifferentAddress && form.line1 ? (
+                  <div className="p-4 bg-gray-50 rounded-xl">
+                    <p className="font-medium text-gray-900">{user?.fullName}</p>
+                    <p className="text-sm text-gray-600">{form.line1}{form.line2 ? `, ${form.line2}` : ''}</p>
+                    <p className="text-sm text-gray-600">{form.city} {form.zip}</p>
+                    <p className="text-sm text-gray-600">New Zealand</p>
+                    {user?.phoneNumber && <p className="text-sm text-gray-600 mt-1">{user.phoneNumber}</p>}
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Address Line 1 *</label>
+                      <AddressAutocomplete value={form.line1} onChange={(val) => setForm(prev => ({ ...prev, line1: val }))} onAddressSelect={handleAddressSelect} placeholder="123 Main Street" />
+                    </div>
+                    <div><label className="block text-sm font-medium text-gray-700 mb-1">Address Line 2</label><input type="text" value={form.line2} onChange={e => setForm({ ...form, line2: e.target.value })} className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm" placeholder="Apartment, suite, etc." /></div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div><label className="block text-sm font-medium text-gray-700 mb-1">City *</label><input type="text" required value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 text-sm" /></div>
+                      <div><label className="block text-sm font-medium text-gray-700 mb-1">Postcode *</label><input type="text" required value={form.zip} onChange={e => setForm({ ...form, zip: e.target.value })} className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 text-sm" /></div>
+                    </div>
+                    <label className="flex items-center gap-2 text-sm text-gray-600">
+                      <input type="checkbox" checked={useDifferentAddress} onChange={e => setUseDifferentAddress(e.target.checked)} className="rounded border-gray-300 text-primary-600" />
+                      Use a different shipping address
+                    </label>
+                  </div>
+                )}
+
+                <button onClick={() => goToStep('payment')} disabled={!canProceedToPayment} className="w-full mt-6 py-3 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2">
+                  Continue to Payment <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Step 3: Review & Pay */}
+        {currentStep === 'payment' && (
+          <div className="max-w-5xl mx-auto">
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">Review & Pay</h1>
+            <p className="text-gray-500 mb-6">Review your order and complete payment</p>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Left: Order Summary */}
+              <div className="space-y-4">
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                  <h2 className="text-lg font-semibold text-gray-900 mb-4">Order Summary</h2>
+                  <button onClick={() => goToStep('cart')} className="text-sm text-primary-600 hover:text-primary-700 mb-4">Edit Cart</button>
+                  {items.map((item) => (
+                    <div key={item.variantId} className="flex gap-3 mb-4 pb-4 border-b border-gray-100 last:border-0">
+                      <div className="h-14 w-14 bg-primary-50 rounded-lg flex-shrink-0 flex items-center justify-center overflow-hidden">
+                        {item.image ? <img src={item.image} alt="" className="h-full w-full object-cover" /> : <PawPrint className="h-6 w-6 text-primary-300" />}
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-medium text-gray-900">{item.name}</p>
+                        <p className="text-xs text-gray-500">Qty: {item.quantity}</p>
+                      </div>
+                      <p className="font-semibold text-gray-900">NZ${(item.price * item.quantity).toFixed(2)}</p>
+                    </div>
+                  ))}
+                  <div className="space-y-2 pt-4">
+                    <div className="flex justify-between text-sm"><span className="text-gray-600">Subtotal</span><span className="text-gray-900">NZ${total.toFixed(2)}</span></div>
+                    {promoDiscount > 0 && <div className="flex justify-between text-sm"><span className="text-green-600">Discount</span><span className="text-green-600">-NZ${promoDiscount.toFixed(2)}</span></div>}
+                    <div className="flex justify-between text-sm"><span className="text-gray-600">Shipping</span><span className="text-green-600 font-medium">FREE</span></div>
+                    <div className="flex justify-between text-sm"><span className="text-gray-600">Tax (Included)</span><span className="text-gray-900">NZ${taxEstimate.toFixed(2)}</span></div>
+                    <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-100"><span>Total (NZD)</span><span className="text-primary-700">NZ${orderTotal.toFixed(2)}</span></div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right: Payment Method */}
+              <div className="space-y-4">
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                  <h2 className="text-lg font-semibold text-gray-900 mb-4">Payment Method</h2>
+                  <div className="space-y-3 mb-6">
+                    <label className="flex items-center gap-3 p-3 border-2 border-primary-500 bg-primary-50 rounded-xl cursor-pointer">
+                      <input type="radio" name="payment" defaultChecked className="text-primary-600" />
+                      <CreditCard className="h-5 w-5 text-primary-600" />
+                      <span className="font-medium text-gray-900">Credit / Debit Card</span>
+                      <div className="ml-auto flex gap-1">
+                        <span className="text-xs bg-gray-100 px-2 py-1 rounded">VISA</span>
+                        <span className="text-xs bg-gray-100 px-2 py-1 rounded">MC</span>
+                      </div>
+                    </label>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div><label className="block text-sm font-medium text-gray-700 mb-1">Card Number</label><input type="text" value={cardNumber} onChange={e => setCardNumber(e.target.value.replace(/\D/g, '').replace(/(.{4})/g, '$1 ').trim())} maxLength={19} placeholder="1234 1234 1234 1234" className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 font-mono text-sm" /></div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div><label className="block text-sm font-medium text-gray-700 mb-1">Expiry Date</label><input type="text" value={cardExpiry} onChange={e => { let v = e.target.value.replace(/\D/g, ''); if (v.length > 2) v = v.slice(0, 2) + '/' + v.slice(2); setCardExpiry(v); }} maxLength={5} placeholder="MM / YY" className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 text-sm" /></div>
+                      <div><label className="block text-sm font-medium text-gray-700 mb-1">CVC</label><input type="text" value={cardCvc} onChange={e => setCardCvc(e.target.value.replace(/\D/g, ''))} maxLength={4} placeholder="123" className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 text-sm" /></div>
+                    </div>
+                    <div><label className="block text-sm font-medium text-gray-700 mb-1">Name on Card</label><input type="text" value={cardName} onChange={e => setCardName(e.target.value)} placeholder="Arpan Bhagat" className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 text-sm" /></div>
+                  </div>
+                </div>
+
+                {/* Trust badges */}
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="text-center p-3 bg-gray-50 rounded-xl"><RefreshCw className="h-5 w-5 text-primary-600 mx-auto mb-1" /><p className="text-xs font-medium text-gray-900">60-Day Returns</p><p className="text-xs text-gray-500">Easy returns & refunds</p></div>
+                  <div className="text-center p-3 bg-gray-50 rounded-xl"><Lock className="h-5 w-5 text-primary-600 mx-auto mb-1" /><p className="text-xs font-medium text-gray-900">Secure Payments</p><p className="text-xs text-gray-500">100% secure checkout</p></div>
+                  <div className="text-center p-3 bg-gray-50 rounded-xl"><Headphones className="h-5 w-5 text-primary-600 mx-auto mb-1" /><p className="text-xs font-medium text-gray-900">24/7 Support</p><p className="text-xs text-gray-500">We're here to help</p></div>
+                </div>
+
+                <button onClick={handlePayment} disabled={!canPay || loading} className="w-full py-4 bg-primary-600 text-white rounded-xl font-semibold text-lg hover:bg-primary-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2">
+                  {loading ? <><Loader2 className="h-5 w-5 animate-spin" /> Processing...</> : <><Lock className="h-5 w-5" /> Pay NZ${orderTotal.toFixed(2)}</>}
+                </button>
+                <p className="text-xs text-gray-400 text-center">By placing this order, you agree to our <Link to="/terms" className="underline">Terms of Service</Link> and <Link to="/privacy" className="underline">Privacy Policy</Link>.</p>
+                <p className="text-xs text-gray-400 text-center">Powered by medusa</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Step 4: Confirmed */}
+        {currentStep === 'confirmed' && (
+          <div className="max-w-lg mx-auto py-12 text-center">
+            <div className="h-20 w-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6"><CheckCircle className="h-12 w-12 text-green-600" /></div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Payment Confirmed!</h1>
+            <p className="text-gray-500 mb-2">Thank you for your order.</p>
+            <p className="text-xl font-mono font-bold text-primary-700 mb-4">{orderNumber}</p>
+            <p className="text-sm text-gray-400 mb-8">We'll send you an email confirmation shortly.</p>
+            <div className="flex gap-3 justify-center">
+              <Link to="/" className="px-6 py-3 border border-gray-300 rounded-xl text-gray-700 font-medium hover:bg-gray-50 transition-all">Back to Home</Link>
+              <Link to="/shop" className="px-6 py-3 bg-primary-600 text-white rounded-xl font-medium hover:bg-primary-700 transition-all">Continue Shopping</Link>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

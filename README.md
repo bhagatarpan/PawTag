@@ -581,13 +581,16 @@ sequenceDiagram
     Owner->>Pet: Status set to "safe"
 ```
 
-### E-Commerce Flow
+### E-Commerce Flow (4-Step Checkout Wizard)
 
-1. Browse shop (Medusa products via SDK) → add to cart (Medusa server-side cart)
-2. Checkout → dual OTP verification → Stripe payment
-3. Order confirmed → Medusa webhook → PawTag order created
-4. Fulfillment → shipping label → tracking
-5. Delivered → customer activates tag
+1. **Cart** — Review items, apply promo code, see totals
+2. **Checkout** — Contact verification (email + mobile verified), shipping address
+3. **Payment** — Order summary, Stripe card form, pay button
+4. **Confirmed** — Success page with order number
+
+**Verification gate:** Users must have both email and mobile verified before proceeding to payment. The checkout page checks `user.emailVerified` and `user.phoneVerified` and shows verification status with links to verify.
+
+**Payment:** Stripe demo mode (no real key = simulated success). Real Stripe when key is configured.
 
 ### Product Management
 

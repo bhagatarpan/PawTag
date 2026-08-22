@@ -457,6 +457,19 @@ MedusaJS v2.19.0 runs in `apps/medusa` (port 9000). Key components:
 PawTag API webhooks: `packages/api/src/routes/medusa-webhooks.ts`
 Customer sync: `packages/api/src/services/medusa-sync.service.ts`
 
+### Checkout Flow (4-Step Wizard)
+
+The checkout page (`apps/web/src/pages/Checkout.tsx`) implements a 4-step wizard:
+
+1. **Cart** — Review items, apply promo code, see totals
+2. **Checkout** — Contact verification (email + mobile), shipping address
+3. **Payment** — Order summary, Stripe card form, pay button
+4. **Confirmed** — Success page with order number
+
+**Verification gate:** Users must have both email and mobile verified before proceeding to payment. The checkout page checks `user.emailVerified` and `user.phoneVerified` and shows verification status with links to verify.
+
+**Payment:** Stripe demo mode (no real key = simulated success). Real Stripe when key is configured.
+
 ## Development Commands
 
 ```bash

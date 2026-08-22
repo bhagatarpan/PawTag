@@ -79,6 +79,8 @@ export interface User {
   fullName: string;
   role: string;
   phoneNumber?: string;
+  emailVerified?: boolean;
+  phoneVerified?: boolean;
   address?: {
     line1: string;
     line2?: string;

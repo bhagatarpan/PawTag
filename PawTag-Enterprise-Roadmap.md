@@ -106,7 +106,7 @@ I did not assume. Each line below reflects what I found reading the real route f
 | 1 | Visits website | ✅ Exists | `apps/web` |
 | 2 | Browses products | ✅ Exists | `Product` model, shop routes |
 | 3 | Adds tag to cart | ✅ Exists | `Cart` model, `/customer/cart/items` |
-| 4 | Checkout | ✅ Exists | `/customer/orders` (POST), address validation |
+| 4 | Checkout | ✅ 4-Step Wizard | Cart → Checkout (verification + address) → Payment (Stripe) → Confirmed |
 | 5 | Payment | ⚠️ Partial | Stripe wired but runs in demo mode; order is marked `paid` right after a PaymentIntent is *created*, not after it's *confirmed* client-side. **Financial integrity gap — Phase 5.** |
 | 6 | Order confirmation | ⚠️ Partial | Email service exists with templates; not confirmed to fire automatically on order creation — verify/wire in Phase 5. |
 | 7 | Invoice | ⚠️ Partial | `Invoice` + `InvoiceAccessToken` models exist (a customer-facing invoice link system is already designed) but **no PDF generation** found. **Phase 15.** |
