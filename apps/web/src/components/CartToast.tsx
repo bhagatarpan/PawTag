@@ -18,7 +18,7 @@ export default function CartToast() {
           clearLastAddedItem();
           setDisplayItem(null);
         }, 300); // Wait for exit animation
-      }, 2500);
+      }, 3500);
 
       return () => clearTimeout(timer);
     }

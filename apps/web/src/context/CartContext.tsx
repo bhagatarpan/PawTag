@@ -47,7 +47,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [lastAddedItem, setLastAddedItem] = useState<AddedItem | null>(null);
   const cartIdRef = useRef<string | null>(null);
 
-  const getCartId = (): string | null => cartIdRef.current || localStorage.getItem(CART_ID_KEY);
+  const getCartId = useCallback((): string | null => cartIdRef.current || localStorage.getItem(CART_ID_KEY), []);
 
   // Re-fetch cart from Medusa and update state
   const refreshCart = useCallback(async (): Promise<StoreCart | null> => {
@@ -63,7 +63,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       localStorage.removeItem(CART_ID_KEY);
       return null;
     }
-  }, []);
+  }, [getCartId]);
 
   const clearLastAddedItem = useCallback(() => setLastAddedItem(null), []);
 
@@ -136,14 +136,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
       }
 
       // OPTIMISTIC: immediately add item to local cart so badge + drawer update instantly
+      // Uses functional updater to handle React batching (prev may be null or stale)
       setCart(prev => {
-        if (!prev) return prev;
-        const existing = (prev.items || []).find(i => i.variant_id === item.variantId);
+        const base = prev || { items: [], total: 0 } as unknown as StoreCart;
+        const existing = (base.items || []).find(i => i.variant_id === item.variantId);
         const newItems = existing
-          ? (prev.items || []).map(i =>
+          ? (base.items || []).map(i =>
               i.variant_id === item.variantId ? { ...i, quantity: i.quantity + item.quantity } : i
             )
-          : [...(prev.items || []), {
+          : [...(base.items || []), {
               id: `optimistic_${item.variantId}`,
               variant_id: item.variantId,
               product_id: item.productId,
@@ -152,7 +153,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
               quantity: item.quantity,
               thumbnail: item.image || null,
             } as any];
-        return { ...prev, items: newItems, total: (prev.total || 0) + item.price * item.quantity } as StoreCart;
+        return { ...base, items: newItems, total: (base.total || 0) + item.price * item.quantity } as StoreCart;
       });
 
       // Show toast
@@ -174,7 +175,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       setError((err as Error)?.message || 'Failed to add item to cart');
       await refreshCart();
     }
-  }, [refreshCart]);
+  }, [getCartId, refreshCart]);
 
   // REMOVE ITEM — optimistic + refetch to reconcile
   const removeItem = useCallback(async (variantId: string) => {
