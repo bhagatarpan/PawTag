@@ -40,12 +40,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
   // Helper: re-fetch cart from Medusa and update state
   const refreshCart = async (): Promise<any | null> => {
     const id = getCartId();
-    if (!id) return null;
+    if (!id) { console.warn('[Cart] refreshCart: no cart ID'); return null; }
     try {
       const { cart: reloaded } = await sdk.store.cart.retrieve(id);
+      console.log('[Cart] refreshCart: items=', reloaded?.items?.length, 'total=', reloaded?.total);
       setCart(reloaded);
       return reloaded;
-    } catch {
+    } catch (e) {
+      console.error('[Cart] refreshCart failed:', e);
       setCart(null);
       cartIdRef.current = null;
       localStorage.removeItem(CART_ID_KEY);
@@ -119,10 +121,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
         }).catch(() => {});
       }
 
+      console.log('[Cart] Adding item to cart:', cartId, item.variantId);
       await sdk.store.cart.createLineItem(cartId as string, {
         variant_id: item.variantId,
         quantity: item.quantity,
       });
+      console.log('[Cart] Item added, refreshing...');
 
       // Always re-fetch to get consistent state
       await refreshCart();
