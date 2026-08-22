@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigation } from '../hooks/useCms';
 import { CartDrawer } from '@pawtag/ui';
 import { useCartInteraction } from '../context/CartInteractionContext';
+import CartToast from './CartToast';
 
 // Memoized cart icon — only re-renders when itemCount changes
 const CartIcon = memo(function CartIcon({ onClick }: { onClick: () => void }) {
@@ -174,6 +175,9 @@ export default function Navbar() {
           onCheckout={handleCheckout}
         />
       )}
+
+      {/* Add-to-Cart Toast */}
+      <CartToast />
     </>
   );
 }

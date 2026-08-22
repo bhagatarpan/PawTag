@@ -23,7 +23,7 @@ const STEPS = [
 ];
 
 export default function Checkout() {
-  const { items, total, cart, clearCart } = useCart();
+  const { items, total, cart, clearCart, refreshCart } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -104,7 +104,11 @@ export default function Checkout() {
     if (!promoCode || !cart) return;
     setPromoLoading(true);
     try {
-      const { cart: updated } = await sdk.store.cart.addPromotions(cart!.id, { promo_codes: [promoCode] } as any);
+      const { cart: updated } = await sdk.store.cart.addPromotions(cart.id, { promo_codes: [promoCode] } as any);
+      if (updated) {
+        // Reconcile local cart with server (discount applied, totals updated)
+        await refreshCart();
+      }
       setPromoApplied(true);
       setPromoDiscount(updated?.discount_total || 0);
     } catch (err: any) {
@@ -117,10 +121,12 @@ export default function Checkout() {
   const removePromoCode = async () => {
     if (!cart) return;
     try {
-      await sdk.store.cart.removePromotions(cart!.id, { promo_codes: [promoCode] } as any);
+      await sdk.store.cart.removePromotions(cart.id, { promo_codes: [promoCode] } as any);
       setPromoApplied(false);
       setPromoDiscount(0);
       setPromoCode('');
+      // Reconcile local cart with server (discount removed, totals updated)
+      await refreshCart();
     } catch (err: any) {
       setError(err.message || 'Failed to remove promo code');
     }
