@@ -103,9 +103,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const addItem = useCallback(async (item: CartItem) => {
     setError(null);
     try {
-      setLoading(true);
-
       let cartId = getCartId();
+
+      // If no cart exists, create one first
       if (!cartId) {
         const regionId = await getNzRegionId();
         const { cart: newCart } = await sdk.store.cart.create({ region_id: regionId });
@@ -121,7 +121,27 @@ export function CartProvider({ children }: { children: ReactNode }) {
         }).catch(() => {});
       }
 
-      // Use mutation response directly — no extra refreshCart needed
+      // OPTIMISTIC: immediately add item to local cart so badge updates instantly
+      setCart(prev => {
+        if (!prev) return prev;
+        const existing = (prev.items || []).find(i => i.variant_id === item.variantId);
+        const newItems = existing
+          ? (prev.items || []).map(i =>
+              i.variant_id === item.variantId ? { ...i, quantity: i.quantity + item.quantity } : i
+            )
+          : [...(prev.items || []), {
+              id: `optimistic_${item.variantId}`,
+              variant_id: item.variantId,
+              product_id: item.productId,
+              title: item.name,
+              unit_price: item.price,
+              quantity: item.quantity,
+              thumbnail: item.image || null,
+            } as any];
+        return { ...prev, items: newItems } as StoreCart;
+      });
+
+      // Then reconcile with server truth
       const { cart: updated } = await sdk.store.cart.createLineItem(cartId!, {
         variant_id: item.variantId,
         quantity: item.quantity,
@@ -131,8 +151,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
       setError((err as Error)?.message || 'Failed to add item to cart');
       // Rollback: re-fetch to reconcile
       await refreshCart();
-    } finally {
-      setLoading(false);
     }
   }, [refreshCart]);
 
