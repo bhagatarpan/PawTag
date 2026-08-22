@@ -20,6 +20,7 @@ export default function FlyingImage() {
 
   useEffect(() => {
     if (!flyRequest || !containerRef.current) return;
+    console.log('[FlyingImage] Rendering animation:', flyRequest.id, 'from:', flyRequest.sourceRect);
 
     const el = containerRef.current;
     const dest = getCartDestination();

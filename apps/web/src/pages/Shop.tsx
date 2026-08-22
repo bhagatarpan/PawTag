@@ -70,10 +70,20 @@ export default function Shop() {
 
     // Find the product image element for flying animation
     if (e) {
-      const card = (e.currentTarget as HTMLElement).closest('[data-product-image]')?.parentElement;
-      const imgEl = card?.querySelector('[data-product-image]');
+      const btn = e.currentTarget as HTMLElement;
+      // Walk up to find the card container, then find the image inside
+      let parent = btn.parentElement;
+      let depth = 0;
+      while (parent && !parent.querySelector('[data-product-image]') && depth < 10) {
+        parent = parent.parentElement;
+        depth++;
+      }
+      const imgEl = parent?.querySelector('[data-product-image]');
       if (imgEl && cardProduct.image) {
+        console.log('[Flying] Triggering animation from:', imgEl.getBoundingClientRect());
         triggerFly(cardProduct.image, imgEl.getBoundingClientRect());
+      } else {
+        console.log('[Flying] No image element found. btn:', btn, 'parent:', parent);
       }
     }
 
