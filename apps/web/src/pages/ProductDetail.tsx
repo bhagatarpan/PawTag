@@ -8,7 +8,7 @@ import type { StoreProduct } from '@medusajs/types';
 
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
-  const [product, setProduct] = useState<any | null>(null);
+  const [product, setProduct] = useState<StoreProduct | null>(null);
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState(false);
@@ -27,16 +27,17 @@ export default function ProductDetail() {
     if (!product) return;
     const variant = product.variants?.[0];
     if (!variant) return;
+    const variantWithPrices = variant as unknown as { prices?: Array<{ amount?: number }> };
     addItem({
       productId: product.id,
       variantId: variant.id,
       name: product.title,
-      price: variant.prices?.[0]?.amount || 0,
+      price: variantWithPrices.prices?.[0]?.amount || 0,
       quantity,
       image: product.thumbnail || undefined,
     });
     setAdded(true);
-    setTimeout(() => setAdded(false), 2000);
+    setTimeout(() => setAdded(false), 1500);
   };
 
   const getProductIconForSku = (sku: string) => getProductIcon(sku, 'lg');
@@ -64,8 +65,12 @@ export default function ProductDetail() {
 
   const badge = getBadge(product.handle || '');
   const variant = product.variants?.[0];
-  const price = variant ? (variant.prices?.[0]?.amount || 0) : 0;
-  const monthlyPrice = (product.metadata as any)?.subscriptionConfig?.monthlyPrice || 0;
+  const variantWithPrices = variant as unknown as { prices?: Array<{ amount?: number }>; inventory_quantity?: number };
+  const price = variantWithPrices.prices?.[0]?.amount || 0;
+  const meta = (product.metadata || {}) as Record<string, unknown>;
+  const subConfig = meta.subscriptionConfig as Record<string, unknown> | undefined;
+  const monthlyPrice = (subConfig?.monthlyPrice as number) || 0;
+  const stock = variantWithPrices.inventory_quantity;
   const images = (product.images || []).map((img: any) => img.url).filter(Boolean);
 
   return (
@@ -77,7 +82,7 @@ export default function ProductDetail() {
             <ArrowLeft className="h-4 w-4" /> Shop
           </Link>
           <span>/</span>
-          <span className="text-gray-900 font-medium">{product.name}</span>
+          <span className="text-gray-900 font-medium">{product.title}</span>
         </nav>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
@@ -173,7 +178,7 @@ export default function ProductDetail() {
                 <div className="flex items-center border border-gray-300 rounded-lg">
                   <button onClick={() => setQuantity(Math.max(1, quantity - 1))} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-l-lg">-</button>
                   <span className="px-6 py-2 font-medium">{quantity}</span>
-                  <button onClick={() => setQuantity(quantity + 1)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-r-lg">+</button>
+                  <button onClick={() => setQuantity(Math.min(typeof stock === 'number' ? stock : 99, quantity + 1))} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-r-lg">+</button>
                 </div>
               </div>
 
@@ -206,7 +211,7 @@ export default function ProductDetail() {
                 <Truck className="h-8 w-8 text-primary-600 flex-shrink-0" />
                 <div>
                   <p className="font-medium text-gray-900 text-sm">NZ-Wide Shipping</p>
-                  <p className="text-gray-500 text-xs">From $7.99</p>
+                   <p className="text-gray-500 text-xs">Free NZ-wide</p>
                 </div>
               </div>
             </div>
@@ -220,7 +225,7 @@ export default function ProductDetail() {
                 <li>• 12 month warranty on normal wear and tear</li>
                 <li>• Physical damage (chewing, bending, breakage) not covered</li>
                 <li>• Warranty replacements shipped with a shipping charge</li>
-                <li>• Shipping: $7.99 NZ cities/suburbs, $10.99 rural/villages</li>
+                 <li>• Free NZ-wide shipping (3–5 working days)</li>
                 <li>• Lost or damaged? Replacement at full cost as new</li>
               </ul>
             </div>

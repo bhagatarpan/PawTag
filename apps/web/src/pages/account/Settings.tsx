@@ -183,7 +183,11 @@ export default function Settings() {
                 <p className="text-xs text-gray-500">{user?.email}</p>
               </div>
             </div>
-            <StatusBadge label="Verified" variant="success" size="sm" />
+            {user?.emailVerified ? (
+              <StatusBadge label="Verified" variant="success" size="sm" />
+            ) : (
+              <Link to="/verify-account" className="text-xs text-amber-600 hover:text-amber-800 font-medium">Verify</Link>
+            )}
           </div>
           <div className="px-5 py-3 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -193,10 +197,12 @@ export default function Settings() {
                 <p className="text-xs text-gray-500">{user?.phoneNumber || 'Not provided'}</p>
               </div>
             </div>
-            {user?.phoneNumber ? (
-              <StatusBadge label="Set" variant="info" size="sm" />
-            ) : (
+            {!user?.phoneNumber ? (
               <Link to="/account/profile" className="text-xs text-teal-600 hover:text-teal-800 font-medium">Add</Link>
+            ) : user?.phoneVerified ? (
+              <StatusBadge label="Verified" variant="success" size="sm" />
+            ) : (
+              <Link to="/verify-account" className="text-xs text-amber-600 hover:text-amber-800 font-medium">Verify</Link>
             )}
           </div>
           <div className="px-5 py-3 flex items-center justify-between">

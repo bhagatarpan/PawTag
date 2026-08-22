@@ -2,7 +2,7 @@ import React from 'react';
 import { X, Plus, Minus, Trash2, ShoppingCart } from 'lucide-react';
 
 export interface CartItem {
-  productId: string;
+  variantId: string;
   name: string;
   price: number;
   quantity: number;
@@ -15,8 +15,8 @@ export interface CartDrawerProps {
   onClose: () => void;
   items: CartItem[];
   total: number;
-  onUpdateQuantity: (productId: string, quantity: number) => void;
-  onRemoveItem: (productId: string) => void;
+  onUpdateQuantity: (variantId: string, quantity: number) => void;
+  onRemoveItem: (variantId: string) => void;
   onClearCart: () => void;
   onCheckout?: () => void;
   className?: string;
@@ -70,7 +70,7 @@ export function CartDrawer({
           ) : (
             items.map((item) => (
               <div
-                key={item.productId}
+                key={item.variantId}
                 className="flex gap-3 p-3 bg-gray-50 rounded-xl"
               >
                 <div className="w-16 h-16 bg-gradient-to-br from-primary-50 to-primary-100 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden">
@@ -91,14 +91,14 @@ export function CartDrawer({
                 </div>
                 <div className="flex flex-col items-end gap-1">
                   <button
-                    onClick={() => onRemoveItem(item.productId)}
+                    onClick={() => onRemoveItem(item.variantId)}
                     className="p-1 text-gray-400 hover:text-red-500 transition-colors"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
                   <div className="flex items-center gap-1">
                     <button
-                      onClick={() => onUpdateQuantity(item.productId, Math.max(1, item.quantity - 1))}
+                      onClick={() => onUpdateQuantity(item.variantId, Math.max(1, item.quantity - 1))}
                       className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
                     >
                       <Minus className="h-3 w-3" />
@@ -107,7 +107,7 @@ export function CartDrawer({
                       {item.quantity}
                     </span>
                     <button
-                      onClick={() => onUpdateQuantity(item.productId, item.quantity + 1)}
+                      onClick={() => onUpdateQuantity(item.variantId, item.quantity + 1)}
                       className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
                     >
                       <Plus className="h-3 w-3" />

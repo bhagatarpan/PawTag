@@ -46,11 +46,6 @@ export function CartInteractionProvider({ children }: { children: ReactNode }) {
     setCartBump(false);
   }, []);
 
-  // Expose a method to trigger cart bump from FlyingImage completion
-  const triggerCartBump = useCallback(() => {
-    setCartBump(true);
-  }, []);
-
   return (
     <CartInteractionContext.Provider value={{
       flyRequest,
@@ -71,8 +66,3 @@ export function useCartInteraction() {
   if (!ctx) throw new Error('useCartInteraction must be used within CartInteractionProvider');
   return ctx;
 }
-
-// Helper to trigger bump externally (from FlyingImage completion)
-let bumpCallback: (() => void) | null = null;
-export function setCartBumpCallback(cb: () => void) { bumpCallback = cb; }
-export function triggerCartBump() { bumpCallback?.(); }

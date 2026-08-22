@@ -1,5 +1,6 @@
 import { useState, useEffect, FormEvent } from 'react';
-import { User, MapPin, Phone, Lock, Save, Gift } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { User, MapPin, Phone, Lock, Save, Gift, CheckCircle, AlertCircle } from 'lucide-react';
 import { AddressAutocomplete } from '@pawtag/ui';
 import type { AddressComponents } from '@pawtag/ui';
 import { useAuth } from '../../context/AuthContext';
@@ -89,9 +90,37 @@ export default function Profile() {
         <div className="bg-white rounded-lg border p-6 space-y-4">
           <h2 className="text-lg font-semibold flex items-center gap-2"><User size={18} /> Personal Information</h2>
           <div className="grid grid-cols-2 gap-4">
-            <div><label className="block text-xs text-gray-500 mb-1">Full Name</label><input value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm" required /></div>
-            <div><label className="block text-xs text-gray-500 mb-1">Email</label><input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm" required /></div>
-            <div><label className="block text-xs text-gray-500 mb-1">Phone Number</label><input type="tel" value={form.phoneNumber} onChange={(e) => setForm({ ...form, phoneNumber: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm" placeholder="+64 21 123 4567" /></div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Full Name</label>
+              <input value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm" required />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Email</label>
+              <div className="flex items-center gap-2">
+                <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm" required />
+                {user?.emailVerified ? (
+                  <span className="flex items-center gap-1 text-xs text-green-600 whitespace-nowrap"><CheckCircle size={14} /> Verified</span>
+                ) : (
+                  <Link to="/verify-account" className="flex items-center gap-1 text-xs text-amber-600 hover:text-amber-800 whitespace-nowrap"><AlertCircle size={14} /> Verify</Link>
+                )}
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Phone Number</label>
+              <div className="flex items-center gap-2">
+                <input type="tel" value={form.phoneNumber} onChange={(e) => setForm({ ...form, phoneNumber: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm" placeholder="+64 21 123 4567" />
+                {form.phoneNumber && (
+                  user?.phoneVerified ? (
+                    <span className="flex items-center gap-1 text-xs text-green-600 whitespace-nowrap"><CheckCircle size={14} /> Verified</span>
+                  ) : (
+                    <Link to="/verify-account" className="flex items-center gap-1 text-xs text-amber-600 hover:text-amber-800 whitespace-nowrap"><AlertCircle size={14} /> Verify</Link>
+                  )
+                )}
+              </div>
+              {form.phoneNumber && !user?.phoneVerified && (
+                <p className="text-xs text-amber-600 mt-1">Phone number needs verification</p>
+              )}
+            </div>
           </div>
         </div>
         <div className="bg-white rounded-lg border p-6 space-y-4">

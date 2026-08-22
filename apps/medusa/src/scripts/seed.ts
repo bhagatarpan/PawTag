@@ -593,7 +593,7 @@ export default async function seedPawTag({ container }: ExecArgs) {
             [Modules.PRICING]: { price_set_id: priceSet.id },
           });
           console.log(
-            `    ✓ ${p.title}: $${(priceAmount / 100).toFixed(2)} NZD linked to variant`
+            `    ✓ ${p.title}: $${priceAmount.toFixed(2)} NZD linked to variant`
           );
         }
       }
@@ -624,7 +624,7 @@ export default async function seedPawTag({ container }: ExecArgs) {
       console.log(`    Variant ${v.sku}: mongo price = ${mongoProduct?.price}, priceAmount = ${priceAmount}`);
       if (priceAmount > 0) {
         try {
-          console.log(`    Creating price set for ${p.title} (${v.sku}): ${priceAmount} cents`);
+          console.log(`    Creating price set for ${p.title} (${v.sku}): $${priceAmount.toFixed(2)} NZD`);
           const priceSet = await pricingModuleService.createPriceSets({
             prices: [{ currency_code: "nzd", amount: priceAmount }],
           });
@@ -634,7 +634,7 @@ export default async function seedPawTag({ container }: ExecArgs) {
             [Modules.PRICING]: { price_set_id: priceSet.id },
           });
           console.log(
-            `    ✓ ${p.title}: $${(priceAmount / 100).toFixed(2)} NZD`
+            `    ✓ ${p.title}: $${priceAmount.toFixed(2)} NZD`
           );
         } catch (e: any) {
           console.log(`    ⚠  ${p.title}: ${e.message || e}`);

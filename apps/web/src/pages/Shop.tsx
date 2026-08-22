@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { ShoppingCart, PawPrint, Check, Shield, Smartphone, Wifi, Zap } from 'lucide-react';
 import { sdk } from '../lib/medusa';
 import { useCart } from '../context/CartContext';
@@ -7,34 +7,50 @@ import { useCartInteraction } from '../context/CartInteractionContext';
 import { ProductCard, type ProductCardProduct } from '@pawtag/ui';
 import SeoHead from '../components/SeoHead';
 import { useShopPage, useSiteSettings } from '../hooks/useCms';
-import { getProductBadge, getProductIcon } from '../utils/productHelpers';
+import { getProductBadge } from '../utils/productHelpers';
 import type { StoreProduct } from '@medusajs/types';
 
-const COMPARISON_FEATURES = [
-  { key: 'technology', label: 'Technology', scan: 'QR Code', classic: 'NFC + QR', plus: 'NFC + QR' },
-  { key: 'material', label: 'Material', scan: 'Plastic', classic: 'Plastic', plus: 'Metal edges + Epoxy resin' },
-  { key: 'scan_method', label: 'Scan Method', scan: 'Phone camera', classic: 'Phone tap', plus: 'Phone tap' },
-  { key: 'durability', label: 'Durability', scan: 'Standard', classic: 'Standard', plus: 'Heavy-duty' },
-  { key: 'subscription', label: 'Free Subscription', scan: '12 months', classic: '12 months', plus: '12 months' },
-  { key: 'after_free', label: 'After Free Period', scan: '$0.99/mo', classic: '$1.99/mo', plus: '$1.99/mo' },
-  { key: 'warranty', label: 'Warranty', scan: '12 months', classic: '12 months', plus: '12 months' },
-  { key: 'shipping', label: 'Shipping', scan: 'Free NZ-wide', classic: 'Free NZ-wide', plus: 'Free NZ-wide' },
-];
+function getComparisonFeatures(products: StoreProduct[]) {
+  const productMap = new Map<string, StoreProduct>();
+  for (const p of products) {
+    if (p.handle) productMap.set(p.handle, p);
+  }
+
+  const getMeta = (handle: string, key: string): string => {
+    const p = productMap.get(handle);
+    return ((p?.metadata as Record<string, unknown>)?.[key] as string) || '';
+  };
+
+  return [
+    { key: 'technology', label: 'Technology', scan: getMeta('scan', 'technology') || 'QR Code', classic: getMeta('classic', 'technology') || 'NFC + QR', plus: getMeta('plus', 'technology') || 'NFC + QR' },
+    { key: 'material', label: 'Material', scan: getMeta('scan', 'material') || 'Plastic', classic: getMeta('classic', 'material') || 'Plastic', plus: getMeta('plus', 'material') || 'Metal edges + Epoxy resin' },
+    { key: 'scan_method', label: 'Scan Method', scan: getMeta('scan', 'scanMethod') || 'Phone camera', classic: getMeta('classic', 'scanMethod') || 'Phone tap', plus: getMeta('plus', 'scanMethod') || 'Phone tap' },
+    { key: 'durability', label: 'Durability', scan: getMeta('scan', 'durability') || 'Standard', classic: getMeta('classic', 'durability') || 'Standard', plus: getMeta('plus', 'durability') || 'Heavy-duty' },
+    { key: 'subscription', label: 'Free Subscription', scan: getMeta('scan', 'freePeriod') || '12 months', classic: getMeta('classic', 'freePeriod') || '12 months', plus: getMeta('plus', 'freePeriod') || '12 months' },
+    { key: 'after_free', label: 'After Free Period', scan: getMeta('scan', 'afterFreePeriod') || 'See pricing', classic: getMeta('classic', 'afterFreePeriod') || 'See pricing', plus: getMeta('plus', 'afterFreePeriod') || 'See pricing' },
+    { key: 'warranty', label: 'Warranty', scan: getMeta('scan', 'warranty') || '12 months', classic: getMeta('classic', 'warranty') || '12 months', plus: getMeta('plus', 'warranty') || '12 months' },
+    { key: 'shipping', label: 'Shipping', scan: 'Free NZ-wide', classic: 'Free NZ-wide', plus: 'Free NZ-wide' },
+  ];
+}
 
 function toCardProduct(p: StoreProduct): ProductCardProduct {
-  const variant = p.variants?.[0] as any;
-  const price = variant?.prices?.[0]?.amount || 0;
-  const monthlyPrice = (p.metadata as any)?.subscriptionConfig?.monthlyPrice || 0;
+  const variant = p.variants?.[0] as Record<string, unknown> | undefined;
+  const prices = variant?.prices as Array<{ amount?: number }> | undefined;
+  const price = prices?.[0]?.amount || 0;
+  const meta = (p.metadata || {}) as Record<string, unknown>;
+  const subConfig = meta.subscriptionConfig as Record<string, unknown> | undefined;
+  const monthlyPrice = (subConfig?.monthlyPrice as number) || 0;
   const badge = getProductBadge(p.handle || '');
+  const inventory = variant?.inventory_quantity as number | undefined;
   return {
     id: p.id,
     name: p.title,
-    shortDescription: (p as any).subtitle || undefined,
+    shortDescription: (p.subtitle as string) || undefined,
     price,
     currency: 'NZD',
     image: p.thumbnail || undefined,
-    sku: variant?.sku || '',
-    stock: 999,
+    sku: (variant?.sku as string) || '',
+    stock: typeof inventory === 'number' ? inventory : 999,
     monthlyPrice: monthlyPrice > 0 ? monthlyPrice : undefined,
     badge: badge ? { label: badge.label, color: badge.color } : null,
     features: [
@@ -53,12 +69,13 @@ export default function Shop() {
   const { page: shopPage } = useShopPage('shop');
   const { settings } = useSiteSettings();
   const companyName = settings?.['company.name'] || 'PawTag';
+  const navigate = useNavigate();
 
   useEffect(() => {
     sdk.store.product
       .list({ fields: '*variants.prices,*images,*type,*tags' })
       .then(({ products: p }) => setProducts(p || []))
-      .catch(console.error)
+      .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
@@ -71,7 +88,6 @@ export default function Shop() {
     // Find the product image element for flying animation
     if (e) {
       const btn = e.currentTarget as HTMLElement;
-      // Walk up to find the card container, then find the image inside
       let parent = btn.parentElement;
       let depth = 0;
       while (parent && !parent.querySelector('[data-product-image]') && depth < 10) {
@@ -80,10 +96,7 @@ export default function Shop() {
       }
       const imgEl = parent?.querySelector('[data-product-image]');
       if (imgEl && cardProduct.image) {
-        console.log('[Flying] Triggering animation from:', imgEl.getBoundingClientRect());
         triggerFly(cardProduct.image, imgEl.getBoundingClientRect());
-      } else {
-        console.log('[Flying] No image element found. btn:', btn, 'parent:', parent);
       }
     }
 
@@ -136,7 +149,7 @@ export default function Shop() {
                 key={product.id}
                 product={toCardProduct(product)}
                 onAddToCart={(p, e) => handleAddToCart(p, e)}
-                onDetails={(p) => window.location.href = `/shop/${p.id}`}
+                onDetails={(p) => navigate(`/shop/${p.id}`)}
                 added={addedId === product.id}
               />
             ))}
@@ -155,43 +168,45 @@ export default function Shop() {
                 <thead>
                   <tr className="border-b border-gray-100">
                     <th className="text-left px-6 py-4 text-sm font-semibold text-gray-500 w-1/4">Feature</th>
-                    <th className="text-center px-4 py-4 w-1/4">
-                      <div className="flex flex-col items-center gap-1">
-                        <Smartphone className="h-5 w-5 text-blue-500" />
-                        <span className="text-sm font-bold text-gray-900">PawTag Scan</span>
-                        <span className="text-xs text-blue-600 font-medium bg-blue-50 px-2 py-0.5 rounded-full">Essential</span>
-                      </div>
-                    </th>
-                    <th className="text-center px-4 py-4 w-1/4 bg-amber-50/50">
-                      <div className="flex flex-col items-center gap-1">
-                        <Wifi className="h-5 w-5 text-amber-500" />
-                        <span className="text-sm font-bold text-gray-900">PawTag Classic</span>
-                        <span className="text-xs text-amber-700 font-medium bg-amber-100 px-2 py-0.5 rounded-full">Most Ordered</span>
-                      </div>
-                    </th>
-                    <th className="text-center px-4 py-4 w-1/4">
-                      <div className="flex flex-col items-center gap-1">
-                        <Zap className="h-5 w-5 text-purple-500" />
-                        <span className="text-sm font-bold text-gray-900">PawTag Plus</span>
-                        <span className="text-xs text-purple-600 font-medium bg-purple-50 px-2 py-0.5 rounded-full">Premium</span>
-                      </div>
-                    </th>
+                    {products.map((p) => {
+                      const badge = getProductBadge(p.handle || '');
+                      const variant = p.variants?.[0] as Record<string, unknown> | undefined;
+                      const prices = variant?.prices as Array<{ amount?: number }> | undefined;
+                      const price = prices?.[0]?.amount || 0;
+                      return (
+                        <th key={p.id} className="text-center px-4 py-4 w-1/4">
+                          <div className="flex flex-col items-center gap-1">
+                            <span className="text-sm font-bold text-gray-900">{p.title}</span>
+                            {badge && (
+                              <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${badge.color}`}>{badge.label}</span>
+                            )}
+                          </div>
+                        </th>
+                      );
+                    })}
                   </tr>
                 </thead>
                 <tbody>
-                  {COMPARISON_FEATURES.map((feat, i) => (
+                  {getComparisonFeatures(products).map((feat, i) => (
                     <tr key={feat.key} className={i % 2 === 0 ? 'bg-gray-50/50' : ''}>
                       <td className="px-6 py-3 text-sm font-medium text-gray-700">{feat.label}</td>
                       <td className="px-4 py-3 text-center text-sm text-gray-600">{feat.scan}</td>
-                      <td className="px-4 py-3 text-center text-sm text-gray-600 bg-amber-50/30 font-medium">{feat.classic}</td>
-                      <td className="px-4 py-3 text-center text-sm text-gray-600">{feat.plus}</td>
+                      {products.length > 1 && <td className="px-4 py-3 text-center text-sm text-gray-600">{feat.classic}</td>}
+                      {products.length > 2 && <td className="px-4 py-3 text-center text-sm text-gray-600">{feat.plus}</td>}
                     </tr>
                   ))}
                   <tr className="border-t border-gray-200">
                     <td className="px-6 py-4 text-sm font-bold text-gray-900">Price</td>
-                    <td className="px-4 py-4 text-center"><span className="text-lg font-bold text-primary-700">$9.99</span></td>
-                    <td className="px-4 py-4 text-center bg-amber-50/30"><span className="text-lg font-bold text-primary-700">$19.99</span></td>
-                    <td className="px-4 py-4 text-center"><span className="text-lg font-bold text-primary-700">$39.99</span></td>
+                    {products.map((p) => {
+                      const variant = p.variants?.[0] as Record<string, unknown> | undefined;
+                      const prices = variant?.prices as Array<{ amount?: number }> | undefined;
+                      const price = prices?.[0]?.amount || 0;
+                      return (
+                        <td key={p.id} className="px-4 py-4 text-center">
+                          <span className="text-lg font-bold text-primary-700">NZ${price.toFixed(2)}</span>
+                        </td>
+                      );
+                    })}
                   </tr>
                 </tbody>
               </table>

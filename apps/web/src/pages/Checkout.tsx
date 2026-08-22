@@ -82,10 +82,10 @@ export default function Checkout() {
   }, []);
 
   // Derived values — all from Medusa cart (single source of truth)
-  const shippingCost = (cart as any)?.shipping_total || 0;
-  const taxAmount = (cart as any)?.tax_total || 0;
-  const discountAmount = (cart as any)?.discount_total || promoDiscount;
-  const orderTotal = (cart as any)?.total || total;
+  const shippingCost = cart?.shipping_total || 0;
+  const taxAmount = cart?.tax_total || 0;
+  const discountAmount = cart?.discount_total || promoDiscount;
+  const orderTotal = cart?.total || total;
 
   const canProceedToCheckout = items.length > 0;
   const canProceedToPayment = emailVerified && mobileVerified && form.line1 && form.city && form.zip;
@@ -104,7 +104,7 @@ export default function Checkout() {
     if (!promoCode || !cart) return;
     setPromoLoading(true);
     try {
-      const { cart: updated } = await sdk.store.cart.addPromotions(cart.id, { promo_codes: [promoCode] } as any);
+      const { cart: updated } = await sdk.store.cart.addPromotions(cart!.id, { promo_codes: [promoCode] } as any);
       setPromoApplied(true);
       setPromoDiscount(updated?.discount_total || 0);
     } catch (err: any) {
@@ -117,7 +117,7 @@ export default function Checkout() {
   const removePromoCode = async () => {
     if (!cart) return;
     try {
-      await sdk.store.cart.removePromotions(cart.id, { promo_codes: [promoCode] } as any);
+      await sdk.store.cart.removePromotions(cart!.id, { promo_codes: [promoCode] } as any);
       setPromoApplied(false);
       setPromoDiscount(0);
       setPromoCode('');
@@ -182,7 +182,7 @@ export default function Checkout() {
         <div className="flex items-center justify-center mb-8">
           {STEPS.map((step, i) => {
             const isActive = currentStep === step.key;
-            const isComplete = STEPS.findIndex(s => s.key === currentStep) > i;
+            const isComplete = STEPS.findIndex(s => s.key === currentStep) > i && currentStep !== 'cart';
             const StepIcon = step.icon;
             return (
               <div key={step.key} className="flex items-center">
@@ -460,7 +460,7 @@ export default function Checkout() {
                       <div><label className="block text-sm font-medium text-gray-700 mb-1">Expiry Date</label><input type="text" value={cardExpiry} onChange={e => { let v = e.target.value.replace(/\D/g, ''); if (v.length > 2) v = v.slice(0, 2) + '/' + v.slice(2); setCardExpiry(v); }} maxLength={5} placeholder="MM / YY" className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 text-sm" /></div>
                       <div><label className="block text-sm font-medium text-gray-700 mb-1">CVC</label><input type="text" value={cardCvc} onChange={e => setCardCvc(e.target.value.replace(/\D/g, ''))} maxLength={4} placeholder="123" className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 text-sm" /></div>
                     </div>
-                    <div><label className="block text-sm font-medium text-gray-700 mb-1">Name on Card</label><input type="text" value={cardName} onChange={e => setCardName(e.target.value)} placeholder="Arpan Bhagat" className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 text-sm" /></div>
+                    <div><label className="block text-sm font-medium text-gray-700 mb-1">Name on Card</label><input type="text" value={cardName} onChange={e => setCardName(e.target.value)} placeholder="Cardholder Name" className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 text-sm" /></div>
                   </div>
                 </div>
 

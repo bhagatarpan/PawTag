@@ -13,12 +13,13 @@ const PRODUCT_BADGES: Record<string, ProductBadge> = {
 };
 
 export function getProductBadge(sku: string): ProductBadge | null {
-  return PRODUCT_BADGES[sku] || null;
+  return PRODUCT_BADGES[sku.toUpperCase()] || null;
 }
 
 export function getProductIcon(sku: string, size: 'sm' | 'md' | 'lg' = 'md'): React.ReactNode {
   const className = size === 'sm' ? 'h-6 w-6' : size === 'lg' ? 'h-12 w-12' : 'h-8 w-8';
-  if (sku === 'PT-SCAN-001') return <Smartphone className={className} />;
-  if (sku === 'PT-PLUS-001') return <Zap className={className} />;
+  const upper = sku.toUpperCase();
+  if (upper === 'PT-SCAN-001') return <Smartphone className={className} />;
+  if (upper === 'PT-PLUS-001') return <Zap className={className} />;
   return <Wifi className={className} />;
 }

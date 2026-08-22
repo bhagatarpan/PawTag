@@ -1297,6 +1297,11 @@ router.put('/profile', authenticate, validate(updateProfileSchema), async (req: 
         return;
       }
     }
+    // Reset phone verification if phone number changed
+    if (update.phoneNumber && update.phoneNumber !== existing.phoneNumber) {
+      update.phoneVerified = false;
+      update.phoneVerifiedAt = null;
+    }
     const user = await User.findByIdAndUpdate(req.user!.id, update, { new: true }).select('-passwordHash');
     if (!user) { res.status(404).json({ success: false, error: 'User not found' }); return; }
     const afterState = {

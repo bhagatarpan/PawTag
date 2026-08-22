@@ -972,9 +972,13 @@ router.post('/orders', requirePermission('order.create'), async (req: AuthReques
     const discountAmount = bundleDiscount.amount;
     const finalAmount = Math.round((totalAmount - discountAmount) * 100) / 100;
 
-    // Generate order number
-    const orderCount = await Order.countDocuments();
-    const orderNumber = `PT-${String(orderCount + 1).padStart(6, '0')}`;
+    // Generate order number atomically to prevent race conditions
+    const counter = await Order.db!.collection('counters').findOneAndUpdate(
+      { _id: 'orderNumber' as any },
+      { $inc: { seq: 1 } },
+      { upsert: true, returnDocument: 'after' }
+    );
+    const orderNumber = `PT-${String(counter?.value?.seq || 1).padStart(6, '0')}`;
 
     // Process payment via Stripe
     const paymentResult = await createPaymentIntent({

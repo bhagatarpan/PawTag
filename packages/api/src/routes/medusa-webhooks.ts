@@ -64,7 +64,7 @@ router.post('/', async (req: Request, res: Response) => {
 
     if (WEBHOOK_SECRET && !verifyWebhookSignature(rawBody, signature)) {
       logger.warn('Medusa webhook signature verification failed');
-      return res.status(401).json({ error: 'Invalid signature' });
+      return res.status(401).json({ success: false, error: 'Invalid signature' });
     }
 
     const { event, data } = req.body;
@@ -143,20 +143,24 @@ async function handleOrderPlaced(data: { id: string }) {
     return;
   }
 
-  // Generate PawTag order number
-  const orderCount = await Order.countDocuments();
-  const orderNumber = `PT-${String(orderCount + 1).padStart(6, '0')}`;
+  // Generate PawTag order number atomically to prevent race conditions
+  const counter = await Order.db!.collection('counters').findOneAndUpdate(
+    { _id: 'orderNumber' as any },
+    { $inc: { seq: 1 } },
+    { upsert: true, returnDocument: 'after' }
+  );
+  const orderNumber = `PT-${String(counter?.value?.seq || 1).padStart(6, '0')}`;
 
   // Map Medusa items to PawTag items
-  const items = (medusaOrder.items || []).map((item: any) => {
-    // Try to find the product by Medusa product ID in metadata
+    const items = (medusaOrder.items || []).map((item: any) => {
+    // Medusa v2 stores prices in major units (dollars), not cents
     const productId = item.product_id || item.metadata?.pawtagProductId || '';
     return {
       productId,
       productName: item.title || item.name,
       quantity: item.quantity,
-      unitPrice: (item.unit_price || 0) / 100, // cents → dollars
-      totalPrice: ((item.unit_price || 0) * item.quantity) / 100,
+      unitPrice: item.unit_price || 0,
+      totalPrice: (item.unit_price || 0) * item.quantity,
     };
   });
 
@@ -170,7 +174,7 @@ async function handleOrderPlaced(data: { id: string }) {
       method: 'card',
       status: 'completed',
       transactionId: medusaOrderId,
-      amount: (medusaOrder.total || 0) / 100,
+      amount: medusaOrder.total || 0,
       currency: (medusaOrder.currency_code || 'nzd').toUpperCase(),
       paidAt: new Date(medusaOrder.created_at),
     },

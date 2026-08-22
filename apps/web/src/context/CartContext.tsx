@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode } from 'react';
 import { sdk, getNzRegionId } from '../lib/medusa';
 import api from '../lib/api';
+import type { StoreCart } from '@medusajs/types';
 
 export interface CartItem {
   productId: string;
@@ -20,7 +21,7 @@ interface CartContextType {
   clearCart: () => void;
   total: number;
   itemCount: number;
-  cart: any | null;
+  cart: StoreCart | null;
   loading: boolean;
   error: string | null;
 }
@@ -29,7 +30,7 @@ const CartContext = createContext<CartContextType | null>(null);
 const CART_ID_KEY = 'pawtag_medusa_cart_id';
 
 export function CartProvider({ children }: { children: ReactNode }) {
-  const [cart, setCart] = useState<any | null>(null);
+  const [cart, setCart] = useState<StoreCart | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const cartIdRef = useRef<string | null>(null);
@@ -38,16 +39,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const getCartId = (): string | null => cartIdRef.current || localStorage.getItem(CART_ID_KEY);
 
   // Helper: re-fetch cart from Medusa and update state
-  const refreshCart = async (): Promise<any | null> => {
+  const refreshCart = async (): Promise<StoreCart | null> => {
     const id = getCartId();
-    if (!id) { console.warn('[Cart] refreshCart: no cart ID'); return null; }
+    if (!id) return null;
     try {
       const { cart: reloaded } = await sdk.store.cart.retrieve(id);
-      console.log('[Cart] refreshCart: items=', reloaded?.items?.length, 'total=', reloaded?.total);
       setCart(reloaded);
       return reloaded;
-    } catch (e) {
-      console.error('[Cart] refreshCart failed:', e);
+    } catch {
       setCart(null);
       cartIdRef.current = null;
       localStorage.removeItem(CART_ID_KEY);
@@ -71,8 +70,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
           try {
             const regionId = await getNzRegionId();
             const { cart: newCart } = await sdk.store.cart.create({ region_id: regionId });
-            cartIdRef.current = (newCart as any).id;
-            localStorage.setItem(CART_ID_KEY, (newCart as any).id);
+            cartIdRef.current = newCart.id;
+            localStorage.setItem(CART_ID_KEY, newCart.id);
             setCart(newCart);
           } catch { /* will create on addItem */ }
         } finally { setLoading(false); }
@@ -80,8 +79,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
         try {
           const regionId = await getNzRegionId();
           const { cart: newCart } = await sdk.store.cart.create({ region_id: regionId });
-          cartIdRef.current = (newCart as any).id;
-          localStorage.setItem(CART_ID_KEY, (newCart as any).id);
+          cartIdRef.current = newCart.id;
+          localStorage.setItem(CART_ID_KEY, newCart.id);
           setCart(newCart);
         } catch { /* will create on addItem */ }
       }
@@ -89,13 +88,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
     loadCart();
   }, []);
 
-  const items: CartItem[] = (cart?.items || []).map((item: any) => ({
+  const items: CartItem[] = (cart?.items || []).map((item) => ({
     productId: item.product_id || '',
     variantId: item.variant_id || '',
     name: item.title || '',
     price: item.unit_price || 0,
     quantity: item.quantity,
-    image: item.thumbnail || item.variant?.product?.thumbnail || undefined,
+    image: item.thumbnail || undefined,
   }));
 
   const addItem = useCallback(async (item: CartItem) => {
@@ -108,41 +107,30 @@ export function CartProvider({ children }: { children: ReactNode }) {
       if (!cartId) {
         const regionId = await getNzRegionId();
         const { cart: newCart } = await sdk.store.cart.create({ region_id: regionId });
-        cartId = (newCart as any).id as string;
+        cartId = newCart.id;
         cartIdRef.current = cartId;
         localStorage.setItem(CART_ID_KEY, cartId);
         setCart(newCart);
 
         // Fire-and-forget: sync user
-        const syncCartId = cartId as string;
         api.post('/customer/medusa-sync').then((res) => {
           const cid = res.data?.data?.medusaCustomerId;
-          if (cid) sdk.store.cart.update(syncCartId, { customer_id: cid } as any).catch(() => {});
+          if (cid) sdk.store.cart.update(cartId!, { customer_id: cid } as any).catch(() => {});
         }).catch(() => {});
       }
 
-      console.log('[Cart] Adding item to cart:', cartId, item.variantId);
-      await sdk.store.cart.createLineItem(cartId as string, {
+      await sdk.store.cart.createLineItem(cartId!, {
         variant_id: item.variantId,
         quantity: item.quantity,
       });
-      console.log('[Cart] Item added, refreshing...');
-
       // Always re-fetch to get consistent state
       await refreshCart();
-    } catch (err: any) {
-      setError(err?.message || 'Failed to add item to cart');
+    } catch (err: unknown) {
+      setError((err as Error)?.message || 'Failed to add item to cart');
     } finally {
       setLoading(false);
     }
   }, []);
-
-  // Helper to ensure we have a valid cart ID
-  const ensureCartId = (): string => {
-    const id = getCartId();
-    if (!id) throw new Error('No cart');
-    return id;
-  };
 
   const removeItem = useCallback(async (variantId: string) => {
     const id = getCartId();
@@ -150,16 +138,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setError(null);
     try {
       setLoading(true);
-      // Re-fetch to get fresh line item IDs
       const freshCart = await refreshCart();
       if (!freshCart) return;
-      const lineItem = (freshCart as any).items?.find((i: any) => i.variant_id === variantId);
+      const lineItem = freshCart.items?.find((i) => i.variant_id === variantId);
       if (lineItem) {
         await sdk.store.cart.deleteLineItem(id, lineItem.id);
         await refreshCart();
       }
-    } catch (err: any) {
-      setError(err.message || 'Failed to remove item');
+    } catch (err: unknown) {
+      setError((err as Error)?.message || 'Failed to remove item');
     } finally {
       setLoading(false);
     }
@@ -174,13 +161,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
       setLoading(true);
       const freshCart = await refreshCart();
       if (!freshCart) return;
-      const lineItem = (freshCart as any).items?.find((i: any) => i.variant_id === variantId);
+      const lineItem = freshCart.items?.find((i) => i.variant_id === variantId);
       if (lineItem) {
         await sdk.store.cart.updateLineItem(id, lineItem.id, { quantity });
         await refreshCart();
       }
-    } catch (err: any) {
-      setError(err.message || 'Failed to update quantity');
+    } catch (err: unknown) {
+      setError((err as Error)?.message || 'Failed to update quantity');
     } finally {
       setLoading(false);
     }
@@ -193,8 +180,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
       setLoading(true);
       const freshCart = await refreshCart();
       if (!freshCart) return;
-      for (const item of (freshCart as any).items || []) {
-        await sdk.store.cart.deleteLineItem(id, (item as any).id);
+      for (const item of freshCart.items || []) {
+        await sdk.store.cart.deleteLineItem(id, item.id);
       }
       await refreshCart();
     } catch {
@@ -206,8 +193,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const total = (cart as any)?.total || 0;
-  const itemCount = ((cart as any)?.items || []).reduce((sum: number, i: any) => sum + i.quantity, 0);
+  const total = cart?.total || 0;
+  const itemCount = (cart?.items || []).reduce((sum, i) => sum + i.quantity, 0);
 
   return (
     <CartContext.Provider value={{ items, addItem, removeItem, updateQuantity, clearCart, total, itemCount, cart, loading, error }}>
