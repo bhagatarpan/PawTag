@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { ShoppingCart, PawPrint, Check, Shield, Smartphone, Wifi, Zap } from 'lucide-react';
 import { sdk } from '../lib/medusa';
 import { useCart } from '../context/CartContext';
+import { useCartInteraction } from '../context/CartInteractionContext';
 import { ProductCard, type ProductCardProduct } from '@pawtag/ui';
 import SeoHead from '../components/SeoHead';
 import { useShopPage, useSiteSettings } from '../hooks/useCms';
@@ -61,9 +62,21 @@ export default function Shop() {
       .finally(() => setLoading(false));
   }, []);
 
-  const handleAddToCart = (cardProduct: ProductCardProduct) => {
+  const { triggerFly } = useCartInteraction();
+
+  const handleAddToCart = useCallback((cardProduct: ProductCardProduct, e?: React.MouseEvent) => {
     const variant = products.find((p) => p.id === cardProduct.id)?.variants?.[0];
     if (!variant) return;
+
+    // Find the product image element for flying animation
+    if (e) {
+      const card = (e.currentTarget as HTMLElement).closest('[data-product-image]')?.parentElement;
+      const imgEl = card?.querySelector('[data-product-image]');
+      if (imgEl && cardProduct.image) {
+        triggerFly(cardProduct.image, imgEl.getBoundingClientRect());
+      }
+    }
+
     setAddedId(cardProduct.id);
     addItem({
       productId: cardProduct.id,
@@ -74,7 +87,7 @@ export default function Shop() {
       image: cardProduct.image,
     });
     setTimeout(() => setAddedId(null), 1000);
-  };
+  }, [products, addItem, triggerFly]);
 
   const shopTitle = (shopPage?.content as Record<string, unknown>)?.heroTitle as string || shopPage?.title || `Shop ${companyName}`;
   const shopDesc = (shopPage?.content as Record<string, unknown>)?.heroDescription as string || shopPage?.subtitle || 'Choose the right PawTag for your pet. Each tag comes with 12 months free subscription.';
@@ -112,7 +125,7 @@ export default function Shop() {
               <ProductCard
                 key={product.id}
                 product={toCardProduct(product)}
-                onAddToCart={handleAddToCart}
+                onAddToCart={(p, e) => handleAddToCart(p, e)}
                 onDetails={(p) => window.location.href = `/shop/${p.id}`}
                 added={addedId === product.id}
               />

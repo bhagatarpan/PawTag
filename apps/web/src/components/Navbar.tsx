@@ -1,10 +1,11 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, X, ShoppingCart, PawPrint, User, LogOut, ChevronDown } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useNavigation } from '../hooks/useCms';
 import { CartDrawer } from '@pawtag/ui';
+import { useCartInteraction } from '../context/CartInteractionContext';
 
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -16,6 +17,24 @@ export default function Navbar() {
   const { user, logout } = useAuth();
   const { menus, loading } = useNavigation('header');
   const cartButtonRef = useRef<HTMLButtonElement>(null);
+  const { cartBump, clearCartBump, tokens } = useCartInteraction();
+  const prevItemCount = useRef(itemCount);
+
+  // Cart icon bump animation when item count changes
+  useEffect(() => {
+    if (itemCount > prevItemCount.current && cartButtonRef.current) {
+      const el = cartButtonRef.current;
+      el.animate([
+        { transform: 'scale(1)' },
+        { transform: `scale(${tokens.cartIcon.scaleBounce})` },
+        { transform: 'scale(1)' },
+      ], {
+        duration: tokens.cartIcon.duration,
+        easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
+      });
+    }
+    prevItemCount.current = itemCount;
+  }, [itemCount, tokens]);
 
   const fallbackLinks = [
     { to: '/', label: 'Home' },
@@ -57,7 +76,7 @@ export default function Navbar() {
             {/* Right Side */}
             <div className="flex items-center gap-3">
               {/* Cart Button */}
-              <button ref={cartButtonRef} onClick={() => setCartOpen(!cartOpen)} className="relative p-2 rounded-lg text-gray-600 hover:text-primary-600 hover:bg-primary-50 transition-all">
+              <button ref={cartButtonRef} data-cart-icon onClick={() => setCartOpen(!cartOpen)} className="relative p-2 rounded-lg text-gray-600 hover:text-primary-600 hover:bg-primary-50 transition-all">
                 <ShoppingCart className="h-5 w-5" />
                 {itemCount > 0 && (
                   <span data-cart-badge className="absolute -top-1 -right-1 bg-primary-600 text-white text-xs font-bold h-5 w-5 rounded-full flex items-center justify-center">

@@ -17,7 +17,7 @@ export interface ProductCardProduct {
 
 export interface ProductCardProps {
   product: ProductCardProduct;
-  onAddToCart?: (product: ProductCardProduct) => void;
+  onAddToCart?: (product: ProductCardProduct, e?: React.MouseEvent) => void;
   onDetails?: (product: ProductCardProduct) => void;
   added?: boolean;
   disabled?: boolean;
@@ -45,7 +45,7 @@ export function ProductCard({
         </div>
       )}
 
-      <div className="relative h-48 bg-gradient-to-br from-primary-50 to-primary-100 flex items-center justify-center">
+      <div data-product-image className="relative h-48 bg-gradient-to-br from-primary-50 to-primary-100 flex items-center justify-center">
         {product.image ? (
           <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
         ) : (
@@ -93,7 +93,7 @@ export function ProductCard({
           )}
           {onAddToCart && (
             <button
-              onClick={() => onAddToCart(product)}
+              onClick={(e) => onAddToCart(product, e)}
               disabled={isOutOfStock || disabled}
               className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-medium transition-all text-sm ${
                 added
