@@ -46,11 +46,25 @@ export default function Checkout() {
   const [emailVerified, setEmailVerified] = useState(false);
   const [mobileVerified, setMobileVerified] = useState(false);
 
-  // Shipping address
+  // Shipping address — prepopulate from user profile if available
   const [form, setForm] = useState({
     line1: '', line2: '', city: '', state: '', zip: '', country: 'NZ',
   });
   const [useDifferentAddress, setUseDifferentAddress] = useState(false);
+
+  // Prepopulate address from user profile on mount / login
+  useEffect(() => {
+    if (user?.address?.line1) {
+      setForm({
+        line1: user.address.line1 || '',
+        line2: user.address.line2 || '',
+        city: user.address.city || '',
+        state: user.address.state || '',
+        zip: user.address.zip || '',
+        country: user.address.country || 'NZ',
+      });
+    }
+  }, [user]);
 
   // Card details (demo mode)
   const [cardNumber, setCardNumber] = useState('');

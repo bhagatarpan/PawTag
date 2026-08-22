@@ -84,6 +84,8 @@ export function AddressAutocomplete({
   const handleSelect = (address: AddressComponents) => {
     onChange(address.line1);
     onAddressSelect(address);
+    // Clear suggestions BEFORE focusing to prevent onFocus from reopening dropdown
+    setSuggestions([]);
     setIsOpen(false);
     setNoResults(false);
     inputRef.current?.focus();
