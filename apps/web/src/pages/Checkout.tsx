@@ -70,11 +70,11 @@ export default function Checkout() {
     localStorage.setItem('pawtag_return_url', '/checkout');
   }, []);
 
-  // Derived values
-  const shippingCost = 0; // Free NZ shipping
-  const discountedSubtotal = total - promoDiscount;
-  const taxEstimate = Math.round(discountedSubtotal * 0.15 * 100) / 100;
-  const orderTotal = discountedSubtotal; // Tax included in NZ
+  // Derived values — all from Medusa cart (single source of truth)
+  const shippingCost = (cart as any)?.shipping_total || 0;
+  const taxAmount = (cart as any)?.tax_total || 0;
+  const discountAmount = (cart as any)?.discount_total || promoDiscount;
+  const orderTotal = (cart as any)?.total || total;
 
   const canProceedToCheckout = items.length > 0;
   const canProceedToPayment = emailVerified && mobileVerified && form.line1 && form.city && form.zip;
@@ -263,15 +263,15 @@ export default function Checkout() {
                 </div>
                 {promoApplied && (
                   <div className="flex items-center justify-between text-sm text-green-600 mb-2">
-                    <span>Promo applied: -NZ${promoDiscount.toFixed(2)}</span>
+                    <span>Promo applied: -NZ${discountAmount.toFixed(2)}</span>
                     <button onClick={removePromoCode} className="text-xs text-gray-400 hover:text-red-500">Remove</button>
                   </div>
                 )}
                 <div className="space-y-2 pt-2">
                   <div className="flex justify-between text-sm text-gray-600"><span>Subtotal</span><span>NZ${total.toFixed(2)}</span></div>
-                  {promoDiscount > 0 && <div className="flex justify-between text-sm text-green-600"><span>Discount</span><span>-NZ${promoDiscount.toFixed(2)}</span></div>}
+                  {discountAmount > 0 && <div className="flex justify-between text-sm text-green-600"><span>Discount</span><span>-NZ${discountAmount.toFixed(2)}</span></div>}
                   <div className="flex justify-between text-sm text-gray-600"><span>Shipping</span><span className="text-green-600 font-medium">FREE</span></div>
-                  <div className="flex justify-between text-sm text-gray-600"><span>Tax (Included)</span><span>NZ${taxEstimate.toFixed(2)}</span></div>
+                  <div className="flex justify-between text-sm text-gray-600"><span>Tax (Included)</span><span>NZ${taxAmount.toFixed(2)}</span></div>
                   <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-100"><span>Total (NZD)</span><span className="text-primary-700">NZ${orderTotal.toFixed(2)}</span></div>
                 </div>
               </div>
@@ -410,9 +410,9 @@ export default function Checkout() {
                   ))}
                   <div className="space-y-2 pt-4">
                     <div className="flex justify-between text-sm"><span className="text-gray-600">Subtotal</span><span className="text-gray-900">NZ${total.toFixed(2)}</span></div>
-                    {promoDiscount > 0 && <div className="flex justify-between text-sm"><span className="text-green-600">Discount</span><span className="text-green-600">-NZ${promoDiscount.toFixed(2)}</span></div>}
+                    {discountAmount > 0 && <div className="flex justify-between text-sm"><span className="text-green-600">Discount</span><span className="text-green-600">-NZ${discountAmount.toFixed(2)}</span></div>}
                     <div className="flex justify-between text-sm"><span className="text-gray-600">Shipping</span><span className="text-green-600 font-medium">FREE</span></div>
-                    <div className="flex justify-between text-sm"><span className="text-gray-600">Tax (Included)</span><span className="text-gray-900">NZ${taxEstimate.toFixed(2)}</span></div>
+                    <div className="flex justify-between text-sm"><span className="text-gray-600">Tax (Included)</span><span className="text-gray-900">NZ${taxAmount.toFixed(2)}</span></div>
                     <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-100"><span>Total (NZD)</span><span className="text-primary-700">NZ${orderTotal.toFixed(2)}</span></div>
                   </div>
                 </div>
