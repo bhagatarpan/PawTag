@@ -91,10 +91,12 @@ export default function Checkout() {
     }
   }, [user]);
 
-  // Save return URL for post-login/register redirect
+  // Save return URL for post-login/register redirect — only when not authenticated
   useEffect(() => {
-    localStorage.setItem('pawtag_return_url', '/checkout');
-  }, []);
+    if (!user) {
+      localStorage.setItem('pawtag_return_url', '/checkout');
+    }
+  }, [user]);
 
   // Derived values — all from Medusa cart (single source of truth)
   const shippingCost = cart?.shipping_total || 0;

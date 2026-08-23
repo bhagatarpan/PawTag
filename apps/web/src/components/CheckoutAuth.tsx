@@ -15,11 +15,6 @@ export default function CheckoutAuth({ onLoginSuccess }: CheckoutAuthProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Set return URL to checkout when this component mounts
-  useState(() => {
-    localStorage.setItem('pawtag_return_url', '/checkout');
-  });
-
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!email || !password) return;
