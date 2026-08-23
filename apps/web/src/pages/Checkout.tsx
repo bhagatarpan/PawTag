@@ -54,7 +54,7 @@ export default function Checkout() {
   // Shipping address
   const [addressMode, setAddressMode] = useState<'saved' | 'custom'>('saved');
   const [form, setForm] = useState({
-    line1: '', line2: '', city: '', state: '', zip: '', country: 'NZ',
+    line1: '', line2: '', city: '', state: '', zip: '', country: 'nz',
   });
   // Prepopulate from user profile on mount / login
   useEffect(() => {
@@ -197,14 +197,13 @@ export default function Checkout() {
             address_1: form.line1,
             address_2: form.line2 || undefined,
             city: form.city,
-            province: form.state,
+            province: form.state || undefined,
             postal_code: form.zip,
-            country_code: form.country || 'nz',
+            country_code: (form.country || 'nz').toLowerCase(),
             phone: user.phoneNumber || undefined,
           },
         } as any);
       } catch (addrErr: any) {
-        // If address update fails, try without optional fields
         console.warn('Address update failed, retrying with minimal fields:', addrErr?.message);
         await sdk.store.cart.update(cart.id, {
           shipping_address: {
@@ -213,7 +212,7 @@ export default function Checkout() {
             address_1: form.line1,
             city: form.city,
             postal_code: form.zip,
-            country_code: form.country || 'nz',
+            country_code: (form.country || 'nz').toLowerCase(),
           },
         } as any);
       }
