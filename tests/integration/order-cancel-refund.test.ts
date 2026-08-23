@@ -20,30 +20,15 @@ beforeEach(async () => {
 
 describe('Phase 8 — Cancel & Refund Workflow', () => {
   describe('POST /api/admin/orders/:id/cancel', () => {
-    it('should cancel a paid order and restore stock', async () => {
+    it('should cancel a paid order', async () => {
       const { userId, token } = await createSuperAdmin();
-
-      // Create product with stock
-      const product = await Product.create({
-        name: 'PawTag Test',
-        sku: 'PT-CANCEL-001',
-        description: 'Cancel test product',
-        price: 19.99,
-        category: 'tags',
-        isActive: true,
-        stock: 10,
-      });
-
-      // Manually decrement stock (simulating order creation)
-      product.stock = 8;
-      await product.save();
 
       // Create order in paid status
       const order = await Order.create({
         orderNumber: 'PT-CANCEL-9001',
         userId,
         items: [{
-          productId: product._id,
+          productId: new mongoose.Types.ObjectId(),
           productName: 'PawTag Test',
           quantity: 2,
           unitPrice: 19.99,
@@ -67,10 +52,6 @@ describe('Phase 8 — Cancel & Refund Workflow', () => {
         },
       });
 
-      // Verify stock is 8
-      const preProduct = await Product.findById(product._id);
-      expect(preProduct!.stock).toBe(8);
-
       const res = await request(app)
         .post(`/api/admin/orders/${order._id}/cancel`)
         .set('Authorization', `Bearer ${token}`)
@@ -84,9 +65,8 @@ describe('Phase 8 — Cancel & Refund Workflow', () => {
       expect(updatedOrder!.status).toBe('cancelled');
       expect(updatedOrder!.cancellationReason).toBe('Customer changed mind');
 
-      // Verify stock restored (back to 10)
-      const postProduct = await Product.findById(product._id);
-      expect(postProduct!.stock).toBe(10);
+      // NOTE: Stock restoration is now handled by Medusa's inventory module.
+      // The restoreOrderStock() function is a no-op since Medusa owns inventory.
 
       // Verify customer notification created
       const notifs = await Notification.find({ userId, audience: 'customer', type: 'order_update' });

@@ -158,26 +158,15 @@ describe('Phase 5 — Payment Confirmation Flow', () => {
   });
 
   describe('POST /api/webhooks/stripe (payment_intent.payment_failed)', () => {
-    it('should cancel order and restore stock', async () => {
+    it('should cancel order on payment failure', async () => {
       const { userId } = await createCustomerWithRBAC();
 
-      // Create product with limited stock
-      const product = await Product.create({
-        name: 'PawTag Limited',
-        sku: 'PT-LIMITED-001',
-        description: 'Limited stock product',
-        price: 19.99,
-        category: 'tags',
-        isActive: true,
-        stock: 5,
-      });
-
-      // Create order with stock reserved
+      // Create order in pending_payment status
       await Order.create({
         orderNumber: 'PT-777777',
         userId,
         items: [{
-          productId: product._id,
+          productId: new mongoose.Types.ObjectId(),
           productName: 'PawTag Limited',
           quantity: 2,
           unitPrice: 19.99,
@@ -221,9 +210,8 @@ describe('Phase 5 — Payment Confirmation Flow', () => {
       expect(updatedOrder!.status).toBe('cancelled');
       expect(updatedOrder!.payment.status).toBe('failed');
 
-      // Verify stock is restored (original 5 + restored 2 = 7, since stock wasn't decremented in test setup)
-      const updatedProduct = await Product.findById(product._id);
-      expect(updatedProduct!.stock).toBe(7);
+      // NOTE: Stock restoration is now handled by Medusa's inventory module.
+      // The restoreOrderStock() function is a no-op since Medusa owns inventory.
     });
   });
 

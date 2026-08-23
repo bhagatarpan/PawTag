@@ -1,64 +1,18 @@
-import { Product } from '@pawtag/db';
 import { auditService, type AuditContext } from './audit';
 import logger from '../lib/logger';
 
-async function auditRestoreStockEvent(
-  input: Parameters<typeof auditService.log>[1],
-  overrides: Partial<AuditContext> = {},
-): Promise<void> {
-  try {
-    await auditService.log({
-      actorType: 'SYSTEM',
-      actorId: 'inventoryService',
-      actorUsername: 'inventory-restore-service',
-      sourceIp: 'system',
-      userAgent: 'inventory-service',
-      applicationName: 'pawtag-api',
-      applicationVersion: '1.0.0',
-      apiVersion: 'v1',
-      environment: process.env.NODE_ENV || 'development',
-      ...overrides,
-    }, input);
-  } catch (err) {
-    logger.error({ err }, '[Audit] Failed to log inventory event');
-  }
-}
-
 /**
  * Restore stock for all items on an order.
- * Call this when an order is cancelled or payment fails.
+ * NOTE: As of the Medusa migration, inventory is managed by Medusa's inventory module.
+ * This function is retained for backward compatibility but is a no-op.
+ * Stock restoration should be handled by Medusa when orders are cancelled/failed.
  */
 export async function restoreOrderStock(orderItems: Array<{
   productId: any;
   quantity: number;
   variantName?: string;
 }>): Promise<void> {
-  for (const item of orderItems) {
-    const product = await Product.findById(item.productId);
-    if (product) {
-      if (item.variantName && product.variants?.length) {
-        const variant = product.variants.find((v: any) => v.name === item.variantName);
-        if (variant) variant.stock += item.quantity;
-      } else {
-        product.stock += item.quantity;
-      }
-      await product.save();
-
-      await auditRestoreStockEvent({
-        action: 'inventory_stock_restored',
-        eventType: 'inventory.stock_restored',
-        eventCategory: 'FINANCIAL',
-        operationType: 'UPDATE',
-        resourceType: 'Product',
-        resourceId: item.productId?.toString?.() || item.productId,
-        outcome: 'SUCCESS',
-        severity: 'MEDIUM',
-        metadata: {
-          productId: item.productId?.toString?.() || item.productId,
-          restoredQty: item.quantity,
-          variantName: item.variantName || 'default',
-        },
-      });
-    }
-  }
+  // No-op: Medusa owns inventory. Stock restoration is handled by Medusa's
+  // inventory module when orders are cancelled or payments fail.
+  logger.info({ itemCount: orderItems.length }, 'restoreOrderStock called (no-op — Medusa owns inventory)');
 }

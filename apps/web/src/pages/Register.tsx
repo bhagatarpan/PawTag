@@ -3,9 +3,11 @@ import { Link, useNavigate } from 'react-router-dom';
 import { PawPrint, Mail, Lock, User, Phone, Eye, EyeOff, CheckCircle, Loader2 } from 'lucide-react';
 import api from '../lib/api';
 import { useAuthPage } from '../hooks/useCms';
+import { useAuth } from '../context/AuthContext';
 import { validatePassword } from '@pawtag/shared';
 
 export default function Register() {
+  const { login } = useAuth();
   const [form, setForm] = useState({ fullName: '', email: '', phoneNumber: '', password: '', confirmPassword: '', acceptTerms: false });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
@@ -50,6 +52,15 @@ export default function Register() {
         confirmPassword: form.confirmPassword,
         acceptTerms: form.acceptTerms,
       });
+
+      // Auto-login after registration so checkout flow continues smoothly
+      try {
+        await login(form.email, form.password);
+      } catch {
+        // Login may fail if email verification is required — that's OK
+        // User will see verification prompts on the verify-account page
+      }
+
       setSuccess(true);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Registration failed. Please try again.');

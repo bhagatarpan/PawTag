@@ -178,7 +178,16 @@ export default function Checkout() {
         }
       }
 
-      // 2. Add shipping address to cart
+      // 2. Pass referral code to cart metadata (if present)
+      const referralCode = localStorage.getItem('pawtag_referral_code');
+      if (referralCode && !cart.metadata?.referralCode) {
+        await sdk.store.cart.update(cart.id, {
+          metadata: { referralCode },
+        } as any);
+        localStorage.removeItem('pawtag_referral_code');
+      }
+
+      // 3. Add shipping address to cart
       await sdk.store.cart.update(cart.id, {
         shipping_address: {
           first_name: user.fullName?.split(' ')[0] || 'Customer',

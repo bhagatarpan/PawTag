@@ -246,6 +246,7 @@ async function handleOrderPlaced(data: { id: string }) {
       zip: '',
       country: 'NZ',
     },
+    referredByCode: medusaOrder.metadata?.referralCode || undefined,
     notes: `Medusa Order: ${medusaOrderId}`,
   });
 

@@ -12,6 +12,8 @@ export default function Refer() {
 
   useEffect(() => {
     if (code) {
+      // Store referral code for checkout
+      localStorage.setItem('pawtag_referral_code', code);
       api.get(`/finder/referral/${code}`)
         .then(r => setValidation(r.data.data))
         .catch(() => setValidation({ valid: false }))
