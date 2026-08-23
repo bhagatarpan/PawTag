@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
-import { Order, Subscription, Tag, User, Notification, Invoice, InvoiceAccessToken } from '@pawtag/db';
+import { Order, Subscription, Tag, User, Notification, Invoice, InvoiceAccessToken, WebhookEvent } from '@pawtag/db';
 import { createSubscription } from '../services/subscription.service';
 import { sendOrderConfirmation, sendInvoiceEmail, sendMail } from '../services/email.service';
 import { generateInvoiceHtml } from '../services/invoice-html.service';
@@ -71,7 +71,41 @@ router.post('/', async (req: Request, res: Response) => {
     }
 
     const { event, data } = req.body;
-    logger.info({ event, dataId: data?.id }, 'Received Medusa webhook event');
+    const eventId = data?.id || `${event}_${Date.now()}`;
+    logger.info({ event, eventId }, 'Received Medusa webhook event');
+
+    // Idempotency check — store event and skip if already processed
+    const existingEvent = await WebhookEvent.findOne({ source: 'medusa', eventId });
+    if (existingEvent?.status === 'completed') {
+      logger.info({ eventId }, 'Medusa webhook already processed — skipping');
+      return res.status(200).json({ received: true, duplicate: true });
+    }
+
+    // Store event for retry capability
+    if (!existingEvent) {
+      try {
+        await WebhookEvent.create({
+          source: 'medusa',
+          event,
+          eventId,
+          payload: req.body,
+          status: 'processing',
+          attempts: 1,
+        });
+      } catch (err: any) {
+        if (err.code === 11000) {
+          // Duplicate key — race condition, another request stored it first
+          logger.info({ eventId }, 'Medusa webhook event already stored — skipping');
+          return res.status(200).json({ received: true, duplicate: true });
+        }
+        throw err;
+      }
+    } else {
+      existingEvent.status = 'processing';
+      existingEvent.attempts += 1;
+      existingEvent.lastError = undefined;
+      await existingEvent.save();
+    }
 
     switch (event) {
       case 'order.placed':
@@ -87,12 +121,29 @@ router.post('/', async (req: Request, res: Response) => {
         logger.info({ event }, 'Unhandled Medusa webhook event');
     }
 
+    // Mark as completed
+    await WebhookEvent.findOneAndUpdate(
+      { source: 'medusa', eventId },
+      { status: 'completed', processedAt: new Date() }
+    );
+
     await auditMedusaEvent(event, data || {});
 
     return res.status(200).json({ received: true });
   } catch (error) {
     logger.error({ err: error }, 'Medusa webhook error');
-    return res.status(200).json({ received: true }); // Always 200 to prevent retries on processing errors
+
+    // Mark as failed for retry
+    const eventId = req.body?.data?.id;
+    if (eventId) {
+      const nextRetry = new Date(Date.now() + 60000); // Retry in 1 minute
+      await WebhookEvent.findOneAndUpdate(
+        { source: 'medusa', eventId },
+        { status: 'failed', lastError: (error as Error)?.message, nextRetryAt: nextRetry }
+      ).catch(() => {});
+    }
+
+    return res.status(200).json({ received: true }); // Always 200 to prevent Medusa retries
   }
 });
 

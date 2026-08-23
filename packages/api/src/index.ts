@@ -265,6 +265,10 @@ async function start() {
     // Start daily low stock check service
     startLowStockService();
 
+    // Start webhook retry job
+    const { startWebhookRetryJob } = await import('./jobs/webhookRetry');
+    startWebhookRetryJob();
+
     const server = app.listen(config.port, () => {
       logger.info(`PawTag API running on port ${config.port}`);
       logger.info(`Environment: ${config.nodeEnv}`);
