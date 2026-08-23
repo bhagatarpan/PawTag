@@ -88,7 +88,8 @@ export async function syncUserToMedusa(userId: string): Promise<string | null> {
     console.log(`[medusa-sync] Created Medusa customer ${customer.id} for PawTag user ${userId}`);
     return customer.id;
   } catch (error: any) {
-    console.error('[medusa-sync] Error syncing user to Medusa:', error.message);
+    // Log but don't fail — sync is non-blocking
+    console.warn('[medusa-sync] Sync failed (non-blocking):', error.message);
     return null;
   }
 }

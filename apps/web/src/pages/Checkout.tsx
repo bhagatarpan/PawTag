@@ -189,19 +189,34 @@ export default function Checkout() {
       }
 
       // 3. Add shipping address to cart
-      await sdk.store.cart.update(cart.id, {
-        shipping_address: {
-          first_name: user.fullName?.split(' ')[0] || 'Customer',
-          last_name: user.fullName?.split(' ').slice(1).join(' ') || '',
-          address_1: form.line1,
-          address_2: form.line2 || undefined,
-          city: form.city,
-          province: form.state,
-          postal_code: form.zip,
-          country_code: form.country || 'nz',
-          phone: user.phoneNumber || undefined,
-        },
-      } as any);
+      try {
+        await sdk.store.cart.update(cart.id, {
+          shipping_address: {
+            first_name: user.fullName?.split(' ')[0] || 'Customer',
+            last_name: user.fullName?.split(' ').slice(1).join(' ') || '',
+            address_1: form.line1,
+            address_2: form.line2 || undefined,
+            city: form.city,
+            province: form.state,
+            postal_code: form.zip,
+            country_code: form.country || 'nz',
+            phone: user.phoneNumber || undefined,
+          },
+        } as any);
+      } catch (addrErr: any) {
+        // If address update fails, try without optional fields
+        console.warn('Address update failed, retrying with minimal fields:', addrErr?.message);
+        await sdk.store.cart.update(cart.id, {
+          shipping_address: {
+            first_name: user.fullName?.split(' ')[0] || 'Customer',
+            last_name: user.fullName?.split(' ').slice(1).join(' ') || '',
+            address_1: form.line1,
+            city: form.city,
+            postal_code: form.zip,
+            country_code: form.country || 'nz',
+          },
+        } as any);
+      }
 
       // 3. Add free shipping method
       const { shipping_options } = await sdk.store.fulfillment.listCartOptions({
