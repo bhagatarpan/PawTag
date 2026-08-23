@@ -29,13 +29,17 @@ export default function Checkout() {
   const navigate = useNavigate();
 
   // Step management
-  const [currentStep, setCurrentStep] = useState<Step>('cart');
+  const [currentStep, setCurrentStep] = useState<Step>(() => {
+    // Restore step from sessionStorage (survives refresh)
+    const savedStep = sessionStorage.getItem('pawtag_checkout_step') as Step;
+    return savedStep || 'cart';
+  });
 
   // Form state
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [orderNumber, setOrderNumber] = useState('');
-  const [success, setSuccess] = useState(false);
+  const [orderNumber, setOrderNumber] = useState(() => sessionStorage.getItem('pawtag_checkout_order') || '');
+  const [success, setSuccess] = useState(() => sessionStorage.getItem('pawtag_checkout_success') === 'true');
 
   // Promo code
   const [promoCode, setPromoCode] = useState('');
@@ -52,10 +56,6 @@ export default function Checkout() {
   const [form, setForm] = useState({
     line1: '', line2: '', city: '', state: '', zip: '', country: 'NZ',
   });
-  const [customDraft, setCustomDraft] = useState({
-    line1: '', line2: '', city: '', state: '', zip: '', country: 'NZ',
-  });
-
   // Prepopulate from user profile on mount / login
   useEffect(() => {
     if (user?.address?.line1 && addressMode === 'saved') {
@@ -116,6 +116,7 @@ export default function Checkout() {
     if (step === 'checkout' && !canProceedToCheckout) return;
     if (step === 'payment' && !canProceedToPayment) return;
     setCurrentStep(step);
+    sessionStorage.setItem('pawtag_checkout_step', step);
     setError(null);
   };
 
@@ -216,12 +217,19 @@ export default function Checkout() {
 
       // 6. Store the Medusa order ID and show confirmation
       const medusaOrder = result.order;
-      setOrderNumber(medusaOrder.id || medusaOrder.display_id?.toString() || 'Processing');
+      // Use display_id (sequential number) if available, fallback to ID
+      const orderDisplay = medusaOrder.display_id?.toString() || medusaOrder.id || 'Processing';
+      setOrderNumber(orderDisplay);
       setSuccess(true);
       setCurrentStep('confirmed');
+      // Persist success state for page refresh
+      sessionStorage.setItem('pawtag_checkout_success', 'true');
+      sessionStorage.setItem('pawtag_checkout_order', orderDisplay);
       clearCart();
     } catch (err: any) {
       setError(err?.message || err?.response?.data?.error || 'Payment failed. Please try again.');
+      // Refresh cart to reconcile any server-side mutations from the failed payment attempt
+      await refreshCart();
     } finally {
       setLoading(false);
     }
@@ -229,6 +237,10 @@ export default function Checkout() {
 
   // Empty cart
   if (items.length === 0 && !success) {
+    // Clean up checkout session state
+    sessionStorage.removeItem('pawtag_checkout_success');
+    sessionStorage.removeItem('pawtag_checkout_order');
+    sessionStorage.removeItem('pawtag_checkout_step');
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-4 p-4">
         <PawPrint className="h-16 w-16 text-gray-300" />
@@ -424,7 +436,7 @@ export default function Checkout() {
                   <div className="flex items-center justify-between mb-4">
                     <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2"><Truck className="h-5 w-5 text-primary-600" /> Shipping Address</h2>
                     {user?.address?.line1 && addressMode === 'saved' && (
-                      <button onClick={() => { setCustomDraft({ ...form }); setAddressMode('custom'); }} className="text-sm text-primary-600 hover:text-primary-700 flex items-center gap-1">
+                      <button onClick={() => { setAddressMode('custom'); }} className="text-sm text-primary-600 hover:text-primary-700 flex items-center gap-1">
                         <Edit3 className="h-3 w-3" /> Change
                       </button>
                     )}

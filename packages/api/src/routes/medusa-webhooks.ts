@@ -256,8 +256,13 @@ async function handleOrderPlaced(data: { id: string }) {
 
   // Create Invoice record
   try {
-    const invoiceCount = await Invoice.countDocuments();
-    const invoiceNumber = `INV-${String(invoiceCount + 1).padStart(6, '0')}`;
+    // Use atomic counter to prevent duplicate invoice numbers
+    const counter = await Invoice.db!.collection('counters').findOneAndUpdate(
+      { _id: 'invoiceNumber' as any },
+      { $inc: { seq: 1 } },
+      { upsert: true, returnDocument: 'after' }
+    );
+    const invoiceNumber = `INV-${String(counter?.value?.seq || 1).padStart(6, '0')}`;
 
     // Check if order has subscription
     let subscriptionId: any = undefined;
