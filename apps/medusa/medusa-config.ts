@@ -3,6 +3,8 @@ import path from "path"
 
 loadEnv(process.env.NODE_ENV || "development", process.cwd())
 
+const hasStripeKey = !!process.env.STRIPE_API_KEY && process.env.STRIPE_API_KEY !== 'sk_test_placeholder';
+
 export default defineConfig({
   projectConfig: {
     databaseUrl: process.env.MEDUSA_DATABASE_URL,
@@ -22,16 +24,15 @@ export default defineConfig({
     {
       resolve: "@medusajs/medusa/payment",
       options: {
-        providers: process.env.STRIPE_API_KEY
-          ? [
-              {
-                resolve: "@medusajs/payment-stripe",
-                id: "stripe",
-                options: {
-                  apiKey: process.env.STRIPE_API_KEY,
-                },
+        providers: hasStripeKey
+          ? [{
+              resolve: "@medusajs/payment-stripe",
+              id: "stripe",
+              options: {
+                apiKey: process.env.STRIPE_API_KEY!,
+                capture: true,
               },
-            ]
+            }]
           : [],
       },
     },
