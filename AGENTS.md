@@ -461,14 +461,30 @@ Customer sync: `packages/api/src/services/medusa-sync.service.ts`
 
 The checkout page (`apps/web/src/pages/Checkout.tsx`) implements a 4-step wizard:
 
-1. **Cart** — Review items, apply promo code, see totals
-2. **Checkout** — Contact verification (email + mobile), shipping address
-3. **Payment** — Order summary, Stripe card form, pay button
+1. **Cart** — Review items, apply promo code, see totals (all from Medusa cart)
+2. **Checkout** — Authentication (inline login or register), contact verification, shipping address
+3. **Payment** — Order summary, card form, pay button
 4. **Confirmed** — Success page with order number
+
+**Checkout Architecture (Medusa-first):**
+
+```
+Frontend (Checkout.tsx)
+  → Medusa SDK: sdk.store.cart.update() — set shipping address
+  → Medusa SDK: sdk.store.cart.addShippingMethod() — add free shipping
+  → Medusa SDK: sdk.store.payment.initiatePaymentSession() — create payment
+  → Medusa SDK: sdk.store.cart.complete() — creates Medusa order
+  → Medusa fires order.placed event
+  → PawTag webhook handler creates: Order + Invoice + Referral + Notifications
+```
 
 **Verification gate:** Users must have both email and mobile verified before proceeding to payment. The checkout page checks `user.emailVerified` and `user.phoneVerified` and shows verification status with links to verify.
 
-**Payment:** Stripe demo mode (no real key = simulated success). Real Stripe when key is configured.
+**Payment:** Medusa handles payment via Stripe module. Demo mode uses `pp_system_default` (auto-succeeds). Real Stripe when `STRIPE_API_KEY` is configured.
+
+**Order creation:** The legacy `POST /customer/orders` endpoint has been removed. All orders are created through Medusa's checkout flow. The Medusa webhook handler (`medusa-webhooks.ts`) creates PawTag order projections, invoices, and processes referrals/notifications.
+
+**Webhook reliability:** Incoming Medusa webhooks are stored in `WebhookEvent` collection for idempotency and retry. Failed events are retried every 60 seconds up to 5 times with exponential backoff.
 
 ## Development Commands
 
@@ -868,6 +884,56 @@ The seed script (`apps/medusa/src/scripts/seed.ts`) is idempotent and handles:
 - Tax region with system provider
 
 Run: `pnpm --filter @pawtag/medusa seed`
+
+## Commerce Architecture
+
+### Data Ownership
+
+| Domain | Source of Truth | Notes |
+|--------|----------------|-------|
+| Products | Medusa (PostgreSQL) | Admin manages via Medusa admin at `:9000/app` |
+| Variants | Medusa (PostgreSQL) | Single variant per product with "Default" option |
+| Prices | Medusa (PostgreSQL) | Per-variant, per-region pricing in major units (dollars) |
+| Inventory | Medusa (PostgreSQL) | Stock levels at PawTag Warehouse |
+| Cart | Medusa (PostgreSQL) | Created via Medusa SDK, persisted by cart ID in localStorage |
+| Promotions | Medusa (PostgreSQL) | Applied via Medusa SDK during checkout |
+| Tax | Medusa (PostgreSQL) | 15% NZ GST, tax-inclusive pricing |
+| Shipping | Medusa (PostgreSQL) | Free NZ-wide shipping via manual fulfillment |
+| Payment | Medusa (PostgreSQL) | Stripe integration via Medusa payment module |
+| Orders | Medusa (PostgreSQL) → PawTag (MongoDB) | Medusa creates order, PawTag mirrors via webhook |
+| Customers | PawTag (MongoDB) → Medusa (PostgreSQL) | Lazy sync on first cart add |
+| Invoices | PawTag (MongoDB) | Created by PawTag webhook handler on Medusa order.placed |
+| Subscriptions | PawTag (MongoDB) | Created on payment success |
+| Referrals | PawTag (MongoDB) | Processed on Medusa order.placed |
+
+### Checkout Flow
+
+1. Frontend adds items to Medusa cart via SDK
+2. Frontend completes checkout via `sdk.store.cart.complete()`
+3. Medusa creates order in PostgreSQL
+4. Medusa fires `order.placed` event
+5. PawTag webhook handler (`medusa-webhooks.ts`) receives event
+6. Handler creates: PawTag Order + Invoice + Referral + Notifications
+7. Webhook events stored in `WebhookEvent` collection for idempotency/retry
+
+### Webhook Reliability
+
+- Events stored in `WebhookEvent` collection with idempotency check
+- Failed events retried every 60 seconds up to 5 times
+- Exponential backoff between retries
+- Events older than 24 hours marked as dead (no retry)
+- All side effects (invoice, referral, notification) are idempotent
+
+### Deprecated Systems
+
+The following are deprecated but still exist in the codebase:
+- MongoDB `Cart` model (no routes populate it)
+- MongoDB `Product` model (admin CRUD still writes here, but shop reads Medusa)
+- `POST /customer/orders` endpoint (removed — was broken)
+- `POST /customer/orders/:orderNumber/confirm-payment` endpoint (removed)
+- `restoreOrderStock()` service (writes to deprecated MongoDB Product)
+- `checkout-otp.ts` endpoint (built but unused by frontend)
+- `bundle-pricing.service.ts` (only used in legacy checkout)
 
 ## Next Move
 
