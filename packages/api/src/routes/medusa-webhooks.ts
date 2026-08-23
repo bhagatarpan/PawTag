@@ -1,8 +1,11 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
-import { Order, Subscription, Tag, User, Notification } from '@pawtag/db';
+import { Order, Subscription, Tag, User, Notification, Invoice, InvoiceAccessToken } from '@pawtag/db';
 import { createSubscription } from '../services/subscription.service';
-import { sendOrderConfirmation } from '../services/email.service';
+import { sendOrderConfirmation, sendInvoiceEmail, sendMail } from '../services/email.service';
+import { generateInvoiceHtml } from '../services/invoice-html.service';
+import { sendPushToUser } from '../services/push-notification.service';
+import { generateSecureToken, hashToken } from '../services/auth.service';
 import { generateTagId } from '../lib/tag-id';
 import logger from '../lib/logger';
 import { auditService, type AuditContext } from '../services/audit';
@@ -200,6 +203,117 @@ async function handleOrderPlaced(data: { id: string }) {
   // Process subscriptions for subscription products
   await processSubscriptions(order, pawtagUser, medusaOrder);
 
+  // Create Invoice record
+  try {
+    const invoiceCount = await Invoice.countDocuments();
+    const invoiceNumber = `INV-${String(invoiceCount + 1).padStart(6, '0')}`;
+
+    // Check if order has subscription
+    let subscriptionId: any = undefined;
+    let billingPeriod: { start: Date; end: Date } | undefined = undefined;
+    const sub = await Subscription.findOne({ userId: pawtagUser._id, orderId: order._id });
+    if (sub) {
+      subscriptionId = sub._id;
+      if (sub.currentPeriodStart && sub.currentPeriodEnd) {
+        billingPeriod = { start: sub.currentPeriodStart, end: sub.currentPeriodEnd };
+      }
+    }
+
+    const invoice = await Invoice.create({
+      ...(subscriptionId ? { subscriptionId } : {}),
+      orderId: order._id,
+      userId: pawtagUser._id,
+      invoiceNumber,
+      amount: order.payment.amount,
+      currency: order.payment.currency || 'NZD',
+      status: 'paid',
+      paymentMethod: order.payment.method,
+      paidAt: order.payment.paidAt || new Date(),
+      ...(billingPeriod ? { billingPeriod } : {}),
+    });
+    logger.info({ invoiceNumber, orderNumber }, 'Invoice created');
+
+    // Generate secure access token for invoice
+    const secureToken = generateSecureToken();
+    const tokenHash = hashToken(secureToken);
+    const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
+    await InvoiceAccessToken.create({
+      invoiceId: invoice._id,
+      userId: pawtagUser._id,
+      tokenHash,
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      verifiedAt: new Date(),
+    });
+    const invoiceUrl = `${FRONTEND_URL}/invoice/${secureToken}?admin=1`;
+
+    // Send invoice email
+    const invoiceHtml = await generateInvoiceHtml(invoice._id.toString());
+    await sendInvoiceEmail(pawtagUser.email, pawtagUser.fullName, invoiceNumber, invoiceHtml, invoiceUrl, invoice.amount);
+    logger.info({ orderNumber }, 'Invoice email sent');
+  } catch (err) {
+    logger.error({ err, orderNumber }, 'Failed to create invoice');
+  }
+
+  // Process referral rewards
+  try {
+    const { createReferralOnOrder, completeReferralRewards } = await import('../services/referral.service');
+    if (order.referredByCode) {
+      await createReferralOnOrder(order.referredByCode, pawtagUser._id.toString(), order.referredByCode, order._id.toString());
+      await completeReferralRewards(order._id.toString());
+      logger.info({ orderNumber }, 'Referral rewards processed');
+    }
+  } catch (err) {
+    logger.error({ err, orderNumber }, 'Referral processing error');
+  }
+
+  // Admin notification (idempotent)
+  try {
+    const existingAdminNotif = await Notification.findOne({
+      audience: 'admin',
+      'data.medusaOrderId': medusaOrderId,
+    });
+    if (!existingAdminNotif) {
+      await Notification.create({
+        userId: pawtagUser._id,
+        audience: 'admin',
+        type: 'new_order',
+        title: 'New order received',
+        message: `Order ${order.orderNumber} — $${order.payment.amount.toFixed(2)} NZD`,
+        data: {
+          orderId: order._id.toString(),
+          orderNumber: order.orderNumber,
+          amount: order.payment.amount,
+          medusaOrderId,
+          customerName: pawtagUser.fullName || 'Unknown',
+          customerEmail: pawtagUser.email || 'Unknown',
+        },
+        priority: 'high',
+        channel: 'alert',
+      });
+
+      // Send admin email
+      const adminEmail = process.env.ADMIN_ALERT_EMAIL;
+      if (adminEmail) {
+        try {
+          await sendMail(
+            adminEmail,
+            `New PawTag order: ${order.orderNumber}`,
+            `<h2>New Order Received</h2>
+             <p><strong>Order:</strong> ${order.orderNumber}</p>
+             <p><strong>Customer:</strong> ${pawtagUser.fullName || 'Unknown'} (${pawtagUser.email || 'Unknown'})</p>
+             <p><strong>Amount:</strong> $${order.payment.amount.toFixed(2)} NZD</p>
+             <p><strong>Medusa Order:</strong> ${medusaOrderId}</p>`,
+          );
+        } catch (emailErr) {
+          logger.error({ err: emailErr }, 'Admin notification email error');
+        }
+      }
+      logger.info({ orderNumber }, 'Admin notification created');
+    }
+  } catch (adminError) {
+    logger.error({ err: adminError }, 'Admin notification error');
+  }
+
   // Send order confirmation email
   try {
     await sendOrderConfirmation({
@@ -218,7 +332,7 @@ async function handleOrderPlaced(data: { id: string }) {
     logger.error({ err, orderNumber }, 'Failed to send order confirmation email');
   }
 
-  // Create notification
+  // Create customer notification
   try {
     await Notification.create({
       userId: pawtagUser._id,
@@ -227,6 +341,17 @@ async function handleOrderPlaced(data: { id: string }) {
       message: `Your order ${order.orderNumber} has been confirmed and paid.`,
       read: false,
     });
+  } catch {
+    // Non-critical
+  }
+
+  // Push notification
+  try {
+    await sendPushToUser(
+      pawtagUser._id.toString(),
+      'Order Confirmed',
+      `Your order ${order.orderNumber} has been confirmed.`,
+    );
   } catch {
     // Non-critical
   }

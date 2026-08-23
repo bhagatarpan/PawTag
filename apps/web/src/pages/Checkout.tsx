@@ -162,29 +162,66 @@ export default function Checkout() {
     }));
   };
 
-  // Payment handler
+  // Payment handler — uses Medusa SDK checkout flow
   const handlePayment = async () => {
-    if (!user || !canPay) return;
+    if (!user || !canPay || !cart) return;
     setLoading(true);
     setError(null);
     try {
-      const res = await api.post('/customer/orders', {
-        shippingAddress: form,
-        paymentMethod: 'card',
-      });
-      const orderData = res.data.data;
-      setOrderNumber(orderData.orderNumber);
-
-      // Demo mode: confirm payment
-      if (orderData.clientSecret?.includes('demo')) {
-        await api.post(`/customer/orders/${orderData.orderNumber}/confirm-payment`);
+      // 1. Ensure customer is associated with cart
+      if (!cart.customer_id) {
+        const syncRes = await api.post('/customer/medusa-sync');
+        const medusaCustomerId = syncRes.data?.data?.medusaCustomerId;
+        if (medusaCustomerId) {
+          await sdk.store.cart.update(cart.id, { customer_id: medusaCustomerId } as any);
+        }
       }
 
+      // 2. Add shipping address to cart
+      await sdk.store.cart.update(cart.id, {
+        shipping_address: {
+          first_name: user.fullName?.split(' ')[0] || 'Customer',
+          last_name: user.fullName?.split(' ').slice(1).join(' ') || '',
+          address_1: form.line1,
+          address_2: form.line2 || undefined,
+          city: form.city,
+          province: form.state,
+          postal_code: form.zip,
+          country_code: form.country || 'nz',
+          phone: user.phoneNumber || undefined,
+        },
+      } as any);
+
+      // 3. Add free shipping method
+      const { shipping_options } = await sdk.store.fulfillment.listCartOptions({
+        cart_id: cart.id,
+      });
+      if (shipping_options?.length > 0) {
+        await sdk.store.cart.addShippingMethod(cart.id, {
+          option_id: shipping_options[0].id,
+        });
+      }
+
+      // 4. Initiate payment session (uses system_default in demo mode)
+      await sdk.store.payment.initiatePaymentSession(cart, {
+        provider_id: 'pp_system_default',
+      });
+
+      // 5. Complete cart — this creates the Medusa order
+      const result = await sdk.store.cart.complete(cart.id);
+
+      if (result.type === 'cart') {
+        throw new Error(result.error?.message || 'Order creation failed');
+      }
+
+      // 6. Store the Medusa order ID and show confirmation
+      const medusaOrder = result.order;
+      setOrderNumber(medusaOrder.id || medusaOrder.display_id?.toString() || 'Processing');
       setSuccess(true);
       setCurrentStep('confirmed');
       clearCart();
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Payment failed');
+      setError(err?.message || err?.response?.data?.error || 'Payment failed. Please try again.');
     } finally {
       setLoading(false);
     }
