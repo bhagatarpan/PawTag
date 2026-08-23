@@ -177,6 +177,15 @@ function buildDefaultInvoiceHtml(data: InvoiceData, company: Record<string, stri
           ${user.phoneNumber ? `<p>${escapeHtml(user.phoneNumber)}</p>` : ''}
           ${user.address ? `<p>${escapeHtml(user.address.line1 || '')}${user.address.city ? `, ${escapeHtml(user.address.city)}` : ''}${user.address.zip ? ` ${escapeHtml(user.address.zip)}` : ''}</p>` : ''}
         </div>
+        ${order?.shippingAddress?.line1 ? `
+        <div class="meta-block">
+          <h3>Ship To</h3>
+          <p>${escapeHtml(order.shippingAddress.line1 || '')}</p>
+          ${order.shippingAddress.line2 ? `<p>${escapeHtml(order.shippingAddress.line2)}</p>` : ''}
+          <p>${escapeHtml(order.shippingAddress.city || '')}, ${escapeHtml(order.shippingAddress.state || '')} ${escapeHtml(order.shippingAddress.zip || '')}</p>
+          <p>${escapeHtml(order.shippingAddress.country || 'NZ')}</p>
+        </div>
+        ` : ''}
         <div class="meta-block">
           <h3>Invoice Details</h3>
           <p><span class="label">Date:</span> ${formatDate(invoice.createdAt)}</p>

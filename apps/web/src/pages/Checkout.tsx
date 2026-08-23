@@ -47,15 +47,18 @@ export default function Checkout() {
   const [emailVerified, setEmailVerified] = useState(false);
   const [mobileVerified, setMobileVerified] = useState(false);
 
-  // Shipping address — prepopulate from user profile if available
+  // Shipping address
+  const [addressMode, setAddressMode] = useState<'saved' | 'custom'>('saved');
   const [form, setForm] = useState({
     line1: '', line2: '', city: '', state: '', zip: '', country: 'NZ',
   });
-  const [useDifferentAddress, setUseDifferentAddress] = useState(false);
+  const [customDraft, setCustomDraft] = useState({
+    line1: '', line2: '', city: '', state: '', zip: '', country: 'NZ',
+  });
 
-  // Prepopulate address from user profile on mount / login
+  // Prepopulate from user profile on mount / login
   useEffect(() => {
-    if (user?.address?.line1) {
+    if (user?.address?.line1 && addressMode === 'saved') {
       setForm({
         line1: user.address.line1 || '',
         line2: user.address.line2 || '',
@@ -65,7 +68,7 @@ export default function Checkout() {
         country: user.address.country || 'NZ',
       });
     }
-  }, [user]);
+  }, [user, addressMode]);
 
   // Card details (demo mode)
   const [cardNumber, setCardNumber] = useState('');
@@ -383,10 +386,14 @@ export default function Checkout() {
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                   <div className="flex items-center justify-between mb-4">
                     <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2"><Truck className="h-5 w-5 text-primary-600" /> Shipping Address</h2>
-                    {form.line1 && <button onClick={() => setUseDifferentAddress(!useDifferentAddress)} className="text-sm text-primary-600 hover:text-primary-700 flex items-center gap-1"><Edit3 className="h-3 w-3" /> Edit</button>}
+                    {user?.address?.line1 && addressMode === 'saved' && (
+                      <button onClick={() => { setCustomDraft({ ...form }); setAddressMode('custom'); }} className="text-sm text-primary-600 hover:text-primary-700 flex items-center gap-1">
+                        <Edit3 className="h-3 w-3" /> Change
+                      </button>
+                    )}
                   </div>
 
-                  {!useDifferentAddress && form.line1 ? (
+                  {addressMode === 'saved' && user?.address?.line1 ? (
                     <div className="p-4 bg-gray-50 rounded-xl">
                       <p className="font-medium text-gray-900">{user.fullName}</p>
                       <p className="text-sm text-gray-600">{form.line1}{form.line2 ? `, ${form.line2}` : ''}</p>
@@ -405,10 +412,25 @@ export default function Checkout() {
                         <div><label className="block text-sm font-medium text-gray-700 mb-1">City *</label><input type="text" required value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 text-sm" /></div>
                         <div><label className="block text-sm font-medium text-gray-700 mb-1">Postcode *</label><input type="text" required value={form.zip} onChange={e => setForm({ ...form, zip: e.target.value })} className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 text-sm" /></div>
                       </div>
-                      <label className="flex items-center gap-2 text-sm text-gray-600">
-                        <input type="checkbox" checked={useDifferentAddress} onChange={e => setUseDifferentAddress(e.target.checked)} className="rounded border-gray-300 text-primary-600" />
-                        Use a different shipping address
-                      </label>
+                      {user?.address?.line1 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setForm({
+                              line1: user.address!.line1 || '',
+                              line2: user.address!.line2 || '',
+                              city: user.address!.city || '',
+                              state: user.address!.state || '',
+                              zip: user.address!.zip || '',
+                              country: user.address!.country || 'NZ',
+                            });
+                            setAddressMode('saved');
+                          }}
+                          className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                        >
+                          Use my saved address
+                        </button>
+                      )}
                     </div>
                   )}
 

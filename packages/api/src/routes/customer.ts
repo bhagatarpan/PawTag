@@ -530,6 +530,8 @@ router.post('/tags/:id/request-replacement', requirePermission('tag.create'), as
         totalPrice: replacementPrice,
       }];
 
+    const user = await User.findById(req.user!.id).select('address').lean();
+
     const order = await Order.create({
       orderNumber,
       userId: req.user!.id,
@@ -541,11 +543,18 @@ router.post('/tags/:id/request-replacement', requirePermission('tag.create'), as
         amount: replacementPrice,
         currency: 'NZD',
       },
-      shippingAddress: {
-        line1: 'Same as previous order',
-        city: 'Auckland',
-        state: 'Auckland',
-        zip: '1010',
+      shippingAddress: user?.address?.line1 ? {
+        line1: user.address.line1 || '',
+        line2: user.address.line2 || '',
+        city: user.address.city || '',
+        state: user.address.state || '',
+        zip: user.address.zip || '',
+        country: user.address.country || 'NZ',
+      } : {
+        line1: '',
+        city: '',
+        state: '',
+        zip: '',
         country: 'NZ',
       },
     });
