@@ -219,6 +219,8 @@ app.use('/api/admin/cms/onboarding', cmsOnboardingAdminRoutes);
 app.use('/api/customer', customerRoutes);
 app.use('/api/customer/checkout-otp', checkoutOtpRoutes);
 app.use('/api/customer/medusa-sync', medusaSyncRoutes);
+import demoPaymentRoutes from './routes/demo-payment';
+app.use('/api/customer/demo-payment', demoPaymentRoutes);
 app.use('/api/customer/subscriptions', customerSubscriptionRoutes);
 app.use('/api/admin/subscriptions', adminSubscriptionRoutes);
 app.use('/api/admin/analytics', adminAnalyticsRoutes);

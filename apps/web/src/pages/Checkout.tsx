@@ -236,18 +236,28 @@ export default function Checkout() {
         // Continue without shipping method — cart complete may still work in some configs
       }
 
-      // 4. Initiate payment session (skip in dev mode without Stripe)
-      try {
-        await sdk.store.payment.initiatePaymentSession(cart, {
-          provider_id: 'pp_stripe_stripe',
-        });
-      } catch (payErr: any) {
-        // In dev mode without Stripe, this will fail — that's OK
-        // The cart can still be completed without a payment session in demo mode
-        console.warn('Payment session initiation failed (expected in demo mode):', payErr?.message);
+      // 4. Initiate payment session
+      await sdk.store.payment.initiatePaymentSession(cart, {
+        provider_id: 'pp_stripe_stripe',
+      });
+
+      // 5. Confirm payment with test card (demo mode)
+      const cartAny = cart as any;
+      const paymentSession = cartAny.payment_sessions?.[0];
+      if (paymentSession?.data?.client_secret) {
+        try {
+          await api.post('/customer/demo-payment/confirm', {
+            paymentIntentId: paymentSession.data.id,
+            clientSecret: paymentSession.data.client_secret,
+          });
+          console.log('[Checkout] Demo payment confirmed');
+        } catch (payErr: any) {
+          console.error('[Checkout] Demo payment confirmation failed:', payErr?.message);
+          // Continue anyway — may work in some configs
+        }
       }
 
-      // 5. Complete cart — this creates the Medusa order
+      // 6. Complete cart — this creates the Medusa order
       const result = await sdk.store.cart.complete(cart.id);
 
       if (result.type === 'cart') {
