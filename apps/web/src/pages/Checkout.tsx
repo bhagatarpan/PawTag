@@ -218,13 +218,22 @@ export default function Checkout() {
       }
 
       // 3. Add free shipping method
-      const { shipping_options } = await sdk.store.fulfillment.listCartOptions({
-        cart_id: cart.id,
-      });
-      if (shipping_options?.length > 0) {
-        await sdk.store.cart.addShippingMethod(cart.id, {
-          option_id: shipping_options[0].id,
+      try {
+        const { shipping_options } = await sdk.store.fulfillment.listCartOptions({
+          cart_id: cart.id,
         });
+        console.log('[Checkout] Shipping options:', shipping_options?.length, shipping_options);
+        if (shipping_options?.length > 0) {
+          await sdk.store.cart.addShippingMethod(cart.id, {
+            option_id: shipping_options[0].id,
+          });
+          console.log('[Checkout] Shipping method added:', shipping_options[0].id);
+        } else {
+          console.warn('[Checkout] No shipping options available');
+        }
+      } catch (shipErr: any) {
+        console.error('[Checkout] Shipping method error:', shipErr?.message);
+        // Continue without shipping method — cart complete may still work in some configs
       }
 
       // 4. Initiate payment session (skip in dev mode without Stripe)
