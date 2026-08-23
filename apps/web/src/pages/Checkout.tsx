@@ -12,6 +12,7 @@ import { sdk } from '../lib/medusa';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useSiteSettings } from '../hooks/useCms';
+import CheckoutAuth from '../components/CheckoutAuth';
 
 type Step = 'cart' | 'checkout' | 'payment' | 'confirmed';
 
@@ -344,83 +345,77 @@ export default function Checkout() {
             <h1 className="text-2xl font-bold text-gray-900 mb-2">Checkout</h1>
             <p className="text-gray-500 mb-6">Verify your contact details and shipping address</p>
 
-            {!user && (
-              <div className="bg-primary-50 border border-primary-200 rounded-xl p-4 mb-6">
-                <p className="text-sm text-primary-700 mb-3">Please sign in or create an account to complete your purchase.</p>
-                <div className="flex gap-3">
-                  <Link to="/login" className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition-all">Sign In</Link>
-                  <Link to="/register" className="px-4 py-2 border border-primary-600 text-primary-600 rounded-lg text-sm font-medium hover:bg-primary-50 transition-all">Create Account</Link>
+            {!user ? (
+              <CheckoutAuth />
+            ) : (
+              <div className="max-w-2xl">
+                {/* Contact Verification — only shown for authenticated users */}
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-4">
+                  <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2"><Mail className="h-5 w-5 text-primary-600" /> Contact Verification</h2>
+
+                  <div className={`flex items-center justify-between p-4 rounded-xl mb-3 ${emailVerified ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'}`}>
+                    <div className="flex items-center gap-3">
+                      <Mail className={`h-5 w-5 ${emailVerified ? 'text-green-600' : 'text-gray-400'}`} />
+                      <div><p className="font-medium text-gray-900">Email Verification</p><p className="text-xs text-gray-500">{user.email}</p></div>
+                    </div>
+                    {emailVerified ? <span className="text-sm text-green-600 font-medium flex items-center gap-1"><Check className="h-4 w-4" /> Verified</span> : <span className="text-sm text-amber-600 font-medium">Not Verified</span>}
+                  </div>
+
+                  <div className={`flex items-center justify-between p-4 rounded-xl mb-4 ${mobileVerified ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'}`}>
+                    <div className="flex items-center gap-3">
+                      <Smartphone className={`h-5 w-5 ${mobileVerified ? 'text-green-600' : 'text-gray-400'}`} />
+                      <div><p className="font-medium text-gray-900">Mobile Verification</p><p className="text-xs text-gray-500">{user.phoneNumber || 'Not set'}</p></div>
+                    </div>
+                    {mobileVerified ? <span className="text-sm text-green-600 font-medium flex items-center gap-1"><Check className="h-4 w-4" /> Verified</span> : <span className="text-sm text-amber-600 font-medium">Not Verified</span>}
+                  </div>
+
+                  {!emailVerified && <Link to="/verify-account" className="block w-full py-2 text-center text-sm text-primary-600 border border-primary-200 rounded-lg hover:bg-primary-50 mb-2">Verify Email</Link>}
+                  {!mobileVerified && <Link to="/verify-account" className="block w-full py-2 text-center text-sm text-primary-600 border border-primary-200 rounded-lg hover:bg-primary-50">Verify Mobile</Link>}
+
+                  <div className="bg-primary-50 border border-primary-100 rounded-xl p-4 mt-4">
+                    <div className="flex items-start gap-2"><Shield className="h-4 w-4 text-primary-600 mt-0.5" /><p className="text-xs text-primary-700"><strong>Why do we verify?</strong> We use verified email & mobile to secure your account, send important updates and help reunite pets faster.</p></div>
+                  </div>
+                </div>
+
+                {/* Shipping Address */}
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2"><Truck className="h-5 w-5 text-primary-600" /> Shipping Address</h2>
+                    {form.line1 && <button onClick={() => setUseDifferentAddress(!useDifferentAddress)} className="text-sm text-primary-600 hover:text-primary-700 flex items-center gap-1"><Edit3 className="h-3 w-3" /> Edit</button>}
+                  </div>
+
+                  {!useDifferentAddress && form.line1 ? (
+                    <div className="p-4 bg-gray-50 rounded-xl">
+                      <p className="font-medium text-gray-900">{user.fullName}</p>
+                      <p className="text-sm text-gray-600">{form.line1}{form.line2 ? `, ${form.line2}` : ''}</p>
+                      <p className="text-sm text-gray-600">{form.city} {form.zip}</p>
+                      <p className="text-sm text-gray-600">New Zealand</p>
+                      {user.phoneNumber && <p className="text-sm text-gray-600 mt-1">{user.phoneNumber}</p>}
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Address Line 1 *</label>
+                        <AddressAutocomplete value={form.line1} onChange={(val) => setForm(prev => ({ ...prev, line1: val }))} onAddressSelect={handleAddressSelect} placeholder="123 Main Street" />
+                      </div>
+                      <div><label className="block text-sm font-medium text-gray-700 mb-1">Address Line 2</label><input type="text" value={form.line2} onChange={e => setForm({ ...form, line2: e.target.value })} className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm" placeholder="Apartment, suite, etc." /></div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div><label className="block text-sm font-medium text-gray-700 mb-1">City *</label><input type="text" required value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 text-sm" /></div>
+                        <div><label className="block text-sm font-medium text-gray-700 mb-1">Postcode *</label><input type="text" required value={form.zip} onChange={e => setForm({ ...form, zip: e.target.value })} className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 text-sm" /></div>
+                      </div>
+                      <label className="flex items-center gap-2 text-sm text-gray-600">
+                        <input type="checkbox" checked={useDifferentAddress} onChange={e => setUseDifferentAddress(e.target.checked)} className="rounded border-gray-300 text-primary-600" />
+                        Use a different shipping address
+                      </label>
+                    </div>
+                  )}
+
+                  <button onClick={() => goToStep('payment')} disabled={!canProceedToPayment} className="w-full mt-6 py-3 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2">
+                    Continue to Payment <ChevronRight className="h-4 w-4" />
+                  </button>
                 </div>
               </div>
             )}
-
-            <div className="max-w-2xl">
-              {/* Contact Verification */}
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-4">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2"><Mail className="h-5 w-5 text-primary-600" /> Contact Verification</h2>
-
-                <div className={`flex items-center justify-between p-4 rounded-xl mb-3 ${emailVerified ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'}`}>
-                  <div className="flex items-center gap-3">
-                    <Mail className={`h-5 w-5 ${emailVerified ? 'text-green-600' : 'text-gray-400'}`} />
-                    <div><p className="font-medium text-gray-900">Email Verification</p><p className="text-xs text-gray-500">{user?.email || 'Not set'}</p></div>
-                  </div>
-                  {emailVerified ? <span className="text-sm text-green-600 font-medium flex items-center gap-1"><Check className="h-4 w-4" /> Verified</span> : <span className="text-sm text-amber-600 font-medium">Not Verified</span>}
-                </div>
-
-                <div className={`flex items-center justify-between p-4 rounded-xl mb-4 ${mobileVerified ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'}`}>
-                  <div className="flex items-center gap-3">
-                    <Smartphone className={`h-5 w-5 ${mobileVerified ? 'text-green-600' : 'text-gray-400'}`} />
-                    <div><p className="font-medium text-gray-900">Mobile Verification</p><p className="text-xs text-gray-500">{user?.phoneNumber || 'Not set'}</p></div>
-                  </div>
-                  {mobileVerified ? <span className="text-sm text-green-600 font-medium flex items-center gap-1"><Check className="h-4 w-4" /> Verified</span> : <span className="text-sm text-amber-600 font-medium">Not Verified</span>}
-                </div>
-
-                {!emailVerified && <Link to="/verify-account" className="block w-full py-2 text-center text-sm text-primary-600 border border-primary-200 rounded-lg hover:bg-primary-50 mb-2">Verify Email</Link>}
-                {!mobileVerified && <Link to="/verify-account" className="block w-full py-2 text-center text-sm text-primary-600 border border-primary-200 rounded-lg hover:bg-primary-50">Verify Mobile</Link>}
-
-                <div className="bg-primary-50 border border-primary-100 rounded-xl p-4 mt-4">
-                  <div className="flex items-start gap-2"><Shield className="h-4 w-4 text-primary-600 mt-0.5" /><p className="text-xs text-primary-700"><strong>Why do we verify?</strong> We use verified email & mobile to secure your account, send important updates and help reunite pets faster.</p></div>
-                </div>
-              </div>
-
-              {/* Shipping Address */}
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2"><Truck className="h-5 w-5 text-primary-600" /> Shipping Address</h2>
-                  {form.line1 && <button onClick={() => setUseDifferentAddress(!useDifferentAddress)} className="text-sm text-primary-600 hover:text-primary-700 flex items-center gap-1"><Edit3 className="h-3 w-3" /> Edit</button>}
-                </div>
-
-                {!useDifferentAddress && form.line1 ? (
-                  <div className="p-4 bg-gray-50 rounded-xl">
-                    <p className="font-medium text-gray-900">{user?.fullName}</p>
-                    <p className="text-sm text-gray-600">{form.line1}{form.line2 ? `, ${form.line2}` : ''}</p>
-                    <p className="text-sm text-gray-600">{form.city} {form.zip}</p>
-                    <p className="text-sm text-gray-600">New Zealand</p>
-                    {user?.phoneNumber && <p className="text-sm text-gray-600 mt-1">{user.phoneNumber}</p>}
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Address Line 1 *</label>
-                      <AddressAutocomplete value={form.line1} onChange={(val) => setForm(prev => ({ ...prev, line1: val }))} onAddressSelect={handleAddressSelect} placeholder="123 Main Street" />
-                    </div>
-                    <div><label className="block text-sm font-medium text-gray-700 mb-1">Address Line 2</label><input type="text" value={form.line2} onChange={e => setForm({ ...form, line2: e.target.value })} className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm" placeholder="Apartment, suite, etc." /></div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div><label className="block text-sm font-medium text-gray-700 mb-1">City *</label><input type="text" required value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 text-sm" /></div>
-                      <div><label className="block text-sm font-medium text-gray-700 mb-1">Postcode *</label><input type="text" required value={form.zip} onChange={e => setForm({ ...form, zip: e.target.value })} className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 text-sm" /></div>
-                    </div>
-                    <label className="flex items-center gap-2 text-sm text-gray-600">
-                      <input type="checkbox" checked={useDifferentAddress} onChange={e => setUseDifferentAddress(e.target.checked)} className="rounded border-gray-300 text-primary-600" />
-                      Use a different shipping address
-                    </label>
-                  </div>
-                )}
-
-                <button onClick={() => goToStep('payment')} disabled={!canProceedToPayment} className="w-full mt-6 py-3 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2">
-                  Continue to Payment <ChevronRight className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
           </div>
         )}
 

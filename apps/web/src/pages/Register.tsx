@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { PawPrint, Mail, Lock, User, Phone, Eye, EyeOff, CheckCircle, Loader2 } from 'lucide-react';
 import api from '../lib/api';
@@ -13,6 +13,16 @@ export default function Register() {
   const [success, setSuccess] = useState(false);
   const navigate = useNavigate();
   const { page: authPage } = useAuthPage('register');
+
+  // Ensure return URL is set for checkout-originated registration
+  useEffect(() => {
+    if (!localStorage.getItem('pawtag_return_url')) {
+      // No return URL set — this is a standalone registration, not from checkout
+    }
+  }, []);
+
+  const returnUrl = localStorage.getItem('pawtag_return_url');
+  const fromCheckout = returnUrl === '/checkout';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,13 +70,25 @@ export default function Register() {
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Account Created!</h1>
           <p className="text-gray-500 mb-6">
             Your account has been created. Please verify your email address and mobile number to activate your account.
+            {fromCheckout && ' After verification, you\'ll return to checkout.'}
           </p>
           <button
-            onClick={() => navigate(`/verify-account?email=${encodeURIComponent(form.email)}&phone=${encodeURIComponent(form.phoneNumber)}`)}
+            onClick={() => {
+              // Keep return URL in localStorage so VerifyAccount can use it
+              navigate(`/verify-account?email=${encodeURIComponent(form.email)}&phone=${encodeURIComponent(form.phoneNumber)}`);
+            }}
             className="w-full py-3 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 transition-all"
           >
             Verify My Account
           </button>
+          {fromCheckout && (
+            <button
+              onClick={() => navigate('/checkout')}
+              className="w-full mt-3 py-2 text-sm text-gray-500 hover:text-gray-700 transition-all"
+            >
+              Skip for now — return to checkout
+            </button>
+          )}
         </div>
       </div>
     );

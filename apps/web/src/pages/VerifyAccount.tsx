@@ -159,6 +159,13 @@ export default function VerifyAccount() {
   };
 
   const handleContinue = () => {
+    // Check if there's a return URL (e.g., from checkout)
+    const returnUrl = localStorage.getItem('pawtag_return_url');
+    if (returnUrl) {
+      localStorage.removeItem('pawtag_return_url');
+      navigate(returnUrl);
+      return;
+    }
     navigate(status ? '/account' : '/login');
   };
 
