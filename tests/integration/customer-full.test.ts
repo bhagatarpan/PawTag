@@ -469,46 +469,10 @@ describe('Customer Full — Tag Redemption', () => {
 // ═══════════════════════════════════════════════════════════════
 
 describe('Customer Full — Orders', () => {
-  it('returns error when creating order with empty cart', async () => {
-    const { token } = await createCustomerWithAllPerms();
-
-    const res = await request(app)
-      .post('/api/customer/orders')
-      .set('Authorization', `Bearer ${token}`)
-      .send({
-        shippingAddress: { line1: '123 Main St', city: 'Auckland', state: 'AKL', zip: '1010' },
-      });
-
-    expect(res.status).toBe(400);
-    expect(res.body.success).toBe(false);
-    expect(res.body.error).toMatch(/cart/i);
-  });
-
-  it('returns 400 when shipping address is incomplete', async () => {
-    const { token } = await createCustomerWithAllPerms();
-    const product = await insertProduct();
-
-    await request(app)
-      .post('/api/customer/cart/items')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ productId: product._id, quantity: 1 });
-
-    const res = await request(app)
-      .post('/api/customer/orders')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ shippingAddress: { line1: '123 Main St' } });
-
-    expect(res.status).toBe(400);
-  });
-
-  it('returns 401 for unauthenticated order creation', async () => {
-    const res = await request(app)
-      .post('/api/customer/orders')
-      .send({
-        shippingAddress: { line1: '123 Main St', city: 'Auckland', state: 'AKL', zip: '1010' },
-      });
-    expect(res.status).toBe(401);
-  });
+  // NOTE: POST /api/customer/orders has been removed.
+  // Checkout now uses Medusa SDK: sdk.store.cart.complete() → order.placed webhook.
+  // The Medusa webhook handler creates PawTag orders.
+  // See: packages/api/src/routes/medusa-webhooks.ts
 
   it('GET /orders returns user orders', async () => {
     const { token } = await createCustomerWithAllPerms();

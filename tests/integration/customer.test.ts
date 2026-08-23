@@ -328,48 +328,10 @@ describe('Integration: Customer - Orders', () => {
     expect(res.status).toBe(404);
   });
 
-  it('POST /api/customer/orders rejects empty cart', async () => {
-    const { token } = await createCustomerWithRBAC();
-    const res = await request(app)
-      .post('/api/customer/orders')
-      .set('Authorization', `Bearer ${token}`)
-      .send({
-        shippingAddress: { line1: '123 Main St', city: 'Auckland', state: 'AKL', zip: '1010' },
-      });
-
-    expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/cart/i);
-  });
-
-  it('POST /api/customer/orders rejects missing shipping address', async () => {
-    const { token } = await createCustomerWithRBAC();
-    const product = await mongoose.connection.collections.products.insertOne({
-      name: 'PawTag Missing',
-      slug: 'pawtag-missing',
-      description: 'Missing tag',
-      price: 29.99,
-      sku: 'PT-MS-001',
-      category: 'tags',
-      stock: 10,
-      isActive: true,
-      images: [],
-      variants: [],
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-
-    await request(app)
-      .post('/api/customer/cart/items')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ productId: product.insertedId.toString(), quantity: 1 });
-
-    const res = await request(app)
-      .post('/api/customer/orders')
-      .set('Authorization', `Bearer ${token}`)
-      .send({});
-
-    expect(res.status).toBe(400);
-  });
+  // NOTE: POST /api/customer/orders has been removed.
+  // Checkout now uses Medusa SDK: sdk.store.cart.complete() → order.placed webhook.
+  // The Medusa webhook handler creates PawTag orders.
+  // See: packages/api/src/routes/medusa-webhooks.ts
 });
 
 // ═══════════════════════════════════════════
