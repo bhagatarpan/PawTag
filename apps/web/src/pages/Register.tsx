@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { PawPrint, Mail, Lock, User, Phone, Eye, EyeOff, CheckCircle, Loader2 } from 'lucide-react';
 import api from '../lib/api';
@@ -14,15 +14,13 @@ export default function Register() {
   const navigate = useNavigate();
   const { page: authPage } = useAuthPage('register');
 
-  // Ensure return URL is set for checkout-originated registration
-  useEffect(() => {
-    if (!localStorage.getItem('pawtag_return_url')) {
-      // No return URL set — this is a standalone registration, not from checkout
-    }
-  }, []);
-
-  const returnUrl = localStorage.getItem('pawtag_return_url');
-  const fromCheckout = returnUrl === '/checkout';
+  // Capture return URL on mount, then clear it to prevent stale values
+  // from affecting navbar-originated registrations
+  const [fromCheckout] = useState(() => {
+    const url = localStorage.getItem('pawtag_return_url');
+    localStorage.removeItem('pawtag_return_url');
+    return url === '/checkout';
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -74,7 +72,11 @@ export default function Register() {
           </p>
           <button
             onClick={() => {
-              // Keep return URL in localStorage so VerifyAccount can use it
+              // Re-set return URL for checkout-originated registrations so
+              // VerifyAccount can redirect back after verification
+              if (fromCheckout) {
+                localStorage.setItem('pawtag_return_url', '/checkout');
+              }
               navigate(`/verify-account?email=${encodeURIComponent(form.email)}&phone=${encodeURIComponent(form.phoneNumber)}`);
             }}
             className="w-full py-3 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 transition-all"
