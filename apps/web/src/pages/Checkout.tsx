@@ -169,13 +169,14 @@ export default function Checkout() {
     setLoading(true);
     setError(null);
     try {
-      // 1. Ensure customer is associated with cart
+      // 1. Ensure customer is associated with cart (non-blocking — fire-and-forget)
       if (!cart.customer_id) {
-        const syncRes = await api.post('/customer/medusa-sync');
-        const medusaCustomerId = syncRes.data?.data?.medusaCustomerId;
-        if (medusaCustomerId) {
-          await sdk.store.cart.update(cart.id, { customer_id: medusaCustomerId } as any);
-        }
+        api.post('/customer/medusa-sync').then((res) => {
+          const medusaCustomerId = res.data?.data?.medusaCustomerId;
+          if (medusaCustomerId) {
+            sdk.store.cart.update(cart.id, { customer_id: medusaCustomerId } as any).catch(() => {});
+          }
+        }).catch(() => {}); // Non-blocking — sync failure should not block checkout
       }
 
       // 2. Pass referral code to cart metadata (if present)

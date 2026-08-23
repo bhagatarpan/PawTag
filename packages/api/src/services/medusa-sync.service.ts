@@ -44,6 +44,12 @@ export async function syncUserToMedusa(userId: string): Promise<string | null> {
     return user.medusaCustomerId;
   }
 
+  // Skip if Medusa is not configured
+  if (!MEDUSA_ADMIN_TOKEN) {
+    console.warn('[medusa-sync] MEDUSA_ADMIN_TOKEN not configured — skipping sync');
+    return null;
+  }
+
   try {
     const sdk = getSdk();
     const { firstName, lastName } = splitFullName(user.fullName);
