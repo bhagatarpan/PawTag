@@ -76,6 +76,27 @@ export default function Checkout() {
   const [cardCvc, setCardCvc] = useState('');
   const [cardName, setCardName] = useState('');
 
+  // Shipping options
+  const [shippingOptions, setShippingOptions] = useState<any[]>([]);
+  const [selectedShippingOption, setSelectedShippingOption] = useState<string>('');
+  const [shippingLoading, setShippingLoading] = useState(false);
+
+  // Fetch shipping options when address is entered
+  useEffect(() => {
+    if (!cart?.id || !form.line1) return;
+    setShippingLoading(true);
+    sdk.store.fulfillment.listCartOptions({ cart_id: cart.id })
+      .then(({ shipping_options }) => {
+        setShippingOptions(shipping_options || []);
+        // Auto-select first option if none selected
+        if (shipping_options?.length > 0 && !selectedShippingOption) {
+          setSelectedShippingOption(shipping_options[0].id);
+        }
+      })
+      .catch(() => setShippingOptions([]))
+      .finally(() => setShippingLoading(false));
+  }, [cart?.id, form.line1]);
+
   // CMS settings for trust badges
   const { settings } = useSiteSettings();
   const trustBadgeTitle = settings?.['checkout.trustBadges.title'] || 'All PawTag devices come with';
@@ -102,7 +123,8 @@ export default function Checkout() {
   }, [user]);
 
   // Derived values — all from Medusa cart (single source of truth)
-  const shippingCost = cart?.shipping_total || 0;
+  const selectedShippingPrice = shippingOptions.find(o => o.id === selectedShippingOption)?.calculated_price?.amount || 0;
+  const shippingCost = cart?.shipping_total || selectedShippingPrice;
   const taxAmount = cart?.tax_total || 0;
   const discountAmount = cart?.discount_total || promoDiscount;
   const orderTotal = cart?.total || total;
@@ -217,23 +239,16 @@ export default function Checkout() {
         } as any);
       }
 
-      // 3. Add free shipping method
-      try {
-        const { shipping_options } = await sdk.store.fulfillment.listCartOptions({
-          cart_id: cart.id,
-        });
-        console.log('[Checkout] Shipping options:', shipping_options?.length, shipping_options);
-        if (shipping_options?.length > 0) {
+      // 3. Add selected shipping method
+      if (selectedShippingOption) {
+        try {
           await sdk.store.cart.addShippingMethod(cart.id, {
-            option_id: shipping_options[0].id,
+            option_id: selectedShippingOption,
           });
-          console.log('[Checkout] Shipping method added:', shipping_options[0].id);
-        } else {
-          console.warn('[Checkout] No shipping options available');
+          console.log('[Checkout] Shipping method added:', selectedShippingOption);
+        } catch (shipErr: any) {
+          console.error('[Checkout] Shipping method error:', shipErr?.message);
         }
-      } catch (shipErr: any) {
-        console.error('[Checkout] Shipping method error:', shipErr?.message);
-        // Continue without shipping method — cart complete may still work in some configs
       }
 
       // 4. Initiate payment session
@@ -415,7 +430,7 @@ export default function Checkout() {
                 <div className="space-y-2 pt-2">
                   <div className="flex justify-between text-sm text-gray-600"><span>Subtotal</span><span>NZ${total.toFixed(2)}</span></div>
                   {discountAmount > 0 && <div className="flex justify-between text-sm text-green-600"><span>Discount</span><span>-NZ${discountAmount.toFixed(2)}</span></div>}
-                  <div className="flex justify-between text-sm text-gray-600"><span>Shipping</span><span className="text-green-600 font-medium">FREE</span></div>
+                  <div className="flex justify-between text-sm text-gray-600"><span>Shipping</span><span className={`font-medium ${shippingCost === 0 ? 'text-green-600' : 'text-gray-900'}`}>{shippingCost === 0 ? 'FREE' : `NZ$${shippingCost.toFixed(2)}`}</span></div>
                   <div className="flex justify-between text-sm text-gray-600"><span>Tax (Included)</span><span>NZ${taxAmount.toFixed(2)}</span></div>
                   <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-100"><span>Total (NZD)</span><span className="text-primary-700">NZ${orderTotal.toFixed(2)}</span></div>
                 </div>
@@ -533,6 +548,47 @@ export default function Checkout() {
                     </div>
                   )}
 
+                  {/* Shipping Method — only shown after address is entered */}
+                  {form.line1 && shippingOptions.length > 0 && (
+                    <div className="mt-6 pt-6 border-t border-gray-100">
+                      <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2 mb-3">
+                        <Truck className="h-4 w-4 text-primary-600" /> Shipping Method
+                      </h3>
+                      <div className="space-y-2">
+                        {shippingOptions.map((option) => (
+                          <label
+                            key={option.id}
+                            className={`flex items-center justify-between p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                              selectedShippingOption === option.id
+                                ? 'border-primary-500 bg-primary-50'
+                                : 'border-gray-200 hover:border-gray-300'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <input
+                                type="radio"
+                                name="shipping"
+                                value={option.id}
+                                checked={selectedShippingOption === option.id}
+                                onChange={() => setSelectedShippingOption(option.id)}
+                                className="text-primary-600"
+                              />
+                              <div>
+                                <p className="text-sm font-medium text-gray-900">{option.name}</p>
+                                {option.type?.description && (
+                                  <p className="text-xs text-gray-500">{option.type.description}</p>
+                                )}
+                              </div>
+                            </div>
+                            <span className={`text-sm font-semibold ${option.calculated_price?.amount === 0 ? 'text-green-600' : 'text-gray-900'}`}>
+                              {option.calculated_price?.amount === 0 ? 'FREE' : `NZ$${(option.calculated_price?.amount || 0).toFixed(2)}`}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   <button onClick={() => goToStep('payment')} disabled={!canProceedToPayment} className="w-full mt-6 py-3 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2">
                     Continue to Payment <ChevronRight className="h-4 w-4" />
                   </button>
@@ -569,7 +625,7 @@ export default function Checkout() {
                   <div className="space-y-2 pt-4">
                     <div className="flex justify-between text-sm"><span className="text-gray-600">Subtotal</span><span className="text-gray-900">NZ${total.toFixed(2)}</span></div>
                     {discountAmount > 0 && <div className="flex justify-between text-sm"><span className="text-green-600">Discount</span><span className="text-green-600">-NZ${discountAmount.toFixed(2)}</span></div>}
-                    <div className="flex justify-between text-sm"><span className="text-gray-600">Shipping</span><span className="text-green-600 font-medium">FREE</span></div>
+                    <div className="flex justify-between text-sm"><span className="text-gray-600">Shipping</span><span className={`font-medium ${shippingCost === 0 ? 'text-green-600' : 'text-gray-900'}`}>{shippingCost === 0 ? 'FREE' : `NZ$${shippingCost.toFixed(2)}`}</span></div>
                     <div className="flex justify-between text-sm"><span className="text-gray-600">Tax (Included)</span><span className="text-gray-900">NZ${taxAmount.toFixed(2)}</span></div>
                     <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-100"><span>Total (NZD)</span><span className="text-primary-700">NZ${orderTotal.toFixed(2)}</span></div>
                   </div>
