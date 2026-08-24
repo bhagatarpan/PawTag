@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Lock, CreditCard, PawPrint, CheckCircle, Truck, Tag, Loader2,
@@ -13,6 +13,7 @@ import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useSiteSettings } from '../hooks/useCms';
 import CheckoutAuth from '../components/CheckoutAuth';
+import StripePaymentForm from '../components/StripePaymentForm';
 
 type Step = 'cart' | 'checkout' | 'payment' | 'confirmed';
 
@@ -40,6 +41,7 @@ export default function Checkout() {
   const [error, setError] = useState<string | null>(null);
   const [orderNumber, setOrderNumber] = useState(() => sessionStorage.getItem('pawtag_checkout_order') || '');
   const [success, setSuccess] = useState(() => sessionStorage.getItem('pawtag_checkout_success') === 'true');
+  const [paymentClientSecret, setPaymentClientSecret] = useState('');
 
   // Promo code
   const [promoCode, setPromoCode] = useState('');
@@ -70,12 +72,6 @@ export default function Checkout() {
     }
   }, [user, addressMode]);
 
-  // Card details (demo mode)
-  const [cardNumber, setCardNumber] = useState('');
-  const [cardExpiry, setCardExpiry] = useState('');
-  const [cardCvc, setCardCvc] = useState('');
-  const [cardName, setCardName] = useState('');
-
   // Shipping options
   const [shippingOptions, setShippingOptions] = useState<any[]>([]);
   const [selectedShippingOption, setSelectedShippingOption] = useState<string>('');
@@ -96,6 +92,18 @@ export default function Checkout() {
       .catch(() => setShippingOptions([]))
       .finally(() => setShippingLoading(false));
   }, [cart?.id, form.line1]);
+
+  // Sync shipping method to Medusa cart when selection changes (updates cart totals in real time)
+  const prevShippingRef = useRef(selectedShippingOption);
+  useEffect(() => {
+    if (!cart?.id || !selectedShippingOption) return;
+    // Skip initial mount — only sync on user-initiated changes
+    if (prevShippingRef.current === selectedShippingOption) return;
+    prevShippingRef.current = selectedShippingOption;
+    sdk.store.cart.addShippingMethod(cart.id, { option_id: selectedShippingOption })
+      .then(() => refreshCart())
+      .catch(() => {});
+  }, [selectedShippingOption, cart?.id]);
 
   // CMS settings for trust badges
   const { settings } = useSiteSettings();
@@ -131,7 +139,6 @@ export default function Checkout() {
 
   const canProceedToCheckout = items.length > 0;
   const canProceedToPayment = emailVerified && mobileVerified && form.line1 && form.city && form.zip;
-  const canPay = cardNumber.length >= 16 && cardExpiry.length >= 4 && cardCvc.length >= 3 && cardName.length > 2;
 
   // Step navigation
   const goToStep = (step: Step) => {
@@ -187,7 +194,7 @@ export default function Checkout() {
 
   // Payment handler — uses Medusa SDK checkout flow
   const handlePayment = async () => {
-    if (!user || !canPay || !cart) return;
+    if (!user || !cart) return;
     setLoading(true);
     setError(null);
     try {
@@ -239,7 +246,7 @@ export default function Checkout() {
         } as any);
       }
 
-      // 3. Add selected shipping method
+      // 4. Add selected shipping method
       if (selectedShippingOption) {
         try {
           await sdk.store.cart.addShippingMethod(cart.id, {
@@ -251,46 +258,23 @@ export default function Checkout() {
         }
       }
 
-      // 4. Initiate payment session
+      // 5. Initiate payment session and get client secret for Stripe Elements
       await sdk.store.payment.initiatePaymentSession(cart, {
         provider_id: 'pp_stripe_stripe',
       });
 
-      // 5. Confirm payment with test card (demo mode)
-      const cartAny = cart as any;
-      const paymentSession = cartAny.payment_sessions?.[0];
-      if (paymentSession?.data?.client_secret) {
-        try {
-          await api.post('/customer/demo-payment/confirm', {
-            paymentIntentId: paymentSession.data.id,
-            clientSecret: paymentSession.data.client_secret,
-          });
-          console.log('[Checkout] Demo payment confirmed');
-        } catch (payErr: any) {
-          console.error('[Checkout] Demo payment confirmation failed:', payErr?.message);
-          // Continue anyway — may work in some configs
-        }
+      // Re-fetch cart to get payment session with client_secret
+      const { cart: refreshedCart } = await sdk.store.cart.retrieve(cart.id);
+      const cartAny = refreshedCart as any;
+      const clientSecret = cartAny?.payment_sessions?.[0]?.data?.client_secret;
+
+      if (!clientSecret) {
+        throw new Error('Payment session could not be created');
       }
 
-      // 6. Complete cart — this creates the Medusa order
-      const result = await sdk.store.cart.complete(cart.id);
-
-      if (result.type === 'cart') {
-        // Cart type means error — show Medusa's error message
-        throw new Error(result.error?.message || result.error?.name || 'Order creation failed — cart could not be completed');
-      }
-
-      // 6. Store the Medusa order ID and show confirmation
-      const medusaOrder = result.order;
-      // Use display_id (sequential number) if available, fallback to ID
-      const orderDisplay = medusaOrder.display_id?.toString() || medusaOrder.id || 'Processing';
-      setOrderNumber(orderDisplay);
-      setSuccess(true);
-      setCurrentStep('confirmed');
-      // Persist success state for page refresh
-      sessionStorage.setItem('pawtag_checkout_success', 'true');
-      sessionStorage.setItem('pawtag_checkout_order', orderDisplay);
-      clearCart();
+      // Store client secret — StripePaymentForm will use it to confirm payment
+      setPaymentClientSecret(clientSecret);
+      setCurrentStep('payment');
     } catch (err: any) {
       setError(err?.message || err?.response?.data?.error || 'Payment failed. Please try again.');
       // Refresh cart to reconcile any server-side mutations from the failed payment attempt
@@ -298,6 +282,38 @@ export default function Checkout() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Called by StripePaymentForm after Stripe confirms payment client-side
+  const handlePaymentSuccess = async (paymentIntentId: string) => {
+    if (!cart) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await sdk.store.cart.complete(cart.id);
+
+      if (result.type === 'cart') {
+        throw new Error(result.error?.message || result.error?.name || 'Order creation failed — cart could not be completed');
+      }
+
+      const medusaOrder = result.order;
+      const orderDisplay = medusaOrder.display_id?.toString() || medusaOrder.id || 'Processing';
+      setOrderNumber(orderDisplay);
+      setSuccess(true);
+      setCurrentStep('confirmed');
+      sessionStorage.setItem('pawtag_checkout_success', 'true');
+      sessionStorage.setItem('pawtag_checkout_order', orderDisplay);
+      clearCart();
+    } catch (err: any) {
+      setError(err?.message || 'Order confirmation failed. Your payment was received — please contact support.');
+      await refreshCart();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePaymentError = (message: string) => {
+    setError(message);
   };
 
   // Empty cart
@@ -589,8 +605,8 @@ export default function Checkout() {
                     </div>
                   )}
 
-                  <button onClick={() => goToStep('payment')} disabled={!canProceedToPayment} className="w-full mt-6 py-3 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2">
-                    Continue to Payment <ChevronRight className="h-4 w-4" />
+                  <button onClick={handlePayment} disabled={!canProceedToPayment || loading} className="w-full mt-6 py-3 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2">
+                    {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Setting up payment...</> : <><>Continue to Payment <ChevronRight className="h-4 w-4" /></></>}
                   </button>
                 </div>
               </div>
@@ -636,26 +652,19 @@ export default function Checkout() {
               <div className="space-y-4">
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                   <h2 className="text-lg font-semibold text-gray-900 mb-4">Payment Method</h2>
-                  <div className="space-y-3 mb-6">
-                    <label className="flex items-center gap-3 p-3 border-2 border-primary-500 bg-primary-50 rounded-xl cursor-pointer">
-                      <input type="radio" name="payment" defaultChecked className="text-primary-600" />
-                      <CreditCard className="h-5 w-5 text-primary-600" />
-                      <span className="font-medium text-gray-900">Credit / Debit Card</span>
-                      <div className="ml-auto flex gap-1">
-                        <span className="text-xs bg-gray-100 px-2 py-1 rounded">VISA</span>
-                        <span className="text-xs bg-gray-100 px-2 py-1 rounded">MC</span>
-                      </div>
-                    </label>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div><label className="block text-sm font-medium text-gray-700 mb-1">Card Number</label><input type="text" value={cardNumber} onChange={e => setCardNumber(e.target.value.replace(/\D/g, '').replace(/(.{4})/g, '$1 ').trim())} maxLength={19} placeholder="1234 1234 1234 1234" className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 font-mono text-sm" /></div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div><label className="block text-sm font-medium text-gray-700 mb-1">Expiry Date</label><input type="text" value={cardExpiry} onChange={e => { let v = e.target.value.replace(/\D/g, ''); if (v.length > 2) v = v.slice(0, 2) + '/' + v.slice(2); setCardExpiry(v); }} maxLength={5} placeholder="MM / YY" className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 text-sm" /></div>
-                      <div><label className="block text-sm font-medium text-gray-700 mb-1">CVC</label><input type="text" value={cardCvc} onChange={e => setCardCvc(e.target.value.replace(/\D/g, ''))} maxLength={4} placeholder="123" className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 text-sm" /></div>
+                  {paymentClientSecret ? (
+                    <StripePaymentForm
+                      clientSecret={paymentClientSecret}
+                      onPaymentSuccess={handlePaymentSuccess}
+                      onPaymentError={handlePaymentError}
+                      disabled={loading}
+                    />
+                  ) : (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin text-primary-600" />
+                      <span className="ml-2 text-sm text-gray-500">Loading payment methods...</span>
                     </div>
-                    <div><label className="block text-sm font-medium text-gray-700 mb-1">Name on Card</label><input type="text" value={cardName} onChange={e => setCardName(e.target.value)} placeholder="Cardholder Name" className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 text-sm" /></div>
-                  </div>
+                  )}
                 </div>
 
                 {/* Trust badges */}
@@ -665,11 +674,8 @@ export default function Checkout() {
                   <div className="text-center p-3 bg-gray-50 rounded-xl"><Headphones className="h-5 w-5 text-primary-600 mx-auto mb-1" /><p className="text-xs font-medium text-gray-900">24/7 Support</p><p className="text-xs text-gray-500">We're here to help</p></div>
                 </div>
 
-                <button onClick={handlePayment} disabled={!canPay || loading} className="w-full py-4 bg-primary-600 text-white rounded-xl font-semibold text-lg hover:bg-primary-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2">
-                  {loading ? <><Loader2 className="h-5 w-5 animate-spin" /> Processing...</> : <><Lock className="h-5 w-5" /> Pay NZ${orderTotal.toFixed(2)}</>}
-                </button>
                 <p className="text-xs text-gray-400 text-center">By placing this order, you agree to our <Link to="/terms" className="underline">Terms of Service</Link> and <Link to="/privacy" className="underline">Privacy Policy</Link>.</p>
-                <p className="text-xs text-gray-400 text-center">Powered by medusa</p>
+                <p className="text-xs text-gray-400 text-center">Powered by Stripe</p>
               </div>
             </div>
           </div>

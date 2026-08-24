@@ -346,7 +346,7 @@ export default async function seedPawTag({ container }: ExecArgs) {
     // Create the option type
     const optionType = await fulfillmentModuleService.createShippingOptionTypes({
       label: "Standard",
-      description: "Free NZ-wide shipping (3–5 working days)",
+      description: "Free NZ-wide shipping (8-10 working days)",
       code: "standard-free",
     });
 

@@ -31,6 +31,7 @@ export default defineConfig({
               options: {
                 apiKey: process.env.STRIPE_API_KEY!,
                 capture: true,
+                automaticPaymentMethods: true,
               },
             }]
           : [],
