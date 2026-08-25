@@ -572,44 +572,52 @@ export default function Checkout() {
                     </div>
                   )}
 
-                  {/* Shipping Method — only shown after address is entered */}
-                  {form.line1 && shippingOptions.length > 0 && (
+                  {/* Shipping Method — shown after address is entered */}
+                  {form.line1 && (
                     <div className="mt-6 pt-6 border-t border-gray-100">
                       <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2 mb-3">
                         <Truck className="h-4 w-4 text-primary-600" /> Shipping Method
                       </h3>
-                      <div className="space-y-2">
-                        {shippingOptions.map((option) => (
-                          <label
-                            key={option.id}
-                            className={`flex items-center justify-between p-3 rounded-xl border-2 cursor-pointer transition-all ${
-                              selectedShippingOption === option.id
-                                ? 'border-primary-500 bg-primary-50'
-                                : 'border-gray-200 hover:border-gray-300'
-                            }`}
-                          >
-                            <div className="flex items-center gap-3">
-                              <input
-                                type="radio"
-                                name="shipping"
-                                value={option.id}
-                                checked={selectedShippingOption === option.id}
-                                onChange={() => setSelectedShippingOption(option.id)}
-                                className="text-primary-600"
-                              />
-                              <div>
-                                <p className="text-sm font-medium text-gray-900">{option.name}</p>
-                                {option.type?.description && (
-                                  <p className="text-xs text-gray-500">{option.type.description}</p>
-                                )}
+                      {shippingLoading ? (
+                        <div className="flex items-center gap-2 text-sm text-gray-500">
+                          <Loader2 className="h-4 w-4 animate-spin" /> Loading shipping options...
+                        </div>
+                      ) : shippingOptions.length > 0 ? (
+                        <div className="space-y-2">
+                          {shippingOptions.map((option) => (
+                            <label
+                              key={option.id}
+                              className={`flex items-center justify-between p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                                selectedShippingOption === option.id
+                                  ? 'border-primary-500 bg-primary-50'
+                                  : 'border-gray-200 hover:border-gray-300'
+                              }`}
+                            >
+                              <div className="flex items-center gap-3">
+                                <input
+                                  type="radio"
+                                  name="shipping"
+                                  value={option.id}
+                                  checked={selectedShippingOption === option.id}
+                                  onChange={() => setSelectedShippingOption(option.id)}
+                                  className="text-primary-600"
+                                />
+                                <div>
+                                  <p className="text-sm font-medium text-gray-900">{option.name}</p>
+                                  {option.type?.description && (
+                                    <p className="text-xs text-gray-500">{option.type.description}</p>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                            <span className={`text-sm font-semibold ${option.amount === 0 ? 'text-green-600' : 'text-gray-900'}`}>
-                              {option.amount === 0 ? 'FREE' : `NZ$${(option.amount || 0).toFixed(2)}`}
-                            </span>
-                          </label>
-                        ))}
-                      </div>
+                              <span className={`text-sm font-semibold ${option.amount === 0 ? 'text-green-600' : 'text-gray-900'}`}>
+                                {option.amount === 0 ? 'FREE' : `NZ$${(option.amount || 0).toFixed(2)}`}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-gray-500">No shipping options available for this address.</p>
+                      )}
                     </div>
                   )}
 
@@ -649,10 +657,24 @@ export default function Checkout() {
                   <div className="space-y-2 pt-4">
                     <div className="flex justify-between text-sm"><span className="text-gray-600">Subtotal</span><span className="text-gray-900">NZ${total.toFixed(2)}</span></div>
                     {discountAmount > 0 && <div className="flex justify-between text-sm"><span className="text-green-600">Discount</span><span className="text-green-600">-NZ${discountAmount.toFixed(2)}</span></div>}
-                    <div className="flex justify-between text-sm"><span className="text-gray-600">Shipping</span><span className={`font-medium ${shippingCost === 0 ? 'text-green-600' : 'text-gray-900'}`}>{shippingCost === 0 ? 'FREE' : `NZ$${shippingCost.toFixed(2)}`}</span></div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Shipping{selectedShippingOption ? ` — ${shippingOptions.find(o => o.id === selectedShippingOption)?.name || ''}` : ''}</span>
+                      <span className={`font-medium ${shippingCost === 0 ? 'text-green-600' : 'text-gray-900'}`}>{shippingCost === 0 ? 'FREE' : `NZ$${shippingCost.toFixed(2)}`}</span>
+                    </div>
                     <div className="flex justify-between text-sm"><span className="text-gray-600">Tax (Included)</span><span className="text-gray-900">NZ${taxAmount.toFixed(2)}</span></div>
                     <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-100"><span>Total (NZD)</span><span className="text-primary-700">NZ${orderTotal.toFixed(2)}</span></div>
                   </div>
+
+                  {/* Shipping Address */}
+                  {form.line1 && (
+                    <div className="mt-4 pt-4 border-t border-gray-100">
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Shipping to</p>
+                      <p className="text-sm text-gray-900">{user?.fullName || 'Customer'}</p>
+                      <p className="text-sm text-gray-600">{form.line1}{form.line2 ? `, ${form.line2}` : ''}</p>
+                      <p className="text-sm text-gray-600">{form.city} {form.zip}</p>
+                      <p className="text-sm text-gray-600">New Zealand</p>
+                    </div>
+                  )}
                 </div>
               </div>
 
