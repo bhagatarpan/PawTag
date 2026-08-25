@@ -266,7 +266,7 @@ export default function Checkout() {
       // Re-fetch cart to get payment session with client_secret
       const { cart: refreshedCart } = await sdk.store.cart.retrieve(cart.id);
       const cartAny = refreshedCart as any;
-      const clientSecret = cartAny?.payment_sessions?.[0]?.data?.client_secret;
+      const clientSecret = cartAny?.payment_collection?.payment_sessions?.[0]?.data?.client_secret;
 
       if (!clientSecret) {
         throw new Error('Payment session could not be created');
@@ -484,6 +484,14 @@ export default function Checkout() {
               <CheckoutAuth />
             ) : (
               <div className="max-w-2xl">
+                {/* Welcome message for signed-in user */}
+                <div className="bg-primary-50 border border-primary-100 rounded-xl p-4 mb-4 flex items-center gap-3">
+                  <CheckCircle className="h-5 w-5 text-primary-600 flex-shrink-0" />
+                  <p className="text-sm text-primary-700">
+                    Welcome back, <span className="font-semibold">{user.fullName || 'there'}</span>! You're signed in and ready to checkout.
+                  </p>
+                </div>
+
                 {/* Contact Verification — only shown for authenticated users */}
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-4">
                   <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2"><Mail className="h-5 w-5 text-primary-600" /> Contact Verification</h2>
