@@ -131,7 +131,7 @@ export default function Checkout() {
   }, [user]);
 
   // Derived values — all from Medusa cart (single source of truth)
-  const selectedShippingPrice = shippingOptions.find(o => o.id === selectedShippingOption)?.calculated_price?.amount || 0;
+  const selectedShippingPrice = shippingOptions.find(o => o.id === selectedShippingOption)?.amount || 0;
   const shippingCost = cart?.shipping_total || selectedShippingPrice;
   const taxAmount = cart?.tax_total || 0;
   const discountAmount = cart?.discount_total || promoDiscount;
@@ -596,8 +596,8 @@ export default function Checkout() {
                                 )}
                               </div>
                             </div>
-                            <span className={`text-sm font-semibold ${option.calculated_price?.amount === 0 ? 'text-green-600' : 'text-gray-900'}`}>
-                              {option.calculated_price?.amount === 0 ? 'FREE' : `NZ$${(option.calculated_price?.amount || 0).toFixed(2)}`}
+                            <span className={`text-sm font-semibold ${option.amount === 0 ? 'text-green-600' : 'text-gray-900'}`}>
+                              {option.amount === 0 ? 'FREE' : `NZ$${(option.amount || 0).toFixed(2)}`}
                             </span>
                           </label>
                         ))}
