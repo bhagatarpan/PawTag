@@ -102,7 +102,7 @@ export default function Checkout() {
     prevShippingRef.current = selectedShippingOption;
     sdk.store.cart.addShippingMethod(cart.id, { option_id: selectedShippingOption })
       .then(() => refreshCart())
-      .catch(() => {});
+      .catch((err) => console.error('[Checkout] Shipping sync error:', err?.message));
   }, [selectedShippingOption, cart?.id]);
 
   // CMS settings for trust badges
@@ -130,12 +130,13 @@ export default function Checkout() {
     }
   }, [user]);
 
-  // Derived values — all from Medusa cart (single source of truth)
+  // Derived values — compute from individual components for reliability
   const selectedShippingPrice = shippingOptions.find(o => o.id === selectedShippingOption)?.amount || 0;
   const shippingCost = cart?.shipping_total || selectedShippingPrice;
   const taxAmount = cart?.tax_total || 0;
   const discountAmount = cart?.discount_total || promoDiscount;
-  const orderTotal = cart?.total || total;
+  const itemsSubtotal = cart?.item_subtotal || cart?.subtotal || total;
+  const orderTotal = itemsSubtotal + shippingCost + taxAmount - discountAmount;
 
   const canProceedToCheckout = items.length > 0;
   const canProceedToPayment = emailVerified && mobileVerified && form.line1 && form.city && form.zip;
@@ -246,7 +247,7 @@ export default function Checkout() {
         } as any);
       }
 
-      // 4. Add selected shipping method
+      // 4. Add selected shipping method + refresh cart so totals include shipping & tax
       if (selectedShippingOption) {
         try {
           await sdk.store.cart.addShippingMethod(cart.id, {
@@ -258,8 +259,12 @@ export default function Checkout() {
         }
       }
 
+      // Re-fetch cart to get updated totals (shipping + tax calculated)
+      const updatedCart = await refreshCart();
+
       // 5. Initiate payment session and get client secret for Stripe Elements
-      await sdk.store.payment.initiatePaymentSession(cart, {
+      const cartForPayment = updatedCart || cart;
+      await sdk.store.payment.initiatePaymentSession(cartForPayment, {
         provider_id: 'pp_stripe_stripe',
       });
 
@@ -444,7 +449,7 @@ export default function Checkout() {
                   </div>
                 )}
                 <div className="space-y-2 pt-2">
-                  <div className="flex justify-between text-sm text-gray-600"><span>Subtotal</span><span>NZ${total.toFixed(2)}</span></div>
+                  <div className="flex justify-between text-sm text-gray-600"><span>Subtotal</span><span>NZ${itemsSubtotal.toFixed(2)}</span></div>
                   {discountAmount > 0 && <div className="flex justify-between text-sm text-green-600"><span>Discount</span><span>-NZ${discountAmount.toFixed(2)}</span></div>}
                   <div className="flex justify-between text-sm text-gray-600"><span>Shipping</span><span className={`font-medium ${shippingCost === 0 ? 'text-green-600' : 'text-gray-900'}`}>{shippingCost === 0 ? 'FREE' : `NZ$${shippingCost.toFixed(2)}`}</span></div>
                   <div className="flex justify-between text-sm text-gray-600"><span>Tax (Included)</span><span>NZ${taxAmount.toFixed(2)}</span></div>
@@ -655,7 +660,7 @@ export default function Checkout() {
                     </div>
                   ))}
                   <div className="space-y-2 pt-4">
-                    <div className="flex justify-between text-sm"><span className="text-gray-600">Subtotal</span><span className="text-gray-900">NZ${total.toFixed(2)}</span></div>
+                    <div className="flex justify-between text-sm"><span className="text-gray-600">Subtotal</span><span className="text-gray-900">NZ${itemsSubtotal.toFixed(2)}</span></div>
                     {discountAmount > 0 && <div className="flex justify-between text-sm"><span className="text-green-600">Discount</span><span className="text-green-600">-NZ${discountAmount.toFixed(2)}</span></div>}
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">Shipping{selectedShippingOption ? ` — ${shippingOptions.find(o => o.id === selectedShippingOption)?.name || ''}` : ''}</span>
