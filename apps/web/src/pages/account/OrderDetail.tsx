@@ -336,10 +336,19 @@ export default function OrderDetail() {
                 <span className="text-gray-500">Subtotal</span>
                 <span>${(order.payment?.amount || order.totalAmount).toFixed(2)}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Shipping</span>
-                <span className="text-green-600">Free</span>
-              </div>
+              {(() => {
+                // Calculate shipping from order items (shipping line items have no productId or "shipping" in name)
+                const shippingItem = order.items?.find((i: any) => !i.productId || i.productName?.toLowerCase().includes('shipping'));
+                const shippingCost = shippingItem?.totalPrice || 0;
+                return (
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Shipping</span>
+                    <span className={shippingCost === 0 ? 'text-green-600' : 'text-gray-900'}>
+                      {shippingCost === 0 ? 'Free' : `NZ$${shippingCost.toFixed(2)}`}
+                    </span>
+                  </div>
+                );
+              })()}
               <div className="border-t border-gray-200 pt-2 flex justify-between font-semibold text-base">
                 <span>Total</span>
                 <span className="text-teal-700">${(order.payment?.amount || order.totalAmount).toFixed(2)} NZD</span>

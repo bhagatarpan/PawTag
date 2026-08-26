@@ -149,6 +149,18 @@ export async function createOrderFromMedusa(medusaOrderId: string): Promise<Crea
     totalPrice: (item.unit_price || 0) * item.quantity,
   }));
 
+  // Add shipping as a line item if there's a shipping cost
+  if (medusaOrder.shipping_total > 0) {
+    const shippingMethod = medusaOrder.shipping_methods?.[0];
+    items.push({
+      productId: '',
+      productName: shippingMethod?.name || 'Shipping',
+      quantity: 1,
+      unitPrice: medusaOrder.shipping_total,
+      totalPrice: medusaOrder.shipping_total,
+    });
+  }
+
   // Create PawTag order
   const order = await Order.create({
     orderNumber,

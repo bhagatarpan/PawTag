@@ -805,9 +805,18 @@ export default function Checkout() {
                   <div className="flex justify-between text-sm text-gray-600">
                     <span>Subtotal</span><span>NZ${confirmedTotal.toFixed(2)}</span>
                   </div>
-                  <div className="flex justify-between text-sm text-gray-600">
-                    <span>Shipping</span><span className="text-green-600 font-medium">FREE</span>
-                  </div>
+                  {(() => {
+                    const shippingItem = confirmedItems.find((i: any) => !i.variantId || i.name?.toLowerCase().includes('shipping'));
+                    const shippingAmt = shippingItem?.price || 0;
+                    return (
+                      <div className="flex justify-between text-sm text-gray-600">
+                        <span>Shipping</span>
+                        <span className={shippingAmt === 0 ? 'text-green-600 font-medium' : 'text-gray-900 font-medium'}>
+                          {shippingAmt === 0 ? 'FREE' : `NZ$${shippingAmt.toFixed(2)}`}
+                        </span>
+                      </div>
+                    );
+                  })()}
                   <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-100">
                     <span>Total Paid</span><span className="text-primary-700">NZ${confirmedTotal.toFixed(2)}</span>
                   </div>
