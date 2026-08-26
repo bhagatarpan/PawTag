@@ -132,34 +132,45 @@ router.post('/', async (req: Request, res: Response) => {
       await existingEvent.save();
     }
 
+    let handlerSucceeded = false;
     switch (event) {
       case 'order.placed':
-        await handleOrderPlaced(data);
+        handlerSucceeded = await handleOrderPlaced(data);
         break;
       case 'payment.captured':
-        await handlePaymentCaptured(data);
+        handlerSucceeded = await handlePaymentCaptured(data);
         break;
       case 'order.canceled':
-        await handleOrderCanceled(data);
+        handlerSucceeded = await handleOrderCanceled(data);
         break;
       case 'order.fulfillment_created':
-        await handleFulfillmentCreated(data);
+        handlerSucceeded = await handleFulfillmentCreated(data);
         break;
       case 'order.fulfillment_canceled':
-        await handleFulfillmentCanceled(data);
+        handlerSucceeded = await handleFulfillmentCanceled(data);
         break;
       case 'shipment.created':
-        await handleShipmentCreated(data);
+        handlerSucceeded = await handleShipmentCreated(data);
         break;
       default:
         logger.info({ event }, 'Unhandled Medusa webhook event');
+        handlerSucceeded = true; // Unhandled events are OK
     }
 
-    // Mark as completed
-    await WebhookEvent.findOneAndUpdate(
-      { source: 'medusa', eventId },
-      { status: 'completed', processedAt: new Date() }
-    );
+    // Only mark completed if handler actually succeeded
+    if (handlerSucceeded) {
+      await WebhookEvent.findOneAndUpdate(
+        { source: 'medusa', eventId },
+        { status: 'completed', processedAt: new Date() }
+      );
+    } else {
+      // Handler failed (e.g., user not found) — mark for retry
+      const nextRetry = new Date(Date.now() + 60000);
+      await WebhookEvent.findOneAndUpdate(
+        { source: 'medusa', eventId },
+        { status: 'failed', lastError: 'Handler returned false', nextRetryAt: nextRetry }
+      );
+    }
 
     await auditMedusaEvent(event, data || {});
 
@@ -182,11 +193,11 @@ router.post('/', async (req: Request, res: Response) => {
 });
 
 // Handle order.placed — create PawTag order and process subscriptions
-async function handleOrderPlaced(data: { id: string }) {
+async function handleOrderPlaced(data: { id: string }): Promise<boolean> {
   const { id: medusaOrderId } = data;
   if (!medusaOrderId) {
     logger.warn('order.placed: no order ID');
-    return;
+    return false;
   }
 
   logger.info({ medusaOrderId }, 'Processing order.placed');
@@ -199,7 +210,7 @@ async function handleOrderPlaced(data: { id: string }) {
 
   if (!response.ok) {
     logger.error({ status: response.status, medusaOrderId }, 'Failed to fetch Medusa order');
-    return;
+    return false;
   }
 
   const { order: medusaOrder } = await response.json() as any;
@@ -241,9 +252,20 @@ async function handleOrderPlaced(data: { id: string }) {
     pawtagUser = await User.findById(medusaOrder.metadata.pawtagUserId);
   }
 
+  // Final fallback: try to find user by shipping address name (first_name + last_name)
+  if (!pawtagUser && medusaOrder.shipping_address?.first_name) {
+    const firstName = medusaOrder.shipping_address.first_name;
+    const lastName = medusaOrder.shipping_address.last_name || '';
+    const fullName = lastName ? `${firstName} ${lastName}` : firstName;
+    pawtagUser = await User.findOne({ fullName: { $regex: new RegExp(`^${firstName}`, 'i') } });
+    if (pawtagUser) {
+      logger.info({ userId: pawtagUser._id, fullName }, 'Found user by shipping address name fallback');
+    }
+  }
+
   if (!pawtagUser) {
     logger.warn({ medusaOrderId, email: medusaOrder.email, customerId: medusaOrder.customer_id }, 'PawTag user not found for Medusa order');
-    return;
+    return false;
   }
 
   // Check if PawTag order already exists (idempotent)
@@ -256,7 +278,7 @@ async function handleOrderPlaced(data: { id: string }) {
 
   if (existingOrder) {
     logger.info({ orderNumber: existingOrder.orderNumber }, 'PawTag order already exists');
-    return;
+    return true;
   }
 
   // Generate PawTag order number atomically to prevent race conditions
@@ -477,12 +499,14 @@ async function handleOrderPlaced(data: { id: string }) {
   } catch {
     // Non-critical
   }
+
+  return true;
 }
 
 // Handle payment.captured — mark existing order as paid
-async function handlePaymentCaptured(data: { id: string }) {
+async function handlePaymentCaptured(data: { id: string }): Promise<boolean> {
   const { id: paymentId } = data;
-  if (!paymentId) return;
+  if (!paymentId) return false;
 
   logger.info({ paymentId }, 'Processing payment.captured');
 
@@ -490,12 +514,12 @@ async function handlePaymentCaptured(data: { id: string }) {
   const order = await Order.findOne({ 'payment.transactionId': paymentId });
   if (!order) {
     logger.info({ paymentId }, 'No matching PawTag order for payment');
-    return;
+    return false;
   }
 
   if (order.status === 'paid') {
     logger.info({ orderNumber: order.orderNumber }, 'Order already marked as paid');
-    return;
+    return true;
   }
 
   order.status = 'paid';
@@ -506,41 +530,43 @@ async function handlePaymentCaptured(data: { id: string }) {
   await recordOrderActivity(order._id, 'payment_confirmed', 'Payment confirmed', 'system');
 
   logger.info({ orderNumber: order.orderNumber }, 'Order marked as paid via payment.captured');
+  return true;
 }
 
 // Handle order.canceled
-async function handleOrderCanceled(data: { id: string }) {
+async function handleOrderCanceled(data: { id: string }): Promise<boolean> {
   const { id: medusaOrderId } = data;
-  if (!medusaOrderId) return;
+  if (!medusaOrderId) return false;
 
   logger.info({ medusaOrderId }, 'Processing order.canceled');
 
   const order = await Order.findOne({ 'payment.transactionId': medusaOrderId });
-  if (!order || order.status === 'cancelled') return;
+  if (!order || order.status === 'cancelled') return true;
 
   order.status = 'cancelled';
   order.cancellationReason = 'Canceled via Medusa';
   await order.save();
 
   logger.info({ orderNumber: order.orderNumber }, 'Order cancelled via Medusa');
+  return true;
 }
 
 // Handle order.fulfillment_created — items packed, ready for shipping
-async function handleFulfillmentCreated(data: { order_id?: string; fulfillment_id?: string }) {
+async function handleFulfillmentCreated(data: { order_id?: string; fulfillment_id?: string }): Promise<boolean> {
   const { order_id: medusaOrderId, fulfillment_id } = data;
-  if (!medusaOrderId) return;
+  if (!medusaOrderId) return false;
 
   logger.info({ medusaOrderId, fulfillment_id }, 'Processing order.fulfillment_created');
 
   const order = await Order.findOne({ 'payment.transactionId': medusaOrderId });
   if (!order) {
     logger.info({ medusaOrderId }, 'No matching PawTag order for fulfillment');
-    return;
+    return false;
   }
 
   if (order.status !== 'paid') {
     logger.info({ orderNumber: order.orderNumber, status: order.status }, 'Order not in paid status — skipping fulfillment update');
-    return;
+    return true;
   }
 
   order.status = 'packing';
@@ -564,21 +590,22 @@ async function handleFulfillmentCreated(data: { order_id?: string; fulfillment_i
   }).catch(() => {});
 
   logger.info({ orderNumber: order.orderNumber }, 'Order marked as packing via fulfillment_created');
+  return true;
 }
 
 // Handle order.fulfillment_canceled — revert to paid
-async function handleFulfillmentCanceled(data: { order_id?: string; fulfillment_id?: string }) {
+async function handleFulfillmentCanceled(data: { order_id?: string; fulfillment_id?: string }): Promise<boolean> {
   const { order_id: medusaOrderId, fulfillment_id } = data;
-  if (!medusaOrderId) return;
+  if (!medusaOrderId) return false;
 
   logger.info({ medusaOrderId, fulfillment_id }, 'Processing order.fulfillment_canceled');
 
   const order = await Order.findOne({ 'payment.transactionId': medusaOrderId });
-  if (!order) return;
+  if (!order) return false;
 
   if (order.status !== 'packing') {
     logger.info({ orderNumber: order.orderNumber, status: order.status }, 'Order not in packing status — skipping');
-    return;
+    return true;
   }
 
   order.status = 'paid';
@@ -587,12 +614,13 @@ async function handleFulfillmentCanceled(data: { order_id?: string; fulfillment_
   await recordOrderActivity(order._id, 'status_change', 'Shipment cancelled — returned to paid', 'system');
 
   logger.info({ orderNumber: order.orderNumber }, 'Order reverted to paid via fulfillment_canceled');
+  return true;
 }
 
 // Handle shipment.created — tracking number assigned, order shipped
-async function handleShipmentCreated(data: { id?: string }) {
+async function handleShipmentCreated(data: { id?: string }): Promise<boolean> {
   const { id: fulfillmentId } = data;
-  if (!fulfillmentId) return;
+  if (!fulfillmentId) return false;
 
   logger.info({ fulfillmentId }, 'Processing shipment.created');
 
@@ -614,12 +642,12 @@ async function handleShipmentCreated(data: { id?: string }) {
     }
   } catch (err) {
     logger.error({ err, fulfillmentId }, 'Failed to fetch fulfillment from Medusa');
-    return;
+    return false;
   }
 
   if (!fulfillment) {
     logger.error({ fulfillmentId }, 'Fulfillment not found in Medusa');
-    return;
+    return false;
   }
 
   // Find the PawTag order by the fulfillment's order link or items
@@ -651,7 +679,7 @@ async function handleShipmentCreated(data: { id?: string }) {
 
   if (!order) {
     logger.warn({ fulfillmentId }, 'No matching PawTag order for shipment');
-    return;
+    return false;
   }
 
   // Update order with tracking info
@@ -675,6 +703,7 @@ async function handleShipmentCreated(data: { id?: string }) {
   await notifyCustomerOfStatusChange(order, 'shipped', { trackingNumber, carrier });
 
   logger.info({ orderNumber: order.orderNumber, trackingNumber, carrier }, 'Order marked as shipped via shipment.created');
+  return true;
 }
 
 // Process subscriptions for subscription products
