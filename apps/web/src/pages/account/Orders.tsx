@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ShoppingBag, ChevronRight, Clock, Package, Truck, CheckCircle, Ban, RefreshCw, ExternalLink } from 'lucide-react';
+import { ShoppingBag, ChevronRight, Clock, Package, Truck, CheckCircle, Ban, RefreshCw, ExternalLink, FileText } from 'lucide-react';
 import { StatusBadge, EmptyState } from '@pawtag/ui';
 import api from '../../lib/api';
 import type { Order } from '../../types';
@@ -198,9 +198,17 @@ export default function Orders() {
                         {order.orderNumber || `#${order._id.slice(-8).toUpperCase()}`}
                       </p>
                       <p className="text-xs text-gray-400 mt-0.5">{formatDate(order.createdAt)}</p>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        {order.items?.length || 0} item{(order.items?.length || 0) !== 1 ? 's' : ''}
-                      </p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <p className="text-xs text-gray-500">
+                          {order.items?.length || 0} item{(order.items?.length || 0) !== 1 ? 's' : ''}
+                        </p>
+                        {order.latestInvoice && (
+                          <span className="text-xs text-gray-400 flex items-center gap-1">
+                            <FileText size={10} />
+                            {order.latestInvoice.invoiceNumber}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">

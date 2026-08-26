@@ -830,6 +830,22 @@ router.get('/pets/:id/locations', requirePermission('pet.read'), async (req: Aut
 router.get('/orders', requirePermission('order.read'), async (req: AuthRequest, res: Response) => {
   try {
     const orders = await Order.find({ userId: req.user!.id }).sort({ createdAt: -1 });
+
+    // Enrich with latest invoice per order
+    const orderIds = orders.map((o: any) => o._id);
+    const invoices = await Invoice.find({ orderId: { $in: orderIds } })
+      .sort({ createdAt: -1 })
+      .select('orderId invoiceNumber amount status paidAt');
+    const invoiceMap = new Map<string, any>();
+    for (const inv of invoices) {
+      const oid = (inv as any).orderId?.toString();
+      if (oid && !invoiceMap.has(oid)) invoiceMap.set(oid, inv);
+    }
+    const ordersWithInvoices = orders.map((o: any) => ({
+      ...o.toObject(),
+      latestInvoice: invoiceMap.get(o._id?.toString()) || null,
+    }));
+
     auditCustomerEvent(req, {
       action: 'view',
       eventType: 'navigation',
@@ -840,7 +856,7 @@ router.get('/orders', requirePermission('order.read'), async (req: AuthRequest, 
       severity: 'INFO',
       businessOperation: 'Viewed orders',
     }).catch(() => {});
-    res.json({ success: true, data: orders });
+    res.json({ success: true, data: ordersWithInvoices });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch orders' });
   }

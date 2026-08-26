@@ -71,6 +71,12 @@ export interface Order {
   trackingNumber?: string;
   carrier?: string;
   createdAt: string;
+  latestInvoice?: {
+    _id: string;
+    invoiceNumber: string;
+    amount: number;
+    status: string;
+  } | null;
   activity?: Array<{
     type: string;
     message: string;
