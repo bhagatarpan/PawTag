@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Package, Truck, CheckCircle, Clock, XCircle, MapPin, CreditCard, Loader2, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Package, Truck, CheckCircle, Clock, XCircle, MapPin, CreditCard, Loader2, ExternalLink, FileText } from 'lucide-react';
 import api from '../../lib/api';
 
 const ORDER_STATUS_STEPS = ['pending', 'paid', 'shipped', 'delivered'];
@@ -60,6 +60,13 @@ interface Order {
   createdAt: string;
   updatedAt: string;
   activity?: ActivityEntry[];
+}
+
+interface Invoice {
+  _id: string;
+  invoiceNumber: string;
+  amount: number;
+  status: string;
 }
 
 function getTrackingUrl(carrier: string, trackingNumber: string): string {
@@ -133,6 +140,7 @@ const statusConfig: Record<string, { color: string; icon: any; label: string }> 
 export default function OrderDetail() {
   const { id } = useParams<{ id: string }>();
   const [order, setOrder] = useState<Order | null>(null);
+  const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -142,6 +150,11 @@ export default function OrderDetail() {
       .then((res) => setOrder(res.data.data))
       .catch((err) => setError(err.response?.data?.error || 'Order not found'))
       .finally(() => setLoading(false));
+
+    // Fetch invoice for this order
+    api.get(`/customer/orders/${id}/invoice`)
+      .then((res) => setInvoice(res.data.data))
+      .catch(() => {}); // No invoice yet — non-critical
   }, [id]);
 
   if (loading) {
@@ -167,6 +180,18 @@ export default function OrderDetail() {
   const currentStep = ORDER_STATUS_STEPS.indexOf(order.status);
   const isCancelled = order.status === 'cancelled' || order.status === 'refunded';
   const cfg = statusConfig[order.status] || statusConfig.pending;
+
+  const handleViewInvoice = async () => {
+    if (!invoice) return;
+    try {
+      const res = await api.post(`/customer/invoices/${invoice._id}/access`);
+      const { secureUrl } = res.data.data;
+      if (secureUrl) window.open(secureUrl, '_blank');
+    } catch {
+      // Fallback: open direct URL
+      window.open(`/invoice/${invoice._id}`, '_blank');
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -328,6 +353,44 @@ export default function OrderDetail() {
               </div>
             )}
           </div>
+
+          {/* Invoice */}
+          {invoice && (
+            <div className="bg-white rounded-xl border p-6">
+              <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                <FileText className="h-4 w-4" /> Invoice
+              </h2>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Invoice #</span>
+                  <span className="font-mono font-medium text-gray-900">{invoice.invoiceNumber}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Amount</span>
+                  <span className="font-medium text-gray-900">${invoice.amount.toFixed(2)} NZD</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500">Status</span>
+                  <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${
+                    invoice.status === 'paid' ? 'bg-green-100 text-green-700' :
+                    invoice.status === 'pending' ? 'bg-amber-100 text-amber-700' :
+                    invoice.status === 'refunded' ? 'bg-red-100 text-red-700' :
+                    'bg-gray-100 text-gray-700'
+                  }`}>
+                    {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={handleViewInvoice}
+                className="w-full mt-4 py-2.5 bg-primary-600 text-white rounded-xl font-semibold text-sm hover:bg-primary-700 transition-all flex items-center justify-center gap-2"
+              >
+                <FileText size={14} />
+                View Full Invoice
+                <ExternalLink size={12} />
+              </button>
+            </div>
+          )}
 
           {/* Shipping Address */}
           {order.shippingAddress && (
