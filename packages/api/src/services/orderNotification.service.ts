@@ -1,4 +1,4 @@
-import { Notification, type IOrderDocument } from '@pawtag/db';
+import { Notification, Order, type IOrderDocument } from '@pawtag/db';
 import { sendMail } from './email.service';
 import { sendPushToUser } from './push-notification.service';
 import logger from '../lib/logger';
@@ -7,6 +7,31 @@ interface StatusChangeExtra {
   trackingNumber?: string;
   carrier?: string;
   reason?: string;
+}
+
+// Generate carrier-specific tracking URL
+export function getTrackingUrl(carrier: string, trackingNumber: string): string {
+  if (!trackingNumber || !carrier) return '';
+  const carrierLower = carrier.toLowerCase();
+  if (carrierLower.includes('nz post') || carrierLower.includes('nzpost')) {
+    return `https://www.nzpost.co.nz/tools/tracking/result?trackid=${encodeURIComponent(trackingNumber)}`;
+  }
+  if (carrierLower.includes('courierpost') || carrierLower.includes('courier post')) {
+    return `https://www.courierpost.co.nz/tracking/${encodeURIComponent(trackingNumber)}`;
+  }
+  if (carrierLower.includes('aramex')) {
+    return `https://www.aramex.co.nz/track/shipment?ShipmentNumber=${encodeURIComponent(trackingNumber)}`;
+  }
+  if (carrierLower.includes('dhl')) {
+    return `https://www.dhl.com/nz-en/home/tracking.html?tracking-id=${encodeURIComponent(trackingNumber)}`;
+  }
+  if (carrierLower.includes('fedex')) {
+    return `https://www.fedex.com/fedextrack/?trknbr=${encodeURIComponent(trackingNumber)}`;
+  }
+  if (carrierLower.includes('ups')) {
+    return `https://www.ups.com/track?tracknum=${encodeURIComponent(trackingNumber)}`;
+  }
+  return '';
 }
 
 const STATUS_NOTIFICATIONS: Record<string, { title: string; getMessage: (orderNumber: string, extra?: StatusChangeExtra) => string }> = {
@@ -39,10 +64,14 @@ const STATUS_EMAILS: Record<string, { subject: (orderNumber: string) => string; 
   },
   shipped: {
     subject: (orderNumber) => `Order ${orderNumber} has shipped`,
-    html: (orderNumber, extra) => `<h2>Order Shipped</h2>
+    html: (orderNumber, extra) => {
+      const trackingUrl = getTrackingUrl(extra?.carrier || '', extra?.trackingNumber || '');
+      return `<h2>Order Shipped</h2>
       <p>Your order <strong>${orderNumber}</strong> has shipped!</p>
       <p><strong>Carrier:</strong> ${extra?.carrier || 'Courier'}</p>
-      <p><strong>Tracking:</strong> ${extra?.trackingNumber || 'N/A'}</p>`,
+      <p><strong>Tracking:</strong> ${extra?.trackingNumber || 'N/A'}</p>
+      ${trackingUrl ? `<p><a href="${trackingUrl}" target="_blank" style="display:inline-block;background-color:#0d9488;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;padding:12px 24px;border-radius:12px;">Track Your Shipment →</a></p>` : ''}`;
+    },
   },
   delivered: {
     subject: (orderNumber) => `Order ${orderNumber} delivered`,
@@ -101,6 +130,29 @@ export async function notifyCustomerOfStatusChange(
     priority: newStatus === 'cancelled' || newStatus === 'refunded' ? 'high' : 'normal',
     channel: 'alert',
   });
+
+  // Record activity on the order timeline
+  try {
+    const activityType = newStatus;
+    const activityMessage = notifConfig.getMessage(order.orderNumber, extra);
+    await Order.findByIdAndUpdate(order._id, {
+      $push: {
+        activity: {
+          type: activityType,
+          message: activityMessage,
+          timestamp: new Date(),
+          actor: 'system',
+          metadata: {
+            trackingNumber: extra?.trackingNumber,
+            carrier: extra?.carrier,
+            reason: extra?.reason,
+          },
+        },
+      },
+    });
+  } catch (err) {
+    logger.error({ err, orderNumber: order.orderNumber }, 'Failed to record order activity');
+  }
 
   // Send push notification
   await sendPushToUser(order.userId.toString(), notifTitle, notifMessage, {

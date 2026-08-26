@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ShoppingBag, ChevronRight, Clock, Package, Truck, CheckCircle, Ban, RefreshCw } from 'lucide-react';
+import { ShoppingBag, ChevronRight, Clock, Package, Truck, CheckCircle, Ban, RefreshCw, ExternalLink } from 'lucide-react';
 import { StatusBadge, EmptyState } from '@pawtag/ui';
 import api from '../../lib/api';
 import type { Order } from '../../types';
@@ -50,6 +50,68 @@ const STATUS_LABELS: Record<string, string> = {
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function formatTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' });
+}
+
+function getRelativeTime(iso: string): string {
+  const now = new Date();
+  const then = new Date(iso);
+  const diffMs = now.getTime() - then.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 1) return 'just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return formatDate(iso);
+}
+
+function getTrackingUrl(carrier: string, trackingNumber: string): string {
+  if (!trackingNumber || !carrier) return '';
+  const c = carrier.toLowerCase();
+  if (c.includes('nz post') || c.includes('nzpost')) return `https://www.nzpost.co.nz/tools/tracking/result?trackid=${encodeURIComponent(trackingNumber)}`;
+  if (c.includes('courierpost') || c.includes('courier post')) return `https://www.courierpost.co.nz/tracking/${encodeURIComponent(trackingNumber)}`;
+  if (c.includes('aramex')) return `https://www.aramex.co.nz/track/shipment?ShipmentNumber=${encodeURIComponent(trackingNumber)}`;
+  if (c.includes('dhl')) return `https://www.dhl.com/nz-en/home/tracking.html?tracking-id=${encodeURIComponent(trackingNumber)}`;
+  return '';
+}
+
+const MILESTONE_ACTIVITY_TYPES = ['order_placed', 'payment_confirmed', 'shipped', 'delivered', 'cancelled', 'refunded'];
+
+function getLatestMilestone(order: Order): { type: string; message: string; timestamp: string } | null {
+  if (!order.activity || order.activity.length === 0) return null;
+  const milestones = order.activity
+    .filter((a) => MILESTONE_ACTIVITY_TYPES.includes(a.type))
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  return milestones[0] || null;
+}
+
+function getActivityIcon(type: string) {
+  switch (type) {
+    case 'order_placed': return <Package size={12} />;
+    case 'payment_confirmed': return <CheckCircle size={12} />;
+    case 'shipped': return <Truck size={12} />;
+    case 'delivered': return <CheckCircle size={12} />;
+    case 'cancelled': return <Ban size={12} />;
+    case 'refunded': return <RefreshCw size={12} />;
+    default: return <Clock size={12} />;
+  }
+}
+
+function getActivityColor(type: string): string {
+  switch (type) {
+    case 'order_placed': return 'text-gray-500';
+    case 'payment_confirmed': return 'text-blue-500';
+    case 'shipped': return 'text-purple-500';
+    case 'delivered': return 'text-green-500';
+    case 'cancelled': return 'text-red-500';
+    case 'refunded': return 'text-orange-500';
+    default: return 'text-gray-400';
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -118,41 +180,59 @@ export default function Orders() {
         />
       ) : (
         <div className="space-y-3">
-          {orders.map((order) => (
-            <Link
-              key={order._id}
-              to={`/account/orders/${order._id}`}
-              className="block bg-white rounded-lg border border-gray-200 p-4 hover:border-teal-300 hover:shadow-sm transition-all"
-            >
-              <div className="flex justify-between items-center">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-teal-100 flex items-center justify-center shrink-0">
-                    <ShoppingBag size={18} className="text-teal-600" />
+          {orders.map((order) => {
+            const latestActivity = getLatestMilestone(order);
+            return (
+              <Link
+                key={order._id}
+                to={`/account/orders/${order._id}`}
+                className="block bg-white rounded-lg border border-gray-200 p-4 hover:border-teal-300 hover:shadow-sm transition-all"
+              >
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-teal-100 flex items-center justify-center shrink-0">
+                      <ShoppingBag size={18} className="text-teal-600" />
+                    </div>
+                    <div>
+                      <p className="font-mono text-sm font-medium text-gray-900">
+                        {order.orderNumber || `#${order._id.slice(-8).toUpperCase()}`}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-0.5">{formatDate(order.createdAt)}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {order.items?.length || 0} item{(order.items?.length || 0) !== 1 ? 's' : ''}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-mono text-sm font-medium text-gray-900">
-                      {order.orderNumber || `#${order._id.slice(-8).toUpperCase()}`}
-                    </p>
-                    <p className="text-xs text-gray-400 mt-0.5">{formatDate(order.createdAt)}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      {order.items?.length || 0} item{(order.items?.length || 0) !== 1 ? 's' : ''}
-                    </p>
+                  <div className="flex items-center gap-3">
+                    <StatusBadge
+                      label={STATUS_LABELS[order.status] || order.status}
+                      variant={getStatusVariant(order.status)}
+                      icon={getStatusIcon(order.status)}
+                    />
+                    <span className="text-sm font-semibold text-gray-900">
+                      ${order.payment?.amount?.toFixed(2) || '0.00'}
+                    </span>
+                    <ChevronRight size={16} className="text-gray-400" />
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <StatusBadge
-                    label={STATUS_LABELS[order.status] || order.status}
-                    variant={getStatusVariant(order.status)}
-                    icon={getStatusIcon(order.status)}
-                  />
-                  <span className="text-sm font-semibold text-gray-900">
-                    ${order.payment?.amount?.toFixed(2) || '0.00'}
-                  </span>
-                  <ChevronRight size={16} className="text-gray-400" />
-                </div>
-              </div>
-            </Link>
-          ))}
+                {/* Compact activity summary */}
+                {latestActivity && (
+                  <div className="mt-3 pt-3 border-t border-gray-100 flex items-center gap-2">
+                    <span className={getActivityColor(latestActivity.type)}>
+                      {getActivityIcon(latestActivity.type)}
+                    </span>
+                    <span className="text-xs text-gray-600 truncate">{latestActivity.message}</span>
+                    <span className="text-xs text-gray-400 ml-auto whitespace-nowrap">{getRelativeTime(latestActivity.timestamp)}</span>
+                    {latestActivity.type === 'shipped' && order.trackingNumber && (
+                      <span className="text-xs text-teal-600 font-medium whitespace-nowrap flex items-center gap-0.5">
+                        Track <ExternalLink size={10} />
+                      </span>
+                    )}
+                  </div>
+                )}
+              </Link>
+            );
+          })}
         </div>
       )}
     </div>

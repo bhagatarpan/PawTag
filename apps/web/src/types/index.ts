@@ -71,6 +71,13 @@ export interface Order {
   trackingNumber?: string;
   carrier?: string;
   createdAt: string;
+  activity?: Array<{
+    type: string;
+    message: string;
+    timestamp: string;
+    actor: 'system' | 'admin' | 'customer';
+    metadata?: Record<string, any>;
+  }>;
 }
 
 export interface User {

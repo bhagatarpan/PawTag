@@ -14,6 +14,31 @@ const router = Router();
 
 const WEBHOOK_SECRET = process.env.MEDUSA_WEBHOOK_SECRET || '';
 
+// Record an activity entry on an order's activity timeline
+async function recordOrderActivity(
+  orderId: any,
+  type: string,
+  message: string,
+  actor: 'system' | 'admin' | 'customer' = 'system',
+  metadata: Record<string, unknown> = {},
+): Promise<void> {
+  try {
+    await Order.findByIdAndUpdate(orderId, {
+      $push: {
+        activity: {
+          type,
+          message,
+          timestamp: new Date(),
+          actor,
+          metadata,
+        },
+      },
+    });
+  } catch (err) {
+    logger.error({ err, orderId, type }, 'Failed to record order activity');
+  }
+}
+
 // Verify Medusa webhook signature (HMAC SHA-256)
 function verifyWebhookSignature(payload: string, signature: string): boolean {
   if (!WEBHOOK_SECRET) {
@@ -116,6 +141,15 @@ router.post('/', async (req: Request, res: Response) => {
         break;
       case 'order.canceled':
         await handleOrderCanceled(data);
+        break;
+      case 'order.fulfillment_created':
+        await handleFulfillmentCreated(data);
+        break;
+      case 'order.fulfillment_canceled':
+        await handleFulfillmentCanceled(data);
+        break;
+      case 'shipment.created':
+        await handleShipmentCreated(data);
         break;
       default:
         logger.info({ event }, 'Unhandled Medusa webhook event');
@@ -251,6 +285,9 @@ async function handleOrderPlaced(data: { id: string }) {
   });
 
   logger.info({ orderNumber, medusaOrderId }, 'Created PawTag order from Medusa');
+
+  // Record order placed activity
+  await recordOrderActivity(order._id, 'order_placed', 'Order placed', 'customer');
 
   // Process subscriptions for subscription products
   await processSubscriptions(order, pawtagUser, medusaOrder);
@@ -438,6 +475,8 @@ async function handlePaymentCaptured(data: { id: string }) {
   order.payment.paidAt = new Date();
   await order.save();
 
+  await recordOrderActivity(order._id, 'payment_confirmed', 'Payment confirmed', 'system');
+
   logger.info({ orderNumber: order.orderNumber }, 'Order marked as paid via payment.captured');
 }
 
@@ -456,6 +495,158 @@ async function handleOrderCanceled(data: { id: string }) {
   await order.save();
 
   logger.info({ orderNumber: order.orderNumber }, 'Order cancelled via Medusa');
+}
+
+// Handle order.fulfillment_created — items packed, ready for shipping
+async function handleFulfillmentCreated(data: { order_id?: string; fulfillment_id?: string }) {
+  const { order_id: medusaOrderId, fulfillment_id } = data;
+  if (!medusaOrderId) return;
+
+  logger.info({ medusaOrderId, fulfillment_id }, 'Processing order.fulfillment_created');
+
+  const order = await Order.findOne({ 'payment.transactionId': medusaOrderId });
+  if (!order) {
+    logger.info({ medusaOrderId }, 'No matching PawTag order for fulfillment');
+    return;
+  }
+
+  if (order.status !== 'paid') {
+    logger.info({ orderNumber: order.orderNumber, status: order.status }, 'Order not in paid status — skipping fulfillment update');
+    return;
+  }
+
+  order.status = 'packing';
+  await order.save();
+
+  // Record activity
+  await recordOrderActivity(order._id, 'packing', 'Order is being packed', 'system');
+
+  // Notify customer
+  const { notifyCustomerOfStatusChange } = await import('../services/orderNotification.service');
+  // packing has no notification config, but we record the activity
+  await Notification.create({
+    userId: order.userId,
+    audience: 'admin',
+    type: 'order_update',
+    title: 'Order packing started',
+    message: `Order ${order.orderNumber} is being packed.`,
+    data: { orderId: order._id.toString(), orderNumber: order.orderNumber, status: 'packing', fulfillmentId: fulfillment_id },
+    priority: 'normal',
+    channel: 'info',
+  }).catch(() => {});
+
+  logger.info({ orderNumber: order.orderNumber }, 'Order marked as packing via fulfillment_created');
+}
+
+// Handle order.fulfillment_canceled — revert to paid
+async function handleFulfillmentCanceled(data: { order_id?: string; fulfillment_id?: string }) {
+  const { order_id: medusaOrderId, fulfillment_id } = data;
+  if (!medusaOrderId) return;
+
+  logger.info({ medusaOrderId, fulfillment_id }, 'Processing order.fulfillment_canceled');
+
+  const order = await Order.findOne({ 'payment.transactionId': medusaOrderId });
+  if (!order) return;
+
+  if (order.status !== 'packing') {
+    logger.info({ orderNumber: order.orderNumber, status: order.status }, 'Order not in packing status — skipping');
+    return;
+  }
+
+  order.status = 'paid';
+  await order.save();
+
+  await recordOrderActivity(order._id, 'status_change', 'Shipment cancelled — returned to paid', 'system');
+
+  logger.info({ orderNumber: order.orderNumber }, 'Order reverted to paid via fulfillment_canceled');
+}
+
+// Handle shipment.created — tracking number assigned, order shipped
+async function handleShipmentCreated(data: { id?: string }) {
+  const { id: fulfillmentId } = data;
+  if (!fulfillmentId) return;
+
+  logger.info({ fulfillmentId }, 'Processing shipment.created');
+
+  // Fetch full fulfillment from Medusa to get tracking info
+  const MEDUSA_URL = process.env.MEDUSA_BACKEND_URL || 'http://localhost:9000';
+  const MEDUSA_ADMIN_TOKEN = process.env.MEDUSA_ADMIN_TOKEN || '';
+
+  let fulfillment: any = null;
+  try {
+    const response = await fetch(`${MEDUSA_URL}/admin/fulfillments/${fulfillmentId}`, {
+      headers: {
+        'Authorization': `Bearer ${MEDUSA_ADMIN_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+    });
+    if (response.ok) {
+      const result = await response.json() as any;
+      fulfillment = result.fulfillment;
+    }
+  } catch (err) {
+    logger.error({ err, fulfillmentId }, 'Failed to fetch fulfillment from Medusa');
+    return;
+  }
+
+  if (!fulfillment) {
+    logger.error({ fulfillmentId }, 'Fulfillment not found in Medusa');
+    return;
+  }
+
+  // Find the PawTag order by the fulfillment's order link or items
+  // The fulfillment has items with line_item_id, but we need to find by order
+  // We'll search by the fulfillment's associated order
+  // Since shipment.created only has fulfillment ID, we need to find the order
+  // via the fulfillment's metadata or by checking recent orders
+
+  // Alternative: look up via the order that has this fulfillment
+  // The fulfillment object has provider_id, labels with tracking info
+  const labels = fulfillment.labels || [];
+  const trackingNumber = labels[0]?.tracking_number || '';
+  const trackingUrl = labels[0]?.tracking_url || '';
+  const carrier = fulfillment.provider_id || fulfillment.shipping_option?.provider_id || 'Unknown';
+
+  // Find order by looking at fulfillment items → line_item_id → order items
+  // Or use the fulfillment's order_id if available
+  const medusaOrderId = fulfillment.metadata?.order_id || fulfillment.order_id;
+
+  let order;
+  if (medusaOrderId) {
+    order = await Order.findOne({ 'payment.transactionId': medusaOrderId });
+  }
+
+  if (!order) {
+    // Try to find by recent packing orders
+    order = await Order.findOne({ status: 'packing' }).sort({ updatedAt: -1 });
+  }
+
+  if (!order) {
+    logger.warn({ fulfillmentId }, 'No matching PawTag order for shipment');
+    return;
+  }
+
+  // Update order with tracking info
+  order.status = 'shipped';
+  if (trackingNumber) order.trackingNumber = trackingNumber;
+  if (carrier) order.carrier = carrier;
+  if (trackingUrl) order.shippingLabelUrl = trackingUrl;
+  await order.save();
+
+  // Record activity
+  await recordOrderActivity(
+    order._id,
+    'shipped',
+    `Order shipped via ${carrier}${trackingNumber ? `. Tracking: ${trackingNumber}` : ''}`,
+    'system',
+    { trackingNumber, carrier, trackingUrl },
+  );
+
+  // Notify customer
+  const { notifyCustomerOfStatusChange } = await import('../services/orderNotification.service');
+  await notifyCustomerOfStatusChange(order, 'shipped', { trackingNumber, carrier });
+
+  logger.info({ orderNumber: order.orderNumber, trackingNumber, carrier }, 'Order marked as shipped via shipment.created');
 }
 
 // Process subscriptions for subscription products

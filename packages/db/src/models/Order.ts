@@ -54,6 +54,13 @@ export interface IOrderDocument extends Document {
   refundReason?: string;
   deliveredAt?: Date;
   deletedAt?: Date;
+  activity: Array<{
+    type: string;
+    message: string;
+    timestamp: Date;
+    actor: 'system' | 'admin' | 'customer';
+    metadata?: Record<string, any>;
+  }>;
 }
 
 const OrderSchema = new Schema<IOrderDocument>(
@@ -116,6 +123,15 @@ const OrderSchema = new Schema<IOrderDocument>(
     refundReason: { type: String },
     deliveredAt: { type: Date },
     deletedAt: { type: Date, default: null },
+    activity: [
+      {
+        type: { type: String, required: true },
+        message: { type: String, required: true },
+        timestamp: { type: Date, default: Date.now },
+        actor: { type: String, enum: ['system', 'admin', 'customer'], default: 'system' },
+        metadata: { type: Schema.Types.Mixed },
+      },
+    ],
   },
   { timestamps: true },
 );

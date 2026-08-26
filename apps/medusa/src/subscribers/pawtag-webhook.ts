@@ -43,5 +43,12 @@ export default async function pawtagWebhookSubscriber(
 }
 
 export const config: SubscriberConfig = {
-  event: ["order.placed", "payment.captured", "order.canceled"],
+  event: [
+    "order.placed",
+    "payment.captured",
+    "order.canceled",
+    "order.fulfillment_created",
+    "order.fulfillment_canceled",
+    "shipment.created",
+  ],
 }

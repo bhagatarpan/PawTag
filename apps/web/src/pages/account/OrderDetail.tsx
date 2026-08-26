@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Package, Truck, CheckCircle, Clock, XCircle, MapPin, CreditCard, Loader2 } from 'lucide-react';
+import { ArrowLeft, Package, Truck, CheckCircle, Clock, XCircle, MapPin, CreditCard, Loader2, ExternalLink } from 'lucide-react';
 import api from '../../lib/api';
 
 const ORDER_STATUS_STEPS = ['pending', 'paid', 'shipped', 'delivered'];
@@ -25,6 +25,14 @@ interface OrderItem {
   customizationTotal?: number;
 }
 
+interface ActivityEntry {
+  type: string;
+  message: string;
+  timestamp: string;
+  actor: 'system' | 'admin' | 'customer';
+  metadata?: Record<string, any>;
+}
+
 interface Order {
   _id: string;
   orderNumber?: string;
@@ -47,9 +55,70 @@ interface Order {
     country: string;
   };
   trackingNumber?: string;
+  carrier?: string;
   notes?: string;
   createdAt: string;
   updatedAt: string;
+  activity?: ActivityEntry[];
+}
+
+function getTrackingUrl(carrier: string, trackingNumber: string): string {
+  if (!trackingNumber || !carrier) return '';
+  const c = carrier.toLowerCase();
+  if (c.includes('nz post') || c.includes('nzpost')) return `https://www.nzpost.co.nz/tools/tracking/result?trackid=${encodeURIComponent(trackingNumber)}`;
+  if (c.includes('courierpost') || c.includes('courier post')) return `https://www.courierpost.co.nz/tracking/${encodeURIComponent(trackingNumber)}`;
+  if (c.includes('aramex')) return `https://www.aramex.co.nz/track/shipment?ShipmentNumber=${encodeURIComponent(trackingNumber)}`;
+  if (c.includes('dhl')) return `https://www.dhl.com/nz-en/home/tracking.html?tracking-id=${encodeURIComponent(trackingNumber)}`;
+  if (c.includes('fedex')) return `https://www.fedex.com/fedextrack/?trknbr=${encodeURIComponent(trackingNumber)}`;
+  if (c.includes('ups')) return `https://www.ups.com/track?tracknum=${encodeURIComponent(trackingNumber)}`;
+  return '';
+}
+
+function getActivityIcon(type: string) {
+  switch (type) {
+    case 'order_placed': return <Package size={16} />;
+    case 'payment_confirmed': return <CreditCard size={16} />;
+    case 'packing': return <Package size={16} />;
+    case 'shipped': return <Truck size={16} />;
+    case 'delivered': return <CheckCircle size={16} />;
+    case 'cancelled': return <XCircle size={16} />;
+    case 'refunded': return <XCircle size={16} />;
+    default: return <Clock size={16} />;
+  }
+}
+
+function getActivityDotColor(type: string): string {
+  switch (type) {
+    case 'order_placed': return 'bg-gray-400';
+    case 'payment_confirmed': return 'bg-blue-500';
+    case 'packing': return 'bg-amber-500';
+    case 'shipped': return 'bg-purple-500';
+    case 'delivered': return 'bg-green-500';
+    case 'cancelled': return 'bg-red-500';
+    case 'refunded': return 'bg-orange-500';
+    default: return 'bg-gray-300';
+  }
+}
+
+function getActivityIconColor(type: string): string {
+  switch (type) {
+    case 'order_placed': return 'text-gray-500';
+    case 'payment_confirmed': return 'text-blue-600';
+    case 'packing': return 'text-amber-600';
+    case 'shipped': return 'text-purple-600';
+    case 'delivered': return 'text-green-600';
+    case 'cancelled': return 'text-red-600';
+    case 'refunded': return 'text-orange-600';
+    default: return 'text-gray-400';
+  }
+}
+
+function formatActivityDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function formatActivityTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' });
 }
 
 const statusConfig: Record<string, { color: string; icon: any; label: string }> = {
@@ -117,36 +186,74 @@ export default function OrderDetail() {
         </span>
       </div>
 
-      {/* Status Timeline */}
+      {/* Status Timeline — vertical activity feed */}
       {!isCancelled && (
         <div className="bg-white rounded-xl border p-6">
-          <h2 className="text-sm font-semibold text-gray-700 mb-4">Order Status</h2>
-          <div className="flex items-center">
-            {ORDER_STATUS_STEPS.map((step, i) => {
-              const StepIcon = statusConfig[step]?.icon || Clock;
-              return (
-                <div key={step} className="flex items-center flex-1">
-                  <div className="flex flex-col items-center">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                      i <= currentStep ? 'bg-teal-600 text-white' : 'bg-gray-200 text-gray-500'
-                    }`}>
-                      {i <= currentStep ? <CheckCircle className="h-5 w-5" /> : <StepIcon className="h-5 w-5" />}
-                    </div>
-                    <span className={`text-xs mt-2 font-medium capitalize ${i <= currentStep ? 'text-teal-700' : 'text-gray-500'}`}>
-                      {step}
-                    </span>
-                  </div>
-                  {i < ORDER_STATUS_STEPS.length - 1 && (
-                    <div className={`flex-1 h-0.5 mx-3 ${i < currentStep ? 'bg-teal-600' : 'bg-gray-200'}`} />
-                  )}
-                </div>
-              );
-            })}
-          </div>
-          {order.trackingNumber && (
-            <div className="mt-4 p-3 bg-teal-50 border border-teal-200 rounded-lg flex items-center gap-2">
-              <Truck className="h-4 w-4 text-teal-600" />
-              <span className="text-sm text-teal-700">Tracking: <strong>{order.trackingNumber}</strong></span>
+          <h2 className="text-sm font-semibold text-gray-700 mb-4">Order Activity</h2>
+          {order.activity && order.activity.length > 0 ? (
+            <div className="relative">
+              {/* Timeline line */}
+              <div className="absolute left-[15px] top-2 bottom-2 w-0.5 bg-gray-200" />
+              <div className="space-y-0">
+                {[...order.activity]
+                  .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+                  .map((entry, i) => {
+                    const isShipped = entry.type === 'shipped';
+                    const trackingUrl = isShipped && order.trackingNumber && order.carrier
+                      ? getTrackingUrl(order.carrier, order.trackingNumber)
+                      : '';
+                    return (
+                      <div key={i} className="relative flex items-start gap-3 pb-6 last:pb-0">
+                        {/* Dot */}
+                        <div className={`relative z-10 w-[30px] h-[30px] rounded-full flex items-center justify-center shrink-0 ${getActivityDotColor(entry.type)} ${i === 0 ? 'ring-2 ring-offset-2 ring-teal-200' : ''}`}>
+                          <span className="text-white">{getActivityIcon(entry.type)}</span>
+                        </div>
+                        {/* Content */}
+                        <div className="flex-1 min-w-0 pt-0.5">
+                          <p className={`text-sm font-medium ${i === 0 ? 'text-gray-900' : 'text-gray-700'}`}>
+                            {entry.message}
+                          </p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <p className="text-xs text-gray-400">
+                              {formatActivityDate(entry.timestamp)} at {formatActivityTime(entry.timestamp)}
+                            </p>
+                            {entry.actor && (
+                              <span className="text-xs text-gray-300 capitalize">· {entry.actor}</span>
+                            )}
+                          </div>
+                          {/* Tracking link for shipped entries */}
+                          {isShipped && order.trackingNumber && (
+                            <div className="mt-2">
+                              {trackingUrl ? (
+                                <a
+                                  href={trackingUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1.5 text-sm text-teal-600 hover:text-teal-700 font-medium"
+                                >
+                                  <Truck size={14} />
+                                  Track: {order.trackingNumber}
+                                  <ExternalLink size={12} />
+                                </a>
+                              ) : (
+                                <span className="inline-flex items-center gap-1.5 text-sm text-gray-600">
+                                  <Truck size={14} />
+                                  Tracking: {order.trackingNumber}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          ) : (
+            /* Fallback: show current status if no activity recorded */
+            <div className="flex items-center gap-3 p-3 bg-teal-50 rounded-lg">
+              <CheckCircle className="h-5 w-5 text-teal-600" />
+              <span className="text-sm text-teal-700 font-medium">{getOrderStatusLabel(order.status)}</span>
             </div>
           )}
         </div>

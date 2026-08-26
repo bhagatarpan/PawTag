@@ -54,6 +54,13 @@ export interface Order {
   cancellationReason?: string;
   refundReason?: string;
   deliveredAt?: string;
+  activity?: Array<{
+    type: string;
+    message: string;
+    timestamp: string;
+    actor: 'system' | 'admin' | 'customer';
+    metadata?: Record<string, any>;
+  }>;
   latestInvoice: {
     _id: string;
     invoiceNumber: string;
@@ -213,7 +220,7 @@ export function OrderDetailDrawer({
   onClose: () => void;
   onRefresh: () => void;
 }) {
-  const [activeTab, setActiveTab] = useState<'info' | 'items' | 'shipping'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'items' | 'shipping' | 'activity'>('info');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState('');
 
@@ -301,6 +308,7 @@ export function OrderDetailDrawer({
     { key: 'info' as const, label: 'Order Info' },
     { key: 'items' as const, label: `Items (${order.items?.length || 0})` },
     { key: 'shipping' as const, label: 'Shipping & Payment' },
+    { key: 'activity' as const, label: `Activity (${order.activity?.length || 0})` },
   ];
 
   return (
@@ -546,6 +554,71 @@ export function OrderDetailDrawer({
           )}
         </div>
       )}
+
+      {activeTab === 'activity' && (
+        <div className="space-y-4">
+          {order.activity && order.activity.length > 0 ? (
+            <div className="relative">
+              <div className="absolute left-[15px] top-2 bottom-2 w-0.5 bg-gray-200" />
+              <div className="space-y-0">
+                {[...order.activity]
+                  .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+                  .map((entry, i) => {
+                    const dotColor = entry.type === 'order_placed' ? 'bg-gray-400'
+                      : entry.type === 'payment_confirmed' ? 'bg-blue-500'
+                      : entry.type === 'packing' ? 'bg-amber-500'
+                      : entry.type === 'shipped' ? 'bg-purple-500'
+                      : entry.type === 'delivered' ? 'bg-green-500'
+                      : entry.type === 'cancelled' ? 'bg-red-500'
+                      : entry.type === 'refunded' ? 'bg-orange-500'
+                      : 'bg-gray-300';
+                    return (
+                      <div key={i} className="relative flex items-start gap-3 pb-5 last:pb-0">
+                        <div className={`relative z-10 w-[30px] h-[30px] rounded-full flex items-center justify-center shrink-0 ${dotColor} ${i === 0 ? 'ring-2 ring-offset-2 ring-teal-200' : ''}`}>
+                          <Clock size={14} className="text-white" />
+                        </div>
+                        <div className="flex-1 min-w-0 pt-0.5">
+                          <p className={`text-sm ${i === 0 ? 'font-medium text-gray-900' : 'text-gray-700'}`}>
+                            {entry.message}
+                          </p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <p className="text-xs text-gray-400">
+                              {new Date(entry.timestamp).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })}
+                              {' at '}
+                              {new Date(entry.timestamp).toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                            <span className="text-xs text-gray-300 capitalize">· {entry.actor}</span>
+                          </div>
+                          {entry.metadata && Object.keys(entry.metadata).length > 0 && (
+                            <div className="mt-1 flex flex-wrap gap-2">
+                              {entry.metadata.trackingNumber && (
+                                <span className="text-xs bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full font-mono">
+                                  Tracking: {entry.metadata.trackingNumber}
+                                </span>
+                              )}
+                              {entry.metadata.carrier && (
+                                <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">
+                                  {entry.metadata.carrier}
+                                </span>
+                              )}
+                              {entry.metadata.reason && (
+                                <span className="text-xs bg-red-50 text-red-700 px-2 py-0.5 rounded-full">
+                                  Reason: {entry.metadata.reason}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500 text-center py-8">No activity recorded yet.</p>
+          )}
+        </div>
+      )}
     </DetailDrawer>
   );
 }
@@ -621,6 +694,15 @@ export default function Orders() {
 
   useEffect(() => { fetchOrders(); }, [fetchOrders]);
   useEffect(() => { fetchSummary(); }, [fetchSummary]);
+
+  // Auto-refresh every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchOrders();
+      fetchSummary();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [fetchOrders, fetchSummary]);
 
   const executeAction = async () => {
     if (!actionModal || !reason.trim()) return;
