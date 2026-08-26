@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Package, Truck, CheckCircle, Clock, XCircle, MapPin, CreditCard, Loader2, ExternalLink, FileText } from 'lucide-react';
+import { ArrowLeft, Package, Truck, CheckCircle, Check, Clock, XCircle, MapPin, CreditCard, Loader2, ExternalLink, FileText, RefreshCw } from 'lucide-react';
 import api from '../../lib/api';
 
-const ORDER_STATUS_STEPS = ['pending', 'paid', 'shipped', 'delivered'];
+const ORDER_STATUS_STEPS = ['pending', 'paid', 'packing', 'shipped', 'delivered'];
 
 const ORDER_STATUS_LABELS: Record<string, string> = {
   pending: 'Pending', paid: 'Paid', shipped: 'Shipped', delivered: 'Delivered', cancelled: 'Cancelled', refunded: 'Refunded',
@@ -211,13 +211,51 @@ export default function OrderDetail() {
         </span>
       </div>
 
-      {/* Status Timeline — vertical activity feed */}
+      {/* Status Timeline — Two-Tier: Progress Stepper + Activity Feed */}
       {!isCancelled && (
-        <div className="bg-white rounded-xl border p-6">
-          <h2 className="text-sm font-semibold text-gray-700 mb-4">Order Activity</h2>
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+          {/* Tier 1: Progress Stepper */}
+          <h2 className="text-sm font-semibold text-gray-700 mb-5">Order Progress</h2>
+          <div className="relative mb-8">
+            {/* Progress track background */}
+            <div className="absolute top-[15px] left-[15px] right-[15px] h-1 bg-gray-200 rounded-full" />
+            {/* Progress fill */}
+            <div
+              className="absolute top-[15px] left-[15px] h-1 bg-primary-500 rounded-full transition-all duration-700 ease-out"
+              style={{ width: `calc(${Math.min(currentStep, ORDER_STATUS_STEPS.length - 1)} / ${ORDER_STATUS_STEPS.length - 1} * (100% - 30px))` }}
+            />
+            {/* Steps */}
+            <div className="relative flex justify-between">
+              {ORDER_STATUS_STEPS.map((step, i) => {
+                const isDone = i <= currentStep;
+                const isCurrent = i === currentStep;
+                const StepIcon = statusConfig[step]?.icon || Clock;
+                return (
+                  <div key={step} className="flex flex-col items-center" style={{ width: `${100 / ORDER_STATUS_STEPS.length}%` }}>
+                    <div className={`w-[30px] h-[30px] rounded-full flex items-center justify-center z-10 transition-all ${
+                      isDone ? 'bg-primary-600 text-white' : 'bg-gray-200 text-gray-400'
+                    } ${isCurrent ? 'ring-2 ring-offset-2 ring-primary-200' : ''}`}>
+                      {isDone ? <Check className="h-4 w-4" /> : <StepIcon className="h-4 w-4" />}
+                    </div>
+                    <span className={`text-xs mt-2 font-medium text-center capitalize ${isDone ? 'text-primary-700' : 'text-gray-400'}`}>
+                      {step}
+                    </span>
+                    {/* Show timestamp for completed steps */}
+                    {isDone && order.activity?.find(a => a.type === step) && (
+                      <span className="text-[10px] text-gray-400 mt-0.5">
+                        {new Date(order.activity.find(a => a.type === step)!.timestamp).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Tier 2: Detailed Activity Feed */}
+          <h2 className="text-sm font-semibold text-gray-700 mb-4">Activity Details</h2>
           {order.activity && order.activity.length > 0 ? (
             <div className="relative">
-              {/* Timeline line */}
               <div className="absolute left-[15px] top-2 bottom-2 w-0.5 bg-gray-200" />
               <div className="space-y-0">
                 {[...order.activity]
@@ -228,14 +266,12 @@ export default function OrderDetail() {
                       ? getTrackingUrl(order.carrier, order.trackingNumber)
                       : '';
                     return (
-                      <div key={i} className="relative flex items-start gap-3 pb-6 last:pb-0">
-                        {/* Dot */}
-                        <div className={`relative z-10 w-[30px] h-[30px] rounded-full flex items-center justify-center shrink-0 ${getActivityDotColor(entry.type)} ${i === 0 ? 'ring-2 ring-offset-2 ring-teal-200' : ''}`}>
+                      <div key={i} className="relative flex items-start gap-3 pb-5 last:pb-0">
+                        <div className={`relative z-10 w-[30px] h-[30px] rounded-full flex items-center justify-center shrink-0 ${getActivityDotColor(entry.type)} ${i === 0 ? 'ring-2 ring-offset-2 ring-primary-200' : ''}`}>
                           <span className="text-white">{getActivityIcon(entry.type)}</span>
                         </div>
-                        {/* Content */}
                         <div className="flex-1 min-w-0 pt-0.5">
-                          <p className={`text-sm font-medium ${i === 0 ? 'text-gray-900' : 'text-gray-700'}`}>
+                          <p className={`text-sm ${i === 0 ? 'font-medium text-gray-900' : 'text-gray-700'}`}>
                             {entry.message}
                           </p>
                           <div className="flex items-center gap-2 mt-0.5">
@@ -254,7 +290,7 @@ export default function OrderDetail() {
                                   href={trackingUrl}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1.5 text-sm text-teal-600 hover:text-teal-700 font-medium"
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary-50 border border-primary-200 text-primary-700 rounded-lg text-sm font-medium hover:bg-primary-100 transition-all"
                                 >
                                   <Truck size={14} />
                                   Track: {order.trackingNumber}
@@ -268,6 +304,12 @@ export default function OrderDetail() {
                               )}
                             </div>
                           )}
+                          {/* Carrier badge for shipped entries */}
+                          {isShipped && order.carrier && (
+                            <span className="inline-block mt-1 px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full text-xs font-medium">
+                              {order.carrier}
+                            </span>
+                          )}
                         </div>
                       </div>
                     );
@@ -275,10 +317,9 @@ export default function OrderDetail() {
               </div>
             </div>
           ) : (
-            /* Fallback: show current status if no activity recorded */
-            <div className="flex items-center gap-3 p-3 bg-teal-50 rounded-lg">
-              <CheckCircle className="h-5 w-5 text-teal-600" />
-              <span className="text-sm text-teal-700 font-medium">{getOrderStatusLabel(order.status)}</span>
+            <div className="flex items-center gap-3 p-3 bg-primary-50 rounded-lg">
+              <CheckCircle className="h-5 w-5 text-primary-600" />
+              <span className="text-sm text-primary-700 font-medium">{getOrderStatusLabel(order.status)}</span>
             </div>
           )}
         </div>

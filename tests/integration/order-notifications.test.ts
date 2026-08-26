@@ -88,11 +88,14 @@ describe('Phase 10 — Centralized Order Notifications', () => {
       // Verify notifications — exactly one per customer-relevant status change
       const notifs = await Notification.find({ userId, audience: 'customer', type: 'order_update' }).sort({ createdAt: 1 });
 
-      // Should have notifications for: paid, shipped, delivered (packing doesn't trigger customer notification)
-      expect(notifs.length).toBe(3);
+      // Should have notifications for: paid, packing, shipped, delivered
+      expect(notifs.length).toBe(4);
 
       const paidNotif = notifs.find(n => n.message.includes('confirmed'));
       expect(paidNotif).toBeDefined();
+
+      const packingNotif = notifs.find(n => n.message.includes('packed') || n.message.includes('prepared'));
+      expect(packingNotif).toBeDefined();
 
       const shippedNotif = notifs.find(n => n.message.includes('shipped'));
       expect(shippedNotif).toBeDefined();

@@ -80,7 +80,7 @@ function getTrackingUrl(carrier: string, trackingNumber: string): string {
   return '';
 }
 
-const MILESTONE_ACTIVITY_TYPES = ['order_placed', 'payment_confirmed', 'shipped', 'delivered', 'cancelled', 'refunded'];
+const MILESTONE_ACTIVITY_TYPES = ['order_placed', 'payment_confirmed', 'packing', 'shipped', 'delivered', 'cancelled', 'refunded'];
 
 function getLatestMilestone(order: Order): { type: string; message: string; timestamp: string } | null {
   if (!order.activity || order.activity.length === 0) return null;

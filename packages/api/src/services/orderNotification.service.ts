@@ -35,6 +35,10 @@ export function getTrackingUrl(carrier: string, trackingNumber: string): string 
 }
 
 const STATUS_NOTIFICATIONS: Record<string, { title: string; getMessage: (orderNumber: string, extra?: StatusChangeExtra) => string }> = {
+  packing: {
+    title: 'Order being packed',
+    getMessage: (orderNumber) => `Your order ${orderNumber} is being prepared for shipping.`,
+  },
   paid: {
     title: 'Order confirmed',
     getMessage: (orderNumber) => `Your order ${orderNumber} has been confirmed and is being processed.`,
@@ -58,6 +62,10 @@ const STATUS_NOTIFICATIONS: Record<string, { title: string; getMessage: (orderNu
 };
 
 const STATUS_EMAILS: Record<string, { subject: (orderNumber: string) => string; html: (orderNumber: string, extra?: StatusChangeExtra) => string }> = {
+  packing: {
+    subject: (orderNumber) => `Order ${orderNumber} is being packed`,
+    html: (orderNumber) => `<h2>Order Being Packed</h2><p>Your order <strong>${orderNumber}</strong> is being prepared for shipping.</p>`,
+  },
   paid: {
     subject: (orderNumber) => `Order ${orderNumber} confirmed`,
     html: (orderNumber) => `<h2>Order Confirmed</h2><p>Your order <strong>${orderNumber}</strong> has been confirmed and is being processed.</p>`,

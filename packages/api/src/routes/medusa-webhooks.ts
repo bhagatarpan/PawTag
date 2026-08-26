@@ -255,6 +255,10 @@ async function handleOrderCanceled(data: { id: string }): Promise<boolean> {
   order.cancellationReason = 'Canceled via Medusa';
   await order.save();
 
+  // Notify customer (records activity + sends email + push + in-app)
+  const { notifyCustomerOfStatusChange } = await import('../services/orderNotification.service');
+  await notifyCustomerOfStatusChange(order, 'cancelled', { reason: 'Canceled via Medusa' });
+
   logger.info({ orderNumber: order.orderNumber }, 'Order cancelled via Medusa');
   return true;
 }
@@ -397,16 +401,8 @@ async function handleShipmentCreated(data: { id?: string }): Promise<boolean> {
   if (trackingUrl) order.shippingLabelUrl = trackingUrl;
   await order.save();
 
-  // Record activity
-  await recordOrderActivity(
-    order._id,
-    'shipped',
-    `Order shipped via ${carrier}${trackingNumber ? `. Tracking: ${trackingNumber}` : ''}`,
-    'system',
-    { trackingNumber, carrier, trackingUrl },
-  );
-
-  // Notify customer
+  // Notify customer (records activity + sends email + push + in-app)
+  // Note: Do NOT call recordOrderActivity() separately — notifyCustomerOfStatusChange handles it
   const { notifyCustomerOfStatusChange } = await import('../services/orderNotification.service');
   await notifyCustomerOfStatusChange(order, 'shipped', { trackingNumber, carrier });
 

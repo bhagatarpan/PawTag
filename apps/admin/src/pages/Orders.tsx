@@ -8,7 +8,7 @@ import {
 import {
   Search, X, ChevronDown, Download, Loader2, ShoppingCart, CreditCard,
   Truck, Package, CheckCircle, AlertCircle, Info, Clock, FileText,
-  RefreshCw, Ban, Send, Eye, Printer, Copy, ExternalLink, AlertTriangle,
+  RefreshCw, Ban, Send, Eye, Printer, Copy, ExternalLink, AlertTriangle, XCircle,
 } from 'lucide-react';
 
 /* ------------------------------------------------------------------ */
@@ -558,62 +558,94 @@ export function OrderDetailDrawer({
       {activeTab === 'activity' && (
         <div className="space-y-4">
           {order.activity && order.activity.length > 0 ? (
-            <div className="relative">
-              <div className="absolute left-[15px] top-2 bottom-2 w-0.5 bg-gray-200" />
-              <div className="space-y-0">
-                {[...order.activity]
-                  .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-                  .map((entry, i) => {
-                    const dotColor = entry.type === 'order_placed' ? 'bg-gray-400'
-                      : entry.type === 'payment_confirmed' ? 'bg-blue-500'
-                      : entry.type === 'packing' ? 'bg-amber-500'
-                      : entry.type === 'shipped' ? 'bg-purple-500'
-                      : entry.type === 'delivered' ? 'bg-green-500'
-                      : entry.type === 'cancelled' ? 'bg-red-500'
-                      : entry.type === 'refunded' ? 'bg-orange-500'
-                      : 'bg-gray-300';
+            <>
+              {/* Progress Stepper */}
+              <div className="relative mb-6">
+                <div className="absolute top-[15px] left-[15px] right-[15px] h-1 bg-gray-200 rounded-full" />
+                <div className="relative flex justify-between">
+                  {['pending', 'paid', 'packing', 'shipped', 'delivered'].map((step, i) => {
+                    const stepIdx = ['pending', 'pending_payment', 'paid', 'packing', 'shipped', 'delivered'].indexOf(order.status);
+                    const isDone = i <= stepIdx;
+                    const isCurrent = i === stepIdx;
                     return (
-                      <div key={i} className="relative flex items-start gap-3 pb-5 last:pb-0">
-                        <div className={`relative z-10 w-[30px] h-[30px] rounded-full flex items-center justify-center shrink-0 ${dotColor} ${i === 0 ? 'ring-2 ring-offset-2 ring-teal-200' : ''}`}>
-                          <Clock size={14} className="text-white" />
+                      <div key={step} className="flex flex-col items-center" style={{ width: '20%' }}>
+                        <div className={`w-[28px] h-[28px] rounded-full flex items-center justify-center z-10 text-xs font-bold ${
+                          isDone ? 'bg-teal-600 text-white' : 'bg-gray-200 text-gray-400'
+                        } ${isCurrent ? 'ring-2 ring-offset-1 ring-teal-200' : ''}`}>
+                          {isDone ? '✓' : i + 1}
                         </div>
-                        <div className="flex-1 min-w-0 pt-0.5">
-                          <p className={`text-sm ${i === 0 ? 'font-medium text-gray-900' : 'text-gray-700'}`}>
-                            {entry.message}
-                          </p>
-                          <div className="flex items-center gap-2 mt-0.5">
-                            <p className="text-xs text-gray-400">
-                              {new Date(entry.timestamp).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })}
-                              {' at '}
-                              {new Date(entry.timestamp).toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' })}
-                            </p>
-                            <span className="text-xs text-gray-300 capitalize">· {entry.actor}</span>
-                          </div>
-                          {entry.metadata && Object.keys(entry.metadata).length > 0 && (
-                            <div className="mt-1 flex flex-wrap gap-2">
-                              {entry.metadata.trackingNumber && (
-                                <span className="text-xs bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full font-mono">
-                                  Tracking: {entry.metadata.trackingNumber}
-                                </span>
-                              )}
-                              {entry.metadata.carrier && (
-                                <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">
-                                  {entry.metadata.carrier}
-                                </span>
-                              )}
-                              {entry.metadata.reason && (
-                                <span className="text-xs bg-red-50 text-red-700 px-2 py-0.5 rounded-full">
-                                  Reason: {entry.metadata.reason}
-                                </span>
-                              )}
-                            </div>
-                          )}
-                        </div>
+                        <span className={`text-[11px] mt-1 font-medium capitalize ${isDone ? 'text-teal-700' : 'text-gray-400'}`}>
+                          {step}
+                        </span>
                       </div>
                     );
                   })}
+                </div>
               </div>
-            </div>
+
+              {/* Activity Feed */}
+              <div className="relative">
+                <div className="absolute left-[15px] top-2 bottom-2 w-0.5 bg-gray-200" />
+                <div className="space-y-0">
+                  {[...order.activity]
+                    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+                    .map((entry, i) => {
+                      const dotColor = entry.type === 'order_placed' ? 'bg-gray-400'
+                        : entry.type === 'payment_confirmed' ? 'bg-blue-500'
+                        : entry.type === 'packing' ? 'bg-amber-500'
+                        : entry.type === 'shipped' ? 'bg-purple-500'
+                        : entry.type === 'delivered' ? 'bg-green-500'
+                        : entry.type === 'cancelled' ? 'bg-red-500'
+                        : entry.type === 'refunded' ? 'bg-orange-500'
+                        : 'bg-gray-300';
+                      const iconMap: Record<string, any> = {
+                        order_placed: Package, payment_confirmed: CreditCard, packing: Package,
+                        shipped: Truck, delivered: CheckCircle, cancelled: XCircle, refunded: RefreshCw,
+                      };
+                      const EntryIcon = iconMap[entry.type] || Clock;
+                      return (
+                        <div key={i} className="relative flex items-start gap-3 pb-5 last:pb-0">
+                          <div className={`relative z-10 w-[30px] h-[30px] rounded-full flex items-center justify-center shrink-0 ${dotColor} ${i === 0 ? 'ring-2 ring-offset-1 ring-teal-200' : ''}`}>
+                            <EntryIcon size={14} className="text-white" />
+                          </div>
+                          <div className="flex-1 min-w-0 pt-0.5">
+                            <p className={`text-sm ${i === 0 ? 'font-medium text-gray-900' : 'text-gray-700'}`}>
+                              {entry.message}
+                            </p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <p className="text-xs text-gray-400">
+                                {new Date(entry.timestamp).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                {' at '}
+                                {new Date(entry.timestamp).toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' })}
+                              </p>
+                              <span className="text-xs text-gray-300 capitalize">· {entry.actor}</span>
+                            </div>
+                            {entry.metadata && Object.keys(entry.metadata).length > 0 && (
+                              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                                {entry.metadata.trackingNumber && (
+                                  <span className="text-xs bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full font-mono">
+                                    Tracking: {entry.metadata.trackingNumber}
+                                  </span>
+                                )}
+                                {entry.metadata.carrier && (
+                                  <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">
+                                    {entry.metadata.carrier}
+                                  </span>
+                                )}
+                                {entry.metadata.reason && (
+                                  <span className="text-xs bg-red-50 text-red-700 px-2 py-0.5 rounded-full">
+                                    Reason: {entry.metadata.reason}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            </>
           ) : (
             <p className="text-sm text-gray-500 text-center py-8">No activity recorded yet.</p>
           )}
