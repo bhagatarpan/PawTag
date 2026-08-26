@@ -213,8 +213,36 @@ async function handleOrderPlaced(data: { id: string }) {
     pawtagUser = await User.findOne({ email: medusaOrder.email.toLowerCase() });
   }
 
+  // Fallback: if no customer_id and no email, try to fetch customer from Medusa admin API
+  if (!pawtagUser && medusaOrder.customer_id) {
+    try {
+      const MEDUSA_ADMIN_TOKEN = process.env.MEDUSA_ADMIN_TOKEN || '';
+      const customerRes = await fetch(`${MEDUSA_URL}/admin/customers/${medusaOrder.customer_id}`, {
+        headers: { 'Authorization': `Bearer ${MEDUSA_ADMIN_TOKEN}` },
+      });
+      if (customerRes.ok) {
+        const { customer } = await customerRes.json() as any;
+        if (customer?.email) {
+          pawtagUser = await User.findOne({ email: customer.email.toLowerCase() });
+          // If found, save the medusaCustomerId for future lookups
+          if (pawtagUser && !pawtagUser.medusaCustomerId) {
+            pawtagUser.medusaCustomerId = medusaOrder.customer_id;
+            await pawtagUser.save();
+          }
+        }
+      }
+    } catch (err) {
+      logger.warn({ err }, 'Failed to fetch Medusa customer for fallback lookup');
+    }
+  }
+
+  // Last fallback: try to find user by metadata (pawtagUserId stored in order metadata)
+  if (!pawtagUser && medusaOrder.metadata?.pawtagUserId) {
+    pawtagUser = await User.findById(medusaOrder.metadata.pawtagUserId);
+  }
+
   if (!pawtagUser) {
-    logger.warn({ medusaOrderId, email: medusaOrder.email }, 'PawTag user not found for Medusa order');
+    logger.warn({ medusaOrderId, email: medusaOrder.email, customerId: medusaOrder.customer_id }, 'PawTag user not found for Medusa order');
     return;
   }
 
