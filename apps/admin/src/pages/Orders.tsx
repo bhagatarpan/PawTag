@@ -145,6 +145,18 @@ function formatCurrency(amount: number, currency = 'NZD'): string {
   return `${currency} $${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+function getTrackingUrl(carrier: string, trackingNumber: string): string {
+  if (!trackingNumber || !carrier) return '';
+  const c = carrier.toLowerCase();
+  if (c.includes('nz post') || c.includes('nzpost')) return `https://www.nzpost.co.nz/tools/tracking/result?trackid=${encodeURIComponent(trackingNumber)}`;
+  if (c.includes('courierpost') || c.includes('courier post')) return `https://www.courierpost.co.nz/tracking/${encodeURIComponent(trackingNumber)}`;
+  if (c.includes('aramex')) return `https://www.aramex.co.nz/track/shipment?ShipmentNumber=${encodeURIComponent(trackingNumber)}`;
+  if (c.includes('dhl')) return `https://www.dhl.com/nz-en/home/tracking.html?tracking-id=${encodeURIComponent(trackingNumber)}`;
+  if (c.includes('fedex')) return `https://www.fedex.com/fedextrack/?trknbr=${encodeURIComponent(trackingNumber)}`;
+  if (c.includes('ups')) return `https://www.ups.com/track?tracknum=${encodeURIComponent(trackingNumber)}`;
+  return '';
+}
+
 function getStatusVariant(status: string): 'success' | 'danger' | 'warning' | 'info' | 'neutral' | 'primary' {
   switch (status) {
     case 'delivered': return 'success';
@@ -544,12 +556,31 @@ export function OrderDetailDrawer({
               <DetailRow label="Tracking #" value={
                 <div className="flex items-center gap-2">
                   <span className="font-mono">{order.trackingNumber}</span>
-                  <button onClick={() => copyToClipboard(order.trackingNumber!)} className="text-gray-400 hover:text-gray-600">
+                  <button onClick={() => copyToClipboard(order.trackingNumber!)} className="text-gray-400 hover:text-gray-600" title="Copy tracking number">
                     <Copy size={12} />
                   </button>
                 </div>
               } />
               {order.carrier && <DetailRow label="Carrier" value={order.carrier} />}
+              {(() => {
+                const url = order.trackingNumber && order.carrier
+                  ? getTrackingUrl(order.carrier, order.trackingNumber)
+                  : '';
+                return url ? (
+                  <div className="mt-3">
+                    <a
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-2 bg-teal-50 border border-teal-200 text-teal-700 rounded-lg text-sm font-medium hover:bg-teal-100 transition-all"
+                    >
+                      <Truck size={14} />
+                      Track on {order.carrier}
+                      <ExternalLink size={12} />
+                    </a>
+                  </div>
+                ) : null;
+              })()}
             </Section>
           )}
         </div>

@@ -333,6 +333,46 @@ export default function OrderDetail() {
         </div>
       )}
 
+      {/* Shipping Tracking Card */}
+      {order.trackingNumber && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+          <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+            <Truck className="h-4 w-4" /> Shipping Tracking
+          </h2>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Carrier</span>
+                <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full text-xs font-medium">{order.carrier || 'Courier'}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Tracking #</span>
+                <span className="font-mono text-sm font-medium text-gray-900">{order.trackingNumber}</span>
+                <button
+                  onClick={() => { navigator.clipboard.writeText(order.trackingNumber!); }}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                  title="Copy tracking number"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                </button>
+              </div>
+            </div>
+            {getTrackingUrl(order.carrier || '', order.trackingNumber) && (
+              <a
+                href={getTrackingUrl(order.carrier || '', order.trackingNumber)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-xl font-semibold text-sm hover:bg-primary-700 transition-all"
+              >
+                <Truck size={16} />
+                Track on {order.carrier || 'Carrier'}
+                <ExternalLink size={14} />
+              </a>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Items */}
         <div className="lg:col-span-2 space-y-4">
