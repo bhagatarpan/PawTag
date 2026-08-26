@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Lock, CreditCard, PawPrint, CheckCircle, Truck, Tag, Loader2,
   Mail, Smartphone, Shield, ChevronRight, Edit3, Check, Package, Clock,
-  ShieldCheck, Headphones, RefreshCw
+  ShieldCheck, Headphones, RefreshCw, FileText, Download, Printer, Share2, Home, ShoppingBag, ExternalLink
 } from 'lucide-react';
 import { AddressAutocomplete } from '@pawtag/ui';
 import type { AddressComponents } from '@pawtag/ui';
@@ -42,6 +42,12 @@ export default function Checkout() {
   const [orderNumber, setOrderNumber] = useState(() => sessionStorage.getItem('pawtag_checkout_order') || '');
   const [success, setSuccess] = useState(() => sessionStorage.getItem('pawtag_checkout_success') === 'true');
   const [paymentClientSecret, setPaymentClientSecret] = useState('');
+
+  // Confirmed order data (preserved before clearCart for the confirmation page)
+  const [confirmedItems, setConfirmedItems] = useState<any[]>([]);
+  const [confirmedTotal, setConfirmedTotal] = useState(0);
+  const [confirmedInvoice, setConfirmedInvoice] = useState<any>(null);
+  const [confirmedPawTagOrder, setConfirmedPawTagOrder] = useState<any>(null);
 
   // Promo code
   const [promoCode, setPromoCode] = useState('');
@@ -199,24 +205,34 @@ export default function Checkout() {
     setLoading(true);
     setError(null);
     try {
-      // 1. Ensure customer is associated with cart (non-blocking — fire-and-forget)
+      // 1. Ensure customer is associated with cart (AWAIT — must complete before cart finishes)
       if (!cart.customer_id) {
-        api.post('/customer/medusa-sync').then((res) => {
-          const medusaCustomerId = res.data?.data?.medusaCustomerId;
+        try {
+          const syncRes = await api.post('/customer/medusa-sync');
+          const medusaCustomerId = syncRes.data?.data?.medusaCustomerId;
           if (medusaCustomerId) {
-            sdk.store.cart.update(cart.id, { customer_id: medusaCustomerId } as any).catch(() => {});
+            await sdk.store.cart.update(cart.id, { customer_id: medusaCustomerId } as any);
           }
-        }).catch(() => {}); // Non-blocking — sync failure should not block checkout
+        } catch (syncErr) {
+          console.warn('[Checkout] Customer sync failed, proceeding without medusaCustomerId:', syncErr);
+        }
       }
 
-      // 2. Pass referral code to cart metadata (if present)
+      // 2. Write identity + referral to cart metadata (ensures webhook can always find user)
+      const metadata: Record<string, string> = {};
       const referralCode = localStorage.getItem('pawtag_referral_code');
       if (referralCode && !cart.metadata?.referralCode) {
-        await sdk.store.cart.update(cart.id, {
-          metadata: { referralCode },
-        } as any);
-        localStorage.removeItem('pawtag_referral_code');
+        metadata.referralCode = referralCode;
       }
+      // Identity fields — guarantees order has PawTag user reference for webhook lookup
+      metadata.pawtagUserId = user.id;
+      metadata.pawtagUserEmail = user.email;
+      if (user.phoneNumber) metadata.pawtagUserPhone = user.phoneNumber;
+      metadata.pawtagUserFullName = user.fullName || '';
+      if (Object.keys(metadata).length > 0) {
+        await sdk.store.cart.update(cart.id, { metadata } as any);
+      }
+      if (referralCode) localStorage.removeItem('pawtag_referral_code');
 
       // 3. Add shipping address to cart
       try {
@@ -291,19 +307,51 @@ export default function Checkout() {
     setLoading(true);
     setError(null);
     try {
+      // 1. Complete the Medusa cart (creates Medusa order)
       const result = await sdk.store.cart.complete(cart.id);
 
       if (result.type === 'cart') {
-        throw new Error(result.error?.message || result.error?.name || 'Order creation failed — cart could not be completed');
+        throw new Error(result.error?.message || result.error?.name || 'Order creation failed');
       }
 
       const medusaOrder = result.order;
+      const medusaOrderId = medusaOrder.id;
       const orderDisplay = medusaOrder.display_id?.toString() || medusaOrder.id || 'Processing';
-      setOrderNumber(orderDisplay);
+
+      // Drive progress: "Payment Processing..."
+      (window as any).__paymentProgress?.setProcessingStage?.('confirmed');
+
+      // 2. Call direct API to create PawTag order + invoice + send emails (synchronous)
+      let pawtagOrder = null;
+      let invoice = null;
+      let invoiceUrl = '';
+      try {
+        const placeRes = await api.post('/customer/orders/place', { medusaOrderId });
+        pawtagOrder = placeRes.data.data.order;
+        invoice = placeRes.data.data.invoice;
+        invoiceUrl = placeRes.data.data.invoiceUrl;
+      } catch (placeErr) {
+        // Direct API failed — webhook backup will create it later
+        console.warn('[Checkout] Direct order placement failed, webhook will retry:', placeErr);
+      }
+
+      // 3. Preserve cart data for confirmation page (before clearCart)
+      setConfirmedItems([...items]);
+      setConfirmedTotal(total);
+      setConfirmedInvoice(invoice);
+      setConfirmedPawTagOrder(pawtagOrder);
+      setOrderNumber(pawtagOrder?.orderNumber || orderDisplay);
+
+      // Drive progress: "Payment Confirmed..." → "✓ Payment Confirmed"
+      (window as any).__paymentProgress?.setProcessingStage?.('complete');
+
+      // 4. Wait for green animation, then show confirmation
+      await new Promise((r) => setTimeout(r, 600));
+
       setSuccess(true);
       setCurrentStep('confirmed');
       sessionStorage.setItem('pawtag_checkout_success', 'true');
-      sessionStorage.setItem('pawtag_checkout_order', orderDisplay);
+      sessionStorage.setItem('pawtag_checkout_order', pawtagOrder?.orderNumber || orderDisplay);
       clearCart();
     } catch (err: any) {
       setError(err?.message || 'Order confirmation failed. Your payment was received — please contact support.');
@@ -712,17 +760,179 @@ export default function Checkout() {
           </div>
         )}
 
-        {/* Step 4: Confirmed */}
+        {/* Step 4: Confirmed — Enterprise Order Confirmation */}
         {currentStep === 'confirmed' && (
-          <div className="max-w-lg mx-auto py-12 text-center">
-            <div className="h-20 w-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6"><CheckCircle className="h-12 w-12 text-green-600" /></div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Payment Confirmed!</h1>
-            <p className="text-gray-500 mb-2">Thank you for your order.</p>
-            <p className="text-xl font-mono font-bold text-primary-700 mb-4">{orderNumber}</p>
-            <p className="text-sm text-gray-400 mb-8">We'll send you an email confirmation shortly.</p>
-            <div className="flex gap-3 justify-center">
-              <Link to="/" className="px-6 py-3 border border-gray-300 rounded-xl text-gray-700 font-medium hover:bg-gray-50 transition-all">Back to Home</Link>
-              <Link to="/shop" className="px-6 py-3 bg-primary-600 text-white rounded-xl font-medium hover:bg-primary-700 transition-all">Continue Shopping</Link>
+          <div className="max-w-2xl mx-auto py-8 space-y-6">
+            {/* Success Header */}
+            <div className="text-center">
+              <div className="h-20 w-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 animate-[pulse_2s_ease-in-out_1]">
+                <CheckCircle className="h-12 w-12 text-green-500" />
+              </div>
+              <h1 className="text-3xl font-bold text-gray-900 mb-1">Order Confirmed!</h1>
+              <p className="text-lg text-gray-600">
+                Thank you for your purchase{user?.fullName ? `, ${user.fullName.split(' ')[0]}` : ''}.
+              </p>
+              <p className="text-sm text-gray-400 mt-2">
+                Order <span className="font-mono font-semibold text-primary-700">{orderNumber}</span>
+                {' · '}
+                {new Date().toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })}
+              </p>
+            </div>
+
+            {/* Order Summary */}
+            {confirmedItems.length > 0 && (
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                <h2 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+                  <Package className="h-4 w-4" /> Order Summary
+                </h2>
+                <div className="space-y-3">
+                  {confirmedItems.map((item: any, i: number) => (
+                    <div key={i} className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 bg-primary-50 rounded-lg flex items-center justify-center">
+                          <PawPrint className="h-5 w-5 text-primary-300" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">{item.name}</p>
+                          <p className="text-xs text-gray-500">Qty: {item.quantity}</p>
+                        </div>
+                      </div>
+                      <p className="text-sm font-semibold text-gray-900">NZ${(item.price * item.quantity).toFixed(2)}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-4 pt-4 border-t border-gray-100 space-y-2">
+                  <div className="flex justify-between text-sm text-gray-600">
+                    <span>Subtotal</span><span>NZ${confirmedTotal.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm text-gray-600">
+                    <span>Shipping</span><span className="text-green-600 font-medium">FREE</span>
+                  </div>
+                  <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-100">
+                    <span>Total Paid</span><span className="text-primary-700">NZ${confirmedTotal.toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Order Status Timeline */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+              <h2 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+                <Truck className="h-4 w-4" /> Order Status
+              </h2>
+              <div className="relative">
+                <div className="absolute left-[15px] top-2 bottom-2 w-0.5 bg-gray-200" />
+                <div className="space-y-0">
+                  {[
+                    { label: 'Order Placed', time: 'Just now', done: true },
+                    { label: 'Being Processed', time: 'Pending', done: false },
+                    { label: confirmedPawTagOrder?.trackingNumber ? `Shipped — ${confirmedPawTagOrder.carrier || 'Courier'}` : 'Shipped (tracking will appear here)', time: confirmedPawTagOrder?.trackingNumber || 'Pending', done: !!confirmedPawTagOrder?.trackingNumber },
+                    { label: 'Delivered', time: 'Pending', done: false },
+                  ].map((step, i) => (
+                    <div key={i} className="relative flex items-start gap-3 pb-5 last:pb-0">
+                      <div className={`relative z-10 w-[30px] h-[30px] rounded-full flex items-center justify-center shrink-0 ${
+                        step.done ? 'bg-primary-600' : 'bg-gray-200'
+                      } ${i === 0 ? 'ring-2 ring-offset-2 ring-green-200' : ''}`}>
+                        {step.done ? <Check className="h-4 w-4 text-white" /> : <Clock className="h-4 w-4 text-gray-400" />}
+                      </div>
+                      <div className="flex-1 min-w-0 pt-0.5">
+                        <p className={`text-sm ${i === 0 ? 'font-medium text-gray-900' : 'text-gray-700'}`}>{step.label}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">{step.time}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Invoice Section */}
+            {confirmedInvoice && (
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                  <FileText className="h-4 w-4" /> Invoice
+                </h2>
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <p className="font-mono font-medium text-gray-900">{confirmedInvoice.invoiceNumber}</p>
+                    <p className="text-sm text-gray-500">NZ${confirmedInvoice.amount.toFixed(2)} · <span className="text-green-600 font-medium">Paid</span></p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <button
+                    onClick={async () => {
+                      try {
+                        const res = await api.post(`/customer/invoices/${confirmedInvoice._id}/access`);
+                        const { secureUrl } = res.data.data;
+                        if (secureUrl) window.open(secureUrl, '_blank');
+                      } catch { window.open(`/account/orders`, '_blank'); }
+                    }}
+                    className="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-primary-600 text-white rounded-xl text-sm font-semibold hover:bg-primary-700 transition-all"
+                  >
+                    <ExternalLink size={14} /> View
+                  </button>
+                  <button
+                    onClick={async () => {
+                      try {
+                        const res = await api.post(`/customer/invoices/${confirmedInvoice._id}/access`);
+                        const { secureUrl } = res.data.data;
+                        if (secureUrl) window.open(secureUrl, '_blank');
+                      } catch {}
+                    }}
+                    className="flex items-center justify-center gap-1.5 px-3 py-2.5 border border-primary-600 text-primary-600 rounded-xl text-sm font-semibold hover:bg-primary-50 transition-all"
+                  >
+                    <Download size={14} /> Download
+                  </button>
+                  <button
+                    onClick={async () => {
+                      try {
+                        const res = await api.post(`/customer/invoices/${confirmedInvoice._id}/access`);
+                        const { secureUrl } = res.data.data;
+                        if (secureUrl) window.open(secureUrl, '_blank');
+                      } catch {}
+                    }}
+                    className="flex items-center justify-center gap-1.5 px-3 py-2.5 border border-gray-300 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-50 transition-all"
+                  >
+                    <Printer size={14} /> Print
+                  </button>
+                  <button
+                    onClick={() => {
+                      const url = window.location.origin + '/account/orders';
+                      if (navigator.share) {
+                        navigator.share({ title: `PawTag Order ${orderNumber}`, url });
+                      } else {
+                        navigator.clipboard.writeText(url);
+                      }
+                    }}
+                    className="flex items-center justify-center gap-1.5 px-3 py-2.5 border border-gray-300 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-50 transition-all"
+                  >
+                    <Share2 size={14} /> Share
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Confirmation Sent */}
+            <div className="bg-green-50 border border-green-200 rounded-2xl p-5 flex items-start gap-3">
+              <Mail className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-green-800">Confirmation sent</p>
+                <p className="text-sm text-green-700 mt-0.5">
+                  Order confirmation and invoice have been sent to <strong>{user?.email}</strong>.
+                </p>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+              <Link to="/" className="flex items-center justify-center gap-2 px-6 py-3 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 transition-all">
+                <Home size={18} /> Back to Home
+              </Link>
+              <Link to="/shop" className="flex items-center justify-center gap-2 px-6 py-3 border border-primary-600 text-primary-600 rounded-xl font-semibold hover:bg-primary-50 transition-all">
+                <ShoppingBag size={18} /> Continue Shopping
+              </Link>
+              <Link to="/account/orders" className="flex items-center justify-center gap-2 px-6 py-3 border border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition-all">
+                View My Orders
+              </Link>
             </div>
           </div>
         )}

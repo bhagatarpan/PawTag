@@ -462,29 +462,48 @@ Customer sync: `packages/api/src/services/medusa-sync.service.ts`
 The checkout page (`apps/web/src/pages/Checkout.tsx`) implements a 4-step wizard:
 
 1. **Cart** — Review items, apply promo code, see totals (all from Medusa cart)
-2. **Checkout** — Authentication (inline login or register), contact verification, shipping address
-3. **Payment** — Order summary, card form, pay button
-4. **Confirmed** — Success page with order number
+2. **Checkout** — Authentication (inline login or register), contact verification, shipping address, Shipping Methods
+3. **Payment** — Order summary, animated pay button with progress bar, card form
+4. **Confirmed** — Enterprise confirmation page with order summary, status timeline, invoice actions
 
-**Checkout Architecture (Medusa-first):**
+**Checkout Architecture (Direct API + Webhook Backup):**
 
 ```
 Frontend (Checkout.tsx)
+  → Await customer sync: POST /customer/medusa-sync
+  → Write identity to cart metadata: pawtagUserId, pawtagUserEmail, phone, fullName
   → Medusa SDK: sdk.store.cart.update() — set shipping address
-  → Medusa SDK: sdk.store.cart.addShippingMethod() — add free shipping
+  → Medusa SDK: sdk.store.cart.addShippingMethod() — add shipping
   → Medusa SDK: sdk.store.payment.initiatePaymentSession() — create payment
-  → Medusa SDK: sdk.store.cart.complete() — creates Medusa order
-  → Medusa fires order.placed event
-  → PawTag webhook handler creates: Order + Invoice + Referral + Notifications
+  → StripePaymentForm: stripe.confirmPayment() — animated progress 0%→25%
+  → Medusa SDK: sdk.store.cart.complete() — creates Medusa order (progress 50%)
+  → POST /customer/orders/place — creates PawTag order + invoice + emails (progress 75%)
+  → Animated confirmation (progress 100%, green, 500ms hold)
+  → Confirmation page with order summary, status timeline, invoice actions
+
+Backup path (async, idempotent):
+  → Medusa fires order.placed event → webhook to PawTag
+  → Webhook checks if order exists → YES → skips (idempotent)
 ```
+
+**Customer identity sync:** Before cart completion, the frontend awaits `POST /customer/medusa-sync` to ensure the Medusa customer is linked. It also writes `pawtagUserId`, `pawtagUserEmail`, `pawtagUserPhone`, and `pawtagUserFullName` to cart metadata. These flow into the Medusa order, ensuring the webhook handler can always find the PawTag user.
 
 **Verification gate:** Users must have both email and mobile verified before proceeding to payment. The checkout page checks `user.emailVerified` and `user.phoneVerified` and shows verification status with links to verify.
 
 **Payment:** Medusa handles payment via Stripe module. Demo mode uses `pp_system_default` (auto-succeeds). Real Stripe when `STRIPE_API_KEY` is configured.
 
-**Order creation:** The legacy `POST /customer/orders` endpoint has been removed. All orders are created through Medusa's checkout flow. The Medusa webhook handler (`medusa-webhooks.ts`) creates PawTag order projections, invoices, and processes referrals/notifications.
+**Order creation:** The `POST /customer/orders/place` endpoint creates the PawTag order synchronously (~700ms). The webhook handler is a backup — it checks idempotency and skips if the order already exists. Both paths use the shared `createOrderFromMedusa()` service function.
 
-**Webhook reliability:** Incoming Medusa webhooks are stored in `WebhookEvent` collection for idempotency and retry. Failed events are retried every 60 seconds up to 5 times with exponential backoff.
+**Email optimization:** All 3 emails (invoice, order confirmation, admin alert) are sent in parallel via `Promise.allSettled()` — ~400ms total instead of ~1200ms sequential.
+
+**Webhook reliability:** Incoming Medusa webhooks are stored in `WebhookEvent` collection for idempotency and retry. Failed events are retried every 60 seconds up to 5 times. Handlers return boolean — only marked "completed" on success.
+
+**User lookup chain (5 fallbacks):**
+1. `medusaCustomerId` (from customer sync)
+2. `email` (from Medusa customer)
+3. Admin API → email (fetch Medusa customer, find by email)
+4. `metadata.pawtagUserId` (from cart metadata)
+5. `metadata.pawtagUserEmail` (from cart metadata)
 
 ## Development Commands
 
@@ -558,9 +577,13 @@ Production uses the configured domain sender.
 - `/api/auth/*` — Login, register, OTP, profile
 - `/api/admin/*` — Full CRUD (requires admin/support role)
 - `/api/customer/*` — Pet management, orders, notifications, onboarding, escalations
+  - `POST /customer/orders/place` — Create PawTag order from Medusa order (direct API, ~700ms)
+  - `GET /customer/orders` — List customer orders with invoice data
+  - `GET /customer/orders/:id` — Order detail with activity timeline
 - `/api/finder/*` — Public tag lookup, location sharing (no auth required)
 - `/api/public/cms/*` — Public CMS content (pages, navigation, footer, settings, onboarding config)
 - `/api/address/*` — Address autocomplete proxy (Photon or NZ Post provider)
+- `/api/webhooks/medusa` — Medusa webhook receiver (backup path for order creation)
 
 ---
 
@@ -580,6 +603,20 @@ Settings are cached in-memory for 60 seconds in some services (e.g., `otp-settin
 **Setting key convention:** `category.subcategory.property` (e.g., `rateLimit.finder.view.max`, `escalation.delayMinutes`)
 
 Seeded in `packages/api/src/seeds/seed-cms.ts` — idempotent upsert (safe to re-run).
+
+Use simple development priciples, YAGNI, SOLID, DRY etc.
+- Prefer established, well-maintained open-source libraries for common functionality.
+- Do not implement functionality from scratch when a suitable library already exists.
+- Before adding a dependency, check whether the project already has a dependency that solves the problem.
+- Avoid adding a dependency for trivial functionality that can be implemented clearly in a few lines.
+- Prefer libraries with active maintenance, good adoption, appropriate licensing, and no known critical security vulnerabilities.
+- Keep dependencies to a minimum.
+
+Don't duplicate code
+- Follow DRY, but do not create abstractions solely to eliminate small or incidental duplication.
+- Extract shared logic when duplication represents the same business rule or behavior.
+- Keep business rules defined in one place.
+
 
 ### Rate Limiting (All DB-Driven)
 
@@ -835,6 +872,7 @@ Located in `apps/mobile/e2e/`:
 | `packages/ui/src/components/ProductCard.tsx` | Shared product card component (primary-* tokens) |
 | `packages/ui/src/components/CartDrawer.tsx` | Shared cart drawer component |
 | `packages/api/src/routes/medusa-webhooks.ts` | Medusa webhook endpoint (order.placed, payment.captured) |
+| `packages/api/src/services/order-creation.service.ts` | Shared order creation service (used by API + webhook) |
 | `packages/api/src/routes/checkout-otp.ts` | Dual OTP checkout verification |
 | `packages/api/src/services/medusa-sync.service.ts` | PawTag ↔ Medusa customer sync |
 | `apps/medusa/src/scripts/seed.ts` | Commerce data migration from MongoDB |
@@ -908,21 +946,25 @@ Run: `pnpm --filter @pawtag/medusa seed`
 
 ### Checkout Flow
 
-1. Frontend adds items to Medusa cart via SDK
-2. Frontend completes checkout via `sdk.store.cart.complete()`
-3. Medusa creates order in PostgreSQL
-4. Medusa fires `order.placed` event
-5. PawTag webhook handler (`medusa-webhooks.ts`) receives event
-6. Handler creates: PawTag Order + Invoice + Referral + Notifications
-7. Webhook events stored in `WebhookEvent` collection for idempotency/retry
+1. Frontend syncs customer to Medusa (`POST /customer/medusa-sync`)
+2. Frontend writes identity to cart metadata (`pawtagUserId`, `email`, `phone`, `fullName`)
+3. Frontend adds items, shipping address, shipping method to Medusa cart via SDK
+4. Stripe payment confirmed client-side via `stripe.confirmPayment()`
+5. Frontend completes checkout via `sdk.store.cart.complete()` → Medusa creates order
+6. Frontend calls `POST /customer/orders/place { medusaOrderId }` → PawTag creates order + invoice + sends emails synchronously (~700ms)
+7. Medusa fires `order.placed` event → webhook backup (idempotent, skips if order exists)
+8. Shared `createOrderFromMedusa()` service used by both direct API and webhook
 
 ### Webhook Reliability
 
+- **Primary path:** Direct API (`POST /customer/orders/place`) — synchronous, ~700ms
+- **Backup path:** Webhook (`POST /api/webhooks/medusa`) — async, ~2-4s, only if direct API fails
 - Events stored in `WebhookEvent` collection with idempotency check
+- Handlers return boolean — only marked "completed" on success
 - Failed events retried every 60 seconds up to 5 times
-- Exponential backoff between retries
 - Events older than 24 hours marked as dead (no retry)
 - All side effects (invoice, referral, notification) are idempotent
+- Shipping/cancellation events still processed via webhook (no frontend involvement)
 
 ### Deprecated Systems
 

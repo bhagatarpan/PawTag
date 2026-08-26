@@ -1,12 +1,6 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
-import { Order, Subscription, Tag, User, Notification, Invoice, InvoiceAccessToken, WebhookEvent } from '@pawtag/db';
-import { createSubscription } from '../services/subscription.service';
-import { sendOrderConfirmation, sendInvoiceEmail, sendMail } from '../services/email.service';
-import { generateInvoiceHtml } from '../services/invoice-html.service';
-import { sendPushToUser } from '../services/push-notification.service';
-import { generateSecureToken, hashToken } from '../services/auth.service';
-import { generateTagId } from '../lib/tag-id';
+import { Order, User, WebhookEvent, Notification as PawTagNotification } from '@pawtag/db';
 import logger from '../lib/logger';
 import { auditService, type AuditContext } from '../services/audit';
 
@@ -15,7 +9,7 @@ const router = Router();
 const WEBHOOK_SECRET = process.env.MEDUSA_WEBHOOK_SECRET || '';
 
 // Record an activity entry on an order's activity timeline
-async function recordOrderActivity(
+export async function recordOrderActivity(
   orderId: any,
   type: string,
   message: string,
@@ -192,7 +186,7 @@ router.post('/', async (req: Request, res: Response) => {
   }
 });
 
-// Handle order.placed — create PawTag order and process subscriptions
+// Handle order.placed — delegates to shared createOrderFromMedusa service
 async function handleOrderPlaced(data: { id: string }): Promise<boolean> {
   const { id: medusaOrderId } = data;
   if (!medusaOrderId) {
@@ -202,305 +196,19 @@ async function handleOrderPlaced(data: { id: string }): Promise<boolean> {
 
   logger.info({ medusaOrderId }, 'Processing order.placed');
 
-  // Fetch full order from Medusa
-  const MEDUSA_URL = process.env.MEDUSA_BACKEND_URL || 'http://localhost:9000';
-  const response = await fetch(`${MEDUSA_URL}/store/orders/${medusaOrderId}`, {
-    headers: { 'x-publishable-api-key': process.env.MEDUSA_PUBLISHABLE_KEY || '' },
-  });
-
-  if (!response.ok) {
-    logger.error({ status: response.status, medusaOrderId }, 'Failed to fetch Medusa order');
-    return false;
-  }
-
-  const { order: medusaOrder } = await response.json() as any;
-
-  // Find PawTag user by Medusa customer email or metadata
-  let pawtagUser = null;
-  if (medusaOrder.customer_id) {
-    pawtagUser = await User.findOne({ medusaCustomerId: medusaOrder.customer_id });
-  }
-  if (!pawtagUser && medusaOrder.email) {
-    pawtagUser = await User.findOne({ email: medusaOrder.email.toLowerCase() });
-  }
-
-  // Fallback: if no customer_id and no email, try to fetch customer from Medusa admin API
-  if (!pawtagUser && medusaOrder.customer_id) {
-    try {
-      const MEDUSA_ADMIN_TOKEN = process.env.MEDUSA_ADMIN_TOKEN || '';
-      const customerRes = await fetch(`${MEDUSA_URL}/admin/customers/${medusaOrder.customer_id}`, {
-        headers: { 'Authorization': `Bearer ${MEDUSA_ADMIN_TOKEN}` },
-      });
-      if (customerRes.ok) {
-        const { customer } = await customerRes.json() as any;
-        if (customer?.email) {
-          pawtagUser = await User.findOne({ email: customer.email.toLowerCase() });
-          // If found, save the medusaCustomerId for future lookups
-          if (pawtagUser && !pawtagUser.medusaCustomerId) {
-            pawtagUser.medusaCustomerId = medusaOrder.customer_id;
-            await pawtagUser.save();
-          }
-        }
-      }
-    } catch (err) {
-      logger.warn({ err }, 'Failed to fetch Medusa customer for fallback lookup');
+  try {
+    const { createOrderFromMedusa } = await import('../services/order-creation.service');
+    const result = await createOrderFromMedusa(medusaOrderId);
+    if (result.isNew) {
+      logger.info({ orderNumber: result.order.orderNumber }, 'Order created via webhook');
+    } else {
+      logger.info({ orderNumber: result.order.orderNumber }, 'Order already existed (webhook idempotent)');
     }
-  }
-
-  // Last fallback: try to find user by metadata (pawtagUserId stored in order metadata)
-  if (!pawtagUser && medusaOrder.metadata?.pawtagUserId) {
-    pawtagUser = await User.findById(medusaOrder.metadata.pawtagUserId);
-  }
-
-  // Final fallback: try to find user by shipping address name (first_name + last_name)
-  if (!pawtagUser && medusaOrder.shipping_address?.first_name) {
-    const firstName = medusaOrder.shipping_address.first_name;
-    const lastName = medusaOrder.shipping_address.last_name || '';
-    const fullName = lastName ? `${firstName} ${lastName}` : firstName;
-    pawtagUser = await User.findOne({ fullName: { $regex: new RegExp(`^${firstName}`, 'i') } });
-    if (pawtagUser) {
-      logger.info({ userId: pawtagUser._id, fullName }, 'Found user by shipping address name fallback');
-    }
-  }
-
-  if (!pawtagUser) {
-    logger.warn({ medusaOrderId, email: medusaOrder.email, customerId: medusaOrder.customer_id }, 'PawTag user not found for Medusa order');
-    return false;
-  }
-
-  // Check if PawTag order already exists (idempotent)
-  const existingOrder = await Order.findOne({
-    $or: [
-      { 'payment.transactionId': medusaOrderId },
-      { notes: `Medusa Order: ${medusaOrderId}` },
-    ],
-  });
-
-  if (existingOrder) {
-    logger.info({ orderNumber: existingOrder.orderNumber }, 'PawTag order already exists');
     return true;
+  } catch (err: any) {
+    logger.error({ err, medusaOrderId }, 'Failed to create order from webhook');
+    return false;
   }
-
-  // Generate PawTag order number atomically to prevent race conditions
-  const counter = await Order.db!.collection('counters').findOneAndUpdate(
-    { _id: 'orderNumber' as any },
-    { $inc: { seq: 1 } },
-    { upsert: true, returnDocument: 'after' }
-  );
-  const orderNumber = `PT-${String(counter?.value?.seq || 1).padStart(6, '0')}`;
-
-  // Map Medusa items to PawTag items
-    const items = (medusaOrder.items || []).map((item: any) => {
-    // Medusa v2 stores prices in major units (dollars), not cents
-    const productId = item.product_id || item.metadata?.pawtagProductId || '';
-    return {
-      productId,
-      productName: item.title || item.name,
-      quantity: item.quantity,
-      unitPrice: item.unit_price || 0,
-      totalPrice: (item.unit_price || 0) * item.quantity,
-    };
-  });
-
-  // Create PawTag order
-  const order = await Order.create({
-    orderNumber,
-    userId: pawtagUser._id,
-    items,
-    status: 'paid',
-    payment: {
-      method: 'card',
-      status: 'completed',
-      transactionId: medusaOrderId,
-      amount: medusaOrder.total || 0,
-      currency: (medusaOrder.currency_code || 'nzd').toUpperCase(),
-      paidAt: new Date(medusaOrder.created_at),
-    },
-    shippingAddress: medusaOrder.shipping_address ? {
-      line1: medusaOrder.shipping_address.address_1 || '',
-      line2: medusaOrder.shipping_address.address_2 || '',
-      city: medusaOrder.shipping_address.city || '',
-      state: medusaOrder.shipping_address.province || '',
-      zip: medusaOrder.shipping_address.postal_code || '',
-      country: (medusaOrder.shipping_address.country_code || 'nz').toUpperCase(),
-    } : {
-      line1: '',
-      city: '',
-      state: '',
-      zip: '',
-      country: 'NZ',
-    },
-    referredByCode: medusaOrder.metadata?.referralCode || undefined,
-    notes: `Medusa Order: ${medusaOrderId}`,
-  });
-
-  logger.info({ orderNumber, medusaOrderId }, 'Created PawTag order from Medusa');
-
-  // Record order placed activity
-  await recordOrderActivity(order._id, 'order_placed', 'Order placed', 'customer');
-
-  // Process subscriptions for subscription products
-  await processSubscriptions(order, pawtagUser, medusaOrder);
-
-  // Create Invoice record
-  try {
-    // Use atomic counter to prevent duplicate invoice numbers
-    const counter = await Invoice.db!.collection('counters').findOneAndUpdate(
-      { _id: 'invoiceNumber' as any },
-      { $inc: { seq: 1 } },
-      { upsert: true, returnDocument: 'after' }
-    );
-    const invoiceNumber = `INV-${String(counter?.value?.seq || 1).padStart(6, '0')}`;
-
-    // Check if order has subscription
-    let subscriptionId: any = undefined;
-    let billingPeriod: { start: Date; end: Date } | undefined = undefined;
-    const sub = await Subscription.findOne({ userId: pawtagUser._id, orderId: order._id });
-    if (sub) {
-      subscriptionId = sub._id;
-      if (sub.currentPeriodStart && sub.currentPeriodEnd) {
-        billingPeriod = { start: sub.currentPeriodStart, end: sub.currentPeriodEnd };
-      }
-    }
-
-    const invoice = await Invoice.create({
-      ...(subscriptionId ? { subscriptionId } : {}),
-      orderId: order._id,
-      userId: pawtagUser._id,
-      invoiceNumber,
-      amount: order.payment.amount,
-      currency: order.payment.currency || 'NZD',
-      status: 'paid',
-      paymentMethod: order.payment.method,
-      paidAt: order.payment.paidAt || new Date(),
-      ...(billingPeriod ? { billingPeriod } : {}),
-    });
-    logger.info({ invoiceNumber, orderNumber }, 'Invoice created');
-
-    // Generate secure access token for invoice
-    const secureToken = generateSecureToken();
-    const tokenHash = hashToken(secureToken);
-    const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
-    await InvoiceAccessToken.create({
-      invoiceId: invoice._id,
-      userId: pawtagUser._id,
-      tokenHash,
-      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-      verifiedAt: new Date(),
-    });
-    const invoiceUrl = `${FRONTEND_URL}/invoice/${secureToken}?admin=1`;
-
-    // Send invoice email
-    const invoiceHtml = await generateInvoiceHtml(invoice._id.toString());
-    await sendInvoiceEmail(pawtagUser.email, pawtagUser.fullName, invoiceNumber, invoiceHtml, invoiceUrl, invoice.amount);
-    logger.info({ orderNumber }, 'Invoice email sent');
-  } catch (err) {
-    logger.error({ err, orderNumber }, 'Failed to create invoice');
-  }
-
-  // Process referral rewards
-  try {
-    const { createReferralOnOrder, completeReferralRewards } = await import('../services/referral.service');
-    if (order.referredByCode) {
-      await createReferralOnOrder(order.referredByCode, pawtagUser._id.toString(), order.referredByCode, order._id.toString());
-      await completeReferralRewards(order._id.toString());
-      logger.info({ orderNumber }, 'Referral rewards processed');
-    }
-  } catch (err) {
-    logger.error({ err, orderNumber }, 'Referral processing error');
-  }
-
-  // Admin notification (idempotent)
-  try {
-    const existingAdminNotif = await Notification.findOne({
-      audience: 'admin',
-      'data.medusaOrderId': medusaOrderId,
-    });
-    if (!existingAdminNotif) {
-      await Notification.create({
-        userId: pawtagUser._id,
-        audience: 'admin',
-        type: 'new_order',
-        title: 'New order received',
-        message: `Order ${order.orderNumber} — $${order.payment.amount.toFixed(2)} NZD`,
-        data: {
-          orderId: order._id.toString(),
-          orderNumber: order.orderNumber,
-          amount: order.payment.amount,
-          medusaOrderId,
-          customerName: pawtagUser.fullName || 'Unknown',
-          customerEmail: pawtagUser.email || 'Unknown',
-        },
-        priority: 'high',
-        channel: 'alert',
-      });
-
-      // Send admin email
-      const adminEmail = process.env.ADMIN_ALERT_EMAIL;
-      if (adminEmail) {
-        try {
-          await sendMail(
-            adminEmail,
-            `New PawTag order: ${order.orderNumber}`,
-            `<h2>New Order Received</h2>
-             <p><strong>Order:</strong> ${order.orderNumber}</p>
-             <p><strong>Customer:</strong> ${pawtagUser.fullName || 'Unknown'} (${pawtagUser.email || 'Unknown'})</p>
-             <p><strong>Amount:</strong> $${order.payment.amount.toFixed(2)} NZD</p>
-             <p><strong>Medusa Order:</strong> ${medusaOrderId}</p>`,
-          );
-        } catch (emailErr) {
-          logger.error({ err: emailErr }, 'Admin notification email error');
-        }
-      }
-      logger.info({ orderNumber }, 'Admin notification created');
-    }
-  } catch (adminError) {
-    logger.error({ err: adminError }, 'Admin notification error');
-  }
-
-  // Send order confirmation email
-  try {
-    await sendOrderConfirmation({
-      to: pawtagUser.email,
-      customerName: pawtagUser.fullName,
-      orderNumber: order.orderNumber,
-      total: order.payment.amount,
-      items: order.items.map((i: any) => ({
-        productName: i.productName,
-        quantity: i.quantity,
-        unitPrice: i.unitPrice,
-      })),
-      shippingAddress: order.shippingAddress,
-    });
-  } catch (err) {
-    logger.error({ err, orderNumber }, 'Failed to send order confirmation email');
-  }
-
-  // Create customer notification
-  try {
-    await Notification.create({
-      userId: pawtagUser._id,
-      type: 'order',
-      title: 'Order Confirmed',
-      message: `Your order ${order.orderNumber} has been confirmed and paid.`,
-      read: false,
-    });
-  } catch {
-    // Non-critical
-  }
-
-  // Push notification
-  try {
-    await sendPushToUser(
-      pawtagUser._id.toString(),
-      'Order Confirmed',
-      `Your order ${order.orderNumber} has been confirmed.`,
-    );
-  } catch {
-    // Non-critical
-  }
-
-  return true;
 }
 
 // Handle payment.captured — mark existing order as paid
@@ -578,7 +286,7 @@ async function handleFulfillmentCreated(data: { order_id?: string; fulfillment_i
   // Notify customer
   const { notifyCustomerOfStatusChange } = await import('../services/orderNotification.service');
   // packing has no notification config, but we record the activity
-  await Notification.create({
+  await PawTagNotification.create({
     userId: order.userId,
     audience: 'admin',
     type: 'order_update',
@@ -707,53 +415,4 @@ async function handleShipmentCreated(data: { id?: string }): Promise<boolean> {
 }
 
 // Process subscriptions for subscription products
-async function processSubscriptions(order: any, user: any, medusaOrder: any) {
-  const MEDUSA_URL = process.env.MEDUSA_BACKEND_URL || 'http://localhost:9000';
-
-  for (const item of order.items) {
-    // Find the Medusa product ID from the order items
-    const medusaItem = (medusaOrder.items || []).find((mi: any) =>
-      mi.product_id === item.productId || mi.title === item.productName
-    );
-    if (!medusaItem?.product_id) continue;
-
-    // Fetch product metadata from Medusa
-    let productMetadata: any = null;
-    try {
-      const response = await fetch(`${MEDUSA_URL}/store/products/${medusaItem.product_id}`, {
-        headers: { 'x-publishable-api-key': process.env.MEDUSA_PUBLISHABLE_KEY || '' },
-      });
-      if (response.ok) {
-        const { product } = await response.json() as any;
-        productMetadata = product?.metadata;
-      }
-    } catch {
-      // Non-critical — skip subscription if product fetch fails
-    }
-
-    if (!productMetadata?.isSubscription || !productMetadata?.subscriptionConfig) continue;
-
-    // Find user's unlinked tags
-    const userTags = await Tag.find({ ownerId: user._id, deletedAt: null });
-    for (const tag of userTags) {
-      if (tag.subscriptionStatus === 'none' || !tag.subscriptionId) {
-        try {
-          await createSubscription({
-            userId: user._id.toString(),
-            tagId: tag._id.toString(),
-            orderId: order._id.toString(),
-            planType: productMetadata.subscriptionConfig.type || 'annual',
-            planId: medusaItem.product_id,
-            price: item.unitPrice,
-          });
-          logger.info({ orderNumber: order.orderNumber, tagId: tag._id }, 'Subscription created');
-          break; // One subscription per order item
-        } catch (err) {
-          logger.error({ err, orderNumber: order.orderNumber }, 'Failed to create subscription');
-        }
-      }
-    }
-  }
-}
-
 export default router;

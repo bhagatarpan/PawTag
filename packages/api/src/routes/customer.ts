@@ -925,6 +925,62 @@ router.get('/orders/:id/invoice', requirePermission('order.read'), async (req: A
   }
 });
 
+/**
+ * POST /api/customer/orders/place — Create PawTag order from Medusa order (direct API).
+ *
+ * Called by the frontend after cart.complete() to synchronously create the PawTag order,
+ * invoice, and send emails. This is faster than waiting for the webhook (~700ms vs ~2-4s).
+ *
+ * The endpoint is idempotent — if the order already exists (e.g., webhook processed first),
+ * it returns the existing order.
+ *
+ * @body { medusaOrderId: string }
+ * @returns { order, invoice, invoiceUrl, isNew }
+ */
+router.post('/orders/place', requirePermission('order.read'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { medusaOrderId } = req.body;
+    if (!medusaOrderId) {
+      res.status(400).json({ success: false, error: 'medusaOrderId is required' });
+      return;
+    }
+
+    const { createOrderFromMedusa } = await import('../services/order-creation.service');
+    const result = await createOrderFromMedusa(medusaOrderId);
+
+    auditCustomerEvent(req, {
+      action: 'place_order',
+      eventType: 'business_operation',
+      eventCategory: 'FINANCIAL',
+      operationType: 'POST',
+      resourceType: 'Order',
+      resourceId: result.order._id.toString(),
+      outcome: 'SUCCESS',
+      severity: 'HIGH',
+      businessOperation: 'Order placed via direct API',
+      metadata: { medusaOrderId, orderNumber: result.order.orderNumber, isNew: result.isNew },
+    }).catch(() => {});
+
+    res.json({
+      success: true,
+      data: {
+        order: result.order,
+        invoice: result.invoice ? {
+          _id: result.invoice._id,
+          invoiceNumber: result.invoice.invoiceNumber,
+          amount: result.invoice.amount,
+          status: result.invoice.status,
+        } : null,
+        invoiceUrl: result.invoiceUrl,
+        isNew: result.isNew,
+      },
+    });
+  } catch (err: any) {
+    logger.error({ err }, 'Failed to place order via direct API');
+    res.status(500).json({ success: false, error: err.message || 'Failed to create order' });
+  }
+});
+
 // NOTE: POST /orders and POST /orders/:orderNumber/confirm-payment have been removed.
 // Checkout now uses the Medusa SDK flow: sdk.store.cart.complete() → order.placed webhook.
 // The Medusa webhook handler creates PawTag orders, invoices, referrals, and notifications.
