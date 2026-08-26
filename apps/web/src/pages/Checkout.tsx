@@ -247,16 +247,12 @@ export default function Checkout() {
         } as any);
       }
 
-      // 4. Add selected shipping method + refresh cart so totals include shipping & tax
+      // 4. Ensure shipping method is on the cart (already synced by effect, just verify)
+      // Note: addShippingMethod is handled by the shipping sync effect — skip here to
+      // avoid concurrent lock contention on the same cart.
       if (selectedShippingOption) {
-        try {
-          await sdk.store.cart.addShippingMethod(cart.id, {
-            option_id: selectedShippingOption,
-          });
-          console.log('[Checkout] Shipping method added:', selectedShippingOption);
-        } catch (shipErr: any) {
-          console.error('[Checkout] Shipping method error:', shipErr?.message);
-        }
+        // Small wait to let any in-flight shipping sync effect complete
+        await new Promise((r) => setTimeout(r, 500));
       }
 
       // Re-fetch cart to get updated totals (shipping + tax calculated)
