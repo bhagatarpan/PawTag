@@ -30,6 +30,7 @@ export default async function pawtagWebhookSubscriber(
       method: "POST",
       headers,
       body: payload,
+      signal: AbortSignal.timeout(5_000), // 5s timeout to avoid blocking Medusa event processing
     })
 
     if (!response.ok) {

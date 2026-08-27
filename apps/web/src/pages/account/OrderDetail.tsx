@@ -144,17 +144,63 @@ export default function OrderDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  const fetchOrder = async () => {
+    if (!id) return;
+    try {
+      const res = await api.get(`/customer/orders/${id}`);
+      setOrder(res.data.data);
+      setError('');
+    } catch (err: any) {
+      if (!order) {
+        setError(err.response?.data?.error || 'Order not found');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!id) return;
-    api.get(`/customer/orders/${id}`)
-      .then((res) => setOrder(res.data.data))
-      .catch((err) => setError(err.response?.data?.error || 'Order not found'))
-      .finally(() => setLoading(false));
+    fetchOrder();
 
     // Fetch invoice for this order
     api.get(`/customer/orders/${id}/invoice`)
       .then((res) => setInvoice(res.data.data))
       .catch(() => {}); // No invoice yet — non-critical
+  }, [id]);
+
+  // 30s polling — pauses when tab is hidden
+  useEffect(() => {
+    if (!id) return;
+    const POLL_INTERVAL = 30_000;
+    let interval: ReturnType<typeof setInterval> | null = null;
+
+    const startPolling = () => {
+      if (interval) return;
+      interval = setInterval(() => {
+        if (document.visibilityState === 'visible') {
+          fetchOrder();
+        }
+      }, POLL_INTERVAL);
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        fetchOrder();
+        startPolling();
+      } else if (interval) {
+        clearInterval(interval);
+        interval = null;
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    startPolling();
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      if (interval) clearInterval(interval);
+    };
   }, [id]);
 
   if (loading) {

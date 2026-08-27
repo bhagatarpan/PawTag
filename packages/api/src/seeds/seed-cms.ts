@@ -131,6 +131,12 @@ async function run() {
         { key: 'systemLog.sampling.error', value: '100', displayValue: 'Error Sampling %', category: 'systemLog', description: 'Percentage of error logs to store (0-100). 100 = store all.' },
         { key: 'systemLog.sampling.fatal', value: '100', displayValue: 'Fatal Sampling %', category: 'systemLog', description: 'Percentage of fatal logs to store (0-100). 100 = store all.' },
         { key: 'systemLog.retentionDays', value: '30', displayValue: 'Log Retention (days)', category: 'systemLog', description: 'Number of days to keep system logs before automatic deletion.' },
+        // Sync Architecture Settings
+        { key: 'sync.reconciliation.enabled', value: 'true', displayValue: 'Reconciliation Job Enabled', category: 'sync', description: 'Enable the order sync reconciliation job that corrects data drift between PawTag and Medusa' },
+        { key: 'sync.reconciliation.intervalSeconds', value: '60', displayValue: 'Reconciliation Interval (seconds)', category: 'sync', description: 'How often the reconciliation job checks for order drift between PawTag and Medusa' },
+        { key: 'sync.reconciliation.skipRecentMinutes', value: '5', displayValue: 'Skip Recent Orders (minutes)', category: 'sync', description: 'Orders updated in the last N minutes are skipped to avoid processing in-flight webhooks' },
+        { key: 'sync.polling.enabled', value: 'true', displayValue: 'Customer Polling Enabled', category: 'sync', description: 'Enable automatic order list polling on the customer Orders page' },
+        { key: 'sync.polling.intervalSeconds', value: '30', displayValue: 'Customer Polling Interval (seconds)', category: 'sync', description: 'How often the customer Orders page polls for updates' },
       ];
 
       let settingsCreated = 0;

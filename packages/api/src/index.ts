@@ -271,6 +271,10 @@ async function start() {
     const { startWebhookRetryJob } = await import('./jobs/webhookRetry');
     startWebhookRetryJob();
 
+    // Start order sync reconciliation job
+    const { startReconciliationJob } = await import('./jobs/orderSyncReconciliation');
+    startReconciliationJob();
+
     const server = app.listen(config.port, () => {
       logger.info(`PawTag API running on port ${config.port}`);
       logger.info(`Environment: ${config.nodeEnv}`);

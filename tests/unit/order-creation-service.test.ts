@@ -116,7 +116,9 @@ describe('createOrderFromMedusa', () => {
       ok: true,
       json: () => Promise.resolve({ order: mockMedusaOrder }),
     });
-    (User.findOne as any).mockResolvedValueOnce(mockPawTagUser);
+    // Parallel lookups: medusaCustomerId, email, pawtagUserId, pawtagUserEmail all call User methods
+    (User.findOne as any).mockResolvedValue(mockPawTagUser);
+    (User.findById as any).mockResolvedValue(mockPawTagUser);
     (Order.findOne as any).mockResolvedValueOnce(null); // No existing order
     (Order.db.collection('counters').findOneAndUpdate as any).mockResolvedValueOnce({ value: { seq: 5 } });
     (Order.create as any).mockResolvedValueOnce({
@@ -153,10 +155,14 @@ describe('createOrderFromMedusa', () => {
       ok: true,
       json: () => Promise.resolve({ order: mockMedusaOrder }),
     });
-    (User.findOne as any).mockResolvedValueOnce(mockPawTagUser);
+    // Parallel lookups: medusaCustomerId, email, pawtagUserId, pawtagUserEmail all call User methods
+    (User.findOne as any).mockResolvedValue(mockPawTagUser);
+    (User.findById as any).mockResolvedValue(mockPawTagUser);
     (Order.findOne as any).mockResolvedValueOnce({
       _id: 'existing_order',
       orderNumber: 'PT-000003',
+      medusaOrderId: undefined,
+      save: vi.fn().mockResolvedValue(true),
     });
     (Invoice.findOne as any).mockResolvedValueOnce({
       _id: 'existing_inv',
@@ -164,6 +170,8 @@ describe('createOrderFromMedusa', () => {
       amount: 59.99,
       status: 'paid',
     });
+    // Mock for fresh token generation in idempotent return
+    (InvoiceAccessToken.create as any).mockResolvedValueOnce({});
 
     const { createOrderFromMedusa } = await import('../../packages/api/src/services/order-creation.service');
     const result = await createOrderFromMedusa('order_test123');

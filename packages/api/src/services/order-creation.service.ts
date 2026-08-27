@@ -48,27 +48,75 @@ export interface CreateOrderResult {
 
 /**
  * Find the PawTag user that corresponds to a Medusa order.
- * Uses a chain of fallbacks: customer_id → email → admin API → metadata.
+ * Uses parallel lookups for speed, with fallback chain.
  */
 async function findPawTagUser(medusaOrder: any): Promise<any | null> {
+  const MEDUSA_TIMEOUT_MS = 5_000;
+
+  // Independent lookups — run in parallel via Promise.any for fastest match
+  const lookupPromises: Promise<any>[] = [];
+
   // 1. By medusaCustomerId
   if (medusaOrder.customer_id) {
-    const user = await User.findOne({ medusaCustomerId: medusaOrder.customer_id });
-    if (user) return user;
+    lookupPromises.push(
+      User.findOne({ medusaCustomerId: medusaOrder.customer_id }).then((user) => {
+        if (user) return user;
+        throw new Error('not found');
+      }),
+    );
   }
 
   // 2. By email
   if (medusaOrder.email) {
-    const user = await User.findOne({ email: medusaOrder.email.toLowerCase() });
-    if (user) return user;
+    lookupPromises.push(
+      User.findOne({ email: medusaOrder.email.toLowerCase() }).then((user) => {
+        if (user) return user;
+        throw new Error('not found');
+      }),
+    );
   }
 
-  // 3. Fetch customer from Medusa admin API, then find by email
+  // 4. By metadata.pawtagUserId (written to cart during checkout)
+  if (medusaOrder.metadata?.pawtagUserId) {
+    lookupPromises.push(
+      User.findById(medusaOrder.metadata.pawtagUserId).then((user) => {
+        if (user) return user;
+        throw new Error('not found');
+      }),
+    );
+  }
+
+  // 5. By metadata.pawtagUserEmail (written to cart during checkout)
+  if (medusaOrder.metadata?.pawtagUserEmail) {
+    lookupPromises.push(
+      User.findOne({ email: medusaOrder.metadata.pawtagUserEmail.toLowerCase() }).then((user) => {
+        if (user) return user;
+        throw new Error('not found');
+      }),
+    );
+  }
+
+  // Try parallel lookups first (fastest path)
+  if (lookupPromises.length > 0) {
+    try {
+      const user = await Promise.any(lookupPromises);
+      if (user) return user;
+    } catch {
+      // All parallel lookups failed — fall through to Medusa admin API
+    }
+  }
+
+  // 3. Fetch customer from Medusa admin API (slowest, with timeout)
   if (medusaOrder.customer_id) {
     try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), MEDUSA_TIMEOUT_MS);
       const customerRes = await fetch(`${MEDUSA_URL}/admin/customers/${medusaOrder.customer_id}`, {
         headers: { Authorization: `Bearer ${MEDUSA_ADMIN_TOKEN}` },
+        signal: controller.signal,
       });
+      clearTimeout(timeout);
+
       if (customerRes.ok) {
         const { customer } = await customerRes.json() as any;
         if (customer?.email) {
@@ -88,18 +136,6 @@ async function findPawTagUser(medusaOrder: any): Promise<any | null> {
     }
   }
 
-  // 4. By metadata.pawtagUserId (written to cart during checkout)
-  if (medusaOrder.metadata?.pawtagUserId) {
-    const user = await User.findById(medusaOrder.metadata.pawtagUserId);
-    if (user) return user;
-  }
-
-  // 5. By metadata.pawtagUserEmail (written to cart during checkout)
-  if (medusaOrder.metadata?.pawtagUserEmail) {
-    const user = await User.findOne({ email: medusaOrder.metadata.pawtagUserEmail.toLowerCase() });
-    if (user) return user;
-  }
-
   return null;
 }
 
@@ -115,11 +151,18 @@ async function findPawTagUser(medusaOrder: any): Promise<any | null> {
  * 6. Record activity + notifications (fire-and-forget)
  * 7. Return { order, invoice, invoiceUrl, isNew }
  */
-export async function createOrderFromMedusa(medusaOrderId: string): Promise<CreateOrderResult> {
-  // 1. Fetch full order from Medusa
+export async function createOrderFromMedusa(
+  medusaOrderId: string,
+  stripePaymentIntentId?: string,
+): Promise<CreateOrderResult> {
+  // 1. Fetch full order from Medusa (with timeout)
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10_000);
   const response = await fetch(`${MEDUSA_URL}/store/orders/${medusaOrderId}`, {
     headers: { 'x-publishable-api-key': MEDUSA_PUBLISHABLE_KEY },
+    signal: controller.signal,
   });
+  clearTimeout(timeout);
 
   if (!response.ok) {
     throw new Error(`Failed to fetch Medusa order: ${response.status}`);
@@ -133,20 +176,37 @@ export async function createOrderFromMedusa(medusaOrderId: string): Promise<Crea
     throw new Error(`PawTag user not found for Medusa order ${medusaOrderId}`);
   }
 
-  // 3. Check idempotency
+  // 3. Check idempotency — prefer medusaOrderId field, fall back to legacy fields
   const existingOrder = await Order.findOne({
     $or: [
+      { medusaOrderId },
       { 'payment.transactionId': medusaOrderId },
       { notes: `Medusa Order: ${medusaOrderId}` },
     ],
   });
 
   if (existingOrder) {
-    // Order already exists — fetch its invoice and return
+    // Backfill medusaOrderId on legacy orders that lack it
+    if (!existingOrder.medusaOrderId) {
+      existingOrder.medusaOrderId = medusaOrderId;
+      await existingOrder.save();
+    }
+
+    // Order already exists — fetch its invoice and generate a fresh access token
     const existingInvoice = await Invoice.findOne({ orderId: existingOrder._id });
-    const invoiceUrl = existingInvoice
-      ? `${FRONTEND_URL}/invoice/${generateSecureToken()}?admin=1` // Token may be expired, but URL format is correct
-      : '';
+    let invoiceUrl = '';
+    if (existingInvoice) {
+      const secureToken = generateSecureToken();
+      const tokenHash = hashToken(secureToken);
+      await InvoiceAccessToken.create({
+        invoiceId: existingInvoice._id,
+        userId: existingOrder.userId,
+        tokenHash,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        verifiedAt: new Date(),
+      });
+      invoiceUrl = `${FRONTEND_URL}/invoice/${secureToken}?admin=1`;
+    }
     logger.info({ orderNumber: existingOrder.orderNumber }, 'Order already exists (idempotent)');
     return { order: existingOrder, invoice: existingInvoice, invoiceUrl, isNew: false };
   }
@@ -181,15 +241,23 @@ export async function createOrderFromMedusa(medusaOrderId: string): Promise<Crea
   }
 
   // Create PawTag order
+  // Stripe payment intent ID: prefer the value passed from frontend, fall back to Medusa payment data
+  const resolvedStripePaymentIntentId = stripePaymentIntentId
+    || medusaOrder.payment_collection?.payment_sessions?.[0]?.data?.id
+    || medusaOrder.payments?.[0]?.payment_intent_id
+    || undefined;
+
   const order = await Order.create({
     orderNumber,
     userId: pawtagUser._id,
+    medusaOrderId,
     items,
     status: 'paid',
     payment: {
       method: 'card',
       status: 'completed',
       transactionId: medusaOrderId,
+      stripePaymentIntentId: resolvedStripePaymentIntentId,
       amount: medusaOrder.total || 0,
       currency: (medusaOrder.currency_code || 'nzd').toUpperCase(),
       paidAt: new Date(medusaOrder.created_at),
@@ -268,6 +336,34 @@ export async function createOrderFromMedusa(medusaOrderId: string): Promise<Crea
     logger.info({ invoiceNumber, orderNumber }, 'Invoice created');
   } catch (err) {
     logger.error({ err, orderNumber }, 'Failed to create invoice');
+
+    // Alert admin about invoice failure — customer has paid but has no invoice
+    const adminEmail = process.env.ADMIN_ALERT_EMAIL;
+    if (adminEmail) {
+      const { sendMail: sendMailFn } = await import('./email.service');
+      sendMailFn(
+        adminEmail,
+        `ALERT: Invoice creation failed for order ${order.orderNumber}`,
+        `<h2>Invoice Creation Failed</h2>
+         <p><strong>Order:</strong> ${order.orderNumber}</p>
+         <p><strong>Customer:</strong> ${pawtagUser.fullName || 'Unknown'} (${pawtagUser.email})</p>
+         <p><strong>Amount:</strong> $${(medusaOrder.total || 0).toFixed(2)} NZD</p>
+         <p><strong>Error:</strong> ${(err as Error)?.message || 'Unknown error'}</p>
+         <p style="color: red;"><strong>Action required:</strong> Customer has paid but no invoice was generated. Please create the invoice manually or investigate the issue.</p>`,
+      ).catch(() => {});
+    }
+
+    // Create admin in-app notification
+    Notification.create({
+      userId: pawtagUser._id,
+      audience: 'admin',
+      type: 'system',
+      title: 'Invoice creation failed',
+      message: `Invoice creation failed for order ${order.orderNumber}. Customer has paid $${(medusaOrder.total || 0).toFixed(2)} NZD. Manual intervention required.`,
+      data: { orderNumber, error: (err as Error)?.message },
+      priority: 'critical',
+      channel: 'alert',
+    }).catch(() => {});
   }
 
   // 5. Send emails in PARALLEL (non-blocking, best-effort)
@@ -381,9 +477,13 @@ async function processSubscriptions(order: any, user: any, medusaOrder: any): Pr
 
     let productMetadata: any = null;
     try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5_000);
       const response = await fetch(`${MEDUSA_URL}/store/products/${medusaItem.product_id}`, {
         headers: { 'x-publishable-api-key': MEDUSA_PUBLISHABLE_KEY },
+        signal: controller.signal,
       });
+      clearTimeout(timeout);
       if (response.ok) {
         const { product } = await response.json() as any;
         productMetadata = product?.metadata;

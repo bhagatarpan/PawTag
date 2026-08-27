@@ -101,7 +101,9 @@ const STATUS_EMAILS: Record<string, { subject: (orderNumber: string) => string; 
 
 /**
  * Centralized customer notification for order status changes.
- * Creates an in-app notification and sends an email.
+ * Creates an in-app notification, records activity, sends push, and sends email — all in parallel.
+ *
+ * Also sends admin notifications for cancelled/refunded orders.
  *
  * @returns true if notification was created, false if status doesn't require notification
  */
@@ -118,10 +120,10 @@ export async function notifyCustomerOfStatusChange(
   const email = user?.email;
   const customerName = user?.fullName || 'Customer';
 
-  // Create in-app notification
   const notifTitle = notifConfig.title;
   const notifMessage = notifConfig.getMessage(order.orderNumber, extra);
 
+  // Create in-app notification (must complete — caller expects this)
   await Notification.create({
     userId: order.userId,
     audience: 'customer',
@@ -139,15 +141,16 @@ export async function notifyCustomerOfStatusChange(
     channel: 'alert',
   });
 
+  // Fire-and-forget: record activity, push, email, admin notification — all in parallel
+  const sideEffects: Array<Promise<unknown>> = [];
+
   // Record activity on the order timeline
-  try {
-    const activityType = newStatus;
-    const activityMessage = notifConfig.getMessage(order.orderNumber, extra);
-    await Order.findByIdAndUpdate(order._id, {
+  sideEffects.push(
+    Order.findByIdAndUpdate(order._id, {
       $push: {
         activity: {
-          type: activityType,
-          message: activityMessage,
+          type: newStatus,
+          message: notifMessage,
           timestamp: new Date(),
           actor: 'system',
           metadata: {
@@ -157,32 +160,76 @@ export async function notifyCustomerOfStatusChange(
           },
         },
       },
-    });
-  } catch (err) {
-    logger.error({ err, orderNumber: order.orderNumber }, 'Failed to record order activity');
-  }
+    }).then(() => {}).catch((err) => {
+      logger.error({ err, orderNumber: order.orderNumber }, 'Failed to record order activity');
+    }),
+  );
 
   // Send push notification
-  await sendPushToUser(order.userId.toString(), notifTitle, notifMessage, {
-    type: 'order_update',
-    orderId: order._id.toString(),
-    orderNumber: order.orderNumber,
-    status: newStatus,
-  }).catch(() => {});
+  sideEffects.push(
+    sendPushToUser(order.userId.toString(), notifTitle, notifMessage, {
+      type: 'order_update',
+      orderId: order._id.toString(),
+      orderNumber: order.orderNumber,
+      status: newStatus,
+    }).catch(() => {}),
+  );
 
   // Send email
   const emailConfig = STATUS_EMAILS[newStatus];
   if (emailConfig && email) {
-    try {
-      await sendMail(
+    sideEffects.push(
+      sendMail(
         email,
         emailConfig.subject(order.orderNumber),
         emailConfig.html(order.orderNumber, extra),
+      ).catch((err) => {
+        logger.error({ err, orderNumber: order.orderNumber, status: newStatus }, 'Order status email error');
+      }),
+    );
+  }
+
+  // Admin notification for cancelled/refunded orders
+  if (newStatus === 'cancelled' || newStatus === 'refunded') {
+    const adminEmail = process.env.ADMIN_ALERT_EMAIL;
+    sideEffects.push(
+      Notification.create({
+        userId: order.userId,
+        audience: 'admin',
+        type: 'order_update',
+        title: `Order ${newStatus}`,
+        message: `Order ${order.orderNumber} has been ${newStatus}.${extra?.reason ? ` Reason: ${extra.reason}` : ''}`,
+        data: {
+          orderId: order._id.toString(),
+          orderNumber: order.orderNumber,
+          status: newStatus,
+          reason: extra?.reason,
+          amount: order.payment?.amount,
+        },
+        priority: 'high',
+        channel: 'alert',
+      }).then(() => {}).catch(() => {}),
+    );
+
+    if (adminEmail) {
+      sideEffects.push(
+        sendMail(
+          adminEmail,
+          `Order ${order.orderNumber} ${newStatus}`,
+          `<h2>Order ${newStatus === 'cancelled' ? 'Cancelled' : 'Refunded'}</h2>
+           <p><strong>Order:</strong> ${order.orderNumber}</p>
+           <p><strong>Customer:</strong> ${customerName} (${email})</p>
+           <p><strong>Amount:</strong> $${order.payment?.amount?.toFixed(2) || '0.00'} NZD</p>
+           ${extra?.reason ? `<p><strong>Reason:</strong> ${extra.reason}</p>` : ''}`,
+        ).catch((err) => {
+          logger.error({ err }, 'Admin cancellation/refund notification email error');
+        }),
       );
-    } catch (err) {
-      logger.error({ err, orderNumber: order.orderNumber, status: newStatus }, 'Order status email error');
     }
   }
+
+  // Wait for all side effects (don't block on failure)
+  await Promise.allSettled(sideEffects);
 
   return true;
 }

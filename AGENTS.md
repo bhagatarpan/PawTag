@@ -973,6 +973,60 @@ Run: `pnpm --filter @pawtag/medusa seed`
 - All side effects (invoice, referral, notification) are idempotent
 - Shipping/cancellation events still processed via webhook (no frontend involvement)
 
+### PawTag ↔ Medusa Sync Architecture
+
+**3-layer enterprise sync ensures data consistency between PawTag (MongoDB) and Medusa (PostgreSQL).**
+
+```
+Layer 1: REAL-TIME (webhooks + admin API calls)
+  Latency: 0.5-2 seconds
+  Medusa event → pawtag-webhook.ts → PawTag handler
+  Admin cancel/ship/refund → medusa-admin.service.ts → Medusa API
+
+Layer 2: RECONCILIATION (safety net)
+  Latency: 60 seconds (configurable)
+  orderSyncReconciliation.ts — polls Medusa for stale orders, corrects drift
+
+Layer 3: FRONTEND POLLING (display)
+  Latency: 30 seconds
+  Customer Orders/Detail pages auto-refresh
+```
+
+**Key files:**
+
+| File | Purpose |
+|------|---------|
+| `packages/api/src/services/medusa-admin.service.ts` | Medusa admin API client for cancel/fulfill/ship |
+| `packages/api/src/jobs/orderSyncReconciliation.ts` | Reconciliation job (60s interval, configurable) |
+| `packages/api/src/jobs/webhookRetry.ts` | Webhook retry with exponential backoff (60s→1h) |
+| `packages/api/src/routes/medusa-webhooks.ts` | Webhook handlers with `findOrderByMedusaId()` helper |
+| `packages/api/src/services/orderNotification.service.ts` | Parallelized notifications (Promise.allSettled) |
+| `apps/medusa/src/subscribers/pawtag-webhook.ts` | Medusa event forwarding with 5s timeout |
+
+**Order model linkage:**
+- `medusaOrderId` — explicit Medusa order ID (indexed, sparse)
+- `payment.transactionId` — stores Medusa order ID (legacy, kept for backward compatibility)
+- `payment.stripePaymentIntentId` — Stripe payment intent ID for refunds
+
+**Admin actions → Medusa sync (best-effort):**
+- Cancel: `cancelMedusaOrder()` → releases Medusa inventory
+- Refund: `cancelMedusaOrderAfterRefund()` → cancels in Medusa after Stripe refund
+- Ship: `createMedusaFulfillment()` + `createMedusaShipment()` → records fulfillment + tracking
+
+**Reconciliation logic:**
+- Runs every 60s (configurable via `sync.reconciliation.intervalSeconds` setting)
+- Skips orders updated in last 5 minutes (avoids in-flight webhook interference)
+- Compares PawTag status against Medusa admin API
+- Corrects drift + notifies customer + audit logs
+- Only processes orders with `medusaOrderId` set
+
+**Settings (DB-driven, seeded in seed-cms.ts):**
+- `sync.reconciliation.enabled` — master toggle (default: true)
+- `sync.reconciliation.intervalSeconds` — check interval (default: 60)
+- `sync.reconciliation.skipRecentMinutes` — skip window (default: 5)
+- `sync.polling.enabled` — customer page polling (default: true)
+- `sync.polling.intervalSeconds` — poll interval (default: 30)
+
 ### Deprecated Systems
 
 The following are deprecated but still exist in the codebase:

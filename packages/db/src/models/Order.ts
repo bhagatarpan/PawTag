@@ -5,6 +5,7 @@ export type OrderStatus = 'pending' | 'pending_payment' | 'paid' | 'packing' | '
 export interface IOrderDocument extends Document {
   orderNumber: string;
   userId: mongoose.Types.ObjectId;
+  medusaOrderId?: string;
   items: Array<{
     productId: mongoose.Types.ObjectId;
     productName: string;
@@ -20,6 +21,7 @@ export interface IOrderDocument extends Document {
     method: 'card' | 'paypal' | 'bank_transfer';
     status: 'pending' | 'completed' | 'failed' | 'refunded';
     transactionId?: string;
+    stripePaymentIntentId?: string;
     amount: number;
     currency: string;
     paidAt?: Date;
@@ -67,6 +69,7 @@ const OrderSchema = new Schema<IOrderDocument>(
   {
     orderNumber: { type: String, required: true, unique: true, index: true },
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    medusaOrderId: { type: String, sparse: true, index: true },
     items: [
       {
         productId: { type: Schema.Types.ObjectId, ref: 'Product', required: true },
@@ -89,6 +92,7 @@ const OrderSchema = new Schema<IOrderDocument>(
       method: { type: String, enum: ['card', 'paypal', 'bank_transfer'] },
       status: { type: String, enum: ['pending', 'completed', 'failed', 'refunded'] },
       transactionId: String,
+      stripePaymentIntentId: String,
       amount: { type: Number, required: true },
       currency: { type: String, default: 'NZD' },
       paidAt: Date,

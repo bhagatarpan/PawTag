@@ -2502,9 +2502,18 @@ router.post('/orders/:id/cancel', requirePermission('order.update'), async (req:
     order.cancellationReason = reason;
     await order.save();
 
-    // Restore stock
+    // Restore stock (no-op — Medusa owns inventory, but keep for consistency)
     const { restoreOrderStock } = await import('../services/inventory.service');
     await restoreOrderStock(order.items);
+
+    // Sync cancel to Medusa (best-effort — reconciliation catches drift)
+    if (order.medusaOrderId) {
+      const { cancelMedusaOrder } = await import('../services/medusa-admin.service');
+      const syncResult = await cancelMedusaOrder(order.medusaOrderId, reason);
+      if (!syncResult.success) {
+        logger.warn({ medusaOrderId: order.medusaOrderId, error: syncResult.error }, 'Medusa cancel sync failed — reconciliation will correct');
+      }
+    }
 
     await auditAdminEvent(req, {
       action: 'cancel_order',
@@ -2554,8 +2563,10 @@ router.post('/orders/:id/refund', requirePermission('order.update'), async (req:
       return;
     }
 
+    // Use the Stripe payment intent ID if available, otherwise fall back to transactionId
+    const stripePaymentId = order.payment.stripePaymentIntentId || order.payment.transactionId;
     const { createRefund } = await import('../services/stripe.service');
-    const refundResult = await createRefund(order.payment.transactionId, amount);
+    const refundResult = await createRefund(stripePaymentId, amount);
 
     if (!refundResult.success) {
       await auditAdminEvent(req, {
@@ -2578,6 +2589,15 @@ router.post('/orders/:id/refund', requirePermission('order.update'), async (req:
     order.refundReason = reason;
     order.payment.status = 'refunded';
     await order.save();
+
+    // Sync refund cancel to Medusa (best-effort)
+    if (order.medusaOrderId) {
+      const { cancelMedusaOrderAfterRefund } = await import('../services/medusa-admin.service');
+      const syncResult = await cancelMedusaOrderAfterRefund(order.medusaOrderId, reason);
+      if (!syncResult.success) {
+        logger.warn({ medusaOrderId: order.medusaOrderId, error: syncResult.error }, 'Medusa refund sync failed — reconciliation will correct');
+      }
+    }
 
     await auditAdminEvent(req, {
       action: 'refund_order',
@@ -2637,6 +2657,28 @@ router.post('/orders/:id/create-shipment', requirePermission('order.update'), as
     order.carrier = result.carrier;
     order.shippingLabelUrl = result.labelUrl;
     await order.save();
+
+    // Sync shipment to Medusa (best-effort — reconciliation catches drift)
+    if (order.medusaOrderId) {
+      const { createMedusaFulfillment, createMedusaShipment } = await import('../services/medusa-admin.service');
+      const medusaOrderId = order.medusaOrderId;
+      const medusaItems = order.items.map((item: any) => ({
+        line_item_id: item.productId?.toString() || '',
+        quantity: item.quantity,
+      })).filter((item: any) => item.line_item_id);
+
+      const fulfillmentResult = await createMedusaFulfillment(medusaOrderId, medusaItems);
+      if (fulfillmentResult.success && fulfillmentResult.fulfillmentId && result.trackingNumber) {
+        await createMedusaShipment(
+          medusaOrderId,
+          fulfillmentResult.fulfillmentId,
+          result.trackingNumber,
+          result.carrier,
+        );
+      } else if (!fulfillmentResult.success) {
+        logger.warn({ medusaOrderId, error: fulfillmentResult.error }, 'Medusa fulfillment sync failed — reconciliation will correct');
+      }
+    }
 
     await auditAdminEvent(req, {
       action: 'create_shipment',

@@ -939,14 +939,14 @@ router.get('/orders/:id/invoice', requirePermission('order.read'), async (req: A
  */
 router.post('/orders/place', requirePermission('order.read'), async (req: AuthRequest, res: Response) => {
   try {
-    const { medusaOrderId } = req.body;
+    const { medusaOrderId, stripePaymentIntentId } = req.body;
     if (!medusaOrderId) {
       res.status(400).json({ success: false, error: 'medusaOrderId is required' });
       return;
     }
 
     const { createOrderFromMedusa } = await import('../services/order-creation.service');
-    const result = await createOrderFromMedusa(medusaOrderId);
+    const result = await createOrderFromMedusa(medusaOrderId, stripePaymentIntentId);
 
     auditCustomerEvent(req, {
       action: 'place_order',

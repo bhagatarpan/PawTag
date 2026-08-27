@@ -78,6 +78,36 @@ async function auditMedusaEvent(
   logAudit();
 }
 
+/**
+ * Find a PawTag order by Medusa order ID.
+ * Searches the new medusaOrderId field first, then falls back to legacy fields.
+ * Backfills medusaOrderId on legacy orders found via payment.transactionId.
+ */
+async function findOrderByMedusaId(medusaOrderId: string) {
+  // Try the explicit field first (fast, indexed)
+  let order = await Order.findOne({ medusaOrderId });
+  if (order) return order;
+
+  // Fall back to legacy lookup by payment.transactionId
+  order = await Order.findOne({ 'payment.transactionId': medusaOrderId });
+  if (order) {
+    // Backfill for future lookups
+    order.medusaOrderId = medusaOrderId;
+    await order.save();
+    return order;
+  }
+
+  // Fall back to notes field
+  order = await Order.findOne({ notes: `Medusa Order: ${medusaOrderId}` });
+  if (order) {
+    order.medusaOrderId = medusaOrderId;
+    await order.save();
+    return order;
+  }
+
+  return null;
+}
+
 // POST /api/webhooks/medusa — receive Medusa events
 router.post('/', async (req: Request, res: Response) => {
   try {
@@ -219,7 +249,7 @@ async function handlePaymentCaptured(data: { id: string }): Promise<boolean> {
   logger.info({ paymentId }, 'Processing payment.captured');
 
   // Find order by payment transaction ID
-  const order = await Order.findOne({ 'payment.transactionId': paymentId });
+  const order = await findOrderByMedusaId(paymentId);
   if (!order) {
     logger.info({ paymentId }, 'No matching PawTag order for payment');
     return false;
@@ -248,7 +278,7 @@ async function handleOrderCanceled(data: { id: string }): Promise<boolean> {
 
   logger.info({ medusaOrderId }, 'Processing order.canceled');
 
-  const order = await Order.findOne({ 'payment.transactionId': medusaOrderId });
+  const order = await findOrderByMedusaId(medusaOrderId);
   if (!order || order.status === 'cancelled') return true;
 
   order.status = 'cancelled';
@@ -270,7 +300,7 @@ async function handleFulfillmentCreated(data: { order_id?: string; fulfillment_i
 
   logger.info({ medusaOrderId, fulfillment_id }, 'Processing order.fulfillment_created');
 
-  const order = await Order.findOne({ 'payment.transactionId': medusaOrderId });
+  const order = await findOrderByMedusaId(medusaOrderId);
   if (!order) {
     logger.info({ medusaOrderId }, 'No matching PawTag order for fulfillment');
     return false;
@@ -312,7 +342,7 @@ async function handleFulfillmentCanceled(data: { order_id?: string; fulfillment_
 
   logger.info({ medusaOrderId, fulfillment_id }, 'Processing order.fulfillment_canceled');
 
-  const order = await Order.findOne({ 'payment.transactionId': medusaOrderId });
+  const order = await findOrderByMedusaId(medusaOrderId);
   if (!order) return false;
 
   if (order.status !== 'packing') {
@@ -381,7 +411,7 @@ async function handleShipmentCreated(data: { id?: string }): Promise<boolean> {
 
   let order;
   if (medusaOrderId) {
-    order = await Order.findOne({ 'payment.transactionId': medusaOrderId });
+    order = await findOrderByMedusaId(medusaOrderId);
   }
 
   if (!order) {

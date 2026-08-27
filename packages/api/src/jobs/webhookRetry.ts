@@ -1,8 +1,17 @@
 import { WebhookEvent } from '@pawtag/db';
 import logger from '../lib/logger';
 
-const RETRY_INTERVAL = 60_000; // Check every 1 minute
+const RETRY_INTERVAL = 60_000; // Base retry interval (1 minute)
 const MAX_AGE_MS = 24 * 60 * 60 * 1000; // Don't retry events older than 24 hours
+const MAX_ATTEMPTS = 5;
+
+// Exponential backoff: 60s → 120s → 300s → 900s → 3600s
+const BACKOFF_MULTIPLIERS = [1, 2, 5, 15, 60];
+
+function getRetryDelay(attempt: number): number {
+  const multiplier = BACKOFF_MULTIPLIERS[Math.min(attempt - 1, BACKOFF_MULTIPLIERS.length - 1)];
+  return RETRY_INTERVAL * multiplier;
+}
 
 let retryTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -13,10 +22,10 @@ async function retryFailedEvents(): Promise<void> {
     // Find failed events due for retry
     const failedEvents = await WebhookEvent.find({
       status: 'failed',
-      attempts: { $lt: 5 },
+      attempts: { $lt: MAX_ATTEMPTS },
       nextRetryAt: { $lte: new Date() },
       createdAt: { $gte: cutoff },
-    }).limit(10); // Process 10 at a time
+    }).limit(10);
 
     if (failedEvents.length === 0) return;
 
@@ -28,27 +37,44 @@ async function retryFailedEvents(): Promise<void> {
         webhookEvent.attempts += 1;
         await webhookEvent.save();
 
-        // Re-dispatch the event
         const { event, payload } = webhookEvent;
-        const data = payload?.data;
+        logger.info(
+          { eventId: webhookEvent.eventId, event, attempt: webhookEvent.attempts },
+          'Retrying webhook event via internal HTTP',
+        );
 
-        // Dynamic import to avoid circular dependencies
-        const medusaWebhooks = await import('../routes/medusa-webhooks');
-        // We can't directly call the handlers, so we simulate the webhook call
-        // In production, this would make an internal HTTP call or use an event bus
-        logger.info({ eventId: webhookEvent.eventId, event, attempt: webhookEvent.attempts }, 'Retrying webhook event');
+        // Re-dispatch via internal HTTP call to the webhook endpoint
+        const port = process.env.PORT || 5000;
+        const response = await fetch(`http://localhost:${port}/api/webhooks/medusa`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-retry-source': 'webhook-retry-job',
+          },
+          body: JSON.stringify(payload),
+          signal: AbortSignal.timeout(30_000), // 30s timeout per attempt
+        });
 
-        // Mark as completed (the handler is idempotent)
+        if (!response.ok) {
+          throw new Error(`Internal webhook dispatch returned ${response.status}`);
+        }
+
+        // Success — mark completed
         webhookEvent.status = 'completed';
         webhookEvent.processedAt = new Date();
+        webhookEvent.lastError = undefined;
         await webhookEvent.save();
 
+        logger.info(
+          { eventId: webhookEvent.eventId, event, attempt: webhookEvent.attempts },
+          'Webhook event retried successfully',
+        );
       } catch (err) {
         logger.error({ err, eventId: webhookEvent.eventId }, 'Webhook retry failed');
 
-        const nextRetry = new Date(Date.now() + RETRY_INTERVAL * webhookEvent.attempts);
-        webhookEvent.status = webhookEvent.attempts >= webhookEvent.maxAttempts ? 'dead' : 'failed';
-        webhookEvent.lastError = (err as Error)?.message;
+        const nextRetry = new Date(Date.now() + getRetryDelay(webhookEvent.attempts));
+        webhookEvent.status = webhookEvent.attempts >= MAX_ATTEMPTS ? 'dead' : 'failed';
+        webhookEvent.lastError = (err as Error)?.message?.slice(0, 500);
         webhookEvent.nextRetryAt = nextRetry;
         await webhookEvent.save();
       }
@@ -60,8 +86,9 @@ async function retryFailedEvents(): Promise<void> {
 
 export function startWebhookRetryJob(): void {
   if (retryTimer) return;
+  if (process.env.NODE_ENV === 'test') return;
   retryTimer = setInterval(retryFailedEvents, RETRY_INTERVAL);
-  logger.info('Webhook retry job started (every 60s)');
+  logger.info('Webhook retry job started (every 60s, exponential backoff)');
 }
 
 export function stopWebhookRetryJob(): void {

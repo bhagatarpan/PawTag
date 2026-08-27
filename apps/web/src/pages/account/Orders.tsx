@@ -145,11 +145,55 @@ export default function Orders() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const fetchOrders = async () => {
+    try {
+      const r = await api.get('/customer/orders');
+      setOrders(r.data.data);
+      setError(null);
+    } catch (err: any) {
+      if (!orders.length) {
+        setError(err.response?.data?.error || 'Failed to load orders');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    api.get('/customer/orders')
-      .then((r) => setOrders(r.data.data))
-      .catch((err) => setError(err.response?.data?.error || 'Failed to load orders'))
-      .finally(() => setLoading(false));
+    fetchOrders();
+  }, []);
+
+  // 30s polling — pauses when tab is hidden
+  useEffect(() => {
+    const POLL_INTERVAL = 30_000;
+    let interval: ReturnType<typeof setInterval> | null = null;
+
+    const startPolling = () => {
+      if (interval) return;
+      interval = setInterval(() => {
+        if (document.visibilityState === 'visible') {
+          fetchOrders();
+        }
+      }, POLL_INTERVAL);
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        fetchOrders();
+        startPolling();
+      } else if (interval) {
+        clearInterval(interval);
+        interval = null;
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    startPolling();
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      if (interval) clearInterval(interval);
+    };
   }, []);
 
   return (

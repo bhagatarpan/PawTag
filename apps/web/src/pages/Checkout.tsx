@@ -326,7 +326,10 @@ export default function Checkout() {
       let invoice = null;
       let invoiceUrl = '';
       try {
-        const placeRes = await api.post('/customer/orders/place', { medusaOrderId });
+        const placeRes = await api.post('/customer/orders/place', {
+          medusaOrderId,
+          stripePaymentIntentId: paymentIntentId,
+        });
         pawtagOrder = placeRes.data.data.order;
         invoice = placeRes.data.data.invoice;
         invoiceUrl = placeRes.data.data.invoiceUrl;
