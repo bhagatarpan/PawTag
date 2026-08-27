@@ -314,22 +314,9 @@ async function handleFulfillmentCreated(data: { order_id?: string; fulfillment_i
   order.status = 'packing';
   await order.save();
 
-  // Record activity
-  await recordOrderActivity(order._id, 'packing', 'Order is being packed', 'system');
-
-  // Notify customer
+  // Notify customer (records activity + sends email + push + in-app)
   const { notifyCustomerOfStatusChange } = await import('../services/orderNotification.service');
-  // packing has no notification config, but we record the activity
-  await PawTagNotification.create({
-    userId: order.userId,
-    audience: 'admin',
-    type: 'order_update',
-    title: 'Order packing started',
-    message: `Order ${order.orderNumber} is being packed.`,
-    data: { orderId: order._id.toString(), orderNumber: order.orderNumber, status: 'packing', fulfillmentId: fulfillment_id },
-    priority: 'normal',
-    channel: 'info',
-  }).catch(() => {});
+  await notifyCustomerOfStatusChange(order, 'packing');
 
   logger.info({ orderNumber: order.orderNumber }, 'Order marked as packing via fulfillment_created');
   return true;
