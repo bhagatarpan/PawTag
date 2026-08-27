@@ -550,10 +550,17 @@ verification emails and OTPs are routed to the test email (`mfa.testEmail`, defa
 - Registration/email-verification links → sent to test email
 - Login MFA OTPs → sent to test email
 - Phone (SMS) OTPs → still printed in the API terminal as demo SMS **and** also emailed to test email
+- **Order confirmation emails** → sent to test email (via `resolveEmailRecipient()` in `order-creation.service.ts`)
+- **Invoice emails** → sent to test email (via `resolveEmailRecipient()` in `order-creation.service.ts`)
 
 This lets you register with a throwaway address like `dave@example.com` while still receiving the
 links/codes in a real inbox. In production this routing is disabled — emails always go to the
 user's own address.
+
+**How it works:** The `resolveEmailRecipient()` helper function checks `NODE_ENV === 'development'`
+AND `mfa.testMode === 'true'` (CMS setting). If both are true, it returns the test email instead
+of the original recipient. This pattern is used in both `auth.ts` (for verification/MFA) and
+`order-creation.service.ts` (for order/invoice emails).
 
 Also note: in dev, `email.service.ts` always sends from `onboarding@resend.dev` (Resend's
 pre-verified test domain) so unverified custom domains like `pawtag.co.nz` don't cause rejections.

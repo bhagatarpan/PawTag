@@ -87,7 +87,7 @@ async function run() {
         { key: 'addressAutocomplete.defaultCountry', value: 'NZ', displayValue: 'Default Country', category: 'addressAutocomplete', description: 'Default country code for address autocomplete (ISO 3166-1 alpha-2)' },
         { key: 'mfa.adminEnabled', value: 'false', displayValue: 'Admin MFA', category: 'mfa', description: 'Global toggle for admin/CSR MFA' },
         { key: 'mfa.customerEnabled', value: 'true', displayValue: 'Customer MFA', category: 'mfa', description: 'Default MFA setting for new customer registrations' },
-        { key: 'mfa.testMode', value: 'false', displayValue: 'MFA Test Mode', category: 'mfa', description: 'Send MFA OTP to test email instead of actual user' },
+        { key: 'mfa.testMode', value: 'true', displayValue: 'MFA Test Mode', category: 'mfa', description: 'Send MFA OTP and verification emails to test email instead of actual user (dev mode only)' },
         { key: 'mfa.testEmail', value: 'arpanbhagat@yahoo.com', displayValue: 'MFA Test Email', category: 'mfa', description: 'Test email address for MFA in dev mode' },
         { key: 'tag.idPrefix', value: 'PT', displayValue: 'Tag ID Prefix', category: 'tag', description: 'Prefix for auto-generated tag IDs (e.g. PT → PT-NNNNNN)' },
         { key: 'finder.showOwnerName', value: 'true', displayValue: 'Show Owner Name', category: 'finder', description: 'Global toggle: show pet owner name in finder portal. When off, suburb and city are shown instead.' },

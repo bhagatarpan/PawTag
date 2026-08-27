@@ -339,12 +339,16 @@ export default function VerifyAccount() {
             <div className="bg-white rounded-xl border-2 border-green-200 p-6 text-center">
               <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto mb-3" />
               <h3 className="font-semibold text-gray-900 mb-1">Account Verified!</h3>
-              <p className="text-sm text-gray-600 mb-4">Your account is now active.</p>
+              <p className="text-sm text-gray-600 mb-4">
+                {localStorage.getItem('pawtag_return_url')
+                  ? 'Your account is active. Please log in to continue.'
+                  : 'Your account is now active.'}
+              </p>
               <button
                 onClick={handleContinue}
                 className="w-full py-3 bg-teal-600 text-white rounded-xl font-semibold hover:bg-teal-700 transition-all"
               >
-                Continue to Dashboard
+                {localStorage.getItem('pawtag_return_url') ? 'Log in to Continue' : 'Continue to Dashboard'}
               </button>
             </div>
           )}

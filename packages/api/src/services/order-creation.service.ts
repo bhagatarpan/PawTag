@@ -20,6 +20,25 @@ const MEDUSA_PUBLISHABLE_KEY = process.env.MEDUSA_PUBLISHABLE_KEY || '';
 const MEDUSA_ADMIN_TOKEN = process.env.MEDUSA_ADMIN_TOKEN || '';
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 
+/**
+ * In dev mode, route emails to the test address (arpanbhagat@yahoo.com)
+ * so developers can receive order confirmations and invoices without
+ * using their real email. In production, emails go to the actual user.
+ *
+ * This mirrors the pattern used in auth.ts for MFA/verification emails.
+ */
+async function resolveEmailRecipient(originalEmail: string): Promise<string> {
+  if (process.env.NODE_ENV !== 'development') return originalEmail;
+  try {
+    const { Setting } = await import('@pawtag/db');
+    const mfaTestMode = (await Setting.findOne({ key: 'mfa.testMode' }).lean())?.value === 'true';
+    if (!mfaTestMode) return originalEmail;
+    return (await Setting.findOne({ key: 'mfa.testEmail' }).lean())?.value || 'arpanbhagat@yahoo.com';
+  } catch {
+    return originalEmail;
+  }
+}
+
 export interface CreateOrderResult {
   order: any;
   invoice: any;
@@ -252,13 +271,15 @@ export async function createOrderFromMedusa(medusaOrderId: string): Promise<Crea
   }
 
   // 5. Send emails in PARALLEL (non-blocking, best-effort)
+  // In dev mode, route customer emails to test address when mfa.testMode is enabled
+  const emailRecipient = await resolveEmailRecipient(pawtagUser.email);
   const emailPromises: Promise<any>[] = [];
 
   // Invoice email
   if (invoice && invoiceUrl) {
     emailPromises.push(
       generateInvoiceHtml(invoice._id.toString())
-        .then((html) => sendInvoiceEmail(pawtagUser.email, pawtagUser.fullName, invoice.invoiceNumber, html, invoiceUrl, invoice.amount))
+        .then((html) => sendInvoiceEmail(emailRecipient, pawtagUser.fullName, invoice.invoiceNumber, html, invoiceUrl, invoice.amount))
         .catch((err) => logger.error({ err, orderNumber }, 'Invoice email error')),
     );
   }
@@ -266,7 +287,7 @@ export async function createOrderFromMedusa(medusaOrderId: string): Promise<Crea
   // Order confirmation email
   emailPromises.push(
     sendOrderConfirmation({
-      to: pawtagUser.email,
+      to: emailRecipient,
       customerName: pawtagUser.fullName,
       orderNumber: order.orderNumber,
       total: order.payment.amount,
