@@ -1600,7 +1600,6 @@ chore: maintenance tasks
 2. **Password Rules:** Minimum 8 characters (industry best practice is 12+)
 3. **No HIBP Integration:** Breached passwords not checked
 4. **Rate Limiting:** Per-process in-memory (not Redis-backed for multi-instance)
-5. **Frontend Sentry:** API-side Sentry done, frontend error boundaries pending
 
 ### Pending Implementation
 
@@ -1612,8 +1611,43 @@ chore: maintenance tasks
 ### Technical Debt
 
 - Legacy `role: string` field on User model (being replaced by RBAC)
-- Some hardcoded values that should be DB-driven
-- Missing IP-based rate limiting on some auth endpoints
+
+---
+
+## Medusa ↔ PawTag Sync Architecture
+
+**3-layer enterprise sync ensures data consistency between PawTag (MongoDB) and Medusa (PostgreSQL).**
+
+```
+Layer 1: REAL-TIME (webhooks + admin API calls)
+  Latency: 0.5-2 seconds
+  Medusa event → pawtag-webhook.ts → PawTag handler
+  Admin cancel/ship/refund → medusa-admin.service.ts → Medusa API
+
+Layer 2: RECONCILIATION (safety net)
+  Latency: 60 seconds (configurable)
+  orderSyncReconciliation.ts — polls Medusa for stale orders, corrects drift
+
+Layer 3: FRONTEND POLLING (display)
+  Latency: 30 seconds
+  Customer Orders/Detail pages auto-refresh
+```
+
+| Medusa Event | PawTag Status | Customer Notification |
+|-------------|---------------|----------------------|
+| `order.placed` | → `paid` | ✅ In-app + email + push |
+| `order.canceled` | → `cancelled` | ✅ In-app + email + push |
+| `order.fulfillment_created` | → `packing` | ✅ In-app + email + push |
+| `shipment.created` | → `shipped` | ✅ In-app + email + push (with tracking) |
+
+**Key files:**
+
+| File | Purpose |
+|------|---------|
+| `packages/api/src/services/medusa-admin.service.ts` | Medusa admin API client for cancel/fulfill/ship |
+| `packages/api/src/jobs/orderSyncReconciliation.ts` | Reconciliation job (60s interval) |
+| `packages/api/src/jobs/webhookRetry.ts` | Webhook retry with exponential backoff |
+| `packages/api/src/routes/medusa-webhooks.ts` | Webhook handlers with `findOrderByMedusaId()` |
 
 ---
 

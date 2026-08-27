@@ -8,6 +8,7 @@
 
 import logger from '../lib/logger';
 import { logIntegration } from '../lib/timing';
+import { auditService } from './audit';
 
 const MEDUSA_URL = process.env.MEDUSA_BACKEND_URL || 'http://localhost:9000';
 const MEDUSA_ADMIN_TOKEN = process.env.MEDUSA_ADMIN_TOKEN || '';
@@ -65,6 +66,36 @@ export interface MedusaSyncResult {
   error?: string;
 }
 
+/** Audit-log a Medusa sync attempt (fire-and-forget). */
+function auditMedusaSync(
+  action: string,
+  medusaOrderId: string,
+  success: boolean,
+  metadata: Record<string, unknown> = {},
+): void {
+  auditService.log({
+    actorType: 'SYSTEM',
+    actorId: 'medusa-admin-service',
+    actorUsername: 'medusa-admin-service',
+    sourceIp: 'system',
+    userAgent: 'medusa-admin-service',
+    applicationName: 'pawtag-api',
+    applicationVersion: '1.0.0',
+    apiVersion: 'v1',
+    environment: process.env.NODE_ENV || 'development',
+  }, {
+    action,
+    eventType: 'SYSTEM',
+    eventCategory: 'INTEGRATION',
+    operationType: 'WEBHOOK',
+    resourceType: 'Order',
+    resourceId: medusaOrderId,
+    outcome: success ? 'SUCCESS' : 'FAILURE',
+    severity: success ? 'LOW' : 'HIGH',
+    metadata: { medusaOrderId, ...metadata },
+  }).catch(() => {});
+}
+
 /**
  * Cancel an order in Medusa.
  * Called after PawTag order is cancelled to keep Medusa in sync.
@@ -83,10 +114,12 @@ export async function cancelMedusaOrder(
         { medusaOrderId, status: result.status, error: result.error },
         'Failed to cancel order in Medusa',
       );
+      auditMedusaSync('medusa_order_cancel_failed', medusaOrderId, false, { reason, error: result.error });
       return { success: false, error: result.error };
     }
 
     logger.info({ medusaOrderId }, 'Order cancelled in Medusa');
+    auditMedusaSync('medusa_order_cancelled', medusaOrderId, true, { reason });
     return { success: true };
   }, { medusaOrderId, reason });
 }
@@ -110,11 +143,13 @@ export async function createMedusaFulfillment(
         { medusaOrderId, status: result.status, error: result.error },
         'Failed to create fulfillment in Medusa',
       );
+      auditMedusaSync('medusa_fulfillment_create_failed', medusaOrderId, false, { itemCount: items.length, error: result.error });
       return { success: false, error: result.error };
     }
 
     const fulfillmentId = (result.data as any)?.fulfillment?.id;
     logger.info({ medusaOrderId, fulfillmentId }, 'Fulfillment created in Medusa');
+    auditMedusaSync('medusa_fulfillment_created', medusaOrderId, true, { fulfillmentId, itemCount: items.length });
     return { success: true, fulfillmentId };
   }, { medusaOrderId, itemCount: items.length });
 }
@@ -143,10 +178,12 @@ export async function createMedusaShipment(
         { medusaOrderId, fulfillmentId, status: result.status, error: result.error },
         'Failed to create shipment in Medusa',
       );
+      auditMedusaSync('medusa_shipment_create_failed', medusaOrderId, false, { fulfillmentId, trackingNumber, error: result.error });
       return { success: false, error: result.error };
     }
 
     logger.info({ medusaOrderId, fulfillmentId, trackingNumber }, 'Shipment created in Medusa');
+    auditMedusaSync('medusa_shipment_created', medusaOrderId, true, { fulfillmentId, trackingNumber, carrier });
     return { success: true };
   }, { medusaOrderId, fulfillmentId, trackingNumber });
 }
@@ -170,10 +207,12 @@ export async function cancelMedusaOrderAfterRefund(
         { medusaOrderId, status: result.status, error: result.error },
         'Failed to cancel order in Medusa after refund',
       );
+      auditMedusaSync('medusa_refund_cancel_failed', medusaOrderId, false, { reason, error: result.error });
       return { success: false, error: result.error };
     }
 
     logger.info({ medusaOrderId }, 'Order cancelled in Medusa after refund');
+    auditMedusaSync('medusa_refund_cancelled', medusaOrderId, true, { reason });
     return { success: true };
   }, { medusaOrderId, reason });
 }

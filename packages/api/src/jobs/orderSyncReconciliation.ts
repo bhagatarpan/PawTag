@@ -22,7 +22,7 @@ const DEFAULT_SKIP_RECENT_MINUTES = 5;
 
 let reconciliationTimer: ReturnType<typeof setInterval> | null = null;
 
-async function reconcileOrders(): Promise<void> {
+export async function reconcileOrders(): Promise<void> {
   try {
     const enabled = await getCachedSetting('sync.reconciliation.enabled', 'true');
     if (enabled !== 'true') return;

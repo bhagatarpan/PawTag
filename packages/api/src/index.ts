@@ -79,6 +79,7 @@ import systemLogRoutes from './routes/system-logs';
 import siteAvailabilityRoutes from './routes/site-availability';
 import systemStatusRoutes from './routes/system-status';
 import { publicRouter as supportPublicRoutes, adminRouter as supportAdminRoutes } from './routes/support';
+import adminWebhookRoutes from './routes/admin-webhooks';
 import addressAutocompleteRoutes from './routes/address-autocomplete';
 import healthRoutes from './routes/health';
 import { siteAvailabilityMiddleware } from './middleware/site-availability';
@@ -239,6 +240,7 @@ app.use('/api/public/cms', cmsPublicV2Routes);
 app.use('/api/admin/audit', auditRoutes);
 app.use('/api/admin/system-logs', systemLogRoutes);
 app.use('/api/admin/site-availability', siteAvailabilityRoutes);
+app.use('/api/admin/webhooks', adminWebhookRoutes);
 app.use('/api/public/system', systemStatusRoutes);
 app.use('/api/address', addressAutocompleteRoutes);
 

@@ -39,6 +39,7 @@ import {
   ChevronRight,
   ChevronDown,
   ExternalLink,
+  Zap,
 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { useTheme } from '../hooks/useTheme';
@@ -145,6 +146,7 @@ const sections: SidebarSection[] = [
     label: 'Operations',
     icon: Terminal,
     links: [
+      { to: '/webhooks', label: 'Webhooks & Sync', icon: Zap, permission: 'setting.read' },
       { to: '/system-log-settings', label: 'System Log Settings', icon: Terminal, permission: 'systemlogs.admin' },
       { to: '/system-logs', label: 'System Logs', icon: Terminal, permission: 'systemlogs.read' },
       { to: '/write-nfc', label: 'Write NFC Tag', icon: Wifi },

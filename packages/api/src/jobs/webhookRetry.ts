@@ -1,13 +1,19 @@
 import { WebhookEvent } from '@pawtag/db';
 import logger from '../lib/logger';
+import { auditService } from '../services/audit';
 
 const RETRY_INTERVAL = 60_000; // Base retry interval (1 minute)
 const MAX_AGE_MS = 24 * 60 * 60 * 1000; // Don't retry events older than 24 hours
 const MAX_ATTEMPTS = 5;
 
-// Exponential backoff: 60s → 120s → 300s → 900s → 3600s
+/** Exponential backoff multipliers: 60s → 120s → 300s → 900s → 3600s. */
 const BACKOFF_MULTIPLIERS = [1, 2, 5, 15, 60];
 
+/**
+ * Calculate retry delay using exponential backoff.
+ * @param attempt - Current attempt number (1-indexed)
+ * @returns Delay in milliseconds before next retry
+ */
 function getRetryDelay(attempt: number): number {
   const multiplier = BACKOFF_MULTIPLIERS[Math.min(attempt - 1, BACKOFF_MULTIPLIERS.length - 1)];
   return RETRY_INTERVAL * multiplier;
@@ -15,6 +21,19 @@ function getRetryDelay(attempt: number): number {
 
 let retryTimer: ReturnType<typeof setInterval> | null = null;
 
+/**
+ * Process failed webhook events by re-dispatching them via internal HTTP.
+ * Uses exponential backoff between attempts. Events that exhaust all retries
+ * are marked as 'dead' and audit-logged as CRITICAL.
+ *
+ * Queries for events where:
+ * - status = 'failed'
+ * - attempts < 5
+ * - nextRetryAt <= now
+ * - createdAt >= 24 hours ago
+ *
+ * Processes 10 events per batch to avoid overwhelming the system.
+ */
 async function retryFailedEvents(): Promise<void> {
   try {
     const cutoff = new Date(Date.now() - MAX_AGE_MS);
@@ -73,10 +92,41 @@ async function retryFailedEvents(): Promise<void> {
         logger.error({ err, eventId: webhookEvent.eventId }, 'Webhook retry failed');
 
         const nextRetry = new Date(Date.now() + getRetryDelay(webhookEvent.attempts));
-        webhookEvent.status = webhookEvent.attempts >= MAX_ATTEMPTS ? 'dead' : 'failed';
+        const isDead = webhookEvent.attempts >= MAX_ATTEMPTS;
+        webhookEvent.status = isDead ? 'dead' : 'failed';
         webhookEvent.lastError = (err as Error)?.message?.slice(0, 500);
         webhookEvent.nextRetryAt = nextRetry;
         await webhookEvent.save();
+
+        // Audit-log dead-letter events (all retries exhausted)
+        if (isDead) {
+          auditService.log({
+            actorType: 'SYSTEM',
+            actorId: 'webhook-retry-job',
+            actorUsername: 'webhook-retry-job',
+            sourceIp: 'system',
+            userAgent: 'webhook-retry-job',
+            applicationName: 'pawtag-api',
+            applicationVersion: '1.0.0',
+            apiVersion: 'v1',
+            environment: process.env.NODE_ENV || 'development',
+          }, {
+            action: 'webhook_event_dead_letter',
+            eventType: 'SYSTEM',
+            eventCategory: 'INTEGRATION',
+            operationType: 'WEBHOOK',
+            resourceType: 'WebhookEvent',
+            resourceId: webhookEvent.eventId,
+            outcome: 'FAILURE',
+            severity: 'CRITICAL',
+            metadata: {
+              event: webhookEvent.event,
+              source: webhookEvent.source,
+              attempts: webhookEvent.attempts,
+              lastError: webhookEvent.lastError,
+            },
+          }).catch(() => {});
+        }
       }
     }
   } catch (err) {
@@ -84,6 +134,10 @@ async function retryFailedEvents(): Promise<void> {
   }
 }
 
+/**
+ * Start the webhook retry job. Runs every 60 seconds.
+ * Skipped in test environment.
+ */
 export function startWebhookRetryJob(): void {
   if (retryTimer) return;
   if (process.env.NODE_ENV === 'test') return;

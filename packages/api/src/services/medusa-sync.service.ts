@@ -1,5 +1,6 @@
 import { User } from '@pawtag/db';
 import Medusa from '@medusajs/js-sdk';
+import logger from '../lib/logger';
 
 const MEDUSA_BACKEND_URL = process.env.MEDUSA_BACKEND_URL || 'http://localhost:9000';
 const MEDUSA_ADMIN_TOKEN = process.env.MEDUSA_ADMIN_TOKEN || '';
@@ -35,7 +36,7 @@ function splitFullName(fullName: string): { firstName: string; lastName: string 
 export async function syncUserToMedusa(userId: string): Promise<string | null> {
   const user = await User.findById(userId);
   if (!user) {
-    console.error('[medusa-sync] User not found:', userId);
+    logger.error({ userId }, '[medusa-sync] User not found');
     return null;
   }
 
@@ -46,7 +47,7 @@ export async function syncUserToMedusa(userId: string): Promise<string | null> {
 
   // Skip if Medusa is not configured
   if (!MEDUSA_ADMIN_TOKEN) {
-    console.warn('[medusa-sync] MEDUSA_ADMIN_TOKEN not configured — skipping sync');
+    logger.warn('[medusa-sync] MEDUSA_ADMIN_TOKEN not configured — skipping sync');
     return null;
   }
 
@@ -77,7 +78,7 @@ export async function syncUserToMedusa(userId: string): Promise<string | null> {
 
     const customer = (response as any).customer;
     if (!customer?.id) {
-      console.error('[medusa-sync] Failed to create Medusa customer:', response);
+      logger.error({ userId, response }, '[medusa-sync] Failed to create Medusa customer');
       return null;
     }
 
@@ -85,11 +86,11 @@ export async function syncUserToMedusa(userId: string): Promise<string | null> {
     user.medusaCustomerId = customer.id;
     await user.save();
 
-    console.log(`[medusa-sync] Created Medusa customer ${customer.id} for PawTag user ${userId}`);
+    logger.info({ userId, medusaCustomerId: customer.id }, '[medusa-sync] Created Medusa customer');
     return customer.id;
   } catch (error: any) {
     // Log but don't fail — sync is non-blocking
-    console.warn('[medusa-sync] Sync failed (non-blocking):', error.message);
+    logger.warn({ userId, error: error.message }, '[medusa-sync] Sync failed (non-blocking)');
     return null;
   }
 }
@@ -115,7 +116,7 @@ export async function ensureMedusaCustomerForCart(
 
     return customerId;
   } catch (error: any) {
-    console.error('[medusa-sync] Error associating customer with cart:', error.message);
+    logger.error({ userId, cartId, error: error.message }, '[medusa-sync] Error associating customer with cart');
     return null;
   }
 }

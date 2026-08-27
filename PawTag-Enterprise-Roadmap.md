@@ -3129,6 +3129,50 @@ Medusa is now the **single source of truth** for all product/commerce data. The 
 
 ---
 
+## Part 11 — PawTag ↔ Medusa Enterprise Sync Architecture ✅ COMPLETE
+
+**Completed:** 2026-08-27
+**Commit:** `7fb4e87` (feat: enterprise sync architecture) + `2fb910c` (fix: packing notification)
+
+### What Was Built
+
+3-layer enterprise sync ensuring data consistency between PawTag (MongoDB) and Medusa (PostgreSQL):
+
+| Layer | Mechanism | Latency | Purpose |
+|-------|-----------|---------|---------|
+| **Layer 1** | Real-time webhooks + admin API calls | 0.5-2s | Instant sync for normal operations |
+| **Layer 2** | Reconciliation job (60s interval) | 60s | Safety net for missed/drifted events |
+| **Layer 3** | Frontend polling (30s interval) | 30s | Customer sees fresh data |
+
+### Bugs Fixed
+
+1. **Webhook retry job was broken** — marked events `completed` without re-executing. Now re-dispatches via internal HTTP with exponential backoff (60s→1h), dead-letter after 5 attempts.
+2. **Refund bug** — passed Medusa order ID to Stripe as payment intent ID. Added `stripePaymentIntentId` field to Order model.
+3. **Admin cancel/refund/ship didn't update Medusa** — now calls Medusa APIs via `medusa-admin.service.ts` (best-effort, 10s timeout).
+4. **No reconciliation** — lost webhooks caused permanent data drift. Reconciliation job corrects within 60s.
+5. **Customer polling missing** — customers had to manually refresh. Now 30s auto-refresh.
+6. **Packing notification missing** — customer received no notification when order started being packed.
+
+### Files Created/Modified
+
+| File | Change |
+|------|--------|
+| `packages/db/src/models/Order.ts` | Added `medusaOrderId`, `payment.stripePaymentIntentId` |
+| `packages/api/src/services/medusa-admin.service.ts` | **New** — Medusa admin API client |
+| `packages/api/src/jobs/orderSyncReconciliation.ts` | **New** — Reconciliation job |
+| `packages/api/src/jobs/webhookRetry.ts` | Rewritten with actual re-dispatch + backoff |
+| `packages/api/src/routes/medusa-webhooks.ts` | Added `findOrderByMedusaId()` with backfill |
+| `packages/api/src/routes/admin.ts` | Cancel/refund/ship call Medusa APIs |
+| `packages/api/src/services/order-creation.service.ts` | Parallel user lookup, timeouts, idempotent fix |
+| `packages/api/src/services/orderNotification.service.ts` | Parallelized, admin alerts for cancel/refund |
+| `apps/web/src/pages/account/Orders.tsx` | 30s polling |
+| `apps/web/src/pages/account/OrderDetail.tsx` | 30s polling |
+| `apps/medusa/src/subscribers/pawtag-webhook.ts` | 5s timeout |
+| `AGENTS.md` | Sync architecture documentation |
+| `README.md` | Sync architecture documentation |
+
+---
+
 ## Part 9 — How to Use This
 
 1. Read Part 1 once — those are the decisions; you don't need to revisit them.

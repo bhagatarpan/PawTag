@@ -45,6 +45,7 @@ import SupportRequests from './pages/SupportRequests';
 import SystemLogs from './pages/SystemLogs';
 import SystemLogSettings from './pages/SystemLogSettings';
 import SiteAvailabilitySettings from './pages/SiteAvailabilitySettings';
+import WebhookSettings from './pages/WebhookSettings';
 import AddressAutocompleteSettings from './pages/AddressAutocompleteSettings';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -192,6 +193,7 @@ export default function App() {
       <Route path="/system-logs" element={<ProtectedRoute><SystemLogs /></ProtectedRoute>} />
       <Route path="/system-log-settings" element={<ProtectedRoute><SystemLogSettings /></ProtectedRoute>} />
       <Route path="/site-availability" element={<ProtectedRoute><SiteAvailabilitySettings /></ProtectedRoute>} />
+      <Route path="/webhooks" element={<ProtectedRoute><WebhookSettings /></ProtectedRoute>} />
       <Route path="/address-autocomplete" element={<ProtectedRoute><AddressAutocompleteSettings /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

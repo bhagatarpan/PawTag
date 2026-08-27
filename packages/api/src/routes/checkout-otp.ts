@@ -9,6 +9,7 @@ import { sendPhoneOtpSMS } from '../services/sms.service';
 import { config } from '../config';
 import { auditService } from '../services/audit';
 import { createAuditContextFromRequest, type AuditRequest } from '../middleware/audit';
+import logger from '../lib/logger';
 
 const router = Router();
 router.use(authenticate);
@@ -74,10 +75,10 @@ router.post('/send', validate(sendCheckoutOtpSchema), async (req: AuthRequest, r
     // Send OTP via email or SMS
     if (channel === 'email') {
       const promise = sendLoginOtpEmail(user.email, user.fullName || 'Customer', otp);
-      promise.catch((err: any) => console.error('Failed to send checkout email OTP:', err));
+      promise.catch((err: any) => logger.error({ err }, 'Failed to send checkout email OTP'));
     } else {
       const promise = sendPhoneOtpSMS(user.phoneNumber, otp);
-      promise.catch((err: any) => console.error('Failed to send checkout SMS OTP:', err));
+      promise.catch((err: any) => logger.error({ err }, 'Failed to send checkout SMS OTP'));
     }
 
     // Fire-and-forget audit log
@@ -108,7 +109,7 @@ router.post('/send', validate(sendCheckoutOtpSchema), async (req: AuthRequest, r
       data: { message: `OTP sent to ${masked}`, maskedContact: masked },
     });
   } catch (error) {
-    console.error('Send checkout OTP error:', error);
+    logger.error({ error }, 'Send checkout OTP error');
     return res.status(500).json({ success: false, error: 'Failed to send verification code' });
   }
 });
@@ -226,7 +227,7 @@ router.post('/verify', validate(verifyCheckoutOtpSchema), async (req: AuthReques
       },
     });
   } catch (error) {
-    console.error('Verify checkout OTP error:', error);
+    logger.error({ error }, 'Verify checkout OTP error');
     return res.status(500).json({ success: false, error: 'Failed to verify code' });
   }
 });
@@ -262,7 +263,7 @@ router.get('/status', async (req: AuthRequest, res: Response) => {
       },
     });
   } catch (error) {
-    console.error('Get checkout OTP status error:', error);
+    logger.error({ error }, 'Get checkout OTP status error');
     return res.status(500).json({ success: false, error: 'Failed to check verification status' });
   }
 });

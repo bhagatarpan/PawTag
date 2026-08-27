@@ -80,8 +80,16 @@ async function auditMedusaEvent(
 
 /**
  * Find a PawTag order by Medusa order ID.
- * Searches the new medusaOrderId field first, then falls back to legacy fields.
- * Backfills medusaOrderId on legacy orders found via payment.transactionId.
+ *
+ * Search strategy (in priority order):
+ * 1. `medusaOrderId` field (fast, indexed) — new orders created by sync architecture
+ * 2. `payment.transactionId` field — legacy orders created before explicit field was added
+ * 3. `notes` field matching "Medusa Order: {id}" — oldest legacy format
+ *
+ * When found via legacy fields, automatically backfills `medusaOrderId` for future lookups.
+ *
+ * @param medusaOrderId - The Medusa order ID to search for
+ * @returns The matching PawTag order, or null if not found
  */
 async function findOrderByMedusaId(medusaOrderId: string) {
   // Try the explicit field first (fast, indexed)
