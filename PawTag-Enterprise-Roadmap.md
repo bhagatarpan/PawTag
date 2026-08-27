@@ -3132,7 +3132,7 @@ Medusa is now the **single source of truth** for all product/commerce data. The 
 ## Part 11 — PawTag ↔ Medusa Enterprise Sync Architecture ✅ COMPLETE
 
 **Completed:** 2026-08-27
-**Commit:** `7fb4e87` (feat: enterprise sync architecture) + `2fb910c` (fix: packing notification)
+**Commits:** `7fb4e87` (feat: enterprise sync architecture) + `2fb910c` (fix: packing notification) + `b3957d5` (feat: admin Webhooks & Sync dashboard)
 
 ### What Was Built
 
@@ -3165,11 +3165,17 @@ Medusa is now the **single source of truth** for all product/commerce data. The 
 | `packages/api/src/routes/admin.ts` | Cancel/refund/ship call Medusa APIs |
 | `packages/api/src/services/order-creation.service.ts` | Parallel user lookup, timeouts, idempotent fix |
 | `packages/api/src/services/orderNotification.service.ts` | Parallelized, admin alerts for cancel/refund |
+| `packages/api/src/routes/admin-webhooks.ts` | **New** — Admin webhook management API |
+| `packages/api/src/services/medusa-sync.service.ts` | Structured logging (replaced console.*) |
+| `packages/api/src/routes/checkout-otp.ts` | Structured logging (replaced console.*) |
 | `apps/web/src/pages/account/Orders.tsx` | 30s polling |
 | `apps/web/src/pages/account/OrderDetail.tsx` | 30s polling |
+| `apps/admin/src/pages/WebhookSettings.tsx` | **New** — Admin webhook dashboard UI |
+| `apps/admin/src/App.tsx` | Added `/webhooks` route |
+| `apps/admin/src/components/Sidebar.tsx` | Added "Webhooks & Sync" menu item |
 | `apps/medusa/src/subscribers/pawtag-webhook.ts` | 5s timeout |
-| `AGENTS.md` | Sync architecture documentation |
-| `README.md` | Sync architecture documentation |
+| `AGENTS.md` | Sync architecture + admin dashboard docs |
+| `README.md` | Sync architecture + admin dashboard docs |
 
 ---
 

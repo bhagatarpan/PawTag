@@ -1027,6 +1027,12 @@ Layer 3: FRONTEND POLLING (display)
 - `sync.polling.enabled` — customer page polling (default: true)
 - `sync.polling.intervalSeconds` — poll interval (default: 30)
 
+**Admin Dashboard (`/webhooks`):**
+- **Backend:** `packages/api/src/routes/admin-webhooks.ts` — status, retry, reconcile, settings, dead-letter
+- **Frontend:** `apps/admin/src/pages/WebhookSettings.tsx` — 3-layer cards, stats, manual triggers, config
+- **Access:** Requires `setting.read` permission (Admin, Super Admin)
+- **Features:** View event stats, manually trigger reconciliation, retry failed events, configure intervals, purge dead-letter queue
+
 ### Deprecated Systems
 
 The following are deprecated but still exist in the codebase:

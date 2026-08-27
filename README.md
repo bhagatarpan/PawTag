@@ -1649,6 +1649,13 @@ Layer 3: FRONTEND POLLING (display)
 | `packages/api/src/jobs/webhookRetry.ts` | Webhook retry with exponential backoff |
 | `packages/api/src/routes/medusa-webhooks.ts` | Webhook handlers with `findOrderByMedusaId()` |
 
+**Admin Dashboard (`/webhooks`):**
+- Monitor all 3 layers with real-time stats
+- Manually trigger reconciliation, retry failed events
+- Configure intervals and toggles for each layer
+- Manage dead-letter queue (retry, purge)
+- Requires `setting.read` permission (Admin, Super Admin)
+
 ---
 
 ## Future Considerations
