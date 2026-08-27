@@ -595,7 +595,11 @@ export function OrderDetailDrawer({
                 <div className="absolute top-[15px] left-[15px] right-[15px] h-1 bg-gray-200 rounded-full" />
                 <div className="relative flex justify-between">
                   {['pending', 'paid', 'packing', 'shipped', 'delivered'].map((step, i) => {
-                    const stepIdx = ['pending', 'pending_payment', 'paid', 'packing', 'shipped', 'delivered'].indexOf(order.status);
+                    const STEPS = ['pending', 'paid', 'packing', 'shipped', 'delivered'];
+                    // Map Medusa statuses to stepper positions: pending_payment is treated as pending
+                    const statusToStep: Record<string, string> = { pending: 'pending', pending_payment: 'pending', paid: 'paid', packing: 'packing', shipped: 'shipped', delivered: 'delivered' };
+                    const mappedStatus = statusToStep[order.status] || order.status;
+                    const stepIdx = STEPS.indexOf(mappedStatus);
                     const isDone = i <= stepIdx;
                     const isCurrent = i === stepIdx;
                     return (
