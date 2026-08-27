@@ -520,7 +520,7 @@ router.post('/tags/:id/request-replacement', requirePermission('tag.create'), as
     const orderNumber = `PT-${String(orderCount + 1).padStart(6, '0')}`;
 
     const orderItems = [{
-        productId: '',
+        productId: new mongoose.Types.ObjectId(),
         productName: 'PawTag Replacement',
         quantity: 1,
         unitPrice: replacementPrice,
@@ -548,10 +548,10 @@ router.post('/tags/:id/request-replacement', requirePermission('tag.create'), as
         zip: user.address.zip || '',
         country: user.address.country || 'NZ',
       } : {
-        line1: '',
-        city: '',
-        state: '',
-        zip: '',
+        line1: 'Address pending',
+        city: 'Auckland',
+        state: 'Auckland',
+        zip: '1010',
         country: 'NZ',
       },
     });

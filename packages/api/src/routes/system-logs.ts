@@ -144,7 +144,10 @@ function buildSystemLogQuery(params: Record<string, unknown>): Record<string, un
 
 router.get('/', requirePermission('systemlogs.read'), validate(querySchema), async (req: AuthRequest, res: Response) => {
   try {
-    const { page, limit, sortBy, sortDir } = req.query;
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 50;
+    const sortBy = (req.query.sortBy as string) || 'timestamp';
+    const sortDir = (req.query.sortDir as string) || 'desc';
     const query = buildSystemLogQuery(req.query as Record<string, unknown>);
 
     const sort: Record<string, 1 | -1> = {};

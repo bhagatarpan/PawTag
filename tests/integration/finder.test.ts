@@ -336,88 +336,13 @@ describe('Integration: Finder - Found Timer', () => {
 });
 
 // ═══════════════════════════════════════════
-// SHOP PRODUCTS (Public)
+// SHOP PRODUCTS (Public) — Removed
+// Products are now served by Medusa Store API.
+// Frontend uses sdk.store.product.list() and sdk.store.product.retrieve().
+// These tests are kept as a reminder that the endpoint was intentionally removed.
 // ═══════════════════════════════════════════
 
 describe('Integration: Finder - Shop Products', () => {
-  it('GET /api/finder/shop/products returns empty array with no products', async () => {
-    const res = await request(app).get('/api/finder/shop/products');
-
-    expect(res.status).toBe(200);
-    expect(res.body.success).toBe(true);
-    expect(res.body.data).toEqual([]);
-  });
-
-  it('GET /api/finder/shop/products returns active products', async () => {
-    await mongoose.connection.collections.products.insertOne({
-      name: 'PawTag Classic',
-      slug: 'pawtag-classic',
-      description: 'Classic QR tag',
-      price: 24.99,
-      sku: 'PT-CL-001',
-      category: 'tags',
-      stock: 50,
-      isActive: true,
-      images: [],
-      variants: [],
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-
-    const res = await request(app).get('/api/finder/shop/products');
-
-    expect(res.status).toBe(200);
-    expect(res.body.data).toHaveLength(1);
-    expect(res.body.data[0].name).toBe('PawTag Classic');
-  });
-
-  it('GET /api/finder/shop/products does not return inactive products', async () => {
-    await mongoose.connection.collections.products.insertOne({
-      name: 'Inactive Product',
-      slug: 'inactive',
-      description: 'Hidden',
-      price: 9.99,
-      sku: 'IN-001',
-      category: 'tags',
-      stock: 10,
-      isActive: false,
-      images: [],
-      variants: [],
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-
-    const res = await request(app).get('/api/finder/shop/products');
-
-    expect(res.status).toBe(200);
-    expect(res.body.data).toHaveLength(0);
-  });
-
-  it('GET /api/finder/shop/products/:id returns specific product', async () => {
-    const product = await mongoose.connection.collections.products.insertOne({
-      name: 'PawTag Pro',
-      slug: 'pawtag-pro',
-      description: 'Premium tag',
-      price: 39.99,
-      sku: 'PT-PR-001',
-      category: 'tags',
-      stock: 30,
-      isActive: true,
-      images: [],
-      variants: [],
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-
-    const res = await request(app).get(`/api/finder/shop/products/${product.insertedId}`);
-
-    expect(res.status).toBe(200);
-    expect(res.body.data.name).toBe('PawTag Pro');
-  });
-
-  it('GET /api/finder/shop/products/:id returns 404 for non-existent', async () => {
-    const fakeId = new mongoose.Types.ObjectId().toString();
-    const res = await request(app).get(`/api/finder/shop/products/${fakeId}`);
-    expect(res.status).toBe(404);
-  });
+  it.skip('GET /api/finder/shop/products — endpoint removed, products served by Medusa', () => {});
+  it.skip('GET /api/finder/shop/products/:id — endpoint removed, products served by Medusa', () => {});
 });
