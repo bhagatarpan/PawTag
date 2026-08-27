@@ -29,6 +29,7 @@
     "@opentelemetry/sdk-trace-node": "^2.10.0",
     "@opentelemetry/semantic-conventions": "^1.43.0",
     "@pawtag/db": "workspace:*",
+    "@medusajs/js-sdk": "^2.9.0",
     "@sentry/node": "^10.69.0",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
