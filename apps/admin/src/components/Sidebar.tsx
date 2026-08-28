@@ -79,7 +79,6 @@ const sections: SidebarSection[] = [
     links: [
       { to: '/orders', label: 'Orders', icon: FileText, permission: 'order.read' },
       { to: '/products', label: 'Products', icon: ShoppingBag, permission: 'product.read' },
-      { to: '/medusa', label: 'Medusa Dashboard', icon: ExternalLink, external: true, href: import.meta.env.VITE_MEDUSA_ADMIN_URL || 'http://localhost:9000/app' },
       { to: '/pets', label: 'Pets', icon: PawPrint, permission: 'pet.read' },
       { to: '/subscriptions', label: 'Subscriptions', icon: CreditCard, permission: 'subscription.read' },
       { to: '/tags', label: 'Tags', icon: QrCode, permission: 'tag.read' },

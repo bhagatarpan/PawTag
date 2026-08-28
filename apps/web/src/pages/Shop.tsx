@@ -1,68 +1,100 @@
+/**
+ * @module Shop Page
+ * @description Public shop page displaying PawTag products.
+ *
+ * Fetches products from the PawTag products API (GET /api/products)
+ * instead of the Medusa SDK. Displays product cards with pricing,
+ * stock status, and comparison table.
+ *
+ * Usage:
+ * ```tsx
+ * // Route: /shop
+ * // No authentication required
+ * <Shop />
+ * ```
+ */
+
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PawPrint, Shield } from 'lucide-react';
-import { sdk } from '../lib/medusa';
 import { useCart } from '../context/CartContext';
 import { useCartInteraction } from '../context/CartInteractionContext';
 import { ProductCard, type ProductCardProduct } from '@pawtag/ui';
 import SeoHead from '../components/SeoHead';
 import { useShopPage, useSiteSettings } from '../hooks/useCms';
 import { getProductBadge } from '../utils/productHelpers';
-import type { StoreProduct } from '@medusajs/types';
+import api from '../lib/api';
 
-function getComparisonFeatures(products: StoreProduct[]) {
-  const productMap = new Map<string, StoreProduct>();
-  for (const p of products) {
-    if (p.handle) productMap.set(p.handle, p);
-  }
+/* ------------------------------------------------------------------ */
+/*  Types                                                              */
+/* ------------------------------------------------------------------ */
 
-  const getMeta = (handle: string, key: string): string => {
-    const p = productMap.get(handle);
-    return ((p?.metadata as Record<string, unknown>)?.[key] as string) || '';
+/** PawTag product from the API */
+interface PawTagProduct {
+  _id: string;
+  name: string;
+  description: string;
+  shortDescription?: string;
+  price: number;
+  salePrice?: number;
+  compareAtPrice?: number;
+  currency: string;
+  images: string[];
+  category: string;
+  tags: string[];
+  isActive: boolean;
+  isPublished: boolean;
+  stock: number;
+  reserved: number;
+  sku: string;
+  weight?: number;
+  isSubscription: boolean;
+  isTagProduct: boolean;
+  subscriptionConfig?: {
+    type: 'annual' | 'monthly';
+    freePeriodMonths: number;
+    gracePeriodWeeks: number;
+    monthlyPrice?: number;
+    features: string[];
   };
-
-  return [
-    { key: 'technology', label: 'Technology', scan: getMeta('scan', 'technology') || 'QR Code', classic: getMeta('classic', 'technology') || 'NFC + QR', plus: getMeta('plus', 'technology') || 'NFC + QR' },
-    { key: 'material', label: 'Material', scan: getMeta('scan', 'material') || 'Plastic', classic: getMeta('classic', 'material') || 'Plastic', plus: getMeta('plus', 'material') || 'Metal edges + Epoxy resin' },
-    { key: 'scan_method', label: 'Scan Method', scan: getMeta('scan', 'scanMethod') || 'Phone camera', classic: getMeta('classic', 'scanMethod') || 'Phone tap', plus: getMeta('plus', 'scanMethod') || 'Phone tap' },
-    { key: 'durability', label: 'Durability', scan: getMeta('scan', 'durability') || 'Standard', classic: getMeta('classic', 'durability') || 'Standard', plus: getMeta('plus', 'durability') || 'Heavy-duty' },
-    { key: 'subscription', label: 'Free Subscription', scan: getMeta('scan', 'freePeriod') || '12 months', classic: getMeta('classic', 'freePeriod') || '12 months', plus: getMeta('plus', 'freePeriod') || '12 months' },
-    { key: 'after_free', label: 'After Free Period', scan: getMeta('scan', 'afterFreePeriod') || 'See pricing', classic: getMeta('classic', 'afterFreePeriod') || 'See pricing', plus: getMeta('plus', 'afterFreePeriod') || 'See pricing' },
-    { key: 'warranty', label: 'Warranty', scan: getMeta('scan', 'warranty') || '12 months', classic: getMeta('classic', 'warranty') || '12 months', plus: getMeta('plus', 'warranty') || '12 months' },
-    { key: 'shipping', label: 'Shipping', scan: 'Free NZ-wide', classic: 'Free NZ-wide', plus: 'Free NZ-wide' },
-  ];
+  badge?: string;
+  sortOrder: number;
+  warrantyMonths: number;
 }
 
-function toCardProduct(p: StoreProduct): ProductCardProduct {
-  const variant = p.variants?.[0] as Record<string, unknown> | undefined;
-  const prices = variant?.prices as Array<{ amount?: number }> | undefined;
-  const price = prices?.[0]?.amount || 0;
-  const meta = (p.metadata || {}) as Record<string, unknown>;
-  const subConfig = meta.subscriptionConfig as Record<string, unknown> | undefined;
-  const monthlyPrice = (subConfig?.monthlyPrice as number) || 0;
-  const badge = getProductBadge(p.handle || '');
-  const inventory = variant?.inventory_quantity as number | undefined;
+/* ------------------------------------------------------------------ */
+/*  Helpers                                                            */
+/* ------------------------------------------------------------------ */
+
+function toCardProduct(p: PawTagProduct): ProductCardProduct {
+  const effectivePrice = p.salePrice ?? p.price;
+  const badge = getProductBadge(p.sku) || (p.badge ? { label: p.badge, color: 'teal' } : null);
+  const available = p.stock - p.reserved;
+
   return {
-    id: p.id,
-    name: p.title,
-    shortDescription: (p.subtitle as string) || undefined,
-    price,
-    currency: 'NZD',
-    image: p.thumbnail || undefined,
-    sku: (variant?.sku as string) || '',
-    stock: typeof inventory === 'number' ? inventory : 999,
-    monthlyPrice: monthlyPrice > 0 ? monthlyPrice : undefined,
+    id: p._id,
+    name: p.name,
+    shortDescription: p.shortDescription || undefined,
+    price: effectivePrice,
+    currency: p.currency || 'NZD',
+    image: p.images?.[0] || undefined,
+    sku: p.sku,
+    stock: available,
+    monthlyPrice: p.subscriptionConfig?.monthlyPrice,
     badge: badge ? { label: badge.label, color: badge.color } : null,
     features: [
-      '12 months free subscription included',
-      '12 month warranty',
+      `${p.subscriptionConfig?.freePeriodMonths || 12} months free subscription included`,
+      `${p.warrantyMonths || 12} month warranty`,
       'Free NZ-wide shipping',
     ],
   };
 }
 
+/* ------------------------------------------------------------------ */
+/*  Component                                                          */
+/* ------------------------------------------------------------------ */
+
 export default function Shop() {
-  const [products, setProducts] = useState<StoreProduct[]>([]);
+  const [products, setProducts] = useState<PawTagProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [addedId, setAddedId] = useState<string | null>(null);
   const { addItem } = useCart();
@@ -72,17 +104,19 @@ export default function Shop() {
   const navigate = useNavigate();
   const { triggerFly } = useCartInteraction();
 
+  /* ---- Fetch products from PawTag API ---- */
   useEffect(() => {
-    sdk.store.product
-      .list({ fields: '*variants.prices,*images,*type,*tags' })
-      .then(({ products: p }) => setProducts(p || []))
+    api.get('/products', { params: { limit: 50 } })
+      .then((res) => {
+        const data = res.data?.data;
+        setProducts(data?.items || []);
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
-  // Memoized derived data — no recomputation unless products change
+  /* ---- Derived data ---- */
   const cardProducts = useMemo(() => products.map(toCardProduct), [products]);
-  const features = useMemo(() => getComparisonFeatures(products), [products]);
 
   const shopTitle = useMemo(() =>
     (shopPage?.content as Record<string, unknown>)?.heroTitle as string || shopPage?.title || `Shop ${companyName}`,
@@ -93,159 +127,79 @@ export default function Shop() {
     [shopPage]
   );
 
-  // Stable callbacks — no new references unless dependencies change
+  /* ---- Add to cart handler ---- */
   const handleAddToCart = useCallback((cardProduct: ProductCardProduct, e?: React.MouseEvent) => {
-    const variant = products.find((p) => p.id === cardProduct.id)?.variants?.[0];
-    if (!variant) return;
+    const product = products.find((p) => p._id === cardProduct.id);
+    if (!product) return;
 
     if (e) {
-      const btn = e.currentTarget as HTMLElement;
-      let parent = btn.parentElement;
-      let depth = 0;
-      while (parent && !parent.querySelector('[data-product-image]') && depth < 10) {
-        parent = parent.parentElement;
-        depth++;
-      }
-      const imgEl = parent?.querySelector('[data-product-image]');
-      if (imgEl && cardProduct.image) {
-        triggerFly(cardProduct.image, imgEl.getBoundingClientRect());
-      }
+      e.preventDefault();
     }
 
-    setAddedId(cardProduct.id);
     addItem({
-      productId: cardProduct.id,
-      variantId: variant.id,
-      name: cardProduct.name,
-      price: cardProduct.price,
+      productId: product._id,
       quantity: 1,
-      image: cardProduct.image,
+      name: product.name,
+      price: product.salePrice ?? product.price,
+      image: product.images?.[0],
     });
-    setTimeout(() => setAddedId(null), 1000);
+
+    setAddedId(product._id);
+    if (e) {
+      const rect = e.currentTarget?.getBoundingClientRect();
+      if (rect) triggerFly(product.images?.[0] || '', rect);
+    }
+    setTimeout(() => setAddedId(null), 2000);
   }, [products, addItem, triggerFly]);
 
-  const handleDetails = useCallback((p: ProductCardProduct) => {
-    navigate(`/shop/${p.id}`);
-  }, [navigate]);
+  /* ---- Product click handler ---- */
+  const handleProductClick = useCallback((cardProduct: ProductCardProduct) => {
+    const product = products.find((p) => p._id === cardProduct.id);
+    if (product) {
+      navigate(`/shop/${product._id}`);
+    }
+  }, [navigate, products]);
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <SeoHead title="Shop" description={shopDesc} keywords={['shop', 'pet tags', 'QR code tags', 'NFC tags', 'pet recovery', 'buy tags']} />
-
-      {/* Hero Banner */}
-      <div className="bg-gradient-to-r from-primary-700 to-primary-600 text-white py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h1 className="text-4xl font-bold mb-4">{shopTitle}</h1>
-          <p className="text-primary-100 text-lg max-w-2xl mx-auto">{shopDesc}</p>
+  /* ---- Loading skeleton ---- */
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="animate-pulse space-y-8">
+            <div className="h-8 bg-gray-200 rounded w-64" />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="bg-white rounded-xl h-80" />
+              ))}
+            </div>
+          </div>
         </div>
       </div>
+    );
+  }
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        {/* Product Cards */}
-        {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="bg-white rounded-2xl shadow-sm overflow-hidden animate-pulse">
-                <div className="h-48 bg-gray-200" />
-                <div className="p-6 space-y-3">
-                  <div className="h-6 bg-gray-200 rounded w-3/4" />
-                  <div className="h-4 bg-gray-200 rounded w-full" />
-                  <div className="h-10 bg-gray-200 rounded w-1/2" />
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
-            {cardProducts.map((cp, i) => (
+  return (
+    <>
+      <SeoHead title={shopTitle} description={shopDesc} />
+      <div className="min-h-screen bg-gray-50 py-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">{shopTitle}</h1>
+          <p className="text-gray-600 mb-8">{shopDesc}</p>
+
+          {/* Product Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {cardProducts.map((product) => (
               <ProductCard
-                key={products[i].id}
-                product={cp}
-                onAddToCart={handleAddToCart}
-                onDetails={handleDetails}
-                added={addedId === products[i].id}
+                key={product.id}
+                product={product}
+                onAddToCart={(_p, e) => handleAddToCart(product, e)}
+                onDetails={() => handleProductClick(product)}
+                added={addedId === product.id}
               />
             ))}
           </div>
-        )}
-
-        {/* Comparison Table */}
-        {!loading && products.length > 0 && (
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-12">
-            <div className="px-6 py-5 border-b border-gray-100">
-              <h2 className="text-2xl font-bold text-gray-900">Compare PawTag Models</h2>
-              <p className="text-gray-500 mt-1">Find the right tag for your pet</p>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-gray-100">
-                    <th className="text-left px-6 py-4 text-sm font-semibold text-gray-500 w-1/4">Feature</th>
-                    {products.map((p) => {
-                      const badge = getProductBadge(p.handle || '');
-                      return (
-                        <th key={p.id} className="text-center px-4 py-4 w-1/4">
-                          <div className="flex flex-col items-center gap-1">
-                            <span className="text-sm font-bold text-gray-900">{p.title}</span>
-                            {badge && (
-                              <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${badge.color}`}>{badge.label}</span>
-                            )}
-                          </div>
-                        </th>
-                      );
-                    })}
-                  </tr>
-                </thead>
-                <tbody>
-                  {features.map((feat, i) => (
-                    <tr key={feat.key} className={i % 2 === 0 ? 'bg-gray-50/50' : ''}>
-                      <td className="px-6 py-3 text-sm font-medium text-gray-700">{feat.label}</td>
-                      <td className="px-4 py-3 text-center text-sm text-gray-600">{feat.scan}</td>
-                      {products.length > 1 && <td className="px-4 py-3 text-center text-sm text-gray-600">{feat.classic}</td>}
-                      {products.length > 2 && <td className="px-4 py-3 text-center text-sm text-gray-600">{feat.plus}</td>}
-                    </tr>
-                  ))}
-                  <tr className="border-t border-gray-200">
-                    <td className="px-6 py-4 text-sm font-bold text-gray-900">Price</td>
-                    {products.map((p) => {
-                      const variant = p.variants?.[0] as Record<string, unknown> | undefined;
-                      const prices = variant?.prices as Array<{ amount?: number }> | undefined;
-                      const price = prices?.[0]?.amount || 0;
-                      return (
-                        <td key={p.id} className="px-4 py-4 text-center">
-                          <span className="text-lg font-bold text-primary-700">NZ${price.toFixed(2)}</span>
-                        </td>
-                      );
-                    })}
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* Info Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <Shield className="h-8 w-8 text-primary-600" />
-              <h3 className="text-lg font-bold text-gray-900">12 Month Warranty</h3>
-            </div>
-            <p className="text-sm text-gray-600 leading-relaxed">Every PawTag comes with a <strong>12 month warranty</strong> covering normal wear and tear.</p>
-          </div>
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <PawPrint className="h-8 w-8 text-primary-600" />
-              <h3 className="text-lg font-bold text-gray-900">NZ-Wide Shipping</h3>
-            </div>
-            <p className="text-sm text-gray-600 leading-relaxed">Shipping is <strong>free</strong> for all New Zealand addresses.</p>
-          </div>
-        </div>
-
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 text-center">
-          <p className="text-sm text-amber-800"><strong>Lost or damaged your PawTag?</strong> Replacement tags are available at full cost as new.</p>
         </div>
       </div>
-    </div>
+    </>
   );
 }

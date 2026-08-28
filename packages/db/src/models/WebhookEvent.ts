@@ -1,7 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IWebhookEventDocument extends Document {
-  source: 'medusa' | 'stripe';
+  source: 'stripe';
   event: string;
   eventId: string; // External event ID for idempotency
   payload: Record<string, unknown>;
@@ -17,7 +17,7 @@ export interface IWebhookEventDocument extends Document {
 
 const WebhookEventSchema = new Schema<IWebhookEventDocument>(
   {
-    source: { type: String, required: true, enum: ['medusa', 'stripe'] },
+    source: { type: String, required: true, enum: ['stripe'] },
     event: { type: String, required: true },
     eventId: { type: String, required: true },
     payload: { type: Schema.Types.Mixed, required: true },

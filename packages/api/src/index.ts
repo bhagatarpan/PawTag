@@ -71,8 +71,6 @@ import webhookRoutes from './routes/webhooks';
 import invoiceAccessRoutes from './routes/invoice-access';
 import referralRoutes from './routes/referrals';
 import checkoutOtpRoutes from './routes/checkout-otp';
-import medusaSyncRoutes from './routes/medusa-sync';
-import medusaWebhookRoutes from './routes/medusa-webhooks';
 import pushTokenRoutes from './routes/push-tokens';
 import auditRoutes from './routes/audit';
 import systemLogRoutes from './routes/system-logs';
@@ -228,7 +226,6 @@ app.use('/api/admin/cms/auth-pages', cmsAuthAdminRoutes);
 app.use('/api/admin/cms/onboarding', cmsOnboardingAdminRoutes);
 app.use('/api/customer', customerRoutes);
 app.use('/api/customer/checkout-otp', checkoutOtpRoutes);
-app.use('/api/customer/medusa-sync', medusaSyncRoutes);
 import demoPaymentRoutes from './routes/demo-payment';
 app.use('/api/customer/demo-payment', demoPaymentRoutes);
 app.use('/api/customer/subscriptions', customerSubscriptionRoutes);
@@ -236,7 +233,6 @@ app.use('/api/admin/subscriptions', adminSubscriptionRoutes);
 app.use('/api/admin/analytics', adminAnalyticsRoutes);
 app.use('/api', invoiceAccessRoutes);
 app.use('/api/webhooks', webhookRoutes);
-app.use('/api/webhooks/medusa', medusaWebhookRoutes);
 app.use('/api/finder', finderRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api', referralRoutes);
@@ -291,14 +287,6 @@ async function start() {
     // Start orphan payment detection job
     const { startOrphanPaymentJob } = await import('./jobs/orphanPaymentDetection');
     startOrphanPaymentJob();
-
-    // Start webhook retry job
-    const { startWebhookRetryJob } = await import('./jobs/webhookRetry');
-    startWebhookRetryJob();
-
-    // Start order sync reconciliation job
-    const { startReconciliationJob } = await import('./jobs/orderSyncReconciliation');
-    startReconciliationJob();
 
     const server = app.listen(config.port, () => {
       logger.info(`PawTag API running on port ${config.port}`);

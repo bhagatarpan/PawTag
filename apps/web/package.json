@@ -10,8 +10,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@medusajs/js-sdk": "^2.9.0",
-    "@medusajs/types": "^2.9.0",
     "@pawtag/shared": "workspace:*",
     "@pawtag/ui": "workspace:*",
     "@puckeditor/core": "^0.22.2",

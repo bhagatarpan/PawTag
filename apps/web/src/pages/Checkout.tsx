@@ -8,7 +8,6 @@ import {
 import { AddressAutocomplete } from '@pawtag/ui';
 import type { AddressComponents } from '@pawtag/ui';
 import api from '../lib/api';
-import { sdk } from '../lib/medusa';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useSiteSettings } from '../hooks/useCms';
@@ -25,7 +24,7 @@ const STEPS = [
 ];
 
 export default function Checkout() {
-  const { items, total, cart, clearCart, refreshCart } = useCart();
+  const { items, total, totals, clearCart, refreshCart } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -85,31 +84,39 @@ export default function Checkout() {
 
   // Fetch shipping options when address is entered
   useEffect(() => {
-    if (!cart?.id || !form.line1) return;
+    if (!form.line1) return;
     setShippingLoading(true);
-    sdk.store.fulfillment.listCartOptions({ cart_id: cart.id })
-      .then(({ shipping_options }) => {
-        setShippingOptions(shipping_options || []);
+    api.get('/shipping/rates', {
+      params: { line1: form.line1, city: form.city, state: form.state, zip: form.zip, country: form.country },
+    })
+      .then((res) => {
+        const rates = res.data?.data || [];
+        setShippingOptions(rates);
         // Auto-select first option if none selected
-        if (shipping_options?.length > 0 && !selectedShippingOption) {
-          setSelectedShippingOption(shipping_options[0].id);
+        if (rates.length > 0 && !selectedShippingOption) {
+          setSelectedShippingOption(rates[0].id);
         }
       })
       .catch(() => setShippingOptions([]))
       .finally(() => setShippingLoading(false));
-  }, [cart?.id, form.line1]);
+  }, [form.line1, form.city, form.state, form.zip, form.country]);
 
-  // Sync shipping method to Medusa cart when selection changes (updates cart totals in real time)
+  // Sync shipping method to cart when selection changes
   const prevShippingRef = useRef(selectedShippingOption);
   useEffect(() => {
-    if (!cart?.id || !selectedShippingOption) return;
+    if (!selectedShippingOption) return;
     // Skip initial mount — only sync on user-initiated changes
     if (prevShippingRef.current === selectedShippingOption) return;
     prevShippingRef.current = selectedShippingOption;
-    sdk.store.cart.addShippingMethod(cart.id, { option_id: selectedShippingOption })
-      .then(() => refreshCart())
-      .catch((err) => console.error('[Checkout] Shipping sync error:', err?.message));
-  }, [selectedShippingOption, cart?.id]);
+    const option = shippingOptions.find(o => o.id === selectedShippingOption);
+    if (option) {
+      api.post('/shipping/select', {
+        methodId: option.id,
+        methodName: option.name,
+        cost: option.cost || 0,
+      }).then(() => refreshCart()).catch(() => {});
+    }
+  }, [selectedShippingOption, shippingOptions]);
 
   // CMS settings for trust badges
   const { settings } = useSiteSettings();
@@ -136,13 +143,13 @@ export default function Checkout() {
     }
   }, [user]);
 
-  // Derived values — compute from individual components for reliability
-  const selectedShippingPrice = shippingOptions.find(o => o.id === selectedShippingOption)?.amount || 0;
-  const shippingCost = cart?.shipping_total || selectedShippingPrice;
-  const taxAmount = cart?.tax_total || 0;
-  const discountAmount = cart?.discount_total || promoDiscount;
-  const itemsSubtotal = cart?.item_subtotal || cart?.subtotal || total;
-  const orderTotal = itemsSubtotal + shippingCost + taxAmount - discountAmount;
+  // Derived values — use PawTag cart totals
+  const selectedShippingPrice = shippingOptions.find(o => o.id === selectedShippingOption)?.cost || 0;
+  const shippingCost = selectedShippingPrice;
+  const taxAmount = totals.tax || 0;
+  const discountAmount = totals.discount || promoDiscount;
+  const itemsSubtotal = totals.subtotal || total;
+  const orderTotal = totals.total || (itemsSubtotal + shippingCost + taxAmount - discountAmount);
 
   const canProceedToCheckout = items.length > 0;
   const canProceedToPayment = emailVerified && mobileVerified && form.line1 && form.city && form.zip;
@@ -158,16 +165,13 @@ export default function Checkout() {
 
   // Promo code handlers
   const applyPromoCode = async () => {
-    if (!promoCode || !cart) return;
+    if (!promoCode) return;
     setPromoLoading(true);
     try {
-      const { cart: updated } = await sdk.store.cart.addPromotions(cart.id, { promo_codes: [promoCode] } as any);
-      if (updated) {
-        // Reconcile local cart with server (discount applied, totals updated)
-        await refreshCart();
-      }
+      await api.post('/cart/promo', { code: promoCode });
+      await refreshCart();
       setPromoApplied(true);
-      setPromoDiscount(updated?.discount_total || 0);
+      setPromoDiscount(totals.discount || 0);
     } catch (err: any) {
       setError(err.message || 'Invalid promo code');
     } finally {
@@ -176,13 +180,11 @@ export default function Checkout() {
   };
 
   const removePromoCode = async () => {
-    if (!cart) return;
     try {
-      await sdk.store.cart.removePromotions(cart.id, { promo_codes: [promoCode] } as any);
+      await api.delete('/cart/promo');
       setPromoApplied(false);
       setPromoDiscount(0);
       setPromoCode('');
-      // Reconcile local cart with server (discount removed, totals updated)
       await refreshCart();
     } catch (err: any) {
       setError(err.message || 'Failed to remove promo code');
@@ -199,102 +201,33 @@ export default function Checkout() {
     }));
   };
 
-  // Payment handler — uses Medusa SDK checkout flow
+  // Payment handler — uses PawTag checkout API
   const handlePayment = async () => {
-    if (!user || !cart) return;
+    if (!user) return;
     setLoading(true);
     setError(null);
     try {
-      // 1. Ensure customer is associated with cart (AWAIT — must complete before cart finishes)
-      if (!cart.customer_id) {
-        try {
-          const syncRes = await api.post('/customer/medusa-sync');
-          const medusaCustomerId = syncRes.data?.data?.medusaCustomerId;
-          if (medusaCustomerId) {
-            await sdk.store.cart.update(cart.id, { customer_id: medusaCustomerId } as any);
-          }
-        } catch (syncErr) {
-          console.warn('[Checkout] Customer sync failed, proceeding without medusaCustomerId:', syncErr);
-        }
-      }
-
-      // 2. Write identity + referral to cart metadata (ensures webhook can always find user)
-      const metadata: Record<string, string> = {};
-      const referralCode = localStorage.getItem('pawtag_referral_code');
-      if (referralCode && !cart.metadata?.referralCode) {
-        metadata.referralCode = referralCode;
-      }
-      // Identity fields — guarantees order has PawTag user reference for webhook lookup
-      metadata.pawtagUserId = user.id;
-      metadata.pawtagUserEmail = user.email;
-      if (user.phoneNumber) metadata.pawtagUserPhone = user.phoneNumber;
-      metadata.pawtagUserFullName = user.fullName || '';
-      if (Object.keys(metadata).length > 0) {
-        await sdk.store.cart.update(cart.id, { metadata } as any);
-      }
-      if (referralCode) localStorage.removeItem('pawtag_referral_code');
-
-      // 3. Add shipping address to cart
-      try {
-        await sdk.store.cart.update(cart.id, {
-          shipping_address: {
-            first_name: user.fullName?.split(' ')[0] || 'Customer',
-            last_name: user.fullName?.split(' ').slice(1).join(' ') || '',
-            address_1: form.line1,
-            address_2: form.line2 || undefined,
-            city: form.city,
-            province: form.state || undefined,
-            postal_code: form.zip,
-            country_code: (form.country || 'nz').toLowerCase(),
-            phone: user.phoneNumber || undefined,
-          },
-        } as any);
-      } catch (addrErr: any) {
-        console.warn('Address update failed, retrying with minimal fields:', addrErr?.message);
-        await sdk.store.cart.update(cart.id, {
-          shipping_address: {
-            first_name: user.fullName?.split(' ')[0] || 'Customer',
-            last_name: user.fullName?.split(' ').slice(1).join(' ') || '',
-            address_1: form.line1,
-            city: form.city,
-            postal_code: form.zip,
-            country_code: (form.country || 'nz').toLowerCase(),
-          },
-        } as any);
-      }
-
-      // 4. Ensure shipping method is on the cart (already synced by effect, just verify)
-      // Note: addShippingMethod is handled by the shipping sync effect — skip here to
-      // avoid concurrent lock contention on the same cart.
-      if (selectedShippingOption) {
-        // Small wait to let any in-flight shipping sync effect complete
-        await new Promise((r) => setTimeout(r, 500));
-      }
-
-      // Re-fetch cart to get updated totals (shipping + tax calculated)
-      const updatedCart = await refreshCart();
-
-      // 5. Initiate payment session and get client secret for Stripe Elements
-      const cartForPayment = updatedCart || cart;
-      await sdk.store.payment.initiatePaymentSession(cartForPayment, {
-        provider_id: 'pp_stripe_stripe',
-      });
-
-      // Re-fetch cart to get payment session with client_secret
-      const { cart: refreshedCart } = await sdk.store.cart.retrieve(cart.id);
-      const cartAny = refreshedCart as any;
-      const clientSecret = cartAny?.payment_collection?.payment_sessions?.[0]?.data?.client_secret;
+      // 1. Create payment intent via PawTag checkout API
+      const checkoutRes = await api.post('/checkout/payment-intent');
+      const { paymentIntentId, clientSecret, pendingOrderId } = checkoutRes.data?.data;
 
       if (!clientSecret) {
         throw new Error('Payment session could not be created');
       }
 
-      // Store client secret — StripePaymentForm will use it to confirm payment
+      // Store referral code for later
+      const referralCode = localStorage.getItem('pawtag_referral_code');
+      if (referralCode) localStorage.removeItem('pawtag_referral_code');
+
+      // Store checkout state for payment confirmation
+      sessionStorage.setItem('pawtag_checkout_payment_intent', paymentIntentId);
+      sessionStorage.setItem('pawtag_checkout_pending_order', pendingOrderId);
+
+      // 2. Store client secret — StripePaymentForm will use it to confirm payment
       setPaymentClientSecret(clientSecret);
       setCurrentStep('payment');
     } catch (err: any) {
       setError(err?.message || err?.response?.data?.error || 'Payment failed. Please try again.');
-      // Refresh cart to reconcile any server-side mutations from the failed payment attempt
       await refreshCart();
     } finally {
       setLoading(false);
@@ -303,58 +236,42 @@ export default function Checkout() {
 
   // Called by StripePaymentForm after Stripe confirms payment client-side
   const handlePaymentSuccess = async (paymentIntentId: string) => {
-    if (!cart) return;
     setLoading(true);
     setError(null);
     try {
-      // 1. Complete the Medusa cart (creates Medusa order)
-      const result = await sdk.store.cart.complete(cart.id);
-
-      if (result.type === 'cart') {
-        throw new Error(result.error?.message || result.error?.name || 'Order creation failed');
-      }
-
-      const medusaOrder = result.order;
-      const medusaOrderId = medusaOrder.id;
-      const orderDisplay = medusaOrder.display_id?.toString() || medusaOrder.id || 'Processing';
-
       // Drive progress: "Payment Processing..."
       (window as any).__paymentProgress?.setProcessingStage?.('confirmed');
 
-      // 2. Call direct API to create PawTag order + invoice + send emails (synchronous)
+      // 1. Confirm checkout via PawTag API (creates Order + Invoice + sends emails)
       let pawtagOrder = null;
       let invoice = null;
       let invoiceUrl = '';
       try {
-        const placeRes = await api.post('/customer/orders/place', {
-          medusaOrderId,
-          stripePaymentIntentId: paymentIntentId,
-        });
-        pawtagOrder = placeRes.data.data.order;
-        invoice = placeRes.data.data.invoice;
-        invoiceUrl = placeRes.data.data.invoiceUrl;
-      } catch (placeErr) {
-        // Direct API failed — webhook backup will create it later
-        console.warn('[Checkout] Direct order placement failed, webhook will retry:', placeErr);
+        const confirmRes = await api.post('/checkout/confirm', { paymentIntentId });
+        pawtagOrder = confirmRes.data.data.order;
+        invoice = confirmRes.data.data.invoice;
+        invoiceUrl = confirmRes.data.data.invoiceUrl;
+      } catch (confirmErr) {
+        console.warn('[Checkout] Order confirmation failed, webhook will retry:', confirmErr);
       }
 
-      // 3. Preserve cart data for confirmation page (before clearCart)
+      // 2. Preserve cart data for confirmation page (before clearCart)
       setConfirmedItems([...items]);
       setConfirmedTotal(total);
       setConfirmedInvoice(invoice);
       setConfirmedPawTagOrder(pawtagOrder);
-      setOrderNumber(pawtagOrder?.orderNumber || orderDisplay);
+      setOrderNumber(pawtagOrder?.orderNumber || paymentIntentId.slice(-8));
 
       // Drive progress: "Payment Confirmed..." → "✓ Payment Confirmed"
       (window as any).__paymentProgress?.setProcessingStage?.('complete');
 
-      // 4. Wait for green animation, then show confirmation
+      // 3. Wait for green animation, then show confirmation
       await new Promise((r) => setTimeout(r, 600));
 
       setSuccess(true);
       setCurrentStep('confirmed');
       sessionStorage.setItem('pawtag_checkout_success', 'true');
-      sessionStorage.setItem('pawtag_checkout_order', pawtagOrder?.orderNumber || orderDisplay);
+      sessionStorage.setItem('pawtag_checkout_order', pawtagOrder?.orderNumber || paymentIntentId.slice(-8));
       clearCart();
     } catch (err: any) {
       setError(err?.message || 'Order confirmation failed. Your payment was received — please contact support.');
@@ -454,21 +371,21 @@ export default function Checkout() {
                   </thead>
                   <tbody>
                     {items.map((item) => (
-                      <tr key={item.variantId} className="border-b border-gray-50">
+                      <tr key={item.productId || item.variantId} className="border-b border-gray-50">
                         <td className="py-4">
                           <div className="flex items-center gap-3">
                             <div className="h-14 w-14 bg-primary-50 rounded-lg flex-shrink-0 flex items-center justify-center overflow-hidden">
                               {item.image ? <img src={item.image} alt="" className="h-full w-full object-cover" /> : <PawPrint className="h-6 w-6 text-primary-300" />}
                             </div>
                             <div>
-                              <p className="font-medium text-gray-900">{item.name}</p>
+                              <p className="font-medium text-gray-900">{item.productName || item.name}</p>
                               <p className="text-xs text-gray-500">{item.quantity > 1 ? `Qty: ${item.quantity}` : ''}</p>
                             </div>
                           </div>
                         </td>
-                        <td className="text-right text-sm text-gray-600">NZ${item.price.toFixed(2)}</td>
+                        <td className="text-right text-sm text-gray-600">NZ${(item.unitPrice || item.price || 0).toFixed(2)}</td>
                         <td className="text-center text-sm text-gray-600">{item.quantity}</td>
-                        <td className="text-right text-sm font-semibold text-gray-900">NZ${(item.price * item.quantity).toFixed(2)}</td>
+                        <td className="text-right text-sm font-semibold text-gray-900">NZ${((item.unitPrice || item.price || 0) * item.quantity).toFixed(2)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -695,15 +612,15 @@ export default function Checkout() {
                   <h2 className="text-lg font-semibold text-gray-900 mb-4">Order Summary</h2>
                   <button onClick={() => goToStep('cart')} className="text-sm text-primary-600 hover:text-primary-700 mb-4">Edit Cart</button>
                   {items.map((item) => (
-                    <div key={item.variantId} className="flex gap-3 mb-4 pb-4 border-b border-gray-100 last:border-0">
+                    <div key={item.productId || item.variantId} className="flex gap-3 mb-4 pb-4 border-b border-gray-100 last:border-0">
                       <div className="h-14 w-14 bg-primary-50 rounded-lg flex-shrink-0 flex items-center justify-center overflow-hidden">
                         {item.image ? <img src={item.image} alt="" className="h-full w-full object-cover" /> : <PawPrint className="h-6 w-6 text-primary-300" />}
                       </div>
                       <div className="flex-1">
-                        <p className="font-medium text-gray-900">{item.name}</p>
+                        <p className="font-medium text-gray-900">{item.productName || item.name}</p>
                         <p className="text-xs text-gray-500">Qty: {item.quantity}</p>
                       </div>
-                      <p className="font-semibold text-gray-900">NZ${(item.price * item.quantity).toFixed(2)}</p>
+                      <p className="font-semibold text-gray-900">NZ${(item.unitPrice || item.price || 0).toFixed(2)}</p>
                     </div>
                   ))}
                   <div className="space-y-2 pt-4">
@@ -796,11 +713,11 @@ export default function Checkout() {
                           <PawPrint className="h-5 w-5 text-primary-300" />
                         </div>
                         <div>
-                          <p className="text-sm font-medium text-gray-900">{item.name}</p>
+                          <p className="text-sm font-medium text-gray-900">{item.productName || item.name}</p>
                           <p className="text-xs text-gray-500">Qty: {item.quantity}</p>
                         </div>
                       </div>
-                      <p className="text-sm font-semibold text-gray-900">NZ${(item.price * item.quantity).toFixed(2)}</p>
+                      <p className="text-sm font-semibold text-gray-900">NZ${(item.unitPrice || item&& 0).toFixed(2)}</p>
                     </div>
                   ))}
                 </div>

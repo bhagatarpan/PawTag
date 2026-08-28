@@ -2,9 +2,13 @@ import React from 'react';
 import { X, Plus, Minus, Trash2, ShoppingCart } from 'lucide-react';
 
 export interface CartItem {
-  variantId: string;
-  name: string;
-  price: number;
+  _id?: string;
+  variantId?: string;
+  productId?: string;
+  name?: string;
+  productName?: string;
+  price?: number;
+  unitPrice?: number;
   quantity: number;
   image?: string;
   petName?: string;
@@ -15,8 +19,8 @@ export interface CartDrawerProps {
   onClose: () => void;
   items: CartItem[];
   total: number;
-  onUpdateQuantity: (variantId: string, quantity: number) => void;
-  onRemoveItem: (variantId: string) => void;
+  onUpdateQuantity: (id: string, quantity: number) => void;
+  onRemoveItem: (id: string) => void;
   onClearCart: () => void;
   onCheckout?: () => void;
   className?: string;
@@ -68,37 +72,41 @@ export const CartDrawer = React.memo(function CartDrawer({
               <p className="text-sm">Your cart is empty</p>
             </div>
           ) : (
-            items.map((item) => (
+            items.map((item) => {
+              const itemId = item._id || item.variantId || item.productId || '';
+              const itemName = item.name || item.productName || 'Item';
+              const itemPrice = item.price || item.unitPrice || 0;
+              return (
               <div
-                key={item.variantId}
+                key={itemId}
                 className="flex gap-3 p-3 bg-gray-50 rounded-xl"
               >
                 <div className="w-16 h-16 bg-gradient-to-br from-primary-50 to-primary-100 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden">
                   {item.image ? (
-                    <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                    <img src={item.image} alt={itemName} className="w-full h-full object-cover" />
                   ) : (
                     <ShoppingCart className="h-6 w-6 text-primary-300" />
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h4 className="text-sm font-semibold text-gray-900 truncate">{item.name}</h4>
+                  <h4 className="text-sm font-semibold text-gray-900 truncate">{itemName}</h4>
                   {item.petName && (
                     <p className="text-xs text-gray-400">For {item.petName}</p>
                   )}
                   <p className="text-sm font-bold text-primary-700 mt-1">
-                    ${(item.price * item.quantity).toFixed(2)}
+                    ${(itemPrice * item.quantity).toFixed(2)}
                   </p>
                 </div>
                 <div className="flex flex-col items-end gap-1">
                   <button
-                    onClick={() => onRemoveItem(item.variantId)}
+                    onClick={() => onRemoveItem(itemId)}
                     className="p-1 text-gray-400 hover:text-red-500 transition-colors"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
                   <div className="flex items-center gap-1">
                     <button
-                      onClick={() => onUpdateQuantity(item.variantId, Math.max(1, item.quantity - 1))}
+                      onClick={() => onUpdateQuantity(itemId, Math.max(1, item.quantity - 1))}
                       className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
                     >
                       <Minus className="h-3 w-3" />
@@ -107,7 +115,7 @@ export const CartDrawer = React.memo(function CartDrawer({
                       {item.quantity}
                     </span>
                     <button
-                      onClick={() => onUpdateQuantity(item.variantId, item.quantity + 1)}
+                      onClick={() => onUpdateQuantity(itemId, item.quantity + 1)}
                       className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
                     >
                       <Plus className="h-3 w-3" />
@@ -115,7 +123,8 @@ export const CartDrawer = React.memo(function CartDrawer({
                   </div>
                 </div>
               </div>
-            ))
+              );
+            })
           )}
         </div>
 

@@ -193,22 +193,19 @@ async function handlePaymentIntentSucceeded(paymentIntent: any) {
   try {
     const { createSubscription } = await import('../services/subscription.service');
     const { sendSubscriptionWelcomeEmail } = await import('../services/email.service');
+    const { Product } = await import('@pawtag/db');
 
-    // Fetch product metadata from Medusa for subscription/tag checks
-    const MEDUSA_URL = process.env.MEDUSA_BACKEND_URL || 'http://localhost:9000';
+    // Fetch product metadata from MongoDB
     for (const item of order.items) {
       let productMetadata: any = null;
       try {
-        const response = await fetch(`${MEDUSA_URL}/store/products/${item.productId}`, {
-          headers: { 'x-publishable-api-key': process.env.MEDUSA_PUBLISHABLE_KEY || '' },
-        });
-        if (response.ok) {
-          const { product } = await response.json() as any;
-          productMetadata = product?.metadata;
+        const product = await Product.findById(item.productId).lean();
+        if (product?.isSubscription && product?.subscriptionConfig) {
+          productMetadata = product.subscriptionConfig;
         }
       } catch { /* non-critical */ }
 
-      if (productMetadata?.isSubscription && productMetadata?.subscriptionConfig) {
+      if (productMetadata && productMetadata.type) {
         const userTags = await Tag.find({ ownerId: order.userId, deletedAt: null });
         for (const tag of userTags) {
           if (tag.subscriptionStatus === 'none' || !tag.subscriptionId) {
@@ -216,7 +213,7 @@ async function handlePaymentIntentSucceeded(paymentIntent: any) {
               userId: order.userId.toString(),
               tagId: tag._id.toString(),
               orderId: order._id.toString(),
-              planType: productMetadata.subscriptionConfig.type || 'annual',
+              planType: productMetadata.type || 'annual',
               planId: String(item.productId),
               price: item.unitPrice,
             });

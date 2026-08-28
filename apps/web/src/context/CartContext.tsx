@@ -1,16 +1,43 @@
-import { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo, ReactNode } from 'react';
-import { sdk, getNzRegionId } from '../lib/medusa';
+/**
+ * @module CartContext
+ * @description React context for PawTag shopping cart.
+ *
+ * Replaces the Medusa SDK-based cart with PawTag-native cart API.
+ * All cart operations go through POST /api/cart/* endpoints.
+ *
+ * Features:
+ * - Add/remove/update items
+ * - Server-side price validation
+ * - Cart totals calculation
+ * - Persistent cart (server-side via user ID)
+ * - Optimistic updates for UI responsiveness
+ *
+ * Usage:
+ * ```tsx
+ * const { items, addItem, removeItem, total } = useCart();
+ * ```
+ */
+
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import api from '../lib/api';
-import type { StoreCart } from '@medusajs/types';
+
+/* ------------------------------------------------------------------ */
+/*  Types                                                              */
+/* ------------------------------------------------------------------ */
 
 export interface CartItem {
+  _id: string;
   productId: string;
-  variantId: string;
-  name: string;
-  price: number;
+  variantId?: string;
+  productName: string;
+  name?: string;
+  sku: string;
+  unitPrice: number;
+  price?: number;
+  customizationTotal: number;
   quantity: number;
   image?: string;
-  petName?: string;
+  customisation?: boolean;
 }
 
 export interface AddedItem {
@@ -21,240 +48,193 @@ export interface AddedItem {
   timestamp: number;
 }
 
+export interface CartTotals {
+  items: Array<{
+    itemId: string;
+    productId: string;
+    productName: string;
+    quantity: number;
+    unitPrice: number;
+    customisationTotal: number;
+    lineTotal: number;
+  }>;
+  subtotal: number;
+  discount: number;
+  shipping: number;
+  tax: number;
+  total: number;
+  currency: string;
+}
+
 interface CartContextType {
   items: CartItem[];
-  addItem: (item: CartItem) => void;
-  removeItem: (variantId: string) => void;
-  updateQuantity: (variantId: string, quantity: number) => void;
+  addItem: (item: { productId: string; quantity: number; customisation?: boolean; name?: string; price?: number; image?: string }) => void;
+  removeItem: (itemId: string) => void;
+  updateQuantity: (itemId: string, quantity: number) => void;
   clearCart: () => void;
-  refreshCart: () => Promise<StoreCart | null>;
+  refreshCart: () => Promise<void>;
+  totals: CartTotals;
   total: number;
   itemCount: number;
-  cart: StoreCart | null;
   loading: boolean;
   error: string | null;
   lastAddedItem: AddedItem | null;
   clearLastAddedItem: () => void;
 }
 
+/* ------------------------------------------------------------------ */
+/*  Context                                                            */
+/* ------------------------------------------------------------------ */
+
 const CartContext = createContext<CartContextType | null>(null);
-const CART_ID_KEY = 'pawtag_medusa_cart_id';
+
+const EMPTY_TOTALS: CartTotals = {
+  items: [],
+  subtotal: 0,
+  discount: 0,
+  shipping: 0,
+  tax: 0,
+  total: 0,
+  currency: 'NZD',
+};
 
 export function CartProvider({ children }: { children: ReactNode }) {
-  const [cart, setCart] = useState<StoreCart | null>(null);
+  const [items, setItems] = useState<CartItem[]>([]);
+  const [totals, setTotals] = useState<CartTotals>(EMPTY_TOTALS);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastAddedItem, setLastAddedItem] = useState<AddedItem | null>(null);
-  const cartIdRef = useRef<string | null>(null);
 
-  const getCartId = useCallback((): string | null => cartIdRef.current || localStorage.getItem(CART_ID_KEY), []);
-
-  // Re-fetch cart from Medusa and update state
-  const refreshCart = useCallback(async (): Promise<StoreCart | null> => {
-    const id = getCartId();
-    if (!id) return null;
+  /* ---- Fetch cart from server ---- */
+  const refreshCart = useCallback(async () => {
     try {
-      const { cart: reloaded } = await sdk.store.cart.retrieve(id);
-      setCart(reloaded);
-      return reloaded;
-    } catch {
-      setCart(null);
-      cartIdRef.current = null;
-      localStorage.removeItem(CART_ID_KEY);
-      return null;
+      setLoading(true);
+      const res = await api.get('/cart');
+      const data = res.data?.data;
+      if (data?.cart) {
+        setItems(data.cart.items || []);
+        setTotals(data.totals || EMPTY_TOTALS);
+      }
+    } catch (err: any) {
+      // 401 = not logged in, that's ok
+      if (err?.response?.status !== 401) {
+        setError('Failed to load cart');
+      }
+    } finally {
+      setLoading(false);
     }
-  }, [getCartId]);
+  }, []);
+
+  /* ---- Load cart on mount ---- */
+  useEffect(() => {
+    refreshCart();
+  }, [refreshCart]);
+
+  /* ---- Add item ---- */
+  const addItem = useCallback(async (item: { productId: string; quantity: number; customisation?: boolean; name?: string; price?: number; image?: string }) => {
+    try {
+      setLoading(true);
+      const res = await api.post('/cart/items', {
+        productId: item.productId,
+        quantity: item.quantity,
+        customisation: item.customisation,
+      });
+      const data = res.data?.data;
+      if (data?.cart) {
+        setItems(data.cart.items || []);
+        setTotals(data.totals || EMPTY_TOTALS);
+        setLastAddedItem({
+          name: item.name || 'Item',
+          price: item.price || 0,
+          quantity: item.quantity,
+          image: item.image,
+          timestamp: Date.now(),
+        });
+      }
+    } catch (err: any) {
+      setError(err?.response?.data?.error || 'Failed to add item');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  /* ---- Remove item ---- */
+  const removeItem = useCallback(async (itemId: string) => {
+    try {
+      setLoading(true);
+      const res = await api.delete(`/cart/items/${itemId}`);
+      const data = res.data?.data;
+      if (data?.cart) {
+        setItems(data.cart.items || []);
+        setTotals(data.totals || EMPTY_TOTALS);
+      }
+    } catch (err: any) {
+      setError(err?.response?.data?.error || 'Failed to remove item');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  /* ---- Update quantity ---- */
+  const updateQuantity = useCallback(async (itemId: string, quantity: number) => {
+    try {
+      setLoading(true);
+      const res = await api.put(`/cart/items/${itemId}`, { quantity });
+      const data = res.data?.data;
+      if (data?.cart) {
+        setItems(data.cart.items || []);
+        setTotals(data.totals || EMPTY_TOTALS);
+      }
+    } catch (err: any) {
+      setError(err?.response?.data?.error || 'Failed to update quantity');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  /* ---- Clear cart ---- */
+  const clearCart = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await api.delete('/cart');
+      const data = res.data?.data;
+      if (data?.cart) {
+        setItems(data.cart.items || []);
+        setTotals(data.totals || EMPTY_TOTALS);
+      }
+    } catch (err: any) {
+      setError(err?.response?.data?.error || 'Failed to clear cart');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  /* ---- Derived values ---- */
+  const total = totals.total;
+  const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
 
   const clearLastAddedItem = useCallback(() => setLastAddedItem(null), []);
 
-  // Load or create cart on mount
-  useEffect(() => {
-    const loadCart = async () => {
-      const savedCartId = localStorage.getItem(CART_ID_KEY);
-      if (savedCartId) {
-        try {
-          const { cart: retrieved } = await sdk.store.cart.retrieve(savedCartId);
-          cartIdRef.current = savedCartId;
-          setCart(retrieved);
-        } catch {
-          localStorage.removeItem(CART_ID_KEY);
-          cartIdRef.current = null;
-          try {
-            const regionId = await getNzRegionId();
-            const { cart: newCart } = await sdk.store.cart.create({ region_id: regionId });
-            cartIdRef.current = newCart.id;
-            localStorage.setItem(CART_ID_KEY, newCart.id);
-            setCart(newCart);
-          } catch { /* will create on addItem */ }
-        }
-      } else {
-        try {
-          const regionId = await getNzRegionId();
-          const { cart: newCart } = await sdk.store.cart.create({ region_id: regionId });
-          cartIdRef.current = newCart.id;
-          localStorage.setItem(CART_ID_KEY, newCart.id);
-          setCart(newCart);
-        } catch { /* will create on addItem */ }
-      }
-    };
-    loadCart();
-  }, []);
+  const value: CartContextType = {
+    items,
+    addItem,
+    removeItem,
+    updateQuantity,
+    clearCart,
+    refreshCart,
+    totals,
+    total,
+    itemCount,
+    loading,
+    error,
+    lastAddedItem,
+    clearLastAddedItem,
+  };
 
-  // Memoized derived values
-  const items: CartItem[] = useMemo(() => (cart?.items || []).map((item) => ({
-    productId: item.product_id || '',
-    variantId: item.variant_id || '',
-    name: item.title || '',
-    price: item.unit_price || 0,
-    quantity: item.quantity,
-    image: item.thumbnail || undefined,
-  })), [cart]);
-
-  const total = useMemo(() => cart?.total || 0, [cart]);
-  const itemCount = useMemo(() => (cart?.items || []).reduce((sum, i) => sum + i.quantity, 0), [cart]);
-
-  // ADD ITEM — optimistic update + server reconcile
-  const addItem = useCallback(async (item: CartItem) => {
-    setError(null);
-    try {
-      let cartId = getCartId();
-
-      // If no cart exists, create one first
-      if (!cartId) {
-        const regionId = await getNzRegionId();
-        const { cart: newCart } = await sdk.store.cart.create({ region_id: regionId });
-        cartId = newCart.id;
-        cartIdRef.current = cartId;
-        localStorage.setItem(CART_ID_KEY, cartId);
-        setCart(newCart);
-
-        // Fire-and-forget: sync user
-        api.post('/customer/medusa-sync').then((res) => {
-          const cid = res.data?.data?.medusaCustomerId;
-          if (cid) sdk.store.cart.update(cartId!, { customer_id: cid } as any).catch(() => {});
-        }).catch(() => {});
-      }
-
-      // OPTIMISTIC: immediately add item to local cart so badge + drawer update instantly
-      // Uses functional updater to handle React batching (prev may be null or stale)
-      setCart(prev => {
-        const base = prev || { items: [], total: 0 } as unknown as StoreCart;
-        const existing = (base.items || []).find(i => i.variant_id === item.variantId);
-        const newItems = existing
-          ? (base.items || []).map(i =>
-              i.variant_id === item.variantId ? { ...i, quantity: i.quantity + item.quantity } : i
-            )
-          : [...(base.items || []), {
-              id: `optimistic_${item.variantId}`,
-              variant_id: item.variantId,
-              product_id: item.productId,
-              title: item.name,
-              unit_price: item.price,
-              quantity: item.quantity,
-              thumbnail: item.image || null,
-            } as any];
-        return { ...base, items: newItems, total: (base.total || 0) + item.price * item.quantity } as StoreCart;
-      });
-
-      // Show toast
-      setLastAddedItem({
-        name: item.name,
-        price: item.price,
-        quantity: item.quantity,
-        image: item.image,
-        timestamp: Date.now(),
-      });
-
-      // Reconcile with server truth
-      const { cart: updated } = await sdk.store.cart.createLineItem(cartId!, {
-        variant_id: item.variantId,
-        quantity: item.quantity,
-      });
-      setCart(updated);
-    } catch (err: unknown) {
-      setError((err as Error)?.message || 'Failed to add item to cart');
-      await refreshCart();
-    }
-  }, [getCartId, refreshCart]);
-
-  // REMOVE ITEM — optimistic + refetch to reconcile
-  const removeItem = useCallback(async (variantId: string) => {
-    const id = getCartId();
-    if (!id) return;
-    setError(null);
-
-    const previousCart = cart;
-    setCart(prev => {
-      if (!prev) return prev;
-      return { ...prev, items: (prev.items || []).filter(i => i.variant_id !== variantId) } as StoreCart;
-    });
-
-    try {
-      setLoading(true);
-      const lineItem = previousCart?.items?.find((i) => i.variant_id === variantId);
-      if (lineItem) {
-        await sdk.store.cart.deleteLineItem(id, lineItem.id);
-        await refreshCart();
-      }
-    } catch (err: unknown) {
-      setError((err as Error)?.message || 'Failed to remove item');
-      setCart(previousCart);
-    } finally {
-      setLoading(false);
-    }
-  }, [cart, refreshCart]);
-
-  // UPDATE QUANTITY — optimistic + use mutation response
-  const updateQuantity = useCallback(async (variantId: string, quantity: number) => {
-    if (quantity <= 0) { removeItem(variantId); return; }
-    const id = getCartId();
-    if (!id) return;
-    setError(null);
-
-    const previousCart = cart;
-    setCart(prev => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        items: (prev.items || []).map(i =>
-          i.variant_id === variantId ? { ...i, quantity } : i
-        ),
-      } as StoreCart;
-    });
-
-    try {
-      setLoading(true);
-      const lineItem = previousCart?.items?.find((i) => i.variant_id === variantId);
-      if (lineItem) {
-        const { cart: updated } = await sdk.store.cart.updateLineItem(id, lineItem.id, { quantity });
-        setCart(updated);
-      }
-    } catch (err: unknown) {
-      setError((err as Error)?.message || 'Failed to update quantity');
-      setCart(previousCart);
-    } finally {
-      setLoading(false);
-    }
-  }, [cart, removeItem]);
-
-  const clearCart = useCallback(async () => {
-    setCart(null);
-    cartIdRef.current = null;
-    localStorage.removeItem(CART_ID_KEY);
-  }, []);
-
-  const value = useMemo(() => ({
-    items, addItem, removeItem, updateQuantity, clearCart, refreshCart, total, itemCount, cart, loading, error, lastAddedItem, clearLastAddedItem,
-  }), [items, addItem, removeItem, updateQuantity, clearCart, refreshCart, total, itemCount, cart, loading, error, lastAddedItem, clearLastAddedItem]);
-
-  return (
-    <CartContext.Provider value={value}>
-      {children}
-    </CartContext.Provider>
-  );
+  return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }
 
-export function useCart() {
+export function useCart(): CartContextType {
   const ctx = useContext(CartContext);
   if (!ctx) throw new Error('useCart must be used within CartProvider');
   return ctx;
