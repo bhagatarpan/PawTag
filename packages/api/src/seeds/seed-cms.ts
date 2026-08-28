@@ -131,21 +131,63 @@ async function run() {
         { key: 'systemLog.sampling.error', value: '100', displayValue: 'Error Sampling %', category: 'systemLog', description: 'Percentage of error logs to store (0-100). 100 = store all.' },
         { key: 'systemLog.sampling.fatal', value: '100', displayValue: 'Fatal Sampling %', category: 'systemLog', description: 'Percentage of fatal logs to store (0-100). 100 = store all.' },
         { key: 'systemLog.retentionDays', value: '30', displayValue: 'Log Retention (days)', category: 'systemLog', description: 'Number of days to keep system logs before automatic deletion.' },
-        // Commerce Settings (PawTag-native)
-        { key: 'commerce.payment.provider', value: 'stripe', displayValue: 'Payment Provider', category: 'commerce', description: 'Payment provider identifier (stripe)' },
+        // Commerce Settings (PawTag-native) — All 35 settings from config.ts
+        // Payment
+        { key: 'commerce.payment.provider', value: 'stripe', displayValue: 'Payment Provider', category: 'commerce', description: 'Payment provider identifier' },
+        { key: 'commerce.payment.currency', value: 'NZD', displayValue: 'Currency', category: 'commerce', description: 'Default currency code' },
         { key: 'commerce.payment.testMode', value: 'true', displayValue: 'Test Mode', category: 'commerce', description: 'Enable demo/test payment mode' },
-        { key: 'commerce.shipping.freeEnabled', value: 'true', displayValue: 'Free Shipping', category: 'commerce', description: 'Enable free NZ-wide shipping' },
-        { key: 'commerce.tax.rate', value: '0.15', displayValue: 'Tax Rate', category: 'commerce', description: 'NZ GST rate (0.15 = 15%)' },
+        // Shipping
+        { key: 'commerce.shipping.enabled', value: 'true', displayValue: 'Shipping Enabled', category: 'commerce', description: 'Enable shipping calculation' },
+        { key: 'commerce.shipping.provider', value: 'nz-shipping', displayValue: 'Shipping Provider', category: 'commerce', description: 'Shipping provider identifier' },
+        { key: 'commerce.shipping.freeEnabled', value: 'true', displayValue: 'Free Shipping', category: 'commerce', description: 'Enable free shipping' },
+        { key: 'commerce.shipping.freeThreshold', value: '0', displayValue: 'Free Shipping Threshold', category: 'commerce', description: 'Minimum order for free shipping (0 = always free)' },
+        { key: 'commerce.shipping.flatRate', value: '0', displayValue: 'Flat Rate Shipping', category: 'commerce', description: 'Flat rate shipping cost (0 = free)' },
+        { key: 'commerce.shipping.taxEnabled', value: 'false', displayValue: 'Tax on Shipping', category: 'commerce', description: 'Apply tax to shipping' },
+        // Tax
+        { key: 'commerce.tax.enabled', value: 'true', displayValue: 'Tax Enabled', category: 'commerce', description: 'Enable tax calculation' },
+        { key: 'commerce.tax.provider', value: 'nz-gst', displayValue: 'Tax Provider', category: 'commerce', description: 'Tax provider identifier' },
+        { key: 'commerce.tax.rate', value: '0.15', displayValue: 'Tax Rate', category: 'commerce', description: 'Tax rate (0.15 = 15% GST)' },
+        { key: 'commerce.tax.label', value: 'GST', displayValue: 'Tax Label', category: 'commerce', description: 'Tax label for display' },
         { key: 'commerce.tax.inclusive', value: 'true', displayValue: 'Tax Inclusive', category: 'commerce', description: 'Prices include tax' },
+        // Inventory
         { key: 'commerce.inventory.enabled', value: 'true', displayValue: 'Inventory Tracking', category: 'commerce', description: 'Enable inventory tracking' },
-        { key: 'commerce.inventory.lowStockThreshold', value: '10', displayValue: 'Low Stock Threshold', category: 'commerce', description: 'Low stock alert level' },
-        { key: 'commerce.checkout.pendingOrderTtlMinutes', value: '30', displayValue: 'Pending Order TTL (min)', category: 'commerce', description: 'How long pending orders are held' },
-        { key: 'commerce.refunds.enabled', value: 'true', displayValue: 'Refunds Enabled', category: 'commerce', description: 'Allow refunds' },
-        { key: 'commerce.refunds.maxDaysAfterPurchase', value: '60', displayValue: 'Refund Window (days)', category: 'commerce', description: 'Maximum days after purchase for refund' },
+        { key: 'commerce.inventory.lowStockThreshold', value: '10', displayValue: 'Low Stock Threshold', category: 'commerce', description: 'Low stock alert threshold' },
+        { key: 'commerce.inventory.outOfStockThreshold', value: '0', displayValue: 'Out of Stock Threshold', category: 'commerce', description: 'Out of stock threshold' },
+        { key: 'commerce.inventory.defaultPolicy', value: 'deny', displayValue: 'Default Stock Policy', category: 'commerce', description: 'Default stock policy (deny or allow)' },
+        { key: 'commerce.inventory.reservationTtlMinutes', value: '30', displayValue: 'Reservation TTL (min)', category: 'commerce', description: 'How long to hold stock during checkout' },
+        // Checkout
+        { key: 'commerce.checkout.guestEnabled', value: 'false', displayValue: 'Guest Checkout', category: 'commerce', description: 'Allow guest checkout' },
+        { key: 'commerce.checkout.verificationRequired', value: 'true', displayValue: 'Verification Required', category: 'commerce', description: 'Require email+phone verification' },
+        { key: 'commerce.checkout.termsRequired', value: 'true', displayValue: 'Terms Required', category: 'commerce', description: 'Require terms acceptance' },
+        { key: 'commerce.checkout.pendingOrderTtlMinutes', value: '30', displayValue: 'Pending Order TTL (min)', category: 'commerce', description: 'How long a pending order is held' },
+        // Orders
+        { key: 'commerce.orders.autoCancelMinutes', value: '60', displayValue: 'Auto-Cancel (min)', category: 'commerce', description: 'Auto-cancel unpaid orders after minutes' },
+        { key: 'commerce.orders.numberPrefix', value: 'PT', displayValue: 'Order Number Prefix', category: 'commerce', description: 'Order number prefix' },
+        { key: 'commerce.orders.numberLength', value: '6', displayValue: 'Order Number Length', category: 'commerce', description: 'Order number length after prefix' },
+        // Subscriptions
         { key: 'commerce.subscriptions.annualPrice', value: '0.99', displayValue: 'Annual Subscription Price', category: 'commerce', description: 'Annual subscription price (NZD)' },
         { key: 'commerce.subscriptions.monthlyPrice', value: '1.99', displayValue: 'Monthly Subscription Price', category: 'commerce', description: 'Monthly subscription price (NZD)' },
+        { key: 'commerce.subscriptions.freePeriodMonths', value: '12', displayValue: 'Free Period (months)', category: 'commerce', description: 'Free period in months' },
+        { key: 'commerce.subscriptions.gracePeriodWeeks', value: '4', displayValue: 'Grace Period (weeks)', category: 'commerce', description: 'Grace period in weeks' },
+        // Refunds
+        { key: 'commerce.refunds.enabled', value: 'true', displayValue: 'Refunds Enabled', category: 'commerce', description: 'Allow refunds' },
+        { key: 'commerce.refunds.maxDaysAfterPurchase', value: '60', displayValue: 'Refund Window (days)', category: 'commerce', description: 'Maximum days after purchase for refund' },
+        { key: 'commerce.refunds.partialEnabled', value: 'true', displayValue: 'Partial Refunds', category: 'commerce', description: 'Allow partial refunds' },
+        // Promotions
+        { key: 'commerce.promotions.enabled', value: 'true', displayValue: 'Promotions Enabled', category: 'commerce', description: 'Enable discount codes' },
+        { key: 'commerce.promotions.maxUsesPerCode', value: '1000', displayValue: 'Max Uses Per Code', category: 'commerce', description: 'Maximum uses per discount code' },
+        { key: 'commerce.promotions.bundle2Items', value: '10', displayValue: 'Bundle Discount (2 items)', category: 'commerce', description: 'Bundle discount % for 2 items' },
+        { key: 'commerce.promotions.bundle3PlusItems', value: '15', displayValue: 'Bundle Discount (3+ items)', category: 'commerce', description: 'Bundle discount % for 3+ items' },
+        // Notifications
+        { key: 'commerce.notifications.orderConfirmation', value: 'true', displayValue: 'Order Confirmation Email', category: 'commerce', description: 'Send order confirmation email' },
+        { key: 'commerce.notifications.invoiceEmail', value: 'true', displayValue: 'Invoice Email', category: 'commerce', description: 'Send invoice email' },
+        { key: 'commerce.notifications.adminAlert', value: 'true', displayValue: 'Admin Alert', category: 'commerce', description: 'Send admin alert for new orders' },
+        { key: 'commerce.notifications.shippingUpdate', value: 'true', displayValue: 'Shipping Update', category: 'commerce', description: 'Send shipping update email' },
+        // Feature Flags
         { key: 'commerce.feature.stripeSignatureVerification', value: 'true', displayValue: 'Stripe Signature Verification', category: 'commerce', description: 'Verify Stripe webhook signatures' },
         { key: 'commerce.feature.orphanPaymentDetection', value: 'true', displayValue: 'Orphan Payment Detection', category: 'commerce', description: 'Detect orphaned payments' },
+        { key: 'commerce.feature.priceValidation', value: 'true', displayValue: 'Price Validation', category: 'commerce', description: 'Server-side price validation' },
+        // Sync (retained for polling)
         { key: 'sync.polling.enabled', value: 'true', displayValue: 'Customer Polling Enabled', category: 'sync', description: 'Enable automatic order list polling on the customer Orders page' },
         { key: 'sync.polling.intervalSeconds', value: '30', displayValue: 'Customer Polling Interval (seconds)', category: 'sync', description: 'How often the customer Orders page polls for updates' },
       ];

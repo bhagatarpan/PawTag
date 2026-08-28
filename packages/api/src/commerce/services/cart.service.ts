@@ -21,11 +21,12 @@
  * ```
  */
 
-import { Cart, Product, type ICartDocument } from '@pawtag/db';
+import { Cart, Product, PromoCode, type ICartDocument } from '@pawtag/db';
 import { NotFoundError } from '../../lib/app-errors';
 import { InvalidCartError, InsufficientStockError, ProductUnavailableError } from '../errors';
 import { pricingService } from './pricing.service';
 import { inventoryService } from './inventory.service';
+import { nzGstProvider } from '../providers/simple-gst';
 import { getNumberSetting } from '../config';
 import logger from '../../lib/logger';
 
@@ -264,11 +265,37 @@ export class CartService {
   async applyPromoCode(userId: string, code: string): Promise<ICartDocument> {
     const cart = await this.getOrCreate(userId);
 
-    // TODO: Validate promo code against database
-    // For now, just store the code
-    cart.promoCode = code;
+    // Validate promo code against database
+    const promoCode = await PromoCode.findOne({ code: code.toUpperCase(), isActive: true }) as any;
+    if (!promoCode) {
+      throw new InvalidCartError('Invalid promo code');
+    }
+
+    if (!promoCode.isValid()) {
+      throw new InvalidCartError('Promo code is expired or has reached its usage limit');
+    }
+
+    // Calculate subtotal for discount calculation
+    const subtotal = cart.items.reduce(
+      (sum, item) => sum + (item.unitPrice + item.customizationTotal) * item.quantity,
+      0,
+    );
+
+    // Check minimum order amount
+    if (promoCode.minOrderAmount && subtotal < promoCode.minOrderAmount) {
+      throw new InvalidCartError(`Minimum order amount of $${promoCode.minOrderAmount} required`);
+    }
+
+    // Calculate discount
+    const discount = promoCode.calculateDiscount(subtotal);
+
+    cart.promoCode = code.toUpperCase();
+    cart.promoDiscount = discount;
     cart.lastAccessedAt = new Date();
     await cart.save();
+
+    // Increment usage count (fire-and-forget)
+    PromoCode.updateOne({ _id: promoCode._id }, { $inc: { usageCount: 1 } }).catch(() => {});
 
     return cart;
   }
@@ -345,9 +372,22 @@ export class CartService {
     const subtotal = items.reduce((sum, item) => sum + item.lineTotal, 0);
     const discount = cart.promoDiscount ?? 0;
     const shipping = cart.shippingCost ?? 0;
-    const taxRate = 0.15; // TODO: Get from tax provider
-    const tax = (subtotal - discount + shipping) * taxRate;
-    const total = subtotal - discount + shipping + tax;
+
+    // Use tax provider for accurate tax calculation
+    const taxRate = await nzGstProvider.getRate();
+    const taxInclusive = await nzGstProvider.isInclusive();
+
+    // If tax-inclusive, extract tax from the price (tax is already included)
+    // If tax-exclusive, add tax on top
+    let tax: number;
+    if (taxInclusive) {
+      // Tax is included in the price — extract the tax component
+      tax = (subtotal - discount + shipping) * (taxRate / (1 + taxRate));
+    } else {
+      // Tax is added on top of the price
+      tax = (subtotal - discount + shipping) * taxRate;
+    }
+    const total = subtotal - discount + shipping + (taxInclusive ? 0 : tax);
 
     return {
       items,

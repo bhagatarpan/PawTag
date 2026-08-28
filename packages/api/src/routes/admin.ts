@@ -2502,9 +2502,12 @@ router.post('/orders/:id/cancel', requirePermission('order.update'), async (req:
     order.cancellationReason = reason;
     await order.save();
 
-    // Restore stock (no-op — inventory managed by PawTag Commerce)
-    const { restoreOrderStock } = await import('../services/inventory.service');
-    await restoreOrderStock(order.items);
+    // Restore stock — release reservations made during checkout
+    const { inventoryService } = await import('../commerce/services/inventory.service');
+    await inventoryService.releaseForOrder(String(order._id), order.items.map((item: any) => ({
+      productId: String(item.productId),
+      quantity: item.quantity,
+    })));
 
     await auditAdminEvent(req, {
       action: 'cancel_order',

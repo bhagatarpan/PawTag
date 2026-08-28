@@ -40,6 +40,7 @@ import {
   ChevronDown,
   ExternalLink,
   Zap,
+  Package,
 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { useTheme } from '../hooks/useTheme';
@@ -78,6 +79,8 @@ const sections: SidebarSection[] = [
     icon: ShoppingBag,
     links: [
       { to: '/orders', label: 'Orders', icon: FileText, permission: 'order.read' },
+      { to: '/invoices', label: 'Invoices', icon: FileText, permission: 'order.read' },
+      { to: '/inventory', label: 'Inventory', icon: Package, permission: 'inventory.read' },
       { to: '/products', label: 'Products', icon: ShoppingBag, permission: 'product.read' },
       { to: '/pets', label: 'Pets', icon: PawPrint, permission: 'pet.read' },
       { to: '/subscriptions', label: 'Subscriptions', icon: CreditCard, permission: 'subscription.read' },

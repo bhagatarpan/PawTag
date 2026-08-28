@@ -48,3 +48,4 @@ export { SystemLog, type ISystemLogDocument, type LogLevel, type LogCategory, cr
 export { WebhookEvent, type IWebhookEventDocument } from './models/WebhookEvent';
 export { StockMovement, type IStockMovementDocument, type MovementType } from './models/StockMovement';
 export { PendingOrder, type IPendingOrderDocument, type PendingOrderStatus } from './models/PendingOrder';
+export { PromoCode, type IPromoCodeDocument } from './models/PromoCode';

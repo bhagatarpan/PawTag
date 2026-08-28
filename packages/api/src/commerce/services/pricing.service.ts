@@ -205,11 +205,12 @@ export class PricingService {
   async getBundleDiscount(itemCount: number): Promise<number> {
     if (itemCount < 2) return 0;
 
-    const twoItemDiscount = await getNumberSetting('commerce.subscriptions.annualPrice' as any);
-    // Bundle discounts are configured in CMS settings
-    // 2 items: 10% off, 3+ items: 15% off
-    if (itemCount >= 3) return 15;
-    if (itemCount >= 2) return 10;
+    // Read bundle discount percentages from CMS settings
+    const bundle2Discount = await getNumberSetting('commerce.promotions.bundle2Items');
+    const bundle3Discount = await getNumberSetting('commerce.promotions.bundle3PlusItems');
+
+    if (itemCount >= 3) return bundle3Discount;
+    if (itemCount >= 2) return bundle2Discount;
     return 0;
   }
 }

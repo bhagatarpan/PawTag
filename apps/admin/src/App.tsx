@@ -48,6 +48,8 @@ import SiteAvailabilitySettings from './pages/SiteAvailabilitySettings';
 import WebhookSettings from './pages/WebhookSettings';
 import AddressAutocompleteSettings from './pages/AddressAutocompleteSettings';
 import CommerceSettings from './pages/CommerceSettings';
+import Invoices from './pages/Invoices';
+import Inventory from './pages/Inventory';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
@@ -197,6 +199,8 @@ export default function App() {
       <Route path="/webhooks" element={<ProtectedRoute><WebhookSettings /></ProtectedRoute>} />
       <Route path="/address-autocomplete" element={<ProtectedRoute><AddressAutocompleteSettings /></ProtectedRoute>} />
       <Route path="/commerce-settings" element={<ProtectedRoute><CommerceSettings /></ProtectedRoute>} />
+      <Route path="/invoices" element={<ProtectedRoute><Invoices /></ProtectedRoute>} />
+      <Route path="/inventory" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

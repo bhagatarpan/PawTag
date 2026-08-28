@@ -67,7 +67,7 @@ import cmsPublicV2Routes from './routes/cms-public-v2';
 import customerSubscriptionRoutes from './routes/customer-subscriptions';
 import adminSubscriptionRoutes from './routes/admin-subscriptions';
 import adminAnalyticsRoutes from './routes/admin-analytics';
-import webhookRoutes from './routes/webhooks';
+
 import invoiceAccessRoutes from './routes/invoice-access';
 import referralRoutes from './routes/referrals';
 import checkoutOtpRoutes from './routes/checkout-otp';
@@ -232,7 +232,6 @@ app.use('/api/customer/subscriptions', customerSubscriptionRoutes);
 app.use('/api/admin/subscriptions', adminSubscriptionRoutes);
 app.use('/api/admin/analytics', adminAnalyticsRoutes);
 app.use('/api', invoiceAccessRoutes);
-app.use('/api/webhooks', webhookRoutes);
 app.use('/api/finder', finderRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api', referralRoutes);
@@ -287,6 +286,10 @@ async function start() {
     // Start orphan payment detection job
     const { startOrphanPaymentJob } = await import('./jobs/orphanPaymentDetection');
     startOrphanPaymentJob();
+
+    // Start order auto-cancel job
+    const { startOrderAutoCancelJob } = await import('./jobs/orderAutoCancel');
+    startOrderAutoCancelJob();
 
     const server = app.listen(config.port, () => {
       logger.info(`PawTag API running on port ${config.port}`);

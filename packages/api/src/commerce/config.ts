@@ -88,6 +88,8 @@ export const COMMERCE_SETTINGS = {
   // ─── Promotions ───────────────────────────────────────────
   'commerce.promotions.enabled': { default: 'true', description: 'Enable discount codes' },
   'commerce.promotions.maxUsesPerCode': { default: '1000', description: 'Maximum uses per discount code' },
+  'commerce.promotions.bundle2Items': { default: '10', description: 'Bundle discount % for 2 items' },
+  'commerce.promotions.bundle3PlusItems': { default: '15', description: 'Bundle discount % for 3+ items' },
 
   // ─── Notifications ────────────────────────────────────────
   'commerce.notifications.orderConfirmation': { default: 'true', description: 'Send order confirmation email' },
