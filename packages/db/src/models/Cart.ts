@@ -2,7 +2,7 @@
  * @module Cart Model
  * @description MongoDB model for PawTag shopping carts.
  *
- * This is the PawTag-native cart, replacing Medusa's cart.
+ * This is the PawTag-native cart for shopping cart management.
  * Each user has one active cart. Cart items store product snapshots
  * for price validation and display.
  *

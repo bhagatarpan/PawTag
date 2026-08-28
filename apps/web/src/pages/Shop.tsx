@@ -2,8 +2,7 @@
  * @module Shop Page
  * @description Public shop page displaying PawTag products.
  *
- * Fetches products from the PawTag products API (GET /api/products)
- * instead of the Medusa SDK. Displays product cards with pricing,
+ * Fetches products from the PawTag products API (GET /api/products).
  * stock status, and comparison table.
  *
  * Usage:

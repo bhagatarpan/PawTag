@@ -698,7 +698,7 @@ router.post('/:tagId/share-location', finderLocationLimiter, requireCaptcha, asy
  *       500:
  *         description: Failed to fetch products
  */
-// Product routes removed — products now served by Medusa Store API
+// Product routes now served by PawTag products API
 // Frontend uses sdk.store.product.list() and sdk.store.product.retrieve()
 
 /**

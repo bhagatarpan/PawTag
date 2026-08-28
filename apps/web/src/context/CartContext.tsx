@@ -2,8 +2,7 @@
  * @module CartContext
  * @description React context for PawTag shopping cart.
  *
- * Replaces the Medusa SDK-based cart with PawTag-native cart API.
- * All cart operations go through POST /api/cart/* endpoints.
+ * PawTag-native shopping cart. All cart operations go through POST /api/cart/* endpoints.
  *
  * Features:
  * - Add/remove/update items

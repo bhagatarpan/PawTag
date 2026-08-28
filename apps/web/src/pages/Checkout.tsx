@@ -429,7 +429,7 @@ export default function Checkout() {
                 <div className="flex items-center gap-4 text-xs text-gray-400 mb-4">
                   <span className="flex items-center gap-1"><Lock className="h-3 w-3" /> SSL Encrypted</span>
                   <span className="flex items-center gap-1"><Shield className="h-3 w-3" /> PCI DSS Compliant</span>
-                  <span className="flex items-center gap-1">Powered by medusa</span>
+                  <span className="flex items-center gap-1">Powered by PawTag</span>
                 </div>
                 <button onClick={() => goToStep('checkout')} className="w-full py-3 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 transition-all flex items-center justify-center gap-2">
                   Proceed to Checkout <ChevronRight className="h-4 w-4" />

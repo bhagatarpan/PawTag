@@ -254,7 +254,7 @@ export default function WebhookSettings() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Webhooks & Sync</h1>
-          <p className="text-sm text-gray-500 mt-1">Monitor and manage the 3-layer PawTag ↔ Medusa sync architecture</p>
+          <p className="text-sm text-gray-500 mt-1">Monitor and manage Stripe webhook events and payment processing</p>
         </div>
         <button
           onClick={() => { setLoading(true); fetchStatus(); }}

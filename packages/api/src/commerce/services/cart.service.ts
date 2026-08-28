@@ -2,7 +2,7 @@
  * @module CartService
  * @description PawTag-native shopping cart service.
  *
- * Replaces Medusa's cart with PawTag's own cart management.
+ * PawTag-native shopping cart.
  * All price calculations are server-side — never trust client-submitted prices.
  *
  * Features:

@@ -799,7 +799,7 @@ router.get('/pets/:id/locations', requirePermission('pet.read'), async (req: Aut
   }
 });
 
-// Cart routes removed — frontend now uses Medusa SDK (sdk.store.cart.*)
+// Cart routes moved to /api/cart/* endpoints (PawTag Commerce)
 
 // --- Orders ---
 /**
@@ -994,8 +994,7 @@ router.post('/orders/place', requirePermission('order.read'), async (req: AuthRe
 });
 
 // NOTE: POST /orders and POST /orders/:orderNumber/confirm-payment have been removed.
-// Checkout now uses the Medusa SDK flow: sdk.store.cart.complete() → order.placed webhook.
-// The Medusa webhook handler creates PawTag orders, invoices, referrals, and notifications.
+// Checkout now uses PawTag Commerce API: POST /checkout/payment-intent → POST /checkout/confirm.
 
 // --- Notifications ---
 /**

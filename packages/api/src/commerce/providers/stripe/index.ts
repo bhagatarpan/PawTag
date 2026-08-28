@@ -2,7 +2,7 @@
  * @module Stripe Payment Provider
  * @description Direct Stripe payment adapter for PawTag Commerce.
  *
- * Replaces Medusa's payment module with direct Stripe API calls.
+ * Direct Stripe payment adapter for PawTag Commerce.
  * Handles payment intent creation, retrieval, refunds, and webhook verification.
  *
  * This provider is stateless — all state is stored in MongoDB via the Order
@@ -45,7 +45,7 @@ const STATUS_MAP: Record<string, PaymentIntentStatus> = {
 /**
  * Stripe payment provider for PawTag Commerce.
  *
- * Uses the Stripe Node SDK directly (not through Medusa).
+ * Uses the Stripe Node SDK directly.
  */
 export class StripePaymentProvider implements IPaymentProvider {
   readonly id = 'stripe';

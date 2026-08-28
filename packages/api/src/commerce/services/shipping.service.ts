@@ -3,7 +3,7 @@
  * @description PawTag-native shipping service.
  *
  * Handles shipping rate calculation, method selection, and shipment tracking.
- * Replaces Medusa's shipping module.
+ * PawTag-native shipping service.
  *
  * Usage:
  * ```typescript

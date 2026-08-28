@@ -2,10 +2,7 @@
  * @module Order Creation Service
  * @description PawTag-native order creation service.
  *
- * Creates orders from confirmed payments. Replaces the Medusa-based
- * `createOrderFromMedusa()` with a direct, simpler flow.
- *
- * Flow:
+ * Creates orders from confirmed payments. Handles the complete flow:
  * 1. Receive order data from checkout service (already validated)
  * 2. Generate atomic order number
  * 3. Create Order record
