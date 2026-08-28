@@ -49,3 +49,9 @@ export { WebhookEvent, type IWebhookEventDocument } from './models/WebhookEvent'
 export { StockMovement, type IStockMovementDocument, type MovementType } from './models/StockMovement';
 export { PendingOrder, type IPendingOrderDocument, type PendingOrderStatus } from './models/PendingOrder';
 export { PromoCode, type IPromoCodeDocument } from './models/PromoCode';
+export { Category, type ICategoryDocument } from './models/Category';
+export { Collection, type ICollectionDocument } from './models/Collection';
+export { Brand, type IBrandDocument } from './models/Brand';
+export { ShippingMethod, type IShippingMethodDocument } from './models/ShippingMethod';
+export { Fulfilment, type IFulfilmentDocument } from './models/Fulfilment';
+export { Return, type IReturnDocument } from './models/Return';
