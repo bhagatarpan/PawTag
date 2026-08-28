@@ -24,4 +24,7 @@ export type { CheckoutPaymentIntent, CheckoutResult } from './checkout.service';
 
 export { ShippingService, shippingService } from './shipping.service';
 
+export { ShipmentService, shipmentService } from './shipment.service';
+export type { CreateShipmentParams, ShipmentWithTracking } from './shipment.service';
+
 export { RefundService, refundService } from './refund.service';

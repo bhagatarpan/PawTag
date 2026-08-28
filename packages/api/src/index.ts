@@ -93,6 +93,7 @@ import adminBrandRoutes from './routes/admin-brands';
 import adminShippingRoutes from './routes/admin-shipping';
 import adminFulfilmentRoutes from './routes/admin-fulfilments';
 import adminReturnRoutes from './routes/admin-returns';
+import adminShipmentRoutes from './routes/admin-shipments';
 import stripeWebhookRoutes from './routes/stripe-webhooks';
 
 import { siteAvailabilityMiddleware } from './middleware/site-availability';
@@ -266,6 +267,7 @@ app.use('/api/admin/commerce/brands', adminBrandRoutes);
 app.use('/api/admin/commerce/shipping-methods', adminShippingRoutes);
 app.use('/api/admin/commerce/fulfilments', adminFulfilmentRoutes);
 app.use('/api/admin/commerce/returns', adminReturnRoutes);
+app.use('/api/admin/commerce/shipments', adminShipmentRoutes);
 
 // Stripe webhooks need raw body for signature verification
 app.use('/api/webhooks/stripe', express.raw({ type: 'application/json' }), stripeWebhookRoutes);
@@ -302,6 +304,10 @@ async function start() {
     // Start order auto-cancel job
     const { startOrderAutoCancelJob } = await import('./jobs/orderAutoCancel');
     startOrderAutoCancelJob();
+
+    // Start shipping tracking poll job
+    const { startTrackingPollJob } = await import('./jobs/shippingTrackingPoll');
+    startTrackingPollJob();
 
     const server = app.listen(config.port, () => {
       logger.info(`PawTag API running on port ${config.port}`);

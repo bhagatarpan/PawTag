@@ -43,11 +43,17 @@ export const COMMERCE_SETTINGS = {
 
   // ─── Shipping ─────────────────────────────────────────────
   'commerce.shipping.enabled': { default: 'true', description: 'Enable shipping calculation' },
-  'commerce.shipping.provider': { default: 'flat-rate', description: 'Shipping provider identifier' },
+  'commerce.shipping.provider': { default: 'nz-shipping', description: 'Shipping provider identifier' },
   'commerce.shipping.freeEnabled': { default: 'true', description: 'Enable free shipping' },
   'commerce.shipping.freeThreshold': { default: '0', description: 'Minimum order amount for free shipping (0 = always free)' },
   'commerce.shipping.flatRate': { default: '0', description: 'Flat rate shipping cost (0 = free)' },
   'commerce.shipping.taxEnabled': { default: 'false', description: 'Apply tax to shipping' },
+  'commerce.shipping.defaultCarrier': { default: 'nz-post', description: 'Default carrier identifier' },
+  'commerce.shipping.rateTypes': { default: 'free,flat_rate,weight_based,price_based', description: 'Available rate types (comma-separated)' },
+  'commerce.shipping.carriers': { default: 'nz-post,courierpost,aramex,dhl,fedex,ups', description: 'Available carriers (comma-separated)' },
+  'commerce.shipping.nzpostClientId': { default: '', description: 'NZ Post API client ID (leave empty for demo mode)' },
+  'commerce.shipping.nzpostClientSecret': { default: '', description: 'NZ Post API client secret' },
+  'commerce.shipping.nzpostLive': { default: 'false', description: 'Use NZ Post live API (false = sandbox)' },
 
   // ─── Tax ──────────────────────────────────────────────────
   'commerce.tax.enabled': { default: 'true', description: 'Enable tax calculation' },

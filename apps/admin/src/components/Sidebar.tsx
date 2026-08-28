@@ -152,6 +152,7 @@ const sections: SidebarSection[] = [
     links: [
       { to: '/shipping/methods', label: 'Methods', icon: Truck, permission: 'setting.read' },
       { to: '/shipping/rates', label: 'Rates', icon: BarChart3, permission: 'setting.read' },
+      { to: '/shipping/shipments', label: 'Shipments', icon: Truck, permission: 'order.read' },
     ],
   },
   {

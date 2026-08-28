@@ -55,3 +55,4 @@ export { Brand, type IBrandDocument } from './models/Brand';
 export { ShippingMethod, type IShippingMethodDocument } from './models/ShippingMethod';
 export { Fulfilment, type IFulfilmentDocument } from './models/Fulfilment';
 export { Return, type IReturnDocument } from './models/Return';
+export { Shipment, type IShipmentDocument, type ShipmentStatus, type IShipmentItem, type ITrackingEvent } from './models/Shipment';

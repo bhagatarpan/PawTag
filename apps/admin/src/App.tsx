@@ -52,6 +52,8 @@ import Invoices from './pages/Invoices';
 import Inventory from './pages/Inventory';
 import Categories from './pages/Categories';
 import ShippingMethods from './pages/ShippingMethods';
+import ShippingRates from './pages/ShippingRates';
+import Shipments from './pages/Shipments';
 import Fulfilment from './pages/Fulfilment';
 import Returns from './pages/Returns';
 import Payments from './pages/Payments';
@@ -223,7 +225,8 @@ export default function App() {
       <Route path="/payments" element={<ProtectedRoute><Payments /></ProtectedRoute>} />
       <Route path="/payments/refunds" element={<ProtectedRoute><Payments /></ProtectedRoute>} />
       <Route path="/shipping/methods" element={<ProtectedRoute><ShippingMethods /></ProtectedRoute>} />
-      <Route path="/shipping/rates" element={<ProtectedRoute><ShippingMethods /></ProtectedRoute>} />
+      <Route path="/shipping/rates" element={<ProtectedRoute><ShippingRates /></ProtectedRoute>} />
+      <Route path="/shipping/shipments" element={<ProtectedRoute><Shipments /></ProtectedRoute>} />
       <Route path="/fulfilment" element={<ProtectedRoute><Fulfilment /></ProtectedRoute>} />
       <Route path="/fulfilment/pending" element={<ProtectedRoute><Fulfilment /></ProtectedRoute>} />
       <Route path="/fulfilment/picking" element={<ProtectedRoute><Fulfilment /></ProtectedRoute>} />
