@@ -84,6 +84,7 @@ const sections: SidebarSection[] = [
       { to: '/subscriptions', label: 'Subscriptions', icon: CreditCard, permission: 'subscription.read' },
       { to: '/tags', label: 'Tags', icon: QrCode, permission: 'tag.read' },
       { to: '/users', label: 'Users', icon: Users, permission: 'user.read' },
+      { to: '/commerce-settings', label: 'Commerce Settings', icon: Settings, permission: 'setting.read' },
     ],
   },
   {

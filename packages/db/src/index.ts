@@ -4,7 +4,7 @@ export { User, type IUserDocument } from './models/User';
 export { Pet, type IPetDocument, generatePetId } from './models/Pet';
 export { Tag, type ITagDocument } from './models/Tag';
 export { VerificationToken, type IVerificationTokenDocument } from './models/VerificationToken';
-export { Product, type IProductDocument } from './models/Product';
+export { Product, type IProductDocument, type IProductVariant } from './models/Product';
 export { Cart, type ICartDocument } from './models/Cart';
 export { Order, type IOrderDocument, type OrderStatus } from './models/Order';
 export { LocationEvent, type ILocationEventDocument } from './models/LocationEvent';
@@ -46,3 +46,5 @@ export { default as CmsOnboarding, type ICmsOnboardingDocument, type ICmsOnboard
 export { default as EscalationRecord, type IEscalationRecord } from './models/EscalationRecord';
 export { SystemLog, type ISystemLogDocument, type LogLevel, type LogCategory, createSystemLogId } from './models/SystemLog';
 export { WebhookEvent, type IWebhookEventDocument } from './models/WebhookEvent';
+export { StockMovement, type IStockMovementDocument, type MovementType } from './models/StockMovement';
+export { PendingOrder, type IPendingOrderDocument, type PendingOrderStatus } from './models/PendingOrder';

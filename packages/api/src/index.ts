@@ -82,6 +82,15 @@ import { publicRouter as supportPublicRoutes, adminRouter as supportAdminRoutes 
 import adminWebhookRoutes from './routes/admin-webhooks';
 import addressAutocompleteRoutes from './routes/address-autocomplete';
 import healthRoutes from './routes/health';
+
+// --- PawTag Commerce Routes (Phase 0-11) ---
+import productRoutes from './routes/products';
+import cartRoutes from './routes/cart';
+import checkoutRoutes from './routes/checkout';
+import shippingRoutes from './routes/shipping';
+import adminCommerceRoutes from './routes/admin-commerce';
+import stripeWebhookRoutes from './routes/stripe-webhooks';
+
 import { siteAvailabilityMiddleware } from './middleware/site-availability';
 import { shutdownTracing } from './lib/tracing';
 import { flushMonitoring } from './lib/monitoring';
@@ -244,6 +253,16 @@ app.use('/api/admin/webhooks', adminWebhookRoutes);
 app.use('/api/public/system', systemStatusRoutes);
 app.use('/api/address', addressAutocompleteRoutes);
 
+// --- PawTag Commerce Routes ---
+app.use('/api/products', productRoutes);
+app.use('/api/cart', cartRoutes);
+app.use('/api/checkout', checkoutRoutes);
+app.use('/api/shipping', shippingRoutes);
+app.use('/api/admin/commerce', adminCommerceRoutes);
+
+// Stripe webhooks need raw body for signature verification
+app.use('/api/webhooks/stripe', express.raw({ type: 'application/json' }), stripeWebhookRoutes);
+
 // --- Error Handling ---
 app.use(notFoundHandler);
 if (process.env.SENTRY_DSN && process.env.NODE_ENV !== 'test') {
@@ -268,6 +287,10 @@ async function start() {
 
     // Start daily low stock check service
     startLowStockService();
+
+    // Start orphan payment detection job
+    const { startOrphanPaymentJob } = await import('./jobs/orphanPaymentDetection');
+    startOrphanPaymentJob();
 
     // Start webhook retry job
     const { startWebhookRetryJob } = await import('./jobs/webhookRetry');

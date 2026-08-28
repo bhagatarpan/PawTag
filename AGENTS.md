@@ -418,8 +418,8 @@ PawTag/
 │   ├── mobile/      → React Native (Expo) app - 14 screens, Maestro E2E tests
 │   └── medusa/      → MedusaJS v2 (PostgreSQL) - commerce backend, port 9000
 ├── packages/
-│   ├── api/         → Express backend (port 5000, 30+ route files, 21+ services)
-│   ├── db/          → MongoDB models & connection (45+ models)
+│   ├── api/         → Express backend (port 5000, 36+ route files, 28+ services)
+│   ├── db/          → MongoDB models & connection (47+ models)
 │   ├── shared/      → Shared TypeScript types, enums, constants
 │   └── ui/          → Shared React component library (13 components)
 ├── tests/           → 77+ test files (41 unit, 35 integration, 1 smoke, 2 regression)
@@ -427,6 +427,75 @@ PawTag/
 ├── docs/            → 15 documentation files
 └── scripts/         → Build and utility scripts
 ```
+
+### PawTag Commerce Module
+
+**PawTag owns its own commerce engine.** Products, pricing, cart, checkout, payments, shipping, inventory, and orders are managed by the PawTag Commerce module (`packages/api/src/commerce/`).
+
+MedusaJS is being phased out. The PawTag Commerce module replaces all Medusa functionality with PawTag-native implementations.
+
+```
+packages/api/src/commerce/
+├── index.ts                    # Module exports
+├── config.ts                   # CMS-driven commerce settings (35+ settings)
+├── errors.ts                   # Commerce-specific error types (11 types)
+├── audit.ts                    # Commerce audit logging helpers
+├── interfaces/                 # Provider interfaces
+│   ├── payment-provider.ts     # Payment provider contract
+│   ├── shipping-provider.ts    # Shipping provider contract
+│   ├── tax-provider.ts         # Tax calculation contract
+│   └── inventory-provider.ts   # Inventory management contract
+├── providers/                  # Provider implementations
+│   ├── stripe/                 # Direct Stripe payment adapter
+│   ├── nz-shipping/            # NZ domestic shipping (free/flat-rate)
+│   └── simple-gst/             # NZ GST (15% tax-inclusive)
+└── services/                   # Business logic services
+    ├── product.service.ts      # Product catalog CRUD + pricing
+    ├── inventory.service.ts    # Stock tracking, reservation, adjustment
+    ├── pricing.service.ts      # Server-side price calculations
+    ├── cart.service.ts         # Shopping cart management
+    ├── checkout.service.ts     # Checkout orchestration
+    ├── shipping.service.ts     # Shipping rates and shipment creation
+    └── refund.service.ts       # Full/partial refund processing
+```
+
+### Database Architecture
+
+PawTag uses **MongoDB** as its primary and only database:
+
+- **MongoDB Atlas** — All PawTag data (users, pets, tags, products, carts, orders, subscriptions, CMS, audit logs, settings)
+- **PostgreSQL (Neon)** — Legacy MedusaJS commerce engine (being phased out)
+
+### PawTag Checkout Flow
+
+```
+Frontend (Checkout.tsx)
+  → POST /checkout/payment-intent — Create Stripe PaymentIntent + PendingOrder
+  → stripe.confirmPayment() — Customer confirms payment
+  → POST /checkout/confirm — Validate payment, create Order + Invoice
+  → Send emails (non-blocking, parallel)
+  → Show confirmation page
+
+Safety nets:
+  → Orphan payment detection job (every 60s)
+  → Stripe webhook handler (payment_intent.succeeded)
+  → PendingOrder TTL (30min)
+```
+
+### Commerce API Routes
+
+| Route | Purpose |
+|-------|---------|
+| `GET /api/products` | Public product listing |
+| `GET/POST/PUT/DELETE /api/cart/*` | Authenticated cart management |
+| `POST /api/checkout/payment-intent` | Create payment intent |
+| `POST /api/checkout/confirm` | Confirm checkout |
+| `POST /api/webhooks/stripe` | Stripe webhook handler |
+| `GET/PUT /api/admin/commerce/settings` | Commerce settings management |
+
+### Commerce Settings (CMS-Driven)
+
+All business values stored in `settings` collection with `commerce.*` prefix. 35+ settings across: Payment, Shipping, Tax, Inventory, Checkout, Orders, Subscriptions, Refunds, Notifications, Feature Flags.
 
 ### Dual Database Architecture
 

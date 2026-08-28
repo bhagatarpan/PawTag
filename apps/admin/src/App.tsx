@@ -47,6 +47,7 @@ import SystemLogSettings from './pages/SystemLogSettings';
 import SiteAvailabilitySettings from './pages/SiteAvailabilitySettings';
 import WebhookSettings from './pages/WebhookSettings';
 import AddressAutocompleteSettings from './pages/AddressAutocompleteSettings';
+import CommerceSettings from './pages/CommerceSettings';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
@@ -195,6 +196,7 @@ export default function App() {
       <Route path="/site-availability" element={<ProtectedRoute><SiteAvailabilitySettings /></ProtectedRoute>} />
       <Route path="/webhooks" element={<ProtectedRoute><WebhookSettings /></ProtectedRoute>} />
       <Route path="/address-autocomplete" element={<ProtectedRoute><AddressAutocompleteSettings /></ProtectedRoute>} />
+      <Route path="/commerce-settings" element={<ProtectedRoute><CommerceSettings /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
