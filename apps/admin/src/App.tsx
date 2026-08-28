@@ -51,6 +51,8 @@ import CommerceSettings from './pages/CommerceSettings';
 import Invoices from './pages/Invoices';
 import Inventory from './pages/Inventory';
 import Categories from './pages/Categories';
+import Collections from './pages/Collections';
+import Brands from './pages/Brands';
 import ShippingMethods from './pages/ShippingMethods';
 import ShippingRates from './pages/ShippingRates';
 import Shipments from './pages/Shipments';
@@ -215,8 +217,8 @@ export default function App() {
       <Route path="/inventory/adjustments" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
       <Route path="/inventory/history" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
       <Route path="/categories" element={<ProtectedRoute><Categories /></ProtectedRoute>} />
-      <Route path="/collections" element={<ProtectedRoute><Categories /></ProtectedRoute>} />
-      <Route path="/brands" element={<ProtectedRoute><Categories /></ProtectedRoute>} />
+      <Route path="/collections" element={<ProtectedRoute><Collections /></ProtectedRoute>} />
+      <Route path="/brands" element={<ProtectedRoute><Brands /></ProtectedRoute>} />
       <Route path="/orders/pending" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
       <Route path="/orders/processing" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
       <Route path="/orders/shipped" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
