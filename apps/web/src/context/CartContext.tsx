@@ -178,9 +178,20 @@ export function CartProvider({ children }: { children: ReactNode }) {
       if (data?.cart) {
         setItems(data.cart.items || []);
         setTotals(data.totals || EMPTY_TOTALS);
+      } else {
+        // Server returned empty cart
+        setItems([]);
+        setTotals(EMPTY_TOTALS);
       }
     } catch (err: any) {
-      if (err?.response?.status !== 401) {
+      if (err?.response?.status === 401) {
+        // Token expired or invalid — fall back to guest cart
+        localStorage.removeItem('pawtag_token');
+        localStorage.removeItem('pawtag_refresh_token');
+        const guestItems = getGuestCart();
+        setItems(guestItems);
+        setTotals(calculateTotals(guestItems));
+      } else {
         setError('Failed to load cart');
       }
     } finally {
@@ -312,9 +323,42 @@ export function CartProvider({ children }: { children: ReactNode }) {
         });
       }
     } catch (err: any) {
-      // Don't redirect on 401 — show error instead
       if (err?.response?.status === 401) {
-        setError('Please log in to add items to your cart');
+        // Token expired — fall back to guest cart
+        localStorage.removeItem('pawtag_token');
+        localStorage.removeItem('pawtag_refresh_token');
+        const guestItems = getGuestCart();
+        const existing = guestItems.find(
+          (i) => i.productId === item.productId && i.customisation === item.customisation
+        );
+        if (existing) {
+          existing.quantity += item.quantity;
+        } else {
+          guestItems.push({
+            _id: item.productId,
+            productId: item.productId,
+            productName: item.name || 'Item',
+            name: item.name,
+            sku: item.sku || '',
+            unitPrice: item.price || 0,
+            price: item.price,
+            customizationTotal: 0,
+            quantity: item.quantity,
+            image: item.image,
+            customisation: item.customisation,
+            addedAt: new Date().toISOString(),
+          });
+        }
+        setGuestCart(guestItems);
+        setItems(guestItems);
+        setTotals(calculateTotals(guestItems));
+        setLastAddedItem({
+          name: item.name || 'Item',
+          price: item.price || 0,
+          quantity: item.quantity,
+          image: item.image,
+          timestamp: Date.now(),
+        });
       } else {
         setError(err?.response?.data?.error || 'Failed to add item');
       }

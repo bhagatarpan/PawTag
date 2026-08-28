@@ -2,8 +2,8 @@
  * @module Shipping Service
  * @description PawTag-native shipping service.
  *
- * Handles shipping rate calculation, method selection, and shipment tracking.
- * PawTag-native shipping service.
+ * Reads shipping methods from the ShippingMethod MongoDB model.
+ * Falls back to the NZ shipping provider if no methods are configured.
  *
  * Usage:
  * ```typescript
@@ -13,7 +13,7 @@
  * ```
  */
 
-import { Cart, Order, type ICartDocument } from '@pawtag/db';
+import { Cart, Order, ShippingMethod, type ICartDocument } from '@pawtag/db';
 import { nzShippingProvider } from '../providers/nz-shipping';
 import type { ShippingAddress, ShippingRate } from '../interfaces/shipping-provider';
 import { ShippingError } from '../errors';
@@ -26,29 +26,34 @@ export class ShippingService {
   /**
    * Get available shipping rates for a user's cart.
    *
+   * Reads from ShippingMethod MongoDB model first.
+   * Falls back to NZ shipping provider if no methods configured.
+   *
    * @param userId - User ID
    * @param address - Shipping address
    * @returns Available shipping rates
    */
-  async getRates(userId: string, address: ShippingAddress): Promise<ShippingRate[]> {
-    const cart = await Cart.findOne({ userId, status: 'active' });
-    if (!cart || !cart.items.length) {
-      throw new ShippingError('Cart is empty');
+  async getRates(_userId: string, address: ShippingAddress): Promise<ShippingRate[]> {
+    // Try to get rates from ShippingMethod model first
+    const methods = await ShippingMethod.find({ isActive: true }).sort({ sortOrder: 1 });
+
+    if (methods.length > 0) {
+      // Use configured shipping methods from admin
+      return methods.map((m) => ({
+        id: String(m._id),
+        name: m.name,
+        description: m.description,
+        cost: m.rate,
+        estimatedDays: m.estimatedDays,
+        carrier: m.carrier,
+      }));
     }
 
-    // Calculate subtotal from cart items
-    const subtotal = cart.items.reduce(
-      (sum, item) => sum + item.unitPrice * item.quantity,
-      0,
-    );
-
-    // Get rates from provider
+    // Fallback to NZ shipping provider (hardcoded free shipping)
     const rates = await nzShippingProvider.getRates({
       address,
-      items: cart.items.map((item) => ({
-        quantity: item.quantity,
-      })),
-      subtotal,
+      items: [],
+      subtotal: 0,
     });
 
     return rates;
@@ -152,7 +157,7 @@ export class ShippingService {
     return {
       trackingNumber: result.trackingNumber || '',
       carrier: result.carrier || 'NZ Post',
-      trackingUrl: result.trackingUrl,
+      trackingUrl: result.trackingUrl || '',
     };
   }
 
