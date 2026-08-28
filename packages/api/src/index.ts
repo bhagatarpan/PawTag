@@ -313,6 +313,14 @@ async function start() {
     const { startTrackingPollJob } = await import('./jobs/shippingTrackingPoll');
     startTrackingPollJob();
 
+    // Start webhook retry job
+    const { startWebhookRetryJob } = await import('./jobs/webhookRetry');
+    startWebhookRetryJob();
+
+    // Start payment reconciliation job
+    const { startPaymentReconciliationJob } = await import('./jobs/paymentReconciliation');
+    startPaymentReconciliationJob();
+
     const server = app.listen(config.port, () => {
       logger.info(`PawTag API running on port ${config.port}`);
       logger.info(`Environment: ${config.nodeEnv}`);

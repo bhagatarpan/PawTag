@@ -296,4 +296,6 @@ async function handleSubscriptionDeleted(subscription: any): Promise<void> {
   logger.info({ subscriptionId: sub._id }, 'Subscription cancelled via Stripe');
 }
 
+export { handleEvent as handleStripeWebhookEvent };
+
 export default router;

@@ -123,6 +123,12 @@ router.get('/dependencies', async (_req: Request, res: Response) => {
     configured: !!(process.env.R2_ACCESS_KEY_ID && process.env.R2_SECRET_ACCESS_KEY),
   };
 
+  // NZ Post Shipping
+  checks.nzPostShipping = {
+    status: 'unknown',
+    configured: !!(process.env.NZPOST_CLIENT_ID || process.env.COMMERCE_SHIPPING_NZPOST_CLIENT_ID),
+  };
+
   const anyConfigured = Object.values(checks).some(c => c.configured);
 
   res.status(200).json({
