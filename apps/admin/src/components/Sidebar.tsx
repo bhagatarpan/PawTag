@@ -48,6 +48,7 @@ import {
   RotateCcw,
   Clock,
   Activity,
+  Receipt,
 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { useTheme } from '../hooks/useTheme';
@@ -173,7 +174,23 @@ const sections: SidebarSection[] = [
       { to: '/returns', label: 'Return Requests', icon: RotateCcw, permission: 'order.read' },
     ],
   },
+  {
+    id: 'tax',
+    label: 'Tax',
+    icon: Receipt,
+    links: [
+      { to: '/tax', label: 'Tax Configuration', icon: Receipt, permission: 'setting.read' },
+    ],
+  },
   // ─── Existing Sections ────────────────────────────────────
+  {
+    id: 'reports',
+    label: 'Reports',
+    icon: BarChart3,
+    links: [
+      { to: '/reports', label: 'Commerce Reports', icon: BarChart3, permission: 'stats.read' },
+    ],
+  },
   {
     id: 'communication',
     label: 'Communication',
@@ -214,7 +231,7 @@ const sections: SidebarSection[] = [
       { to: '/feature-flags', label: 'Feature Flags', icon: Flag, permission: 'feature_flag.read' },
       { to: '/site-availability', label: 'Site Availability', icon: Wifi, permission: 'setting.read' },
       { to: '/address-autocomplete', label: 'Address Autocomplete', icon: MapPin, permission: 'setting.read' },
-      { to: '/pet-references', label: 'Pet References', icon: PawPrint, permission: 'cms.pet_reference.read' },
+      { to: '/cms/pet-references', label: 'Pet References', icon: PawPrint, permission: 'cms.pet_reference.read' },
     ],
   },
   {

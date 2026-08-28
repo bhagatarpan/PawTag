@@ -4,19 +4,21 @@
  */
 
 import { Router, Response } from 'express';
-import { AuthRequest } from '../middleware/auth';
+import { AuthRequest, authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
 import { Fulfilment, Order } from '@pawtag/db';
 import { toAppError } from '../lib/app-errors';
 import logger from '../lib/logger';
 
 const router = Router();
+router.use(authenticate);
 
 router.get('/', requirePermission('order.read'), async (req: AuthRequest, res: Response) => {
   try {
-    const { page = 1, limit = 20, status } = req.query;
+    const { page = 1, limit = 20, status, search } = req.query;
     const query: Record<string, any> = {};
     if (status) query.status = status;
+    if (search) query.orderNumber = { $regex: search, $options: 'i' };
     const total = await Fulfilment.countDocuments(query);
     const items = await Fulfilment.find(query).sort({ createdAt: -1 }).skip((Number(page) - 1) * Number(limit)).limit(Number(limit));
     res.json({ success: true, data: { items, total, page: Number(page), limit: Number(limit), totalPages: Math.ceil(total / Number(limit)) } });

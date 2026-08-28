@@ -4,14 +4,13 @@
  */
 
 import { useEffect, useState, useCallback } from 'react';
-import { Loader2, TrendingUp, DollarSign, ShoppingCart, Package, Users, BarChart3 } from 'lucide-react';
+import { Loader2, TrendingUp, DollarSign, ShoppingCart, Users } from 'lucide-react';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
 
 interface ReportSummary {
   totalRevenue: number;
   totalOrders: number;
-  totalProducts: number;
   totalCustomers: number;
   averageOrderValue: number;
   recentOrders: Array<{ orderNumber: string; amount: number; status: string; createdAt: string }>;
@@ -24,21 +23,20 @@ export default function Reports() {
   const fetchSummary = useCallback(async () => {
     try {
       setLoading(true);
-      const [ordersRes, analyticsRes] = await Promise.all([
+      const [ordersRes, usersRes] = await Promise.all([
         api.get('/admin/commerce/orders', { params: { limit: 100 } }),
-        api.get('/admin/analytics/overview').catch(() => ({ data: { data: {} } })),
+        api.get('/admin/users', { params: { limit: 1 } }).catch(() => ({ data: { data: { total: 0 } } })),
       ]);
 
       const orders = ordersRes.data?.data?.items || [];
-      const totalRevenue = orders.reduce((sum: number, o: any) => sum + (o.payment?.amount || 0), 0);
       const paidOrders = orders.filter((o: any) => o.payment?.status === 'completed');
+      const paidRevenue = paidOrders.reduce((sum: number, o: any) => sum + (o.payment?.amount || 0), 0);
 
       setSummary({
-        totalRevenue,
+        totalRevenue: paidRevenue,
         totalOrders: orders.length,
-        totalProducts: 0,
-        totalCustomers: analyticsRes.data?.data?.users?.total || 0,
-        averageOrderValue: paidOrders.length > 0 ? totalRevenue / paidOrders.length : 0,
+        totalCustomers: usersRes.data?.data?.total || 0,
+        averageOrderValue: paidOrders.length > 0 ? paidRevenue / paidOrders.length : 0,
         recentOrders: orders.slice(0, 10).map((o: any) => ({
           orderNumber: o.orderNumber,
           amount: o.payment?.amount || 0,
@@ -58,13 +56,12 @@ export default function Reports() {
     <div className="max-w-7xl mx-auto p-6">
       <h1 className="text-2xl font-bold text-gray-900 mb-6">Reports</h1>
 
-      {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
         <div className="bg-white rounded-xl border border-gray-200 p-4">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-green-50 rounded-lg"><DollarSign size={20} className="text-green-600" /></div>
             <div>
-              <p className="text-sm text-gray-500">Total Revenue</p>
+              <p className="text-sm text-gray-500">Revenue (Paid)</p>
               <p className="text-xl font-bold text-gray-900">${(summary?.totalRevenue || 0).toFixed(2)}</p>
             </div>
           </div>
@@ -98,7 +95,6 @@ export default function Reports() {
         </div>
       </div>
 
-      {/* Recent Orders */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-100">
           <h2 className="font-semibold text-gray-900">Recent Orders</h2>
@@ -113,8 +109,8 @@ export default function Reports() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {(summary?.recentOrders || []).map((o) => (
-              <tr key={o.orderNumber} className="hover:bg-gray-50">
+            {(summary?.recentOrders || []).map((o, i) => (
+              <tr key={i} className="hover:bg-gray-50">
                 <td className="px-4 py-3 font-mono text-sm font-medium text-gray-900">{o.orderNumber}</td>
                 <td className="px-4 py-3 text-right text-sm font-semibold text-gray-900">${o.amount.toFixed(2)}</td>
                 <td className="px-4 py-3 text-center">

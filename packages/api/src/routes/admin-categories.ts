@@ -13,21 +13,26 @@
  */
 
 import { Router, Response } from 'express';
-import { AuthRequest } from '../middleware/auth';
+import { AuthRequest, authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
 import { Category } from '@pawtag/db';
 import { toAppError } from '../lib/app-errors';
 import logger from '../lib/logger';
 
 const router = Router();
+router.use(authenticate);
 
 router.get('/', requirePermission('product.read'), async (req: AuthRequest, res: Response) => {
   try {
     const { page = 1, limit = 50, search, parentId } = req.query;
     const query: Record<string, any> = {};
     if (search) query.name = { $regex: search, $options: 'i' };
-    if (parentId) query.parentId = parentId;
-    else if (parentId === 'null') query.parentId = null;
+    if (parentId === 'null' || parentId === null || parentId === undefined) {
+      // No parentId filter — show all, or filter for root categories if explicitly requested
+      if (parentId === 'null') query.parentId = null;
+    } else {
+      query.parentId = parentId;
+    }
 
     const total = await Category.countDocuments(query);
     const categories = await Category.find(query)

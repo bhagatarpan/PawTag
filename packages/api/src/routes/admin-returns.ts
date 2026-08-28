@@ -4,13 +4,14 @@
  */
 
 import { Router, Response } from 'express';
-import { AuthRequest } from '../middleware/auth';
+import { AuthRequest, authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
 import { Return } from '@pawtag/db';
 import { toAppError } from '../lib/app-errors';
 import logger from '../lib/logger';
 
 const router = Router();
+router.use(authenticate);
 
 router.get('/', requirePermission('order.read'), async (req: AuthRequest, res: Response) => {
   try {

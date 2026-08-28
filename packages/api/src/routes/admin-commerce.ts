@@ -36,6 +36,7 @@ import { shippingService } from '../commerce/services/shipping.service';
 import { refundService } from '../commerce/services/refund.service';
 import { getAllSettings, updateSetting, type CommerceSettingKey } from '../commerce/config';
 import { logOrderEvent } from '../commerce/audit';
+import { isValidTransition } from '../services/orderStatus.service';
 import { Order, Invoice, type IOrderDocument } from '@pawtag/db';
 import { toAppError } from '../lib/app-errors';
 import { auditService } from '../services/audit';
@@ -368,7 +369,7 @@ router.post('/orders/:id/cancel', requirePermission('order.update'), async (req:
       return;
     }
 
-    if (!['pending', 'pending_payment', 'paid', 'packing'].includes(order.status)) {
+    if (!isValidTransition(order.status, 'cancelled')) {
       res.status(400).json({ success: false, error: `Cannot cancel order in "${order.status}" status` });
       return;
     }
@@ -379,7 +380,6 @@ router.post('/orders/:id/cancel', requirePermission('order.update'), async (req:
     await order.save();
 
     // Release reserved stock
-    const { inventoryService } = await import('../commerce/services/inventory.service');
     await inventoryService.releaseForOrder(String(order._id), order.items.map((item: any) => ({
       productId: String(item.productId),
       quantity: item.quantity,
