@@ -50,6 +50,14 @@ import AddressAutocompleteSettings from './pages/AddressAutocompleteSettings';
 import CommerceSettings from './pages/CommerceSettings';
 import Invoices from './pages/Invoices';
 import Inventory from './pages/Inventory';
+import Categories from './pages/Categories';
+import ShippingMethods from './pages/ShippingMethods';
+import Fulfilment from './pages/Fulfilment';
+import Returns from './pages/Returns';
+import Payments from './pages/Payments';
+import Discounts from './pages/Discounts';
+import Tax from './pages/Tax';
+import Reports from './pages/Reports';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
@@ -201,6 +209,29 @@ export default function App() {
       <Route path="/commerce-settings" element={<ProtectedRoute><CommerceSettings /></ProtectedRoute>} />
       <Route path="/invoices" element={<ProtectedRoute><Invoices /></ProtectedRoute>} />
       <Route path="/inventory" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
+      <Route path="/inventory/adjustments" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
+      <Route path="/inventory/history" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
+      <Route path="/categories" element={<ProtectedRoute><Categories /></ProtectedRoute>} />
+      <Route path="/collections" element={<ProtectedRoute><Categories /></ProtectedRoute>} />
+      <Route path="/brands" element={<ProtectedRoute><Categories /></ProtectedRoute>} />
+      <Route path="/orders/pending" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
+      <Route path="/orders/processing" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
+      <Route path="/orders/shipped" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
+      <Route path="/orders/delivered" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
+      <Route path="/orders/cancelled" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
+      <Route path="/discounts" element={<ProtectedRoute><Discounts /></ProtectedRoute>} />
+      <Route path="/payments" element={<ProtectedRoute><Payments /></ProtectedRoute>} />
+      <Route path="/payments/refunds" element={<ProtectedRoute><Payments /></ProtectedRoute>} />
+      <Route path="/shipping/methods" element={<ProtectedRoute><ShippingMethods /></ProtectedRoute>} />
+      <Route path="/shipping/rates" element={<ProtectedRoute><ShippingMethods /></ProtectedRoute>} />
+      <Route path="/fulfilment" element={<ProtectedRoute><Fulfilment /></ProtectedRoute>} />
+      <Route path="/fulfilment/pending" element={<ProtectedRoute><Fulfilment /></ProtectedRoute>} />
+      <Route path="/fulfilment/picking" element={<ProtectedRoute><Fulfilment /></ProtectedRoute>} />
+      <Route path="/fulfilment/packing" element={<ProtectedRoute><Fulfilment /></ProtectedRoute>} />
+      <Route path="/fulfilment/fulfilled" element={<ProtectedRoute><Fulfilment /></ProtectedRoute>} />
+      <Route path="/returns" element={<ProtectedRoute><Returns /></ProtectedRoute>} />
+      <Route path="/tax" element={<ProtectedRoute><Tax /></ProtectedRoute>} />
+      <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

@@ -87,6 +87,12 @@ import cartRoutes from './routes/cart';
 import checkoutRoutes from './routes/checkout';
 import shippingRoutes from './routes/shipping';
 import adminCommerceRoutes from './routes/admin-commerce';
+import adminCategoryRoutes from './routes/admin-categories';
+import adminCollectionRoutes from './routes/admin-collections';
+import adminBrandRoutes from './routes/admin-brands';
+import adminShippingRoutes from './routes/admin-shipping';
+import adminFulfilmentRoutes from './routes/admin-fulfilments';
+import adminReturnRoutes from './routes/admin-returns';
 import stripeWebhookRoutes from './routes/stripe-webhooks';
 
 import { siteAvailabilityMiddleware } from './middleware/site-availability';
@@ -254,6 +260,12 @@ app.use('/api/cart', cartRoutes);
 app.use('/api/checkout', checkoutRoutes);
 app.use('/api/shipping', shippingRoutes);
 app.use('/api/admin/commerce', adminCommerceRoutes);
+app.use('/api/admin/commerce/categories', adminCategoryRoutes);
+app.use('/api/admin/commerce/collections', adminCollectionRoutes);
+app.use('/api/admin/commerce/brands', adminBrandRoutes);
+app.use('/api/admin/commerce/shipping-methods', adminShippingRoutes);
+app.use('/api/admin/commerce/fulfilments', adminFulfilmentRoutes);
+app.use('/api/admin/commerce/returns', adminReturnRoutes);
 
 // Stripe webhooks need raw body for signature verification
 app.use('/api/webhooks/stripe', express.raw({ type: 'application/json' }), stripeWebhookRoutes);
