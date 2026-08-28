@@ -94,6 +94,7 @@ import adminShippingRoutes from './routes/admin-shipping';
 import adminFulfilmentRoutes from './routes/admin-fulfilments';
 import adminReturnRoutes from './routes/admin-returns';
 import adminShipmentRoutes from './routes/admin-shipments';
+import adminPaymentRoutes from './routes/admin-payments';
 import stripeWebhookRoutes from './routes/stripe-webhooks';
 
 import { siteAvailabilityMiddleware } from './middleware/site-availability';
@@ -268,6 +269,7 @@ app.use('/api/admin/commerce/shipping-methods', adminShippingRoutes);
 app.use('/api/admin/commerce/fulfilments', adminFulfilmentRoutes);
 app.use('/api/admin/commerce/returns', adminReturnRoutes);
 app.use('/api/admin/commerce/shipments', adminShipmentRoutes);
+app.use('/api/admin/commerce/payments', adminPaymentRoutes);
 
 // Stripe webhooks need raw body for signature verification
 app.use('/api/webhooks/stripe', express.raw({ type: 'application/json' }), stripeWebhookRoutes);

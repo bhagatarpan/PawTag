@@ -56,3 +56,4 @@ export { ShippingMethod, type IShippingMethodDocument } from './models/ShippingM
 export { Fulfilment, type IFulfilmentDocument } from './models/Fulfilment';
 export { Return, type IReturnDocument } from './models/Return';
 export { Shipment, type IShipmentDocument, type ShipmentStatus, type IShipmentItem, type ITrackingEvent } from './models/Shipment';
+export { PaymentTransaction, type IPaymentTransactionDocument, type TransactionType, type TransactionStatus } from './models/PaymentTransaction';

@@ -26,7 +26,7 @@
  * ```
  */
 
-import { PendingOrder, Order, Invoice, InvoiceAccessToken, Cart, User, type IPendingOrderDocument } from '@pawtag/db';
+import { PendingOrder, Order, Invoice, InvoiceAccessToken, Cart, User, PaymentTransaction, type IPendingOrderDocument } from '@pawtag/db';
 import { NotFoundError } from '../../lib/app-errors';
 import { InvalidCartError, CheckoutExpiredError, DuplicateOrderError, PaymentFailedError, PriceMismatchError } from '../errors';
 import { stripePaymentProvider } from '../providers/stripe';
@@ -264,6 +264,19 @@ export class CheckoutService {
       actor: 'customer' as const,
     };
     await Order.updateOne({ _id: order._id }, { $push: { activity: activityEntry } });
+
+    // 7b. Record payment transaction for audit trail
+    await PaymentTransaction.create({
+      orderId: order._id,
+      orderNumber: order.orderNumber,
+      type: 'payment',
+      status: 'succeeded',
+      amount: pending.total,
+      currency: pending.currency,
+      provider: 'stripe',
+      providerTransactionId: paymentIntentId,
+      initiatedBy: 'customer',
+    });
 
     // 8. Confirm stock (deduct actual inventory)
     for (const item of pending.items) {

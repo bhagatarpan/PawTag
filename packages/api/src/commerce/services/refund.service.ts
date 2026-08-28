@@ -12,7 +12,7 @@
  * ```
  */
 
-import { Order, type IOrderDocument } from '@pawtag/db';
+import { Order, PaymentTransaction, type IOrderDocument } from '@pawtag/db';
 import { NotFoundError } from '../../lib/app-errors';
 import { RefundError } from '../errors';
 import { stripePaymentProvider } from '../providers/stripe';
@@ -149,6 +149,20 @@ export class RefundService {
       amount: refundAmount,
       currency: order.payment.currency || 'NZD',
       reason: params.reason,
+    });
+
+    // 10. Record payment transaction for audit trail
+    await PaymentTransaction.create({
+      orderId: order._id,
+      orderNumber: order.orderNumber,
+      type: 'refund',
+      status: 'succeeded',
+      amount: refundAmount,
+      currency: order.payment.currency || 'NZD',
+      provider: 'stripe',
+      providerTransactionId: stripeResult.refundId,
+      initiatedBy: 'admin',
+      notes: params.reason,
     });
 
     logger.info({
