@@ -303,7 +303,7 @@ export default function Checkout() {
       clearCart();
     } catch (err: any) {
       console.error('[Checkout] Payment success handler failed:', err);
-      setError('Something went wrong after payment. Your payment was received — please contact support.');
+      setError('Something went wrong during payment processing. — please contact support.');
       await refreshCart();
     } finally {
       setLoading(false);
