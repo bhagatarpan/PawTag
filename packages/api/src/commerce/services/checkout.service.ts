@@ -198,13 +198,34 @@ export class CheckoutService {
   async confirmCheckout(userId: string, paymentIntentId: string): Promise<CheckoutResult> {
     logger.info({ userId, paymentIntentId }, 'Checkout confirm started');
 
-    // 1. Find PendingOrder
-    const pending = await PendingOrder.findOne({
+    // 1. Find PendingOrder — try exact match first
+    let pending = await PendingOrder.findOne({
       stripePaymentIntentId: paymentIntentId,
       userId,
     });
 
+    // Fallback: find by paymentIntentId alone (userId may have changed after token refresh)
     if (!pending) {
+      pending = await PendingOrder.findOne({ stripePaymentIntentId: paymentIntentId });
+      if (pending) {
+        logger.warn({ pendingUserId: String(pending.userId), requestUserId: userId }, 'PendingOrder found with different userId — token may have refreshed');
+      }
+    }
+
+    if (!pending) {
+      // Check if it was already converted
+      const anyPending = await PendingOrder.findOne({ stripePaymentIntentId: paymentIntentId });
+      if (anyPending) {
+        logger.error({ status: anyPending.status, userId: String(anyPending.userId) }, 'PendingOrder exists but with wrong status or userId');
+        if (anyPending.status === 'converted' && anyPending.convertedOrderId) {
+          const existingOrder = await Order.findById(anyPending.convertedOrderId);
+          if (existingOrder) {
+            const invoice = await Invoice.findOne({ orderId: existingOrder._id });
+            const invoiceUrl = invoice ? await this.getInvoiceUrl(invoice._id.toString(), userId) : '';
+            return { order: existingOrder, invoice, invoiceUrl, isNew: false };
+          }
+        }
+      }
       logger.error({ userId, paymentIntentId }, 'PendingOrder not found');
       throw new NotFoundError('Pending order');
     }
