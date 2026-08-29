@@ -578,8 +578,8 @@ export default function Checkout() {
                                   )}
                                 </div>
                               </div>
-                              <span className={`text-sm font-semibold ${option.amount === 0 ? 'text-green-600' : 'text-gray-900'}`}>
-                                {option.amount === 0 ? 'FREE' : `NZ$${(option.amount || 0).toFixed(2)}`}
+                              <span className={`text-sm font-semibold ${(option.cost || 0) === 0 ? 'text-green-600' : 'text-gray-900'}`}>
+                                {(option.cost || 0) === 0 ? 'FREE' : `NZ$${(option.cost || 0).toFixed(2)}`}
                               </span>
                             </label>
                           ))}
