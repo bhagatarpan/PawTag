@@ -12,7 +12,6 @@ import logger from '../lib/logger';
 
 const router = Router();
 router.use(authenticate);
-router.use(authenticate);
 
 router.get('/', requirePermission('product.read'), async (req: AuthRequest, res: Response) => {
   try {
