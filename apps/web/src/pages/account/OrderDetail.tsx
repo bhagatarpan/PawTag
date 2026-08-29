@@ -542,6 +542,49 @@ export default function OrderDetail() {
               </div>
             </div>
           )}
+
+          {/* Order Actions */}
+          {!isCancelled && (order.status === 'delivered') && (
+            <div className="bg-white rounded-xl border p-6">
+              <h2 className="text-sm font-semibold text-gray-700 mb-3">Need Help?</h2>
+              <Link
+                to={`/account/orders/${order._id}/return`}
+                className="block w-full py-2.5 text-center border border-gray-300 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-50 transition-all"
+              >
+                Request Return
+              </Link>
+            </div>
+          )}
+          {!isCancelled && (order.status === 'paid' || order.status === 'packing') && (
+            <div className="bg-white rounded-xl border p-6">
+              <h2 className="text-sm font-semibold text-gray-700 mb-3">Order Actions</h2>
+              <div className="space-y-2">
+                <Link
+                  to={`/account/orders/${order._id}/return`}
+                  className="block w-full py-2.5 text-center border border-gray-300 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-50 transition-all"
+                >
+                  Request Return
+                </Link>
+                <button
+                  onClick={async () => {
+                    if (!confirm('Are you sure you want to cancel this order? A full refund will be processed.')) return;
+                    try {
+                      const res = await api.post(`/customer/returns/orders/${order._id}/cancel`, { reason: 'Cancelled by customer' });
+                      if (res.data.success) {
+                        alert('Order cancelled and refund initiated. You should see the refund in 5-10 business days.');
+                        fetchOrder();
+                      }
+                    } catch (err: any) {
+                      alert(err.response?.data?.error || 'Failed to cancel order');
+                    }
+                  }}
+                  className="block w-full py-2.5 text-center border border-red-200 text-red-600 rounded-xl text-sm font-medium hover:bg-red-50 transition-all"
+                >
+                  Cancel Order
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

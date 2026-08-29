@@ -101,7 +101,7 @@ const OrderSchema = new Schema<IOrderDocument>(
       line1: { type: String, required: true },
       line2: String,
       city: { type: String, required: true },
-      state: { type: String, required: true },
+      state: { type: String, default: '' },
       zip: { type: String, required: true },
       country: { type: String, default: 'NZ' },
     },

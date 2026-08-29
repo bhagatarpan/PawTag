@@ -29,6 +29,7 @@ import MyPets from './pages/account/MyPets';
 import Profile from './pages/account/Profile';
 import Orders from './pages/account/Orders';
 import OrderDetail from './pages/account/OrderDetail';
+import ReturnRequest from './pages/account/ReturnRequest';
 import Notifications from './pages/account/Notifications';
 import Settings from './pages/account/Settings';
 import Subscriptions from './pages/account/Subscriptions';
@@ -109,6 +110,7 @@ export default function App() {
         <Route path="/account/profile" element={<ProtectedRoute><AccountLayout><Profile /></AccountLayout></ProtectedRoute>} />
         <Route path="/account/orders" element={<ProtectedRoute><AccountLayout><Orders /></AccountLayout></ProtectedRoute>} />
         <Route path="/account/orders/:id" element={<ProtectedRoute><AccountLayout><OrderDetail /></AccountLayout></ProtectedRoute>} />
+        <Route path="/account/orders/:id/return" element={<ProtectedRoute><AccountLayout><ReturnRequest /></AccountLayout></ProtectedRoute>} />
         <Route path="/account/subscriptions" element={<ProtectedRoute><AccountLayout><Subscriptions /></AccountLayout></ProtectedRoute>} />
         <Route path="/account/notifications" element={<ProtectedRoute><AccountLayout><Notifications /></AccountLayout></ProtectedRoute>} />
         <Route path="/account/notification-preferences" element={<ProtectedRoute><AccountLayout><NotificationPreferences /></AccountLayout></ProtectedRoute>} />

@@ -418,8 +418,8 @@ PawTag/
 │   ├── mobile/      → React Native (Expo) app - 14 screens, Maestro E2E tests
 │   └── medusa/      → MedusaJS v2 (PostgreSQL) - commerce backend, port 9000
 ├── packages/
-│   ├── api/         → Express backend (port 5000, 30+ route files, 21+ services)
-│   ├── db/          → MongoDB models & connection (45+ models)
+│   ├── api/         → Express backend (port 5000, 36+ route files, 28+ services)
+│   ├── db/          → MongoDB models & connection (47+ models)
 │   ├── shared/      → Shared TypeScript types, enums, constants
 │   └── ui/          → Shared React component library (13 components)
 ├── tests/           → 77+ test files (41 unit, 35 integration, 1 smoke, 2 regression)
@@ -427,6 +427,92 @@ PawTag/
 ├── docs/            → 15 documentation files
 └── scripts/         → Build and utility scripts
 ```
+
+### PawTag Commerce Module
+
+**PawTag owns its own commerce engine.** Products, pricing, cart, checkout, payments, shipping, inventory, and orders are managed by the PawTag Commerce module (`packages/api/src/commerce/`).
+
+MedusaJS is being phased out. The PawTag Commerce module replaces all Medusa functionality with PawTag-native implementations.
+
+```
+packages/api/src/commerce/
+├── index.ts                    # Module exports
+├── config.ts                   # CMS-driven commerce settings (35+ settings)
+├── errors.ts                   # Commerce-specific error types (11 types)
+├── audit.ts                    # Commerce audit logging helpers
+├── interfaces/                 # Provider interfaces
+│   ├── payment-provider.ts     # Payment provider contract
+│   ├── shipping-provider.ts    # Shipping provider contract
+│   ├── tax-provider.ts         # Tax calculation contract
+│   └── inventory-provider.ts   # Inventory management contract
+├── providers/                  # Provider implementations
+│   ├── stripe/                 # Direct Stripe payment adapter
+│   ├── nz-shipping/            # NZ domestic shipping (free/flat-rate)
+│   └── simple-gst/             # NZ GST (15% tax-inclusive)
+└── services/                   # Business logic services
+    ├── product.service.ts      # Product catalog CRUD + pricing
+    ├── inventory.service.ts    # Stock tracking, reservation, adjustment
+    ├── pricing.service.ts      # Server-side price calculations
+    ├── cart.service.ts         # Shopping cart management + price revalidation
+    ├── checkout.service.ts     # Checkout orchestration
+    ├── shipping.service.ts     # Shipping rates and shipment creation
+    └── refund.service.ts       # Full/partial refund processing
+```
+
+### Database Architecture
+
+PawTag uses **MongoDB** as its primary and only database:
+
+- **MongoDB Atlas** — All PawTag data (users, pets, tags, products, carts, orders, subscriptions, CMS, audit logs, settings)
+- **PostgreSQL (Neon)** — Legacy MedusaJS commerce engine (being phased out)
+
+### PawTag Checkout Flow
+
+```
+Frontend (Checkout.tsx)
+  → POST /checkout/payment-intent — Create Stripe PaymentIntent + PendingOrder
+  → stripe.confirmPayment() — Customer confirms payment
+  → POST /checkout/confirm — Validate payment, create Order + Invoice (idempotent, retry on duplicate key)
+  → Send emails (non-blocking, parallel)
+  → Show confirmation page
+
+Guest promo codes:
+  → POST /public/promo/validate — Check promo code validity (no auth required)
+
+Safety nets:
+  → Orphan payment detection job (every 60s)
+  → Stripe webhook handler (payment_intent.succeeded)
+  → PendingOrder TTL (30 days)
+  → Order number retry on duplicate key (error code 11000)
+```
+
+### Commerce API Routes
+
+| Route | Purpose |
+|-------|---------|
+| `GET /api/products` | Public product listing |
+| `GET/POST/PUT/DELETE /api/cart/*` | Cart management (supports guest and authenticated users; guest-to-auth merge on login) |
+| `POST /api/checkout/payment-intent` | Create payment intent |
+| `POST /api/checkout/confirm` | Confirm checkout (idempotent) |
+| `POST /api/public/promo/validate` | Validate promo code (no auth — guests) |
+| `POST /api/webhooks/stripe` | Stripe webhook handler |
+| `GET/PUT /api/admin/commerce/settings` | Commerce settings management |
+| `GET/POST/PUT/DELETE /api/admin/commerce/shipments` | Shipment management (NZ Post) |
+| `GET /api/admin/commerce/payments` | Payment transaction reconciliation |
+| `GET/POST/PUT/DELETE /api/admin/commerce/promo-codes` | Discount/promo code CRUD |
+| `POST /api/customer/returns` | Customer return requests |
+| `DELETE /api/customer/returns/:orderId` | Customer order cancellation with refund |
+
+### Commerce Settings (CMS-Driven)
+
+All business values stored in `settings` collection with `commerce.*` prefix. 35+ settings across: Payment, Shipping, Tax, Inventory, Cart, Checkout, Orders, Subscriptions, Refunds, Notifications, Feature Flags.
+
+**Cart settings (seeded in `seed-cms.ts`):**
+| Key | Default | Purpose |
+|-----|---------|---------|
+| `commerce.cart.ttlDays` | 30 | Cart expiry for guest/anonymous carts (days) |
+| `commerce.cart.priceRevalidation` | `true` | Re-validate prices from DB on every cart load |
+| `commerce.cart.maxItems` | 50 | Maximum items allowed in a single cart |
 
 ### Dual Database Architecture
 
@@ -461,49 +547,41 @@ Customer sync: `packages/api/src/services/medusa-sync.service.ts`
 
 The checkout page (`apps/web/src/pages/Checkout.tsx`) implements a 4-step wizard:
 
-1. **Cart** — Review items, apply promo code, see totals (all from Medusa cart)
+1. **Cart** — Review items, apply promo code (guests can validate, logged-in apply), see totals
 2. **Checkout** — Authentication (inline login or register), contact verification, shipping address, Shipping Methods
 3. **Payment** — Order summary, animated pay button with progress bar, card form
 4. **Confirmed** — Enterprise confirmation page with order summary, status timeline, invoice actions
 
-**Checkout Architecture (Direct API + Webhook Backup):**
+**Checkout Architecture (PawTag-Native Direct API):**
 
 ```
 Frontend (Checkout.tsx)
-  → Await customer sync: POST /customer/medusa-sync
-  → Write identity to cart metadata: pawtagUserId, pawtagUserEmail, phone, fullName
-  → Medusa SDK: sdk.store.cart.update() — set shipping address
-  → Medusa SDK: sdk.store.cart.addShippingMethod() — add shipping
-  → Medusa SDK: sdk.store.payment.initiatePaymentSession() — create payment
+  → POST /checkout/payment-intent — Create Stripe PaymentIntent + PendingOrder (server-side totals)
   → StripePaymentForm: stripe.confirmPayment() — animated progress 0%→25%
-  → Medusa SDK: sdk.store.cart.complete() — creates Medusa order (progress 50%)
-  → POST /customer/orders/place — creates PawTag order + invoice + emails (progress 75%)
-  → Animated confirmation (progress 100%, green, 500ms hold)
+  → POST /checkout/confirm — Validate payment, create Order + Invoice (idempotent)
+  → Send emails (non-blocking, parallel)
   → Confirmation page with order summary, status timeline, invoice actions
 
-Backup path (async, idempotent):
-  → Medusa fires order.placed event → webhook to PawTag
-  → Webhook checks if order exists → YES → skips (idempotent)
-```
+Guest promo validation:
+  → POST /public/promo/validate — Check if code is valid (no auth required)
+  → Guest sees discount info, prompted to log in to apply
 
-**Customer identity sync:** Before cart completion, the frontend awaits `POST /customer/medusa-sync` to ensure the Medusa customer is linked. It also writes `pawtagUserId`, `pawtagUserEmail`, `pawtagUserPhone`, and `pawtagUserFullName` to cart metadata. These flow into the Medusa order, ensuring the webhook handler can always find the PawTag user.
+Safety nets:
+  → Orphan payment detection job (every 60s)
+  → Stripe webhook handler (payment_intent.succeeded)
+  → PendingOrder TTL (30 days)
+  → Order number retry on duplicate key (error code 11000)
+```
 
 **Verification gate:** Users must have both email and mobile verified before proceeding to payment. The checkout page checks `user.emailVerified` and `user.phoneVerified` and shows verification status with links to verify.
 
-**Payment:** Medusa handles payment via Stripe module. Demo mode uses `pp_system_default` (auto-succeeds). Real Stripe when `STRIPE_API_KEY` is configured.
+**Payment:** Stripe payment via PawTag's direct Stripe provider. Demo mode when `commerce.payment.testMode` is `true` (CMS setting). Real Stripe when test mode is OFF in admin Commerce Settings.
 
-**Order creation:** The `POST /customer/orders/place` endpoint creates the PawTag order synchronously (~700ms). The webhook handler is a backup — it checks idempotency and skips if the order already exists. Both paths use the shared `createOrderFromMedusa()` service function.
+**Order creation:** The `POST /checkout/confirm` endpoint creates the order idempotently. If an order already exists for the payment intent, it returns the existing order instead of failing. Order number generation retries on duplicate key (error code 11000).
 
 **Email optimization:** All 3 emails (invoice, order confirmation, admin alert) are sent in parallel via `Promise.allSettled()` — ~400ms total instead of ~1200ms sequential.
 
-**Webhook reliability:** Incoming Medusa webhooks are stored in `WebhookEvent` collection for idempotency and retry. Failed events are retried every 60 seconds up to 5 times. Handlers return boolean — only marked "completed" on success.
-
-**User lookup chain (5 fallbacks):**
-1. `medusaCustomerId` (from customer sync)
-2. `email` (from Medusa customer)
-3. Admin API → email (fetch Medusa customer, find by email)
-4. `metadata.pawtagUserId` (from cart metadata)
-5. `metadata.pawtagUserEmail` (from cart metadata)
+**Guest promo codes:** Guests can validate promo codes via `POST /public/promo/validate` (no auth required). The endpoint returns the code details (type, value, description, min order). Logged-in users apply codes directly to their server-side cart.
 
 ## Development Commands
 
@@ -606,6 +684,8 @@ const value = setting?.value || 'default';
 ```
 
 Settings are cached in-memory for 60 seconds in some services (e.g., `otp-settings.service.ts`, `rate-limiter.ts`).
+
+**Cart price revalidation:** `cart.service.ts` re-validates item prices from the database on every cart load when `commerce.cart.priceRevalidation` is enabled. Customisation comparison treats `undefined` and `false` as equivalent. Guest-to-auth cart sync merges items instead of creating duplicates. `addItem` is async (`Promise<void>`) — callers must `await` and handle errors.
 
 **Setting key convention:** `category.subcategory.property` (e.g., `rateLimit.finder.view.max`, `escalation.delayMinutes`)
 
@@ -777,6 +857,7 @@ Enterprise-grade sidebar with collapsible sections and dark/light mode:
 - Permission check: `requirePermission('resource.action')` middleware
 - Admin permissions seeded in `packages/api/src/seeds/seed.ts`
 - **Super Admin bypass:** Both `SUPER_ADMIN` and `ADMIN` roles have `isSuperAdmin: true`, which bypasses ALL permission checks (unrestricted "GOD mode" access)
+- **Token refresh:** `api.ts` interceptor no longer removes tokens on failed refresh — calling code handles cleanup to avoid race conditions with concurrent requests
 
 ### Frontend Patterns
 
@@ -787,6 +868,8 @@ Enterprise-grade sidebar with collapsible sections and dark/light mode:
 - **PuckEditor CMS:** Visual page builder with 36 block types in both admin and web apps
 - **Rich Text Editing:** TipTap-based editor in admin with 13 extensions
 - **Monaco Editor:** JSON editor in admin for advanced content editing
+- **Scroll Animations:** `<FadeIn>` component from `@pawtag/ui` — uses native IntersectionObserver, respects prefers-reduced-motion
+- **CartDrawer:** Shared cart drawer shows a guest mode banner when user is not logged in; displays price-changed warnings when current prices differ from when item was added to cart
 
 ### PuckEditor CMS Page Builder
 
@@ -877,7 +960,9 @@ Located in `apps/mobile/e2e/`:
 | `apps/admin/src/pages/AddressAutocompleteSettings.tsx` | Address autocomplete provider config |
 | `packages/ui/src/components/AddressAutocomplete.tsx` | Reusable address autocomplete component |
 | `packages/ui/src/components/ProductCard.tsx` | Shared product card component (primary-* tokens) |
-| `packages/ui/src/components/CartDrawer.tsx` | Shared cart drawer component |
+| `packages/ui/src/components/CartDrawer.tsx` | Shared cart drawer component (guest mode banner, price-changed warnings) |
+| `packages/ui/src/components/FadeIn.tsx` | Scroll-triggered fade-in animation component |
+| `packages/api/src/routes/promo-public.ts` | Public promo code validation (no auth) |
 | `packages/api/src/routes/medusa-webhooks.ts` | Medusa webhook endpoint (order.placed, payment.captured) |
 | `packages/api/src/services/order-creation.service.ts` | Shared order creation service (used by API + webhook) |
 | `packages/api/src/routes/checkout-otp.ts` | Dual OTP checkout verification |

@@ -48,7 +48,7 @@ export default function Navbar() {
   const [cartOpen, setCartOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const { items, total, removeItem, updateQuantity, clearCart } = useCart();
+  const { items, total, removeItem, updateQuantity, clearCart, isGuest, priceChanged } = useCart();
   const { user, logout } = useAuth();
   const { menus, loading } = useNavigation('header');
 
@@ -173,6 +173,8 @@ export default function Navbar() {
           onRemoveItem={removeItem}
           onClearCart={clearCart}
           onCheckout={handleCheckout}
+          isGuest={isGuest}
+          priceChanged={priceChanged}
         />
       )}
 

@@ -124,6 +124,11 @@ async function seed() {
       { name: 'order.read', displayName: 'Read Orders', description: 'View order details and lists', resource: 'order', action: 'read', groupIndex: groupDefs.findIndex(g => g.name === 'REPORTS') },
       { name: 'order.create', displayName: 'Create Orders', description: 'Create new orders', resource: 'order', action: 'create', groupIndex: groupDefs.findIndex(g => g.name === 'REPORTS') },
       { name: 'order.update', displayName: 'Update Orders', description: 'Update order status and details', resource: 'order', action: 'update', groupIndex: groupDefs.findIndex(g => g.name === 'REPORTS') },
+      { name: 'order.refund', displayName: 'Refund Orders', description: 'Process order refunds', resource: 'order', action: 'refund', groupIndex: groupDefs.findIndex(g => g.name === 'REPORTS') },
+
+      // Inventory Management
+      { name: 'inventory.read', displayName: 'Read Inventory', description: 'View inventory levels and movements', resource: 'inventory', action: 'read', groupIndex: groupDefs.findIndex(g => g.name === 'REPORTS') },
+      { name: 'inventory.adjust', displayName: 'Adjust Inventory', description: 'Adjust stock levels', resource: 'inventory', action: 'adjust', groupIndex: groupDefs.findIndex(g => g.name === 'REPORTS') },
 
       // Settings Management
       { name: 'setting.read', displayName: 'Read Settings', description: 'View system settings', resource: 'setting', action: 'read', groupIndex: groupDefs.findIndex(g => g.name === 'SYSTEM_CONFIGURATION') },
@@ -501,6 +506,10 @@ async function seed() {
         // Order Management
         { permissionName: 'order.read' },
         { permissionName: 'order.update' },
+        { permissionName: 'order.refund' },
+        // Inventory Management
+        { permissionName: 'inventory.read' },
+        { permissionName: 'inventory.adjust' },
         // Reports
         { permissionName: 'report.read' },
         { permissionName: 'report.create' },
@@ -606,6 +615,8 @@ async function seed() {
         { permissionName: 'health_document.download' },
         { permissionName: 'user.read' },
         { permissionName: 'order.read' },
+        { permissionName: 'order.refund' },
+        { permissionName: 'inventory.read' },
         { permissionName: 'finder_scan.read' },
         { permissionName: 'systemlogs.read' },
         { permissionName: 'audit.read' },

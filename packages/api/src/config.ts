@@ -23,7 +23,7 @@ export const config = {
   port: parseInt(process.env.PORT || '5000', 10),
   dbUrl: process.env.DB_URL!,
   jwtSecret: process.env.JWT_SECRET!,
-  jwtExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '30m',
+  jwtExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '2h',
   refreshTokenExpiresInDays: parseInt(process.env.REFRESH_TOKEN_EXPIRES_IN_DAYS || '30', 10),
   otpExpiryMinutes: parseInt(process.env.OTP_EXPIRY_MINUTES || '10', 10),
   emailTokenExpiryHours: parseInt(process.env.EMAIL_TOKEN_EXPIRY_HOURS || '24', 10),

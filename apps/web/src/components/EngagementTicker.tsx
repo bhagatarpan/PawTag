@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useInView } from 'react-intersection-observer';
 import { PawPrint, Heart } from 'lucide-react';
 import api from '../lib/api';
 
@@ -22,10 +23,11 @@ const fallbackStats: TickerStat[] = [
   { label: 'tags sold', value: 6840 },
 ];
 
-function useAnimatedCounter(target: number, duration = 2000) {
+function useAnimatedCounter(target: number, duration = 2000, enabled = true) {
   const [count, setCount] = useState(0);
 
   useEffect(() => {
+    if (!enabled) return;
     let start = 0;
     const increment = target / (duration / 16);
     const timer = setInterval(() => {
@@ -38,13 +40,13 @@ function useAnimatedCounter(target: number, duration = 2000) {
       }
     }, 16);
     return () => clearInterval(timer);
-  }, [target, duration]);
+  }, [target, duration, enabled]);
 
   return count;
 }
 
-function TickerItem({ stat }: { stat: TickerStat }) {
-  const count = useAnimatedCounter(stat.value);
+function TickerItem({ stat, inView }: { stat: TickerStat; inView: boolean }) {
+  const count = useAnimatedCounter(stat.value, 2000, inView);
   const formatted = count.toLocaleString();
 
   return (
@@ -57,6 +59,7 @@ function TickerItem({ stat }: { stat: TickerStat }) {
 
 export default function EngagementTicker() {
   const [stats, setStats] = useState<TickerStat[]>(fallbackStats);
+  const { ref, inView } = useInView({ threshold: 0.3, triggerOnce: true });
 
   useEffect(() => {
     api.get('/finder/stats')
@@ -72,7 +75,7 @@ export default function EngagementTicker() {
   }, []);
 
   return (
-    <div className="bg-teal-700 border-y border-teal-600">
+    <div ref={ref} className="bg-teal-700 border-y border-teal-600">
       <div className="max-w-7xl mx-auto px-4 py-3">
         <div className="flex items-center justify-center gap-6 md:gap-10 flex-wrap">
           <div className="flex items-center gap-2 text-teal-200">
@@ -82,7 +85,7 @@ export default function EngagementTicker() {
           {stats.map((stat, i) => (
             <div key={stat.label} className="flex items-center gap-6 md:gap-10">
               {i > 0 && <div className="w-px h-4 bg-white/20 hidden md:block" />}
-              <TickerItem stat={stat} />
+              <TickerItem stat={stat} inView={inView} />
             </div>
           ))}
           <div className="flex items-center gap-1.5 text-teal-200">

@@ -40,6 +40,15 @@ import {
   ChevronDown,
   ExternalLink,
   Zap,
+  Package,
+  Truck,
+  CheckCircle,
+  XCircle,
+  Tag,
+  RotateCcw,
+  Clock,
+  Activity,
+  Receipt,
 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { useTheme } from '../hooks/useTheme';
@@ -63,27 +72,125 @@ interface SidebarSection {
 }
 
 const sections: SidebarSection[] = [
+  // ─── Shop & Commerce ─────────────────────────────────────
   {
-    id: 'overview',
-    label: 'Overview',
-    icon: LayoutDashboard,
+    id: 'commerce',
+    label: 'Shop & Commerce',
+    icon: ShoppingCart,
     links: [
       { to: '/', label: 'Dashboard', icon: LayoutDashboard, permission: 'dashboard.read' },
-      { to: '/statistics', label: 'Statistics', icon: BarChart3, permission: 'stats.read' },
     ],
   },
   {
-    id: 'business',
-    label: 'Business',
+    id: 'catalog',
+    label: 'Catalog',
     icon: ShoppingBag,
     links: [
-      { to: '/orders', label: 'Orders', icon: FileText, permission: 'order.read' },
       { to: '/products', label: 'Products', icon: ShoppingBag, permission: 'product.read' },
-      { to: '/medusa', label: 'Medusa Dashboard', icon: ExternalLink, external: true, href: import.meta.env.VITE_MEDUSA_ADMIN_URL || 'http://localhost:9000/app' },
+      { to: '/categories', label: 'Categories', icon: FolderTree, permission: 'product.read' },
+      { to: '/collections', label: 'Collections', icon: Database, permission: 'product.read' },
+      { to: '/brands', label: 'Brands', icon: Target, permission: 'product.read' },
+      { to: '/tags', label: 'Tags', icon: QrCode, permission: 'tag.read' },
+    ],
+  },
+  {
+    id: 'inventory',
+    label: 'Inventory',
+    icon: Package,
+    links: [
+      { to: '/inventory', label: 'Stock', icon: Package, permission: 'inventory.read' },
+      { to: '/inventory/adjustments', label: 'Adjustments', icon: AlertTriangle, permission: 'inventory.adjust' },
+      { to: '/inventory/history', label: 'Stock History', icon: Database, permission: 'inventory.read' },
+    ],
+  },
+  {
+    id: 'orders',
+    label: 'Orders',
+    icon: FileText,
+    links: [
+      { to: '/orders', label: 'All Orders', icon: FileText, permission: 'order.read' },
+      { to: '/orders/pending', label: 'Pending', icon: Clock, permission: 'order.read' },
+      { to: '/orders/processing', label: 'Processing', icon: Activity, permission: 'order.read' },
+      { to: '/orders/shipped', label: 'Shipped', icon: Truck, permission: 'order.read' },
+      { to: '/orders/delivered', label: 'Delivered', icon: CheckCircle, permission: 'order.read' },
+      { to: '/orders/cancelled', label: 'Cancelled', icon: XCircle, permission: 'order.read' },
+      { to: '/invoices', label: 'Invoices', icon: FileText, permission: 'order.read' },
+    ],
+  },
+  {
+    id: 'customers',
+    label: 'Customers',
+    icon: Users,
+    links: [
+      { to: '/users', label: 'Customers', icon: Users, permission: 'user.read' },
       { to: '/pets', label: 'Pets', icon: PawPrint, permission: 'pet.read' },
       { to: '/subscriptions', label: 'Subscriptions', icon: CreditCard, permission: 'subscription.read' },
-      { to: '/tags', label: 'Tags', icon: QrCode, permission: 'tag.read' },
-      { to: '/users', label: 'Users', icon: Users, permission: 'user.read' },
+    ],
+  },
+  {
+    id: 'discounts',
+    label: 'Discounts',
+    icon: Tag,
+    links: [
+      { to: '/discounts', label: 'Discount Codes', icon: Tag, permission: 'product.read' },
+      { to: '/referrals', label: 'Referral Program', icon: Gift, permission: 'product.read' },
+    ],
+  },
+  {
+    id: 'payments',
+    label: 'Payments',
+    icon: CreditCard,
+    links: [
+      { to: '/payments', label: 'Transactions', icon: CreditCard, permission: 'order.read' },
+      { to: '/payments/refunds', label: 'Refunds', icon: RotateCcw, permission: 'order.refund' },
+      { to: '/payments/reconciliation', label: 'Reconciliation', icon: AlertTriangle, permission: 'order.read' },
+    ],
+  },
+  {
+    id: 'shipping',
+    label: 'Shipping',
+    icon: Truck,
+    links: [
+      { to: '/shipping/methods', label: 'Methods', icon: Truck, permission: 'setting.read' },
+      { to: '/shipping/rates', label: 'Rates', icon: BarChart3, permission: 'setting.read' },
+      { to: '/shipping/shipments', label: 'Shipments', icon: Truck, permission: 'order.read' },
+    ],
+  },
+  {
+    id: 'fulfilment',
+    label: 'Fulfilment',
+    icon: ClipboardCheck,
+    links: [
+      { to: '/fulfilment', label: 'All Fulfilments', icon: ClipboardCheck, permission: 'order.read' },
+      { to: '/fulfilment/pending', label: 'Pending', icon: Clock, permission: 'order.read' },
+      { to: '/fulfilment/picking', label: 'Picking', icon: Package, permission: 'order.read' },
+      { to: '/fulfilment/packing', label: 'Packing', icon: Package, permission: 'order.read' },
+      { to: '/fulfilment/fulfilled', label: 'Fulfilled', icon: CheckCircle, permission: 'order.read' },
+    ],
+  },
+  {
+    id: 'returns',
+    label: 'Returns',
+    icon: RotateCcw,
+    links: [
+      { to: '/returns', label: 'Return Requests', icon: RotateCcw, permission: 'order.read' },
+    ],
+  },
+  {
+    id: 'tax',
+    label: 'Tax',
+    icon: Receipt,
+    links: [
+      { to: '/tax', label: 'Tax Configuration', icon: Receipt, permission: 'setting.read' },
+    ],
+  },
+  // ─── Existing Sections ────────────────────────────────────
+  {
+    id: 'reports',
+    label: 'Reports',
+    icon: BarChart3,
+    links: [
+      { to: '/reports', label: 'Commerce Reports', icon: BarChart3, permission: 'stats.read' },
     ],
   },
   {
@@ -93,7 +200,6 @@ const sections: SidebarSection[] = [
     links: [
       { to: '/notifications', label: 'Notifications', icon: Bell },
       { to: '/support-requests', label: 'Support Requests', icon: MessageSquare },
-      { to: '/referrals', label: 'Referrals', icon: Gift },
       { to: '/tag-expiry-notifications', label: 'Tag Expiry Alerts', icon: AlertTriangle },
     ],
   },
@@ -122,11 +228,12 @@ const sections: SidebarSection[] = [
     label: 'Settings',
     icon: Settings,
     links: [
-      { to: '/address-autocomplete', label: 'Address Autocomplete', icon: MapPin, permission: 'setting.read' },
-      { to: '/feature-flags', label: 'Feature Flags', icon: Flag, permission: 'feature_flag.read' },
+      { to: '/commerce-settings', label: 'Commerce Settings', icon: Settings, permission: 'setting.read' },
       { to: '/settings', label: 'General Settings', icon: Settings, permission: 'setting.read' },
-      { to: '/cms/pet-references', label: 'Pet References', icon: Database, permission: 'cms.pet_reference.read' },
-      { to: '/site-availability', label: 'Site Availability', icon: Globe, permission: 'setting.read' },
+      { to: '/feature-flags', label: 'Feature Flags', icon: Flag, permission: 'feature_flag.read' },
+      { to: '/site-availability', label: 'Site Availability', icon: Wifi, permission: 'setting.read' },
+      { to: '/address-autocomplete', label: 'Address Autocomplete', icon: MapPin, permission: 'setting.read' },
+      { to: '/cms/pet-references', label: 'Pet References', icon: PawPrint, permission: 'cms.pet_reference.read' },
     ],
   },
   {
@@ -134,11 +241,12 @@ const sections: SidebarSection[] = [
     label: 'Security',
     icon: Shield,
     links: [
-      { to: '/rbac/scopes', label: 'Access Scopes', icon: Target, permission: 'permission.read' },
-      { to: '/audit-settings', label: 'Audit Settings', icon: FileSignature, permission: 'audit.admin' },
-      { to: '/audit-trail', label: 'Audit Trail', icon: FileSignature, permission: 'audit.read' },
-      { to: '/rbac/permission-groups', label: 'Permission Groups', icon: FolderTree, permission: 'permission_group.read' },
       { to: '/rbac/roles', label: 'Roles & Permissions', icon: Shield, permission: 'role.read' },
+      { to: '/rbac/permissions', label: 'Permissions', icon: Key, permission: 'permission.read' },
+      { to: '/rbac/permission-groups', label: 'Permission Groups', icon: FolderTree, permission: 'permission_group.read' },
+      { to: '/rbac/scopes', label: 'Access Scopes', icon: Target, permission: 'permission_scope.read' },
+      { to: '/audit-trail', label: 'Audit Trail', icon: Database, permission: 'audit.read' },
+      { to: '/audit-settings', label: 'Audit Settings', icon: Settings, permission: 'audit.read' },
     ],
   },
   {
@@ -146,10 +254,11 @@ const sections: SidebarSection[] = [
     label: 'Operations',
     icon: Terminal,
     links: [
-      { to: '/webhooks', label: 'Webhooks & Sync', icon: Zap, permission: 'setting.read' },
-      { to: '/system-log-settings', label: 'System Log Settings', icon: Terminal, permission: 'systemlogs.admin' },
+      { to: '/webhooks', label: 'Webhooks', icon: Zap, permission: 'setting.read' },
       { to: '/system-logs', label: 'System Logs', icon: Terminal, permission: 'systemlogs.read' },
-      { to: '/write-nfc', label: 'Write NFC Tag', icon: Wifi },
+      { to: '/system-log-settings', label: 'Log Settings', icon: Settings, permission: 'systemlogs.admin' },
+      { to: '/statistics', label: 'Statistics', icon: BarChart3, permission: 'stats.read' },
+      { to: '/write-nfc', label: 'Write NFC Tag', icon: Wifi, permission: 'tag.update' },
     ],
   },
 ];

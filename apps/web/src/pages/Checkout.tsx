@@ -8,12 +8,20 @@ import {
 import { AddressAutocomplete } from '@pawtag/ui';
 import type { AddressComponents } from '@pawtag/ui';
 import api from '../lib/api';
-import { sdk } from '../lib/medusa';
+import axios from 'axios';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useSiteSettings } from '../hooks/useCms';
 import CheckoutAuth from '../components/CheckoutAuth';
 import StripePaymentForm from '../components/StripePaymentForm';
+import CheckoutErrorBoundary from '../components/CheckoutErrorBoundary';
+
+// Confirmation page animations
+const confirmationStyles = `
+@keyframes scale-in { 0% { transform: scale(0); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+@keyframes check-draw { 0% { transform: scale(0) rotate(-45deg); opacity: 0; } 100% { transform: scale(1) rotate(0deg); opacity: 1; } }
+@keyframes fade-in-up { 0% { transform: translateY(12px); opacity: 0; } 100% { transform: translateY(0); opacity: 1; } }
+`;
 
 type Step = 'cart' | 'checkout' | 'payment' | 'confirmed';
 
@@ -25,16 +33,14 @@ const STEPS = [
 ];
 
 export default function Checkout() {
-  const { items, total, cart, clearCart, refreshCart } = useCart();
+  const { items, total, totals, clearCart, refreshCart } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  // Step management
-  const [currentStep, setCurrentStep] = useState<Step>(() => {
-    // Restore step from sessionStorage (survives refresh)
-    const savedStep = sessionStorage.getItem('pawtag_checkout_step') as Step;
-    return savedStep || 'cart';
-  });
+  // Step management — always start at cart step on mount.
+  // sessionStorage restoration caused a race condition: step restored before
+  // cart loaded from server, rendering step 2/3 with empty items = blank screen.
+  const [currentStep, setCurrentStep] = useState<Step>('cart');
 
   // Form state
   const [loading, setLoading] = useState(false);
@@ -54,6 +60,7 @@ export default function Checkout() {
   const [promoApplied, setPromoApplied] = useState(false);
   const [promoLoading, setPromoLoading] = useState(false);
   const [promoDiscount, setPromoDiscount] = useState(0);
+  const [guestPromoInfo, setGuestPromoInfo] = useState<any>(null);
 
   // Verification status
   const [emailVerified, setEmailVerified] = useState(false);
@@ -85,31 +92,41 @@ export default function Checkout() {
 
   // Fetch shipping options when address is entered
   useEffect(() => {
-    if (!cart?.id || !form.line1) return;
+    if (!form.line1) return;
     setShippingLoading(true);
-    sdk.store.fulfillment.listCartOptions({ cart_id: cart.id })
-      .then(({ shipping_options }) => {
-        setShippingOptions(shipping_options || []);
+    api.get('/shipping/rates', {
+      params: { line1: form.line1, city: form.city, state: form.state, zip: form.zip, country: form.country },
+    })
+      .then((res) => {
+        const rates = res.data?.data || [];
+        setShippingOptions(rates);
         // Auto-select first option if none selected
-        if (shipping_options?.length > 0 && !selectedShippingOption) {
-          setSelectedShippingOption(shipping_options[0].id);
+        if (rates.length > 0 && !selectedShippingOption) {
+          setSelectedShippingOption(rates[0].id);
         }
       })
       .catch(() => setShippingOptions([]))
       .finally(() => setShippingLoading(false));
-  }, [cart?.id, form.line1]);
+  }, [form.line1, form.city, form.state, form.zip, form.country]);
 
-  // Sync shipping method to Medusa cart when selection changes (updates cart totals in real time)
+  // Sync shipping method to cart when selection changes
   const prevShippingRef = useRef(selectedShippingOption);
   useEffect(() => {
-    if (!cart?.id || !selectedShippingOption) return;
+    if (!selectedShippingOption) return;
     // Skip initial mount — only sync on user-initiated changes
     if (prevShippingRef.current === selectedShippingOption) return;
     prevShippingRef.current = selectedShippingOption;
-    sdk.store.cart.addShippingMethod(cart.id, { option_id: selectedShippingOption })
-      .then(() => refreshCart())
-      .catch((err) => console.error('[Checkout] Shipping sync error:', err?.message));
-  }, [selectedShippingOption, cart?.id]);
+    const option = shippingOptions.find(o => o.id === selectedShippingOption);
+    if (option) {
+      api.post('/shipping/select', {
+        methodId: option.id,
+        methodName: option.name,
+        cost: option.cost || 0,
+      }).then(() => refreshCart()).catch((err) => {
+        console.warn('[Checkout] Shipping select failed:', err?.response?.data || err.message);
+      });
+    }
+  }, [selectedShippingOption, shippingOptions]);
 
   // CMS settings for trust badges
   const { settings } = useSiteSettings();
@@ -136,13 +153,13 @@ export default function Checkout() {
     }
   }, [user]);
 
-  // Derived values — compute from individual components for reliability
-  const selectedShippingPrice = shippingOptions.find(o => o.id === selectedShippingOption)?.amount || 0;
-  const shippingCost = cart?.shipping_total || selectedShippingPrice;
-  const taxAmount = cart?.tax_total || 0;
-  const discountAmount = cart?.discount_total || promoDiscount;
-  const itemsSubtotal = cart?.item_subtotal || cart?.subtotal || total;
-  const orderTotal = itemsSubtotal + shippingCost + taxAmount - discountAmount;
+  // Derived values — use PawTag cart totals
+  const selectedShippingPrice = shippingOptions.find(o => o.id === selectedShippingOption)?.cost || 0;
+  const shippingCost = selectedShippingPrice;
+  const taxAmount = totals.tax || 0;
+  const discountAmount = totals.discount || promoDiscount;
+  const itemsSubtotal = totals.subtotal || total;
+  const orderTotal = totals.total || (itemsSubtotal + shippingCost + taxAmount - discountAmount);
 
   const canProceedToCheckout = items.length > 0;
   const canProceedToPayment = emailVerified && mobileVerified && form.line1 && form.city && form.zip;
@@ -152,38 +169,65 @@ export default function Checkout() {
     if (step === 'checkout' && !canProceedToCheckout) return;
     if (step === 'payment' && !canProceedToPayment) return;
     setCurrentStep(step);
-    sessionStorage.setItem('pawtag_checkout_step', step);
     setError(null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   // Promo code handlers
+  const [promoError, setPromoError] = useState('');
   const applyPromoCode = async () => {
-    if (!promoCode || !cart) return;
+    if (!promoCode) return;
     setPromoLoading(true);
-    try {
-      const { cart: updated } = await sdk.store.cart.addPromotions(cart.id, { promo_codes: [promoCode] } as any);
-      if (updated) {
-        // Reconcile local cart with server (discount applied, totals updated)
-        await refreshCart();
+    setPromoError('');
+    setGuestPromoInfo(null);
+
+    // Guest: validate promo code via public endpoint (no auth required)
+    if (!user) {
+      try {
+        const res = await axios.post('/api/public/promo/validate', { code: promoCode });
+        const data = res.data.data;
+        if (data.valid) {
+          setGuestPromoInfo(data);
+          setPromoError('');
+        } else {
+          setPromoError(data.error || 'Invalid promo code');
+          setPromoCode('');
+        }
+      } catch {
+        setPromoError('Failed to validate promo code');
+        setPromoCode('');
+      } finally {
+        setPromoLoading(false);
       }
+      return;
+    }
+
+    // Logged in: apply promo code to server-side cart
+    try {
+      await api.post('/cart/promo', { code: promoCode });
+      await refreshCart();
       setPromoApplied(true);
-      setPromoDiscount(updated?.discount_total || 0);
+      setPromoDiscount(totals.discount || 0);
+      setPromoError('');
     } catch (err: any) {
-      setError(err.message || 'Invalid promo code');
+      const msg = err?.response?.status === 401
+        ? 'Your session expired. Please log in again to continue.'
+        : err?.response?.data?.error || 'Invalid promo code';
+      setPromoError(msg);
+      setPromoCode('');
     } finally {
       setPromoLoading(false);
     }
   };
 
   const removePromoCode = async () => {
-    if (!cart) return;
     try {
-      await sdk.store.cart.removePromotions(cart.id, { promo_codes: [promoCode] } as any);
+      if (user) await api.delete('/cart/promo');
       setPromoApplied(false);
       setPromoDiscount(0);
       setPromoCode('');
-      // Reconcile local cart with server (discount removed, totals updated)
-      await refreshCart();
+      setGuestPromoInfo(null);
+      if (user) await refreshCart();
     } catch (err: any) {
       setError(err.message || 'Failed to remove promo code');
     }
@@ -199,103 +243,56 @@ export default function Checkout() {
     }));
   };
 
-  // Payment handler — uses Medusa SDK checkout flow
+  // Payment handler — uses PawTag checkout API
   const handlePayment = async () => {
-    if (!user || !cart) return;
+    if (!user) return;
     setLoading(true);
     setError(null);
     try {
-      // 1. Ensure customer is associated with cart (AWAIT — must complete before cart finishes)
-      if (!cart.customer_id) {
-        try {
-          const syncRes = await api.post('/customer/medusa-sync');
-          const medusaCustomerId = syncRes.data?.data?.medusaCustomerId;
-          if (medusaCustomerId) {
-            await sdk.store.cart.update(cart.id, { customer_id: medusaCustomerId } as any);
-          }
-        } catch (syncErr) {
-          console.warn('[Checkout] Customer sync failed, proceeding without medusaCustomerId:', syncErr);
-        }
+      // 0. Verify cart has items from server (not stale React state)
+      const cartCheck = await api.get('/cart');
+      const serverItems = cartCheck.data?.data?.cart?.items || [];
+      if (serverItems.length === 0) {
+        setError('Your cart is empty. Please go back and add items before checking out.');
+        setLoading(false);
+        return;
       }
 
-      // 2. Write identity + referral to cart metadata (ensures webhook can always find user)
-      const metadata: Record<string, string> = {};
-      const referralCode = localStorage.getItem('pawtag_referral_code');
-      if (referralCode && !cart.metadata?.referralCode) {
-        metadata.referralCode = referralCode;
-      }
-      // Identity fields — guarantees order has PawTag user reference for webhook lookup
-      metadata.pawtagUserId = user.id;
-      metadata.pawtagUserEmail = user.email;
-      if (user.phoneNumber) metadata.pawtagUserPhone = user.phoneNumber;
-      metadata.pawtagUserFullName = user.fullName || '';
-      if (Object.keys(metadata).length > 0) {
-        await sdk.store.cart.update(cart.id, { metadata } as any);
-      }
-      if (referralCode) localStorage.removeItem('pawtag_referral_code');
-
-      // 3. Add shipping address to cart
-      try {
-        await sdk.store.cart.update(cart.id, {
-          shipping_address: {
-            first_name: user.fullName?.split(' ')[0] || 'Customer',
-            last_name: user.fullName?.split(' ').slice(1).join(' ') || '',
-            address_1: form.line1,
-            address_2: form.line2 || undefined,
-            city: form.city,
-            province: form.state || undefined,
-            postal_code: form.zip,
-            country_code: (form.country || 'nz').toLowerCase(),
-            phone: user.phoneNumber || undefined,
-          },
-        } as any);
-      } catch (addrErr: any) {
-        console.warn('Address update failed, retrying with minimal fields:', addrErr?.message);
-        await sdk.store.cart.update(cart.id, {
-          shipping_address: {
-            first_name: user.fullName?.split(' ')[0] || 'Customer',
-            last_name: user.fullName?.split(' ').slice(1).join(' ') || '',
-            address_1: form.line1,
-            city: form.city,
-            postal_code: form.zip,
-            country_code: (form.country || 'nz').toLowerCase(),
-          },
-        } as any);
-      }
-
-      // 4. Ensure shipping method is on the cart (already synced by effect, just verify)
-      // Note: addShippingMethod is handled by the shipping sync effect — skip here to
-      // avoid concurrent lock contention on the same cart.
-      if (selectedShippingOption) {
-        // Small wait to let any in-flight shipping sync effect complete
-        await new Promise((r) => setTimeout(r, 500));
-      }
-
-      // Re-fetch cart to get updated totals (shipping + tax calculated)
-      const updatedCart = await refreshCart();
-
-      // 5. Initiate payment session and get client secret for Stripe Elements
-      const cartForPayment = updatedCart || cart;
-      await sdk.store.payment.initiatePaymentSession(cartForPayment, {
-        provider_id: 'pp_stripe_stripe',
+      // 1. Create payment intent via PawTag checkout API
+      const checkoutRes = await api.post('/checkout/payment-intent', {
+        shippingAddress: {
+          line1: form.line1,
+          line2: form.line2,
+          city: form.city,
+          state: form.state,
+          zip: form.zip,
+          country: form.country || 'NZ',
+        },
       });
-
-      // Re-fetch cart to get payment session with client_secret
-      const { cart: refreshedCart } = await sdk.store.cart.retrieve(cart.id);
-      const cartAny = refreshedCart as any;
-      const clientSecret = cartAny?.payment_collection?.payment_sessions?.[0]?.data?.client_secret;
+      const { paymentIntentId, clientSecret, pendingOrderId } = checkoutRes.data?.data;
 
       if (!clientSecret) {
         throw new Error('Payment session could not be created');
       }
 
-      // Store client secret — StripePaymentForm will use it to confirm payment
+      // Store referral code for later
+      const referralCode = localStorage.getItem('pawtag_referral_code');
+      if (referralCode) localStorage.removeItem('pawtag_referral_code');
+
+      // Store checkout state for payment confirmation
+      sessionStorage.setItem('pawtag_checkout_payment_intent', paymentIntentId);
+      sessionStorage.setItem('pawtag_checkout_pending_order', pendingOrderId);
+
+      // 2. Store client secret — StripePaymentForm will use it to confirm payment
       setPaymentClientSecret(clientSecret);
       setCurrentStep('payment');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err: any) {
-      setError(err?.message || err?.response?.data?.error || 'Payment failed. Please try again.');
-      // Refresh cart to reconcile any server-side mutations from the failed payment attempt
-      await refreshCart();
+      console.error('[Checkout] Payment intent creation failed:', err?.response?.data || err);
+      const msg = err?.response?.status === 401
+        ? 'Your session expired. Please log in again to continue.'
+        : 'Payment setup failed. Please try again.';
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -303,61 +300,51 @@ export default function Checkout() {
 
   // Called by StripePaymentForm after Stripe confirms payment client-side
   const handlePaymentSuccess = async (paymentIntentId: string) => {
-    if (!cart) return;
     setLoading(true);
     setError(null);
     try {
-      // 1. Complete the Medusa cart (creates Medusa order)
-      const result = await sdk.store.cart.complete(cart.id);
-
-      if (result.type === 'cart') {
-        throw new Error(result.error?.message || result.error?.name || 'Order creation failed');
-      }
-
-      const medusaOrder = result.order;
-      const medusaOrderId = medusaOrder.id;
-      const orderDisplay = medusaOrder.display_id?.toString() || medusaOrder.id || 'Processing';
-
       // Drive progress: "Payment Processing..."
       (window as any).__paymentProgress?.setProcessingStage?.('confirmed');
 
-      // 2. Call direct API to create PawTag order + invoice + send emails (synchronous)
+      // 1. Confirm checkout via PawTag API (creates Order + Invoice + sends emails)
       let pawtagOrder = null;
       let invoice = null;
       let invoiceUrl = '';
       try {
-        const placeRes = await api.post('/customer/orders/place', {
-          medusaOrderId,
-          stripePaymentIntentId: paymentIntentId,
-        });
-        pawtagOrder = placeRes.data.data.order;
-        invoice = placeRes.data.data.invoice;
-        invoiceUrl = placeRes.data.data.invoiceUrl;
-      } catch (placeErr) {
-        // Direct API failed — webhook backup will create it later
-        console.warn('[Checkout] Direct order placement failed, webhook will retry:', placeErr);
+        const confirmRes = await api.post('/checkout/confirm', { paymentIntentId });
+        pawtagOrder = confirmRes.data.data.order;
+        invoice = confirmRes.data.data.invoice;
+        invoiceUrl = confirmRes.data.data.invoiceUrl;
+      } catch (confirmErr: any) {
+        console.error('[Checkout] Order confirmation failed:', confirmErr?.response?.data || confirmErr);
+        // Don't show confirmation page — show error instead
+        setError('Something went wrong confirming your order. Your payment was received — please contact support.');
+        setLoading(false);
+        return;
       }
 
-      // 3. Preserve cart data for confirmation page (before clearCart)
+      // 2. Only show confirmation if order was created
       setConfirmedItems([...items]);
       setConfirmedTotal(total);
       setConfirmedInvoice(invoice);
       setConfirmedPawTagOrder(pawtagOrder);
-      setOrderNumber(pawtagOrder?.orderNumber || orderDisplay);
+      setOrderNumber(pawtagOrder?.orderNumber || paymentIntentId.slice(-8));
 
       // Drive progress: "Payment Confirmed..." → "✓ Payment Confirmed"
       (window as any).__paymentProgress?.setProcessingStage?.('complete');
 
-      // 4. Wait for green animation, then show confirmation
+      // 3. Wait for green animation, then show confirmation
       await new Promise((r) => setTimeout(r, 600));
 
       setSuccess(true);
       setCurrentStep('confirmed');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       sessionStorage.setItem('pawtag_checkout_success', 'true');
-      sessionStorage.setItem('pawtag_checkout_order', pawtagOrder?.orderNumber || orderDisplay);
+      sessionStorage.setItem('pawtag_checkout_order', pawtagOrder?.orderNumber || paymentIntentId.slice(-8));
       clearCart();
     } catch (err: any) {
-      setError(err?.message || 'Order confirmation failed. Your payment was received — please contact support.');
+      console.error('[Checkout] Payment success handler failed:', err);
+      setError('Something went wrong during payment processing. — please contact support.');
       await refreshCart();
     } finally {
       setLoading(false);
@@ -368,12 +355,8 @@ export default function Checkout() {
     setError(message);
   };
 
-  // Empty cart
-  if (items.length === 0 && !success) {
-    // Clean up checkout session state
-    sessionStorage.removeItem('pawtag_checkout_success');
-    sessionStorage.removeItem('pawtag_checkout_order');
-    sessionStorage.removeItem('pawtag_checkout_step');
+  // Empty cart — but only show if we're not loading, not in payment flow, and not on confirmed step
+  if (items.length === 0 && !success && !loading && currentStep === 'cart') {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-4 p-4">
         <PawPrint className="h-16 w-16 text-gray-300" />
@@ -385,6 +368,7 @@ export default function Checkout() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <style>{confirmationStyles}</style>
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Step Indicator */}
         <div className="flex items-center justify-center mb-8">
@@ -454,21 +438,21 @@ export default function Checkout() {
                   </thead>
                   <tbody>
                     {items.map((item) => (
-                      <tr key={item.variantId} className="border-b border-gray-50">
+                      <tr key={item.productId || item.variantId} className="border-b border-gray-50">
                         <td className="py-4">
                           <div className="flex items-center gap-3">
                             <div className="h-14 w-14 bg-primary-50 rounded-lg flex-shrink-0 flex items-center justify-center overflow-hidden">
                               {item.image ? <img src={item.image} alt="" className="h-full w-full object-cover" /> : <PawPrint className="h-6 w-6 text-primary-300" />}
                             </div>
                             <div>
-                              <p className="font-medium text-gray-900">{item.name}</p>
+                              <p className="font-medium text-gray-900">{item.productName || item.name}</p>
                               <p className="text-xs text-gray-500">{item.quantity > 1 ? `Qty: ${item.quantity}` : ''}</p>
                             </div>
                           </div>
                         </td>
-                        <td className="text-right text-sm text-gray-600">NZ${item.price.toFixed(2)}</td>
+                        <td className="text-right text-sm text-gray-600">NZ${(item.unitPrice || item.price || 0).toFixed(2)}</td>
                         <td className="text-center text-sm text-gray-600">{item.quantity}</td>
-                        <td className="text-right text-sm font-semibold text-gray-900">NZ${(item.price * item.quantity).toFixed(2)}</td>
+                        <td className="text-right text-sm font-semibold text-gray-900">NZ${((item.unitPrice || item.price || 0) * item.quantity).toFixed(2)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -478,8 +462,9 @@ export default function Checkout() {
               {/* Summary */}
               <div className="px-6 py-4 border-t border-gray-100">
                 {/* Promo code section */}
-                {promoApplied ? (
-                  <div className="flex items-center justify-between text-sm mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="mb-4">
+                  {promoApplied ? (
+                  <div className="flex items-center justify-between text-sm p-3 bg-green-50 border border-green-200 rounded-lg">
                     <div className="flex items-center gap-2">
                       <Tag className="h-4 w-4 text-green-600" />
                       <span className="font-medium text-green-700">{promoCode}</span>
@@ -487,14 +472,35 @@ export default function Checkout() {
                     </div>
                     <button onClick={removePromoCode} className="text-xs text-gray-500 hover:text-red-500 font-medium ml-2">Remove</button>
                   </div>
-                ) : (
-                  <div className="flex gap-2 mb-4">
-                    <input type="text" value={promoCode} onChange={e => setPromoCode(e.target.value.toUpperCase())} placeholder="Add promo code" disabled={promoApplied} className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-primary-500 disabled:bg-gray-50 disabled:text-gray-400" />
-                    <button onClick={applyPromoCode} disabled={!promoCode || promoLoading || promoApplied} className="px-4 py-2 text-sm text-primary-600 border border-primary-200 rounded-lg hover:bg-primary-50 disabled:opacity-50">
-                      {promoLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Apply'}
-                    </button>
+                ) : guestPromoInfo ? (
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Tag className="h-4 w-4 text-blue-600" />
+                        <span className="font-medium text-blue-700">{guestPromoInfo.code}</span>
+                        <span className="text-blue-600">
+                          — {guestPromoInfo.discountType === 'percentage'
+                            ? `${guestPromoInfo.discountValue}% off`
+                            : `NZ$${guestPromoInfo.discountValue} off`}
+                          {guestPromoInfo.minOrderAmount > 0 && ` (min order: NZ$${guestPromoInfo.minOrderAmount})`}
+                        </span>
+                      </div>
+                      <button onClick={() => { setGuestPromoInfo(null); setPromoCode(''); }} className="text-xs text-gray-500 hover:text-red-500 font-medium ml-2">Remove</button>
+                    </div>
+                    <p className="text-xs text-blue-600 mt-1">Log in to apply this discount to your order</p>
                   </div>
+                ) : (
+                  <>
+                    <div className="flex gap-2 mb-1">
+                      <input type="text" value={promoCode} onChange={e => { setPromoCode(e.target.value.toUpperCase()); setPromoError(''); }} placeholder="Add promo code" disabled={promoApplied} className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-primary-500 disabled:bg-gray-50 disabled:text-gray-400" />
+                      <button onClick={applyPromoCode} disabled={!promoCode || promoLoading || promoApplied} className="px-4 py-2 text-sm text-primary-600 border border-primary-200 rounded-lg hover:bg-primary-50 disabled:opacity-50">
+                        {promoLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Apply'}
+                      </button>
+                    </div>
+                    {promoError && <p className="text-xs text-red-500">{promoError}</p>}
+                  </>
                 )}
+                  </div>
                 <div className="space-y-2 pt-2">
                   <div className="flex justify-between text-sm text-gray-600"><span>Subtotal</span><span>NZ${itemsSubtotal.toFixed(2)}</span></div>
                   {discountAmount > 0 && <div className="flex justify-between text-sm text-green-600"><span>Discount</span><span>-NZ${discountAmount.toFixed(2)}</span></div>}
@@ -512,7 +518,7 @@ export default function Checkout() {
                 <div className="flex items-center gap-4 text-xs text-gray-400 mb-4">
                   <span className="flex items-center gap-1"><Lock className="h-3 w-3" /> SSL Encrypted</span>
                   <span className="flex items-center gap-1"><Shield className="h-3 w-3" /> PCI DSS Compliant</span>
-                  <span className="flex items-center gap-1">Powered by medusa</span>
+                  <span className="flex items-center gap-1">Powered by PawTag</span>
                 </div>
                 <button onClick={() => goToStep('checkout')} className="w-full py-3 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 transition-all flex items-center justify-center gap-2">
                   Proceed to Checkout <ChevronRight className="h-4 w-4" />
@@ -661,8 +667,8 @@ export default function Checkout() {
                                   )}
                                 </div>
                               </div>
-                              <span className={`text-sm font-semibold ${option.amount === 0 ? 'text-green-600' : 'text-gray-900'}`}>
-                                {option.amount === 0 ? 'FREE' : `NZ$${(option.amount || 0).toFixed(2)}`}
+                              <span className={`text-sm font-semibold ${(option.cost || 0) === 0 ? 'text-green-600' : 'text-gray-900'}`}>
+                                {(option.cost || 0) === 0 ? 'FREE' : `NZ$${(option.cost || 0).toFixed(2)}`}
                               </span>
                             </label>
                           ))}
@@ -695,15 +701,15 @@ export default function Checkout() {
                   <h2 className="text-lg font-semibold text-gray-900 mb-4">Order Summary</h2>
                   <button onClick={() => goToStep('cart')} className="text-sm text-primary-600 hover:text-primary-700 mb-4">Edit Cart</button>
                   {items.map((item) => (
-                    <div key={item.variantId} className="flex gap-3 mb-4 pb-4 border-b border-gray-100 last:border-0">
+                    <div key={item.productId || item.variantId} className="flex gap-3 mb-4 pb-4 border-b border-gray-100 last:border-0">
                       <div className="h-14 w-14 bg-primary-50 rounded-lg flex-shrink-0 flex items-center justify-center overflow-hidden">
                         {item.image ? <img src={item.image} alt="" className="h-full w-full object-cover" /> : <PawPrint className="h-6 w-6 text-primary-300" />}
                       </div>
                       <div className="flex-1">
-                        <p className="font-medium text-gray-900">{item.name}</p>
+                        <p className="font-medium text-gray-900">{item.productName || item.name}</p>
                         <p className="text-xs text-gray-500">Qty: {item.quantity}</p>
                       </div>
-                      <p className="font-semibold text-gray-900">NZ${(item.price * item.quantity).toFixed(2)}</p>
+                      <p className="font-semibold text-gray-900">NZ${(item.unitPrice || item.price || 0).toFixed(2)}</p>
                     </div>
                   ))}
                   <div className="space-y-2 pt-4">
@@ -735,12 +741,14 @@ export default function Checkout() {
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                   <h2 className="text-lg font-semibold text-gray-900 mb-4">Payment Method</h2>
                   {paymentClientSecret ? (
-                    <StripePaymentForm
-                      clientSecret={paymentClientSecret}
-                      onPaymentSuccess={handlePaymentSuccess}
-                      onPaymentError={handlePaymentError}
-                      disabled={loading}
-                    />
+                    <CheckoutErrorBoundary onReset={() => setPaymentClientSecret('')}>
+                      <StripePaymentForm
+                        clientSecret={paymentClientSecret}
+                        onPaymentSuccess={handlePaymentSuccess}
+                        onPaymentError={handlePaymentError}
+                        disabled={loading}
+                      />
+                    </CheckoutErrorBoundary>
                   ) : (
                     <div className="flex items-center justify-center py-8">
                       <Loader2 className="h-6 w-6 animate-spin text-primary-600" />
@@ -763,23 +771,63 @@ export default function Checkout() {
           </div>
         )}
 
-        {/* Step 4: Confirmed — Enterprise Order Confirmation */}
+        {/* Step 4: Confirmed */}
         {currentStep === 'confirmed' && (
           <div className="max-w-2xl mx-auto py-8 space-y-6">
-            {/* Success Header */}
             <div className="text-center">
-              <div className="h-20 w-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 animate-[pulse_2s_ease-in-out_1]">
-                <CheckCircle className="h-12 w-12 text-green-500" />
+              <div className="h-20 w-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4" style={{ animation: 'scale-in 0.5s ease-out' }}>
+                <CheckCircle className="h-12 w-12 text-green-500" style={{ animation: 'check-draw 0.6s ease-out 0.3s both' }} />
               </div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-1">Order Confirmed!</h1>
-              <p className="text-lg text-gray-600">
+              <h1 className="text-3xl font-bold text-gray-900 mb-1" style={{ animation: 'fade-in-up 0.4s ease-out 0.2s both' }}>Order Confirmed!</h1>
+              <p className="text-lg text-gray-600" style={{ animation: 'fade-in-up 0.4s ease-out 0.3s both' }}>
                 Thank you for your purchase{user?.fullName ? `, ${user.fullName.split(' ')[0]}` : ''}.
               </p>
-              <p className="text-sm text-gray-400 mt-2">
+              <p className="text-sm text-gray-400 mt-2" style={{ animation: 'fade-in-up 0.4s ease-out 0.4s both' }}>
                 Order <span className="font-mono font-semibold text-primary-700">{orderNumber}</span>
                 {' · '}
                 {new Date().toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })}
               </p>
+            </div>
+
+            {/* Confirmation Sent — under Order Confirmed */}
+            <div className="bg-green-50 border border-green-200 rounded-2xl p-5 flex items-start gap-3" style={{ animation: 'fade-in-up 0.4s ease-out 0.5s both' }}>
+              <Mail className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-green-800">Confirmation sent</p>
+                <p className="text-sm text-green-700 mt-0.5">
+                  {confirmedPawTagOrder?.confirmationEmailSent
+                    ? <>Order confirmation and invoice have been sent to <strong>{user?.email}</strong>.</>
+                    : <>You'll receive an order confirmation at <strong>{user?.email}</strong> shortly.</>
+                  }
+                </p>
+              </div>
+            </div>
+
+            {/* Action Buttons — under confirmation sent */}
+            <div className="flex flex-col sm:flex-row gap-3 justify-center" style={{ animation: 'fade-in-up 0.4s ease-out 0.6s both' }}>
+              <Link to="/" className="flex items-center justify-center gap-2 px-6 py-3 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 transition-all">
+                <Home size={18} /> Back to Home
+              </Link>
+              <Link to="/shop" className="flex items-center justify-center gap-2 px-6 py-3 border border-primary-600 text-primary-600 rounded-xl font-semibold hover:bg-primary-50 transition-all">
+                <ShoppingBag size={18} /> Continue Shopping
+              </Link>
+              {confirmedInvoice && (
+                <button
+                  onClick={async () => {
+                    try {
+                      const res = await api.post(`/customer/invoices/${confirmedInvoice._id}/access`);
+                      const { secureUrl } = res.data.data;
+                      if (secureUrl) window.open(secureUrl, '_blank');
+                    } catch { window.open('/account/orders', '_blank'); }
+                  }}
+                  className="flex items-center justify-center gap-2 px-6 py-3 border border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition-all"
+                >
+                  <FileText size={18} /> View / Download Invoice
+                </button>
+              )}
+              <Link to="/account/orders" className="flex items-center justify-center gap-2 px-6 py-3 border border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition-all">
+                View My Orders
+              </Link>
             </div>
 
             {/* Order Summary */}
@@ -796,11 +844,11 @@ export default function Checkout() {
                           <PawPrint className="h-5 w-5 text-primary-300" />
                         </div>
                         <div>
-                          <p className="text-sm font-medium text-gray-900">{item.name}</p>
+                          <p className="text-sm font-medium text-gray-900">{item.productName || item.name}</p>
                           <p className="text-xs text-gray-500">Qty: {item.quantity}</p>
                         </div>
                       </div>
-                      <p className="text-sm font-semibold text-gray-900">NZ${(item.price * item.quantity).toFixed(2)}</p>
+                      <p className="text-sm font-semibold text-gray-900">NZ${(item.unitPrice || 0).toFixed(2)}</p>
                     </div>
                   ))}
                 </div>
@@ -923,29 +971,6 @@ export default function Checkout() {
               </div>
             )}
 
-            {/* Confirmation Sent */}
-            <div className="bg-green-50 border border-green-200 rounded-2xl p-5 flex items-start gap-3">
-              <Mail className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
-              <div>
-                <p className="text-sm font-medium text-green-800">Confirmation sent</p>
-                <p className="text-sm text-green-700 mt-0.5">
-                  Order confirmation and invoice have been sent to <strong>{user?.email}</strong>.
-                </p>
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
-              <Link to="/" className="flex items-center justify-center gap-2 px-6 py-3 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 transition-all">
-                <Home size={18} /> Back to Home
-              </Link>
-              <Link to="/shop" className="flex items-center justify-center gap-2 px-6 py-3 border border-primary-600 text-primary-600 rounded-xl font-semibold hover:bg-primary-50 transition-all">
-                <ShoppingBag size={18} /> Continue Shopping
-              </Link>
-              <Link to="/account/orders" className="flex items-center justify-center gap-2 px-6 py-3 border border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition-all">
-                View My Orders
-              </Link>
-            </div>
           </div>
         )}
       </div>

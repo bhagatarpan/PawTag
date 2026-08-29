@@ -67,13 +67,12 @@ import cmsPublicV2Routes from './routes/cms-public-v2';
 import customerSubscriptionRoutes from './routes/customer-subscriptions';
 import adminSubscriptionRoutes from './routes/admin-subscriptions';
 import adminAnalyticsRoutes from './routes/admin-analytics';
-import webhookRoutes from './routes/webhooks';
+
 import invoiceAccessRoutes from './routes/invoice-access';
 import referralRoutes from './routes/referrals';
 import checkoutOtpRoutes from './routes/checkout-otp';
-import medusaSyncRoutes from './routes/medusa-sync';
-import medusaWebhookRoutes from './routes/medusa-webhooks';
 import pushTokenRoutes from './routes/push-tokens';
+import customerReturnsRoutes from './routes/customer-returns';
 import auditRoutes from './routes/audit';
 import systemLogRoutes from './routes/system-logs';
 import siteAvailabilityRoutes from './routes/site-availability';
@@ -82,6 +81,25 @@ import { publicRouter as supportPublicRoutes, adminRouter as supportAdminRoutes 
 import adminWebhookRoutes from './routes/admin-webhooks';
 import addressAutocompleteRoutes from './routes/address-autocomplete';
 import healthRoutes from './routes/health';
+
+// --- PawTag Commerce Routes (Phase 0-11) ---
+import productRoutes from './routes/products';
+import cartRoutes from './routes/cart';
+import checkoutRoutes from './routes/checkout';
+import shippingRoutes from './routes/shipping';
+import adminCommerceRoutes from './routes/admin-commerce';
+import adminCategoryRoutes from './routes/admin-categories';
+import adminCollectionRoutes from './routes/admin-collections';
+import adminBrandRoutes from './routes/admin-brands';
+import adminShippingRoutes from './routes/admin-shipping';
+import adminFulfilmentRoutes from './routes/admin-fulfilments';
+import adminReturnRoutes from './routes/admin-returns';
+import adminShipmentRoutes from './routes/admin-shipments';
+import adminPaymentRoutes from './routes/admin-payments';
+import adminPromoCodeRoutes from './routes/admin-promocodes';
+import stripeWebhookRoutes from './routes/stripe-webhooks';
+import promoPublicRoutes from './routes/promo-public';
+
 import { siteAvailabilityMiddleware } from './middleware/site-availability';
 import { shutdownTracing } from './lib/tracing';
 import { flushMonitoring } from './lib/monitoring';
@@ -98,7 +116,12 @@ app.use('/api/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // --- Security & Middleware ---
 const cspDirectives = helmet.contentSecurityPolicy.getDefaultDirectives();
-cspDirectives['img-src'] = ["'self'", 'data:', 'http://localhost:*', 'https:'];
+cspDirectives['script-src'] = ["'self'", 'https://js.stripe.com', 'https://m.stripe.network'];
+cspDirectives['frame-src'] = ["'self'", 'https://js.stripe.com', 'https://hooks.stripe.com'];
+cspDirectives['img-src'] = ["'self'", 'data:', 'http://localhost:*', 'https:', 'https://*.stripe.com'];
+cspDirectives['connect-src'] = ["'self'", 'https://api.stripe.com', 'https://maps.googleapis.com'];
+cspDirectives['style-src'] = ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'];
+cspDirectives['font-src'] = ["'self'", 'https://fonts.gstatic.com'];
 
 app.use(helmet({
   crossOriginResourcePolicy: false,
@@ -219,19 +242,17 @@ app.use('/api/admin/cms/auth-pages', cmsAuthAdminRoutes);
 app.use('/api/admin/cms/onboarding', cmsOnboardingAdminRoutes);
 app.use('/api/customer', customerRoutes);
 app.use('/api/customer/checkout-otp', checkoutOtpRoutes);
-app.use('/api/customer/medusa-sync', medusaSyncRoutes);
 import demoPaymentRoutes from './routes/demo-payment';
 app.use('/api/customer/demo-payment', demoPaymentRoutes);
 app.use('/api/customer/subscriptions', customerSubscriptionRoutes);
 app.use('/api/admin/subscriptions', adminSubscriptionRoutes);
 app.use('/api/admin/analytics', adminAnalyticsRoutes);
 app.use('/api', invoiceAccessRoutes);
-app.use('/api/webhooks', webhookRoutes);
-app.use('/api/webhooks/medusa', medusaWebhookRoutes);
 app.use('/api/finder', finderRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api', referralRoutes);
 app.use('/api', pushTokenRoutes);
+app.use('/api/customer/returns', customerReturnsRoutes);
 app.use('/api/support', supportPublicRoutes);
 app.use('/api/admin/support-requests', supportAdminRoutes);
 app.use('/api/public/cms', cmsPublicRoutes);
@@ -243,6 +264,26 @@ app.use('/api/admin/site-availability', siteAvailabilityRoutes);
 app.use('/api/admin/webhooks', adminWebhookRoutes);
 app.use('/api/public/system', systemStatusRoutes);
 app.use('/api/address', addressAutocompleteRoutes);
+
+// --- PawTag Commerce Routes ---
+app.use('/api/products', productRoutes);
+app.use('/api/cart', cartRoutes);
+app.use('/api/checkout', checkoutRoutes);
+app.use('/api/shipping', shippingRoutes);
+app.use('/api/admin/commerce', adminCommerceRoutes);
+app.use('/api/admin/commerce/categories', adminCategoryRoutes);
+app.use('/api/admin/commerce/collections', adminCollectionRoutes);
+app.use('/api/admin/commerce/brands', adminBrandRoutes);
+app.use('/api/admin/commerce/shipping-methods', adminShippingRoutes);
+app.use('/api/admin/commerce/fulfilments', adminFulfilmentRoutes);
+app.use('/api/admin/commerce/returns', adminReturnRoutes);
+app.use('/api/admin/commerce/shipments', adminShipmentRoutes);
+app.use('/api/admin/commerce/payments', adminPaymentRoutes);
+app.use('/api/admin/commerce/promo-codes', adminPromoCodeRoutes);
+app.use('/api/public/promo', promoPublicRoutes);
+
+// Stripe webhooks need raw body for signature verification
+app.use('/api/webhooks/stripe', express.raw({ type: 'application/json' }), stripeWebhookRoutes);
 
 // --- Error Handling ---
 app.use(notFoundHandler);
@@ -269,13 +310,25 @@ async function start() {
     // Start daily low stock check service
     startLowStockService();
 
+    // Start orphan payment detection job
+    const { startOrphanPaymentJob } = await import('./jobs/orphanPaymentDetection');
+    startOrphanPaymentJob();
+
+    // Start order auto-cancel job
+    const { startOrderAutoCancelJob } = await import('./jobs/orderAutoCancel');
+    startOrderAutoCancelJob();
+
+    // Start shipping tracking poll job
+    const { startTrackingPollJob } = await import('./jobs/shippingTrackingPoll');
+    startTrackingPollJob();
+
     // Start webhook retry job
     const { startWebhookRetryJob } = await import('./jobs/webhookRetry');
     startWebhookRetryJob();
 
-    // Start order sync reconciliation job
-    const { startReconciliationJob } = await import('./jobs/orderSyncReconciliation');
-    startReconciliationJob();
+    // Start payment reconciliation job
+    const { startPaymentReconciliationJob } = await import('./jobs/paymentReconciliation');
+    startPaymentReconciliationJob();
 
     const server = app.listen(config.port, () => {
       logger.info(`PawTag API running on port ${config.port}`);

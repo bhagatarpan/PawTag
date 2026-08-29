@@ -69,14 +69,22 @@ PawTag is a pet recovery platform that solves the problem of reuniting lost pets
 - Health conditions and surgery history
 - Weight tracking
 
-### E-Commerce (MedusaJS v2)
-- Product catalog with variants (Medusa commerce engine)
-- Server-side cart via Medusa SDK
-- Dual OTP checkout gatekeeper (email + SMS)
-- Stripe payment processing
-- Order lifecycle management
+### E-Commerce (PawTag Commerce)
+- Product catalog with variants and inventory management
+- Server-side cart with promo codes (guests can validate, logged-in apply)
+- Cart with server-side price re-validation on every item load (price change detection)
+- Guest mode with visual indicator in the cart drawer
+- 4-step checkout wizard with Stripe payment processing
+- Order lifecycle management with idempotent creation
 - Subscription management
-- Invoice generation
+- Invoice generation and email delivery
+- NZ domestic shipping via NZ Post API (with demo fallback)
+- Shipment tracking with automated carrier polling (5-min intervals)
+- Payment transaction audit trail and reconciliation
+- Self-service returns and order cancellation with auto-refund
+- Discount/promo code management (percentage, fixed, usage limits)
+- CMS-driven commerce settings (35+ configurable settings)
+- Cart configuration via CMS: TTL, max items per cart, price revalidation toggle
 
 ### Mobile App (React Native/Expo)
 - QR code scanning
@@ -90,7 +98,11 @@ PawTag is a pet recovery platform that solves the problem of reuniting lost pets
 - Role-based access control (RBAC)
 - Analytics dashboard
 - CMS content management
-- Order fulfillment
+- Order fulfillment with shipment management
+- Payment reconciliation dashboard
+- Returns and refund processing
+- Discount/promo code management
+- Commerce settings with human-readable labels and tooltips
 - Subscription management
 
 ### Security
@@ -583,10 +595,15 @@ sequenceDiagram
 
 ### E-Commerce Flow (4-Step Checkout Wizard)
 
-1. **Cart** — Review items, apply promo code, see totals
+1. **Cart** — Review items, apply promo code (guests validate only, logged-in apply), see totals with server-side price re-validation
 2. **Checkout** — Contact verification (email + mobile verified), shipping address
 3. **Payment** — Order summary, Stripe card form, pay button
 4. **Confirmed** — Success page with order number
+
+**Cart behavior:**
+- Server-side price re-validation on every cart load detects price changes and alerts the user
+- Guest users see a visual indicator in the cart drawer indicating guest mode
+- Cart configuration (TTL, max items, price revalidation) managed via CMS settings
 
 **Verification gate:** Users must have both email and mobile verified before proceeding to payment. The checkout page checks `user.emailVerified` and `user.phoneVerified` and shows verification status with links to verify.
 
@@ -756,6 +773,7 @@ The Admin Portal is the operational control centre of the application. It provid
 - Monaco JSON editor for advanced content editing
 - Enterprise-grade sidebar with collapsible sections
 - Dark/light mode toggle with persistence
+- Cart settings management (TTL, max items, price revalidation toggle)
 
 ---
 
@@ -1169,6 +1187,7 @@ pnpm test:watch
 - **Test Files:** 77 (25 unit, 32 integration, 1 smoke, 2 regression)
 - **Tests:** 1100+ passing (99% pass rate)
 - **Duration:** ~60 seconds
+- **Cart Service Tests:** 18 unit tests covering price re-validation, guest mode, price change detection, and cart configuration
 
 ---
 

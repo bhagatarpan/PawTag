@@ -107,9 +107,9 @@ I did not assume. Each line below reflects what I found reading the real route f
 | 2 | Browses products | ✅ Exists | `Product` model, shop routes |
 | 3 | Adds tag to cart | ✅ Exists | `Cart` model, `/customer/cart/items` |
 | 4 | Checkout | ✅ 4-Step Wizard | Cart → Checkout (verification + address) → Payment (Stripe) → Confirmed |
-| 5 | Payment | ⚠️ Partial | Stripe wired but runs in demo mode; order is marked `paid` right after a PaymentIntent is *created*, not after it's *confirmed* client-side. **Financial integrity gap — Phase 5.** |
-| 6 | Order confirmation | ⚠️ Partial | Email service exists with templates; not confirmed to fire automatically on order creation — verify/wire in Phase 5. |
-| 7 | Invoice | ⚠️ Partial | `Invoice` + `InvoiceAccessToken` models exist (a customer-facing invoice link system is already designed) but **no PDF generation** found. **Phase 15.** |
+| 5 | Payment | ✅ Working | PawTag-native checkout API creates Stripe PaymentIntent server-side. Customer confirms client-side via `stripe.confirmPayment()`. Payment confirmed only after Stripe callback. Orphan payment detection job runs every 60s. |
+| 6 | Order confirmation | ✅ Working | Emails fire automatically on order creation: order confirmation, invoice, and admin notification sent in parallel via `Promise.allSettled()`. |
+| 7 | Invoice | ✅ Working | `Invoice` + `InvoiceAccessToken` models with atomic counter and secure access tokens. Customer invoice access via `/api/customer/orders/:id/invoice`. |
 | 8 | Admin receives order notification | ❌ Missing | No email/dashboard alert fires when an order is placed. An admin could miss a sale entirely. **Phase 7.** |
 | 9 | Warehouse receives order | ❌ Missing | No packing/fulfillment concept beyond order status. |
 | 10 | Packing | ❌ Missing | No "packed" state in the workflow (status enum has `pending/paid/shipped/delivered/cancelled/refunded` — no `packing`/`packed`). **Phase 6.** |
@@ -142,23 +142,23 @@ Direct answers to your operational questions, based on what exists today vs. wha
 
 | Question | Current reality | Fix |
 |---|---|---|
-| How does the owner know a new order arrived? | Nothing — silent. | Phase 7: email + admin dashboard badge. |
-| How are invoices generated? | DB record only, no PDF. | Phase 15: PDF generation on payment success. |
-| How are shipping labels created? | Manually, outside the system (or not at all). | Phase 9: courier API integration. |
-| How are tracking numbers stored? | Field exists, set manually by admin. | Phase 9: auto-populate from courier API. |
-| How are customers notified of status? | They aren't. | Phase 10. |
-| How are refunds handled? | `createRefund()` exists in the Stripe service but isn't wired into an admin action or inventory restock. | Phase 8. |
-| How are cancelled orders handled? | Status value exists, no workflow around it (restocking, refund trigger, customer email). | Phase 6/8. |
-| How are returns handled? | Not built at all. | Phase 8 (scoped as "cancellation + basic RMA," full returns can be a post-MVP phase if volume justifies it). |
-| How are subscriptions renewed? | Stripe webhook-driven — mostly automated. | Verify only (Phase 19). |
-| How are failed payments handled? | Partially — a `TagExpiryNotification` model suggests grace-period logic exists for expired subscriptions, but dunning emails aren't confirmed. | Phase 19. |
-| How are expired tags handled? | `grace_period` subscription status exists on `Tag` — reasonably well handled already. | Verify only. |
-| How are replacement/damaged tags handled? | Not built. | Phase 13. |
-| How are support requests handled? | No ticketing model exists. | Phase 19 — recommend a lightweight "contact us → email" form first, and only adopt a full helpdesk tool (e.g. Plain, Freshdesk) once support volume justifies the cost, rather than building one from scratch. |
-| How are admin users notified? | `Notification` model appears customer-scoped only. | Extend in Phase 7. |
-| How are inventory levels updated? | Automatically decremented at order time — this already works well. | No action needed. |
-| How are low-stock alerts generated? | Not built. | Phase 19. |
-| How are reports produced? | No reporting/analytics surface in the admin app currently. | Phase 18: basic order/revenue/scan-volume dashboard using data you already have — no new infrastructure required. |
+| How does the owner know a new order arrived? | ✅ Email + in-app admin notification on every order (parallel, non-blocking). | Done (Phase 7). |
+| How are invoices generated? | ✅ Atomic counter, secure access tokens, customer-facing invoice link. PDF pending. | Done (Phase 15 — minus PDF). |
+| How are shipping labels created? | ✅ NZ Post integration via `nz-shipping` provider + admin shipment management. | Done (Phase 9). |
+| How are tracking numbers stored? | ✅ Auto-populated from NZ Post API on shipment creation. | Done (Phase 9). |
+| How are customers notified of status? | ✅ Multi-channel: email + push + in-app on every status change. | Done (Phase 10). |
+| How are refunds handled? | ✅ Full/partial refunds via `refund.service.ts` with inventory restock. Admin UI in commerce settings. | Done (Phase 8). |
+| How are cancelled orders handled? | ✅ Workflow: validate → cancel in Medusa (best-effort) → refund via Stripe → restock inventory → notify customer. | Done (Phase 6/8). |
+| How are returns handled? | ✅ Customer self-service return requests + admin management UI. | Done (Phase 8). |
+| How are subscriptions renewed? | ✅ PawTag-native cron-based renewal, not Stripe Billing. Hourly check. | Done (Phase 19). |
+| How are failed payments handled? | ✅ Dunning emails (30d, 7d, 1d), grace period, admin notifications. | Done (Phase 19). |
+| How are expired tags handled? | ✅ Grace period subscription status on Tag, auto-transition to expired. | Done. |
+| How are replacement/damaged tags handled? | ⚠️ Not built. | Phase 13. |
+| How are support requests handled? | ✅ Contact form + admin management UI with status tracking. | Done (Phase 19). |
+| How are admin users notified? | ✅ `Notification` model supports `audience: 'admin'` with unread count badge. | Done (Phase 7). |
+| How are inventory levels updated? | ✅ Automatically decremented at order time + reservation during checkout. | Done. |
+| How are low-stock alerts generated? | ⚠️ Not built. | Phase 19. |
+| How are reports produced? | ⚠️ No reporting/analytics surface in the admin app currently. | Phase 18. |
 
 ---
 
@@ -3176,6 +3176,90 @@ Medusa is now the **single source of truth** for all product/commerce data. The 
 | `apps/medusa/src/subscribers/pawtag-webhook.ts` | 5s timeout |
 | `AGENTS.md` | Sync architecture + admin dashboard docs |
 | `README.md` | Sync architecture + admin dashboard docs |
+
+---
+
+## Part 10B — PawTag Commerce Engine (Medusa Replacement) ✅ IN PROGRESS
+
+**Branch:** `feature/pawtag-commerce`
+**Started:** 2026-08-28
+**Status:** Phases 0-10 Complete
+
+### What Was Built (Last 3 Days)
+
+**Shipment Management:**
+- `Shipment` model with NZ Post carrier integration (real API + demo fallback)
+- `ShipmentService` — shipment lifecycle (create, track, label generation)
+- Admin Shipments page with tracking, label download, carrier status
+- Automated tracking poll job (5-minute intervals)
+
+**Payment Transaction Tracking:**
+- `PaymentTransaction` model — audit trail for all Stripe transactions
+- Transactions recorded on checkout success and refund
+- Admin PaymentReconciliation page with stats, filters, detail drawer
+
+**Self-Service Returns & Cancellation:**
+- Customer return request API (`POST /api/customer/returns`)
+- Order cancellation with auto-refund and inventory release
+- Frontend `ReturnRequest.tsx` page
+- Order detail page with return/cancel buttons
+
+**Dedicated Admin Pages:**
+- Collections page (standalone, not sharing Categories component)
+- Brands page (standalone)
+
+**Reliability Infrastructure:**
+- Webhook retry job with exponential backoff (60s → 1h)
+- Payment reconciliation job (5-minute Stripe comparison)
+- Health check extended with NZ Post carrier status
+
+**Checkout Hardening (15+ fixes):**
+- Cart TTL: 30min → 30 days
+- Removed destructive `refreshCart()` from error path
+- Skip 401 redirect during checkout
+- Skip CartContext refresh on token clear during checkout
+- Error boundary around StripePaymentForm
+- Stripe.js loading failure handling
+- CSP headers: added Stripe domains
+- Promo code route mounted + duplicate middleware fixed
+- Inline promo code error messages (not global banner)
+- Confirmation page redesigned (invoice button, animations, scroll-to-top)
+- Order number reads prefix/length from admin settings
+- Commerce Settings page rewritten (human-readable labels, tooltips)
+- All checkout errors logged to system logs, users see friendly messages
+- `shippingAddress.state` made optional (NZ addresses)
+- Order number retry on duplicate key (error code 11000)
+- Idempotent order lookup (prevents 409 Conflict)
+- Guest promo code validation (no auth required)
+- JWT expiry increased to 2 hours
+
+**Scroll-Triggered Animations:**
+- `<FadeIn>` component in `@pawtag/ui` (native IntersectionObserver)
+- Homepage sections wrapped with FadeIn for progressive reveal
+- EngagementTicker counter starts only when scrolled into view
+- Respects prefers-reduced-motion for accessibility
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `packages/api/src/commerce/services/checkout.service.ts` | Payment intent + order confirmation (idempotent) |
+| `packages/api/src/routes/promo-public.ts` | Public promo validation (no auth) |
+| `packages/api/src/routes/admin-shipments.ts` | Shipment management API |
+| `packages/api/src/routes/admin-payments.ts` | Payment reconciliation API |
+| `packages/api/src/routes/customer-returns.ts` | Customer return/cancel API |
+| `packages/api/src/jobs/webhookRetry.ts` | Webhook retry with backoff |
+| `packages/api/src/jobs/paymentReconciliation.ts` | Stripe reconciliation |
+| `packages/api/src/jobs/shippingTrackingPoll.ts` | Carrier tracking poll |
+| `packages/ui/src/components/FadeIn.tsx` | Scroll-triggered animation |
+| `apps/web/src/pages/Checkout.tsx` | Full checkout flow |
+| `apps/admin/src/pages/CommerceSettings.tsx` | Commerce settings UI |
+
+### Remaining Work
+
+- Phase 11: NZ Tax, Addresses and Customer Experience
+- Phase 12: Medusa Migration and Removal
+- Phase 13: Security, Observability and Production Hardening
 
 ---
 
