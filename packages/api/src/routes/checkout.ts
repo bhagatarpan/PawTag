@@ -42,7 +42,8 @@ router.use(authenticate);
  */
 router.post('/payment-intent', async (req: AuthRequest, res: Response) => {
   try {
-    const result = await checkoutService.createPaymentIntent(req.user!.id);
+    const { shippingAddress } = req.body || {};
+    const result = await checkoutService.createPaymentIntent(req.user!.id, shippingAddress);
 
     res.json({
       success: true,

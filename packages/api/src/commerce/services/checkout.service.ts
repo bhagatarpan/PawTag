@@ -88,7 +88,7 @@ export class CheckoutService {
    * @param userId - User ID
    * @returns Payment intent details for frontend
    */
-  async createPaymentIntent(userId: string): Promise<CheckoutPaymentIntent> {
+  async createPaymentIntent(userId: string, shippingAddress?: { line1: string; line2?: string; city: string; state: string; zip: string; country?: string }): Promise<CheckoutPaymentIntent> {
     // 1. Get and validate cart
     const cart = await Cart.findOne({ userId, status: 'active' });
     if (!cart || !cart.items.length) {
@@ -154,6 +154,7 @@ export class CheckoutService {
       currency: totals.currency,
       stripePaymentIntentId: paymentIntent.id,
       stripeClientSecret: paymentIntent.clientSecret,
+      shippingAddress: shippingAddress || undefined,
       status: 'pending',
       referralCode: cart.promoCode,
       expiresAt,

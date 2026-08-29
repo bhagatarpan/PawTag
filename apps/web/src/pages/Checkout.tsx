@@ -219,7 +219,16 @@ export default function Checkout() {
     setError(null);
     try {
       // 1. Create payment intent via PawTag checkout API
-      const checkoutRes = await api.post('/checkout/payment-intent');
+      const checkoutRes = await api.post('/checkout/payment-intent', {
+        shippingAddress: {
+          line1: form.line1,
+          line2: form.line2,
+          city: form.city,
+          state: form.state,
+          zip: form.zip,
+          country: form.country || 'NZ',
+        },
+      });
       const { paymentIntentId, clientSecret, pendingOrderId } = checkoutRes.data?.data;
 
       if (!clientSecret) {
