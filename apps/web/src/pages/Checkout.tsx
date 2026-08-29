@@ -227,7 +227,10 @@ export default function Checkout() {
       setPaymentClientSecret(clientSecret);
       setCurrentStep('payment');
     } catch (err: any) {
-      setError(err?.message || err?.response?.data?.error || 'Payment failed. Please try again.');
+      const msg = err?.response?.status === 401
+        ? 'Your session expired. Please log in again to continue.'
+        : err?.message || err?.response?.data?.error || 'Payment failed. Please try again.';
+      setError(msg);
     } finally {
       setLoading(false);
     }

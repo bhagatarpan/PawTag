@@ -242,8 +242,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
         // User just logged in — sync guest cart
         syncGuestCartToServer();
       } else if (!token) {
-        // User logged out — reload guest cart
-        refreshCart();
+        // User logged out — but DON'T wipe the cart during checkout.
+        // The checkout page manages its own cart state and error handling.
+        if (!window.location.pathname.startsWith('/checkout')) {
+          refreshCart();
+        }
       }
     };
 

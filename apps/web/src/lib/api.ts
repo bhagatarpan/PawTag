@@ -36,7 +36,9 @@ api.interceptors.response.use(
       if (!refreshToken) {
         localStorage.removeItem('pawtag_token');
         localStorage.removeItem('pawtag_refresh_token');
-        if (!window.location.pathname.startsWith('/login')) {
+        // Don't hard-redirect during checkout — it destroys cart state.
+        // Let the calling code handle the 401 gracefully.
+        if (!window.location.pathname.startsWith('/login') && !window.location.pathname.startsWith('/checkout')) {
           window.location.href = '/login';
         }
         return Promise.reject(err);
@@ -73,7 +75,8 @@ api.interceptors.response.use(
         processQueue(refreshError, null);
         localStorage.removeItem('pawtag_token');
         localStorage.removeItem('pawtag_refresh_token');
-        if (!window.location.pathname.startsWith('/login')) {
+        // Don't hard-redirect during checkout — it destroys cart state.
+        if (!window.location.pathname.startsWith('/login') && !window.location.pathname.startsWith('/checkout')) {
           window.location.href = '/login';
         }
         return Promise.reject(refreshError);
