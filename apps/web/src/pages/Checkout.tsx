@@ -717,7 +717,7 @@ export default function Checkout() {
                           <p className="text-xs text-gray-500">Qty: {item.quantity}</p>
                         </div>
                       </div>
-                      <p className="text-sm font-semibold text-gray-900">NZ${(item.unitPrice || item&& 0).toFixed(2)}</p>
+                      <p className="text-sm font-semibold text-gray-900">NZ${(item.unitPrice || 0).toFixed(2)}</p>
                     </div>
                   ))}
                 </div>
