@@ -49,13 +49,16 @@ PawTag is a pet recovery platform with an integrated commerce system for selling
 
 | Component | Status | Implementation |
 |-----------|--------|---------------|
-| Add/remove items | Working (Medusa) | `CartContext.tsx` via Medusa SDK |
-| Quantity updates | Working (Medusa) | Optimistic UI + server reconciliation |
-| Cart persistence | Working (Medusa) | Cart ID in localStorage |
-| Customer sync | Working | Auto-sync on first cart add |
-| Cart drawer | Working | Shared `@pawtag/ui` `CartDrawer` component |
+| Add/remove items | Working (PawTag-native) | `cart.service.ts` — server-side via `POST /api/cart/items` |
+| Quantity updates | Working (PawTag-native) | `PUT /api/cart/items/:id` — server-side validation |
+| Cart persistence | Working (PawTag-native) | MongoDB Cart model with unique userId index + TTL expiry |
+| Customer sync | Working | Auto-sync guest cart on login (`syncGuestCartToServer`) |
+| Cart drawer | Working | Shared `@pawtag/ui` `CartDrawer` component with guest banner + price warnings |
+| Price re-validation | Working | `calculateTotals()` re-fetches prices from DB on every cart load |
+| Promo codes | Working (PawTag-native) | Server-side validation + application via `POST /api/cart/promo` |
+| Guest mode | Working | localStorage cart with visual indicator, merges on login |
 
-**Cart lives entirely in Medusa.** MongoDB Cart model is deprecated with no active routes.
+**Cart is PawTag-native.** MongoDB Cart model with `unique: true` on userId (one active cart per user). Converted/abandoned carts are reset on next visit.
 
 ### Checkout
 
@@ -65,23 +68,23 @@ PawTag is a pet recovery platform with an integrated commerce system for selling
 | Authentication gate | Working | Inline login/register |
 | Email/SMS verification | Working | OTP with CMS-configurable settings |
 | Address autocomplete | Working | Photon or NZ Post provider |
-| Shipping selection | Working | From Medusa fulfillment options |
-| Promo codes | Working | Via Medusa SDK |
+| Shipping selection | Working (PawTag-native) | `shipping.service.ts` — rates from ShippingMethod model + NZ Post fallback |
+| Promo codes | Working (PawTag-native) | Server-side cart promo via `POST /api/cart/promo` (guests validate via public endpoint) |
 | Referral codes | Working | Via cart metadata propagation |
 
 ### Payments
 
 | Component | Status | Implementation |
 |-----------|--------|---------------|
-| Stripe integration | Working (via Medusa) | `pp_stripe_stripe` payment module |
+| Stripe integration | Working (PawTag-native) | `stripe/` provider — direct Stripe API |
 | Card payments | Working | Stripe Elements (PaymentElement) |
 | Apple Pay | Working | Via Stripe PaymentElement |
 | Google Pay | Working | Via Stripe PaymentElement |
 | Klarna/Afterpay | Working | Via Stripe PaymentElement |
-| Demo mode | Working | `pp_system_default` auto-succeeds |
-| Refunds | Working | Direct Stripe API (`stripe.service.ts`) |
+| Demo mode | Working | `commerce.payment.testMode` CMS setting |
+| Refunds | Working | Direct Stripe API via `refund.service.ts` |
 
-**Payment sessions created via Medusa.** Refunds bypass Medusa (direct Stripe API).
+**Payment sessions created via PawTag checkout API** (`POST /api/checkout/payment-intent`). Stripe webhook handler as backup.
 
 ### Orders
 
@@ -177,21 +180,20 @@ Medusa is the **commerce engine** responsible for:
 | Domain | Source of Truth | Notes |
 |--------|----------------|-------|
 | Users/Customers | **PawTag (MongoDB)** | Medusa gets a synced copy |
-| Products | **Medusa (PostgreSQL)** | MongoDB Product model deprecated |
-| Prices | **Medusa (PostgreSQL)** | PawTag has no pricing system |
-| Cart | **Medusa (PostgreSQL)** | MongoDB Cart model deprecated |
-| Checkout | **Shared** | Frontend orchestrates, Medusa handles payment/shipping |
-| Payment | **Stripe** | Medusa creates sessions, Stripe is authority |
+| Products | **Medusa (PostgreSQL)** | Admin manages via Medusa admin at `:9000/app` |
+| Prices | **Medusa (PostgreSQL)** | Per-variant, per-region pricing |
+| Cart | **PawTag (MongoDB)** | PawTag-native `cart.service.ts` with unique userId index |
+| Checkout | **PawTag (MongoDB)** | PawTag-native `checkout.service.ts` — payment-intent + confirm |
+| Payment | **PawTag → Stripe** | Direct Stripe integration, PawTag-native provider |
 | Orders | **PawTag (MongoDB)** | PawTag is business record owner |
 | Invoices | **PawTag (MongoDB)** | Created on order placement |
 | Subscriptions | **PawTag (MongoDB)** | PawTag-native lifecycle |
-| Shipping | **Medusa (PostgreSQL)** | PawTag stores tracking numbers |
-| Inventory | **Medusa (PostgreSQL)** | PawTag low-stock check is stale |
-| Tax | **Medusa (PostgreSQL)** | 15% NZ GST |
-| Promos/Discounts | **Medusa (PostgreSQL)** | No PawTag-side management |
+| Shipping | **PawTag (MongoDB)** | PawTag-native `shipping.service.ts` — ShippingMethod model + NZ Post |
+| Inventory | **PawTag (MongoDB)** | PawTag-native `inventory.service.ts` with reservation |
+| Tax | **PawTag (MongoDB)** | 15% NZ GST, tax-inclusive via `simple-gst` provider |
+| Promos/Discounts | **PawTag (MongoDB)** | PawTag-native `PromoCode` model with admin CRUD |
 | Tags (physical) | **PawTag (MongoDB)** | Core product entity |
 | Referrals | **PawTag (MongoDB)** | PawTag-native |
-| Fulfilment | **Shared** | Admin action syncs to Medusa |
 | Tracking | **PawTag (MongoDB)** | Stored on Order model |
 
 ---
@@ -212,26 +214,26 @@ Medusa is the **commerce engine** responsible for:
 
 ## What Functionality Is Missing
 
-### Critical for PawTag Commerce
+### ~~Critical for PawTag Commerce~~ ✅ RESOLVED
 
-1. **No PawTag-native product management** — Products live only in Medusa
-2. **No PawTag-native cart** — Cart lives only in Medusa
-3. **No PawTag-native payment session creation** — Medusa creates Stripe payment sessions
-4. **No server-side price validation** — Relies on Medusa to resolve prices
-5. **No orphan payment detection** — If payment succeeds but order creation fails, no recovery
-6. **Stripe webhook signature verification is stubbed** — Security vulnerability
-7. **Invoice counter race condition** — Non-atomic counter in `webhooks.ts`
-8. **Subscription pricing hardcoded** — `$0.99/month` and `$1.99/month` in `subscription.service.ts`
+1. ~~No PawTag-native product management~~ — Products managed via Medusa admin (`:9000/app`)
+2. ~~No PawTag-native cart~~ — **Done.** PawTag-native `cart.service.ts` with MongoDB Cart model
+3. ~~No PawTag-native payment session creation~~ — **Done.** Direct Stripe via `checkout.service.ts`
+4. ~~No server-side price validation~~ — **Done.** `calculateTotals()` re-fetches prices from DB
+5. ~~No orphan payment detection~~ — **Done.** Background job detects stale pending payments
+6. ~~Stripe webhook signature verification is stubbed~~ — **Done.** Production-grade verification
+7. ~~Invoice counter race condition~~ — **Done.** Atomic counters
+8. ~~Subscription pricing hardcoded~~ — **Done.** CMS-driven pricing
 
 ### Important for Production
 
-9. **No real shipping integration** — Demo mode with fake tracking
-10. **No inventory reservation during checkout** — Stock could be oversold
-11. **Low stock check queries deprecated MongoDB Product** — Stale data
-12. **No admin product management in PawTag** — Products managed in Medusa admin
-13. **No admin shipping management** — Shipping configured in Medusa
-14. **No admin discount/promo management** — Promos configured in Medusa
-15. **No admin tax configuration** — Tax configured in Medusa
+9. **No real shipping integration** — NZ Post integration done via `nz-shipping` provider
+10. ~~No inventory reservation during checkout~~ — **Done.** `inventory.service.ts` with reservation
+11. ~~Low stock check queries deprecated MongoDB Product~~ — **Done.** PawTag-native inventory
+12. ~~No admin product management in PawTag~~ — Products managed via Medusa admin
+13. **No admin shipping management** — ShippingMethod model with admin CRUD ✅
+14. ~~No admin discount/promo management~~ — **Done.** PromoCode model with admin CRUD
+15. ~~No admin tax configuration~~ — **Done.** Simple GST via CMS settings
 
 ### Nice to Have
 
