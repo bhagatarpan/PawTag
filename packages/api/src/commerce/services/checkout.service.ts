@@ -196,6 +196,8 @@ export class CheckoutService {
    * @returns Checkout result with order and invoice
    */
   async confirmCheckout(userId: string, paymentIntentId: string): Promise<CheckoutResult> {
+    logger.info({ userId, paymentIntentId }, 'Checkout confirm started');
+
     // 1. Find PendingOrder
     const pending = await PendingOrder.findOne({
       stripePaymentIntentId: paymentIntentId,
@@ -203,8 +205,10 @@ export class CheckoutService {
     });
 
     if (!pending) {
+      logger.error({ userId, paymentIntentId }, 'PendingOrder not found');
       throw new NotFoundError('Pending order');
     }
+    logger.info({ pendingId: pending._id, status: pending.status, expiresAt: pending.expiresAt }, 'PendingOrder found');
 
     // 2. Check if already converted (idempotent)
     if (pending.status === 'converted' && pending.convertedOrderId) {
@@ -223,7 +227,9 @@ export class CheckoutService {
 
     // 4. Validate payment via Stripe API (server-side)
     const payment = await stripePaymentProvider.retrievePaymentIntent(paymentIntentId);
+    logger.info({ paymentStatus: payment.status, paymentId: payment.id }, 'Stripe payment status');
     if (payment.status !== 'succeeded' && payment.status !== 'requires_capture') {
+      logger.error({ paymentStatus: payment.status, paymentIntentId }, 'Payment not in expected state');
       throw new PaymentFailedError(`Payment status is ${payment.status}`);
     }
 

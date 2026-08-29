@@ -265,8 +265,10 @@ export default function Checkout() {
         pawtagOrder = confirmRes.data.data.order;
         invoice = confirmRes.data.data.invoice;
         invoiceUrl = confirmRes.data.data.invoiceUrl;
-      } catch (confirmErr) {
-        console.warn('[Checkout] Order confirmation failed, webhook will retry:', confirmErr);
+      } catch (confirmErr: any) {
+        console.error('[Checkout] Order confirmation failed:', confirmErr?.response?.data || confirmErr);
+        // Show error but still show confirmation — webhook may recover later
+        setError(`Order confirmation failed: ${confirmErr?.response?.data?.error || confirmErr?.message || 'Unknown error'}. Your payment was received — please contact support if this persists.`);
       }
 
       // 2. Preserve cart data for confirmation page (before clearCart)

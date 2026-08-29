@@ -238,6 +238,7 @@ export default function CommerceSettings() {
                         </div>
                       )}
                     </div>
+                    <p className="text-xs text-gray-400 mt-0.5">{setting.description}</p>
                     {setting.hint && <p className="text-xs text-amber-600 mt-0.5">{setting.hint}</p>}
                   </div>
                   <div className="flex-shrink-0">
