@@ -89,7 +89,7 @@ export class CartService {
     let cart = await Cart.findOne({ userId, status: 'active' });
 
     if (!cart) {
-      const ttlDays = await getNumberSetting('commerce.checkout.pendingOrderTtlMinutes' as any) / (24 * 60) || DEFAULT_CART_TTL_DAYS;
+      const ttlDays = DEFAULT_CART_TTL_DAYS;
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + ttlDays);
 

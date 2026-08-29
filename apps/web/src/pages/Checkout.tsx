@@ -228,7 +228,6 @@ export default function Checkout() {
       setCurrentStep('payment');
     } catch (err: any) {
       setError(err?.message || err?.response?.data?.error || 'Payment failed. Please try again.');
-      await refreshCart();
     } finally {
       setLoading(false);
     }
@@ -285,8 +284,8 @@ export default function Checkout() {
     setError(message);
   };
 
-  // Empty cart
-  if (items.length === 0 && !success) {
+  // Empty cart — but only show if we're not loading, not in payment flow, and not on confirmed step
+  if (items.length === 0 && !success && !loading && currentStep === 'cart') {
     // Clean up checkout session state
     sessionStorage.removeItem('pawtag_checkout_success');
     sessionStorage.removeItem('pawtag_checkout_order');
