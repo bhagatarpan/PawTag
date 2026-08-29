@@ -182,7 +182,9 @@ export default function Checkout() {
       setPromoDiscount(totals.discount || 0);
       setPromoError('');
     } catch (err: any) {
-      const msg = err?.response?.data?.error || err?.message || 'Invalid promo code';
+      const msg = err?.response?.status === 401
+        ? 'Your session expired. Please log in again to continue.'
+        : err?.response?.data?.error || 'Invalid promo code';
       setPromoError(msg);
       setPromoCode('');
     } finally {
