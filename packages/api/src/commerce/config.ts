@@ -75,6 +75,11 @@ export const COMMERCE_SETTINGS = {
   'commerce.checkout.termsRequired': { default: 'true', description: 'Require terms acceptance' },
   'commerce.checkout.pendingOrderTtlMinutes': { default: '30', description: 'How long a pending order is held' },
 
+  // ─── Cart ─────────────────────────────────────────────────
+  'commerce.cart.ttlDays': { default: '30', description: 'How long items stay in a cart before expiry' },
+  'commerce.cart.priceRevalidation': { default: 'true', description: 'Re-validate prices when cart is loaded' },
+  'commerce.cart.maxItems': { default: '50', description: 'Maximum number of unique items in a cart' },
+
   // ─── Orders ───────────────────────────────────────────────
   'commerce.orders.autoCancelMinutes': { default: '60', description: 'Auto-cancel unpaid orders after this many minutes' },
   'commerce.orders.numberPrefix': { default: 'PT', description: 'Order number prefix' },

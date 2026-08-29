@@ -61,7 +61,7 @@ export default function ProductDetail() {
   const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState(false);
   const [selectedImage, setSelectedImage] = useState(0);
-  const { addItem } = useCart();
+  const { addItem, error: cartError, clearError } = useCart();
 
   /* ---- Fetch product ---- */
   useEffect(() => {
@@ -73,17 +73,21 @@ export default function ProductDetail() {
   }, [id]);
 
   /* ---- Add to cart ---- */
-  const handleAddToCart = () => {
+  const handleAddToCart = async () => {
     if (!product) return;
-    addItem({
-      productId: product._id,
-      quantity,
-      name: product.name,
-      price: product.salePrice ?? product.price,
-      image: product.images?.[0],
-    });
-    setAdded(true);
-    setTimeout(() => setAdded(false), 1500);
+    try {
+      await addItem({
+        productId: product._id,
+        quantity,
+        name: product.name,
+        price: product.salePrice ?? product.price,
+        image: product.images?.[0],
+      });
+      setAdded(true);
+      setTimeout(() => setAdded(false), 1500);
+    } catch {
+      // Error already set in CartContext — toast will display it
+    }
   };
 
   /* ---- Loading state ---- */
@@ -249,6 +253,27 @@ export default function ProductDetail() {
           </div>
         </div>
       </div>
+
+      {/* Cart Error Toast */}
+      {cartError && (
+        <div className="fixed top-20 right-4 z-50 animate-slide-in-right">
+          <div className="bg-red-50 border border-red-200 rounded-xl shadow-xl p-3 flex items-center gap-3 max-w-xs w-full">
+            <div className="flex-shrink-0 h-8 w-8 bg-red-100 rounded-full flex items-center justify-center">
+              <span className="text-red-600 text-sm font-bold">!</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-red-800">{cartError}</p>
+            </div>
+            <button
+              onClick={clearError}
+              className="flex-shrink-0 p-1 text-red-400 hover:text-red-600 transition-colors"
+            >
+              <span className="sr-only">Dismiss</span>
+              &times;
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -27,11 +27,8 @@ import { InvalidCartError, InsufficientStockError, ProductUnavailableError } fro
 import { pricingService } from './pricing.service';
 import { inventoryService } from './inventory.service';
 import { nzGstProvider } from '../providers/simple-gst';
-import { getNumberSetting } from '../config';
+import { getNumberSetting, getBooleanSetting } from '../config';
 import logger from '../../lib/logger';
-
-/** Default cart TTL (30 days) */
-const DEFAULT_CART_TTL_DAYS = 30;
 
 /** Cart abandonment threshold (30 minutes) */
 const ABANDONMENT_THRESHOLD_MS = 30 * 60 * 1000;
@@ -89,7 +86,7 @@ export class CartService {
     let cart = await Cart.findOne({ userId, status: 'active' });
 
     if (!cart) {
-      const ttlDays = DEFAULT_CART_TTL_DAYS;
+      const ttlDays = await getNumberSetting('commerce.cart.ttlDays');
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + ttlDays);
 
@@ -132,6 +129,22 @@ export class CartService {
       throw new ProductUnavailableError(`${product.name} is no longer available`);
     }
 
+    // Normalise customisation for consistent comparison
+    const inputCust = input.customisation === true;
+
+    // Check if item already exists in cart
+    const existingItem = cart.items.find(
+      (item) => String(item.productId) === input.productId && (item.customisation === true) === inputCust,
+    );
+
+    // Check max cart items limit (only for new items)
+    if (!existingItem) {
+      const maxItems = await getNumberSetting('commerce.cart.maxItems');
+      if (cart.items.length >= maxItems) {
+        throw new InvalidCartError(`Cart is full. Maximum ${maxItems} unique items allowed.`);
+      }
+    }
+
     // Check stock availability
     const canFulfill = await inventoryService.canFulfill(input.productId, input.quantity);
     if (!canFulfill && product.stockPolicy === 'deny') {
@@ -144,11 +157,6 @@ export class CartService {
         },
       );
     }
-
-    // Check if item already exists in cart
-    const existingItem = cart.items.find(
-      (item) => String(item.productId) === input.productId && item.customisation === input.customisation,
-    );
 
     if (existingItem) {
       // Increment quantity
@@ -358,16 +366,34 @@ export class CartService {
       };
     }
 
-    // Fetch current prices from database
-    const items = cart.items.map((item) => ({
-      itemId: String(item._id),
-      productId: String(item.productId),
-      productName: item.productName,
-      quantity: item.quantity,
-        unitPrice: item.unitPrice, // Stored price, will be validated
+    // Fetch current prices from database (never trust stored prices)
+    const productIds = cart.items.map((item) => item.productId);
+    const products = await Product.find({ _id: { $in: productIds } }).lean();
+    const productMap = new Map(products.map((p) => [String(p._id), p]));
+
+    const items = cart.items.map((item) => {
+      const product = productMap.get(String(item.productId));
+      const currentPrice = product ? (product.salePrice ?? product.price) : item.unitPrice;
+
+      // Update stored price if product price changed
+      if (product && item.unitPrice !== currentPrice) {
+        item.unitPrice = currentPrice;
+        item.customizationTotal = item.customisation ? (product.customizationPrice || 0) : 0;
+      }
+
+      return {
+        itemId: String(item._id),
+        productId: String(item.productId),
+        productName: item.productName,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
         customisationTotal: item.customizationTotal,
         lineTotal: (item.unitPrice + item.customizationTotal) * item.quantity,
-    }));
+      };
+    });
+
+    // Persist any price updates
+    await cart.save();
 
     const subtotal = items.reduce((sum, item) => sum + item.lineTotal, 0);
     const discount = cart.promoDiscount ?? 0;

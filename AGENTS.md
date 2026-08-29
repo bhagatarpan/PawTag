@@ -453,7 +453,7 @@ packages/api/src/commerce/
     ├── product.service.ts      # Product catalog CRUD + pricing
     ├── inventory.service.ts    # Stock tracking, reservation, adjustment
     ├── pricing.service.ts      # Server-side price calculations
-    ├── cart.service.ts         # Shopping cart management
+    ├── cart.service.ts         # Shopping cart management + price revalidation
     ├── checkout.service.ts     # Checkout orchestration
     ├── shipping.service.ts     # Shipping rates and shipment creation
     └── refund.service.ts       # Full/partial refund processing
@@ -491,7 +491,7 @@ Safety nets:
 | Route | Purpose |
 |-------|---------|
 | `GET /api/products` | Public product listing |
-| `GET/POST/PUT/DELETE /api/cart/*` | Authenticated cart management |
+| `GET/POST/PUT/DELETE /api/cart/*` | Cart management (supports guest and authenticated users; guest-to-auth merge on login) |
 | `POST /api/checkout/payment-intent` | Create payment intent |
 | `POST /api/checkout/confirm` | Confirm checkout (idempotent) |
 | `POST /api/public/promo/validate` | Validate promo code (no auth — guests) |
@@ -505,7 +505,14 @@ Safety nets:
 
 ### Commerce Settings (CMS-Driven)
 
-All business values stored in `settings` collection with `commerce.*` prefix. 35+ settings across: Payment, Shipping, Tax, Inventory, Checkout, Orders, Subscriptions, Refunds, Notifications, Feature Flags.
+All business values stored in `settings` collection with `commerce.*` prefix. 35+ settings across: Payment, Shipping, Tax, Inventory, Cart, Checkout, Orders, Subscriptions, Refunds, Notifications, Feature Flags.
+
+**Cart settings (seeded in `seed-cms.ts`):**
+| Key | Default | Purpose |
+|-----|---------|---------|
+| `commerce.cart.ttlDays` | 30 | Cart expiry for guest/anonymous carts (days) |
+| `commerce.cart.priceRevalidation` | `true` | Re-validate prices from DB on every cart load |
+| `commerce.cart.maxItems` | 50 | Maximum items allowed in a single cart |
 
 ### Dual Database Architecture
 
@@ -678,6 +685,8 @@ const value = setting?.value || 'default';
 
 Settings are cached in-memory for 60 seconds in some services (e.g., `otp-settings.service.ts`, `rate-limiter.ts`).
 
+**Cart price revalidation:** `cart.service.ts` re-validates item prices from the database on every cart load when `commerce.cart.priceRevalidation` is enabled. Customisation comparison treats `undefined` and `false` as equivalent. Guest-to-auth cart sync merges items instead of creating duplicates. `addItem` is async (`Promise<void>`) — callers must `await` and handle errors.
+
 **Setting key convention:** `category.subcategory.property` (e.g., `rateLimit.finder.view.max`, `escalation.delayMinutes`)
 
 Seeded in `packages/api/src/seeds/seed-cms.ts` — idempotent upsert (safe to re-run).
@@ -848,6 +857,7 @@ Enterprise-grade sidebar with collapsible sections and dark/light mode:
 - Permission check: `requirePermission('resource.action')` middleware
 - Admin permissions seeded in `packages/api/src/seeds/seed.ts`
 - **Super Admin bypass:** Both `SUPER_ADMIN` and `ADMIN` roles have `isSuperAdmin: true`, which bypasses ALL permission checks (unrestricted "GOD mode" access)
+- **Token refresh:** `api.ts` interceptor no longer removes tokens on failed refresh — calling code handles cleanup to avoid race conditions with concurrent requests
 
 ### Frontend Patterns
 
@@ -859,6 +869,7 @@ Enterprise-grade sidebar with collapsible sections and dark/light mode:
 - **Rich Text Editing:** TipTap-based editor in admin with 13 extensions
 - **Monaco Editor:** JSON editor in admin for advanced content editing
 - **Scroll Animations:** `<FadeIn>` component from `@pawtag/ui` — uses native IntersectionObserver, respects prefers-reduced-motion
+- **CartDrawer:** Shared cart drawer shows a guest mode banner when user is not logged in; displays price-changed warnings when current prices differ from when item was added to cart
 
 ### PuckEditor CMS Page Builder
 
@@ -949,7 +960,7 @@ Located in `apps/mobile/e2e/`:
 | `apps/admin/src/pages/AddressAutocompleteSettings.tsx` | Address autocomplete provider config |
 | `packages/ui/src/components/AddressAutocomplete.tsx` | Reusable address autocomplete component |
 | `packages/ui/src/components/ProductCard.tsx` | Shared product card component (primary-* tokens) |
-| `packages/ui/src/components/CartDrawer.tsx` | Shared cart drawer component |
+| `packages/ui/src/components/CartDrawer.tsx` | Shared cart drawer component (guest mode banner, price-changed warnings) |
 | `packages/ui/src/components/FadeIn.tsx` | Scroll-triggered fade-in animation component |
 | `packages/api/src/routes/promo-public.ts` | Public promo code validation (no auth) |
 | `packages/api/src/routes/medusa-webhooks.ts` | Medusa webhook endpoint (order.placed, payment.captured) |

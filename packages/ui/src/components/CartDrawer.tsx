@@ -23,6 +23,8 @@ export interface CartDrawerProps {
   onRemoveItem: (id: string) => void;
   onClearCart: () => void;
   onCheckout?: () => void;
+  isGuest?: boolean;
+  priceChanged?: boolean;
   className?: string;
 }
 
@@ -35,6 +37,8 @@ export const CartDrawer = React.memo(function CartDrawer({
   onRemoveItem,
   onClearCart,
   onCheckout,
+  isGuest = false,
+  priceChanged = false,
   className = '',
 }: CartDrawerProps) {
   if (!open) return null;
@@ -63,6 +67,20 @@ export const CartDrawer = React.memo(function CartDrawer({
             <X className="h-5 w-5" />
           </button>
         </div>
+
+        {/* Guest mode banner */}
+        {isGuest && items.length > 0 && (
+          <div className="mx-4 mt-3 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">
+            You're shopping as a guest. <strong>Log in</strong> to save your cart and check out.
+          </div>
+        )}
+
+        {/* Price changed warning */}
+        {priceChanged && (
+          <div className="mx-4 mt-3 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700">
+            A price in your cart has been updated to reflect current pricing.
+          </div>
+        )}
 
         {/* Items */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">

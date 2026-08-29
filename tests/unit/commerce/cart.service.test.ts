@@ -6,19 +6,25 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock database models
-vi.mock('@pawtag/db', () => ({
-  Cart: {
-    findOne: vi.fn(),
-    create: vi.fn(),
-    updateOne: vi.fn(),
-  },
-  Product: {
-    findById: vi.fn(),
-  },
-  PromoCode: {
-    findOne: vi.fn(),
-  },
-}));
+vi.mock('@pawtag/db', () => {
+  const findChain = {
+    lean: vi.fn().mockResolvedValue([]),
+  };
+  return {
+    Cart: {
+      findOne: vi.fn(),
+      create: vi.fn(),
+      updateOne: vi.fn(),
+    },
+    Product: {
+      findById: vi.fn(),
+      find: vi.fn().mockReturnValue(findChain),
+    },
+    PromoCode: {
+      findOne: vi.fn(),
+    },
+  };
+});
 
 // Mock inventory service
 vi.mock('../../../packages/api/src/commerce/services/inventory.service', () => ({
@@ -37,7 +43,13 @@ vi.mock('../../../packages/api/src/commerce/providers/simple-gst', () => ({
 
 // Mock config
 vi.mock('../../../packages/api/src/commerce/config', () => ({
-  getNumberSetting: vi.fn().mockResolvedValue(0),
+  getNumberSetting: vi.fn().mockImplementation((key: string) => {
+    const defaults: Record<string, string> = {
+      'commerce.cart.ttlDays': '30',
+      'commerce.cart.maxItems': '50',
+    };
+    return Promise.resolve(defaults[key] || '0');
+  }),
   getBooleanSetting: vi.fn().mockResolvedValue(true),
 }));
 
@@ -114,21 +126,20 @@ describe('CartService', () => {
     });
   });
 
+  function cloneCart(overrides?: Record<string, any>) {
+    const saveFn = vi.fn();
+    return {
+      ...mockCart,
+      items: mockCart.items.map((item) => ({ ...item })),
+      save: saveFn,
+      ...overrides,
+    };
+  }
+
   describe('addItem', () => {
     it('should add new item to cart', async () => {
-      (Cart.findOne as any).mockResolvedValue({ ...mockCart, items: [] });
-      (Product.findById as any).mockResolvedValue(mockProduct);
-
-      const result = await cartService.addItem('user_123', {
-        productId: 'prod_1',
-        quantity: 1,
-      });
-
-      expect(mockCart.save).toHaveBeenCalled();
-    });
-
-    it('should increment quantity for existing item', async () => {
-      (Cart.findOne as any).mockResolvedValue(mockCart);
+      const freshCart = cloneCart({ items: [] });
+      (Cart.findOne as any).mockResolvedValue(freshCart);
       (Product.findById as any).mockResolvedValue(mockProduct);
 
       await cartService.addItem('user_123', {
@@ -136,13 +147,30 @@ describe('CartService', () => {
         quantity: 1,
       });
 
-      expect(mockCart.save).toHaveBeenCalled();
+      expect(freshCart.save).toHaveBeenCalled();
+    });
+
+    it('should increment quantity for existing item', async () => {
+      const freshCart = cloneCart();
+      (Cart.findOne as any).mockResolvedValue(freshCart);
+      (Product.findById as any).mockResolvedValue(mockProduct);
+
+      await cartService.addItem('user_123', {
+        productId: 'prod_1',
+        quantity: 1,
+      });
+
+      expect(freshCart.save).toHaveBeenCalled();
     });
   });
 
   describe('calculateTotals', () => {
     it('should calculate totals correctly', async () => {
-      (Cart.findOne as any).mockResolvedValue(mockCart);
+      const freshCart = cloneCart();
+      (Cart.findOne as any).mockResolvedValue(freshCart);
+      // Mock Product.find().lean() to return current DB prices
+      const findChain = { lean: vi.fn().mockResolvedValue([{ _id: 'prod_1', price: 19.99, salePrice: undefined, customizationPrice: 0 }]) };
+      (Product.find as any).mockReturnValue(findChain);
 
       const result = await cartService.calculateTotals('user_123');
 
@@ -152,7 +180,7 @@ describe('CartService', () => {
     });
 
     it('should return empty totals for empty cart', async () => {
-      (Cart.findOne as any).mockResolvedValue({ ...mockCart, items: [] });
+      (Cart.findOne as any).mockResolvedValue({ ...mockCart, items: [], save: vi.fn() });
 
       const result = await cartService.calculateTotals('user_123');
 
@@ -163,11 +191,12 @@ describe('CartService', () => {
 
   describe('clearCart', () => {
     it('should clear all items', async () => {
-      (Cart.findOne as any).mockResolvedValue(mockCart);
+      const freshCart = cloneCart();
+      (Cart.findOne as any).mockResolvedValue(freshCart);
 
       await cartService.clearCart('user_123');
 
-      expect(mockCart.save).toHaveBeenCalled();
+      expect(freshCart.save).toHaveBeenCalled();
     });
   });
 });

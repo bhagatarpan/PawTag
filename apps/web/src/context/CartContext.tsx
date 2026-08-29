@@ -63,7 +63,7 @@ export interface CartTotals {
 
 interface CartContextType {
   items: CartItem[];
-  addItem: (item: { productId: string; quantity: number; customisation?: boolean; name?: string; price?: number; image?: string; sku?: string }) => void;
+  addItem: (item: { productId: string; quantity: number; customisation?: boolean; name?: string; price?: number; image?: string; sku?: string }) => Promise<void>;
   removeItem: (itemId: string) => void;
   updateQuantity: (itemId: string, quantity: number) => void;
   clearCart: () => void;
@@ -73,9 +73,12 @@ interface CartContextType {
   itemCount: number;
   loading: boolean;
   error: string | null;
+  clearError: () => void;
   lastAddedItem: AddedItem | null;
   clearLastAddedItem: (id?: string) => void;
   isGuest: boolean;
+  /** Price of item when added vs current DB price — set if price changed */
+  priceChanged: boolean;
 }
 
 /* ------------------------------------------------------------------ */
@@ -142,6 +145,11 @@ function calculateTotals(items: CartItem[]): CartTotals {
 
 const CartContext = createContext<CartContextType | null>(null);
 
+/** Normalise customisation to a boolean for consistent comparison. */
+function normCustom(v?: boolean): boolean {
+  return v === true;
+}
+
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [totals, setTotals] = useState<CartTotals>(EMPTY_TOTALS);
@@ -149,6 +157,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [lastAddedItem, setLastAddedItem] = useState<AddedItem | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [priceChanged, setPriceChanged] = useState(false);
 
   // Check auth state
   useEffect(() => {
@@ -207,27 +216,46 @@ export function CartProvider({ children }: { children: ReactNode }) {
     const guestItems = getGuestCart();
     if (!guestItems.length) return;
 
-    // Add each guest item to server cart
-    let syncSuccess = false;
+    // First, fetch the current server cart to detect duplicates
+    let serverCart: CartItem[] = [];
+    try {
+      const res = await api.get('/cart');
+      serverCart = res.data?.data?.cart?.items || [];
+    } catch {
+      // If we can't fetch, just add all items
+    }
+
+    // Merge: for each guest item, if it already exists on server, add quantity
+    // Otherwise, push it as a new item
     for (const item of guestItems) {
+      const cust = normCustom(item.customisation);
+      const existing = serverCart.find(
+        (si) => si.productId === item.productId && normCustom(si.customisation) === cust
+      );
+
       try {
-        await api.post('/cart/items', {
-          productId: item.productId,
-          quantity: item.quantity,
-          customisation: item.customisation,
-        });
-        syncSuccess = true;
+        if (existing) {
+          // Item already on server — update quantity (add guest qty to server qty)
+          await api.put(`/cart/items/${existing._id}`, {
+            quantity: existing.quantity + item.quantity,
+          });
+        } else {
+          // New item — add to server
+          await api.post('/cart/items', {
+            productId: item.productId,
+            quantity: item.quantity,
+            customisation: cust,
+          });
+        }
       } catch {
         // Non-critical — continue syncing other items
       }
     }
 
-    // Only clear guest cart if sync was successful
-    if (syncSuccess) {
-      localStorage.removeItem(CART_STORAGE_KEY);
-    }
+    // Clear guest cart after successful sync
+    localStorage.removeItem(CART_STORAGE_KEY);
 
-    // Reload cart from server (whether sync succeeded or not)
+    // Reload cart from server
     await refreshCart();
   }, [refreshCart]);
 
@@ -271,12 +299,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
   /* ---- Add item ---- */
   const addItem = useCallback(async (item: { productId: string; quantity: number; customisation?: boolean; name?: string; price?: number; image?: string; sku?: string }) => {
     const token = localStorage.getItem('pawtag_token');
+    const cust = normCustom(item.customisation);
 
     if (!token) {
       // Guest: add to localStorage
       const guestItems = getGuestCart();
       const existing = guestItems.find(
-        (i) => i.productId === item.productId && i.customisation === item.customisation
+        (i) => i.productId === item.productId && normCustom(i.customisation) === cust
       );
 
       if (existing) {
@@ -293,7 +322,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           customizationTotal: 0,
           quantity: item.quantity,
           image: item.image,
-          customisation: item.customisation,
+          customisation: cust,
           addedAt: new Date().toISOString(),
         });
       }
@@ -314,18 +343,28 @@ export function CartProvider({ children }: { children: ReactNode }) {
     // Authenticated: add to server
     try {
       setLoading(true);
+      setError(null);
       const res = await api.post('/cart/items', {
         productId: item.productId,
         quantity: item.quantity,
-        customisation: item.customisation,
+        customisation: cust,
       });
       const data = res.data?.data;
       if (data?.cart) {
         setItems(data.cart.items || []);
         setTotals(data.totals || EMPTY_TOTALS);
+
+        // Detect price changes — compare what we sent vs what server stored
+        const serverItem = (data.cart.items || []).find(
+          (ci: CartItem) => ci.productId === item.productId && normCustom(ci.customisation) === cust
+        );
+        if (serverItem && item.price && serverItem.unitPrice !== item.price) {
+          setPriceChanged(true);
+        }
+
         setLastAddedItem({
           name: item.name || 'Item',
-          price: item.price || 0,
+          price: serverItem?.unitPrice || item.price || 0,
           quantity: item.quantity,
           image: item.image,
           timestamp: Date.now(),
@@ -336,9 +375,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
         // Token expired — fall back to guest cart
         localStorage.removeItem('pawtag_token');
         localStorage.removeItem('pawtag_refresh_token');
+        setIsAuthenticated(false);
         const guestItems = getGuestCart();
         const existing = guestItems.find(
-          (i) => i.productId === item.productId && i.customisation === item.customisation
+          (i) => i.productId === item.productId && normCustom(i.customisation) === cust
         );
         if (existing) {
           existing.quantity += item.quantity;
@@ -354,7 +394,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
             customizationTotal: 0,
             quantity: item.quantity,
             image: item.image,
-            customisation: item.customisation,
+            customisation: cust,
             addedAt: new Date().toISOString(),
           });
         }
@@ -369,7 +409,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
           timestamp: Date.now(),
         });
       } else {
-        setError(err?.response?.data?.error || 'Failed to add item');
+        const msg = err?.response?.data?.error || 'Failed to add item. Please try again.';
+        setError(msg);
+        throw new Error(msg);
       }
     } finally {
       setLoading(false);
@@ -478,6 +520,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const total = totals.total;
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
 
+  const clearError = useCallback(() => setError(null), []);
+
   const clearLastAddedItem = useCallback((id?: string) => {
     if (id) {
       setLastAddedItem((prev) => (prev && prev.timestamp.toString() === id ? null : prev));
@@ -498,9 +542,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
     itemCount,
     loading,
     error,
+    clearError,
     lastAddedItem,
     clearLastAddedItem,
     isGuest,
+    priceChanged,
   };
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

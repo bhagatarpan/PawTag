@@ -96,7 +96,7 @@ export default function Shop() {
   const [products, setProducts] = useState<PawTagProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [addedId, setAddedId] = useState<string | null>(null);
-  const { addItem } = useCart();
+  const { addItem, error: cartError, clearError } = useCart();
   const { page: shopPage } = useShopPage('shop');
   const { settings } = useSiteSettings();
   const companyName = settings?.['company.name'] || 'PawTag';
@@ -127,7 +127,7 @@ export default function Shop() {
   );
 
   /* ---- Add to cart handler ---- */
-  const handleAddToCart = useCallback((cardProduct: ProductCardProduct, e?: React.MouseEvent) => {
+  const handleAddToCart = useCallback(async (cardProduct: ProductCardProduct, e?: React.MouseEvent) => {
     const product = products.find((p) => p._id === cardProduct.id);
     if (!product) return;
 
@@ -135,20 +135,24 @@ export default function Shop() {
       e.preventDefault();
     }
 
-    addItem({
-      productId: product._id,
-      quantity: 1,
-      name: product.name,
-      price: product.salePrice ?? product.price,
-      image: product.images?.[0],
-    });
+    try {
+      await addItem({
+        productId: product._id,
+        quantity: 1,
+        name: product.name,
+        price: product.salePrice ?? product.price,
+        image: product.images?.[0],
+      });
 
-    setAddedId(product._id);
-    if (e) {
-      const rect = e.currentTarget?.getBoundingClientRect();
-      if (rect) triggerFly(product.images?.[0] || '', rect);
+      setAddedId(product._id);
+      if (e) {
+        const rect = e.currentTarget?.getBoundingClientRect();
+        if (rect) triggerFly(product.images?.[0] || '', rect);
+      }
+      setTimeout(() => setAddedId(null), 2000);
+    } catch {
+      // Error already set in CartContext — toast will display it
     }
-    setTimeout(() => setAddedId(null), 2000);
   }, [products, addItem, triggerFly]);
 
   /* ---- Product click handler ---- */
@@ -199,6 +203,26 @@ export default function Shop() {
           </div>
         </div>
       </div>
+      {/* Cart Error Toast */}
+      {cartError && (
+        <div className="fixed top-20 right-4 z-50 animate-slide-in-right">
+          <div className="bg-red-50 border border-red-200 rounded-xl shadow-xl p-3 flex items-center gap-3 max-w-xs w-full">
+            <div className="flex-shrink-0 h-8 w-8 bg-red-100 rounded-full flex items-center justify-center">
+              <span className="text-red-600 text-sm font-bold">!</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-red-800">{cartError}</p>
+            </div>
+            <button
+              onClick={clearError}
+              className="flex-shrink-0 p-1 text-red-400 hover:text-red-600 transition-colors"
+            >
+              <span className="sr-only">Dismiss</span>
+              &times;
+            </button>
+          </div>
+        </div>
+      )}
     </>
   );
 }

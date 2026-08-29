@@ -34,13 +34,8 @@ api.interceptors.response.use(
       const refreshToken = localStorage.getItem('pawtag_refresh_token');
 
       if (!refreshToken) {
-        localStorage.removeItem('pawtag_token');
-        localStorage.removeItem('pawtag_refresh_token');
-        // Don't hard-redirect during checkout — it destroys cart state.
-        // Let the calling code handle the 401 gracefully.
-        if (!window.location.pathname.startsWith('/login') && !window.location.pathname.startsWith('/checkout')) {
-          window.location.href = '/login';
-        }
+        // No refresh token — let the calling code handle 401.
+        // Don't remove tokens here to avoid race conditions with CartContext.
         return Promise.reject(err);
       }
 
@@ -73,12 +68,9 @@ api.interceptors.response.use(
         return api(originalRequest);
       } catch (refreshError) {
         processQueue(refreshError, null);
-        localStorage.removeItem('pawtag_token');
-        localStorage.removeItem('pawtag_refresh_token');
-        // Don't hard-redirect during checkout — it destroys cart state.
-        if (!window.location.pathname.startsWith('/login') && !window.location.pathname.startsWith('/checkout')) {
-          window.location.href = '/login';
-        }
+        // Refresh failed — let the calling code handle 401 cleanup.
+        // Don't remove tokens or redirect here; doing so races with
+        // CartContext/AuthContext which also handle 401 gracefully.
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;
