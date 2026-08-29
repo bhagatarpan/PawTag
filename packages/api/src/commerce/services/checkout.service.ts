@@ -91,7 +91,11 @@ export class CheckoutService {
   async createPaymentIntent(userId: string, shippingAddress?: { line1: string; line2?: string; city: string; state: string; zip: string; country?: string }): Promise<CheckoutPaymentIntent> {
     // 1. Get and validate cart
     const cart = await Cart.findOne({ userId, status: 'active' });
+    logger.info({ userId, cartFound: !!cart, itemCount: cart?.items?.length || 0 }, 'Payment intent cart lookup');
     if (!cart || !cart.items.length) {
+      // Debug: check if any cart exists for this user
+      const anyCart = await Cart.findOne({ userId });
+      logger.error({ userId, anyCartFound: !!anyCart, anyCartStatus: anyCart?.status, anyCartItems: anyCart?.items?.length || 0 }, 'Cart empty or missing');
       throw new InvalidCartError('Your cart is empty');
     }
 
@@ -255,10 +259,28 @@ export class CheckoutService {
       throw new PaymentFailedError(`Payment status is ${payment.status}`);
     }
 
-    // 5. Generate order number atomically
+    // 5. Check if order already exists for this payment (idempotent — previous attempt may have partially succeeded)
+    const existingOrder = await Order.findOne({ 'payment.stripePaymentIntentId': paymentIntentId });
+    if (existingOrder) {
+      logger.info({ orderId: existingOrder._id, orderNumber: existingOrder.orderNumber }, 'Order already exists for this payment');
+      const invoice = await Invoice.findOne({ orderId: existingOrder._id });
+      const invoiceUrl = invoice ? await this.getInvoiceUrl(invoice._id.toString(), userId) : '';
+
+      // Mark pending as converted if not already
+      if (pending.status !== 'converted') {
+        pending.status = 'converted';
+        pending.convertedOrderId = existingOrder._id;
+        pending.convertedAt = new Date();
+        await pending.save();
+      }
+
+      return { order: existingOrder, invoice, invoiceUrl, isNew: false };
+    }
+
+    // 6. Generate order number atomically
     const orderNumber = await this.generateOrderNumber();
 
-    // 6. Create Order
+    // 7. Create Order
     const order = await Order.create({
       orderNumber,
       userId,

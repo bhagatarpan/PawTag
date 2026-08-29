@@ -276,13 +276,14 @@ export default function Checkout() {
         invoice = confirmRes.data.data.invoice;
         invoiceUrl = confirmRes.data.data.invoiceUrl;
       } catch (confirmErr: any) {
-        // Log full error for developers (browser console + backend already logs via logger.error)
         console.error('[Checkout] Order confirmation failed:', confirmErr?.response?.data || confirmErr);
-        // Show user-friendly message — never expose internal details
-        setError('Something went wrong confirming your order. Your payment was received — please contact support if this persists.');
+        // Don't show confirmation page — show error instead
+        setError('Something went wrong confirming your order. Your payment was received — please contact support.');
+        setLoading(false);
+        return;
       }
 
-      // 2. Preserve cart data for confirmation page (before clearCart)
+      // 2. Only show confirmation if order was created
       setConfirmedItems([...items]);
       setConfirmedTotal(total);
       setConfirmedInvoice(invoice);
