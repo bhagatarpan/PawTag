@@ -173,6 +173,10 @@ export default function Checkout() {
   const [promoError, setPromoError] = useState('');
   const applyPromoCode = async () => {
     if (!promoCode) return;
+    if (!user) {
+      setPromoError('Please log in to apply a promo code');
+      return;
+    }
     setPromoLoading(true);
     setPromoError('');
     try {
