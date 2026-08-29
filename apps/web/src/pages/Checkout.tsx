@@ -28,12 +28,10 @@ export default function Checkout() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  // Step management
-  const [currentStep, setCurrentStep] = useState<Step>(() => {
-    // Restore step from sessionStorage (survives refresh)
-    const savedStep = sessionStorage.getItem('pawtag_checkout_step') as Step;
-    return savedStep || 'cart';
-  });
+  // Step management — always start at cart step on mount.
+  // sessionStorage restoration caused a race condition: step restored before
+  // cart loaded from server, rendering step 2/3 with empty items = blank screen.
+  const [currentStep, setCurrentStep] = useState<Step>('cart');
 
   // Form state
   const [loading, setLoading] = useState(false);
@@ -159,7 +157,6 @@ export default function Checkout() {
     if (step === 'checkout' && !canProceedToCheckout) return;
     if (step === 'payment' && !canProceedToPayment) return;
     setCurrentStep(step);
-    sessionStorage.setItem('pawtag_checkout_step', step);
     setError(null);
   };
 
@@ -289,10 +286,6 @@ export default function Checkout() {
 
   // Empty cart — but only show if we're not loading, not in payment flow, and not on confirmed step
   if (items.length === 0 && !success && !loading && currentStep === 'cart') {
-    // Clean up checkout session state
-    sessionStorage.removeItem('pawtag_checkout_success');
-    sessionStorage.removeItem('pawtag_checkout_order');
-    sessionStorage.removeItem('pawtag_checkout_step');
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-4 p-4">
         <PawPrint className="h-16 w-16 text-gray-300" />
