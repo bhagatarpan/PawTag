@@ -122,7 +122,9 @@ export default function Checkout() {
         methodId: option.id,
         methodName: option.name,
         cost: option.cost || 0,
-      }).then(() => refreshCart()).catch(() => {});
+      }).then(() => refreshCart()).catch((err) => {
+        console.warn('[Checkout] Shipping select failed:', err?.response?.data || err.message);
+      });
     }
   }, [selectedShippingOption, shippingOptions]);
 
@@ -247,6 +249,15 @@ export default function Checkout() {
     setLoading(true);
     setError(null);
     try {
+      // 0. Verify cart has items from server (not stale React state)
+      const cartCheck = await api.get('/cart');
+      const serverItems = cartCheck.data?.data?.cart?.items || [];
+      if (serverItems.length === 0) {
+        setError('Your cart is empty. Please go back and add items before checking out.');
+        setLoading(false);
+        return;
+      }
+
       // 1. Create payment intent via PawTag checkout API
       const checkoutRes = await api.post('/checkout/payment-intent', {
         shippingAddress: {

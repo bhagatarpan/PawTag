@@ -461,4 +461,96 @@ describe('CartService', () => {
       expect(totals.items).toEqual([]);
     });
   });
+
+  describe('getOrCreate - race condition', () => {
+    it('should return existing active cart', async () => {
+      const mockCart = {
+        _id: 'cart1',
+        userId: 'user1',
+        items: [],
+        lastAccessedAt: new Date(),
+        save: mocks.cartSave,
+      };
+      mocks.cartFindOne.mockResolvedValue(mockCart);
+
+      const result = await cartService.getOrCreate('user1');
+
+      expect(result).toBe(mockCart);
+      expect(mockCart.save).toHaveBeenCalled();
+      expect(mocks.cartCreate).not.toHaveBeenCalled();
+    });
+
+    it('should create a new cart when no cart exists at all', async () => {
+      const mockCart = {
+        _id: 'cart1',
+        userId: 'user1',
+        items: [],
+        lastAccessedAt: new Date(),
+        save: mocks.cartSave,
+      };
+      mocks.cartFindOne.mockResolvedValue(null);
+      mocks.cartCreate.mockResolvedValue(mockCart);
+
+      const result = await cartService.getOrCreate('user1');
+
+      expect(result).toBe(mockCart);
+      expect(mocks.cartCreate).toHaveBeenCalled();
+    });
+
+    it('should reset converted cart to active with empty items', async () => {
+      const convertedCart = {
+        _id: 'cart_existing',
+        userId: 'user1',
+        items: [{ productId: 'p1' }],
+        status: 'converted',
+        promoCode: 'OLD',
+        promoDiscount: 5,
+        shippingMethodId: 'old-method',
+        shippingMethodName: 'Old Method',
+        shippingCost: 10,
+        lastAccessedAt: new Date(),
+        save: mocks.cartSave,
+      };
+
+      // First findOne({ status: 'active' }) returns null, second findOne({ userId }) returns converted cart
+      mocks.cartFindOne
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(convertedCart);
+
+      const result = await cartService.getOrCreate('user1');
+
+      expect(result).toBe(convertedCart);
+      expect(convertedCart.status).toBe('active');
+      expect(convertedCart.items).toEqual([]);
+      expect(convertedCart.promoCode).toBeUndefined();
+      expect(convertedCart.promoDiscount).toBeUndefined();
+      expect(convertedCart.shippingMethodId).toBeUndefined();
+      expect(convertedCart.shippingMethodName).toBeUndefined();
+      expect(convertedCart.shippingCost).toBe(0);
+      expect(convertedCart.save).toHaveBeenCalled();
+      expect(mocks.cartCreate).not.toHaveBeenCalled();
+    });
+
+    it('should reset abandoned cart to active with empty items', async () => {
+      const abandonedCart = {
+        _id: 'cart_abandoned',
+        userId: 'user1',
+        items: [],
+        status: 'abandoned',
+        lastAccessedAt: new Date(),
+        save: mocks.cartSave,
+      };
+
+      mocks.cartFindOne
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(abandonedCart);
+
+      const result = await cartService.getOrCreate('user1');
+
+      expect(result).toBe(abandonedCart);
+      expect(abandonedCart.status).toBe('active');
+      expect(abandonedCart.save).toHaveBeenCalled();
+      expect(mocks.cartCreate).not.toHaveBeenCalled();
+    });
+  });
 });

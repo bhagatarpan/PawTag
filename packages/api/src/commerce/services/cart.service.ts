@@ -86,6 +86,29 @@ export class CartService {
     let cart = await Cart.findOne({ userId, status: 'active' });
 
     if (!cart) {
+      // No active cart — check if a converted/abandoned cart exists (userId is unique)
+      const existing = await Cart.findOne({ userId });
+      if (existing) {
+        // Reset the existing cart to active with empty items
+        const ttlDays = await getNumberSetting('commerce.cart.ttlDays');
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + ttlDays);
+
+        existing.items = [] as any;
+        existing.status = 'active';
+        existing.promoCode = undefined;
+        existing.promoDiscount = undefined;
+        existing.shippingMethodId = undefined;
+        existing.shippingMethodName = undefined;
+        existing.shippingCost = 0;
+        existing.expiresAt = expiresAt;
+        existing.lastAccessedAt = new Date();
+        await existing.save();
+        logger.info({ userId, cartId: existing._id }, 'Cart reset from converted/abandoned');
+        return existing;
+      }
+
+      // No cart at all — create a new one
       const ttlDays = await getNumberSetting('commerce.cart.ttlDays');
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + ttlDays);
