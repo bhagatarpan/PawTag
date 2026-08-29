@@ -268,7 +268,7 @@ export class CartService {
     // Validate promo code against database
     const promoCode = await PromoCode.findOne({ code: code.toUpperCase(), isActive: true }) as any;
     if (!promoCode) {
-      throw new InvalidCartError('Invalid promo code');
+      throw new InvalidCartError('Promo code is invalid, either old or expired');
     }
 
     if (!promoCode.isValid()) {
