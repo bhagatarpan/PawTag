@@ -13,6 +13,7 @@ import { useAuth } from '../context/AuthContext';
 import { useSiteSettings } from '../hooks/useCms';
 import CheckoutAuth from '../components/CheckoutAuth';
 import StripePaymentForm from '../components/StripePaymentForm';
+import CheckoutErrorBoundary from '../components/CheckoutErrorBoundary';
 
 type Step = 'cart' | 'checkout' | 'payment' | 'confirmed';
 
@@ -647,12 +648,14 @@ export default function Checkout() {
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                   <h2 className="text-lg font-semibold text-gray-900 mb-4">Payment Method</h2>
                   {paymentClientSecret ? (
-                    <StripePaymentForm
-                      clientSecret={paymentClientSecret}
-                      onPaymentSuccess={handlePaymentSuccess}
-                      onPaymentError={handlePaymentError}
-                      disabled={loading}
-                    />
+                    <CheckoutErrorBoundary onReset={() => setPaymentClientSecret('')}>
+                      <StripePaymentForm
+                        clientSecret={paymentClientSecret}
+                        onPaymentSuccess={handlePaymentSuccess}
+                        onPaymentError={handlePaymentError}
+                        disabled={loading}
+                      />
+                    </CheckoutErrorBoundary>
                   ) : (
                     <div className="flex items-center justify-center py-8">
                       <Loader2 className="h-6 w-6 animate-spin text-primary-600" />
