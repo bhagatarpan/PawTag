@@ -15,6 +15,13 @@ import CheckoutAuth from '../components/CheckoutAuth';
 import StripePaymentForm from '../components/StripePaymentForm';
 import CheckoutErrorBoundary from '../components/CheckoutErrorBoundary';
 
+// Confirmation page animations
+const confirmationStyles = `
+@keyframes scale-in { 0% { transform: scale(0); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+@keyframes check-draw { 0% { transform: scale(0) rotate(-45deg); opacity: 0; } 100% { transform: scale(1) rotate(0deg); opacity: 1; } }
+@keyframes fade-in-up { 0% { transform: translateY(12px); opacity: 0; } 100% { transform: translateY(0); opacity: 1; } }
+`;
+
 type Step = 'cart' | 'checkout' | 'payment' | 'confirmed';
 
 const STEPS = [
@@ -303,6 +310,7 @@ export default function Checkout() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <style>{confirmationStyles}</style>
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Step Indicator */}
         <div className="flex items-center justify-center mb-8">
@@ -688,23 +696,63 @@ export default function Checkout() {
           </div>
         )}
 
-        {/* Step 4: Confirmed — Enterprise Order Confirmation */}
+        {/* Step 4: Confirmed */}
         {currentStep === 'confirmed' && (
-          <div className="max-w-2xl mx-auto py-8 space-y-6">
-            {/* Success Header */}
+          <div className="max-w-2xl mx-auto py-8 space-y-6" ref={(el) => { if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}>
             <div className="text-center">
-              <div className="h-20 w-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 animate-[pulse_2s_ease-in-out_1]">
-                <CheckCircle className="h-12 w-12 text-green-500" />
+              <div className="h-20 w-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4" style={{ animation: 'scale-in 0.5s ease-out' }}>
+                <CheckCircle className="h-12 w-12 text-green-500" style={{ animation: 'check-draw 0.6s ease-out 0.3s both' }} />
               </div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-1">Order Confirmed!</h1>
-              <p className="text-lg text-gray-600">
+              <h1 className="text-3xl font-bold text-gray-900 mb-1" style={{ animation: 'fade-in-up 0.4s ease-out 0.2s both' }}>Order Confirmed!</h1>
+              <p className="text-lg text-gray-600" style={{ animation: 'fade-in-up 0.4s ease-out 0.3s both' }}>
                 Thank you for your purchase{user?.fullName ? `, ${user.fullName.split(' ')[0]}` : ''}.
               </p>
-              <p className="text-sm text-gray-400 mt-2">
+              <p className="text-sm text-gray-400 mt-2" style={{ animation: 'fade-in-up 0.4s ease-out 0.4s both' }}>
                 Order <span className="font-mono font-semibold text-primary-700">{orderNumber}</span>
                 {' · '}
                 {new Date().toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })}
               </p>
+            </div>
+
+            {/* Confirmation Sent — under Order Confirmed */}
+            <div className="bg-green-50 border border-green-200 rounded-2xl p-5 flex items-start gap-3" style={{ animation: 'fade-in-up 0.4s ease-out 0.5s both' }}>
+              <Mail className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-green-800">Confirmation sent</p>
+                <p className="text-sm text-green-700 mt-0.5">
+                  {confirmedPawTagOrder?.confirmationEmailSent
+                    ? <>Order confirmation and invoice have been sent to <strong>{user?.email}</strong>.</>
+                    : <>You'll receive an order confirmation at <strong>{user?.email}</strong> shortly.</>
+                  }
+                </p>
+              </div>
+            </div>
+
+            {/* Action Buttons — under confirmation sent */}
+            <div className="flex flex-col sm:flex-row gap-3 justify-center" style={{ animation: 'fade-in-up 0.4s ease-out 0.6s both' }}>
+              <Link to="/" className="flex items-center justify-center gap-2 px-6 py-3 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 transition-all">
+                <Home size={18} /> Back to Home
+              </Link>
+              <Link to="/shop" className="flex items-center justify-center gap-2 px-6 py-3 border border-primary-600 text-primary-600 rounded-xl font-semibold hover:bg-primary-50 transition-all">
+                <ShoppingBag size={18} /> Continue Shopping
+              </Link>
+              {confirmedInvoice && (
+                <button
+                  onClick={async () => {
+                    try {
+                      const res = await api.post(`/customer/invoices/${confirmedInvoice._id}/access`);
+                      const { secureUrl } = res.data.data;
+                      if (secureUrl) window.open(secureUrl, '_blank');
+                    } catch { window.open('/account/orders', '_blank'); }
+                  }}
+                  className="flex items-center justify-center gap-2 px-6 py-3 border border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition-all"
+                >
+                  <FileText size={18} /> View / Download Invoice
+                </button>
+              )}
+              <Link to="/account/orders" className="flex items-center justify-center gap-2 px-6 py-3 border border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition-all">
+                View My Orders
+              </Link>
             </div>
 
             {/* Order Summary */}
@@ -848,29 +896,6 @@ export default function Checkout() {
               </div>
             )}
 
-            {/* Confirmation Sent */}
-            <div className="bg-green-50 border border-green-200 rounded-2xl p-5 flex items-start gap-3">
-              <Mail className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
-              <div>
-                <p className="text-sm font-medium text-green-800">Confirmation sent</p>
-                <p className="text-sm text-green-700 mt-0.5">
-                  Order confirmation and invoice have been sent to <strong>{user?.email}</strong>.
-                </p>
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
-              <Link to="/" className="flex items-center justify-center gap-2 px-6 py-3 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 transition-all">
-                <Home size={18} /> Back to Home
-              </Link>
-              <Link to="/shop" className="flex items-center justify-center gap-2 px-6 py-3 border border-primary-600 text-primary-600 rounded-xl font-semibold hover:bg-primary-50 transition-all">
-                <ShoppingBag size={18} /> Continue Shopping
-              </Link>
-              <Link to="/account/orders" className="flex items-center justify-center gap-2 px-6 py-3 border border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition-all">
-                View My Orders
-              </Link>
-            </div>
           </div>
         )}
       </div>

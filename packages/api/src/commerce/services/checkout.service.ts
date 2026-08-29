@@ -437,12 +437,14 @@ export class CheckoutService {
    * Generate atomic order number.
    */
   private async generateOrderNumber(): Promise<string> {
+    const prefix = await getSetting('commerce.orders.numberPrefix');
+    const length = await getNumberSetting('commerce.orders.numberLength');
     const counter = await Order.db!.collection('counters').findOneAndUpdate(
       { _id: 'orderNumber' as any },
       { $inc: { seq: 1 } },
       { upsert: true, returnDocument: 'after' },
     );
-    return `PT-${String(counter?.value?.seq || 1).padStart(6, '0')}`;
+    return `${prefix}-${String(counter?.value?.seq || 1).padStart(length, '0')}`;
   }
 }
 

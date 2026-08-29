@@ -1,37 +1,12 @@
 /**
  * @module CommerceSettings Page
- * @description Admin page for managing all PawTag Commerce settings.
- *
- * Provides a comprehensive settings interface for:
- * - Payment configuration (provider, test mode)
- * - Shipping configuration (free/flat-rate)
- * - Tax configuration (GST rate, inclusive/exclusive)
- * - Inventory settings (thresholds, policies)
- * - Checkout settings (guest, verification, expiry)
- * - Order settings (auto-cancel, number format)
- * - Subscription pricing (annual, monthly, free period, grace)
- * - Refund policy (enabled, max days, partial)
- * - Feature flags (signature verification, orphan detection)
- *
- * All settings are CMS-driven — changes take effect immediately.
- * No code changes required for business rule adjustments.
- *
- * @example
- * ```tsx
- * // Route: /commerce-settings
- * // Requires: setting.read, setting.update permissions
- * <CommerceSettings />
- * ```
+ * @description Enterprise admin page for managing all PawTag Commerce settings.
  */
 
 import { useEffect, useState, useCallback } from 'react';
-import { Save, Loader2, RefreshCcw, CreditCard, Truck, Receipt, Package, ShoppingCart, Clock, RotateCcw, Settings, Shield, Bell } from 'lucide-react';
+import { Save, Loader2, RefreshCcw, CreditCard, Truck, Receipt, Package, ShoppingCart, Clock, RotateCcw, Settings, Shield, Bell, Info } from 'lucide-react';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
-
-/* ------------------------------------------------------------------ */
-/*  Types                                                              */
-/* ------------------------------------------------------------------ */
 
 interface CommerceSetting {
   key: string;
@@ -44,44 +19,102 @@ interface SettingGroup {
   name: string;
   icon: React.ReactNode;
   description: string;
-  settings: CommerceSetting[];
+  category: string;
+  settings: Array<CommerceSetting & { label: string; tooltip: string; type: 'toggle' | 'text' | 'number' | 'select'; options?: { value: string; label: string }[]; hint?: string }>;
 }
 
-/* ------------------------------------------------------------------ */
-/*  Helpers                                                            */
-/* ------------------------------------------------------------------ */
+/* Human-readable labels and tooltips for every setting */
+const SETTING_META: Record<string, { label: string; tooltip: string; type: 'toggle' | 'text' | 'number' | 'select'; options?: { value: string; label: string }[]; hint?: string }> = {
+  'commerce.payment.provider': { label: 'Payment Provider', tooltip: 'Which payment gateway processes your transactions', type: 'select', options: [{ value: 'stripe', label: 'Stripe' }] },
+  'commerce.payment.currency': { label: 'Currency', tooltip: 'The currency all prices are displayed and charged in', type: 'text' },
+  'commerce.payment.testMode': { label: 'Demo Mode', tooltip: 'When enabled, payments auto-succeed without contacting Stripe. Use this for testing checkout without real charges.', type: 'toggle', hint: 'Disable this before going live' },
+  'commerce.shipping.enabled': { label: 'Enable Shipping', tooltip: 'Show shipping options and calculate shipping costs during checkout', type: 'toggle' },
+  'commerce.shipping.provider': { label: 'Shipping Provider', tooltip: 'Which carrier integration calculates rates and creates labels', type: 'select', options: [{ value: 'nz-shipping', label: 'NZ Domestic Shipping' }] },
+  'commerce.shipping.freeEnabled': { label: 'Offer Free Shipping', tooltip: 'Show a free shipping option to customers at checkout', type: 'toggle' },
+  'commerce.shipping.freeThreshold': { label: 'Free Shipping Minimum Order ($)', tooltip: 'Minimum cart value for free shipping. Set to 0 to always offer free shipping.', type: 'number' },
+  'commerce.shipping.flatRate': { label: 'Flat Rate Shipping Cost ($)', tooltip: 'Fixed shipping fee charged when free shipping does not apply', type: 'number' },
+  'commerce.shipping.taxEnabled': { label: 'Apply Tax to Shipping', tooltip: 'Include shipping costs in GST calculation', type: 'toggle' },
+  'commerce.shipping.defaultCarrier': { label: 'Default Carrier', tooltip: 'The carrier used when no specific carrier is selected for an order', type: 'text' },
+  'commerce.shipping.rateTypes': { label: 'Available Rate Types', tooltip: 'Shipping calculation methods available (comma-separated)', type: 'text' },
+  'commerce.shipping.carriers': { label: 'Available Carriers', tooltip: 'Shipping carriers available for selection (comma-separated)', type: 'text' },
+  'commerce.shipping.nzpostClientId': { label: 'NZ Post Client ID', tooltip: 'OAuth client ID for NZ Post API. Leave empty to use demo mode with mock tracking numbers.', type: 'text' },
+  'commerce.shipping.nzpostClientSecret': { label: 'NZ Post Client Secret', tooltip: 'OAuth client secret for NZ Post API', type: 'text' },
+  'commerce.shipping.nzpostLive': { label: 'Use NZ Post Live API', tooltip: 'Use the production NZ Post API instead of the sandbox', type: 'toggle' },
+  'commerce.tax.enabled': { label: 'Enable Tax Calculation', tooltip: 'Automatically calculate GST on orders', type: 'toggle' },
+  'commerce.tax.provider': { label: 'Tax Provider', tooltip: 'Which tax engine calculates GST', type: 'select', options: [{ value: 'nz-gst', label: 'NZ GST (15%)' }] },
+  'commerce.tax.rate': { label: 'Tax Rate (GST)', tooltip: 'New Zealand GST rate as a decimal (0.15 = 15%)', type: 'number', hint: 'Standard NZ GST is 15%' },
+  'commerce.tax.label': { label: 'Tax Label', tooltip: 'How tax appears on receipts and invoices (e.g., "GST" or "Tax")', type: 'text' },
+  'commerce.tax.inclusive': { label: 'Prices Include Tax', tooltip: 'When enabled, product prices shown to customers already include GST', type: 'toggle', hint: 'NZ standard is tax-inclusive pricing' },
+  'commerce.inventory.enabled': { label: 'Enable Inventory Tracking', tooltip: 'Track stock quantities and prevent overselling', type: 'toggle' },
+  'commerce.inventory.lowStockThreshold': { label: 'Low Stock Alert Level', tooltip: 'When stock drops below this number, admins receive a low-stock notification', type: 'number' },
+  'commerce.inventory.outOfStockThreshold': { label: 'Out of Stock Level', tooltip: 'Stock level at which a product is considered sold out', type: 'number' },
+  'commerce.inventory.defaultPolicy': { label: 'Out of Stock Behaviour', tooltip: 'What happens when a product has zero stock', type: 'select', options: [{ value: 'deny', label: 'Block checkout (prevent overselling)' }, { value: 'allow', label: 'Allow backorders (let customers order out-of-stock items)' }] },
+  'commerce.inventory.reservationTtlMinutes': { label: 'Stock Reservation Hold (minutes)', tooltip: 'How long stock is reserved during checkout before being released', type: 'number' },
+  'commerce.checkout.guestEnabled': { label: 'Allow Guest Checkout', tooltip: 'Let customers buy without creating an account', type: 'toggle' },
+  'commerce.checkout.verificationRequired': { label: 'Require Identity Verification', tooltip: 'Customers must verify email and phone before payment', type: 'toggle' },
+  'commerce.checkout.termsRequired': { label: 'Require Terms Acceptance', tooltip: 'Customers must accept terms and conditions before placing an order', type: 'toggle' },
+  'commerce.checkout.pendingOrderTtlMinutes': { label: 'Pending Order Expiry (minutes)', tooltip: 'How long an unpaid order is held before being automatically cancelled', type: 'number' },
+  'commerce.orders.autoCancelMinutes': { label: 'Auto-Cancel Unpaid Orders (minutes)', tooltip: 'Automatically cancel orders that remain unpaid after this duration', type: 'number' },
+  'commerce.orders.numberPrefix': { label: 'Order Number Prefix', tooltip: 'The text prepended to every order number (e.g., "PT" produces "PT-000001")', type: 'text' },
+  'commerce.orders.numberLength': { label: 'Order Number Length', tooltip: 'How many digits appear after the prefix in order numbers', type: 'number' },
+  'commerce.subscriptions.annualPrice': { label: 'Annual Subscription Price ($)', tooltip: 'Price charged per year for subscription products', type: 'number' },
+  'commerce.subscriptions.monthlyPrice': { label: 'Monthly Subscription Price ($)', tooltip: 'Price charged per month for subscription products', type: 'number' },
+  'commerce.subscriptions.freePeriodMonths': { label: 'Free Period (months)', tooltip: 'Number of months of free subscription included with tag purchase', type: 'number' },
+  'commerce.subscriptions.gracePeriodWeeks': { label: 'Grace Period (weeks)', tooltip: 'Weeks allowed after subscription expires before losing access', type: 'number' },
+  'commerce.refunds.enabled': { label: 'Allow Refunds', tooltip: 'Enable customers to request refunds on their orders', type: 'toggle' },
+  'commerce.refunds.maxDaysAfterPurchase': { label: 'Refund Window (days)', tooltip: 'Maximum number of days after purchase when a refund can be requested', type: 'number' },
+  'commerce.refunds.partialEnabled': { label: 'Allow Partial Refunds', tooltip: 'Let admins refund part of an order instead of the full amount', type: 'toggle' },
+  'commerce.notifications.orderConfirmation': { label: 'Send Order Confirmation Email', tooltip: 'Email the customer when their order is placed', type: 'toggle' },
+  'commerce.notifications.invoiceEmail': { label: 'Send Invoice Email', tooltip: 'Attach and send the invoice with the order confirmation', type: 'toggle' },
+  'commerce.notifications.adminAlert': { label: 'Notify Admin on New Order', tooltip: 'Send an email to the admin team when a new order is placed', type: 'toggle' },
+  'commerce.notifications.shippingUpdate': { label: 'Send Shipping Updates', tooltip: 'Email the customer when their order ships', type: 'toggle' },
+  'commerce.feature.stripeSignatureVerification': { label: 'Verify Stripe Webhook Signatures', tooltip: 'Validate that incoming Stripe webhooks are genuine (recommended for production)', type: 'toggle' },
+  'commerce.feature.orphanPaymentDetection': { label: 'Detect Orphan Payments', tooltip: 'Automatically recover orders where payment succeeded but order creation failed', type: 'toggle' },
+  'commerce.feature.priceValidation': { label: 'Server-Side Price Validation', tooltip: 'Verify product prices on the server during checkout (prevents price tampering)', type: 'toggle' },
+  'commerce.promotions.enabled': { label: 'Enable Discount Codes', tooltip: 'Allow customers to apply promo codes at checkout for discounts', type: 'toggle' },
+  'commerce.promotions.maxUsesPerCode': { label: 'Max Uses Per Discount Code', tooltip: 'Maximum number of times a single discount code can be used across all customers', type: 'number' },
+  'commerce.promotions.bundle2Items': { label: 'Bundle Discount — 2 Items (%)', tooltip: 'Automatic percentage discount when a customer buys exactly 2 items', type: 'number' },
+  'commerce.promotions.bundle3PlusItems': { label: 'Bundle Discount — 3+ Items (%)', tooltip: 'Automatic percentage discount when a customer buys 3 or more items', type: 'number' },
+};
+
+function getSettingMeta(key: string) {
+  return SETTING_META[key] || {
+    label: key.split('.').pop() || key,
+    tooltip: '',
+    type: 'text' as const,
+  };
+}
 
 function parseSettings(all: CommerceSetting[]): SettingGroup[] {
-  const groups: SettingGroup[] = [
-    { name: 'Payment', icon: <CreditCard size={20} />, description: 'Payment provider and processing', settings: [] },
-    { name: 'Shipping', icon: <Truck size={20} />, description: 'Shipping methods and rates', settings: [] },
-    { name: 'Tax', icon: <Receipt size={20} />, description: 'GST and tax calculation', settings: [] },
-    { name: 'Inventory', icon: <Package size={20} />, description: 'Stock management', settings: [] },
-    { name: 'Checkout', icon: <ShoppingCart size={20} />, description: 'Checkout flow', settings: [] },
-    { name: 'Orders', icon: <RotateCcw size={20} />, description: 'Order management', settings: [] },
-    { name: 'Subscriptions', icon: <Clock size={20} />, description: 'Subscription pricing', settings: [] },
-    { name: 'Refunds', icon: <RotateCcw size={20} />, description: 'Refund policy', settings: [] },
-    { name: 'Notifications', icon: <Bell size={20} />, description: 'Email notifications', settings: [] },
-    { name: 'Feature Flags', icon: <Shield size={20} />, description: 'Commerce features', settings: [] },
+  const groupDefs: Array<{ name: string; icon: React.ReactNode; description: string; category: string }> = [
+    { name: 'Payment', icon: <CreditCard size={20} />, description: 'How customers pay and how you receive money', category: 'payment' },
+    { name: 'Shipping', icon: <Truck size={20} />, description: 'How orders are shipped and what it costs', category: 'shipping' },
+    { name: 'Tax', icon: <Receipt size={20} />, description: 'GST calculation and display', category: 'tax' },
+    { name: 'Inventory', icon: <Package size={20} />, description: 'Stock levels and availability rules', category: 'inventory' },
+    { name: 'Checkout', icon: <ShoppingCart size={20} />, description: 'What happens during the checkout process', category: 'checkout' },
+    { name: 'Orders', icon: <RotateCcw size={20} />, description: 'How orders are numbered and managed', category: 'orders' },
+    { name: 'Subscriptions', icon: <Clock size={20} />, description: 'Subscription pricing and billing cycles', category: 'subscriptions' },
+    { name: 'Refunds', icon: <RotateCcw size={20} />, description: 'Refund rules and policies', category: 'refunds' },
+    { name: 'Notifications', icon: <Bell size={20} />, description: 'Email notifications sent to customers and admins', category: 'notifications' },
+    { name: 'Feature Flags', icon: <Shield size={20} />, description: 'Toggle advanced commerce features on or off', category: 'feature' },
   ];
 
+  const groups: SettingGroup[] = groupDefs.map((g) => ({ ...g, settings: [] }));
+
   for (const setting of all) {
-    const category = setting.key.split('.')[1]; // e.g., 'payment' from 'commerce.payment.provider'
-    const group = groups.find(g => g.name.toLowerCase() === category);
+    const category = setting.key.split('.')[1];
+    const group = groups.find((g) => g.category === category);
+    const meta = getSettingMeta(setting.key);
+    const entry = { ...setting, ...meta };
     if (group) {
-      group.settings.push(setting);
+      group.settings.push(entry);
     } else {
-      // Fallback: add to first group
-      groups[0].settings.push(setting);
+      groups[0].settings.push(entry);
     }
   }
 
-  return groups.filter(g => g.settings.length > 0);
+  return groups.filter((g) => g.settings.length > 0);
 }
-
-/* ------------------------------------------------------------------ */
-/*  Component                                                          */
-/* ------------------------------------------------------------------ */
 
 export default function CommerceSettings() {
   const [settings, setSettings] = useState<CommerceSetting[]>([]);
@@ -98,7 +131,7 @@ export default function CommerceSettings() {
       setSettings(data);
       setEditedValues(Object.fromEntries(data.map((s: CommerceSetting) => [s.key, s.value])));
       setHasChanges(false);
-    } catch (err) {
+    } catch {
       toast.error('Failed to load commerce settings');
     } finally {
       setLoading(false);
@@ -108,32 +141,29 @@ export default function CommerceSettings() {
   useEffect(() => { fetchSettings(); }, [fetchSettings]);
 
   const handleChange = (key: string, value: string) => {
-    setEditedValues(prev => ({ ...prev, [key]: value }));
+    setEditedValues((prev) => ({ ...prev, [key]: value }));
     setHasChanges(true);
   };
 
   const handleSave = async () => {
     try {
       setSaving(true);
-      // Only send changed settings
       const changed: Record<string, string> = {};
       for (const [key, value] of Object.entries(editedValues)) {
-        const original = settings.find(s => s.key === key);
+        const original = settings.find((s) => s.key === key);
         if (original && original.value !== value) {
           changed[key] = value;
         }
       }
-
       if (Object.keys(changed).length === 0) {
         toast.info('No changes to save');
         return;
       }
-
       await api.put('/admin/commerce/settings', { settings: changed });
       toast.success(`Saved ${Object.keys(changed).length} setting(s)`);
       setHasChanges(false);
       fetchSettings();
-    } catch (err) {
+    } catch {
       toast.error('Failed to save settings');
     } finally {
       setSaving(false);
@@ -152,13 +182,11 @@ export default function CommerceSettings() {
 
   return (
     <div className="max-w-6xl mx-auto p-6">
-      {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Commerce Settings</h1>
           <p className="text-sm text-gray-500 mt-1">
-            Configure payment, shipping, tax, inventory, and other commerce rules.
-            Changes take effect immediately.
+            Configure how your shop operates. Changes take effect immediately.
           </p>
         </div>
         <div className="flex gap-3">
@@ -182,7 +210,6 @@ export default function CommerceSettings() {
         </div>
       </div>
 
-      {/* Settings Groups */}
       <div className="space-y-6">
         {groups.map((group) => (
           <div key={group.name} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -199,13 +226,22 @@ export default function CommerceSettings() {
               {group.settings.map((setting) => (
                 <div key={setting.key} className="px-6 py-4 flex items-center justify-between gap-6">
                   <div className="flex-1 min-w-0">
-                    <label className="text-sm font-medium text-gray-700 block">
-                      {setting.key.replace('commerce.' + group.name.toLowerCase() + '.', '')}
-                    </label>
-                    <p className="text-xs text-gray-400 mt-0.5">{setting.description}</p>
+                    <div className="flex items-center gap-1.5">
+                      <label className="text-sm font-medium text-gray-700">{setting.label}</label>
+                      {setting.tooltip && (
+                        <div className="group relative">
+                          <Info size={14} className="text-gray-400 hover:text-gray-600 cursor-help" />
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10 pointer-events-none">
+                            {setting.tooltip}
+                            <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900" />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    {setting.hint && <p className="text-xs text-amber-600 mt-0.5">{setting.hint}</p>}
                   </div>
                   <div className="flex-shrink-0">
-                    {setting.key.includes('Enabled') || setting.key.includes('enabled') || setting.key.includes('Required') || setting.key.includes('required') || setting.key.includes('testMode') || setting.key.includes('Verification') ? (
+                    {setting.type === 'toggle' ? (
                       <select
                         value={editedValues[setting.key] ?? setting.value}
                         onChange={(e) => handleChange(setting.key, e.target.value)}
@@ -214,23 +250,22 @@ export default function CommerceSettings() {
                         <option value="true">Enabled</option>
                         <option value="false">Disabled</option>
                       </select>
-                    ) : setting.key.includes('policy') || setting.key.includes('Policy') ? (
+                    ) : setting.type === 'select' && setting.options ? (
                       <select
                         value={editedValues[setting.key] ?? setting.value}
                         onChange={(e) => handleChange(setting.key, e.target.value)}
                         className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
                       >
-                        <option value="deny">Deny checkout when out of stock</option>
-                        <option value="allow">Allow backorders</option>
+                        {setting.options.map((opt) => (
+                          <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
                       </select>
                     ) : (
                       <input
-                        type={setting.key.includes('rate') || setting.key.includes('Price') || setting.key.includes('Threshold') || setting.key.includes('Minutes') || setting.key.includes('Days') || setting.key.includes('Months') || setting.key.includes('Weeks') || setting.key.includes('max') || setting.key.includes('Length') || setting.key.includes('perCode') ? 'number' : 'text'}
+                        type={setting.type}
                         value={editedValues[setting.key] ?? setting.value}
                         onChange={(e) => handleChange(setting.key, e.target.value)}
-                        step={setting.key.includes('rate') ? '0.01' : '1'}
-                        min={setting.key.includes('rate') ? '0' : undefined}
-                        max={setting.key.includes('rate') ? '1' : undefined}
+                        step={setting.type === 'number' ? '0.01' : undefined}
                         className="w-48 px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
                       />
                     )}
