@@ -114,7 +114,12 @@ app.use('/api/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // --- Security & Middleware ---
 const cspDirectives = helmet.contentSecurityPolicy.getDefaultDirectives();
-cspDirectives['img-src'] = ["'self'", 'data:', 'http://localhost:*', 'https:'];
+cspDirectives['script-src'] = ["'self'", 'https://js.stripe.com', 'https://m.stripe.network'];
+cspDirectives['frame-src'] = ["'self'", 'https://js.stripe.com', 'https://hooks.stripe.com'];
+cspDirectives['img-src'] = ["'self'", 'data:', 'http://localhost:*', 'https:', 'https://*.stripe.com'];
+cspDirectives['connect-src'] = ["'self'", 'https://api.stripe.com', 'https://maps.googleapis.com'];
+cspDirectives['style-src'] = ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'];
+cspDirectives['font-src'] = ["'self'", 'https://fonts.gstatic.com'];
 
 app.use(helmet({
   crossOriginResourcePolicy: false,
