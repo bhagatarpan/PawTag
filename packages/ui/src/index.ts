@@ -42,3 +42,6 @@ export { ProductCard } from './components/ProductCard';
 export { PriceDisplay } from './components/PriceDisplay';
 export { ProductBadge, getProductBadgeVariant } from './components/ProductBadge';
 export { CartDrawer } from './components/CartDrawer';
+
+// Animation components
+export { FadeIn } from './components/FadeIn';

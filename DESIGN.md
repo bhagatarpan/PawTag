@@ -258,6 +258,32 @@ This app is often used in a stressful moment — someone's pet is missing. Motio
 | `slide-in-right` | 300ms ease-out | Content slides in from right edge |
 | `pulse-once` | 2s ease-in-out × 3 | Subtle scale pulse (1 → 1.08 → 1) for attention |
 
+### Scroll-Triggered Animations
+
+Content below the fold fades/slides in when scrolled into view. This creates a progressive reveal that improves perceived quality and keeps users engaged.
+
+**Component:** `<FadeIn>` from `@pawtag/ui` (uses native `IntersectionObserver`, zero extra dependencies)
+
+| Section | Animation | Rationale |
+|---------|-----------|-----------|
+| HeroSlider | None (above fold) | Loads immediately |
+| EngagementTicker | `direction="up"` | Counter starts only when visible |
+| HowItWorks | `direction="up"` | Steps reveal as user scrolls |
+| TrustSection | `direction="up"` | Trust badges reveal on scroll |
+| ResponsibilityScore | `direction="left"` | Slides in from side for variety |
+| Testimonials | `direction="up"` | Cards reveal on scroll |
+| EmergencyLostPet | None (fixed FAB) | Always positioned, no scroll needed |
+
+**Props:**
+- `delay` (seconds) — offset before animation starts
+- `direction` — `up` | `down` | `left` | `right` | `none`
+- `duration` (seconds) — animation length (default: 0.6)
+- `distance` (px) — travel distance (default: 24)
+- `once` — animate only on first scroll-into-view (default: true)
+- `stagger` — children animate in sequence with 100ms delay each
+
+**Accessibility:** Respects `prefers-reduced-motion: reduce` — elements appear immediately without animation.
+
 ---
 
 ## States Catalog
