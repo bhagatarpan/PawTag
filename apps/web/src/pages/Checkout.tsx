@@ -248,9 +248,10 @@ export default function Checkout() {
       setCurrentStep('payment');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err: any) {
+      console.error('[Checkout] Payment intent creation failed:', err?.response?.data || err);
       const msg = err?.response?.status === 401
         ? 'Your session expired. Please log in again to continue.'
-        : err?.message || err?.response?.data?.error || 'Payment failed. Please try again.';
+        : 'Payment setup failed. Please try again.';
       setError(msg);
     } finally {
       setLoading(false);
@@ -275,9 +276,10 @@ export default function Checkout() {
         invoice = confirmRes.data.data.invoice;
         invoiceUrl = confirmRes.data.data.invoiceUrl;
       } catch (confirmErr: any) {
+        // Log full error for developers (browser console + backend already logs via logger.error)
         console.error('[Checkout] Order confirmation failed:', confirmErr?.response?.data || confirmErr);
-        // Show error but still show confirmation — webhook may recover later
-        setError(`Order confirmation failed: ${confirmErr?.response?.data?.error || confirmErr?.message || 'Unknown error'}. Your payment was received — please contact support if this persists.`);
+        // Show user-friendly message — never expose internal details
+        setError('Something went wrong confirming your order. Your payment was received — please contact support if this persists.');
       }
 
       // 2. Preserve cart data for confirmation page (before clearCart)
@@ -300,7 +302,8 @@ export default function Checkout() {
       sessionStorage.setItem('pawtag_checkout_order', pawtagOrder?.orderNumber || paymentIntentId.slice(-8));
       clearCart();
     } catch (err: any) {
-      setError(err?.message || 'Order confirmation failed. Your payment was received — please contact support.');
+      console.error('[Checkout] Payment success handler failed:', err);
+      setError('Something went wrong after payment. Your payment was received — please contact support.');
       await refreshCart();
     } finally {
       setLoading(false);
