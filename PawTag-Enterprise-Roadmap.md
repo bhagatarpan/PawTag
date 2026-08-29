@@ -3179,6 +3179,90 @@ Medusa is now the **single source of truth** for all product/commerce data. The 
 
 ---
 
+## Part 10B — PawTag Commerce Engine (Medusa Replacement) ✅ IN PROGRESS
+
+**Branch:** `feature/pawtag-commerce`
+**Started:** 2026-08-28
+**Status:** Phases 0-10 Complete
+
+### What Was Built (Last 3 Days)
+
+**Shipment Management:**
+- `Shipment` model with NZ Post carrier integration (real API + demo fallback)
+- `ShipmentService` — shipment lifecycle (create, track, label generation)
+- Admin Shipments page with tracking, label download, carrier status
+- Automated tracking poll job (5-minute intervals)
+
+**Payment Transaction Tracking:**
+- `PaymentTransaction` model — audit trail for all Stripe transactions
+- Transactions recorded on checkout success and refund
+- Admin PaymentReconciliation page with stats, filters, detail drawer
+
+**Self-Service Returns & Cancellation:**
+- Customer return request API (`POST /api/customer/returns`)
+- Order cancellation with auto-refund and inventory release
+- Frontend `ReturnRequest.tsx` page
+- Order detail page with return/cancel buttons
+
+**Dedicated Admin Pages:**
+- Collections page (standalone, not sharing Categories component)
+- Brands page (standalone)
+
+**Reliability Infrastructure:**
+- Webhook retry job with exponential backoff (60s → 1h)
+- Payment reconciliation job (5-minute Stripe comparison)
+- Health check extended with NZ Post carrier status
+
+**Checkout Hardening (15+ fixes):**
+- Cart TTL: 30min → 30 days
+- Removed destructive `refreshCart()` from error path
+- Skip 401 redirect during checkout
+- Skip CartContext refresh on token clear during checkout
+- Error boundary around StripePaymentForm
+- Stripe.js loading failure handling
+- CSP headers: added Stripe domains
+- Promo code route mounted + duplicate middleware fixed
+- Inline promo code error messages (not global banner)
+- Confirmation page redesigned (invoice button, animations, scroll-to-top)
+- Order number reads prefix/length from admin settings
+- Commerce Settings page rewritten (human-readable labels, tooltips)
+- All checkout errors logged to system logs, users see friendly messages
+- `shippingAddress.state` made optional (NZ addresses)
+- Order number retry on duplicate key (error code 11000)
+- Idempotent order lookup (prevents 409 Conflict)
+- Guest promo code validation (no auth required)
+- JWT expiry increased to 2 hours
+
+**Scroll-Triggered Animations:**
+- `<FadeIn>` component in `@pawtag/ui` (native IntersectionObserver)
+- Homepage sections wrapped with FadeIn for progressive reveal
+- EngagementTicker counter starts only when scrolled into view
+- Respects prefers-reduced-motion for accessibility
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `packages/api/src/commerce/services/checkout.service.ts` | Payment intent + order confirmation (idempotent) |
+| `packages/api/src/routes/promo-public.ts` | Public promo validation (no auth) |
+| `packages/api/src/routes/admin-shipments.ts` | Shipment management API |
+| `packages/api/src/routes/admin-payments.ts` | Payment reconciliation API |
+| `packages/api/src/routes/customer-returns.ts` | Customer return/cancel API |
+| `packages/api/src/jobs/webhookRetry.ts` | Webhook retry with backoff |
+| `packages/api/src/jobs/paymentReconciliation.ts` | Stripe reconciliation |
+| `packages/api/src/jobs/shippingTrackingPoll.ts` | Carrier tracking poll |
+| `packages/ui/src/components/FadeIn.tsx` | Scroll-triggered animation |
+| `apps/web/src/pages/Checkout.tsx` | Full checkout flow |
+| `apps/admin/src/pages/CommerceSettings.tsx` | Commerce settings UI |
+
+### Remaining Work
+
+- Phase 11: NZ Tax, Addresses and Customer Experience
+- Phase 12: Medusa Migration and Removal
+- Phase 13: Security, Observability and Production Hardening
+
+---
+
 ## Part 9 — How to Use This
 
 1. Read Part 1 once — those are the decisions; you don't need to revisit them.

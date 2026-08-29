@@ -472,14 +472,18 @@ PawTag uses **MongoDB** as its primary and only database:
 Frontend (Checkout.tsx)
   → POST /checkout/payment-intent — Create Stripe PaymentIntent + PendingOrder
   → stripe.confirmPayment() — Customer confirms payment
-  → POST /checkout/confirm — Validate payment, create Order + Invoice
+  → POST /checkout/confirm — Validate payment, create Order + Invoice (idempotent, retry on duplicate key)
   → Send emails (non-blocking, parallel)
   → Show confirmation page
+
+Guest promo codes:
+  → POST /public/promo/validate — Check promo code validity (no auth required)
 
 Safety nets:
   → Orphan payment detection job (every 60s)
   → Stripe webhook handler (payment_intent.succeeded)
-  → PendingOrder TTL (30min)
+  → PendingOrder TTL (30 days)
+  → Order number retry on duplicate key (error code 11000)
 ```
 
 ### Commerce API Routes
@@ -489,9 +493,15 @@ Safety nets:
 | `GET /api/products` | Public product listing |
 | `GET/POST/PUT/DELETE /api/cart/*` | Authenticated cart management |
 | `POST /api/checkout/payment-intent` | Create payment intent |
-| `POST /api/checkout/confirm` | Confirm checkout |
+| `POST /api/checkout/confirm` | Confirm checkout (idempotent) |
+| `POST /api/public/promo/validate` | Validate promo code (no auth — guests) |
 | `POST /api/webhooks/stripe` | Stripe webhook handler |
 | `GET/PUT /api/admin/commerce/settings` | Commerce settings management |
+| `GET/POST/PUT/DELETE /api/admin/commerce/shipments` | Shipment management (NZ Post) |
+| `GET /api/admin/commerce/payments` | Payment transaction reconciliation |
+| `GET/POST/PUT/DELETE /api/admin/commerce/promo-codes` | Discount/promo code CRUD |
+| `POST /api/customer/returns` | Customer return requests |
+| `DELETE /api/customer/returns/:orderId` | Customer order cancellation with refund |
 
 ### Commerce Settings (CMS-Driven)
 
@@ -530,49 +540,41 @@ Customer sync: `packages/api/src/services/medusa-sync.service.ts`
 
 The checkout page (`apps/web/src/pages/Checkout.tsx`) implements a 4-step wizard:
 
-1. **Cart** — Review items, apply promo code, see totals (all from Medusa cart)
+1. **Cart** — Review items, apply promo code (guests can validate, logged-in apply), see totals
 2. **Checkout** — Authentication (inline login or register), contact verification, shipping address, Shipping Methods
 3. **Payment** — Order summary, animated pay button with progress bar, card form
 4. **Confirmed** — Enterprise confirmation page with order summary, status timeline, invoice actions
 
-**Checkout Architecture (Direct API + Webhook Backup):**
+**Checkout Architecture (PawTag-Native Direct API):**
 
 ```
 Frontend (Checkout.tsx)
-  → Await customer sync: POST /customer/medusa-sync
-  → Write identity to cart metadata: pawtagUserId, pawtagUserEmail, phone, fullName
-  → Medusa SDK: sdk.store.cart.update() — set shipping address
-  → Medusa SDK: sdk.store.cart.addShippingMethod() — add shipping
-  → Medusa SDK: sdk.store.payment.initiatePaymentSession() — create payment
+  → POST /checkout/payment-intent — Create Stripe PaymentIntent + PendingOrder (server-side totals)
   → StripePaymentForm: stripe.confirmPayment() — animated progress 0%→25%
-  → Medusa SDK: sdk.store.cart.complete() — creates Medusa order (progress 50%)
-  → POST /customer/orders/place — creates PawTag order + invoice + emails (progress 75%)
-  → Animated confirmation (progress 100%, green, 500ms hold)
+  → POST /checkout/confirm — Validate payment, create Order + Invoice (idempotent)
+  → Send emails (non-blocking, parallel)
   → Confirmation page with order summary, status timeline, invoice actions
 
-Backup path (async, idempotent):
-  → Medusa fires order.placed event → webhook to PawTag
-  → Webhook checks if order exists → YES → skips (idempotent)
-```
+Guest promo validation:
+  → POST /public/promo/validate — Check if code is valid (no auth required)
+  → Guest sees discount info, prompted to log in to apply
 
-**Customer identity sync:** Before cart completion, the frontend awaits `POST /customer/medusa-sync` to ensure the Medusa customer is linked. It also writes `pawtagUserId`, `pawtagUserEmail`, `pawtagUserPhone`, and `pawtagUserFullName` to cart metadata. These flow into the Medusa order, ensuring the webhook handler can always find the PawTag user.
+Safety nets:
+  → Orphan payment detection job (every 60s)
+  → Stripe webhook handler (payment_intent.succeeded)
+  → PendingOrder TTL (30 days)
+  → Order number retry on duplicate key (error code 11000)
+```
 
 **Verification gate:** Users must have both email and mobile verified before proceeding to payment. The checkout page checks `user.emailVerified` and `user.phoneVerified` and shows verification status with links to verify.
 
-**Payment:** Medusa handles payment via Stripe module. Demo mode uses `pp_system_default` (auto-succeeds). Real Stripe when `STRIPE_API_KEY` is configured.
+**Payment:** Stripe payment via PawTag's direct Stripe provider. Demo mode when `commerce.payment.testMode` is `true` (CMS setting). Real Stripe when test mode is OFF in admin Commerce Settings.
 
-**Order creation:** The `POST /customer/orders/place` endpoint creates the PawTag order synchronously (~700ms). The webhook handler is a backup — it checks idempotency and skips if the order already exists. Both paths use the shared `createOrderFromMedusa()` service function.
+**Order creation:** The `POST /checkout/confirm` endpoint creates the order idempotently. If an order already exists for the payment intent, it returns the existing order instead of failing. Order number generation retries on duplicate key (error code 11000).
 
 **Email optimization:** All 3 emails (invoice, order confirmation, admin alert) are sent in parallel via `Promise.allSettled()` — ~400ms total instead of ~1200ms sequential.
 
-**Webhook reliability:** Incoming Medusa webhooks are stored in `WebhookEvent` collection for idempotency and retry. Failed events are retried every 60 seconds up to 5 times. Handlers return boolean — only marked "completed" on success.
-
-**User lookup chain (5 fallbacks):**
-1. `medusaCustomerId` (from customer sync)
-2. `email` (from Medusa customer)
-3. Admin API → email (fetch Medusa customer, find by email)
-4. `metadata.pawtagUserId` (from cart metadata)
-5. `metadata.pawtagUserEmail` (from cart metadata)
+**Guest promo codes:** Guests can validate promo codes via `POST /public/promo/validate` (no auth required). The endpoint returns the code details (type, value, description, min order). Logged-in users apply codes directly to their server-side cart.
 
 ## Development Commands
 
@@ -856,6 +858,7 @@ Enterprise-grade sidebar with collapsible sections and dark/light mode:
 - **PuckEditor CMS:** Visual page builder with 36 block types in both admin and web apps
 - **Rich Text Editing:** TipTap-based editor in admin with 13 extensions
 - **Monaco Editor:** JSON editor in admin for advanced content editing
+- **Scroll Animations:** `<FadeIn>` component from `@pawtag/ui` — uses native IntersectionObserver, respects prefers-reduced-motion
 
 ### PuckEditor CMS Page Builder
 
@@ -947,6 +950,8 @@ Located in `apps/mobile/e2e/`:
 | `packages/ui/src/components/AddressAutocomplete.tsx` | Reusable address autocomplete component |
 | `packages/ui/src/components/ProductCard.tsx` | Shared product card component (primary-* tokens) |
 | `packages/ui/src/components/CartDrawer.tsx` | Shared cart drawer component |
+| `packages/ui/src/components/FadeIn.tsx` | Scroll-triggered fade-in animation component |
+| `packages/api/src/routes/promo-public.ts` | Public promo code validation (no auth) |
 | `packages/api/src/routes/medusa-webhooks.ts` | Medusa webhook endpoint (order.placed, payment.captured) |
 | `packages/api/src/services/order-creation.service.ts` | Shared order creation service (used by API + webhook) |
 | `packages/api/src/routes/checkout-otp.ts` | Dual OTP checkout verification |

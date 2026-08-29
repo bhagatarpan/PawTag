@@ -1,6 +1,6 @@
 # PawTag Design System
 
-**Last updated:** 2026-08-06
+**Last updated:** 2026-08-30
 **Status:** Active — authoritative reference for all PawTag UI (web, customer, admin, finder, mobile)
 
 ---

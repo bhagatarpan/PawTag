@@ -69,14 +69,19 @@ PawTag is a pet recovery platform that solves the problem of reuniting lost pets
 - Health conditions and surgery history
 - Weight tracking
 
-### E-Commerce (MedusaJS v2)
-- Product catalog with variants (Medusa commerce engine)
-- Server-side cart via Medusa SDK
-- Dual OTP checkout gatekeeper (email + SMS)
-- Stripe payment processing
-- Order lifecycle management
+### E-Commerce (PawTag Commerce)
+- Product catalog with variants and inventory management
+- Server-side cart with promo codes (guests can validate, logged-in apply)
+- 4-step checkout wizard with Stripe payment processing
+- Order lifecycle management with idempotent creation
 - Subscription management
-- Invoice generation
+- Invoice generation and email delivery
+- NZ domestic shipping via NZ Post API (with demo fallback)
+- Shipment tracking with automated carrier polling (5-min intervals)
+- Payment transaction audit trail and reconciliation
+- Self-service returns and order cancellation with auto-refund
+- Discount/promo code management (percentage, fixed, usage limits)
+- CMS-driven commerce settings (35+ configurable settings)
 
 ### Mobile App (React Native/Expo)
 - QR code scanning
@@ -90,7 +95,11 @@ PawTag is a pet recovery platform that solves the problem of reuniting lost pets
 - Role-based access control (RBAC)
 - Analytics dashboard
 - CMS content management
-- Order fulfillment
+- Order fulfillment with shipment management
+- Payment reconciliation dashboard
+- Returns and refund processing
+- Discount/promo code management
+- Commerce settings with human-readable labels and tooltips
 - Subscription management
 
 ### Security

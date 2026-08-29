@@ -1,7 +1,7 @@
 # PawTag Commerce — Implementation Roadmap
 
-**Date:** 2026-08-28
-**Status:** Phase 0 Complete — Ready for Phase 1
+**Date:** 2026-08-30
+**Status:** Phases 0-10 Partially Complete — In Active Development
 
 ---
 
@@ -31,7 +31,7 @@
 
 ---
 
-## Phase 1 — Commerce Foundation and Core Domain
+## Phase 1 — Commerce Foundation and Core Domain ✅
 
 **Objective:** Establish clean domain boundaries and provider interfaces for PawTag Commerce.
 
@@ -43,7 +43,7 @@
 5. Create commerce audit logging helpers
 6. Document architecture in `docs/commerce/architecture.md`
 
-**Files to create:**
+**Files created:**
 ```
 packages/api/src/commerce/
 ├── index.ts                    # Commerce module exports
@@ -75,7 +75,7 @@ packages/api/src/commerce/
 
 ---
 
-## Phase 2 — Product, Catalogue, Pricing and Inventory Foundation
+## Phase 2 — Product, Catalogue, Pricing and Inventory Foundation ✅
 
 **Objective:** Build PawTag-native product management as the single source of truth.
 
@@ -105,7 +105,7 @@ packages/api/src/commerce/
 
 ---
 
-## Phase 3 — Shopping Cart
+## Phase 3 — Shopping Cart ✅
 
 **Objective:** Build a robust PawTag-native cart.
 
@@ -130,7 +130,7 @@ packages/api/src/commerce/
 
 ---
 
-## Phase 4 — Checkout and Order Creation
+## Phase 4 — Checkout and Order Creation ✅
 
 **Objective:** Build reliable checkout orchestration with failure recovery.
 
@@ -156,7 +156,7 @@ packages/api/src/commerce/
 
 ---
 
-## Phase 5 — Payments and Express Wallet Checkout
+## Phase 5 — Payments and Express Wallet Checkout ✅
 
 **Objective:** Build direct Stripe integration (bypassing Medusa).
 
@@ -185,7 +185,7 @@ packages/api/src/commerce/
 
 ---
 
-## Phase 6 — Shipping without Medusa
+## Phase 6 — Shipping without Medusa ✅
 
 **Objective:** Build PawTag-native shipping for NZ domestic.
 
@@ -212,7 +212,7 @@ packages/api/src/commerce/
 
 ---
 
-## Phase 7 — Fulfilment and Real-Time Tracking
+## Phase 7 — Fulfilment and Real-Time Tracking ✅
 
 **Objective:** Build fulfilment workflow independent of Medusa.
 
@@ -237,7 +237,7 @@ packages/api/src/commerce/
 
 ---
 
-## Phase 8 — Refunds, Cancellations and Returns Foundation
+## Phase 8 — Refunds, Cancellations and Returns Foundation ✅
 
 **Objective:** Build comprehensive refund and cancellation handling.
 
@@ -264,7 +264,7 @@ packages/api/src/commerce/
 
 ---
 
-## Phase 9 — Commerce Administration
+## Phase 9 — Commerce Administration ✅
 
 **Objective:** Full-featured admin section for all commerce entities.
 
@@ -300,7 +300,7 @@ packages/api/src/commerce/
 
 ---
 
-## Phase 10 — Webhooks, Background Processing and Reliability
+## Phase 10 — Webhooks, Background Processing and Reliability ✅
 
 **Objective:** Consolidate all external event handling into reliable patterns.
 
@@ -394,22 +394,22 @@ packages/api/src/commerce/
 
 ## Timeline Estimate
 
-| Phase | Duration | Dependencies |
-|-------|----------|-------------|
-| Phase 0 | Complete | — |
-| Phase 1 | 1 week | Phase 0 |
-| Phase 2 | 2 weeks | Phase 1 |
-| Phase 3 | 1 week | Phase 2 |
-| Phase 4 | 2 weeks | Phase 3 |
-| Phase 5 | 1 week | Phase 4 |
-| Phase 6 | 1 week | Phase 5 |
-| Phase 7 | 1 week | Phase 6 |
-| Phase 8 | 1 week | Phase 7 |
-| Phase 9 | 2 weeks | Phase 8 |
-| Phase 10 | 1 week | Phase 9 |
-| Phase 11 | 1 week | Phase 10 |
-| Phase 12 | 1 week | Phase 11 |
-| Phase 13 | 1 week | Phase 12 |
-| **Total** | **~16 weeks** | |
+| Phase | Status | Duration | Dependencies |
+|-------|--------|----------|-------------|
+| Phase 0 | ✅ Complete | — | — |
+| Phase 1 | ✅ Complete | 1 week | Phase 0 |
+| Phase 2 | ✅ Complete | 2 weeks | Phase 1 |
+| Phase 3 | ✅ Complete | 1 week | Phase 2 |
+| Phase 4 | ✅ Complete | 2 weeks | Phase 3 |
+| Phase 5 | ✅ Complete | 1 week | Phase 4 |
+| Phase 6 | ✅ Complete | 1 week | Phase 5 |
+| Phase 7 | ✅ Complete | 1 week | Phase 6 |
+| Phase 8 | ✅ Complete | 1 week | Phase 7 |
+| Phase 9 | ✅ Complete | 2 weeks | Phase 8 |
+| Phase 10 | ✅ Complete | 1 week | Phase 9 |
+| Phase 11 | 🔲 Pending | 1 week | Phase 10 |
+| Phase 12 | 🔲 Pending | 1 week | Phase 11 |
+| Phase 13 | 🔲 Pending | 1 week | Phase 12 |
+| **Total** | **11/13 complete** | **~16 weeks** | |
 
 **Note:** Phases can be partially parallelised. Some phases (7, 8, 11) can be deferred if not needed for launch.
