@@ -179,7 +179,46 @@ function PaymentFormInner({ onPaymentSuccess, onPaymentError, disabled }: Omit<S
 }
 
 export default function StripePaymentForm({ clientSecret, onPaymentSuccess, onPaymentError, disabled }: StripePaymentFormProps) {
+  const [stripeError, setStripeError] = useState<string | null>(null);
+  const [stripeLoaded, setStripeLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!clientSecret) return;
+    stripePromise.then((stripe) => {
+      if (stripe) {
+        setStripeLoaded(true);
+      } else {
+        setStripeError('Payment system failed to load. Please disable any ad blockers and refresh.');
+      }
+    }).catch(() => {
+      setStripeError('Payment system failed to load. Please check your connection and refresh.');
+    });
+  }, [clientSecret]);
+
   if (!clientSecret) return null;
+
+  if (stripeError) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
+        <p className="text-sm text-red-700 font-medium mb-2">{stripeError}</p>
+        <button
+          onClick={() => { setStripeError(null); setStripeLoaded(false); window.location.reload(); }}
+          className="text-sm text-red-600 underline hover:text-red-800"
+        >
+          Reload page
+        </button>
+      </div>
+    );
+  }
+
+  if (!stripeLoaded) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="h-6 w-6 animate-spin text-primary-600" />
+        <span className="ml-2 text-sm text-gray-500">Loading payment methods...</span>
+      </div>
+    );
+  }
 
   const options = {
     clientSecret,
