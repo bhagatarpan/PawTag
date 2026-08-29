@@ -1,6 +1,12 @@
 /**
  * @module Shipping Methods Page
  * @description Admin page for managing shipping methods.
+ *
+ * Rate types and carriers are read from CMS settings:
+ * - commerce.shipping.rateTypes: free,flat_rate,weight_based,price_based
+ * - commerce.shipping.carriers: nz-post,courierpost,aramex,dhl,fedex,ups
+ *
+ * Follows PawTag Design System tokens from DESIGN.md.
  */
 
 import { useEffect, useState, useCallback } from 'react';
@@ -21,12 +27,28 @@ interface ShippingMethod {
   sortOrder: number;
 }
 
-const RATE_TYPES = [
-  { value: 'free', label: 'Free' },
-  { value: 'flat_rate', label: 'Flat Rate' },
-  { value: 'weight_based', label: 'Weight Based' },
-  { value: 'price_based', label: 'Price Based' },
-];
+interface CommerceSetting {
+  key: string;
+  value: string;
+  default: string;
+  description: string;
+}
+
+const RATE_TYPE_LABELS: Record<string, string> = {
+  free: 'Free',
+  flat_rate: 'Flat Rate',
+  weight_based: 'Weight Based',
+  price_based: 'Price Based',
+};
+
+const CARRIER_LABELS: Record<string, string> = {
+  'nz-post': 'NZ Post',
+  'courierpost': 'CourierPost',
+  'aramex': 'Aramex',
+  'dhl': 'DHL',
+  'fedex': 'FedEx',
+  'ups': 'UPS',
+};
 
 export default function ShippingMethods() {
   const [methods, setMethods] = useState<ShippingMethod[]>([]);
@@ -34,8 +56,37 @@ export default function ShippingMethods() {
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<ShippingMethod | null>(null);
-  const [form, setForm] = useState({ name: '', description: '', rate: 0, rateType: 'free', estimatedDays: '', carrier: '', isActive: true, sortOrder: 0, zones: [] as string[] });
+  const [form, setForm] = useState({ name: '', description: '', rate: 0, rateType: 'free', estimatedDays: '', carrier: 'nz-post', isActive: true, sortOrder: 0, zones: [] as string[] });
   const [saving, setSaving] = useState(false);
+
+  // Rate types and carriers from CMS settings
+  const [rateTypes, setRateTypes] = useState<Record<string, string>>(RATE_TYPE_LABELS);
+  const [carriers, setCarriers] = useState<Record<string, string>>(CARRIER_LABELS);
+
+  // Load settings for rate types and carriers
+  useEffect(() => {
+    api.get('/admin/commerce/settings').then((res) => {
+      const settings: CommerceSetting[] = res.data?.data || [];
+      const rateTypesSetting = settings.find(s => s.key === 'commerce.shipping.rateTypes');
+      const carriersSetting = settings.find(s => s.key === 'commerce.shipping.carriers');
+
+      if (rateTypesSetting?.value) {
+        const types: Record<string, string> = {};
+        rateTypesSetting.value.split(',').forEach(t => {
+          types[t.trim()] = RATE_TYPE_LABELS[t.trim()] || t.trim();
+        });
+        setRateTypes(types);
+      }
+
+      if (carriersSetting?.value) {
+        const carrierMap: Record<string, string> = {};
+        carriersSetting.value.split(',').forEach(c => {
+          carrierMap[c.trim()] = CARRIER_LABELS[c.trim()] || c.trim();
+        });
+        setCarriers(carrierMap);
+      }
+    }).catch(() => {});
+  }, []);
 
   const fetchMethods = useCallback(async () => {
     try {
@@ -61,14 +112,14 @@ export default function ShippingMethods() {
       }
       setShowForm(false);
       setEditing(null);
-      setForm({ name: '', description: '', rate: 0, rateType: 'free', estimatedDays: '', carrier: '', isActive: true, sortOrder: 0, zones: [] });
+      setForm({ name: '', description: '', rate: 0, rateType: 'free', estimatedDays: '', carrier: 'nz-post', isActive: true, sortOrder: 0, zones: [] });
       fetchMethods();
     } catch (err: any) { toast.error(err.response?.data?.error || 'Failed to save'); }
     finally { setSaving(false); }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Delete this shipping method?')) return;
+  const handleDelete = async (id: string, name: string) => {
+    if (!confirm(`Delete shipping method "${name}"?`)) return;
     try { await api.delete(`/admin/commerce/shipping-methods/${id}`); toast.success('Deleted'); fetchMethods(); }
     catch { toast.error('Failed to delete'); }
   };
@@ -80,7 +131,7 @@ export default function ShippingMethods() {
           <h1 className="text-2xl font-bold text-gray-900">Shipping Methods</h1>
           <p className="text-sm text-gray-500 mt-1">{methods.length} methods configured</p>
         </div>
-        <button onClick={() => { setEditing(null); setForm({ name: '', description: '', rate: 0, rateType: 'free', estimatedDays: '', carrier: '', isActive: true, sortOrder: 0, zones: [] }); setShowForm(true); }}
+        <button onClick={() => { setEditing(null); setForm({ name: '', description: '', rate: 0, rateType: 'free', estimatedDays: '', carrier: 'nz-post', isActive: true, sortOrder: 0, zones: [] }); setShowForm(true); }}
           className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-xl font-semibold hover:bg-teal-700 transition-all">
           <Plus size={16} /> Add Method
         </button>
@@ -106,6 +157,7 @@ export default function ShippingMethods() {
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Name</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Rate Type</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Rate</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Carrier</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Est. Days</th>
                 <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Status</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Actions</th>
@@ -115,10 +167,11 @@ export default function ShippingMethods() {
               {methods.map((m) => (
                 <tr key={m._id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-medium text-gray-900">{m.name}</td>
-                  <td className="px-4 py-3 text-sm text-gray-500">{RATE_TYPES.find(r => r.value === m.rateType)?.label || m.rateType}</td>
+                  <td className="px-4 py-3 text-sm text-gray-500">{rateTypes[m.rateType] || m.rateType}</td>
                   <td className="px-4 py-3 text-right text-sm font-semibold text-gray-900">
                     {m.rateType === 'free' ? 'Free' : `$${m.rate.toFixed(2)}`}
                   </td>
+                  <td className="px-4 py-3 text-sm text-gray-500">{carriers[m.carrier || ''] || m.carrier || '-'}</td>
                   <td className="px-4 py-3 text-sm text-gray-500">{m.estimatedDays || '-'}</td>
                   <td className="px-4 py-3 text-center">
                     <span className={`px-2 py-1 text-xs font-medium rounded-full ${m.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
@@ -126,9 +179,9 @@ export default function ShippingMethods() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <button onClick={() => { setEditing(m); setForm({ name: m.name, description: m.description || '', rate: m.rate, rateType: m.rateType, estimatedDays: m.estimatedDays || '', carrier: m.carrier || '', isActive: m.isActive, sortOrder: m.sortOrder, zones: m.zones || [] }); setShowForm(true); }}
+                    <button onClick={() => { setEditing(m); setForm({ name: m.name, description: m.description || '', rate: m.rate, rateType: m.rateType, estimatedDays: m.estimatedDays || '', carrier: m.carrier || 'nz-post', isActive: m.isActive, sortOrder: m.sortOrder, zones: m.zones || [] }); setShowForm(true); }}
                       className="p-1.5 text-gray-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg"><Edit2 size={16} /></button>
-                    <button onClick={() => handleDelete(m._id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 size={16} /></button>
+                    <button onClick={() => handleDelete(m._id, m.name)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 size={16} /></button>
                   </td>
                 </tr>
               ))}
@@ -139,7 +192,7 @@ export default function ShippingMethods() {
 
       {showForm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowForm(false)}>
-          <div className="bg-white rounded-xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-xl max-w-lg w-full p-6" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold text-gray-900">{editing ? 'Edit' : 'Add'} Shipping Method</h2>
               <button onClick={() => setShowForm(false)} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
@@ -150,37 +203,53 @@ export default function ShippingMethods() {
                 <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <input type="text" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  placeholder="Optional description"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" />
+              </div>
               <div className="flex gap-4">
                 <div className="flex-1">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Rate Type</label>
                   <select value={form.rateType} onChange={(e) => setForm({ ...form, rateType: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500">
-                    {RATE_TYPES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                    {Object.entries(rateTypes).map(([value, label]) => (
+                      <option key={value} value={value}>{label}</option>
+                    ))}
                   </select>
                 </div>
                 {form.rateType !== 'free' && (
                   <div className="flex-1">
                     <label className="block text-sm font-medium text-gray-700 mb-1">Rate ($)</label>
-                    <input type="number" step="0.01" value={form.rate} onChange={(e) => setForm({ ...form, rate: Number(e.target.value) })}
+                    <input type="number" step="0.01" min="0" value={form.rate} onChange={(e) => setForm({ ...form, rate: Number(e.target.value) })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" />
                   </div>
                 )}
               </div>
               <div className="flex gap-4">
                 <div className="flex-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Carrier</label>
+                  <select value={form.carrier} onChange={(e) => setForm({ ...form, carrier: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500">
+                    {Object.entries(carriers).map(([value, label]) => (
+                      <option key={value} value={value}>{label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex-1">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Est. Days</label>
                   <input type="text" value={form.estimatedDays} onChange={(e) => setForm({ ...form, estimatedDays: e.target.value })}
                     placeholder="e.g. 3-5 business days"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" />
                 </div>
-                <div className="flex-1">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Carrier</label>
-                  <input type="text" value={form.carrier} onChange={(e) => setForm({ ...form, carrier: e.target.value })}
-                    placeholder="e.g. NZ Post"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" />
-                </div>
               </div>
-              <div className="flex justify-end gap-2">
+              <div className="flex items-center gap-2">
+                <input type="checkbox" checked={form.isActive} onChange={(e) => setForm({ ...form, isActive: e.target.checked })}
+                  className="rounded border-gray-300 text-teal-600 focus:ring-teal-500" />
+                <label className="text-sm text-gray-700">Active</label>
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
                 <button onClick={() => setShowForm(false)} className="px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">Cancel</button>
                 <button onClick={handleSave} disabled={saving}
                   className="flex items-center gap-2 px-4 py-2 text-sm text-white bg-teal-600 rounded-lg hover:bg-teal-700 disabled:opacity-50">

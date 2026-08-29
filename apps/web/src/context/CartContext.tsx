@@ -208,6 +208,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     if (!guestItems.length) return;
 
     // Add each guest item to server cart
+    let syncSuccess = false;
     for (const item of guestItems) {
       try {
         await api.post('/cart/items', {
@@ -215,13 +216,18 @@ export function CartProvider({ children }: { children: ReactNode }) {
           quantity: item.quantity,
           customisation: item.customisation,
         });
+        syncSuccess = true;
       } catch {
         // Non-critical — continue syncing other items
       }
     }
 
-    // Clear guest cart and reload from server
-    localStorage.removeItem(CART_STORAGE_KEY);
+    // Only clear guest cart if sync was successful
+    if (syncSuccess) {
+      localStorage.removeItem(CART_STORAGE_KEY);
+    }
+
+    // Reload cart from server (whether sync succeeded or not)
     await refreshCart();
   }, [refreshCart]);
 
