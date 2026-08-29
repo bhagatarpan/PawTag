@@ -166,6 +166,7 @@ export default function Checkout() {
     if (step === 'payment' && !canProceedToPayment) return;
     setCurrentStep(step);
     setError(null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   // Promo code handlers
@@ -236,6 +237,7 @@ export default function Checkout() {
       // 2. Store client secret — StripePaymentForm will use it to confirm payment
       setPaymentClientSecret(clientSecret);
       setCurrentStep('payment');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err: any) {
       const msg = err?.response?.status === 401
         ? 'Your session expired. Please log in again to continue.'
@@ -282,6 +284,7 @@ export default function Checkout() {
 
       setSuccess(true);
       setCurrentStep('confirmed');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       sessionStorage.setItem('pawtag_checkout_success', 'true');
       sessionStorage.setItem('pawtag_checkout_order', pawtagOrder?.orderNumber || paymentIntentId.slice(-8));
       clearCart();
@@ -698,7 +701,7 @@ export default function Checkout() {
 
         {/* Step 4: Confirmed */}
         {currentStep === 'confirmed' && (
-          <div className="max-w-2xl mx-auto py-8 space-y-6" ref={(el) => { if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}>
+          <div className="max-w-2xl mx-auto py-8 space-y-6">
             <div className="text-center">
               <div className="h-20 w-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4" style={{ animation: 'scale-in 0.5s ease-out' }}>
                 <CheckCircle className="h-12 w-12 text-green-500" style={{ animation: 'check-draw 0.6s ease-out 0.3s both' }} />
