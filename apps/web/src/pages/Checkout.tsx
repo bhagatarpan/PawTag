@@ -162,16 +162,21 @@ export default function Checkout() {
   };
 
   // Promo code handlers
+  const [promoError, setPromoError] = useState('');
   const applyPromoCode = async () => {
     if (!promoCode) return;
     setPromoLoading(true);
+    setPromoError('');
     try {
       await api.post('/cart/promo', { code: promoCode });
       await refreshCart();
       setPromoApplied(true);
       setPromoDiscount(totals.discount || 0);
+      setPromoError('');
     } catch (err: any) {
-      setError(err.message || 'Invalid promo code');
+      const msg = err?.response?.data?.error || err?.message || 'Invalid promo code';
+      setPromoError(msg);
+      setPromoCode('');
     } finally {
       setPromoLoading(false);
     }
@@ -391,8 +396,9 @@ export default function Checkout() {
               {/* Summary */}
               <div className="px-6 py-4 border-t border-gray-100">
                 {/* Promo code section */}
-                {promoApplied ? (
-                  <div className="flex items-center justify-between text-sm mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="mb-4">
+                  {promoApplied ? (
+                  <div className="flex items-center justify-between text-sm p-3 bg-green-50 border border-green-200 rounded-lg">
                     <div className="flex items-center gap-2">
                       <Tag className="h-4 w-4 text-green-600" />
                       <span className="font-medium text-green-700">{promoCode}</span>
@@ -401,13 +407,17 @@ export default function Checkout() {
                     <button onClick={removePromoCode} className="text-xs text-gray-500 hover:text-red-500 font-medium ml-2">Remove</button>
                   </div>
                 ) : (
-                  <div className="flex gap-2 mb-4">
-                    <input type="text" value={promoCode} onChange={e => setPromoCode(e.target.value.toUpperCase())} placeholder="Add promo code" disabled={promoApplied} className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-primary-500 disabled:bg-gray-50 disabled:text-gray-400" />
-                    <button onClick={applyPromoCode} disabled={!promoCode || promoLoading || promoApplied} className="px-4 py-2 text-sm text-primary-600 border border-primary-200 rounded-lg hover:bg-primary-50 disabled:opacity-50">
-                      {promoLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Apply'}
-                    </button>
-                  </div>
+                  <>
+                    <div className="flex gap-2 mb-1">
+                      <input type="text" value={promoCode} onChange={e => { setPromoCode(e.target.value.toUpperCase()); setPromoError(''); }} placeholder="Add promo code" disabled={promoApplied} className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-primary-500 disabled:bg-gray-50 disabled:text-gray-400" />
+                      <button onClick={applyPromoCode} disabled={!promoCode || promoLoading || promoApplied} className="px-4 py-2 text-sm text-primary-600 border border-primary-200 rounded-lg hover:bg-primary-50 disabled:opacity-50">
+                        {promoLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Apply'}
+                      </button>
+                    </div>
+                    {promoError && <p className="text-xs text-red-500">{promoError}</p>}
+                  </>
                 )}
+                  </div>
                 <div className="space-y-2 pt-2">
                   <div className="flex justify-between text-sm text-gray-600"><span>Subtotal</span><span>NZ${itemsSubtotal.toFixed(2)}</span></div>
                   {discountAmount > 0 && <div className="flex justify-between text-sm text-green-600"><span>Discount</span><span>-NZ${discountAmount.toFixed(2)}</span></div>}
