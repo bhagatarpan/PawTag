@@ -277,34 +277,44 @@ export class CheckoutService {
       return { order: existingOrder, invoice, invoiceUrl, isNew: false };
     }
 
-    // 6. Generate order number atomically
-    const orderNumber = await this.generateOrderNumber();
-
-    // 7. Create Order
-    const order = await Order.create({
-      orderNumber,
-      userId,
-      items: pending.items.map((item) => ({
-        productId: item.productId,
-        productName: item.productName,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        totalPrice: (item.unitPrice + item.customizationTotal) * item.quantity,
-      })),
-      status: 'paid',
-      payment: {
-        method: 'card',
-        status: 'completed',
-        transactionId: paymentIntentId,
-        stripePaymentIntentId: paymentIntentId,
-        amount: pending.total,
-        currency: pending.currency,
-        paidAt: new Date(),
-      },
-      shippingAddress: pending.shippingAddress,
-      referredByCode: pending.referralCode,
-      notes: `Stripe PaymentIntent: ${paymentIntentId}`,
-    });
+    // 6-7. Generate order number and create Order (retry on duplicate key)
+    let order: any;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const orderNumber = await this.generateOrderNumber();
+        order = await Order.create({
+          orderNumber,
+          userId,
+          items: pending.items.map((item) => ({
+            productId: item.productId,
+            productName: item.productName,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            totalPrice: (item.unitPrice + item.customizationTotal) * item.quantity,
+          })),
+          status: 'paid',
+          payment: {
+            method: 'card',
+            status: 'completed',
+            transactionId: paymentIntentId,
+            stripePaymentIntentId: paymentIntentId,
+            amount: pending.total,
+            currency: pending.currency,
+            paidAt: new Date(),
+          },
+          shippingAddress: pending.shippingAddress,
+          referredByCode: pending.referralCode,
+          notes: `Stripe PaymentIntent: ${paymentIntentId}`,
+        });
+        break; // success
+      } catch (err: any) {
+        if (err?.code === 11000 && attempt < 2) {
+          logger.warn({ attempt, paymentIntentId }, 'Order number duplicate, retrying');
+          continue;
+        }
+        throw err;
+      }
+    }
 
     // 7. Record activity
     const activityEntry = {
@@ -330,7 +340,7 @@ export class CheckoutService {
 
     // 8. Confirm stock (deduct actual inventory)
     for (const item of pending.items) {
-      await inventoryService.confirmSale(String(item.productId), item.quantity, orderNumber);
+      await inventoryService.confirmSale(String(item.productId), item.quantity, order.orderNumber);
     }
 
     // 9. Create Invoice
@@ -350,7 +360,7 @@ export class CheckoutService {
 
     // 13. Fire-and-forget: emails, notifications, referrals
     this.sendPostCheckoutNotifications(order, invoice, invoiceUrl, userId).catch((err) => {
-      logger.error({ err, orderNumber }, 'Post-checkout notification error');
+      logger.error({ err, orderNumber: order.orderNumber }, 'Post-checkout notification error');
     });
 
     // 14. Audit log
@@ -361,7 +371,7 @@ export class CheckoutService {
       currency: pending.currency,
     });
 
-    logger.info({ orderNumber, userId, total: pending.total }, 'Checkout confirmed');
+    logger.info({ orderNumber: order.orderNumber, userId, total: pending.total }, 'Checkout confirmed');
 
     return { order, invoice, invoiceUrl, isNew: true };
   }
@@ -494,7 +504,9 @@ export class CheckoutService {
       { $inc: { seq: 1 } },
       { upsert: true, returnDocument: 'after' },
     );
-    return `${prefix}-${String(counter?.value?.seq || 1).padStart(length, '0')}`;
+    // MongoDB driver v5 returns { value: { seq: N } } on returnDocument: 'after'
+    const seq = (counter as any)?.value?.seq ?? 1;
+    return `${prefix}-${String(seq).padStart(length, '0')}`;
   }
 }
 

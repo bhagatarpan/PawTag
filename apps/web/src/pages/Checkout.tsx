@@ -8,6 +8,7 @@ import {
 import { AddressAutocomplete } from '@pawtag/ui';
 import type { AddressComponents } from '@pawtag/ui';
 import api from '../lib/api';
+import axios from 'axios';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useSiteSettings } from '../hooks/useCms';
@@ -59,6 +60,7 @@ export default function Checkout() {
   const [promoApplied, setPromoApplied] = useState(false);
   const [promoLoading, setPromoLoading] = useState(false);
   const [promoDiscount, setPromoDiscount] = useState(0);
+  const [guestPromoInfo, setGuestPromoInfo] = useState<any>(null);
 
   // Verification status
   const [emailVerified, setEmailVerified] = useState(false);
@@ -173,12 +175,32 @@ export default function Checkout() {
   const [promoError, setPromoError] = useState('');
   const applyPromoCode = async () => {
     if (!promoCode) return;
-    if (!user) {
-      setPromoError('Please log in to apply a promo code');
-      return;
-    }
     setPromoLoading(true);
     setPromoError('');
+    setGuestPromoInfo(null);
+
+    // Guest: validate promo code via public endpoint (no auth required)
+    if (!user) {
+      try {
+        const res = await axios.post('/api/public/promo/validate', { code: promoCode });
+        const data = res.data.data;
+        if (data.valid) {
+          setGuestPromoInfo(data);
+          setPromoError('');
+        } else {
+          setPromoError(data.error || 'Invalid promo code');
+          setPromoCode('');
+        }
+      } catch {
+        setPromoError('Failed to validate promo code');
+        setPromoCode('');
+      } finally {
+        setPromoLoading(false);
+      }
+      return;
+    }
+
+    // Logged in: apply promo code to server-side cart
     try {
       await api.post('/cart/promo', { code: promoCode });
       await refreshCart();
@@ -198,11 +220,12 @@ export default function Checkout() {
 
   const removePromoCode = async () => {
     try {
-      await api.delete('/cart/promo');
+      if (user) await api.delete('/cart/promo');
       setPromoApplied(false);
       setPromoDiscount(0);
       setPromoCode('');
-      await refreshCart();
+      setGuestPromoInfo(null);
+      if (user) await refreshCart();
     } catch (err: any) {
       setError(err.message || 'Failed to remove promo code');
     }
@@ -437,6 +460,23 @@ export default function Checkout() {
                       <span className="text-green-600">applied — saved NZ${discountAmount.toFixed(2)}</span>
                     </div>
                     <button onClick={removePromoCode} className="text-xs text-gray-500 hover:text-red-500 font-medium ml-2">Remove</button>
+                  </div>
+                ) : guestPromoInfo ? (
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Tag className="h-4 w-4 text-blue-600" />
+                        <span className="font-medium text-blue-700">{guestPromoInfo.code}</span>
+                        <span className="text-blue-600">
+                          — {guestPromoInfo.discountType === 'percentage'
+                            ? `${guestPromoInfo.discountValue}% off`
+                            : `NZ$${guestPromoInfo.discountValue} off`}
+                          {guestPromoInfo.minOrderAmount > 0 && ` (min order: NZ$${guestPromoInfo.minOrderAmount})`}
+                        </span>
+                      </div>
+                      <button onClick={() => { setGuestPromoInfo(null); setPromoCode(''); }} className="text-xs text-gray-500 hover:text-red-500 font-medium ml-2">Remove</button>
+                    </div>
+                    <p className="text-xs text-blue-600 mt-1">Log in to apply this discount to your order</p>
                   </div>
                 ) : (
                   <>
