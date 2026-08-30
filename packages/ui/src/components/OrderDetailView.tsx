@@ -34,6 +34,8 @@ const STEP_LABELS: Record<string, string> = {
   packing: 'Packing',
   shipped: 'Shipped',
   delivered: 'Delivered',
+  cancelled: 'Cancelled',
+  refunded: 'Refunded',
 };
 
 const STATUS_BADGE_VARIANT: Record<string, BadgeVariant> = {
@@ -147,26 +149,33 @@ function OrderHeader({
   const label = STEP_LABELS[order.status] || order.status;
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-      <div className="flex items-start justify-between">
-        <div>
-          {onBackToOrders && (
-            <button
-              onClick={onBackToOrders}
-              className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-primary-600 mb-3 transition-colors"
-            >
-              <ArrowLeft className="h-4 w-4" /> Back to Orders
-            </button>
-          )}
-          <h1 className="text-2xl font-bold text-gray-900">
-            Order {order.orderNumber || `#${order._id.slice(-8).toUpperCase()}`}
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Placed on {formatDateTime(order.createdAt)}
-          </p>
-        </div>
-        <StatusBadge label={label} variant={variant} size="md" />
+    <div className="flex items-start justify-between">
+      <div>
+        {onBackToOrders && (
+          <button
+            onClick={onBackToOrders}
+            className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-primary-600 mb-3 transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4" /> Back to Orders
+          </button>
+        )}
+        <h1 className="text-2xl font-bold text-gray-900">
+          Order {order.orderNumber || `#${order._id.slice(-8).toUpperCase()}`}
+        </h1>
+        <p className="text-sm text-gray-500 mt-1">
+          Placed on {formatDateTime(order.createdAt)}
+        </p>
       </div>
+      <span className={`px-3 py-1.5 text-sm font-medium rounded-full ${
+        variant === 'success' ? 'bg-emerald-100 text-emerald-700' :
+        variant === 'danger' ? 'bg-red-100 text-red-700' :
+        variant === 'warning' ? 'bg-amber-100 text-amber-700' :
+        variant === 'primary' ? 'bg-primary-100 text-primary-700' :
+        variant === 'info' ? 'bg-blue-100 text-blue-700' :
+        'bg-gray-100 text-gray-600'
+      }`}>
+        {label}
+      </span>
     </div>
   );
 }
@@ -195,18 +204,21 @@ function OrderProgressStepper({ order }: { order: OrderData }) {
       <div className="relative mb-8">
         {/* Track background */}
         <div className="absolute top-[15px] left-[15px] right-[15px] h-1 bg-gray-200 rounded-full" />
-        {/* Fill */}
+        {/* Fill — green primary bar */}
         <div
           className="absolute top-[15px] left-[15px] h-1 bg-primary-500 rounded-full transition-all duration-700 ease-out"
           style={{
-            width: `calc(${Math.min(currentStep, ORDER_STATUS_STEPS.length - 1)} / ${ORDER_STATUS_STEPS.length - 1} * (100% - 30px))`,
+            width: currentStep >= 0
+              ? `calc(${Math.min(currentStep, ORDER_STATUS_STEPS.length - 1)} / ${ORDER_STATUS_STEPS.length - 1} * (100% - 30px))`
+              : '0px',
           }}
         />
         {/* Steps */}
         <div className="relative flex justify-between">
           {ORDER_STATUS_STEPS.map((step, i) => {
-            const isDone = i <= currentStep;
+            const isDone = currentStep >= 0 && i < currentStep;
             const isCurrent = i === currentStep;
+            const isFuture = currentStep < 0 || i > currentStep;
             const StepIcon = STEP_ICON[step] || Clock;
             return (
               <div key={step} className="flex flex-col items-center" style={{ width: `${100 / ORDER_STATUS_STEPS.length}%` }}>
@@ -214,14 +226,20 @@ function OrderProgressStepper({ order }: { order: OrderData }) {
                   className={`w-[30px] h-[30px] rounded-full flex items-center justify-center z-10 transition-all ${
                     isDone
                       ? 'bg-primary-600 text-white'
+                      : isCurrent
+                      ? 'bg-primary-600 text-white ring-2 ring-offset-2 ring-primary-200'
                       : 'bg-gray-200 text-gray-400'
-                  } ${isCurrent ? 'ring-2 ring-offset-2 ring-primary-200' : ''}`}
+                  }`}
                 >
-                  {isDone ? <Check className="h-4 w-4" /> : <StepIcon className="h-4 w-4" />}
+                  {isDone ? (
+                    <Check className="h-4 w-4" />
+                  ) : (
+                    <StepIcon className="h-4 w-4" />
+                  )}
                 </div>
                 <span
-                  className={`text-xs mt-2 font-medium text-center capitalize ${
-                    isDone ? 'text-primary-700' : 'text-gray-400'
+                  className={`text-xs mt-2 font-medium text-center ${
+                    isDone || isCurrent ? 'text-primary-700' : 'text-gray-400'
                   }`}
                 >
                   {STEP_LABELS[step] || step}
@@ -237,7 +255,16 @@ function OrderProgressStepper({ order }: { order: OrderData }) {
         <CheckCircle className="h-5 w-5 text-primary-600" />
         <div>
           <p className="text-sm font-medium text-primary-800">
-            Order Status: <StatusBadge label={STEP_LABELS[order.status] || order.status} variant="primary" size="sm" />
+            Order Status:{' '}
+            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
+              order.status === 'paid' ? 'bg-primary-100 text-primary-700' :
+              order.status === 'delivered' ? 'bg-emerald-100 text-emerald-700' :
+              order.status === 'shipped' ? 'bg-blue-100 text-blue-700' :
+              order.status === 'packing' ? 'bg-amber-100 text-amber-700' :
+              'bg-primary-100 text-primary-700'
+            }`}>
+              {STEP_LABELS[order.status] || order.status}
+            </span>
           </p>
           <p className="text-xs text-primary-600 mt-0.5">
             {order.activity && order.activity.length > 0
