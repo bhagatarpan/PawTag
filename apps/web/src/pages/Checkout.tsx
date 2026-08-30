@@ -782,11 +782,14 @@ export default function Checkout() {
               <p className="text-lg text-gray-600" style={{ animation: 'fade-in-up 0.4s ease-out 0.3s both' }}>
                 Thank you for your purchase{user?.fullName ? `, ${user.fullName.split(' ')[0]}` : ''}.
               </p>
-              <p className="text-sm text-gray-400 mt-2" style={{ animation: 'fade-in-up 0.4s ease-out 0.4s both' }}>
-                Order <span className="font-mono font-semibold text-primary-700">{orderNumber}</span>
-                {' · '}
-                {new Date().toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })}
-              </p>
+              <div className="mt-3 bg-white border border-gray-200 rounded-xl px-5 py-3 inline-flex items-center gap-3" style={{ animation: 'fade-in-up 0.4s ease-out 0.4s both' }}>
+                <span className="text-sm text-gray-500">Order</span>
+                <span className="font-mono text-lg font-bold text-primary-700 tracking-wide">{orderNumber}</span>
+                <span className="text-gray-300">|</span>
+                <span className="text-sm font-medium text-gray-700">
+                  {new Date().toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </span>
+              </div>
             </div>
 
             {/* Confirmation Sent — under Order Confirmed */}
