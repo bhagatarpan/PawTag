@@ -42,8 +42,9 @@ export default function VerifyAccount() {
     try {
       const params = emailParam ? `?email=${encodeURIComponent(emailParam)}` : '';
       const res = await api.get(`/auth/verification-status${params}`);
+      console.log('[VerifyAccount] API response:', res.data);
       setStatus(res.data.data);
-      setCooldown(res.data.data.otpCooldown || 0);
+      setCooldown(res.data.data?.otpCooldown || 0);
     } catch {
       // Not authenticated — may have just registered
     } finally {
@@ -215,6 +216,7 @@ export default function VerifyAccount() {
   const isPhoneVerified = status?.phoneVerified ?? false;
   const allVerified = isEmailVerified && isPhoneVerified;
   const isPending = status?.status === 'pending_verification' || !status;
+  console.log('[VerifyAccount] status:', status, { isEmailVerified, isPhoneVerified, allVerified });
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-12">
