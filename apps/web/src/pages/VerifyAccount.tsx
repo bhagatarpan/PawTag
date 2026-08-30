@@ -28,6 +28,7 @@ export default function VerifyAccount() {
   const [success, setSuccess] = useState('');
   const [cooldown, setCooldown] = useState(0);
   const [emailSent, setEmailSent] = useState(false);
+  const [phoneOtpSent, setPhoneOtpSent] = useState(false);
   const [editingField, setEditingField] = useState<'email' | 'phone' | null>(null);
   const [editValue, setEditValue] = useState('');
   const [editSaving, setEditSaving] = useState(false);
@@ -119,6 +120,7 @@ export default function VerifyAccount() {
     try {
       await api.post('/auth/send-phone-otp', { phoneNumber: effectivePhone });
       setSuccess('OTP sent to your phone number.');
+      setPhoneOtpSent(true);
       setCooldown(60);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to send OTP');
@@ -139,6 +141,7 @@ export default function VerifyAccount() {
       await api.post('/auth/verify-phone', { otp: otpValue, phoneNumber: effectivePhone });
       setSuccess('Phone number verified successfully!');
       setOtpValue('');
+      setPhoneOtpSent(false);
       fetchStatus();
       // Optimistically update local state when no auth
       if (!status) {
@@ -195,6 +198,7 @@ export default function VerifyAccount() {
         setEmailSent(false);
       } else {
         setOtpValue('');
+        setPhoneOtpSent(false);
       }
       setEditingField(null);
       setSuccess('Contact updated. Please re-verify.');
@@ -380,7 +384,7 @@ export default function VerifyAccount() {
           )}
 
           {/* OTP Input (shown when phone verification is in progress) */}
-          {!isPhoneVerified && otpValue.length > 0 && (
+          {!isPhoneVerified && phoneOtpSent && (
             <div className="bg-white rounded-xl border-2 border-gray-200 p-4">
               <p className="text-sm text-gray-600 mb-3">Enter the 6-digit code sent to your phone.</p>
               <OtpInput
