@@ -302,6 +302,8 @@ export class CheckoutService {
             status: 'completed',
             transactionId: paymentIntentId,
             stripePaymentIntentId: paymentIntentId,
+            cardBrand: payment.cardBrand,
+            cardLast4: payment.cardLast4,
             amount: pending.total,
             currency: pending.currency,
             paidAt: new Date(),

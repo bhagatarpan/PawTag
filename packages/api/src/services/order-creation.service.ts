@@ -74,6 +74,12 @@ export interface CreateOrderParams {
   /** Stripe PaymentIntent ID */
   paymentIntentId: string;
 
+  /** Card brand (visa, mastercard, etc.) */
+  cardBrand?: string;
+
+  /** Last 4 digits of the card */
+  cardLast4?: string;
+
   /** Shipping address */
   shippingAddress?: {
     line1: string;
@@ -118,6 +124,8 @@ export async function createPawTagOrder(params: CreateOrderParams): Promise<Crea
     total,
     currency,
     paymentIntentId,
+    cardBrand,
+    cardLast4,
     shippingAddress,
     referralCode,
     promoCode,
@@ -170,6 +178,8 @@ export async function createPawTagOrder(params: CreateOrderParams): Promise<Crea
       status: 'completed',
       transactionId: paymentIntentId,
       stripePaymentIntentId: paymentIntentId,
+      cardBrand,
+      cardLast4,
       amount: total,
       currency: currency.toUpperCase(),
       paidAt: new Date(),

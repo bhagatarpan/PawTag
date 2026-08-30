@@ -167,13 +167,30 @@ export class StripePaymentProvider implements IPaymentProvider {
     const stripe = this.getClient();
 
     try {
-      const intent = await stripe.paymentIntents.retrieve(paymentIntentId);
+      const intent = await stripe.paymentIntents.retrieve(paymentIntentId, {
+        expand: ['charges', 'charges.data.payment_method_details'],
+      });
+
+      // Extract card details from the latest charge
+      let cardBrand: string | undefined;
+      let cardLast4: string | undefined;
+      const charges = (intent as any).charges?.data;
+      if (charges?.length > 0) {
+        const card = charges[0].payment_method_details?.card;
+        if (card) {
+          cardBrand = card.brand;
+          cardLast4 = card.last4;
+        }
+      }
+
       return {
         id: intent.id,
         clientSecret: intent.client_secret || '',
         amount: (intent.amount || 0) / 100, // Convert from cents
         currency: intent.currency,
         status: STATUS_MAP[intent.status] || 'processing',
+        cardBrand,
+        cardLast4,
         metadata: intent.metadata as Record<string, string>,
       };
     } catch (err: any) {

@@ -31,6 +31,8 @@ export interface IOrderDocument extends Document {
     status: 'pending' | 'completed' | 'failed' | 'refunded';
     transactionId?: string;
     stripePaymentIntentId?: string;
+    cardBrand?: string;
+    cardLast4?: string;
     amount: number;
     currency: string;
     paidAt?: Date;
@@ -106,6 +108,8 @@ const OrderSchema = new Schema<IOrderDocument>(
       status: { type: String, enum: ['pending', 'completed', 'failed', 'refunded'] },
       transactionId: String,
       stripePaymentIntentId: String,
+      cardBrand: String,
+      cardLast4: String,
       amount: { type: Number, required: true },
       currency: { type: String, default: 'NZD' },
       paidAt: Date,

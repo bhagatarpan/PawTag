@@ -29,6 +29,12 @@ export interface PaymentIntent {
   /** Current status of the payment intent */
   status: PaymentIntentStatus;
 
+  /** Card brand (visa, mastercard, amex, etc.) — populated after payment */
+  cardBrand?: string;
+
+  /** Last 4 digits of the card — populated after payment */
+  cardLast4?: string;
+
   /** Provider metadata (raw response from provider) */
   metadata?: Record<string, string>;
 }
