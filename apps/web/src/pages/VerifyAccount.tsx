@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Mail, Phone, CheckCircle2, Clock, ArrowRight, RefreshCw, Loader2, AlertCircle, Pencil, Check } from 'lucide-react';
 import api from '../lib/api';
+import { useAuth } from '../context/AuthContext';
 import OtpInput from '../components/verification/OtpInput';
 
 type VerificationStatus = {
@@ -14,6 +15,7 @@ type VerificationStatus = {
 } | null;
 
 export default function VerifyAccount() {
+  const { user: authUser } = useAuth();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [status, setStatus] = useState<VerificationStatus>(null);
@@ -40,7 +42,8 @@ export default function VerifyAccount() {
 
   const fetchStatus = useCallback(async () => {
     try {
-      const params = emailParam ? `?email=${encodeURIComponent(emailParam)}` : '';
+      const lookupEmail = emailParam || authUser?.email || '';
+      const params = lookupEmail ? `?email=${encodeURIComponent(lookupEmail)}` : '';
       const res = await api.get(`/auth/verification-status${params}`);
       console.log('[VerifyAccount] API response:', res.data);
       setStatus(res.data.data);
@@ -50,7 +53,7 @@ export default function VerifyAccount() {
     } finally {
       setLoading(false);
     }
-  }, [emailParam]);
+  }, [emailParam, authUser?.email]);
 
   useEffect(() => {
     fetchStatus();
