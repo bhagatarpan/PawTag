@@ -232,20 +232,20 @@ export default function CheckoutVerificationGate({ children }: CheckoutVerificat
                   )}
                 </div>
                 <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-semibold text-gray-900">Email Verification</h3>
-                    {emailDone && <span className="text-xs font-medium text-green-600 bg-green-100 px-2 py-0.5 rounded-full">Verified</span>}
-                  </div>
-                  <p className="text-xs text-gray-500">
-                    {user?.email?.replace(/(.{2})(.*)(@.*)/, '$1***$3') || 'your email'}
-                  </p>
+                  <h3 className="font-semibold text-gray-900">Email Verification</h3>
+                  <p className="text-sm text-gray-700">{user?.email || 'your email'}</p>
                 </div>
                 <button onClick={() => startEdit('email')} className="text-xs text-primary-500 hover:text-primary-700 flex items-center gap-1">
                   <Pencil size={12} /> Edit
                 </button>
               </div>
 
-              {!emailDone && (
+              {emailDone ? (
+                <div className="flex items-center gap-2 text-green-600">
+                  <CheckCircle className="h-4 w-4" />
+                  <span className="text-sm font-medium">Email verified</span>
+                </div>
+              ) : (
                 <>
                   {emailStep === 'idle' && (
                     <button
@@ -336,20 +336,20 @@ export default function CheckoutVerificationGate({ children }: CheckoutVerificat
                   )}
                 </div>
                 <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-semibold text-gray-900">SMS Verification</h3>
-                    {smsDone && <span className="text-xs font-medium text-green-600 bg-green-100 px-2 py-0.5 rounded-full">Verified</span>}
-                  </div>
-                  <p className="text-xs text-gray-500">
-                    {user?.phoneNumber?.replace(/(\d{3})\d*(\d{3})/, '$1***$2') || 'your phone'}
-                  </p>
+                  <h3 className="font-semibold text-gray-900">Phone Verification</h3>
+                  <p className="text-sm text-gray-700">{user?.phoneNumber || 'your phone'}</p>
                 </div>
                 <button onClick={() => startEdit('phone')} className="text-xs text-primary-500 hover:text-primary-700 flex items-center gap-1">
                   <Pencil size={12} /> Edit
                 </button>
               </div>
 
-              {!smsDone && (
+              {smsDone ? (
+                <div className="flex items-center gap-2 text-green-600">
+                  <CheckCircle className="h-4 w-4" />
+                  <span className="text-sm font-medium">Phone verified</span>
+                </div>
+              ) : (
                 <>
                   {smsStep === 'idle' && (
                     <button

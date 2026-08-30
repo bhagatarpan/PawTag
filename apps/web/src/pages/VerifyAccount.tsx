@@ -280,31 +280,31 @@ export default function VerifyAccount() {
               </div>
             ) : (
               <>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
-                      isEmailVerified ? 'bg-green-100' : 'bg-teal-100'
-                    }`}>
-                      {isEmailVerified ? (
-                        <CheckCircle2 className="h-5 w-5 text-green-600" />
-                      ) : (
-                        <Mail className="h-5 w-5 text-teal-600" />
-                      )}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-semibold text-gray-900">Email Verification</h3>
-                        {isEmailVerified && <span className="text-xs font-medium text-green-600 bg-green-100 px-2 py-1 rounded-full">Verified</span>}
-                      </div>
-                      <p className="text-xs text-gray-500">{effectiveEmail}</p>
-                    </div>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
+                    isEmailVerified ? 'bg-green-100' : 'bg-teal-100'
+                  }`}>
+                    {isEmailVerified ? (
+                      <CheckCircle2 className="h-5 w-5 text-green-600" />
+                    ) : (
+                      <Mail className="h-5 w-5 text-teal-600" />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-gray-900">Email Verification</h3>
+                    <p className="text-sm text-gray-700">{effectiveEmail}</p>
                   </div>
                   <button onClick={() => startEdit('email')} className="text-xs text-teal-600 hover:text-teal-800 flex items-center gap-1">
                     <Pencil size={12} /> Edit
                   </button>
                 </div>
 
-                {!isEmailVerified && (
+                {isEmailVerified ? (
+                  <div className="flex items-center gap-2 text-green-600">
+                    <CheckCircle2 className="h-4 w-4" />
+                    <span className="text-sm font-medium">Email verified</span>
+                  </div>
+                ) : (
                   <div>
                     <p className="text-sm text-gray-600 mb-3">
                       We'll send a verification link to your email address.
@@ -368,31 +368,31 @@ export default function VerifyAccount() {
               </div>
             ) : (
               <>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
-                      isPhoneVerified ? 'bg-green-100' : 'bg-teal-100'
-                    }`}>
-                      {isPhoneVerified ? (
-                        <CheckCircle2 className="h-5 w-5 text-green-600" />
-                      ) : (
-                        <Phone className="h-5 w-5 text-teal-600" />
-                      )}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-semibold text-gray-900">Phone Verification</h3>
-                        {isPhoneVerified && <span className="text-xs font-medium text-green-600 bg-green-100 px-2 py-1 rounded-full">Verified</span>}
-                      </div>
-                      <p className="text-xs text-gray-500">{effectivePhone}</p>
-                    </div>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
+                    isPhoneVerified ? 'bg-green-100' : 'bg-teal-100'
+                  }`}>
+                    {isPhoneVerified ? (
+                      <CheckCircle2 className="h-5 w-5 text-green-600" />
+                    ) : (
+                      <Phone className="h-5 w-5 text-teal-600" />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-gray-900">Phone Verification</h3>
+                    <p className="text-sm text-gray-700">{effectivePhone}</p>
                   </div>
                   <button onClick={() => startEdit('phone')} className="text-xs text-teal-600 hover:text-teal-800 flex items-center gap-1">
                     <Pencil size={12} /> Edit
                   </button>
                 </div>
 
-                {!isPhoneVerified && (
+                {isPhoneVerified ? (
+                  <div className="flex items-center gap-2 text-green-600">
+                    <CheckCircle2 className="h-4 w-4" />
+                    <span className="text-sm font-medium">Phone verified</span>
+                  </div>
+                ) : (
                   <div>
                     <p className="text-sm text-gray-600 mb-3">
                       Enter the 6-digit code sent to your phone.
