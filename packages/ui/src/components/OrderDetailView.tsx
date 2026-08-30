@@ -279,8 +279,8 @@ function OrderProgressStepper({ order }: { order: OrderData }) {
 
 function OrderItemsList({ order }: { order: OrderData }) {
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-      <h2 className="text-sm font-semibold text-gray-700 mb-4">Order Items</h2>
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 space-y-3">
+      <h2 className="text-sm font-semibold text-gray-700 mb-3">Order Items</h2>
       <div className="space-y-4">
         {order.items?.map((item, i) => (
           <div key={i} className="flex items-start gap-4 py-3 border-b border-gray-100 last:border-0">
@@ -325,7 +325,7 @@ function PaymentInformationCard({ order }: { order: OrderData }) {
   if (!order.payment) return null;
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 space-y-2">
       <h2 className="text-sm font-semibold text-gray-700 mb-4">Payment Information</h2>
       <div className="space-y-3">
         {order.payment.cardBrand && (
@@ -365,9 +365,9 @@ function OrderSummaryCard({ order }: { order: OrderData }) {
   const total = order.payment?.amount ?? order.totalAmount ?? 0;
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-      <h2 className="text-sm font-semibold text-gray-700 mb-4">Order Summary</h2>
-      <div className="space-y-2 text-sm">
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 space-y-1.5">
+      <h2 className="text-sm font-semibold text-gray-700 mb-3">Order Summary</h2>
+      <div className="space-y-1 text-sm">
         <div className="flex justify-between">
           <span className="text-gray-500">Subtotal:</span>
           <span className="text-gray-900 font-medium">NZ${subtotal.toFixed(2)}</span>
@@ -416,8 +416,8 @@ function InvoiceCard({
       : 'neutral';
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-      <h2 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 space-y-3">
+      <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
         <FileText className="h-4 w-4" /> Invoice
       </h2>
       <div className="space-y-2 text-sm">
@@ -460,7 +460,7 @@ function ShippingAddressCard({
   if (!order.shippingAddress) return null;
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
       <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
         <MapPin className="h-4 w-4" /> Shipping Address
       </h2>
@@ -559,7 +559,7 @@ export function OrderDetailView({
       <OrderProgressStepper order={order} />
 
       {/* Two-column layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
         {/* Left column: Items + Actions */}
         <div className="lg:col-span-3 space-y-6">
           <OrderItemsList order={order} />
