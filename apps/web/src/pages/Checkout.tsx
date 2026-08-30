@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Lock, CreditCard, PawPrint, CheckCircle, Truck, Tag, Loader2,
   Mail, Smartphone, Shield, ChevronRight, Edit3, Check, Package, Clock,
-  ShieldCheck, Headphones, RefreshCw, FileText, Download, Printer, Share2, Home, ShoppingBag, ExternalLink
+  ShieldCheck, Headphones, RefreshCw, FileText, Download, Printer, Share2, Home, ExternalLink
 } from 'lucide-react';
 import { AddressAutocomplete } from '@pawtag/ui';
 import type { AddressComponents } from '@pawtag/ui';
@@ -806,10 +806,7 @@ export default function Checkout() {
             {/* Action Buttons — under confirmation sent */}
             <div className="flex flex-col sm:flex-row gap-3 justify-center" style={{ animation: 'fade-in-up 0.4s ease-out 0.6s both' }}>
               <Link to="/" className="flex items-center justify-center gap-2 px-6 py-3 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 transition-all">
-                <Home size={18} /> Back to Home
-              </Link>
-              <Link to="/shop" className="flex items-center justify-center gap-2 px-6 py-3 border border-primary-600 text-primary-600 rounded-xl font-semibold hover:bg-primary-50 transition-all">
-                <ShoppingBag size={18} /> Continue Shopping
+                <Home size={18} /> Home
               </Link>
               {confirmedInvoice && (
                 <button
@@ -822,11 +819,16 @@ export default function Checkout() {
                   }}
                   className="flex items-center justify-center gap-2 px-6 py-3 border border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition-all"
                 >
-                  <FileText size={18} /> View / Download Invoice
+                  <FileText size={18} /> View Invoice
                 </button>
               )}
               <Link to="/account/orders" className="flex items-center justify-center gap-2 px-6 py-3 border border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition-all">
-                View My Orders
+                My Dashboard
+              </Link>
+            </div>
+            <div className="text-center mt-3" style={{ animation: 'fade-in-up 0.4s ease-out 0.7s both' }}>
+              <Link to="/shop" className="text-sm text-primary-600 hover:text-primary-700 font-medium">
+                Continue Shopping &rsaquo;
               </Link>
             </div>
 
