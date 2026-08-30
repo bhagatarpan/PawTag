@@ -46,19 +46,19 @@ function statusColor(status: string): string {
 function cardBrandIcon(brand: string): string {
   const b = brand.toLowerCase();
   if (b === 'visa') {
-    return `<svg viewBox="0 0 48 32" width="28" height="18" style="vertical-align:middle;margin-right:4px;"><rect width="48" height="32" rx="4" fill="#1A1F71"/><text x="24" y="20" text-anchor="middle" fill="#fff" font-family="system-ui,sans-serif" font-size="13" font-weight="700" font-style="italic">VISA</text></svg>`;
+    return `<svg viewBox="0 0 48 32" width="28" height="18" style="display:inline-block;vertical-align:middle;margin:0 4px 0 0;"><rect width="48" height="32" rx="4" fill="#1A1F71"/><text x="24" y="20" text-anchor="middle" fill="#fff" font-family="system-ui,sans-serif" font-size="13" font-weight="700" font-style="italic">VISA</text></svg>`;
   }
   if (b === 'mastercard') {
-    return `<svg viewBox="0 0 48 32" width="28" height="18" style="vertical-align:middle;margin-right:4px;"><rect width="48" height="32" rx="4" fill="#252525"/><circle cx="19" cy="16" r="9" fill="#EB001B"/><circle cx="29" cy="16" r="9" fill="#F79E1B"/><path d="M24 9.3a9 9 0 010 13.4 9 9 0 000-13.4z" fill="#FF5F00"/></svg>`;
+    return `<svg viewBox="0 0 48 32" width="28" height="18" style="display:inline-block;vertical-align:middle;margin:0 4px 0 0;"><rect width="48" height="32" rx="4" fill="#252525"/><circle cx="19" cy="16" r="9" fill="#EB001B"/><circle cx="29" cy="16" r="9" fill="#F79E1B"/><path d="M24 9.3a9 9 0 010 13.4 9 9 0 000-13.4z" fill="#FF5F00"/></svg>`;
   }
   if (b === 'amex' || b === 'american_express') {
-    return `<svg viewBox="0 0 48 32" width="28" height="18" style="vertical-align:middle;margin-right:4px;"><rect width="48" height="32" rx="4" fill="#006FCF"/><text x="24" y="20" text-anchor="middle" fill="#fff" font-family="system-ui,sans-serif" font-size="9" font-weight="700">AMEX</text></svg>`;
+    return `<svg viewBox="0 0 48 32" width="28" height="18" style="display:inline-block;vertical-align:middle;margin:0 4px 0 0;"><rect width="48" height="32" rx="4" fill="#006FCF"/><text x="24" y="20" text-anchor="middle" fill="#fff" font-family="system-ui,sans-serif" font-size="9" font-weight="700">AMEX</text></svg>`;
   }
   if (b === 'discover') {
-    return `<svg viewBox="0 0 48 32" width="28" height="18" style="vertical-align:middle;margin-right:4px;"><rect width="48" height="32" rx="4" fill="#FF6000"/><circle cx="30" cy="16" r="8" fill="#fff" opacity="0.4"/></svg>`;
+    return `<svg viewBox="0 0 48 32" width="28" height="18" style="display:inline-block;vertical-align:middle;margin:0 4px 0 0;"><rect width="48" height="32" rx="4" fill="#FF6000"/><circle cx="30" cy="16" r="8" fill="#fff" opacity="0.4"/></svg>`;
   }
   // Default: generic card icon
-  return `<svg viewBox="0 0 48 32" width="28" height="18" style="vertical-align:middle;margin-right:4px;"><rect width="48" height="32" rx="4" fill="#6B7280"/><rect x="4" y="8" width="40" height="4" rx="1" fill="#fff" opacity="0.5"/><rect x="4" y="18" width="16" height="3" rx="1" fill="#fff" opacity="0.4"/></svg>`;
+  return `<svg viewBox="0 0 48 32" width="28" height="18" style="display:inline-block;vertical-align:middle;margin:0 4px 0 0;"><rect width="48" height="32" rx="4" fill="#6B7280"/><rect x="4" y="8" width="40" height="4" rx="1" fill="#fff" opacity="0.5"/><rect x="4" y="18" width="16" height="3" rx="1" fill="#fff" opacity="0.4"/></svg>`;
 }
 
 function buildDefaultInvoiceHtml(data: InvoiceData, company: Record<string, string>, order?: any): string {
@@ -252,7 +252,7 @@ function buildDefaultInvoiceHtml(data: InvoiceData, company: Record<string, stri
           ${invoice.dueDate ? `<p><span class="label">Due:</span> ${formatDate(invoice.dueDate)}</p>` : ''}
           ${invoice.paidAt ? `<p><span class="label">Paid:</span> ${formatDate(invoice.paidAt)}</p>` : ''}
           ${invoice.paymentMethod ? `<p><span class="label">Method:</span> ${escapeHtml(invoice.paymentMethod)}</p>` : ''}
-          ${order?.payment?.cardBrand ? `<p><span class="label">Card:</span> ${cardBrandIcon(order.payment.cardBrand)} &bull;&bull;&bull;&bull; ${escapeHtml(order.payment.cardLast4 || '****')}</p>` : ''}
+          ${order?.payment?.cardBrand ? `<p style="white-space:nowrap;"><span class="label">Card:</span> ${cardBrandIcon(order.payment.cardBrand)}&nbsp;&bull;&bull;&bull;&bull;&nbsp;${escapeHtml(order.payment.cardLast4 || '****')}</p>` : ''}
           ${order?.payment?.stripePaymentIntentId ? `<p><span class="label">Payment ID:</span> <span style="font-size:11px;color:#9ca3af;">${escapeHtml(order.payment.stripePaymentIntentId)}</span></p>` : ''}
         </div>
       </div>
