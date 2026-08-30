@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { Mail, Smartphone, CheckCircle, Loader2, ArrowRight, Shield, LogIn } from 'lucide-react';
+import { Mail, Smartphone, CheckCircle, Loader2, ArrowRight, Shield, LogIn, Pencil, X } from 'lucide-react';
 import api from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 
@@ -61,6 +61,10 @@ export default function CheckoutVerificationGate({ children }: CheckoutVerificat
   const [smsOtp, setSmsOtp] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState<'email' | 'sms' | null>(null);
+  const [editingField, setEditingField] = useState<'email' | 'phone' | null>(null);
+  const [editValue, setEditValue] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState('');
 
   const checkStatus = useCallback(async () => {
     try {
@@ -132,6 +136,38 @@ export default function CheckoutVerificationGate({ children }: CheckoutVerificat
     }
   };
 
+  const startEdit = (field: 'email' | 'phone') => {
+    setEditingField(field);
+    setEditValue(field === 'email' ? (user?.email || '') : (user?.phoneNumber || ''));
+    setEditError('');
+  };
+
+  const saveEdit = async () => {
+    setEditSaving(true);
+    setEditError('');
+    try {
+      const payload: Record<string, string> = {};
+      if (editingField === 'email') payload.email = editValue;
+      if (editingField === 'phone') payload.phoneNumber = editValue;
+      await api.put('/auth/profile', payload);
+      // Reset verification state for the changed field
+      if (editingField === 'email') {
+        setEmailStep('idle');
+        setEmailOtp('');
+      } else {
+        setSmsStep('idle');
+        setSmsOtp('');
+      }
+      setEditingField(null);
+      // Re-fetch status (will show false for changed field)
+      await checkStatus();
+    } catch (err: any) {
+      setEditError(err.response?.data?.error || 'Failed to update');
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
   const emailDone = emailStep === 'verified' || status?.emailVerified;
   const smsDone = smsStep === 'verified' || status?.smsVerified;
   const bothDone = emailDone && smsDone;
@@ -157,65 +193,103 @@ export default function CheckoutVerificationGate({ children }: CheckoutVerificat
       <div className="space-y-4">
         {/* Email OTP */}
         <div className={`bg-white rounded-2xl shadow-sm border p-6 transition-all ${emailDone ? 'border-green-200 bg-green-50' : 'border-gray-100'}`}>
-          <div className="flex items-center gap-3 mb-4">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${emailDone ? 'bg-green-100' : 'bg-primary-100'}`}>
-              {emailDone ? (
-                <CheckCircle className="h-5 w-5 text-green-600" />
-              ) : (
-                <Mail className="h-5 w-5 text-primary-600" />
-              )}
-            </div>
-            <div>
-              <h3 className="font-semibold text-gray-900">Email Verification</h3>
-              <p className="text-xs text-gray-500">
-                {emailDone ? 'Verified' : `Code sent to ${user?.email?.replace(/(.{2})(.*)(@.*)/, '$1***$3') || 'your email'}`}
-              </p>
-            </div>
-          </div>
-
-          {!emailDone && (
-            <>
-              {emailStep === 'idle' && (
-                <button
-                  onClick={() => sendOtp('email')}
-                  disabled={sending === 'email'}
-                  className="w-full bg-primary-600 text-white rounded-xl font-semibold px-6 py-3 hover:bg-primary-700 active:bg-primary-800 transition-all disabled:opacity-50"
-                >
-                  {sending === 'email' ? (
-                    <Loader2 className="h-5 w-5 animate-spin mx-auto" />
-                  ) : (
-                    'Send Email Code'
-                  )}
-                </button>
-              )}
-
-              {(emailStep === 'sending' || emailStep === 'entered') && (
-                <div className="space-y-3">
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={6}
-                    value={emailOtp}
-                    onChange={(e) => setEmailOtp(e.target.value.replace(/\D/g, ''))}
-                    placeholder="Enter 6-digit code"
-                    className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-center text-lg tracking-widest font-mono"
-                  />
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => { setEmailStep('idle'); setEmailOtp(''); }}
-                      className="flex-1 py-3 border border-primary-600 text-primary-600 rounded-xl font-medium hover:bg-primary-50 transition-all text-sm"
-                    >
-                      Resend
-                    </button>
-                    <button
-                      onClick={() => { setEmailStep('entered'); verifyOtp('email'); }}
-                      disabled={emailOtp.length !== 6}
-                      className="flex-1 bg-primary-600 text-white rounded-xl font-semibold px-6 py-3 hover:bg-primary-700 active:bg-primary-800 transition-all text-sm disabled:opacity-50"
-                    >
-                      Verify
-                    </button>
-                  </div>
+          {editingField === 'email' ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-primary-100">
+                  <Mail className="h-5 w-5 text-primary-600" />
                 </div>
+                <h3 className="font-semibold text-gray-900">Edit Email</h3>
+              </div>
+              <input
+                type="email"
+                value={editValue}
+                onChange={(e) => setEditValue(e.target.value)}
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm"
+                placeholder="Enter new email address"
+              />
+              {editError && <p className="text-xs text-red-600">{editError}</p>}
+              <div className="flex gap-2">
+                <button onClick={saveEdit} disabled={editSaving || !editValue || editValue === user?.email}
+                  className="flex-1 py-2.5 bg-primary-600 text-white rounded-xl font-semibold text-sm hover:bg-primary-700 disabled:opacity-50 transition-all">
+                  {editSaving ? 'Saving...' : 'Save & Re-verify'}
+                </button>
+                <button onClick={() => setEditingField(null)}
+                  className="flex-1 py-2.5 border border-gray-300 text-gray-700 rounded-xl font-medium text-sm hover:bg-gray-50 transition-all">
+                  Cancel
+                </button>
+              </div>
+              <p className="text-xs text-gray-400 text-center">You'll need to re-verify your email after changing it.</p>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-3 mb-4">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${emailDone ? 'bg-green-100' : 'bg-primary-100'}`}>
+                  {emailDone ? (
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                  ) : (
+                    <Mail className="h-5 w-5 text-primary-600" />
+                  )}
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-semibold text-gray-900">Email Verification</h3>
+                    {emailDone && <span className="text-xs font-medium text-green-600 bg-green-100 px-2 py-0.5 rounded-full">Verified</span>}
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    {user?.email?.replace(/(.{2})(.*)(@.*)/, '$1***$3') || 'your email'}
+                  </p>
+                </div>
+                <button onClick={() => startEdit('email')} className="text-xs text-primary-500 hover:text-primary-700 flex items-center gap-1">
+                  <Pencil size={12} /> Edit
+                </button>
+              </div>
+
+              {!emailDone && (
+                <>
+                  {emailStep === 'idle' && (
+                    <button
+                      onClick={() => sendOtp('email')}
+                      disabled={sending === 'email'}
+                      className="w-full bg-primary-600 text-white rounded-xl font-semibold px-6 py-3 hover:bg-primary-700 active:bg-primary-800 transition-all disabled:opacity-50"
+                    >
+                      {sending === 'email' ? (
+                        <Loader2 className="h-5 w-5 animate-spin mx-auto" />
+                      ) : (
+                        'Send Email Code'
+                      )}
+                    </button>
+                  )}
+
+                  {(emailStep === 'sending' || emailStep === 'entered') && (
+                    <div className="space-y-3">
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={6}
+                        value={emailOtp}
+                        onChange={(e) => setEmailOtp(e.target.value.replace(/\D/g, ''))}
+                        placeholder="Enter 6-digit code"
+                        className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-center text-lg tracking-widest font-mono"
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => { setEmailStep('idle'); setEmailOtp(''); }}
+                          className="flex-1 py-3 border border-primary-600 text-primary-600 rounded-xl font-medium hover:bg-primary-50 transition-all text-sm"
+                        >
+                          Resend
+                        </button>
+                        <button
+                          onClick={() => { setEmailStep('entered'); verifyOtp('email'); }}
+                          disabled={emailOtp.length !== 6}
+                          className="flex-1 bg-primary-600 text-white rounded-xl font-semibold px-6 py-3 hover:bg-primary-700 active:bg-primary-800 transition-all text-sm disabled:opacity-50"
+                        >
+                          Verify
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </>
           )}
@@ -223,65 +297,103 @@ export default function CheckoutVerificationGate({ children }: CheckoutVerificat
 
         {/* SMS OTP */}
         <div className={`bg-white rounded-2xl shadow-sm border p-6 transition-all ${smsDone ? 'border-green-200 bg-green-50' : 'border-gray-100'}`}>
-          <div className="flex items-center gap-3 mb-4">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${smsDone ? 'bg-green-100' : 'bg-primary-100'}`}>
-              {smsDone ? (
-                <CheckCircle className="h-5 w-5 text-green-600" />
-              ) : (
-                <Smartphone className="h-5 w-5 text-primary-600" />
-              )}
-            </div>
-            <div>
-              <h3 className="font-semibold text-gray-900">SMS Verification</h3>
-              <p className="text-xs text-gray-500">
-                {smsDone ? 'Verified' : `Code sent to ${user?.phoneNumber?.replace(/(\d{3})\d*(\d{3})/, '$1***$2') || 'your phone'}`}
-              </p>
-            </div>
-          </div>
-
-          {!smsDone && (
-            <>
-              {smsStep === 'idle' && (
-                <button
-                  onClick={() => sendOtp('sms')}
-                  disabled={sending === 'sms'}
-                  className="w-full bg-primary-600 text-white rounded-xl font-semibold px-6 py-3 hover:bg-primary-700 active:bg-primary-800 transition-all disabled:opacity-50"
-                >
-                  {sending === 'sms' ? (
-                    <Loader2 className="h-5 w-5 animate-spin mx-auto" />
-                  ) : (
-                    'Send SMS Code'
-                  )}
-                </button>
-              )}
-
-              {(smsStep === 'sending' || smsStep === 'entered') && (
-                <div className="space-y-3">
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={6}
-                    value={smsOtp}
-                    onChange={(e) => setSmsOtp(e.target.value.replace(/\D/g, ''))}
-                    placeholder="Enter 6-digit code"
-                    className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-center text-lg tracking-widest font-mono"
-                  />
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => { setSmsStep('idle'); setSmsOtp(''); }}
-                      className="flex-1 py-3 border border-primary-600 text-primary-600 rounded-xl font-medium hover:bg-primary-50 transition-all text-sm"
-                    >
-                      Resend
-                    </button>
-                    <button
-                      onClick={() => { setSmsStep('entered'); verifyOtp('sms'); }}
-                      disabled={smsOtp.length !== 6}
-                      className="flex-1 bg-primary-600 text-white rounded-xl font-semibold px-6 py-3 hover:bg-primary-700 active:bg-primary-800 transition-all text-sm disabled:opacity-50"
-                    >
-                      Verify
-                    </button>
-                  </div>
+          {editingField === 'phone' ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-primary-100">
+                  <Smartphone className="h-5 w-5 text-primary-600" />
                 </div>
+                <h3 className="font-semibold text-gray-900">Edit Phone</h3>
+              </div>
+              <input
+                type="tel"
+                value={editValue}
+                onChange={(e) => setEditValue(e.target.value)}
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm"
+                placeholder="Enter new phone number"
+              />
+              {editError && <p className="text-xs text-red-600">{editError}</p>}
+              <div className="flex gap-2">
+                <button onClick={saveEdit} disabled={editSaving || !editValue || editValue === user?.phoneNumber}
+                  className="flex-1 py-2.5 bg-primary-600 text-white rounded-xl font-semibold text-sm hover:bg-primary-700 disabled:opacity-50 transition-all">
+                  {editSaving ? 'Saving...' : 'Save & Re-verify'}
+                </button>
+                <button onClick={() => setEditingField(null)}
+                  className="flex-1 py-2.5 border border-gray-300 text-gray-700 rounded-xl font-medium text-sm hover:bg-gray-50 transition-all">
+                  Cancel
+                </button>
+              </div>
+              <p className="text-xs text-gray-400 text-center">You'll need to re-verify your phone after changing it.</p>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-3 mb-4">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${smsDone ? 'bg-green-100' : 'bg-primary-100'}`}>
+                  {smsDone ? (
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                  ) : (
+                    <Smartphone className="h-5 w-5 text-primary-600" />
+                  )}
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-semibold text-gray-900">SMS Verification</h3>
+                    {smsDone && <span className="text-xs font-medium text-green-600 bg-green-100 px-2 py-0.5 rounded-full">Verified</span>}
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    {user?.phoneNumber?.replace(/(\d{3})\d*(\d{3})/, '$1***$2') || 'your phone'}
+                  </p>
+                </div>
+                <button onClick={() => startEdit('phone')} className="text-xs text-primary-500 hover:text-primary-700 flex items-center gap-1">
+                  <Pencil size={12} /> Edit
+                </button>
+              </div>
+
+              {!smsDone && (
+                <>
+                  {smsStep === 'idle' && (
+                    <button
+                      onClick={() => sendOtp('sms')}
+                      disabled={sending === 'sms'}
+                      className="w-full bg-primary-600 text-white rounded-xl font-semibold px-6 py-3 hover:bg-primary-700 active:bg-primary-800 transition-all disabled:opacity-50"
+                    >
+                      {sending === 'sms' ? (
+                        <Loader2 className="h-5 w-5 animate-spin mx-auto" />
+                      ) : (
+                        'Send SMS Code'
+                      )}
+                    </button>
+                  )}
+
+                  {(smsStep === 'sending' || smsStep === 'entered') && (
+                    <div className="space-y-3">
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={6}
+                        value={smsOtp}
+                        onChange={(e) => setSmsOtp(e.target.value.replace(/\D/g, ''))}
+                        placeholder="Enter 6-digit code"
+                        className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-center text-lg tracking-widest font-mono"
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => { setSmsStep('idle'); setSmsOtp(''); }}
+                          className="flex-1 py-3 border border-primary-600 text-primary-600 rounded-xl font-medium hover:bg-primary-50 transition-all text-sm"
+                        >
+                          Resend
+                        </button>
+                        <button
+                          onClick={() => { setSmsStep('entered'); verifyOtp('sms'); }}
+                          disabled={smsOtp.length !== 6}
+                          className="flex-1 bg-primary-600 text-white rounded-xl font-semibold px-6 py-3 hover:bg-primary-700 active:bg-primary-800 transition-all text-sm disabled:opacity-50"
+                        >
+                          Verify
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </>
           )}

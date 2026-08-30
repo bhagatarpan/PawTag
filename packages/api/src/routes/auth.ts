@@ -163,7 +163,7 @@ async function resolveVerificationRecipient(originalEmail: string): Promise<stri
 }
 
 /** In development with MFA test mode enabled, return the test email for sending OTPs, else null. */
-async function getTestEmailRecipient(): Promise<string | null> {
+export async function getTestEmailRecipient(): Promise<string | null> {
   if (config.nodeEnv !== 'development') return null;
   const mfaTestMode = (await Setting.findOne({ key: 'mfa.testMode' }).lean())?.value === 'true';
   if (!mfaTestMode) return null;
@@ -1296,6 +1296,11 @@ router.put('/profile', authenticate, validate(updateProfileSchema), async (req: 
         res.status(400).json({ success: false, error: 'Email already in use' });
         return;
       }
+    }
+    // Reset email verification if email changed
+    if (update.email && update.email !== existing.email) {
+      update.emailVerified = false;
+      update.emailVerifiedAt = null;
     }
     // Reset phone verification if phone number changed
     if (update.phoneNumber && update.phoneNumber !== existing.phoneNumber) {

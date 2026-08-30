@@ -6,6 +6,7 @@ import { User, VerificationToken, Setting } from '@pawtag/db';
 import { generateOtp, hashToken } from '../services/auth.service';
 import { sendLoginOtpEmail } from '../services/email.service';
 import { sendPhoneOtpSMS } from '../services/sms.service';
+import { getTestEmailRecipient } from './auth';
 import { config } from '../config';
 import { auditService } from '../services/audit';
 import { createAuditContextFromRequest, type AuditRequest } from '../middleware/audit';
@@ -74,11 +75,18 @@ router.post('/send', validate(sendCheckoutOtpSchema), async (req: AuthRequest, r
 
     // Send OTP via email or SMS
     if (channel === 'email') {
-      const promise = sendLoginOtpEmail(user.email, user.fullName || 'Customer', otp);
+      // Dev test mode: route to test email
+      const recipient = await getTestEmailRecipient() || user.email;
+      const promise = sendLoginOtpEmail(recipient, user.fullName || 'Customer', otp);
       promise.catch((err: any) => logger.error({ err }, 'Failed to send checkout email OTP'));
     } else {
       const promise = sendPhoneOtpSMS(user.phoneNumber, otp);
       promise.catch((err: any) => logger.error({ err }, 'Failed to send checkout SMS OTP'));
+      // Dev test mode: also email the SMS OTP to test email
+      const testRecipient = await getTestEmailRecipient();
+      if (testRecipient) {
+        sendLoginOtpEmail(testRecipient, user.fullName || 'Customer', otp).catch(() => {});
+      }
     }
 
     // Fire-and-forget audit log
