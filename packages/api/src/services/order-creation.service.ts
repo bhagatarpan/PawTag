@@ -34,6 +34,9 @@ import logger from '../lib/logger';
 export interface OrderItem {
   productId: string;
   productName: string;
+  variantName?: string;
+  petName?: string;
+  tagId?: string;
   quantity: number;
   unitPrice: number;
   customizationTotal?: number;
@@ -150,10 +153,17 @@ export async function createPawTagOrder(params: CreateOrderParams): Promise<Crea
     items: items.map((item) => ({
       productId: item.productId,
       productName: item.productName,
+      variantName: item.variantName,
+      petName: item.petName,
+      tagId: item.tagId,
       quantity: item.quantity,
       unitPrice: item.unitPrice,
       totalPrice: (item.unitPrice + (item.customizationTotal || 0)) * item.quantity,
     })),
+    subtotal,
+    shippingCost: shipping,
+    tax,
+    discount: discount > 0 ? { percent: 0, amount: discount, reason: params.promoCode || '' } : undefined,
     status: 'paid',
     payment: {
       method: 'card',

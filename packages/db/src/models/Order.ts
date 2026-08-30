@@ -11,11 +11,20 @@ export interface IOrderDocument extends Document {
     productName: string;
     variantName?: string;
     petName?: string;
+    tagId?: string;
     quantity: number;
     unitPrice: number;
     totalPrice: number;
     customizationTotal?: number;
   }>;
+  subtotal?: number;
+  shippingCost?: number;
+  tax?: number;
+  discount?: {
+    percent: number;
+    amount: number;
+    reason: string;
+  };
   status: OrderStatus;
   payment: {
     method: 'card' | 'paypal' | 'bank_transfer';
@@ -46,11 +55,6 @@ export interface IOrderDocument extends Document {
   carrier?: string;
   shippingLabelUrl?: string;
   notes?: string;
-  discount?: {
-    percent: number;
-    amount: number;
-    reason: string;
-  };
   referredByCode?: string;
   cancellationReason?: string;
   refundReason?: string;
@@ -76,12 +80,21 @@ const OrderSchema = new Schema<IOrderDocument>(
         productName: { type: String, required: true },
         variantName: { type: String },
         petName: { type: String },
+        tagId: { type: String },
         quantity: { type: Number, required: true, min: 1 },
         unitPrice: { type: Number, required: true },
         totalPrice: { type: Number, required: true },
         customizationTotal: { type: Number, default: 0 },
       },
     ],
+    subtotal: { type: Number },
+    shippingCost: { type: Number },
+    tax: { type: Number },
+    discount: {
+      percent: { type: Number, default: 0 },
+      amount: { type: Number, default: 0 },
+      reason: { type: String },
+    },
     status: {
       type: String,
       enum: ['pending', 'pending_payment', 'paid', 'packing', 'shipped', 'delivered', 'cancelled', 'refunded'],
@@ -117,11 +130,6 @@ const OrderSchema = new Schema<IOrderDocument>(
     carrier: String,
     shippingLabelUrl: String,
     notes: String,
-    discount: {
-      percent: { type: Number, default: 0 },
-      amount: { type: Number, default: 0 },
-      reason: { type: String },
-    },
     referredByCode: { type: String },
     cancellationReason: { type: String },
     refundReason: { type: String },

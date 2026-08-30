@@ -68,6 +68,7 @@ function buildDefaultInvoiceHtml(data: InvoiceData, company: Record<string, stri
               <strong>${escapeHtml(item.productName)}</strong>
               ${item.variantName ? `<br><span style="color:#6b7280;font-size:12px;">${escapeHtml(item.variantName)}</span>` : ''}
               ${item.petName ? `<br><span style="color:#0d9488;font-size:12px;">For: ${escapeHtml(item.petName)}</span>` : ''}
+              ${item.tagId ? `<br><span style="color:#0d9488;font-size:12px;">Tag: ${escapeHtml(item.tagId)}</span>` : ''}
             </td>
             <td>${item.quantity}</td>
             <td class="amount-col">$${(item.unitPrice * item.quantity).toFixed(2)}</td>
@@ -101,6 +102,46 @@ function buildDefaultInvoiceHtml(data: InvoiceData, company: Record<string, stri
     qtyCol = `${formatDate(getBillingPeriod(invoice).start)} — ${formatDate(getBillingPeriod(invoice).end)}`;
   } else {
     qtyCol = '—';
+  }
+
+  // Totals breakdown — only for order invoices with stored breakdown
+  const orderSubtotal = order?.subtotal;
+  const orderShipping = order?.shippingCost;
+  const orderTax = order?.tax;
+  const orderDiscount = order?.discount?.amount || 0;
+
+  const showBreakdown = hasOrderItems && (orderSubtotal != null || orderTax != null);
+
+  let totalsRows = '';
+  if (showBreakdown) {
+    if (orderSubtotal != null) {
+      totalsRows += `
+          <tr>
+            <td colspan="2" style="border:none;padding:8px 16px;font-size:13px;color:#6b7280;">Subtotal</td>
+            <td class="amount-col" style="border:none;padding:8px 16px;font-size:13px;color:#6b7280;font-weight:400;">$${orderSubtotal.toFixed(2)}</td>
+          </tr>`;
+    }
+    if (orderDiscount > 0) {
+      totalsRows += `
+          <tr>
+            <td colspan="2" style="border:none;padding:8px 16px;font-size:13px;color:#6b7280;">Discount${order?.discount?.reason ? ` (${escapeHtml(order.discount.reason)})` : ''}</td>
+            <td class="amount-col" style="border:none;padding:8px 16px;font-size:13px;color:#16a34a;font-weight:400;">-$${orderDiscount.toFixed(2)}</td>
+          </tr>`;
+    }
+    if (orderShipping != null) {
+      totalsRows += `
+          <tr>
+            <td colspan="2" style="border:none;padding:8px 16px;font-size:13px;color:#6b7280;">Shipping</td>
+            <td class="amount-col" style="border:none;padding:8px 16px;font-size:13px;color:#6b7280;font-weight:400;">${orderShipping === 0 ? 'Free' : `$${orderShipping.toFixed(2)}`}</td>
+          </tr>`;
+    }
+    if (orderTax != null && orderTax > 0) {
+      totalsRows += `
+          <tr>
+            <td colspan="2" style="border:none;padding:8px 16px;font-size:13px;color:#6b7280;">GST (15%)</td>
+            <td class="amount-col" style="border:none;padding:8px 16px;font-size:13px;color:#6b7280;font-weight:400;">$${orderTax.toFixed(2)}</td>
+          </tr>`;
+    }
   }
 
   return `<!DOCTYPE html>
@@ -188,10 +229,12 @@ function buildDefaultInvoiceHtml(data: InvoiceData, company: Record<string, stri
         ` : ''}
         <div class="meta-block">
           <h3>Invoice Details</h3>
+          ${order?.orderNumber ? `<p><span class="label">Order:</span> <strong>${escapeHtml(order.orderNumber)}</strong></p>` : ''}
           <p><span class="label">Date:</span> ${formatDate(invoice.createdAt)}</p>
           ${invoice.dueDate ? `<p><span class="label">Due:</span> ${formatDate(invoice.dueDate)}</p>` : ''}
           ${invoice.paidAt ? `<p><span class="label">Paid:</span> ${formatDate(invoice.paidAt)}</p>` : ''}
           ${invoice.paymentMethod ? `<p><span class="label">Method:</span> ${escapeHtml(invoice.paymentMethod)}</p>` : ''}
+          ${order?.payment?.stripePaymentIntentId ? `<p><span class="label">Ref:</span> <span style="font-size:11px;color:#9ca3af;">${escapeHtml(order.payment.stripePaymentIntentId)}</span></p>` : ''}
         </div>
       </div>
 
@@ -205,8 +248,9 @@ function buildDefaultInvoiceHtml(data: InvoiceData, company: Record<string, stri
         </thead>
         <tbody>
           ${lineItemRows}
+          ${totalsRows}
           <tr class="total-row">
-            <td colspan="2"><strong>Total</strong></td>
+            <td colspan="2"><strong>Total${showBreakdown ? ` (incl. GST)` : ''}</strong></td>
             <td class="amount-col"><strong>${invoice.currency || 'NZD'} $${invoice.amount.toFixed(2)}</strong></td>
           </tr>
         </tbody>
@@ -290,6 +334,12 @@ export async function generateInvoiceHtml(invoiceId: string): Promise<string> {
       'invoice.paymentMethod': invoice.paymentMethod || '',
       'invoice.billingPeriodStart': invoice.billingPeriod ? formatDate(getBillingPeriod(invoice).start) : formatDate(invoice.createdAt),
       'invoice.billingPeriodEnd': invoice.billingPeriod ? formatDate(getBillingPeriod(invoice).end) : formatDate(invoice.createdAt),
+      'invoice.orderNumber': (order as any)?.orderNumber || '',
+      'invoice.subtotal': (order as any)?.subtotal != null ? `$${(order as any).subtotal.toFixed(2)}` : '',
+      'invoice.shipping': (order as any)?.shippingCost != null ? ((order as any).shippingCost === 0 ? 'Free' : `$${(order as any).shippingCost.toFixed(2)}`) : '',
+      'invoice.tax': (order as any)?.tax != null ? `$${(order as any).tax.toFixed(2)}` : '',
+      'invoice.discount': (order as any)?.discount?.amount ? `$${(order as any).discount.amount.toFixed(2)}` : '',
+      'invoice.paymentRef': (order as any)?.payment?.stripePaymentIntentId || '',
       'customer.name': customerName,
       'customer.email': customerEmail,
       'subscription.planName': subscription?.planName || '',

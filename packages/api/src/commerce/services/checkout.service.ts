@@ -292,6 +292,10 @@ export class CheckoutService {
             unitPrice: item.unitPrice,
             totalPrice: (item.unitPrice + item.customizationTotal) * item.quantity,
           })),
+          subtotal: pending.subtotal,
+          shippingCost: pending.shipping,
+          tax: pending.tax,
+          discount: pending.discount > 0 ? { percent: 0, amount: pending.discount, reason: pending.promoCode || '' } : undefined,
           status: 'paid',
           payment: {
             method: 'card',
