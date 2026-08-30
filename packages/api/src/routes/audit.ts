@@ -404,4 +404,45 @@ router.post('/retention/enforce', requirePermission('audit.admin'), async (_req:
   }
 });
 
+// ── Purge ───────────────────────────────────────────────────────────
+
+const purgeSchema = z.object({
+  startDate: z.string().datetime(),
+  endDate: z.string().datetime(),
+});
+
+router.post('/purge', requirePermission('audit.admin'), validate(purgeSchema), async (req: AuthRequest, res: Response) => {
+  try {
+    const { startDate, endDate } = req.body;
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    if (start >= end) {
+      res.status(400).json({ success: false, error: 'startDate must be before endDate' });
+      return;
+    }
+
+    // Purge audit events in date range, but skip those under legal hold
+    const query = { occurredAt: { $gte: start, $lte: end }, legalHold: false };
+    const count = await AuditEvent.countDocuments(query);
+
+    if (count === 0) {
+      res.json({ success: true, data: { deleted: 0 } });
+      return;
+    }
+
+    const result = await AuditEvent.deleteMany(query);
+
+    logger.info(
+      { deleted: result.deletedCount, startDate, endDate, userId: req.user!.id },
+      'Audit events purged',
+    );
+
+    res.json({ success: true, data: { deleted: result.deletedCount } });
+  } catch (error) {
+    logger.error({ err: error }, 'Audit event purge failed');
+    res.status(500).json({ success: false, error: 'Failed to purge audit events' });
+  }
+});
+
 export default router;
