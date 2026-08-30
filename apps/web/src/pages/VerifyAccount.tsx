@@ -452,7 +452,7 @@ export default function VerifyAccount() {
                 onClick={handleContinue}
                 className="w-full py-3 bg-teal-600 text-white rounded-xl font-semibold hover:bg-teal-700 transition-all"
               >
-                Go to Dashboard
+                {localStorage.getItem('pawtag_return_url') ? 'Continue to Checkout' : 'Go to Dashboard'}
               </button>
             </div>
           )}
