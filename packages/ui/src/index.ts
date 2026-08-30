@@ -18,6 +18,10 @@ export type {
   ConfirmDialogProps,
   AddressComponents,
   AddressAutocompleteProps,
+  OrderItemData,
+  OrderData,
+  InvoiceData,
+  OrderDetailViewProps,
 } from './types';
 
 export type { ProductCardProduct, ProductCardProps } from './components/ProductCard';
@@ -36,6 +40,7 @@ export { EmptyState, ErrorState } from './components/EmptyState';
 export { StatusBadge } from './components/StatusBadge';
 export { ConfirmDialog } from './components/ConfirmDialog';
 export { AddressAutocomplete } from './components/AddressAutocomplete';
+export { OrderDetailView } from './components/OrderDetailView';
 
 // Commerce components
 export { ProductCard } from './components/ProductCard';

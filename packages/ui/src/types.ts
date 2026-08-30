@@ -198,3 +198,84 @@ export interface AddressAutocompleteProps {
   /** Additional CSS classes for the input */
   className?: string;
 }
+
+/* ------------------------------------------------------------------ */
+/*  OrderDetailView                                                     */
+/* ------------------------------------------------------------------ */
+
+export interface OrderItemData {
+  productName: string;
+  variantName?: string;
+  sku?: string;
+  quantity: number;
+  unitPrice: number;
+  totalPrice: number;
+  petName?: string;
+  tagId?: string;
+  image?: string;
+  customizationTotal?: number;
+}
+
+export interface OrderData {
+  _id: string;
+  orderNumber?: string;
+  status: string;
+  items: OrderItemData[];
+  totalAmount: number;
+  subtotal?: number;
+  shippingCost?: number;
+  tax?: number;
+  discount?: {
+    percent: number;
+    amount: number;
+    reason: string;
+  };
+  payment?: {
+    amount: number;
+    currency: string;
+    status: string;
+    method?: string;
+    stripePaymentIntentId?: string;
+    cardBrand?: string;
+    cardLast4?: string;
+  };
+  shippingAddress?: {
+    line1: string;
+    line2?: string;
+    city: string;
+    state: string;
+    zip: string;
+    country: string;
+  };
+  trackingNumber?: string;
+  carrier?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt?: string;
+  activity?: Array<{
+    type: string;
+    message: string;
+    timestamp: string;
+    actor: string;
+    metadata?: Record<string, unknown>;
+  }>;
+}
+
+export interface InvoiceData {
+  _id: string;
+  invoiceNumber: string;
+  amount: number;
+  status: string;
+}
+
+export interface OrderDetailViewProps {
+  order: OrderData;
+  invoice?: InvoiceData | null;
+  onViewInvoice?: () => void;
+  onRequestReturn?: () => void;
+  onCancelOrder?: () => void;
+  onBackToOrders?: () => void;
+  contactPhone?: string;
+  contactEmail?: string;
+  className?: string;
+}
