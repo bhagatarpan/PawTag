@@ -288,6 +288,7 @@ export class CheckoutService {
           items: pending.items.map((item) => ({
             productId: item.productId,
             productName: item.productName,
+            sku: item.sku,
             quantity: item.quantity,
             unitPrice: item.unitPrice,
             totalPrice: (item.unitPrice + item.customizationTotal) * item.quantity,

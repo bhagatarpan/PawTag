@@ -47,15 +47,28 @@ export interface Order {
     productName: string;
     variantName?: string;
     petName?: string;
+    tagId?: string;
+    sku?: string;
     quantity: number;
     unitPrice: number;
     totalPrice: number;
   }>;
+  subtotal?: number;
+  shippingCost?: number;
+  tax?: number;
+  discount?: {
+    percent: number;
+    amount: number;
+    reason: string;
+  };
   status: 'pending' | 'pending_payment' | 'paid' | 'packing' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
   payment: {
     method: 'card' | 'paypal' | 'bank_transfer';
     status: 'pending' | 'completed' | 'failed' | 'refunded';
     transactionId?: string;
+    stripePaymentIntentId?: string;
+    cardBrand?: string;
+    cardLast4?: string;
     amount: number;
     currency: string;
     paidAt?: string;

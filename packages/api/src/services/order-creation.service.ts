@@ -37,6 +37,7 @@ export interface OrderItem {
   variantName?: string;
   petName?: string;
   tagId?: string;
+  sku?: string;
   quantity: number;
   unitPrice: number;
   customizationTotal?: number;
@@ -164,6 +165,7 @@ export async function createPawTagOrder(params: CreateOrderParams): Promise<Crea
       variantName: item.variantName,
       petName: item.petName,
       tagId: item.tagId,
+      sku: item.sku,
       quantity: item.quantity,
       unitPrice: item.unitPrice,
       totalPrice: (item.unitPrice + (item.customizationTotal || 0)) * item.quantity,

@@ -12,6 +12,7 @@ export interface IOrderDocument extends Document {
     variantName?: string;
     petName?: string;
     tagId?: string;
+    sku?: string;
     quantity: number;
     unitPrice: number;
     totalPrice: number;
@@ -83,6 +84,7 @@ const OrderSchema = new Schema<IOrderDocument>(
         variantName: { type: String },
         petName: { type: String },
         tagId: { type: String },
+        sku: { type: String },
         quantity: { type: Number, required: true, min: 1 },
         unitPrice: { type: Number, required: true },
         totalPrice: { type: Number, required: true },

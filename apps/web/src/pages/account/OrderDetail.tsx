@@ -16,11 +16,12 @@ function getOrderStatusLabel(status: string): string {
 interface OrderItem {
   productName: string;
   variantName?: string;
-  sku: string;
+  sku?: string;
   quantity: number;
   unitPrice: number;
   totalPrice: number;
   petName?: string;
+  tagId?: string;
   image?: string;
   customizationTotal?: number;
 }
@@ -39,12 +40,23 @@ interface Order {
   status: string;
   items: OrderItem[];
   totalAmount: number;
+  subtotal?: number;
+  shippingCost?: number;
+  tax?: number;
+  discount?: {
+    percent: number;
+    amount: number;
+    reason: string;
+  };
   payment?: {
     amount: number;
     currency: string;
     status: string;
     method?: string;
     stripePaymentId?: string;
+    stripePaymentIntentId?: string;
+    cardBrand?: string;
+    cardLast4?: string;
   };
   shippingAddress?: {
     line1: string;
@@ -438,7 +450,7 @@ export default function OrderDetail() {
                     <h3 className="font-medium text-gray-900">{item.productName}</h3>
                     {item.variantName && <p className="text-sm text-gray-500">{item.variantName}</p>}
                     {item.petName && <p className="text-sm text-teal-600">For: {item.petName}</p>}
-                    <p className="text-xs text-gray-400 mt-1">SKU: {item.sku}</p>
+                    {item.sku && <p className="text-xs text-gray-400 mt-1">SKU: {item.sku}</p>}
                   </div>
                   <div className="text-right">
                     <p className="font-medium text-gray-900">${item.totalPrice.toFixed(2)}</p>
@@ -461,21 +473,26 @@ export default function OrderDetail() {
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-gray-500">Subtotal</span>
-                <span>${(order.payment?.amount || order.totalAmount).toFixed(2)}</span>
+                <span>${(order.subtotal ?? order.items?.reduce((s: number, i: any) => s + (i.totalPrice || 0), 0) ?? order.payment?.amount ?? 0).toFixed(2)}</span>
               </div>
-              {(() => {
-                // Calculate shipping from order items (shipping line items have no productId or "shipping" in name)
-                const shippingItem = order.items?.find((i: any) => !i.productId || i.productName?.toLowerCase().includes('shipping'));
-                const shippingCost = shippingItem?.totalPrice || 0;
-                return (
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Shipping</span>
-                    <span className={shippingCost === 0 ? 'text-green-600' : 'text-gray-900'}>
-                      {shippingCost === 0 ? 'Free' : `NZ$${shippingCost.toFixed(2)}`}
-                    </span>
-                  </div>
-                );
-              })()}
+              <div className="flex justify-between">
+                <span className="text-gray-500">Shipping</span>
+                <span className={(order.shippingCost ?? 0) === 0 ? 'text-green-600' : 'text-gray-900'}>
+                  {(order.shippingCost ?? 0) === 0 ? 'Free' : `NZ$${(order.shippingCost as number).toFixed(2)}`}
+                </span>
+              </div>
+              {order.discount && order.discount.amount > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Discount</span>
+                  <span className="text-green-600">-${order.discount.amount.toFixed(2)}</span>
+                </div>
+              )}
+              {(order.tax ?? 0) > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-gray-500">GST (15%)</span>
+                  <span>${(order.tax as number).toFixed(2)}</span>
+                </div>
+              )}
               <div className="border-t border-gray-200 pt-2 flex justify-between font-semibold text-base">
                 <span>Total</span>
                 <span className="text-teal-700">${(order.payment?.amount || order.totalAmount).toFixed(2)} NZD</span>
@@ -484,8 +501,11 @@ export default function OrderDetail() {
             {order.payment && (
               <div className="mt-4 pt-4 border-t border-gray-100 text-xs text-gray-500 space-y-1">
                 <p>Method: {order.payment.method || 'Card'}</p>
-                <p>Status: <span className={order.payment.status === 'succeeded' ? 'text-green-600' : 'text-yellow-600'}>{order.payment.status}</span></p>
-                {order.payment.stripePaymentId && <p>Ref: {order.payment.stripePaymentId}</p>}
+                <p>Status: <span className={order.payment.status === 'completed' ? 'text-green-600' : 'text-yellow-600'}>{order.payment.status}</span></p>
+                {order.payment.cardBrand && (
+                  <p>Card: {order.payment.cardBrand} •••• {order.payment.cardLast4}</p>
+                )}
+                {order.payment.stripePaymentIntentId && <p>Payment ID: {order.payment.stripePaymentIntentId}</p>}
               </div>
             )}
           </div>
