@@ -45,7 +45,6 @@ export default function VerifyAccount() {
       const lookupEmail = emailParam || authUser?.email || '';
       const params = lookupEmail ? `?email=${encodeURIComponent(lookupEmail)}` : '';
       const res = await api.get(`/auth/verification-status${params}`);
-      console.log('[VerifyAccount] API response:', res.data);
       setStatus(res.data.data);
       setCooldown(res.data.data?.otpCooldown || 0);
     } catch {
@@ -219,7 +218,6 @@ export default function VerifyAccount() {
   const isPhoneVerified = status?.phoneVerified ?? false;
   const allVerified = isEmailVerified && isPhoneVerified;
   const isPending = status?.status === 'pending_verification' || !status;
-  console.log('[VerifyAccount] status:', status, { isEmailVerified, isPhoneVerified, allVerified });
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-12">
