@@ -60,18 +60,27 @@ export default function AuditSettings() {
   const [policy, setPolicy] = useState<Policy | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
+  const [masterEnabled, setMasterEnabled] = useState(true);
 
   const fetchPolicy = () => {
     setLoading(true);
     api.get('/admin/audit/settings')
-      .then((res) => setPolicy(res.data.data))
+      .then((res) => {
+        setPolicy(res.data.data);
+        // Set master enabled based on all categories and actors being enabled
+        if (res.data.data) {
+          const allCategoriesEnabled = res.data.data.categories?.every((c: SettingItem) => c.enabled);
+          const allActorsEnabled = res.data.data.actors?.every((a: SettingItem) => a.enabled);
+          setMasterEnabled(allCategoriesEnabled && allActorsEnabled);
+        }
+      })
       .catch(() => toast.error('Failed to load audit settings'))
       .finally(() => setLoading(false));
   };
 
   useEffect(fetchPolicy, []);
 
-  const toggle = async (kind: 'category' | 'actor', item: SettingItem) => {
+  async function toggle(kind: 'category' | 'actor', item: SettingItem): Promise<void> {
     const id = `${kind}:${item.key}`;
     setSaving(id);
     try {
@@ -84,6 +93,30 @@ export default function AuditSettings() {
       toast.success('Audit setting updated');
     } catch {
       toast.error('Failed to update audit setting');
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  const toggleMaster = async () => {
+    const newVal = !masterEnabled;
+    setMasterEnabled(newVal);
+    setSaving('audit.settings.master');
+    try {
+      await api.put('/admin/audit/settings/master', { enabled: newVal });
+      // Update all categories and actors
+      if (policy) {
+        const updatedCategories = policy.categories.map((c) => ({ ...c, enabled: newVal }));
+        const updatedActors = policy.actors.map((a) => ({ ...a, enabled: newVal }));
+        setPolicy({ ...policy, categories: updatedCategories, actors: updatedActors });
+      }
+      // Persist master enabled state
+      await api.put('/admin/audit/settings/master', { enabled: newVal });
+      toast.success(`Audit logging ${newVal ? 'enabled' : 'disabled'}.`);
+    } catch {
+      toast.error(`Failed to ${newVal ? 'enable' : 'disable'} audit logging`);
+      // Revert state
+      setMasterEnabled(!newVal);
     } finally {
       setSaving(null);
     }
@@ -109,7 +142,7 @@ export default function AuditSettings() {
     </div>
   );
 
-  return (
+return (
     <div className="space-y-6">
       <div className="flex items-start gap-3">
         <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-50 text-primary-600"><ShieldCheck className="h-5 w-5" /></span>
@@ -118,6 +151,13 @@ export default function AuditSettings() {
           <p className="text-sm text-gray-500 mt-1">Control enterprise audit logging by event category and actor type. Changes are themselves audited.</p>
         </div>
       </div>
+
+      {/* Master Toggle */}
+      <div className="mt-3 flex items-center gap-2">
+        <Toggle enabled={masterEnabled} disabled={saving === 'audit.settings.master'} onToggle={toggleMaster} />
+        <span className="text-sm text-gray-600">{" "}{masterEnabled ? 'All audit logging enabled' : 'All audit logging disabled'}</span>
+      </div>
+
       {loading || !policy ? <div className="bg-white rounded-xl border border-gray-200 p-10 text-center text-gray-500">Loading audit settings...</div> : (
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
           {renderGroup('category', policy.categories)}
