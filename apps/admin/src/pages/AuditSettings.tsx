@@ -103,15 +103,21 @@ export default function AuditSettings() {
     setMasterEnabled(newVal);
     setSaving('audit.settings.master');
     try {
-      await api.put('/admin/audit/settings/master', { enabled: newVal });
-      // Update all categories and actors
       if (policy) {
-        const updatedCategories = policy.categories.map((c) => ({ ...c, enabled: newVal }));
-        const updatedActors = policy.actors.map((a) => ({ ...a, enabled: newVal }));
-        setPolicy({ ...policy, categories: updatedCategories, actors: updatedActors });
+        // Update each category and actor using the existing backend endpoint
+        const updatePromises: Array<Promise<void>> = [];
+        policy.categories.forEach((c) => {
+          updatePromises.push(
+            api.put(`/admin/audit/settings/category/${c.key}`, { enabled: newVal })
+          );
+        });
+        policy.actors.forEach((a) => {
+          updatePromises.push(
+            api.put(`/admin/audit/settings/actor/${a.key}`, { enabled: newVal })
+          );
+        });
+        await Promise.all(updatePromises);
       }
-      // Persist master enabled state
-      await api.put('/admin/audit/settings/master', { enabled: newVal });
       toast.success(`Audit logging ${newVal ? 'enabled' : 'disabled'}.`);
     } catch {
       toast.error(`Failed to ${newVal ? 'enable' : 'disable'} audit logging`);

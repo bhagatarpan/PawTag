@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useAuth } from '../lib/auth';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
 import { buildChangeRows, formatAuditValue, type AuditChangeRow, getActualChanges, getFieldDisplayName, getEntityDisplayName, getActionDisplayName, type ActualChange } from '../lib/audit-diff';
@@ -924,6 +925,7 @@ export default function AuditTrail() {
   const [verifyLoading, setVerifyLoading] = useState(false);
   const [exportLoading, setExportLoading] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const { hasPermission } = useAuth();
   const [activeDatePreset, setActiveDatePreset] = useState<number | null>(null);
   const [searchSuggestions, setSearchSuggestions] = useState<string[]>([]);
   const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
@@ -1216,6 +1218,24 @@ export default function AuditTrail() {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Settings and Refresh buttons */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => navigate('/admin/audit/settings')}
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
+            disabled={!hasPermission('audit.admin')}
+            title="Audit Settings"
+          >
+            <Settings size={15} /> Settings
+          </button>
+          <button
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
+            title="Refresh"
+          >
+            <RotateCcw size={15} /> Refresh
+          </button>
         </div>
 
         {/* Verify Banner */}
