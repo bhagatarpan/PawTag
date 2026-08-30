@@ -927,6 +927,13 @@ export default function AuditTrail() {
   const [showExportMenu, setShowExportMenu] = useState(false);
   const { hasPermission } = useAuth();
   const [activeDatePreset, setActiveDatePreset] = useState<number | null>(null);
+  const [showPurgeMenu, setShowPurgeMenu] = useState(false);
+  const [purgeRange, setPurgeRange] = useState<{ start: string; end: string; label: string } | null>(null);
+  const [purgeConfirmOpen, setPurgeConfirmOpen] = useState(false);
+  const [purging, setPurging] = useState(false);
+  const [customRangeOpen, setCustomRangeOpen] = useState(false);
+  const [customStart, setCustomStart] = useState('');
+  const [customEnd, setCustomEnd] = useState('');
   const [searchSuggestions, setSearchSuggestions] = useState<string[]>([]);
   const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
   const [searchHighlightIdx, setSearchHighlightIdx] = useState(-1);
@@ -1014,6 +1021,89 @@ export default function AuditTrail() {
       setSummaryLoading(false);
     }
   }, []);
+
+  // ── Purge ─────────────────────────────────────────────────────
+
+  const getPurgeRange = (option: string): { start: string; end: string; label: string } => {
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+
+    switch (option) {
+      case 'today':
+        return { start: todayStart.toISOString(), end: todayEnd.toISOString(), label: 'Today' };
+      case 'yesterday': {
+        const yStart = new Date(todayStart);
+        yStart.setDate(yStart.getDate() - 1);
+        const yEnd = new Date(todayEnd);
+        yEnd.setDate(yEnd.getDate() - 1);
+        return { start: yStart.toISOString(), end: yEnd.toISOString(), label: 'Yesterday' };
+      }
+      case 'week': {
+        const wStart = new Date(todayStart);
+        wStart.setDate(wStart.getDate() - 7);
+        return { start: wStart.toISOString(), end: todayEnd.toISOString(), label: 'Last 7 Days' };
+      }
+      case 'month': {
+        const mStart = new Date(todayStart);
+        mStart.setDate(mStart.getDate() - 30);
+        return { start: mStart.toISOString(), end: todayEnd.toISOString(), label: 'Last 30 Days' };
+      }
+      default:
+        return { start: todayStart.toISOString(), end: todayEnd.toISOString(), label: 'Today' };
+    }
+  };
+
+  const selectPurgeOption = (option: string) => {
+    setShowPurgeMenu(false);
+    if (option === 'custom') {
+      setCustomRangeOpen(true);
+      return;
+    }
+    const range = getPurgeRange(option);
+    setPurgeRange(range);
+    setFilters((f) => ({ ...f, startDate: range.start.split('T')[0], endDate: range.end.split('T')[0] }));
+    setPage(1);
+  };
+
+  const applyCustomRange = () => {
+    if (!customStart || !customEnd) return;
+    const s = new Date(customStart);
+    const e = new Date(customEnd + 'T23:59:59');
+    if (s >= e) { toast.error('Start date must be before end date'); return; }
+    setPurgeRange({ start: s.toISOString(), end: e.toISOString(), label: `${customStart} to ${customEnd}` });
+    setCustomRangeOpen(false);
+    setFilters((f) => ({ ...f, startDate: customStart, endDate: customEnd }));
+    setPage(1);
+  };
+
+  const clearPurge = () => {
+    setPurgeRange(null);
+    setPurgeConfirmOpen(false);
+    setFilters((f) => ({ ...f, startDate: '', endDate: '' }));
+    setPage(1);
+  };
+
+  const handlePurge = async () => {
+    if (!purgeRange) return;
+    setPurging(true);
+    try {
+      const res = await api.post('/admin/audit/purge', {
+        startDate: purgeRange.start,
+        endDate: purgeRange.end,
+      });
+      const deleted = res.data.data.deleted;
+      toast.success(`${deleted.toLocaleString()} audit event${deleted !== 1 ? 's' : ''} purged`);
+      setPurgeRange(null);
+      setPurgeConfirmOpen(false);
+      fetchEvents();
+      fetchSummary();
+    } catch {
+      toast.error('Failed to purge audit events');
+    } finally {
+      setPurging(false);
+    }
+  };
 
   // Fetch events
   const fetchEvents = useCallback(async () => {
@@ -1216,6 +1306,67 @@ export default function AuditTrail() {
                   </>
                 )}
               </div>
+              {/* Purge dropdown — admin only */}
+              {hasPermission('audit.admin') && (
+                <div className="relative">
+                  <button type="button" onClick={() => { setShowPurgeMenu(!showPurgeMenu); setCustomRangeOpen(false); }} className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50">
+                    <Trash2 size={15} /> Purge <ChevronDown size={14} />
+                  </button>
+                  {showPurgeMenu && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => { setShowPurgeMenu(false); setCustomRangeOpen(false); }} />
+                      <div className="absolute right-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                        {[
+                          { key: 'today', label: 'Today' },
+                          { key: 'yesterday', label: 'Yesterday' },
+                          { key: 'week', label: 'Last 7 Days' },
+                          { key: 'month', label: 'Last 30 Days' },
+                        ].map((opt) => (
+                          <button key={opt.key} type="button" onClick={() => selectPurgeOption(opt.key)} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                            {opt.label}
+                          </button>
+                        ))}
+                        <div className="border-t border-gray-100" />
+                        <button type="button" onClick={() => selectPurgeOption('custom')} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                          Custom Range...
+                        </button>
+                      </div>
+                    </>
+                  )}
+                  {customRangeOpen && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setCustomRangeOpen(false)} />
+                      <div className="absolute right-0 mt-1 w-64 bg-white rounded-lg shadow-lg border border-gray-200 p-4 z-50">
+                        <p className="text-sm font-medium text-gray-900 mb-3">Custom Date Range</p>
+                        <div className="space-y-2">
+                          <div>
+                            <label className="text-xs text-gray-500">From</label>
+                            <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} className="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm" />
+                          </div>
+                          <div>
+                            <label className="text-xs text-gray-500">To</label>
+                            <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} className="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm" />
+                          </div>
+                          <button type="button" onClick={applyCustomRange} disabled={!customStart || !customEnd} className="w-full rounded-lg bg-teal-600 text-white py-1.5 text-sm font-medium hover:bg-teal-700 disabled:opacity-50">
+                            Apply
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+              {/* Purge action button — visible when a range is selected */}
+              {purgeRange && hasPermission('audit.admin') && (
+                <div className="inline-flex items-center gap-1">
+                  <button type="button" onClick={() => setPurgeConfirmOpen(true)} className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700">
+                    <Trash2 size={15} /> Purge {total.toLocaleString()} event{total !== 1 ? 's' : ''}
+                  </button>
+                  <button type="button" onClick={clearPurge} className="rounded-lg border border-gray-200 p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50" title="Cancel purge">
+                    <X size={15} />
+                  </button>
+                </div>
+              )}
               {/* Settings and Refresh buttons */}
               <div className="flex items-center gap-2">
                 <button
@@ -1724,6 +1875,45 @@ export default function AuditTrail() {
           setFilters((f) => ({ ...f, search: txId }));
         }}
       />
+
+      {/* Purge Confirmation Dialog */}
+      {purgeConfirmOpen && purgeRange && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => !purging && setPurgeConfirmOpen(false)} />
+          <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-md p-6 mx-4 animate-slide-up">
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                <AlertTriangle size={20} className="text-red-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Permanently Delete Audit Events?</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  You are about to permanently delete <strong className="text-gray-900">{total.toLocaleString()}</strong> event{total !== 1 ? 's' : ''} from <strong className="text-gray-900">{purgeRange.label}</strong>.
+                </p>
+                <p className="text-sm text-red-600 mt-2 font-medium">This action cannot be undone.</p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                type="button"
+                onClick={() => setPurgeConfirmOpen(false)}
+                disabled={purging}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handlePurge}
+                disabled={purging}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
+              >
+                {purging ? <><Loader2 className="animate-spin h-4 w-4" /> Purging...</> : 'Delete Permanently'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
