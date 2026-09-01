@@ -2,6 +2,7 @@ Development & Refactoring Principles
 Core Rule
 
 DO NOT DUPLICATE CODE.
+MUST Use DESIGN.md design tokens, update as and when required.
 
 Before creating new code, components, controls, styles, validation, business logic, API calls, state handling, or UI patterns, investigate the existing codebase first.
 
@@ -182,6 +183,7 @@ success states
 
 
 Look for existing design-system conventions and shared classes/components.
+Look for DESIGN.md, utilise, use, enhance, update as and when required.
 
 Maintain visual consistency.
 

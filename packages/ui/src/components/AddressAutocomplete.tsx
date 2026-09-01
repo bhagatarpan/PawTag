@@ -108,7 +108,7 @@ export function AddressAutocomplete({
             if (suggestions.length > 0) setIsOpen(true);
           }}
           placeholder={placeholder}
-          className={`w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 pr-10 ${className}`}
+          className={`w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 pr-10 ${className}`}
         />
         <div className="absolute right-3 top-1/2 -translate-y-1/2">
           {isLoading ? (
@@ -126,9 +126,9 @@ export function AddressAutocomplete({
               key={index}
               type="button"
               onClick={() => handleSelect(suggestion)}
-              className="w-full px-4 py-3 text-left hover:bg-teal-50 border-b border-gray-100 last:border-0 flex items-start gap-2 transition-colors"
+              className="w-full px-4 py-3 text-left hover:bg-primary-50 border-b border-gray-100 last:border-0 flex items-start gap-2 transition-colors"
             >
-              <MapPin className="w-4 h-4 text-teal-500 mt-0.5 flex-shrink-0" />
+              <MapPin className="w-4 h-4 text-primary-500 mt-0.5 flex-shrink-0" />
               <span className="text-sm text-gray-700">
                 {suggestion.line1}
                 {suggestion.city && <>, {suggestion.city}</>}
@@ -146,7 +146,7 @@ export function AddressAutocomplete({
           <button
             type="button"
             onClick={handleDismissNoResults}
-            className="text-teal-600 hover:underline font-medium"
+            className="text-primary-600 hover:underline font-medium"
           >
             Enter address manually
           </button>

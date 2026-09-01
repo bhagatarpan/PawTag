@@ -5,6 +5,7 @@ import {
   SummaryCards, SearchBar, FilterChips, Pagination, EmptyState, ErrorState,
   DetailDrawer, Section, DetailRow, StatusBadge, ConfirmDialog,
 } from '@pawtag/ui';
+import { OrderProgressStepper, OrderStatusBanner } from '@pawtag/ui';
 import {
   Search, X, ChevronDown, Download, Loader2, ShoppingCart, CreditCard,
   Truck, Package, CheckCircle, AlertCircle, Info, Clock, FileText,
@@ -15,6 +16,7 @@ import {
   getStatusBadgeVariant,
   getStatusBorderColor,
   getTrackingUrl,
+  isTerminalStatus,
 } from '@pawtag/shared';
 
 /* ------------------------------------------------------------------ */
@@ -26,6 +28,8 @@ interface OrderItem {
   productName: string;
   variantName?: string;
   petName?: string;
+  tagId?: string;
+  sku?: string;
   quantity: number;
   unitPrice: number;
   totalPrice: number;
@@ -36,12 +40,24 @@ export interface Order {
   _id: string;
   orderNumber: string;
   userId: { _id: string; fullName: string; email: string } | null;
+  medusaOrderId?: string;
   items: OrderItem[];
   status: string;
+  subtotal?: number;
+  shippingCost?: number;
+  tax?: number;
+  discount?: {
+    percent?: number;
+    amount?: number;
+    reason?: string;
+  };
   payment: {
     method: string;
     status: string;
     transactionId?: string;
+    stripePaymentIntentId?: string;
+    cardBrand?: string;
+    cardLast4?: string;
     amount: number;
     currency: string;
     paidAt?: string;
@@ -54,9 +70,19 @@ export interface Order {
     zip: string;
     country: string;
   };
+  billingAddress?: {
+    line1: string;
+    line2?: string;
+    city: string;
+    state: string;
+    zip: string;
+    country: string;
+  };
   trackingNumber?: string;
   carrier?: string;
+  shippingLabelUrl?: string;
   notes?: string;
+  referredByCode?: string;
   cancellationReason?: string;
   refundReason?: string;
   deliveredAt?: string;
@@ -71,9 +97,13 @@ export interface Order {
     _id: string;
     invoiceNumber: string;
     amount: number;
+    currency?: string;
     status: string;
+    paidAt?: string;
+    createdAt?: string;
   } | null;
   createdAt: string;
+  updatedAt?: string;
 }
 
 interface SummaryData {
@@ -316,6 +346,13 @@ export function OrderDetailDrawer({
     >
       {activeTab === 'info' && (
         <div className="space-y-6">
+          {/* Order Progress or Status Banner */}
+          {isTerminalStatus(order.status) ? (
+            <OrderStatusBanner status={order.status} amount={order.payment?.amount} />
+          ) : (
+            <OrderProgressStepper status={order.status} variant="full" />
+          )}
+
           <Section title="Order Details" icon={<ShoppingCart size={16} />}>
             <DetailRow label="Order Number" value={<span className="font-mono font-medium">{order.orderNumber}</span>} />
             <DetailRow label="Customer" value={order.userId?.fullName || 'N/A'} />
@@ -331,6 +368,9 @@ export function OrderDetailDrawer({
             <DetailRow label="Items" value={`${order.items?.length || 0} item(s)`} />
             <DetailRow label="Total Amount" value={<span className="font-semibold">{formatCurrency(order.payment.amount, order.payment.currency)}</span>} />
             <DetailRow label="Created" value={formatDateTime(order.createdAt)} />
+            {order.updatedAt && (
+              <DetailRow label="Last Updated" value={formatDateTime(order.updatedAt)} />
+            )}
             {order.deliveredAt && (
               <DetailRow label="Delivered" value={formatDateTime(order.deliveredAt)} />
             )}
@@ -343,12 +383,50 @@ export function OrderDetailDrawer({
             {order.notes && (
               <DetailRow label="Notes" value={order.notes} />
             )}
+            {order.referredByCode && (
+              <DetailRow label="Referral Code" value={
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-50 text-purple-700 rounded-full text-xs font-medium">
+                  {order.referredByCode}
+                </span>
+              } />
+            )}
+            {order.medusaOrderId && (
+              <DetailRow label="Medusa Order" value={
+                <span className="font-mono text-xs text-gray-500">{order.medusaOrderId}</span>
+              } />
+            )}
           </Section>
+
+          {/* Order Summary Breakdown */}
+          {(order.subtotal !== undefined || order.shippingCost !== undefined || order.tax !== undefined || order.discount) && (
+            <Section title="Order Summary" icon={<ShoppingCart size={16} />}>
+              {order.subtotal !== undefined && (
+                <DetailRow label="Subtotal" value={formatCurrency(order.subtotal, order.payment.currency)} />
+              )}
+              {order.shippingCost !== undefined && (
+                <DetailRow label="Shipping" value={order.shippingCost === 0 ? 'Free' : formatCurrency(order.shippingCost, order.payment.currency)} />
+              )}
+              {order.tax !== undefined && (
+                <DetailRow label="Tax (GST)" value={formatCurrency(order.tax, order.payment.currency)} />
+              )}
+              {order.discount && ((order.discount.amount ?? 0) > 0 || (order.discount.percent ?? 0) > 0) && (
+                <DetailRow label="Discount" value={
+                  <span className="text-green-600">
+                    {(order.discount.amount ?? 0) > 0 ? `-${formatCurrency(order.discount.amount!, order.payment.currency)}` : `${order.discount.percent}% off`}
+                    {order.discount.reason && <span className="text-gray-400 ml-1">({order.discount.reason})</span>}
+                  </span>
+                } />
+              )}
+              <div className="pt-2 mt-2 border-t border-gray-200">
+                <DetailRow label="Total" value={<span className="font-bold text-gray-900">{formatCurrency(order.payment.amount, order.payment.currency)}</span>} />
+              </div>
+            </Section>
+          )}
 
           {order.latestInvoice && (
             <Section title="Invoice" icon={<FileText size={16} />}>
               <DetailRow label="Invoice #" value={<span className="font-mono">{order.latestInvoice.invoiceNumber}</span>} />
-              <DetailRow label="Amount" value={formatCurrency(order.latestInvoice.amount)} />
+              <DetailRow label="Amount" value={formatCurrency(order.latestInvoice.amount, order.latestInvoice.currency)} />
               <DetailRow label="Status" value={
                 <StatusBadge
                   label={order.latestInvoice.status}
@@ -356,11 +434,14 @@ export function OrderDetailDrawer({
                   size="md"
                 />
               } />
+              {order.latestInvoice.paidAt && (
+                <DetailRow label="Paid At" value={formatDateTime(order.latestInvoice.paidAt)} />
+              )}
               <div className="flex items-center gap-2 mt-3">
                 <button
                   onClick={() => handleInvoiceAction('view')}
                   disabled={actionLoading === 'invoice-view'}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-teal-700 bg-teal-50 border border-teal-200 rounded-lg hover:bg-teal-100 disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary-700 bg-primary-50 border border-primary-200 rounded-lg hover:bg-primary-100 disabled:opacity-50"
                 >
                   {actionLoading === 'invoice-view' ? <Loader2 size={12} className="animate-spin" /> : <Eye size={12} />}
                   View
@@ -447,6 +528,20 @@ export function OrderDetailDrawer({
               {order.carrier && (
                 <DetailRow label="Carrier" value={order.carrier} />
               )}
+              {order.shippingLabelUrl && (
+                <div className="mt-3">
+                  <a
+                    href={order.shippingLabelUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-2 bg-primary-50 border border-primary-200 text-primary-700 rounded-lg text-sm font-medium hover:bg-primary-100 transition-all"
+                  >
+                    <Download size={14} />
+                    Shipping Label
+                    <ExternalLink size={12} />
+                  </a>
+                </div>
+              )}
             </Section>
           )}
         </div>
@@ -460,6 +555,8 @@ export function OrderDetailDrawer({
                 <tr>
                   <th className="text-left px-4 py-2 font-medium text-gray-500">Product</th>
                   <th className="text-left px-4 py-2 font-medium text-gray-500">Variant</th>
+                  <th className="text-left px-4 py-2 font-medium text-gray-500">Tag ID</th>
+                  <th className="text-left px-4 py-2 font-medium text-gray-500">SKU</th>
                   <th className="text-center px-4 py-2 font-medium text-gray-500">Qty</th>
                   <th className="text-right px-4 py-2 font-medium text-gray-500">Unit Price</th>
                   <th className="text-right px-4 py-2 font-medium text-gray-500">Total</th>
@@ -475,6 +572,12 @@ export function OrderDetailDrawer({
                       )}
                     </td>
                     <td className="px-4 py-2.5 text-gray-600">{item.variantName || '—'}</td>
+                    <td className="px-4 py-2.5">
+                      {item.tagId ? (
+                        <span className="font-mono text-xs bg-primary-50 text-primary-700 px-2 py-0.5 rounded">{item.tagId}</span>
+                      ) : '—'}
+                    </td>
+                    <td className="px-4 py-2.5 text-xs text-gray-500">{item.sku || '—'}</td>
                     <td className="px-4 py-2.5 text-center text-gray-600">{item.quantity}</td>
                     <td className="px-4 py-2.5 text-right text-gray-600">{formatCurrency(item.unitPrice)}</td>
                     <td className="px-4 py-2.5 text-right font-medium text-gray-900">{formatCurrency(item.totalPrice)}</td>
@@ -483,7 +586,7 @@ export function OrderDetailDrawer({
               </tbody>
               <tfoot className="bg-gray-50">
                 <tr>
-                  <td colSpan={4} className="px-4 py-2 text-right font-medium text-gray-700">Total:</td>
+                  <td colSpan={6} className="px-4 py-2 text-right font-medium text-gray-700">Total:</td>
                   <td className="px-4 py-2 text-right font-bold text-gray-900">{formatCurrency(order.payment.amount, order.payment.currency)}</td>
                 </tr>
               </tfoot>
@@ -503,8 +606,29 @@ export function OrderDetailDrawer({
             </div>
           </Section>
 
+          {order.billingAddress && (
+            <Section title="Billing Address" icon={<CreditCard size={16} />}>
+              <div className="text-sm text-gray-700 space-y-0.5">
+                <p>{order.billingAddress.line1}</p>
+                {order.billingAddress.line2 && <p>{order.billingAddress.line2}</p>}
+                <p>{order.billingAddress.city}, {order.billingAddress.state} {order.billingAddress.zip}</p>
+                <p>{order.billingAddress.country}</p>
+              </div>
+            </Section>
+          )}
+
           <Section title="Payment" icon={<CreditCard size={16} />}>
-            <DetailRow label="Method" value={PAYMENT_METHOD_LABELS[order.payment.method] || order.payment.method} />
+            <DetailRow label="Method" value={
+              <span className="flex items-center gap-2">
+                {order.payment.cardBrand && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 rounded text-xs font-medium">
+                    {order.payment.cardBrand.charAt(0).toUpperCase() + order.payment.cardBrand.slice(1)}
+                    {order.payment.cardLast4 && <span className="text-gray-500">•••• {order.payment.cardLast4}</span>}
+                  </span>
+                )}
+                {!order.payment.cardBrand && (PAYMENT_METHOD_LABELS[order.payment.method] || order.payment.method)}
+              </span>
+            } />
             <DetailRow label="Amount" value={formatCurrency(order.payment.amount, order.payment.currency)} />
             <DetailRow label="Status" value={
               <StatusBadge
@@ -516,6 +640,11 @@ export function OrderDetailDrawer({
             {order.payment.transactionId && (
               <DetailRow label="Transaction ID" value={
                 <span className="font-mono text-xs">{order.payment.transactionId}</span>
+              } />
+            )}
+            {order.payment.stripePaymentIntentId && (
+              <DetailRow label="Stripe Payment Intent" value={
+                <span className="font-mono text-xs text-gray-500">{order.payment.stripePaymentIntentId}</span>
               } />
             )}
             {order.payment.paidAt && (
@@ -544,7 +673,7 @@ export function OrderDetailDrawer({
                       href={url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 px-3 py-2 bg-teal-50 border border-teal-200 text-teal-700 rounded-lg text-sm font-medium hover:bg-teal-100 transition-all"
+                      className="inline-flex items-center gap-1.5 px-3 py-2 bg-primary-50 border border-primary-200 text-primary-700 rounded-lg text-sm font-medium hover:bg-primary-100 transition-all"
                     >
                       <Truck size={14} />
                       Track on {order.carrier}
@@ -553,6 +682,20 @@ export function OrderDetailDrawer({
                   </div>
                 ) : null;
               })()}
+              {order.shippingLabelUrl && (
+                <div className="mt-3">
+                  <a
+                    href={order.shippingLabelUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-2 bg-gray-50 border border-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-100 transition-all"
+                  >
+                    <Download size={14} />
+                    Shipping Label
+                    <ExternalLink size={12} />
+                  </a>
+                </div>
+              )}
             </Section>
           )}
         </div>
@@ -562,33 +705,12 @@ export function OrderDetailDrawer({
         <div className="space-y-4">
           {order.activity && order.activity.length > 0 ? (
             <>
-              {/* Progress Stepper */}
-              <div className="relative mb-6">
-                <div className="absolute top-[15px] left-[15px] right-[15px] h-1 bg-gray-200 rounded-full" />
-                <div className="relative flex justify-between">
-                  {['pending', 'paid', 'packing', 'shipped', 'delivered'].map((step, i) => {
-                    const STEPS = ['pending', 'paid', 'packing', 'shipped', 'delivered'];
-                    // Map order statuses to stepper positions: pending_payment is treated as pending
-                    const statusToStep: Record<string, string> = { pending: 'pending', pending_payment: 'pending', paid: 'paid', packing: 'packing', shipped: 'shipped', delivered: 'delivered' };
-                    const mappedStatus = statusToStep[order.status] || order.status;
-                    const stepIdx = STEPS.indexOf(mappedStatus);
-                    const isDone = i <= stepIdx;
-                    const isCurrent = i === stepIdx;
-                    return (
-                      <div key={step} className="flex flex-col items-center" style={{ width: '20%' }}>
-                        <div className={`w-[28px] h-[28px] rounded-full flex items-center justify-center z-10 text-xs font-bold ${
-                          isDone ? 'bg-teal-600 text-white' : 'bg-gray-200 text-gray-400'
-                        } ${isCurrent ? 'ring-2 ring-offset-1 ring-teal-200' : ''}`}>
-                          {isDone ? '✓' : i + 1}
-                        </div>
-                        <span className={`text-[11px] mt-1 font-medium capitalize ${isDone ? 'text-teal-700' : 'text-gray-400'}`}>
-                          {step}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+              {/* Progress Stepper or Status Banner */}
+              {isTerminalStatus(order.status) ? (
+                <OrderStatusBanner status={order.status} amount={order.payment?.amount} />
+              ) : (
+                <OrderProgressStepper status={order.status} variant="full" />
+              )}
 
               {/* Activity Feed */}
               <div className="relative">
@@ -612,7 +734,7 @@ export function OrderDetailDrawer({
                       const EntryIcon = iconMap[entry.type] || Clock;
                       return (
                         <div key={i} className="relative flex items-start gap-3 pb-5 last:pb-0">
-                          <div className={`relative z-10 w-[30px] h-[30px] rounded-full flex items-center justify-center shrink-0 ${dotColor} ${i === 0 ? 'ring-2 ring-offset-1 ring-teal-200' : ''}`}>
+                          <div className={`relative z-10 w-[30px] h-[30px] rounded-full flex items-center justify-center shrink-0 ${dotColor} ${i === 0 ? 'ring-2 ring-offset-1 ring-primary-200' : ''}`}>
                             <EntryIcon size={14} className="text-white" />
                           </div>
                           <div className="flex-1 min-w-0 pt-0.5">

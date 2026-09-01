@@ -799,9 +799,26 @@ router.get('/users/:id/orders', requirePermission('user.read'), requirePermissio
       .skip((Number(page) - 1) * Number(limit))
       .limit(Number(limit));
 
+    // Enrich with latest invoice per order (same pattern as main orders endpoint)
+    const orderIds = orders.map((o: any) => o._id);
+    const invoices = await Invoice.find({ orderId: { $in: orderIds } })
+      .sort({ createdAt: -1 })
+      .select('orderId invoiceNumber amount currency status paidAt createdAt');
+
+    const invoiceMap = new Map<string, any>();
+    for (const inv of invoices) {
+      const oid = (inv as any).orderId?.toString();
+      if (oid && !invoiceMap.has(oid)) invoiceMap.set(oid, inv);
+    }
+
+    const ordersWithInvoices = orders.map((o: any) => ({
+      ...o.toObject(),
+      latestInvoice: invoiceMap.get(o._id?.toString()) || null,
+    }));
+
     res.json({
       success: true,
-      data: { items: orders, total, page: Number(page), limit: Number(limit), totalPages: Math.ceil(total / Number(limit)) },
+      data: { items: ordersWithInvoices, total, page: Number(page), limit: Number(limit), totalPages: Math.ceil(total / Number(limit)) },
     });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch user orders' });

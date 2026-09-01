@@ -208,13 +208,13 @@ export default function Orders() {
               <Link
                 key={order._id}
                 to={`/account/orders/${order._id}`}
-                className={`block bg-white rounded-lg border border-gray-200 border-l-4 ${getStatusBorderColor(order.status)} p-4 hover:border-teal-300 hover:shadow-md transition-all`}
+                className={`block bg-white rounded-lg border border-gray-200 border-l-4 ${getStatusBorderColor(order.status)} p-4 hover:border-primary-300 hover:shadow-md transition-all`}
               >
                 {/* Row 1: Order number, status, price */}
                 <div className="flex justify-between items-start">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-teal-100 flex items-center justify-center shrink-0">
-                      <ShoppingBag size={18} className="text-teal-600" />
+                    <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center shrink-0">
+                      <ShoppingBag size={18} className="text-primary-600" />
                     </div>
                     <div>
                       <p className="font-mono text-sm font-semibold text-gray-900">
@@ -289,12 +289,12 @@ export default function Orders() {
                       <span className="text-xs text-gray-600 truncate">{latestActivity.message}</span>
                       <span className="text-xs text-gray-400 whitespace-nowrap">· {getRelativeTime(latestActivity.timestamp)}</span>
                       {latestActivity.type === 'shipped' && order.trackingNumber && (
-                        <span className="text-xs text-teal-600 font-medium whitespace-nowrap flex items-center gap-0.5">
+                        <span className="text-xs text-primary-600 font-medium whitespace-nowrap flex items-center gap-0.5">
                           Track <ExternalLink size={10} />
                         </span>
                       )}
                     </div>
-                    <span className="flex items-center gap-1 text-xs font-medium text-teal-600 hover:text-teal-700 whitespace-nowrap ml-3">
+                    <span className="flex items-center gap-1 text-xs font-medium text-primary-600 hover:text-primary-700 whitespace-nowrap ml-3">
                       <Eye size={13} />
                       View Details
                       <ChevronRight size={14} />

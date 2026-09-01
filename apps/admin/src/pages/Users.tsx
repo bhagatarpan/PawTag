@@ -3,7 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import api, { PaginatedData } from '../lib/api';
 import { toast } from '../lib/toast';
 import { StatusBadge, AddressAutocomplete } from '@pawtag/ui';
+import { OrderProgressStepper, OrderStatusBanner } from '@pawtag/ui';
 import type { AddressComponents } from '@pawtag/ui';
+import { ORDER_STATUS_LABELS, getStatusBadgeVariant, getStatusBorderColor, isTerminalStatus } from '@pawtag/shared';
 import { OrderDetailDrawer, type Order } from './Orders';
 import {
   Search,
@@ -148,11 +150,14 @@ function getOrderStatusIcon(status: string) {
     case 'pending': return <Clock size={13} />;
     case 'pending_payment': return <Clock size={13} />;
     case 'cancelled': return <AlertCircle size={13} />;
-    case 'refunded': return <RotateCcw size={13} />;
-    default: return <Clock size={13} />;
+    case 'refund_initiated': return <RotateCcw size={13} />;
+    case 'refunded': return <CheckCircle size={13} />;
+    default: return <Info size={13} />;
   }
 }
 
+/* ------------------------------------------------------------------ */
+/*  User Status Helpers                                                */
 /* ------------------------------------------------------------------ */
 /*  Skeleton                                                           */
 /* ------------------------------------------------------------------ */
@@ -822,33 +827,74 @@ export function DetailDrawer({
                 </div>
               ) : (
                 userOrders.map((order: any) => (
-                  <div key={order._id} onClick={() => setSelectedAdminOrder(order)} className="bg-white rounded-xl border border-gray-100 p-5 hover:border-gray-200 hover:shadow-sm transition-all duration-200 cursor-pointer">
-                    <div className="flex items-center justify-between">
+                  <div key={order._id} onClick={() => setSelectedAdminOrder(order)} className={`bg-white rounded-xl border border-gray-200 border-l-4 ${getStatusBorderColor(order.status)} p-4 hover:border-gray-300 hover:shadow-sm transition-all duration-200 cursor-pointer`}>
+                    {/* Row 1: Order number, status, price */}
+                    <div className="flex justify-between items-start">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
-                          <FileText size={18} className="text-blue-600" />
+                        <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center shrink-0">
+                          <FileText size={18} className="text-primary-600" />
                         </div>
                         <div>
-                          <p className="font-mono text-sm font-medium text-gray-900">
+                          <p className="font-mono text-sm font-semibold text-gray-900">
                             {order.orderNumber || `#${order._id.slice(-8).toUpperCase()}`}
                           </p>
-                          <p className="text-xs text-gray-400 mt-0.5">{formatDate(order.createdAt)}</p>
                           <p className="text-xs text-gray-500 mt-0.5">
-                            {order.items?.length || 0} item{(order.items?.length || 0) !== 1 ? 's' : ''}
+                            {formatDate(order.createdAt)} at {formatDateTime(order.createdAt).split(',')[1]?.trim()}
                           </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
                         <StatusBadge
-                          label={formatStatusLabel(order.status)}
-                          variant={getOrderStatusVariant(order.status)}
+                          label={ORDER_STATUS_LABELS[order.status] || formatStatusLabel(order.status)}
+                          variant={getStatusBadgeVariant(order.status)}
                           icon={getOrderStatusIcon(order.status)}
                         />
-                        <span className="text-sm font-semibold text-gray-900">
-                          ${order.payment?.amount?.toFixed(2) || '0.00'}
+                        <span className="text-sm font-bold text-gray-900">
+                          ${(order.payment?.amount ?? 0).toFixed(2)}
                         </span>
                         <ChevronRight size={16} className="text-gray-400" />
                       </div>
+                    </div>
+
+                    {/* Progress stepper or status banner */}
+                    <div className="mt-3 pt-3 border-t border-gray-100">
+                      {isTerminalStatus(order.status) ? (
+                        <OrderStatusBanner status={order.status} amount={order.payment?.amount} />
+                      ) : (
+                        <OrderProgressStepper status={order.status} variant="compact" />
+                      )}
+                    </div>
+
+                    {/* Row 2: Info row - Payment, Shipping, Items, Invoice */}
+                    <div className="mt-3 pt-3 border-t border-gray-100 flex items-center gap-4 text-xs text-gray-500">
+                      {order.payment?.cardBrand && (
+                        <span className="flex items-center gap-1.5">
+                          <Package size={12} className="text-gray-400" />
+                          {order.payment.cardBrand.charAt(0).toUpperCase() + order.payment.cardBrand.slice(1)} {order.payment.cardLast4 ? `•••• ${order.payment.cardLast4}` : ''}
+                        </span>
+                      )}
+                      {!order.payment?.cardBrand && order.payment?.method && (
+                        <span className="flex items-center gap-1.5">
+                          <Package size={12} className="text-gray-400" />
+                          {order.payment.method}
+                        </span>
+                      )}
+                      {order.shippingAddress?.city && (
+                        <span className="flex items-center gap-1.5">
+                          <MapPin size={12} className="text-gray-400" />
+                          {order.shippingAddress.city}
+                        </span>
+                      )}
+                      <span className="flex items-center gap-1.5">
+                        <Package size={12} className="text-gray-400" />
+                        {order.items?.length || 0} item{(order.items?.length || 0) !== 1 ? 's' : ''}
+                      </span>
+                      {order.latestInvoice && (
+                        <span className="flex items-center gap-1.5">
+                          <FileText size={12} className="text-gray-400" />
+                          {order.latestInvoice.invoiceNumber}
+                        </span>
+                      )}
                     </div>
                   </div>
                 ))

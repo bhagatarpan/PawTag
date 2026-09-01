@@ -4,7 +4,7 @@ import type { SummaryCardData } from '../types';
 const colorClasses: Record<string, string> = {
   default: '',
   primary: 'text-primary-500',
-  success: 'text-emerald-500',
+  success: 'text-green-500',
   warning: 'text-amber-500',
   danger: 'text-red-500',
 };
