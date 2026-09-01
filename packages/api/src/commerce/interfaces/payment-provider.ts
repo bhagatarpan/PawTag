@@ -66,6 +66,15 @@ export interface RefundResult {
   /** Refund amount in major units */
   amount?: number;
 
+  /** Current refund status from the provider (pending, succeeded, failed, canceled) */
+  status?: string;
+
+  /** Acquirer Reference Number (bank reference) — populated after settlement */
+  arn?: string;
+
+  /** Expected date when funds reach the merchant account */
+  expectedArrival?: Date;
+
   /** Error message if refund failed */
   error?: string;
 }
@@ -129,13 +138,34 @@ export interface IPaymentProvider {
    * Create a refund for a payment.
    *
    * @param params - Refund parameters
-   * @returns Refund result with provider refund ID
+   * @returns Refund result with provider refund ID and status
    */
   createRefund(params: {
     paymentIntentId: string;
     amount?: number;
     reason?: string;
+    metadata?: Record<string, string>;
   }): Promise<RefundResult>;
+
+  /**
+   * Retrieve the current status of a refund.
+   *
+   * @param refundId - Provider-specific refund ID
+   * @returns Refund result with latest status, ARN, and expected arrival
+   */
+  retrieveRefund(refundId: string): Promise<RefundResult>;
+
+  /**
+   * List refunds for reconciliation.
+   *
+   * @param params - Date range and pagination options
+   * @returns Array of refunds
+   */
+  listRefunds(params?: {
+    since?: Date;
+    until?: Date;
+    limit?: number;
+  }): Promise<RefundResult[]>;
 
   /**
    * Verify a webhook signature from the provider.

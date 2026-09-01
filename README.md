@@ -712,6 +712,51 @@ Orders can be cancelled from three sources — each captures the same rich audit
 
 **Modal reuse:** The shared `ConfirmDialog` (`packages/ui/src/components/ConfirmDialog.tsx`) was extended (not duplicated) with optional props: `reasons`, `selectedReason`, `onReasonChange`, `showNotes`, `notesRequired`, `notes`, `onNotesChange`, `notesLabel`, `notesPlaceholder`. Both the admin Orders page and customer OrderDetail page consume the same component with their own context.
 
+### Refund Status & Accounting
+
+When an order is cancelled, a refund is created via Stripe and tracked through the full lifecycle:
+
+**Refund status values:** `Refund Processing` → `Refund Succeeded` (with ARN) or `Failed` (auto-retried)
+
+**Customer-facing:**
+- Order detail page shows refund status with amount, ARN, expected arrival date
+- Customer receives 3 emails: processing (immediate), settled (when complete), failed (with retry info)
+
+**Admin-facing:**
+- `/admin/refunds` — List all refunds with filters (status, date, search), per-row "Sync with Stripe" button
+- `/admin/refund-report` — Export to CSV/GL/Xero with date picker and column selection
+- "Retry" button for failed refunds (manual)
+- Auto-retry: 2h first attempt, 24h second attempt (via daily reconciliation job)
+
+**Accounting exports (3 formats):**
+- **CSV (Full)** — All columns: Date, Order, Customer, Refund ID, ARN, Status, Amount, etc.
+- **CSV (Xero)** — Xero-compatible columns: Date, Reference, Description, Amount
+- **CSV (Configurable)** — Admin picks which columns to include
+- **GL (General Ledger)** — Debit/Credit journal entries (account codes from CMS settings)
+- **Xero** — Push directly to Xero via OAuth 2.0 (Manual Journals)
+
+**Stripe metadata sent:** orderId, orderNumber, cancelledBy, cancelledByType (Customer/Admin role), cancelledByPortal (web/mobile/system), cancellationReason, cancellationNotes, initiatedBy, environment
+
+**Configuration (CMS settings):**
+- `commerce.stripe.statementDescriptor` — Text on bank statement (default: `PAWTAG NZ`)
+- `commerce.accounting.exportFormat` — Default format (csv/gl/xero)
+- `commerce.accounting.csvColumnMode` — full/xero/configurable
+- `commerce.accounting.glAccountCode` — Sales account (default: 1200)
+- `commerce.accounting.glRefundAccountCode` — Refund clearing account (default: 2200)
+- `commerce.accounting.taxCode` — Tax code (default: GST)
+- `commerce.refunds.reconciliationHour` — Daily job hour in NZ time (default: 2am)
+- `commerce.refunds.retryFirstHours` — First auto-retry delay (default: 2h)
+- `commerce.refunds.retrySecondHours` — Second auto-retry delay (default: 24h)
+- `commerce.refunds.maxAutoRetries` — Max auto-retry count (default: 1)
+
+**Xero setup:**
+1. Create a Xero app at https://developer.xero.com
+2. Set `XERO_CLIENT_ID`, `XERO_CLIENT_SECRET`, `XERO_REDIRECT_URI` in `.env`
+3. Admin clicks "Connect to Xero" in Commerce Settings → Accounting
+4. OAuth flow stores encrypted tokens in `IntegrationConnection` model
+
+**MYOB:** Stubbed — returns "coming soon" message. Falls back to CSV export.
+
 ### Escalation System
 
 When a pet is found and the owner doesn't respond within 30 minutes:

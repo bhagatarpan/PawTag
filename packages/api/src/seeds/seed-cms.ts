@@ -162,7 +162,7 @@ async function run() {
         { key: 'commerce.checkout.pendingOrderTtlMinutes', value: '30', displayValue: 'Pending Order TTL (min)', category: 'commerce', description: 'How long a pending order is held' },
         // Orders
         { key: 'commerce.orders.autoCancelMinutes', value: '60', displayValue: 'Auto-Cancel (min)', category: 'commerce', description: 'Auto-cancel unpaid orders after minutes' },
-        { key: 'commerce.orders.cancellationReasons', value: JSON.stringify(['Ordered by mistake', 'Found a better price', 'Shipping takes too long', 'Need to change address or payment', 'Item not as described', 'Duplicate order', 'Financial reasons', 'Other']), displayValue: 'Cancellation Reasons', category: 'commerce', description: 'Predefined reasons selectable when cancelling an order' },
+        { key: 'commerce.orders.cancellationReasons', value: JSON.stringify(['Ordered by mistake', 'Found a better price', 'Shipping takes too long', 'Need to change address or payment', 'Item not as described', 'Duplicate order', 'Financial reasons', 'Other']), displayValue: 'Cancellation Reasons', category: 'commerce', description: 'Predefined reasons selectable when cancelling an order (managed at /admin/commerce-settings)' },
         { key: 'commerce.orders.numberPrefix', value: 'PT', displayValue: 'Order Number Prefix', category: 'commerce', description: 'Order number prefix' },
         { key: 'commerce.orders.numberLength', value: '6', displayValue: 'Order Number Length', category: 'commerce', description: 'Order number length after prefix' },
         // Subscriptions
@@ -174,11 +174,25 @@ async function run() {
         { key: 'commerce.refunds.enabled', value: 'true', displayValue: 'Refunds Enabled', category: 'commerce', description: 'Allow refunds' },
         { key: 'commerce.refunds.maxDaysAfterPurchase', value: '60', displayValue: 'Refund Window (days)', category: 'commerce', description: 'Maximum days after purchase for refund' },
         { key: 'commerce.refunds.partialEnabled', value: 'true', displayValue: 'Partial Refunds', category: 'commerce', description: 'Allow partial refunds' },
+        { key: 'commerce.refunds.reconciliationEnabled', value: 'true', displayValue: 'Reconciliation Enabled', category: 'commerce', description: 'Run daily refund reconciliation against Stripe' },
+        { key: 'commerce.refunds.reconciliationHour', value: '2', displayValue: 'Reconciliation Hour (NZ)', category: 'commerce', description: 'Hour of day (NZ time) to run reconciliation job' },
+        { key: 'commerce.refunds.retryFirstHours', value: '2', displayValue: 'First Retry (hours)', category: 'commerce', description: 'Hours to wait before first auto-retry of failed refund' },
+        { key: 'commerce.refunds.retrySecondHours', value: '24', displayValue: 'Second Retry (hours)', category: 'commerce', description: 'Hours to wait before second auto-retry of failed refund' },
+        { key: 'commerce.refunds.maxAutoRetries', value: '1', displayValue: 'Max Auto-Retries', category: 'commerce', description: 'Maximum number of automatic refund retries' },
         // Promotions
         { key: 'commerce.promotions.enabled', value: 'true', displayValue: 'Promotions Enabled', category: 'commerce', description: 'Enable discount codes' },
         { key: 'commerce.promotions.maxUsesPerCode', value: '1000', displayValue: 'Max Uses Per Code', category: 'commerce', description: 'Maximum uses per discount code' },
         { key: 'commerce.promotions.bundle2Items', value: '10', displayValue: 'Bundle Discount (2 items)', category: 'commerce', description: 'Bundle discount % for 2 items' },
         { key: 'commerce.promotions.bundle3PlusItems', value: '15', displayValue: 'Bundle Discount (3+ items)', category: 'commerce', description: 'Bundle discount % for 3+ items' },
+        // Stripe
+        { key: 'commerce.stripe.statementDescriptor', value: 'PAWTAG NZ', displayValue: 'Statement Descriptor', category: 'commerce', description: 'Text shown on customer bank statement' },
+        { key: 'commerce.stripe.descriptionTemplate', value: 'PawTag Order {orderNumber}', displayValue: 'Description Template', category: 'commerce', description: 'Template for Stripe charge description. Use {orderNumber}, {itemCount}' },
+        // Accounting
+        { key: 'commerce.accounting.exportFormat', value: 'csv', displayValue: 'Default Export Format', category: 'commerce', description: 'csv | xero | myob | gl' },
+        { key: 'commerce.accounting.csvColumnMode', value: 'full', displayValue: 'CSV Column Mode', category: 'commerce', description: 'full | xero | configurable' },
+        { key: 'commerce.accounting.glAccountCode', value: '1200', displayValue: 'GL Sales Account', category: 'commerce', description: 'General ledger account code for sales' },
+        { key: 'commerce.accounting.glRefundAccountCode', value: '2200', displayValue: 'GL Refund Account', category: 'commerce', description: 'General ledger account code for refunds (clearing)' },
+        { key: 'commerce.accounting.taxCode', value: 'GST', displayValue: 'Default Tax Code', category: 'commerce', description: 'Default tax code applied to export lines' },
         // Notifications
         { key: 'commerce.notifications.orderConfirmation', value: 'true', displayValue: 'Order Confirmation Email', category: 'commerce', description: 'Send order confirmation email' },
         { key: 'commerce.notifications.invoiceEmail', value: 'true', displayValue: 'Invoice Email', category: 'commerce', description: 'Send invoice email' },

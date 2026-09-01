@@ -84,6 +84,10 @@ export const COMMERCE_SETTINGS = {
   'commerce.orders.autoCancelMinutes': { default: '60', description: 'Auto-cancel unpaid orders after this many minutes' },
   'commerce.orders.numberPrefix': { default: 'PT', description: 'Order number prefix' },
   'commerce.orders.numberLength': { default: '6', description: 'Order number length after prefix' },
+  'commerce.orders.cancellationReasons': {
+    default: JSON.stringify(['Ordered by mistake', 'Found a better price', 'Shipping takes too long', 'Need to change address or payment', 'Item not as described', 'Duplicate order', 'Financial reasons', 'Other']),
+    description: 'Predefined reasons selectable when cancelling an order',
+  },
 
   // ─── Subscriptions ────────────────────────────────────────
   'commerce.subscriptions.annualPrice': { default: '0.99', description: 'Annual subscription price (NZD)' },
@@ -95,6 +99,24 @@ export const COMMERCE_SETTINGS = {
   'commerce.refunds.enabled': { default: 'true', description: 'Allow refunds' },
   'commerce.refunds.maxDaysAfterPurchase': { default: '60', description: 'Maximum days after purchase for refund' },
   'commerce.refunds.partialEnabled': { default: 'true', description: 'Allow partial refunds' },
+  'commerce.refunds.reconciliationEnabled': { default: 'true', description: 'Run daily refund reconciliation against Stripe' },
+  'commerce.refunds.reconciliationHour': { default: '2', description: 'Hour of day (NZ time) to run reconciliation job' },
+  'commerce.refunds.retryFirstHours': { default: '2', description: 'Hours to wait before first auto-retry of failed refund' },
+  'commerce.refunds.retrySecondHours': { default: '24', description: 'Hours to wait before second auto-retry of failed refund' },
+  'commerce.refunds.maxAutoRetries': { default: '1', description: 'Maximum number of automatic refund retries' },
+
+  // ─── Stripe ───────────────────────────────────────────────
+  'commerce.stripe.statementDescriptor': { default: 'PAWTAG NZ', description: 'Text shown on customer bank statement' },
+  'commerce.stripe.descriptionTemplate': { default: 'PawTag Order {orderNumber}', description: 'Template for Stripe charge description. Use {orderNumber}, {itemCount}' },
+
+  // ─── Accounting ───────────────────────────────────────────
+  'commerce.accounting.exportFormat': { default: 'csv', description: 'Default export format: csv | xero | myob | gl' },
+  'commerce.accounting.csvColumnMode': { default: 'full', description: 'CSV column mode: full | xero | configurable' },
+  'commerce.accounting.glAccountCode': { default: '1200', description: 'General ledger account code for sales' },
+  'commerce.accounting.glRefundAccountCode': { default: '2200', description: 'General ledger account code for refunds (clearing)' },
+  'commerce.accounting.taxCode': { default: 'GST', description: 'Default tax code applied to export lines' },
+  'commerce.accounting.xeroRefreshToken': { default: '', description: 'Encrypted Xero refresh token (backup storage)' },
+  'commerce.accounting.myobRefreshToken': { default: '', description: 'Encrypted MYOB refresh token (backup storage)' },
 
   // ─── Promotions ───────────────────────────────────────────
   'commerce.promotions.enabled': { default: 'true', description: 'Enable discount codes' },

@@ -279,6 +279,14 @@ export interface OrderData {
   cancelledByPortal?: 'customer-web' | 'customer-mobile' | 'admin-web' | 'system';
   cancelledByDescription?: string;
   cancelledAt?: string;
+  refundId?: string;
+  refundArn?: string;
+  refundStatus?: 'pending' | 'succeeded' | 'failed' | 'canceled';
+  refundExpectedArrival?: string;
+  refundSettledAt?: string;
+  refundLastSyncedAt?: string;
+  refundFailureReason?: string;
+  refundAttemptCount?: number;
   createdAt: string;
   updatedAt?: string;
   activity?: Array<{

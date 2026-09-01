@@ -507,6 +507,62 @@ function CancellationInfoCard({ order }: { order: OrderData }) {
   );
 }
 
+function RefundStatusCard({ order }: { order: OrderData }) {
+  if (order.status !== 'cancelled' && order.status !== 'refunded') return null;
+  if (!order.refundStatus) return null;
+
+  const statusConfig: Record<string, { label: string; bg: string; border: string; text: string; icon: any }> = {
+    pending: { label: 'Refund Processing', bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', icon: Clock },
+    succeeded: { label: 'Refund Succeeded', bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-700', icon: CheckCircle },
+    failed: { label: 'Refund Failed', bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700', icon: XCircle },
+    canceled: { label: 'Refund Canceled', bg: 'bg-gray-50', border: 'border-gray-200', text: 'text-gray-700', icon: XCircle },
+  };
+
+  const config = statusConfig[order.refundStatus] || statusConfig.pending;
+  const Icon = config.icon;
+
+  return (
+    <div className={`${config.bg} ${config.border} border rounded-2xl p-5`}>
+      <h3 className={`text-sm font-semibold ${config.text} mb-3 flex items-center gap-2`}>
+        <Icon size={16} />
+        {config.label}
+      </h3>
+      <div className="space-y-2 text-sm">
+        {order.refundId && (
+          <div className="flex justify-between gap-4">
+            <span className="text-gray-600">Refund ID</span>
+            <span className="text-gray-900 font-mono text-xs">{order.refundId}</span>
+          </div>
+        )}
+        {order.refundArn && (
+          <div className="flex justify-between gap-4">
+            <span className="text-gray-600">ARN (Bank Ref)</span>
+            <span className="text-gray-900 font-mono text-xs">{order.refundArn}</span>
+          </div>
+        )}
+        {order.refundExpectedArrival && (
+          <div className="flex justify-between gap-4">
+            <span className="text-gray-600">Expected arrival</span>
+            <span className="text-gray-900">{formatDateTime(order.refundExpectedArrival)}</span>
+          </div>
+        )}
+        {order.refundSettledAt && (
+          <div className="flex justify-between gap-4">
+            <span className="text-gray-600">Settled at</span>
+            <span className="text-gray-900">{formatDateTime(order.refundSettledAt)}</span>
+          </div>
+        )}
+        {order.refundFailureReason && (
+          <div className="flex justify-between gap-4">
+            <span className="text-gray-600">Failure reason</span>
+            <span className="text-red-700 text-right">{order.refundFailureReason}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /*  Main Component                                                     */
 /* ------------------------------------------------------------------ */
@@ -559,6 +615,7 @@ export function OrderDetailView({
             onCancelOrder={onCancelOrder}
           />
           <CancellationInfoCard order={order} />
+          <RefundStatusCard order={order} />
         </div>
       </div>
     </div>

@@ -10,6 +10,8 @@ import Pets from './pages/Pets';
 import Tags from './pages/Tags';
 import Products from './pages/Products';
 import Orders from './pages/Orders';
+import OrderRefunds from './pages/OrderRefunds';
+import RefundReport from './pages/RefundReport';
 import Content from './pages/Content';
 import Settings from './pages/Settings';
 import FeatureFlags from './pages/FeatureFlags';
@@ -224,6 +226,9 @@ export default function App() {
       <Route path="/orders/shipped" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
       <Route path="/orders/delivered" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
       <Route path="/orders/cancelled" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
+      <Route path="/refunds" element={<ProtectedRoute><OrderRefunds /></ProtectedRoute>} />
+      <Route path="/refunds/:orderId" element={<ProtectedRoute><OrderRefunds /></ProtectedRoute>} />
+      <Route path="/refund-report" element={<ProtectedRoute><RefundReport /></ProtectedRoute>} />
       <Route path="/discounts" element={<ProtectedRoute><Discounts /></ProtectedRoute>} />
       <Route path="/payments" element={<ProtectedRoute><Payments /></ProtectedRoute>} />
       <Route path="/payments/refunds" element={<ProtectedRoute><Payments /></ProtectedRoute>} />

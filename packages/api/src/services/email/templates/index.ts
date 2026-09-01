@@ -9,3 +9,6 @@ export { renderPetFoundEmail } from './pet-found';
 export { renderAccountStatusEmail } from './account-status';
 export { renderLoginNotificationEmail } from './login-notification';
 export { renderLoginOtpEmail } from './mfa-otp';
+export { renderRefundProcessingEmail } from './refund-processing';
+export { renderRefundSettledEmail } from './refund-settled';
+export { renderRefundFailedEmail } from './refund-failed';

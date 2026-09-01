@@ -66,6 +66,27 @@ export interface IPaymentTransactionDocument extends Document {
   /** Notes (e.g., admin refund reason) */
   notes?: string;
 
+  /** Provider-side status (e.g., Stripe's refund status: 'pending', 'succeeded', 'failed', 'canceled') */
+  providerStatus?: string;
+
+  /** Acquirer Reference Number (bank reference for refunds) */
+  arn?: string;
+
+  /** Expected date when funds reach the merchant account */
+  expectedArrival?: Date;
+
+  /** When Stripe confirmed the refund settled */
+  refundedAt?: Date;
+
+  /** Last successful reconciliation timestamp */
+  lastSyncedAt?: Date;
+
+  /** Failure reason if Stripe reported the refund failed */
+  failureReason?: string;
+
+  /** Number of retry attempts (0 = first attempt, max 1 auto-retry) */
+  attemptCount?: number;
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -107,6 +128,14 @@ const PaymentTransactionSchema = new Schema<IPaymentTransactionDocument>(
     },
 
     notes: { type: String },
+
+    providerStatus: { type: String, index: true },
+    arn: { type: String, index: true },
+    expectedArrival: { type: Date },
+    refundedAt: { type: Date },
+    lastSyncedAt: { type: Date },
+    failureReason: { type: String },
+    attemptCount: { type: Number, default: 0 },
   },
   { timestamps: true },
 );

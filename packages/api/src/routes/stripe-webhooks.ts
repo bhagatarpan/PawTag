@@ -27,7 +27,7 @@
  */
 
 import { Router, Request, Response } from 'express';
-import { Order, Invoice, InvoiceAccessToken, Subscription, Tag, User, Notification, WebhookEvent, PendingOrder } from '@pawtag/db';
+import { Order, Invoice, InvoiceAccessToken, Subscription, Tag, User, Notification, WebhookEvent, PendingOrder, PaymentTransaction } from '@pawtag/db';
 import { stripePaymentProvider } from '../commerce/providers/stripe';
 import { checkoutService } from '../commerce/services/checkout.service';
 import { logPaymentEvent, logOrderEvent } from '../commerce/audit';
@@ -152,6 +152,18 @@ async function handleEvent(type: string, data: any): Promise<void> {
       break;
     case 'payment_intent.payment_failed':
       await handlePaymentIntentFailed(data);
+      break;
+    case 'charge.refunded':
+      await handleChargeRefunded(data);
+      break;
+    case 'refund.created':
+      await handleRefundCreated(data);
+      break;
+    case 'refund.updated':
+      await handleRefundUpdated(data);
+      break;
+    case 'charge.refund.updated':
+      await handleRefundUpdated(data);
       break;
     case 'invoice.payment_succeeded':
       await handleInvoicePaymentSucceeded(data);
@@ -294,6 +306,179 @@ async function handleSubscriptionDeleted(subscription: any): Promise<void> {
   await sub.save();
 
   logger.info({ subscriptionId: sub._id }, 'Subscription cancelled via Stripe');
+}
+
+/**
+ * Handle refund.created.
+ *
+ * Triggered when a refund is first initiated (status: 'pending').
+ * Updates Order and PaymentTransaction with refund ID.
+ */
+async function handleRefundCreated(refund: any): Promise<void> {
+  if (!refund?.id) return;
+
+  const paymentIntentId = refund.payment_intent;
+  if (!paymentIntentId) return;
+
+  const order = await Order.findOne({
+    $or: [
+      { 'payment.stripePaymentIntentId': paymentIntentId },
+      { 'payment.transactionId': paymentIntentId },
+    ],
+  });
+  if (!order) {
+    logger.warn({ refundId: refund.id, paymentIntentId }, 'Refund webhook: order not found');
+    return;
+  }
+
+  order.refundId = refund.id;
+  order.refundStatus = 'pending';
+  order.refundLastSyncedAt = new Date();
+  await order.save();
+
+  // Update PaymentTransaction
+  await PaymentTransaction.findOneAndUpdate(
+    { providerTransactionId: refund.id, type: 'refund' },
+    {
+      providerStatus: refund.status || 'pending',
+      lastSyncedAt: new Date(),
+    },
+  );
+
+  logger.info({
+    refundId: refund.id,
+    orderNumber: order.orderNumber,
+    status: refund.status,
+  }, 'Refund created webhook processed');
+}
+
+/**
+ * Handle refund.updated (and charge.refund.updated).
+ *
+ * Triggered when a refund status changes:
+ * - 'succeeded' — funds returned to customer (final state)
+ * - 'failed' — refund could not be processed
+ * - 'pending' — still being processed
+ * - 'canceled' — refund was canceled
+ */
+async function handleRefundUpdated(refund: any): Promise<void> {
+  if (!refund?.id) return;
+
+  const paymentIntentId = refund.payment_intent;
+  if (!paymentIntentId) return;
+
+  const order = await Order.findOne({
+    $or: [
+      { 'payment.stripePaymentIntentId': paymentIntentId },
+      { 'payment.transactionId': paymentIntentId },
+    ],
+  });
+  if (!order) {
+    logger.warn({ refundId: refund.id, paymentIntentId }, 'Refund updated webhook: order not found');
+    return;
+  }
+
+  const newStatus = refund.status as 'pending' | 'succeeded' | 'failed' | 'canceled';
+  const previousStatus = order.refundStatus;
+
+  // Update order
+  order.refundId = refund.id;
+  order.refundStatus = newStatus;
+  order.refundLastSyncedAt = new Date();
+  if (newStatus === 'succeeded') {
+    order.refundSettledAt = new Date();
+  }
+  if (newStatus === 'failed') {
+    order.refundFailureReason = refund.failure_reason || 'Unknown failure';
+  }
+  await order.save();
+
+  // Update PaymentTransaction
+  await PaymentTransaction.findOneAndUpdate(
+    { providerTransactionId: refund.id, type: 'refund' },
+    {
+      providerStatus: newStatus,
+      lastSyncedAt: new Date(),
+      refundedAt: newStatus === 'succeeded' ? new Date() : undefined,
+      failureReason: newStatus === 'failed' ? refund.failure_reason : undefined,
+    },
+  );
+
+  // Record activity log
+  await Order.updateOne(
+    { _id: order._id },
+    {
+      $push: {
+        activity: {
+          type: `refund_${newStatus}`,
+          message: `Refund ${newStatus}: ${refund.id}${newStatus === 'succeeded' ? ` (ARN pending)` : newStatus === 'failed' ? ` (${refund.failure_reason || 'unknown failure'})` : ''}`,
+          timestamp: new Date(),
+          actor: 'webhook',
+          metadata: {
+            refundId: refund.id,
+            previousStatus,
+            newStatus,
+            amount: (refund.amount || 0) / 100,
+            failureReason: refund.failure_reason,
+          },
+        },
+      },
+    },
+  );
+
+  logger.info({
+    refundId: refund.id,
+    orderNumber: order.orderNumber,
+    previousStatus,
+    newStatus,
+  }, 'Refund updated webhook processed');
+
+  // Trigger customer + admin notifications
+  try {
+    const { notifyRefundUpdate } = await import('../services/orderNotification.service');
+    await notifyRefundUpdate(order, refund, newStatus);
+  } catch (err) {
+    logger.error({ err, refundId: refund.id }, 'Failed to send refund update notification');
+  }
+
+  // Schedule auto-retry for failed refunds
+  if (newStatus === 'failed') {
+    try {
+      const { onRefundFailed } = await import('../commerce/services/refund-retry.service');
+      await onRefundFailed(String(order._id), refund.id);
+    } catch (err) {
+      logger.error({ err, refundId: refund.id }, 'Failed to schedule refund retry');
+    }
+  }
+}
+
+/**
+ * Handle charge.refunded.
+ *
+ * Triggered when a charge is fully refunded. Sets refundSettledAt.
+ */
+async function handleChargeRefunded(charge: any): Promise<void> {
+  if (!charge?.payment_intent) return;
+
+  const order = await Order.findOne({
+    $or: [
+      { 'payment.stripePaymentIntentId': charge.payment_intent },
+      { 'payment.transactionId': charge.payment_intent },
+    ],
+  });
+  if (!order) return;
+
+  // Set final settlement
+  order.refundStatus = 'succeeded';
+  order.refundSettledAt = new Date();
+  order.refundLastSyncedAt = new Date();
+  await order.save();
+
+  logger.info({
+    chargeId: charge.id,
+    orderNumber: order.orderNumber,
+    amountRefunded: (charge.amount_refunded || 0) / 100,
+  }, 'Charge fully refunded');
 }
 
 export { handleEvent as handleStripeWebhookEvent };

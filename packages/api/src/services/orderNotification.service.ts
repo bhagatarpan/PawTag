@@ -1,6 +1,11 @@
-import { Notification, Order, type IOrderDocument } from '@pawtag/db';
+import { Notification, Order, User, type IOrderDocument } from '@pawtag/db';
 import { sendMail } from './email.service';
 import { sendPushToUser } from './push-notification.service';
+import {
+  renderRefundProcessingEmail,
+  renderRefundSettledEmail,
+  renderRefundFailedEmail,
+} from './email/templates';
 import logger from '../lib/logger';
 
 interface StatusChangeExtra {
@@ -232,4 +237,134 @@ export async function notifyCustomerOfStatusChange(
   await Promise.allSettled(sideEffects);
 
   return true;
+}
+
+/**
+ * Notify customer (and admin on failure) of a refund status update from Stripe.
+ *
+ * Called from the Stripe webhook handler when a refund event arrives:
+ * - 'pending' → "Refund Processing" email
+ * - 'succeeded' → "Refund Settled" email
+ * - 'failed' → "Refund Failed" email + admin in-app alert + admin email
+ *
+ * @param order - The Order document
+ * @param refund - Raw Stripe refund object
+ * @param newStatus - Normalised refund status
+ */
+export async function notifyRefundUpdate(
+  order: IOrderDocument,
+  refund: any,
+  newStatus: 'pending' | 'succeeded' | 'failed' | 'canceled',
+): Promise<void> {
+  const user = await User.findById(order.userId).select('fullName email').lean();
+  if (!user) {
+    logger.warn({ orderId: String(order._id) }, 'Cannot send refund notification: user not found');
+    return;
+  }
+
+  const refundId = refund.id;
+  const amount = (refund.amount || 0) / 100;
+  const currency = (refund.currency || 'nzd').toUpperCase();
+  const failureReason = refund.failure_reason as string | undefined;
+  const settledAt = new Date().toLocaleString('en-NZ', {
+    day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  });
+  const expectedArrival = refund.arrival_date
+    ? new Date(refund.arrival_date * 1000).toLocaleDateString('en-NZ', {
+        day: 'numeric', month: 'long', year: 'numeric',
+      })
+    : undefined;
+
+  // Build order view URL (assumes public-facing domain)
+  const baseUrl = process.env.PUBLIC_WEB_URL || 'http://localhost:3000';
+  const viewOrderUrl = `${baseUrl}/account/orders/${order._id}`;
+
+  // Customer email + push notification
+  let subject = '';
+  let html = '';
+
+  if (newStatus === 'pending') {
+    subject = `Refund Processing — Order ${order.orderNumber}`;
+    html = renderRefundProcessingEmail({
+      name: user.fullName || 'Customer',
+      orderNumber: order.orderNumber,
+      refundId,
+      amount,
+      currency,
+      expectedArrival,
+      viewOrderUrl,
+    });
+  } else if (newStatus === 'succeeded') {
+    subject = `Refund Settled — Order ${order.orderNumber}`;
+    html = renderRefundSettledEmail({
+      name: user.fullName || 'Customer',
+      orderNumber: order.orderNumber,
+      refundId,
+      arn: undefined,
+      amount,
+      currency,
+      settledAt,
+      viewOrderUrl,
+    });
+  } else if (newStatus === 'failed') {
+    subject = `Refund Update — Order ${order.orderNumber}`;
+    const willRetry = (order.refundAttemptCount || 0) < 1;
+    html = renderRefundFailedEmail({
+      name: user.fullName || 'Customer',
+      orderNumber: order.orderNumber,
+      refundId,
+      amount,
+      currency,
+      failureReason,
+      willRetry,
+      viewOrderUrl,
+    });
+  } else {
+    // 'canceled' — no customer email, just log
+    logger.info({ refundId, orderNumber: order.orderNumber }, 'Refund canceled — no customer email sent');
+    return;
+  }
+
+  await Promise.allSettled([
+    sendMail(user.email, subject, html).catch((err) => {
+      logger.error({ err, refundId, email: user.email }, 'Refund email error');
+    }),
+    sendPushToUser(String(order.userId), subject, `Refund ${newStatus} for order ${order.orderNumber}`, {
+      type: 'refund_update',
+      orderId: String(order._id),
+      orderNumber: order.orderNumber,
+      refundId,
+      status: newStatus,
+    }).catch(() => {}),
+  ]);
+
+  // Admin alert for failed refunds (in-app + email)
+  if (newStatus === 'failed') {
+    const adminEmail = process.env.ADMIN_ALERT_EMAIL;
+    await Promise.allSettled([
+      Notification.create({
+        userId: order.userId,
+        audience: 'admin',
+        type: 'refund_failed',
+        title: `Refund Failed: ${order.orderNumber}`,
+        message: `Refund ${refundId} of $${amount.toFixed(2)} failed. Reason: ${failureReason || 'Unknown'}. ${(order.refundAttemptCount || 0) < 1 ? 'Auto-retry scheduled.' : 'Manual intervention required.'}`,
+        data: { orderId: String(order._id), refundId, amount, failureReason },
+        priority: 'high',
+        channel: 'alert',
+      }).catch(() => {}),
+      adminEmail
+        ? sendMail(
+            adminEmail,
+            `[ACTION REQUIRED] Refund Failed — ${order.orderNumber}`,
+            `<h2>Refund Failed</h2>
+             <p><strong>Order:</strong> ${order.orderNumber}</p>
+             <p><strong>Refund ID:</strong> ${refundId}</p>
+             <p><strong>Amount:</strong> $${amount.toFixed(2)} ${currency}</p>
+             <p><strong>Reason:</strong> ${failureReason || 'Unknown'}</p>
+             <p><strong>Customer:</strong> ${user.fullName} (${user.email})</p>
+             <p><strong>Action needed:</strong> ${(order.refundAttemptCount || 0) < 1 ? 'Auto-retry scheduled in 2h.' : 'Manual intervention required.'}</p>`,
+          ).catch(() => {})
+        : Promise.resolve(),
+    ]);
+  }
 }
