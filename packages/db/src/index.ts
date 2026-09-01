@@ -57,3 +57,4 @@ export { Fulfilment, type IFulfilmentDocument } from './models/Fulfilment';
 export { Return, type IReturnDocument } from './models/Return';
 export { Shipment, type IShipmentDocument, type ShipmentStatus, type IShipmentItem, type ITrackingEvent } from './models/Shipment';
 export { PaymentTransaction, type IPaymentTransactionDocument, type TransactionType, type TransactionStatus } from './models/PaymentTransaction';
+export { IntegrationConnection, type IIntegrationConnectionDocument, type IntegrationProvider } from './models/IntegrationConnection';

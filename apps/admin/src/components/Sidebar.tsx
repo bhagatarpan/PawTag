@@ -142,7 +142,9 @@ const sections: SidebarSection[] = [
     icon: CreditCard,
     links: [
       { to: '/payments', label: 'Transactions', icon: CreditCard, permission: 'order.read' },
-      { to: '/payments/refunds', label: 'Refunds', icon: RotateCcw, permission: 'order.refund' },
+      { to: '/refunds', label: 'Refunds', icon: RotateCcw, permission: 'order.refund' },
+      { to: '/refund-report', label: 'Refund Report', icon: FileText, permission: 'order.refund' },
+      { to: '/payments/refunds', label: 'Old Refunds', icon: RotateCcw, permission: 'order.refund' },
       { to: '/payments/reconciliation', label: 'Reconciliation', icon: AlertTriangle, permission: 'order.read' },
     ],
   },

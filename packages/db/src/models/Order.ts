@@ -67,6 +67,14 @@ export interface IOrderDocument extends Document {
   cancelledByDescription?: string;
   cancelledAt?: Date;
   refundReason?: string;
+  refundId?: string;
+  refundArn?: string;
+  refundStatus?: 'pending' | 'succeeded' | 'failed' | 'canceled';
+  refundExpectedArrival?: Date;
+  refundSettledAt?: Date;
+  refundLastSyncedAt?: Date;
+  refundFailureReason?: string;
+  refundAttemptCount?: number;
   deliveredAt?: Date;
   deletedAt?: Date;
   activity: Array<{
@@ -154,6 +162,18 @@ const OrderSchema = new Schema<IOrderDocument>(
     cancelledByDescription: { type: String },
     cancelledAt: { type: Date, index: true },
     refundReason: { type: String },
+    refundId: { type: String, index: true },
+    refundArn: { type: String },
+    refundStatus: {
+      type: String,
+      enum: ['pending', 'succeeded', 'failed', 'canceled'],
+      index: true,
+    },
+    refundExpectedArrival: { type: Date },
+    refundSettledAt: { type: Date },
+    refundLastSyncedAt: { type: Date },
+    refundFailureReason: { type: String },
+    refundAttemptCount: { type: Number, default: 0 },
     deliveredAt: { type: Date },
     deletedAt: { type: Date, default: null },
     activity: [

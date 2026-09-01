@@ -933,6 +933,69 @@ Orders can be cancelled from three sources, all of which capture rich audit data
 
 **Admin Settings:** A new "Cancellation Reasons" card in `/admin/commerce-settings` allows admins to add, remove, and reorder the predefined reason list. Changes are audited (`cancellation_reasons_updated` event, MEDIUM severity).
 
+### Stripe Refund Workflow
+
+When an order is cancelled (by customer, admin, or system), a refund is created via Stripe. The full refund lifecycle is tracked:
+
+| Stage | Source | Status Values |
+|-------|--------|---------------|
+| **Initiated** | Stripe `refund.created` | `pending` |
+| **Settled** | Stripe `refund.updated` → `succeeded` or `charge.refunded` | `succeeded` |
+| **Failed** | Stripe `refund.updated` → `failed` | `failed` |
+| **Canceled** | Stripe `refund.updated` → `canceled` | `canceled` |
+
+**Refund metadata sent to Stripe:**
+- `orderId`, `orderNumber`
+- `cancelledBy`, `cancelledByType` (Customer / Customer Service / etc.)
+- `cancelledByPortal` (customer-web / admin-web / system)
+- `cancellationReason`, `cancellationNotes`
+- `initiatedBy` (customer / admin / system)
+- `environment` (dev / staging / prod)
+
+**Refund status fields on Order model:**
+- `refundId` (Stripe refund ID)
+- `refundArn` (Acquirer Reference Number, bank reference)
+- `refundStatus` (pending / succeeded / failed / canceled)
+- `refundExpectedArrival` (when funds reach merchant account)
+- `refundSettledAt` (when Stripe confirmed)
+- `refundLastSyncedAt` (last reconciliation)
+- `refundFailureReason` (if failed)
+- `refundAttemptCount` (retry tracking)
+
+**Auto-retry logic:**
+- First retry: 2 hours after failure (in-memory timer)
+- Second retry: 24 hours (via daily reconciliation job)
+- After max retries (default 1): alert admin, require manual retry
+- Manual retry available via "Retry" button in admin
+
+**Customer email notifications:**
+- `refund-processing.ts` — Sent on `refund.created` (status: pending)
+- `refund-settled.ts` — Sent on `refund.updated` → succeeded
+- `refund-failed.ts` — Sent on `refund.updated` → failed (with retry info)
+
+**Admin email + in-app alert:** Sent only on `refund.failed` (in-app + email)
+
+**Daily reconciliation job** (`packages/api/src/jobs/refundReconciliation.ts`):
+- Runs daily at `commerce.refunds.reconciliationHour` (default 2am NZ time)
+- Fetches recent refunds from Stripe via `listRefunds()`
+- Updates `Order.refundStatus`, `Order.refundArn`, `Order.refundExpectedArrival`
+- Retries failed refunds (admin AND customer cancellations)
+- Logs to SystemLog
+
+**Accounting integrations:**
+- `csvExporter.ts` — CSV in 3 modes: full, xero, configurable
+- `glExporter.ts` — Debit/Credit journal entries for general ledger
+- `xeroExporter.ts` — Xero OAuth 2.0 + Manual Journal creation
+- `myobExporter.ts` — Stub (returns "coming soon")
+- Tokens stored in `IntegrationConnection` model (encrypted with AES-256-GCM)
+- Backup tokens in CMS setting `commerce.accounting.xeroRefreshToken`
+
+**Admin pages:**
+- `/refunds` — List all refunds with filters (status, date, search)
+- `/refund-report` — Export to CSV/GL/Xero with date picker and column selection
+- "Sync with Stripe" button per refund
+- "Retry" button for failed refunds
+
 ### CI/CD Pipeline (GitHub Actions)
 
 **File:** `.github/workflows/ci.yml`
@@ -960,6 +1023,9 @@ Located in `packages/api/src/services/email/templates/`:
 - `order-confirmation.ts` — Order placed confirmation
 - `shipping-notification.ts` — Shipping notification
 - `pet-found.ts` — Pet found notification
+- `refund-processing.ts` — Refund initiated (status: pending)
+- `refund-settled.ts` — Refund settled (status: succeeded, includes ARN)
+- `refund-failed.ts` — Refund failed (with retry info)
 - `base.ts` — Base email wrapper
 - `index.ts` — Template registry
 

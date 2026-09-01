@@ -214,11 +214,28 @@ router.post('/orders/:id/cancel', async (req: AuthRequest, res: Response) => {
       const paymentIntentId = order.payment.stripePaymentIntentId;
       if (!paymentIntentId.startsWith('pi_demo_')) {
         try {
-          await stripePaymentProvider.createRefund({
+          const refundResult = await stripePaymentProvider.createRefund({
             paymentIntentId,
             amount: order.payment.amount,
             reason: 'requested_by_customer',
+            metadata: {
+              orderId: String(order._id),
+              orderNumber: order.orderNumber,
+              cancelledBy: 'Cancelled by Customer',
+              cancelledByType: 'Customer',
+              cancelledByPortal: resolvedPortal,
+              cancellationReason: reason,
+              cancellationNotes: notes || '',
+              initiatedBy: 'customer',
+              environment: process.env.NODE_ENV === 'production' ? 'production' : 'development',
+            },
           });
+
+          if (refundResult.refundId) {
+            order.refundId = refundResult.refundId;
+            order.refundStatus = (refundResult.status as any) || 'pending';
+            order.refundLastSyncedAt = new Date();
+          }
 
           await PaymentTransaction.create({
             orderId: order._id,
@@ -228,8 +245,12 @@ router.post('/orders/:id/cancel', async (req: AuthRequest, res: Response) => {
             amount: order.payment.amount,
             currency: order.payment.currency || 'NZD',
             provider: 'stripe',
-            providerTransactionId: paymentIntentId,
+            providerTransactionId: refundResult.refundId || paymentIntentId,
+            providerStatus: refundResult.status,
+            arn: refundResult.arn,
+            expectedArrival: refundResult.expectedArrival,
             initiatedBy: 'customer',
+            attemptCount: 0,
             notes: notes ? `${reason} — ${notes}` : reason,
           });
         } catch (err: any) {

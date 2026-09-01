@@ -250,6 +250,19 @@ All order status displays (badges, steppers, banners, left borders) must use the
 | `refund_initiated` | warning | `bg-amber-100 text-amber-700` | `border-l-amber-400` |
 | `refunded` | success | `bg-green-100 text-green-700` | `border-l-green-400` |
 
+### Refund Status Colors
+
+The refund lifecycle has its own status (separate from the order status):
+
+| Status | Label | Card Style | Icon |
+|--------|-------|-----------|------|
+| `pending` | Refund Processing | `bg-blue-50 border-blue-200 text-blue-700` | Clock |
+| `succeeded` | Refund Succeeded | `bg-green-50 border-green-200 text-green-700` | CheckCircle |
+| `failed` | Refund Failed | `bg-red-50 border-red-200 text-red-700` | XCircle |
+| `canceled` | Refund Canceled | `bg-gray-50 border-gray-200 text-gray-700` | XCircle |
+
+**ARN display:** Always shown when available (bank reference for the refund). Customer and admin both see it.
+
 **Order Progress Stepper:** Active/completed step dots use `bg-primary-500` / `border-primary-500`. Labels use `text-primary-600`. Progress bar fill uses `bg-primary-500`.
 
 ### Alerts

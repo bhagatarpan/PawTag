@@ -97,6 +97,7 @@ import adminReturnRoutes from './routes/admin-returns';
 import adminShipmentRoutes from './routes/admin-shipments';
 import adminPaymentRoutes from './routes/admin-payments';
 import adminPromoCodeRoutes from './routes/admin-promocodes';
+import adminRefundRoutes from './routes/admin-refunds';
 import stripeWebhookRoutes from './routes/stripe-webhooks';
 import promoPublicRoutes from './routes/promo-public';
 import commercePublicRoutes from './routes/commerce-public';
@@ -281,6 +282,7 @@ app.use('/api/admin/commerce/returns', adminReturnRoutes);
 app.use('/api/admin/commerce/shipments', adminShipmentRoutes);
 app.use('/api/admin/commerce/payments', adminPaymentRoutes);
 app.use('/api/admin/commerce/promo-codes', adminPromoCodeRoutes);
+app.use('/api/admin/commerce', adminRefundRoutes);
 app.use('/api/public/promo', promoPublicRoutes);
 app.use('/api/public/commerce', commercePublicRoutes);
 
@@ -331,6 +333,10 @@ async function start() {
     // Start payment reconciliation job
     const { startPaymentReconciliationJob } = await import('./jobs/paymentReconciliation');
     startPaymentReconciliationJob();
+
+    // Start refund reconciliation job (daily)
+    const { startRefundReconciliationJob } = await import('./jobs/refundReconciliation');
+    startRefundReconciliationJob();
 
     const server = app.listen(config.port, () => {
       logger.info(`PawTag API running on port ${config.port}`);
