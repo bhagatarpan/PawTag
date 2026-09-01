@@ -10,6 +10,12 @@ import {
   Truck, Package, CheckCircle, AlertCircle, Info, Clock, FileText,
   RefreshCw, Ban, Send, Eye, Printer, Copy, ExternalLink, AlertTriangle, XCircle,
 } from 'lucide-react';
+import {
+  ORDER_STATUS_LABELS,
+  getStatusBadgeVariant,
+  getStatusBorderColor,
+  getTrackingUrl,
+} from '@pawtag/shared';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -90,23 +96,13 @@ interface SummaryData {
 const ORDER_STATUS_TRANSITIONS: Record<string, string[]> = {
   pending: ['pending_payment', 'paid', 'cancelled'],
   pending_payment: ['paid', 'cancelled'],
-  paid: ['packing', 'cancelled', 'refunded'],
+  paid: ['packing', 'cancelled', 'refund_initiated'],
   packing: ['shipped', 'cancelled'],
   shipped: ['delivered'],
-  delivered: ['refunded'],
+  delivered: ['refund_initiated'],
   cancelled: [],
+  refund_initiated: ['refunded'],
   refunded: [],
-};
-
-const STATUS_LABELS: Record<string, string> = {
-  pending: 'Pending',
-  pending_payment: 'Pending Payment',
-  paid: 'Paid',
-  packing: 'Packing',
-  shipped: 'Shipped',
-  delivered: 'Delivered',
-  cancelled: 'Cancelled',
-  refunded: 'Refunded',
 };
 
 const STATUS_OPTIONS = [
@@ -117,6 +113,7 @@ const STATUS_OPTIONS = [
   { value: 'shipped', label: 'Shipped' },
   { value: 'delivered', label: 'Delivered' },
   { value: 'cancelled', label: 'Cancelled' },
+  { value: 'refund_initiated', label: 'Refund Initiated' },
   { value: 'refunded', label: 'Refunded' },
 ];
 
@@ -145,32 +142,6 @@ function formatCurrency(amount: number, currency = 'NZD'): string {
   return `${currency} $${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-function getTrackingUrl(carrier: string, trackingNumber: string): string {
-  if (!trackingNumber || !carrier) return '';
-  const c = carrier.toLowerCase();
-  if (c.includes('nz post') || c.includes('nzpost')) return `https://www.nzpost.co.nz/tools/tracking/result?trackid=${encodeURIComponent(trackingNumber)}`;
-  if (c.includes('courierpost') || c.includes('courier post')) return `https://www.courierpost.co.nz/tracking/${encodeURIComponent(trackingNumber)}`;
-  if (c.includes('aramex')) return `https://www.aramex.co.nz/track/shipment?ShipmentNumber=${encodeURIComponent(trackingNumber)}`;
-  if (c.includes('dhl')) return `https://www.dhl.com/nz-en/home/tracking.html?tracking-id=${encodeURIComponent(trackingNumber)}`;
-  if (c.includes('fedex')) return `https://www.fedex.com/fedextrack/?trknbr=${encodeURIComponent(trackingNumber)}`;
-  if (c.includes('ups')) return `https://www.ups.com/track?tracknum=${encodeURIComponent(trackingNumber)}`;
-  return '';
-}
-
-function getStatusVariant(status: string): 'success' | 'danger' | 'warning' | 'info' | 'neutral' | 'primary' {
-  switch (status) {
-    case 'delivered': return 'success';
-    case 'shipped': return 'primary';
-    case 'paid': return 'info';
-    case 'packing': return 'info';
-    case 'pending': return 'warning';
-    case 'pending_payment': return 'warning';
-    case 'cancelled': return 'danger';
-    case 'refunded': return 'danger';
-    default: return 'neutral';
-  }
-}
-
 function getStatusIcon(status: string) {
   switch (status) {
     case 'delivered': return <CheckCircle size={13} />;
@@ -180,7 +151,8 @@ function getStatusIcon(status: string) {
     case 'pending': return <Clock size={13} />;
     case 'pending_payment': return <Clock size={13} />;
     case 'cancelled': return <Ban size={13} />;
-    case 'refunded': return <RefreshCw size={13} />;
+    case 'refund_initiated': return <RefreshCw size={13} />;
+    case 'refunded': return <CheckCircle size={13} />;
     default: return <Info size={13} />;
   }
 }
@@ -258,7 +230,7 @@ export function OrderDetailDrawer({
     setActionLoading('status');
     try {
       await api.put(`/admin/orders/${order._id}/status`, { status: newStatus });
-      toast.success(`Order status updated to ${STATUS_LABELS[newStatus]}`);
+      toast.success(`Order status updated to ${ORDER_STATUS_LABELS[newStatus]}`);
       onRefresh();
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Failed to update status');
@@ -335,8 +307,8 @@ export function OrderDetailDrawer({
       headerActions={
         <div className="flex items-center gap-2">
           <StatusBadge
-            label={STATUS_LABELS[order.status] || order.status}
-            variant={getStatusVariant(order.status)}
+            label={ORDER_STATUS_LABELS[order.status] || order.status}
+            variant={getStatusBadgeVariant(order.status)}
             icon={getStatusIcon(order.status)}
           />
         </div>
@@ -350,8 +322,8 @@ export function OrderDetailDrawer({
             <DetailRow label="Email" value={order.userId?.email || 'N/A'} />
             <DetailRow label="Status" value={
               <StatusBadge
-                label={STATUS_LABELS[order.status] || order.status}
-                variant={getStatusVariant(order.status)}
+                label={ORDER_STATUS_LABELS[order.status] || order.status}
+                variant={getStatusBadgeVariant(order.status)}
                 icon={getStatusIcon(order.status)}
                 size="md"
               />
@@ -796,7 +768,7 @@ export default function Orders() {
       o.userId?.fullName || 'N/A',
       o.items?.length || 0,
       o.payment.amount,
-      STATUS_LABELS[o.status] || o.status,
+      ORDER_STATUS_LABELS[o.status] || o.status,
       PAYMENT_METHOD_LABELS[o.payment.method] || o.payment.method,
       formatDate(o.createdAt),
     ]);
@@ -812,7 +784,7 @@ export default function Orders() {
   };
 
   const chips = [];
-  if (statusFilter) chips.push({ key: 'status', label: `Status: ${STATUS_LABELS[statusFilter] || statusFilter}` });
+  if (statusFilter) chips.push({ key: 'status', label: `Status: ${ORDER_STATUS_LABELS[statusFilter] || statusFilter}` });
   if (search.trim()) chips.push({ key: 'search', label: `Search: "${search}"` });
 
   const handleRemoveChip = (key: string) => {
@@ -934,8 +906,8 @@ export default function Orders() {
                   </td>
                   <td className="px-4 py-3">
                     <StatusBadge
-                      label={STATUS_LABELS[order.status] || order.status}
-                      variant={getStatusVariant(order.status)}
+                      label={ORDER_STATUS_LABELS[order.status] || order.status}
+                      variant={getStatusBadgeVariant(order.status)}
                       icon={getStatusIcon(order.status)}
                     />
                   </td>

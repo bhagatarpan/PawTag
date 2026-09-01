@@ -28,6 +28,8 @@ export type { ProductCardProduct, ProductCardProps } from './components/ProductC
 export type { PriceDisplayProps } from './components/PriceDisplay';
 export type { ProductBadgeProps } from './components/ProductBadge';
 export type { CartItem, CartDrawerProps } from './components/CartDrawer';
+export type { OrderProgressStepperProps } from './components/OrderProgressStepper';
+export type { OrderStatusBannerProps } from './components/OrderStatusBanner';
 
 // Components
 export { SummaryCards } from './components/SummaryCards';
@@ -41,6 +43,8 @@ export { StatusBadge } from './components/StatusBadge';
 export { ConfirmDialog } from './components/ConfirmDialog';
 export { AddressAutocomplete } from './components/AddressAutocomplete';
 export { OrderDetailView } from './components/OrderDetailView';
+export { OrderProgressStepper, ORDER_STATUS_STEPS, STEP_LABELS } from './components/OrderProgressStepper';
+export { OrderStatusBanner } from './components/OrderStatusBanner';
 
 // Commerce components
 export { ProductCard } from './components/ProductCard';

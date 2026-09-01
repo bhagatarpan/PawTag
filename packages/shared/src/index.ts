@@ -33,10 +33,13 @@ export enum PetStatus {
 
 export enum OrderStatus {
   PENDING = 'pending',
+  PENDING_PAYMENT = 'pending_payment',
   PAID = 'paid',
+  PACKING = 'packing',
   SHIPPED = 'shipped',
   DELIVERED = 'delivered',
   CANCELLED = 'cancelled',
+  REFUND_INITIATED = 'refund_initiated',
   REFUNDED = 'refunded',
 }
 
@@ -681,24 +684,30 @@ export interface AdminDashboardStats {
 // --- Order Status Utilities ---
 
 export const ORDER_STATUS_COLORS: Record<string, string> = {
-  pending: 'bg-yellow-100 text-yellow-700',
-  paid: 'bg-blue-100 text-blue-700',
-  shipped: 'bg-purple-100 text-purple-700',
+  pending: 'bg-amber-100 text-amber-700',
+  pending_payment: 'bg-amber-100 text-amber-700',
+  paid: 'bg-primary-100 text-primary-700',
+  packing: 'bg-primary-100 text-primary-700',
+  shipped: 'bg-blue-100 text-blue-700',
   delivered: 'bg-green-100 text-green-700',
   cancelled: 'bg-red-100 text-red-700',
-  refunded: 'bg-gray-100 text-gray-700',
+  refund_initiated: 'bg-amber-100 text-amber-700',
+  refunded: 'bg-green-100 text-green-700',
 };
 
 export const ORDER_STATUS_LABELS: Record<string, string> = {
   pending: 'Pending',
+  pending_payment: 'Pending Payment',
   paid: 'Paid',
+  packing: 'Packing',
   shipped: 'Shipped',
   delivered: 'Delivered',
   cancelled: 'Cancelled',
+  refund_initiated: 'Refund Initiated',
   refunded: 'Refunded',
 };
 
-export const ORDER_STATUS_STEPS = ['pending', 'paid', 'shipped', 'delivered'];
+export const ORDER_STATUS_STEPS = ['pending', 'paid', 'packing', 'shipped', 'delivered'];
 
 export function getOrderStatusColor(status: string): string {
   return ORDER_STATUS_COLORS[status] || 'bg-gray-100 text-gray-700';
@@ -706,6 +715,58 @@ export function getOrderStatusColor(status: string): string {
 
 export function getOrderStatusLabel(status: string): string {
   return ORDER_STATUS_LABELS[status] || status;
+}
+
+export function isTerminalStatus(status: string): boolean {
+  return ['cancelled', 'refunded', 'refund_initiated'].includes(status);
+}
+
+export function getStatusBadgeVariant(status: string): 'success' | 'danger' | 'warning' | 'info' | 'neutral' | 'primary' {
+  switch (status) {
+    case 'delivered': return 'success';
+    case 'shipped': return 'info';
+    case 'paid': return 'primary';
+    case 'packing': return 'primary';
+    case 'pending': return 'warning';
+    case 'pending_payment': return 'warning';
+    case 'cancelled': return 'danger';
+    case 'refund_initiated': return 'warning';
+    case 'refunded': return 'success';
+    default: return 'neutral';
+  }
+}
+
+export function getStatusBorderColor(status: string): string {
+  switch (status) {
+    case 'delivered': return 'border-l-green-500';
+    case 'shipped': return 'border-l-blue-500';
+    case 'packing': return 'border-l-primary-500';
+    case 'paid': return 'border-l-primary-500';
+    case 'pending':
+    case 'pending_payment': return 'border-l-amber-400';
+    case 'cancelled': return 'border-l-red-400';
+    case 'refund_initiated': return 'border-l-amber-400';
+    case 'refunded': return 'border-l-green-400';
+    default: return 'border-l-gray-300';
+  }
+}
+
+export function getTrackingUrl(carrier: string, trackingNumber: string): string {
+  if (!trackingNumber || !carrier) return '';
+  const c = carrier.toLowerCase();
+  if (c.includes('nz post') || c.includes('nzpost'))
+    return `https://www.nzpost.co.nz/tools/tracking/result?trackid=${encodeURIComponent(trackingNumber)}`;
+  if (c.includes('courierpost') || c.includes('courier post'))
+    return `https://www.courierpost.co.nz/tracking/${encodeURIComponent(trackingNumber)}`;
+  if (c.includes('aramex'))
+    return `https://www.aramex.co.nz/track/shipment?ShipmentNumber=${encodeURIComponent(trackingNumber)}`;
+  if (c.includes('dhl'))
+    return `https://www.dhl.com/nz-en/home/tracking.html?tracking-id=${encodeURIComponent(trackingNumber)}`;
+  if (c.includes('fedex'))
+    return `https://www.fedex.com/fedextrack/?trknbr=${encodeURIComponent(trackingNumber)}`;
+  if (c.includes('ups'))
+    return `https://www.ups.com/track?tracknum=${encodeURIComponent(trackingNumber)}`;
+  return '';
 }
 
 // --- Subscription Status Utilities ---

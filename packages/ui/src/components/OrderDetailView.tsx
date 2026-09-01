@@ -15,6 +15,8 @@ import {
   Mail,
 } from 'lucide-react';
 import { StatusBadge } from './StatusBadge';
+import { OrderProgressStepper } from './OrderProgressStepper';
+import { OrderStatusBanner } from './OrderStatusBanner';
 import type {
   OrderData,
   InvoiceData,
@@ -26,34 +28,16 @@ import type {
 /*  Constants                                                          */
 /* ------------------------------------------------------------------ */
 
-const ORDER_STATUS_STEPS = ['pending', 'paid', 'packing', 'shipped', 'delivered'];
-
-const STEP_LABELS: Record<string, string> = {
-  pending: 'Pending',
-  paid: 'Paid',
-  packing: 'Packing',
-  shipped: 'Shipped',
-  delivered: 'Delivered',
-  cancelled: 'Cancelled',
-  refunded: 'Refunded',
-};
-
 const STATUS_BADGE_VARIANT: Record<string, BadgeVariant> = {
   pending: 'warning',
+  pending_payment: 'warning',
   paid: 'primary',
-  packing: 'info',
+  packing: 'primary',
   shipped: 'info',
   delivered: 'success',
   cancelled: 'danger',
-  refunded: 'neutral',
-};
-
-const STEP_ICON: Record<string, React.FC<{ className?: string }>> = {
-  pending: Clock,
-  paid: CreditCard,
-  packing: Package,
-  shipped: Truck,
-  delivered: CheckCircle,
+  refund_initiated: 'warning',
+  refunded: 'success',
 };
 
 /* ------------------------------------------------------------------ */
@@ -138,6 +122,36 @@ function CardBrandIcon({ brand }: { brand: string }) {
 /*  Sub-Components                                                     */
 /* ------------------------------------------------------------------ */
 
+function getStepLabel(status: string): string {
+  const labels: Record<string, string> = {
+    pending: 'Pending',
+    pending_payment: 'Pending Payment',
+    paid: 'Paid',
+    packing: 'Packing',
+    shipped: 'Shipped',
+    delivered: 'Delivered',
+    cancelled: 'Cancelled',
+    refund_initiated: 'Refund Initiated',
+    refunded: 'Refunded',
+  };
+  return labels[status] || status;
+}
+
+function getStatusIcon(status: string) {
+  switch (status) {
+    case 'delivered': return <CheckCircle size={16} />;
+    case 'shipped': return <Truck size={16} />;
+    case 'paid': return <CreditCard size={16} />;
+    case 'packing': return <Package size={16} />;
+    case 'pending': return <Clock size={16} />;
+    case 'pending_payment': return <Clock size={16} />;
+    case 'cancelled': return <XCircle size={16} />;
+    case 'refund_initiated': return <Clock size={16} />;
+    case 'refunded': return <CheckCircle size={16} />;
+    default: return <Clock size={16} />;
+  }
+}
+
 function OrderHeader({
   order,
   onBackToOrders,
@@ -146,7 +160,7 @@ function OrderHeader({
   onBackToOrders?: () => void;
 }) {
   const variant = STATUS_BADGE_VARIANT[order.status] || 'neutral';
-  const label = STEP_LABELS[order.status] || order.status;
+  const label = getStepLabel(order.status);
 
   return (
     <div className="flex items-start justify-between">
@@ -166,113 +180,11 @@ function OrderHeader({
           Placed on {formatDateTime(order.createdAt)}
         </p>
       </div>
-      <span className={`px-3 py-1.5 text-sm font-medium rounded-full ${
-        variant === 'success' ? 'bg-emerald-100 text-emerald-700' :
-        variant === 'danger' ? 'bg-red-100 text-red-700' :
-        variant === 'warning' ? 'bg-amber-100 text-amber-700' :
-        variant === 'primary' ? 'bg-primary-100 text-primary-700' :
-        variant === 'info' ? 'bg-blue-100 text-blue-700' :
-        'bg-gray-100 text-gray-600'
-      }`}>
-        {label}
-      </span>
-    </div>
-  );
-}
-
-function OrderProgressStepper({ order }: { order: OrderData }) {
-  const currentStep = ORDER_STATUS_STEPS.indexOf(order.status);
-  const isCancelled = order.status === 'cancelled' || order.status === 'refunded';
-
-  if (isCancelled) {
-    return (
-      <div className={`p-4 rounded-xl border ${
-        order.status === 'cancelled'
-          ? 'bg-red-50 border-red-200 text-red-700'
-          : 'bg-gray-50 border-gray-200 text-gray-700'
-      }`}>
-        <p className="font-medium">This order has been {order.status}.</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-      <h2 className="text-sm font-semibold text-gray-700 mb-5">Order Progress</h2>
-
-      {/* Stepper */}
-      <div className="relative mb-8">
-        {/* Track background */}
-        <div className="absolute top-[15px] left-[15px] right-[15px] h-1 bg-gray-200 rounded-full" />
-        {/* Fill — green primary bar */}
-        <div
-          className="absolute top-[15px] left-[15px] h-1 bg-primary-500 rounded-full transition-all duration-700 ease-out"
-          style={{
-            width: currentStep >= 0
-              ? `calc(${Math.min(currentStep, ORDER_STATUS_STEPS.length - 1)} / ${ORDER_STATUS_STEPS.length - 1} * (100% - 30px))`
-              : '0px',
-          }}
-        />
-        {/* Steps */}
-        <div className="relative flex justify-between">
-          {ORDER_STATUS_STEPS.map((step, i) => {
-            const isDone = currentStep >= 0 && i < currentStep;
-            const isCurrent = i === currentStep;
-            const isFuture = currentStep < 0 || i > currentStep;
-            const StepIcon = STEP_ICON[step] || Clock;
-            return (
-              <div key={step} className="flex flex-col items-center" style={{ width: `${100 / ORDER_STATUS_STEPS.length}%` }}>
-                <div
-                  className={`w-[30px] h-[30px] rounded-full flex items-center justify-center z-10 transition-all ${
-                    isDone
-                      ? 'bg-primary-600 text-white'
-                      : isCurrent
-                      ? 'bg-primary-600 text-white ring-2 ring-offset-2 ring-primary-200'
-                      : 'bg-gray-200 text-gray-400'
-                  }`}
-                >
-                  {isDone ? (
-                    <Check className="h-4 w-4" />
-                  ) : (
-                    <StepIcon className="h-4 w-4" />
-                  )}
-                </div>
-                <span
-                  className={`text-xs mt-2 font-medium text-center ${
-                    isDone || isCurrent ? 'text-primary-700' : 'text-gray-400'
-                  }`}
-                >
-                  {STEP_LABELS[step] || step}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Status summary */}
-      <div className="flex items-center gap-3 p-3 bg-primary-50 rounded-lg">
-        <CheckCircle className="h-5 w-5 text-primary-600" />
-        <div>
-          <p className="text-sm font-medium text-primary-800">
-            Order Status:{' '}
-            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
-              order.status === 'paid' ? 'bg-primary-100 text-primary-700' :
-              order.status === 'delivered' ? 'bg-emerald-100 text-emerald-700' :
-              order.status === 'shipped' ? 'bg-blue-100 text-blue-700' :
-              order.status === 'packing' ? 'bg-amber-100 text-amber-700' :
-              'bg-primary-100 text-primary-700'
-            }`}>
-              {STEP_LABELS[order.status] || order.status}
-            </span>
-          </p>
-          <p className="text-xs text-primary-600 mt-0.5">
-            {order.activity && order.activity.length > 0
-              ? `${order.activity[0].message} on ${formatDateTime(order.activity[0].timestamp)}`
-              : `Order placed and paid on ${formatDateTime(order.createdAt)}`}
-          </p>
-        </div>
-      </div>
+      <StatusBadge
+        label={label}
+        variant={variant}
+        icon={getStatusIcon(order.status)}
+      />
     </div>
   );
 }
@@ -555,25 +467,24 @@ export function OrderDetailView({
       {/* Header */}
       <OrderHeader order={order} onBackToOrders={onBackToOrders} />
 
-      {/* Progress Stepper */}
-      <OrderProgressStepper order={order} />
+      {/* Progress Stepper or Status Banner */}
+      {['cancelled', 'refunded', 'refund_initiated'].includes(order.status) ? (
+        <OrderStatusBanner status={order.status} amount={order.payment?.amount} />
+      ) : (
+        <OrderProgressStepper status={order.status} variant="full" />
+      )}
 
       {/* Two-column layout */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-        {/* Left column: Items + Actions */}
+        {/* Left column: Items + Summary */}
         <div className="lg:col-span-3 space-y-6">
           <OrderItemsList order={order} />
-          <OrderActions
-            order={order}
-            onRequestReturn={onRequestReturn}
-            onCancelOrder={onCancelOrder}
-          />
+          <OrderSummaryCard order={order} />
         </div>
 
-        {/* Right column: Payment, Summary, Invoice, Address */}
+        {/* Right column: Payment, Invoice, Address, Actions */}
         <div className="lg:col-span-2 space-y-6">
           <PaymentInformationCard order={order} />
-          <OrderSummaryCard order={order} />
           {invoice && (
             <InvoiceCard invoice={invoice} onViewInvoice={onViewInvoice} />
           )}
@@ -581,6 +492,11 @@ export function OrderDetailView({
             order={order}
             contactPhone={contactPhone}
             contactEmail={contactEmail}
+          />
+          <OrderActions
+            order={order}
+            onRequestReturn={onRequestReturn}
+            onCancelOrder={onCancelOrder}
           />
         </div>
       </div>

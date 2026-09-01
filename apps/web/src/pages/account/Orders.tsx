@@ -1,27 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ShoppingBag, ChevronRight, Clock, Package, Truck, CheckCircle, Ban, RefreshCw, ExternalLink, FileText } from 'lucide-react';
-import { StatusBadge, EmptyState } from '@pawtag/ui';
+import { ShoppingBag, ChevronRight, Clock, Package, Truck, CheckCircle, Ban, RefreshCw, ExternalLink, FileText, CreditCard, MapPin, Eye } from 'lucide-react';
+import { StatusBadge, EmptyState, OrderProgressStepper, OrderStatusBanner } from '@pawtag/ui';
+import { ORDER_STATUS_LABELS, getStatusBadgeVariant, getStatusBorderColor, getTrackingUrl, isTerminalStatus } from '@pawtag/shared';
 import api from '../../lib/api';
 import type { Order } from '../../types';
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
-
-function getStatusVariant(status: string): 'success' | 'danger' | 'warning' | 'info' | 'neutral' | 'primary' {
-  switch (status) {
-    case 'delivered': return 'success';
-    case 'shipped': return 'primary';
-    case 'paid': return 'info';
-    case 'packing': return 'info';
-    case 'pending': return 'warning';
-    case 'pending_payment': return 'warning';
-    case 'cancelled': return 'danger';
-    case 'refunded': return 'danger';
-    default: return 'neutral';
-  }
-}
 
 function getStatusIcon(status: string) {
   switch (status) {
@@ -32,21 +19,11 @@ function getStatusIcon(status: string) {
     case 'pending': return <Clock size={13} />;
     case 'pending_payment': return <Clock size={13} />;
     case 'cancelled': return <Ban size={13} />;
-    case 'refunded': return <RefreshCw size={13} />;
+    case 'refund_initiated': return <RefreshCw size={13} />;
+    case 'refunded': return <CheckCircle size={13} />;
     default: return <Clock size={13} />;
   }
 }
-
-const STATUS_LABELS: Record<string, string> = {
-  pending: 'Pending',
-  pending_payment: 'Pending Payment',
-  paid: 'Paid',
-  packing: 'Packing',
-  shipped: 'Shipped',
-  delivered: 'Delivered',
-  cancelled: 'Cancelled',
-  refunded: 'Refunded',
-};
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -70,17 +47,7 @@ function getRelativeTime(iso: string): string {
   return formatDate(iso);
 }
 
-function getTrackingUrl(carrier: string, trackingNumber: string): string {
-  if (!trackingNumber || !carrier) return '';
-  const c = carrier.toLowerCase();
-  if (c.includes('nz post') || c.includes('nzpost')) return `https://www.nzpost.co.nz/tools/tracking/result?trackid=${encodeURIComponent(trackingNumber)}`;
-  if (c.includes('courierpost') || c.includes('courier post')) return `https://www.courierpost.co.nz/tracking/${encodeURIComponent(trackingNumber)}`;
-  if (c.includes('aramex')) return `https://www.aramex.co.nz/track/shipment?ShipmentNumber=${encodeURIComponent(trackingNumber)}`;
-  if (c.includes('dhl')) return `https://www.dhl.com/nz-en/home/tracking.html?tracking-id=${encodeURIComponent(trackingNumber)}`;
-  return '';
-}
-
-const MILESTONE_ACTIVITY_TYPES = ['order_placed', 'payment_confirmed', 'packing', 'shipped', 'delivered', 'cancelled', 'refunded'];
+const MILESTONE_ACTIVITY_TYPES = ['order_placed', 'payment_confirmed', 'packing', 'shipped', 'delivered', 'cancelled', 'refunded', 'refund_initiated'];
 
 function getLatestMilestone(order: Order): { type: string; message: string; timestamp: string } | null {
   if (!order.activity || order.activity.length === 0) return null;
@@ -120,17 +87,28 @@ function getActivityColor(type: string): string {
 
 function SkeletonRow() {
   return (
-    <div className="bg-white rounded-lg border p-4 animate-shimmer">
-      <div className="flex justify-between items-center">
-        <div className="flex-1">
-          <div className="h-4 bg-gray-200 rounded w-24 mb-2" />
-          <div className="h-3 bg-gray-200 rounded w-16 mb-1" />
-          <div className="h-3 bg-gray-200 rounded w-12" />
+    <div className="bg-white rounded-lg border border-l-4 border-l-gray-200 p-4 animate-shimmer">
+      <div className="flex justify-between items-start">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-gray-200" />
+          <div>
+            <div className="h-4 bg-gray-200 rounded w-24 mb-2" />
+            <div className="h-3 bg-gray-200 rounded w-32" />
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <div className="h-5 bg-gray-200 rounded-full w-16" />
           <div className="h-4 bg-gray-200 rounded w-16" />
         </div>
+      </div>
+      <div className="mt-3 pt-3 border-t border-gray-100 flex items-center gap-4">
+        <div className="h-3 bg-gray-200 rounded w-28" />
+        <div className="h-3 bg-gray-200 rounded w-20" />
+        <div className="h-3 bg-gray-200 rounded w-16" />
+      </div>
+      <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
+        <div className="h-3 bg-gray-200 rounded w-48" />
+        <div className="h-3 bg-gray-200 rounded w-24" />
       </div>
     </div>
   );
@@ -230,56 +208,97 @@ export default function Orders() {
               <Link
                 key={order._id}
                 to={`/account/orders/${order._id}`}
-                className="block bg-white rounded-lg border border-gray-200 p-4 hover:border-teal-300 hover:shadow-sm transition-all"
+                className={`block bg-white rounded-lg border border-gray-200 border-l-4 ${getStatusBorderColor(order.status)} p-4 hover:border-teal-300 hover:shadow-md transition-all`}
               >
-                <div className="flex justify-between items-center">
+                {/* Row 1: Order number, status, price */}
+                <div className="flex justify-between items-start">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-teal-100 flex items-center justify-center shrink-0">
                       <ShoppingBag size={18} className="text-teal-600" />
                     </div>
                     <div>
-                      <p className="font-mono text-sm font-medium text-gray-900">
+                      <p className="font-mono text-sm font-semibold text-gray-900">
                         {order.orderNumber || `#${order._id.slice(-8).toUpperCase()}`}
                       </p>
-                      <p className="text-xs text-gray-400 mt-0.5">{formatDate(order.createdAt)}</p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <p className="text-xs text-gray-500">
-                          {order.items?.length || 0} item{(order.items?.length || 0) !== 1 ? 's' : ''}
-                        </p>
-                        {order.latestInvoice && (
-                          <span className="text-xs text-gray-400 flex items-center gap-1">
-                            <FileText size={10} />
-                            {order.latestInvoice.invoiceNumber}
-                          </span>
-                        )}
-                      </div>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {formatDate(order.createdAt)} at {formatTime(order.createdAt)}
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
                     <StatusBadge
-                      label={STATUS_LABELS[order.status] || order.status}
-                      variant={getStatusVariant(order.status)}
+                      label={ORDER_STATUS_LABELS[order.status] || order.status}
+                      variant={getStatusBadgeVariant(order.status)}
                       icon={getStatusIcon(order.status)}
                     />
-                    <span className="text-sm font-semibold text-gray-900">
-                      ${order.payment?.amount?.toFixed(2) || '0.00'}
+                    <span className="text-sm font-bold text-gray-900">
+                      ${(order.payment?.amount ?? 0).toFixed(2)}
                     </span>
-                    <ChevronRight size={16} className="text-gray-400" />
                   </div>
                 </div>
-                {/* Compact activity summary */}
-                {latestActivity && (
-                  <div className="mt-3 pt-3 border-t border-gray-100 flex items-center gap-2">
-                    <span className={getActivityColor(latestActivity.type)}>
-                      {getActivityIcon(latestActivity.type)}
+
+                {/* Progress stepper or status banner */}
+                <div className="mt-3 pt-3 border-t border-gray-100">
+                  {isTerminalStatus(order.status) ? (
+                    <OrderStatusBanner status={order.status} amount={order.payment?.amount} />
+                  ) : (
+                    <OrderProgressStepper status={order.status} variant="compact" />
+                  )}
+                </div>
+
+                {/* Row 2: Info row - Payment, Shipping, Items */}
+                <div className="mt-3 pt-3 border-t border-gray-100 flex items-center gap-4 text-xs text-gray-500">
+                  {order.payment?.cardBrand && (
+                    <span className="flex items-center gap-1.5">
+                      <CreditCard size={12} className="text-gray-400" />
+                      {order.payment.cardBrand.charAt(0).toUpperCase() + order.payment.cardBrand.slice(1)} •••• {order.payment.cardLast4 || '****'}
                     </span>
-                    <span className="text-xs text-gray-600 truncate">{latestActivity.message}</span>
-                    <span className="text-xs text-gray-400 ml-auto whitespace-nowrap">{getRelativeTime(latestActivity.timestamp)}</span>
-                    {latestActivity.type === 'shipped' && order.trackingNumber && (
-                      <span className="text-xs text-teal-600 font-medium whitespace-nowrap flex items-center gap-0.5">
-                        Track <ExternalLink size={10} />
+                  )}
+                  {!order.payment?.cardBrand && order.payment?.method && (
+                    <span className="flex items-center gap-1.5">
+                      <CreditCard size={12} className="text-gray-400" />
+                      {order.payment.method}
+                    </span>
+                  )}
+                  {order.shippingAddress?.city && (
+                    <span className="flex items-center gap-1.5">
+                      <MapPin size={12} className="text-gray-400" />
+                      {order.shippingAddress.city}
+                      {order.shippingAddress.country ? `, ${order.shippingAddress.country}` : ''}
+                    </span>
+                  )}
+                  <span className="flex items-center gap-1.5">
+                    <Package size={12} className="text-gray-400" />
+                    {order.items?.length || 0} item{(order.items?.length || 0) !== 1 ? 's' : ''}
+                  </span>
+                  {order.latestInvoice && (
+                    <span className="flex items-center gap-1.5">
+                      <FileText size={12} className="text-gray-400" />
+                      {order.latestInvoice.invoiceNumber}
+                    </span>
+                  )}
+                </div>
+
+                {/* Row 3: Activity + View Details button */}
+                {latestActivity && (
+                  <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className={getActivityColor(latestActivity.type)}>
+                        {getActivityIcon(latestActivity.type)}
                       </span>
-                    )}
+                      <span className="text-xs text-gray-600 truncate">{latestActivity.message}</span>
+                      <span className="text-xs text-gray-400 whitespace-nowrap">· {getRelativeTime(latestActivity.timestamp)}</span>
+                      {latestActivity.type === 'shipped' && order.trackingNumber && (
+                        <span className="text-xs text-teal-600 font-medium whitespace-nowrap flex items-center gap-0.5">
+                          Track <ExternalLink size={10} />
+                        </span>
+                      )}
+                    </div>
+                    <span className="flex items-center gap-1 text-xs font-medium text-teal-600 hover:text-teal-700 whitespace-nowrap ml-3">
+                      <Eye size={13} />
+                      View Details
+                      <ChevronRight size={14} />
+                    </span>
                   </div>
                 )}
               </Link>

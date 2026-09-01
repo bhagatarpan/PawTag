@@ -205,6 +205,24 @@ A consistent 4px base unit, multiplied to create a predictable rhythm:
 | **Warning** | `inline-block px-3 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-semibold` |
 | **Error** | `inline-block px-3 py-1 rounded-full bg-red-100 text-red-700 text-xs font-semibold` |
 
+### Order Status Colors
+
+All order status displays (badges, steppers, banners, left borders) must use these design tokens. No hardcoded colors.
+
+| Status | Badge Variant | Badge Classes | Border Left |
+|---|---|---|---|
+| `pending` | warning | `bg-amber-100 text-amber-700` | `border-l-amber-400` |
+| `pending_payment` | warning | `bg-amber-100 text-amber-700` | `border-l-amber-400` |
+| `paid` | primary | `bg-primary-100 text-primary-700` | `border-l-primary-500` |
+| `packing` | primary | `bg-primary-100 text-primary-700` | `border-l-primary-500` |
+| `shipped` | info | `bg-blue-100 text-blue-700` | `border-l-blue-500` |
+| `delivered` | success | `bg-green-100 text-green-700` | `border-l-green-500` |
+| `cancelled` | danger | `bg-red-100 text-red-700` | `border-l-red-400` |
+| `refund_initiated` | warning | `bg-amber-100 text-amber-700` | `border-l-amber-400` |
+| `refunded` | success | `bg-green-100 text-green-700` | `border-l-green-400` |
+
+**Order Progress Stepper:** Active/completed step dots use `bg-primary-500` / `border-primary-500`. Labels use `text-primary-600`. Progress bar fill uses `bg-primary-500`.
+
 ### Alerts
 
 | Type | Classes |

@@ -411,6 +411,8 @@ If something could not be completed, clearly explain why and what is required.
 
 ```
 PawTag/
+├── skills/
+│   ├── coding-practice/SKILL.md 
 ├── apps/
 │   ├── admin/       → Admin portal (port 3001) - 44 pages, god-mode CRUD
 │   ├── web/         → Public site, shop, auth & customer portal (port 3000) - 31 pages

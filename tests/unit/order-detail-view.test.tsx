@@ -79,7 +79,7 @@ describe('OrderDetailView', () => {
     it('shows a cancellation banner instead of the stepper for cancelled orders', () => {
       render(<OrderDetailView order={makeOrder({ status: 'cancelled' })} />);
       expect(screen.queryByText('Order Progress')).toBeNull();
-      expect(screen.getByText('This order has been cancelled.')).toBeDefined();
+      expect(screen.getByText('This order has been cancelled')).toBeDefined();
     });
   });
 
