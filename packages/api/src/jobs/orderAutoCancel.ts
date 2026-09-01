@@ -20,6 +20,7 @@ import { inventoryService } from '../commerce/services/inventory.service';
 import { getBooleanSetting, getNumberSetting } from '../commerce/config';
 import { notifyCustomerOfStatusChange } from '../services/orderNotification.service';
 import { logOrderEvent } from '../commerce/audit';
+import { formatSystemActivityMessage } from '../lib/actor';
 import logger from '../lib/logger';
 
 /** How often to check for stale orders (ms) */
@@ -48,19 +49,54 @@ async function checkAndCancelStaleOrders(): Promise<void> {
 
     for (const order of staleOrders) {
       try {
+        const cancelledAt = new Date();
+        const reason = `Auto-cancelled: no payment received within ${autoCancelMinutes} minutes`;
+        const systemMessage = formatSystemActivityMessage(reason, cancelledAt);
+
         order.status = 'cancelled';
-        order.cancellationReason = `Auto-cancelled: no payment received within ${autoCancelMinutes} minutes`;
+        order.cancellationReason = reason;
+        order.cancelledBy = 'CANCELLED BY SYSTEM (AUTO)';
+        order.cancelledByType = 'System';
+        order.cancelledByPortal = 'system';
+        order.cancelledByDescription = `Order is auto-cancelled by System after no payment received within ${autoCancelMinutes} minutes`;
+        order.cancelledAt = cancelledAt;
         await order.save();
 
         // Release reserved stock
-        await inventoryService.releaseForOrder(String(order._id), order.items.map((item: any) => ({
-          productId: String(item.productId),
-          quantity: item.quantity,
-        })));
+        try {
+          await inventoryService.releaseForOrder(String(order._id), order.items.map((item: any) => ({
+            productId: String(item.productId),
+            quantity: item.quantity,
+          })));
+        } catch (stockErr) {
+          logger.error({ err: stockErr, orderId: String(order._id) }, 'Failed to release stock on auto-cancel');
+        }
+
+        // Record activity on order timeline
+        await Order.updateOne(
+          { _id: order._id },
+          {
+            $push: {
+              activity: {
+                type: 'cancelled',
+                message: systemMessage,
+                timestamp: cancelledAt,
+                actor: 'system',
+                metadata: {
+                  reason,
+                  cancelledBy: 'CANCELLED BY SYSTEM (AUTO)',
+                  cancelledByType: 'System',
+                  cancelledByPortal: 'system',
+                  cancelledAt: cancelledAt.toISOString(),
+                },
+              },
+            },
+          },
+        );
 
         // Notify customer
         await notifyCustomerOfStatusChange(order, 'cancelled', {
-          reason: order.cancellationReason,
+          reason,
         }).catch(() => {});
 
         // Audit log
@@ -68,7 +104,7 @@ async function checkAndCancelStaleOrders(): Promise<void> {
           orderId: String(order._id),
           orderNumber: order.orderNumber,
           amount: order.payment.amount,
-          reason: order.cancellationReason,
+          reason,
         }).catch(() => {});
 
         logger.info({ orderNumber: order.orderNumber }, 'Order auto-cancelled');

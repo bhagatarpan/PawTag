@@ -169,6 +169,28 @@ export interface ConfirmDialogProps {
   cancelLabel?: string;
   variant?: 'danger' | 'warning' | 'primary';
   loading?: boolean;
+  /** Predefined reasons to choose from. Renders a select dropdown. */
+  reasons?: string[];
+  /** Currently selected reason. */
+  selectedReason?: string;
+  /** Called when the user picks a different reason. */
+  onReasonChange?: (reason: string) => void;
+  /** Placeholder for the reason select. */
+  reasonPlaceholder?: string;
+  /** Free-text notes. Rendered as a textarea. */
+  notes?: string;
+  /** Called when notes change. */
+  onNotesChange?: (notes: string) => void;
+  /** Show the notes textarea. Typically enabled when "Other" is selected. */
+  showNotes?: boolean;
+  /** Mark notes as required. Confirm is disabled until filled. */
+  notesRequired?: boolean;
+  /** Label for the notes textarea. */
+  notesLabel?: string;
+  /** Placeholder for the notes textarea. */
+  notesPlaceholder?: string;
+  /** Optional footnote content rendered below the message (e.g. "What happens next?"). */
+  footnote?: React.ReactNode;
 }
 
 /* ------------------------------------------------------------------ */
@@ -250,6 +272,13 @@ export interface OrderData {
   trackingNumber?: string;
   carrier?: string;
   notes?: string;
+  cancellationReason?: string;
+  cancellationNotes?: string;
+  cancelledBy?: string;
+  cancelledByType?: string;
+  cancelledByPortal?: 'customer-web' | 'customer-mobile' | 'admin-web' | 'system';
+  cancelledByDescription?: string;
+  cancelledAt?: string;
   createdAt: string;
   updatedAt?: string;
   activity?: Array<{

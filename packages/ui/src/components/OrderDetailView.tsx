@@ -447,6 +447,66 @@ function OrderActions({
   );
 }
 
+function CancellationInfoCard({ order }: { order: OrderData }) {
+  if (order.status !== 'cancelled') return null;
+  if (!order.cancelledBy && !order.cancellationReason && !order.cancelledByDescription) return null;
+
+  return (
+    <div className="bg-red-50 border border-red-200 rounded-2xl p-5">
+      <h3 className="text-sm font-semibold text-red-900 mb-3 flex items-center gap-2">
+        <XCircle size={16} />
+        Cancellation Details
+      </h3>
+      <div className="space-y-2 text-sm">
+        {order.cancelledByDescription && (
+          <div className="text-red-800">{order.cancelledByDescription}</div>
+        )}
+        {order.cancelledBy && (
+          <div className="flex justify-between gap-4">
+            <span className="text-red-700">Cancelled by</span>
+            <span className="text-red-900 font-medium text-right">{order.cancelledBy}</span>
+          </div>
+        )}
+        {order.cancelledByType && (
+          <div className="flex justify-between gap-4">
+            <span className="text-red-700">Role</span>
+            <span className="text-red-900 font-medium">{order.cancelledByType}</span>
+          </div>
+        )}
+        {order.cancelledByPortal && (
+          <div className="flex justify-between gap-4">
+            <span className="text-red-700">Portal</span>
+            <span className="text-red-900 font-medium">
+              {order.cancelledByPortal === 'customer-web' && 'Customer Web Portal'}
+              {order.cancelledByPortal === 'customer-mobile' && 'Customer Mobile App'}
+              {order.cancelledByPortal === 'admin-web' && 'Admin Web Portal'}
+              {order.cancelledByPortal === 'system' && 'System (Auto)'}
+            </span>
+          </div>
+        )}
+        {order.cancellationReason && (
+          <div className="flex justify-between gap-4">
+            <span className="text-red-700">Reason</span>
+            <span className="text-red-900 font-medium text-right">{order.cancellationReason}</span>
+          </div>
+        )}
+        {order.cancellationNotes && (
+          <div className="pt-2 border-t border-red-200">
+            <div className="text-red-700 text-xs uppercase tracking-wide mb-1">Additional notes</div>
+            <div className="text-red-900">{order.cancellationNotes}</div>
+          </div>
+        )}
+        {order.cancelledAt && (
+          <div className="flex justify-between gap-4 pt-2 border-t border-red-200">
+            <span className="text-red-700">Cancelled at</span>
+            <span className="text-red-900 font-medium">{formatDateTime(order.cancelledAt)}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /*  Main Component                                                     */
 /* ------------------------------------------------------------------ */
@@ -498,6 +558,7 @@ export function OrderDetailView({
             onRequestReturn={onRequestReturn}
             onCancelOrder={onCancelOrder}
           />
+          <CancellationInfoCard order={order} />
         </div>
       </div>
     </div>

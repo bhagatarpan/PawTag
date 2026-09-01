@@ -1325,7 +1325,7 @@ export function DetailDrawer({
           )}
         </div>
       </div>
-      <OrderDetailDrawer order={selectedAdminOrder} onClose={() => setSelectedAdminOrder(null)} onRefresh={() => { fetchUserOrders(); onRefresh(); }} />
+      <OrderDetailDrawer order={selectedAdminOrder} onClose={() => setSelectedAdminOrder(null)} onRefresh={() => { fetchUserOrders(); onRefresh(); }} onCancel={() => {}} onRefund={() => {}} cancellationReasons={[]} />
     </div>
   );
 }

@@ -82,6 +82,9 @@ PawTag is a pet recovery platform that solves the problem of reuniting lost pets
 - Shipment tracking with automated carrier polling (5-min intervals)
 - Payment transaction audit trail and reconciliation
 - Self-service returns and order cancellation with auto-refund
+- **Order cancellation with reason selection** — predefined reasons in CMS (8 defaults), customer and admin both select from dropdown, "Other" prompts for notes (required)
+- **Full cancellation audit trail** — captures `cancelledBy` (e.g., "Customer (Sarah Johnson)" or "Dave Macenzie (Customer Service)"), `cancelledByType` (role name), `cancelledByPortal` (`customer-web`, `customer-mobile`, `admin-web`, `system`), `cancelledByDescription`, `cancelledAt` timestamp
+- **Admin-managed cancellation reasons** — edit, add, remove, reorder via `/admin/commerce-settings`
 - Discount/promo code management (percentage, fixed, usage limits)
 - CMS-driven commerce settings (35+ configurable settings)
 - Cart configuration via CMS: TTL, max items per cart, price revalidation toggle
@@ -642,6 +645,72 @@ stateDiagram-v2
     cancelled --> [*]
     refunded --> [*]
 ```
+
+### Order Cancellation Workflow
+
+Orders can be cancelled from three sources — each captures the same rich audit fields (`cancelledBy`, `cancelledByType`, `cancelledByPortal`, `cancelledByDescription`, `cancelledAt`):
+
+| Source | Endpoint | When Allowed |
+|--------|----------|--------------|
+| **Customer** | `POST /api/customer/orders/:id/cancel` | Status `paid` or `packing` |
+| **Admin** | `POST /api/admin/orders/:id/cancel` | Valid status transition to `cancelled` |
+| **System (auto)** | Background job `jobs/orderAutoCancel.ts` | `pending_payment` older than `commerce.orders.autoCancelMinutes` |
+
+**Customer cancellation flow:**
+
+1. Customer opens an order in `paid` or `packing` status → clicks "Cancel Order"
+2. Modal opens with title "Cancel Order", a warning (no refund warning — that only shows in admin), a **reason dropdown** populated from `GET /api/public/commerce/cancellation-reasons` (8 default reasons)
+3. If the customer selects "Other" → an **Additional notes** textarea appears and becomes required
+4. Customer confirms → `POST /api/customer/orders/:id/cancel` with `{ reason, notes?, portal: 'customer-web' }`
+5. Server: status check, refund via Stripe (if payment completed), set all 6 cancellation fields, release stock, record activity, notify customer
+6. Order detail refreshes showing the "Cancellation Details" section
+
+**Admin cancellation flow:**
+
+1. Admin opens an order in the detail drawer → clicks "Cancel Order"
+2. Modal opens with title "Cancel Order", warning ("This will cancel the order, restore stock, and process a refund if payment was completed. This action cannot be undone."), a **reason dropdown** populated from `GET /api/admin/commerce/cancellation-reasons`
+3. If the admin selects "Other" → an **Additional notes** textarea appears and becomes required
+4. Admin confirms → `POST /api/admin/orders/:id/cancel` with `{ reason, notes? }`
+5. Server: resolve actor's full name and RBAC role via `resolveActor()`, set all 6 fields with `cancelledByPortal: 'admin-web'`, release stock, record activity, audit, notify customer
+6. List refreshes; order shows the "Cancellation Details" section
+
+**Auto-cancel (system) flow:**
+
+1. Job runs every 60 seconds, finds `pending_payment` orders older than threshold
+2. Sets `cancelledBy = "CANCELLED BY SYSTEM (AUTO)"`, `cancelledByType = "System"`, `cancelledByPortal = "system"`, `cancelledByDescription = "Order is auto-cancelled by System after no payment received within X minutes"`, `cancelledAt`, reason = `"Auto-cancelled: no payment received within X minutes"`
+3. Releases stock, records activity (`"Order auto-cancelled by System: <reason> : AT : <timestamp>"`), notifies customer
+
+**Activity log message format:**
+
+| Actor | Format |
+|-------|--------|
+| Customer | `Order cancelled by <Customer FullName> (Customer): <Reason> : AT : <ISO Timestamp>` |
+| Admin | `Order cancelled by <Admin FullName> (<Role DisplayName>): <Reason> : AT : <ISO Timestamp>` |
+| System | `Order auto-cancelled by System: <Reason> : AT : <ISO Timestamp>` |
+
+**Data model (`Order` schema):**
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `cancellationReason` | `String` | Selected reason (e.g., "Ordered by mistake") |
+| `cancellationNotes` | `String` | Free-text additional notes when "Other" selected |
+| `cancelledBy` | `String` | Human-readable: `"Customer (Sarah Johnson)"` or `"Dave Macenzie (Customer Service)"` or `"CANCELLED BY SYSTEM (AUTO)"` |
+| `cancelledByType` | `String` | **Not an enum** — RBAC roles are dynamic; uses `Role.displayName` from populated `User.roles[]` |
+| `cancelledByPortal` | `enum: 'customer-web' \| 'customer-mobile' \| 'admin-web' \| 'system'` | Fixed list of known portals |
+| `cancelledByDescription` | `String` | Full human description (e.g., `"Order is Cancelled via Admin Web Portal by Dave Macenzie (Customer Service)"`) |
+| `cancelledAt` | `Date` | Timestamp of cancellation |
+
+**Helper (`packages/api/src/lib/actor.ts`):**
+
+- `resolveActor(userId, fallbackType)` — picks the highest-privileged active role from `User.roles[]` (sorted by `isSuperAdmin DESC, isSystemRole DESC`), falls back to legacy `User.role`
+- `formatCancelledBy(fullName, roleDisplayName)` — produces the `cancelledBy` string
+- `formatCancelledByDescription(portal, fullName, roleLabel)` — produces the full description
+- `formatActivityMessage(cancelledBy, reason, at?)` — canonical log message
+- `formatSystemActivityMessage(reason, at?)` — system-prefixed log message
+
+**Admin-managed reasons:** `/admin/commerce-settings` → "Cancellation Reasons" card allows admins to add, remove, and reorder the predefined list. Changes are audited (`cancellation_reasons_updated` event, MEDIUM severity) and immediately reflected in the customer modal.
+
+**Modal reuse:** The shared `ConfirmDialog` (`packages/ui/src/components/ConfirmDialog.tsx`) was extended (not duplicated) with optional props: `reasons`, `selectedReason`, `onReasonChange`, `showNotes`, `notesRequired`, `notes`, `onNotesChange`, `notesLabel`, `notesPlaceholder`. Both the admin Orders page and customer OrderDetail page consume the same component with their own context.
 
 ### Escalation System
 

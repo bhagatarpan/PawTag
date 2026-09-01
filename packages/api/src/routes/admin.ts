@@ -21,6 +21,7 @@ import {
 import { sendPasswordChangedEmail } from '../services/email.service';
 import { isValidTransition } from '../services/orderStatus.service';
 import { notifyCustomerOfStatusChange } from '../services/orderNotification.service';
+import { resolveActor, formatActivityMessage, formatCancelledBy, formatCancelledByDescription } from '../lib/actor';
 import {
   User,
   Pet,
@@ -2502,8 +2503,8 @@ router.put('/orders/:id/status', requirePermission('order.update'), async (req: 
 // --- Cancel Order ---
 router.post('/orders/:id/cancel', requirePermission('order.update'), async (req: AuthRequest, res: Response) => {
   try {
-    const { reason } = req.body;
-    if (!reason) {
+    const { reason, notes } = req.body;
+    if (!reason || typeof reason !== 'string' || !reason.trim()) {
       res.status(400).json({ success: false, error: 'Cancellation reason is required' });
       return;
     }
@@ -2516,17 +2517,33 @@ router.post('/orders/:id/cancel', requirePermission('order.update'), async (req:
       return;
     }
 
+    const actor = await resolveActor(req.user!.id, 'admin');
+    const cancelledAt = new Date();
+    const cancelledBy = formatCancelledBy(actor.fullName, actor.displayName);
+    const cancelledByDescription = formatCancelledByDescription('admin-web', actor.fullName, actor.displayName);
+    const activityMessage = formatActivityMessage(cancelledBy, reason, cancelledAt);
+
     const previousStatus = order.status;
     order.status = 'cancelled';
     order.cancellationReason = reason;
+    order.cancellationNotes = notes;
+    order.cancelledBy = cancelledBy;
+    order.cancelledByType = actor.displayName;
+    order.cancelledByPortal = 'admin-web';
+    order.cancelledByDescription = cancelledByDescription;
+    order.cancelledAt = cancelledAt;
     await order.save();
 
     // Restore stock — release reservations made during checkout
-    const { inventoryService } = await import('../commerce/services/inventory.service');
-    await inventoryService.releaseForOrder(String(order._id), order.items.map((item: any) => ({
-      productId: String(item.productId),
-      quantity: item.quantity,
-    })));
+    try {
+      const { inventoryService } = await import('../commerce/services/inventory.service');
+      await inventoryService.releaseForOrder(String(order._id), order.items.map((item: any) => ({
+        productId: String(item.productId),
+        quantity: item.quantity,
+      })));
+    } catch (stockErr) {
+      logger.error({ err: stockErr, orderId: req.params.id }, 'Failed to release stock on admin cancel');
+    }
 
     await auditAdminEvent(req, {
       action: 'cancel_order',
@@ -2538,8 +2555,41 @@ router.post('/orders/:id/cancel', requirePermission('order.update'), async (req:
       outcome: 'SUCCESS',
       severity: 'HIGH',
       changedFields: [{ field: 'status', before: previousStatus, after: 'cancelled', sensitive: false }],
-      metadata: { orderNumber: order.orderNumber, previousStatus, reason, amount: order.payment.amount, stockRestored: true },
+      metadata: {
+        orderNumber: order.orderNumber,
+        previousStatus,
+        reason,
+        notes,
+        amount: order.payment.amount,
+        stockRestored: true,
+        cancelledBy,
+        cancelledByType: actor.displayName,
+        cancelledByPortal: 'admin-web',
+      },
     });
+
+    // Record activity log on the order itself
+    await Order.updateOne(
+      { _id: order._id },
+      {
+        $push: {
+          activity: {
+            type: 'cancelled',
+            message: activityMessage,
+            timestamp: cancelledAt,
+            actor: 'admin',
+            metadata: {
+              reason,
+              notes,
+              cancelledBy,
+              cancelledByType: actor.displayName,
+              cancelledByPortal: 'admin-web',
+              cancelledAt: cancelledAt.toISOString(),
+            },
+          },
+        },
+      },
+    );
 
     // Notify customer
     try {

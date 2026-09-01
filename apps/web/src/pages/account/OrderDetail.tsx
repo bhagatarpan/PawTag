@@ -1,9 +1,20 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Package, Loader2 } from 'lucide-react';
-import { OrderDetailView } from '@pawtag/ui';
+import { OrderDetailView, ConfirmDialog } from '@pawtag/ui';
 import type { OrderData, InvoiceData } from '@pawtag/ui';
 import api from '../../lib/api';
+
+const DEFAULT_REASONS = [
+  'Ordered by mistake',
+  'Found a better price',
+  'Shipping takes too long',
+  'Need to change address or payment',
+  'Item not as described',
+  'Duplicate order',
+  'Financial reasons',
+  'Other',
+];
 
 export default function OrderDetail() {
   const { id } = useParams<{ id: string }>();
@@ -12,6 +23,12 @@ export default function OrderDetail() {
   const [invoice, setInvoice] = useState<InvoiceData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [reasons, setReasons] = useState<string[]>(DEFAULT_REASONS);
+
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [selectedReason, setSelectedReason] = useState<string>('');
+  const [notes, setNotes] = useState<string>('');
+  const [cancelLoading, setCancelLoading] = useState(false);
 
   const fetchOrder = async () => {
     if (!id) return;
@@ -35,9 +52,16 @@ export default function OrderDetail() {
     api.get(`/customer/orders/${id}/invoice`)
       .then((res) => setInvoice(res.data.data))
       .catch(() => {});
+
+    api.get('/public/commerce/cancellation-reasons')
+      .then((res) => {
+        if (Array.isArray(res.data?.data) && res.data.data.length > 0) {
+          setReasons(res.data.data);
+        }
+      })
+      .catch(() => {});
   }, [id]);
 
-  // 30s polling — pauses when tab is hidden
   useEffect(() => {
     if (!id) return;
     const POLL_INTERVAL = 30_000;
@@ -105,27 +129,72 @@ export default function OrderDetail() {
     }
   };
 
-  const handleCancelOrder = async () => {
-    if (!confirm('Are you sure you want to cancel this order? A full refund will be processed.')) return;
+  const openCancelModal = () => {
+    setSelectedReason('');
+    setNotes('');
+    setCancelOpen(true);
+  };
+
+  const handleConfirmCancel = async () => {
+    if (!selectedReason) return;
+    if (selectedReason === 'Other' && !notes.trim()) return;
+    setCancelLoading(true);
     try {
-      const res = await api.post(`/customer/returns/orders/${order._id}/cancel`, { reason: 'Cancelled by customer' });
-      if (res.data.success) {
-        alert('Order cancelled and refund initiated. You should see the refund in 5-10 business days.');
-        fetchOrder();
-      }
+      await api.post(`/customer/returns/orders/${order._id}/cancel`, {
+        reason: selectedReason,
+        notes: selectedReason === 'Other' ? notes : undefined,
+        portal: 'customer-web',
+      });
+      alert('Order cancelled. A refund will be processed within 5–10 business days.');
+      setCancelOpen(false);
+      fetchOrder();
     } catch (err: any) {
       alert(err.response?.data?.error || 'Failed to cancel order');
+    } finally {
+      setCancelLoading(false);
     }
   };
 
   return (
-    <OrderDetailView
-      order={order}
-      invoice={invoice}
-      onViewInvoice={handleViewInvoice}
-      onRequestReturn={() => navigate(`/account/orders/${order._id}/return`)}
-      onCancelOrder={handleCancelOrder}
-      onBackToOrders={() => navigate('/account/orders')}
-    />
+    <>
+      <OrderDetailView
+        order={order}
+        invoice={invoice}
+        onViewInvoice={handleViewInvoice}
+        onRequestReturn={() => navigate(`/account/orders/${order._id}/return`)}
+        onCancelOrder={openCancelModal}
+        onBackToOrders={() => navigate('/account/orders')}
+      />
+
+      <ConfirmDialog
+        open={cancelOpen}
+        onClose={() => setCancelOpen(false)}
+        onConfirm={handleConfirmCancel}
+        title="Cancel Order"
+        message="Are you sure you want to cancel this order?"
+        confirmLabel="Confirm Cancellation"
+        variant="danger"
+        loading={cancelLoading}
+        reasons={reasons}
+        selectedReason={selectedReason}
+        onReasonChange={setSelectedReason}
+        showNotes={selectedReason === 'Other'}
+        notesRequired={selectedReason === 'Other'}
+        notes={notes}
+        onNotesChange={setNotes}
+        notesLabel="Additional notes"
+        notesPlaceholder="Please provide more detail about why you're cancelling"
+        footnote={
+          <div>
+            <p className="font-medium mb-1">What happens next?</p>
+            <ul className="list-disc pl-5 space-y-0.5 text-primary-800">
+              <li>A full refund will be processed automatically</li>
+              <li>Refunds typically take 5–10 business days to appear on your statement</li>
+              <li>Your order status will update to "Cancelled"</li>
+            </ul>
+          </div>
+        }
+      />
+    </>
   );
 }

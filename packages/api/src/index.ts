@@ -99,6 +99,7 @@ import adminPaymentRoutes from './routes/admin-payments';
 import adminPromoCodeRoutes from './routes/admin-promocodes';
 import stripeWebhookRoutes from './routes/stripe-webhooks';
 import promoPublicRoutes from './routes/promo-public';
+import commercePublicRoutes from './routes/commerce-public';
 
 import { siteAvailabilityMiddleware } from './middleware/site-availability';
 import { shutdownTracing } from './lib/tracing';
@@ -281,6 +282,7 @@ app.use('/api/admin/commerce/shipments', adminShipmentRoutes);
 app.use('/api/admin/commerce/payments', adminPaymentRoutes);
 app.use('/api/admin/commerce/promo-codes', adminPromoCodeRoutes);
 app.use('/api/public/promo', promoPublicRoutes);
+app.use('/api/public/commerce', commercePublicRoutes);
 
 // Stripe webhooks need raw body for signature verification
 app.use('/api/webhooks/stripe', express.raw({ type: 'application/json' }), stripeWebhookRoutes);
