@@ -205,6 +205,35 @@ A consistent 4px base unit, multiplied to create a predictable rhythm:
 | **Warning** | `inline-block px-3 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-semibold` |
 | **Error** | `inline-block px-3 py-1 rounded-full bg-red-100 text-red-700 text-xs font-semibold` |
 
+### Modals & Confirmation Dialogs
+
+Use the shared `ConfirmDialog` from `@pawtag/ui` rather than creating custom modals. The component is reusable and supports reason selection, notes, and footnote.
+
+**Pattern (cancellation / destructive confirmation):**
+
+| Section | Classes / Behavior |
+|---------|--------------------|
+| **Container** | `fixed inset-0 z-50 flex items-center justify-center` with `bg-black/40` backdrop |
+| **Card** | `relative bg-white rounded-xl shadow-2xl w-full max-w-lg p-6 mx-4 max-h-[90vh] flex flex-col` |
+| **Header** | Icon circle (`w-10 h-10 rounded-full`) + title (`text-lg font-semibold text-gray-900`) + close button (top-right, `text-gray-400 hover:text-gray-600`) |
+| **Icon circle** | `danger`: `bg-red-100` / `text-red-600` · `warning`: `bg-amber-100` / `text-amber-600` · `primary`: `bg-primary-100` / `text-primary-600` |
+| **Reason dropdown** | Placed FIRST, label "Reason *" with red asterisk, `border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500` |
+| **Description** | `text-sm text-gray-500 mt-3` |
+| **Footnote** | `mt-3 bg-primary-50 border border-primary-200 rounded-lg p-3 text-sm text-primary-900` — for "What happens next?" callouts |
+| **Notes textarea** | Same form-input styling as select, `resize-none`, required when "Other" selected |
+| **Sticky footer** | `flex justify-end gap-3 pt-4 mt-4 border-t border-gray-100 bg-white` |
+| **Cancel button** | `px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50` |
+| **Confirm button (danger)** | `px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg disabled:opacity-50` |
+| **Confirm button (warning)** | `bg-amber-600 hover:bg-amber-700` |
+| **Confirm button (primary)** | `bg-primary-600 hover:bg-primary-700` |
+| **Disabled state** | `disabled:opacity-50 cursor-not-allowed pointer-events-none` — Confirm disabled when required fields are missing |
+
+**Validation:** Confirm button is disabled when:
+- A reason is required but not selected
+- Notes are required (`notesRequired={true}`) but empty or whitespace
+
+**Reuse rule:** Do not create custom modals for confirmations. Extend `ConfirmDialog` with optional props (reasons, notes, footnote) instead. This keeps destructive actions consistent across the app.
+
 ### Order Status Colors
 
 All order status displays (badges, steppers, banners, left borders) must use these design tokens. No hardcoded colors.

@@ -37,7 +37,7 @@ import { refundService } from '../commerce/services/refund.service';
 import { getAllSettings, updateSetting, type CommerceSettingKey } from '../commerce/config';
 import { logOrderEvent } from '../commerce/audit';
 import { isValidTransition } from '../services/orderStatus.service';
-import { Order, Invoice, type IOrderDocument } from '@pawtag/db';
+import { Order, Invoice, Setting, type IOrderDocument } from '@pawtag/db';
 import { toAppError } from '../lib/app-errors';
 import { auditService } from '../services/audit';
 import logger from '../lib/logger';
@@ -518,6 +518,87 @@ router.put('/settings', requirePermission('setting.update'), async (req: AuthReq
     );
 
     res.json({ success: true });
+  } catch (err) {
+    const error = toAppError(err);
+    res.status(error.httpStatus).json({ success: false, error: error.userMessage });
+  }
+});
+
+// ─── Cancellation Reasons Management ─────────────────────────────
+
+/**
+ * GET /api/admin/commerce/cancellation-reasons
+ *
+ * Returns the list of predefined cancellation reasons. Falls back to defaults
+ * if the CMS setting is missing or invalid.
+ */
+router.get('/cancellation-reasons', requirePermission('setting.read'), async (_req: AuthRequest, res: Response) => {
+  try {
+    const setting = await Setting.findOne({ key: 'commerce.orders.cancellationReasons' }).lean();
+    const defaults = ['Ordered by mistake', 'Found a better price', 'Shipping takes too long', 'Need to change address or payment', 'Item not as described', 'Duplicate order', 'Financial reasons', 'Other'];
+    let reasons: string[] = defaults;
+    if (setting?.value) {
+      try {
+        const parsed = JSON.parse(setting.value);
+        if (Array.isArray(parsed) && parsed.every((r) => typeof r === 'string') && parsed.length > 0) {
+          reasons = parsed;
+        }
+      } catch {
+        // use defaults
+      }
+    }
+    res.json({ success: true, data: reasons });
+  } catch (err) {
+    const error = toAppError(err);
+    res.status(error.httpStatus).json({ success: false, error: error.userMessage });
+  }
+});
+
+/**
+ * PUT /api/admin/commerce/cancellation-reasons
+ *
+ * Update the list of predefined cancellation reasons.
+ * Body: { reasons: string[] }
+ */
+router.put('/cancellation-reasons', requirePermission('setting.update'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { reasons } = req.body;
+    if (!Array.isArray(reasons) || reasons.length === 0) {
+      res.status(400).json({ success: false, error: 'reasons array is required with at least one entry' });
+      return;
+    }
+    if (!reasons.every((r) => typeof r === 'string' && r.trim().length > 0)) {
+      res.status(400).json({ success: false, error: 'Each reason must be a non-empty string' });
+      return;
+    }
+
+    await Setting.findOneAndUpdate(
+      { key: 'commerce.orders.cancellationReasons' },
+      { value: JSON.stringify(reasons), updatedBy: req.user!.id },
+      { upsert: true, new: true },
+    );
+
+    await auditService.log(
+      {
+        actorType: req.auditContext?.actorType as any,
+        actorId: req.user!.id,
+        actorEmail: req.user!.email,
+        actorUsername: (req.auditContext?.actorUsername || req.user!.email) as string,
+      },
+      {
+        action: 'cancellation_reasons_updated',
+        eventType: 'admin.commerce.cancellation_reasons_updated',
+        eventCategory: 'UPDATE',
+        operationType: 'UPDATE',
+        resourceType: 'Setting',
+        resourceId: 'commerce.orders.cancellationReasons',
+        outcome: 'SUCCESS',
+        severity: 'MEDIUM',
+        metadata: { reasonCount: reasons.length },
+      },
+    );
+
+    res.json({ success: true, data: reasons });
   } catch (err) {
     const error = toAppError(err);
     res.status(error.httpStatus).json({ success: false, error: error.userMessage });

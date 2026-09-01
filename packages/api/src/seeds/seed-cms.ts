@@ -162,6 +162,7 @@ async function run() {
         { key: 'commerce.checkout.pendingOrderTtlMinutes', value: '30', displayValue: 'Pending Order TTL (min)', category: 'commerce', description: 'How long a pending order is held' },
         // Orders
         { key: 'commerce.orders.autoCancelMinutes', value: '60', displayValue: 'Auto-Cancel (min)', category: 'commerce', description: 'Auto-cancel unpaid orders after minutes' },
+        { key: 'commerce.orders.cancellationReasons', value: JSON.stringify(['Ordered by mistake', 'Found a better price', 'Shipping takes too long', 'Need to change address or payment', 'Item not as described', 'Duplicate order', 'Financial reasons', 'Other']), displayValue: 'Cancellation Reasons', category: 'commerce', description: 'Predefined reasons selectable when cancelling an order' },
         { key: 'commerce.orders.numberPrefix', value: 'PT', displayValue: 'Order Number Prefix', category: 'commerce', description: 'Order number prefix' },
         { key: 'commerce.orders.numberLength', value: '6', displayValue: 'Order Number Length', category: 'commerce', description: 'Order number length after prefix' },
         // Subscriptions

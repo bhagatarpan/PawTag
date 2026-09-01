@@ -891,6 +891,48 @@ Visual page builder using `@puckeditor/core` in both admin and web apps:
 - **QR code PNG:** `GET /api/tags/:tagId/qr` — generates QR code on-demand
 - **Printable sticker:** `GET /api/tags/:tagId/sticker` — HTML sticker with QR code for physical tags
 
+### Order Cancellation Workflow
+
+Orders can be cancelled from three sources, all of which capture rich audit data:
+
+| Source | Endpoint | When Allowed |
+|--------|----------|--------------|
+| **Customer** | `POST /api/customer/orders/:id/cancel` | Status `paid` or `packing` |
+| **Admin** | `POST /api/admin/orders/:id/cancel` | Valid transition to `cancelled` |
+| **System (auto)** | Background job (`jobs/orderAutoCancel.ts`) | `pending_payment` older than `commerce.orders.autoCancelMinutes` |
+
+**Reason selection:** A predefined list is stored in CMS setting `commerce.orders.cancellationReasons` (JSON array of strings, seeded with 8 defaults). The customer portal fetches it from `GET /api/public/commerce/cancellation-reasons` (no auth); the admin portal uses `GET /api/admin/commerce/cancellation-reasons` (`setting.read` permission). When the user selects "Other", an additional notes textarea appears and is **required** before the Confirm button is enabled.
+
+**Data captured on every cancellation (`Order` model):**
+
+| Field | Type | Purpose |
+|-------|------|---------|
+| `cancellationReason` | `String` | Selected dropdown reason |
+| `cancellationNotes` | `String` | Free-text notes (when "Other" selected) |
+| `cancelledBy` | `String` | Human-readable: `"Customer (Sarah Johnson)"` or `"Dave Macenzie (Customer Service)"` or `"CANCELLED BY SYSTEM (AUTO)"` |
+| `cancelledByType` | `String` | Role display name (e.g., `"Customer Service"`, `"Admin"`, `"System"`) — **not an enum** because RBAC roles are dynamic |
+| `cancelledByPortal` | `enum: 'customer-web' \| 'customer-mobile' \| 'admin-web' \| 'system'` | Source portal |
+| `cancelledByDescription` | `String` | Full description, e.g., `"Order is Cancelled via Admin Web Portal by Dave Macenzie (Customer Service)"` |
+| `cancelledAt` | `Date` (indexed) | Timestamp of cancellation |
+
+**Activity log message format:**
+
+- Customer/Admin: `Order cancelled by <cancelledBy>: <Reason> : AT : <ISO Timestamp>`
+- System: `Order auto-cancelled by System: <Reason> : AT : <ISO Timestamp>`
+
+**Helpers (`packages/api/src/lib/actor.ts`):**
+
+- `resolveActor(userId, fallbackType)` — fetches user, picks the highest-privileged role from `User.roles[]` (sorted by `isSuperAdmin` then `isSystemRole`), returns `{ fullName, displayName, roleName }`. Falls back to legacy `User.role` field, then to "Customer"/"Unknown".
+- `formatCancelledBy(fullName, roleDisplayName)` — produces `"Customer (FullName)"` or `"FullName (Role)"`.
+- `formatCancellationPortalLabel(portal)` — maps portal enum to human label.
+- `formatCancelledByDescription(portal, fullName, roleLabel)` — full human description.
+- `formatActivityMessage(cancelledBy, reason, at?)` — canonical log format.
+- `formatSystemActivityMessage(reason, at?)` — system-prefixed log format.
+
+**Modal reuse (per SKILL.md):** The shared `ConfirmDialog` (`packages/ui/src/components/ConfirmDialog.tsx`) was extended (not duplicated) with optional props: `reasons`, `selectedReason`, `onReasonChange`, `showNotes`, `notesRequired`, `notes`, `onNotesChange`. The admin Orders page and customer OrderDetail page both consume the same component with their own context.
+
+**Admin Settings:** A new "Cancellation Reasons" card in `/admin/commerce-settings` allows admins to add, remove, and reorder the predefined reason list. Changes are audited (`cancellation_reasons_updated` event, MEDIUM severity).
+
 ### CI/CD Pipeline (GitHub Actions)
 
 **File:** `.github/workflows/ci.yml`

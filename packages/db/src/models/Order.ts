@@ -60,6 +60,12 @@ export interface IOrderDocument extends Document {
   notes?: string;
   referredByCode?: string;
   cancellationReason?: string;
+  cancellationNotes?: string;
+  cancelledBy?: string;
+  cancelledByType?: string;
+  cancelledByPortal?: 'customer-web' | 'customer-mobile' | 'admin-web' | 'system';
+  cancelledByDescription?: string;
+  cancelledAt?: Date;
   refundReason?: string;
   deliveredAt?: Date;
   deletedAt?: Date;
@@ -138,6 +144,15 @@ const OrderSchema = new Schema<IOrderDocument>(
     notes: String,
     referredByCode: { type: String },
     cancellationReason: { type: String },
+    cancellationNotes: { type: String },
+    cancelledBy: { type: String, index: true },
+    cancelledByType: { type: String, index: true },
+    cancelledByPortal: {
+      type: String,
+      enum: ['customer-web', 'customer-mobile', 'admin-web', 'system'],
+    },
+    cancelledByDescription: { type: String },
+    cancelledAt: { type: Date, index: true },
     refundReason: { type: String },
     deliveredAt: { type: Date },
     deletedAt: { type: Date, default: null },

@@ -4,7 +4,7 @@
  */
 
 import { useEffect, useState, useCallback } from 'react';
-import { Save, Loader2, RefreshCcw, CreditCard, Truck, Receipt, Package, ShoppingCart, Clock, RotateCcw, Settings, Shield, Bell, Info } from 'lucide-react';
+import { Save, Loader2, RefreshCcw, CreditCard, Truck, Receipt, Package, ShoppingCart, Clock, RotateCcw, Settings, Shield, Bell, Info, Plus, Trash2, Ban, X } from 'lucide-react';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
 
@@ -126,6 +126,9 @@ export default function CommerceSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+  const [cancellationReasons, setCancellationReasons] = useState<string[]>([]);
+  const [savingReasons, setSavingReasons] = useState(false);
+  const [newReason, setNewReason] = useState('');
 
   const fetchSettings = useCallback(async () => {
     try {
@@ -142,7 +145,59 @@ export default function CommerceSettings() {
     }
   }, []);
 
+  const fetchCancellationReasons = useCallback(async () => {
+    try {
+      const res = await api.get('/admin/commerce/cancellation-reasons');
+      if (Array.isArray(res.data?.data)) {
+        setCancellationReasons(res.data.data);
+      }
+    } catch {
+      // non-critical
+    }
+  }, []);
+
+  const saveCancellationReasons = async () => {
+    setSavingReasons(true);
+    try {
+      const res = await api.put('/admin/commerce/cancellation-reasons', { reasons: cancellationReasons });
+      if (Array.isArray(res.data?.data)) {
+        setCancellationReasons(res.data.data);
+      }
+      toast.success('Cancellation reasons updated');
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to update cancellation reasons');
+    } finally {
+      setSavingReasons(false);
+    }
+  };
+
+  const addReason = () => {
+    const trimmed = newReason.trim();
+    if (!trimmed) return;
+    if (cancellationReasons.includes(trimmed)) {
+      toast.error('This reason already exists');
+      return;
+    }
+    setCancellationReasons((prev) => [...prev, trimmed]);
+    setNewReason('');
+  };
+
+  const removeReason = (idx: number) => {
+    setCancellationReasons((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const moveReason = (idx: number, dir: -1 | 1) => {
+    setCancellationReasons((prev) => {
+      const next = [...prev];
+      const target = idx + dir;
+      if (target < 0 || target >= next.length) return prev;
+      [next[idx], next[target]] = [next[target], next[idx]];
+      return next;
+    });
+  };
+
   useEffect(() => { fetchSettings(); }, [fetchSettings]);
+  useEffect(() => { fetchCancellationReasons(); }, [fetchCancellationReasons]);
 
   const handleChange = (key: string, value: string) => {
     setEditedValues((prev) => ({ ...prev, [key]: value }));
@@ -280,6 +335,85 @@ export default function CommerceSettings() {
             </div>
           </div>
         ))}
+
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100 bg-gray-50">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <span className="text-red-600"><Ban size={20} /></span>
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900">Cancellation Reasons</h2>
+                  <p className="text-sm text-gray-500">Manage the list of reasons customers and admins can select when cancelling an order.</p>
+                </div>
+              </div>
+              <button
+                onClick={saveCancellationReasons}
+                disabled={savingReasons}
+                className="flex items-center gap-2 px-4 py-2 text-sm text-white bg-teal-600 rounded-lg hover:bg-teal-700 disabled:opacity-50"
+              >
+                {savingReasons ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                Save Reasons
+              </button>
+            </div>
+          </div>
+          <div className="p-6 space-y-3">
+            {cancellationReasons.length === 0 && (
+              <p className="text-sm text-gray-500">No reasons configured. Add a reason below.</p>
+            )}
+            {cancellationReasons.map((r, idx) => (
+              <div key={`${r}-${idx}`} className="flex items-center gap-2">
+                <span className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50">
+                  {r}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => moveReason(idx, -1)}
+                  disabled={idx === 0}
+                  className="p-2 text-gray-500 hover:text-gray-700 disabled:opacity-30"
+                  aria-label="Move up"
+                >
+                  ▲
+                </button>
+                <button
+                  type="button"
+                  onClick={() => moveReason(idx, 1)}
+                  disabled={idx === cancellationReasons.length - 1}
+                  className="p-2 text-gray-500 hover:text-gray-700 disabled:opacity-30"
+                  aria-label="Move down"
+                >
+                  ▼
+                </button>
+                <button
+                  type="button"
+                  onClick={() => removeReason(idx)}
+                  className="p-2 text-red-500 hover:text-red-700"
+                  aria-label="Remove"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            ))}
+            <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
+              <input
+                type="text"
+                value={newReason}
+                onChange={(e) => setNewReason(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addReason(); } }}
+                placeholder="Add a new reason"
+                className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+              />
+              <button
+                type="button"
+                onClick={addReason}
+                className="flex items-center gap-1 px-3 py-2 text-sm text-white bg-teal-600 rounded-lg hover:bg-teal-700 disabled:opacity-50"
+                disabled={!newReason.trim()}
+              >
+                <Plus size={14} />
+                Add
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

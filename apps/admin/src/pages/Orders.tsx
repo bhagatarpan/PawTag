@@ -84,6 +84,12 @@ export interface Order {
   notes?: string;
   referredByCode?: string;
   cancellationReason?: string;
+  cancellationNotes?: string;
+  cancelledBy?: string;
+  cancelledByType?: string;
+  cancelledByPortal?: 'customer-web' | 'customer-mobile' | 'admin-web' | 'system';
+  cancelledByDescription?: string;
+  cancelledAt?: string;
   refundReason?: string;
   deliveredAt?: string;
   activity?: Array<{
@@ -229,10 +235,18 @@ export function OrderDetailDrawer({
   order,
   onClose,
   onRefresh,
+  onCancel,
+  onRefund,
+  cancellationReasons,
+  onNotesChange,
 }: {
   order: Order | null;
   onClose: () => void;
   onRefresh: () => void;
+  onCancel: (orderId: string) => void;
+  onRefund: (orderId: string) => void;
+  cancellationReasons: string[];
+  onNotesChange?: (notes: string) => void;
 }) {
   const [activeTab, setActiveTab] = useState<'info' | 'items' | 'shipping' | 'activity'>('info');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -500,7 +514,7 @@ export function OrderDetailDrawer({
                 )}
                 {availableTransitions.includes('cancelled') && (
                   <button
-                    onClick={() => setStatusFilter('cancel')}
+                    onClick={() => order && onCancel(order._id)}
                     disabled={!!actionLoading}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 disabled:opacity-50"
                   >
@@ -509,7 +523,7 @@ export function OrderDetailDrawer({
                 )}
                 {availableTransitions.includes('refunded') && (
                   <button
-                    onClick={() => setStatusFilter('refund')}
+                    onClick={() => order && onRefund(order._id)}
                     disabled={!!actionLoading}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-orange-700 bg-orange-50 border border-orange-200 rounded-lg hover:bg-orange-100 disabled:opacity-50"
                   >
@@ -541,6 +555,40 @@ export function OrderDetailDrawer({
                     <ExternalLink size={12} />
                   </a>
                 </div>
+              )}
+            </Section>
+          )}
+
+          {order.status === 'cancelled' && (order.cancelledBy || order.cancellationReason) && (
+            <Section title="Cancellation Details" icon={<Ban size={16} />}>
+              {order.cancelledByDescription && (
+                <div className="mb-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
+                  {order.cancelledByDescription}
+                </div>
+              )}
+              {order.cancelledBy && <DetailRow label="Cancelled by" value={order.cancelledBy} />}
+              {order.cancelledByType && <DetailRow label="Role" value={order.cancelledByType} />}
+              {order.cancelledByPortal && (
+                <DetailRow
+                  label="Portal"
+                  value={
+                    order.cancelledByPortal === 'customer-web' ? 'Customer Web Portal' :
+                    order.cancelledByPortal === 'customer-mobile' ? 'Customer Mobile App' :
+                    order.cancelledByPortal === 'admin-web' ? 'Admin Web Portal' :
+                    order.cancelledByPortal === 'system' ? 'System (Auto)' :
+                    order.cancelledByPortal
+                  }
+                />
+              )}
+              {order.cancellationReason && <DetailRow label="Reason" value={order.cancellationReason} />}
+              {order.cancellationNotes && <DetailRow label="Additional notes" value={order.cancellationNotes} />}
+              {order.cancelledAt && (
+                <DetailRow
+                  label="Cancelled at"
+                  value={new Date(order.cancelledAt).toLocaleString('en-NZ', {
+                    day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+                  })}
+                />
               )}
             </Section>
           )}
@@ -846,7 +894,9 @@ export default function Orders() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [actionModal, setActionModal] = useState<{ orderId: string; action: 'cancel' | 'refund' } | null>(null);
   const [reason, setReason] = useState('');
+  const [notes, setNotes] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
+  const [cancellationReasons, setCancellationReasons] = useState<string[]>([]);
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
@@ -902,6 +952,16 @@ export default function Orders() {
   useEffect(() => { fetchOrders(); }, [fetchOrders]);
   useEffect(() => { fetchSummary(); }, [fetchSummary]);
 
+  useEffect(() => {
+    api.get('/admin/commerce/cancellation-reasons')
+      .then((res) => {
+        if (Array.isArray(res.data?.data)) {
+          setCancellationReasons(res.data.data);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   // Auto-refresh every 30 seconds
   useEffect(() => {
     const interval = setInterval(() => {
@@ -915,10 +975,14 @@ export default function Orders() {
     if (!actionModal || !reason.trim()) return;
     setActionLoading(true);
     try {
-      await api.post(`/admin/orders/${actionModal.orderId}/${actionModal.action}`, { reason: reason.trim() });
+      await api.post(`/admin/orders/${actionModal.orderId}/${actionModal.action}`, {
+        reason: reason.trim(),
+        notes: actionModal.action === 'cancel' && reason.trim() === 'Other' ? notes.trim() : undefined,
+      });
       toast.success(actionModal.action === 'cancel' ? 'Order cancelled' : 'Order refunded');
       setActionModal(null);
       setReason('');
+      setNotes('');
       fetchOrders();
       fetchSummary();
     } catch (err: any) {
@@ -1120,23 +1184,33 @@ export default function Orders() {
         order={selectedOrder}
         onClose={() => setSelectedOrder(null)}
         onRefresh={() => { fetchOrders(); fetchSummary(); }}
+        onCancel={(orderId) => setActionModal({ orderId, action: 'cancel' })}
+        onRefund={(orderId) => setActionModal({ orderId, action: 'refund' })}
+        cancellationReasons={cancellationReasons}
       />
 
       {/* Cancel / Refund Modal */}
       {actionModal && (
         <ConfirmDialog
           open={!!actionModal}
-          onClose={() => { setActionModal(null); setReason(''); }}
+          onClose={() => { setActionModal(null); setReason(''); setNotes(''); }}
           onConfirm={executeAction}
           title={actionModal.action === 'cancel' ? 'Cancel Order' : 'Refund Order'}
           message={
             actionModal.action === 'cancel'
-              ? 'This will cancel the order and restore stock. This action cannot be undone.'
+              ? 'This will cancel the order, restore stock, and process a refund if payment was completed. This action cannot be undone.'
               : 'This will refund the payment via Stripe and mark the order as refunded. This action cannot be undone.'
           }
           confirmLabel={actionModal.action === 'cancel' ? 'Cancel Order' : 'Refund Order'}
           variant={actionModal.action === 'cancel' ? 'danger' : 'warning'}
           loading={actionLoading}
+          reasons={actionModal.action === 'cancel' ? cancellationReasons : undefined}
+          selectedReason={actionModal.action === 'cancel' ? reason : undefined}
+          onReasonChange={actionModal.action === 'cancel' ? setReason : undefined}
+          showNotes={actionModal.action === 'cancel' && reason === 'Other'}
+          notesRequired={actionModal.action === 'cancel' && reason === 'Other'}
+          notes={notes}
+          onNotesChange={setNotes}
         />
       )}
     </div>

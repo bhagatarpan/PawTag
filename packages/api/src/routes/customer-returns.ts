@@ -10,11 +10,12 @@
 
 import { Router, Response } from 'express';
 import { AuthRequest, authenticate } from '../middleware/auth';
-import { Order, Return, PaymentTransaction } from '@pawtag/db';
+import { Order, Return, PaymentTransaction, User } from '@pawtag/db';
 import { stripePaymentProvider } from '../commerce/providers/stripe';
 import { inventoryService } from '../commerce/services/inventory.service';
 import { toAppError } from '../lib/app-errors';
 import { notifyCustomerOfStatusChange } from '../services/orderNotification.service';
+import { formatActivityMessage, formatCancelledBy, formatCancelledByDescription, formatCancellationPortalLabel } from '../lib/actor';
 import logger from '../lib/logger';
 
 const router = Router();
@@ -176,7 +177,12 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 router.post('/orders/:id/cancel', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user?.id;
-    const { reason } = req.body;
+    const { reason, notes, portal } = req.body;
+
+    if (!reason || typeof reason !== 'string' || !reason.trim()) {
+      res.status(400).json({ success: false, error: 'Cancellation reason is required' });
+      return;
+    }
 
     const order = await Order.findById(req.params.id);
     if (!order) {
@@ -184,13 +190,11 @@ router.post('/orders/:id/cancel', async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    // Verify order belongs to user
     if (String(order.userId) !== userId) {
       res.status(403).json({ success: false, error: 'Access denied' });
       return;
     }
 
-    // Only allow cancellation before shipment
     const cancellableStatuses = ['paid', 'packing'];
     if (!cancellableStatuses.includes(order.status)) {
       res.status(400).json({
@@ -200,7 +204,12 @@ router.post('/orders/:id/cancel', async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    // Process refund if payment was completed
+    const resolvedPortal: 'customer-web' | 'customer-mobile' =
+      portal === 'customer-mobile' ? 'customer-mobile' : 'customer-web';
+
+    const user = await User.findById(userId).select('fullName').lean();
+    const customerFullName = user?.fullName || 'Customer';
+
     if (order.payment?.status === 'completed' && order.payment?.stripePaymentIntentId) {
       const paymentIntentId = order.payment.stripePaymentIntentId;
       if (!paymentIntentId.startsWith('pi_demo_')) {
@@ -211,7 +220,6 @@ router.post('/orders/:id/cancel', async (req: AuthRequest, res: Response) => {
             reason: 'requested_by_customer',
           });
 
-          // Record refund transaction
           await PaymentTransaction.create({
             orderId: order._id,
             orderNumber: order.orderNumber,
@@ -222,7 +230,7 @@ router.post('/orders/:id/cancel', async (req: AuthRequest, res: Response) => {
             provider: 'stripe',
             providerTransactionId: paymentIntentId,
             initiatedBy: 'customer',
-            notes: reason || 'Customer cancelled order',
+            notes: notes ? `${reason} — ${notes}` : reason,
           });
         } catch (err: any) {
           logger.error({ err, orderId: String(order._id) }, 'Failed to process refund for cancelled order');
@@ -232,15 +240,23 @@ router.post('/orders/:id/cancel', async (req: AuthRequest, res: Response) => {
       }
     }
 
-    // Update order status
+    const cancelledAt = new Date();
+    const cancelledBy = formatCancelledBy(customerFullName, 'Customer');
+    const cancelledByDescription = formatCancelledByDescription(resolvedPortal, customerFullName, 'Customer');
+
     order.status = 'cancelled';
-    order.cancellationReason = reason || 'Cancelled by customer';
+    order.cancellationReason = reason;
+    order.cancellationNotes = notes;
+    order.cancelledBy = cancelledBy;
+    order.cancelledByType = 'Customer';
+    order.cancelledByPortal = resolvedPortal;
+    order.cancelledByDescription = cancelledByDescription;
+    order.cancelledAt = cancelledAt;
     if (order.payment) {
       order.payment.status = 'refunded';
     }
     await order.save();
 
-    // Release inventory
     try {
       await inventoryService.releaseForOrder(order._id.toString(), order.items.map((item) => ({
         productId: String(item.productId),
@@ -250,30 +266,38 @@ router.post('/orders/:id/cancel', async (req: AuthRequest, res: Response) => {
       // Best-effort stock release
     }
 
-    // Record activity
+    const activityMessage = formatActivityMessage(cancelledBy, reason, cancelledAt);
     await Order.updateOne(
       { _id: order._id },
       {
         $push: {
           activity: {
             type: 'cancelled',
-            message: `Order cancelled by customer${reason ? `: ${reason}` : ''}`,
-            timestamp: new Date(),
+            message: activityMessage,
+            timestamp: cancelledAt,
             actor: 'customer',
-            metadata: { reason },
+            metadata: {
+              reason,
+              notes,
+              cancelledBy,
+              cancelledByType: 'Customer',
+              cancelledByPortal: resolvedPortal,
+              cancelledAt: cancelledAt.toISOString(),
+            },
           },
         },
       },
     );
 
-    // Notify customer
-    notifyCustomerOfStatusChange(order, 'cancelled').catch(() => {});
+    notifyCustomerOfStatusChange(order, 'cancelled', { reason }).catch(() => {});
 
     logger.info({
       orderId: String(order._id),
       orderNumber: order.orderNumber,
       userId,
       reason,
+      cancelledBy,
+      cancelledByPortal: resolvedPortal,
     }, 'Order cancelled by customer');
 
     res.json({ success: true, data: { status: 'cancelled', refundAmount: order.payment?.amount || 0 } });
