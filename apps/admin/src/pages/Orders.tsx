@@ -24,7 +24,7 @@ import {
 /* ------------------------------------------------------------------ */
 
 interface OrderItem {
-  productId: string;
+  productId: string | { _id: string; images?: string[]; category?: string };
   productName: string;
   variantName?: string;
   petName?: string;
@@ -563,34 +563,80 @@ export function OrderDetailDrawer({
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {order.items?.map((item, idx) => (
-                  <tr key={idx} className="hover:bg-gray-50">
-                    <td className="px-4 py-2.5">
-                      <div className="font-medium text-gray-900">{item.productName}</div>
-                      {item.petName && (
-                        <div className="text-xs text-gray-500">For: {item.petName}</div>
-                      )}
-                    </td>
-                    <td className="px-4 py-2.5 text-gray-600">{item.variantName || '—'}</td>
-                    <td className="px-4 py-2.5">
-                      {item.tagId ? (
-                        <span className="font-mono text-xs bg-primary-50 text-primary-700 px-2 py-0.5 rounded">{item.tagId}</span>
-                      ) : '—'}
-                    </td>
-                    <td className="px-4 py-2.5 text-xs text-gray-500">{item.sku || '—'}</td>
-                    <td className="px-4 py-2.5 text-center text-gray-600">{item.quantity}</td>
-                    <td className="px-4 py-2.5 text-right text-gray-600">{formatCurrency(item.unitPrice)}</td>
-                    <td className="px-4 py-2.5 text-right font-medium text-gray-900">{formatCurrency(item.totalPrice)}</td>
-                  </tr>
-                ))}
+                {order.items?.map((item, idx) => {
+                  const productImages = typeof item.productId === 'object' ? item.productId.images : undefined;
+                  const productCategory = typeof item.productId === 'object' ? item.productId.category : undefined;
+                  const imageUrl = productImages?.[0];
+                  return (
+                    <tr key={idx} className="hover:bg-gray-50">
+                      <td className="px-4 py-2.5">
+                        <div className="flex items-center gap-3">
+                          {imageUrl ? (
+                            <img src={imageUrl} alt={item.productName} className="w-10 h-10 rounded-lg object-cover border border-gray-200 shrink-0" />
+                          ) : (
+                            <div className="w-10 h-10 rounded-lg bg-primary-50 flex items-center justify-center shrink-0">
+                              <Package size={16} className="text-primary-400" />
+                            </div>
+                          )}
+                          <div>
+                            <div className="font-medium text-gray-900">{item.productName}</div>
+                            {item.petName && (
+                              <div className="text-xs text-gray-500">For: {item.petName}</div>
+                            )}
+                            {productCategory && (
+                              <div className="text-xs text-gray-400 mt-0.5">{productCategory}</div>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-2.5 text-gray-600">{item.variantName || '—'}</td>
+                      <td className="px-4 py-2.5">
+                        {item.tagId ? (
+                          <span className="font-mono text-xs bg-primary-50 text-primary-700 px-2 py-0.5 rounded">{item.tagId}</span>
+                        ) : '—'}
+                      </td>
+                      <td className="px-4 py-2.5 text-xs text-gray-500">{item.sku || '—'}</td>
+                      <td className="px-4 py-2.5 text-center text-gray-600">{item.quantity}</td>
+                      <td className="px-4 py-2.5 text-right text-gray-600">{formatCurrency(item.unitPrice)}</td>
+                      <td className="px-4 py-2.5 text-right font-medium text-gray-900">{formatCurrency(item.totalPrice)}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
-              <tfoot className="bg-gray-50">
-                <tr>
-                  <td colSpan={6} className="px-4 py-2 text-right font-medium text-gray-700">Total:</td>
-                  <td className="px-4 py-2 text-right font-bold text-gray-900">{formatCurrency(order.payment.amount, order.payment.currency)}</td>
-                </tr>
-              </tfoot>
             </table>
+          </div>
+
+          {/* Order Summary */}
+          <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <h4 className="text-sm font-semibold text-gray-700 mb-3">Order Summary</h4>
+            <div className="space-y-1.5 text-sm max-w-xs ml-auto">
+              <div className="flex justify-between">
+                <span className="text-gray-500">Subtotal:</span>
+                <span className="text-gray-900 font-medium">{formatCurrency(order.subtotal ?? order.items?.reduce((s, i) => s + (i.totalPrice || 0), 0) ?? 0, order.payment.currency)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Shipping:</span>
+                <span className={(order.shippingCost ?? 0) === 0 ? 'text-primary-600 font-medium' : 'text-gray-900 font-medium'}>
+                  {(order.shippingCost ?? 0) === 0 ? 'Free' : formatCurrency(order.shippingCost!, order.payment.currency)}
+                </span>
+              </div>
+              {(order.discount?.amount ?? 0) > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Discount:</span>
+                  <span className="text-primary-600 font-medium">-{formatCurrency(order.discount!.amount ?? 0, order.payment.currency)}</span>
+                </div>
+              )}
+              {(order.tax ?? 0) > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-gray-500">GST (15%):</span>
+                  <span className="text-gray-900 font-medium">{formatCurrency(order.tax ?? 0, order.payment.currency)}</span>
+                </div>
+              )}
+              <div className="border-t border-gray-200 pt-2 mt-2 flex justify-between">
+                <span className="font-semibold text-gray-900">Total:</span>
+                <span className="font-bold text-primary-700">{formatCurrency(order.payment.amount, order.payment.currency)}</span>
+              </div>
+            </div>
           </div>
         </div>
       )}

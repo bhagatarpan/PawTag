@@ -795,6 +795,7 @@ router.get('/users/:id/orders', requirePermission('user.read'), requirePermissio
 
     const total = await Order.countDocuments(query);
     const orders = await Order.find(query)
+      .populate('items.productId', 'images category')
       .sort({ createdAt: -1 })
       .skip((Number(page) - 1) * Number(limit))
       .limit(Number(limit));
@@ -2381,6 +2382,7 @@ router.get('/orders', requirePermission('order.read'), async (req, res: Response
     const total = await Order.countDocuments(query);
     const orders = await Order.find(query)
       .populate('userId', 'fullName email')
+      .populate('items.productId', 'images category')
       .sort({ createdAt: -1 })
       .skip((Number(page) - 1) * Number(limit))
       .limit(Number(limit));
