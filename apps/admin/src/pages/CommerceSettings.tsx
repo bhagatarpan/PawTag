@@ -4,7 +4,7 @@
  */
 
 import { useEffect, useState, useCallback } from 'react';
-import { Save, Loader2, RefreshCcw, CreditCard, Truck, Receipt, Package, ShoppingCart, Clock, RotateCcw, Settings, Shield, Bell, Info, Plus, Trash2, Ban, X } from 'lucide-react';
+import { Save, Loader2, RefreshCcw, CreditCard, Truck, Receipt, Package, ShoppingCart, Clock, RotateCcw, Settings, Shield, Bell, Info, Plus, Trash2, Ban, X, Database, Link2, Unlink } from 'lucide-react';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
 
@@ -129,6 +129,9 @@ export default function CommerceSettings() {
   const [cancellationReasons, setCancellationReasons] = useState<string[]>([]);
   const [savingReasons, setSavingReasons] = useState(false);
   const [newReason, setNewReason] = useState('');
+  const [xeroStatus, setXeroStatus] = useState<{ connected: boolean; tenantName?: string } | null>(null);
+  const [xeroConnecting, setXeroConnecting] = useState(false);
+  const [xeroDisconnecting, setXeroDisconnecting] = useState(false);
 
   const fetchSettings = useCallback(async () => {
     try {
@@ -198,6 +201,59 @@ export default function CommerceSettings() {
 
   useEffect(() => { fetchSettings(); }, [fetchSettings]);
   useEffect(() => { fetchCancellationReasons(); }, [fetchCancellationReasons]);
+
+  // Check for Xero connection status from URL params (after OAuth callback)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('xero') === 'connected') {
+      toast.success('Xero connected successfully');
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (params.get('xero') === 'error') {
+      toast.error(params.get('message') || 'Xero connection failed');
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
+
+  const fetchXeroStatus = useCallback(async () => {
+    try {
+      const res = await api.get('/admin/commerce/accounting/status');
+      setXeroStatus(res.data.data.xero);
+    } catch {
+      setXeroStatus({ connected: false });
+    }
+  }, []);
+
+  const handleConnectXero = async () => {
+    setXeroConnecting(true);
+    try {
+      const res = await api.get('/admin/commerce/accounting/connect/xero');
+      if (res.data.success && res.data.data.authUrl) {
+        window.location.href = res.data.data.authUrl;
+      } else {
+        toast.error('Failed to get Xero authorisation URL');
+      }
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to initiate Xero connection');
+    } finally {
+      setXeroConnecting(false);
+    }
+  };
+
+  const handleDisconnectXero = async () => {
+    if (!window.confirm('Disconnect Xero? You will need to reconnect to export refunds.')) return;
+    setXeroDisconnecting(true);
+    try {
+      await api.delete('/admin/commerce/accounting/disconnect/xero');
+      toast.success('Xero disconnected');
+      fetchXeroStatus();
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to disconnect Xero');
+    } finally {
+      setXeroDisconnecting(false);
+    }
+  };
+
+  useEffect(() => { fetchXeroStatus(); }, [fetchXeroStatus]);
 
   const handleChange = (key: string, value: string) => {
     setEditedValues((prev) => ({ ...prev, [key]: value }));
@@ -411,6 +467,78 @@ export default function CommerceSettings() {
                 <Plus size={14} />
                 Add
               </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100 bg-gray-50">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <span className="text-primary-600"><Database size={20} /></span>
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900">Accounting Integrations</h2>
+                  <p className="text-sm text-gray-500">Connect to accounting software and export refunds for reconciliation.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="p-6 space-y-4">
+            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${xeroStatus?.connected ? 'bg-green-100' : 'bg-gray-200'}`}>
+                  {xeroStatus?.connected ? (
+                    <span className="text-green-600 text-lg">✓</span>
+                  ) : (
+                    <Link2 size={18} className="text-gray-500" />
+                  )}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold text-gray-900">Xero</span>
+                    {xeroStatus?.connected ? (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                        Connected
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-700">
+                        Not connected
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-0.5">
+                    {xeroStatus?.connected
+                      ? xeroStatus.tenantName || 'PawTag org connected'
+                      : 'Push refunds as Manual Journals via OAuth 2.0'}
+                  </div>
+                </div>
+              </div>
+              <div>
+                {xeroStatus?.connected ? (
+                  <button
+                    onClick={handleDisconnectXero}
+                    disabled={xeroDisconnecting}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 disabled:opacity-50"
+                  >
+                    {xeroDisconnecting ? <Loader2 size={12} className="animate-spin" /> : <Unlink size={12} />}
+                    Disconnect
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleConnectXero}
+                    disabled={xeroConnecting}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50"
+                  >
+                    {xeroConnecting ? <Loader2 size={12} className="animate-spin" /> : <Link2 size={12} />}
+                    Connect to Xero
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="text-xs text-gray-500 bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <p className="font-medium text-blue-900 mb-1">Export options</p>
+              <p>After connecting, you can push refunds directly to Xero from <a href="/refund-report" className="text-primary-600 hover:text-primary-700 underline font-medium">Refund Report</a>. CSV, GL, and configurable column exports are also available without Xero.</p>
             </div>
           </div>
         </div>
