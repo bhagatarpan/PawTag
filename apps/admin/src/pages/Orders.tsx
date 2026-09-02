@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import api, { PaginatedData } from '../lib/api';
 import { toast } from '../lib/toast';
 import {
@@ -10,7 +11,7 @@ import RefundStatusCard from '../components/RefundStatusCard';
 import {
   Search, X, ChevronDown, Download, Loader2, ShoppingCart, CreditCard,
   Truck, Package, CheckCircle, AlertCircle, Info, Clock, FileText,
-  RefreshCw, Ban, Send, Eye, Printer, Copy, ExternalLink, AlertTriangle, XCircle,
+  RefreshCw, Ban, Send, Eye, Printer, Copy, ExternalLink, AlertTriangle, XCircle, RotateCcw,
 } from 'lucide-react';
 import {
   ORDER_STATUS_LABELS,
@@ -1113,6 +1114,29 @@ export default function Orders() {
       </div>
 
       <FilterChips chips={chips} onRemove={handleRemoveChip} onClearAll={handleClearChips} />
+
+      {/* Quick links to refund management */}
+      <div className="flex flex-wrap gap-2 text-sm">
+        <Link
+          to="/refunds"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-primary-700 bg-primary-50 border border-primary-200 rounded-lg hover:bg-primary-100 transition-colors"
+        >
+          <RotateCcw size={14} />
+          View all refunds
+          {summary?.refunded !== undefined && (
+            <span className="ml-1 px-1.5 py-0.5 text-xs bg-white border border-primary-200 rounded">
+              {summary.refunded}
+            </span>
+          )}
+        </Link>
+        <Link
+          to="/refund-report"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
+        >
+          <FileText size={14} />
+          Refund Report
+        </Link>
+      </div>
 
       {/* Error */}
       {error && <ErrorState message={error} onRetry={fetchOrders} />}
