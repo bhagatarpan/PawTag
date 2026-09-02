@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { RefreshCw, Download, Filter, Search, XCircle, CheckCircle, Clock, AlertTriangle } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { RefreshCw, Download, Filter, Search, XCircle, CheckCircle, Clock, AlertTriangle, ChevronDown, ChevronRight, RotateCcw } from 'lucide-react';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
 import RefundStatusCard from '../components/RefundStatusCard';
@@ -63,6 +63,35 @@ export default function OrderRefunds() {
   const [search, setSearch] = useState('');
   const [selectedRefund, setSelectedRefund] = useState<RefundListItem | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [reconciling, setReconciling] = useState(false);
+
+  const toggleRow = (orderId: string) => {
+    setExpandedRows((prev) => {
+      const next = new Set(prev);
+      if (next.has(orderId)) next.delete(orderId);
+      else next.add(orderId);
+      return next;
+    });
+  };
+
+  const handleReconcileNow = async () => {
+    setReconciling(true);
+    try {
+      const res = await api.post('/admin/commerce/refunds/reconcile');
+      if (res.data.success) {
+        const d = res.data.data;
+        toast.success(`Reconciliation done: ${d.synced} synced, ${d.retried} retried, ${d.errors} errors`);
+        fetchRefunds();
+      } else {
+        toast.error(res.data.error || 'Reconciliation failed');
+      }
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Reconciliation failed');
+    } finally {
+      setReconciling(false);
+    }
+  };
 
   const fetchRefunds = async () => {
     setLoading(true);
@@ -192,6 +221,15 @@ export default function OrderRefunds() {
         </div>
         <div className="flex items-center gap-2">
           <button
+            onClick={handleReconcileNow}
+            disabled={reconciling}
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+            title="Run daily reconciliation against Stripe now"
+          >
+            {reconciling ? <RefreshCw size={14} className="animate-spin" /> : <RotateCcw size={14} />}
+            Reconcile Now
+          </button>
+          <button
             onClick={() => handleExport('csv')}
             disabled={exporting}
             className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50"
@@ -294,6 +332,7 @@ export default function OrderRefunds() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50">
               <tr>
+                <th className="w-8"></th>
                 <th className="text-left px-4 py-2 font-medium text-gray-500">Order #</th>
                 <th className="text-left px-4 py-2 font-medium text-gray-500">Customer</th>
                 <th className="text-right px-4 py-2 font-medium text-gray-500">Amount</th>
@@ -307,49 +346,116 @@ export default function OrderRefunds() {
               {data.items.map((r) => {
                 const badge = STATUS_BADGE[r.status] || STATUS_BADGE.pending;
                 const BadgeIcon = badge.icon;
+                const isExpanded = expandedRows.has(r.orderId);
                 return (
-                  <tr key={r.orderId} className="border-t border-gray-100 hover:bg-gray-50">
-                    <td className="px-4 py-3 font-mono text-gray-900">{r.orderNumber}</td>
-                    <td className="px-4 py-3 text-gray-600">
-                      <div>{r.customerName}</div>
-                      <div className="text-xs text-gray-400">{r.customerEmail}</div>
-                    </td>
-                    <td className="px-4 py-3 text-right font-medium text-gray-900">
-                      {formatAmount(r.amount, r.currency)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${badge.color}`}>
-                        <BadgeIcon size={11} />
-                        {badge.label}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-gray-600 text-xs max-w-xs truncate">
-                      {r.cancellationReason}
-                    </td>
-                    <td className="px-4 py-3 text-xs text-gray-500">
-                      {formatDate(r.refundCreatedAt)}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-1">
+                  <React.Fragment key={r.orderId}>
+                    <tr className="border-t border-gray-100 hover:bg-gray-50">
+                      <td className="px-2 py-3">
                         <button
-                          onClick={() => handleSync(r.orderId)}
-                          className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
-                          title="Sync with Stripe"
+                          onClick={() => toggleRow(r.orderId)}
+                          className="p-1 text-gray-400 hover:text-gray-700"
+                          title={isExpanded ? 'Collapse' : 'Expand'}
                         >
-                          <RefreshCw size={14} />
+                          {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                         </button>
-                        {r.status === 'failed' && (
+                      </td>
+                      <td className="px-4 py-3 font-mono text-gray-900">{r.orderNumber}</td>
+                      <td className="px-4 py-3 text-gray-600">
+                        <div>{r.customerName}</div>
+                        <div className="text-xs text-gray-400">{r.customerEmail}</div>
+                      </td>
+                      <td className="px-4 py-3 text-right font-medium text-gray-900">
+                        {formatAmount(r.amount, r.currency)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${badge.color}`}>
+                          <BadgeIcon size={11} />
+                          {badge.label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-gray-600 text-xs max-w-xs truncate">
+                        {r.cancellationReason}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-gray-500">
+                        {formatDate(r.refundCreatedAt)}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex items-center justify-end gap-1">
                           <button
-                            onClick={() => handleRetry(r.orderId)}
-                            className="p-1.5 text-primary-600 hover:text-primary-700 hover:bg-primary-50 rounded"
-                            title="Retry refund"
+                            onClick={() => handleSync(r.orderId)}
+                            className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
+                            title="Sync with Stripe"
                           >
                             <RefreshCw size={14} />
                           </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
+                          {r.status === 'failed' && (
+                            <button
+                              onClick={() => handleRetry(r.orderId)}
+                              className="p-1.5 text-primary-600 hover:text-primary-700 hover:bg-primary-50 rounded"
+                              title="Retry refund"
+                            >
+                              <RefreshCw size={14} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                    {isExpanded && (
+                      <tr className="bg-gray-50">
+                        <td colSpan={8} className="px-4 py-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="bg-white border border-gray-200 rounded-lg p-4">
+                              <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Refund details</h4>
+                              <dl className="space-y-1 text-sm">
+                                <div className="flex justify-between gap-4">
+                                  <dt className="text-gray-500">Refund ID</dt>
+                                  <dd className="text-gray-900 font-mono text-xs">{r.refundId || '—'}</dd>
+                                </div>
+                                <div className="flex justify-between gap-4">
+                                  <dt className="text-gray-500">ARN</dt>
+                                  <dd className="text-gray-900 font-mono text-xs">{r.arn || '—'}</dd>
+                                </div>
+                                <div className="flex justify-between gap-4">
+                                  <dt className="text-gray-500">Initiated by</dt>
+                                  <dd className="text-gray-900">{r.initiatedBy}</dd>
+                                </div>
+                                <div className="flex justify-between gap-4">
+                                  <dt className="text-gray-500">Cancelled by</dt>
+                                  <dd className="text-gray-900">{r.cancelledBy || '—'}</dd>
+                                </div>
+                                <div className="flex justify-between gap-4">
+                                  <dt className="text-gray-500">Settled at</dt>
+                                  <dd className="text-gray-900">{formatDate(r.refundSettledAt)}</dd>
+                                </div>
+                                <div className="flex justify-between gap-4">
+                                  <dt className="text-gray-500">Retry attempts</dt>
+                                  <dd className="text-gray-900">{r.attemptCount}</dd>
+                                </div>
+                              </dl>
+                            </div>
+                            <div>
+                              <RefundStatusCard
+                                orderId={r.orderId}
+                                orderNumber={r.orderNumber}
+                                details={{
+                                  refundId: r.refundId,
+                                  refundArn: r.arn,
+                                  refundStatus: (r.status as any) || null,
+                                  refundSettledAt: r.refundSettledAt,
+                                  refundLastSyncedAt: r.refundCreatedAt,
+                                  refundAttemptCount: r.attemptCount,
+                                  cancelledBy: r.cancelledBy,
+                                  cancellationReason: r.cancellationReason,
+                                }}
+                                onSynced={fetchRefunds}
+                                compact
+                              />
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
                 );
               })}
             </tbody>

@@ -6,6 +6,7 @@ import {
   DetailDrawer, Section, DetailRow, StatusBadge, ConfirmDialog,
 } from '@pawtag/ui';
 import { OrderProgressStepper, OrderStatusBanner } from '@pawtag/ui';
+import RefundStatusCard from '../components/RefundStatusCard';
 import {
   Search, X, ChevronDown, Download, Loader2, ShoppingCart, CreditCard,
   Truck, Package, CheckCircle, AlertCircle, Info, Clock, FileText,
@@ -91,6 +92,14 @@ export interface Order {
   cancelledByDescription?: string;
   cancelledAt?: string;
   refundReason?: string;
+  refundId?: string;
+  refundArn?: string;
+  refundStatus?: 'pending' | 'succeeded' | 'failed' | 'canceled';
+  refundExpectedArrival?: string;
+  refundSettledAt?: string;
+  refundLastSyncedAt?: string;
+  refundFailureReason?: string;
+  refundAttemptCount?: number;
   deliveredAt?: string;
   activity?: Array<{
     type: string;
@@ -591,6 +600,30 @@ export function OrderDetailDrawer({
                 />
               )}
             </Section>
+          )}
+
+          {order.status === 'cancelled' && order.refundStatus && (
+            <div className="mt-3">
+              <RefundStatusCard
+                orderId={order._id}
+                orderNumber={order.orderNumber}
+                details={{
+                  refundId: order.refundId,
+                  refundArn: order.refundArn,
+                  refundStatus: order.refundStatus,
+                  refundExpectedArrival: order.refundExpectedArrival,
+                  refundSettledAt: order.refundSettledAt,
+                  refundLastSyncedAt: order.refundLastSyncedAt,
+                  refundFailureReason: order.refundFailureReason,
+                  refundAttemptCount: order.refundAttemptCount,
+                }}
+                onSynced={() => {
+                  // Trigger parent refresh — best-effort via toast
+                  toast.success('Refund synced');
+                }}
+                compact
+              />
+            </div>
           )}
         </div>
       )}
