@@ -1,10 +1,23 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
 import mongoose from 'mongoose';
 import request from 'supertest';
 import { setupTestDb, teardownTestDb, clearDb } from './setup';
 import app from '../../packages/api/src/index';
 import { Order, Product, Notification } from '@pawtag/db';
 import { createSuperAdmin } from './helpers';
+
+// Mock Stripe payment provider to avoid real API calls in tests
+vi.mock('../../packages/api/src/commerce/providers/stripe', () => ({
+  stripePaymentProvider: {
+    createRefund: vi.fn().mockResolvedValue({
+      success: true,
+      refundId: 're_test_mock_001',
+      status: 'succeeded',
+      arn: 'arn_test_001',
+      expectedArrival: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
+    }),
+  },
+}));
 
 beforeAll(async () => {
   await setupTestDb();
@@ -174,7 +187,8 @@ describe('Phase 8 — Cancel & Refund Workflow', () => {
         payment: {
           method: 'card',
           status: 'completed',
-          transactionId: 'pi_demo_refund_001',
+          transactionId: 'pi_real_test_001',
+          stripePaymentIntentId: 'pi_real_test_001',
           amount: 29.99,
           currency: 'NZD',
           paidAt: new Date(),

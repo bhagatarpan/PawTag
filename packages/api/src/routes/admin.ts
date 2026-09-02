@@ -42,7 +42,9 @@ import {
   Notification,
   ReferralCode,
   Referral,
+  PaymentTransaction,
 } from '@pawtag/db';
+import { stripePaymentProvider } from '../commerce/providers/stripe';
 import { auditService, type AuditContext } from '../services/audit';
 import { createAuditContextFromRequest, type AuditRequest } from '../middleware/audit';
 import { hashPassword } from '../services/auth.service';
@@ -2500,7 +2502,7 @@ router.put('/orders/:id/status', requirePermission('order.update'), async (req: 
   }
 });
 
-// --- Cancel Order ---
+// --- Cancel Order (with inline refund for paid orders) ---
 router.post('/orders/:id/cancel', requirePermission('order.update'), async (req: AuthRequest, res: Response) => {
   try {
     const { reason, notes } = req.body;
@@ -2523,6 +2525,59 @@ router.post('/orders/:id/cancel', requirePermission('order.update'), async (req:
     const cancelledByDescription = formatCancelledByDescription('admin-web', actor.fullName, actor.displayName);
     const activityMessage = formatActivityMessage(cancelledBy, reason, cancelledAt);
 
+    // Process refund inline for paid orders (matches customer cancel behavior)
+    let refundCreated = false;
+    if (order.payment?.status === 'completed' && order.payment?.stripePaymentIntentId) {
+      const paymentIntentId = order.payment.stripePaymentIntentId;
+      if (!paymentIntentId.startsWith('pi_demo_')) {
+        try {
+          const refundResult = await stripePaymentProvider.createRefund({
+            paymentIntentId,
+            amount: order.payment.amount,
+            reason: 'requested_by_customer',
+            metadata: {
+              orderId: String(order._id),
+              orderNumber: order.orderNumber,
+              cancelledBy,
+              cancelledByType: actor.displayName,
+              cancelledByPortal: 'admin-web',
+              cancellationReason: reason,
+              cancellationNotes: notes || '',
+              initiatedBy: 'admin',
+              environment: process.env.NODE_ENV === 'production' ? 'production' : 'development',
+            },
+          });
+
+          if (refundResult.refundId) {
+            order.refundId = refundResult.refundId;
+            order.refundStatus = (refundResult.status as any) || 'pending';
+            order.refundLastSyncedAt = new Date();
+            refundCreated = true;
+          }
+
+          await PaymentTransaction.create({
+            orderId: order._id,
+            orderNumber: order.orderNumber,
+            type: 'refund',
+            status: refundResult.status === 'succeeded' ? 'succeeded' : 'pending',
+            amount: order.payment.amount,
+            currency: order.payment.currency || 'NZD',
+            provider: 'stripe',
+            providerTransactionId: refundResult.refundId || paymentIntentId,
+            providerStatus: refundResult.status,
+            arn: refundResult.arn,
+            expectedArrival: refundResult.expectedArrival,
+            initiatedBy: 'admin',
+            attemptCount: 0,
+            notes: notes ? `${reason} — ${notes}` : reason,
+          });
+        } catch (refundErr: any) {
+          logger.error({ err: refundErr, orderId: String(order._id) }, 'Failed to process refund during admin cancel');
+          // Continue with cancellation even if refund fails — order is still cancelled
+        }
+      }
+    }
+
     const previousStatus = order.status;
     order.status = 'cancelled';
     order.cancellationReason = reason;
@@ -2532,6 +2587,9 @@ router.post('/orders/:id/cancel', requirePermission('order.update'), async (req:
     order.cancelledByPortal = 'admin-web';
     order.cancelledByDescription = cancelledByDescription;
     order.cancelledAt = cancelledAt;
+    if (refundCreated && order.payment) {
+      order.payment.status = 'refunded';
+    }
     await order.save();
 
     // Restore stock — release reservations made during checkout
@@ -2554,7 +2612,10 @@ router.post('/orders/:id/cancel', requirePermission('order.update'), async (req:
       resourceId: req.params.id,
       outcome: 'SUCCESS',
       severity: 'HIGH',
-      changedFields: [{ field: 'status', before: previousStatus, after: 'cancelled', sensitive: false }],
+      changedFields: [
+        { field: 'status', before: previousStatus, after: 'cancelled', sensitive: false },
+        ...(refundCreated ? [{ field: 'payment.status', before: 'completed', after: 'refunded', sensitive: false }] : []),
+      ],
       metadata: {
         orderNumber: order.orderNumber,
         previousStatus,
@@ -2565,6 +2626,8 @@ router.post('/orders/:id/cancel', requirePermission('order.update'), async (req:
         cancelledBy,
         cancelledByType: actor.displayName,
         cancelledByPortal: 'admin-web',
+        refundCreated,
+        refundId: order.refundId,
       },
     });
 
@@ -2585,6 +2648,8 @@ router.post('/orders/:id/cancel', requirePermission('order.update'), async (req:
               cancelledByType: actor.displayName,
               cancelledByPortal: 'admin-web',
               cancelledAt: cancelledAt.toISOString(),
+              refundCreated,
+              refundId: order.refundId,
             },
           },
         },
@@ -2598,13 +2663,13 @@ router.post('/orders/:id/cancel', requirePermission('order.update'), async (req:
       logger.error({ err: notifError, orderId: req.params.id, orderNumber: order.orderNumber }, 'Cancel notification error');
     }
 
-    res.json({ success: true, data: order });
+    res.json({ success: true, data: { order, refundCreated, refundId: order.refundId } });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to cancel order' });
   }
 });
 
-// --- Refund Order ---
+// --- Refund Order (using production Stripe provider) ---
 router.post('/orders/:id/refund', requirePermission('order.update'), async (req: AuthRequest, res: Response) => {
   try {
     const { reason, amount } = req.body;
@@ -2621,15 +2686,34 @@ router.post('/orders/:id/refund', requirePermission('order.update'), async (req:
       return;
     }
 
-    if (!order.payment.transactionId) {
+    const paymentIntentId = order.payment.stripePaymentIntentId || order.payment.transactionId;
+    if (!paymentIntentId) {
       res.status(400).json({ success: false, error: 'No payment transaction to refund' });
       return;
     }
 
-    // Use the Stripe payment intent ID if available, otherwise fall back to transactionId
-    const stripePaymentId = order.payment.stripePaymentIntentId || order.payment.transactionId;
-    const { createRefund } = await import('../services/stripe.service');
-    const refundResult = await createRefund(stripePaymentId, amount);
+    if (paymentIntentId.startsWith('pi_demo_')) {
+      res.status(400).json({ success: false, error: 'Cannot refund demo payments' });
+      return;
+    }
+
+    const actor = await resolveActor(req.user!.id, 'admin');
+
+    const refundResult = await stripePaymentProvider.createRefund({
+      paymentIntentId,
+      amount: amount || order.payment.amount,
+      reason: 'requested_by_customer',
+      metadata: {
+        orderId: String(order._id),
+        orderNumber: order.orderNumber,
+        cancelledBy: formatCancelledBy(actor.fullName, actor.displayName),
+        cancelledByType: actor.displayName,
+        cancelledByPortal: 'admin-web',
+        cancellationReason: reason,
+        initiatedBy: 'admin',
+        environment: process.env.NODE_ENV === 'production' ? 'production' : 'development',
+      },
+    });
 
     if (!refundResult.success) {
       await auditAdminEvent(req, {
@@ -2641,7 +2725,7 @@ router.post('/orders/:id/refund', requirePermission('order.update'), async (req:
         resourceId: req.params.id,
         outcome: 'FAILURE',
         severity: 'CRITICAL',
-        metadata: { orderNumber: order.orderNumber, previousStatus: order.status, reason, amount: amount || order.payment.amount, paymentTransactionId: order.payment.transactionId, stripeError: refundResult.error },
+        metadata: { orderNumber: order.orderNumber, previousStatus: order.status, reason, amount: amount || order.payment.amount, paymentTransactionId: paymentIntentId, stripeError: refundResult.error },
       });
       res.status(400).json({ success: false, error: `Stripe refund failed: ${refundResult.error}` });
       return;
@@ -2650,8 +2734,29 @@ router.post('/orders/:id/refund', requirePermission('order.update'), async (req:
     const previousStatus = order.status;
     order.status = 'refunded';
     order.refundReason = reason;
+    order.refundId = refundResult.refundId;
+    order.refundStatus = (refundResult.status as any) || 'pending';
+    order.refundLastSyncedAt = new Date();
     order.payment.status = 'refunded';
     await order.save();
+
+    // Create PaymentTransaction for audit trail
+    await PaymentTransaction.create({
+      orderId: order._id,
+      orderNumber: order.orderNumber,
+      type: 'refund',
+      status: refundResult.status === 'succeeded' ? 'succeeded' : 'pending',
+      amount: amount || order.payment.amount,
+      currency: order.payment.currency || 'NZD',
+      provider: 'stripe',
+      providerTransactionId: refundResult.refundId || paymentIntentId,
+      providerStatus: refundResult.status,
+      arn: refundResult.arn,
+      expectedArrival: refundResult.expectedArrival,
+      initiatedBy: 'admin',
+      attemptCount: 0,
+      notes: reason,
+    });
 
     await auditAdminEvent(req, {
       action: 'refund_order',
@@ -2662,8 +2767,11 @@ router.post('/orders/:id/refund', requirePermission('order.update'), async (req:
       resourceId: req.params.id,
       outcome: 'SUCCESS',
       severity: 'CRITICAL',
-      changedFields: [{ field: 'status', before: previousStatus, after: 'refunded', sensitive: false }],
-      metadata: { orderNumber: order.orderNumber, previousStatus, reason, refundId: refundResult.refundId, amount: amount || order.payment.amount, paymentTransactionId: order.payment.transactionId },
+      changedFields: [
+        { field: 'status', before: previousStatus, after: 'refunded', sensitive: false },
+        { field: 'payment.status', before: 'completed', after: 'refunded', sensitive: false },
+      ],
+      metadata: { orderNumber: order.orderNumber, previousStatus, reason, refundId: refundResult.refundId, amount: amount || order.payment.amount, paymentTransactionId: paymentIntentId },
     });
 
     // Notify customer

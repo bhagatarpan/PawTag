@@ -143,8 +143,12 @@ describe('Order Status State Machine', () => {
         expect(isValidTransition('delivered', 'cancelled')).toBe(false);
       });
 
-      it('cancelled -> anything (terminal)', () => {
-        const statuses: OrderStatus[] = ['pending', 'pending_payment', 'paid', 'packing', 'shipped', 'delivered', 'refunded'];
+      it('cancelled -> refunded (valid)', () => {
+        expect(isValidTransition('cancelled', 'refunded')).toBe(true);
+      });
+
+      it('cancelled -> anything else (invalid)', () => {
+        const statuses: OrderStatus[] = ['pending', 'pending_payment', 'paid', 'packing', 'shipped', 'delivered', 'cancelled'];
         for (const status of statuses) {
           expect(isValidTransition('cancelled', status)).toBe(false);
         }
@@ -198,8 +202,8 @@ describe('Order Status State Machine', () => {
       expect(getValidTransitions('delivered')).toEqual(['refunded']);
     });
 
-    it('returns empty for cancelled', () => {
-      expect(getValidTransitions('cancelled')).toEqual([]);
+    it('returns refunded for cancelled', () => {
+      expect(getValidTransitions('cancelled')).toEqual(['refunded']);
     });
 
     it('returns empty for refunded', () => {

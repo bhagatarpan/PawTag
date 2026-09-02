@@ -39,7 +39,6 @@ export enum OrderStatus {
   SHIPPED = 'shipped',
   DELIVERED = 'delivered',
   CANCELLED = 'cancelled',
-  REFUND_INITIATED = 'refund_initiated',
   REFUNDED = 'refunded',
 }
 
@@ -691,7 +690,6 @@ export const ORDER_STATUS_COLORS: Record<string, string> = {
   shipped: 'bg-blue-100 text-blue-700',
   delivered: 'bg-green-100 text-green-700',
   cancelled: 'bg-red-100 text-red-700',
-  refund_initiated: 'bg-amber-100 text-amber-700',
   refunded: 'bg-green-100 text-green-700',
 };
 
@@ -703,7 +701,6 @@ export const ORDER_STATUS_LABELS: Record<string, string> = {
   shipped: 'Shipped',
   delivered: 'Delivered',
   cancelled: 'Cancelled',
-  refund_initiated: 'Refund Initiated',
   refunded: 'Refunded',
 };
 
@@ -718,7 +715,7 @@ export function getOrderStatusLabel(status: string): string {
 }
 
 export function isTerminalStatus(status: string): boolean {
-  return ['cancelled', 'refunded', 'refund_initiated'].includes(status);
+  return ['cancelled', 'refunded'].includes(status);
 }
 
 export function getStatusBadgeVariant(status: string): 'success' | 'danger' | 'warning' | 'info' | 'neutral' | 'primary' {
@@ -730,7 +727,6 @@ export function getStatusBadgeVariant(status: string): 'success' | 'danger' | 'w
     case 'pending': return 'warning';
     case 'pending_payment': return 'warning';
     case 'cancelled': return 'danger';
-    case 'refund_initiated': return 'warning';
     case 'refunded': return 'success';
     default: return 'neutral';
   }
@@ -745,9 +741,42 @@ export function getStatusBorderColor(status: string): string {
     case 'pending':
     case 'pending_payment': return 'border-l-amber-400';
     case 'cancelled': return 'border-l-red-400';
-    case 'refund_initiated': return 'border-l-amber-400';
     case 'refunded': return 'border-l-green-400';
     default: return 'border-l-gray-300';
+  }
+}
+
+// --- Payment Status Utilities ---
+
+export const PAYMENT_STATUS_COLORS: Record<string, string> = {
+  pending: 'bg-amber-100 text-amber-700',
+  completed: 'bg-green-100 text-green-700',
+  failed: 'bg-red-100 text-red-700',
+  refunded: 'bg-gray-100 text-gray-600',
+};
+
+export const PAYMENT_STATUS_LABELS: Record<string, string> = {
+  pending: 'Awaiting Payment',
+  completed: 'Payment Confirmed',
+  failed: 'Payment Failed',
+  refunded: 'Refunded',
+};
+
+export function getPaymentStatusColor(status: string): string {
+  return PAYMENT_STATUS_COLORS[status] || 'bg-gray-100 text-gray-700';
+}
+
+export function getPaymentStatusLabel(status: string): string {
+  return PAYMENT_STATUS_LABELS[status] || status;
+}
+
+export function getPaymentStatusBadgeVariant(status: string): 'success' | 'danger' | 'warning' | 'info' | 'neutral' | 'primary' {
+  switch (status) {
+    case 'completed': return 'success';
+    case 'failed': return 'danger';
+    case 'pending': return 'warning';
+    case 'refunded': return 'neutral';
+    default: return 'neutral';
   }
 }
 

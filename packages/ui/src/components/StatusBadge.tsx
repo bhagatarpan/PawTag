@@ -20,12 +20,13 @@ export function StatusBadge({
   variant,
   icon,
   size = 'sm',
+  className,
 }: StatusBadgeProps) {
   return (
     <span
       className={`inline-flex items-center gap-1 rounded-full font-medium border ${
         variantClasses[variant]
-      } ${sizeClasses[size]}`}
+      } ${sizeClasses[size]} ${className || ''}`}
     >
       {icon}
       {label}

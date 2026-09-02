@@ -153,6 +153,7 @@ export interface StatusBadgeProps {
   variant: BadgeVariant;
   icon?: React.ReactNode;
   size?: 'sm' | 'md';
+  className?: string;
 }
 
 /* ------------------------------------------------------------------ */

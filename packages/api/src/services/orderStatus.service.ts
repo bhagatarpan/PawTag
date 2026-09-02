@@ -9,7 +9,7 @@ const ALLOWED_TRANSITIONS: StatusTransitionMap = {
   packing: ['shipped', 'cancelled'],
   shipped: ['delivered'],
   delivered: ['refunded'],
-  cancelled: [],
+  cancelled: ['refunded'],
   refunded: [],
 };
 

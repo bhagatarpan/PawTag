@@ -21,7 +21,6 @@ export const STEP_LABELS: Record<string, string> = {
   shipped: 'Shipped',
   delivered: 'Delivered',
   cancelled: 'Cancelled',
-  refund_initiated: 'Refund Initiated',
   refunded: 'Refunded',
 };
 
@@ -49,7 +48,7 @@ export interface OrderProgressStepperProps {
 
 export function OrderProgressStepper({ status, variant, className }: OrderProgressStepperProps) {
   const currentStep = ORDER_STATUS_STEPS.indexOf(status);
-  const isCancelled = status === 'cancelled' || status === 'refunded' || status === 'refund_initiated';
+  const isCancelled = status === 'cancelled' || status === 'refunded';
 
   if (isCancelled) {
     return null;

@@ -247,8 +247,32 @@ All order status displays (badges, steppers, banners, left borders) must use the
 | `shipped` | info | `bg-blue-100 text-blue-700` | `border-l-blue-500` |
 | `delivered` | success | `bg-green-100 text-green-700` | `border-l-green-500` |
 | `cancelled` | danger | `bg-red-100 text-red-700` | `border-l-red-400` |
-| `refund_initiated` | warning | `bg-amber-100 text-amber-700` | `border-l-amber-400` |
 | `refunded` | success | `bg-green-100 text-green-700` | `border-l-green-400` |
+
+### Payment Status Colors
+
+Payment status is a separate, independent system from order status. Always display both when showing order details.
+
+| Status | Badge Variant | Badge Classes | Label |
+|---|---|---|---|
+| `pending` | warning | `bg-amber-100 text-amber-700` | Awaiting Payment |
+| `completed` | success | `bg-green-100 text-green-700` | Payment Confirmed |
+| `failed` | danger | `bg-red-100 text-red-700` | Payment Failed |
+| `refunded` | neutral | `bg-gray-100 text-gray-600` | Refunded |
+
+**Cross-state display rules (order status + payment status → what to show):**
+
+| Order Status | Payment Status | Order Banner | Payment Badge | Refund Card |
+|---|---|---|---|---|
+| `pending` / `pending_payment` | `pending` | None | "Awaiting Payment" | None |
+| `paid` / `packing` / `shipped` / `delivered` | `completed` | None | "Payment Confirmed" | None |
+| `cancelled` | `completed` | "Order Cancelled" (red) | "Payment Confirmed" | None (not yet refunded) |
+| `cancelled` | `refunded` | "Order Cancelled" (red) | "Refunded" | None |
+| `refunded` | `refunded` | "Refund Complete" (green) | "Refunded" | Shown if `refundStatus` exists |
+
+**Customer portal:** Always show payment status badge on order cards and order detail page. Show refund pending card when `order.status === 'cancelled'` AND `order.payment.status === 'completed'` (prompt to process refund).
+
+**Admin portal:** Always show payment status indicator on orders table and order detail. Show "Process Refund" button when `order.status === 'cancelled'` AND `order.payment.status === 'completed'`.
 
 ### Refund Status Colors
 

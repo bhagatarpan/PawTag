@@ -19,6 +19,8 @@ import {
   getStatusBorderColor,
   getTrackingUrl,
   isTerminalStatus,
+  getPaymentStatusLabel,
+  getPaymentStatusBadgeVariant,
 } from '@pawtag/shared';
 
 /* ------------------------------------------------------------------ */
@@ -142,12 +144,11 @@ interface SummaryData {
 const ORDER_STATUS_TRANSITIONS: Record<string, string[]> = {
   pending: ['pending_payment', 'paid', 'cancelled'],
   pending_payment: ['paid', 'cancelled'],
-  paid: ['packing', 'cancelled', 'refund_initiated'],
+  paid: ['packing', 'cancelled', 'refunded'],
   packing: ['shipped', 'cancelled'],
   shipped: ['delivered'],
-  delivered: ['refund_initiated'],
-  cancelled: [],
-  refund_initiated: ['refunded'],
+  delivered: ['refunded'],
+  cancelled: ['refunded'],
   refunded: [],
 };
 
@@ -159,7 +160,6 @@ const STATUS_OPTIONS = [
   { value: 'shipped', label: 'Shipped' },
   { value: 'delivered', label: 'Delivered' },
   { value: 'cancelled', label: 'Cancelled' },
-  { value: 'refund_initiated', label: 'Refund Initiated' },
   { value: 'refunded', label: 'Refunded' },
 ];
 
@@ -197,7 +197,6 @@ function getStatusIcon(status: string) {
     case 'pending': return <Clock size={13} />;
     case 'pending_payment': return <Clock size={13} />;
     case 'cancelled': return <Ban size={13} />;
-    case 'refund_initiated': return <RefreshCw size={13} />;
     case 'refunded': return <CheckCircle size={13} />;
     default: return <Info size={13} />;
   }
@@ -360,6 +359,12 @@ export function OrderDetailDrawer({
       onTabChange={(t) => setActiveTab(t as typeof activeTab)}
       headerActions={
         <div className="flex items-center gap-2">
+          {order.payment?.status && (
+            <StatusBadge
+              label={getPaymentStatusLabel(order.payment.status)}
+              variant={getPaymentStatusBadgeVariant(order.payment.status)}
+            />
+          )}
           <StatusBadge
             label={ORDER_STATUS_LABELS[order.status] || order.status}
             variant={getStatusBadgeVariant(order.status)}
@@ -1199,6 +1204,13 @@ export default function Orders() {
                       variant={getStatusBadgeVariant(order.status)}
                       icon={getStatusIcon(order.status)}
                     />
+                    {order.payment?.status && (
+                      <StatusBadge
+                        label={getPaymentStatusLabel(order.payment.status)}
+                        variant={getPaymentStatusBadgeVariant(order.payment.status)}
+                        className="mt-1"
+                      />
+                    )}
                   </td>
                   <td className="px-4 py-3 hidden lg:table-cell">
                     {order.latestInvoice ? (

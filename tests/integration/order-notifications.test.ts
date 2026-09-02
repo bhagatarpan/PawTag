@@ -12,6 +12,19 @@ vi.mock('../../packages/api/src/services/email.service', () => ({
   sendOrderConfirmation: vi.fn().mockResolvedValue({ success: true }),
 }));
 
+// Mock Stripe payment provider to avoid real API calls in tests
+vi.mock('../../packages/api/src/commerce/providers/stripe', () => ({
+  stripePaymentProvider: {
+    createRefund: vi.fn().mockResolvedValue({
+      success: true,
+      refundId: 're_test_mock_002',
+      status: 'succeeded',
+      arn: 'arn_test_002',
+      expectedArrival: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
+    }),
+  },
+}));
+
 beforeAll(async () => {
   await setupTestDb();
 }, 30000);
@@ -176,7 +189,8 @@ describe('Phase 10 — Centralized Order Notifications', () => {
         payment: {
           method: 'card',
           status: 'completed',
-          transactionId: 'pi_demo_refund',
+          transactionId: 'pi_real_refund_test',
+          stripePaymentIntentId: 'pi_real_refund_test',
           amount: 29.99,
           currency: 'NZD',
           paidAt: new Date(),

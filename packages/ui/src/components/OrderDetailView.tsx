@@ -13,6 +13,7 @@ import {
   ExternalLink,
   Phone,
   Mail,
+  RefreshCw,
 } from 'lucide-react';
 import { StatusBadge } from './StatusBadge';
 import { OrderProgressStepper } from './OrderProgressStepper';
@@ -36,7 +37,6 @@ const STATUS_BADGE_VARIANT: Record<string, BadgeVariant> = {
   shipped: 'info',
   delivered: 'success',
   cancelled: 'danger',
-  refund_initiated: 'warning',
   refunded: 'success',
 };
 
@@ -131,7 +131,6 @@ function getStepLabel(status: string): string {
     shipped: 'Shipped',
     delivered: 'Delivered',
     cancelled: 'Cancelled',
-    refund_initiated: 'Refund Initiated',
     refunded: 'Refunded',
   };
   return labels[status] || status;
@@ -146,7 +145,6 @@ function getStatusIcon(status: string) {
     case 'pending': return <Clock size={16} />;
     case 'pending_payment': return <Clock size={16} />;
     case 'cancelled': return <XCircle size={16} />;
-    case 'refund_initiated': return <Clock size={16} />;
     case 'refunded': return <CheckCircle size={16} />;
     default: return <Clock size={16} />;
   }
@@ -180,11 +178,19 @@ function OrderHeader({
           Placed on {formatDateTime(order.createdAt)}
         </p>
       </div>
-      <StatusBadge
-        label={label}
-        variant={variant}
-        icon={getStatusIcon(order.status)}
-      />
+      <div className="flex items-center gap-2">
+        {order.payment?.status && (
+          <StatusBadge
+            label={order.payment.status === 'completed' ? 'Payment Confirmed' : order.payment.status === 'refunded' ? 'Refunded' : order.payment.status === 'pending' ? 'Awaiting Payment' : order.payment.status}
+            variant={order.payment.status === 'completed' ? 'success' : order.payment.status === 'refunded' ? 'neutral' : order.payment.status === 'pending' ? 'warning' : 'danger'}
+          />
+        )}
+        <StatusBadge
+          label={label}
+          variant={variant}
+          icon={getStatusIcon(order.status)}
+        />
+      </div>
     </div>
   );
 }
@@ -584,10 +590,25 @@ export function OrderDetailView({
       <OrderHeader order={order} onBackToOrders={onBackToOrders} />
 
       {/* Progress Stepper or Status Banner */}
-      {['cancelled', 'refunded', 'refund_initiated'].includes(order.status) ? (
+      {['cancelled', 'refunded'].includes(order.status) ? (
         <OrderStatusBanner status={order.status} amount={order.payment?.amount} />
       ) : (
         <OrderProgressStepper status={order.status} variant="full" />
+      )}
+
+      {/* Refund pending card — shown when order is cancelled but payment hasn't been refunded yet */}
+      {order.status === 'cancelled' && order.payment?.status === 'completed' && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+          <div className="flex items-center gap-3">
+            <RefreshCw size={20} className="text-amber-600 animate-spin" />
+            <div>
+              <p className="text-sm font-medium text-amber-800">Refund Pending</p>
+              <p className="text-xs text-amber-600 mt-0.5">
+                Your payment of ${(order.payment?.amount ?? 0).toFixed(2)} has been captured but not yet refunded. Contact support to process your refund.
+              </p>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Two-column layout */}

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ShoppingBag, ChevronRight, Clock, Package, Truck, CheckCircle, Ban, RefreshCw, ExternalLink, FileText, CreditCard, MapPin, Eye } from 'lucide-react';
 import { StatusBadge, EmptyState, OrderProgressStepper, OrderStatusBanner } from '@pawtag/ui';
-import { ORDER_STATUS_LABELS, getStatusBadgeVariant, getStatusBorderColor, getTrackingUrl, isTerminalStatus } from '@pawtag/shared';
+import { ORDER_STATUS_LABELS, getStatusBadgeVariant, getStatusBorderColor, getTrackingUrl, isTerminalStatus, getPaymentStatusLabel, getPaymentStatusBadgeVariant } from '@pawtag/shared';
 import api from '../../lib/api';
 import type { Order } from '../../types';
 
@@ -19,7 +19,6 @@ function getStatusIcon(status: string) {
     case 'pending': return <Clock size={13} />;
     case 'pending_payment': return <Clock size={13} />;
     case 'cancelled': return <Ban size={13} />;
-    case 'refund_initiated': return <RefreshCw size={13} />;
     case 'refunded': return <CheckCircle size={13} />;
     default: return <Clock size={13} />;
   }
@@ -47,7 +46,7 @@ function getRelativeTime(iso: string): string {
   return formatDate(iso);
 }
 
-const MILESTONE_ACTIVITY_TYPES = ['order_placed', 'payment_confirmed', 'packing', 'shipped', 'delivered', 'cancelled', 'refunded', 'refund_initiated'];
+const MILESTONE_ACTIVITY_TYPES = ['order_placed', 'payment_confirmed', 'packing', 'shipped', 'delivered', 'cancelled', 'refunded'];
 
 function getLatestMilestone(order: Order): { type: string; message: string; timestamp: string } | null {
   if (!order.activity || order.activity.length === 0) return null;
@@ -231,6 +230,12 @@ export default function Orders() {
                       variant={getStatusBadgeVariant(order.status)}
                       icon={getStatusIcon(order.status)}
                     />
+                    {order.payment?.status && (
+                      <StatusBadge
+                        label={getPaymentStatusLabel(order.payment.status)}
+                        variant={getPaymentStatusBadgeVariant(order.payment.status)}
+                      />
+                    )}
                     <span className="text-sm font-bold text-gray-900">
                       ${(order.payment?.amount ?? 0).toFixed(2)}
                     </span>

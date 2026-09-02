@@ -16,6 +16,7 @@ import { inventoryService } from '../commerce/services/inventory.service';
 import { toAppError } from '../lib/app-errors';
 import { notifyCustomerOfStatusChange } from '../services/orderNotification.service';
 import { formatActivityMessage, formatCancelledBy, formatCancelledByDescription, formatCancellationPortalLabel } from '../lib/actor';
+import { isValidTransition } from '../services/orderStatus.service';
 import logger from '../lib/logger';
 
 const router = Router();
@@ -195,8 +196,7 @@ router.post('/orders/:id/cancel', async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    const cancellableStatuses = ['paid', 'packing'];
-    if (!cancellableStatuses.includes(order.status)) {
+    if (!isValidTransition(order.status, 'cancelled')) {
       res.status(400).json({
         success: false,
         error: `Order in status '${order.status}' cannot be cancelled. Contact support for assistance.`,
@@ -210,6 +210,8 @@ router.post('/orders/:id/cancel', async (req: AuthRequest, res: Response) => {
     const user = await User.findById(userId).select('fullName').lean();
     const customerFullName = user?.fullName || 'Customer';
 
+    // Process refund inline for paid orders
+    let refundCreated = false;
     if (order.payment?.status === 'completed' && order.payment?.stripePaymentIntentId) {
       const paymentIntentId = order.payment.stripePaymentIntentId;
       if (!paymentIntentId.startsWith('pi_demo_')) {
@@ -235,13 +237,14 @@ router.post('/orders/:id/cancel', async (req: AuthRequest, res: Response) => {
             order.refundId = refundResult.refundId;
             order.refundStatus = (refundResult.status as any) || 'pending';
             order.refundLastSyncedAt = new Date();
+            refundCreated = true;
           }
 
           await PaymentTransaction.create({
             orderId: order._id,
             orderNumber: order.orderNumber,
             type: 'refund',
-            status: 'succeeded',
+            status: refundResult.status === 'succeeded' ? 'succeeded' : 'pending',
             amount: order.payment.amount,
             currency: order.payment.currency || 'NZD',
             provider: 'stripe',
@@ -273,7 +276,7 @@ router.post('/orders/:id/cancel', async (req: AuthRequest, res: Response) => {
     order.cancelledByPortal = resolvedPortal;
     order.cancelledByDescription = cancelledByDescription;
     order.cancelledAt = cancelledAt;
-    if (order.payment) {
+    if (refundCreated && order.payment) {
       order.payment.status = 'refunded';
     }
     await order.save();

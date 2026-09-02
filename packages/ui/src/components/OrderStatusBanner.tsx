@@ -1,5 +1,5 @@
 import React from 'react';
-import { XCircle, CheckCircle, RefreshCw } from 'lucide-react';
+import { XCircle, CheckCircle } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 /* ------------------------------------------------------------------ */
@@ -42,16 +42,6 @@ const STATUS_CONFIG: Record<string, {
       ? `Refund of $${amount.toFixed(2)} has been processed`
       : 'This order has been refunded',
   },
-  refund_initiated: {
-    bgColor: 'bg-amber-50',
-    borderColor: 'border-amber-200',
-    textColor: 'text-amber-700',
-    iconColor: 'text-amber-500',
-    icon: RefreshCw,
-    message: (amount) => amount
-      ? `Refund of $${amount.toFixed(2)} is being processed`
-      : 'Refund is being processed',
-  },
 };
 
 /* ------------------------------------------------------------------ */
@@ -71,10 +61,7 @@ export function OrderStatusBanner({ status, amount, className }: OrderStatusBann
     <div
       className={`${config.bgColor} border ${config.borderColor} rounded-lg p-3 flex items-center gap-2 ${className || ''}`}
     >
-      <Icon
-        size={16}
-        className={`${config.iconColor} shrink-0 ${status === 'refund_initiated' ? 'animate-spin' : ''}`}
-      />
+      <Icon size={16} className={`${config.iconColor} shrink-0`} />
       <span className={`text-sm font-medium ${config.textColor}`}>
         {config.message(amount)}
       </span>

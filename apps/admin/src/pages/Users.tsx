@@ -150,7 +150,6 @@ function getOrderStatusIcon(status: string) {
     case 'pending': return <Clock size={13} />;
     case 'pending_payment': return <Clock size={13} />;
     case 'cancelled': return <AlertCircle size={13} />;
-    case 'refund_initiated': return <RotateCcw size={13} />;
     case 'refunded': return <CheckCircle size={13} />;
     default: return <Info size={13} />;
   }
