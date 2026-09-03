@@ -39,6 +39,7 @@ import CmsInvoiceTemplatePage from './pages/cms/CmsInvoiceTemplate';
 import CmsOnboardingStepsPage from './pages/cms/CmsOnboardingSteps';
 import SubscriptionsPage from './pages/SubscriptionsPage';
 import SubscriptionDetailPage from './pages/SubscriptionDetailPage';
+import SubscriptionPlans from './pages/SubscriptionPlans';
 import Referrals from './pages/Referrals';
 import TagExpiryNotifications from './pages/TagExpiryNotifications';
 import Notifications from './pages/Notifications';
@@ -94,12 +95,24 @@ export default function App() {
         }
       />
       <Route
-        path="/users"
+        path="/users/customers"
         element={
           <ProtectedRoute>
-            <Users />
+            <Users defaultRoleFilter="customer" />
           </ProtectedRoute>
         }
+      />
+      <Route
+        path="/users/admin"
+        element={
+          <ProtectedRoute>
+            <Users defaultRoleFilter="admin" />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/users"
+        element={<Navigate to="/users/customers" replace />}
       />
       <Route
         path="/pets"
@@ -201,8 +214,9 @@ export default function App() {
       <Route path="/cms/auth-pages" element={<ProtectedRoute><CmsAuthPagesPage /></ProtectedRoute>} />
       <Route path="/cms/invoice-template" element={<ProtectedRoute><CmsInvoiceTemplatePage /></ProtectedRoute>} />
       <Route path="/cms/onboarding" element={<ProtectedRoute><CmsOnboardingStepsPage /></ProtectedRoute>} />
-      <Route path="/subscriptions" element={<ProtectedRoute><SubscriptionsPage /></ProtectedRoute>} />
-      <Route path="/subscriptions/:id" element={<ProtectedRoute><SubscriptionDetailPage /></ProtectedRoute>} />
+      <Route path="/customer-subscriptions" element={<ProtectedRoute><SubscriptionsPage /></ProtectedRoute>} />
+      <Route path="/customer-subscriptions/:id" element={<ProtectedRoute><SubscriptionDetailPage /></ProtectedRoute>} />
+      <Route path="/subscription-plans" element={<ProtectedRoute><SubscriptionPlans /></ProtectedRoute>} />
       <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
       <Route path="/referrals" element={<ProtectedRoute><Referrals /></ProtectedRoute>} />
       <Route path="/tag-expiry-notifications" element={<ProtectedRoute><TagExpiryNotifications /></ProtectedRoute>} />

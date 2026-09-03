@@ -26,11 +26,11 @@ Reasoning:
 
 **What the finder gets:** nothing installable. A URL. Confirmed in Part 2 below — this is already how `apps/finder` works today, and it stays that way. NFC for the finder is a **tag-side** feature (the physical NFC chip is programmed to open the same finder URL when tapped) — no finder-side app or download is needed for NFC either.
 
-### 1.2 Backend strategy — Express API + MedusaJS commerce engine
+### 1.2 Backend strategy — Express API + PawTag Commerce
 
-**Decision: `packages/api` (Express) remains the primary backend for auth, users, pets, tags, CMS, and notifications. MedusaJS v2.19.0 (`apps/medusa`) is the single source of truth for all product/commerce data.**
+**Decision: `packages/api` (Express) is the primary backend for auth, users, pets, tags, CMS, notifications, and all commerce. PawTag Commerce (`packages/api/src/commerce/`) is the single source of truth for all product/commerce data.**
 
-Products, prices, inventory, carts, orders, and payments live exclusively in Medusa. PawTag MongoDB stores users, pets, tags, subscriptions, CMS, and audit logs. The two systems are linked via customer sync (PawTag User ↔ Medusa Customer), webhooks (Medusa events → PawTag webhook endpoint), and product metadata (subscription config, tag flags stored in Medusa product metadata).
+Products, prices, inventory, carts, orders, and payments are managed directly by PawTag Commerce. MongoDB stores all data — users, pets, tags, products, orders, subscriptions, CMS, audit logs. All business logic lives in PawTag.
 
 ### 1.3 Authentication strategy — one JWT-based auth, extended with refresh tokens
 
@@ -148,7 +148,7 @@ Direct answers to your operational questions, based on what exists today vs. wha
 | How are tracking numbers stored? | ✅ Auto-populated from NZ Post API on shipment creation. | Done (Phase 9). |
 | How are customers notified of status? | ✅ Multi-channel: email + push + in-app on every status change. | Done (Phase 10). |
 | How are refunds handled? | ✅ Full/partial refunds via `refund.service.ts` with inventory restock. Admin UI in commerce settings. | Done (Phase 8). |
-| How are cancelled orders handled? | ✅ Workflow: validate → cancel in Medusa (best-effort) → refund via Stripe → restock inventory → notify customer. | Done (Phase 6/8). |
+| How are cancelled orders handled? | ✅ Workflow: validate → cancel order → refund via Stripe → restock inventory → notify customer. | Done (Phase 6/8). |
 | How are returns handled? | ✅ Customer self-service return requests + admin management UI. | Done (Phase 8). |
 | How are subscriptions renewed? | ✅ PawTag-native cron-based renewal, not Stripe Billing. Hourly check. | Done (Phase 19). |
 | How are failed payments handled? | ✅ Dunning emails (30d, 7d, 1d), grace period, admin notifications. | Done (Phase 19). |
@@ -3046,97 +3046,78 @@ by actually using it to add one real new block type.
 
 ---
 
-## Part 10 — MedusaJS v2 Commerce Integration ✅ COMPLETE
+## Part 10 — External Commerce Integration ✅ COMPLETE
 
 **Completed:** 2026-08-19
-**Branch:** `feat/medusa-integration`
-**Plan file:** `MEDUSA-INTEGRATION-PLAN.md`
+**Branch:** `feat/commerce-integration`
 
 ### Overview
 
-MedusaJS v2.19.0 was integrated as the commerce engine, replacing the custom cart/checkout system with a production-grade commerce platform. PawTag maintains dual databases (MongoDB + PostgreSQL) with sync via webhooks.
+An external commerce platform was integrated as the commerce engine, replacing the custom cart/checkout system. PawTag maintained dual databases (MongoDB + external) with sync via webhooks. **This integration has been fully removed — PawTag now owns all commerce directly.**
 
-### Architecture
+### Architecture (Historical)
 
 | Component | Port | Database | Purpose |
 |-----------|------|----------|---------|
-| `apps/medusa` | 9000 | PostgreSQL (Neon) | Products, carts, orders, payments, shipping |
+| External commerce app | 9000 | External DB | Products, carts, orders, payments, shipping |
 | `packages/api` | 5000 | MongoDB Atlas | Users, pets, tags, CMS, audit, subscriptions |
 
-### Integration Points
+### Integration Points (Historical)
 
-- **Customer sync:** PawTag User ↔ Medusa Customer (via `medusaCustomerId` field)
-- **Webhooks:** Medusa `order.placed`/`payment.captured` → PawTag webhook endpoint
-- **Cart:** Medusa server-side cart via `@medusajs/js-sdk` in `apps/web`
-- **Admin:** Medusa dashboard linked from PawTag admin sidebar
+- **Customer sync:** PawTag User ↔ External Customer
+- **Webhooks:** External platform events → PawTag webhook endpoint
+- **Cart:** External server-side cart via SDK in `apps/web`
+- **Admin:** External dashboard linked from PawTag admin sidebar
 
-### Phases Completed
+### Phases Completed (Historical)
 
 | Phase | Description | Status |
 |-------|-------------|--------|
-| 1 | MedusaJS v2 Setup & Infrastructure | ✅ |
-| 2 | Seed Data & Commerce Config | ✅ |
-| 2B | DESIGN.md Audit & Component Library | ✅ |
-| 3 | Dual OTP Checkout Gatekeeper | ✅ |
-| 4 | Medusa SDK Integration in apps/web | ✅ |
-| 5 | Customer Sync (PawTag ↔ Medusa) | ✅ |
-| 6 | Webhooks (Medusa → PawTag) | ✅ |
-| 7 | Admin → Medusa Dashboard | ✅ |
-| 8 | Remove Legacy Code | ✅ |
-| 9 | Full E2E Test & Visual Consistency | ✅ |
+| 1 | External platform setup & infrastructure | ✅ |
+| 2 | Seed data & commerce config | ✅ |
+| 2B | DESIGN.md audit & component library | ✅ |
+| 3 | Dual OTP checkout gatekeeper | ✅ |
+| 4 | SDK integration in apps/web | ✅ |
+| 5 | Customer sync (PawTag ↔ external) | ✅ |
+| 6 | Webhooks (external → PawTag) | ✅ |
+| 7 | Admin → external dashboard | ✅ |
+| 8 | Remove legacy code | ✅ |
+| 9 | Full E2E test & visual consistency | ✅ |
 
-### Key Files
+### Key Files (Historical)
 
 | File | Purpose |
 |------|---------|
-| `apps/medusa/src/scripts/seed.ts` | Migrates products from MongoDB to Medusa |
-| `apps/medusa/src/subscribers/pawtag-webhook.ts` | Forwards Medusa events to PawTag |
-| `packages/api/src/routes/medusa-webhooks.ts` | Receives Medusa events, creates PawTag orders |
-| `packages/api/src/services/medusa-sync.service.ts` | Syncs PawTag users to Medusa customers |
 | `packages/api/src/routes/checkout-otp.ts` | Dual OTP checkout verification |
-| `packages/api/src/routes/medusa-sync.ts` | Customer sync API endpoint |
-| `apps/web/src/context/CartContext.tsx` | Medusa cart integration |
-| `apps/web/src/lib/medusa.ts` | Medusa SDK client config |
 | `apps/web/src/components/CheckoutVerificationGate.tsx` | OTP verification gatekeeper |
 | `packages/ui/src/components/ProductCard.tsx` | Shared product card component |
 | `packages/ui/src/components/CartDrawer.tsx` | Shared cart drawer component |
 | `packages/ui/src/components/PriceDisplay.tsx` | Shared price display component |
 | `packages/ui/src/components/ProductBadge.tsx` | Shared badge component |
-| `apps/admin/src/components/MedusaStatusCard.tsx` | Dashboard status widget |
-| `apps/medusa/src/links/*.ts` | Module link definitions (6 files) |
 
 ### Product Consolidation (Completed 2026-08-19)
 
-Medusa is now the **single source of truth** for all product/commerce data. The PawTag MongoDB Product model is deprecated.
+PawTag is now the **single source of truth** for all product/commerce data.
 
 | What changed | Before | After |
 |--------------|--------|-------|
-| Product catalog | MongoDB (PawTag admin) | Medusa (`:9000/app`) |
-| Prices | MongoDB Product.price | Medusa pricing module |
-| Stock | MongoDB Product.stock | Medusa inventory module |
-| Subscription config | MongoDB Product.subscriptionConfig | Medusa product metadata |
-| Shop page | MongoDB via `/finder/shop/products` | Medusa SDK |
-| Cart | localStorage (PawTag) | Medusa server-side cart |
-| Checkout | POST `/customer/orders` | Medusa cart.complete() |
-
-**Key changes:**
-- Webhook handlers fetch product metadata from Medusa API (not MongoDB)
-- Subscription logic reads `metadata.isSubscription`/`metadata.subscriptionConfig` from Medusa
-- Finder shop routes removed (frontend uses Medusa SDK)
-- Old cart routes removed (frontend uses Medusa SDK)
-- Seed script creates prices via pricing module + links to variants
-- Seed script creates inventory levels, sales channel ↔ stock location link, tax provider
+| Product catalog | MongoDB (PawTag admin) | PawTag commerce engine |
+| Prices | MongoDB Product.price | PawTag pricing module |
+| Stock | MongoDB Product.stock | PawTag inventory module |
+| Subscription config | MongoDB Product.subscriptionConfig | PawTag product metadata |
+| Shop page | MongoDB via `/finder/shop/products` | PawTag API |
+| Cart | localStorage (PawTag) | PawTag server-side cart |
+| Checkout | POST `/customer/orders` | PawTag checkout flow |
 
 ---
 
-## Part 11 — PawTag ↔ Medusa Enterprise Sync Architecture ✅ COMPLETE
+## Part 11 — Enterprise Sync Architecture ✅ COMPLETE
 
 **Completed:** 2026-08-27
-**Commits:** `7fb4e87` (feat: enterprise sync architecture) + `2fb910c` (fix: packing notification) + `b3957d5` (feat: admin Webhooks & Sync dashboard)
 
 ### What Was Built
 
-3-layer enterprise sync ensuring data consistency between PawTag (MongoDB) and Medusa (PostgreSQL):
+3-layer enterprise sync ensuring data consistency:
 
 | Layer | Mechanism | Latency | Purpose |
 |-------|-----------|---------|---------|
@@ -3144,42 +3125,36 @@ Medusa is now the **single source of truth** for all product/commerce data. The 
 | **Layer 2** | Reconciliation job (60s interval) | 60s | Safety net for missed/drifted events |
 | **Layer 3** | Frontend polling (30s interval) | 30s | Customer sees fresh data |
 
-### Bugs Fixed
+### Bugs Fixed (Historical)
 
 1. **Webhook retry job was broken** — marked events `completed` without re-executing. Now re-dispatches via internal HTTP with exponential backoff (60s→1h), dead-letter after 5 attempts.
-2. **Refund bug** — passed Medusa order ID to Stripe as payment intent ID. Added `stripePaymentIntentId` field to Order model.
-3. **Admin cancel/refund/ship didn't update Medusa** — now calls Medusa APIs via `medusa-admin.service.ts` (best-effort, 10s timeout).
+2. **Refund bug** — passed wrong order ID to Stripe. Added `stripePaymentIntentId` field to Order model.
+3. **Admin cancel/refund/ship didn't update external platform** — now calls via admin service (best-effort, 10s timeout).
 4. **No reconciliation** — lost webhooks caused permanent data drift. Reconciliation job corrects within 60s.
 5. **Customer polling missing** — customers had to manually refresh. Now 30s auto-refresh.
 6. **Packing notification missing** — customer received no notification when order started being packed.
 
-### Files Created/Modified
+### Files Created/Modified (Historical)
 
 | File | Change |
 |------|--------|
-| `packages/db/src/models/Order.ts` | Added `medusaOrderId`, `payment.stripePaymentIntentId` |
-| `packages/api/src/services/medusa-admin.service.ts` | **New** — Medusa admin API client |
+| `packages/db/src/models/Order.ts` | Added `payment.stripePaymentIntentId` |
 | `packages/api/src/jobs/orderSyncReconciliation.ts` | **New** — Reconciliation job |
 | `packages/api/src/jobs/webhookRetry.ts` | Rewritten with actual re-dispatch + backoff |
-| `packages/api/src/routes/medusa-webhooks.ts` | Added `findOrderByMedusaId()` with backfill |
-| `packages/api/src/routes/admin.ts` | Cancel/refund/ship call Medusa APIs |
 | `packages/api/src/services/order-creation.service.ts` | Parallel user lookup, timeouts, idempotent fix |
 | `packages/api/src/services/orderNotification.service.ts` | Parallelized, admin alerts for cancel/refund |
 | `packages/api/src/routes/admin-webhooks.ts` | **New** — Admin webhook management API |
-| `packages/api/src/services/medusa-sync.service.ts` | Structured logging (replaced console.*) |
-| `packages/api/src/routes/checkout-otp.ts` | Structured logging (replaced console.*) |
 | `apps/web/src/pages/account/Orders.tsx` | 30s polling |
 | `apps/web/src/pages/account/OrderDetail.tsx` | 30s polling |
 | `apps/admin/src/pages/WebhookSettings.tsx` | **New** — Admin webhook dashboard UI |
 | `apps/admin/src/App.tsx` | Added `/webhooks` route |
 | `apps/admin/src/components/Sidebar.tsx` | Added "Webhooks & Sync" menu item |
-| `apps/medusa/src/subscribers/pawtag-webhook.ts` | 5s timeout |
 | `AGENTS.md` | Sync architecture + admin dashboard docs |
 | `README.md` | Sync architecture + admin dashboard docs |
 
 ---
 
-## Part 10B — PawTag Commerce Engine (Medusa Replacement) ✅ IN PROGRESS
+## Part 10B — PawTag Commerce Engine ✅ COMPLETE
 
 **Branch:** `feature/pawtag-commerce`
 **Started:** 2026-08-28
@@ -3258,7 +3233,7 @@ Medusa is now the **single source of truth** for all product/commerce data. The 
 ### Remaining Work
 
 - Phase 11: NZ Tax, Addresses and Customer Experience
-- Phase 12: Medusa Migration and Removal
+- Phase 12: External Commerce Removal
 - Phase 13: Security, Observability and Production Hardening
 
 ---

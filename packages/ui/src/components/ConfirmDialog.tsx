@@ -41,6 +41,7 @@ export function ConfirmDialog({
   notesLabel = 'Additional notes',
   notesPlaceholder = 'Please provide more detail',
   footnote,
+  children,
 }: ConfirmDialogProps) {
   const config = variantConfig[variant];
 
@@ -133,6 +134,8 @@ export function ConfirmDialog({
               )}
             </div>
           )}
+
+          {children}
         </div>
 
         <div className="flex justify-end gap-3 pt-4 mt-4 border-t border-gray-100 bg-white">

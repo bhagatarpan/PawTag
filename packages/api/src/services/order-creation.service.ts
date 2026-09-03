@@ -26,6 +26,7 @@ import { generateInvoiceHtml } from './invoice-html.service';
 import { sendPushToUser } from './push-notification.service';
 import { generateSecureToken, hashToken } from './auth.service';
 import { recordOrderActivity } from '../lib/order-activity';
+import { formatCreatedBy, formatCreatedByDescription } from '../lib/actor';
 import logger from '../lib/logger';
 
 /**
@@ -97,6 +98,9 @@ export interface CreateOrderParams {
 
   /** Promo code used */
   promoCode?: string;
+
+  /** Source portal (default: 'customer-web') */
+  portal?: string;
 }
 
 /**
@@ -130,6 +134,7 @@ export async function createPawTagOrder(params: CreateOrderParams): Promise<Crea
     shippingAddress,
     referralCode,
     promoCode,
+    portal = 'customer-web',
   } = params;
 
   // 1. Idempotency check — prevent duplicate orders for same payment
@@ -155,7 +160,12 @@ export async function createPawTagOrder(params: CreateOrderParams): Promise<Crea
   );
   const orderNumber = `PT-${String(counter?.value?.seq || 1).padStart(6, '0')}`;
 
-  // 3. Create Order
+  // 3. Resolve creator info
+  const creator = await User.findById(userId).select('fullName email').lean();
+  const createdBy = formatCreatedBy(creator?.fullName || 'Unknown User', 'Customer');
+  const createdByDescription = formatCreatedByDescription(portal, creator?.fullName || 'Unknown User');
+
+  // 4. Create Order
   const order = await Order.create({
     orderNumber,
     userId,
@@ -189,6 +199,11 @@ export async function createPawTagOrder(params: CreateOrderParams): Promise<Crea
     shippingAddress: shippingAddress || { line1: '', city: '', state: '', zip: '', country: 'NZ' },
     referredByCode: referralCode,
     notes: `Stripe PaymentIntent: ${paymentIntentId}`,
+    createdBy,
+    createdByType: 'Customer',
+    createdByPortal: portal,
+    createdByDescription,
+    createdByEmail: creator?.email || null,
   });
 
   // 4. Record activity

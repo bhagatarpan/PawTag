@@ -462,7 +462,7 @@ describe('Customer Full — Tag Redemption', () => {
 // 4. CART
 // ═══════════════════════════════════════════════════════════════
 
-// Cart routes removed — frontend now uses Medusa SDK
+// Cart routes removed — frontend uses PawTag checkout API
 
 // ═══════════════════════════════════════════════════════════════
 // 5. ORDERS
@@ -470,9 +470,7 @@ describe('Customer Full — Tag Redemption', () => {
 
 describe('Customer Full — Orders', () => {
   // NOTE: POST /api/customer/orders has been removed.
-  // Checkout now uses Medusa SDK: sdk.store.cart.complete() → order.placed webhook.
-  // The Medusa webhook handler creates PawTag orders.
-  // See: packages/api/src/routes/medusa-webhooks.ts
+  // Checkout uses POST /checkout/payment-intent → POST /checkout/confirm.
 
   it('GET /orders returns user orders', async () => {
     const { token } = await createCustomerWithAllPerms();

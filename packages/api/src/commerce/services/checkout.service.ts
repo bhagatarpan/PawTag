@@ -39,6 +39,7 @@ import { generateSecureToken, hashToken } from '../../services/auth.service';
 import { sendOrderConfirmation, sendInvoiceEmail, sendMail } from '../../services/email.service';
 import { generateInvoiceHtml } from '../../services/invoice-html.service';
 import { sendPushToUser } from '../../services/push-notification.service';
+import { formatCreatedBy, formatCreatedByDescription } from '../../lib/actor';
 import logger from '../../lib/logger';
 
 /** Checkout result from creating payment intent */
@@ -198,9 +199,10 @@ export class CheckoutService {
    *
    * @param userId - User ID
    * @param paymentIntentId - Stripe PaymentIntent ID
+   * @param portal - Source portal (default: 'customer-web')
    * @returns Checkout result with order and invoice
    */
-  async confirmCheckout(userId: string, paymentIntentId: string): Promise<CheckoutResult> {
+  async confirmCheckout(userId: string, paymentIntentId: string, portal: string = 'customer-web'): Promise<CheckoutResult> {
     logger.info({ userId, paymentIntentId }, 'Checkout confirm started');
 
     // 1. Find PendingOrder — try exact match first
@@ -278,6 +280,10 @@ export class CheckoutService {
     }
 
     // 6-7. Generate order number and create Order (retry on duplicate key)
+    const creator = await User.findById(userId).select('fullName email').lean();
+    const createdBy = formatCreatedBy(creator?.fullName || 'Unknown User', 'Customer');
+    const createdByDescription = formatCreatedByDescription(portal, creator?.fullName || 'Unknown User');
+
     let order: any;
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
@@ -312,6 +318,11 @@ export class CheckoutService {
           shippingAddress: pending.shippingAddress,
           referredByCode: pending.referralCode,
           notes: `Stripe PaymentIntent: ${paymentIntentId}`,
+          createdBy,
+          createdByType: 'Customer',
+          createdByPortal: portal,
+          createdByDescription,
+          createdByEmail: creator?.email || null,
         });
         break; // success
       } catch (err: any) {

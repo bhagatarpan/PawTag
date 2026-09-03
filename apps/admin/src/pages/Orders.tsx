@@ -11,7 +11,7 @@ import RefundStatusCard from '../components/RefundStatusCard';
 import {
   Search, X, ChevronDown, Download, Loader2, ShoppingCart, CreditCard,
   Truck, Package, CheckCircle, AlertCircle, Info, Clock, FileText,
-  RefreshCw, Ban, Send, Eye, Printer, Copy, ExternalLink, AlertTriangle, XCircle, RotateCcw,
+  RefreshCw, Ban, Send, Eye, Printer, Copy, ExternalLink, AlertTriangle, XCircle, RotateCcw, PlusCircle,
 } from 'lucide-react';
 import {
   ORDER_STATUS_LABELS,
@@ -44,7 +44,6 @@ export interface Order {
   _id: string;
   orderNumber: string;
   userId: { _id: string; fullName: string; email: string } | null;
-  medusaOrderId?: string;
   items: OrderItem[];
   status: string;
   subtotal?: number;
@@ -94,6 +93,11 @@ export interface Order {
   cancelledByPortal?: 'customer-web' | 'customer-mobile' | 'admin-web' | 'system';
   cancelledByDescription?: string;
   cancelledAt?: string;
+  createdBy?: string;
+  createdByType?: string;
+  createdByPortal?: 'customer-web' | 'customer-mobile' | 'admin-web' | 'system';
+  createdByDescription?: string;
+  createdByEmail?: string;
   refundReason?: string;
   refundId?: string;
   refundArn?: string;
@@ -103,6 +107,11 @@ export interface Order {
   refundLastSyncedAt?: string;
   refundFailureReason?: string;
   refundAttemptCount?: number;
+  refundedBy?: string;
+  refundedByType?: string;
+  refundedByPortal?: 'customer-web' | 'customer-mobile' | 'admin-web' | 'system';
+  refundedByDescription?: string;
+  refundedAt?: string;
   deliveredAt?: string;
   activity?: Array<{
     type: string;
@@ -419,11 +428,6 @@ export function OrderDetailDrawer({
                 </span>
               } />
             )}
-            {order.medusaOrderId && (
-              <DetailRow label="Medusa Order" value={
-                <span className="font-mono text-xs text-gray-500">{order.medusaOrderId}</span>
-              } />
-            )}
           </Section>
 
           {/* Order Summary Breakdown */}
@@ -492,6 +496,38 @@ export function OrderDetailDrawer({
                   Print
                 </button>
               </div>
+            </Section>
+          )}
+
+          {/* Creation Details - always shown for paid/refunded orders */}
+          {order.createdByDescription && (
+            <Section title="Creation Details" icon={<PlusCircle size={16} />}>
+              <div className="mb-3 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg p-3">
+                {order.createdByDescription}
+              </div>
+              {order.createdBy && <DetailRow label="Created by" value={order.createdBy} />}
+              {order.createdByType && <DetailRow label="Role" value={order.createdByType} />}
+              {order.createdByPortal && (
+                <DetailRow
+                  label="Portal"
+                  value={
+                    order.createdByPortal === 'customer-web' ? 'Customer Web Portal' :
+                    order.createdByPortal === 'customer-mobile' ? 'Customer Mobile App' :
+                    order.createdByPortal === 'admin-web' ? 'Admin Web Portal' :
+                    order.createdByPortal === 'system' ? 'System (Auto)' :
+                    order.createdByPortal
+                  }
+                />
+              )}
+              {order.createdByEmail && <DetailRow label="Email" value={order.createdByEmail} />}
+              {order.createdAt && (
+                <DetailRow
+                  label="Created at"
+                  value={new Date(order.createdAt).toLocaleString('en-NZ', {
+                    day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+                  })}
+                />
+              )}
             </Section>
           )}
 
@@ -570,6 +606,40 @@ export function OrderDetailDrawer({
                     <ExternalLink size={12} />
                   </a>
                 </div>
+              )}
+            </Section>
+          )}
+
+          {/* Refund Details - shown for refunded orders or cancelled with refund */}
+          {(order.status === 'refunded' || (order.status === 'cancelled' && order.refundedByDescription)) && (
+            <Section title="Refund Details" icon={<RotateCcw size={16} />}>
+              {order.refundedByDescription && (
+                <div className="mb-3 text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  {order.refundedByDescription}
+                </div>
+              )}
+              {order.refundedBy && <DetailRow label="Refunded by" value={order.refundedBy} />}
+              {order.refundedByType && <DetailRow label="Role" value={order.refundedByType} />}
+              {order.refundedByPortal && (
+                <DetailRow
+                  label="Portal"
+                  value={
+                    order.refundedByPortal === 'customer-web' ? 'Customer Web Portal' :
+                    order.refundedByPortal === 'customer-mobile' ? 'Customer Mobile App' :
+                    order.refundedByPortal === 'admin-web' ? 'Admin Web Portal' :
+                    order.refundedByPortal === 'system' ? 'System (Auto)' :
+                    order.refundedByPortal
+                  }
+                />
+              )}
+              {order.refundReason && <DetailRow label="Reason" value={order.refundReason} />}
+              {order.refundedAt && (
+                <DetailRow
+                  label="Refunded at"
+                  value={new Date(order.refundedAt).toLocaleString('en-NZ', {
+                    day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+                  })}
+                />
               )}
             </Section>
           )}
@@ -934,6 +1004,7 @@ export default function Orders() {
   const [actionModal, setActionModal] = useState<{ orderId: string; action: 'cancel' | 'refund' } | null>(null);
   const [reason, setReason] = useState('');
   const [notes, setNotes] = useState('');
+  const [refundAmount, setRefundAmount] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
   const [cancellationReasons, setCancellationReasons] = useState<string[]>([]);
 
@@ -1012,16 +1083,32 @@ export default function Orders() {
 
   const executeAction = async () => {
     if (!actionModal || !reason.trim()) return;
+    if (actionModal.action === 'refund' && refundAmount) {
+      const amt = parseFloat(refundAmount);
+      if (isNaN(amt) || amt <= 0) {
+        toast.error('Invalid refund amount');
+        return;
+      }
+      if (selectedOrder && amt > (selectedOrder.payment?.amount || 0)) {
+        toast.error(`Refund amount cannot exceed $${selectedOrder.payment?.amount?.toFixed(2)}`);
+        return;
+      }
+    }
     setActionLoading(true);
     try {
-      await api.post(`/admin/orders/${actionModal.orderId}/${actionModal.action}`, {
+      const payload: Record<string, any> = {
         reason: reason.trim(),
         notes: actionModal.action === 'cancel' && reason.trim() === 'Other' ? notes.trim() : undefined,
-      });
+      };
+      if (actionModal.action === 'refund' && refundAmount) {
+        payload.amount = parseFloat(refundAmount);
+      }
+      await api.post(`/admin/orders/${actionModal.orderId}/${actionModal.action}`, payload);
       toast.success(actionModal.action === 'cancel' ? 'Order cancelled' : 'Order refunded');
       setActionModal(null);
       setReason('');
       setNotes('');
+      setRefundAmount('');
       fetchOrders();
       fetchSummary();
     } catch (err: any) {
@@ -1262,7 +1349,7 @@ export default function Orders() {
       {actionModal && (
         <ConfirmDialog
           open={!!actionModal}
-          onClose={() => { setActionModal(null); setReason(''); setNotes(''); }}
+          onClose={() => { setActionModal(null); setReason(''); setNotes(''); setRefundAmount(''); }}
           onConfirm={executeAction}
           title={actionModal.action === 'cancel' ? 'Cancel Order' : 'Refund Order'}
           message={
@@ -1273,14 +1360,43 @@ export default function Orders() {
           confirmLabel={actionModal.action === 'cancel' ? 'Cancel Order' : 'Refund Order'}
           variant={actionModal.action === 'cancel' ? 'danger' : 'warning'}
           loading={actionLoading}
-          reasons={actionModal.action === 'cancel' ? cancellationReasons : undefined}
-          selectedReason={actionModal.action === 'cancel' ? reason : undefined}
-          onReasonChange={actionModal.action === 'cancel' ? setReason : undefined}
+          reasons={cancellationReasons}
+          selectedReason={reason || undefined}
+          onReasonChange={setReason}
           showNotes={actionModal.action === 'cancel' && reason === 'Other'}
           notesRequired={actionModal.action === 'cancel' && reason === 'Other'}
           notes={notes}
           onNotesChange={setNotes}
-        />
+          footnote={
+            actionModal.action === 'cancel'
+              ? 'A full refund will be processed automatically. Refunds typically take 5-10 business days to appear on your statement.'
+              : 'The refund will be processed via Stripe. Refunds typically take 5-10 business days to appear on the customer\'s statement.'
+          }
+        >
+          {actionModal.action === 'refund' && selectedOrder && (
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Refund Amount (NZD)
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0.01"
+                max={selectedOrder.payment?.amount || 0}
+                value={refundAmount || selectedOrder.payment?.amount || ''}
+                onChange={(e) => setRefundAmount(e.target.value)}
+                disabled={actionLoading}
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
+              />
+              <p className="text-sm text-gray-500 mt-1">
+                Maximum: ${selectedOrder.payment?.amount?.toFixed(2) || '0.00'}
+                {refundAmount && parseFloat(refundAmount) < (selectedOrder.payment?.amount || 0) && (
+                  <span className="text-amber-600 ml-2">Partial refund</span>
+                )}
+              </p>
+            </div>
+          )}
+        </ConfirmDialog>
       )}
     </div>
   );

@@ -22,6 +22,7 @@ import SeoHead from '../components/SeoHead';
 import { useShopPage, useSiteSettings } from '../hooks/useCms';
 import { getProductBadge } from '../utils/productHelpers';
 import api from '../lib/api';
+import { Package } from 'lucide-react';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -190,16 +191,24 @@ export default function Shop() {
           <p className="text-gray-600 mb-8">{shopDesc}</p>
 
           {/* Product Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {cardProducts.map((product) => (
-              <ProductCard
-                key={product.id}
-                product={product}
-                onAddToCart={(_p, e) => handleAddToCart(product, e)}
-                onDetails={() => handleProductClick(product)}
-                added={addedId === product.id}
-              />
-            ))}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {cardProducts.length === 0 ? (
+              <div className="col-span-full text-center py-16 bg-white rounded-2xl border border-gray-200">
+                <Package className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">No products available right now</h3>
+                <p className="text-gray-500">We're restocking our shelves. Check back soon!</p>
+              </div>
+            ) : (
+              cardProducts.map((product) => (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  onAddToCart={(_p, e) => handleAddToCart(product, e)}
+                  onDetails={() => handleProductClick(product)}
+                  added={addedId === product.id}
+                />
+              ))
+            )}
           </div>
         </div>
       </div>

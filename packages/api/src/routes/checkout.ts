@@ -68,14 +68,14 @@ router.post('/payment-intent', async (req: AuthRequest, res: Response) => {
  */
 router.post('/confirm', async (req: AuthRequest, res: Response) => {
   try {
-    const { paymentIntentId } = req.body;
+    const { paymentIntentId, portal } = req.body;
 
     if (!paymentIntentId) {
       res.status(400).json({ success: false, error: 'paymentIntentId is required' });
       return;
     }
 
-    const result = await checkoutService.confirmCheckout(req.user!.id, paymentIntentId);
+    const result = await checkoutService.confirmCheckout(req.user!.id, paymentIntentId, portal);
 
     res.json({
       success: true,

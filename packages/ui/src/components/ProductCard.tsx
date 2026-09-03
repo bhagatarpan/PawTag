@@ -37,7 +37,7 @@ export const ProductCard = React.memo(function ProductCard({
 
   return (
     <div
-      className={`bg-white rounded-2xl shadow-sm border border-gray-100 hover:border-primary-200 hover:shadow-lg transition-all duration-300 overflow-hidden relative ${isHighlight ? 'ring-2 ring-amber-400 scale-[1.02]' : ''} ${className}`}
+      className={`bg-white rounded-2xl shadow-sm border border-gray-100 hover:border-primary-200 hover:shadow-lg transition-all duration-300 overflow-hidden relative h-full flex flex-col ${isHighlight ? 'ring-2 ring-amber-400 scale-[1.02]' : ''} ${className}`}
     >
       {product.badge && (
         <div className={`absolute top-4 left-4 z-10 px-3 py-1 rounded-full text-xs font-bold ${product.badge.color}`}>
@@ -53,7 +53,7 @@ export const ProductCard = React.memo(function ProductCard({
         )}
       </div>
 
-      <div className="p-6">
+      <div className="p-6 flex-1 flex flex-col">
         <h3 className="text-xl font-bold text-gray-900 mb-1">{product.name}</h3>
         {product.shortDescription && (
           <p className="text-sm text-gray-500 mb-4">{product.shortDescription}</p>
@@ -82,7 +82,7 @@ export const ProductCard = React.memo(function ProductCard({
           </div>
         )}
 
-        <div className="flex gap-2">
+        <div className="flex gap-2 mt-auto">
           {onDetails && (
             <button
               onClick={() => onDetails(product)}

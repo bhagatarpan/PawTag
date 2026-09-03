@@ -20,12 +20,11 @@ Do not introduce or depend on:
 
 * WooCommerce
 * Shopify
-* Medusa
 * Saleor
 * BigCommerce
 * Any other full e-commerce platform
 
-Medusa may currently exist in the repository and is currently involved in shipping. The long-term goal is to **remove Medusa completely**, but it must not be removed recklessly before its responsibilities have been safely replaced.
+PawTag owns all commerce business logic directly.
 
 The target architecture is:
 
@@ -95,7 +94,7 @@ If there are several technically valid options, make a sensible recommendation b
 * Inspect the actual repository before making assumptions.
 * Documentation may be outdated; actual code is the source of truth.
 * Do not introduce another full e-commerce platform.
-* Do not remove Medusa until its dependencies are understood and safely replaced.
+* Do not remove existing functionality until its dependencies are understood and safely replaced.
 * Do not rewrite working parts of PawTag without a clear reason.
 * Prefer extending the existing architecture over creating unnecessary parallel systems.
 * Keep the technology stack consistent with the repository unless there is a compelling reason not to.
@@ -165,7 +164,6 @@ Inspect the actual implementation of:
 
 Search the entire repository for references to:
 
-* Medusa
 * Stripe
 * PayPal
 * Apple Pay
@@ -211,13 +209,13 @@ It must explain in plain English:
 1. **What PawTag already has**
 2. **What currently works**
 3. **What is incomplete or problematic**
-4. **Exactly what Medusa currently does**
-5. **What PawTag already owns versus what Medusa owns**
+4. **Exactly what the external commerce platform currently does**
+5. **What PawTag already owns versus what the external platform owns**
 6. **What external providers currently do**
 7. **What functionality is missing**
 8. **Which existing components should be kept**
 9. **Which components should be replaced or refactored**
-10. **Every known Medusa dependency**
+10. **Every known external commerce dependency**
 11. **The safest high-level migration path**
 
 Include a simple table such as:
@@ -521,11 +519,11 @@ Ensure that:
 
 ---
 
-# PHASE 6 — SHIPPING WITHOUT MEDUSA
+# PHASE 6 — SHIPPING
 
-This phase begins the functional replacement of Medusa's shipping responsibilities.
+This phase covers PawTag's shipping implementation.
 
-Do not remove Medusa yet unless the repository analysis proves it is no longer needed.
+PawTag now handles shipping directly via its own shipping service and NZ Post integration.
 
 Create a practical shipping abstraction:
 
@@ -563,7 +561,7 @@ Do not integrate every NZ courier simply because it is possible. Start with the 
 
 ### Phase completion criteria
 
-* PawTag can calculate and select shipping without Medusa handling the business logic
+* PawTag can calculate and select shipping independently
 * Shipping is connected through a clean provider boundary
 * Checkout correctly incorporates shipping costs
 * Failure handling is implemented
@@ -717,13 +715,13 @@ Do not unnecessarily collect or store precise location information.
 
 ---
 
-# PHASE 12 — MEDUSA MIGRATION AND REMOVAL
+# PHASE 12 — EXTERNAL COMMERCE REMOVAL — COMPLETE
 
-Only begin final Medusa removal after PawTag Commerce has safely replaced every required responsibility.
+**Status:** ✅ COMPLETE. External commerce platform has been fully removed from the codebase.
 
-Before removal:
+PawTag now operates as a single-system architecture with MongoDB as the sole database.
 
-1. Re-scan the entire repository for Medusa references.
+1. Re-scan the entire repository for external commerce references.
 2. Identify runtime dependencies.
 3. Identify package dependencies.
 4. Identify environment variables.
@@ -738,7 +736,7 @@ If existing data must be migrated, create a safe migration plan.
 Prefer a staged approach:
 
 ```text
-Existing Medusa functionality
+Existing external functionality
           │
           ▼
 Build PawTag replacement
@@ -753,13 +751,13 @@ Switch PawTag traffic/workflows
 Validate in controlled conditions
           │
           ▼
-Remove unused Medusa dependencies
+Remove unused external dependencies
           │
           ▼
 Regression test entire application
 ```
 
-Do not remove Medusa simply because this phase has been reached. Remove it only when the repository demonstrates that it is genuinely no longer required.
+Do not remove external functionality simply because this phase has been reached. Remove it only when the repository demonstrates that it is genuinely no longer required.
 
 After removal:
 
@@ -771,7 +769,7 @@ After removal:
 * Verify builds and deployments
 * Run regression tests
 
-The final repository should have no unnecessary Medusa dependency.
+The final repository should have no unnecessary external commerce dependency.
 
 ---
 
@@ -883,7 +881,7 @@ docs/commerce/
 ├── database-model.md
 ├── api-map.md
 ├── security-and-reliability.md
-└── medusa-migration.md
+└── commerce-migration.md
 ```
 
 Do not create documentation that merely describes what the code was intended to do. Keep it aligned with the actual implementation.
@@ -1019,7 +1017,7 @@ When possible, provide a recommendation rather than simply presenting me with an
 The work is successful when PawTag has a cohesive, first-party commerce system that:
 
 * Fits naturally into the existing PawTag application
-* Does not depend on Medusa or another full e-commerce platform
+* Does not depend on another full e-commerce platform
 * Owns PawTag's commerce business logic
 * Uses specialised external providers only where appropriate
 * Provides a modern shopping cart and checkout experience

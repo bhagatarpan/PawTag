@@ -8,6 +8,7 @@ import { Pet, Tag, Order, LocationEvent, Notification, FinderScan, User, generat
 import { auditService, type AuditContext } from '../services/audit';
 import { createAuditContextFromRequest, type AuditRequest } from '../middleware/audit';
 import { sendOrderConfirmation } from '../services/email.service';
+import { formatCreatedBy, formatCreatedByDescription } from '../lib/actor';
 import logger from '../lib/logger';
 
 const router = Router();
@@ -527,7 +528,10 @@ router.post('/tags/:id/request-replacement', requirePermission('tag.create'), as
         totalPrice: replacementPrice,
       }];
 
-    const user = await User.findById(req.user!.id).select('address').lean();
+    const user = await User.findById(req.user!.id).select('fullName email address').lean();
+
+    const createdBy = formatCreatedBy(user?.fullName || 'Unknown User', 'Customer');
+    const createdByDescription = formatCreatedByDescription('customer-web', user?.fullName || 'Unknown User');
 
     const order = await Order.create({
       orderNumber,
@@ -554,6 +558,11 @@ router.post('/tags/:id/request-replacement', requirePermission('tag.create'), as
         zip: '1010',
         country: 'NZ',
       },
+      createdBy,
+      createdByType: 'Customer',
+      createdByPortal: 'customer-web',
+      createdByDescription,
+      createdByEmail: user?.email || null,
     });
 
     await auditCustomerEvent(req, {

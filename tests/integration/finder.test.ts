@@ -337,12 +337,12 @@ describe('Integration: Finder - Found Timer', () => {
 
 // ═══════════════════════════════════════════
 // SHOP PRODUCTS (Public) — Removed
-// Products are now served by Medusa Store API.
-// Frontend uses sdk.store.product.list() and sdk.store.product.retrieve().
+// Products are now served by PawTag commerce API.
+// Frontend uses the PawTag commerce API directly.
 // These tests are kept as a reminder that the endpoint was intentionally removed.
 // ═══════════════════════════════════════════
 
 describe('Integration: Finder - Shop Products', () => {
-  it.skip('GET /api/finder/shop/products — endpoint removed, products served by Medusa', () => {});
-  it.skip('GET /api/finder/shop/products/:id — endpoint removed, products served by Medusa', () => {});
+  it.skip('GET /api/finder/shop/products — endpoint removed, products served by PawTag commerce API', () => {});
+  it.skip('GET /api/finder/shop/products/:id — endpoint removed, products served by PawTag commerce API', () => {});
 });

@@ -86,11 +86,19 @@ const sections: SidebarSection[] = [
     label: 'Catalog',
     icon: ShoppingBag,
     links: [
-      { to: '/products', label: 'Products', icon: ShoppingBag, permission: 'product.read' },
       { to: '/categories', label: 'Categories', icon: FolderTree, permission: 'product.read' },
       { to: '/collections', label: 'Collections', icon: Database, permission: 'product.read' },
       { to: '/brands', label: 'Brands', icon: Target, permission: 'product.read' },
+    ],
+  },
+  {
+    id: 'products-services',
+    label: 'PawTag Products & Services',
+    icon: Package,
+    links: [
+      { to: '/products', label: 'Products', icon: ShoppingBag, permission: 'product.read' },
       { to: '/tags', label: 'Tags', icon: QrCode, permission: 'tag.read' },
+      { to: '/subscription-plans', label: 'Subscriptions', icon: CreditCard, permission: 'product.read' },
     ],
   },
   {
@@ -118,13 +126,13 @@ const sections: SidebarSection[] = [
     ],
   },
   {
-    id: 'customers',
-    label: 'Customers',
+    id: 'users',
+    label: 'Users',
     icon: Users,
     links: [
-      { to: '/users', label: 'Customers', icon: Users, permission: 'user.read' },
+      { to: '/users/customers', label: 'Customers', icon: Users, permission: 'user.read' },
+      { to: '/users/admin', label: 'Users', icon: Users, permission: 'user.read' },
       { to: '/pets', label: 'Pets', icon: PawPrint, permission: 'pet.read' },
-      { to: '/subscriptions', label: 'Subscriptions', icon: CreditCard, permission: 'subscription.read' },
     ],
   },
   {

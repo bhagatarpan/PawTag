@@ -1358,7 +1358,11 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
 /*  Main Component                                                     */
 /* ------------------------------------------------------------------ */
 
-export default function Users() {
+interface UsersProps {
+  defaultRoleFilter?: 'customer' | 'admin';
+}
+
+export default function Users({ defaultRoleFilter }: UsersProps) {
   // Data state
   const [data, setData] = useState<PaginatedData<UserRecord> | null>(null);
   const [loading, setLoading] = useState(true);
@@ -1399,6 +1403,20 @@ export default function Users() {
     api.get('/admin/rbac/roles').then((res) => setRbacRoles(res.data.data || [])).catch(console.error);
   }, []);
 
+  // Apply default role filter from props
+  useEffect(() => {
+    if (!defaultRoleFilter || rbacRoles.length === 0) return;
+    
+    if (defaultRoleFilter === 'customer') {
+      const customerRole = rbacRoles.find((r: any) => r.name === 'CUSTOMER');
+      if (customerRole) setRoleFilter(customerRole._id);
+    } else if (defaultRoleFilter === 'admin') {
+      // For admin view, we'll filter client-side to exclude CUSTOMER role
+      // Set a special marker to indicate admin filter mode
+      setRoleFilter('__admin__');
+    }
+  }, [defaultRoleFilter, rbacRoles]);
+
   // Fetch summary
   const fetchSummary = useCallback(async () => {
     setSummaryLoading(true);
@@ -1425,9 +1443,27 @@ export default function Users() {
     try {
       const params: any = { page, limit: pageSize };
       if (debouncedSearch) params.search = debouncedSearch;
-      if (roleFilter) params.roleId = roleFilter;
       if (statusFilter) params.status = statusFilter;
+      
+      // For admin filter (__admin__), don't send roleId - fetch all and filter client-side
+      const isAdminFilter = roleFilter === '__admin__';
+      if (roleFilter && !isAdminFilter) {
+        params.roleId = roleFilter;
+      }
+      
       const res = await api.get('/admin/users', { params });
+      let items = res.data.data.items || [];
+      
+      // Client-side filter for admin view: exclude CUSTOMER role
+      if (isAdminFilter) {
+        items = items.filter((u: UserRecord) => 
+          !u.rbacRoles?.some((ur: any) => ur.roleId?.name === 'CUSTOMER')
+        );
+        // Update total count for pagination
+        res.data.data.total = items.length;
+        res.data.data.totalPages = Math.ceil(items.length / pageSize);
+      }
+      
       setData(res.data.data);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to load users');
@@ -1446,11 +1482,23 @@ export default function Users() {
     try {
       const params: Record<string, unknown> = { format, limit: 10000 };
       if (debouncedSearch) params.search = debouncedSearch;
-      if (roleFilter) params.roleId = roleFilter;
       if (statusFilter) params.status = statusFilter;
+      
+      // For admin filter (__admin__), don't send roleId - fetch all and filter client-side
+      const isAdminFilter = roleFilter === '__admin__';
+      if (roleFilter && !isAdminFilter) {
+        params.roleId = roleFilter;
+      }
 
       const res = await api.get('/admin/users', { params });
-      const items = res.data.data.items || [];
+      let items = res.data.data.items || [];
+      
+      // Client-side filter for admin view: exclude CUSTOMER role
+      if (isAdminFilter) {
+        items = items.filter((u: UserRecord) => 
+          !u.rbacRoles?.some((ur: any) => ur.roleId?.name === 'CUSTOMER')
+        );
+      }
 
       if (format === 'json') {
         const blob = new Blob([JSON.stringify(items, null, 2)], { type: 'application/json' });
@@ -1489,8 +1537,12 @@ export default function Users() {
   const activeFilters: Array<{ key: string; label: string; clear: () => void }> = [];
   if (debouncedSearch) activeFilters.push({ key: 'search', label: `Search: "${debouncedSearch}"`, clear: () => { setSearch(''); setDebouncedSearch(''); } });
   if (roleFilter) {
-    const role = rbacRoles.find((r: any) => r._id === roleFilter);
-    activeFilters.push({ key: 'role', label: `Role: ${role?.displayName || roleFilter}`, clear: () => setRoleFilter('') });
+    if (roleFilter === '__admin__') {
+      activeFilters.push({ key: 'role', label: 'Role: Admin Users (Staff)', clear: () => setRoleFilter('') });
+    } else {
+      const role = rbacRoles.find((r: any) => r._id === roleFilter);
+      activeFilters.push({ key: 'role', label: `Role: ${role?.displayName || roleFilter}`, clear: () => setRoleFilter('') });
+    }
   }
   if (statusFilter) activeFilters.push({ key: 'status', label: `Status: ${formatStatusLabel(statusFilter)}`, clear: () => setStatusFilter('') });
 

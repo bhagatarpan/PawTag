@@ -9,9 +9,8 @@
 
 PawTag is a pet recovery platform using QR code and NFC tags. A pet owner purchases a tag, links it to their pet's profile, and when the pet is lost, anyone who finds it can scan the tag to notify the owner and facilitate a reunion.
 
-**Dual Database Architecture:**
-- **MongoDB Atlas** — PawTag's primary data store (users, pets, tags, subscriptions, CMS, audit logs, settings)
-- **PostgreSQL (Neon)** — MedusaJS commerce engine (products, prices, carts, customers, orders, payments, shipping, inventory)
+**Database:**
+- **MongoDB Atlas** — PawTag's single data store (users, pets, tags, products, prices, carts, customers, orders, payments, shipping, inventory, subscriptions, CMS, audit logs, settings)
 
 ---
 
@@ -28,12 +27,10 @@ flowchart TB
 
     subgraph BACKEND["BACKEND"]
         API["packages/api<br/>Express API<br/>:5000"]
-        Medusa["apps/medusa<br/>MedusaJS v2<br/>:9000"]
     end
 
     subgraph DATABASE["DATABASE"]
-        MongoDB[("MongoDB Atlas<br/>Users, Pets, Tags<br/>Orders, CMS, Audit")]
-        PostgreSQL[("PostgreSQL<br/>Neon<br/>Products, Carts<br/>Payments, Shipping")]
+        MongoDB[("MongoDB Atlas<br/>Users, Pets, Tags<br/>Products, Orders, CMS<br/>Inventory, Audit")]
     end
 
     subgraph EXTERNAL["EXTERNAL SERVICES"]
@@ -46,22 +43,17 @@ flowchart TB
     end
 
     Web --> API
-    Web --> Medusa
     Admin --> API
-    Admin --> Medusa
     Finder --> API
     Mobile --> API
 
     API --> MongoDB
-    Medusa --> PostgreSQL
     API --> Stripe
     API --> Resend
     API --> Twilio
     API --> Firebase
     API --> R2
     API --> Sentry
-
-    Medusa -->|"webhooks"| API
 ```
 
 ---
@@ -196,17 +188,15 @@ flowchart TB
         CustomerR["/customer/*<br/>Pets, Orders<br/>Subscriptions"]
         FinderR["/finder/*<br/>Public Tag Lookup<br/>Rate-Limited"]
         CMS["/admin/cms/*<br/>CMS Management<br/>7 Route Files"]
-        Webhooks["/webhooks/*<br/>Stripe + Medusa"]
+        Webhooks["/webhooks/*<br/>Stripe Webhooks"]
         PublicCMS["/public/cms/*<br/>Public CMS Content"]
     end
 
     subgraph SERVICES["Services 28"]
         AuthSvc["Auth Service<br/>JWT, bcrypt, OTP"]
-        OrderSvc["Order Creation<br/>Medusa Integration"]
+        OrderSvc["Order Creation<br/>Direct Stripe"]
         EmailSvc["Email Service<br/>Resend + Templates"]
         StripeSvc["Stripe Service<br/>Payments, Refunds"]
-        MedusaSync["Medusa Sync<br/>Customer Linking"]
-        MedusaAdmin["Medusa Admin<br/>Cancel/Ship/Refund"]
         SubSvc["Subscription<br/>Lifecycle Management"]
         NotifSvc["Notification<br/>Delivery Service"]
         EscalationSvc["Escalation<br/>30-Min Polling"]
@@ -239,7 +229,7 @@ flowchart TB
 | `/api/admin/audit/*` | `audit.ts` | Audit trail viewer | Admin RBAC |
 | `/api/admin/system-logs/*` | `system-logs.ts` | System log viewer | Admin RBAC |
 | `/api/admin/site-availability/*` | `site-availability.ts` | Maintenance/offline controls | Admin RBAC |
-| `/api/admin/webhooks/*` | `admin-webhooks.ts` | Sync dashboard API | Admin RBAC |
+| `/api/admin/webhooks/*` | `admin-webhooks.ts` | Webhook dashboard API | Admin RBAC |
 | `/api/customer/*` | `customer.ts` | Pets, orders, tags, notifications | Customer JWT |
 | `/api/customer/subscriptions/*` | `customer-subscriptions.ts` | Subscription management | Customer JWT |
 | `/api/finder/*` | `finder.ts` | Public tag lookup, notify, location | Public + CAPTCHA |
@@ -253,8 +243,6 @@ flowchart TB
 | `/api/address/*` | `address-autocomplete.ts` | Address autocomplete proxy | Public |
 | `/api/health` | `health.ts` | Health check endpoint | Public |
 | `/api/webhooks/stripe` | `webhooks.ts` | Stripe webhook receiver | Stripe signature |
-| `/api/webhooks/medusa` | `medusa-webhooks.ts` | Medusa webhook receiver | Medusa signature |
-| `/api/customer/medusa-sync` | `medusa-sync.ts` | Customer sync to Medusa | Customer JWT |
 | `/api/customer/checkout-otp/*` | `checkout-otp.ts` | Dual OTP checkout verification | Customer JWT |
 
 ### 4.3 Background Jobs
@@ -265,8 +253,6 @@ flowchart TB
 | Subscription Lifecycle | `subscription.service.ts` | 1 minute | Expiry checks, grace periods, auto-renewal |
 | Escalation Polling | `escalation.service.ts` | 1 minute | 30-min deadline after pet found |
 | Low Stock Check | `lowStockCheck.ts` | 24 hours | Admin alerts for low inventory |
-| Webhook Retry | `webhookRetry.ts` | 60 seconds | Retry failed Medusa webhooks with exponential backoff |
-| Reconciliation | `orderSyncReconciliation.ts` | 60 seconds | Correct data drift between PawTag and Medusa |
 
 ### 4.4 Middleware Stack
 
@@ -331,22 +317,6 @@ erDiagram
 | **RBAC** | Role, Permission, PermissionGroup, PermissionScope, RolePermission, UserRole | Access control |
 | **CMS** | CmsPage, CmsNavigation, CmsFooter, CmsEmailTemplate, CmsSmsTemplate, CmsOnboarding, CmsHomepageSection, CmsShopPage, CmsAuthPage, CmsPetReference, CmsAnnouncement, CmsMedia, CmsRedirect, CmsPageVersion | Content management |
 | **System** | Setting, FeatureFlag, SystemLog, AuditEvent, WebhookEvent, SupportRequest, Cart, Referral, ReferralCode | Infrastructure |
-
-### 5.2 PostgreSQL (MedusaJS)
-
-| Table | Purpose |
-|-------|---------|
-| Orders | Commerce orders (source of truth for orders) |
-| OrderItems | Line items per order |
-| Products | Product catalog with variants |
-| ProductVariants | Product variants with prices |
-| Customers | Medusa customers (linked to PawTag users) |
-| Carts | Server-side shopping carts |
-| Payments | Payment sessions and captures |
-| Fulfillments | Shipping fulfillments |
-| ShippingOptions | Shipping methods |
-| Regions | Tax and shipping regions |
-| InventoryLevels | Stock levels at PawTag Warehouse |
 
 ---
 
@@ -438,7 +408,6 @@ flowchart TB
     Step2 --> Address["Shipping Address<br/>+ Address Autocomplete"]
 
     Step3 --> Stripe["Stripe Payment<br/>Confirm Card"]
-    Step3 --> MedusaCart["Medusa Cart<br/>Complete"]
     Step3 --> PawTagOrder["PawTag Order<br/>Create + Invoice"]
 ```
 
@@ -463,45 +432,6 @@ stateDiagram-v2
     refunded --> [*]
 ```
 
-### 7.3 PawTag ↔ Medusa Sync Architecture
-
-```mermaid
-flowchart TB
-    subgraph LAYER1["LAYER 1: REAL-TIME 0.5-2s"]
-        MedusaEvent["Medusa Event"] --> WebhookHandler["Webhook Handler<br/>medusa-webhooks.ts"]
-        AdminAction["Admin Cancel/Ship/Refund"] --> MedusaAdmin["Medusa Admin API<br/>medusa-admin.service.ts"]
-        FrontendCheckout["Frontend Checkout"] --> DirectAPI["Direct API<br/>POST /orders/place"]
-    end
-
-    subgraph LAYER2["LAYER 2: RECONCILIATION 60s"]
-        ReconcileJob["Reconciliation Job<br/>orderSyncReconciliation.ts"]
-        ReconcileJob --> Compare["Compare PawTag vs Medusa"]
-        Compare --> Correct["Correct Drift"]
-        Correct --> Notify["Notify Customer"]
-    end
-
-    subgraph LAYER3["LAYER 3: FRONTEND POLLING 30s"]
-        OrdersPoll["Orders Page<br/>30s auto-refresh"]
-        OrderDetailPoll["Order Detail<br/>30s auto-refresh"]
-    end
-
-    WebhookHandler --> PawTagOrder
-    MedusaAdmin --> MedusaAPI["Medusa Admin API"]
-    DirectAPI --> PawTagOrder["PawTag Order<br/>MongoDB"]
-    ReconcileJob --> MedusaAPI
-
-    style LAYER1 fill:#e3f2fd
-    style LAYER2 fill:#fff3e0
-    style LAYER3 fill:#e8f5e9
-```
-
-**Sync Settings (DB-driven):**
-- `sync.reconciliation.enabled` — master toggle (default: true)
-- `sync.reconciliation.intervalSeconds` — check interval (default: 60)
-- `sync.reconciliation.skipRecentMinutes` — skip window (default: 5)
-- `sync.polling.enabled` — customer page polling (default: true)
-- `sync.polling.intervalSeconds` — poll interval (default: 30)
-
 ---
 
 ## 8. External Integrations
@@ -518,10 +448,6 @@ flowchart LR
     API --> Sentry["Sentry<br/>Error Tracking<br/>Performance"]
     API --> Photon["Photon<br/>Address Autocomplete"]
     API --> NZPost["NZ Post<br/>Address Autocomplete"]
-
-    Medusa["MedusaJS"] --> StripeMedusa["Stripe<br/>Payment Module"]
-    Medusa --> NeonDB["Neon<br/>PostgreSQL"]
-    Medusa -->|"webhooks"| API
 
     Mobile["Mobile App"] --> Expo["Expo<br/>Push Notifications"]
     Mobile --> ExpoBuild["EAS Build<br/>App Distribution"]
@@ -670,13 +596,11 @@ flowchart TB
 
     subgraph INFRA["Infrastructure"]
         Nginx["Nginx<br/>Reverse Proxy"]
-        PostgreSQL["PostgreSQL<br/>Docker Container"]
     end
 
     Nginx --> WebContainer
     Nginx --> AdminContainer
     Nginx --> FinderContainer
-    APIContainer --> PostgreSQL
 ```
 
 ### 12.2 Production Deployment (Planned)
@@ -688,8 +612,8 @@ flowchart TB
 | Admin | Vercel | Pending accounts |
 | Finder | Vercel | Pending accounts |
 | Mobile | Expo EAS | Pending accounts |
-| Database | MongoDB Atlas (existing) | Active |
-| Commerce | MedusaJS (Neon PostgreSQL) | Active |
+| Database | MongoDB Atlas | Active |
+| Commerce | PawTag Commerce (MongoDB) | Active |
 
 ---
 
@@ -746,13 +670,8 @@ flowchart LR
 | `packages/api/src/routes/customer.ts` | Customer routes (2500+ lines) |
 | `packages/api/src/routes/finder.ts` | Finder portal routes (747 lines) |
 | `packages/api/src/routes/auth.ts` | Authentication routes |
-| `packages/api/src/routes/medusa-webhooks.ts` | Medusa webhook handlers |
+| `packages/api/src/routes/webhooks.ts` | Stripe webhook handlers |
 | `packages/api/src/services/order-creation.service.ts` | Order creation logic |
-| `packages/api/src/services/medusa-sync.service.ts` | Customer sync to Medusa |
-| `packages/api/src/services/medusa-admin.service.ts` | Medusa admin API client |
-| `packages/api/src/routes/admin-webhooks.ts` | Sync dashboard API |
-| `packages/api/src/jobs/orderSyncReconciliation.ts` | Reconciliation job |
-| `packages/api/src/jobs/webhookRetry.ts` | Webhook retry with backoff |
 | `packages/api/src/services/orderNotification.service.ts` | Customer notifications |
 | `packages/api/src/middleware/auth.ts` | JWT authentication |
 | `packages/api/src/middleware/permission.ts` | RBAC permission check |
@@ -772,14 +691,12 @@ flowchart LR
 | `apps/web/src/pages/Checkout.tsx` | 4-step checkout wizard |
 | `apps/web/src/pages/account/Orders.tsx` | Customer orders (30s polling) |
 | `apps/web/src/pages/account/OrderDetail.tsx` | Order detail (30s polling) |
-| `apps/web/src/context/CartContext.tsx` | Medusa cart integration |
-| `apps/web/src/lib/medusa.ts` | Medusa SDK client |
+| `apps/web/src/context/CartContext.tsx` | Cart context (PawTag-native) |
 | `apps/web/src/components/StripePaymentForm.tsx` | Stripe Elements form |
 | `apps/web/src/components/CheckoutAuth.tsx` | Inline auth for checkout |
 | `apps/web/src/components/CheckoutVerificationGate.tsx` | OTP verification gate |
 | `apps/web/src/components/OnboardingWizard.tsx` | Dynamic onboarding |
 | `apps/web/src/components/AccountLayout.tsx` | Customer portal layout |
-| `apps/admin/src/pages/WebhookSettings.tsx` | Sync dashboard UI |
 | `apps/admin/src/components/Sidebar.tsx` | Admin sidebar (7 sections) |
 | `apps/finder/src/App.tsx` | Finder portal (10 components) |
 | `packages/ui/src/components/*.tsx` | 14 shared components |
@@ -788,8 +705,8 @@ flowchart LR
 
 | File | Purpose |
 |------|---------|
-| `packages/db/src/models/Order.ts` | Order model (medusaOrderId, stripePaymentIntentId) |
-| `packages/db/src/models/User.ts` | User model (medusaCustomerId, RBAC) |
+| `packages/db/src/models/Order.ts` | Order model (stripePaymentIntentId, activity timeline) |
+| `packages/db/src/models/User.ts` | User model (RBAC, MFA) |
 | `packages/db/src/models/Tag.ts` | Tag model (nfcEnabled, orderId) |
 | `packages/db/src/models/Pet.ts` | Pet model (medical, photos) |
 | `packages/db/src/models/WebhookEvent.ts` | Webhook event tracking |
@@ -816,16 +733,7 @@ flowchart LR
 | `JWT_ACCESS_EXPIRES_IN` | `30m` | Access token lifetime |
 | `REFRESH_TOKEN_EXPIRES_IN_DAYS` | `30` | Refresh token lifetime |
 
-### 15.3 Medusa Integration
-
-| Variable | Description |
-|----------|-------------|
-| `MEDUSA_BACKEND_URL` | Medusa API URL (default: `http://localhost:9000`) |
-| `MEDUSA_PUBLISHABLE_KEY` | Medusa publishable API key |
-| `MEDUSA_ADMIN_TOKEN` | Medusa admin JWT token |
-| `MEDUSA_WEBHOOK_SECRET` | Medusa webhook signature secret |
-
-### 15.4 External Services
+### 15.3 External Services
 
 | Variable | Service | Purpose |
 |----------|---------|---------|
@@ -860,14 +768,13 @@ flowchart LR
 | Order creation fails silently — frontend swallows error | **Critical** | `Checkout.tsx:336-338` |
 | Confirmation page always shows "email sent" (hardcoded) | **High** | `Checkout.tsx:926-935` |
 | Emails from `onboarding@resend.dev` go to spam (Yahoo) | **Medium** | `email.service.ts:92` |
-| `medusa-sync.service.ts` uses `console.*` instead of logger | **Low** | 6 occurrences |
 
 ### 16.2 Technical Debt
 
 | Item | Impact |
 |------|--------|
 | Legacy `role: string` field on User model | Being replaced by RBAC |
-| `restoreOrderStock()` is a no-op | Medusa owns inventory |
+| `restoreOrderStock()` is a no-op | PawTag owns inventory |
 | `checkout-otp.ts` uses `console.error` | Should use structured logger |
 | No Redis-backed rate limiting | Won't survive multi-instance |
 
@@ -893,7 +800,6 @@ pnpm dev:api              # API only (:5000)
 pnpm dev:admin            # Admin only (:3001)
 pnpm dev:web              # Web only (:3000)
 pnpm dev:finder           # Finder only (:3003)
-pnpm dev:medusa           # Medusa only (:9000)
 pnpm build                # Build all packages
 pnpm typecheck            # Type-check all packages
 pnpm test                 # Run all tests
@@ -915,4 +821,3 @@ pnpm test:coverage        # Run with coverage
 | Admin | 3001 |
 | Finder | 3003 |
 | API | 5000 |
-| Medusa | 9000 |

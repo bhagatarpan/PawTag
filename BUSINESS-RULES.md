@@ -92,11 +92,11 @@ stateDiagram-v2
 
 | Rule | Value | Enforced At |
 |------|-------|-------------|
-| Order created via | `POST /customer/orders/place` (direct API) or webhook backup | `customer.ts`, `medusa-webhooks.ts` |
+| Order created via | `POST /customer/orders/place` (direct API) or webhook backup | `customer.ts`, `webhooks.ts` |
 | Order number format | `PT-NNNNNN` (6-digit padded) | `order-creation.service.ts` |
 | Invoice number format | `INV-NNNNNN` (6-digit padded) | `order-creation.service.ts` |
-| Idempotency | Duplicate `medusaOrderId` rejected | `order-creation.service.ts` |
-| Payment status | `completed` on creation (Medusa handles payment) | `order-creation.service.ts` |
+| Idempotency | Duplicate `stripePaymentIntentId` rejected | `order-creation.service.ts` |
+| Payment status | `completed` on creation (Stripe handles payment) | `order-creation.service.ts` |
 | Currency | NZD (default) | `Order.ts` model |
 
 ### 2.4 Cancel Rules
@@ -105,8 +105,7 @@ stateDiagram-v2
 |------|-------|-------------|
 | Cancellation reason | Required (not empty) | `admin.ts` |
 | Valid from states | `pending`, `pending_payment`, `paid`, `packing` | `orderStatus.service.ts` |
-| Stock restoration | Medusa owns inventory (PawTag no-op) | `inventory.service.ts` |
-| Medusa sync | `cancelMedusaOrder()` called (best-effort) | `medusa-admin.service.ts` |
+| Stock restoration | PawTag-native via `inventory.service.ts` | `inventory.service.ts` |
 | Customer notification | Email + in-app + push | `orderNotification.service.ts` |
 | Audit logged | Yes, HIGH severity | `admin.ts` |
 
@@ -117,7 +116,6 @@ stateDiagram-v2
 | Refund reason | Required (not empty) | `admin.ts` |
 | Valid from states | `paid`, `delivered` | `orderStatus.service.ts` |
 | Stripe refund | `createRefund()` called with `stripePaymentIntentId` | `stripe.service.ts` |
-| Medusa sync | `cancelMedusaOrderAfterRefund()` called | `medusa-admin.service.ts` |
 | Customer notification | Email + in-app + push | `orderNotification.service.ts` |
 | Audit logged | Yes, CRITICAL severity | `admin.ts` |
 
@@ -126,7 +124,6 @@ stateDiagram-v2
 | Rule | Value | Enforced At |
 |------|-------|-------------|
 | Valid from states | `packing` | `orderStatus.service.ts` |
-| Medusa sync | `createMedusaFulfillment()` + `createMedusaShipment()` | `medusa-admin.service.ts` |
 | Tracking number | Required for shipment creation | `shipping.service.ts` |
 | Customer notification | Email with tracking URL + in-app + push | `orderNotification.service.ts` |
 | Audit logged | Yes, HIGH severity | `admin.ts` |
@@ -631,14 +628,14 @@ stateDiagram-v2
 |------|-------|-------------|
 | Payment method | Stripe (card) | `StripePaymentForm.tsx` |
 | Demo mode | Auto-succeeds when no Stripe key | `stripe.service.ts` |
-| Cart completion | Creates Medusa order | `Checkout.tsx` |
+| Cart completion | Creates PawTag order | `Checkout.tsx` |
 | PawTag order | Created via `POST /customer/orders/place` | `Checkout.tsx` |
 
 ### 17.3 Cart Rules
 
 | Rule | Value | Enforced At |
 |------|-------|-------------|
-| Cart type | Medusa server-side cart | `CartContext.tsx` |
+| Cart type | PawTag-native server-side cart | `CartContext.tsx` |
 | Cart persistence | Cart ID in localStorage | `CartContext.tsx` |
 | Cart clearing | After successful checkout | `Checkout.tsx` |
 
@@ -694,45 +691,9 @@ stateDiagram-v2
 
 ---
 
-## 20. Sync Architecture Rules
+## 20. ~~Sync Architecture Rules~~ — REMOVED
 
-### 20.1 Layer 1: Real-Time (0.5-2s)
-
-| Rule | Value | Enforced At |
-|------|-------|-------------|
-| Medusa → PawTag | Webhooks (order.placed, payment.captured, etc.) | `medusa-webhooks.ts` |
-| PawTag → Medusa | Admin cancel/ship/refund calls | `medusa-admin.service.ts` |
-| Timeout | 10 seconds per Medusa API call | `medusa-admin.service.ts` |
-| Best-effort | Medusa failure doesn't block PawTag | `medusa-admin.service.ts` |
-
-### 20.2 Layer 2: Reconciliation (60s)
-
-| Rule | Value | Enforced At |
-|------|-------|-------------|
-| Interval | 60 seconds (configurable) | `orderSyncReconciliation.ts` |
-| Skip window | 5 minutes (avoid in-flight webhooks) | `orderSyncReconciliation.ts` |
-| Drift detection | Compare PawTag status vs Medusa | `orderSyncReconciliation.ts` |
-| Auto-correction | Update PawTag + notify customer | `orderSyncReconciliation.ts` |
-| Enabled | Via `sync.reconciliation.enabled` setting | `orderSyncReconciliation.ts` |
-
-### 20.3 Layer 3: Frontend Polling (30s)
-
-| Rule | Value | Enforced At |
-|------|-------|-------------|
-| Orders page | 30s auto-refresh | `Orders.tsx` |
-| Order detail | 30s auto-refresh | `OrderDetail.tsx` |
-| Pause when hidden | Yes (visibility API) | `Orders.tsx`, `OrderDetail.tsx` |
-| Enabled | Via `sync.polling.enabled` setting | Frontend |
-
-### 20.4 Webhook Retry
-
-| Rule | Value | Enforced At |
-|------|-------|-------------|
-| Max attempts | 5 | `webhookRetry.ts` |
-| Backoff | Exponential: 60s → 120s → 300s → 900s → 3600s | `webhookRetry.ts` |
-| Dead letter | After 5 failed attempts | `webhookRetry.ts` |
-| Max event age | 24 hours | `webhookRetry.ts` |
-| Batch size | 10 events per cycle | `webhookRetry.ts` |
+> **Note:** PawTag owns all commerce data in MongoDB. Stripe webhooks remain as the payment safety net.
 
 ---
 
@@ -752,8 +713,8 @@ stateDiagram-v2
 
 | Operation | Idempotency Key | Enforced At |
 |-----------|----------------|-------------|
-| Order creation | `medusaOrderId` | `order-creation.service.ts` |
-| Webhook events | `eventId` | `medusa-webhooks.ts` |
+| Order creation | `stripePaymentIntentId` | `order-creation.service.ts` |
+| Webhook events | `eventId` | `webhooks.ts` |
 | Stripe webhooks | `payment_intent` ID | `webhooks.ts` |
 
 ### 21.3 Atomic Operations

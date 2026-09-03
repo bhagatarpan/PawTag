@@ -100,3 +100,46 @@ export function formatSystemActivityMessage(
 ): string {
   return `Order auto-cancelled by System: ${reason} : AT : ${at.toISOString()}`;
 }
+
+export function formatCreatedBy(fullName: string, roleDisplayName: string): string {
+  if (roleDisplayName.toLowerCase() === 'customer') {
+    return `Customer (${fullName})`;
+  }
+  return `${fullName} (${roleDisplayName})`;
+}
+
+export function formatCreatedByDescription(
+  portal: string,
+  fullName: string,
+): string {
+  const portalLabel = formatCancellationPortalLabel(portal);
+  if (portal === 'system') {
+    return `Order placed by System`;
+  }
+  if (portal.startsWith('customer')) {
+    return `Order placed via ${portalLabel} by ${fullName}`;
+  }
+  return `Order placed via ${portalLabel} by ${fullName}`;
+}
+
+export function formatRefundedBy(fullName: string, roleDisplayName: string): string {
+  if (roleDisplayName.toLowerCase() === 'customer') {
+    return `Customer (${fullName})`;
+  }
+  return `${fullName} (${roleDisplayName})`;
+}
+
+export function formatRefundedByDescription(
+  portal: string,
+  fullName: string,
+  roleDisplayName: string,
+): string {
+  const portalLabel = formatCancellationPortalLabel(portal);
+  if (portal === 'system') {
+    return `Order refunded by System`;
+  }
+  if (portal.startsWith('customer')) {
+    return `Order refunded via ${portalLabel} by ${fullName}`;
+  }
+  return `Order refunded via ${portalLabel} by ${fullName} (${roleDisplayName})`;
+}

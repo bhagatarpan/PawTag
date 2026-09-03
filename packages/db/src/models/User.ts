@@ -36,7 +36,6 @@ export interface IUserDocument extends Document {
   skipInvoiceOtpExpiresAt?: Date;
   checkoutOtpVerified: boolean;
   checkoutOtpVerifiedAt?: Date;
-  medusaCustomerId?: string;
   showOwnerNameInFinder: boolean;
   onboardingCompleted: boolean;
   onboardingSkipped: boolean;
@@ -97,7 +96,6 @@ const UserSchema = new Schema<IUserDocument>(
     skipInvoiceOtpExpiresAt: { type: Date, default: null },
     checkoutOtpVerified: { type: Boolean, default: false },
     checkoutOtpVerifiedAt: { type: Date, default: null },
-    medusaCustomerId: { type: String, default: null },
     showOwnerNameInFinder: { type: Boolean, default: true },
     onboardingCompleted: { type: Boolean, default: false },
     onboardingSkipped: { type: Boolean, default: false },

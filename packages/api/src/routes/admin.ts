@@ -21,7 +21,7 @@ import {
 import { sendPasswordChangedEmail } from '../services/email.service';
 import { isValidTransition } from '../services/orderStatus.service';
 import { notifyCustomerOfStatusChange } from '../services/orderNotification.service';
-import { resolveActor, formatActivityMessage, formatCancelledBy, formatCancelledByDescription } from '../lib/actor';
+import { resolveActor, formatActivityMessage, formatCancelledBy, formatCancelledByDescription, formatRefundedBy, formatRefundedByDescription } from '../lib/actor';
 import {
   User,
   Pet,
@@ -43,11 +43,13 @@ import {
   ReferralCode,
   Referral,
   PaymentTransaction,
+  InvoiceAccessToken,
 } from '@pawtag/db';
 import { stripePaymentProvider } from '../commerce/providers/stripe';
+import { getNumberSetting } from '../commerce/config';
 import { auditService, type AuditContext } from '../services/audit';
 import { createAuditContextFromRequest, type AuditRequest } from '../middleware/audit';
-import { hashPassword } from '../services/auth.service';
+import { hashPassword, generateSecureToken, hashToken } from '../services/auth.service';
 import { getReferralStats, getReferralHistory } from '../services/referral.service';
 import logger from '../lib/logger';
 
@@ -2673,7 +2675,7 @@ router.post('/orders/:id/cancel', requirePermission('order.update'), async (req:
 router.post('/orders/:id/refund', requirePermission('order.update'), async (req: AuthRequest, res: Response) => {
   try {
     const { reason, amount } = req.body;
-    if (!reason) {
+    if (!reason || typeof reason !== 'string' || !reason.trim()) {
       res.status(400).json({ success: false, error: 'Refund reason is required' });
       return;
     }
@@ -2697,19 +2699,36 @@ router.post('/orders/:id/refund', requirePermission('order.update'), async (req:
       return;
     }
 
+    // Validate refund amount
+    const refundAmount = amount || order.payment.amount;
+    if (refundAmount <= 0 || refundAmount > order.payment.amount) {
+      res.status(400).json({ success: false, error: `Invalid refund amount: $${refundAmount}. Must be between $0.01 and $${order.payment.amount}` });
+      return;
+    }
+
+    // Check refund time window
+    const maxDays = await getNumberSetting('commerce.refunds.maxDaysAfterPurchase');
+    const paidAt = order.payment.paidAt || (order as any).createdAt;
+    const daysSincePurchase = Math.floor((Date.now() - new Date(paidAt).getTime()) / (1000 * 60 * 60 * 24));
+    if (daysSincePurchase > maxDays) {
+      res.status(400).json({ success: false, error: `Refund window of ${maxDays} days has passed (${daysSincePurchase} days since purchase)` });
+      return;
+    }
+
     const actor = await resolveActor(req.user!.id, 'admin');
+    const refundedBy = formatCancelledBy(actor.fullName, actor.displayName);
 
     const refundResult = await stripePaymentProvider.createRefund({
       paymentIntentId,
-      amount: amount || order.payment.amount,
+      amount: refundAmount,
       reason: 'requested_by_customer',
       metadata: {
         orderId: String(order._id),
         orderNumber: order.orderNumber,
-        cancelledBy: formatCancelledBy(actor.fullName, actor.displayName),
-        cancelledByType: actor.displayName,
-        cancelledByPortal: 'admin-web',
-        cancellationReason: reason,
+        refundedBy,
+        refundedByType: actor.displayName,
+        refundedByPortal: 'admin-web',
+        refundReason: reason,
         initiatedBy: 'admin',
         environment: process.env.NODE_ENV === 'production' ? 'production' : 'development',
       },
@@ -2725,7 +2744,7 @@ router.post('/orders/:id/refund', requirePermission('order.update'), async (req:
         resourceId: req.params.id,
         outcome: 'FAILURE',
         severity: 'CRITICAL',
-        metadata: { orderNumber: order.orderNumber, previousStatus: order.status, reason, amount: amount || order.payment.amount, paymentTransactionId: paymentIntentId, stripeError: refundResult.error },
+        metadata: { orderNumber: order.orderNumber, previousStatus: order.status, reason, amount: refundAmount, paymentTransactionId: paymentIntentId, stripeError: refundResult.error },
       });
       res.status(400).json({ success: false, error: `Stripe refund failed: ${refundResult.error}` });
       return;
@@ -2738,6 +2757,11 @@ router.post('/orders/:id/refund', requirePermission('order.update'), async (req:
     order.refundStatus = (refundResult.status as any) || 'pending';
     order.refundLastSyncedAt = new Date();
     order.payment.status = 'refunded';
+    order.refundedBy = refundedBy;
+    order.refundedByType = actor.displayName;
+    order.refundedByPortal = 'admin-web';
+    order.refundedByDescription = formatRefundedByDescription('admin-web', actor.fullName, actor.displayName);
+    order.refundedAt = new Date();
     await order.save();
 
     // Create PaymentTransaction for audit trail
@@ -2746,7 +2770,7 @@ router.post('/orders/:id/refund', requirePermission('order.update'), async (req:
       orderNumber: order.orderNumber,
       type: 'refund',
       status: refundResult.status === 'succeeded' ? 'succeeded' : 'pending',
-      amount: amount || order.payment.amount,
+      amount: refundAmount,
       currency: order.payment.currency || 'NZD',
       provider: 'stripe',
       providerTransactionId: refundResult.refundId || paymentIntentId,
@@ -2771,8 +2795,35 @@ router.post('/orders/:id/refund', requirePermission('order.update'), async (req:
         { field: 'status', before: previousStatus, after: 'refunded', sensitive: false },
         { field: 'payment.status', before: 'completed', after: 'refunded', sensitive: false },
       ],
-      metadata: { orderNumber: order.orderNumber, previousStatus, reason, refundId: refundResult.refundId, amount: amount || order.payment.amount, paymentTransactionId: paymentIntentId },
+      metadata: { orderNumber: order.orderNumber, previousStatus, reason, refundId: refundResult.refundId, amount: refundAmount, paymentTransactionId: paymentIntentId },
     });
+
+    // Record activity log on the order
+    const refundedAt = new Date();
+    const refundActivityMessage = `${refundedBy} refunded order: ${reason} : AT : ${refundedAt.toISOString()}`;
+    await Order.updateOne(
+      { _id: order._id },
+      {
+        $push: {
+          activity: {
+            type: 'refunded',
+            message: refundActivityMessage,
+            timestamp: refundedAt,
+            actor: 'admin',
+            metadata: {
+              reason,
+              refundId: refundResult.refundId,
+              refundStatus: refundResult.status,
+              amount: refundAmount,
+              refundedBy,
+              refundedByType: actor.displayName,
+              refundedByPortal: 'admin-web',
+              refundedAt: refundedAt.toISOString(),
+            },
+          },
+        },
+      },
+    );
 
     // Notify customer
     try {
@@ -2784,6 +2835,74 @@ router.post('/orders/:id/refund', requirePermission('order.update'), async (req:
     res.json({ success: true, data: { order, refundId: refundResult.refundId } });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to refund order' });
+  }
+});
+
+// --- Backfill Invoice for an Order ---
+router.post('/orders/:id/invoice', requirePermission('order.update'), async (req: AuthRequest, res: Response) => {
+  try {
+    const order = await Order.findById(req.params.id);
+    if (!order) { res.status(404).json({ success: false, error: 'Order not found' }); return; }
+
+    const existing = await Invoice.findOne({ orderId: order._id });
+    if (existing) { res.status(409).json({ success: false, error: `Order ${order.orderNumber} already has invoice ${existing.invoiceNumber}` }); return; }
+
+    const paymentStatus = order.payment.status;
+    if (paymentStatus !== 'completed' && paymentStatus !== 'refunded') {
+      res.status(400).json({ success: false, error: `Cannot backfill invoice for order "${order.orderNumber}" with payment status "${paymentStatus}"` });
+      return;
+    }
+
+    const invCounter = await Invoice.db!.collection('counters').findOneAndUpdate(
+      { _id: 'invoiceNumber' as any },
+      { $inc: { seq: 1 } },
+      { upsert: true, returnDocument: 'after' },
+    );
+    const invoiceNumber = `INV-${String(invCounter?.value?.seq || 1).padStart(6, '0')}`;
+
+    const invoiceStatus = paymentStatus === 'refunded' ? 'refunded' : 'paid';
+
+    const invoice = await Invoice.create({
+      orderId: order._id,
+      userId: order.userId,
+      invoiceNumber,
+      amount: order.payment.amount,
+      currency: order.payment.currency || 'NZD',
+      status: invoiceStatus,
+      paymentMethod: order.payment.method || 'card',
+      stripePaymentIntentId: order.payment.stripePaymentIntentId,
+      paidAt: order.payment.paidAt || (order as any).createdAt,
+    });
+
+    const secureToken = generateSecureToken();
+    const tokenHash = hashToken(secureToken);
+
+    await InvoiceAccessToken.create({
+      invoiceId: invoice._id,
+      userId: order.userId,
+      tokenHash,
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      verifiedAt: new Date(),
+    });
+
+    await auditAdminEvent(req, {
+      action: 'backfill_invoice',
+      eventType: 'admin_order_invoice_backfill',
+      eventCategory: 'FINANCIAL',
+      operationType: 'CREATE',
+      resourceType: 'Order',
+      resourceId: req.params.id,
+      outcome: 'SUCCESS',
+      severity: 'MEDIUM',
+      metadata: { orderNumber: order.orderNumber, invoiceNumber, amount: order.payment.amount, currency: order.payment.currency || 'NZD', invoiceStatus, previousPaymentStatus: order.payment.status },
+    });
+
+    logger.info({ orderId: req.params.id, orderNumber: order.orderNumber, invoiceNumber }, 'Admin backfilled invoice for order');
+
+    res.status(201).json({ success: true, data: { invoice } });
+  } catch (err) {
+    logger.error({ err, orderId: req.params.id }, 'Failed to backfill invoice');
+    res.status(500).json({ success: false, error: 'Failed to backfill invoice' });
   }
 });
 

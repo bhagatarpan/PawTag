@@ -78,8 +78,8 @@ describe('Phase 8 — Cancel & Refund Workflow', () => {
       expect(updatedOrder!.status).toBe('cancelled');
       expect(updatedOrder!.cancellationReason).toBe('Customer changed mind');
 
-      // NOTE: Stock restoration is now handled by Medusa's inventory module.
-      // The restoreOrderStock() function is a no-op since Medusa owns inventory.
+      // NOTE: Stock restoration is now handled by PawTag's inventory service.
+      // The restoreOrderStock() function is a no-op since PawTag inventory service owns stock.
 
       // Verify customer notification created
       const notifs = await Notification.find({ userId, audience: 'customer', type: 'order_update' });

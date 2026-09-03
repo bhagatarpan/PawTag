@@ -33,14 +33,10 @@ import { requirePermission } from '../middleware/permission';
 import { productService } from '../commerce/services/product.service';
 import { inventoryService } from '../commerce/services/inventory.service';
 import { shippingService } from '../commerce/services/shipping.service';
-import { refundService } from '../commerce/services/refund.service';
 import { getAllSettings, updateSetting, type CommerceSettingKey } from '../commerce/config';
-import { logOrderEvent } from '../commerce/audit';
-import { isValidTransition } from '../services/orderStatus.service';
-import { Order, Invoice, Setting, type IOrderDocument } from '@pawtag/db';
+import { Order, Invoice, Setting } from '@pawtag/db';
 import { toAppError } from '../lib/app-errors';
 import { auditService } from '../services/audit';
-import logger from '../lib/logger';
 
 const router = Router();
 router.use(authenticate);
@@ -312,29 +308,6 @@ router.get('/orders/:id', requirePermission('order.read'), async (req: AuthReque
 });
 
 /**
- * POST /api/admin/commerce/orders/:id/refund
- *
- * Process a refund for an order.
- * Body: { amount?, reason }
- */
-router.post('/orders/:id/refund', requirePermission('order.refund'), async (req: AuthRequest, res: Response) => {
-  try {
-    const { amount, reason } = req.body;
-
-    const result = await refundService.processRefund(req.params.id, {
-      amount,
-      reason,
-      initiatedBy: req.user!.email,
-    });
-
-    res.json({ success: true, data: result });
-  } catch (err) {
-    const error = toAppError(err);
-    res.status(error.httpStatus).json({ success: false, error: error.userMessage });
-  }
-});
-
-/**
  * POST /api/admin/commerce/orders/:id/ship
  *
  * Create a shipment for an order.
@@ -343,57 +316,6 @@ router.post('/orders/:id/ship', requirePermission('order.update'), async (req: A
   try {
     const result = await shippingService.createShipment(req.params.id);
     res.json({ success: true, data: result });
-  } catch (err) {
-    const error = toAppError(err);
-    res.status(error.httpStatus).json({ success: false, error: error.userMessage });
-  }
-});
-
-/**
- * POST /api/admin/commerce/orders/:id/cancel
- *
- * Cancel an order and release reserved stock.
- * Body: { reason }
- */
-router.post('/orders/:id/cancel', requirePermission('order.update'), async (req: AuthRequest, res: Response) => {
-  try {
-    const { reason } = req.body;
-    if (!reason) {
-      res.status(400).json({ success: false, error: 'Cancellation reason is required' });
-      return;
-    }
-
-    const order = await Order.findById(req.params.id);
-    if (!order) {
-      res.status(404).json({ success: false, error: 'Order not found' });
-      return;
-    }
-
-    if (!isValidTransition(order.status, 'cancelled')) {
-      res.status(400).json({ success: false, error: `Cannot cancel order in "${order.status}" status` });
-      return;
-    }
-
-    const previousStatus = order.status;
-    order.status = 'cancelled';
-    order.cancellationReason = reason;
-    await order.save();
-
-    // Release reserved stock
-    await inventoryService.releaseForOrder(String(order._id), order.items.map((item: any) => ({
-      productId: String(item.productId),
-      quantity: item.quantity,
-    })));
-
-    // Audit log
-    await logOrderEvent('cancelled', {
-      orderId: String(order._id),
-      orderNumber: order.orderNumber,
-      amount: order.payment.amount,
-      reason,
-    });
-
-    res.json({ success: true, data: order });
   } catch (err) {
     const error = toAppError(err);
     res.status(error.httpStatus).json({ success: false, error: error.userMessage });

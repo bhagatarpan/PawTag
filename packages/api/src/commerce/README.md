@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Commerce module provides the core infrastructure for PawTag's first-party commerce system. It replaces MedusaJS with PawTag-native business logic.
+The Commerce module provides the core infrastructure for PawTag's first-party commerce system. PawTag owns all commerce business logic directly.
 
 ## Architecture
 

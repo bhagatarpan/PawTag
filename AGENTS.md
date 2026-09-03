@@ -417,15 +417,14 @@ PawTag/
 │   ├── admin/       → Admin portal (port 3001) - 44 pages, god-mode CRUD
 │   ├── web/         → Public site, shop, auth & customer portal (port 3000) - 31 pages
 │   ├── finder/      → Finder portal (port 3003) - 10 purpose-built components
-│   ├── mobile/      → React Native (Expo) app - 14 screens, Maestro E2E tests
-│   └── medusa/      → MedusaJS v2 (PostgreSQL) - commerce backend, port 9000
+│   └── mobile/      → React Native (Expo) app - 14 screens, Maestro E2E tests
 ├── packages/
 │   ├── api/         → Express backend (port 5000, 36+ route files, 28+ services)
 │   ├── db/          → MongoDB models & connection (47+ models)
 │   ├── shared/      → Shared TypeScript types, enums, constants
 │   └── ui/          → Shared React component library (13 components)
 ├── tests/           → 77+ test files (41 unit, 35 integration, 1 smoke, 2 regression)
-├── docker/          → Docker configs (4 services + PostgreSQL)
+├── docker/          → Docker configs
 ├── docs/            → 15 documentation files
 └── scripts/         → Build and utility scripts
 ```
@@ -433,8 +432,6 @@ PawTag/
 ### PawTag Commerce Module
 
 **PawTag owns its own commerce engine.** Products, pricing, cart, checkout, payments, shipping, inventory, and orders are managed by the PawTag Commerce module (`packages/api/src/commerce/`).
-
-MedusaJS is being phased out. The PawTag Commerce module replaces all Medusa functionality with PawTag-native implementations.
 
 ```
 packages/api/src/commerce/
@@ -463,10 +460,8 @@ packages/api/src/commerce/
 
 ### Database Architecture
 
-PawTag uses **MongoDB** as its primary and only database:
-
-- **MongoDB Atlas** — All PawTag data (users, pets, tags, products, carts, orders, subscriptions, CMS, audit logs, settings)
-- **PostgreSQL (Neon)** — Legacy MedusaJS commerce engine (being phased out)
+PawTag uses **MongoDB Atlas** as its single database for all data:
+users, pets, tags, products, carts, orders, subscriptions, CMS, audit logs, settings.
 
 ### PawTag Checkout Flow
 
@@ -515,35 +510,6 @@ All business values stored in `settings` collection with `commerce.*` prefix. 35
 | `commerce.cart.ttlDays` | 30 | Cart expiry for guest/anonymous carts (days) |
 | `commerce.cart.priceRevalidation` | `true` | Re-validate prices from DB on every cart load |
 | `commerce.cart.maxItems` | 50 | Maximum items allowed in a single cart |
-
-### Dual Database Architecture
-
-PawTag uses **two databases**:
-
-- **MongoDB Atlas** — PawTag's primary data store (users, pets, tags, subscriptions, CMS, audit logs, settings)
-- **PostgreSQL (Neon)** — MedusaJS commerce engine (products, prices, carts, customers, orders, payments, shipping, inventory)
-
-The two systems are linked via:
-- **Customer sync:** PawTag User ↔ Medusa Customer (via `medusaCustomerId` field)
-- **Webhooks:** Medusa events → PawTag webhook endpoint (order.placed, payment.captured)
-- **Cart association:** Medusa cart linked to PawTag user via `customer_id`
-- **Product metadata:** Subscription config, tag flags, warranty stored in Medusa product metadata
-
-**Products are single-sourced in Medusa.** The PawTag MongoDB Product model is deprecated. All product/pricing/inventory operations go through Medusa.
-
-### MedusaJS Integration
-
-MedusaJS v2.19.0 runs in `apps/medusa` (port 9000). Key components:
-
-| Component | File | Purpose |
-|-----------|------|---------|
-| Config | `apps/medusa/medusa-config.ts` | Database, CORS, Stripe, plugins |
-| Seed script | `apps/medusa/src/scripts/seed.ts` | Migrates products from MongoDB, sets up regions/shipping/tax |
-| Webhook subscriber | `apps/medusa/src/subscribers/pawtag-webhook.ts` | Forwards events to PawTag |
-| Link definitions | `apps/medusa/src/links/*.ts` | Module link registrations |
-
-PawTag API webhooks: `packages/api/src/routes/medusa-webhooks.ts`
-Customer sync: `packages/api/src/services/medusa-sync.service.ts`
 
 ### Checkout Flow (4-Step Wizard)
 
@@ -599,7 +565,6 @@ pnpm dev:api       # API on :5000
 pnpm dev:admin     # Admin on :3001
 pnpm dev:web       # Public site, shop, auth & customer portal on :3000
 pnpm dev:finder    # Finder portal on :3003
-pnpm dev:medusa    # MedusaJS commerce backend on :9000
 
 # Build everything
 pnpm build
@@ -664,13 +629,13 @@ Production uses the configured domain sender.
 - `/api/auth/*` — Login, register, OTP, profile
 - `/api/admin/*` — Full CRUD (requires admin/support role)
 - `/api/customer/*` — Pet management, orders, notifications, onboarding, escalations
-  - `POST /customer/orders/place` — Create PawTag order from Medusa order (direct API, ~700ms)
+  - `POST /customer/orders/place` — Create PawTag order (direct API, ~700ms)
   - `GET /customer/orders` — List customer orders with invoice data
   - `GET /customer/orders/:id` — Order detail with activity timeline
 - `/api/finder/*` — Public tag lookup, location sharing (no auth required)
 - `/api/public/cms/*` — Public CMS content (pages, navigation, footer, settings, onboarding config)
 - `/api/address/*` — Address autocomplete proxy (Photon or NZ Post provider)
-- `/api/webhooks/medusa` — Medusa webhook receiver (backup path for order creation)
+
 
 ---
 
@@ -843,13 +808,26 @@ Address autocomplete with configurable provider (Photon or NZ Post):
 
 Enterprise-grade sidebar with collapsible sections and dark/light mode:
 
-- **Sections:** 7 logical groups (Overview, Business, Communication, Content, Settings, Security, Operations)
+- **Sections:** 8 logical groups (Overview, Business, Users, Products & Services, Communication, Content, Settings, Security, Operations)
 - **Collapsible:** Click section header to expand/collapse, state persists in localStorage
 - **Theme toggle:** Sun/Moon icon in sidebar header, persists in localStorage
 - **Active state:** Section auto-expands when child route is active
 - **Badges:** Notification unread count, Support request count
 - **Items:** Sorted alphabetically within each section
 - **Files:** `apps/admin/src/components/Sidebar.tsx`, `apps/admin/src/hooks/useTheme.ts`, `apps/admin/src/hooks/useSidebarCollapse.ts`
+
+**Sidebar Structure:**
+| Section | Items |
+|---------|-------|
+| **Overview** | Dashboard |
+| **Business** | Shop & Commerce (Dashboard), Catalog (Categories, Collections, Brands), Inventory, Orders, Discounts, Payments, Shipping, Fulfilment, Returns, Tax |
+| **Users** | Customers (site visitors), Users (admin staff), Pets |
+| **Products & Services** | Products, Tags, Subscription Plans |
+| **Communication** | Notifications, Support Requests, Tag Expiry Alerts |
+| **Content** | Announcements, Auth Pages, Customer Onboarding, Footer, Homepage Sections, Invoice Template, Media Library, Navigation, Pages, Redirects, Shop Pages, Email Templates, SMS Templates, Pet References |
+| **Settings** | Commerce Settings, General Settings, Feature Flags, Site Availability, Address Autocomplete, Pet References |
+| **Security** | Roles & Permissions, Permissions, Permission Groups, Access Scopes, Audit Trail, Audit Settings |
+| **Operations** | Webhooks, System Logs, Log Settings, Statistics, Write NFC Tag |
 
 ### Auth & Permissions
 
@@ -915,10 +893,31 @@ Orders can be cancelled from three sources, all of which capture rich audit data
 | `cancelledByDescription` | `String` | Full description, e.g., `"Order is Cancelled via Admin Web Portal by Dave Macenzie (Customer Service)"` |
 | `cancelledAt` | `Date` (indexed) | Timestamp of cancellation |
 
+**Data captured on order creation (`Order` model):**
+
+| Field | Type | Purpose |
+|-------|------|---------|
+| `createdBy` | `String` (indexed) | Human-readable: `"Customer (Sarah Johnson)"` |
+| `createdByType` | `String` (indexed) | Role display name (e.g., `"Customer"`) |
+| `createdByPortal` | `enum: 'customer-web' \| 'customer-mobile' \| 'admin-web' \| 'system'` | Source portal |
+| `createdByDescription` | `String` | Full description, e.g., `"Order placed via Customer Web Portal by Sarah Johnson"` |
+| `createdByEmail` | `String` | Creator's email address |
+
+**Data captured on refund (`Order` model):**
+
+| Field | Type | Purpose |
+|-------|------|---------|
+| `refundedBy` | `String` (indexed) | Human-readable: `"Dave Macenzie (Admin)"` |
+| `refundedByType` | `String` (indexed) | Role display name (e.g., `"Admin"`) |
+| `refundedByPortal` | `enum: 'customer-web' \| 'customer-mobile' \| 'admin-web' \| 'system'` | Source portal |
+| `refundedByDescription` | `String` | Full description, e.g., `"Order refunded via Admin Web Portal by Dave Macenzie (Admin)"` |
+| `refundedAt` | `Date` (indexed) | Timestamp of refund |
+
 **Activity log message format:**
 
 - Customer/Admin: `Order cancelled by <cancelledBy>: <Reason> : AT : <ISO Timestamp>`
 - System: `Order auto-cancelled by System: <Reason> : AT : <ISO Timestamp>`
+- Refund: `<refundedBy> refunded order: <Reason> : AT : <ISO Timestamp>`
 
 **Helpers (`packages/api/src/lib/actor.ts`):**
 
@@ -928,6 +927,10 @@ Orders can be cancelled from three sources, all of which capture rich audit data
 - `formatCancelledByDescription(portal, fullName, roleLabel)` — full human description.
 - `formatActivityMessage(cancelledBy, reason, at?)` — canonical log format.
 - `formatSystemActivityMessage(reason, at?)` — system-prefixed log format.
+- `formatCreatedBy(fullName, roleDisplayName)` — produces `"Customer (FullName)"` or `"FullName (Role)"` for order creation.
+- `formatCreatedByDescription(portal, fullName)` — full human description for order creation.
+- `formatRefundedBy(fullName, roleDisplayName)` — produces `"Customer (FullName)"` or `"FullName (Role)"` for refund.
+- `formatRefundedByDescription(portal, fullName, roleLabel)` — full human description for refund.
 
 **Modal reuse (per SKILL.md):** The shared `ConfirmDialog` (`packages/ui/src/components/ConfirmDialog.tsx`) was extended (not duplicated) with optional props: `reasons`, `selectedReason`, `onReasonChange`, `showNotes`, `notesRequired`, `notes`, `onNotesChange`. The admin Orders page and customer OrderDetail page both consume the same component with their own context.
 
@@ -1073,57 +1076,27 @@ Located in `apps/mobile/e2e/`:
 | `packages/ui/src/components/CartDrawer.tsx` | Shared cart drawer component (guest mode banner, price-changed warnings) |
 | `packages/ui/src/components/FadeIn.tsx` | Scroll-triggered fade-in animation component |
 | `packages/api/src/routes/promo-public.ts` | Public promo code validation (no auth) |
-| `packages/api/src/routes/medusa-webhooks.ts` | Medusa webhook endpoint (order.placed, payment.captured) |
-| `packages/api/src/services/order-creation.service.ts` | Shared order creation service (used by API + webhook) |
+| `packages/api/src/services/order-creation.service.ts` | Shared order creation service |
 | `packages/api/src/routes/checkout-otp.ts` | Dual OTP checkout verification |
-| `packages/api/src/services/medusa-sync.service.ts` | PawTag ↔ Medusa customer sync |
-| `apps/medusa/src/scripts/seed.ts` | Commerce data migration from MongoDB |
-| `apps/medusa/src/subscribers/pawtag-webhook.ts` | Medusa event forwarding to PawTag |
 | `apps/web/src/components/CheckoutVerificationGate.tsx` | OTP verification gatekeeper |
-| `apps/web/src/lib/medusa.ts` | Medusa SDK client config |
-| `apps/admin/src/components/MedusaStatusCard.tsx` | Medusa connection status widget |
+
 | `apps/web/src/components/OnboardingWizard.tsx` | Dynamic onboarding wizard with success screen |
 | `apps/web/src/components/AccountLayout.tsx` | Customer portal layout + wizard gating |
 | `apps/finder/src/App.tsx` | Finder portal (decomposed into components) |
 
 ## Product Management
 
-Products are managed exclusively through **Medusa** (`localhost:9000/app`). The PawTag MongoDB Product model is deprecated.
+Products are managed through the PawTag Commerce module (`packages/api/src/commerce/`).
 
 ### How Products Work
 
 | What | Where | Purpose |
 |------|-------|---------|
-| **Product catalog** | Medusa admin (`:9000/app`) | Create/edit/delete products, prices, variants |
-| **Product metadata** | Medusa product metadata | Subscription config, tag flags, warranty, affiliate fields |
-| **Inventory** | Medusa inventory module | Stock levels at PawTag Warehouse |
-| **Prices** | Medusa pricing module | Per-variant, per-region pricing |
-| **Shop page** | `apps/web` | Fetches from Medusa SDK, displays with PawTag UI |
-| **Subscription logic** | `packages/api` (MongoDB) | Reads Medusa product metadata for subscription config |
-
-### Adding/Editing Products
-
-1. Go to `http://localhost:9000/app` (Medusa admin)
-2. Products → Add Product or click existing product
-3. Fill details, set variant prices, assign to "Default Sales Channel"
-4. Save → product appears in shop immediately on refresh
-
-### Price Format
-
-Medusa v2 stores prices in **major units (dollars)**, not cents.
-- `$19.99` = stored as `19.99` (not `1999`)
-- The shop page displays prices directly without division
-
-### Seed Script
-
-The seed script (`apps/medusa/src/scripts/seed.ts`) is idempotent and handles:
-- Product creation from MongoDB
-- Price set creation + linking to variants
-- Inventory levels at PawTag Warehouse
-- Sales channel ↔ stock location link
-- Tax region with system provider
-
-Run: `pnpm --filter @pawtag/medusa seed`
+| **Product catalog** | PawTag Commerce admin | Create/edit/delete products, prices, variants |
+| **Inventory** | PawTag Commerce services | Stock levels at PawTag Warehouse |
+| **Prices** | PawTag Commerce services | Per-variant pricing |
+| **Shop page** | `apps/web` | Displays products with PawTag UI |
+| **Subscription logic** | `packages/api` (MongoDB) | Product metadata for subscription config |
 
 ## Commerce Architecture
 
@@ -1131,108 +1104,33 @@ Run: `pnpm --filter @pawtag/medusa seed`
 
 | Domain | Source of Truth | Notes |
 |--------|----------------|-------|
-| Products | Medusa (PostgreSQL) | Admin manages via Medusa admin at `:9000/app` |
-| Variants | Medusa (PostgreSQL) | Single variant per product with "Default" option |
-| Prices | Medusa (PostgreSQL) | Per-variant, per-region pricing in major units (dollars) |
-| Inventory | Medusa (PostgreSQL) | Stock levels at PawTag Warehouse |
-| Cart | Medusa (PostgreSQL) | Created via Medusa SDK, persisted by cart ID in localStorage |
-| Promotions | Medusa (PostgreSQL) | Applied via Medusa SDK during checkout |
-| Tax | Medusa (PostgreSQL) | 15% NZ GST, tax-inclusive pricing |
-| Shipping | Medusa (PostgreSQL) | Free NZ-wide shipping via manual fulfillment |
-| Payment | Medusa (PostgreSQL) | Stripe integration via Medusa payment module |
-| Orders | Medusa (PostgreSQL) → PawTag (MongoDB) | Medusa creates order, PawTag mirrors via webhook |
-| Customers | PawTag (MongoDB) → Medusa (PostgreSQL) | Lazy sync on first cart add |
-| Invoices | PawTag (MongoDB) | Created by PawTag webhook handler on Medusa order.placed |
+| Products | PawTag (MongoDB) | Admin manages via PawTag Commerce admin |
+| Variants | PawTag (MongoDB) | Single variant per product with "Default" option |
+| Prices | PawTag (MongoDB) | Per-variant pricing |
+| Inventory | PawTag (MongoDB) | Stock levels at PawTag Warehouse |
+| Cart | PawTag (MongoDB) | Server-side cart management |
+| Promotions | PawTag (MongoDB) | Applied during checkout |
+| Tax | PawTag (MongoDB) | 15% NZ GST, tax-inclusive pricing |
+| Shipping | PawTag (MongoDB) | Free NZ-wide shipping via manual fulfillment |
+| Payment | PawTag (MongoDB) | Stripe integration via PawTag payment provider |
+| Orders | PawTag (MongoDB) | Created via PawTag checkout flow |
+| Customers | PawTag (MongoDB) | Auth-based customer management |
+| Invoices | PawTag (MongoDB) | Created on order placement |
 | Subscriptions | PawTag (MongoDB) | Created on payment success |
-| Referrals | PawTag (MongoDB) | Processed on Medusa order.placed |
+| Referrals | PawTag (MongoDB) | Processed on order placement |
 
 ### Checkout Flow
 
-1. Frontend syncs customer to Medusa (`POST /customer/medusa-sync`)
-2. Frontend writes identity to cart metadata (`pawtagUserId`, `email`, `phone`, `fullName`)
-3. Frontend adds items, shipping address, shipping method to Medusa cart via SDK
-4. Stripe payment confirmed client-side via `stripe.confirmPayment()`
-5. Frontend completes checkout via `sdk.store.cart.complete()` → Medusa creates order
-6. Frontend calls `POST /customer/orders/place { medusaOrderId }` → PawTag creates order + invoice + sends emails synchronously (~700ms)
-7. Medusa fires `order.placed` event → webhook backup (idempotent, skips if order exists)
-8. Shared `createOrderFromMedusa()` service used by both direct API and webhook
-
-### Webhook Reliability
-
-- **Primary path:** Direct API (`POST /customer/orders/place`) — synchronous, ~700ms
-- **Backup path:** Webhook (`POST /api/webhooks/medusa`) — async, ~2-4s, only if direct API fails
-- Events stored in `WebhookEvent` collection with idempotency check
-- Handlers return boolean — only marked "completed" on success
-- Failed events retried every 60 seconds up to 5 times
-- Events older than 24 hours marked as dead (no retry)
-- All side effects (invoice, referral, notification) are idempotent
-- Shipping/cancellation events still processed via webhook (no frontend involvement)
-
-### PawTag ↔ Medusa Sync Architecture
-
-**3-layer enterprise sync ensures data consistency between PawTag (MongoDB) and Medusa (PostgreSQL).**
-
-```
-Layer 1: REAL-TIME (webhooks + admin API calls)
-  Latency: 0.5-2 seconds
-  Medusa event → pawtag-webhook.ts → PawTag handler
-  Admin cancel/ship/refund → medusa-admin.service.ts → Medusa API
-
-Layer 2: RECONCILIATION (safety net)
-  Latency: 60 seconds (configurable)
-  orderSyncReconciliation.ts — polls Medusa for stale orders, corrects drift
-
-Layer 3: FRONTEND POLLING (display)
-  Latency: 30 seconds
-  Customer Orders/Detail pages auto-refresh
-```
-
-**Key files:**
-
-| File | Purpose |
-|------|---------|
-| `packages/api/src/services/medusa-admin.service.ts` | Medusa admin API client for cancel/fulfill/ship |
-| `packages/api/src/jobs/orderSyncReconciliation.ts` | Reconciliation job (60s interval, configurable) |
-| `packages/api/src/jobs/webhookRetry.ts` | Webhook retry with exponential backoff (60s→1h) |
-| `packages/api/src/routes/medusa-webhooks.ts` | Webhook handlers with `findOrderByMedusaId()` helper |
-| `packages/api/src/services/orderNotification.service.ts` | Parallelized notifications (Promise.allSettled) |
-| `apps/medusa/src/subscribers/pawtag-webhook.ts` | Medusa event forwarding with 5s timeout |
-
-**Order model linkage:**
-- `medusaOrderId` — explicit Medusa order ID (indexed, sparse)
-- `payment.transactionId` — stores Medusa order ID (legacy, kept for backward compatibility)
-- `payment.stripePaymentIntentId` — Stripe payment intent ID for refunds
-
-**Admin actions → Medusa sync (best-effort):**
-- Cancel: `cancelMedusaOrder()` → releases Medusa inventory
-- Refund: `cancelMedusaOrderAfterRefund()` → cancels in Medusa after Stripe refund
-- Ship: `createMedusaFulfillment()` + `createMedusaShipment()` → records fulfillment + tracking
-
-**Reconciliation logic:**
-- Runs every 60s (configurable via `sync.reconciliation.intervalSeconds` setting)
-- Skips orders updated in last 5 minutes (avoids in-flight webhook interference)
-- Compares PawTag status against Medusa admin API
-- Corrects drift + notifies customer + audit logs
-- Only processes orders with `medusaOrderId` set
-
-**Settings (DB-driven, seeded in seed-cms.ts):**
-- `sync.reconciliation.enabled` — master toggle (default: true)
-- `sync.reconciliation.intervalSeconds` — check interval (default: 60)
-- `sync.reconciliation.skipRecentMinutes` — skip window (default: 5)
-- `sync.polling.enabled` — customer page polling (default: true)
-- `sync.polling.intervalSeconds` — poll interval (default: 30)
-
-**Admin Dashboard (`/webhooks`):**
-- **Backend:** `packages/api/src/routes/admin-webhooks.ts` — status, retry, reconcile, settings, dead-letter
-- **Frontend:** `apps/admin/src/pages/WebhookSettings.tsx` — 3-layer cards, stats, manual triggers, config
-- **Access:** Requires `setting.read` permission (Admin, Super Admin)
-- **Features:** View event stats, manually trigger reconciliation, retry failed events, configure intervals, purge dead-letter queue
+1. Frontend writes identity to cart metadata (`pawtagUserId`, `email`, `phone`, `fullName`)
+2. Frontend adds items, shipping address, shipping method to server-side cart
+3. Stripe payment confirmed client-side via `stripe.confirmPayment()`
+4. Frontend calls `POST /checkout/payment-intent` → PawTag creates PaymentIntent + PendingOrder
+5. Frontend calls `POST /checkout/confirm` → PawTag creates Order + Invoice + sends emails (~700ms)
 
 ### Deprecated Systems
 
 The following are deprecated but still exist in the codebase:
 - MongoDB `Cart` model (no routes populate it)
-- MongoDB `Product` model (admin CRUD still writes here, but shop reads Medusa)
 - `POST /customer/orders` endpoint (removed — was broken)
 - `POST /customer/orders/:orderNumber/confirm-payment` endpoint (removed)
 - `restoreOrderStock()` service (writes to deprecated MongoDB Product)

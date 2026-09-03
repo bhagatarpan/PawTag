@@ -5,7 +5,6 @@ export type OrderStatus = 'pending' | 'pending_payment' | 'paid' | 'packing' | '
 export interface IOrderDocument extends Document {
   orderNumber: string;
   userId: mongoose.Types.ObjectId;
-  medusaOrderId?: string;
   items: Array<{
     productId: mongoose.Types.ObjectId;
     productName: string;
@@ -59,6 +58,11 @@ export interface IOrderDocument extends Document {
   shippingLabelUrl?: string;
   notes?: string;
   referredByCode?: string;
+  createdBy?: string;
+  createdByType?: string;
+  createdByPortal?: 'customer-web' | 'customer-mobile' | 'admin-web' | 'system';
+  createdByDescription?: string;
+  createdByEmail?: string;
   cancellationReason?: string;
   cancellationNotes?: string;
   cancelledBy?: string;
@@ -75,6 +79,11 @@ export interface IOrderDocument extends Document {
   refundLastSyncedAt?: Date;
   refundFailureReason?: string;
   refundAttemptCount?: number;
+  refundedBy?: string;
+  refundedByType?: string;
+  refundedByPortal?: 'customer-web' | 'customer-mobile' | 'admin-web' | 'system';
+  refundedByDescription?: string;
+  refundedAt?: Date;
   deliveredAt?: Date;
   deletedAt?: Date;
   activity: Array<{
@@ -90,7 +99,6 @@ const OrderSchema = new Schema<IOrderDocument>(
   {
     orderNumber: { type: String, required: true, unique: true, index: true },
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-    medusaOrderId: { type: String, sparse: true, index: true },
     items: [
       {
         productId: { type: Schema.Types.ObjectId, ref: 'Product', required: true },
@@ -151,6 +159,14 @@ const OrderSchema = new Schema<IOrderDocument>(
     shippingLabelUrl: String,
     notes: String,
     referredByCode: { type: String },
+    createdBy: { type: String, index: true },
+    createdByType: { type: String, index: true },
+    createdByPortal: {
+      type: String,
+      enum: ['customer-web', 'customer-mobile', 'admin-web', 'system'],
+    },
+    createdByDescription: { type: String },
+    createdByEmail: { type: String },
     cancellationReason: { type: String },
     cancellationNotes: { type: String },
     cancelledBy: { type: String, index: true },
@@ -174,6 +190,14 @@ const OrderSchema = new Schema<IOrderDocument>(
     refundLastSyncedAt: { type: Date },
     refundFailureReason: { type: String },
     refundAttemptCount: { type: Number, default: 0 },
+    refundedBy: { type: String, index: true },
+    refundedByType: { type: String, index: true },
+    refundedByPortal: {
+      type: String,
+      enum: ['customer-web', 'customer-mobile', 'admin-web', 'system'],
+    },
+    refundedByDescription: { type: String },
+    refundedAt: { type: Date, index: true },
     deliveredAt: { type: Date },
     deletedAt: { type: Date, default: null },
     activity: [

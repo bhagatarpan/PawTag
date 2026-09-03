@@ -311,7 +311,7 @@ export default function Checkout() {
       let invoice = null;
       let invoiceUrl = '';
       try {
-        const confirmRes = await api.post('/checkout/confirm', { paymentIntentId });
+        const confirmRes = await api.post('/checkout/confirm', { paymentIntentId, portal: 'customer-web' });
         pawtagOrder = confirmRes.data.data.order;
         invoice = confirmRes.data.data.invoice;
         invoiceUrl = confirmRes.data.data.invoiceUrl;

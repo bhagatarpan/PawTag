@@ -131,12 +131,10 @@ flowchart TD
 
     subgraph Backend
         API["packages/api<br/>Express API<br/>:5000"]
-        Medusa["apps/medusa<br/>MedusaJS v2<br/>:9000"]
     end
 
     subgraph Database
         MongoDB[(MongoDB Atlas)]
-        PostgreSQL[(PostgreSQL<br/>Neon)]
     end
 
     subgraph External Services
@@ -149,21 +147,17 @@ flowchart TD
     end
 
     Web --> API
-    Web --> Medusa
     Admin --> API
-    Admin --> Medusa
     Finder --> API
     Mobile --> API
 
     API --> MongoDB
-    Medusa --> PostgreSQL
     API --> Stripe
     API --> Resend
     API --> Twilio
     API --> Firebase
     API --> R2
     API --> Sentry
-    Medusa -->|"webhooks"| API
 ```
 
 ### One Backend
@@ -182,7 +176,6 @@ A single Express API (`packages/api`) serves all clients. There is no API duplic
 | `apps/web` | 3000 | Public/Pet owners | Optional | Marketing site, shop, checkout, auth, customer portal |
 | `apps/admin` | 3001 | Staff | Admin RBAC | Full CRUD, dashboard, order management, CMS |
 | `apps/finder` | 3003 | Strangers | None | Public tag lookup — must be tiny and fast |
-| `apps/medusa` | 9000 | System | API key | MedusaJS commerce engine (products, carts, payments) |
 
 The finder page is intentionally kept minimal — it's the page a stressed stranger opens on their phone with poor signal to report a found pet.
 
@@ -211,7 +204,7 @@ Located in `apps/mobile/e2e/`:
 - **Framework:** Express.js 4.18
 - **Language:** TypeScript 5.5 (strict mode)
 - **Database:** MongoDB Atlas with Mongoose 7
-- **Commerce:** MedusaJS v2.19.0 (PostgreSQL via Neon)
+- **Commerce:** PawTag Commerce module (in-app)
 - **Authentication:** JWT (jsonwebtoken) + bcryptjs
 - **Validation:** Zod 3.23
 - **Rate Limiting:** express-rate-limit (DB-driven)
@@ -273,11 +266,6 @@ PawTag/
 │   ├── finder/         → Finder portal (port 3003) - 10 components
 │   │   └── src/
 │   │       └── components/
-│   ├── medusa/         → MedusaJS v2 commerce backend (port 9000)
-│   │   └── src/
-│   │       ├── links/
-│   │       ├── scripts/
-│   │       └── subscribers/
 │   ├── mobile/         → React Native (Expo) app - 14 screens
 │   │   ├── src/
 │   │   │   ├── components/
@@ -313,14 +301,13 @@ PawTag/
 │   ├── regression/     → Regression tests
 │   ├── smoke/          → API smoke tests
 │   └── unit/           → Unit tests
-├── docker/             → Docker configurations (4 services + PostgreSQL)
+├── docker/             → Docker configurations (4 services)
 ├── docs/               → Documentation (15 files)
 ├── scripts/            → Build and utility scripts
 ├── .github/workflows/  → GitHub Actions CI/CD pipeline
 ├── ARCHITECTURE.md     → System architecture
 ├── DESIGN.md           → Design system
 ├── AGENTS.md           → AI development guide
-├── MEDUSA-INTEGRATION-PLAN.md → MedusaJS integration plan (Phases 1-9)
 └── package.json        → Root package.json
 ```
 
@@ -532,7 +519,7 @@ pnpm dev:api       # API on :5000
 pnpm dev:admin     # Admin on :3001
 pnpm dev:web       # Public site on :3000
 pnpm dev:finder    # Finder on :3003
-pnpm dev:medusa    # MedusaJS commerce on :9000
+
 ```
 
 ### Mobile App
@@ -558,7 +545,7 @@ pnpm build:api
 pnpm build:admin
 pnpm build:web
 pnpm build:finder
-pnpm build:medusa
+
 ```
 
 ### Production Start
@@ -614,16 +601,16 @@ sequenceDiagram
 
 ### Product Management
 
-Products are managed exclusively through Medusa (`localhost:9000/app`). The PawTag MongoDB Product model is deprecated. All product/pricing/inventory operations go through Medusa.
+Products are managed through PawTag's admin portal. The product catalog supports variants, inventory tracking, and pricing.
 
 | What | Where | Purpose |
 |------|-------|---------|
-| Product catalog | Medusa admin (`:9000/app`) | Create/edit/delete products, prices, variants |
-| Product metadata | Medusa product metadata | Subscription config, tag flags, warranty, affiliate fields |
-| Inventory | Medusa inventory module | Stock levels at PawTag Warehouse |
-| Prices | Medusa pricing module | Per-variant, per-region pricing |
-| Shop page | `apps/web` | Fetches from Medusa SDK, displays with PawTag UI |
-| Subscription logic | `packages/api` (MongoDB) | Reads Medusa product metadata for subscription config |
+| Product catalog | Admin portal (`:3001`) | Create/edit/delete products, prices, variants |
+| Product metadata | MongoDB Product model | Subscription config, tag flags, warranty, affiliate fields |
+| Inventory | PawTag inventory service | Stock levels at PawTag Warehouse |
+| Prices | PawTag pricing service | Per-variant, per-region pricing |
+| Shop page | `apps/web` | Fetches from PawTag API, displays with PawTag UI |
+| Subscription logic | `packages/api` (MongoDB) | Reads product metadata for subscription config |
 
 ### Order Lifecycle
 
@@ -699,6 +686,16 @@ Orders can be cancelled from three sources — each captures the same rich audit
 | `cancelledByPortal` | `enum: 'customer-web' \| 'customer-mobile' \| 'admin-web' \| 'system'` | Fixed list of known portals |
 | `cancelledByDescription` | `String` | Full human description (e.g., `"Order is Cancelled via Admin Web Portal by Dave Macenzie (Customer Service)"`) |
 | `cancelledAt` | `Date` | Timestamp of cancellation |
+| `createdBy` | `String` | Human-readable: `"Customer (Sarah Johnson)"` — set on order creation |
+| `createdByType` | `String` | Role display name (e.g., `"Customer"`) |
+| `createdByPortal` | `enum: 'customer-web' \| 'customer-mobile' \| 'admin-web' \| 'system'` | Source portal where order was created |
+| `createdByDescription` | `String` | Full description (e.g., `"Order placed via Customer Web Portal by Sarah Johnson"`) |
+| `createdByEmail` | `String` | Creator's email address |
+| `refundedBy` | `String` | Human-readable: `"Dave Macenzie (Admin)"` — set on refund |
+| `refundedByType` | `String` | Role display name (e.g., `"Admin"`) |
+| `refundedByPortal` | `enum: 'customer-web' \| 'customer-mobile' \| 'admin-web' \| 'system'` | Source portal where refund was processed |
+| `refundedByDescription` | `String` | Full description (e.g., `"Order refunded via Admin Web Portal by Dave Macenzie (Admin)"`) |
+| `refundedAt` | `Date` | Timestamp of refund |
 
 **Helper (`packages/api/src/lib/actor.ts`):**
 
@@ -707,6 +704,10 @@ Orders can be cancelled from three sources — each captures the same rich audit
 - `formatCancelledByDescription(portal, fullName, roleLabel)` — produces the full description
 - `formatActivityMessage(cancelledBy, reason, at?)` — canonical log message
 - `formatSystemActivityMessage(reason, at?)` — system-prefixed log message
+- `formatCreatedBy(fullName, roleDisplayName)` — produces the `createdBy` string for order creation
+- `formatCreatedByDescription(portal, fullName)` — produces the full description for order creation
+- `formatRefundedBy(fullName, roleDisplayName)` — produces the `refundedBy` string for refund
+- `formatRefundedByDescription(portal, fullName, roleLabel)` — produces the full description for refund
 
 **Admin-managed reasons:** `/admin/commerce-settings` → "Cancellation Reasons" card allows admins to add, remove, and reorder the predefined list. Changes are audited (`cancellation_reasons_updated` event, MEDIUM severity) and immediately reflected in the customer modal.
 
@@ -837,12 +838,11 @@ The Admin Portal is the operational control centre of the application. It provid
 | Area | Purpose |
 |------|---------|
 | **Dashboard** | Analytics overview (revenue, orders, tags, scans, reunions) |
-| **Users** | User management with role assignments |
-| **Pets** | Pet profile management |
-| **Tags** | Tag management, NFC writing, activation |
-| **Products** | Product catalog with variants and subscriptions |
+| **Users** | User management with role assignments — **Customers** (site visitors), **Users** (admin staff), **Pets** |
+| **PawTag Products & Services** | Product catalog — **Products**, **Tags**, **Subscription Plans** |
+| **Catalog** | Taxonomy — Categories, Collections, Brands |
 | **Orders** | Order fulfillment, shipping, refunds |
-| **Subscriptions** | Subscription lifecycle management |
+| **Subscriptions** | Customer subscription lifecycle management |
 | **Invoices** | Invoice generation and access |
 | **Referrals** | Referral program management |
 | **Support** | Support request management |
@@ -1744,50 +1744,6 @@ chore: maintenance tasks
 ### Technical Debt
 
 - Legacy `role: string` field on User model (being replaced by RBAC)
-
----
-
-## Medusa ↔ PawTag Sync Architecture
-
-**3-layer enterprise sync ensures data consistency between PawTag (MongoDB) and Medusa (PostgreSQL).**
-
-```
-Layer 1: REAL-TIME (webhooks + admin API calls)
-  Latency: 0.5-2 seconds
-  Medusa event → pawtag-webhook.ts → PawTag handler
-  Admin cancel/ship/refund → medusa-admin.service.ts → Medusa API
-
-Layer 2: RECONCILIATION (safety net)
-  Latency: 60 seconds (configurable)
-  orderSyncReconciliation.ts — polls Medusa for stale orders, corrects drift
-
-Layer 3: FRONTEND POLLING (display)
-  Latency: 30 seconds
-  Customer Orders/Detail pages auto-refresh
-```
-
-| Medusa Event | PawTag Status | Customer Notification |
-|-------------|---------------|----------------------|
-| `order.placed` | → `paid` | ✅ In-app + email + push |
-| `order.canceled` | → `cancelled` | ✅ In-app + email + push |
-| `order.fulfillment_created` | → `packing` | ✅ In-app + email + push |
-| `shipment.created` | → `shipped` | ✅ In-app + email + push (with tracking) |
-
-**Key files:**
-
-| File | Purpose |
-|------|---------|
-| `packages/api/src/services/medusa-admin.service.ts` | Medusa admin API client for cancel/fulfill/ship |
-| `packages/api/src/jobs/orderSyncReconciliation.ts` | Reconciliation job (60s interval) |
-| `packages/api/src/jobs/webhookRetry.ts` | Webhook retry with exponential backoff |
-| `packages/api/src/routes/medusa-webhooks.ts` | Webhook handlers with `findOrderByMedusaId()` |
-
-**Admin Dashboard (`/webhooks`):**
-- Monitor all 3 layers with real-time stats
-- Manually trigger reconciliation, retry failed events
-- Configure intervals and toggles for each layer
-- Manage dead-letter queue (retry, purge)
-- Requires `setting.read` permission (Admin, Super Admin)
 
 ---
 

@@ -192,6 +192,8 @@ export interface ConfirmDialogProps {
   notesPlaceholder?: string;
   /** Optional footnote content rendered below the message (e.g. "What happens next?"). */
   footnote?: React.ReactNode;
+  /** Optional custom content rendered inside the dialog body (after notes). */
+  children?: React.ReactNode;
 }
 
 /* ------------------------------------------------------------------ */
