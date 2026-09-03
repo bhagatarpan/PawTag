@@ -89,10 +89,12 @@ function DetailDrawer({
   product,
   onClose,
   onRefresh,
+  onEdit,
 }: {
   product: Product | null;
   onClose: () => void;
   onRefresh: () => void;
+  onEdit: (product: Product) => void;
 }) {
   const [activeTab, setActiveTab] = useState<'info' | 'variants' | 'images'>('info');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -234,6 +236,9 @@ function DetailDrawer({
 
               <Section title="Quick Actions" icon={<Activity size={16} />}>
                 <div className="flex flex-wrap gap-2">
+                  <button onClick={() => onEdit(product)} className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-primary-700 bg-primary-100 hover:bg-primary-200 rounded-lg">
+                    <Edit2 size={12} /> Edit
+                  </button>
                   <button onClick={handleToggleActive} disabled={actionLoading === 'toggle'} className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg disabled:opacity-50">
                     {actionLoading === 'toggle' && <Loader2 size={12} className="animate-spin" />}
                     {product.isActive ? 'Deactivate' : 'Activate'}
@@ -688,7 +693,7 @@ export default function Products() {
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-2 gap-4">
                 <div><label className="block text-sm font-medium text-gray-700 mb-1">Name *</label><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm" required /></div>
-                <div><label className="block text-sm font-medium text-gray-700 mb-1">SKU *</label><select value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm" required><option value="">Select SKU...</option><option value="PT-SCAN-001">PT-SCAN-001</option><option value="PT-CLASSIC-001">PT-CLASSIC-001</option><option value="PT-PLUS-001">PT-PLUS-001</option></select></div>
+                <div><label className="block text-sm font-medium text-gray-700 mb-1">SKU *</label><input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm font-mono" placeholder="e.g. PT-SCAN-001" required /></div>
                 <div><label className="block text-sm font-medium text-gray-700 mb-1">Base Price (NZD) *</label><input type="number" step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: parseFloat(e.target.value) || 0 })} className="w-full border rounded-md px-3 py-2 text-sm" required /></div>
                 <div><label className="block text-sm font-medium text-gray-700 mb-1">Base Stock</label><input type="number" value={form.stock} onChange={(e) => setForm({ ...form, stock: parseInt(e.target.value) || 0 })} className="w-full border rounded-md px-3 py-2 text-sm" /></div>
                 <div className="col-span-2"><label className="block text-sm font-medium text-gray-700 mb-1">Short Description</label><input value={form.shortDescription} onChange={(e) => setForm({ ...form, shortDescription: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm" /></div>
@@ -849,7 +854,7 @@ export default function Products() {
         )}
 
         {/* Detail Drawer */}
-        <DetailDrawer product={selectedProduct} onClose={() => setSelectedProduct(null)} onRefresh={() => { fetchProducts(); fetchSummary(); }} />
+        <DetailDrawer product={selectedProduct} onClose={() => setSelectedProduct(null)} onRefresh={() => { fetchProducts(); fetchSummary(); }} onEdit={(p) => { setSelectedProduct(null); openEdit(p); }} />
       </div>
     </div>
   );
