@@ -171,7 +171,7 @@ export default function Shop() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="animate-pulse space-y-8">
             <div className="h-8 bg-gray-200 rounded w-64" />
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {[1, 2, 3].map((i) => (
                 <div key={i} className="bg-white rounded-xl h-80" />
               ))}
@@ -191,7 +191,7 @@ export default function Shop() {
           <p className="text-gray-600 mb-8">{shopDesc}</p>
 
           {/* Product Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {cardProducts.length === 0 ? (
               <div className="col-span-full text-center py-16 bg-white rounded-2xl border border-gray-200">
                 <Package className="w-16 h-16 text-gray-300 mx-auto mb-4" />
