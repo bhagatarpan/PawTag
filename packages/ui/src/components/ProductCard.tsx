@@ -37,7 +37,7 @@ export const ProductCard = React.memo(function ProductCard({
 
   return (
     <div
-      className={`bg-white rounded-2xl shadow-sm border border-gray-100 hover:border-primary-200 hover:shadow-lg transition-all duration-300 overflow-hidden relative h-full flex flex-col ${isHighlight ? 'ring-2 ring-amber-400 scale-[1.02]' : ''} ${className}`}
+      className={`bg-white rounded-2xl shadow-sm border border-gray-100 hover:border-primary-200 hover:shadow-lg transition-all duration-300 overflow-hidden relative h-full flex flex-col ${isHighlight ? 'ring-2 ring-amber-400' : ''} ${className}`}
     >
       {product.badge && (
         <div className={`absolute top-4 left-4 z-10 px-3 py-1 rounded-full text-xs font-bold ${product.badge.color}`}>
@@ -47,7 +47,7 @@ export const ProductCard = React.memo(function ProductCard({
 
       <div data-product-image className="relative h-48 bg-gradient-to-br from-primary-50 to-primary-100 flex items-center justify-center">
         {product.image ? (
-          <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+          <img src={product.image} alt={product.name} className="w-full h-full object-contain" />
         ) : (
           <PawPrint className="h-20 w-20 text-primary-300" />
         )}
