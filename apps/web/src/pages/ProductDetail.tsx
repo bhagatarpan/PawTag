@@ -247,7 +247,7 @@ export default function ProductDetail() {
             {product.description && (
               <div className="mt-6 pt-6 border-t border-gray-200">
                 <h3 className="font-semibold text-gray-900 mb-2">Description</h3>
-                <p className="text-gray-600 text-sm whitespace-pre-wrap">{product.description}</p>
+                <div className="text-gray-600 text-sm" dangerouslySetInnerHTML={{ __html: product.description }} />
               </div>
             )}
           </div>
