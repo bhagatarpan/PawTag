@@ -606,7 +606,8 @@ Products are managed through PawTag's admin portal. The product catalog supports
 | What | Where | Purpose |
 |------|-------|---------|
 | Product catalog | Admin portal (`:3001`) | Create/edit/delete products, prices, variants |
-| Product metadata | MongoDB Product model | Subscription config, tag flags, warranty, affiliate fields |
+| Product metadata | MongoDB Product model | Subscription config, tag flags, warranty, shipping, affiliate fields |
+| Product URLs | URL slugs (e.g., `/shop/pawtag-scan`) | SEO-friendly URLs instead of MongoDB ObjectIDs |
 | Inventory | PawTag inventory service | Stock levels at PawTag Warehouse |
 | Prices | PawTag pricing service | Per-variant, per-region pricing |
 | Shop page | `apps/web` | Fetches from PawTag API, displays with PawTag UI |
@@ -1058,7 +1059,14 @@ or on error:
 | GET | `/captcha` | Get CAPTCHA challenge | No |
 | GET | `/me` | Get current user | Yes |
 
-#### Customer (`/api/customer`)
+#### Public Products (`/api/products`)
+
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| GET | `/` | List active, published products | No |
+| GET | `/:id` | Get product by ID | No |
+| GET | `/sku/:sku` | Get product by SKU | No |
+| GET | `/slug/:slug` | Get product by slug (SEO-friendly) | No |
 
 | Method | Endpoint | Description | Auth Required |
 |--------|----------|-------------|---------------|
@@ -1078,6 +1086,15 @@ or on error:
 | GET | `/notifications` | List notifications | Yes |
 | PUT | `/notifications/:id/read` | Mark notification read | Yes |
 | POST | `/escalations/:id/forward` | Forward to emergency contact | Yes |
+
+#### Public Products (`/api/products`)
+
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| GET | `/` | List active, published products | No |
+| GET | `/:id` | Get product by ID | No |
+| GET | `/sku/:sku` | Get product by SKU | No |
+| GET | `/slug/:slug` | Get product by slug (SEO-friendly) | No |
 
 #### Admin (`/api/admin`)
 

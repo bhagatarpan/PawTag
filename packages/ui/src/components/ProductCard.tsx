@@ -2,18 +2,19 @@ import React from 'react';
 import { ShoppingCart, Check, PawPrint } from 'lucide-react';
 
 export interface ProductCardProduct {
-  id: string;
-  name: string;
-  shortDescription?: string;
-  price: number;
-  currency?: string;
-  image?: string;
-  sku: string;
-  stock: number;
-  monthlyPrice?: number;
-  badge?: { label: string; color: string } | null;
-  features?: string[];
-}
+   id: string;
+   slug: string;
+   name: string;
+   shortDescription?: string;
+   price: number;
+   currency?: string;
+   image?: string;
+   sku: string;
+   stock: number;
+   monthlyPrice?: number;
+   badge?: { label: string; color: string } | null;
+   features?: string[];
+ }
 
 export interface ProductCardProps {
   product: ProductCardProduct;

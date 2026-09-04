@@ -25,30 +25,32 @@ import api from '../lib/api';
 /* ------------------------------------------------------------------ */
 
 interface PawTagProduct {
-  _id: string;
-  name: string;
-  description: string;
-  shortDescription?: string;
-  price: number;
-  salePrice?: number;
-  compareAtPrice?: number;
-  currency: string;
-  images: string[];
-  category: string;
-  stock: number;
-  reserved: number;
-  sku: string;
-  isActive: boolean;
-  isSubscription: boolean;
-  isTagProduct: boolean;
-  subscriptionConfig?: {
-    type: 'annual' | 'monthly';
-    freePeriodMonths: number;
-    monthlyPrice?: number;
-    features: string[];
-  };
-  warrantyMonths: number;
-}
+   _id: string;
+   name: string;
+   slug: string;
+   description: string;
+   shortDescription?: string;
+   price: number;
+   salePrice?: number;
+   compareAtPrice?: number;
+   currency: string;
+   images: string[];
+   category: string;
+   stock: number;
+   reserved: number;
+   sku: string;
+   isActive: boolean;
+   isSubscription: boolean;
+   isTagProduct: boolean;
+   subscriptionConfig?: {
+     type: 'annual' | 'monthly';
+     freePeriodMonths: number;
+     monthlyPrice?: number;
+     features: string[];
+   };
+   warrantyMonths: number;
+   shippingDescription?: string;
+ }
 
 /* ------------------------------------------------------------------ */
 /*  Component                                                          */
@@ -63,14 +65,14 @@ export default function ProductDetail() {
   const [selectedImage, setSelectedImage] = useState(0);
   const { addItem, error: cartError, clearError } = useCart();
 
-  /* ---- Fetch product ---- */
-  useEffect(() => {
-    if (!id) return;
-    api.get(`/products/${id}`)
-      .then((res) => setProduct(res.data?.data))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [id]);
+/* ---- Fetch product ---- */
+   useEffect(() => {
+     if (!id) return;
+     api.get(`/products/slug/${id}`)
+       .then((res) => setProduct(res.data?.data))
+       .catch(() => {})
+       .finally(() => setLoading(false));
+   }, [id]);
 
   /* ---- Add to cart ---- */
   const handleAddToCart = async () => {
@@ -225,23 +227,23 @@ export default function ProductDetail() {
               </button>
             </div>
 
-            {/* Features */}
-            <div className="mt-6 space-y-3 text-sm text-gray-600">
-              <div className="flex items-center gap-2">
-                <Shield size={16} className="text-teal-600" />
-                {product.warrantyMonths || 12} month warranty
-              </div>
-              <div className="flex items-center gap-2">
-                <Truck size={16} className="text-teal-600" />
-                Free NZ-wide shipping
-              </div>
-              {product.isSubscription && (
+{/* Features */}
+             <div className="mt-6 space-y-3 text-sm text-gray-600">
+               <div className="flex items-center gap-2">
+                 <Shield size={16} className="text-teal-600" />
+                 {product.warrantyMonths || 12} month warranty
+               </div>
                 <div className="flex items-center gap-2">
-                  <Check size={16} className="text-teal-600" />
-                  {product.subscriptionConfig?.freePeriodMonths || 12} months free subscription
+                  <Truck size={16} className="text-teal-600" />
+                  {product.shippingDescription || 'Free NZ-wide shipping'}
                 </div>
-              )}
-            </div>
+               {product.isSubscription && (
+                 <div className="flex items-center gap-2">
+                   <Check size={16} className="text-teal-600" />
+                   {product.subscriptionConfig?.freePeriodMonths || 12} months free subscription
+                 </div>
+               )}
+             </div>
 
             {/* Description */}
             {product.description && (

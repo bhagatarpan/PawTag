@@ -90,31 +90,59 @@ router.get('/:id', async (req: Request, res: Response) => {
 });
 
 /**
- * GET /api/products/sku/:sku
- *
- * Get a product by SKU (e.g., 'PT-SCAN').
- */
-router.get('/sku/:sku', async (req: Request, res: Response) => {
-  try {
-    const product = await productService.getBySku(req.params.sku);
+   * GET /api/products/sku/:sku
+   *
+   * Get a product by SKU (e.g., 'PT-SCAN').
+   */
+  router.get('/sku/:sku', async (req: Request, res: Response) => {
+    try {
+      const product = await productService.getBySku(req.params.sku);
 
-    if (!product.isActive || !product.isPublished) {
-      res.status(404).json({ success: false, error: 'Product not found' });
-      return;
-    }
+      if (!product.isActive || !product.isPublished) {
+        res.status(404).json({ success: false, error: 'Product not found' });
+        return;
+      }
 
-    res.json({
-      success: true,
-      data: product,
-    });
-  } catch (err: any) {
-    if (err.name === 'NotFoundError') {
-      res.status(404).json({ success: false, error: 'Product not found' });
-      return;
+      res.json({
+        success: true,
+        data: product,
+      });
+    } catch (err: any) {
+      if (err.name === 'NotFoundError') {
+        res.status(404).json({ success: false, error: 'Product not found' });
+        return;
+      }
+      logger.error({ err }, 'Failed to fetch product by SKU');
+      res.status(500).json({ success: false, error: 'Failed to fetch product' });
     }
-    logger.error({ err }, 'Failed to fetch product by SKU');
-    res.status(500).json({ success: false, error: 'Failed to fetch product' });
-  }
-});
+  });
+
+  /**
+   * GET /api/products/slug/:slug
+   *
+   * Get a product by slug (e.g., 'pawtag-scan').
+   */
+  router.get('/slug/:slug', async (req: Request, res: Response) => {
+    try {
+      const product = await productService.getBySlug(req.params.slug);
+
+      if (!product.isActive || !product.isPublished) {
+        res.status(404).json({ success: false, error: 'Product not found' });
+        return;
+      }
+
+      res.json({
+        success: true,
+        data: product,
+      });
+    } catch (err: any) {
+      if (err.name === 'NotFoundError') {
+        res.status(404).json({ success: false, error: 'Product not found' });
+        return;
+      }
+      logger.error({ err }, 'Failed to fetch product by slug');
+      res.status(500).json({ success: false, error: 'Failed to fetch product' });
+    }
+  });
 
 export default router;

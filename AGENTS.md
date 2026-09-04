@@ -488,6 +488,9 @@ Safety nets:
 | Route | Purpose |
 |-------|---------|
 | `GET /api/products` | Public product listing |
+| `GET /api/products/slug/:slug` | Get product by slug (SEO-friendly) |
+| `GET /api/products/sku/:sku` | Get product by SKU |
+| `GET /api/products/:id` | Get product by ID |
 | `GET/POST/PUT/DELETE /api/cart/*` | Cart management (supports guest and authenticated users; guest-to-auth merge on login) |
 | `POST /api/checkout/payment-intent` | Create payment intent |
 | `POST /api/checkout/confirm` | Confirm checkout (idempotent) |
@@ -1095,6 +1098,7 @@ Products are managed through the PawTag Commerce module (`packages/api/src/comme
 | **Product catalog** | PawTag Commerce admin | Create/edit/delete products, prices, variants |
 | **Inventory** | PawTag Commerce services | Stock levels at PawTag Warehouse |
 | **Prices** | PawTag Commerce services | Per-variant pricing |
+| **Product URLs** | Slug-based (e.g., `/shop/pawtag-scan`) | SEO-friendly URLs |
 | **Shop page** | `apps/web` | Displays products with PawTag UI |
 | **Subscription logic** | `packages/api` (MongoDB) | Product metadata for subscription config |
 

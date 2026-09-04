@@ -7,10 +7,11 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 const API_URL = process.env.API_URL || 'http://localhost:5000';
 
 const products = [
-  {
-    name: 'PawTag Scan',
-    description: 'Our essential QR code pet tag. Simply scan with any smartphone camera to view your pet\'s profile, medical info, and owner contact details. Made from durable plastic with a printed QR code. Includes 12 months free subscription — after that just $0.99/month billed annually.',
-    shortDescription: 'QR code tag — scan with phone camera',
+   {
+     name: 'PawTag Scan',
+     slug: 'pawtag-scan',
+     description: 'Our essential QR code pet tag. Simply scan with any smartphone camera to view your pet\'s profile, medical info, and owner contact details. Made from durable plastic with a printed QR code. Includes 12 months free subscription — after that just $0.99/month billed annually.',
+     shortDescription: 'QR code tag — scan with phone camera',
     price: 9.99,
     currency: 'NZD',
     images: [`${API_URL}/api/uploads/products/pawtag-scan.svg`],
@@ -33,10 +34,11 @@ const products = [
       features: ['qr_scan', 'lost_pet_alerts', 'finder_notifications'],
     },
   },
-  {
-    name: 'PawTag Classic',
-    description: 'Our most popular NFC pet tag. Simply tap with any NFC-enabled smartphone to instantly view your pet\'s profile, medical info, and owner contact details. Made from durable plastic with a built-in NFC chip. Includes 12 months free subscription — after that just $1.99/month billed annually.',
-    shortDescription: 'NFC tag — tap with phone (Most Ordered)',
+{
+     name: 'PawTag Classic',
+     slug: 'pawtag-classic',
+     description: 'Our most popular NFC pet tag. Simply tap with any NFC-enabled smartphone to instantly view your pet\'s profile, medical info, and owner contact details. Made from durable plastic with a built-in NFC chip. Includes 12 months free subscription — after that just $1.99/month billed annually.',
+     shortDescription: 'NFC tag — tap with phone (Most Ordered)',
     price: 19.99,
     currency: 'NZD',
     images: [`${API_URL}/api/uploads/products/pawtag-classic.svg`],
@@ -59,10 +61,11 @@ const products = [
       features: ['nfc_scan', 'qr_scan', 'lost_pet_alerts', 'finder_notifications'],
     },
   },
-  {
-    name: 'PawTag Plus',
-    description: 'Our premium NFC pet tag with metal edges and epoxy resin coating for ultimate durability. Simply tap with any NFC-enabled smartphone to instantly view your pet\'s profile, medical info, and owner contact details. Built to withstand the most active pets. Includes 12 months free subscription — after that just $1.99/month billed annually.',
-    shortDescription: 'NFC tag — metal edges + epoxy resin',
+{
+     name: 'PawTag Plus',
+     slug: 'pawtag-plus',
+     description: 'Our premium NFC pet tag with metal edges and epoxy resin coating for ultimate durability. Simply tap with any NFC-enabled smartphone to instantly view your pet\'s profile, medical info, and owner contact details. Built to withstand the most active pets. Includes 12 months free subscription — after that just $1.99/month billed annually.',
+     shortDescription: 'NFC tag — metal edges + epoxy resin',
     price: 39.99,
     currency: 'NZD',
     images: [`${API_URL}/api/uploads/products/pawtag-plus.svg`],

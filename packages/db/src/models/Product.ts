@@ -62,9 +62,11 @@ export interface IProductVariant {
  * Extends Mongoose Document for type-safe queries.
  */
 export interface IProductDocument extends Document {
-  // ─── Basic Info ──────────────────────────────────────────
-  /** Product display name */
-  name: string;
+   // ─── Basic Info ──────────────────────────────────────
+   /** Product display name */
+   name: string;
+   /** URL-friendly product identifier */
+   slug: string;
 
   /** Full product description (supports HTML/Markdown) */
   description: string;
@@ -143,10 +145,12 @@ export interface IProductDocument extends Document {
   customizationPrice: number;
 
   // ─── Shipping ────────────────────────────────────────────
-  /** Additional shipping cost (0 = standard shipping rules apply) */
-  shippingCost: number;
+   /** Additional shipping cost (0 = standard shipping rules apply) */
+   shippingCost: number;
+   /** Shipping description (e.g., 'Free NZ-wide shipping') */
+   shippingDescription: string;
 
-  // ─── Warranty ────────────────────────────────────────────
+   // ─── Warranty ────────────────────────────────────────────
   /** Warranty period in months */
   warrantyMonths: number;
 
@@ -191,11 +195,13 @@ const ProductVariantSchema = new Schema<IProductVariant>({
 }, { _id: false });
 
 const ProductSchema = new Schema<IProductDocument>(
-  {
-    // ─── Basic Info ──────────────────────────────────────
-    name: { type: String, required: true, trim: true },
-    description: { type: String, required: true },
-    shortDescription: { type: String },
+   {
+     // ─── Basic Info ──────────────────────────────────────
+     name: { type: String, required: true, trim: true },
+     description: { type: String, required: true },
+     shortDescription: { type: String },
+     /** URL-friendly product identifier */
+     slug: { type: String, required: true, unique: true, lowercase: true, trim: true },
 
     // ─── Pricing ─────────────────────────────────────────
     price: { type: Number, required: true, min: 0 },
@@ -237,10 +243,11 @@ const ProductSchema = new Schema<IProductDocument>(
     customizable: { type: Boolean, default: false },
     customizationPrice: { type: Number, default: 0, min: 0 },
 
-    // ─── Shipping ────────────────────────────────────────
-    shippingCost: { type: Number, default: 0, min: 0 },
+     // ─── Shipping ────────────────────────────────────────
+     shippingCost: { type: Number, default: 0, min: 0 },
+     shippingDescription: { type: String, default: 'Free NZ-wide shipping' },
 
-    // ─── Warranty ────────────────────────────────────────
+     // ─── Warranty ────────────────────────────────────────
     warrantyMonths: { type: Number, default: 12, min: 0 },
 
     // ─── Subscription ────────────────────────────────────
@@ -267,7 +274,8 @@ ProductSchema.index({ category: 1 });
 ProductSchema.index({ isActive: 1 });
 ProductSchema.index({ isPublished: 1 });
 ProductSchema.index({ sortOrder: 1 });
-ProductSchema.index({ name: 'text', description: 'text' });
+ProductSchema.index({ name: 'text', description: 'text' }); 
+ProductSchema.index({ slug: 1 }, { unique: true });
 ProductSchema.index({ isTagProduct: 1 });
 ProductSchema.index({ isSubscription: 1 });
 

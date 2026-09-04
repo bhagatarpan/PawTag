@@ -30,64 +30,67 @@ import { Package } from 'lucide-react';
 
 /** PawTag product from the API */
 interface PawTagProduct {
-  _id: string;
-  name: string;
-  description: string;
-  shortDescription?: string;
-  price: number;
-  salePrice?: number;
-  compareAtPrice?: number;
-  currency: string;
-  images: string[];
-  category: string;
-  tags: string[];
-  isActive: boolean;
-  isPublished: boolean;
-  stock: number;
-  reserved: number;
-  sku: string;
-  weight?: number;
-  isSubscription: boolean;
-  isTagProduct: boolean;
-  subscriptionConfig?: {
-    type: 'annual' | 'monthly';
-    freePeriodMonths: number;
-    gracePeriodWeeks: number;
-    monthlyPrice?: number;
-    features: string[];
-  };
-  badge?: string;
-  sortOrder: number;
-  warrantyMonths: number;
-}
+   _id: string;
+   name: string;
+   slug: string;
+   description: string;
+   shortDescription?: string;
+   price: number;
+   salePrice?: number;
+   compareAtPrice?: number;
+   currency: string;
+   images: string[];
+   category: string;
+   tags: string[];
+   isActive: boolean;
+   isPublished: boolean;
+   stock: number;
+   reserved: number;
+   sku: string;
+   weight?: number;
+   isSubscription: boolean;
+   isTagProduct: boolean;
+   subscriptionConfig?: {
+     type: 'annual' | 'monthly';
+     freePeriodMonths: number;
+     gracePeriodWeeks: number;
+     monthlyPrice?: number;
+     features: string[];
+   };
+   badge?: string;
+   sortOrder: number;
+   warrantyMonths: number;
+   shippingDescription?: string;
+ }
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
 
 function toCardProduct(p: PawTagProduct): ProductCardProduct {
-  const effectivePrice = p.salePrice ?? p.price;
-  const badge = getProductBadge(p.sku) || (p.badge ? { label: p.badge, color: 'teal' } : null);
-  const available = p.stock - p.reserved;
+   const effectivePrice = p.salePrice ?? p.price;
+   const badge = getProductBadge(p.sku) || (p.badge ? { label: p.badge, color: 'teal' } : null);
+   const available = p.stock - p.reserved;
 
-  return {
-    id: p._id,
-    name: p.name,
-    shortDescription: p.shortDescription || undefined,
-    price: effectivePrice,
-    currency: p.currency || 'NZD',
-    image: p.images?.[0] || undefined,
-    sku: p.sku,
-    stock: available,
-    monthlyPrice: p.subscriptionConfig?.monthlyPrice,
-    badge: badge ? { label: badge.label, color: badge.color } : null,
-    features: [
-      `${p.subscriptionConfig?.freePeriodMonths || 12} months free subscription included`,
-      `${p.warrantyMonths || 12} month warranty`,
-      'Free NZ-wide shipping',
-    ],
-  };
-}
+   return {
+     id: p._id,
+     slug: p.slug,
+     name: p.name,
+     shortDescription: p.shortDescription || undefined,
+     price: effectivePrice,
+     currency: p.currency || 'NZD',
+     image: p.images?.[0] || undefined,
+     sku: p.sku,
+     stock: available,
+     monthlyPrice: p.subscriptionConfig?.monthlyPrice,
+     badge: badge ? { label: badge.label, color: badge.color } : null,
+     features: [
+       `${p.subscriptionConfig?.freePeriodMonths || 12} months free subscription included`,
+       `${p.warrantyMonths || 12} month warranty`,
+       p.shippingDescription || 'Free NZ-wide shipping',
+     ],
+   };
+ }
 
 /* ------------------------------------------------------------------ */
 /*  Component                                                          */
@@ -156,13 +159,13 @@ export default function Shop() {
     }
   }, [products, addItem, triggerFly]);
 
-  /* ---- Product click handler ---- */
-  const handleProductClick = useCallback((cardProduct: ProductCardProduct) => {
-    const product = products.find((p) => p._id === cardProduct.id);
-    if (product) {
-      navigate(`/shop/${product._id}`);
-    }
-  }, [navigate, products]);
+/* ---- Product click handler ---- */
+   const handleProductClick = useCallback((cardProduct: ProductCardProduct) => {
+     const product = products.find((p) => p._id === cardProduct.id);
+     if (product) {
+       navigate(`/shop/${product.slug}`);
+     }
+   }, [navigate, products]);
 
   /* ---- Loading skeleton ---- */
   if (loading) {

@@ -105,6 +105,21 @@ export class ProductService {
   }
 
   /**
+   * Get a product by slug.
+   *
+   * @param slug - URL-friendly product identifier
+   * @returns Product document
+   * @throws NotFoundError NotFoundError if product doesn't exist
+   */
+  async getBySlug(slug: string): Promise<IProductDocument> {
+    const product = await Product.findOne({ slug });
+    if (!product) {
+      throw new NotFoundError('Product');
+    }
+    return product;
+  }
+
+  /**
    * List products with filtering, sorting, and pagination.
    *
    * @param filter - Filter options
