@@ -11,12 +11,15 @@
  */
 
 import { Router, Response } from 'express';
-import { AuthRequest } from '../middleware/auth';
+import { AuthRequest, authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
 import { WebhookEvent } from '@pawtag/db';
 import logger from '../lib/logger';
 
 const router = Router();
+/** Explicitly require authentication for all webhook admin routes.
+ *  Previously relied on implicit req.user check inside requirePermission. */
+router.use(authenticate);
 
 /**
  * GET /api/admin/webhooks/status

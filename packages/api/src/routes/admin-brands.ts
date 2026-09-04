@@ -45,7 +45,18 @@ router.post('/', requirePermission('product.create'), async (req: AuthRequest, r
 
 router.put('/:id', requirePermission('product.update'), async (req: AuthRequest, res: Response) => {
   try {
-    const item = await Brand.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    /** Whitelist allowed fields — prevents mass-assignment of system-managed fields
+     *  such as productCount, _id, createdAt, updatedAt */
+    const { name, slug, description, logo, website, isActive } = req.body;
+    const updateData: Record<string, any> = {};
+    if (name !== undefined) updateData.name = name;
+    if (slug !== undefined) updateData.slug = slug;
+    if (description !== undefined) updateData.description = description;
+    if (logo !== undefined) updateData.logo = logo;
+    if (website !== undefined) updateData.website = website;
+    if (isActive !== undefined) updateData.isActive = isActive;
+
+    const item = await Brand.findByIdAndUpdate(req.params.id, updateData, { new: true });
     if (!item) { res.status(404).json({ success: false, error: 'Brand not found' }); return; }
     res.json({ success: true, data: item });
   } catch (err) { res.status(500).json({ success: false, error: toAppError(err).userMessage }); }

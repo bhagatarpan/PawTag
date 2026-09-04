@@ -126,8 +126,16 @@ router.put('/pet-references/:id', requirePermission('cms.pet_reference.update'),
     const reference = await CmsPetReference.findOne({ _id: req.params.id, deletedAt: null });
     if (!reference) { res.status(404).json({ success: false, error: 'Reference not found' }); return; }
 
-    const updateData = { ...req.body, updatedBy: req.user!.id };
-    if (updateData.value) updateData.value = updateData.value.toLowerCase();
+    /** Whitelist allowed fields — prevents mass-assignment of system-managed fields
+     *  such as createdBy, deletedAt, _id */
+    const { type, petSpecies, label, value, order, isActive } = req.body;
+    const updateData: Record<string, any> = { updatedBy: req.user!.id };
+    if (type !== undefined) updateData.type = type;
+    if (petSpecies !== undefined) updateData.petSpecies = petSpecies;
+    if (label !== undefined) updateData.label = label;
+    if (value !== undefined) updateData.value = value.toLowerCase();
+    if (order !== undefined) updateData.order = order;
+    if (isActive !== undefined) updateData.isActive = isActive;
 
     const updated = await CmsPetReference.findByIdAndUpdate(req.params.id, updateData, { new: true });
 

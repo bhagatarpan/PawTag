@@ -45,7 +45,18 @@ router.post('/', requirePermission('product.create'), async (req: AuthRequest, r
 
 router.put('/:id', requirePermission('product.update'), async (req: AuthRequest, res: Response) => {
   try {
-    const item = await Collection.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    /** Whitelist allowed fields — prevents mass-assignment of system-managed fields
+     *  such as productCount, _id, createdAt, updatedAt */
+    const { name, slug, description, image, sortOrder, isActive } = req.body;
+    const updateData: Record<string, any> = {};
+    if (name !== undefined) updateData.name = name;
+    if (slug !== undefined) updateData.slug = slug;
+    if (description !== undefined) updateData.description = description;
+    if (image !== undefined) updateData.image = image;
+    if (sortOrder !== undefined) updateData.sortOrder = sortOrder;
+    if (isActive !== undefined) updateData.isActive = isActive;
+
+    const item = await Collection.findByIdAndUpdate(req.params.id, updateData, { new: true });
     if (!item) { res.status(404).json({ success: false, error: 'Collection not found' }); return; }
     res.json({ success: true, data: item });
   } catch (err) { res.status(500).json({ success: false, error: toAppError(err).userMessage }); }

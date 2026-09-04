@@ -93,7 +93,7 @@ const sections: SidebarSection[] = [
   },
   {
     id: 'products-services',
-    label: 'PawTag Products & Services',
+    label: 'Products & Services',
     icon: Package,
     links: [
       { to: '/products', label: 'Products', icon: ShoppingBag, permission: 'product.read' },

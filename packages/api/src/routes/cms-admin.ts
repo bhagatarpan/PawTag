@@ -138,10 +138,34 @@ router.put('/pages/:id', requirePermission('cms.page.update'), async (req: AuthR
     });
 
     const oldSlug = page.slug;
-    const updateData = { ...req.body, updatedBy: req.user!.id, $inc: { version: 1 } };
+
+    /** Whitelist allowed fields — prevents mass-assignment of system-managed fields
+     *  such as createdBy, deletedAt, _id, createdAt */
+    const { slug, title, description, template, sections, metaTitle, metaDescription, metaKeywords, canonicalUrl, ogImage, ogTitle, ogDescription, twitterCard, twitterTitle, twitterDescription, twitterImage, schemaJsonLd, status, scheduledPublishAt, scheduledUnpublishAt } = req.body;
+    const updateData: Record<string, any> = { updatedBy: req.user!.id, $inc: { version: 1 } };
+    if (slug !== undefined) updateData.slug = slug;
+    if (title !== undefined) updateData.title = title;
+    if (description !== undefined) updateData.description = description;
+    if (template !== undefined) updateData.template = template;
+    if (sections !== undefined) updateData.sections = sections;
+    if (metaTitle !== undefined) updateData.metaTitle = metaTitle;
+    if (metaDescription !== undefined) updateData.metaDescription = metaDescription;
+    if (metaKeywords !== undefined) updateData.metaKeywords = metaKeywords;
+    if (canonicalUrl !== undefined) updateData.canonicalUrl = canonicalUrl;
+    if (ogImage !== undefined) updateData.ogImage = ogImage;
+    if (ogTitle !== undefined) updateData.ogTitle = ogTitle;
+    if (ogDescription !== undefined) updateData.ogDescription = ogDescription;
+    if (twitterCard !== undefined) updateData.twitterCard = twitterCard;
+    if (twitterTitle !== undefined) updateData.twitterTitle = twitterTitle;
+    if (twitterDescription !== undefined) updateData.twitterDescription = twitterDescription;
+    if (twitterImage !== undefined) updateData.twitterImage = twitterImage;
+    if (schemaJsonLd !== undefined) updateData.schemaJsonLd = schemaJsonLd;
+    if (status !== undefined) updateData.status = status;
+    if (scheduledPublishAt !== undefined) updateData.scheduledPublishAt = scheduledPublishAt;
+    if (scheduledUnpublishAt !== undefined) updateData.scheduledUnpublishAt = scheduledUnpublishAt;
 
     if (updateData.status === 'published' && !page.publishedAt) {
-      (updateData as any).publishedAt = new Date();
+      updateData.publishedAt = new Date();
     }
 
     const updated = await CmsPage.findByIdAndUpdate(req.params.id, updateData, { new: true });
@@ -292,9 +316,19 @@ router.post('/navigation', requirePermission('cms.navigation.create'), async (re
 
 router.put('/navigation/:id', requirePermission('cms.navigation.update'), async (req: AuthRequest, res: Response) => {
   try {
+    /** Whitelist allowed fields — prevents mass-assignment of system-managed fields
+     *  such as createdBy, deletedAt, _id */
+    const { name, slug, location, items, status } = req.body;
+    const updateData: Record<string, any> = { updatedBy: req.user!.id };
+    if (name !== undefined) updateData.name = name;
+    if (slug !== undefined) updateData.slug = slug;
+    if (location !== undefined) updateData.location = location;
+    if (items !== undefined) updateData.items = items;
+    if (status !== undefined) updateData.status = status;
+
     const menu = await CmsNavigation.findOneAndUpdate(
       { _id: req.params.id, deletedAt: null },
-      { ...req.body, updatedBy: req.user!.id },
+      updateData,
       { new: true },
     );
     if (!menu) { res.status(404).json({ success: false, error: 'Navigation not found' }); return; }
@@ -366,9 +400,19 @@ router.post('/footer', requirePermission('cms.footer.create'), async (req: AuthR
 
 router.put('/footer/:id', requirePermission('cms.footer.update'), async (req: AuthRequest, res: Response) => {
   try {
+    /** Whitelist allowed fields — prevents mass-assignment of system-managed fields
+     *  such as createdBy, deletedAt, _id */
+    const { name, groups, copyright, socialLinks, status } = req.body;
+    const updateData: Record<string, any> = { updatedBy: req.user!.id };
+    if (name !== undefined) updateData.name = name;
+    if (groups !== undefined) updateData.groups = groups;
+    if (copyright !== undefined) updateData.copyright = copyright;
+    if (socialLinks !== undefined) updateData.socialLinks = socialLinks;
+    if (status !== undefined) updateData.status = status;
+
     const footer = await CmsFooter.findOneAndUpdate(
       { _id: req.params.id, deletedAt: null },
-      { ...req.body, updatedBy: req.user!.id },
+      updateData,
       { new: true },
     );
     if (!footer) { res.status(404).json({ success: false, error: 'Footer not found' }); return; }
@@ -532,9 +576,26 @@ router.post('/announcements', requirePermission('cms.announcement.create'), asyn
 
 router.put('/announcements/:id', requirePermission('cms.announcement.update'), async (req: AuthRequest, res: Response) => {
   try {
+    /** Whitelist allowed fields — prevents mass-assignment of system-managed fields
+     *  such as createdBy, deletedAt, _id */
+    const { title, message, type, priority, status, startsAt, endsAt, link, linkText, dismissible, visible, targetAudience } = req.body;
+    const updateData: Record<string, any> = { updatedBy: req.user!.id };
+    if (title !== undefined) updateData.title = title;
+    if (message !== undefined) updateData.message = message;
+    if (type !== undefined) updateData.type = type;
+    if (priority !== undefined) updateData.priority = priority;
+    if (status !== undefined) updateData.status = status;
+    if (startsAt !== undefined) updateData.startsAt = startsAt;
+    if (endsAt !== undefined) updateData.endsAt = endsAt;
+    if (link !== undefined) updateData.link = link;
+    if (linkText !== undefined) updateData.linkText = linkText;
+    if (dismissible !== undefined) updateData.dismissible = dismissible;
+    if (visible !== undefined) updateData.visible = visible;
+    if (targetAudience !== undefined) updateData.targetAudience = targetAudience;
+
     const announcement = await CmsAnnouncement.findOneAndUpdate(
       { _id: req.params.id, deletedAt: null },
-      { ...req.body, updatedBy: req.user!.id },
+      updateData,
       { new: true },
     );
     if (!announcement) { res.status(404).json({ success: false, error: 'Announcement not found' }); return; }
@@ -615,9 +676,18 @@ router.post('/redirects', requirePermission('cms.redirect.create'), async (req: 
 
 router.put('/redirects/:id', requirePermission('cms.redirect.update'), async (req: AuthRequest, res: Response) => {
   try {
+    /** Whitelist allowed fields — prevents mass-assignment of system-managed fields
+     *  such as createdBy, deletedAt, hitCount, _id */
+    const { from, to, type, status } = req.body;
+    const updateData: Record<string, any> = { updatedBy: req.user!.id };
+    if (from !== undefined) updateData.from = from;
+    if (to !== undefined) updateData.to = to;
+    if (type !== undefined) updateData.type = type;
+    if (status !== undefined) updateData.status = status;
+
     const redirect = await CmsRedirect.findOneAndUpdate(
       { _id: req.params.id, deletedAt: null },
-      { ...req.body, updatedBy: req.user!.id },
+      updateData,
       { new: true },
     );
     if (!redirect) { res.status(404).json({ success: false, error: 'Redirect not found' }); return; }

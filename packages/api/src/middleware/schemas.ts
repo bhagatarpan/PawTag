@@ -243,6 +243,7 @@ export const updateUserSchema = z.object({
     relationship: z.string().optional(),
   }).optional(),
   showOwnerNameInFinder: z.boolean().optional(),
+  profilePicture: z.string().url().optional(),
   notificationPreferences: z.object({
     email: z.boolean().optional(),
     push: z.boolean().optional(),
@@ -271,6 +272,7 @@ export const updateTagSchema = z.object({
   ownerId: z.string().optional(),
   tagType: z.enum(['qr', 'nfc']).optional(),
   status: z.enum(['active', 'inactive', 'lost']).optional(),
+  nfcEnabled: z.boolean().optional(),
 });
 
 // --- Subscription Schemas ---

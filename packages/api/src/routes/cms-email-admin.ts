@@ -127,7 +127,25 @@ router.put('/email-templates/:id', requirePermission('cms.email_template.update'
     if (!template) { res.status(404).json({ success: false, error: 'Template not found' }); return; }
 
     const oldSlug = template.slug;
-    const updateData = { ...req.body, updatedBy: req.user!.id };
+
+    /** Whitelist allowed fields — prevents mass-assignment of system-managed fields
+     *  such as createdBy, deletedAt, _id */
+    const { name, slug, subject, title, subtitle, body, ctaText, ctaUrl, preheader, footerText, senderEmail, senderName, variables, status } = req.body;
+    const updateData: Record<string, any> = { updatedBy: req.user!.id };
+    if (name !== undefined) updateData.name = name;
+    if (slug !== undefined) updateData.slug = slug;
+    if (subject !== undefined) updateData.subject = subject;
+    if (title !== undefined) updateData.title = title;
+    if (subtitle !== undefined) updateData.subtitle = subtitle;
+    if (body !== undefined) updateData.body = body;
+    if (ctaText !== undefined) updateData.ctaText = ctaText;
+    if (ctaUrl !== undefined) updateData.ctaUrl = ctaUrl;
+    if (preheader !== undefined) updateData.preheader = preheader;
+    if (footerText !== undefined) updateData.footerText = footerText;
+    if (senderEmail !== undefined) updateData.senderEmail = senderEmail;
+    if (senderName !== undefined) updateData.senderName = senderName;
+    if (variables !== undefined) updateData.variables = variables;
+    if (status !== undefined) updateData.status = status;
 
     const updated = await CmsEmailTemplate.findByIdAndUpdate(req.params.id, updateData, { new: true });
 

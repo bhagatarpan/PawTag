@@ -2068,7 +2068,7 @@ router.post('/tags/qr-bulk', requirePermission('tag.generate_qr'), async (req: A
  */
 router.get('/products', requirePermission('product.read'), async (req, res: Response) => {
   try {
-    const { page = 1, limit = 20, search, category, isActive, stockStatus, sortBy = 'createdAt', sortDir = 'desc' } = req.query;
+    const { page = 1, limit = 20, search, category, isActive, stockStatus, isSubscription, subscriptionType, sortBy = 'createdAt', sortDir = 'desc' } = req.query;
     const query: any = {};
     if (search) {
       query.$or = [
@@ -2087,6 +2087,10 @@ router.get('/products', requirePermission('product.read'), async (req, res: Resp
     } else if (stockStatus === 'in') {
       query.stock = { $gt: 10 };
     }
+    /** Filter by subscription plans — used by SubscriptionPlans page to show only
+     *  products with isSubscription=true, optionally filtered by type (annual/monthly) */
+    if (isSubscription !== undefined) query.isSubscription = isSubscription === 'true';
+    if (subscriptionType) query['subscriptionConfig.type'] = subscriptionType;
 
     const sort: any = {};
     const dir = sortDir === 'asc' ? 1 : -1;
@@ -2501,6 +2505,46 @@ router.put('/orders/:id/status', requirePermission('order.update'), async (req: 
     res.json({ success: true, data: order });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to update order' });
+  }
+});
+
+/**
+ * PUT /api/admin/orders/:id/notes
+ *
+ * Update order notes (admin-only). Notes are internal comments for customer
+ * service reference — not visible to customers.
+ */
+router.put('/orders/:id/notes', requirePermission('order.update'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { notes } = req.body;
+    if (notes === undefined || typeof notes !== 'string') {
+      res.status(400).json({ success: false, error: 'notes field is required' });
+      return;
+    }
+
+    const order = await Order.findById(req.params.id);
+    if (!order) { res.status(404).json({ success: false, error: 'Order not found' }); return; }
+
+    const previousNotes = order.notes;
+    order.notes = notes;
+    await order.save();
+
+    await auditAdminEvent(req, {
+      action: 'update_order_notes',
+      eventType: 'admin_order_notes_update',
+      eventCategory: 'FINANCIAL',
+      operationType: 'UPDATE',
+      resourceType: 'Order',
+      resourceId: req.params.id,
+      outcome: 'SUCCESS',
+      severity: 'MEDIUM',
+      changedFields: [{ field: 'notes', before: previousNotes || '', after: notes, sensitive: false }],
+      metadata: { orderNumber: order.orderNumber },
+    });
+
+    res.json({ success: true, data: { notes: order.notes } });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to update order notes' });
   }
 });
 
@@ -3150,6 +3194,83 @@ router.put('/notifications/mark-all-read', requirePermission('notification.updat
   }
 });
 
+/**
+ * POST /api/admin/notifications
+ *
+ * Create an admin notification. Used for internal alerts, operational messages,
+ * or manually triggered notifications. Only admin roles can create.
+ */
+router.post('/notifications', requirePermission('notification.create'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { title, message, type, priority, link, linkText } = req.body;
+    if (!title || !message) {
+      res.status(400).json({ success: false, error: 'title and message are required' });
+      return;
+    }
+
+    const notification = await Notification.create({
+      title,
+      message,
+      type: type || 'info',
+      priority: priority || 'normal',
+      link,
+      linkText,
+      audience: 'admin',
+      read: false,
+      userId: req.user!.id,
+    });
+
+    await auditAdminEvent(req, {
+      action: 'notification_create',
+      eventType: 'notification.created',
+      eventCategory: 'CREATE',
+      operationType: 'CREATE',
+      resourceType: 'Notification',
+      resourceId: notification._id.toString(),
+      afterState: { title: notification.title, type: notification.type, priority: notification.priority },
+      outcome: 'SUCCESS',
+      severity: 'LOW',
+    });
+
+    logger.info({ notificationId: notification._id, createdBy: req.user!.id }, 'Admin notification created');
+    res.status(201).json({ success: true, data: notification });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to create notification' });
+  }
+});
+
+/**
+ * DELETE /api/admin/notifications/:id
+ *
+ * Delete an admin notification. Only admin roles can delete.
+ */
+router.delete('/notifications/:id', requirePermission('notification.delete'), async (req: AuthRequest, res: Response) => {
+  try {
+    const notification = await Notification.findByIdAndDelete(req.params.id);
+    if (!notification) {
+      res.status(404).json({ success: false, error: 'Notification not found' });
+      return;
+    }
+
+    await auditAdminEvent(req, {
+      action: 'notification_delete',
+      eventType: 'notification.deleted',
+      eventCategory: 'DELETE',
+      operationType: 'DELETE',
+      resourceType: 'Notification',
+      resourceId: req.params.id,
+      beforeState: { title: notification.title, type: notification.type, read: notification.read },
+      outcome: 'SUCCESS',
+      severity: 'LOW',
+    });
+
+    logger.info({ notificationId: req.params.id, deletedBy: req.user!.id }, 'Admin notification deleted');
+    res.json({ success: true, data: { message: 'Notification deleted' } });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to delete notification' });
+  }
+});
+
 // --- Site Content Management ---
 /**
  * @swagger
@@ -3715,10 +3836,21 @@ router.put('/feature-flags/:key', requirePermission('feature_flag.update'), asyn
     const existing = await FeatureFlag.findOne({ key: req.params.key });
     if (!existing) { res.status(404).json({ success: false, error: 'Feature flag not found' }); return; }
     const beforeState = { key: existing.key, isEnabled: existing.isEnabled, description: existing.description };
-    const flag = await FeatureFlag.findOneAndUpdate({ key: req.params.key }, req.body, { new: true });
+
+    /** Whitelist allowed fields — prevents mass-assignment of system-managed fields
+     *  such as _id, createdAt, updatedAt, percentage (when not intended) */
+    const { name, description, isEnabled, allowedRoles, percentage } = req.body;
+    const updateData: Record<string, any> = {};
+    if (name !== undefined) updateData.name = name;
+    if (description !== undefined) updateData.description = description;
+    if (isEnabled !== undefined) updateData.isEnabled = isEnabled;
+    if (allowedRoles !== undefined) updateData.allowedRoles = allowedRoles;
+    if (percentage !== undefined) updateData.percentage = percentage;
+
+    const flag = await FeatureFlag.findOneAndUpdate({ key: req.params.key }, updateData, { new: true });
     if (!flag) { res.status(404).json({ success: false, error: 'Feature flag not found' }); return; }
     const updatedFlag = flag as unknown as InstanceType<typeof FeatureFlag>;
-    const changedFields = Object.keys(req.body).map((field) => ({ field, before: (existing as any)[field], after: (updatedFlag as any)[field] }));
+    const changedFields = Object.keys(updateData).map((field) => ({ field, before: (existing as any)[field], after: (updatedFlag as any)[field] }));
     await auditAdminEvent(req, {
       action: 'feature_flag_update',
       eventType: 'feature_flag.updated',

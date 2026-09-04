@@ -6,6 +6,24 @@ import { SupportRequest } from '@pawtag/db';
 import { sendMail } from '../services/email.service';
 import { AuthRequest, authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
+import { auditService, type AuditContext } from '../services/audit';
+import { createAuditContextFromRequest, type AuditRequest } from '../middleware/audit';
+
+async function auditSupportEvent(
+  req: AuditRequest,
+  input: Parameters<typeof auditService.log>[1],
+  overrides: Partial<AuditContext> = {},
+): Promise<void> {
+  const reqContext = req.auditContext as AuditContext;
+  if (!reqContext) {
+    throw new Error('Audit middleware not applied - request has no audit context');
+  }
+  const context: AuditContext = {
+    ...reqContext,
+    ...overrides,
+  } as AuditContext;
+  await auditService.log(context, input);
+}
 
 // --- Public: Contact form ---
 export const publicRouter = Router();
@@ -98,8 +116,174 @@ adminRouter.patch('/:id/resolve', authenticate, requirePermission('admin.update'
     if (!request) {
       return res.status(404).json({ success: false, error: 'Support request not found' });
     }
+
+    await auditSupportEvent(req, {
+      action: 'support_request_resolve',
+      eventType: 'support_request.resolved',
+      eventCategory: 'UPDATE',
+      operationType: 'UPDATE',
+      resourceType: 'SupportRequest',
+      resourceId: req.params.id,
+      afterState: { resolved: true, resolvedAt: new Date(), resolvedBy: req.user?.id },
+      outcome: 'SUCCESS',
+      severity: 'MEDIUM',
+    });
+
     res.json({ success: true, data: request });
-  } catch {
+  } catch (error) {
+    await auditSupportEvent(req, {
+      action: 'support_request_resolve',
+      eventType: 'support_request.resolved',
+      eventCategory: 'UPDATE',
+      operationType: 'UPDATE',
+      resourceType: 'SupportRequest',
+      resourceId: req.params.id,
+      outcome: 'FAILURE',
+      severity: 'HIGH',
+    });
     res.status(500).json({ success: false, error: 'Failed to resolve support request' });
   }
 });
+
+/**
+ * PATCH /api/admin/support-requests/:id/reopen
+ *
+ * Reopen a previously resolved support request. Clears resolution metadata
+ * so the request appears in the active queue again.
+ */
+adminRouter.patch('/:id/reopen', authenticate, requirePermission('admin.update'), async (req: AuthRequest, res: Response) => {
+  try {
+    const request = await SupportRequest.findByIdAndUpdate(
+      req.params.id,
+      { resolved: false, resolvedAt: null, resolvedBy: null },
+      { new: true },
+    );
+    if (!request) {
+      return res.status(404).json({ success: false, error: 'Support request not found' });
+    }
+
+    await auditSupportEvent(req, {
+      action: 'support_request_reopen',
+      eventType: 'support_request.reopened',
+      eventCategory: 'UPDATE',
+      operationType: 'UPDATE',
+      resourceType: 'SupportRequest',
+      resourceId: req.params.id,
+      afterState: { resolved: false, resolvedAt: null, resolvedBy: null },
+      outcome: 'SUCCESS',
+      severity: 'MEDIUM',
+    });
+
+    res.json({ success: true, data: request });
+  } catch (error) {
+    await auditSupportEvent(req, {
+      action: 'support_request_reopen',
+      eventType: 'support_request.reopened',
+      eventCategory: 'UPDATE',
+      operationType: 'UPDATE',
+      resourceType: 'SupportRequest',
+      resourceId: req.params.id,
+      outcome: 'FAILURE',
+      severity: 'HIGH',
+    });
+    res.status(500).json({ success: false, error: 'Failed to reopen support request' });
+  }
+});
+
+/**
+ * PUT /api/admin/support-requests/:id
+ *
+ * Update support request notes. Allows admins to add or modify internal
+ * notes without changing the resolved status.
+ */
+adminRouter.put('/:id', authenticate, requirePermission('admin.update'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { notes } = req.body;
+    const updateData: Record<string, any> = {};
+    if (notes !== undefined) updateData.notes = notes;
+
+    const existing = await SupportRequest.findById(req.params.id);
+    if (!existing) {
+      return res.status(404).json({ success: false, error: 'Support request not found' });
+    }
+
+    const request = await SupportRequest.findByIdAndUpdate(
+      req.params.id,
+      updateData,
+      { new: true },
+    );
+    if (!request) {
+      return res.status(404).json({ success: false, error: 'Support request not found' });
+    }
+
+    await auditSupportEvent(req, {
+      action: 'support_request_update',
+      eventType: 'support_request.updated',
+      eventCategory: 'UPDATE',
+      operationType: 'UPDATE',
+      resourceType: 'SupportRequest',
+      resourceId: req.params.id,
+      beforeState: { notes: existing.notes },
+      afterState: { notes: request.notes },
+      changedFields: notes !== undefined ? [{ field: 'notes', before: existing.notes, after: request.notes }] : [],
+      outcome: 'SUCCESS',
+      severity: 'LOW',
+    });
+
+    res.json({ success: true, data: request });
+  } catch (error) {
+    await auditSupportEvent(req, {
+      action: 'support_request_update',
+      eventType: 'support_request.updated',
+      eventCategory: 'UPDATE',
+      operationType: 'UPDATE',
+      resourceType: 'SupportRequest',
+      resourceId: req.params.id,
+      outcome: 'FAILURE',
+      severity: 'HIGH',
+    });
+    res.status(500).json({ success: false, error: 'Failed to update support request' });
+  }
+});
+
+/**
+ * DELETE /api/admin/support-requests/:id
+ *
+ * Delete a support request. Only accessible by admin roles.
+ */
+adminRouter.delete('/:id', authenticate, requirePermission('admin.update'), async (req: AuthRequest, res: Response) => {
+  try {
+    const request = await SupportRequest.findByIdAndDelete(req.params.id);
+    if (!request) {
+      return res.status(404).json({ success: false, error: 'Support request not found' });
+    }
+
+    await auditSupportEvent(req, {
+      action: 'support_request_delete',
+      eventType: 'support_request.deleted',
+      eventCategory: 'DELETE',
+      operationType: 'DELETE',
+      resourceType: 'SupportRequest',
+      resourceId: req.params.id,
+      beforeState: { name: request.name, email: request.email, resolved: request.resolved },
+      outcome: 'SUCCESS',
+      severity: 'MEDIUM',
+    });
+
+    res.json({ success: true, data: { message: 'Support request deleted' } });
+  } catch (error) {
+    await auditSupportEvent(req, {
+      action: 'support_request_delete',
+      eventType: 'support_request.deleted',
+      eventCategory: 'DELETE',
+      operationType: 'DELETE',
+      resourceType: 'SupportRequest',
+      resourceId: req.params.id,
+      outcome: 'FAILURE',
+      severity: 'HIGH',
+    });
+    res.status(500).json({ success: false, error: 'Failed to delete support request' });
+  }
+});
+
+export default adminRouter;

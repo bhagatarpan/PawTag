@@ -66,8 +66,21 @@ router.post('/', requirePermission('product.create'), async (req: AuthRequest, r
 
 router.put('/:id', requirePermission('product.update'), async (req: AuthRequest, res: Response) => {
   try {
-    const category = await Category.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    /** Whitelist allowed fields — prevents mass-assignment of system-managed fields
+     *  such as productCount, _id, createdAt, updatedAt */
+    const { name, slug, description, parentId, image, sortOrder, isActive } = req.body;
+    const updateData: Record<string, any> = {};
+    if (name !== undefined) updateData.name = name;
+    if (slug !== undefined) updateData.slug = slug;
+    if (description !== undefined) updateData.description = description;
+    if (parentId !== undefined) updateData.parentId = parentId;
+    if (image !== undefined) updateData.image = image;
+    if (sortOrder !== undefined) updateData.sortOrder = sortOrder;
+    if (isActive !== undefined) updateData.isActive = isActive;
+
+    const category = await Category.findByIdAndUpdate(req.params.id, updateData, { new: true });
     if (!category) { res.status(404).json({ success: false, error: 'Category not found' }); return; }
+    logger.info({ categoryId: category._id, updatedBy: req.user!.id, fields: Object.keys(updateData) }, 'Category updated');
     res.json({ success: true, data: category });
   } catch (err) { res.status(500).json({ success: false, error: toAppError(err).userMessage }); }
 });

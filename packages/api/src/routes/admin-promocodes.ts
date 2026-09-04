@@ -50,9 +50,27 @@ router.post('/', requirePermission('product.create'), async (req: AuthRequest, r
 
 router.put('/:id', requirePermission('product.update'), async (req: AuthRequest, res: Response) => {
   try {
-    const item = await PromoCode.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    /** Whitelist allowed fields — prevents mass-assignment of system-managed fields
+     *  such as usageCount, createdBy, _id, createdAt, updatedAt */
+    const { code, description, discountType, discountValue, maxDiscountAmount, minOrderAmount, usageLimit, perUserLimit, startsAt, expiresAt, isActive, applicableProducts, applicableCategories } = req.body;
+    const updateData: Record<string, any> = {};
+    if (code !== undefined) updateData.code = code;
+    if (description !== undefined) updateData.description = description;
+    if (discountType !== undefined) updateData.discountType = discountType;
+    if (discountValue !== undefined) updateData.discountValue = discountValue;
+    if (maxDiscountAmount !== undefined) updateData.maxDiscountAmount = maxDiscountAmount;
+    if (minOrderAmount !== undefined) updateData.minOrderAmount = minOrderAmount;
+    if (usageLimit !== undefined) updateData.usageLimit = usageLimit;
+    if (perUserLimit !== undefined) updateData.perUserLimit = perUserLimit;
+    if (startsAt !== undefined) updateData.startsAt = startsAt;
+    if (expiresAt !== undefined) updateData.expiresAt = expiresAt;
+    if (isActive !== undefined) updateData.isActive = isActive;
+    if (applicableProducts !== undefined) updateData.applicableProducts = applicableProducts;
+    if (applicableCategories !== undefined) updateData.applicableCategories = applicableCategories;
+
+    const item = await PromoCode.findByIdAndUpdate(req.params.id, updateData, { new: true });
     if (!item) { res.status(404).json({ success: false, error: 'Discount code not found' }); return; }
-    logger.info({ promoCode: item.code, updatedBy: req.user!.id }, 'Promo code updated');
+    logger.info({ promoCode: item.code, updatedBy: req.user!.id, fields: Object.keys(updateData) }, 'Promo code updated');
     res.json({ success: true, data: item });
   } catch (err) { res.status(500).json({ success: false, error: toAppError(err).userMessage }); }
 });

@@ -116,7 +116,16 @@ router.put('/sms-templates/:id', requirePermission('cms.sms_template.update'), a
     if (!template) { res.status(404).json({ success: false, error: 'Template not found' }); return; }
 
     const oldSlug = template.slug;
-    const updateData = { ...req.body, updatedBy: req.user!.id };
+
+    /** Whitelist allowed fields — prevents mass-assignment of system-managed fields
+     *  such as createdBy, deletedAt, _id */
+    const { name, slug, message, variables, status } = req.body;
+    const updateData: Record<string, any> = { updatedBy: req.user!.id };
+    if (name !== undefined) updateData.name = name;
+    if (slug !== undefined) updateData.slug = slug;
+    if (message !== undefined) updateData.message = message;
+    if (variables !== undefined) updateData.variables = variables;
+    if (status !== undefined) updateData.status = status;
 
     const updated = await CmsSmsTemplate.findByIdAndUpdate(req.params.id, updateData, { new: true });
 

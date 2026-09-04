@@ -85,6 +85,8 @@ async function seed() {
       { name: 'NOTIFICATION_MANAGEMENT', displayName: 'Notification Management', description: 'Manage notifications and templates', icon: 'Bell', sortOrder: 210 },
       { name: 'CMS_MANAGEMENT', displayName: 'CMS Management', description: 'Manage website pages, navigation, footer, media, and announcements', icon: 'Layout', sortOrder: 220 },
       { name: 'SYSTEM_LOGGING', displayName: 'System Logging', description: 'View and manage system application logs', icon: 'Terminal', sortOrder: 230 },
+      { name: 'SUBSCRIPTION_MANAGEMENT', displayName: 'Subscription Management', description: 'Manage customer subscriptions and plans', icon: 'RefreshCw', sortOrder: 240 },
+      { name: 'SUPPORT_MANAGEMENT', displayName: 'Support Management', description: 'Manage customer support requests and escalations', icon: 'HeadphonesIcon', sortOrder: 250 },
     ];
 
     const groupMap: Record<string, string> = {};
@@ -384,6 +386,17 @@ async function seed() {
       // System Logging
       { name: 'systemlogs.read', displayName: 'Read System Logs', description: 'View system application logs', resource: 'systemlogs', action: 'read', groupIndex: groupDefs.findIndex(g => g.name === 'SYSTEM_LOGGING') },
       { name: 'systemlogs.admin', displayName: 'Manage System Log Settings', description: 'Configure system log storage, levels, and retention', resource: 'systemlogs', action: 'admin', groupIndex: groupDefs.findIndex(g => g.name === 'SYSTEM_LOGGING') },
+
+      // Subscription Management
+      { name: 'subscription.read', displayName: 'Read Subscriptions', description: 'View customer subscriptions and details', resource: 'subscription', action: 'read', groupIndex: groupDefs.findIndex(g => g.name === 'SUBSCRIPTION_MANAGEMENT') },
+      { name: 'subscription.update', displayName: 'Update Subscriptions', description: 'Update subscription status, extend periods, and manage renewals', resource: 'subscription', action: 'update', groupIndex: groupDefs.findIndex(g => g.name === 'SUBSCRIPTION_MANAGEMENT') },
+
+      // Support Management
+      { name: 'admin.read', displayName: 'Read Support Requests', description: 'View customer support requests and messages', resource: 'admin', action: 'read', groupIndex: groupDefs.findIndex(g => g.name === 'SUPPORT_MANAGEMENT') },
+      { name: 'admin.update', displayName: 'Update Support Requests', description: 'Update support request status, add notes, and manage resolutions', resource: 'admin', action: 'update', groupIndex: groupDefs.findIndex(g => g.name === 'SUPPORT_MANAGEMENT') },
+
+      // Permission Scope (referenced by Sidebar for Access Scopes page)
+      { name: 'permission_scope.read', displayName: 'Read Access Scopes', description: 'View permission scopes and their configurations', resource: 'permission_scope', action: 'read', groupIndex: groupDefs.findIndex(g => g.name === 'PERMISSION_MANAGEMENT') },
     ];
 
     const permMap: Record<string, string> = {};
@@ -599,6 +612,14 @@ async function seed() {
         { permissionName: 'cms.shop_page.delete' },
         { permissionName: 'cms.auth_page.read' },
         { permissionName: 'cms.auth_page.update' },
+        // Subscriptions
+        { permissionName: 'subscription.read' },
+        { permissionName: 'subscription.update' },
+        // Support Requests
+        { permissionName: 'admin.read' },
+        { permissionName: 'admin.update' },
+        // Permission Scopes
+        { permissionName: 'permission_scope.read' },
       ],
 
       CUSTOMER_SERVICE: [
@@ -620,6 +641,12 @@ async function seed() {
         { permissionName: 'finder_scan.read' },
         { permissionName: 'systemlogs.read' },
         { permissionName: 'audit.read' },
+        // Subscriptions (needed for subscription management)
+        { permissionName: 'subscription.read' },
+        { permissionName: 'subscription.update' },
+        // Support Requests (needed for support request management)
+        { permissionName: 'admin.read' },
+        { permissionName: 'admin.update' },
       ],
 
       PET_OWNER: [
@@ -783,6 +810,8 @@ async function seed() {
         { permissionName: 'cms.shop_page.delete' },
         { permissionName: 'cms.auth_page.read' },
         { permissionName: 'cms.auth_page.update' },
+        // Permission Scopes (for Access Scopes page visibility)
+        { permissionName: 'permission_scope.read' },
       ],
     };
 
