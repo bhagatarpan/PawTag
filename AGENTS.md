@@ -487,10 +487,10 @@ Safety nets:
 
 | Route | Purpose |
 |-------|---------|
-| `GET /api/products` | Public product listing |
-| `GET /api/products/slug/:slug` | Get product by slug (SEO-friendly) |
-| `GET /api/products/sku/:sku` | Get product by SKU |
-| `GET /api/products/:id` | Get product by ID |
+| `GET /api/products` | Public product listing with feature highlights |
+| `GET /api/products/slug/:slug` | Get product by slug (SEO-friendly) with feature highlights |
+| `GET /api/products/sku/:sku` | Get product by SKU with feature highlights |
+| `GET /api/products/:id` | Get product by ID with feature highlights |
 | `GET/POST/PUT/DELETE /api/cart/*` | Cart management (supports guest and authenticated users; guest-to-auth merge on login) |
 | `POST /api/checkout/payment-intent` | Create payment intent |
 | `POST /api/checkout/confirm` | Confirm checkout (idempotent) |
@@ -1075,6 +1075,7 @@ Located in `apps/mobile/e2e/`:
 | `apps/admin/src/pages/SystemLogSettings.tsx` | System log settings page |
 | `apps/admin/src/pages/AddressAutocompleteSettings.tsx` | Address autocomplete provider config |
 | `packages/ui/src/components/AddressAutocomplete.tsx` | Reusable address autocomplete component |
+| `packages/ui/src/components/IconPicker.tsx` | Visual grid icon picker with search and categories (~50 Lucide icons) |
 | `packages/ui/src/components/ProductCard.tsx` | Shared product card component (primary-* tokens) |
 | `packages/ui/src/components/CartDrawer.tsx` | Shared cart drawer component (guest mode banner, price-changed warnings) |
 | `packages/ui/src/components/FadeIn.tsx` | Scroll-triggered fade-in animation component |
@@ -1099,8 +1100,8 @@ Products are managed through the PawTag Commerce module (`packages/api/src/comme
 | **Inventory** | PawTag Commerce services | Stock levels at PawTag Warehouse |
 | **Prices** | PawTag Commerce services | Per-variant pricing |
 | **Product URLs** | Slug-based (e.g., `/shop/pawtag-scan`) | SEO-friendly URLs |
-| **Shop page** | `apps/web` | Displays products with PawTag UI |
-| **Subscription logic** | `packages/api` (MongoDB) | Product metadata for subscription config |
+| **Shop page** | `apps/web` | Displays products with PawTag UI including feature highlights |
+| **Subscription logic** | `packages/api` (MongoDB) | Product metadata for subscription config and feature highlights |
 
 ## Commerce Architecture
 

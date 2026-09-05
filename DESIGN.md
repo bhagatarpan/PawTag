@@ -205,6 +205,29 @@ A consistent 4px base unit, multiplied to create a predictable rhythm:
 | **Warning** | `inline-block px-3 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-semibold` |
 | **Error** | `inline-block px-3 py-1 rounded-full bg-red-100 text-red-700 text-xs font-semibold` |
 
+### Icon Picker
+
+Use the shared `IconPicker` from `@pawtag/ui` for selecting icons. It provides a visual grid picker with search, categorized icons (~50 from Lucide), and a clean dropdown UI.
+
+**Component:** `IconPicker` from `@pawtag/ui`
+**Props:** `{ value: string; onChange: (iconName: string) => void; className?: string }`
+**Exported helper:** `ICON_MAP` — a `Record<string, LucideIcon>` for resolving icon names to components.
+
+**Icon categories:** Shipping, Quality, Communication, Commerce, General.
+
+**Usage pattern:**
+
+```tsx
+import { IconPicker, ICON_MAP } from '@pawtag/ui';
+
+// In form:
+<IconPicker value={form.icon} onChange={(icon) => setForm({ ...form, icon })} />
+
+// For rendering selected icons:
+const IconComponent = ICON_MAP[iconName] || Check;
+<IconComponent size={16} className="text-primary-600" />
+```
+
 ### Modals & Confirmation Dialogs
 
 Use the shared `ConfirmDialog` from `@pawtag/ui` rather than creating custom modals. The component is reusable and supports reason selection, notes, and footnote.

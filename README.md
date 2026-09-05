@@ -319,7 +319,7 @@ PawTag/
 | `packages/api` | Express backend with all routes, services, and middleware |
 | `packages/db` | Mongoose models and database connection |
 | `packages/shared` | TypeScript types, enums, and validation constants |
-| `packages/ui` | Shared React components (DataTable, StatusBadge, etc.) |
+| `packages/ui` | Shared React components (DataTable, StatusBadge, IconPicker, etc.) |
 | `tests/` | Test suites (unit, integration, smoke, regression) |
 | `docker/` | Dockerfiles and docker-compose configuration |
 | `docs/` | Documentation files |
@@ -606,7 +606,7 @@ Products are managed through PawTag's admin portal. The product catalog supports
 | What | Where | Purpose |
 |------|-------|---------|
 | Product catalog | Admin portal (`:3001`) | Create/edit/delete products, prices, variants |
-| Product metadata | MongoDB Product model | Subscription config, tag flags, warranty, shipping, affiliate fields |
+| Product metadata | MongoDB Product model | Subscription config, tag flags, warranty, shipping, feature highlights, affiliate fields |
 | Product URLs | URL slugs (e.g., `/shop/pawtag-scan`) | SEO-friendly URLs instead of MongoDB ObjectIDs |
 | Inventory | PawTag inventory service | Stock levels at PawTag Warehouse |
 | Prices | PawTag pricing service | Per-variant, per-region pricing |
