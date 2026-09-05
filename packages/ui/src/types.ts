@@ -319,3 +319,16 @@ export interface OrderDetailViewProps {
   contactEmail?: string;
   className?: string;
 }
+
+/* ------------------------------------------------------------------ */
+/*  IconPicker                                                          */
+/* ------------------------------------------------------------------ */
+
+export interface IconPickerProps {
+  /** Currently selected icon name (e.g. "Truck", "Shield") */
+  value: string;
+  /** Called when the user selects or clears an icon */
+  onChange: (iconName: string) => void;
+  /** Additional CSS classes for the container */
+  className?: string;
+}

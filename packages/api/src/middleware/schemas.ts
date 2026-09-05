@@ -186,6 +186,10 @@ export const createProductSchema = z.object({
   }).optional(),
   warrantyMonths: z.number().optional(),
   shippingCost: z.number().min(0).optional(),
+  featureHighlights: z.array(z.object({
+    icon: z.string(),
+    description: z.string(),
+  })).optional(),
 });
 
 export const updateProductSchema = createProductSchema.partial();

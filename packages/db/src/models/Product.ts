@@ -56,12 +56,20 @@ export interface IProductVariant {
   /** Variant attributes (e.g., { color: 'blue', size: 'large' }) */
   attributes: Record<string, string>;
 }
+  
+/** Product feature highlight for display in shop and product detail */
+ export interface IFeatureHighlight {
+    /** Icon name from Lucide icon set */
+    icon: string;
+    /** Description text */
+    description: string;
+ }
 
-/**
- * Product document interface.
- * Extends Mongoose Document for type-safe queries.
- */
-export interface IProductDocument extends Document {
+ /**
+  * Product document interface.
+  * Extends Mongoose Document for type-safe queries.
+  */
+ export interface IProductDocument extends Document {
    // ─── Basic Info ──────────────────────────────────────
    /** Product display name */
    name: string;
@@ -161,17 +169,20 @@ export interface IProductDocument extends Document {
   /** Whether this product is a physical tag */
   isTagProduct: boolean;
 
-  /** Subscription configuration (if isSubscription is true) */
-  subscriptionConfig?: {
-    type: 'annual' | 'monthly';
-    freePeriodMonths: number;
-    gracePeriodWeeks: number;
-    monthlyPrice?: number;
-    stripePriceId?: string;
-    features: string[];
-  };
+/** Subscription configuration (if isSubscription is true) */
+   subscriptionConfig?: {
+     type: 'annual' | 'monthly';
+     freePeriodMonths: number;
+     gracePeriodWeeks: number;
+     monthlyPrice?: number;
+     stripePriceId?: string;
+     features: string[];
+   };
 
-  // ─── Display ─────────────────────────────────────────────
+   /** Product feature highlights for display in shop and product detail */
+   featureHighlights?: IFeatureHighlight[];
+
+   // ─── Display ─────────────────────────────────────────────
   /** Sort order for shop display (lower = first) */
   sortOrder: number;
 
@@ -250,19 +261,28 @@ const ProductSchema = new Schema<IProductDocument>(
      // ─── Warranty ────────────────────────────────────────
     warrantyMonths: { type: Number, default: 12, min: 0 },
 
-    // ─── Subscription ────────────────────────────────────
-    isSubscription: { type: Boolean, default: false, index: true },
-    isTagProduct: { type: Boolean, default: false, index: true },
-    subscriptionConfig: {
-      type: { type: String, enum: ['annual', 'monthly'] },
-      freePeriodMonths: { type: Number, default: 12 },
-      gracePeriodWeeks: { type: Number, default: 4 },
-      monthlyPrice: { type: Number },
-      stripePriceId: { type: String },
-      features: [{ type: String }],
-    },
+// ─── Subscription ────────────────────────────────────
+     isSubscription: { type: Boolean, default: false, index: true },
+     isTagProduct: { type: Boolean, default: false, index: true },
+     subscriptionConfig: {
+       type: { type: String, enum: ['annual', 'monthly'] },
+       freePeriodMonths: { type: Number, default: 12 },
+       gracePeriodWeeks: { type: Number, default: 4 },
+       monthlyPrice: { type: Number },
+       stripePriceId: { type: String },
+       features: [{ type: String }],
+     },
 
-    // ─── Display ─────────────────────────────────────────
+     // ─── Feature Highlights ───────────────────────────────────
+     /** Product feature highlights for display in shop and product detail */
+     featureHighlights: [{
+       /** Icon name from Lucide icon set */
+       icon: { type: String, required: true },
+       /** Description text */
+       description: { type: String, required: true },
+     }],
+
+     // ─── Display ─────────────────────────────────────────
     sortOrder: { type: Number, default: 0, index: true },
     badge: { type: String },
   },

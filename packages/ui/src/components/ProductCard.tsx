@@ -1,7 +1,22 @@
 import React from 'react';
 import { ShoppingCart, Check, PawPrint } from 'lucide-react';
+import { ICON_MAP } from './IconPicker';
 
-export interface ProductCardProduct {
+/** Product feature highlight for display in shop and product detail */
+ export interface IFeatureHighlight {
+    /** Icon name from Lucide icon set */
+    icon: string;
+    /** Description text */
+    description: string;
+ }
+
+// Helper function to get Lucide icon component by name
+const getIconByName = (iconName: string) => {
+  // Try exact match first (PascalCase), then lowercase
+  return ICON_MAP[iconName] || ICON_MAP[iconName.toLowerCase()] || Check;
+};
+
+ export interface ProductCardProduct {
    id: string;
    slug: string;
    name: string;
@@ -9,11 +24,12 @@ export interface ProductCardProduct {
    price: number;
    currency?: string;
    image?: string;
-   sku: string;
-   stock: number;
-   monthlyPrice?: number;
-   badge?: { label: string; color: string } | null;
-   features?: string[];
+sku: string;
+    stock: number;
+    monthlyPrice?: number;
+    badge?: { label: string; color: string } | null;
+    /** Product feature highlights for display in shop and product detail */
+    featureHighlights?: IFeatureHighlight[];
  }
 
 export interface ProductCardProps {
@@ -72,16 +88,20 @@ export const ProductCard = React.memo(function ProductCard({
           )}
         </div>
 
-        {product.features && product.features.length > 0 && (
-          <div className="space-y-2 mb-6">
-            {product.features.map((feat, i) => (
-              <div key={i} className="flex items-center gap-2 text-sm text-gray-600">
-                <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
-                <span>{feat}</span>
-              </div>
-            ))}
-          </div>
-        )}
+{/* Features */}
+          {product.featureHighlights && product.featureHighlights.length > 0 && (
+            <div className="space-y-2 mb-6">
+              {product.featureHighlights.map((highlight, index) => {
+                const IconComponent = getIconByName(highlight.icon);
+                return (
+                  <div key={index} className="flex items-center gap-2 text-sm text-gray-600">
+                    <IconComponent size={16} className="text-primary-600 shrink-0" />
+                    <span>{highlight.description}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
         <div className="flex gap-2 mt-auto">
           {onDetails && (

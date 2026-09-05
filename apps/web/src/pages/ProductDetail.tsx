@@ -15,16 +15,36 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ShoppingCart, ArrowLeft, Shield, Truck, Check } from 'lucide-react';
+import { 
+  ShoppingCart, 
+  ArrowLeft, 
+  Shield, 
+  Truck, 
+  Check,
+} from 'lucide-react';
+import { ICON_MAP } from '@pawtag/ui';
 import { useCart } from '../context/CartContext';
-import { getProductBadge } from '../utils/productHelpers';
 import api from '../lib/api';
+import { getProductBadge } from '../utils/productHelpers';
+
+// Helper function to get Lucide icon component by name
+const getIconByName = (iconName: string) => {
+  // Try exact match first (PascalCase), then lowercase
+  return ICON_MAP[iconName] || ICON_MAP[iconName.toLowerCase()] || Check;
+};
 
 /* ------------------------------------------------------------------ */
-/*  Types                                                              */
-/* ------------------------------------------------------------------ */
+ /*  Types                                                              */
+ /* ------------------------------------------------------------------ */
 
-interface PawTagProduct {
+ export interface IFeatureHighlight {
+    /** Icon name from Lucide icon set */
+    icon: string;
+    /** Description text */
+    description: string;
+ }
+
+ interface PawTagProduct {
    _id: string;
    name: string;
    slug: string;
@@ -42,14 +62,15 @@ interface PawTagProduct {
    isActive: boolean;
    isSubscription: boolean;
    isTagProduct: boolean;
-   subscriptionConfig?: {
-     type: 'annual' | 'monthly';
-     freePeriodMonths: number;
-     monthlyPrice?: number;
-     features: string[];
-   };
-   warrantyMonths: number;
-   shippingDescription?: string;
+subscriptionConfig?: {
+      type: 'annual' | 'monthly';
+      freePeriodMonths: number;
+      monthlyPrice?: number;
+      features: string[];
+    };
+    warrantyMonths: number;
+    shippingDescription?: string;
+    featureHighlights?: IFeatureHighlight[];
  }
 
 /* ------------------------------------------------------------------ */
@@ -228,22 +249,37 @@ export default function ProductDetail() {
             </div>
 
 {/* Features */}
-             <div className="mt-6 space-y-3 text-sm text-gray-600">
-               <div className="flex items-center gap-2">
-                 <Shield size={16} className="text-teal-600" />
-                 {product.warrantyMonths || 12} month warranty
-               </div>
-                <div className="flex items-center gap-2">
-                  <Truck size={16} className="text-teal-600" />
-                  {product.shippingDescription || 'Free NZ-wide shipping'}
+              {product.featureHighlights && product.featureHighlights.length > 0 ? (
+                <div className="mt-6 space-y-3 text-sm text-gray-600">
+                  {product.featureHighlights.map((highlight, index) => {
+                    const HighlightIcon = getIconByName(highlight.icon);
+                    return (
+                      <div key={index} className="flex items-center gap-2">
+                        <HighlightIcon size={16} className="text-teal-600 shrink-0" />
+                        <span>{highlight.description}</span>
+                      </div>
+                    );
+                  })}
                 </div>
-               {product.isSubscription && (
-                 <div className="flex items-center gap-2">
-                   <Check size={16} className="text-teal-600" />
-                   {product.subscriptionConfig?.freePeriodMonths || 12} months free subscription
-                 </div>
-               )}
-             </div>
+              ) : (
+                // Fallback to default features if no custom highlights are set
+                <div className="mt-6 space-y-3 text-sm text-gray-600">
+                  <div className="flex items-center gap-2">
+                    <Shield size={16} className="text-teal-600" />
+                    {product.warrantyMonths || 12} month warranty
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Truck size={16} className="text-teal-600" />
+                    {product.shippingDescription || 'Free NZ-wide shipping'}
+                  </div>
+                  {product.isSubscription && (
+                    <div className="flex items-center gap-2">
+                      <Check size={16} className="text-teal-600" />
+                      {product.subscriptionConfig?.freePeriodMonths || 12} months free subscription
+                    </div>
+                  )}
+                </div>
+              )}
 
             {/* Description */}
             {product.description && (

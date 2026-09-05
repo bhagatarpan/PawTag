@@ -25,11 +25,18 @@ import api from '../lib/api';
 import { Package } from 'lucide-react';
 
 /* ------------------------------------------------------------------ */
-/*  Types                                                              */
-/* ------------------------------------------------------------------ */
+ /*  Types                                                              */
+ /* ------------------------------------------------------------------ */
 
-/** PawTag product from the API */
-interface PawTagProduct {
+ export interface IFeatureHighlight {
+    /** Icon name from Lucide icon set */
+    icon: string;
+    /** Description text */
+    description: string;
+ }
+
+ /** PawTag product from the API */
+ interface PawTagProduct {
    _id: string;
    name: string;
    slug: string;
@@ -47,20 +54,21 @@ interface PawTagProduct {
    stock: number;
    reserved: number;
    sku: string;
-   weight?: number;
-   isSubscription: boolean;
-   isTagProduct: boolean;
-   subscriptionConfig?: {
-     type: 'annual' | 'monthly';
-     freePeriodMonths: number;
-     gracePeriodWeeks: number;
-     monthlyPrice?: number;
-     features: string[];
-   };
-   badge?: string;
-   sortOrder: number;
-   warrantyMonths: number;
-   shippingDescription?: string;
+weight?: number;
+    isSubscription: boolean;
+    isTagProduct: boolean;
+    subscriptionConfig?: {
+      type: 'annual' | 'monthly';
+      freePeriodMonths: number;
+      gracePeriodWeeks: number;
+      monthlyPrice?: number;
+      features: string[];
+    };
+    badge?: string;
+    sortOrder: number;
+    warrantyMonths: number;
+    shippingDescription?: string;
+    featureHighlights?: IFeatureHighlight[];
  }
 
 /* ------------------------------------------------------------------ */
@@ -72,24 +80,26 @@ function toCardProduct(p: PawTagProduct): ProductCardProduct {
    const badge = getProductBadge(p.sku) || (p.badge ? { label: p.badge, color: 'teal' } : null);
    const available = p.stock - p.reserved;
 
-   return {
-     id: p._id,
-     slug: p.slug,
-     name: p.name,
-     shortDescription: p.shortDescription || undefined,
-     price: effectivePrice,
-     currency: p.currency || 'NZD',
-     image: p.images?.[0] || undefined,
-     sku: p.sku,
-     stock: available,
-     monthlyPrice: p.subscriptionConfig?.monthlyPrice,
-     badge: badge ? { label: badge.label, color: badge.color } : null,
-     features: [
-       `${p.subscriptionConfig?.freePeriodMonths || 12} months free subscription included`,
-       `${p.warrantyMonths || 12} month warranty`,
-       p.shippingDescription || 'Free NZ-wide shipping',
-     ],
-   };
+return {
+      id: p._id,
+      slug: p.slug,
+      name: p.name,
+      shortDescription: p.shortDescription || undefined,
+      price: effectivePrice,
+      currency: p.currency || 'NZD',
+      image: p.images?.[0] || undefined,
+      sku: p.sku,
+      stock: available,
+      monthlyPrice: p.subscriptionConfig?.monthlyPrice,
+      badge: badge ? { label: badge.label, color: badge.color } : null,
+      featureHighlights: p.featureHighlights && p.featureHighlights.length > 0
+        ? p.featureHighlights
+        : [
+            { icon: 'Check', description: `${p.subscriptionConfig?.freePeriodMonths || 12} months free subscription included` },
+            { icon: 'Shield', description: `${p.warrantyMonths || 12} month warranty` },
+            { icon: 'Truck', description: p.shippingDescription || 'Free NZ-wide shipping' },
+          ],
+    };
  }
 
 /* ------------------------------------------------------------------ */

@@ -375,31 +375,40 @@ export interface LocationEvent {
 }
 
 export interface Product {
-  _id: string;
-  name: string;
-  description: string;
-  shortDescription?: string;
-  price: number;
-  currency: string;
-  images: string[];
-  category: string;
-  tags: string[];
-  isActive: boolean;
-  stock: number;
-  sku: string;
-  weight?: number;
-  dimensions?: ProductDimensions;
-  variants?: ProductVariant[];
-  customizable?: boolean;
-  customizationPrice?: number;
-  shippingCost?: number;
-  warrantyMonths?: number;
-  isSubscription?: boolean;
-  isTagProduct?: boolean;
-  subscriptionConfig?: SubscriptionConfig;
-  createdAt: string;
-  updatedAt: string;
-}
+   _id: string;
+   name: string;
+   description: string;
+   shortDescription?: string;
+   price: number;
+   currency: string;
+   images: string[];
+   category: string;
+   tags: string[];
+   isActive: boolean;
+   stock: number;
+   sku: string;
+   weight?: number;
+   dimensions?: ProductDimensions;
+   variants?: ProductVariant[];
+   customizable?: boolean;
+   customizationPrice?: number;
+   shippingCost?: number;
+   warrantyMonths?: number;
+   isSubscription?: boolean;
+   isTagProduct?: boolean;
+   subscriptionConfig?: SubscriptionConfig;
+   /** Product feature highlights for display in shop and product detail */
+   featureHighlights?: IFeatureHighlight[];
+   createdAt: string;
+   updatedAt: string;
+ }
+
+ export interface IFeatureHighlight {
+   /** Icon name from Lucide icon set */
+   icon: string;
+   /** Description text */
+   description: string;
+ }
 
 export interface ProductVariant {
   name: string;

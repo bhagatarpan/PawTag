@@ -31,9 +31,14 @@ const products = [
       freePeriodMonths: 12,
       gracePeriodWeeks: 4,
       monthlyPrice: 0.99,
-      features: ['qr_scan', 'lost_pet_alerts', 'finder_notifications'],
-    },
-  },
+features: ['qr_scan', 'lost_pet_alerts', 'finder_notifications'],
+     },
+     featureHighlights: [
+       { icon: 'Shield', description: '12 month warranty' },
+       { icon: 'Truck', description: 'Free NZ-wide shipping' },
+       { icon: 'Check', description: '12 months free subscription included' }
+     ],
+   },
 {
      name: 'PawTag Classic',
      slug: 'pawtag-classic',
@@ -58,11 +63,16 @@ const products = [
       freePeriodMonths: 12,
       gracePeriodWeeks: 4,
       monthlyPrice: 1.99,
-      features: ['nfc_scan', 'qr_scan', 'lost_pet_alerts', 'finder_notifications'],
-    },
-  },
-{
-     name: 'PawTag Plus',
+features: ['nfc_scan', 'qr_scan', 'lost_pet_alerts', 'finder_notifications'],
+     },
+     featureHighlights: [
+       { icon: 'Shield', description: '12 month warranty' },
+       { icon: 'Truck', description: 'Free NZ-wide shipping' },
+       { icon: 'Check', description: '12 months free subscription included' }
+     ],
+   },
+ {
+      name: 'PawTag Plus',
      slug: 'pawtag-plus',
      description: 'Our premium NFC pet tag with metal edges and epoxy resin coating for ultimate durability. Simply tap with any NFC-enabled smartphone to instantly view your pet\'s profile, medical info, and owner contact details. Built to withstand the most active pets. Includes 12 months free subscription — after that just $1.99/month billed annually.',
      shortDescription: 'NFC tag — metal edges + epoxy resin',
@@ -85,9 +95,14 @@ const products = [
       freePeriodMonths: 12,
       gracePeriodWeeks: 4,
       monthlyPrice: 1.99,
-      features: ['nfc_scan', 'qr_scan', 'lost_pet_alerts', 'finder_notifications'],
-    },
-  },
+features: ['nfc_scan', 'qr_scan', 'lost_pet_alerts', 'finder_notifications'],
+     },
+     featureHighlights: [
+       { icon: 'Shield', description: '12 month warranty' },
+       { icon: 'Truck', description: 'Free NZ-wide shipping' },
+       { icon: 'Check', description: '12 months free subscription included' }
+     ],
+   },
 ];
 
 async function seedProducts() {

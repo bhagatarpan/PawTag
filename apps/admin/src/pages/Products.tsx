@@ -1,5 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { ImagePlus, X, Upload, Loader2, Search, SlidersHorizontal, ChevronDown, ChevronLeft, ChevronRight, Download, Trash2, Edit2, Save, Settings, AlertTriangle, RotateCcw, Database, FileText, Package, Activity, CheckCircle, AlertCircle, Info, Copy, Eye } from 'lucide-react';
+import { ImagePlus, X, Upload, Loader2, Search, SlidersHorizontal, ChevronDown, ChevronLeft, ChevronRight, Download, Trash2, Edit2, Save, Settings, AlertTriangle, RotateCcw, Database, FileText, Package, Activity, CheckCircle, AlertCircle, Info, Copy, Eye, Plus } from 'lucide-react';
+import { IconPicker, ICON_MAP, type IconPickerProps } from '@pawtag/ui';
+import { Check } from 'lucide-react';
 import api, { PaginatedData } from '../lib/api';
 import { toast } from '../lib/toast';
 import RichTextEditor from '../components/RichTextEditor';
@@ -18,21 +20,32 @@ interface ProductVariant {
 }
 
 interface Product {
-  _id: string;
-  name: string;
-  description: string;
-  shortDescription?: string;
-  price: number;
-  sku: string;
-  category: string;
-  stock: number;
-  isActive: boolean;
-  images: string[];
-  variants: ProductVariant[];
-  customizable: boolean;
-  customizationPrice: number;
-  createdAt: string;
-}
+   _id: string;
+   name: string;
+   description: string;
+   shortDescription?: string;
+   price: number;
+   sku: string;
+   category: string;
+   stock: number;
+   isActive: boolean;
+   images: string[];
+   variants: ProductVariant[];
+   customizable: boolean;
+   customizationPrice: number;
+   createdAt: string;
+   slug?: string;
+   featureHighlights?: IFeatureHighlight[];
+ }
+
+ interface IFeatureHighlight {
+   icon: string;
+   description: string;
+ }
+
+ const DEFAULT_FEATURE_HIGHLIGHTS: IFeatureHighlight[] = [
+   { icon: 'Check', description: 'Eligible for Free Shipping NZ Wide' },
+ ];
 
 interface SummaryData {
   total: number;
@@ -201,15 +214,31 @@ function DetailDrawer({
           {activeTab === 'info' && (
             <div className="space-y-6">
               <Section title="Product Details" icon={<Package size={16} />}>
-                <DetailRow label="Name" value={product.name} />
-                <DetailRow label="SKU" value={
-                  <span className="flex items-center gap-2">
-                    <span className="font-mono text-xs">{product.sku}</span>
-                    <button onClick={() => copyToClipboard(product.sku)} className="text-gray-400 hover:text-gray-600"><Copy size={12} /></button>
-                  </span>
-                } />
-                <DetailRow label="Price" value={`$${product.price.toFixed(2)} NZD`} />
-                <DetailRow label="Category" value={product.category} />
+<DetailRow label="Name" value={product.name} />
+                 <DetailRow label="SKU" value={
+                   <span className="flex items-center gap-2">
+                     <span className="font-mono text-xs">{product.sku}</span>
+                     <button onClick={() => copyToClipboard(product.sku)} className="text-gray-400 hover:text-gray-600"><Copy size={12} /></button>
+                   </span>
+                 } />
+                 <DetailRow label="Slug" value={product.slug} />
+                 <DetailRow label="Price" value={`$${product.price.toFixed(2)} NZD`} />
+                 {product.featureHighlights && product.featureHighlights.length > 0 && (
+                   <DetailRow label="Features" value={
+                     <div className="space-y-1">
+                       {product.featureHighlights.map((fh, i) => {
+                         const IconComp = ICON_MAP[fh.icon] || Check;
+                         return (
+                           <div key={i} className="flex items-center gap-2 text-sm">
+                             <IconComp size={14} className="text-primary-600 shrink-0" />
+                             <span>{fh.description}</span>
+                           </div>
+                         );
+                       })}
+                     </div>
+                   } />
+                 )}
+                 <DetailRow label="Category" value={product.category} />
                 <DetailRow label="Total Stock" value={
                   <span className={`text-sm font-medium px-2 py-0.5 rounded-full ${
                     totalStock === 0 ? 'bg-red-100 text-red-700' :
@@ -360,10 +389,12 @@ export default function Products() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
-  const [form, setForm] = useState({
-    name: '', description: '', shortDescription: '', price: 0, category: 'PawTag',
-    stock: 0, sku: '', currency: 'NZD', isActive: true, customizable: false, customizationPrice: 0,
-  });
+const [form, setForm] = useState({
+     name: '', description: '', shortDescription: '', price: 0, category: 'PawTag',
+     stock: 0, sku: '', currency: 'NZD', isActive: true, customizable: false, customizationPrice: 0,
+     featureHighlights: DEFAULT_FEATURE_HIGHLIGHTS as IFeatureHighlight[],
+     slug: '',
+   });
   const [variants, setVariants] = useState<ProductVariant[]>([]);
   const [images, setImages] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -435,25 +466,27 @@ export default function Products() {
   useEffect(() => { fetchSummary(); }, [fetchSummary]);
 
   // Form handlers
-  const openCreate = () => {
-    setEditing(null);
-    setForm({ name: '', description: '', shortDescription: '', price: 0, category: 'PawTag', stock: 0, sku: '', currency: 'NZD', isActive: true, customizable: false, customizationPrice: 0 });
+const openCreate = () => {
+     setEditing(null);
+     setForm({ name: '', description: '', shortDescription: '', price: 0, category: 'PawTag', stock: 0, sku: '', currency: 'NZD', isActive: true, customizable: false, customizationPrice: 0, featureHighlights: [...DEFAULT_FEATURE_HIGHLIGHTS], slug: '' });
     setVariants([]);
     setImages([]);
     setShowForm(true);
   };
 
-  const openEdit = (p: Product) => {
-    setEditing(p);
-    setForm({
-      name: p.name, description: p.description || '', shortDescription: p.shortDescription || '',
-      price: p.price, category: p.category, stock: p.stock, sku: p.sku, currency: 'NZD',
-      isActive: p.isActive, customizable: p.customizable || false, customizationPrice: p.customizationPrice || 0,
-    });
-    setVariants(p.variants?.map((v) => ({ ...v, attributes: { ...v.attributes } })) || []);
-    setImages(p.images || []);
-    setShowForm(true);
-  };
+const openEdit = (p: Product) => {
+     setEditing(p);
+     setForm({
+       name: p.name, description: p.description || '', shortDescription: p.shortDescription || '',
+       price: p.price, category: p.category, stock: p.stock, sku: p.sku, currency: 'NZD',
+       isActive: p.isActive, customizable: p.customizable || false, customizationPrice: p.customizationPrice || 0,
+       featureHighlights: p.featureHighlights && p.featureHighlights.length > 0 ? [...p.featureHighlights] : [...DEFAULT_FEATURE_HIGHLIGHTS],
+       slug: p.slug || '',
+     });
+     setVariants(p.variants?.map((v) => ({ ...v, attributes: { ...v.attributes } })) || []);
+     setImages(p.images || []);
+     setShowForm(true);
+   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -519,6 +552,18 @@ export default function Products() {
       (next[i] as any)[field] = value;
     }
     setVariants(next);
+  };
+
+  const addFeatureHighlight = () => {
+    setForm({ ...form, featureHighlights: [...form.featureHighlights, { icon: 'check', description: '' }] });
+  };
+  const removeFeatureHighlight = (i: number) => {
+    setForm({ ...form, featureHighlights: form.featureHighlights.filter((_, idx) => idx !== i) });
+  };
+  const updateFeatureHighlight = (i: number, field: 'icon' | 'description', value: string) => {
+    const next = [...form.featureHighlights];
+    next[i] = { ...next[i], [field]: value };
+    setForm({ ...form, featureHighlights: next });
   };
 
   // Export
@@ -691,13 +736,41 @@ export default function Products() {
               </label>
             </div>
             <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid grid-cols-2 gap-4">
-                <div><label className="block text-sm font-medium text-gray-700 mb-1">Name *</label><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm" required /></div>
-                <div><label className="block text-sm font-medium text-gray-700 mb-1">SKU *</label><input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm font-mono" placeholder="e.g. PT-SCAN-001" required /></div>
-                <div><label className="block text-sm font-medium text-gray-700 mb-1">Base Price (NZD) *</label><input type="number" step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: parseFloat(e.target.value) || 0 })} className="w-full border rounded-md px-3 py-2 text-sm" required /></div>
-                <div><label className="block text-sm font-medium text-gray-700 mb-1">Base Stock</label><input type="number" value={form.stock} onChange={(e) => setForm({ ...form, stock: parseInt(e.target.value) || 0 })} className="w-full border rounded-md px-3 py-2 text-sm" /></div>
-                <div className="col-span-2"><label className="block text-sm font-medium text-gray-700 mb-1">Short Description</label><input value={form.shortDescription} onChange={(e) => setForm({ ...form, shortDescription: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm" /></div>
-                <div className="col-span-2"><label className="block text-sm font-medium text-gray-700 mb-1">Description *</label><RichTextEditor value={form.description} onChange={(val) => setForm({ ...form, description: val })} placeholder="Describe your product..." minHeight="120px" /></div>
+      <div className="grid grid-cols-2 gap-4">
+        <div><label className="block text-sm font-medium text-gray-700 mb-1">Name *</label><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm" required /></div>
+        <div><label className="block text-sm font-medium text-gray-700 mb-1">SKU *</label><input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm font-mono" placeholder="e.g. PT-SCAN-001" required /></div>
+        <div><label className="block text-sm font-medium text-gray-700 mb-1">Slug (SEO-friendly URL)</label><input value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm" placeholder="e.g. pawtag-scan" /></div>
+        <div><label className="block text-sm font-medium text-gray-700 mb-1">Base Price (NZD) *</label><input type="number" step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: parseFloat(e.target.value) || 0 })} className="w-full border rounded-md px-3 py-2 text-sm" required /></div>
+        <div><label className="block text-sm font-medium text-gray-700 mb-1">Base Stock</label><input type="number" value={form.stock} onChange={(e) => setForm({ ...form, stock: parseInt(e.target.value) || 0 })} className="w-full border rounded-md px-3 py-2 text-sm" /></div>
+        <div className="col-span-2"><label className="block text-sm font-medium text-gray-700 mb-1">Short Description</label><input value={form.shortDescription} onChange={(e) => setForm({ ...form, shortDescription: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm" /></div>
+        <div className="col-span-2">
+          <label className="block text-sm font-medium text-gray-700 mb-1">Feature Highlights</label>
+          <p className="text-xs text-gray-400 mb-2">Displayed on shop and product detail pages. Add as many as you like.</p>
+          <div className="space-y-2">
+            {form.featureHighlights.map((fh, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <IconPicker
+                  value={fh.icon}
+                  onChange={(icon) => updateFeatureHighlight(i, 'icon', icon)}
+                  className="w-40"
+                />
+                <input
+                  value={fh.description}
+                  onChange={(e) => updateFeatureHighlight(i, 'description', e.target.value)}
+                  className="flex-1 border rounded-md px-3 py-2 text-sm"
+                  placeholder="e.g. Eligible for Free Shipping NZ Wide"
+                />
+                <button type="button" onClick={() => removeFeatureHighlight(i)} className="text-red-500 hover:text-red-700 p-1">
+                  <X size={16} />
+                </button>
+              </div>
+            ))}
+          </div>
+          <button type="button" onClick={addFeatureHighlight} className="mt-2 inline-flex items-center gap-1 text-sm text-primary-600 hover:text-primary-800 font-medium">
+            <Plus size={14} /> Add Feature
+          </button>
+        </div>
+        <div className="col-span-2"><label className="block text-sm font-medium text-gray-700 mb-1">Description *</label><RichTextEditor value={form.description} onChange={(val) => setForm({ ...form, description: val })} placeholder="Describe your product..." minHeight="120px" /></div>
               </div>
               <div className="border-t pt-4">
                 <h3 className="text-sm font-semibold text-gray-700 mb-3">Product Images</h3>

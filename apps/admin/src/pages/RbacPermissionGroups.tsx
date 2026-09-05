@@ -1,13 +1,10 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
-import { ConfirmDialog } from '@pawtag/ui';
+import { ConfirmDialog, IconPicker, ICON_MAP } from '@pawtag/ui';
 import {
   Plus, X, Save, Trash2, Search, Shield, Loader2,
   ChevronDown, ChevronUp, LayoutGrid, Package,
-  PawPrint, Users, Settings, Tag, ShoppingBag,
-  FileText, Bell, Heart, Activity, Lock, Globe,
-  CreditCard, ClipboardList, BarChart3, Mail, Star,
 } from 'lucide-react';
 
 /* ------------------------------------------------------------------ */
@@ -37,73 +34,6 @@ function HighlightText({ text, query }: { text: string; query: string }) {
       ? <mark key={i} className="bg-yellow-200 rounded px-0.5">{part}</mark>
       : part
   )}</>;
-}
-
-/* ------------------------------------------------------------------ */
-/*  Icon Picker                                                        */
-/* ------------------------------------------------------------------ */
-
-const ICON_OPTIONS = [
-  { name: 'PawPrint', icon: PawPrint },
-  { name: 'Users', icon: Users },
-  { name: 'Settings', icon: Settings },
-  { name: 'Tag', icon: Tag },
-  { name: 'ShoppingBag', icon: ShoppingBag },
-  { name: 'FileText', icon: FileText },
-  { name: 'Bell', icon: Bell },
-  { name: 'Heart', icon: Heart },
-  { name: 'Activity', icon: Activity },
-  { name: 'Lock', icon: Lock },
-  { name: 'Globe', icon: Globe },
-  { name: 'CreditCard', icon: CreditCard },
-  { name: 'ClipboardList', icon: ClipboardList },
-  { name: 'BarChart3', icon: BarChart3 },
-  { name: 'Mail', icon: Mail },
-  { name: 'Star', icon: Star },
-  { name: 'Package', icon: Package },
-  { name: 'Shield', icon: Shield },
-];
-
-function IconPicker({ value, onChange }: { value: string; onChange: (name: string) => void }) {
-  const [open, setOpen] = useState(false);
-  const SelectedIcon = ICON_OPTIONS.find((i) => i.name === value)?.icon;
-
-  return (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm flex items-center gap-2 hover:border-gray-300 transition-colors"
-      >
-        {SelectedIcon ? <SelectedIcon size={16} className="text-primary-600" /> : <LayoutGrid size={16} className="text-gray-400" />}
-        <span className="flex-1 text-left">{value || 'Select icon...'}</span>
-        <ChevronDown size={14} className="text-gray-400" />
-      </button>
-      {open && (
-        <div className="absolute z-20 top-full mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg p-2">
-          <div className="grid grid-cols-6 gap-1">
-            {ICON_OPTIONS.map((opt) => {
-              const Icon = opt.icon;
-              return (
-                <button
-                  key={opt.name}
-                  type="button"
-                  onClick={() => { onChange(opt.name); setOpen(false); }}
-                  className={`p-2 rounded-lg flex flex-col items-center gap-1 transition-colors ${
-                    value === opt.name ? 'bg-primary-50 text-primary-600 ring-1 ring-primary-200' : 'hover:bg-gray-50 text-gray-600'
-                  }`}
-                  title={opt.name}
-                >
-                  <Icon size={18} />
-                  <span className="text-[9px] leading-tight truncate w-full text-center">{opt.name}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-    </div>
-  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -381,7 +311,7 @@ export default function RbacPermissionGroups() {
                 </td>
               </tr>
             ) : filtered.map((group) => {
-              const GroupIcon = ICON_OPTIONS.find((i) => i.name === group.icon)?.icon;
+              const GroupIcon = group.icon ? ICON_MAP[group.icon] : undefined;
               return (
                 <tr key={group._id} className="hover:bg-gray-50/50 transition-colors">
                   <td className="px-5 py-3 text-gray-400 text-xs font-mono">{group.sortOrder}</td>
