@@ -1,5 +1,9 @@
 # PawTag Commerce — Architecture
 
+> **Master Plan Reference:** See [PawTag Master Project Plan](../PawTag-Master-Project-Plan.md) for overall project strategy, phasing, and tracking
+> **Phase Association:** This document provides technical foundation for **all commerce-related phases** as part of the overall project
+> **Last Updated:** September 2026 — Updated to reference Master Plan
+
 **Last updated:** 2026-08-28
 
 ---

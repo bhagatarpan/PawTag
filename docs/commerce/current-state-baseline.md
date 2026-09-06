@@ -1,5 +1,9 @@
 # PawTag Commerce — Current-State Baseline
 
+> **Master Plan Reference:** See [PawTag Master Project Plan](../PawTag-Master-Project-Plan.md) for overall project strategy, phasing, and tracking
+> **Phase Association:** This document provides historical context for **Phase 0** and supports implementation roadmap as part of the overall project
+> **Last Updated:** September 2026 — Updated to reference Master Plan
+
 **Date:** 2026-08-28 (updated 2026-09-03)
 **Status:** Current baseline — PawTag owns all commerce. Migration complete.
 

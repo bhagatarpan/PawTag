@@ -1,5 +1,9 @@
 # PawTag Subscription & Loyalty Strategy — Research, Gap Analysis & Implementation Plan
 
+> **Master Plan Reference:** See [PawTag Master Project Plan](PawTag-Master-Project-Plan.md) for overall project strategy, phasing, and tracking
+> **Phase Association:** This document details **Phase 6 (Guardian Loyalty Integration)** specifics as part of the overall project
+> **Last Updated:** September 2026 — Updated to reference Master Plan
+
 **Date:** September 2026
 **Status:** Strategic Analysis — Pending Business Decisions
 **Scope:** Full audit of PawTag's subscription system, market research, loyalty program design, and implementation roadmap

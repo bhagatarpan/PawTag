@@ -1,5 +1,9 @@
 # PawTag Commerce — Implementation Roadmap
 
+> **Master Plan Reference:** See [PawTag Master Project Plan](../PawTag-Master-Project-Plan.md) for overall project strategy, phasing, and tracking
+> **Phase Association:** This document provides historical reference for completed **Phases 0-13 (Commerce Migration)** and implementation approach as part of the overall project
+> **Last Updated:** September 2026 — Updated to reference Master Plan
+
 **Date:** 2026-08-30
 **Status:** Phases 0-13 Complete — Migration Fully Executed
 

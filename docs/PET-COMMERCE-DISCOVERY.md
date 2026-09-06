@@ -1,6 +1,9 @@
 # PawTag Pet Commerce Discovery Report
 
 > **Document type:** Comprehensive discovery, code audit, business model research, and architecture recommendation
+> **Master Plan Reference:** See [PawTag Master Project Plan](PawTag-Master-Project-Plan.md) for overall project strategy, phasing, and tracking
+> **Phase Association:** This document details **Phases 1-5 (Commerce Foundation through Affiliate Commerce)** specifics as part of the overall project
+> **Last Updated:** September 2026 — Updated to reference Master Plan
 > **Date:** September 2026
 > **Status:** Pre-implementation (no code changes)
 > **Scope:** Full codebase audit + external research + architecture recommendation for selling pet products on PawTag
