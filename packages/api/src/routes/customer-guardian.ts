@@ -3,10 +3,19 @@ import { AuthRequest, authenticate } from '../middleware/auth';
 import { User } from '@pawtag/db';
 import { auditService, type AuditContext } from '../services/audit';
 import { createAuditContextFromRequest, type AuditRequest } from '../middleware/audit';
+import { createDbRateLimiter } from '../lib/rate-limiter';
 import { redeemRewardsSchema, paginationQuerySchema } from '../validation/loyalty';
 import logger from '../lib/logger';
 
 const router = Router();
+
+// Rate limiters
+const redeemRateLimiter = createDbRateLimiter({
+  settingKey: 'rateLimit.guardian.redeem.max',
+  defaultValue: 10,
+  windowMs: 60 * 60 * 1000, // 1 hour
+  message: 'Too many redemption attempts. Please try again later.',
+});
 
 async function auditCustomerGuardianEvent(
   req: AuditRequest,
@@ -186,7 +195,7 @@ router.get('/rewards', async (req: AuthRequest, res: Response) => {
  *       401:
  *         description: Not authenticated
  */
-router.post('/rewards/redeem', async (req: AuthRequest, res: Response) => {
+router.post('/rewards/redeem', redeemRateLimiter, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user?.id;
     if (!userId) {

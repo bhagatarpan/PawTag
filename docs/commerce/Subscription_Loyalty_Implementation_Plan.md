@@ -481,9 +481,9 @@ A complete, self-contained subscription and loyalty system that:
 #### Task X.8: Input Validation
 - **Description:** Implement input validation for all new API endpoints
 - **Files to create:**
-  - `packages/api/src/validation/loyalty.ts`
+  - `packages/api/src/validation/loyalty.ts` ✅
 - **Estimated effort:** 2 days (ongoing)
-- **Status:** ⏳ Pending
+- **Status:** ✅ Complete (Zod schemas for redemption, settings, pagination, members, activity)
 
 #### Task X.9: Rate Limiting
 - **Description:** Add rate limiting for points earning to prevent abuse

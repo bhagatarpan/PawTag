@@ -100,6 +100,8 @@ async function run() {
         { key: 'rateLimit.finder.location.max', value: '10', displayValue: 'Finder Location Rate Limit', category: 'rateLimit', description: 'Max location shares per hour per IP' },
         { key: 'rateLimit.auth.mfaSend.max', value: '1', displayValue: 'OTP Send Rate Limit', category: 'rateLimit', description: 'Max OTP send attempts per 30 seconds per IP' },
         { key: 'rateLimit.auth.mfaVerify.max', value: '5', displayValue: 'OTP Verify Rate Limit', category: 'rateLimit', description: 'Max OTP verify attempts per 15 minutes per IP' },
+        { key: 'rateLimit.guardian.redeem.max', value: '10', displayValue: 'Guardian Rewards Redemption Rate Limit', category: 'rateLimit', description: 'Max rewards redemption attempts per hour per IP' },
+        { key: 'rateLimit.guardian.view.max', value: '60', displayValue: 'Guardian View Rate Limit', category: 'rateLimit', description: 'Max Guardian data view requests per hour per IP' },
         { key: 'escalation.delayMinutes', value: '30', displayValue: 'Escalation Delay (minutes)', category: 'escalation', description: 'Minutes to wait before auto-notifying emergency contact if owner does not respond' },
         { key: 'escalation.notifyEmergencyContact', value: 'true', displayValue: 'Auto-Notify Emergency Contact', category: 'escalation', description: 'Auto-notify emergency contact when escalation delay expires' },
         { key: 'escalation.enableManualForward', value: 'true', displayValue: 'Manual Forward to Emergency Contact', category: 'escalation', description: 'Allow owner to manually forward found notification to emergency contact' },
