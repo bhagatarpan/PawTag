@@ -112,6 +112,7 @@ import { startReminderService } from './services/reminder.service';
 import { startSubscriptionService } from './services/subscription.service';
 import { startEscalationService } from './services/escalation.service';
 import { startLowStockService } from './jobs/lowStockCheck';
+import { startPetMilestonesJob } from './jobs/pet-milestones';
 
 const app = express();
 
@@ -317,6 +318,9 @@ async function start() {
 
     // Start daily low stock check service
     startLowStockService();
+
+    // Start pet milestones job (daily)
+    startPetMilestonesJob();
 
     // Start orphan payment detection job
     const { startOrphanPaymentJob } = await import('./jobs/orphanPaymentDetection');

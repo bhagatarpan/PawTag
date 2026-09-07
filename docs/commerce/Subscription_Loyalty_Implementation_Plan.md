@@ -310,22 +310,20 @@ A complete, self-contained subscription and loyalty system that:
 - **Description:** Connect points earning to actual customer activities
 - **Files to modify:**
   - `packages/api/src/services/order-creation.service.ts` (purchases)
-  - `packages/api/src/routes/customer-reviews.ts` (reviews)
   - `packages/api/src/services/referral.service.ts` (referrals)
-  - `packages/api/src/routes/customer-pets.ts` (pet profiles)
+  - `packages/api/src/routes/customer.ts` (pet profiles)
   - `packages/api/src/routes/finder.ts` (tag scans, lost pet reports, reunions)
 - **Deliverable:** Points earned automatically for all eligible activities
 - **Estimated effort:** 2 weeks
-- **Status:** ⏳ Pending
+- **Status:** ✅ Complete (commit 637b0b1)
 
 #### Task 3.2: Implement PawRewards Redemption at Checkout
 - **Description:** Add PawRewards application as discount in checkout flow
 - **Files to modify:**
   - `apps/web/src/pages/Checkout.tsx`
-  - `packages/api/src/commerce/services/cart.service.ts`
 - **Deliverable:** Customers can redeem PawRewards for discounts
 - **Estimated effort:** 1 week
-- **Status:** ⏳ Pending
+- **Status:** ✅ Complete (commit 637b0b1)
 
 #### Task 3.3: Build Gold-Exclusive Benefits
 - **Description:** Implement early access, priority support, free shipping over $50
@@ -334,7 +332,7 @@ A complete, self-contained subscription and loyalty system that:
   - `apps/web/src/pages/account/GoldBenefits.tsx`
 - **Deliverable:** Clear differentiation between Guardian and Gold
 - **Estimated effort:** 1 week
-- **Status:** ⏳ Pending
+- **Status:** ✅ Complete (commit 637b0b1)
 
 #### Task 3.4: Build Referral Program with Tracking
 - **Description:** Create referral tracking system with unique codes/links
@@ -392,16 +390,16 @@ A complete, self-contained subscription and loyalty system that:
 
 | Task | Status | Start Date | End Date | Notes |
 |------|--------|------------|----------|-------|
-| Task 3.1: Wire Up Points Earning | ⏳ Pending | | | |
-| Task 3.2: PawRewards Redemption | ⏳ Pending | | | |
-| Task 3.3: Gold-Exclusive Benefits | ⏳ Pending | | | |
+| Task 3.1: Wire Up Points Earning | ✅ Complete | | | Commit 637b0b1 |
+| Task 3.2: PawRewards Redemption | ✅ Complete | | | Commit 637b0b1 |
+| Task 3.3: Gold-Exclusive Benefits | ✅ Complete | | | Commit 637b0b1 |
 | Task 3.4: Referral Program | ⏳ Pending | | | |
 | Task 3.5: Pet Milestone Bonuses | ⏳ Pending | | | |
 | Task 3.6: Tier Expiration Logic | ⏳ Pending | | | |
 | Task 3.7: Analytics Dashboard | ⏳ Pending | | | |
 | Task 3.8: Optimize Performance | ⏳ Pending | | | |
 
-**Phase 3 Overall Progress:** 0%
+**Phase 3 Overall Progress:** 37.5%
 
 ---
 
