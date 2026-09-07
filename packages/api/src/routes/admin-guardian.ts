@@ -4,6 +4,7 @@ import { requirePermission } from '../middleware/permission';
 import { User, Setting } from '@pawtag/db';
 import { auditService, type AuditContext } from '../services/audit';
 import { createAuditContextFromRequest, type AuditRequest } from '../middleware/audit';
+import { guardianSettingsSchema, membersQuerySchema, activityQuerySchema } from '../validation/loyalty';
 import logger from '../lib/logger';
 
 const router = Router();
@@ -375,56 +376,16 @@ router.put('/settings', requirePermission('setting.update'), async (req: AuthReq
   try {
     const updates = req.body;
 
-    // Validate that all keys are valid guardian settings
-    const allowedPrefixes = [
-      'purchaseRateGuardian',
-      'purchaseRateGold',
-      'repeatPurchaseBonusGuardian',
-      'repeatPurchaseBonusGold',
-      'reviewTextPoints',
-      'reviewPhotoPoints',
-      'reviewVideoPoints',
-      'referralSignupPoints',
-      'referralPurchasePoints',
-      'petProfilePoints',
-      'petBirthdayPoints',
-      'petAnniversaryPoints',
-      'monthlyAnniversaryPoints',
-      'annualAnniversaryPoints',
-      'tagScanPoints',
-      'tagScanDailyLimit',
-      'lostPetReportPoints',
-      'petReunitedPoints',
-      'socialSharePoints',
-      'goldMultiplier',
-      'annualCapReviewText',
-      'annualCapReviewPhoto',
-      'annualCapReviewVideo',
-      'annualCapReferralSignup',
-      'annualCapTagScan',
-      'tierThresholdNurture',
-      'tierThresholdProtector',
-      'tierThresholdSafeguard',
-      'pawRewardsCare',
-      'pawRewardsNurture',
-      'pawRewardsProtector',
-      'pawRewardsSafeguard',
-      'pawRewardsEarningRateGuardian',
-      'pawRewardsEarningRateGold',
-      'pawRewardsMinRedemption',
-      'pawRewardsExpirationMonths',
-      'pawRewardsMaxBalanceGuardian',
-      'pawRewardsMaxBalanceGold',
-    ];
-
-    for (const key of Object.keys(updates)) {
-      if (!allowedPrefixes.includes(key)) {
-        return res.status(400).json({ success: false, error: `Invalid setting: ${key}` });
-      }
+    const parsed = guardianSettingsSchema.safeParse(updates);
+    if (!parsed.success) {
+      return res.status(400).json({
+        success: false,
+        error: parsed.error.errors[0]?.message || 'Invalid settings',
+      });
     }
 
     // Update each setting in the database
-    for (const [key, value] of Object.entries(updates)) {
+    for (const [key, value] of Object.entries(parsed.data)) {
       await Setting.findOneAndUpdate(
         { key: `guardian.${key}` },
         { value: String(value), updatedAt: new Date() },

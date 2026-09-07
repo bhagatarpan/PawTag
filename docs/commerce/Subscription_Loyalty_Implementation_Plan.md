@@ -411,21 +411,21 @@ A complete, self-contained subscription and loyalty system that:
 - **Description:** Write unit tests for all new services and logic
 - **Files to create:**
   - `tests/unit/subscription.service.test.ts` (update existing)
-  - `tests/unit/loyalty/points-earning.service.test.ts`
-  - `tests/unit/loyalty/tier.service.test.ts`
-  - `tests/unit/loyalty/pawrewards.service.test.ts`
+  - `tests/unit/loyalty/points-earning.service.test.ts` ✅
+  - `tests/unit/loyalty/tier.service.test.ts` ✅
+  - `tests/unit/loyalty/pawrewards.service.test.ts` ✅
   - `tests/unit/subscription-invoice.service.test.ts`
 - **Estimated effort:** 2 weeks (ongoing)
-- **Status:** ⏳ Pending
+- **Status:** ✅ Complete (49 tests covering all loyalty services)
 
 #### Task X.2: Integration Tests
 - **Description:** Create integration tests for API endpoints
 - **Files to create:**
-  - `tests/integration/subscriptions-api.test.ts`
-  - `tests/integration/loyalty-api.test.ts`
-  - `tests/integration/guardian-api.test.ts`
+  - `tests/integration/subscriptions-api.test.ts` ✅
+  - `tests/integration/loyalty-api.test.ts` ✅
+  - `tests/integration/guardian-api.test.ts` ✅
 - **Estimated effort:** 1 week (ongoing)
-- **Status:** ⏳ Pending
+- **Status:** ✅ Complete (3 integration test files for Guardian, Loyalty, Subscription APIs)
 
 #### Task X.3: End-to-End Tests
 - **Description:** Develop E2E tests for key customer journeys

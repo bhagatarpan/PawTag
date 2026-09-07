@@ -3,6 +3,7 @@ import { AuthRequest, authenticate } from '../middleware/auth';
 import { User } from '@pawtag/db';
 import { auditService, type AuditContext } from '../services/audit';
 import { createAuditContextFromRequest, type AuditRequest } from '../middleware/audit';
+import { redeemRewardsSchema, paginationQuerySchema } from '../validation/loyalty';
 import logger from '../lib/logger';
 
 const router = Router();
@@ -194,13 +195,16 @@ router.post('/rewards/redeem', async (req: AuthRequest, res: Response) => {
 
     const { amount, orderId } = req.body;
 
-    if (!amount || typeof amount !== 'number' || amount < 2) {
-      return res.status(400).json({ success: false, error: 'Minimum redemption amount is $2' });
+    const parsed = redeemRewardsSchema.safeParse({ amount, orderId });
+    if (!parsed.success) {
+      return res.status(400).json({
+        success: false,
+        error: parsed.error.errors[0]?.message || 'Invalid input',
+      });
     }
 
-    // Import service dynamically to avoid circular dependencies
     const { redeemRewards } = require('../services/loyalty/pawrewards.service');
-    const result = await redeemRewards(userId, amount, orderId);
+    const result = await redeemRewards(userId, parsed.data.amount, parsed.data.orderId);
 
     await auditCustomerGuardianEvent(req, {
       action: 'guardian_rewards_redeemed',
@@ -250,7 +254,8 @@ router.get('/history', async (req: AuthRequest, res: Response) => {
       return res.status(401).json({ success: false, error: 'Not authenticated' });
     }
 
-    const limit = parseInt(req.query.limit as string) || 50;
+    const limitParsed = paginationQuerySchema.safeParse({ limit: req.query.limit });
+    const limit = limitParsed.success ? limitParsed.data.limit : 50;
 
     // Import models dynamically to avoid circular dependencies
     const { GuardianPointsLedger } = require('@pawtag/db');
