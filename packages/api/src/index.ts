@@ -67,6 +67,8 @@ import cmsPublicV2Routes from './routes/cms-public-v2';
 import customerSubscriptionRoutes from './routes/customer-subscriptions';
 import adminSubscriptionRoutes from './routes/admin-subscriptions';
 import adminAnalyticsRoutes from './routes/admin-analytics';
+import adminGuardianRoutes from './routes/admin-guardian';
+import customerGuardianRoutes from './routes/customer-guardian';
 
 import invoiceAccessRoutes from './routes/invoice-access';
 import referralRoutes from './routes/referrals';
@@ -249,6 +251,8 @@ app.use('/api/customer/demo-payment', demoPaymentRoutes);
 app.use('/api/customer/subscriptions', customerSubscriptionRoutes);
 app.use('/api/admin/subscriptions', adminSubscriptionRoutes);
 app.use('/api/admin/analytics', adminAnalyticsRoutes);
+app.use('/api/admin/guardian', adminGuardianRoutes);
+app.use('/api/customer/guardian', customerGuardianRoutes);
 app.use('/api', invoiceAccessRoutes);
 app.use('/api/finder', finderRoutes);
 app.use('/api/upload', uploadRoutes);

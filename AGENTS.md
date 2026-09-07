@@ -635,6 +635,18 @@ Production uses the configured domain sender.
   - `POST /customer/orders/place` — Create PawTag order (direct API, ~700ms)
   - `GET /customer/orders` — List customer orders with invoice data
   - `GET /customer/orders/:id` — Order detail with activity timeline
+- `/api/customer/guardian/*` — Guardian loyalty program (authenticated)
+  - `GET /customer/guardian/points` — Points balance and history
+  - `GET /customer/guardian/rewards` — PawRewards balance and history
+  - `POST /customer/guardian/rewards/redeem` — Redeem PawRewards (min $2)
+  - `GET /customer/guardian/history` — Combined activity history
+  - `GET /customer/guardian/tier` — Tier info and benefits
+- `/api/admin/guardian/*` — Guardian admin management (requires setting.read/update)
+  - `GET /admin/guardian/stats` — Program statistics (members, tiers, points, rewards)
+  - `GET /admin/guardian/members` — Paginated member list with search/filter
+  - `GET /admin/guardian/activity` — Recent points/rewards activity feed
+  - `GET /admin/guardian/settings` — Guardian program settings
+  - `PUT /admin/guardian/settings` — Update Guardian settings
 - `/api/finder/*` — Public tag lookup, location sharing (no auth required)
 - `/api/public/cms/*` — Public CMS content (pages, navigation, footer, settings, onboarding config)
 - `/api/address/*` — Address autocomplete proxy (Photon or NZ Post provider)
@@ -1082,6 +1094,21 @@ Located in `apps/mobile/e2e/`:
 | `packages/api/src/routes/promo-public.ts` | Public promo code validation (no auth) |
 | `packages/api/src/services/order-creation.service.ts` | Shared order creation service |
 | `packages/api/src/services/subscription.service.ts` | Subscription lifecycle management (create, renew, cancel, dunning, reminders) |
+| `packages/api/src/services/loyalty/points-earning.service.ts` | Guardian points earning engine |
+| `packages/api/src/services/loyalty/tier.service.ts` | Guardian tier management (Care→Nurture→Protector→Safeguard) |
+| `packages/api/src/services/loyalty/pawrewards.service.ts` | PawRewards currency system |
+| `packages/api/src/routes/admin-guardian.ts` | Admin Guardian management API |
+| `packages/api/src/routes/customer-guardian.ts` | Customer Guardian loyalty API |
+| `packages/db/src/models/GuardianPointsLedger.ts` | Points ledger model |
+| `packages/db/src/models/GuardianTierHistory.ts` | Tier history model |
+| `packages/db/src/models/PawRewardsLedger.ts` | PawRewards ledger model |
+| `apps/admin/src/pages/GuardianDashboard.tsx` | Admin Guardian overview dashboard |
+| `apps/admin/src/pages/GuardianMembers.tsx` | Admin Guardian member management |
+| `apps/admin/src/pages/GuardianSettings.tsx` | Admin Guardian program settings |
+| `apps/web/src/pages/account/GuardianDashboard.tsx` | Customer Guardian dashboard |
+| `apps/web/src/pages/account/GuardianPoints.tsx` | Customer points history |
+| `apps/web/src/pages/account/GuardianRewards.tsx` | Customer PawRewards management |
+| `apps/web/src/pages/account/SubscriptionUpgrade.tsx` | Gold membership upgrade page |
 | `packages/api/src/routes/checkout-otp.ts` | Dual OTP checkout verification |
 | `apps/web/src/components/CheckoutVerificationGate.tsx` | OTP verification gatekeeper |
 
