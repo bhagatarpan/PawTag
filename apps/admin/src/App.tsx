@@ -40,6 +40,9 @@ import CmsOnboardingStepsPage from './pages/cms/CmsOnboardingSteps';
 import SubscriptionsPage from './pages/SubscriptionsPage';
 import SubscriptionDetailPage from './pages/SubscriptionDetailPage';
 import SubscriptionPlans from './pages/SubscriptionPlans';
+import GuardianDashboard from './pages/GuardianDashboard';
+import GuardianMembers from './pages/GuardianMembers';
+import GuardianSettings from './pages/GuardianSettings';
 import Referrals from './pages/Referrals';
 import TagExpiryNotifications from './pages/TagExpiryNotifications';
 import Notifications from './pages/Notifications';
@@ -217,6 +220,9 @@ export default function App() {
       <Route path="/customer-subscriptions" element={<ProtectedRoute><SubscriptionsPage /></ProtectedRoute>} />
       <Route path="/customer-subscriptions/:id" element={<ProtectedRoute><SubscriptionDetailPage /></ProtectedRoute>} />
       <Route path="/subscription-plans" element={<ProtectedRoute><SubscriptionPlans /></ProtectedRoute>} />
+      <Route path="/guardian" element={<ProtectedRoute><GuardianDashboard /></ProtectedRoute>} />
+      <Route path="/guardian/members" element={<ProtectedRoute><GuardianMembers /></ProtectedRoute>} />
+      <Route path="/guardian/settings" element={<ProtectedRoute><GuardianSettings /></ProtectedRoute>} />
       <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
       <Route path="/referrals" element={<ProtectedRoute><Referrals /></ProtectedRoute>} />
       <Route path="/tag-expiry-notifications" element={<ProtectedRoute><TagExpiryNotifications /></ProtectedRoute>} />

@@ -247,6 +247,24 @@ function SubscriptionsInner() {
           </div>
         </div>
 
+        {/* Upgrade CTA */}
+        {isActive && sub.price < 1.99 && (
+          <div className="bg-gradient-to-r from-amber-500 to-orange-500 rounded-xl p-4 text-white">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold">Upgrade to Gold</h3>
+                <p className="text-white/80 text-sm">Earn 2× points, get higher PawRewards, and start at Nurture tier</p>
+              </div>
+              <a
+                href="/account/upgrade"
+                className="px-4 py-2 bg-white text-amber-600 rounded-lg font-semibold hover:bg-amber-50 transition-colors"
+              >
+                Upgrade
+              </a>
+            </div>
+          </div>
+        )}
+
         {/* Timeline */}
         <div className="bg-white rounded-xl border border-gray-100 p-5 shadow-sm">
           <h3 className="text-sm font-semibold text-gray-900 mb-4">Subscription Timeline</h3>

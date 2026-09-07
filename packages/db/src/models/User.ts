@@ -52,6 +52,12 @@ export interface IUserDocument extends Document {
       marketing: boolean;
     };
   };
+  guardianPoints: number;
+  guardianTier: 'CARE' | 'NURTURE' | 'PROTECTOR' | 'SAFEGUARD';
+  pawRewardsBalance: number;
+  pawRewardsTotalEarned: number;
+  pawRewardsTotalRedeemed: number;
+  pawRewardsTotalExpired: number;
   deletedAt?: Date;
 }
 
@@ -112,6 +118,16 @@ const UserSchema = new Schema<IUserDocument>(
         marketing: { type: Boolean, default: false },
       },
     },
+    guardianPoints: { type: Number, default: 0, min: 0 },
+    guardianTier: { 
+      type: String, 
+      enum: ['CARE', 'NURTURE', 'PROTECTOR', 'SAFEGUARD'], 
+      default: 'CARE' 
+    },
+    pawRewardsBalance: { type: Number, default: 0, min: 0 },
+    pawRewardsTotalEarned: { type: Number, default: 0, min: 0 },
+    pawRewardsTotalRedeemed: { type: Number, default: 0, min: 0 },
+    pawRewardsTotalExpired: { type: Number, default: 0, min: 0 },
     deletedAt: { type: Date, default: null },
   },
   { timestamps: true },

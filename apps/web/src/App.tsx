@@ -38,6 +38,10 @@ import Referrals from './pages/account/Referrals';
 import NotificationPreferences from './pages/account/NotificationPreferences';
 import InvoiceView from './pages/InvoiceView';
 import AccountDashboard from './pages/account/Dashboard';
+import GuardianDashboard from './pages/account/GuardianDashboard';
+import GuardianPoints from './pages/account/GuardianPoints';
+import GuardianRewards from './pages/account/GuardianRewards';
+import SubscriptionUpgrade from './pages/account/SubscriptionUpgrade';
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const token = localStorage.getItem('pawtag_token');
@@ -112,6 +116,10 @@ export default function App() {
         <Route path="/account/orders/:id" element={<ProtectedRoute><AccountLayout><OrderDetail /></AccountLayout></ProtectedRoute>} />
         <Route path="/account/orders/:id/return" element={<ProtectedRoute><AccountLayout><ReturnRequest /></AccountLayout></ProtectedRoute>} />
         <Route path="/account/subscriptions" element={<ProtectedRoute><AccountLayout><Subscriptions /></AccountLayout></ProtectedRoute>} />
+        <Route path="/account/guardian" element={<ProtectedRoute><AccountLayout><GuardianDashboard /></AccountLayout></ProtectedRoute>} />
+        <Route path="/account/guardian/points" element={<ProtectedRoute><AccountLayout><GuardianPoints /></AccountLayout></ProtectedRoute>} />
+        <Route path="/account/guardian/rewards" element={<ProtectedRoute><AccountLayout><GuardianRewards /></AccountLayout></ProtectedRoute>} />
+        <Route path="/account/upgrade" element={<ProtectedRoute><AccountLayout><SubscriptionUpgrade /></AccountLayout></ProtectedRoute>} />
         <Route path="/account/notifications" element={<ProtectedRoute><AccountLayout><Notifications /></AccountLayout></ProtectedRoute>} />
         <Route path="/account/notification-preferences" element={<ProtectedRoute><AccountLayout><NotificationPreferences /></AccountLayout></ProtectedRoute>} />
         <Route path="/account/redeem-tag" element={<ProtectedRoute><AccountLayout><RedeemTag /></AccountLayout></ProtectedRoute>} />

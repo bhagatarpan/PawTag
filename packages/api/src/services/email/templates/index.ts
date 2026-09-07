@@ -12,3 +12,8 @@ export { renderLoginOtpEmail } from './mfa-otp';
 export { renderRefundProcessingEmail } from './refund-processing';
 export { renderRefundSettledEmail } from './refund-settled';
 export { renderRefundFailedEmail } from './refund-failed';
+export { generateGuardianWelcomeEmail } from './guardian-welcome';
+export { generateTierUpgradeEmail } from './guardian-tier-upgrade';
+export { generateMonthlySummaryEmail } from './guardian-monthly-summary';
+export { generatePawRewardsReminderEmail } from './guardian-pawrewards-reminder';
+export { generateGuardianBirthdayEmail } from './guardian-birthday';
