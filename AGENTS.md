@@ -1081,6 +1081,7 @@ Located in `apps/mobile/e2e/`:
 | `packages/ui/src/components/FadeIn.tsx` | Scroll-triggered fade-in animation component |
 | `packages/api/src/routes/promo-public.ts` | Public promo code validation (no auth) |
 | `packages/api/src/services/order-creation.service.ts` | Shared order creation service |
+| `packages/api/src/services/subscription.service.ts` | Subscription lifecycle management (create, renew, cancel, dunning, reminders) |
 | `packages/api/src/routes/checkout-otp.ts` | Dual OTP checkout verification |
 | `apps/web/src/components/CheckoutVerificationGate.tsx` | OTP verification gatekeeper |
 

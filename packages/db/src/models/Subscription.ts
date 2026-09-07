@@ -42,6 +42,11 @@ export interface ISubscriptionDocument extends Document {
     lastGraceReminderAt?: Date;
   };
 
+  // Dunning/Retry fields
+  paymentRetryCount?: number;
+  lastPaymentAttemptAt?: Date;
+  nextPaymentAttemptAt?: Date;
+
   createdAt: Date;
   updatedAt: Date;
   deletedAt?: Date;
@@ -94,6 +99,11 @@ const SubscriptionSchema = new Schema<ISubscriptionDocument>(
       graceWeeklySentCount: { type: Number, default: 0 },
       lastGraceReminderAt: { type: Date },
     },
+
+    // Dunning/Retry fields
+    paymentRetryCount: { type: Number, default: 0 },
+    lastPaymentAttemptAt: { type: Date },
+    nextPaymentAttemptAt: { type: Date },
 
     deletedAt: { type: Date, default: null },
   },

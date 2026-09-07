@@ -64,6 +64,9 @@ Standard Tailwind gray scale for text, borders, backgrounds, and disabled states
 | **Amber** | `amber-50` → `amber-700` | Warnings, grace period, low stock, found pet status |
 | **Blue** | `blue-50` → `blue-700` | Informational, location consent, email actions |
 | **Purple** | `purple-50` → `purple-700` | Featured/premium badges, shipped status |
+| **Teal** | `teal-50` → `teal-700` | Subscription active, Guardian membership, points earned |
+| **Orange** | `orange-50` → `orange-700` | Grace period, payment retry, dunning alerts |
+| **Gold** | `yellow-50` → `yellow-700` | Gold membership, premium tier, PawRewards balance |
 
 ### Gradients
 
@@ -307,6 +310,40 @@ The refund lifecycle has its own status (separate from the order status):
 | `succeeded` | Refund Succeeded | `bg-green-50 border-green-200 text-green-700` | CheckCircle |
 | `failed` | Refund Failed | `bg-red-50 border-red-200 text-red-700` | XCircle |
 | `canceled` | Refund Canceled | `bg-gray-50 border-gray-200 text-gray-700` | XCircle |
+
+### Subscription Status Colors
+
+Subscription status displays (badges, cards, steppers) must use these design tokens. No hardcoded colors.
+
+| Status | Badge Variant | Badge Classes | Card Gradient | Border Left |
+|---|---|---|---|---|
+| `active` | success | `bg-green-100 text-green-700` | `from-emerald-600 to-teal-700` | `border-l-green-400` |
+| `grace_period` | warning | `bg-amber-100 text-amber-700` | `from-amber-500 to-orange-600` | `border-l-amber-400` |
+| `expired` | danger | `bg-red-100 text-red-700` | `from-gray-700 to-gray-900` | `border-l-red-400` |
+| `cancelled` | neutral | `bg-gray-100 text-gray-600` | `from-gray-500 to-gray-700` | `border-l-gray-400` |
+| `pending_payment` | warning | `bg-amber-100 text-amber-700` | `from-amber-500 to-orange-600` | `border-l-amber-400` |
+
+### Subscription Tier Colors
+
+Guardian/Gold membership tier displays (badges, cards, progress indicators) must use these design tokens.
+
+| Tier | Badge Classes | Card Background | Icon Color |
+|---|---|---|---|
+| **Guardian** | `bg-teal-100 text-teal-700` | `bg-teal-50` | `text-teal-600` |
+| **Gold** | `bg-yellow-100 text-yellow-700` | `bg-yellow-50` | `text-yellow-600` |
+
+### Guardian Points Display
+
+Guardian Points progress and balance displays must use these design tokens.
+
+| Element | Classes | Usage |
+|---|---|---|
+| **Points earned** | `text-teal-600 font-semibold` | Points earned in current period |
+| **Points balance** | `text-primary-600 font-bold text-lg` | Total points balance |
+| **Points progress bar** | `bg-teal-500` | Progress toward next tier |
+| **Points label** | `text-xs text-gray-500 uppercase tracking-wide` | "Guardian Points" label |
+| **PawRewards balance** | `text-green-600 font-semibold` | Redeemable rewards balance |
+| **PawRewards label** | `text-xs text-gray-500 uppercase tracking-wide` | "PawRewards" label |
 
 **ARN display:** Always shown when available (bank reference for the refund). Customer and admin both see it.
 

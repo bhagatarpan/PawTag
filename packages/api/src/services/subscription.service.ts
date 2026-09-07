@@ -4,9 +4,73 @@ import { createAndDeliverNotification } from './notification-delivery.service';
 import { auditService, type AuditContext } from './audit';
 import logger from '../lib/logger';
 
-const GRACE_PERIOD_WEEKS = 4;
-const FREE_PERIOD_MONTHS = 12;
 const REMINDER_CHECK_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
+
+// Cache for settings to avoid hitting DB on every call
+let settingsCache: Record<string, string> = {};
+let settingsCacheTimestamp = 0;
+const SETTINGS_CACHE_TTL = 60 * 1000; // 1 minute
+
+async function loadSettings(): Promise<Record<string, string>> {
+  const now = Date.now();
+  if (now - settingsCacheTimestamp < SETTINGS_CACHE_TTL && Object.keys(settingsCache).length > 0) {
+    return settingsCache;
+  }
+
+  try {
+    const settings = await Setting.find({
+      key: {
+        $in: [
+          'commerce.subscriptions.annualPrice',
+          'commerce.subscriptions.monthlyPrice',
+          'commerce.subscriptions.freePeriodMonths',
+          'commerce.subscriptions.gracePeriodWeeks',
+        ],
+      },
+    }).lean();
+
+    settingsCache = {};
+    for (const setting of settings) {
+      settingsCache[setting.key] = setting.value;
+    }
+    settingsCacheTimestamp = now;
+    return settingsCache;
+  } catch (error) {
+    logger.error({ err: error }, 'Failed to load subscription settings');
+    // Return defaults if DB fails
+    return {
+      'commerce.subscriptions.annualPrice': '0.99',
+      'commerce.subscriptions.monthlyPrice': '1.99',
+      'commerce.subscriptions.freePeriodMonths': '12',
+      'commerce.subscriptions.gracePeriodWeeks': '4',
+    };
+  }
+}
+
+async function getSettingValue(key: string, defaultValue: string): Promise<string> {
+  const settings = await loadSettings();
+  return settings[key] || defaultValue;
+}
+
+async function getGracePeriodWeeks(): Promise<number> {
+  const value = await getSettingValue('commerce.subscriptions.gracePeriodWeeks', '4');
+  return parseInt(value, 10) || 4;
+}
+
+async function getFreePeriodMonths(): Promise<number> {
+  const value = await getSettingValue('commerce.subscriptions.freePeriodMonths', '12');
+  return parseInt(value, 10) || 12;
+}
+
+async function getAnnualPrice(): Promise<number> {
+  const value = await getSettingValue('commerce.subscriptions.annualPrice', '0.99');
+  return parseFloat(value) || 0.99;
+}
+
+async function getMonthlyPrice(): Promise<number> {
+  const value = await getSettingValue('commerce.subscriptions.monthlyPrice', '1.99');
+  return parseFloat(value) || 1.99;
+}
 
 async function auditJobEvent(
   input: Parameters<typeof auditService.log>[1],
@@ -38,12 +102,13 @@ export function startSubscriptionService() {
   setInterval(async () => {
     try {
       await runSubscriptionChecks();
+      await processPaymentRetries();
     } catch (error) {
       logger.error({ err: error }, '[SubscriptionService] Error');
     }
   }, REMINDER_CHECK_INTERVAL_MS);
 
-  logger.info('[SubscriptionService] Started — checks every hour for subscription lifecycle events');
+  logger.info('[SubscriptionService] Started — checks every hour for subscription lifecycle events and payment retries');
 }
 
 export async function createSubscription(data: {
@@ -56,7 +121,11 @@ export async function createSubscription(data: {
 }) {
   const now = new Date();
   const planType = data.planType || 'annual';
-  const price = data.price ?? (planType === 'annual' ? 0.99 : planType === 'monthly' ? 1.99 : 0);
+  
+  // Get prices from CMS settings
+  const annualPrice = await getAnnualPrice();
+  const monthlyPrice = await getMonthlyPrice();
+  const price = data.price ?? (planType === 'annual' ? annualPrice : planType === 'monthly' ? monthlyPrice : 0);
 
   const planNames: Record<string, string> = {
     annual: 'PawTag Annual',
@@ -64,8 +133,10 @@ export async function createSubscription(data: {
     free: 'PawTag Free',
   };
 
+  // Get free period from CMS settings
+  const freePeriodMonths = await getFreePeriodMonths();
   const freePeriodEndsAt = new Date(now);
-  freePeriodEndsAt.setMonth(freePeriodEndsAt.getMonth() + FREE_PERIOD_MONTHS);
+  freePeriodEndsAt.setMonth(freePeriodEndsAt.getMonth() + freePeriodMonths);
 
   const currentPeriodEnd = new Date(freePeriodEndsAt);
 
@@ -402,11 +473,14 @@ export async function checkExpiredSubscriptions() {
     deletedAt: null,
   });
 
+  // Get grace period from CMS settings
+  const gracePeriodWeeks = await getGracePeriodWeeks();
+
   for (const sub of expiredSubs) {
     const oldStatus = sub.status;
     sub.status = 'grace_period';
     const graceEnd = new Date(now);
-    graceEnd.setDate(graceEnd.getDate() + GRACE_PERIOD_WEEKS * 7);
+    graceEnd.setDate(graceEnd.getDate() + gracePeriodWeeks * 7);
     sub.gracePeriodEndsAt = graceEnd;
     sub.reminderStates = {
       reminder30dSent: true,
@@ -433,7 +507,7 @@ export async function checkExpiredSubscriptions() {
       severity: 'HIGH',
       metadata: {
         transitionedCount: expiredSubs.length,
-        gracePeriodWeeks: GRACE_PERIOD_WEEKS,
+        gracePeriodWeeks,
         subscriptions: expiredSubs.map(s => ({
           subscriptionId: s._id.toString(),
           userId: s.userId.toString(),
@@ -781,4 +855,267 @@ export async function changeSubscriptionPlan(subscriptionId: string, newPlanType
   }, { actorType: 'SERVICE' });
 
   return subscription;
+}
+
+// Dunning/Retry Logic for Failed Payments
+export async function handlePaymentFailure(subscriptionId: string, paymentMethod?: string) {
+  const subscription = await Subscription.findById(subscriptionId);
+  if (!subscription) throw new Error('Subscription not found');
+
+  const now = new Date();
+  
+  // Calculate retry schedule: immediate, 1 hour, 24 hours, 72 hours
+  const retryDelays = [0, 60 * 60 * 1000, 24 * 60 * 60 * 1000, 72 * 60 * 60 * 1000];
+  const retryCount = (subscription as any).paymentRetryCount || 0;
+  
+  if (retryCount >= retryDelays.length) {
+    // Max retries exceeded - move to grace period
+    await moveSubscriptionToGracePeriod(subscription._id.toString());
+    return;
+  }
+
+  // Update retry count and schedule
+  (subscription as any).paymentRetryCount = retryCount + 1;
+  (subscription as any).lastPaymentAttemptAt = now;
+  (subscription as any).nextPaymentAttemptAt = new Date(now.getTime() + retryDelays[retryCount + 1]);
+  
+  await subscription.save();
+
+  // Send payment failure email
+  const user = await User.findById(subscription.userId).lean();
+  if (user?.email) {
+    await sendPaymentFailureEmail(
+      user.email,
+      user.fullName || 'Customer',
+      subscription.tagId?.toString() || 'Unknown',
+      retryCount + 1,
+      retryDelays.length - retryCount - 1
+    );
+  }
+
+  await auditJobEvent({
+    action: 'subscription_payment_failed',
+    eventType: 'subscription.payment_failed',
+    eventCategory: 'FINANCIAL',
+    operationType: 'UPDATE',
+    resourceType: 'Subscription',
+    resourceId: subscription._id.toString(),
+    outcome: 'SUCCESS',
+    severity: 'HIGH',
+    metadata: {
+      userId: subscription.userId.toString(),
+      tagId: subscription.tagId?.toString(),
+      retryCount: retryCount + 1,
+      maxRetries: retryDelays.length,
+      nextAttemptAt: (subscription as any).nextPaymentAttemptAt,
+      paymentMethod,
+    },
+  }, { actorType: 'SERVICE' });
+}
+
+async function moveSubscriptionToGracePeriod(subscriptionId: string) {
+  const subscription = await Subscription.findById(subscriptionId);
+  if (!subscription) return;
+
+  const now = new Date();
+  const gracePeriodWeeks = await getGracePeriodWeeks();
+  const graceEnd = new Date(now);
+  graceEnd.setDate(graceEnd.getDate() + gracePeriodWeeks * 7);
+
+  subscription.status = 'grace_period';
+  subscription.gracePeriodEndsAt = graceEnd;
+  (subscription as any).paymentRetryCount = 0;
+  (subscription as any).nextPaymentAttemptAt = undefined;
+  
+  await subscription.save();
+
+  await Tag.findByIdAndUpdate(subscription.tagId, { subscriptionStatus: 'grace_period' });
+
+  // Send grace period email
+  const user = await User.findById(subscription.userId).lean();
+  if (user?.email) {
+    await sendGracePeriodEmail(
+      user.email,
+      user.fullName || 'Customer',
+      subscription.tagId?.toString() || 'Unknown',
+      gracePeriodWeeks
+    );
+  }
+
+  await auditJobEvent({
+    action: 'subscription_moved_to_grace',
+    eventType: 'subscription.moved_to_grace',
+    eventCategory: 'FINANCIAL',
+    operationType: 'UPDATE',
+    resourceType: 'Subscription',
+    resourceId: subscription._id.toString(),
+    outcome: 'SUCCESS',
+    severity: 'HIGH',
+    metadata: {
+      userId: subscription.userId.toString(),
+      tagId: subscription.tagId?.toString(),
+      gracePeriodWeeks,
+      graceEndsAt: graceEnd,
+    },
+  }, { actorType: 'SERVICE' });
+}
+
+async function sendPaymentFailureEmail(to: string, name: string, tagId: string, retryCount: number, retriesLeft: number) {
+  const renewUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/subscriptions`;
+
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+      <div style="background: linear-gradient(135deg, #ef4444, #dc2626); padding: 24px; border-radius: 12px 12px 0 0; text-align: center;">
+        <h1 style="color: white; font-size: 24px; margin: 0;">PawTag</h1>
+      </div>
+      <div style="background: #fef2f2; padding: 32px; border: 1px solid #fecaca;">
+        <h2 style="color: #111827; font-size: 20px;">Hi ${name},</h2>
+        <p style="color: #374151; font-size: 15px; line-height: 1.7;">
+          We couldn't process your payment for PawTag subscription <strong>${tagId}</strong>.
+        </p>
+        <p style="color: #374151; font-size: 15px; line-height: 1.7;">
+          This is attempt <strong>${retryCount}</strong> of 4. We'll automatically retry ${retriesLeft} more time${retriesLeft !== 1 ? 's' : ''} before your subscription enters grace period.
+        </p>
+        <p style="color: #374151; font-size: 15px; line-height: 1.7;">
+          Please ensure your payment method is up to date or update it in your account settings.
+        </p>
+        <a href="${renewUrl}" style="display: inline-block; background: #ef4444; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; margin: 16px 0;">Update Payment Method</a>
+      </div>
+      <div style="text-align: center; padding: 16px; color: #9ca3af; font-size: 11px;">
+        PawTag — Reuniting lost pets with their families
+      </div>
+    </div>`;
+
+  await sendMail(to, `Payment failed for your PawTag subscription — Retry ${retryCount}`, html);
+}
+
+async function sendGracePeriodEmail(to: string, name: string, tagId: string, gracePeriodWeeks: number) {
+  const renewUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/subscriptions`;
+
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+      <div style="background: linear-gradient(135deg, #f59e0b, #f97316); padding: 24px; border-radius: 12px 12px 0 0; text-align: center;">
+        <h1 style="color: white; font-size: 24px; margin: 0;">PawTag</h1>
+      </div>
+      <div style="background: #fffbeb; padding: 32px; border: 1px solid #fde68a;">
+        <h2 style="color: #111827; font-size: 20px;">Hi ${name},</h2>
+        <p style="color: #374151; font-size: 15px; line-height: 1.7;">
+          Your PawTag subscription for <strong>${tagId}</strong> has entered the grace period after multiple failed payment attempts.
+        </p>
+        <p style="color: #374151; font-size: 15px; line-height: 1.7;">
+          You have <strong>${gracePeriodWeeks} week${gracePeriodWeeks !== 1 ? 's' : ''}</strong> to renew before your tag becomes inactive.
+        </p>
+        <p style="color: #374151; font-size: 15px; line-height: 1.7;">
+          During this time, your tag is still working. Renew now to restore full protection.
+        </p>
+        <a href="${renewUrl}" style="display: inline-block; background: #f59e0b; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; margin: 16px 0;">Renew Now</a>
+      </div>
+      <div style="text-align: center; padding: 16px; color: #9ca3af; font-size: 11px;">
+        PawTag — Reuniting lost pets with their families
+      </div>
+    </div>`;
+
+  await sendMail(to, `Grace period started for your PawTag subscription`, html);
+}
+
+export async function processPaymentRetries() {
+  const now = new Date();
+  const subscriptions = await Subscription.find({
+    status: { $in: ['active', 'grace_period'] },
+    'paymentRetryCount': { $gt: 0 },
+    'nextPaymentAttemptAt': { $lte: now },
+    deletedAt: null,
+  });
+
+  for (const subscription of subscriptions) {
+    try {
+      // Attempt to charge the payment method
+      // In a real implementation, this would call Stripe to retry the payment
+      const success = await attemptPaymentCharge(subscription);
+      
+      if (success) {
+        // Payment succeeded - reset retry state
+        (subscription as any).paymentRetryCount = 0;
+        (subscription as any).lastPaymentAttemptAt = now;
+        (subscription as any).nextPaymentAttemptAt = undefined;
+        await subscription.save();
+        
+        // Create invoice for successful payment
+        await createInvoice({
+          subscriptionId: subscription._id.toString(),
+          userId: subscription.userId.toString(),
+          amount: subscription.price,
+          billingPeriodStart: subscription.currentPeriodStart,
+          billingPeriodEnd: subscription.currentPeriodEnd,
+          status: 'paid',
+          paymentMethod: 'retry',
+        });
+
+        // Send success email
+        const user = await User.findById(subscription.userId).lean();
+        if (user?.email) {
+          await sendPaymentRetrySuccessEmail(
+            user.email,
+            user.fullName || 'Customer',
+            subscription.tagId?.toString() || 'Unknown'
+          );
+        }
+
+        await auditJobEvent({
+          action: 'subscription_payment_retry_success',
+          eventType: 'subscription.payment_retry_success',
+          eventCategory: 'FINANCIAL',
+          operationType: 'UPDATE',
+          resourceType: 'Subscription',
+          resourceId: subscription._id.toString(),
+          outcome: 'SUCCESS',
+          severity: 'HIGH',
+          metadata: {
+            userId: subscription.userId.toString(),
+            tagId: subscription.tagId?.toString(),
+            retryCount: (subscription as any).paymentRetryCount,
+          },
+        }, { actorType: 'SERVICE' });
+      } else {
+        // Payment failed - handle failure
+        await handlePaymentFailure(subscription._id.toString(), 'retry');
+      }
+    } catch (error) {
+      logger.error({ err: error, subscriptionId: subscription._id }, 'Error processing payment retry');
+    }
+  }
+}
+
+async function attemptPaymentCharge(_subscription: any): Promise<boolean> {
+  // In demo mode, simulate 80% success rate for retries
+  if (!process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY === 'sk_test_demo_key') {
+    return Math.random() < 0.8;
+  }
+
+  // In production, this would call Stripe to retry the payment
+  // For now, return false as we haven't implemented Stripe integration for subscriptions
+  return false;
+}
+
+async function sendPaymentRetrySuccessEmail(to: string, name: string, tagId: string) {
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+      <div style="background: linear-gradient(135deg, #10b981, #059669); padding: 24px; border-radius: 12px 12px 0 0; text-align: center;">
+        <h1 style="color: white; font-size: 24px; margin: 0;">PawTag</h1>
+      </div>
+      <div style="background: #ecfdf5; padding: 32px; border: 1px solid #a7f3d0;">
+        <h2 style="color: #111827; font-size: 20px;">Hi ${name},</h2>
+        <p style="color: #374151; font-size: 15px; line-height: 1.7;">
+          Great news! Your payment for PawTag subscription <strong>${tagId}</strong> was successfully processed.
+        </p>
+        <p style="color: #374151; font-size: 15px; line-height: 1.7;">
+          Your subscription is now active and your tag is fully protected.
+        </p>
+      </div>
+      <div style="text-align: center; padding: 16px; color: #9ca3af; font-size: 11px;">
+        PawTag — Reuniting lost pets with their families
+      </div>
+    </div>`;
+
+  await sendMail(to, `Payment successful for your PawTag subscription`, html);
 }

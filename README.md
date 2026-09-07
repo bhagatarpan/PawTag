@@ -1459,7 +1459,7 @@ Triggers on push/PR to `main` and `develop`. **7 jobs:**
 | Service | Interval | Purpose |
 |---------|----------|---------|
 | `startReminderService()` | 1 hour | Finder reminders (24h after scan) + onboarding nudges (3+ days skipped) |
-| `startSubscriptionService()` | 1 minute | Subscription expiry checks, grace period transitions, auto-renewal |
+| `startSubscriptionService()` | 1 minute | Subscription expiry checks, grace period transitions, auto-renewal, payment retries |
 | `startEscalationService()` | 1 minute | Overdue escalation detection (30-min deadline after pet found) |
 | `startLowStockService()` | 24 hours (1h initial delay) | Low stock alerts via email + in-app notification to admin |
 

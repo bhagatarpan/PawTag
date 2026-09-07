@@ -9,6 +9,7 @@ import { auditService, type AuditContext } from '../services/audit';
 import { createAuditContextFromRequest, type AuditRequest } from '../middleware/audit';
 import { sendOrderConfirmation } from '../services/email.service';
 import { formatCreatedBy, formatCreatedByDescription } from '../lib/actor';
+import { createSubscription } from '../services/subscription.service';
 import logger from '../lib/logger';
 
 const router = Router();
@@ -477,6 +478,20 @@ router.post('/tags/redeem', requirePermission('tag.create'), async (req: AuthReq
     }
 
     await tag.save();
+
+    // Create subscription for the activated tag
+    try {
+      await createSubscription({
+        userId: req.user!.id,
+        tagId: tag._id.toString(),
+        orderId: tag.orderId?.toString(),
+        planType: 'annual', // Default to annual plan
+      });
+      logger.info({ tagId: tag.tagId, userId: req.user!.id }, 'Subscription created for activated tag');
+    } catch (error) {
+      logger.error({ err: error, tagId: tag.tagId }, 'Failed to create subscription for activated tag');
+      // Don't fail the tag redemption if subscription creation fails
+    }
 
     await auditCustomerEvent(req, {
       action: 'redeem',

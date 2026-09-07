@@ -27,6 +27,7 @@ import { sendPushToUser } from './push-notification.service';
 import { generateSecureToken, hashToken } from './auth.service';
 import { recordOrderActivity } from '../lib/order-activity';
 import { formatCreatedBy, formatCreatedByDescription } from '../lib/actor';
+import { createSubscription } from './subscription.service';
 import logger from '../lib/logger';
 
 /**
@@ -251,7 +252,7 @@ export async function createPawTagOrder(params: CreateOrderParams): Promise<Crea
         const { generateTagId } = await import('../lib/tag-id');
         for (let i = 0; i < item.quantity; i++) {
           const tagId = await generateTagId();
-          await Tag.create({
+          const tag = await Tag.create({
             tagId,
             tagType: 'qr',
             orderId: order._id,
@@ -259,6 +260,20 @@ export async function createPawTagOrder(params: CreateOrderParams): Promise<Crea
             subscriptionStatus: 'none',
           });
           logger.info({ tagId, orderNumber }, 'Auto-created tag');
+
+          // Create subscription for the tag
+          try {
+            await createSubscription({
+              userId,
+              tagId: tag._id.toString(),
+              orderId: order._id.toString(),
+              planType: 'annual', // Default to annual plan
+            });
+            logger.info({ tagId: tag.tagId, userId, orderNumber }, 'Subscription created for tag');
+          } catch (error) {
+            logger.error({ err: error, tagId: tag.tagId }, 'Failed to create subscription for tag');
+            // Don't fail the order if subscription creation fails
+          }
         }
       }
     } catch (err) {
