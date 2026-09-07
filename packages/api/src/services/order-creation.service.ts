@@ -357,6 +357,12 @@ export async function createPawTagOrder(params: CreateOrderParams): Promise<Crea
     }).catch(() => {});
   }
 
+  // 11. Award Guardian Points for purchase (non-blocking)
+  import('./loyalty/points-earning.service').then(({ awardPurchasePoints }) => {
+    awardPurchasePoints(userId, total, order._id.toString())
+      .catch((err) => logger.error({ err, orderNumber }, 'Guardian points earning error'));
+  }).catch(() => {});
+
   logger.info({ orderNumber, total, userId }, 'Order created successfully');
 
   return { order, invoice, invoiceUrl };

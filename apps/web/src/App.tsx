@@ -42,6 +42,7 @@ import GuardianDashboard from './pages/account/GuardianDashboard';
 import GuardianPoints from './pages/account/GuardianPoints';
 import GuardianRewards from './pages/account/GuardianRewards';
 import SubscriptionUpgrade from './pages/account/SubscriptionUpgrade';
+import GoldBenefits from './pages/account/GoldBenefits';
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const token = localStorage.getItem('pawtag_token');
@@ -119,6 +120,7 @@ export default function App() {
         <Route path="/account/guardian" element={<ProtectedRoute><AccountLayout><GuardianDashboard /></AccountLayout></ProtectedRoute>} />
         <Route path="/account/guardian/points" element={<ProtectedRoute><AccountLayout><GuardianPoints /></AccountLayout></ProtectedRoute>} />
         <Route path="/account/guardian/rewards" element={<ProtectedRoute><AccountLayout><GuardianRewards /></AccountLayout></ProtectedRoute>} />
+        <Route path="/account/guardian/benefits" element={<ProtectedRoute><AccountLayout><GoldBenefits /></AccountLayout></ProtectedRoute>} />
         <Route path="/account/upgrade" element={<ProtectedRoute><AccountLayout><SubscriptionUpgrade /></AccountLayout></ProtectedRoute>} />
         <Route path="/account/notifications" element={<ProtectedRoute><AccountLayout><Notifications /></AccountLayout></ProtectedRoute>} />
         <Route path="/account/notification-preferences" element={<ProtectedRoute><AccountLayout><NotificationPreferences /></AccountLayout></ProtectedRoute>} />

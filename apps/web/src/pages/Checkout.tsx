@@ -62,6 +62,11 @@ export default function Checkout() {
   const [promoDiscount, setPromoDiscount] = useState(0);
   const [guestPromoInfo, setGuestPromoInfo] = useState<any>(null);
 
+  // PawRewards
+  const [pawRewardsBalance, setPawRewardsBalance] = useState(0);
+  const [pawRewardsRedemption, setPawRewardsRedemption] = useState(0);
+  const [pawRewardsLoading, setPawRewardsLoading] = useState(false);
+
   // Verification status
   const [emailVerified, setEmailVerified] = useState(false);
   const [mobileVerified, setMobileVerified] = useState(false);
@@ -153,13 +158,27 @@ export default function Checkout() {
     }
   }, [user]);
 
+  // Fetch PawRewards balance when user is logged in
+  useEffect(() => {
+    if (user) {
+      api.get('/customer/guardian/rewards')
+        .then(res => {
+          setPawRewardsBalance(res.data.data.balance || 0);
+        })
+        .catch(() => {
+          setPawRewardsBalance(0);
+        });
+    }
+  }, [user]);
+
   // Derived values — use PawTag cart totals
   const selectedShippingPrice = shippingOptions.find(o => o.id === selectedShippingOption)?.cost || 0;
   const shippingCost = selectedShippingPrice;
   const taxAmount = totals.tax || 0;
   const discountAmount = totals.discount || promoDiscount;
   const itemsSubtotal = totals.subtotal || total;
-  const orderTotal = totals.total || (itemsSubtotal + shippingCost + taxAmount - discountAmount);
+  const pawRewardsDiscount = Math.min(pawRewardsRedemption, itemsSubtotal + shippingCost + taxAmount - discountAmount);
+  const orderTotal = totals.total || (itemsSubtotal + shippingCost + taxAmount - discountAmount - pawRewardsDiscount);
 
   const canProceedToCheckout = items.length > 0;
   const canProceedToPayment = emailVerified && mobileVerified && form.line1 && form.city && form.zip;
@@ -230,6 +249,38 @@ export default function Checkout() {
       if (user) await refreshCart();
     } catch (err: any) {
       setError(err.message || 'Failed to remove promo code');
+    }
+  };
+
+  // PawRewards redemption handler
+  const handlePawRewardsRedemption = async (amount: number) => {
+    if (!user || amount < 0) return;
+    
+    // Validate minimum redemption
+    if (amount > 0 && amount < 2) {
+      setError('Minimum PawRewards redemption is $2');
+      return;
+    }
+    
+    // Validate maximum redemption (can't exceed order total)
+    const maxRedemption = itemsSubtotal + shippingCost + taxAmount - discountAmount;
+    if (amount > maxRedemption) {
+      setError(`Cannot redeem more than order total ($${maxRedemption.toFixed(2)})`);
+      return;
+    }
+    
+    setPawRewardsLoading(true);
+    try {
+      // If redeeming, validate with server
+      if (amount > 0) {
+        await api.post('/customer/guardian/rewards/redeem', { amount });
+      }
+      setPawRewardsRedemption(amount);
+      setError(null);
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to redeem PawRewards');
+    } finally {
+      setPawRewardsLoading(false);
     }
   };
 
@@ -501,9 +552,59 @@ export default function Checkout() {
                   </>
                 )}
                   </div>
+
+                {/* PawRewards Redemption */}
+                {user && pawRewardsBalance > 0 && (
+                  <div className="border-t border-gray-100 pt-4 mt-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <PawPrint className="h-4 w-4 text-amber-500" />
+                        <span className="text-sm font-medium text-gray-700">PawRewards</span>
+                      </div>
+                      <span className="text-sm text-amber-600 font-medium">${pawRewardsBalance.toFixed(2)} available</span>
+                    </div>
+                    <p className="text-xs text-gray-500 mb-3">Redeem your PawRewards for instant discounts</p>
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        min="0"
+                        max={Math.min(pawRewardsBalance, itemsSubtotal + shippingCost + taxAmount - discountAmount)}
+                        step="0.01"
+                        value={pawRewardsRedemption || ''}
+                        onChange={(e) => {
+                          const value = parseFloat(e.target.value) || 0;
+                          setPawRewardsRedemption(Math.min(value, pawRewardsBalance));
+                        }}
+                        placeholder="0.00"
+                        className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-amber-500 disabled:bg-gray-50"
+                        disabled={pawRewardsLoading}
+                      />
+                      <button
+                        onClick={() => handlePawRewardsRedemption(pawRewardsRedemption)}
+                        disabled={pawRewardsLoading || pawRewardsRedemption < 2}
+                        className="px-4 py-2 text-sm text-amber-600 border border-amber-200 rounded-lg hover:bg-amber-50 disabled:opacity-50"
+                      >
+                        {pawRewardsLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Apply'}
+                      </button>
+                    </div>
+                    {pawRewardsRedemption > 0 && (
+                      <div className="mt-2 flex items-center justify-between">
+                        <span className="text-xs text-amber-600">Redeeming ${pawRewardsRedemption.toFixed(2)}</span>
+                        <button
+                          onClick={() => setPawRewardsRedemption(0)}
+                          className="text-xs text-red-500 hover:text-red-600"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div className="space-y-2 pt-2">
                   <div className="flex justify-between text-sm text-gray-600"><span>Subtotal</span><span>NZ${itemsSubtotal.toFixed(2)}</span></div>
                   {discountAmount > 0 && <div className="flex justify-between text-sm text-green-600"><span>Discount</span><span>-NZ${discountAmount.toFixed(2)}</span></div>}
+                  {pawRewardsDiscount > 0 && <div className="flex justify-between text-sm text-amber-600"><span>PawRewards</span><span>-NZ${pawRewardsDiscount.toFixed(2)}</span></div>}
                   <div className="flex justify-between text-sm text-gray-600"><span>Shipping</span><span className={`font-medium ${shippingCost === 0 ? 'text-green-600' : 'text-gray-900'}`}>{shippingCost === 0 ? 'FREE' : `NZ$${shippingCost.toFixed(2)}`}</span></div>
                   <div className="flex justify-between text-sm text-gray-600"><span>Tax (Included)</span><span>NZ${taxAmount.toFixed(2)}</span></div>
                   <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-100"><span>Total (NZD)</span><span className="text-primary-700">NZ${orderTotal.toFixed(2)}</span></div>

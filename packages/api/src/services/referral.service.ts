@@ -183,6 +183,12 @@ export async function completeReferralRewards(orderId: string): Promise<void> {
         <p>Thanks for spreading the word about PawTag!</p>
       </div>`);
   }
+
+  // Award Guardian Points for referral (non-blocking)
+  import('./loyalty/points-earning.service').then(({ awardReferralPoints }) => {
+    awardReferralPoints(referral.referrerId.toString(), referral._id.toString(), 'signup')
+      .catch((err) => logger.error({ err }, 'Guardian referral points earning error'));
+  }).catch(() => {});
 }
 
 export async function getReferralStats(userId: string) {

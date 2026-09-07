@@ -212,6 +212,12 @@ router.post('/pets', requirePermission('pet.create'), validate(createPetSchema),
       metadata: { name: pet.name, petType: pet.petType, petId: pet.petId, breed: pet.breed },
     });
 
+    // Award Guardian Points for pet profile completion (non-blocking)
+    import('../services/loyalty/points-earning.service').then(({ awardPetMilestonePoints }) => {
+      awardPetMilestonePoints(req.user!.id, pet._id.toString(), 'profile_complete')
+        .catch((err) => logger.error({ err }, 'Guardian pet milestone points earning error'));
+    }).catch(() => {});
+
     res.status(201).json({ success: true, data: pet });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to create pet' });

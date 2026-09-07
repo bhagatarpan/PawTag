@@ -362,4 +362,69 @@ router.get('/tier', async (req: AuthRequest, res: Response) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/customer/guardian/benefits:
+ *   get:
+ *     tags: [Customer - Guardian]
+ *     summary: Get Gold benefits information
+ *     description: 'Returns Gold membership benefits and status.'
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Gold benefits data
+ *       401:
+ *         description: Not authenticated
+ */
+router.get('/benefits', async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'Not authenticated' });
+    }
+
+    const { Subscription } = require('@pawtag/db');
+    
+    const goldSubscription = await Subscription.findOne({
+      userId,
+      status: 'active',
+      planType: 'monthly',
+      price: 1.99,
+    }).lean();
+
+    const isGoldMember = !!goldSubscription;
+    
+    const benefits = [
+      'Free shipping on orders over $50',
+      'Priority customer support',
+      'Early access to new products',
+      'Double points on all purchases',
+      'Nurture tier starting point (100 bonus points)',
+    ];
+
+    await auditCustomerGuardianEvent(req, {
+      action: 'guardian_benefits_viewed',
+      eventType: 'CUSTOMER_ACTION',
+      eventCategory: 'READ',
+      operationType: 'READ',
+      resourceType: 'GUARDIAN',
+      severity: 'LOW',
+    });
+
+    res.json({
+      success: true,
+      data: {
+        isGoldMember,
+        benefits,
+        nextBillingDate: goldSubscription?.currentPeriodEnd,
+        monthlyPrice: 1.99,
+      },
+    });
+  } catch (error) {
+    logger.error({ error }, 'Failed to get Gold benefits');
+    res.status(500).json({ success: false, error: 'Failed to get Gold benefits' });
+  }
+});
+
 export default router;
