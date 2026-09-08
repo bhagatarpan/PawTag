@@ -150,6 +150,7 @@ router.get('/suggest', async (req: Request, res: Response) => {
 
         const params = new URLSearchParams({
           q: q.trim(),
+          type: 'All',
           max: limit.toString(),
         });
         const apiUrl = `https://api.nzpost.co.nz/addresschecker/1.0/suggest?${params}`;

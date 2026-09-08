@@ -82,8 +82,10 @@ export default function AddressAutocompleteSettings() {
       const data = await res.json();
       if (data.success && data.addresses?.length > 0) {
         toast.success(`Test successful! Found: ${data.addresses[0].line1}, ${data.addresses[0].city}`);
+      } else if (!data.success && data.error) {
+        toast.error(`Test failed: ${data.error}`);
       } else {
-        toast.error('Test failed: No results returned');
+        toast.error('Test failed: No results returned for this address');
       }
     } catch {
       toast.error('Test failed: Could not reach API');
