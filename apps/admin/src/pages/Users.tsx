@@ -921,7 +921,7 @@ export function DetailDrawer({
                   const isExpired = sub.status === 'expired';
                   return (
                     <div key={sub._id} className="bg-white rounded-xl border border-gray-100 overflow-hidden hover:border-gray-200 hover:shadow-sm transition-all duration-200">
-                      <div onClick={() => { onClose(); navigate(`/subscriptions/${sub._id}`); }} className="p-5 cursor-pointer">
+                      <div onClick={() => { onClose(); navigate(`/customer-subscriptions/${sub._id}`); }} className="p-5 cursor-pointer">
                         <div className="flex items-start justify-between mb-3">
                           <div className="flex items-center gap-3">
                             <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isActive ? 'bg-emerald-50' : isGrace ? 'bg-amber-50' : 'bg-gray-50'}`}>

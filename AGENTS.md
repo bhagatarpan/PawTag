@@ -823,7 +823,7 @@ Address autocomplete with configurable provider (Photon or NZ Post):
 
 Enterprise-grade sidebar with collapsible sections and dark/light mode:
 
-- **Sections:** 8 logical groups (Overview, Business, Users, Products & Services, Communication, Content, Settings, Security, Operations)
+- **Sections:** 13 logical groups (Overview, Catalog, Inventory, Orders & Fulfilment, Payments & Refunds, Subscriptions & Loyalty, Discounts & Promotions, Users & Pets, Communication, Content (CMS), Settings, Security & Access, Operations)
 - **Collapsible:** Click section header to expand/collapse, state persists in localStorage
 - **Theme toggle:** Sun/Moon icon in sidebar header, persists in localStorage
 - **Active state:** Section auto-expands when child route is active
@@ -834,15 +834,19 @@ Enterprise-grade sidebar with collapsible sections and dark/light mode:
 **Sidebar Structure:**
 | Section | Items |
 |---------|-------|
-| **Overview** | Dashboard |
-| **Business** | Shop & Commerce (Dashboard), Catalog (Categories, Collections, Brands), Inventory, Orders, Discounts, Payments, Shipping, Fulfilment, Returns, Tax |
-| **Users** | Customers (site visitors), Users (admin staff), Pets |
-| **Products & Services** | Products, Tags, Subscription Plans |
+| **Overview** | Dashboard, Commerce Reports |
+| **Catalog** | Products, Categories, Collections, Brands, Tags |
+| **Inventory** | Stock, Adjustments, Stock History |
+| **Orders & Fulfilment** | All Orders, Pending, Processing, Invoices, Shipments, Returns |
+| **Payments & Refunds** | Transactions, Refunds, Refund Report, Reconciliation, Shipping Methods |
+| **Subscriptions & Loyalty** | Subscription Plans, Customer Subscriptions, Guardian Dashboard, Members, Analytics, Guardian Settings |
+| **Discounts & Promotions** | Discount Codes, Referral Program |
+| **Users & Pets** | Customers, Admin Users, Pets |
 | **Communication** | Notifications, Support Requests, Tag Expiry Alerts |
-| **Content** | Announcements, Auth Pages, Customer Onboarding, Footer, Homepage Sections, Invoice Template, Media Library, Navigation, Pages, Redirects, Shop Pages, Email Templates, SMS Templates, Pet References |
-| **Settings** | Commerce Settings, General Settings, Feature Flags, Site Availability, Address Autocomplete, Pet References |
-| **Security** | Roles & Permissions, Permissions, Permission Groups, Access Scopes, Audit Trail, Audit Settings |
-| **Operations** | Webhooks, System Logs, Log Settings, Statistics, Write NFC Tag |
+| **Content (CMS)** | Pages, Homepage, Shop Pages, Auth Pages, Navigation, Footer, Announcements, Onboarding, Email Templates, SMS Templates, Invoice Template, Media, Redirects, Pet References |
+| **Settings** | Commerce Settings, General Settings, Site Availability, Address Autocomplete |
+| **Security & Access** | Roles & Permissions, Permissions, Permission Groups, Access Scopes, Audit Trail, Audit Settings |
+| **Operations** | Feature Flags, Webhooks, System Logs, Log Settings, Statistics, Write NFC Tag |
 
 ### Auth & Permissions
 

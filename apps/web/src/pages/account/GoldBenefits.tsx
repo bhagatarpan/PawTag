@@ -3,15 +3,39 @@ import { Link } from 'react-router-dom';
 import { Crown, Check, Star, Truck, Headphones, Zap, Shield, Gift, ArrowRight } from 'lucide-react';
 import api from '../../lib/api';
 
-interface GoldBenefitsData {
-  isGoldMember: boolean;
-  benefits: string[];
-  nextBillingDate?: string;
-  monthlyPrice: number;
+type TierName = 'CARE' | 'NURTURE' | 'PROTECTOR' | 'SAFEGUARD';
+
+interface TierBenefits {
+  name: string;
+  displayName: string;
+  pointsMultiplier: number;
+  pawRewardsMonthly: number;
+  freeShippingThreshold: number;
+  earlyAccess: boolean;
+  prioritySupport: boolean;
+  exclusivePromotions: boolean;
+  monthlyProgressEmail: boolean;
+  guardianBadge: boolean;
+  communityAccess: boolean;
 }
 
+interface GuardianTierData {
+  currentTier: TierName;
+  points: number;
+  pointsToNextTier: number | null;
+  nextTier: TierName | null;
+  benefits: TierBenefits;
+}
+
+const TIER_CONFIG: Record<TierName, { gradient: string; icon: typeof Crown }> = {
+  CARE: { gradient: 'from-emerald-500 to-teal-600', icon: Shield },
+  NURTURE: { gradient: 'from-teal-500 to-cyan-600', icon: Star },
+  PROTECTOR: { gradient: 'from-purple-500 to-indigo-600', icon: Zap },
+  SAFEGUARD: { gradient: 'from-amber-500 to-orange-600', icon: Crown },
+};
+
 export default function GoldBenefits() {
-  const [benefitsData, setBenefitsData] = useState<GoldBenefitsData | null>(null);
+  const [tierData, setTierData] = useState<GuardianTierData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -21,22 +45,8 @@ export default function GoldBenefits() {
 
   async function fetchBenefits() {
     try {
-      const res = await api.get('/customer/guardian/tier');
-      const tierData = res.data.data;
-      
-      // Mock Gold benefits data (in real implementation, this would come from API)
-      setBenefitsData({
-        isGoldMember: tierData.currentTier === 'GOLD',
-        benefits: [
-          'Free shipping on orders over $50',
-          'Priority customer support',
-          'Early access to new products',
-          'Double points on all purchases',
-          'Nurture tier starting point (100 bonus points)',
-        ],
-        nextBillingDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        monthlyPrice: 1.99,
-      });
+      const res = await api.get('/customer/guardian/points');
+      setTierData(res.data.data);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to load benefits');
     } finally {
@@ -76,13 +86,19 @@ export default function GoldBenefits() {
     );
   }
 
+  if (!tierData) return null;
+
+  const { benefits } = tierData;
+  const tierConfig = TIER_CONFIG[tierData.currentTier];
+  const TierIcon = tierConfig.icon;
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Gold Membership</h1>
-          <p className="text-gray-500">Premium benefits for our most loyal guardians</p>
+          <h1 className="text-2xl font-bold text-gray-900">{benefits.displayName}</h1>
+          <p className="text-gray-500">Your Guardian tier benefits and rewards</p>
         </div>
         <Link
           to="/account/guardian"
@@ -92,165 +108,173 @@ export default function GoldBenefits() {
         </Link>
       </div>
 
-      {/* Gold Membership Card */}
-      <div className="bg-gradient-to-br from-amber-500 to-yellow-600 rounded-2xl p-6 text-white shadow-lg">
+      {/* Tier Card */}
+      <div className={`bg-gradient-to-br ${tierConfig.gradient} rounded-2xl p-6 text-white shadow-lg`}>
         <div className="flex items-center gap-3 mb-4">
-          <Crown className="h-8 w-8" />
-          <h2 className="text-2xl font-bold">Gold Membership</h2>
+          <TierIcon className="h-8 w-8" />
+          <h2 className="text-2xl font-bold">{benefits.displayName}</h2>
         </div>
-        <p className="text-amber-100 mb-4">
-          Unlock premium benefits and earn points faster with Gold membership.
+        <p className="text-white/80 mb-4">
+          {tierData.pointsToNextTier !== null
+            ? `${tierData.pointsToNextTier} points to ${tierData.nextTier}`
+            : 'Maximum tier reached!'}
         </p>
         <div className="flex items-center gap-4">
           <div className="text-center">
-            <p className="text-3xl font-bold">${benefitsData?.monthlyPrice.toFixed(2)}</p>
-            <p className="text-amber-200 text-sm">per month</p>
+            <p className="text-3xl font-bold">{tierData.points}</p>
+            <p className="text-white/70 text-sm">Guardian Points</p>
           </div>
-          {benefitsData?.isGoldMember && benefitsData.nextBillingDate && (
-            <div className="text-center">
-              <p className="text-lg font-semibold">Next Billing</p>
-              <p className="text-amber-200 text-sm">
-                {new Date(benefitsData.nextBillingDate).toLocaleDateString()}
-              </p>
-            </div>
-          )}
+          <div className="text-center">
+            <p className="text-3xl font-bold">{benefits.pointsMultiplier}×</p>
+            <p className="text-white/70 text-sm">Points Multiplier</p>
+          </div>
         </div>
       </div>
 
       {/* Benefits Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Free Shipping */}
+        {/* Monthly PawRewards */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
           <div className="flex items-center gap-3 mb-4">
             <div className="p-2 bg-green-100 rounded-lg">
-              <Truck className="h-6 w-6 text-green-600" />
+              <Gift className="h-6 w-6 text-green-600" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900">Monthly PawRewards</h3>
+          </div>
+          <p className="text-gray-600 mb-4">
+            Receive ${benefits.pawRewardsMonthly.toFixed(2)} in PawRewards every month to spend on products.
+          </p>
+          <div className="flex items-center gap-2 text-green-600">
+            <Check className="h-5 w-5" />
+            <span className="font-medium">${benefits.pawRewardsMonthly.toFixed(2)} per month</span>
+          </div>
+        </div>
+
+        {/* Free Shipping */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2 bg-blue-100 rounded-lg">
+              <Truck className="h-6 w-6 text-blue-600" />
             </div>
             <h3 className="text-lg font-semibold text-gray-900">Free Shipping</h3>
           </div>
           <p className="text-gray-600 mb-4">
-            Get free shipping on all orders over $50. No minimum purchase required for Gold members.
+            {benefits.freeShippingThreshold === 0
+              ? 'Free shipping on all orders, no minimum required.'
+              : `Free shipping on orders over $${benefits.freeShippingThreshold}.`}
           </p>
-          <div className="flex items-center gap-2 text-green-600">
+          <div className="flex items-center gap-2 text-blue-600">
             <Check className="h-5 w-5" />
-            <span className="font-medium">Available on all orders over $50</span>
+            <span className="font-medium">
+              {benefits.freeShippingThreshold === 0 ? 'All orders' : `Orders over $${benefits.freeShippingThreshold}`}
+            </span>
           </div>
         </div>
 
         {/* Priority Support */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <Headphones className="h-6 w-6 text-blue-600" />
+        {benefits.prioritySupport && (
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-purple-100 rounded-lg">
+                <Headphones className="h-6 w-6 text-purple-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900">Priority Support</h3>
             </div>
-            <h3 className="text-lg font-semibold text-gray-900">Priority Support</h3>
+            <p className="text-gray-600 mb-4">
+              Get priority customer support with faster response times and dedicated assistance.
+            </p>
+            <div className="flex items-center gap-2 text-purple-600">
+              <Check className="h-5 w-5" />
+              <span className="font-medium">Priority response times</span>
+            </div>
           </div>
-          <p className="text-gray-600 mb-4">
-            Get priority customer support with faster response times and dedicated assistance.
-          </p>
-          <div className="flex items-center gap-2 text-blue-600">
-            <Check className="h-5 w-5" />
-            <span className="font-medium">24-hour response guarantee</span>
-          </div>
-        </div>
+        )}
 
         {/* Early Access */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 bg-purple-100 rounded-lg">
-              <Zap className="h-6 w-6 text-purple-600" />
+        {benefits.earlyAccess && (
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-amber-100 rounded-lg">
+                <Zap className="h-6 w-6 text-amber-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900">Early Access</h3>
             </div>
-            <h3 className="text-lg font-semibold text-gray-900">Early Access</h3>
-          </div>
-          <p className="text-gray-600 mb-4">
-            Be the first to access new products and features before they're released to the public.
-          </p>
-          <div className="flex items-center gap-2 text-purple-600">
-            <Check className="h-5 w-5" />
-            <span className="font-medium">48-hour early access window</span>
-          </div>
-        </div>
-
-        {/* Double Points */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 bg-amber-100 rounded-lg">
-              <Star className="h-6 w-6 text-amber-600" />
+            <p className="text-gray-600 mb-4">
+              Be the first to access new products and features before they're released to the public.
+            </p>
+            <div className="flex items-center gap-2 text-amber-600">
+              <Check className="h-5 w-5" />
+              <span className="font-medium">Early access to new products</span>
             </div>
-            <h3 className="text-lg font-semibold text-gray-900">Double Points</h3>
           </div>
-          <p className="text-gray-600 mb-4">
-            Earn 2× points on all purchases, reviews, and referrals. Accelerate your tier progression.
-          </p>
-          <div className="flex items-center gap-2 text-amber-600">
-            <Check className="h-5 w-5" />
-            <span className="font-medium">2× points on all activities</span>
-          </div>
-        </div>
+        )}
 
-        {/* Nurture Tier Starting Point */}
+        {/* Exclusive Promotions */}
+        {benefits.exclusivePromotions && (
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-pink-100 rounded-lg">
+                <Star className="h-6 w-6 text-pink-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900">Exclusive Promotions</h3>
+            </div>
+            <p className="text-gray-600 mb-4">
+              Access exclusive deals and special offers available only to Guardian members.
+            </p>
+            <div className="flex items-center gap-2 text-pink-600">
+              <Check className="h-5 w-5" />
+              <span className="font-medium">Member-only promotions</span>
+            </div>
+          </div>
+        )}
+
+        {/* Points Multiplier */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
           <div className="flex items-center gap-3 mb-4">
             <div className="p-2 bg-teal-100 rounded-lg">
               <Shield className="h-6 w-6 text-teal-600" />
             </div>
-            <h3 className="text-lg font-semibold text-gray-900">Nurture Tier Start</h3>
+            <h3 className="text-lg font-semibold text-gray-900">Points Multiplier</h3>
           </div>
           <p className="text-gray-600 mb-4">
-            Start at the Nurture tier with 100 bonus points credited to your account immediately.
+            Earn {benefits.pointsMultiplier}× points on all purchases, reviews, and referrals.
           </p>
           <div className="flex items-center gap-2 text-teal-600">
             <Check className="h-5 w-5" />
-            <span className="font-medium">100 bonus points on signup</span>
-          </div>
-        </div>
-
-        {/* Exclusive Rewards */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 bg-pink-100 rounded-lg">
-              <Gift className="h-6 w-6 text-pink-600" />
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900">Exclusive Rewards</h3>
-          </div>
-          <p className="text-gray-600 mb-4">
-            Access exclusive PawRewards and special offers available only to Gold members.
-          </p>
-          <div className="flex items-center gap-2 text-pink-600">
-            <Check className="h-5 w-5" />
-            <span className="font-medium">$40 maximum PawRewards balance</span>
+            <span className="font-medium">{benefits.pointsMultiplier}× points on all activities</span>
           </div>
         </div>
       </div>
 
-      {/* CTA Section */}
-      {!benefitsData?.isGoldMember && (
-        <div className="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-2xl p-6">
+      {/* Upgrade CTA */}
+      {tierData.nextTier && (
+        <div className="bg-gradient-to-r from-teal-50 to-cyan-50 border border-teal-200 rounded-2xl p-6">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">Ready to go Gold?</h3>
+              <h3 className="text-lg font-semibold text-gray-900">Ready to level up?</h3>
               <p className="text-gray-600 mt-1">
-                Unlock all premium benefits for just $1.99/month
+                Upgrade to {tierData.nextTier} to unlock even more benefits
               </p>
             </div>
             <Link
-              to="/account/subscriptions"
-              className="px-6 py-3 bg-amber-500 text-white rounded-xl font-semibold hover:bg-amber-600 transition-colors flex items-center gap-2"
+              to="/account/upgrade"
+              className="px-6 py-3 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 transition-colors flex items-center gap-2"
             >
-              Upgrade to Gold <ArrowRight className="h-4 w-4" />
+              Upgrade Plan <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
         </div>
       )}
 
-      {/* Current Member Info */}
-      {benefitsData?.isGoldMember && (
+      {/* Max Tier Message */}
+      {!tierData.nextTier && (
         <div className="bg-green-50 border border-green-200 rounded-2xl p-6">
           <div className="flex items-center gap-3">
             <Crown className="h-6 w-6 text-green-600" />
             <div>
-              <h3 className="text-lg font-semibold text-green-800">You're a Gold Member!</h3>
+              <h3 className="text-lg font-semibold text-green-800">Maximum Tier Reached!</h3>
               <p className="text-green-600 mt-1">
-                Enjoying all premium benefits. Thank you for being a valued member.
+                You've reached the highest Guardian tier. Enjoy all premium benefits!
               </p>
             </div>
           </div>

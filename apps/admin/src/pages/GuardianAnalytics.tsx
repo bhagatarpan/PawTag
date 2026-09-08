@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { TrendingUp, Users, Star, Gift, DollarSign, RefreshCw } from 'lucide-react';
 import api from '../lib/api';
 
@@ -233,24 +234,24 @@ export default function GuardianAnalytics() {
       <div className="bg-gradient-to-r from-primary-50 to-primary-100 border border-primary-200 rounded-2xl p-6">
         <h2 className="text-lg font-semibold text-primary-900 mb-4">Quick Actions</h2>
         <div className="flex flex-wrap gap-3">
-          <a
-            href="/admin/guardian"
+          <Link
+            to="/guardian"
             className="px-4 py-2 bg-white border border-primary-300 text-primary-700 rounded-lg hover:bg-primary-50 transition-colors"
           >
             View Dashboard
-          </a>
-          <a
-            href="/admin/guardian/members"
+          </Link>
+          <Link
+            to="/guardian/members"
             className="px-4 py-2 bg-white border border-primary-300 text-primary-700 rounded-lg hover:bg-primary-50 transition-colors"
           >
             Manage Members
-          </a>
-          <a
-            href="/admin/guardian/settings"
+          </Link>
+          <Link
+            to="/guardian/settings"
             className="px-4 py-2 bg-white border border-primary-300 text-primary-700 rounded-lg hover:bg-primary-50 transition-colors"
           >
             Program Settings
-          </a>
+          </Link>
         </div>
       </div>
     </div>

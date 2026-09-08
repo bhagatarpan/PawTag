@@ -72,35 +72,30 @@ interface SidebarSection {
 }
 
 const sections: SidebarSection[] = [
-  // ─── Shop & Commerce ─────────────────────────────────────
+  // ─── Overview ─────────────────────────────────────────────
   {
-    id: 'commerce',
-    label: 'Shop & Commerce',
-    icon: ShoppingCart,
+    id: 'overview',
+    label: 'Overview',
+    icon: LayoutDashboard,
     links: [
       { to: '/', label: 'Dashboard', icon: LayoutDashboard, permission: 'dashboard.read' },
+      { to: '/reports', label: 'Commerce Reports', icon: BarChart3, permission: 'stats.read' },
     ],
   },
+  // ─── Catalog ──────────────────────────────────────────────
   {
     id: 'catalog',
     label: 'Catalog',
     icon: ShoppingBag,
     links: [
+      { to: '/products', label: 'Products', icon: ShoppingBag, permission: 'product.read' },
       { to: '/categories', label: 'Categories', icon: FolderTree, permission: 'product.read' },
       { to: '/collections', label: 'Collections', icon: Database, permission: 'product.read' },
       { to: '/brands', label: 'Brands', icon: Target, permission: 'product.read' },
-    ],
-  },
-  {
-    id: 'products-services',
-    label: 'Products & Services',
-    icon: Package,
-    links: [
-      { to: '/products', label: 'Products', icon: ShoppingBag, permission: 'product.read' },
       { to: '/tags', label: 'Tags', icon: QrCode, permission: 'tag.read' },
-      { to: '/subscription-plans', label: 'Subscriptions', icon: CreditCard, permission: 'product.read' },
     ],
   },
+  // ─── Inventory ────────────────────────────────────────────
   {
     id: 'inventory',
     label: 'Inventory',
@@ -111,98 +106,69 @@ const sections: SidebarSection[] = [
       { to: '/inventory/history', label: 'Stock History', icon: Database, permission: 'inventory.read' },
     ],
   },
+  // ─── Orders & Fulfilment ──────────────────────────────────
   {
     id: 'orders',
-    label: 'Orders',
+    label: 'Orders & Fulfilment',
     icon: FileText,
     links: [
       { to: '/orders', label: 'All Orders', icon: FileText, permission: 'order.read' },
       { to: '/orders/pending', label: 'Pending', icon: Clock, permission: 'order.read' },
       { to: '/orders/processing', label: 'Processing', icon: Activity, permission: 'order.read' },
-      { to: '/orders/shipped', label: 'Shipped', icon: Truck, permission: 'order.read' },
-      { to: '/orders/delivered', label: 'Delivered', icon: CheckCircle, permission: 'order.read' },
-      { to: '/orders/cancelled', label: 'Cancelled', icon: XCircle, permission: 'order.read' },
       { to: '/invoices', label: 'Invoices', icon: FileText, permission: 'order.read' },
+      { to: '/shipping/shipments', label: 'Shipments', icon: Truck, permission: 'order.read' },
+      { to: '/returns', label: 'Returns', icon: RotateCcw, permission: 'order.read' },
     ],
   },
+  // ─── Payments & Refunds ───────────────────────────────────
   {
-    id: 'users',
-    label: 'Users',
-    icon: Users,
+    id: 'payments',
+    label: 'Payments & Refunds',
+    icon: CreditCard,
     links: [
-      { to: '/users/customers', label: 'Customers', icon: Users, permission: 'user.read' },
-      { to: '/users/admin', label: 'Users', icon: Users, permission: 'user.read' },
-      { to: '/pets', label: 'Pets', icon: PawPrint, permission: 'pet.read' },
+      { to: '/payments', label: 'Transactions', icon: CreditCard, permission: 'order.read' },
+      { to: '/refunds', label: 'Refunds', icon: RotateCcw, permission: 'order.refund' },
+      { to: '/refund-report', label: 'Refund Report', icon: FileText, permission: 'order.refund' },
+      { to: '/payments/reconciliation', label: 'Reconciliation', icon: AlertTriangle, permission: 'order.read' },
+      { to: '/shipping/methods', label: 'Shipping Methods', icon: Truck, permission: 'setting.read' },
     ],
   },
+  // ─── Subscriptions & Loyalty ──────────────────────────────
+  {
+    id: 'subscriptions-loyalty',
+    label: 'Subscriptions & Loyalty',
+    icon: CreditCard,
+    links: [
+      { to: '/subscription-plans', label: 'Subscription Plans', icon: CreditCard, permission: 'product.read' },
+      { to: '/customer-subscriptions', label: 'Customer Subscriptions', icon: Users, permission: 'subscription.read' },
+      { to: '/guardian', label: 'Guardian Dashboard', icon: Shield, permission: 'subscription.read' },
+      { to: '/guardian/members', label: 'Members', icon: Users, permission: 'subscription.read' },
+      { to: '/guardian/analytics', label: 'Analytics', icon: BarChart3, permission: 'subscription.read' },
+      { to: '/guardian/settings', label: 'Guardian Settings', icon: Settings, permission: 'subscription.read' },
+    ],
+  },
+  // ─── Discounts & Promotions ───────────────────────────────
   {
     id: 'discounts',
-    label: 'Discounts',
+    label: 'Discounts & Promotions',
     icon: Tag,
     links: [
       { to: '/discounts', label: 'Discount Codes', icon: Tag, permission: 'product.read' },
       { to: '/referrals', label: 'Referral Program', icon: Gift, permission: 'product.read' },
     ],
   },
+  // ─── Users & Pets ─────────────────────────────────────────
   {
-    id: 'payments',
-    label: 'Payments',
-    icon: CreditCard,
+    id: 'users',
+    label: 'Users & Pets',
+    icon: Users,
     links: [
-      { to: '/payments', label: 'Transactions', icon: CreditCard, permission: 'order.read' },
-      { to: '/refunds', label: 'Refunds', icon: RotateCcw, permission: 'order.refund' },
-      { to: '/refund-report', label: 'Refund Report', icon: FileText, permission: 'order.refund' },
-      { to: '/payments/refunds', label: 'Old Refunds', icon: RotateCcw, permission: 'order.refund' },
-      { to: '/payments/reconciliation', label: 'Reconciliation', icon: AlertTriangle, permission: 'order.read' },
+      { to: '/users/customers', label: 'Customers', icon: Users, permission: 'user.read' },
+      { to: '/users/admin', label: 'Admin Users', icon: Users, permission: 'user.read' },
+      { to: '/pets', label: 'Pets', icon: PawPrint, permission: 'pet.read' },
     ],
   },
-  {
-    id: 'shipping',
-    label: 'Shipping',
-    icon: Truck,
-    links: [
-      { to: '/shipping/methods', label: 'Methods', icon: Truck, permission: 'setting.read' },
-      { to: '/shipping/rates', label: 'Rates', icon: BarChart3, permission: 'setting.read' },
-      { to: '/shipping/shipments', label: 'Shipments', icon: Truck, permission: 'order.read' },
-    ],
-  },
-  {
-    id: 'fulfilment',
-    label: 'Fulfilment',
-    icon: ClipboardCheck,
-    links: [
-      { to: '/fulfilment', label: 'All Fulfilments', icon: ClipboardCheck, permission: 'order.read' },
-      { to: '/fulfilment/pending', label: 'Pending', icon: Clock, permission: 'order.read' },
-      { to: '/fulfilment/picking', label: 'Picking', icon: Package, permission: 'order.read' },
-      { to: '/fulfilment/packing', label: 'Packing', icon: Package, permission: 'order.read' },
-      { to: '/fulfilment/fulfilled', label: 'Fulfilled', icon: CheckCircle, permission: 'order.read' },
-    ],
-  },
-  {
-    id: 'returns',
-    label: 'Returns',
-    icon: RotateCcw,
-    links: [
-      { to: '/returns', label: 'Return Requests', icon: RotateCcw, permission: 'order.read' },
-    ],
-  },
-  {
-    id: 'tax',
-    label: 'Tax',
-    icon: Receipt,
-    links: [
-      { to: '/tax', label: 'Tax Configuration', icon: Receipt, permission: 'setting.read' },
-    ],
-  },
-  // ─── Existing Sections ────────────────────────────────────
-  {
-    id: 'reports',
-    label: 'Reports',
-    icon: BarChart3,
-    links: [
-      { to: '/reports', label: 'Commerce Reports', icon: BarChart3, permission: 'stats.read' },
-    ],
-  },
+  // ─── Communication ────────────────────────────────────────
   {
     id: 'communication',
     label: 'Communication',
@@ -213,26 +179,29 @@ const sections: SidebarSection[] = [
       { to: '/tag-expiry-notifications', label: 'Tag Expiry Alerts', icon: AlertTriangle },
     ],
   },
+  // ─── Content (CMS) ────────────────────────────────────────
   {
     id: 'content',
-    label: 'Content',
+    label: 'Content (CMS)',
     icon: Layout,
     links: [
-      { to: '/cms/announcements', label: 'Announcements', icon: Megaphone, permission: 'cms.announcement.read' },
-      { to: '/cms/auth-pages', label: 'Auth Pages', icon: LogIn, permission: 'cms.auth_page.read' },
-      { to: '/cms/onboarding', label: 'Customer Onboarding', icon: ClipboardCheck, permission: 'cms.onboarding.read' },
-      { to: '/cms/footer', label: 'Footer', icon: PanelBottom, permission: 'cms.footer.read' },
-      { to: '/cms/homepage', label: 'Homepage Sections', icon: Monitor, permission: 'cms.homepage.read' },
-      { to: '/cms/invoice-template', label: 'Invoice Template', icon: FileSignature, permission: 'cms.email_template.read' },
-      { to: '/cms/media', label: 'Media Library', icon: Image, permission: 'cms.media.read' },
-      { to: '/cms/navigation', label: 'Navigation', icon: Navigation, permission: 'cms.navigation.read' },
       { to: '/cms/pages', label: 'Pages', icon: Layout, permission: 'cms.page.read' },
-      { to: '/cms/redirects', label: 'Redirects', icon: ArrowRightLeft, permission: 'cms.redirect.read' },
+      { to: '/cms/homepage', label: 'Homepage', icon: Monitor, permission: 'cms.homepage.read' },
       { to: '/cms/shop-pages', label: 'Shop Pages', icon: ShoppingCart, permission: 'cms.shop_page.read' },
+      { to: '/cms/auth-pages', label: 'Auth Pages', icon: LogIn, permission: 'cms.auth_page.read' },
+      { to: '/cms/navigation', label: 'Navigation', icon: Navigation, permission: 'cms.navigation.read' },
+      { to: '/cms/footer', label: 'Footer', icon: PanelBottom, permission: 'cms.footer.read' },
+      { to: '/cms/announcements', label: 'Announcements', icon: Megaphone, permission: 'cms.announcement.read' },
+      { to: '/cms/onboarding', label: 'Onboarding', icon: ClipboardCheck, permission: 'cms.onboarding.read' },
       { to: '/cms/email-templates', label: 'Email Templates', icon: Mail, permission: 'cms.email_template.read' },
       { to: '/cms/sms-templates', label: 'SMS Templates', icon: MessageSquare, permission: 'cms.sms_template.read' },
+      { to: '/cms/invoice-template', label: 'Invoice Template', icon: FileSignature, permission: 'cms.email_template.read' },
+      { to: '/cms/media', label: 'Media Library', icon: Image, permission: 'cms.media.read' },
+      { to: '/cms/redirects', label: 'Redirects', icon: ArrowRightLeft, permission: 'cms.redirect.read' },
+      { to: '/cms/pet-references', label: 'Pet References', icon: PawPrint, permission: 'cms.pet_reference.read' },
     ],
   },
+  // ─── Settings ─────────────────────────────────────────────
   {
     id: 'settings',
     label: 'Settings',
@@ -240,15 +209,14 @@ const sections: SidebarSection[] = [
     links: [
       { to: '/commerce-settings', label: 'Commerce Settings', icon: Settings, permission: 'setting.read' },
       { to: '/settings', label: 'General Settings', icon: Settings, permission: 'setting.read' },
-      { to: '/feature-flags', label: 'Feature Flags', icon: Flag, permission: 'feature_flag.read' },
       { to: '/site-availability', label: 'Site Availability', icon: Wifi, permission: 'setting.read' },
       { to: '/address-autocomplete', label: 'Address Autocomplete', icon: MapPin, permission: 'setting.read' },
-      { to: '/cms/pet-references', label: 'Pet References', icon: PawPrint, permission: 'cms.pet_reference.read' },
     ],
   },
+  // ─── Security & Access ────────────────────────────────────
   {
     id: 'security',
-    label: 'Security',
+    label: 'Security & Access',
     icon: Shield,
     links: [
       { to: '/rbac/roles', label: 'Roles & Permissions', icon: Shield, permission: 'role.read' },
@@ -259,11 +227,13 @@ const sections: SidebarSection[] = [
       { to: '/audit-settings', label: 'Audit Settings', icon: Settings, permission: 'audit.read' },
     ],
   },
+  // ─── Operations ───────────────────────────────────────────
   {
     id: 'operations',
     label: 'Operations',
     icon: Terminal,
     links: [
+      { to: '/feature-flags', label: 'Feature Flags', icon: Flag, permission: 'feature_flag.read' },
       { to: '/webhooks', label: 'Webhooks', icon: Zap, permission: 'setting.read' },
       { to: '/system-logs', label: 'System Logs', icon: Terminal, permission: 'systemlogs.read' },
       { to: '/system-log-settings', label: 'Log Settings', icon: Settings, permission: 'systemlogs.admin' },

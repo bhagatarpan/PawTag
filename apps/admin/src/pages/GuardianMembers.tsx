@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../lib/api';
 
 interface GuardianMember {
@@ -119,12 +120,12 @@ export default function GuardianMembers() {
           <p className="text-gray-500">Manage Guardian loyalty program members</p>
         </div>
         <div className="flex gap-3">
-          <a
-            href="/admin/guardian"
+          <Link
+            to="/guardian"
             className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
           >
             Back to Dashboard
-          </a>
+          </Link>
         </div>
       </div>
 

@@ -4,6 +4,7 @@
  */
 
 import { useEffect, useState, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { Save, Loader2, RefreshCcw, CreditCard, Truck, Receipt, Package, ShoppingCart, Clock, RotateCcw, Settings, Shield, Bell, Info, Plus, Trash2, Ban, X, Database, Link2, Unlink } from 'lucide-react';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
@@ -64,6 +65,10 @@ const SETTING_META: Record<string, { label: string; tooltip: string; type: 'togg
   'commerce.subscriptions.monthlyPrice': { label: 'Monthly Subscription Price ($)', tooltip: 'Price charged per month for subscription products', type: 'number' },
   'commerce.subscriptions.freePeriodMonths': { label: 'Free Period (months)', tooltip: 'Number of months of free subscription included with tag purchase', type: 'number' },
   'commerce.subscriptions.gracePeriodWeeks': { label: 'Grace Period (weeks)', tooltip: 'Weeks allowed after subscription expires before losing access', type: 'number' },
+  'commerce.subscriptions.autoRenewEnabled': { label: 'Auto-Renew Enabled', tooltip: 'Allow subscriptions to auto-renew (global toggle for all subscriptions)', type: 'toggle' },
+  'commerce.subscriptions.defaultAutoRenew': { label: 'Default Auto-Renew', tooltip: 'Default auto-renew state when creating new subscriptions', type: 'toggle' },
+  'commerce.subscriptions.maxRetries': { label: 'Max Payment Retries', tooltip: 'Maximum number of payment retry attempts before grace period begins', type: 'number' },
+  'commerce.subscriptions.retryDelaysHours': { label: 'Retry Delays (hours)', tooltip: 'Payment retry delay schedule in hours (JSON array, e.g. [0,1,24,72])', type: 'text' },
   'commerce.refunds.enabled': { label: 'Allow Refunds', tooltip: 'Enable customers to request refunds on their orders', type: 'toggle' },
   'commerce.refunds.maxDaysAfterPurchase': { label: 'Refund Window (days)', tooltip: 'Maximum number of days after purchase when a refund can be requested', type: 'number' },
   'commerce.refunds.partialEnabled': { label: 'Allow Partial Refunds', tooltip: 'Let admins refund part of an order instead of the full amount', type: 'toggle' },
@@ -538,7 +543,7 @@ export default function CommerceSettings() {
 
             <div className="text-xs text-gray-500 bg-blue-50 border border-blue-200 rounded-lg p-3">
               <p className="font-medium text-blue-900 mb-1">Export options</p>
-              <p>After connecting, you can push refunds directly to Xero from <a href="/refund-report" className="text-primary-600 hover:text-primary-700 underline font-medium">Refund Report</a>. CSV, GL, and configurable column exports are also available without Xero.</p>
+              <p>After connecting, you can push refunds directly to Xero from <Link to="/refund-report" className="text-primary-600 hover:text-primary-700 underline font-medium">Refund Report</Link>. CSV, GL, and configurable column exports are also available without Xero.</p>
             </div>
           </div>
         </div>

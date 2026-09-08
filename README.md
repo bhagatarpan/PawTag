@@ -838,40 +838,19 @@ The Admin Portal is the operational control centre of the application. It provid
 
 | Area | Purpose |
 |------|---------|
-| **Dashboard** | Analytics overview (revenue, orders, tags, scans, reunions) |
-| **Users** | User management with role assignments — **Customers** (site visitors), **Users** (admin staff), **Pets** |
-| **PawTag Products & Services** | Product catalog — **Products**, **Tags**, **Subscription Plans** |
-| **Catalog** | Taxonomy — Categories, Collections, Brands |
-| **Orders** | Order fulfillment, shipping, refunds |
-| **Subscriptions** | Customer subscription lifecycle management |
-| **Invoices** | Invoice generation and access |
-| **Referrals** | Referral program management |
-| **Support** | Support request management |
-| **Statistics** | Detailed analytics and reporting |
-| **Notifications** | System notification management |
-| **Tag Expiry** | Tag expiry notification management |
-| **CMS Pages** | Content pages with versioning and rollback |
-| **CMS Navigation** | Header, footer, sidebar navigation |
-| **CMS Email Templates** | Email template management |
-| **CMS SMS Templates** | SMS template management |
-| **CMS Onboarding** | Onboarding wizard configuration |
-| **CMS Homepage** | Homepage sections management |
-| **CMS Shop Pages** | Shop page content |
-| **CMS Auth Pages** | Login/register page customization |
-| **CMS Pet References** | Pet breed, color, pattern reference data |
-| **CMS Announcements** | Banner and popup announcements |
-| **CMS Media** | Media library management |
-| **CMS Redirects** | URL redirect management |
-| **CMS Invoice Template** | Invoice template customization |
-| **Feature Flags** | Feature flag management |
-| **Settings** | System configuration (DB-driven) |
-| **Audit Trail** | Enterprise audit logging with hash chain |
-| **Audit Settings** | Audit policy configuration |
-| **System Logs** | Application log viewer with search, filters, pagination, purge, export |
-| **System Log Settings** | Log level/category toggles, sampling, retention |
-| **Site Availability** | Maintenance mode and offline mode controls |
-| **Address Autocomplete** | Address autocomplete provider configuration (Photon/NZ Post) |
-| **Roles & Permissions** | RBAC configuration (Roles, Permissions, Groups, Scopes) |
+| **Overview** | Dashboard analytics, Commerce Reports |
+| **Catalog** | Product catalog — Products, Categories, Collections, Brands, Tags |
+| **Inventory** | Stock management — Stock, Adjustments, Stock History |
+| **Orders & Fulfilment** | Order lifecycle — All Orders, Pending, Processing, Invoices, Shipments, Returns |
+| **Payments & Refunds** | Financial — Transactions, Refunds, Refund Report, Reconciliation, Shipping Methods |
+| **Subscriptions & Loyalty** | Subscription Plans, Customer Subscriptions, Guardian Dashboard, Members, Analytics, Guardian Settings |
+| **Discounts & Promotions** | Discount Codes, Referral Program |
+| **Users & Pets** | User management — Customers, Admin Users, Pets |
+| **Communication** | Notifications, Support Requests, Tag Expiry Alerts |
+| **Content (CMS)** | Pages, Homepage, Shop Pages, Auth Pages, Navigation, Footer, Announcements, Onboarding, Email Templates, SMS Templates, Invoice Template, Media, Redirects, Pet References |
+| **Settings** | Commerce Settings, General Settings, Site Availability, Address Autocomplete |
+| **Security & Access** | Roles & Permissions, Permissions, Permission Groups, Access Scopes, Audit Trail, Audit Settings |
+| **Operations** | Feature Flags, Webhooks, System Logs, Log Settings, Statistics, Write NFC Tag |
 
 ### Admin Portal Features
 

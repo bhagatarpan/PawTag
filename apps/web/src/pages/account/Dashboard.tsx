@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   PawPrint, Tag, CreditCard, ShoppingBag, Bell, AlertTriangle,
-  CheckCircle, Clock, ChevronRight, Shield, QrCode, Phone, Forward, X,
+  CheckCircle, Clock, ChevronRight, Shield, QrCode, Phone, Forward, X, Gift,
 } from 'lucide-react';
 import { SummaryCards, EmptyState, StatusBadge } from '@pawtag/ui';
 import api from '../../lib/api';
@@ -13,6 +13,12 @@ import type { Pet, Tag as TagType, Subscription, Order, Notification } from '../
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
 
+interface GuardianData {
+  points: number;
+  tier: string;
+  pawRewardsBalance: number;
+}
+
 interface DashboardData {
   pets: Pet[];
   tags: TagType[];
@@ -20,6 +26,7 @@ interface DashboardData {
   recentOrders: Order[];
   notifications: Notification[];
   escalations: EscalationRecord[];
+  guardian: GuardianData | null;
 }
 
 interface EscalationRecord {
@@ -117,13 +124,14 @@ export default function AccountDashboard() {
   useEffect(() => {
     async function fetchDashboard() {
       try {
-        const [petsRes, tagsRes, subsRes, ordersRes, notifsRes, escRes] = await Promise.all([
+        const [petsRes, tagsRes, subsRes, ordersRes, notifsRes, escRes, guardianRes] = await Promise.all([
           api.get('/customer/pets').catch(() => ({ data: { data: [] } })),
           api.get('/customer/tags').catch(() => ({ data: { data: [] } })),
           api.get('/customer/subscriptions').catch(() => ({ data: { data: [] } })),
           api.get('/customer/orders').catch(() => ({ data: { data: [] } })),
           api.get('/customer/notifications').catch(() => ({ data: { data: [] } })),
           api.get('/customer/escalations?status=pending').catch(() => ({ data: { data: [] } })),
+          api.get('/customer/guardian/points').catch(() => ({ data: { data: null } })),
         ]);
         setData({
           pets: petsRes.data.data || [],
@@ -132,6 +140,7 @@ export default function AccountDashboard() {
           recentOrders: (ordersRes.data.data || []).slice(0, 5),
           notifications: notifsRes.data.data || [],
           escalations: escRes.data.data || [],
+          guardian: guardianRes.data.data || null,
         });
       } catch (err: any) {
         setError(err.message || 'Failed to load dashboard');
@@ -147,6 +156,8 @@ export default function AccountDashboard() {
   const activeTags = data?.tags.filter((t) => t.status === 'active').length || 0;
   const activeSubs = data?.subscriptions.filter((s) => s.status === 'active' || s.status === 'free_period' || s.status === 'grace_period').length || 0;
   const unreadNotifs = data?.notifications.filter((n) => !n.read).length || 0;
+  const guardianPoints = data?.guardian?.points || 0;
+  const guardianTier = data?.guardian?.tier || 'CARE';
 
   if (loading) {
     return (
@@ -224,10 +235,11 @@ export default function AccountDashboard() {
         { label: 'Active Tags', value: activeTags, icon: <Tag size={20} />, color: 'primary' },
         { label: 'Subscriptions', value: activeSubs, icon: <CreditCard size={20} />, color: 'success' },
         { label: 'Notifications', value: unreadNotifs, icon: <Bell size={20} />, color: unreadNotifs > 0 ? 'warning' : 'default' },
+        ...(guardianPoints > 0 ? [{ label: `${guardianTier} Points`, value: guardianPoints, icon: <Shield size={20} />, color: 'primary' as const }] : []),
       ]} />
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <Link to="/account/pets" className="bg-white rounded-lg border border-gray-200 p-4 hover:border-teal-300 hover:shadow-sm transition-all flex flex-col items-center gap-2 text-center">
           <PawPrint size={20} className="text-teal-600" />
           <span className="text-sm font-medium text-gray-700">My Pets</span>
@@ -240,8 +252,12 @@ export default function AccountDashboard() {
           <ShoppingBag size={20} className="text-teal-600" />
           <span className="text-sm font-medium text-gray-700">Orders</span>
         </Link>
-        <Link to="/account/referrals" className="bg-white rounded-lg border border-gray-200 p-4 hover:border-teal-300 hover:shadow-sm transition-all flex flex-col items-center gap-2 text-center">
+        <Link to="/account/guardian" className="bg-white rounded-lg border border-gray-200 p-4 hover:border-teal-300 hover:shadow-sm transition-all flex flex-col items-center gap-2 text-center">
           <Shield size={20} className="text-teal-600" />
+          <span className="text-sm font-medium text-gray-700">Guardian</span>
+        </Link>
+        <Link to="/account/referrals" className="bg-white rounded-lg border border-gray-200 p-4 hover:border-teal-300 hover:shadow-sm transition-all flex flex-col items-center gap-2 text-center">
+          <Gift size={20} className="text-teal-600" />
           <span className="text-sm font-medium text-gray-700">Referrals</span>
         </Link>
       </div>
@@ -320,7 +336,7 @@ export default function AccountDashboard() {
             <h2 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
               <PawPrint size={16} className="text-teal-600" /> My Pets
             </h2>
-            <Link to="/account" className="text-xs text-teal-600 hover:text-teal-800 font-medium flex items-center gap-1">
+            <Link to="/account/pets" className="text-xs text-teal-600 hover:text-teal-800 font-medium flex items-center gap-1">
               View All <ChevronRight size={12} />
             </Link>
           </div>
@@ -330,7 +346,7 @@ export default function AccountDashboard() {
                 icon={<PawPrint size={20} className="text-gray-400" />}
                 message="No pets yet"
                 description="Add your first pet to get started"
-                action={{ label: 'Add Pet', onClick: () => window.location.href = '/account/pets' }}
+                action={{ label: 'Add Pet', onClick: () => navigate('/account/pets') }}
               />
             ) : (
               data?.pets.slice(0, 5).map((pet) => (

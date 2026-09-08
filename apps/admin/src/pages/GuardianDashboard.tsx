@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../lib/api';
 
 interface GuardianStats {
@@ -94,18 +95,18 @@ export default function GuardianDashboard() {
           <p className="text-gray-500">Overview of the Guardian loyalty program</p>
         </div>
         <div className="flex gap-3">
-          <a
-            href="/admin/guardian/members"
+          <Link
+            to="/guardian/members"
             className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
           >
             View Members
-          </a>
-          <a
-            href="/admin/guardian/settings"
+          </Link>
+          <Link
+            to="/guardian/settings"
             className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
           >
             Settings
-          </a>
+          </Link>
         </div>
       </div>
 

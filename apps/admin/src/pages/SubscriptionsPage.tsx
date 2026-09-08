@@ -225,7 +225,7 @@ export default function SubscriptionsPage() {
                   <td className="px-6 py-4 text-sm text-gray-900">{sub.totalScans}</td>
                   <td className="px-6 py-4">
                     <Link
-                      to={`/subscriptions/${sub._id}`}
+                      to={`/customer-subscriptions/${sub._id}`}
                       className="text-teal-600 hover:text-teal-800 text-sm font-medium"
                     >
                       View

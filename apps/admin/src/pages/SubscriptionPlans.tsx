@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 import {
   Search,
@@ -60,6 +60,7 @@ interface SubscriptionPlan {
     stripePriceId?: string;
     features: string[];
   };
+  featureHighlights?: Array<{ icon: string; description: string }>;
   sortOrder: number;
   badge?: string;
   createdAt: string;
@@ -96,6 +97,7 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 export default function SubscriptionPlans() {
+  const navigate = useNavigate();
   const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
   const [stats, setStats] = useState<PlanStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -163,6 +165,30 @@ export default function SubscriptionPlans() {
     fetchPlans();
   }
 
+  async function handleDuplicate(plan: SubscriptionPlan) {
+    try {
+      const payload = {
+        name: `${plan.name} (Copy)`,
+        description: plan.description,
+        shortDescription: plan.shortDescription,
+        price: plan.price,
+        currency: plan.currency,
+        category: plan.category,
+        stock: plan.stock,
+        sku: `${plan.sku}-copy`,
+        isActive: false,
+        isSubscription: true,
+        subscriptionConfig: plan.subscriptionConfig,
+        featureHighlights: plan.featureHighlights,
+      };
+      await api.post('/admin/products', payload);
+      fetchPlans();
+      fetchStats();
+    } catch (err: any) {
+      console.error('Failed to duplicate plan:', err);
+    }
+  }
+
   function formatPrice(price: number, currency = 'NZD') {
     return new Intl.NumberFormat('en-NZ', { style: 'currency', currency }).format(price);
   }
@@ -181,6 +207,7 @@ export default function SubscriptionPlans() {
           <p className="mt-1 text-sm text-gray-500">Manage subscription products and pricing</p>
         </div>
         <button
+          onClick={() => navigate('/products/new')}
           className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition-colors"
         >
           <Plus size={16} /> Add Plan
@@ -346,6 +373,7 @@ export default function SubscriptionPlans() {
                         Edit
                       </Link>
                       <button
+                        onClick={() => handleDuplicate(plan)}
                         className="text-gray-600 hover:text-gray-800 text-sm font-medium"
                       >
                         Duplicate

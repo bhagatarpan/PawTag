@@ -127,7 +127,7 @@ export default function SubscriptionDetailPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <button onClick={() => navigate('/subscriptions')} className="text-teal-600 hover:text-teal-800 text-sm mb-2">&larr; Back to Subscriptions</button>
+          <button onClick={() => navigate('/customer-subscriptions')} className="text-teal-600 hover:text-teal-800 text-sm mb-2">&larr; Back to Subscriptions</button>
           <h1 className="text-2xl font-bold text-gray-900">Subscription Detail</h1>
         </div>
         <div className="flex gap-2">

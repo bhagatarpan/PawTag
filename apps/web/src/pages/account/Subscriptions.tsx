@@ -1,4 +1,5 @@
 import { useState, useEffect, Component, ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../../lib/api';
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
@@ -248,19 +249,19 @@ function SubscriptionsInner() {
         </div>
 
         {/* Upgrade CTA */}
-        {isActive && sub.price < 1.99 && (
+        {isActive && sub.planType !== 'annual' && (
           <div className="bg-gradient-to-r from-amber-500 to-orange-500 rounded-xl p-4 text-white">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="font-semibold">Upgrade to Gold</h3>
-                <p className="text-white/80 text-sm">Earn 2× points, get higher PawRewards, and start at Nurture tier</p>
+                <h3 className="font-semibold">Upgrade Your Plan</h3>
+                <p className="text-white/80 text-sm">Earn more points, get higher PawRewards, and unlock premium benefits</p>
               </div>
-              <a
-                href="/account/upgrade"
+              <Link
+                to="/account/upgrade"
                 className="px-4 py-2 bg-white text-amber-600 rounded-lg font-semibold hover:bg-amber-50 transition-colors"
               >
                 Upgrade
-              </a>
+              </Link>
             </div>
           </div>
         )}

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../lib/api';
 
 interface GuardianSettings {
@@ -171,12 +172,12 @@ export default function GuardianSettings() {
           <p className="text-gray-500">Configure Guardian loyalty program settings</p>
         </div>
         <div className="flex gap-3">
-          <a
-            href="/admin/guardian"
+          <Link
+            to="/guardian"
             className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
           >
             Back to Dashboard
-          </a>
+          </Link>
           <button
             onClick={handleSave}
             disabled={saving}

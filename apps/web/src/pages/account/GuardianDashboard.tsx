@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { Shield, Gift, ArrowUpRight } from 'lucide-react';
 import api from '../../lib/api';
 
 type TierName = 'CARE' | 'NURTURE' | 'PROTECTOR' | 'SAFEGUARD';
@@ -17,61 +18,6 @@ interface TierBenefits {
   guardianBadge: boolean;
   communityAccess: boolean;
 }
-
-const TIER_BENEFITS: Record<TierName, TierBenefits> = {
-  CARE: {
-    name: 'Care',
-    displayName: 'Care Guardian',
-    pointsMultiplier: 1,
-    pawRewardsMonthly: 2.00,
-    freeShippingThreshold: 100,
-    earlyAccess: false,
-    prioritySupport: false,
-    exclusivePromotions: true,
-    monthlyProgressEmail: true,
-    guardianBadge: true,
-    communityAccess: true,
-  },
-  NURTURE: {
-    name: 'Nurture',
-    displayName: 'Nurture Guardian',
-    pointsMultiplier: 1,
-    pawRewardsMonthly: 3.00,
-    freeShippingThreshold: 75,
-    earlyAccess: false,
-    prioritySupport: false,
-    exclusivePromotions: true,
-    monthlyProgressEmail: true,
-    guardianBadge: true,
-    communityAccess: true,
-  },
-  PROTECTOR: {
-    name: 'Protector',
-    displayName: 'Protector Guardian',
-    pointsMultiplier: 1,
-    pawRewardsMonthly: 5.00,
-    freeShippingThreshold: 50,
-    earlyAccess: true,
-    prioritySupport: true,
-    exclusivePromotions: true,
-    monthlyProgressEmail: true,
-    guardianBadge: true,
-    communityAccess: true,
-  },
-  SAFEGUARD: {
-    name: 'Safeguard',
-    displayName: 'Safeguard Guardian',
-    pointsMultiplier: 1,
-    pawRewardsMonthly: 8.00,
-    freeShippingThreshold: 0,
-    earlyAccess: true,
-    prioritySupport: true,
-    exclusivePromotions: true,
-    monthlyProgressEmail: true,
-    guardianBadge: true,
-    communityAccess: true,
-  },
-};
 
 interface GuardianData {
   points: number;
@@ -351,20 +297,36 @@ export default function GuardianDashboard() {
       </div>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Link
           to="/account/guardian/points"
           className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 hover:border-primary-200 hover:shadow-md transition-all"
         >
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">Points History</h3>
+          <div className="flex items-center gap-3 mb-2">
+            <Shield size={20} className="text-primary-600" />
+            <h3 className="text-lg font-semibold text-gray-900">Points History</h3>
+          </div>
           <p className="text-gray-500">View all your points transactions and earning history</p>
         </Link>
         <Link
           to="/account/guardian/rewards"
           className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 hover:border-primary-200 hover:shadow-md transition-all"
         >
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">PawRewards</h3>
+          <div className="flex items-center gap-3 mb-2">
+            <Gift size={20} className="text-green-600" />
+            <h3 className="text-lg font-semibold text-gray-900">PawRewards</h3>
+          </div>
           <p className="text-gray-500">Manage your rewards balance and redemption history</p>
+        </Link>
+        <Link
+          to="/account/upgrade"
+          className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 hover:border-primary-200 hover:shadow-md transition-all"
+        >
+          <div className="flex items-center gap-3 mb-2">
+            <ArrowUpRight size={20} className="text-amber-600" />
+            <h3 className="text-lg font-semibold text-gray-900">Upgrade Plan</h3>
+          </div>
+          <p className="text-gray-500">Unlock higher tiers with more benefits and rewards</p>
         </Link>
       </div>
     </div>

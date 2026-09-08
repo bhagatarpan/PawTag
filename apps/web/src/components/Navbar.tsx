@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, memo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, ShoppingCart, PawPrint, User, LogOut, ChevronDown } from 'lucide-react';
+import { Menu, X, ShoppingCart, PawPrint, User, LogOut, ChevronDown, Shield } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useNavigation } from '../hooks/useCms';
@@ -119,6 +119,9 @@ export default function Navbar() {
                         </div>
                         <Link to="/account" className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50" onClick={() => setUserMenuOpen(false)}>
                           <User className="h-4 w-4" /> My Account
+                        </Link>
+                        <Link to="/account/guardian" className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50" onClick={() => setUserMenuOpen(false)}>
+                          <Shield className="h-4 w-4" /> Guardian
                         </Link>
                         <button onClick={() => { logout(); setUserMenuOpen(false); }} className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50">
                           <LogOut className="h-4 w-4" /> Sign Out

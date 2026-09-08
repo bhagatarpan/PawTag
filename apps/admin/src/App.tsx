@@ -12,7 +12,6 @@ import Products from './pages/Products';
 import Orders from './pages/Orders';
 import OrderRefunds from './pages/OrderRefunds';
 import RefundReport from './pages/RefundReport';
-import Content from './pages/Content';
 import Settings from './pages/Settings';
 import FeatureFlags from './pages/FeatureFlags';
 import AuditTrail from './pages/AuditTrail';
@@ -68,7 +67,6 @@ import Returns from './pages/Returns';
 import Payments from './pages/Payments';
 import PaymentReconciliation from './pages/PaymentReconciliation';
 import Discounts from './pages/Discounts';
-import Tax from './pages/Tax';
 import Reports from './pages/Reports';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -147,14 +145,6 @@ export default function App() {
         element={
           <ProtectedRoute>
             <Orders />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/content"
-        element={
-          <ProtectedRoute>
-            <Content />
           </ProtectedRoute>
         }
       />
@@ -264,7 +254,6 @@ export default function App() {
       <Route path="/fulfilment/packing" element={<ProtectedRoute><Fulfilment /></ProtectedRoute>} />
       <Route path="/fulfilment/fulfilled" element={<ProtectedRoute><Fulfilment /></ProtectedRoute>} />
       <Route path="/returns" element={<ProtectedRoute><Returns /></ProtectedRoute>} />
-      <Route path="/tax" element={<ProtectedRoute><Tax /></ProtectedRoute>} />
       <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
