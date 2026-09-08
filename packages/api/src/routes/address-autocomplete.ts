@@ -75,6 +75,7 @@ async function getNzpostToken(clientId: string, clientSecret: string): Promise<s
 
   const response = await fetch('https://oauth.nzpost.co.nz/as/token.oauth2', {
     method: 'POST',
+    signal: AbortSignal.timeout(10_000),
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
     },
@@ -132,7 +133,7 @@ router.get('/suggest', async (req: Request, res: Response) => {
     }
 
     const settings = await getSettings();
-    const provider = settings['addressAutocomplete.provider'] || 'nzpost';
+    const provider = settings['addressAutocomplete.provider'] || 'photon';
     const defaultCountry = settings['addressAutocomplete.defaultCountry'] || 'NZ';
 
     if (provider === 'nzpost') {
@@ -154,6 +155,7 @@ router.get('/suggest', async (req: Request, res: Response) => {
         const apiUrl = `https://api.nzpost.co.nz/addresschecker/1.0/suggest?${params}`;
         const startTime = Date.now();
         const response = await fetch(apiUrl, {
+          signal: AbortSignal.timeout(10_000),
           headers: {
             'Accept': 'application/json',
             'Authorization': `Bearer ${token}`,
@@ -218,7 +220,14 @@ router.get('/suggest', async (req: Request, res: Response) => {
           countrycode: defaultCountry,
         });
         const startTime = Date.now();
-        const response = await fetch(`https://photon.komoot.io/api/?${params}`);
+        const response = await fetch(`https://photon.komoot.io/api/?${params}`, {
+          signal: AbortSignal.timeout(10_000),
+        });
+        if (!response.ok) {
+          writeLog({ level: 40, time: Date.now(), msg: 'Photon API error', provider: 'photon', operation: 'address.suggest', statusCode: response.status });
+          res.status(502).json({ success: false, error: 'Photon API temporarily unavailable' });
+          return;
+        }
         const data = await response.json();
         const durationMs = Date.now() - startTime;
         writeLog({
@@ -236,8 +245,9 @@ router.get('/suggest', async (req: Request, res: Response) => {
         res.json({ success: true, addresses });
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : String(err);
-        writeLog({ level: 50, time: Date.now(), msg: 'Failed to call Photon API', provider: 'photon', operation: 'address.suggest', err: { message: errMsg } });
-        res.status(502).json({ success: false, error: 'Failed to reach Photon API' });
+        const isTimeout = err instanceof Error && err.name === 'TimeoutError';
+        writeLog({ level: 50, time: Date.now(), msg: isTimeout ? 'Photon API timeout' : 'Failed to call Photon API', provider: 'photon', operation: 'address.suggest', err: { message: errMsg } });
+        res.status(502).json({ success: false, error: isTimeout ? 'Address service timed out — please try again' : 'Failed to reach Photon API' });
       }
     }
   } catch (err) {
