@@ -2,6 +2,7 @@ import { Subscription, Tag, Invoice, User, Notification, Product, TagExpiryNotif
 import { sendMail } from './email.service';
 import { createAndDeliverNotification } from './notification-delivery.service';
 import { auditService, type AuditContext } from './audit';
+import { incrementCounter, METRICS } from '../lib/metrics';
 import logger from '../lib/logger';
 
 const REMINDER_CHECK_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
@@ -25,6 +26,10 @@ async function loadSettings(): Promise<Record<string, string>> {
           'commerce.subscriptions.monthlyPrice',
           'commerce.subscriptions.freePeriodMonths',
           'commerce.subscriptions.gracePeriodWeeks',
+          'commerce.subscriptions.autoRenewEnabled',
+          'commerce.subscriptions.defaultAutoRenew',
+          'commerce.subscriptions.maxRetries',
+          'commerce.subscriptions.retryDelaysHours',
         ],
       },
     }).lean();
@@ -43,6 +48,10 @@ async function loadSettings(): Promise<Record<string, string>> {
       'commerce.subscriptions.monthlyPrice': '1.99',
       'commerce.subscriptions.freePeriodMonths': '12',
       'commerce.subscriptions.gracePeriodWeeks': '4',
+      'commerce.subscriptions.autoRenewEnabled': 'true',
+      'commerce.subscriptions.defaultAutoRenew': 'true',
+      'commerce.subscriptions.maxRetries': '4',
+      'commerce.subscriptions.retryDelaysHours': '[0,1,24,72]',
     };
   }
 }
@@ -70,6 +79,31 @@ async function getAnnualPrice(): Promise<number> {
 async function getMonthlyPrice(): Promise<number> {
   const value = await getSettingValue('commerce.subscriptions.monthlyPrice', '1.99');
   return parseFloat(value) || 1.99;
+}
+
+async function getAutoRenewEnabled(): Promise<boolean> {
+  const value = await getSettingValue('commerce.subscriptions.autoRenewEnabled', 'true');
+  return value !== 'false';
+}
+
+async function getDefaultAutoRenew(): Promise<boolean> {
+  const value = await getSettingValue('commerce.subscriptions.defaultAutoRenew', 'true');
+  return value !== 'false';
+}
+
+async function getMaxRetries(): Promise<number> {
+  const value = await getSettingValue('commerce.subscriptions.maxRetries', '4');
+  return parseInt(value, 10) || 4;
+}
+
+async function getRetryDelays(): Promise<number[]> {
+  const value = await getSettingValue('commerce.subscriptions.retryDelaysHours', '[0,1,24,72]');
+  try {
+    const hours = JSON.parse(value) as number[];
+    return hours.map(h => h * 60 * 60 * 1000);
+  } catch {
+    return [0, 60 * 60 * 1000, 24 * 60 * 60 * 1000, 72 * 60 * 60 * 1000];
+  }
 }
 
 async function auditJobEvent(
@@ -135,6 +169,7 @@ export async function createSubscription(data: {
 
   // Get free period from CMS settings
   const freePeriodMonths = await getFreePeriodMonths();
+  const defaultAutoRenew = await getDefaultAutoRenew();
   const freePeriodEndsAt = new Date(now);
   freePeriodEndsAt.setMonth(freePeriodEndsAt.getMonth() + freePeriodMonths);
 
@@ -154,7 +189,7 @@ export async function createSubscription(data: {
     freePeriodEndsAt,
     currentPeriodStart: now,
     currentPeriodEnd,
-    autoRenew: true,
+    autoRenew: defaultAutoRenew,
     renewalMethod: planType === 'monthly' ? 'monthly' : 'annual',
     totalScans: 0,
     reminderStates: {
@@ -190,9 +225,11 @@ export async function createSubscription(data: {
       currency: 'NZD',
       freePeriodEndsAt,
       currentPeriodEnd,
-      autoRenew: true,
+      autoRenew: defaultAutoRenew,
     },
   });
+
+  incrementCounter(METRICS.SUBSCRIPTION_CREATED_TOTAL, { planType });
 
   return subscription;
 }
@@ -276,6 +313,8 @@ export async function renewSubscription(subscriptionId: string, paymentMethod?: 
     },
   });
 
+  incrementCounter(METRICS.SUBSCRIPTION_RENEWED_TOTAL, { planType: subscription.planType });
+
   return subscription;
 }
 
@@ -313,10 +352,18 @@ export async function cancelSubscription(subscriptionId: string, reason?: string
     },
   });
 
+  incrementCounter(METRICS.SUBSCRIPTION_CANCELLED_TOTAL, { planType: subscription.planType });
+
   return subscription;
 }
 
 export async function processAutoRenewals() {
+  const autoRenewEnabled = await getAutoRenewEnabled();
+  if (!autoRenewEnabled) {
+    logger.info('[SubscriptionService] Auto-renew is disabled via CMS setting');
+    return;
+  }
+
   const now = new Date();
   const subsToRenew = await Subscription.find({
     status: 'active',
@@ -626,7 +673,7 @@ async function createInvoice(data: {
   amount: number;
   billingPeriodStart: Date;
   billingPeriodEnd: Date;
-  status: 'paid' | 'pending' | 'failed' | 'refunded';
+  status: 'paid' | 'pending' | 'failed' | 'refunded' | 'void' | 'uncollectible';
   paymentMethod?: string;
 }) {
   const count = await Invoice.countDocuments();
@@ -810,7 +857,9 @@ export async function changeSubscriptionPlan(subscriptionId: string, newPlanType
   if (!subscription) throw new Error('Subscription not found');
   if (subscription.status !== 'active') throw new Error('Can only change plan for active subscriptions');
 
-  const prices: Record<string, number> = { annual: 0.99, monthly: 1.99 };
+  const annualPrice = await getAnnualPrice();
+  const monthlyPrice = await getMonthlyPrice();
+  const prices: Record<string, number> = { annual: annualPrice, monthly: monthlyPrice };
   const planNames: Record<string, string> = { annual: 'PawTag Annual', monthly: 'PawTag Monthly' };
 
   const oldPlanType = subscription.planType;
@@ -864,11 +913,12 @@ export async function handlePaymentFailure(subscriptionId: string, paymentMethod
 
   const now = new Date();
   
-  // Calculate retry schedule: immediate, 1 hour, 24 hours, 72 hours
-  const retryDelays = [0, 60 * 60 * 1000, 24 * 60 * 60 * 1000, 72 * 60 * 60 * 1000];
+  // Calculate retry schedule from CMS settings
+  const retryDelays = await getRetryDelays();
+  const maxRetries = await getMaxRetries();
   const retryCount = (subscription as any).paymentRetryCount || 0;
   
-  if (retryCount >= retryDelays.length) {
+  if (retryCount >= maxRetries) {
     // Max retries exceeded - move to grace period
     await moveSubscriptionToGracePeriod(subscription._id.toString());
     return;
@@ -906,11 +956,13 @@ export async function handlePaymentFailure(subscriptionId: string, paymentMethod
       userId: subscription.userId.toString(),
       tagId: subscription.tagId?.toString(),
       retryCount: retryCount + 1,
-      maxRetries: retryDelays.length,
+      maxRetries,
       nextAttemptAt: (subscription as any).nextPaymentAttemptAt,
       paymentMethod,
     },
   }, { actorType: 'SERVICE' });
+
+  incrementCounter(METRICS.SUBSCRIPTION_PAYMENT_FAILED_TOTAL);
 }
 
 async function moveSubscriptionToGracePeriod(subscriptionId: string) {
@@ -1076,6 +1128,8 @@ export async function processPaymentRetries() {
             retryCount: (subscription as any).paymentRetryCount,
           },
         }, { actorType: 'SERVICE' });
+
+        incrementCounter(METRICS.SUBSCRIPTION_PAYMENT_RETRIED_TOTAL, { outcome: 'success' });
       } else {
         // Payment failed - handle failure
         await handlePaymentFailure(subscription._id.toString(), 'retry');

@@ -25,6 +25,7 @@
 
 import mongoose from 'mongoose';
 import { User, Subscription, Order, Setting, GuardianPointsLedger } from '@pawtag/db';
+import { incrementCounter, METRICS } from '../../lib/metrics';
 import logger from '../../lib/logger';
 
 // Points earning activities with base rates
@@ -495,6 +496,8 @@ async function recordPointsEarned(
       metadata,
       createdAt: new Date(),
     });
+
+    incrementCounter(METRICS.LOYALTY_POINTS_EARNED_TOTAL, { activity }, points);
   } catch (error) {
     logger.error({ err: error, userId, activity }, 'Failed to record points in ledger');
   }

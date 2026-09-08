@@ -6,6 +6,13 @@ import { renderPasswordResetEmail } from '../../packages/api/src/services/email/
 import { renderPasswordChangedEmail } from '../../packages/api/src/services/email/templates/password-changed';
 import { renderPetFoundEmail } from '../../packages/api/src/services/email/templates/pet-found';
 import { renderAccountStatusEmail } from '../../packages/api/src/services/email/templates/account-status';
+import { renderGuardianWelcomeEmail } from '../../packages/api/src/services/email/templates/guardian-welcome';
+import { renderTierUpgradeEmail } from '../../packages/api/src/services/email/templates/guardian-tier-upgrade';
+import { renderGuardianBirthdayEmail } from '../../packages/api/src/services/email/templates/guardian-birthday';
+import { renderMonthlySummaryEmail } from '../../packages/api/src/services/email/templates/guardian-monthly-summary';
+import { renderPawRewardsReminderEmail } from '../../packages/api/src/services/email/templates/guardian-pawrewards-reminder';
+import { renderGuardianAnniversaryEmail } from '../../packages/api/src/services/email/templates/guardian-anniversary';
+import { renderGuardianRenewalReminderEmail } from '../../packages/api/src/services/email/templates/guardian-renewal-reminder';
 
 describe('Base Email Template', () => {
   it('returns valid HTML with title', () => {
@@ -152,5 +159,112 @@ describe('Password Changed Email', () => {
     const html = renderPasswordChangedEmail({ name: 'Bob', changedBy: 'self' });
     expect(html).toContain('<!DOCTYPE html>');
     expect(html).toContain('PawTag');
+  });
+});
+
+describe('Guardian Welcome Email', () => {
+  it('includes customer name and tier', () => {
+    const html = renderGuardianWelcomeEmail({ customerName: 'Alice', tier: 'Nurture', points: 100, dashboardUrl: 'https://app.com/guardian' });
+    expect(html).toContain('Alice');
+    expect(html).toContain('Nurture');
+  });
+
+  it('includes starting points', () => {
+    const html = renderGuardianWelcomeEmail({ customerName: 'Alice', tier: 'Care', points: 50, dashboardUrl: 'https://app.com/guardian' });
+    expect(html).toContain('50');
+  });
+
+  it('includes dashboard URL', () => {
+    const html = renderGuardianWelcomeEmail({ customerName: 'Alice', tier: 'Care', points: 0, dashboardUrl: 'https://app.com/guardian' });
+    expect(html).toContain('https://app.com/guardian');
+  });
+});
+
+describe('Tier Upgrade Email', () => {
+  it('includes previous and new tier', () => {
+    const html = renderTierUpgradeEmail({
+      customerName: 'Bob', previousTier: 'Care', newTier: 'Nurture', points: 150,
+      benefits: ['Monthly PawRewards: $3.00'], dashboardUrl: 'https://app.com/guardian',
+    });
+    expect(html).toContain('Care');
+    expect(html).toContain('Nurture');
+  });
+
+  it('includes benefits list', () => {
+    const html = renderTierUpgradeEmail({
+      customerName: 'Bob', previousTier: 'Nurture', newTier: 'Protector', points: 250,
+      benefits: ['Early access', 'Priority support'], dashboardUrl: 'https://app.com/guardian',
+    });
+    expect(html).toContain('Early access');
+    expect(html).toContain('Priority support');
+  });
+});
+
+describe('Guardian Birthday Email', () => {
+  it('includes pet name and points', () => {
+    const html = renderGuardianBirthdayEmail({ customerName: 'Carol', petName: 'Buddy', pointsEarned: 10, dashboardUrl: 'https://app.com/guardian' });
+    expect(html).toContain('Buddy');
+    expect(html).toContain('10');
+  });
+});
+
+describe('Monthly Summary Email', () => {
+  it('includes tier and points data', () => {
+    const html = renderMonthlySummaryEmail({
+      customerName: 'Dave', tier: 'Protector', pointsEarned: 25, totalPoints: 300,
+      pawRewardsBalance: 12.50, pawRewardsAllocated: 5.00, topActivity: 'Purchase', dashboardUrl: 'https://app.com/guardian',
+    });
+    expect(html).toContain('Protector');
+    expect(html).toContain('25');
+    expect(html).toContain('300');
+  });
+
+  it('includes top activity when provided', () => {
+    const html = renderMonthlySummaryEmail({
+      customerName: 'Dave', tier: 'Care', pointsEarned: 10, totalPoints: 50,
+      pawRewardsBalance: 2.00, pawRewardsAllocated: 2.00, topActivity: 'Review', dashboardUrl: 'https://app.com/guardian',
+    });
+    expect(html).toContain('Review');
+  });
+});
+
+describe('PawRewards Reminder Email', () => {
+  it('includes balance and expiration info', () => {
+    const html = renderPawRewardsReminderEmail({
+      customerName: 'Eve', balance: 8.50, expirationDate: '2026-03-01', expirationAmount: 3.00, redeemUrl: 'https://app.com/rewards',
+    });
+    expect(html).toContain('Eve');
+    expect(html).toContain('8.50');
+    expect(html).toContain('3');
+  });
+});
+
+describe('Guardian Anniversary Email', () => {
+  it('includes pet name and years', () => {
+    const html = renderGuardianAnniversaryEmail({
+      customerName: 'Frank', petName: 'Luna', yearsOwned: 2, pointsEarned: 10, dashboardUrl: 'https://app.com/guardian',
+    });
+    expect(html).toContain('Luna');
+    expect(html).toContain('2');
+    expect(html).toContain('10');
+  });
+});
+
+describe('Guardian Renewal Reminder Email', () => {
+  it('includes tier and renewal date', () => {
+    const html = renderGuardianRenewalReminderEmail({
+      customerName: 'Grace', tier: 'Safeguard', renewalDate: '2026-06-01',
+      currentBenefits: ['Monthly PawRewards: $8.00', 'Free shipping'], dashboardUrl: 'https://app.com/subscriptions',
+    });
+    expect(html).toContain('Safeguard');
+    expect(html).toContain('2026-06-01');
+  });
+
+  it('includes benefits list', () => {
+    const html = renderGuardianRenewalReminderEmail({
+      customerName: 'Grace', tier: 'Care', renewalDate: '2026-06-01',
+      currentBenefits: ['Monthly PawRewards: $2.00'], dashboardUrl: 'https://app.com/subscriptions',
+    });
+    expect(html).toContain('Monthly PawRewards: $2.00');
   });
 });

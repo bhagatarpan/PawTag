@@ -172,6 +172,10 @@ async function run() {
         { key: 'commerce.subscriptions.monthlyPrice', value: '1.99', displayValue: 'Monthly Subscription Price', category: 'commerce', description: 'Monthly subscription price (NZD)' },
         { key: 'commerce.subscriptions.freePeriodMonths', value: '12', displayValue: 'Free Period (months)', category: 'commerce', description: 'Free period in months' },
         { key: 'commerce.subscriptions.gracePeriodWeeks', value: '4', displayValue: 'Grace Period (weeks)', category: 'commerce', description: 'Grace period in weeks' },
+        { key: 'commerce.subscriptions.autoRenewEnabled', value: 'true', displayValue: 'Auto-Renew Enabled', category: 'commerce', description: 'Allow subscriptions to auto-renew (global toggle)' },
+        { key: 'commerce.subscriptions.defaultAutoRenew', value: 'true', displayValue: 'Default Auto-Renew', category: 'commerce', description: 'Default auto-renew state for new subscriptions' },
+        { key: 'commerce.subscriptions.maxRetries', value: '4', displayValue: 'Max Payment Retries', category: 'commerce', description: 'Maximum number of payment retry attempts before grace period' },
+        { key: 'commerce.subscriptions.retryDelaysHours', value: '[0,1,24,72]', displayValue: 'Retry Delays (hours)', category: 'commerce', description: 'Payment retry delay schedule in hours (JSON array)' },
         // Refunds
         { key: 'commerce.refunds.enabled', value: 'true', displayValue: 'Refunds Enabled', category: 'commerce', description: 'Allow refunds' },
         { key: 'commerce.refunds.maxDaysAfterPurchase', value: '60', displayValue: 'Refund Window (days)', category: 'commerce', description: 'Maximum days after purchase for refund' },

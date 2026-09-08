@@ -121,6 +121,18 @@ export const METRICS = {
   NOTIFICATIONS_SENT_TOTAL: 'pawtag_notifications_sent_total',
   NOTIFICATIONS_FAILED_TOTAL: 'pawtag_notifications_failed_total',
 
+  // Subscriptions
+  SUBSCRIPTION_CREATED_TOTAL: 'pawtag_subscription_created_total',
+  SUBSCRIPTION_RENEWED_TOTAL: 'pawtag_subscription_renewed_total',
+  SUBSCRIPTION_CANCELLED_TOTAL: 'pawtag_subscription_cancelled_total',
+  SUBSCRIPTION_PAYMENT_FAILED_TOTAL: 'pawtag_subscription_payment_failed_total',
+  SUBSCRIPTION_PAYMENT_RETRIED_TOTAL: 'pawtag_subscription_payment_retried_total',
+
+  // Loyalty
+  LOYALTY_POINTS_EARNED_TOTAL: 'pawtag_loyalty_points_earned_total',
+  LOYALTY_TIER_UPGRADED_TOTAL: 'pawtag_loyalty_tier_upgraded_total',
+  LOYALTY_PAWREWARDS_REDEEMED_TOTAL: 'pawtag_loyalty_pawrewards_redeemed_total',
+
   // System
   ACTIVE_CONNECTIONS: 'pawtag_active_connections',
   UPTIME_SECONDS: 'pawtag_uptime_seconds',

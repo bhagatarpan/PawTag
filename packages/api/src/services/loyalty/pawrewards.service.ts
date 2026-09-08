@@ -27,7 +27,8 @@
 import mongoose from 'mongoose';
 import { User, Subscription, Order, Setting, PawRewardsLedger } from '@pawtag/db';
 import { calculateTier, TIER_BENEFITS, TierName } from './tier.service';
-import { sendMail } from '../email.service';
+import { sendMonthlySummaryEmail, sendPawRewardsReminderEmail } from '../email.service';
+import { incrementCounter, METRICS } from '../../lib/metrics';
 import logger from '../../lib/logger';
 
 // PawRewards configuration
@@ -262,6 +263,8 @@ export async function redeemRewards(
     newBalance: updatedUser?.pawRewardsBalance,
   }, 'PawRewards redeemed');
 
+  incrementCounter(METRICS.LOYALTY_PAWREWARDS_REDEEMED_TOTAL, { }, amount);
+
   return {
     redeemed: amount,
     newBalance: updatedUser?.pawRewardsBalance || 0,
@@ -441,33 +444,15 @@ async function sendAllocationEmail(
   const user = await User.findById(userId).select('email fullName').lean();
   if (!user?.email) return;
 
-  const tierBenefits = TIER_BENEFITS[tier];
-
-  const html = `
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-      <div style="background: linear-gradient(135deg, #10b981, #059669); padding: 24px; border-radius: 12px 12px 0 0; text-align: center;">
-        <h1 style="color: white; font-size: 24px; margin: 0;">PawTag PawRewards</h1>
-      </div>
-      <div style="background: #f9fafb; padding: 32px; border: 1px solid #e5e7eb;">
-        <h2 style="color: #111827; font-size: 20px;">Hi ${user.fullName || 'Guardian'},</h2>
-        <p style="color: #374151; font-size: 15px; line-height: 1.7;">
-          Your monthly PawRewards have been allocated! As a <strong>${tierBenefits.displayName}</strong>, you've received <strong>$${amount.toFixed(2)}</strong> in PawRewards.
-        </p>
-        <div style="background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin: 16px 0;">
-          <p style="color: #6b7280; font-size: 13px; margin: 0 0 4px;">Your Balance</p>
-          <p style="color: #10b981; font-size: 24px; font-weight: 600; margin: 0;">$${newBalance.toFixed(2)}</p>
-        </div>
-        <p style="color: #374151; font-size: 15px; line-height: 1.7;">
-          PawRewards can be redeemed on any purchase. Minimum redemption is $${PAWREWARDS_CONFIG.MINIMUM_REDEMPTION.toFixed(2)}.
-        </p>
-        <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/guardian/rewards" style="display: inline-block; background: #10b981; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; margin: 16px 0;">View Rewards</a>
-      </div>
-      <div style="text-align: center; padding: 16px; color: #9ca3af; font-size: 11px;">
-        PawTag — Reuniting lost pets with their families
-      </div>
-    </div>`;
-
-  await sendMail(user.email, `Your monthly PawRewards are here — $${amount.toFixed(2)} added`, html);
+  await sendMonthlySummaryEmail(
+    user.email,
+    user.fullName || 'Guardian',
+    tier,
+    0,
+    0,
+    newBalance,
+    amount,
+  );
 }
 
 /**
@@ -477,28 +462,14 @@ async function sendExpirationEmail(userId: string, amount: number): Promise<void
   const user = await User.findById(userId).select('email fullName pawRewardsBalance').lean();
   if (!user?.email) return;
 
-  const html = `
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-      <div style="background: linear-gradient(135deg, #f59e0b, #d97706); padding: 24px; border-radius: 12px 12px 0 0; text-align: center;">
-        <h1 style="color: white; font-size: 24px; margin: 0;">PawTag PawRewards</h1>
-      </div>
-      <div style="background: #fffbeb; padding: 32px; border: 1px solid #fde68a;">
-        <h2 style="color: #111827; font-size: 20px;">Hi ${user.fullName || 'Guardian'},</h2>
-        <p style="color: #374151; font-size: 15px; line-height: 1.7;">
-          <strong>$${amount.toFixed(2)}</strong> in PawRewards have expired after 6 months of inactivity.
-        </p>
-        <p style="color: #374151; font-size: 15px; line-height: 1.7;">
-          Your remaining balance is <strong>$${(user.pawRewardsBalance || 0).toFixed(2)}</strong>.
-        </p>
-        <p style="color: #374151; font-size: 15px; line-height: 1.7;">
-          Use your PawRewards before they expire! Redeem them on any purchase.
-        </p>
-        <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/guardian/rewards" style="display: inline-block; background: #f59e0b; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; margin: 16px 0;">Use Rewards Now</a>
-      </div>
-      <div style="text-align: center; padding: 16px; color: #9ca3af; font-size: 11px;">
-        PawTag — Reuniting lost pets with their families
-      </div>
-    </div>`;
+  const expirationDate = new Date();
+  expirationDate.setMonth(expirationDate.getMonth() + 1);
 
-  await sendMail(user.email, `Your PawRewards are expiring soon`, html);
+  await sendPawRewardsReminderEmail(
+    user.email,
+    user.fullName || 'Guardian',
+    user.pawRewardsBalance || 0,
+    expirationDate.toISOString(),
+    amount,
+  );
 }

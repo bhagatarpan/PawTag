@@ -9,7 +9,7 @@ export interface IInvoiceDocument extends Document {
   amount: number;
   currency: string;
 
-  status: 'paid' | 'pending' | 'failed' | 'refunded';
+  status: 'paid' | 'pending' | 'failed' | 'refunded' | 'void' | 'uncollectible';
 
   stripeInvoiceId?: string;
   stripePaymentIntentId?: string;
@@ -19,6 +19,10 @@ export interface IInvoiceDocument extends Document {
     start: Date;
     end: Date;
   };
+
+  pdfUrl?: string;
+  voidedAt?: Date;
+  voidedReason?: string;
 
   paidAt?: Date;
   dueDate?: Date;
@@ -39,7 +43,7 @@ const InvoiceSchema = new Schema<IInvoiceDocument>(
 
     status: {
       type: String,
-      enum: ['paid', 'pending', 'failed', 'refunded'],
+      enum: ['paid', 'pending', 'failed', 'refunded', 'void', 'uncollectible'],
       default: 'pending',
       index: true,
     },
@@ -52,6 +56,10 @@ const InvoiceSchema = new Schema<IInvoiceDocument>(
       start: { type: Date },
       end: { type: Date },
     },
+
+    pdfUrl: { type: String },
+    voidedAt: { type: Date },
+    voidedReason: { type: String },
 
     paidAt: { type: Date },
     dueDate: { type: Date },

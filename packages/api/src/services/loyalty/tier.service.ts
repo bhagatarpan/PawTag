@@ -22,7 +22,8 @@
 
 import mongoose from 'mongoose';
 import { User, Subscription, Setting, GuardianTierHistory } from '@pawtag/db';
-import { sendMail } from '../email.service';
+import { sendTierUpgradeEmail } from '../email.service';
+import { incrementCounter, METRICS } from '../../lib/metrics';
 import logger from '../../lib/logger';
 
 // Tier thresholds
@@ -188,6 +189,8 @@ export async function updateTier(userId: string): Promise<TierCalculationResult>
     // Send tier change email
     await sendTierChangeEmail(userId, previousTier, currentTier.tier, currentTier.points);
 
+    incrementCounter(METRICS.LOYALTY_TIER_UPGRADED_TOTAL, { from: previousTier, to: currentTier.tier });
+
     logger.info({
       userId,
       previousTier,
@@ -292,88 +295,24 @@ async function sendTierChangeEmail(
   const user = await User.findById(userId).select('email fullName').lean();
   if (!user?.email) return;
 
-  const isUpgrade = getTierLevel(newTier) > getTierLevel(previousTier);
   const tierBenefits = TIER_BENEFITS[newTier];
+  const benefits = [
+    `Monthly PawRewards: $${tierBenefits.pawRewardsMonthly.toFixed(2)}`,
+    `Free shipping on orders over $${tierBenefits.freeShippingThreshold}`,
+    ...(tierBenefits.earlyAccess ? ['Early access to new products'] : []),
+    ...(tierBenefits.prioritySupport ? ['Priority customer support'] : []),
+    ...('annualGift' in tierBenefits && tierBenefits.annualGift ? ['Annual surprise gift'] : []),
+    ...('referralBonusBoost' in tierBenefits && tierBenefits.referralBonusBoost ? ['Enhanced referral rewards'] : []),
+  ];
 
-  const subject = isUpgrade
-    ? `Congratulations! You've been promoted to ${tierBenefits.displayName}`
-    : `Your Guardian tier has changed`;
-
-  const html = `
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-      <div style="background: linear-gradient(135deg, ${getTierGradient(newTier)}); padding: 24px; border-radius: 12px 12px 0 0; text-align: center;">
-        <h1 style="color: white; font-size: 24px; margin: 0;">PawTag Guardian</h1>
-      </div>
-      <div style="background: #f9fafb; padding: 32px; border: 1px solid #e5e7eb;">
-        <h2 style="color: #111827; font-size: 20px;">Hi ${user.fullName || 'Guardian'},</h2>
-        <p style="color: #374151; font-size: 15px; line-height: 1.7;">
-          ${isUpgrade
-            ? `Congratulations! You've been promoted from ${previousTier} to <strong>${tierBenefits.displayName}</strong>.`
-            : `Your Guardian tier has changed from ${previousTier} to <strong>${tierBenefits.displayName}</strong>.`
-          }
-        </p>
-        <div style="background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin: 16px 0;">
-          <p style="color: #6b7280; font-size: 13px; margin: 0 0 4px;">Your Points</p>
-          <p style="color: #111827; font-size: 24px; font-weight: 600; margin: 0;">${points}</p>
-        </div>
-        <div style="background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin: 16px 0;">
-          <p style="color: #6b7280; font-size: 13px; margin: 0 0 4px;">Your Benefits</p>
-          <ul style="color: #374151; font-size: 14px; margin: 0; padding-left: 20px;">
-            <li>Monthly PawRewards: $${tierBenefits.pawRewardsMonthly.toFixed(2)}</li>
-            <li>Free shipping on orders over $${tierBenefits.freeShippingThreshold}</li>
-            ${tierBenefits.earlyAccess ? '<li>Early access to new products</li>' : ''}
-            ${tierBenefits.prioritySupport ? '<li>Priority customer support</li>' : ''}
-            ${'annualGift' in tierBenefits && tierBenefits.annualGift ? '<li>Annual surprise gift</li>' : ''}
-            ${'referralBonusBoost' in tierBenefits && tierBenefits.referralBonusBoost ? '<li>Enhanced referral rewards</li>' : ''}
-          </ul>
-        </div>
-        <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/guardian" style="display: inline-block; background: ${getTierColor(newTier)}; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; margin: 16px 0;">View Your Dashboard</a>
-      </div>
-      <div style="text-align: center; padding: 16px; color: #9ca3af; font-size: 11px;">
-        PawTag — Reuniting lost pets with their families
-      </div>
-    </div>`;
-
-  await sendMail(user.email, subject, html);
-}
-
-/**
- * Get tier level for comparison
- */
-function getTierLevel(tier: TierName): number {
-  const levels: Record<TierName, number> = {
-    CARE: 1,
-    NURTURE: 2,
-    PROTECTOR: 3,
-    SAFEGUARD: 4,
-  };
-  return levels[tier];
-}
-
-/**
- * Get tier gradient for email styling
- */
-function getTierGradient(tier: TierName): string {
-  const gradients: Record<TierName, string> = {
-    CARE: '#10b981, #059669',
-    NURTURE: '#0d9488, #14b8a6',
-    PROTECTOR: '#8b5cf6, #7c3aed',
-    SAFEGUARD: '#f59e0b, #d97706',
-  };
-  return gradients[tier];
-}
-
-/**
- * Get tier color for email styling
- */
-function getTierColor(tier: TierName): string {
-  const colors: Record<TierName, string> = {
-    CARE: '#10b981',
-    NURTURE: '#0d9488',
-    PROTECTOR: '#8b5cf6',
-    SAFEGUARD: '#f59e0b',
-  };
-  return colors[tier];
+  await sendTierUpgradeEmail(
+    user.email,
+    user.fullName || 'Guardian',
+    previousTier,
+    newTier,
+    points,
+    benefits,
+  );
 }
 
 /**

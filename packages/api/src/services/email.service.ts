@@ -14,6 +14,13 @@ import {
   renderAccountStatusEmail,
   renderLoginNotificationEmail,
   renderLoginOtpEmail,
+  renderGuardianWelcomeEmail,
+  renderTierUpgradeEmail,
+  renderGuardianBirthdayEmail,
+  renderMonthlySummaryEmail,
+  renderPawRewardsReminderEmail,
+  renderGuardianAnniversaryEmail,
+  renderGuardianRenewalReminderEmail,
 } from './email/templates';
 
 const resendApiKey = process.env.RESEND_API_KEY;
@@ -403,4 +410,117 @@ export async function sendLoginOtpEmail(
 
   const html = renderLoginOtpEmail({ name, otp, expiresIn });
   return sendMail(to, 'Your PawTag Login Verification Code', html);
+}
+
+// ─── Guardian / Loyalty Emails ──────────────────────────────────────
+
+export async function sendGuardianWelcomeEmail(
+  to: string,
+  customerName: string,
+  tier: string,
+  points: number,
+): Promise<EmailResult> {
+  const dashboardUrl = `${frontendUrl}/account/guardian`;
+  const vars = { customerName, tier, points: String(points), dashboardUrl };
+  const cms = await renderCmsEmail('guardian-welcome', vars);
+  if (cms) return sendMail(to, cms.subject, cms.html, cms.from);
+  const html = renderGuardianWelcomeEmail({ customerName, tier, points, dashboardUrl });
+  return sendMail(to, 'Welcome to Guardian — PawTag', html);
+}
+
+export async function sendTierUpgradeEmail(
+  to: string,
+  customerName: string,
+  previousTier: string,
+  newTier: string,
+  points: number,
+  benefits: string[],
+): Promise<EmailResult> {
+  const dashboardUrl = `${frontendUrl}/account/guardian`;
+  const vars = { customerName, previousTier, newTier, points: String(points), benefits: benefits.join(', '), dashboardUrl };
+  const cms = await renderCmsEmail('guardian-tier-upgrade', vars);
+  if (cms) return sendMail(to, cms.subject, cms.html, cms.from);
+  const html = renderTierUpgradeEmail({ customerName, previousTier, newTier, points, benefits, dashboardUrl });
+  return sendMail(to, `Congratulations! You've been promoted to ${newTier} — PawTag`, html);
+}
+
+export async function sendGuardianBirthdayEmail(
+  to: string,
+  customerName: string,
+  petName: string,
+  pointsEarned: number,
+): Promise<EmailResult> {
+  const dashboardUrl = `${frontendUrl}/account/guardian`;
+  const vars = { customerName, petName, pointsEarned: String(pointsEarned), dashboardUrl };
+  const cms = await renderCmsEmail('guardian-birthday', vars);
+  if (cms) return sendMail(to, cms.subject, cms.html, cms.from);
+  const html = renderGuardianBirthdayEmail({ customerName, petName, pointsEarned, dashboardUrl });
+  return sendMail(to, `Happy Birthday ${petName}! — PawTag`, html);
+}
+
+export async function sendMonthlySummaryEmail(
+  to: string,
+  customerName: string,
+  tier: string,
+  pointsEarned: number,
+  totalPoints: number,
+  pawRewardsBalance: number,
+  pawRewardsAllocated: number,
+  topActivity?: string,
+): Promise<EmailResult> {
+  const dashboardUrl = `${frontendUrl}/account/guardian`;
+  const vars = {
+    customerName, tier, pointsEarned: String(pointsEarned), totalPoints: String(totalPoints),
+    pawRewardsBalance: pawRewardsBalance.toFixed(2), pawRewardsAllocated: pawRewardsAllocated.toFixed(2),
+    topActivity: topActivity || '', dashboardUrl,
+  };
+  const cms = await renderCmsEmail('guardian-monthly-summary', vars);
+  if (cms) return sendMail(to, cms.subject, cms.html, cms.from);
+  const html = renderMonthlySummaryEmail({ customerName, tier, pointsEarned, totalPoints, pawRewardsBalance, pawRewardsAllocated, topActivity: topActivity || '', dashboardUrl });
+  return sendMail(to, `Your ${tier} Guardian Monthly Summary — PawTag`, html);
+}
+
+export async function sendPawRewardsReminderEmail(
+  to: string,
+  customerName: string,
+  balance: number,
+  expirationDate: string,
+  expirationAmount: number,
+): Promise<EmailResult> {
+  const redeemUrl = `${frontendUrl}/account/guardian/rewards`;
+  const vars = { customerName, balance: balance.toFixed(2), expirationDate, expirationAmount: String(expirationAmount), redeemUrl };
+  const cms = await renderCmsEmail('guardian-pawrewards-reminder', vars);
+  if (cms) return sendMail(to, cms.subject, cms.html, cms.from);
+  const html = renderPawRewardsReminderEmail({ customerName, balance, expirationDate, expirationAmount, redeemUrl });
+  return sendMail(to, 'PawRewards Expiring Soon — PawTag', html);
+}
+
+export async function sendGuardianAnniversaryEmail(
+  to: string,
+  customerName: string,
+  petName: string,
+  yearsOwned: number,
+  pointsEarned: number,
+): Promise<EmailResult> {
+  const dashboardUrl = `${frontendUrl}/account/guardian`;
+  const vars = { customerName, petName, yearsOwned: String(yearsOwned), pointsEarned: String(pointsEarned), dashboardUrl };
+  const cms = await renderCmsEmail('guardian-anniversary', vars);
+  if (cms) return sendMail(to, cms.subject, cms.html, cms.from);
+  const html = renderGuardianAnniversaryEmail({ customerName, petName, yearsOwned, pointsEarned, dashboardUrl });
+  return sendMail(to, `${petName}'s Adoption Anniversary — PawTag`, html);
+}
+
+export async function sendGuardianRenewalReminderEmail(
+  to: string,
+  customerName: string,
+  tier: string,
+  renewalDate: string,
+  currentBenefits: string[],
+): Promise<EmailResult> {
+  const dashboardUrl = `${frontendUrl}/account/subscriptions`;
+  const vars = { customerName, tier, renewalDate, currentBenefits: currentBenefits.join(', '), dashboardUrl };
+  const cms = await renderCmsEmail('guardian-renewal-reminder', vars);
+  if (cms) return sendMail(to, cms.subject, cms.html, cms.from);
+  const html = renderGuardianRenewalReminderEmail({ customerName, tier, renewalDate, currentBenefits, dashboardUrl });
+  return sendMail(to, 'Your Guardian Membership Renewal — PawTag', html);
 }
