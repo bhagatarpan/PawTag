@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Shield, Gift, ArrowUpRight, Award, Star, Trophy, Target } from 'lucide-react';
+import { Shield, Gift, ArrowUpRight, Award, Star, Trophy, Target, ShoppingBag, MessageSquare, Users, TrendingUp, Zap, Crown, Heart, Flame, Medal, CheckCircle } from 'lucide-react';
 import api from '../../lib/api';
 
 type TierName = 'CARE' | 'NURTURE' | 'PROTECTOR' | 'SAFEGUARD';
@@ -57,6 +57,140 @@ const TIER_BADGES: Record<TierName, string> = {
   PROTECTOR: 'bg-purple-100 text-purple-700',
   SAFEGUARD: 'bg-amber-100 text-amber-700',
 };
+
+const TIER_ORDER: TierName[] = ['CARE', 'NURTURE', 'PROTECTOR', 'SAFEGUARD'];
+
+interface Achievement {
+  id: string;
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  unlocked: boolean;
+  progress: number;
+  total: number;
+  gradient: string;
+  glowColor: string;
+}
+
+function useAchievements(data: GuardianData): Achievement[] {
+  const tierIndex = TIER_ORDER.indexOf(data.tier);
+  const purchaseCount = data.recentActivity.filter((a) => a.type === 'purchase').length;
+  const reviewCount = data.recentActivity.filter((a) => a.type === 'review').length;
+  const referralCount = data.recentActivity.filter((a) => a.type === 'referral').length;
+
+  return [
+    {
+      id: 'guardian-member',
+      icon: <Star size={24} />,
+      title: 'Guardian Member',
+      description: 'Joined the Guardian loyalty program',
+      unlocked: true,
+      progress: 1,
+      total: 1,
+      gradient: 'from-amber-400 to-orange-500',
+      glowColor: 'rgba(251, 191, 36, 0.4)',
+    },
+    {
+      id: 'first-purchase',
+      icon: <ShoppingBag size={24} />,
+      title: 'First Purchase',
+      description: 'Made your first order',
+      unlocked: data.points > 0,
+      progress: Math.min(data.points > 0 ? 1 : 0, 1),
+      total: 1,
+      gradient: 'from-emerald-400 to-teal-500',
+      glowColor: 'rgba(16, 185, 129, 0.4)',
+    },
+    {
+      id: 'care-tier',
+      icon: <Award size={24} />,
+      title: 'CARE Tier',
+      description: 'Reached CARE Guardian status',
+      unlocked: tierIndex >= 0,
+      progress: tierIndex >= 0 ? 1 : Math.min(data.points / 100, 0.99),
+      total: 1,
+      gradient: 'from-emerald-500 to-teal-600',
+      glowColor: 'rgba(16, 185, 129, 0.4)',
+    },
+    {
+      id: 'points-collector',
+      icon: <Target size={24} />,
+      title: 'Points Collector',
+      description: 'Earned 500+ Guardian Points',
+      unlocked: data.points >= 500,
+      progress: Math.min(data.points / 500, 1),
+      total: 500,
+      gradient: 'from-primary-400 to-primary-600',
+      glowColor: 'rgba(20, 184, 166, 0.4)',
+    },
+    {
+      id: 'review-star',
+      icon: <MessageSquare size={24} />,
+      title: 'Review Star',
+      description: 'Left a product review',
+      unlocked: reviewCount > 0,
+      progress: Math.min(reviewCount > 0 ? 1 : 0, 1),
+      total: 1,
+      gradient: 'from-yellow-400 to-amber-500',
+      glowColor: 'rgba(245, 158, 11, 0.4)',
+    },
+    {
+      id: 'refer-a-friend',
+      icon: <Users size={24} />,
+      title: 'Refer a Friend',
+      description: 'Referred 1+ friend to PawTag',
+      unlocked: referralCount > 0,
+      progress: Math.min(referralCount > 0 ? 1 : 0, 1),
+      total: 1,
+      gradient: 'from-blue-400 to-indigo-500',
+      glowColor: 'rgba(59, 130, 246, 0.4)',
+    },
+    {
+      id: 'nurture-tier',
+      icon: <TrendingUp size={24} />,
+      title: 'NURTURE Tier',
+      description: 'Reached NURTURE Guardian status',
+      unlocked: tierIndex >= 1,
+      progress: tierIndex >= 1 ? 1 : Math.min(data.points / 100, 0.99),
+      total: 100,
+      gradient: 'from-teal-500 to-cyan-600',
+      glowColor: 'rgba(20, 184, 166, 0.4)',
+    },
+    {
+      id: 'power-shopper',
+      icon: <Zap size={24} />,
+      title: 'Power Shopper',
+      description: 'Made 10+ purchases',
+      unlocked: purchaseCount >= 10,
+      progress: Math.min(purchaseCount / 10, 1),
+      total: 10,
+      gradient: 'from-violet-400 to-purple-600',
+      glowColor: 'rgba(139, 92, 246, 0.4)',
+    },
+    {
+      id: 'protector-tier',
+      icon: <Shield size={24} />,
+      title: 'PROTECTOR Tier',
+      description: 'Reached PROTECTOR Guardian status',
+      unlocked: tierIndex >= 2,
+      progress: tierIndex >= 2 ? 1 : Math.min(data.points / 200, 0.99),
+      total: 200,
+      gradient: 'from-purple-500 to-indigo-600',
+      glowColor: 'rgba(139, 92, 246, 0.4)',
+    },
+    {
+      id: 'safeguard-elite',
+      icon: <Crown size={24} />,
+      title: 'SAFEGUARD Elite',
+      description: 'Reached the highest Guardian tier',
+      unlocked: tierIndex >= 3,
+      progress: tierIndex >= 3 ? 1 : Math.min(data.points / 300, 0.99),
+      total: 300,
+      gradient: 'from-amber-500 to-orange-600',
+      glowColor: 'rgba(245, 158, 11, 0.5)',
+    },
+  ];
+}
 
 export default function GuardianDashboard() {
   const [data, setData] = useState<GuardianData | null>(null);
@@ -129,6 +263,9 @@ export default function GuardianDashboard() {
 const progressPercent = data.tierInfo.pointsToNextTier !== null
    ? Math.min(100, (data.points / (data.points + data.tierInfo.pointsToNextTier)) * 100)
    : 100;
+
+const achievements = useAchievements(data);
+const unlockedCount = achievements.filter((a) => a.unlocked).length;
 
   return (
     <div className="space-y-6">
@@ -262,32 +399,129 @@ const progressPercent = data.tierInfo.pointsToNextTier !== null
           </ul>
         </div>
 
-        {/* Achievements Card */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Achievements</h3>
-          <div className="grid grid-cols-2 gap-3">
-            {[
-              { icon: <Award size={20} />, title: 'First Purchase', desc: 'Made your first order', unlocked: data.points > 0 },
-              { icon: <Star size={20} />, title: 'Guardian Member', desc: 'Joined the Guardian program', unlocked: true },
-              { icon: <Trophy size={20} />, title: `${data.tier} Tier`, desc: `Reached ${data.tier} status`, unlocked: true },
-              { icon: <Target size={20} />, title: 'Points Collector', desc: 'Earned 500+ points', unlocked: data.points >= 500 },
-            ].map((achievement, index) => (
-              <div
-                key={index}
-                className={`p-3 rounded-xl border ${
-                  achievement.unlocked
-                    ? 'bg-primary-50 border-primary-200 text-primary-700'
-                    : 'bg-gray-50 border-gray-200 text-gray-400'
-                }`}
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  {achievement.icon}
-                  <span className="text-sm font-medium">{achievement.title}</span>
-                </div>
-                <p className="text-xs opacity-75">{achievement.desc}</p>
-              </div>
-            ))}
+        {/* Achievements Card — removed, now full-width below */}
+      </div>
+
+      {/* Achievements Section — Full Width */}
+      <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 rounded-2xl p-6 md:p-8 text-white relative overflow-hidden">
+        {/* Decorative background elements */}
+        <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-primary-500/5 rounded-full translate-y-1/2 -translate-x-1/2 blur-3xl" />
+
+        {/* Header */}
+        <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div>
+            <div className="flex items-center gap-3 mb-1">
+              <Trophy size={28} className="text-amber-400" />
+              <h2 className="text-2xl font-bold">Achievements</h2>
+            </div>
+            <p className="text-gray-400 text-sm">
+              {unlockedCount} of {achievements.length} unlocked — keep going!
+            </p>
           </div>
+          <div className="flex items-center gap-3">
+            <div className="text-right">
+              <div className="text-2xl font-bold text-amber-400">{unlockedCount}/{achievements.length}</div>
+              <div className="text-xs text-gray-400">Completed</div>
+            </div>
+            <div className="relative w-16 h-16">
+              <svg className="w-16 h-16 -rotate-90" viewBox="0 0 36 36">
+                <path
+                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                  fill="none"
+                  stroke="rgba(255,255,255,0.1)"
+                  strokeWidth="3"
+                />
+                <path
+                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                  fill="none"
+                  stroke="url(#achievementGradient)"
+                  strokeWidth="3"
+                  strokeDasharray={`${(unlockedCount / achievements.length) * 100}, 100`}
+                  strokeLinecap="round"
+                  className="transition-all duration-1000"
+                />
+                <defs>
+                  <linearGradient id="achievementGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="#f59e0b" />
+                    <stop offset="100%" stopColor="#f97316" />
+                  </linearGradient>
+                </defs>
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Medal size={20} className="text-amber-400" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Achievement Grid */}
+        <div className="relative grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 md:gap-4">
+          {achievements.map((achievement) => (
+            <div
+              key={achievement.id}
+              className={`group relative rounded-xl p-4 transition-all duration-300 ${
+                achievement.unlocked
+                  ? 'bg-gradient-to-br ' + achievement.gradient + ' text-white shadow-lg hover:scale-105 hover:shadow-xl cursor-default'
+                  : 'bg-white/5 border border-white/10 text-gray-400 hover:bg-white/10'
+              }`}
+              style={achievement.unlocked ? { boxShadow: `0 4px 20px ${achievement.glowColor}` } : undefined}
+            >
+              {/* Unlocked shine effect */}
+              {achievement.unlocked && (
+                <div className="absolute inset-0 rounded-xl overflow-hidden">
+                  <div className="absolute -top-1 -right-1 w-8 h-8 bg-white/20 rounded-full blur-lg" />
+                </div>
+              )}
+
+              <div className="relative">
+                {/* Icon */}
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 ${
+                  achievement.unlocked
+                    ? 'bg-white/20'
+                    : 'bg-white/5'
+                }`}>
+                  {achievement.icon}
+                </div>
+
+                {/* Title & Description */}
+                <h3 className={`text-sm font-semibold mb-1 ${
+                  achievement.unlocked ? 'text-white' : 'text-gray-300'
+                }`}>
+                  {achievement.title}
+                </h3>
+                <p className={`text-xs leading-relaxed ${
+                  achievement.unlocked ? 'text-white/70' : 'text-gray-500'
+                }`}>
+                  {achievement.description}
+                </p>
+
+                {/* Progress bar for locked achievements */}
+                {!achievement.unlocked && achievement.progress > 0 && (
+                  <div className="mt-3">
+                    <div className="flex justify-between text-[10px] text-gray-500 mb-1">
+                      <span>{Math.round(achievement.progress * 100)}%</span>
+                      <span>{achievement.total} pts</span>
+                    </div>
+                    <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-amber-500/60 to-orange-500/60 rounded-full transition-all duration-700"
+                        style={{ width: `${achievement.progress * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Unlocked badge */}
+                {achievement.unlocked && (
+                  <div className="mt-3 flex items-center gap-1">
+                    <CheckCircle size={12} className="text-white/80" />
+                    <span className="text-[10px] font-medium text-white/80 uppercase tracking-wide">Unlocked</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
