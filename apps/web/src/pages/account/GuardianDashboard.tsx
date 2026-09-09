@@ -22,24 +22,26 @@ interface TierBenefits {
 interface GuardianData {
   points: number;
   tier: TierName;
-  pointsToNextTier: number | null;
-  nextTier: TierName | null;
-  benefits: TierBenefits;
-  isLifetime: boolean;
   pawRewards: {
     balance: number;
     totalEarned: number;
     totalRedeemed: number;
     totalExpired: number;
-    nextExpiration: Date | null;
-    expirationAmount: number;
   };
   recentActivity: Array<{
     type: string;
-    points: number;
-    description: string;
+    points?: number;
+    amount?: number;
+    description?: string;
     createdAt: string;
   }>;
+  tierInfo: {
+    currentTier: TierName;
+    points: number;
+    nextTier: TierName | null;
+    pointsToNextTier: number | null;
+    benefits: TierBenefits;
+  };
 }
 
 const TIER_COLORS: Record<TierName, string> = {
@@ -67,21 +69,24 @@ export default function GuardianDashboard() {
 
   async function fetchGuardianData() {
     try {
-      const [pointsRes, rewardsRes, activityRes] = await Promise.all([
+      const [pointsRes, rewardsRes, tierRes, historyRes] = await Promise.all([
         api.get('/customer/guardian/points'),
         api.get('/customer/guardian/rewards'),
-        api.get('/customer/guardian/activity'),
+        api.get('/customer/guardian/tier'),
+        api.get('/customer/guardian/history'),
       ]);
 
       setData({
         points: pointsRes.data.data.points,
         tier: pointsRes.data.data.tier,
-        pointsToNextTier: pointsRes.data.data.pointsToNextTier,
-        nextTier: pointsRes.data.data.nextTier,
-        benefits: pointsRes.data.data.benefits,
-        isLifetime: pointsRes.data.data.isLifetime,
-        pawRewards: rewardsRes.data.data,
-        recentActivity: activityRes.data.data,
+        pawRewards: {
+          balance: rewardsRes.data.data.balance,
+          totalEarned: rewardsRes.data.data.totalEarned,
+          totalRedeemed: rewardsRes.data.data.totalRedeemed,
+          totalExpired: rewardsRes.data.data.totalExpired,
+        },
+        recentActivity: historyRes.data.data.history,
+        tierInfo: tierRes.data.data,
       });
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to load Guardian data');
@@ -121,9 +126,9 @@ export default function GuardianDashboard() {
 
   if (!data) return null;
 
-  const progressPercent = data.pointsToNextTier !== null
-    ? Math.min(100, (data.points / (data.points + data.pointsToNextTier)) * 100)
-    : 100;
+const progressPercent = data.tierInfo.pointsToNextTier !== null
+   ? Math.min(100, (data.points / (data.points + data.tierInfo.pointsToNextTier)) * 100)
+   : 100;
 
   return (
     <div className="space-y-6">
@@ -145,19 +150,19 @@ export default function GuardianDashboard() {
       <div className={`bg-gradient-to-r ${TIER_COLORS[data.tier]} rounded-2xl p-6 text-white`}>
         <div className="flex items-center justify-between">
           <div>
-            <div className="flex items-center gap-3 mb-2">
-              <span className="text-3xl font-bold">{data.benefits.displayName}</span>
-              {data.isLifetime && (
-                <span className="px-3 py-1 bg-white/20 rounded-full text-sm font-medium">
-                  Lifetime
-                </span>
-              )}
-            </div>
-            <p className="text-white/80">
-              {data.pointsToNextTier !== null
-                ? `${data.pointsToNextTier} points to ${data.nextTier}`
-                : 'Maximum tier reached!'}
-            </p>
+<div className="flex items-center gap-3 mb-2">
+               <span className="text-3xl font-bold">{data.tierInfo.benefits.displayName}</span>
+               {data.tierInfo.benefits.guardianBadge && (
+                 <span className="px-3 py-1 bg-white/20 rounded-full text-sm font-medium">
+                   Guardian Badge
+                 </span>
+               )}
+             </div>
+<p className="text-white/80">
+               {data.tierInfo.pointsToNextTier !== null
+                 ? `${data.tierInfo.pointsToNextTier} points to ${data.tierInfo.nextTier}`
+                 : 'Maximum tier reached!'}
+             </p>
           </div>
           <div className="text-right">
             <div className="text-4xl font-bold">{data.points}</div>
@@ -166,17 +171,17 @@ export default function GuardianDashboard() {
         </div>
 
         {/* Progress Bar */}
-        {data.pointsToNextTier !== null && (
-          <div className="mt-6">
-            <div className="flex justify-between text-sm text-white/80 mb-2">
-              <span>{data.tier}</span>
-              <span>{data.nextTier}</span>
-            </div>
-            <div className="h-2 bg-white/20 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-white rounded-full transition-all duration-500"
-                style={{ width: `${progressPercent}%` }}
-              />
+{data.tierInfo.pointsToNextTier !== null && (
+           <div className="mt-6">
+             <div className="flex justify-between text-sm text-white/80 mb-2">
+               <span>{data.tier}</span>
+               <span>{data.tierInfo.nextTier}</span>
+             </div>
+             <div className="h-2 bg-white/20 rounded-full overflow-hidden">
+               <div
+                 className="h-full bg-white rounded-full transition-all duration-500"
+                 style={{ width: `${progressPercent}%` }}
+               />
             </div>
           </div>
         )}
@@ -212,20 +217,14 @@ export default function GuardianDashboard() {
           </div>
           <div className="text-3xl font-bold text-green-600 mb-2">
             ${data.pawRewards.balance.toFixed(2)}
-          </div>
-          <p className="text-sm text-gray-500">Available to redeem</p>
-          {data.pawRewards.nextExpiration && (
-            <p className="text-xs text-amber-600 mt-2">
-              ${data.pawRewards.expirationAmount.toFixed(2)} expires{' '}
-              {new Date(data.pawRewards.nextExpiration).toLocaleDateString()}
-            </p>
-          )}
-          <Link
-            to="/account/guardian/rewards"
-            className="mt-4 block text-center text-primary-600 hover:text-primary-700 text-sm font-medium"
-          >
-            View Rewards →
-          </Link>
+</div>
+           <p className="text-sm text-gray-500">Available to redeem</p>
+           <Link
+             to="/account/guardian/rewards"
+             className="mt-4 block text-center text-primary-600 hover:text-primary-700 text-sm font-medium"
+           >
+             View Rewards →
+           </Link>
         </div>
 
         {/* Benefits Card */}
@@ -233,33 +232,33 @@ export default function GuardianDashboard() {
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Your Benefits</h3>
           <ul className="space-y-2">
             <li className="flex items-center text-sm">
-              <span className="w-5 h-5 bg-green-100 text-green-600 rounded-full flex items-center justify-center mr-3">
-                ✓
-              </span>
-              Monthly PawRewards: ${data.benefits.pawRewardsMonthly.toFixed(2)}
+<span className="w-5 h-5 bg-green-100 text-green-600 rounded-full flex items-center justify-center mr-3">
+                 ✓
+               </span>
+               Monthly PawRewards: ${data.tierInfo.benefits.pawRewardsMonthly.toFixed(2)}
             </li>
             <li className="flex items-center text-sm">
-              <span className="w-5 h-5 bg-green-100 text-green-600 rounded-full flex items-center justify-center mr-3">
-                ✓
-              </span>
-              Free shipping over ${data.benefits.freeShippingThreshold}
+<span className="w-5 h-5 bg-green-100 text-green-600 rounded-full flex items-center justify-center mr-3">
+                 ✓
+               </span>
+               Free shipping over ${data.tierInfo.benefits.freeShippingThreshold}
             </li>
-            {data.benefits.earlyAccess && (
-              <li className="flex items-center text-sm">
-                <span className="w-5 h-5 bg-green-100 text-green-600 rounded-full flex items-center justify-center mr-3">
-                  ✓
-                </span>
-                Early access to products
-              </li>
-            )}
-            {data.benefits.prioritySupport && (
-              <li className="flex items-center text-sm">
-                <span className="w-5 h-5 bg-green-100 text-green-600 rounded-full flex items-center justify-center mr-3">
-                  ✓
-                </span>
-                Priority support
-              </li>
-            )}
+{data.tierInfo.benefits.earlyAccess && (
+               <li className="flex items-center text-sm">
+                 <span className="w-5 h-5 bg-green-100 text-green-600 rounded-full flex items-center justify-center mr-3">
+                   ✓
+                 </span>
+                 Early access to products
+               </li>
+             )}
+{data.tierInfo.benefits.prioritySupport && (
+               <li className="flex items-center text-sm">
+                 <span className="w-5 h-5 bg-green-100 text-green-600 rounded-full flex items-center justify-center mr-3">
+                   ✓
+                 </span>
+                 Priority support
+               </li>
+             )}
           </ul>
         </div>
       </div>

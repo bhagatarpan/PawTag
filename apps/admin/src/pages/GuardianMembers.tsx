@@ -4,25 +4,13 @@ import api from '../lib/api';
 
 interface GuardianMember {
   _id: string;
-  userId: {
-    _id: string;
-    fullName: string;
-    email: string;
-    phoneNumber?: string;
-  };
-  subscription: {
-    _id: string;
-    planType: string;
-    planName: string;
-    status: string;
-    price: number;
-    currentPeriodEnd: string;
-    autoRenew: boolean;
-  };
-  points: number;
-  tier: string;
+  fullName: string;
+  email: string;
+  guardianTier: string;
+  guardianPoints: number;
   pawRewardsBalance: number;
-  lastActivity: string;
+  subscriptionPlan: string;
+  createdAt: string;
 }
 
 const TIER_BADGES: Record<string, string> = {
@@ -59,7 +47,7 @@ export default function GuardianMembers() {
     try {
       const params = new URLSearchParams({
         limit: '20',
-        offset: String((page - 1) * 20),
+        page: String(page),
       });
 
       if (filters.tier) params.append('tier', filters.tier);
@@ -69,12 +57,12 @@ export default function GuardianMembers() {
       const res = await api.get(`/admin/guardian/members?${params.toString()}`);
       
       if (page === 1) {
-        setMembers(res.data.data);
+        setMembers(res.data.data.members);
       } else {
-        setMembers((prev) => [...prev, ...res.data.data]);
+        setMembers((prev) => [...prev, ...res.data.data.members]);
       }
 
-      setHasMore(res.data.data.length === 20);
+      setHasMore(res.data.data.members.length === 20);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to load members');
     } finally {
@@ -191,33 +179,33 @@ export default function GuardianMembers() {
               <div key={member._id} className="p-4 hover:bg-gray-50 transition-colors">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
-                    <div className="w-12 h-12 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center mr-4">
-                      <span className="text-lg font-semibold">
-                        {member.userId?.fullName?.charAt(0) || '?'}
-                      </span>
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-gray-900">
-                        {member.userId?.fullName || 'Unknown User'}
-                      </h3>
-                      <p className="text-sm text-gray-500">{member.userId?.email}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${TIER_BADGES[member.tier] || 'bg-gray-100 text-gray-700'}`}>
-                          {member.tier}
-                        </span>
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_BADGES[member.subscription?.status] || 'bg-gray-100 text-gray-700'}`}>
-                          {member.subscription?.status?.replace('_', ' ') || 'Unknown'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-lg font-bold text-primary-600">{member.points} pts</div>
-                    <div className="text-sm text-gray-500">${member.pawRewardsBalance.toFixed(2)} rewards</div>
-                    <div className="text-xs text-gray-400 mt-1">
-                      Last activity: {new Date(member.lastActivity).toLocaleDateString()}
+<div className="w-12 h-12 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center mr-4">
+                       <span className="text-lg font-semibold">
+                         {member.fullName?.charAt(0) || '?'}
+                       </span>
+                     </div>
+                     <div>
+                       <h3 className="font-semibold text-gray-900">
+                         {member.fullName || 'Unknown User'}
+                       </h3>
+                       <p className="text-sm text-gray-500">{member.email}</p>
+<div className="flex items-center gap-2 mt-1">
+                         <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${TIER_BADGES[member.guardianTier] || 'bg-gray-100 text-gray-700'}`}>
+                           {member.guardianTier}
+                         </span>
+                         <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_BADGES[member.subscriptionPlan] || 'bg-gray-100 text-gray-700'}`}>
+                           {member.subscriptionPlan.replace('_', ' ') || 'Unknown'}
+                         </span>
+                       </div>
                     </div>
                   </div>
+<div className="text-right">
+                     <div className="text-lg font-bold text-primary-600">{member.guardianPoints} pts</div>
+                     <div className="text-sm text-gray-500">${member.pawRewardsBalance.toFixed(2)} rewards</div>
+                     <div className="text-xs text-gray-400 mt-1">
+                       Last activity: {new Date(member.createdAt).toLocaleDateString()}
+                     </div>
+                   </div>
                 </div>
               </div>
             ))}

@@ -781,7 +781,7 @@ export default function Checkout() {
                   )}
 
                   <button onClick={handlePayment} disabled={!canProceedToPayment || loading} className="w-full mt-6 py-3 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2">
-                    {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Setting up payment...</> : <><>Continue to Payment <ChevronRight className="h-4 w-4" /></></>}
+                    {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Setting up payment...</> : <>Continue to Payment <ChevronRight className="h-4 w-4" /></>}
                   </button>
                 </div>
               </div>

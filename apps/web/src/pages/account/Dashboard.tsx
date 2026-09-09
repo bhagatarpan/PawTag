@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   PawPrint, Tag, CreditCard, ShoppingBag, Bell, AlertTriangle,
-  CheckCircle, Clock, ChevronRight, Shield, QrCode, Phone, Forward, X, Gift,
+  CheckCircle, Clock, ChevronRight, Shield, QrCode, Forward, X, Gift,
 } from 'lucide-react';
 import { SummaryCards, EmptyState, StatusBadge } from '@pawtag/ui';
 import api from '../../lib/api';

@@ -4,27 +4,26 @@ import api from '../lib/api';
 
 interface GuardianStats {
   totalMembers: number;
-  guardianMembers: number;
   goldMembers: number;
   totalPointsEarned: number;
-  totalPawRewardsAllocated: number;
-  totalPawRewardsRedeemed: number;
+  totalRewardsAllocated: number;
+  totalRewardsRedeemed: number;
   tierDistribution: {
     CARE: number;
     NURTURE: number;
     PROTECTOR: number;
     SAFEGUARD: number;
   };
-  monthlyRecurringRevenue: number;
-  averagePointsPerUser: number;
 }
 
 interface RecentActivity {
   _id: string;
   userId: { fullName: string; email: string };
-  points: number;
-  activity: string;
-  description: string;
+  points?: number;
+  amount?: number;
+  activity?: string;
+  description?: string;
+  type: 'points' | 'rewards';
   createdAt: string;
 }
 
@@ -45,8 +44,8 @@ export default function GuardianDashboard() {
         api.get('/admin/guardian/activity?limit=10'),
       ]);
 
-      setStats(statsRes.data.data);
-      setActivity(activityRes.data.data);
+setStats(statsRes.data.data);
+       setActivity(activityRes.data.activity);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to load Guardian data');
     } finally {
@@ -112,30 +111,32 @@ export default function GuardianDashboard() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <h3 className="text-sm font-medium text-gray-500 mb-2">Total Members</h3>
-          <div className="text-3xl font-bold text-gray-900">{stats.totalMembers}</div>
-          <p className="text-sm text-gray-500 mt-1">
-            {stats.guardianMembers} Guardian · {stats.goldMembers} Gold
-          </p>
-        </div>
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <h3 className="text-sm font-medium text-gray-500 mb-2">Monthly Revenue</h3>
-          <div className="text-3xl font-bold text-green-600">${stats.monthlyRecurringRevenue.toFixed(2)}</div>
-          <p className="text-sm text-gray-500 mt-1">Recurring subscription revenue</p>
-        </div>
+<div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+           <h3 className="text-sm font-medium text-gray-500 mb-2">Total Members</h3>
+           <div className="text-3xl font-bold text-gray-900">{stats.totalMembers}</div>
+           <p className="text-sm text-gray-500 mt-1">
+             {stats.totalMembers - stats.goldMembers} Guardian · {stats.goldMembers} Gold
+           </p>
+         </div>
+<div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+           <h3 className="text-sm font-medium text-gray-500 mb-2">Avg Points/Member</h3>
+           <div className="text-3xl font-bold text-primary-600">
+             {stats.totalMembers > 0 ? Math.round(stats.totalPointsEarned / stats.totalMembers) : 0}
+           </div>
+           <p className="text-sm text-gray-500 mt-1">Average points earned per member</p>
+         </div>
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
           <h3 className="text-sm font-medium text-gray-500 mb-2">Points Earned</h3>
           <div className="text-3xl font-bold text-primary-600">{stats.totalPointsEarned.toLocaleString()}</div>
           <p className="text-sm text-gray-500 mt-1">Total points earned by all members</p>
         </div>
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <h3 className="text-sm font-medium text-gray-500 mb-2">PawRewards</h3>
-          <div className="text-3xl font-bold text-amber-600">${stats.totalPawRewardsAllocated.toFixed(2)}</div>
-          <p className="text-sm text-gray-500 mt-1">
-            ${stats.totalPawRewardsRedeemed.toFixed(2)} redeemed
-          </p>
-        </div>
+<div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+           <h3 className="text-sm font-medium text-gray-500 mb-2">PawRewards</h3>
+           <div className="text-3xl font-bold text-amber-600">${stats.totalRewardsAllocated.toFixed(2)}</div>
+           <p className="text-sm text-gray-500 mt-1">
+             ${stats.totalRewardsRedeemed.toFixed(2)} redeemed
+           </p>
+         </div>
       </div>
 
       {/* Tier Distribution */}
@@ -175,28 +176,32 @@ export default function GuardianDashboard() {
           <p className="text-gray-500 text-center py-8">No recent activity</p>
         ) : (
           <div className="space-y-4">
-            {activity.map((item) => (
-              <div
-                key={item._id}
-                className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0"
-              >
-                <div className="flex items-center">
-                  <div className="w-10 h-10 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center mr-4">
-                    {getActivityIcon(item.activity)}
-                  </div>
-                  <div>
-                    <p className="font-medium text-gray-900">
-                      {item.userId?.fullName || 'Unknown User'}
-                    </p>
-                    <p className="text-sm text-gray-500">{item.description}</p>
-                    <p className="text-xs text-gray-400">
-                      {new Date(item.createdAt).toLocaleDateString()}
-                    </p>
-                  </div>
-                </div>
-                <span className="text-green-600 font-semibold">+{item.points}</span>
-              </div>
-            ))}
+{activity.map((item) => (
+               <div
+                 key={item._id}
+                 className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0"
+               >
+                 <div className="flex items-center">
+                   <div className="w-10 h-10 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center mr-4">
+                     {getActivityIcon(item.activity || item.type)}
+                   </div>
+                   <div>
+                     <p className="font-medium text-gray-900">
+                       {item.userId?.fullName || 'Unknown User'}
+                     </p>
+                     <p className="text-sm text-gray-500">
+                       {item.description || (item.type === 'points' ? 'Earned points' : 'PawRewards transaction')}
+                     </p>
+                     <p className="text-xs text-gray-400">
+                       {new Date(item.createdAt).toLocaleDateString()}
+                     </p>
+                   </div>
+                 </div>
+                 <span className="text-green-600 font-semibold">
+                   {item.type === 'points' ? `+${item.points}` : `+${item.amount?.toFixed(2) ?? 0} PW`}
+                 </span>
+               </div>
+             ))}
           </div>
         )}
       </div>
