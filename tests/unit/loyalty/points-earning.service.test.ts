@@ -11,6 +11,9 @@ vi.mock('@pawtag/db', () => ({
   Order: {
     countDocuments: vi.fn(),
   },
+  Setting: {
+    findOne: vi.fn().mockReturnValue({ lean: vi.fn().mockReturnValue(null) }),
+  },
   GuardianPointsLedger: {
     countDocuments: vi.fn(),
     create: vi.fn(),
@@ -28,8 +31,9 @@ import {
   awardReviewPoints,
   awardReferralPoints,
   awardPetMilestonePoints,
-  awardTagScanPoints,
+  awardTagActivationPoints,
 } from '../../../packages/api/src/services/loyalty/points-earning.service';
+import { clearGuardianCache } from '../../../packages/api/src/services/loyalty/guardian-config';
 import { User, Subscription, Order, GuardianPointsLedger } from '@pawtag/db';
 
 const mockUser = vi.mocked(User);
@@ -59,6 +63,7 @@ function setupMocks(points: number, isGold = false, orderCount = 0) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  clearGuardianCache();
 });
 
 describe('POINTS_CONFIG', () => {
@@ -85,14 +90,7 @@ describe('POINTS_CONFIG', () => {
     expect(POINTS_CONFIG.PET_ADOPTION_ANNIVERSARY).toBe(10);
   });
 
-  it('has correct tag scan config', () => {
-    expect(POINTS_CONFIG.TAG_SCAN).toBe(2);
-    expect(POINTS_CONFIG.TAG_SCAN_DAILY_LIMIT).toBe(3);
-  });
-
-  it('has correct social and lost pet points', () => {
-    expect(POINTS_CONFIG.LOST_PET_REPORT).toBe(5);
-    expect(POINTS_CONFIG.PET_REUNITED).toBe(20);
+  it('has correct social share points', () => {
     expect(POINTS_CONFIG.SOCIAL_SHARE).toBe(3);
   });
 
@@ -103,7 +101,6 @@ describe('POINTS_CONFIG', () => {
 
   it('has correct annual caps', () => {
     expect(POINTS_CONFIG.ANNUAL_CAPS.REFERRAL_SIGNUP).toBe(200);
-    expect(POINTS_CONFIG.ANNUAL_CAPS.TAG_SCAN).toBe(100);
     expect(POINTS_CONFIG.ANNUAL_CAPS.REVIEW_TEXT).toBe(30);
   });
 });
@@ -224,17 +221,17 @@ describe('awardPetMilestonePoints', () => {
   });
 });
 
-describe('awardTagScanPoints', () => {
-  it('awards 2 pts per scan', async () => {
+describe('awardTagActivationPoints', () => {
+  it('awards 10 pts for tag activation', async () => {
     setupMocks(50);
-    const result = await awardTagScanPoints('u1', 'tag1');
-    expect(result.pointsAwarded).toBe(2);
-    expect(result.activity).toBe('tag_scan');
+    const result = await awardTagActivationPoints('u1', 'tag1');
+    expect(result.pointsAwarded).toBe(10);
+    expect(result.activity).toBe('tag_activation');
   });
 
   it('doubles points for Gold members', async () => {
     setupMocks(50, true);
-    const result = await awardTagScanPoints('u1', 'tag1');
-    expect(result.pointsAwarded).toBe(4); // 2 * 2
+    const result = await awardTagActivationPoints('u1', 'tag1');
+    expect(result.pointsAwarded).toBe(20); // 10 * 2
   });
 });

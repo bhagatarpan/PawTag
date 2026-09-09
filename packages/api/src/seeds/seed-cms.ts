@@ -230,12 +230,9 @@ async function run() {
         // Guardian Loyalty Program — Membership Milestones
         { key: 'guardian.monthlyAnniversaryPoints', value: '5', displayValue: 'Monthly Membership Points', category: 'guardian', description: 'Points per month of membership' },
         { key: 'guardian.annualAnniversaryPoints', value: '25', displayValue: 'Annual Membership Points', category: 'guardian', description: 'Points per year of membership' },
-        // Guardian Loyalty Program — Tag Scans & Lost Pet
-        { key: 'guardian.tagScanPoints', value: '2', displayValue: 'Tag Scan Points', category: 'guardian', description: 'Points per tag scan' },
-        { key: 'guardian.tagScanDailyLimit', value: '3', displayValue: 'Tag Scan Daily Limit', category: 'guardian', description: 'Maximum scan-point awards per day' },
-        { key: 'guardian.lostPetReportPoints', value: '5', displayValue: 'Lost Pet Report Points', category: 'guardian', description: 'Points for filing a lost pet report' },
-        { key: 'guardian.petReunitedPoints', value: '20', displayValue: 'Pet Reunited Points', category: 'guardian', description: 'Points when a pet is reunited' },
-        { key: 'guardian.socialSharePoints', value: '3', displayValue: 'Social Share Points', category: 'guardian', description: 'Points for social media share' },
+        // Guardian Loyalty Program — Tag Activation
+        { key: 'guardian.tagActivationPoints', value: '10', displayValue: 'Tag Activation Points', category: 'guardian', description: 'Points for activating a new tag' },
+        // Guardian Loyalty Program — Social Shares
         // Guardian Loyalty Program — Gold
         { key: 'guardian.goldMultiplier', value: '2', displayValue: 'Gold Points Multiplier', category: 'guardian', description: 'Points multiplier for Gold members' },
         // Guardian Loyalty Program — Annual Caps
@@ -243,7 +240,6 @@ async function run() {
         { key: 'guardian.annualCapReviewPhoto', value: '50', displayValue: 'Annual Cap: Photo Reviews', category: 'guardian', description: 'Annual cap for photo review points' },
         { key: 'guardian.annualCapReviewVideo', value: '75', displayValue: 'Annual Cap: Video Reviews', category: 'guardian', description: 'Annual cap for video review points' },
         { key: 'guardian.annualCapReferralSignup', value: '200', displayValue: 'Annual Cap: Referral Signups', category: 'guardian', description: 'Annual cap for referral signup points' },
-        { key: 'guardian.annualCapTagScan', value: '100', displayValue: 'Annual Cap: Tag Scans', category: 'guardian', description: 'Annual cap for tag scan points' },
         // Guardian Loyalty Program — Tier Thresholds
         { key: 'guardian.tierThresholdNurture', value: '100', displayValue: 'Nurture Tier Threshold', category: 'guardian', description: 'Points required for Nurture tier' },
         { key: 'guardian.tierThresholdProtector', value: '200', displayValue: 'Protector Tier Threshold', category: 'guardian', description: 'Points required for Protector tier' },

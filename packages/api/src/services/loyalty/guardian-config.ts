@@ -60,13 +60,8 @@ export const GUARDIAN_DEFAULTS: Record<string, number> = {
   monthlyAnniversaryPoints: 5,
   annualAnniversaryPoints: 25,
 
-  // Tag scan points
-  tagScanPoints: 2,
-  tagScanDailyLimit: 3,
-
-  // Lost pet report points
-  lostPetReportPoints: 5,
-  petReunitedPoints: 20,
+  // Tag activation points
+  tagActivationPoints: 10,
 
   // Social share points
   socialSharePoints: 3,
@@ -79,7 +74,6 @@ export const GUARDIAN_DEFAULTS: Record<string, number> = {
   annualCapReviewPhoto: 50,
   annualCapReviewVideo: 75,
   annualCapReferralSignup: 200,
-  annualCapTagScan: 100,
 
   // Tier thresholds
   tierThresholdNurture: 100,

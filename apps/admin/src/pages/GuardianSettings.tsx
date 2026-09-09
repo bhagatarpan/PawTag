@@ -29,13 +29,8 @@ interface GuardianSettings {
   monthlyAnniversaryPoints: number;
   annualAnniversaryPoints: number;
   
-  // Tag scan points
-  tagScanPoints: number;
-  tagScanDailyLimit: number;
-  
-  // Lost pet report points
-  lostPetReportPoints: number;
-  petReunitedPoints: number;
+  // Tag activation points
+  tagActivationPoints: number;
   
   // Social share points
   socialSharePoints: number;
@@ -48,7 +43,6 @@ interface GuardianSettings {
   annualCapReviewPhoto: number;
   annualCapReviewVideo: number;
   annualCapReferralSignup: number;
-  annualCapTagScan: number;
   
   // Tier thresholds
   tierThresholdNurture: number;
@@ -89,17 +83,13 @@ const DEFAULT_SETTINGS: GuardianSettings = {
   petAnniversaryPoints: 10,
   monthlyAnniversaryPoints: 5,
   annualAnniversaryPoints: 25,
-  tagScanPoints: 2,
-  tagScanDailyLimit: 3,
-  lostPetReportPoints: 5,
-  petReunitedPoints: 20,
+  tagActivationPoints: 10,
   socialSharePoints: 3,
   goldMultiplier: 2,
   annualCapReviewText: 30,
   annualCapReviewPhoto: 50,
   annualCapReviewVideo: 75,
   annualCapReferralSignup: 200,
-  annualCapTagScan: 100,
   tierThresholdNurture: 100,
   tierThresholdProtector: 200,
   tierThresholdSafeguard: 300,

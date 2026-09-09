@@ -3,15 +3,13 @@
  * @description Guardian Points earning engine for the loyalty program.
  *
  * Handles points earning for all activities:
- * - Purchases (1 pt per $1 Guardian, 2 pts per $1 Gold)
- * - Repeat purchase bonuses (+10 pts on 3rd+ order, +20 for Gold)
- * - Product reviews (text: 5 pts, photo: 15 pts, video: 25 pts)
- * - Referrals (signup: 20 pts, purchase: 50 pts)
+ * - Purchases (configurable rate per $1 spent, Guardian vs Gold)
+ * - Repeat purchase bonuses (configurable, on 3rd+ order)
+ * - Product reviews (text, photo, video — configurable)
+ * - Referrals (signup, purchase — configurable)
  * - Pet milestones (profile: 15 pts, birthday: 10 pts, anniversary: 10 pts)
  * - Membership milestones (monthly: 5 pts, annual: 25 pts)
- * - Tag scans (2 pts, max 3/day)
- * - Lost pet reports (5 pts)
- * - Pet reunited (20 pts)
+ * - Tag activation (configurable, per new tag — not replacement tags)
  * - Social shares (3 pts)
  *
  * Gold members earn 2× points on all activities.
@@ -82,14 +80,6 @@ export const POINTS_CONFIG = {
   MONTHLY_ANNIVERSARY: 5, // 5 pts per month of membership
   ANNUAL_ANNIVERSARY: 25, // 25 pts per year of membership
   
-  // Tag scan points
-  TAG_SCAN: 2, // 2 pts per scan (max 3/day)
-  TAG_SCAN_DAILY_LIMIT: 3, // Max 3 scans per day
-  
-  // Lost pet report points
-  LOST_PET_REPORT: 5, // 5 pts for filing lost pet report
-  PET_REUNITED: 20, // 20 pts when pet is reunited
-  
   // Social share points
   SOCIAL_SHARE: 3, // 3 pts for sharing on social media
   
@@ -102,7 +92,6 @@ export const POINTS_CONFIG = {
     REVIEW_PHOTO: 50,
     REVIEW_VIDEO: 75,
     REFERRAL_SIGNUP: 200,
-    TAG_SCAN: 100,
   },
 };
 
@@ -292,7 +281,12 @@ export async function awardPetMilestonePoints(
   const isGoldMember = await isGoldSubscription(subscription);
 
   // Get base points for milestone type (read from CMS settings)
-  const milestoneKey = `pet${milestoneType.charAt(0).toUpperCase() + milestoneType.slice(1).replace(/_/g, '')}Points` as GuardianSettingKey;
+  const MILESTONE_KEYS: Record<string, GuardianSettingKey> = {
+    profile_complete: 'petProfilePoints',
+    birthday: 'petBirthdayPoints',
+    adoption_anniversary: 'petAnniversaryPoints',
+  };
+  const milestoneKey = MILESTONE_KEYS[milestoneType];
   const basePoints = await getGuardianNumber(milestoneKey);
   const goldMultiplier = await getGuardianNumber('goldMultiplier');
   const points = isGoldMember ? basePoints * goldMultiplier : basePoints;
@@ -316,9 +310,9 @@ export async function awardPetMilestonePoints(
 }
 
 /**
- * Award points for tag scans
+ * Award points for tag activation (new tags only, NOT replacement tags)
  */
-export async function awardTagScanPoints(
+export async function awardTagActivationPoints(
   userId: string,
   tagId: string
 ): Promise<PointsEarningResult> {
@@ -328,47 +322,12 @@ export async function awardTagScanPoints(
   const subscription = await Subscription.findOne({ userId, status: 'active' }).lean();
   const isGoldMember = await isGoldSubscription(subscription);
 
-  // Check daily limit
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const scansToday = await getPointsEarnedForActivity(userId, 'TAG_SCAN', today);
-  const dailyLimit = await getGuardianNumber('tagScanDailyLimit');
-  
-  if (scansToday >= dailyLimit) {
-    logger.info({ userId, tagId, scansToday }, 'Daily tag scan limit reached');
-    return {
-      pointsAwarded: 0,
-      totalPoints: user.guardianPoints || 0,
-      activity: 'tag_scan',
-      isGoldMember,
-    };
-  }
-
-  // Calculate points (read from CMS settings)
-  const basePoints = await getGuardianNumber('tagScanPoints');
+  const basePoints = await getGuardianNumber('tagActivationPoints');
   const goldMultiplier = await getGuardianNumber('goldMultiplier');
   const points = isGoldMember ? basePoints * goldMultiplier : basePoints;
 
-  // Check annual cap
-  const annualCap = await getGuardianNumber('annualCapTagScan');
-  const currentYear = new Date().getFullYear();
-  const startOfYear = new Date(currentYear, 0, 1);
-  const pointsThisYear = await getPointsEarnedForActivity(userId, 'TAG_SCAN', startOfYear);
-  
-  if (pointsThisYear >= annualCap) {
-    logger.info({ userId, pointsThisYear, annualCap }, 'Annual cap reached for tag scans');
-    return {
-      pointsAwarded: 0,
-      totalPoints: user.guardianPoints || 0,
-      activity: 'tag_scan',
-      isGoldMember,
-    };
-  }
+  await recordPointsEarned(userId, points, 'tag_activation', tagId, {});
 
-  // Record in ledger
-  await recordPointsEarned(userId, points, 'tag_scan', tagId, { scansToday: scansToday + 1 });
-
-  // Update user's total points
   const updatedUser = await User.findByIdAndUpdate(
     userId,
     { $inc: { guardianPoints: points } },
@@ -378,77 +337,7 @@ export async function awardTagScanPoints(
   return {
     pointsAwarded: points,
     totalPoints: updatedUser?.guardianPoints || 0,
-    activity: 'tag_scan',
-    isGoldMember,
-  };
-}
-
-/**
- * Award points for lost pet report
- */
-export async function awardLostPetReportPoints(
-  userId: string,
-  petId: string
-): Promise<PointsEarningResult> {
-  const user = await User.findById(userId).lean();
-  if (!user) throw new Error('User not found');
-
-  const subscription = await Subscription.findOne({ userId, status: 'active' }).lean();
-  const isGoldMember = await isGoldSubscription(subscription);
-
-  const basePoints = await getGuardianNumber('lostPetReportPoints');
-  const goldMultiplier = await getGuardianNumber('goldMultiplier');
-  const points = isGoldMember ? basePoints * goldMultiplier : basePoints;
-
-  // Record in ledger
-  await recordPointsEarned(userId, points, 'lost_pet_report', petId, {});
-
-  // Update user's total points
-  const updatedUser = await User.findByIdAndUpdate(
-    userId,
-    { $inc: { guardianPoints: points } },
-    { new: true }
-  ).lean();
-
-  return {
-    pointsAwarded: points,
-    totalPoints: updatedUser?.guardianPoints || 0,
-    activity: 'lost_pet_report',
-    isGoldMember,
-  };
-}
-
-/**
- * Award points when pet is reunited
- */
-export async function awardPetReunitedPoints(
-  userId: string,
-  petId: string
-): Promise<PointsEarningResult> {
-  const user = await User.findById(userId).lean();
-  if (!user) throw new Error('User not found');
-
-  const subscription = await Subscription.findOne({ userId, status: 'active' }).lean();
-  const isGoldMember = await isGoldSubscription(subscription);
-
-  const basePoints = await getGuardianNumber('petReunitedPoints');
-  const goldMultiplier = await getGuardianNumber('goldMultiplier');
-  const points = isGoldMember ? basePoints * goldMultiplier : basePoints;
-
-  // Record in ledger
-  await recordPointsEarned(userId, points, 'pet_reunited', petId, {});
-
-  // Update user's total points
-  const updatedUser = await User.findByIdAndUpdate(
-    userId,
-    { $inc: { guardianPoints: points } },
-    { new: true }
-  ).lean();
-
-  return {
-    pointsAwarded: points,
-    totalPoints: updatedUser?.guardianPoints || 0,
-    activity: 'pet_reunited',
+    activity: 'tag_activation',
     isGoldMember,
   };
 }

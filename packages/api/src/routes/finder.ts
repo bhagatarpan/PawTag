@@ -230,15 +230,6 @@ router.get('/:tagId', async (req: Request, res: Response) => {
       });
     }
 
-    // Award Guardian Points for tag scan (non-blocking)
-    const ownerId = tag.ownerId?.toString();
-    if (ownerId) {
-      import('../services/loyalty/points-earning.service').then(({ awardTagScanPoints }) => {
-        awardTagScanPoints(ownerId, tag._id.toString())
-          .catch((err) => logger.error({ err }, 'Guardian tag scan points earning error'));
-      }).catch(() => {});
-    }
-
     // Check admin CMS setting for finder name visibility
     const adminSetting = await Setting.findOne({ key: 'finder.showOwnerName' });
     const adminShowName = adminSetting?.value !== 'false'; // default true
@@ -422,14 +413,6 @@ router.post('/:tagId/notify', finderNotifyLimiter, requireCaptcha, async (req: R
       await pet.save();
       await Tag.updateMany({ petId: pet._id, deletedAt: null }, { status: 'active' });
 
-      // Award Guardian Points for pet reunited (non-blocking)
-      const ownerId = tag.ownerId?.toString();
-      if (ownerId) {
-        import('../services/loyalty/points-earning.service').then(({ awardPetReunitedPoints }) => {
-          awardPetReunitedPoints(ownerId, pet._id.toString())
-            .catch((err) => logger.error({ err }, 'Guardian pet reunited points earning error'));
-        }).catch(() => {});
-      }
     }
 
     // Build contact info string for notification
