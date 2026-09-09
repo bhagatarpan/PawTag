@@ -7,6 +7,14 @@ import { useNavigation } from '../hooks/useCms';
 import { CartDrawer } from '@pawtag/ui';
 import { useCartInteraction } from '../context/CartInteractionContext';
 import CartToast from './CartToast';
+import api from '../lib/api';
+
+interface GuardianData {
+  points: number;
+  tier: string;
+  pawRewardsBalance: number;
+  [key: string]: any; // For additional fields from tier endpoint
+}
 
 // Memoized cart icon — only re-renders when itemCount changes
 const CartIcon = memo(function CartIcon({ onClick }: { onClick: () => void }) {
@@ -43,14 +51,55 @@ const CartIcon = memo(function CartIcon({ onClick }: { onClick: () => void }) {
 });
 
 export default function Navbar() {
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [cartOpen, setCartOpen] = useState(false);
-  const location = useLocation();
-  const navigate = useNavigate();
-  const { items, total, removeItem, updateQuantity, clearCart, isGuest, priceChanged } = useCart();
-  const { user, logout } = useAuth();
-  const { menus, loading } = useNavigation('header');
+   const [mobileOpen, setMobileOpen] = useState(false);
+   const [userMenuOpen, setUserMenuOpen] = useState(false);
+   const [cartOpen, setCartOpen] = useState(false);
+   const [guardianData, setGuardianData] = useState<GuardianData | null>(null);
+   const [guardianLoading, setGuardianLoading] = useState(false);
+   const location = useLocation();
+   const navigate = useNavigate();
+   const { items, total, removeItem, updateQuantity, clearCart, isGuest, priceChanged } = useCart();
+   const { user, logout } = useAuth();
+   const { menus, loading } = useNavigation('header');
+
+   // Fetch Guardian data when user logs in or user changes
+   useEffect(() => {
+     const fetchGuardianData = async () => {
+       if (!user) {
+         setGuardianData(null);
+         return;
+       }
+       
+       setGuardianLoading(true);
+       try {
+         const res = await api.get('/customer/guardian/points');
+         // Also get rewards and tier info for complete data
+         const [pointsRes, rewardsRes, tierRes] = await Promise.all([
+           api.get('/customer/guardian/points'),
+           api.get('/customer/guardian/rewards'),
+           api.get('/customer/guardian/tier')
+         ]);
+         
+         setGuardianData({
+           points: pointsRes.data.data.points,
+           tier: pointsRes.data.data.tier,
+           pawRewardsBalance: rewardsRes.data.data.balance,
+           ...tierRes.data.data // includes nextTier, pointsToNextTier, benefits, etc.
+         });
+       } catch (err) {
+         console.warn('Failed to fetch Guardian data:', err);
+         setGuardianData(null);
+       } finally {
+         setGuardianLoading(false);
+       }
+     };
+
+     if (user) {
+       fetchGuardianData();
+     } else {
+       setGuardianData(null);
+     }
+   }, [user]);
 
   const fallbackLinks = [
     { to: '/', label: 'Home' },
@@ -112,11 +161,43 @@ export default function Navbar() {
                   {userMenuOpen && (
                     <>
                       <div className="fixed inset-0 z-40" onClick={() => setUserMenuOpen(false)} />
-                      <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-gray-100 py-2 z-50">
-                        <div className="px-4 py-3 border-b border-gray-100">
-                          <p className="text-sm font-medium text-gray-900">{user.fullName}</p>
-                          <p className="text-xs text-gray-500">{user.email}</p>
-                        </div>
+<div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-gray-100 py-2 z-50">
+                       <div className="px-4 py-3 border-b border-gray-100">
+                         <p className="text-sm font-medium text-gray-900">{user.fullName}</p>
+                         <p className="text-xs text-gray-500">{user.email}</p>
+                         {guardianData ? (
+                           <div className="mt-2 space-y-1 text-xs">
+                             <div className="flex items-center justify-between">
+                               <span className="font-medium">Guardian Tier:</span>
+                               <span className="text-primary-600 font-semibold">{guardianData.tier}</span>
+                             </div>
+                             <div className="flex items-center justify-between">
+                               <span className="font-medium">Points:</span>
+                               <span className="text-primary-600 font-semibold">{guardianData.points || 0}</span>
+                             </div>
+                             <div className="flex items-center justify-between">
+                               <span className="font-medium">PawRewards:</span>
+                               <span className="text-amber-600 font-semibold">${(guardianData.pawRewardsBalance || 0).toFixed(2)}</span>
+                             </div>
+                           </div>
+                         ) : (
+                           <div className="mt-2">
+                             <p className="text-xs text-primary-600 font-medium">
+                               Not a Guardian member yet
+                             </p>
+                             {guardianLoading ? (
+                               <p className="text-xs text-gray-500">Loading...</p>
+                             ) : (
+                               <Link
+                                 to="/account/guardian"
+                                 className="block px-3 py-1 bg-primary-50 text-primary-600 rounded text-sm font-medium hover:bg-primary-100"
+                               >
+                                 Join Guardian →
+                               </Link>
+                             )}
+                           </div>
+                         )}
+                       </div>
                         <Link to="/account" className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50" onClick={() => setUserMenuOpen(false)}>
                           <User className="h-4 w-4" /> My Account
                         </Link>
