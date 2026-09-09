@@ -197,6 +197,7 @@ export default function GuardianSettings() {
       {/* Points Earning Settings */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Points Earning</h2>
+        <p className="text-sm text-gray-500 mb-4">Formula: (Order Total ÷ Spent Amount) × Rate = Points Earned</p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -208,7 +209,19 @@ export default function GuardianSettings() {
               onChange={(e) => setSettings({ ...settings, purchaseRateGuardian: Number(e.target.value) })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
             />
-            <p className="text-xs text-gray-500 mt-1">Points per $1 spent</p>
+            <p className="text-xs text-gray-500 mt-1">Points earned</p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Spent Amount (Guardian)
+            </label>
+            <input
+              type="number"
+              value={settings.purchaseSpentAmount}
+              onChange={(e) => setSettings({ ...settings, purchaseSpentAmount: Number(e.target.value) })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            />
+            <p className="text-xs text-gray-500 mt-1">Per dollar amount spent (e.g., 10 = earn for every $10)</p>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -220,7 +233,19 @@ export default function GuardianSettings() {
               onChange={(e) => setSettings({ ...settings, purchaseRateGold: Number(e.target.value) })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
             />
-            <p className="text-xs text-gray-500 mt-1">Points per $1 spent (Gold members)</p>
+            <p className="text-xs text-gray-500 mt-1">Points earned (Gold members)</p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Spent Amount (Gold)
+            </label>
+            <input
+              type="number"
+              value={settings.purchaseSpentAmountGold}
+              onChange={(e) => setSettings({ ...settings, purchaseSpentAmountGold: Number(e.target.value) })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            />
+            <p className="text-xs text-gray-500 mt-1">Per dollar amount spent (Gold members)</p>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
