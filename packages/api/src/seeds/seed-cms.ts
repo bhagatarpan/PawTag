@@ -326,7 +326,7 @@ async function run() {
       // ═══════════════════════════════════════
       // 4. HOMEPAGE SECTIONS
       // ═══════════════════════════════════════
-      console.log('--- Seeding Homepage Sections ---');
+       console.log('--- Seeding Homepage Sections ---');
       const existingHero = await CmsHomepageSection.findOne({ sectionType: 'hero_slide', deletedAt: null }).session(session);
       if (!existingHero) {
         await CmsHomepageSection.create([
@@ -400,10 +400,63 @@ async function run() {
             order: 2,
             isActive: true,
           },
+          {
+            sectionType: 'hero_slide',
+            title: 'Hero Slide 4',
+            content: {
+              tag: 'Guardian',
+              headline: 'Earn rewards for being a great pet parent',
+              sub: 'Join Guardian and turn every purchase into points, PawRewards, and exclusive benefits.',
+              ctaText: 'Join Guardian Free',
+              ctaUrl: '/guardian',
+              bg: 'from-amber-600 via-amber-700 to-orange-600',
+              visualType: 'heart',
+              duration: 5,
+              stats: [],
+              flowSteps: [],
+              imageUrl: '',
+              imageAlt: '',
+            },
+            order: 3,
+            isActive: true,
+          },
         ], { session });
-        console.log('  Created 3 hero slides');
+        console.log('  Created 4 hero slides');
       } else {
-        console.log('  Hero slides already exist');
+        // Idempotent: add Guardian hero slide if missing
+        const hasGuardianSlide = await CmsHomepageSection.findOne({
+          sectionType: 'hero_slide',
+          'content.tag': 'Guardian',
+          deletedAt: null,
+        }).session(session);
+        if (!hasGuardianSlide) {
+          const maxOrder = await CmsHomepageSection.findOne({ sectionType: 'hero_slide', deletedAt: null })
+            .sort({ order: -1 })
+            .session(session);
+          await CmsHomepageSection.create([{
+            sectionType: 'hero_slide',
+            title: 'Hero Slide 4',
+            content: {
+              tag: 'Guardian',
+              headline: 'Earn rewards for being a great pet parent',
+              sub: 'Join Guardian and turn every purchase into points, PawRewards, and exclusive benefits.',
+              ctaText: 'Join Guardian Free',
+              ctaUrl: '/guardian',
+              bg: 'from-amber-600 via-amber-700 to-orange-600',
+              visualType: 'heart',
+              duration: 5,
+              stats: [],
+              flowSteps: [],
+              imageUrl: '',
+              imageAlt: '',
+            },
+            order: (maxOrder?.order ?? 2) + 1,
+            isActive: true,
+          }], { session });
+          console.log('  Added Guardian hero slide');
+        } else {
+          console.log('  Hero slides already exist');
+        }
       }
 
       const existingHowItWorks = await CmsHomepageSection.findOne({ sectionType: 'how_it_works', deletedAt: null }).session(session);
@@ -1307,6 +1360,46 @@ async function run() {
         const FULL_RELATIONSHIP_OPTIONS = ['Spouse', 'Partner', 'Fiancé', 'Ex-Spouse', 'Ex-Partner', 'Parent', 'Stepparent', 'Parent-in-law', 'Grandparent', 'Sibling', 'Step-Sibling', 'Sibling-in-law', 'Child', 'Stepchild', 'Child-in-law', 'Grandchild', 'Uncle', 'Aunt', 'Cousin', 'Godparent', 'Godchild', 'Friend', 'Neighbour', 'Housemate', 'Work Colleague', 'Manager', 'Client', 'Mentor', 'Teacher', 'Caregiver', 'Other'];
         existingOnboarding.globalSettings = existingOnboarding.globalSettings || {};
         existingOnboarding.globalSettings.relationshipOptions = FULL_RELATIONSHIP_OPTIONS;
+
+        // Idempotent: add Guardian step if missing
+        const hasGuardianStep = existingOnboarding.steps?.some((s: { stepId: string }) => s.stepId === 'guardian');
+        if (!hasGuardianStep) {
+          // Insert Guardian step before contact-details (order 3), shift subsequent steps
+          const guardianStep = {
+            stepId: 'guardian',
+            title: 'Join Guardian — Earn Rewards',
+            subtitle: "Turn every purchase into points, PawRewards, and exclusive benefits. It's free to join.",
+            icon: 'Shield',
+            order: 3,
+            isActive: true,
+            type: 'info',
+            content: {
+              storyHeading: 'Your pet safety journey comes with rewards',
+              storyText: "Guardian is PawTag's free loyalty program. Every purchase earns Points that unlock PawRewards (store credit) and better tier benefits. The more you engage, the more you earn.\n\nGold members earn 2× Points on every purchase and start at a higher tier.",
+              callout: {
+                icon: 'Star',
+                title: 'Start Earning Immediately',
+                text: "As soon as you join Guardian, you start earning Points on eligible purchases. Points convert to PawRewards that you can spend on products. Higher tiers unlock better shipping, bigger rewards, and exclusive perks.",
+                variant: 'tip',
+              },
+            },
+          };
+          // Shift existing steps with order >= 3
+          if (existingOnboarding.steps) {
+            for (const step of existingOnboarding.steps) {
+              if (step.order >= 3) {
+                step.order += 1;
+              }
+            }
+            existingOnboarding.steps.push(guardianStep as any);
+            existingOnboarding.steps.sort((a: { order: number }, b: { order: number }) => a.order - b.order);
+          }
+          await existingOnboarding.save({ session });
+          console.log('  Added Guardian onboarding step to existing config');
+        } else {
+          console.log('  Onboarding config already has Guardian step');
+        }
+
         await existingOnboarding.save({ session });
         console.log('  Updated relationship options in existing onboarding config');
       }
