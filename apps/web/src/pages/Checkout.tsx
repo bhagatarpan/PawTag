@@ -646,7 +646,13 @@ export default function Checkout() {
                       <div>
                         <p className="text-sm font-medium text-primary-800">You're not earning Guardian Points</p>
                         <p className="text-xs text-primary-600 mt-1">Join Guardian (free) to earn points on this order and unlock PawRewards.</p>
-                        <Link to="/shop" className="text-xs font-medium text-primary-700 underline mt-1 inline-block">Learn more</Link>
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2">
+                          <Link to="/shop" className="text-xs font-medium text-primary-700 underline">Learn more</Link>
+                          <span className="text-xs text-primary-300">|</span>
+                          <Link to="/register" className="text-xs font-medium text-primary-700 underline">Register free</Link>
+                          <span className="text-xs text-primary-300">|</span>
+                          <Link to="/login" className="text-xs font-medium text-primary-700 underline">Already a customer? Login</Link>
+                        </div>
                       </div>
                     </div>
                   ) : (
