@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { ImagePlus, X, Upload, Loader2, Search, SlidersHorizontal, ChevronDown, ChevronLeft, ChevronRight, Download, Trash2, Edit2, Save, Settings, AlertTriangle, RotateCcw, Database, FileText, Package, Activity, CheckCircle, AlertCircle, Info, Copy, Eye, Plus, GripVertical } from 'lucide-react';
 import { IconPicker, ICON_MAP, type IconPickerProps } from '@pawtag/ui';
 import { Check } from 'lucide-react';
@@ -462,6 +463,8 @@ function SortableProductRow({
 /* ------------------------------------------------------------------ */
 
 export default function Products() {
+  const [searchParams, setSearchParams] = useSearchParams();
+
   // Data state
   const [data, setData] = useState<PaginatedData<Product> | null>(null);
   const [loading, setLoading] = useState(true);
@@ -594,6 +597,23 @@ const [form, setForm] = useState({
 
   useEffect(() => { fetchProducts(); }, [fetchProducts]);
   useEffect(() => { fetchSummary(); }, [fetchSummary]);
+
+  // Auto-open create form when navigated from Subscription Plans page
+  useEffect(() => {
+    if (searchParams.get('create') === 'subscription') {
+      setSearchParams({}, { replace: true });
+      setEditing(null);
+      setForm({
+        name: '', description: '', shortDescription: '', price: 0, category: 'PawTag',
+        stock: 0, sku: '', currency: 'NZD', isActive: true, customizable: false, customizationPrice: 0,
+        featureHighlights: [...DEFAULT_FEATURE_HIGHLIGHTS], slug: '', isSubscription: true, isTagProduct: false,
+        subscriptionConfig: { type: 'annual', freePeriodMonths: 12, monthlyPrice: 0, gracePeriodWeeks: 4 },
+      });
+      setVariants([]);
+      setImages([]);
+      setShowForm(true);
+    }
+  }, []);
 
   // Form handlers
 const openCreate = () => {

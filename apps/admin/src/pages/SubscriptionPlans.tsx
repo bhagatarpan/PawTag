@@ -207,7 +207,7 @@ export default function SubscriptionPlans() {
           <p className="mt-1 text-sm text-gray-500">Manage subscription products and pricing</p>
         </div>
         <button
-          onClick={() => navigate('/products/new?isSubscription=true')}
+          onClick={() => navigate('/products?create=subscription')}
           className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition-colors"
         >
           <Plus size={16} /> Add Plan
