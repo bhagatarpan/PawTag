@@ -27,6 +27,7 @@
 import mongoose from 'mongoose';
 import { User, Subscription, Order, Setting, PawRewardsLedger } from '@pawtag/db';
 import { calculateTier, TIER_BENEFITS, TierName } from './tier.service';
+import { isGoldSubscription } from './points-earning.service';
 import { sendMonthlySummaryEmail, sendPawRewardsReminderEmail } from '../email.service';
 import { incrementCounter, METRICS } from '../../lib/metrics';
 import logger from '../../lib/logger';
@@ -100,7 +101,7 @@ export async function allocateMonthlyRewards(userId: string): Promise<{
   }
 
   // Check maximum balance
-  const isGoldMember = subscription.planType === 'monthly' && subscription.price === 1.99;
+  const isGoldMember = await isGoldSubscription(subscription);
   const maxBalance = isGoldMember ? PAWREWARDS_CONFIG.MAX_BALANCE.GOLD : PAWREWARDS_CONFIG.MAX_BALANCE.GUARDIAN;
   const currentBalance = user.pawRewardsBalance || 0;
 
@@ -166,7 +167,7 @@ export async function earnRewardsFromPurchase(
   }
 
   // Determine earning rate
-  const isGoldMember = subscription.planType === 'monthly' && subscription.price === 1.99;
+  const isGoldMember = await isGoldSubscription(subscription);
   const earningRate = isGoldMember ? PAWREWARDS_CONFIG.EARNING_RATE.GOLD : PAWREWARDS_CONFIG.EARNING_RATE.GUARDIAN;
 
   // Calculate earnings

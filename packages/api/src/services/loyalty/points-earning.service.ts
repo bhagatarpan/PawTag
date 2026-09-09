@@ -28,6 +28,31 @@ import { User, Subscription, Order, Setting, GuardianPointsLedger } from '@pawta
 import { incrementCounter, METRICS } from '../../lib/metrics';
 import logger from '../../lib/logger';
 
+/**
+ * Get the Gold membership price from CMS settings.
+ * Cached in-memory for 60 seconds to avoid repeated DB hits.
+ */
+let _goldPriceCache: { price: number; expiresAt: number } | null = null;
+export async function getGoldPrice(): Promise<number> {
+  const now = Date.now();
+  if (_goldPriceCache && _goldPriceCache.expiresAt > now) {
+    return _goldPriceCache.price;
+  }
+  const setting = await Setting.findOne({ key: 'guardian.goldPrice' }).lean();
+  const price = parseFloat(setting?.value || '1.99');
+  _goldPriceCache = { price, expiresAt: now + 60_000 };
+  return price;
+}
+
+/**
+ * Check if a subscription represents Gold membership.
+ */
+export async function isGoldSubscription(subscription: { planType?: string; price?: number } | null): Promise<boolean> {
+  if (!subscription || subscription.planType !== 'monthly') return false;
+  const goldPrice = await getGoldPrice();
+  return subscription.price === goldPrice;
+}
+
 // Points earning activities with base rates
 export const POINTS_CONFIG = {
   // Purchase points
@@ -99,7 +124,7 @@ export async function awardPurchasePoints(
   if (!user) throw new Error('User not found');
 
   const subscription = await Subscription.findOne({ userId, status: 'active' }).lean();
-  const isGoldMember = subscription?.planType === 'monthly' && subscription?.price === 1.99;
+  const isGoldMember = await isGoldSubscription(subscription);
 
   // Calculate base points
   const rate = isGoldMember ? POINTS_CONFIG.PURCHASE_RATE_GOLD : POINTS_CONFIG.PURCHASE_RATE;
@@ -142,7 +167,7 @@ export async function awardReviewPoints(
   if (!user) throw new Error('User not found');
 
   const subscription = await Subscription.findOne({ userId, status: 'active' }).lean();
-  const isGoldMember = subscription?.planType === 'monthly' && subscription?.price === 1.99;
+  const isGoldMember = await isGoldSubscription(subscription);
 
   // Get base points for review type
   const basePoints = POINTS_CONFIG[`REVIEW_${reviewType.toUpperCase()}` as keyof typeof POINTS_CONFIG] as number;
@@ -197,7 +222,7 @@ export async function awardReferralPoints(
   if (!user) throw new Error('User not found');
 
   const subscription = await Subscription.findOne({ userId, status: 'active' }).lean();
-  const isGoldMember = subscription?.planType === 'monthly' && subscription?.price === 1.99;
+  const isGoldMember = await isGoldSubscription(subscription);
 
   // Get base points for referral type
   const basePoints = POINTS_CONFIG[`REFERRAL_${referralType.toUpperCase()}` as keyof typeof POINTS_CONFIG] as number;
@@ -251,7 +276,7 @@ export async function awardPetMilestonePoints(
   if (!user) throw new Error('User not found');
 
   const subscription = await Subscription.findOne({ userId, status: 'active' }).lean();
-  const isGoldMember = subscription?.planType === 'monthly' && subscription?.price === 1.99;
+  const isGoldMember = await isGoldSubscription(subscription);
 
   // Get base points for milestone type
   const basePoints = POINTS_CONFIG[`PET_${milestoneType.toUpperCase()}` as keyof typeof POINTS_CONFIG] as number;
@@ -286,7 +311,7 @@ export async function awardTagScanPoints(
   if (!user) throw new Error('User not found');
 
   const subscription = await Subscription.findOne({ userId, status: 'active' }).lean();
-  const isGoldMember = subscription?.planType === 'monthly' && subscription?.price === 1.99;
+  const isGoldMember = await isGoldSubscription(subscription);
 
   // Check daily limit
   const today = new Date();
@@ -352,7 +377,7 @@ export async function awardLostPetReportPoints(
   if (!user) throw new Error('User not found');
 
   const subscription = await Subscription.findOne({ userId, status: 'active' }).lean();
-  const isGoldMember = subscription?.planType === 'monthly' && subscription?.price === 1.99;
+  const isGoldMember = await isGoldSubscription(subscription);
 
   const basePoints = POINTS_CONFIG.LOST_PET_REPORT;
   const points = isGoldMember ? basePoints * POINTS_CONFIG.GOLD_MULTIPLIER : basePoints;
@@ -386,7 +411,7 @@ export async function awardPetReunitedPoints(
   if (!user) throw new Error('User not found');
 
   const subscription = await Subscription.findOne({ userId, status: 'active' }).lean();
-  const isGoldMember = subscription?.planType === 'monthly' && subscription?.price === 1.99;
+  const isGoldMember = await isGoldSubscription(subscription);
 
   const basePoints = POINTS_CONFIG.PET_REUNITED;
   const points = isGoldMember ? basePoints * POINTS_CONFIG.GOLD_MULTIPLIER : basePoints;
@@ -420,7 +445,7 @@ export async function awardSocialSharePoints(
   if (!user) throw new Error('User not found');
 
   const subscription = await Subscription.findOne({ userId, status: 'active' }).lean();
-  const isGoldMember = subscription?.planType === 'monthly' && subscription?.price === 1.99;
+  const isGoldMember = await isGoldSubscription(subscription);
 
   const basePoints = POINTS_CONFIG.SOCIAL_SHARE;
   const points = isGoldMember ? basePoints * POINTS_CONFIG.GOLD_MULTIPLIER : basePoints;
@@ -454,7 +479,7 @@ export async function awardMembershipMilestonePoints(
   if (!user) throw new Error('User not found');
 
   const subscription = await Subscription.findOne({ userId, status: 'active' }).lean();
-  const isGoldMember = subscription?.planType === 'monthly' && subscription?.price === 1.99;
+  const isGoldMember = await isGoldSubscription(subscription);
 
   const basePoints = POINTS_CONFIG[`${milestoneType.toUpperCase()}_ANNIVERSARY` as keyof typeof POINTS_CONFIG] as number;
   const points = isGoldMember ? basePoints * POINTS_CONFIG.GOLD_MULTIPLIER : basePoints;

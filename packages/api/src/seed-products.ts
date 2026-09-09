@@ -30,7 +30,6 @@ const products = [
       type: 'annual',
       freePeriodMonths: 12,
       gracePeriodWeeks: 4,
-      monthlyPrice: 0.99,
 features: ['qr_scan', 'lost_pet_alerts', 'finder_notifications'],
      },
      featureHighlights: [
@@ -51,18 +50,17 @@ features: ['qr_scan', 'lost_pet_alerts', 'finder_notifications'],
     tags: ['nfc', 'plastic', 'popular', 'subscription'],
     isActive: true,
     stock: 500,
-    sku: 'PT-CLASSIC-001',
-    variants: [],
-    customizable: false,
-    customizationPrice: 0,
-    shippingCost: 0,
-    warrantyMonths: 12,
-    isSubscription: true,
-    subscriptionConfig: {
-      type: 'annual',
-      freePeriodMonths: 12,
-      gracePeriodWeeks: 4,
-      monthlyPrice: 1.99,
+      sku: 'PT-CLASSIC-001',
+      variants: [],
+      customizable: false,
+      customizationPrice: 0,
+      shippingCost: 0,
+      warrantyMonths: 12,
+      isSubscription: true,
+      subscriptionConfig: {
+        type: 'annual',
+        freePeriodMonths: 12,
+        gracePeriodWeeks: 4,
 features: ['nfc_scan', 'qr_scan', 'lost_pet_alerts', 'finder_notifications'],
      },
      featureHighlights: [
@@ -83,26 +81,75 @@ features: ['nfc_scan', 'qr_scan', 'lost_pet_alerts', 'finder_notifications'],
     tags: ['nfc', 'metal', 'premium', 'epoxy', 'subscription'],
     isActive: true,
     stock: 300,
-    sku: 'PT-PLUS-001',
-    variants: [],
-    customizable: false,
-    customizationPrice: 0,
-    shippingCost: 0,
-    warrantyMonths: 12,
-    isSubscription: true,
-    subscriptionConfig: {
-      type: 'annual',
-      freePeriodMonths: 12,
-      gracePeriodWeeks: 4,
-      monthlyPrice: 1.99,
+      sku: 'PT-PLUS-001',
+      variants: [],
+      customizable: false,
+      customizationPrice: 0,
+      shippingCost: 0,
+      warrantyMonths: 12,
+      isSubscription: true,
+      subscriptionConfig: {
+        type: 'annual',
+        freePeriodMonths: 12,
+        gracePeriodWeeks: 4,
 features: ['nfc_scan', 'qr_scan', 'lost_pet_alerts', 'finder_notifications'],
      },
-     featureHighlights: [
-       { icon: 'Shield', description: '12 month warranty' },
-       { icon: 'Truck', description: 'Free NZ-wide shipping' },
-       { icon: 'Check', description: '12 months free subscription included' }
-     ],
-   },
+      featureHighlights: [
+        { icon: 'Shield', description: '12 month warranty' },
+        { icon: 'Truck', description: 'Free NZ-wide shipping' },
+        { icon: 'Check', description: '12 months free subscription included' }
+      ],
+    },
+    // ─── Guardian Loyalty: Gold Membership ──────────────────────
+    {
+      name: 'Gold Membership',
+      slug: 'gold-membership',
+      description: 'Upgrade to Gold and earn 2× Guardian Points on every purchase. Priority support, early access to new products, and free shipping on orders over $50.',
+      shortDescription: 'Earn 2× Guardian Points on every purchase',
+      price: 1.99,
+      currency: 'NZD',
+      images: [],
+      category: 'Guardian',
+      tags: ['gold', 'membership', 'loyalty', 'guardian'],
+      isActive: true,
+      isPublished: true,
+      stock: 99999,
+      reserved: 0,
+      lowStockThreshold: 0,
+      stockPolicy: 'allow',
+      weight: 0,
+      sku: 'PT-GOLD-001',
+      variants: [],
+      customizable: false,
+      customizationPrice: 0,
+      shippingCost: 0,
+      shippingDescription: 'Digital membership — no shipping required',
+      warrantyMonths: 0,
+      isSubscription: true,
+      isTagProduct: false,
+      subscriptionConfig: {
+        type: 'monthly',
+        freePeriodMonths: 0,
+        gracePeriodWeeks: 1,
+        monthlyPrice: 1.99,
+        features: [
+          '2× Guardian Points on all purchases',
+          'Free shipping on orders over $50',
+          'Early access to new products',
+          'Priority support',
+          '$3/month PawRewards',
+        ],
+      },
+      featureHighlights: [
+        { icon: 'Sparkles', description: '2× Points on every purchase' },
+        { icon: 'Truck', description: 'Free shipping on orders over $50' },
+        { icon: 'Clock', description: 'Early access to new products' },
+        { icon: 'Headphones', description: 'Priority support' },
+        { icon: 'Gift', description: '$3/month PawRewards' },
+      ],
+      sortOrder: 100,
+      badge: 'Gold',
+    },
 ];
 
 async function seedProducts() {
@@ -110,17 +157,20 @@ async function seedProducts() {
     await connectDatabase();
     console.log('Connected to MongoDB');
 
-    // Clear existing products
-    await Product.deleteMany({});
-    console.log('Cleared existing products');
-
-    // Insert new products
-    const result = await Product.insertMany(products);
-    console.log(`Seeded ${result.length} products`);
-
-    for (const p of result) {
-      console.log(`  - ${p.name} (${p.sku}) — $${p.price} NZD + subscription`);
+    // Idempotent: only add missing products (don't clear existing ones)
+    let added = 0;
+    let skipped = 0;
+    for (const productData of products) {
+      const existing = await Product.findOne({ sku: productData.sku });
+      if (existing) {
+        skipped++;
+        continue;
+      }
+      await Product.create(productData);
+      added++;
+      console.log(`  + ${productData.name} (${productData.sku})`);
     }
+    console.log(`Products: ${added} added, ${skipped} already existed`);
 
     // Seed company settings
     const companySettings = [

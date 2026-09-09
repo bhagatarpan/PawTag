@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { AuthRequest } from './auth';
-import { User, Subscription } from '@pawtag/db';
+import { User, Subscription, Setting } from '@pawtag/db';
 import logger from '../lib/logger';
 
 /**
@@ -19,12 +19,15 @@ export async function requireGoldMember(req: AuthRequest, res: Response, next: N
       return res.status(404).json({ success: false, error: 'User not found' });
     }
 
-    // Check if user has Gold subscription
+    // Check if user has Gold subscription (price from CMS setting)
+    const goldPriceSetting = await Setting.findOne({ key: 'guardian.goldPrice' }).lean();
+    const goldPrice = parseFloat(goldPriceSetting?.value || '1.99');
+    
     const goldSubscription = await Subscription.findOne({
       userId,
       status: 'active',
       planType: 'monthly',
-      price: 1.99,
+      price: goldPrice,
     }).lean();
 
     if (!goldSubscription) {

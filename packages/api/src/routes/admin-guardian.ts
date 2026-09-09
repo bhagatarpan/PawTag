@@ -78,9 +78,11 @@ router.get('/stats', requirePermission('setting.read'), async (req: AuthRequest,
     ]);
     const totalRewardsRedeemed = totalRedeemedResult[0]?.total || 0;
 
-    // Get Gold members (active monthly subscription at $1.99)
+    // Get Gold members (active monthly subscription at Gold price)
+    const goldPriceSetting = await Setting.findOne({ key: 'guardian.goldPrice' }).lean();
+    const goldPrice = parseFloat(goldPriceSetting?.value || '1.99');
     const goldMembersResult = await Subscription.aggregate([
-      { $match: { status: 'active', planType: 'monthly', price: 1.99 } },
+      { $match: { status: 'active', planType: 'monthly', price: goldPrice } },
       { $group: { _id: '$userId' } },
       { $count: 'total' },
     ]);
@@ -194,12 +196,14 @@ router.get('/members', requirePermission('setting.read'), async (req: AuthReques
     const total = await User.countDocuments(query);
 
     // Enrich with Gold membership status from Subscription collection
+    const goldPriceSetting = await Setting.findOne({ key: 'guardian.goldPrice' }).lean();
+    const goldPrice = parseFloat(goldPriceSetting?.value || '1.99');
     const memberIds = members.map(m => m._id);
     const goldSubscriptions = await Subscription.find({
       userId: { $in: memberIds },
       status: 'active',
       planType: 'monthly',
-      price: 1.99,
+      price: goldPrice,
     }).select('userId').lean();
     const goldUserIds = new Set(goldSubscriptions.map(s => s.userId.toString()));
     const enrichedMembers = members.map(m => ({

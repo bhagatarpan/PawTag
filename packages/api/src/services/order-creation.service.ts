@@ -377,11 +377,12 @@ export async function createPawTagOrder(params: CreateOrderParams): Promise<Crea
         if (!user || !user.guardianTier) return;
 
         const { calculateTier } = await import('./loyalty/tier.service');
+        const { isGoldSubscription } = await import('./loyalty/points-earning.service');
         const [tierInfo, goldSub] = await Promise.all([
           calculateTier(userId),
-          Subscription.findOne({ userId, status: 'active', planType: 'monthly', price: 1.99 }).lean(),
+          Subscription.findOne({ userId, status: 'active', planType: 'monthly' }).lean(),
         ]);
-        const isGoldMember = !!goldSub;
+        const isGoldMember = await isGoldSubscription(goldSub);
         const pointsEarned = Math.floor(total * (isGoldMember ? 2 : 1));
 
         await sendMail(

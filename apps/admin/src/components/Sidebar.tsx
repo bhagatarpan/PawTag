@@ -133,14 +133,22 @@ const sections: SidebarSection[] = [
       { to: '/shipping/methods', label: 'Shipping Methods', icon: Truck, permission: 'setting.read' },
     ],
   },
-  // ─── Subscriptions & Loyalty ──────────────────────────────
+  // ─── Tag Subscriptions ─────────────────────────────────────
   {
-    id: 'subscriptions-loyalty',
-    label: 'Subscriptions & Loyalty',
-    icon: CreditCard,
+    id: 'tag-subscriptions',
+    label: 'Tag Subscriptions',
+    icon: QrCode,
     links: [
       { to: '/subscription-plans', label: 'Subscription Plans', icon: CreditCard, permission: 'product.read' },
       { to: '/customer-subscriptions', label: 'Customer Subscriptions', icon: Users, permission: 'subscription.read' },
+    ],
+  },
+  // ─── Guardian Loyalty ──────────────────────────────────────
+  {
+    id: 'guardian-loyalty',
+    label: 'Guardian Loyalty',
+    icon: Shield,
+    links: [
       { to: '/guardian', label: 'Guardian Dashboard', icon: Shield, permission: 'subscription.read' },
       { to: '/guardian/members', label: 'Members', icon: Users, permission: 'subscription.read' },
       { to: '/guardian/analytics', label: 'Analytics', icon: BarChart3, permission: 'subscription.read' },
