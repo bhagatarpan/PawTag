@@ -31,6 +31,7 @@ import { isGoldSubscription } from './points-earning.service';
 import { sendMonthlySummaryEmail, sendPawRewardsReminderEmail } from '../email.service';
 import { incrementCounter, METRICS } from '../../lib/metrics';
 import logger from '../../lib/logger';
+import { getGuardianNumber, type GuardianSettingKey } from './guardian-config';
 
 // PawRewards configuration
 export const PAWREWARDS_CONFIG = {
@@ -90,8 +91,9 @@ export async function allocateMonthlyRewards(userId: string): Promise<{
   const tierInfo = await calculateTier(userId);
   const tier = tierInfo.tier;
 
-  // Get monthly allocation for tier
-  const allocation = PAWREWARDS_CONFIG.MONTHLY_ALLOCATION[tier];
+  // Get monthly allocation for tier (read from CMS settings)
+  const allocationKey = `pawRewards${tier.charAt(0) + tier.slice(1).toLowerCase()}` as GuardianSettingKey;
+  const allocation = await getGuardianNumber(allocationKey);
 
   // Check if user has active subscription
   const subscription = await Subscription.findOne({ userId, status: 'active' }).lean();
@@ -100,9 +102,11 @@ export async function allocateMonthlyRewards(userId: string): Promise<{
     return { allocated: 0, newBalance: user.pawRewardsBalance || 0, tier };
   }
 
-  // Check maximum balance
+  // Check maximum balance (read from CMS settings)
   const isGoldMember = await isGoldSubscription(subscription);
-  const maxBalance = isGoldMember ? PAWREWARDS_CONFIG.MAX_BALANCE.GOLD : PAWREWARDS_CONFIG.MAX_BALANCE.GUARDIAN;
+  const maxBalance = isGoldMember
+    ? await getGuardianNumber('pawRewardsMaxBalanceGold')
+    : await getGuardianNumber('pawRewardsMaxBalanceGuardian');
   const currentBalance = user.pawRewardsBalance || 0;
 
   if (currentBalance >= maxBalance) {
@@ -166,9 +170,11 @@ export async function earnRewardsFromPurchase(
     return { earned: 0, newBalance: user.pawRewardsBalance || 0 };
   }
 
-  // Determine earning rate
+  // Determine earning rate (read from CMS settings)
   const isGoldMember = await isGoldSubscription(subscription);
-  const earningRate = isGoldMember ? PAWREWARDS_CONFIG.EARNING_RATE.GOLD : PAWREWARDS_CONFIG.EARNING_RATE.GUARDIAN;
+  const earningRate = isGoldMember
+    ? await getGuardianNumber('pawRewardsEarningRateGold')
+    : await getGuardianNumber('pawRewardsEarningRateGuardian');
 
   // Calculate earnings
   const earned = Math.floor(orderTotal / earningRate);
@@ -176,8 +182,10 @@ export async function earnRewardsFromPurchase(
     return { earned: 0, newBalance: user.pawRewardsBalance || 0 };
   }
 
-  // Check maximum balance
-  const maxBalance = isGoldMember ? PAWREWARDS_CONFIG.MAX_BALANCE.GOLD : PAWREWARDS_CONFIG.MAX_BALANCE.GUARDIAN;
+  // Check maximum balance (read from CMS settings)
+  const maxBalance = isGoldMember
+    ? await getGuardianNumber('pawRewardsMaxBalanceGold')
+    : await getGuardianNumber('pawRewardsMaxBalanceGuardian');
   const currentBalance = user.pawRewardsBalance || 0;
 
   if (currentBalance >= maxBalance) {
@@ -231,9 +239,10 @@ export async function redeemRewards(
   const user = await User.findById(userId).lean();
   if (!user) throw new Error('User not found');
 
-  // Check minimum redemption
-  if (amount < PAWREWARDS_CONFIG.MINIMUM_REDEMPTION) {
-    throw new Error(`Minimum redemption is $${PAWREWARDS_CONFIG.MINIMUM_REDEMPTION}`);
+  // Check minimum redemption (read from CMS settings)
+  const minRedemption = await getGuardianNumber('pawRewardsMinRedemption');
+  if (amount < minRedemption) {
+    throw new Error(`Minimum redemption is $${minRedemption}`);
   }
 
   // Check sufficient balance
@@ -329,11 +338,12 @@ export async function processRewardsExpiration(): Promise<{
 
   // Find all users with PawRewards balance
   const users = await User.find({ pawRewardsBalance: { $gt: 0 } }).lean();
+  const expirationMonths = await getGuardianNumber('pawRewardsExpirationMonths');
 
   for (const user of users) {
-    // Find transactions older than 6 months
+    // Find transactions older than configured expiration
     const expirationDate = new Date(now);
-    expirationDate.setMonth(expirationDate.getMonth() - PAWREWARDS_CONFIG.EXPIRATION_MONTHS);
+    expirationDate.setMonth(expirationDate.getMonth() - expirationMonths);
 
     const oldTransactions = await PawRewardsLedger.find({
       userId: user._id,
@@ -385,8 +395,9 @@ export async function processRewardsExpiration(): Promise<{
  */
 async function getNextExpiration(userId: string): Promise<{ date: Date; amount: number } | null> {
   const now = new Date();
+  const expirationMonths = await getGuardianNumber('pawRewardsExpirationMonths');
   const expirationDate = new Date(now);
-  expirationDate.setMonth(expirationDate.getMonth() - PAWREWARDS_CONFIG.EXPIRATION_MONTHS);
+  expirationDate.setMonth(expirationDate.getMonth() - expirationMonths);
 
   const oldestTransaction = await PawRewardsLedger.findOne({
     userId,
@@ -406,7 +417,7 @@ async function getNextExpiration(userId: string): Promise<{ date: Date; amount: 
   const totalAmount = transactionsToExpire.reduce((sum, t) => sum + t.amount, 0);
 
   return {
-    date: new Date(oldestTransaction.createdAt.getTime() + PAWREWARDS_CONFIG.EXPIRATION_MONTHS * 30 * 24 * 60 * 60 * 1000),
+    date: new Date(oldestTransaction.createdAt.getTime() + expirationMonths * 30 * 24 * 60 * 60 * 1000),
     amount: totalAmount,
   };
 }

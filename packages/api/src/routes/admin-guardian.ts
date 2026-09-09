@@ -5,6 +5,7 @@ import { User, Setting, Subscription } from '@pawtag/db';
 import { auditService, type AuditContext } from '../services/audit';
 import { createAuditContextFromRequest, type AuditRequest } from '../middleware/audit';
 import { guardianSettingsSchema, membersQuerySchema, activityQuerySchema } from '../validation/loyalty';
+import { clearGuardianCache } from '../services/loyalty/guardian-config';
 import logger from '../lib/logger';
 
 const router = Router();
@@ -427,6 +428,9 @@ router.put('/settings', requirePermission('setting.update'), async (req: AuthReq
         { upsert: true }
       );
     }
+
+    // Clear in-memory cache so services pick up new values
+    clearGuardianCache();
 
     await auditAdminGuardianEvent(req, {
       action: 'guardian_settings_updated',

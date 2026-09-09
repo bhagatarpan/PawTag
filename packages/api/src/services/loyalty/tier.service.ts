@@ -25,6 +25,7 @@ import { User, Subscription, Setting, GuardianTierHistory } from '@pawtag/db';
 import { sendTierUpgradeEmail } from '../email.service';
 import { incrementCounter, METRICS } from '../../lib/metrics';
 import logger from '../../lib/logger';
+import { getGuardianNumber } from './guardian-config';
 
 // Tier thresholds
 export const TIER_THRESHOLDS = {
@@ -121,13 +122,18 @@ export async function calculateTier(userId: string): Promise<TierCalculationResu
 
   const points = user.guardianPoints || 0;
 
+  // Read tier thresholds from CMS settings
+  const nurtureMin = await getGuardianNumber('tierThresholdNurture');
+  const protectorMin = await getGuardianNumber('tierThresholdProtector');
+  const safeguardMin = await getGuardianNumber('tierThresholdSafeguard');
+
   // Determine tier based on points
   let tier: TierName = 'CARE';
-  if (points >= TIER_THRESHOLDS.SAFEGUARD.min) {
+  if (points >= safeguardMin) {
     tier = 'SAFEGUARD';
-  } else if (points >= TIER_THRESHOLDS.PROTECTOR.min) {
+  } else if (points >= protectorMin) {
     tier = 'PROTECTOR';
-  } else if (points >= TIER_THRESHOLDS.NURTURE.min) {
+  } else if (points >= nurtureMin) {
     tier = 'NURTURE';
   }
 
@@ -136,13 +142,13 @@ export async function calculateTier(userId: string): Promise<TierCalculationResu
   let nextTier: TierName | null = null;
 
   if (tier === 'CARE') {
-    pointsToNextTier = TIER_THRESHOLDS.NURTURE.min - points;
+    pointsToNextTier = nurtureMin - points;
     nextTier = 'NURTURE';
   } else if (tier === 'NURTURE') {
-    pointsToNextTier = TIER_THRESHOLDS.PROTECTOR.min - points;
+    pointsToNextTier = protectorMin - points;
     nextTier = 'PROTECTOR';
   } else if (tier === 'PROTECTOR') {
-    pointsToNextTier = TIER_THRESHOLDS.SAFEGUARD.min - points;
+    pointsToNextTier = safeguardMin - points;
     nextTier = 'SAFEGUARD';
   }
 
@@ -276,7 +282,12 @@ async function sendTierDowngradeWarningEmail(
 
   const { sendMail } = await import('../email.service');
 
-  const pointsNeeded = TIER_THRESHOLDS[currentTier].min;
+  // Read tier thresholds from CMS settings
+  const pointsNeeded = await getGuardianNumber(
+    currentTier === 'NURTURE' ? 'tierThresholdNurture'
+    : currentTier === 'PROTECTOR' ? 'tierThresholdProtector'
+    : 'tierThresholdSafeguard'
+  );
   const html = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
       <div style="background: linear-gradient(135deg, #f59e0b, #d97706); padding: 24px; border-radius: 12px 12px 0 0; text-align: center;">
@@ -424,39 +435,43 @@ async function sendTierChangeEmail(
 /**
  * Get all tiers with their thresholds and benefits
  */
-export function getAllTiers(): Array<{
+export async function getAllTiers(): Promise<Array<{
   name: TierName;
   displayName: string;
   minPoints: number;
   maxPoints: number;
   benefits: typeof TIER_BENEFITS[TierName];
-}> {
+}>> {
+  const nurtureMin = await getGuardianNumber('tierThresholdNurture');
+  const protectorMin = await getGuardianNumber('tierThresholdProtector');
+  const safeguardMin = await getGuardianNumber('tierThresholdSafeguard');
+
   return [
     {
       name: 'CARE',
       displayName: 'Care Guardian',
-      minPoints: TIER_THRESHOLDS.CARE.min,
-      maxPoints: TIER_THRESHOLDS.CARE.max,
+      minPoints: 0,
+      maxPoints: nurtureMin - 1,
       benefits: TIER_BENEFITS.CARE,
     },
     {
       name: 'NURTURE',
       displayName: 'Nurture Guardian',
-      minPoints: TIER_THRESHOLDS.NURTURE.min,
-      maxPoints: TIER_THRESHOLDS.NURTURE.max,
+      minPoints: nurtureMin,
+      maxPoints: protectorMin - 1,
       benefits: TIER_BENEFITS.NURTURE,
     },
     {
       name: 'PROTECTOR',
       displayName: 'Protector Guardian',
-      minPoints: TIER_THRESHOLDS.PROTECTOR.min,
-      maxPoints: TIER_THRESHOLDS.PROTECTOR.max,
+      minPoints: protectorMin,
+      maxPoints: safeguardMin - 1,
       benefits: TIER_BENEFITS.PROTECTOR,
     },
     {
       name: 'SAFEGUARD',
       displayName: 'Safeguard Guardian',
-      minPoints: TIER_THRESHOLDS.SAFEGUARD.min,
+      minPoints: safeguardMin,
       maxPoints: Infinity,
       benefits: TIER_BENEFITS.SAFEGUARD,
     },
