@@ -262,6 +262,47 @@ export default function AccountDashboard() {
         </Link>
       </div>
 
+      {/* Guardian Status Card */}
+      {data?.guardian ? (
+        <div className="bg-gradient-to-r from-primary-50 to-primary-100 rounded-lg border border-primary-200 p-5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-primary-600 rounded-xl flex items-center justify-center">
+                <Shield size={24} className="text-white" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-primary-900">Guardian {data.guardian.tier} Member</h3>
+                <p className="text-sm text-primary-700">
+                  {data.guardian.points} points · ${(data.guardian.pawRewardsBalance || 0).toFixed(2)} PawRewards
+                </p>
+              </div>
+            </div>
+            <Link to="/account/guardian" className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition-colors">
+              View Dashboard
+            </Link>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-lg border border-amber-200 p-5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-amber-500 rounded-xl flex items-center justify-center">
+                <Shield size={24} className="text-white" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-amber-900">Join Guardian — It's Free</h3>
+                <p className="text-sm text-amber-700">
+                  Earn points on every purchase and unlock exclusive rewards
+                </p>
+              </div>
+            </div>
+            <Link to="/account/guardian" className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 transition-colors">
+              Learn More
+            </Link>
+          </div>
+        </div>
+      )}
+
       {/* Pending Escalations */}
       {data?.escalations && data.escalations.length > 0 && (
         <div className="bg-amber-50 border border-amber-200 rounded-lg overflow-hidden">

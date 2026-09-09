@@ -77,6 +77,15 @@ export function HomeScreen({ navigation }: any) {
           <Text style={styles.actionTitle}>Order History</Text>
           <Text style={styles.actionDesc}>View past orders and invoices</Text>
         </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.actionCard}
+          onPress={() => { hapticLight(); navigation.navigate('GuardianDashboard'); }}
+        >
+          <Text style={styles.actionIcon}>🛡️</Text>
+          <Text style={styles.actionTitle}>Guardian</Text>
+          <Text style={styles.actionDesc}>View points, tier, and rewards</Text>
+        </TouchableOpacity>
       </View>
 
       <TouchableOpacity

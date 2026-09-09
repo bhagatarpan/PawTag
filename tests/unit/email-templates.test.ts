@@ -13,6 +13,7 @@ import { renderMonthlySummaryEmail } from '../../packages/api/src/services/email
 import { renderPawRewardsReminderEmail } from '../../packages/api/src/services/email/templates/guardian-pawrewards-reminder';
 import { renderGuardianAnniversaryEmail } from '../../packages/api/src/services/email/templates/guardian-anniversary';
 import { renderGuardianRenewalReminderEmail } from '../../packages/api/src/services/email/templates/guardian-renewal-reminder';
+import { renderPurchasePointsEmail } from '../../packages/api/src/services/email/templates/guardian-purchase-points';
 
 describe('Base Email Template', () => {
   it('returns valid HTML with title', () => {
@@ -266,5 +267,57 @@ describe('Guardian Renewal Reminder Email', () => {
       currentBenefits: ['Monthly PawRewards: $2.00'], dashboardUrl: 'https://app.com/subscriptions',
     });
     expect(html).toContain('Monthly PawRewards: $2.00');
+  });
+});
+
+describe('Post-Purchase Points Email', () => {
+  it('includes points earned and order number', () => {
+    const html = renderPurchasePointsEmail({
+      customerName: 'Sarah',
+      orderNumber: 'PT-12345',
+      pointsEarned: 100,
+      totalPoints: 600,
+      tier: 'CARE',
+      pointsToNextTier: 400,
+      nextTier: 'NURTURE',
+      isGoldMember: false,
+      dashboardUrl: 'https://app.com/account/guardian',
+    });
+    expect(html).toContain('100');
+    expect(html).toContain('PT-12345');
+    expect(html).toContain('Sarah');
+    expect(html).toContain('CARE');
+  });
+
+  it('shows Gold 2x bonus for Gold members', () => {
+    const html = renderPurchasePointsEmail({
+      customerName: 'Mike',
+      orderNumber: 'PT-67890',
+      pointsEarned: 200,
+      totalPoints: 1500,
+      tier: 'PROTECTOR',
+      pointsToNextTier: 500,
+      nextTier: 'SAFEGUARD',
+      isGoldMember: true,
+      dashboardUrl: 'https://app.com/account/guardian',
+    });
+    expect(html).toContain('Gold 2x bonus');
+    expect(html).toContain('200');
+  });
+
+  it('shows progress to next tier', () => {
+    const html = renderPurchasePointsEmail({
+      customerName: 'Emma',
+      orderNumber: 'PT-11111',
+      pointsEarned: 50,
+      totalPoints: 450,
+      tier: 'CARE',
+      pointsToNextTier: 50,
+      nextTier: 'NURTURE',
+      isGoldMember: false,
+      dashboardUrl: 'https://app.com/account/guardian',
+    });
+    expect(html).toContain('50');
+    expect(html).toContain('NURTURE');
   });
 });

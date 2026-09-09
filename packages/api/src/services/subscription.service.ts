@@ -1140,15 +1140,46 @@ export async function processPaymentRetries() {
   }
 }
 
-async function attemptPaymentCharge(_subscription: any): Promise<boolean> {
+async function attemptPaymentCharge(subscription: any): Promise<boolean> {
   // In demo mode, simulate 80% success rate for retries
   if (!process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY === 'sk_test_demo_key') {
     return Math.random() < 0.8;
   }
 
-  // In production, this would call Stripe to retry the payment
-  // For now, return false as we haven't implemented Stripe integration for subscriptions
-  return false;
+  // In production, use Stripe to retry the payment
+  try {
+    const Stripe = (await import('stripe')).default;
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2024-06-20' as any });
+
+    if (!subscription.stripeCustomerId) {
+      logger.warn({ subscriptionId: subscription._id }, 'No Stripe customer ID for subscription');
+      return false;
+    }
+
+    // Get the latest invoice for this subscription
+    const invoices = await stripe.invoices.list({
+      customer: subscription.stripeCustomerId,
+      limit: 1,
+      status: 'open',
+    });
+
+    if (invoices.data.length === 0) {
+      logger.warn({ subscriptionId: subscription._id }, 'No open invoice found for subscription');
+      return false;
+    }
+
+    const invoice = invoices.data[0];
+
+    // Attempt to pay the invoice
+    const paidInvoice = await stripe.invoices.pay(invoice.id, {
+      payment_method_types: ['card'],
+    });
+
+    return paidInvoice.status === 'paid';
+  } catch (err) {
+    logger.error({ err, subscriptionId: subscription._id }, 'Stripe payment retry failed');
+    return false;
+  }
 }
 
 async function sendPaymentRetrySuccessEmail(to: string, name: string, tagId: string) {

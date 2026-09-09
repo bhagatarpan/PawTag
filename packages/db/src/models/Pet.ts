@@ -104,6 +104,7 @@ export interface IPetDocument extends Document {
   secondaryBreed?: string;
   gender: 'male' | 'female' | 'unknown';
   dateOfBirth?: Date;
+  adoptionDate?: Date;
   age?: number;
   weight?: number;
   color: string;
@@ -268,6 +269,7 @@ const PetSchema = new Schema<IPetDocument>(
     secondaryBreed: { type: String, trim: true, default: 'Unknown' },
     gender: { type: String, enum: ['male', 'female', 'unknown'], default: 'unknown' },
     dateOfBirth: { type: Date },
+    adoptionDate: { type: Date },
     age: { type: Number, min: 0, max: 30 },
     weight: { type: Number },
     color: { type: String, required: true, trim: true },

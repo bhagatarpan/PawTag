@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Shield, Gift, ArrowUpRight } from 'lucide-react';
+import { Shield, Gift, ArrowUpRight, Award, Star, Trophy, Target } from 'lucide-react';
 import api from '../../lib/api';
 
 type TierName = 'CARE' | 'NURTURE' | 'PROTECTOR' | 'SAFEGUARD';
@@ -260,6 +260,34 @@ const progressPercent = data.tierInfo.pointsToNextTier !== null
                </li>
              )}
           </ul>
+        </div>
+
+        {/* Achievements Card */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Achievements</h3>
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { icon: <Award size={20} />, title: 'First Purchase', desc: 'Made your first order', unlocked: data.points > 0 },
+              { icon: <Star size={20} />, title: 'Guardian Member', desc: 'Joined the Guardian program', unlocked: true },
+              { icon: <Trophy size={20} />, title: `${data.tier} Tier`, desc: `Reached ${data.tier} status`, unlocked: true },
+              { icon: <Target size={20} />, title: 'Points Collector', desc: 'Earned 500+ points', unlocked: data.points >= 500 },
+            ].map((achievement, index) => (
+              <div
+                key={index}
+                className={`p-3 rounded-xl border ${
+                  achievement.unlocked
+                    ? 'bg-primary-50 border-primary-200 text-primary-700'
+                    : 'bg-gray-50 border-gray-200 text-gray-400'
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  {achievement.icon}
+                  <span className="text-sm font-medium">{achievement.title}</span>
+                </div>
+                <p className="text-xs opacity-75">{achievement.desc}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 

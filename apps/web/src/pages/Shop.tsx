@@ -17,12 +17,14 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useCartInteraction } from '../context/CartInteractionContext';
+import { useAuth } from '../context/AuthContext';
 import { ProductCard, type ProductCardProduct } from '@pawtag/ui';
 import SeoHead from '../components/SeoHead';
 import { useShopPage, useSiteSettings } from '../hooks/useCms';
 import { getProductBadge } from '../utils/productHelpers';
 import api from '../lib/api';
-import { Package } from 'lucide-react';
+import { Package, Shield } from 'lucide-react';
+import analytics from '../lib/analytics';
 
 /* ------------------------------------------------------------------ */
  /*  Types                                                              */
@@ -75,12 +77,23 @@ weight?: number;
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
 
-function toCardProduct(p: PawTagProduct): ProductCardProduct {
+function toCardProduct(p: PawTagProduct, guardianTier: string, isGoldMember: boolean): ProductCardProduct {
    const effectivePrice = p.salePrice ?? p.price;
    const badge = getProductBadge(p.sku) || (p.badge ? { label: p.badge, color: 'teal' } : null);
    const available = p.stock - p.reserved;
 
-return {
+   // Calculate points earning for this product
+   let pointsEarning: { points: number; label?: string } | null = null;
+   if (guardianTier) {
+     const multiplier = isGoldMember ? 2 : 1;
+     const points = Math.floor(effectivePrice * multiplier);
+     pointsEarning = {
+       points,
+       label: isGoldMember ? 'Gold 2x' : undefined,
+     };
+   }
+
+   return {
       id: p._id,
       slug: p.slug,
       name: p.name,
@@ -99,6 +112,7 @@ return {
             { icon: 'Shield', description: `${p.warrantyMonths || 12} month warranty` },
             { icon: 'Truck', description: p.shippingDescription || 'Free NZ-wide shipping' },
           ],
+      pointsEarning,
     };
  }
 
@@ -113,9 +127,14 @@ export default function Shop() {
   const { addItem, error: cartError, clearError } = useCart();
   const { page: shopPage } = useShopPage('shop');
   const { settings } = useSiteSettings();
+  const { user } = useAuth();
   const companyName = settings?.['company.name'] || 'PawTag';
   const navigate = useNavigate();
   const { triggerFly } = useCartInteraction();
+
+  // Guardian loyalty state
+  const [guardianTier, setGuardianTier] = useState<string>('');
+  const [isGoldMember, setIsGoldMember] = useState(false);
 
   /* ---- Fetch products from PawTag API ---- */
   useEffect(() => {
@@ -128,8 +147,21 @@ export default function Shop() {
       .finally(() => setLoading(false));
   }, []);
 
+  // Fetch Guardian tier for points earning display
+  useEffect(() => {
+    if (user) {
+      api.get('/customer/guardian/tier')
+        .then(res => {
+          const tierData = res.data.data;
+          setGuardianTier(tierData.tier || 'CARE');
+          setIsGoldMember(tierData.isGoldMember || false);
+        })
+        .catch(() => {});
+    }
+  }, [user]);
+
   /* ---- Derived data ---- */
-  const cardProducts = useMemo(() => products.map(toCardProduct), [products]);
+  const cardProducts = useMemo(() => products.map(p => toCardProduct(p, guardianTier, isGoldMember)), [products, guardianTier, isGoldMember]);
 
   const shopTitle = useMemo(() =>
     (shopPage?.content as Record<string, unknown>)?.heroTitle as string || shopPage?.title || `Shop ${companyName}`,
@@ -157,6 +189,14 @@ export default function Shop() {
         price: product.salePrice ?? product.price,
         image: product.images?.[0],
       });
+
+      // Track add to cart event
+      analytics.trackAddToCart(
+        product._id,
+        product.name,
+        product.salePrice ?? product.price,
+        1
+      );
 
       setAddedId(product._id);
       if (e) {
@@ -201,7 +241,49 @@ export default function Shop() {
       <div className="min-h-screen bg-gray-50 py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">{shopTitle}</h1>
-          <p className="text-gray-600 mb-8">{shopDesc}</p>
+          <p className="text-gray-600 mb-4">{shopDesc}</p>
+
+          {/* Guardian Loyalty Banner */}
+          {!user && (
+            <div className="mb-6 p-4 bg-gradient-to-r from-primary-50 to-amber-50 border border-primary-100 rounded-xl">
+              <div className="flex items-center gap-3">
+                <Shield className="h-5 w-5 text-primary-600 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-primary-800">
+                    <strong>Every purchase can earn rewards.</strong>{' '}
+                    <span className="text-primary-600">Guardian members earn Points with every eligible purchase.</span>
+                  </p>
+                  <p className="text-xs text-primary-600 mt-1">
+                    Join free and start earning PawRewards today.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* What You're Missing - for logged-in non-Guardian users */}
+          {user && !guardianTier && (
+            <div className="mb-6 p-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
+                    <Shield className="h-5 w-5 text-amber-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-amber-900">
+                      <strong>You're not earning rewards yet.</strong>
+                    </p>
+                    <p className="text-xs text-amber-700 mt-0.5">
+                      Guardian members earn points on every purchase and unlock exclusive benefits.
+                    </p>
+                  </div>
+                </div>
+                <Link to="/account/guardian" className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 transition-colors whitespace-nowrap">
+                  Join Free
+                </Link>
+              </div>
+            </div>
+          )}
 
           {/* Product Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">

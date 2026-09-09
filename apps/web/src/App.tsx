@@ -43,6 +43,7 @@ import GuardianPoints from './pages/account/GuardianPoints';
 import GuardianRewards from './pages/account/GuardianRewards';
 import SubscriptionUpgrade from './pages/account/SubscriptionUpgrade';
 import GoldBenefits from './pages/account/GoldBenefits';
+import FloatingLoyaltyBadge from './components/FloatingLoyaltyBadge';
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const token = localStorage.getItem('pawtag_token');
@@ -57,6 +58,7 @@ function PublicLayout({ children, showEmergency = true }: { children: ReactNode;
       <main className="flex-1">{children}</main>
       <Footer />
       {showEmergency && <EmergencyLostPet />}
+      <FloatingLoyaltyBadge />
     </div>
   );
 }

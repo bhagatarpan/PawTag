@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { PawPrint, Mail, Phone, MapPin } from 'lucide-react';
+import { PawPrint, Mail, Phone, MapPin, Shield } from 'lucide-react';
 import { useFooter, useSiteSettings } from '../hooks/useCms';
 
 export default function Footer() {
@@ -13,6 +13,7 @@ export default function Footer() {
       links: [
         { label: 'Shop', url: '/shop', type: 'custom' as const },
         { label: 'About', url: '/about', type: 'custom' as const },
+        { label: 'Guardian Rewards', url: '/account/guardian', type: 'custom' as const },
         { label: 'Sign In', url: '/login', type: 'custom' as const },
       ],
     },

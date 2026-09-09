@@ -674,6 +674,12 @@ router.post('/pets/:id/mark-lost', requirePermission('pet.update'), async (req: 
     pet.foundByFinderAt = undefined;
     await pet.save();
 
+    // Award Guardian Points for lost pet report (non-blocking)
+    import('./services/loyalty/points-earning.service').then(({ awardLostPetReportPoints }) => {
+      awardLostPetReportPoints(req.user!.id, pet._id.toString())
+        .catch((err) => logger.error({ err, petId: pet._id }, 'Guardian lost pet report points error'));
+    }).catch(() => {});
+
     // Update owner responsibility score
     const allPets = await Pet.find({ ownerId: req.user!.id, deletedAt: null }).select('lostCount');
     const totalLostCount = allPets.reduce((sum, p) => sum + (p.lostCount || 0), 0);
@@ -740,6 +746,14 @@ router.post('/pets/:id/mark-found', requirePermission('pet.update'), async (req:
 
     const oldStatus = pet.status;
     const wasFoundByFinder = !!pet.foundByFinderAt;
+
+    // Award Guardian Points for pet reunited (only if pet was found by a finder)
+    if (wasFoundByFinder) {
+      import('./services/loyalty/points-earning.service').then(({ awardPetReunitedPoints }) => {
+        awardPetReunitedPoints(req.user!.id, pet._id.toString())
+          .catch((err) => logger.error({ err, petId: pet._id }, 'Guardian pet reunited points error'));
+      }).catch(() => {});
+    }
     let timeToFoundMs: number | null = null;
     if (pet.foundByFinderAt) {
       timeToFoundMs = Date.now() - new Date(pet.foundByFinderAt).getTime();

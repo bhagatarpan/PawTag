@@ -1,6 +1,8 @@
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Shield, Star, Zap, Crown, ArrowRight } from 'lucide-react';
+import { Shield, Star, Zap, Crown, ArrowRight, TrendingUp } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import api from '../lib/api';
 
 const tiers = [
   {
@@ -10,6 +12,7 @@ const tiers = [
     rewards: '$2/mo',
     shipping: 'Over $100',
     color: 'bg-emerald-100 text-emerald-700',
+    minPoints: 0,
   },
   {
     name: 'Nurture',
@@ -18,6 +21,7 @@ const tiers = [
     rewards: '$3/mo',
     shipping: 'Over $75',
     color: 'bg-teal-100 text-teal-700',
+    minPoints: 500,
   },
   {
     name: 'Protector',
@@ -26,19 +30,41 @@ const tiers = [
     rewards: '$5/mo',
     shipping: 'Over $50',
     color: 'bg-purple-100 text-purple-700',
+    minPoints: 2000,
   },
   {
     name: 'Safeguard',
     icon: Crown,
-    points: '1×',
+    points: '2×',
     rewards: '$8/mo',
     shipping: 'Free',
     color: 'bg-amber-100 text-amber-700',
+    minPoints: 5000,
   },
 ];
 
+interface GuardianData {
+  tier: string;
+  points: number;
+  isGoldMember: boolean;
+}
+
 export default function GuardianSection() {
   const { user } = useAuth();
+  const [guardianData, setGuardianData] = useState<GuardianData | null>(null);
+
+  useEffect(() => {
+    if (user) {
+      api.get('/customer/guardian/tier')
+        .then(res => setGuardianData(res.data.data))
+        .catch(() => {});
+    }
+  }, [user]);
+
+  const currentTierIndex = guardianData ? tiers.findIndex(t => t.name === guardianData.tier) : -1;
+  const nextTier = currentTierIndex >= 0 && currentTierIndex < tiers.length - 1 ? tiers[currentTierIndex + 1] : null;
+  const progressToNext = nextTier && guardianData ? 
+    Math.min(100, ((guardianData.points - tiers[currentTierIndex].minPoints) / (nextTier.minPoints - tiers[currentTierIndex].minPoints)) * 100) : 0;
 
   return (
     <section className="py-20 bg-white">
@@ -113,6 +139,43 @@ export default function GuardianSection() {
             </div>
           </div>
         </div>
+
+        {/* Points Visualizer for logged-in users */}
+        {user && guardianData && (
+          <div className="mt-12 bg-white rounded-2xl border border-gray-100 p-6 md:p-8">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center">
+                <TrendingUp className="h-5 w-5 text-primary-600" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900">Your Guardian Progress</h3>
+                <p className="text-sm text-gray-500">{guardianData.points} points · {guardianData.tier} Tier</p>
+              </div>
+            </div>
+            
+            {nextTier ? (
+              <div>
+                <div className="flex justify-between text-sm mb-2">
+                  <span className="text-gray-600">{guardianData.tier}</span>
+                  <span className="text-primary-600 font-medium">{nextTier.name}</span>
+                </div>
+                <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-gradient-to-r from-primary-500 to-primary-600 rounded-full transition-all duration-500"
+                    style={{ width: `${progressToNext}%` }}
+                  />
+                </div>
+                <p className="text-sm text-gray-500 mt-2">
+                  {nextTier.minPoints - guardianData.points} points to {nextTier.name}
+                </p>
+              </div>
+            ) : (
+              <p className="text-sm text-primary-600 font-medium">
+                You've reached the highest tier! Enjoy all premium benefits.
+              </p>
+            )}
+          </div>
+        )}
 
         {/* CTA */}
         <div className="text-center mt-12">

@@ -16,7 +16,7 @@ const getIconByName = (iconName: string) => {
   return ICON_MAP[iconName] || ICON_MAP[iconName.toLowerCase()] || Check;
 };
 
- export interface ProductCardProduct {
+export interface ProductCardProduct {
    id: string;
    slug: string;
    name: string;
@@ -24,22 +24,24 @@ const getIconByName = (iconName: string) => {
    price: number;
    currency?: string;
    image?: string;
-sku: string;
+   sku: string;
     stock: number;
     monthlyPrice?: number;
     badge?: { label: string; color: string } | null;
     /** Product feature highlights for display in shop and product detail */
     featureHighlights?: IFeatureHighlight[];
+    /** Points earning info for Guardian members */
+    pointsEarning?: { points: number; label?: string } | null;
  }
 
-export interface ProductCardProps {
-  product: ProductCardProduct;
-  onAddToCart?: (product: ProductCardProduct, e?: React.MouseEvent) => void;
-  onDetails?: (product: ProductCardProduct) => void;
-  added?: boolean;
-  disabled?: boolean;
-  className?: string;
-}
+ export interface ProductCardProps {
+   product: ProductCardProduct;
+   onAddToCart?: (product: ProductCardProduct, e?: React.MouseEvent) => void;
+   onDetails?: (product: ProductCardProduct) => void;
+   added?: boolean;
+   disabled?: boolean;
+   className?: string;
+ }
 
 export const ProductCard = React.memo(function ProductCard({
   product,
@@ -84,6 +86,11 @@ export const ProductCard = React.memo(function ProductCard({
           {product.monthlyPrice != null && product.monthlyPrice > 0 && (
             <p className="text-xs text-gray-400 mt-1">
               + ${product.monthlyPrice.toFixed(2)}/mo after 12 months free
+            </p>
+          )}
+          {product.pointsEarning && (
+            <p className="text-xs text-primary-600 font-medium mt-1">
+              Earn {product.pointsEarning.points} Points{product.pointsEarning.label ? ` — ${product.pointsEarning.label}` : ''}
             </p>
           )}
         </div>

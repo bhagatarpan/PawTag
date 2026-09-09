@@ -21,11 +21,14 @@ import {
   Shield, 
   Truck, 
   Check,
+  Star,
 } from 'lucide-react';
 import { ICON_MAP } from '@pawtag/ui';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
 import { getProductBadge } from '../utils/productHelpers';
+import analytics from '../lib/analytics';
 
 // Helper function to get Lucide icon component by name
 const getIconByName = (iconName: string) => {
@@ -85,15 +88,42 @@ export default function ProductDetail() {
   const [added, setAdded] = useState(false);
   const [selectedImage, setSelectedImage] = useState(0);
   const { addItem, error: cartError, clearError } = useCart();
+  const { user } = useAuth();
+  const [guardianTier, setGuardianTier] = useState<string>('');
+  const [isGoldMember, setIsGoldMember] = useState(false);
 
 /* ---- Fetch product ---- */
    useEffect(() => {
      if (!id) return;
      api.get(`/products/slug/${id}`)
-       .then((res) => setProduct(res.data?.data))
+       .then((res) => {
+         const productData = res.data?.data;
+         setProduct(productData);
+         // Track product view
+         if (productData) {
+           analytics.trackProductView(
+             productData._id,
+             productData.name,
+             productData.salePrice ?? productData.price
+           );
+         }
+       })
        .catch(() => {})
        .finally(() => setLoading(false));
    }, [id]);
+
+  // Fetch Guardian tier for points earning display
+  useEffect(() => {
+    if (user) {
+      api.get('/customer/guardian/tier')
+        .then(res => {
+          const tierData = res.data.data;
+          setGuardianTier(tierData.tier || 'CARE');
+          setIsGoldMember(tierData.isGoldMember || false);
+        })
+        .catch(() => {});
+    }
+  }, [user]);
 
   /* ---- Add to cart ---- */
   const handleAddToCart = async () => {
@@ -208,6 +238,29 @@ export default function ProductDetail() {
             {product.shortDescription && (
               <p className="text-gray-600 mt-4">{product.shortDescription}</p>
             )}
+
+            {/* Loyalty messaging */}
+            <div className="mt-4">
+              {!user ? (
+                <div className="flex items-center gap-2 text-sm text-primary-600">
+                  <Shield size={16} />
+                  <span>Join Guardian to earn <strong>{Math.floor(effectivePrice)}</strong> points on this purchase</span>
+                </div>
+              ) : guardianTier ? (
+                <div className={`flex items-center gap-2 text-sm ${isGoldMember ? 'text-amber-600' : 'text-primary-600'}`}>
+                  <Star size={16} />
+                  <span>
+                    Earn <strong>{Math.floor(effectivePrice * (isGoldMember ? 2 : 1))}</strong> Guardian Points
+                    {isGoldMember && ' (Gold 2x)'}
+                  </span>
+                </div>
+              ) : (
+                <Link to="/account/guardian" className="flex items-center gap-2 text-sm text-amber-600 hover:text-amber-700">
+                  <Shield size={16} />
+                  <span>Join Guardian to earn points on this purchase</span>
+                </Link>
+              )}
+            </div>
 
             {/* Stock status */}
             <div className="mt-4">

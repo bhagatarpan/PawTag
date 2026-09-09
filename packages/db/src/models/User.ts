@@ -54,6 +54,7 @@ export interface IUserDocument extends Document {
   };
   guardianPoints: number;
   guardianTier: 'CARE' | 'NURTURE' | 'PROTECTOR' | 'SAFEGUARD';
+  tierGracePeriodEndsAt?: Date;
   pawRewardsBalance: number;
   pawRewardsTotalEarned: number;
   pawRewardsTotalRedeemed: number;
@@ -124,6 +125,7 @@ const UserSchema = new Schema<IUserDocument>(
       enum: ['CARE', 'NURTURE', 'PROTECTOR', 'SAFEGUARD'], 
       default: 'CARE' 
     },
+    tierGracePeriodEndsAt: { type: Date, default: null },
     pawRewardsBalance: { type: Number, default: 0, min: 0 },
     pawRewardsTotalEarned: { type: Number, default: 0, min: 0 },
     pawRewardsTotalRedeemed: { type: Number, default: 0, min: 0 },

@@ -15,6 +15,7 @@ import { useSiteSettings } from '../hooks/useCms';
 import CheckoutAuth from '../components/CheckoutAuth';
 import StripePaymentForm from '../components/StripePaymentForm';
 import CheckoutErrorBoundary from '../components/CheckoutErrorBoundary';
+import analytics from '../lib/analytics';
 
 // Confirmation page animations
 const confirmationStyles = `
@@ -66,6 +67,13 @@ export default function Checkout() {
   const [pawRewardsBalance, setPawRewardsBalance] = useState(0);
   const [pawRewardsRedemption, setPawRewardsRedemption] = useState(0);
   const [pawRewardsLoading, setPawRewardsLoading] = useState(false);
+
+  // Guardian loyalty data
+  const [guardianTier, setGuardianTier] = useState<string>('');
+  const [guardianPoints, setGuardianPoints] = useState(0);
+  const [pointsToNextTier, setPointsToNextTier] = useState<number | null>(null);
+  const [nextTierName, setNextTierName] = useState<string>('');
+  const [isGoldMember, setIsGoldMember] = useState(false);
 
   // Verification status
   const [emailVerified, setEmailVerified] = useState(false);
@@ -168,6 +176,20 @@ export default function Checkout() {
         .catch(() => {
           setPawRewardsBalance(0);
         });
+
+      // Fetch Guardian tier and points
+      Promise.all([
+        api.get('/customer/guardian/tier').catch(() => ({ data: { data: {} } })),
+        api.get('/customer/guardian/points').catch(() => ({ data: { data: {} } })),
+      ]).then(([tierRes, pointsRes]) => {
+        const tierData = tierRes.data.data;
+        const pointsData = pointsRes.data.data;
+        setGuardianTier(tierData.tier || 'CARE');
+        setGuardianPoints(pointsData.balance || 0);
+        setPointsToNextTier(tierData.pointsToNextTier || null);
+        setNextTierName(tierData.nextTier || '');
+        setIsGoldMember(tierData.isGoldMember || false);
+      }).catch(() => {});
     }
   }, [user]);
 
@@ -337,6 +359,13 @@ export default function Checkout() {
       // 2. Store client secret — StripePaymentForm will use it to confirm payment
       setPaymentClientSecret(clientSecret);
       setCurrentStep('payment');
+      
+      // Track checkout start
+      analytics.trackCheckoutStart(
+        cartTotal,
+        items.length
+      );
+      
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err: any) {
       console.error('[Checkout] Payment intent creation failed:', err?.response?.data || err);
@@ -389,6 +418,13 @@ export default function Checkout() {
 
       setSuccess(true);
       setCurrentStep('confirmed');
+      
+      // Track checkout completion
+      analytics.trackCheckoutComplete(
+        total,
+        pawtagOrder?.orderNumber || paymentIntentId.slice(-8)
+      );
+      
       window.scrollTo({ top: 0, behavior: 'smooth' });
       sessionStorage.setItem('pawtag_checkout_success', 'true');
       sessionStorage.setItem('pawtag_checkout_order', pawtagOrder?.orderNumber || paymentIntentId.slice(-8));
@@ -600,6 +636,40 @@ export default function Checkout() {
                     )}
                   </div>
                 )}
+
+                {/* Guardian Loyalty Messaging */}
+                <div className="border-t border-gray-100 pt-4 mt-4">
+                  {!user ? (
+                    // Guest — prompt to join Guardian
+                    <div className="flex items-start gap-3 p-3 bg-primary-50 border border-primary-100 rounded-lg">
+                      <Shield className="h-5 w-5 text-primary-600 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="text-sm font-medium text-primary-800">You're not earning Guardian Points</p>
+                        <p className="text-xs text-primary-600 mt-1">Join Guardian (free) to earn points on this order and unlock PawRewards.</p>
+                        <Link to="/shop" className="text-xs font-medium text-primary-700 underline mt-1 inline-block">Learn more</Link>
+                      </div>
+                    </div>
+                  ) : (
+                    // Logged in — show personalized points earning info
+                    <div className={`p-3 rounded-lg border ${isGoldMember ? 'bg-amber-50 border-amber-200' : 'bg-primary-50 border-primary-100'}`}>
+                      <div className="flex items-center gap-2 mb-1">
+                        <Shield className={`h-4 w-4 ${isGoldMember ? 'text-amber-600' : 'text-primary-600'}`} />
+                        <span className={`text-sm font-medium ${isGoldMember ? 'text-amber-800' : 'text-primary-800'}`}>
+                          {isGoldMember ? 'Gold' : guardianTier || 'Guardian'} Member
+                        </span>
+                        {isGoldMember && <span className="text-xs bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded-full font-medium">2x Points</span>}
+                      </div>
+                      <p className={`text-sm ${isGoldMember ? 'text-amber-700' : 'text-primary-700'}`}>
+                        This order will earn you approximately <strong>{Math.floor(orderTotal * (isGoldMember ? 2 : 1))} Points</strong>
+                      </p>
+                      {pointsToNextTier && pointsToNextTier > 0 && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          {pointsToNextTier} Points to {nextTierName}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
 
                 <div className="space-y-2 pt-2">
                   <div className="flex justify-between text-sm text-gray-600"><span>Subtotal</span><span>NZ${itemsSubtotal.toFixed(2)}</span></div>
@@ -906,6 +976,26 @@ export default function Checkout() {
                 </p>
               </div>
             </div>
+
+            {/* Points Earned — for logged-in Guardian members */}
+            {user && guardianTier && (
+              <div className="bg-primary-50 border border-primary-100 rounded-2xl p-5 flex items-start gap-3" style={{ animation: 'fade-in-up 0.4s ease-out 0.55s both' }}>
+                <PawPrint className="h-5 w-5 text-primary-600 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-primary-800">
+                    You earned <strong>{Math.floor(confirmedTotal * (isGoldMember ? 2 : 1))} Guardian Points</strong> from this order!
+                  </p>
+                  {pointsToNextTier && pointsToNextTier > 0 && (
+                    <p className="text-sm text-primary-600 mt-1">
+                      You're now {pointsToNextTier - Math.floor(confirmedTotal * (isGoldMember ? 2 : 1))} Points away from {nextTierName}.
+                    </p>
+                  )}
+                  <Link to="/account/guardian" className="text-xs font-medium text-primary-700 underline mt-1 inline-block">
+                    View your Guardian Dashboard
+                  </Link>
+                </div>
+              </div>
+            )}
 
             {/* Action Buttons — under confirmation sent */}
             <div className="flex flex-col sm:flex-row gap-3 justify-center" style={{ animation: 'fade-in-up 0.4s ease-out 0.6s both' }}>

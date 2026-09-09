@@ -58,24 +58,23 @@ async function findPetsWithMilestonesToday(): Promise<PetMilestone[]> {
     }
   }
 
-  // Note: adoptionDate field doesn't exist in Pet model yet
-  // When added, uncomment the following code:
-  // const petsWithAdoptionDates = await Pet.find({
-  //   deletedAt: null,
-  //   adoptionDate: { $exists: true, $ne: null },
-  // }).lean();
+  // Check for adoption anniversaries
+  const petsWithAdoptionDates = await Pet.find({
+    deletedAt: null,
+    adoptionDate: { $exists: true, $ne: null },
+  }).lean();
 
-  // for (const pet of petsWithAdoptionDates) {
-  //   if (pet.adoptionDate && isTodayAnniversary(new Date(pet.adoptionDate))) {
-  //     milestones.push({
-  //       petId: pet._id.toString(),
-  //       ownerId: pet.ownerId.toString(),
-  //       type: 'adoption_anniversary',
-  //       date: new Date(pet.adoptionDate),
-  //       petName: pet.name,
-  //     });
-  //   }
-  // }
+  for (const pet of petsWithAdoptionDates) {
+    if (pet.adoptionDate && isTodayAnniversary(new Date(pet.adoptionDate))) {
+      milestones.push({
+        petId: pet._id.toString(),
+        ownerId: pet.ownerId.toString(),
+        type: 'adoption_anniversary',
+        date: new Date(pet.adoptionDate),
+        petName: pet.name,
+      });
+    }
+  }
 
   return milestones;
 }

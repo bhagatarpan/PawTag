@@ -19,6 +19,7 @@ import { HealthRecordsScreen } from '../screens/health/HealthRecordsScreen';
 import { SubscriptionScreen } from '../screens/subscriptions/SubscriptionScreen';
 import { OrderHistoryScreen } from '../screens/orders/OrderHistoryScreen';
 import { LostModeScreen } from '../screens/pets/LostModeScreen';
+import { GuardianDashboardScreen } from '../screens/guardian/GuardianDashboardScreen';
 import { FullScreenSpinner } from '../components/states/Spinner';
 import { OfflineScreen } from '../components/OfflineScreen';
 import { colors, typography } from '../theme/tokens';
@@ -38,6 +39,7 @@ export type RootStackParamList = {
   Subscriptions: undefined;
   OrderHistory: undefined;
   LostMode: undefined;
+  GuardianDashboard: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -161,6 +163,7 @@ export function RootNavigator() {
             <Stack.Screen name="Subscriptions" component={SubscriptionScreen} options={stackScreenOptions} />
             <Stack.Screen name="OrderHistory" component={OrderHistoryScreen} options={stackScreenOptions} />
             <Stack.Screen name="LostMode" component={LostModeScreen} options={stackScreenOptions} />
+            <Stack.Screen name="GuardianDashboard" component={GuardianDashboardScreen} options={stackScreenOptions} />
           </>
         )}
       </Stack.Navigator>

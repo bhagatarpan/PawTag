@@ -357,11 +357,52 @@ export async function createPawTagOrder(params: CreateOrderParams): Promise<Crea
     }).catch(() => {});
   }
 
-  // 11. Award Guardian Points for purchase (non-blocking)
-  import('./loyalty/points-earning.service').then(({ awardPurchasePoints }) => {
-    awardPurchasePoints(userId, total, order._id.toString())
-      .catch((err) => logger.error({ err, orderNumber }, 'Guardian points earning error'));
-  }).catch(() => {});
+// 11. Award Guardian Points for purchase (non-blocking)
+   import('./loyalty/points-earning.service').then(({ awardPurchasePoints }) => {
+     awardPurchasePoints(userId, total, order._id.toString())
+       .catch((err) => logger.error({ err, orderNumber }, 'Guardian points earning error'));
+   }).catch(() => {});
+
+    // 12. Award PawRewards for purchase (non-blocking)
+    import('./loyalty/pawrewards.service').then(({ earnRewardsFromPurchase }) => {
+      earnRewardsFromPurchase(userId, total, order._id.toString())
+        .catch((err) => logger.error({ err, orderNumber }, 'PawRewards earning error'));
+    }).catch(() => {});
+
+    // 13. Send post-purchase points notification email (non-blocking)
+    import('./email.service').then(({ sendMail }) => {
+      import('./email/templates/guardian-purchase-points').then(({ renderPurchasePointsEmail }) => {
+        User.findById(userId).then((user) => {
+          if (!user || !user.guardianMember) return;
+          const tier = user.guardianTier || 'CARE';
+          const isGoldMember = user.subscriptionStatus === 'active';
+          const pointsEarned = Math.floor(total * (isGoldMember ? 2 : 1));
+          const totalPoints = user.guardianPoints || 0;
+          const pointsToNextTier = tier === 'CARE' ? 500 - totalPoints :
+            tier === 'NURTURE' ? 2000 - totalPoints :
+            tier === 'PROTECTOR' ? 5000 - totalPoints : null;
+          const nextTier = tier === 'CARE' ? 'NURTURE' :
+            tier === 'NURTURE' ? 'PROTECTOR' :
+            tier === 'PROTECTOR' ? 'SAFEGUARD' : null;
+
+          sendMail({
+            to: user.email,
+            subject: `You earned ${pointsEarned} Guardian Points!`,
+            html: renderPurchasePointsEmail({
+              customerName: user.fullName || user.email,
+              orderNumber,
+              pointsEarned,
+              totalPoints,
+              tier,
+              pointsToNextTier,
+              nextTier,
+              isGoldMember,
+              dashboardUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/guardian`,
+            }),
+          }).catch((err) => logger.error({ err, orderNumber }, 'Post-purchase points email error'));
+        }).catch(() => {});
+      }).catch(() => {});
+    }).catch(() => {});
 
   logger.info({ orderNumber, total, userId }, 'Order created successfully');
 

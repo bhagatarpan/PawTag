@@ -141,6 +141,12 @@ export default function Navbar() {
                   {link.label}
                 </Link>
               ))}
+              {user && (
+                <Link to="/account/guardian" className="px-4 py-2 rounded-lg text-sm font-medium text-primary-600 hover:bg-primary-50 transition-all flex items-center gap-1">
+                  <Shield className="h-4 w-4" />
+                  Guardian
+                </Link>
+              )}
             </div>
 
             {/* Right Side */}
@@ -156,6 +162,15 @@ export default function Navbar() {
                       <span className="text-primary-700 font-semibold text-sm">{user.fullName?.[0] || 'U'}</span>
                     </div>
                     <span className="hidden sm:block">{user.fullName}</span>
+                    {guardianData?.tier && (
+                      <span className={`hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                        guardianData.tier === 'GOLD' || (guardianData as any).isGoldMember
+                          ? 'bg-amber-100 text-amber-700'
+                          : 'bg-primary-100 text-primary-700'
+                      }`}>
+                        {guardianData.tier === 'GOLD' || (guardianData as any).isGoldMember ? 'GOLD' : guardianData.tier}
+                      </span>
+                    )}
                     <ChevronDown className="h-4 w-4" />
                   </button>
                   {userMenuOpen && (
@@ -236,6 +251,12 @@ export default function Navbar() {
                   {link.label}
                 </Link>
               ))}
+              {user && (
+                <Link to="/account/guardian" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 px-4 py-3 rounded-lg font-medium text-primary-600 hover:bg-primary-50 transition-all">
+                  <Shield className="h-4 w-4" />
+                  Guardian
+                </Link>
+              )}
               {!user && (
                 <Link to="/login" onClick={() => setMobileOpen(false)} className="block px-4 py-3 bg-primary-600 text-white rounded-lg font-medium text-center mt-4">
                   Sign In
@@ -259,6 +280,11 @@ export default function Navbar() {
           onCheckout={handleCheckout}
           isGuest={isGuest}
           priceChanged={priceChanged}
+          guardianTier={guardianData?.tier || null}
+          pointsEarning={guardianData ? {
+            points: Math.floor(total * (guardianData.tier === 'GOLD' || (guardianData as any).isGoldMember ? 2 : 1)),
+            isGoldMember: guardianData.tier === 'GOLD' || (guardianData as any).isGoldMember,
+          } : null}
         />
       )}
 

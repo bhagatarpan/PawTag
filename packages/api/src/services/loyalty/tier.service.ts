@@ -176,17 +176,18 @@ export async function updateTier(userId: string): Promise<TierCalculationResult>
   const currentTier = await calculateTier(userId);
   
   // Get current tier from user record
-  const user = await User.findById(userId).select('guardianTier').lean();
+  const user = await User.findById(userId).select('guardianTier tierGracePeriodEndsAt').lean();
   const previousTier = (user?.guardianTier as TierName) || 'CARE';
+  const now = new Date();
 
-  // Update tier if changed
-  if (previousTier !== currentTier.tier) {
-    await User.findByIdAndUpdate(userId, { guardianTier: currentTier.tier });
+  // Tier upgrade — apply immediately
+  if (getTierPriority(currentTier.tier) > getTierPriority(previousTier)) {
+    await User.findByIdAndUpdate(userId, {
+      guardianTier: currentTier.tier,
+      tierGracePeriodEndsAt: null, // Clear any grace period
+    });
 
-    // Record tier change in history
     await recordTierChange(userId, previousTier, currentTier.tier, currentTier.points);
-
-    // Send tier change email
     await sendTierChangeEmail(userId, previousTier, currentTier.tier, currentTier.points);
 
     incrementCounter(METRICS.LOYALTY_TIER_UPGRADED_TOTAL, { from: previousTier, to: currentTier.tier });
@@ -196,10 +197,115 @@ export async function updateTier(userId: string): Promise<TierCalculationResult>
       previousTier,
       newTier: currentTier.tier,
       points: currentTier.points,
-    }, 'User tier updated');
+    }, 'User tier upgraded');
+  }
+
+  // Tier downgrade — apply grace period
+  if (getTierPriority(currentTier.tier) < getTierPriority(previousTier)) {
+    const gracePeriodEndsAt = user?.tierGracePeriodEndsAt;
+
+    if (!gracePeriodEndsAt) {
+      // First downgrade detection — start 90-day grace period
+      const graceEnd = new Date(now);
+      graceEnd.setDate(graceEnd.getDate() + 90);
+
+      await User.findByIdAndUpdate(userId, {
+        tierGracePeriodEndsAt: graceEnd,
+      });
+
+      await sendTierDowngradeWarningEmail(userId, previousTier, currentTier.tier, currentTier.points, 90);
+
+      logger.info({
+        userId,
+        previousTier,
+        newTier: currentTier.tier,
+        gracePeriodEndsAt: graceEnd,
+      }, 'User tier downgrade grace period started');
+    } else if (now >= new Date(gracePeriodEndsAt)) {
+      // Grace period expired — apply downgrade
+      await User.findByIdAndUpdate(userId, {
+        guardianTier: currentTier.tier,
+        tierGracePeriodEndsAt: null,
+      });
+
+      await recordTierChange(userId, previousTier, currentTier.tier, currentTier.points);
+      await sendTierChangeEmail(userId, previousTier, currentTier.tier, currentTier.points);
+
+      logger.info({
+        userId,
+        previousTier,
+        newTier: currentTier.tier,
+      }, 'User tier downgraded after grace period');
+    } else {
+      // Still in grace period — send reminder if needed
+      const daysRemaining = Math.ceil((new Date(gracePeriodEndsAt).getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      if (daysRemaining <= 7) {
+        await sendTierDowngradeWarningEmail(userId, previousTier, currentTier.tier, currentTier.points, daysRemaining);
+      }
+    }
   }
 
   return currentTier;
+}
+
+/**
+ * Get tier priority for comparison (higher = better)
+ */
+function getTierPriority(tier: TierName): number {
+  const priorities: Record<TierName, number> = {
+    CARE: 0,
+    NURTURE: 1,
+    PROTECTOR: 2,
+    SAFEGUARD: 3,
+  };
+  return priorities[tier] || 0;
+}
+
+/**
+ * Send tier downgrade warning email
+ */
+async function sendTierDowngradeWarningEmail(
+  userId: string,
+  currentTier: TierName,
+  newTier: TierName,
+  points: number,
+  daysRemaining: number,
+): Promise<void> {
+  const user = await User.findById(userId).select('email fullName').lean();
+  if (!user?.email) return;
+
+  const { sendMail } = await import('../email.service');
+
+  const pointsNeeded = TIER_THRESHOLDS[currentTier].min;
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+      <div style="background: linear-gradient(135deg, #f59e0b, #d97706); padding: 24px; border-radius: 12px 12px 0 0; text-align: center;">
+        <h1 style="color: white; font-size: 24px; margin: 0;">PawTag Guardian</h1>
+      </div>
+      <div style="background: #fffbeb; padding: 32px; border: 1px solid #fcd34d;">
+        <h2 style="color: #111827; font-size: 20px;">Hi ${user.fullName || 'Guardian'},</h2>
+        <p style="color: #374151; font-size: 15px; line-height: 1.7;">
+          We noticed your Guardian tier may change from <strong>${currentTier}</strong> to <strong>${newTier}</strong>.
+        </p>
+        <p style="color: #374151; font-size: 15px; line-height: 1.7;">
+          You currently have <strong>${points} points</strong>. You need <strong>${pointsNeeded} points</strong> to maintain your ${currentTier} status.
+        </p>
+        <p style="color: #374151; font-size: 15px; line-height: 1.7;">
+          You have <strong>${daysRemaining} days</strong> to earn ${pointsNeeded - points} more points to keep your current tier.
+        </p>
+        <p style="color: #374151; font-size: 15px; line-height: 1.7;">
+          Earn points through purchases, pet milestones, reviews, and referrals!
+        </p>
+        <div style="text-align: center; margin-top: 24px;">
+          <a href="${process.env.FRONTEND_URL || 'https://pawtag.co.nz'}/account/guardian" style="background: #f59e0b; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600;">View Your Guardian Dashboard</a>
+        </div>
+      </div>
+      <div style="text-align: center; padding: 16px; color: #9ca3af; font-size: 11px;">
+        PawTag — Reuniting lost pets with their families
+      </div>
+    </div>`;
+
+  await sendMail(user.email, `Keep your ${currentTier} Guardian status — ${daysRemaining} days left`, html);
 }
 
 /**

@@ -19,3 +19,4 @@ export { renderPawRewardsReminderEmail } from './guardian-pawrewards-reminder';
 export { renderGuardianBirthdayEmail } from './guardian-birthday';
 export { renderGuardianAnniversaryEmail } from './guardian-anniversary';
 export { renderGuardianRenewalReminderEmail } from './guardian-renewal-reminder';
+export { renderPurchasePointsEmail } from './guardian-purchase-points';

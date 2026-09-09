@@ -26,6 +26,10 @@ export interface CartDrawerProps {
   isGuest?: boolean;
   priceChanged?: boolean;
   className?: string;
+  /** Points earning info for logged-in Guardian members */
+  pointsEarning?: { points: number; isGoldMember?: boolean } | null;
+  /** User's Guardian tier */
+  guardianTier?: string | null;
 }
 
 export const CartDrawer = React.memo(function CartDrawer({
@@ -40,6 +44,8 @@ export const CartDrawer = React.memo(function CartDrawer({
   isGuest = false,
   priceChanged = false,
   className = '',
+  pointsEarning = null,
+  guardianTier = null,
 }: CartDrawerProps) {
   if (!open) return null;
 
@@ -79,6 +85,23 @@ export const CartDrawer = React.memo(function CartDrawer({
         {priceChanged && (
           <div className="mx-4 mt-3 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700">
             A price in your cart has been updated to reflect current pricing.
+          </div>
+        )}
+
+        {/* Loyalty messaging */}
+        {items.length > 0 && (
+          <div className="mx-4 mt-3">
+            {!guardianTier && isGuest ? (
+              <div className="px-3 py-2 bg-primary-50 border border-primary-100 rounded-lg text-xs text-primary-700">
+                <strong>You could be earning rewards on this purchase.</strong>{' '}
+                Join Guardian and start earning Points.
+              </div>
+            ) : pointsEarning && pointsEarning.points > 0 ? (
+              <div className={`px-3 py-2 rounded-lg text-xs ${pointsEarning.isGoldMember ? 'bg-amber-50 border border-amber-200 text-amber-700' : 'bg-primary-50 border border-primary-100 text-primary-700'}`}>
+                This order could earn you <strong>{pointsEarning.points} Guardian Points</strong>
+                {pointsEarning.isGoldMember && ' (Gold 2x)'}.
+              </div>
+            ) : null}
           </div>
         )}
 

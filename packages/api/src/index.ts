@@ -322,6 +322,10 @@ async function start() {
     // Start pet milestones job (daily)
     startPetMilestonesJob();
 
+    // Start PawRewards job (daily allocation + expiration)
+    const { startPawRewardsJob } = await import('./jobs/pawrewards');
+    startPawRewardsJob();
+
     // Start orphan payment detection job
     const { startOrphanPaymentJob } = await import('./jobs/orphanPaymentDetection');
     startOrphanPaymentJob();

@@ -101,6 +101,12 @@ setStats(statsRes.data.data);
             View Members
           </Link>
           <Link
+            to="/guardian/analytics"
+            className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            Analytics
+          </Link>
+          <Link
             to="/guardian/settings"
             className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
           >
