@@ -1,4 +1,9 @@
-Development & Refactoring Principles
+---
+name: coding-practice
+description: Use when writing, refactoring, or reviewing code in this repository. Enforces DRY principles, code reuse, design token usage, and prevents duplication. Mandatory before any code change.
+---
+
+# Development & Refactoring Principles
 Core Rule
 
 DO NOT DUPLICATE CODE.
