@@ -10,7 +10,7 @@ export const redeemRewardsSchema = z.object({
 });
 
 // Admin settings update validation
-const numberSetting = z.number().min(0).max(1000);
+const numberSetting = z.coerce.number().min(0).max(1000);
 
 export const guardianSettingsSchema = z.object({
   purchaseRateGuardian: numberSetting.optional(),
