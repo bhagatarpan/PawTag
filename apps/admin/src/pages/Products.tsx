@@ -1,7 +1,10 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { ImagePlus, X, Upload, Loader2, Search, SlidersHorizontal, ChevronDown, ChevronLeft, ChevronRight, Download, Trash2, Edit2, Save, Settings, AlertTriangle, RotateCcw, Database, FileText, Package, Activity, CheckCircle, AlertCircle, Info, Copy, Eye, Plus } from 'lucide-react';
+import { ImagePlus, X, Upload, Loader2, Search, SlidersHorizontal, ChevronDown, ChevronLeft, ChevronRight, Download, Trash2, Edit2, Save, Settings, AlertTriangle, RotateCcw, Database, FileText, Package, Activity, CheckCircle, AlertCircle, Info, Copy, Eye, Plus, GripVertical } from 'lucide-react';
 import { IconPicker, ICON_MAP, type IconPickerProps } from '@pawtag/ui';
 import { Check } from 'lucide-react';
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import api, { PaginatedData } from '../lib/api';
 import { toast } from '../lib/toast';
 import RichTextEditor from '../components/RichTextEditor';
@@ -35,6 +38,7 @@ interface Product {
    customizationPrice: number;
    createdAt: string;
    slug?: string;
+   sortOrder?: number;
    featureHighlights?: IFeatureHighlight[];
    isSubscription?: boolean;
    isTagProduct?: boolean;
@@ -80,6 +84,7 @@ function copyToClipboard(text: string) {
 }
 
 const SORT_OPTIONS = [
+  { value: 'sortOrder', label: 'Display Order' },
   { value: 'createdAt', label: 'Newest' },
   { value: 'name', label: 'Name' },
   { value: 'price', label: 'Price' },
@@ -94,6 +99,7 @@ const SORT_OPTIONS = [
 function SkeletonRow() {
   return (
     <tr className="animate-pulse">
+      <td className="px-2 py-3 w-8"><div className="w-4 h-4 rounded bg-gray-200" /></td>
       <td className="px-4 py-3"><div className="w-10 h-10 rounded bg-gray-200" /></td>
       <td className="px-4 py-3"><div className="h-4 bg-gray-200 rounded w-32" /></td>
       <td className="px-4 py-3 hidden md:table-cell"><div className="h-4 bg-gray-200 rounded w-20" /></td>
@@ -381,6 +387,77 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
 }
 
 /* ------------------------------------------------------------------ */
+/*  Sortable Product Row                                               */
+/* ------------------------------------------------------------------ */
+
+function SortableProductRow({
+  product,
+  onSelect,
+  onEdit,
+}: {
+  product: Product;
+  onSelect: (p: Product) => void;
+  onEdit: (p: Product) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: product._id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    position: 'relative' as const,
+    zIndex: isDragging ? 10 : 0,
+  };
+
+  const totalStock = product.variants?.length > 0
+    ? product.variants.reduce((s, v) => s + v.stock, 0)
+    : product.stock;
+
+  return (
+    <tr ref={setNodeRef} style={style} className={`hover:bg-gray-50 cursor-pointer transition-colors ${isDragging ? 'bg-primary-50 shadow-lg' : ''}`}>
+      <td className="px-2 py-3 w-8">
+        <button
+          className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-100 touch-none"
+          {...attributes}
+          {...listeners}
+          aria-label="Drag to reorder"
+        >
+          <GripVertical size={16} />
+        </button>
+      </td>
+      <td className="px-4 py-3" onClick={() => onSelect(product)}>
+        {product.images?.[0] ? (
+          <img src={product.images[0]} alt="" className="w-10 h-10 rounded-lg object-cover" />
+        ) : (
+          <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center"><Package className="h-4 w-4 text-gray-400" /></div>
+        )}
+      </td>
+      <td className="px-4 py-3" onClick={() => onSelect(product)}>
+        <div className="font-medium text-gray-900">{product.name}</div>
+        {product.customizable && <span className="text-xs text-primary-600">Customizable</span>}
+      </td>
+      <td className="px-4 py-3 hidden md:table-cell font-mono text-gray-600 text-xs" onClick={() => onSelect(product)}>{product.sku}</td>
+      <td className="px-4 py-3 font-medium" onClick={() => onSelect(product)}>${product.price.toFixed(2)}</td>
+      <td className="px-4 py-3 hidden lg:table-cell" onClick={() => onSelect(product)}>
+        <span className={`text-xs px-2 py-0.5 rounded-full ${totalStock === 0 ? 'bg-red-100 text-red-700' : totalStock <= 10 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+          {totalStock}
+        </span>
+      </td>
+      <td className="px-4 py-3" onClick={() => onSelect(product)}>
+        <span className={`text-xs px-2 py-0.5 rounded-full ${product.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
+          {product.isActive ? 'Active' : 'Inactive'}
+        </span>
+      </td>
+      <td className="px-4 py-3 text-right">
+        <button onClick={(e) => { e.stopPropagation(); onSelect(product); }} className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600">
+          <ChevronRight size={16} />
+        </button>
+      </td>
+    </tr>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Main Component                                                     */
 /* ------------------------------------------------------------------ */
 
@@ -402,8 +479,8 @@ export default function Products() {
   const [category, setCategory] = useState('');
   const [isActive, setIsActive] = useState('');
   const [stockStatus, setStockStatus] = useState('');
-  const [sortBy, setSortBy] = useState('createdAt');
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const [sortBy, setSortBy] = useState('sortOrder');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
   // UI state
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -427,6 +504,36 @@ const [form, setForm] = useState({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const searchDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const [reorderSaving, setReorderSaving] = useState(false);
+
+  // DnD sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  // Handle drag end — reorder products and persist to server
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id || !data?.items) return;
+
+    const oldIndex = data.items.findIndex((p) => p._id === active.id);
+    const newIndex = data.items.findIndex((p) => p._id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const reordered = arrayMove(data.items, oldIndex, newIndex);
+
+    // Update local state immediately for responsive UI
+    setData({ ...data, items: reordered });
+
+    // Persist to server
+    setReorderSaving(true);
+    const items = reordered.map((p, i) => ({ id: p._id, sortOrder: i }));
+    api.put('/admin/commerce/products/reorder', { items })
+      .then(() => toast.success('Display order saved'))
+      .catch(() => toast.error('Failed to save display order'))
+      .finally(() => setReorderSaving(false));
+  }, [data, setData]);
 
   // Debounce search
   useEffect(() => {
@@ -645,7 +752,7 @@ const openEdit = (p: Product) => {
   const clearAllFilters = () => {
     setSearch(''); setDebouncedSearch('');
     setCategory(''); setIsActive(''); setStockStatus('');
-    setSortBy('createdAt'); setSortDir('desc');
+    setSortBy('sortOrder'); setSortDir('asc');
     setPage(1);
   };
 
@@ -900,80 +1007,58 @@ const openEdit = (p: Product) => {
 
         {/* Table */}
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="text-left px-4 py-3 font-medium text-gray-500 w-10">Image</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500">Name</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500 hidden md:table-cell">SKU</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500">Price</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500 hidden lg:table-cell">Stock</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500">Status</th>
-                <th className="text-right px-4 py-3 font-medium text-gray-500"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {loading ? (
-                <><SkeletonRow /><SkeletonRow /><SkeletonRow /><SkeletonRow /><SkeletonRow /></>
-              ) : error ? (
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center">
-                    <div className="flex flex-col items-center gap-3">
-                      <AlertTriangle size={32} className="text-red-400" />
-                      <p className="text-sm text-red-600">{error}</p>
-                      <button onClick={fetchProducts} className="text-sm text-primary-600 hover:underline flex items-center gap-1"><RotateCcw size={14} /> Try Again</button>
-                    </div>
-                  </td>
+                  <th className="w-8 px-2 py-3"></th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-500 w-10">Image</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-500">Name</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-500 hidden md:table-cell">SKU</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-500">Price</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-500 hidden lg:table-cell">Stock</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-500">Status</th>
+                  <th className="text-right px-4 py-3 font-medium text-gray-500"></th>
                 </tr>
-              ) : data?.items.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center">
-                    <div className="flex flex-col items-center gap-3">
-                      <Package size={32} className="text-gray-300" />
-                      <p className="text-sm text-gray-500">No products found</p>
-                      {activeFilters.length > 0 && <button onClick={clearAllFilters} className="text-sm text-primary-600 hover:underline">Clear Filters</button>}
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                data?.items.map((p) => {
-                  const totalStock = p.variants?.length > 0 ? p.variants.reduce((s, v) => s + v.stock, 0) : p.stock;
-                  return (
-                    <tr key={p._id} className="hover:bg-gray-50 cursor-pointer transition-colors" onClick={() => setSelectedProduct(p)}>
-                      <td className="px-4 py-3">
-                        {p.images?.[0] ? (
-                          <img src={p.images[0]} alt="" className="w-10 h-10 rounded-lg object-cover" />
-                        ) : (
-                          <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center"><Package className="h-4 w-4 text-gray-400" /></div>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="font-medium text-gray-900">{p.name}</div>
-                        {p.customizable && <span className="text-xs text-primary-600">Customizable</span>}
-                      </td>
-                      <td className="px-4 py-3 hidden md:table-cell font-mono text-gray-600 text-xs">{p.sku}</td>
-                      <td className="px-4 py-3 font-medium">${p.price.toFixed(2)}</td>
-                      <td className="px-4 py-3 hidden lg:table-cell">
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${totalStock === 0 ? 'bg-red-100 text-red-700' : totalStock <= 10 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                          {totalStock}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${p.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
-                          {p.isActive ? 'Active' : 'Inactive'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <button onClick={(e) => { e.stopPropagation(); setSelectedProduct(p); }} className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600">
-                          <ChevronRight size={16} />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {loading ? (
+                  <><SkeletonRow /><SkeletonRow /><SkeletonRow /><SkeletonRow /><SkeletonRow /></>
+                ) : error ? (
+                  <tr>
+                    <td colSpan={8} className="px-4 py-12 text-center">
+                      <div className="flex flex-col items-center gap-3">
+                        <AlertTriangle size={32} className="text-red-400" />
+                        <p className="text-sm text-red-600">{error}</p>
+                        <button onClick={fetchProducts} className="text-sm text-primary-600 hover:underline flex items-center gap-1"><RotateCcw size={14} /> Try Again</button>
+                      </div>
+                    </td>
+                  </tr>
+                ) : data?.items.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="px-4 py-12 text-center">
+                      <div className="flex flex-col items-center gap-3">
+                        <Package size={32} className="text-gray-300" />
+                        <p className="text-sm text-gray-500">No products found</p>
+                        {activeFilters.length > 0 && <button onClick={clearAllFilters} className="text-sm text-primary-600 hover:underline">Clear Filters</button>}
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  <SortableContext items={data?.items.map((p) => p._id) || []} strategy={verticalListSortingStrategy}>
+                    {data?.items.map((p) => (
+                      <SortableProductRow key={p._id} product={p} onSelect={setSelectedProduct} onEdit={openEdit} />
+                    ))}
+                  </SortableContext>
+                )}
+              </tbody>
+            </table>
+          </DndContext>
+          {reorderSaving && (
+            <div className="px-4 py-2 bg-primary-50 border-t border-primary-100 text-xs text-primary-600 flex items-center gap-2">
+              <Loader2 size={12} className="animate-spin" /> Saving display order...
+            </div>
+          )}
         </div>
 
         {/* Pagination */}

@@ -45,7 +45,7 @@ export default function GuardianDashboard() {
       ]);
 
 setStats(statsRes.data.data);
-       setActivity(activityRes.data.activity);
+       setActivity(activityRes.data.data.activity);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to load Guardian data');
     } finally {

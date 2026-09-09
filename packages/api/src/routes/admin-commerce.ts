@@ -181,6 +181,49 @@ router.delete('/products/:id', requirePermission('product.delete'), async (req: 
   }
 });
 
+/**
+ * PUT /api/admin/commerce/products/reorder
+ *
+ * Batch-update product sort orders.
+ * Body: { items: Array<{ id: string; sortOrder: number }> }
+ */
+router.put('/products/reorder', requirePermission('product.update'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { items } = req.body;
+
+    if (!Array.isArray(items) || items.length === 0) {
+      res.status(400).json({ success: false, error: 'items array is required' });
+      return;
+    }
+
+    if (!items.every((item: any) => typeof item.id === 'string' && typeof item.sortOrder === 'number')) {
+      res.status(400).json({ success: false, error: 'Each item must have id (string) and sortOrder (number)' });
+      return;
+    }
+
+    await productService.reorder(items);
+
+    await auditService.log(
+      { actorType: 'ADMIN', actorId: req.user!.id, actorUsername: req.user!.email },
+      {
+        action: 'product_sort_order_updated',
+        eventType: 'admin.product.sort_order_updated',
+        eventCategory: 'INTEGRATION',
+        operationType: 'UPDATE',
+        resourceType: 'Product',
+        outcome: 'SUCCESS',
+        severity: 'LOW',
+        metadata: { count: items.length },
+      },
+    );
+
+    res.json({ success: true });
+  } catch (err) {
+    const error = toAppError(err);
+    res.status(error.httpStatus).json({ success: false, error: error.userMessage });
+  }
+});
+
 // ─── Inventory Management ───────────────────────────────────────
 
 /**

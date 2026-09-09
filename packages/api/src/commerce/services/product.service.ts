@@ -277,6 +277,25 @@ weight: data.weight,
   }
 
   /**
+   * Reorder products by updating sort orders in a single bulk write.
+   *
+   * @param items - Array of { id, sortOrder } pairs
+   */
+  async reorder(items: Array<{ id: string; sortOrder: number }>): Promise<void> {
+    if (items.length === 0) return;
+
+    const operations = items.map((item) => ({
+      updateOne: {
+        filter: { _id: item.id },
+        update: { $set: { sortOrder: item.sortOrder } },
+      },
+    }));
+
+    await Product.bulkWrite(operations, { ordered: false });
+    logger.info({ count: items.length }, 'Products reordered');
+  }
+
+  /**
    * Get the effective price for a product.
    * Pricing priority: salePrice > price.
    *

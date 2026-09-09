@@ -491,6 +491,7 @@ Safety nets:
 | `GET /api/products/slug/:slug` | Get product by slug (SEO-friendly) with feature highlights |
 | `GET /api/products/sku/:sku` | Get product by SKU with feature highlights |
 | `GET /api/products/:id` | Get product by ID with feature highlights |
+| `PUT /api/admin/commerce/products/reorder` | Batch-update product display order (drag-and-drop) |
 | `GET/POST/PUT/DELETE /api/cart/*` | Cart management (supports guest and authenticated users; guest-to-auth merge on login) |
 | `POST /api/checkout/payment-intent` | Create payment intent |
 | `POST /api/checkout/confirm` | Confirm checkout (idempotent) |
@@ -1087,6 +1088,9 @@ Located in `apps/mobile/e2e/`:
 | `packages/api/src/routes/site-availability.ts` | Admin site availability routes |
 | `packages/api/src/routes/system-status.ts` | Public system status endpoint |
 | `packages/api/src/routes/address-autocomplete.ts` | Address autocomplete proxy (Photon/NZ Post) |
+| `packages/api/src/routes/admin-commerce.ts` | Admin commerce routes (products, orders, inventory, settings) |
+| `packages/api/src/commerce/services/product.service.ts` | Product CRUD, pricing, and reorder service |
+| `apps/admin/src/pages/Products.tsx` | Product management with drag-and-drop reordering |
 | `apps/admin/src/pages/SystemLogs.tsx` | System log viewer with purge UI |
 | `apps/admin/src/pages/SystemLogSettings.tsx` | System log settings page |
 | `apps/admin/src/pages/AddressAutocompleteSettings.tsx` | Address autocomplete provider config |
@@ -1129,6 +1133,7 @@ Products are managed through the PawTag Commerce module (`packages/api/src/comme
 | What | Where | Purpose |
 |------|-------|---------|
 | **Product catalog** | PawTag Commerce admin | Create/edit/delete products, prices, variants |
+| **Display order** | Admin drag-and-drop | Controls shop listing order via `sortOrder` field (lower = first) |
 | **Inventory** | PawTag Commerce services | Stock levels at PawTag Warehouse |
 | **Prices** | PawTag Commerce services | Per-variant pricing |
 | **Product URLs** | Slug-based (e.g., `/shop/pawtag-scan`) | SEO-friendly URLs |
