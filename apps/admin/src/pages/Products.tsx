@@ -36,6 +36,15 @@ interface Product {
    createdAt: string;
    slug?: string;
    featureHighlights?: IFeatureHighlight[];
+   isSubscription?: boolean;
+   isTagProduct?: boolean;
+   subscriptionConfig?: {
+     type?: 'annual' | 'monthly';
+     freePeriodMonths?: number;
+     monthlyPrice?: number;
+     gracePeriodWeeks?: number;
+     features?: string[];
+   };
  }
 
  interface IFeatureHighlight {
@@ -390,11 +399,14 @@ export default function Products() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
 const [form, setForm] = useState({
-     name: '', description: '', shortDescription: '', price: 0, category: 'PawTag',
-     stock: 0, sku: '', currency: 'NZD', isActive: true, customizable: false, customizationPrice: 0,
-     featureHighlights: DEFAULT_FEATURE_HIGHLIGHTS as IFeatureHighlight[],
-     slug: '',
-   });
+      name: '', description: '', shortDescription: '', price: 0, category: 'PawTag',
+      stock: 0, sku: '', currency: 'NZD', isActive: true, customizable: false, customizationPrice: 0,
+      featureHighlights: DEFAULT_FEATURE_HIGHLIGHTS as IFeatureHighlight[],
+      slug: '',
+      isSubscription: false,
+      isTagProduct: false,
+      subscriptionConfig: { type: 'annual' as 'annual' | 'monthly', freePeriodMonths: 12, monthlyPrice: 0, gracePeriodWeeks: 4 },
+    });
   const [variants, setVariants] = useState<ProductVariant[]>([]);
   const [images, setImages] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -468,7 +480,7 @@ const [form, setForm] = useState({
   // Form handlers
 const openCreate = () => {
      setEditing(null);
-     setForm({ name: '', description: '', shortDescription: '', price: 0, category: 'PawTag', stock: 0, sku: '', currency: 'NZD', isActive: true, customizable: false, customizationPrice: 0, featureHighlights: [...DEFAULT_FEATURE_HIGHLIGHTS], slug: '' });
+     setForm({ name: '', description: '', shortDescription: '', price: 0, category: 'PawTag', stock: 0, sku: '', currency: 'NZD', isActive: true, customizable: false, customizationPrice: 0, featureHighlights: [...DEFAULT_FEATURE_HIGHLIGHTS], slug: '', isSubscription: false, isTagProduct: false, subscriptionConfig: { type: 'annual', freePeriodMonths: 12, monthlyPrice: 0, gracePeriodWeeks: 4 } });
     setVariants([]);
     setImages([]);
     setShowForm(true);
@@ -482,6 +494,14 @@ const openEdit = (p: Product) => {
        isActive: p.isActive, customizable: p.customizable || false, customizationPrice: p.customizationPrice || 0,
        featureHighlights: p.featureHighlights && p.featureHighlights.length > 0 ? [...p.featureHighlights] : [...DEFAULT_FEATURE_HIGHLIGHTS],
        slug: p.slug || '',
+       isSubscription: p.isSubscription || false,
+       isTagProduct: p.isTagProduct || false,
+       subscriptionConfig: {
+         type: p.subscriptionConfig?.type || 'annual',
+         freePeriodMonths: p.subscriptionConfig?.freePeriodMonths || 0,
+         monthlyPrice: p.subscriptionConfig?.monthlyPrice || 0,
+         gracePeriodWeeks: p.subscriptionConfig?.gracePeriodWeeks || 4,
+       },
      });
      setVariants(p.variants?.map((v) => ({ ...v, attributes: { ...v.attributes } })) || []);
      setImages(p.images || []);
@@ -793,6 +813,44 @@ const openEdit = (p: Product) => {
                 <div className="flex items-center gap-6">
                   <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.customizable} onChange={(e) => setForm({ ...form, customizable: e.target.checked })} className="rounded" /> Allow pet name engraving</label>
                   {form.customizable && <div className="flex items-center gap-2"><label className="text-sm text-gray-600">Extra cost:</label><input type="number" step="0.01" value={form.customizationPrice} onChange={(e) => setForm({ ...form, customizationPrice: parseFloat(e.target.value) || 0 })} className="w-24 border rounded-md px-3 py-2 text-sm" /><span className="text-sm text-gray-500">NZD</span></div>}
+                </div>
+              </div>
+              <div className="border-t pt-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">Subscription</h3>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-6">
+                    <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.isSubscription} onChange={(e) => setForm({ ...form, isSubscription: e.target.checked })} className="rounded" /> This product includes a subscription</label>
+                  </div>
+                  {form.isSubscription && (
+                    <div className="grid grid-cols-2 gap-4 ml-6">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Tag Product</label>
+                        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.isTagProduct} onChange={(e) => setForm({ ...form, isTagProduct: e.target.checked })} className="rounded" /> Physical QR/NFC tag (creates tag subscription)</label>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Billing Cycle</label>
+                        <select value={form.subscriptionConfig.type} onChange={(e) => setForm({ ...form, subscriptionConfig: { ...form.subscriptionConfig, type: e.target.value as 'annual' | 'monthly' } })} className="w-full border rounded-md px-3 py-2 text-sm">
+                          <option value="annual">Annual</option>
+                          <option value="monthly">Monthly</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Free Period (months)</label>
+                        <input type="number" min={0} value={form.subscriptionConfig.freePeriodMonths} onChange={(e) => setForm({ ...form, subscriptionConfig: { ...form.subscriptionConfig, freePeriodMonths: parseInt(e.target.value) || 0 } })} className="w-full border rounded-md px-3 py-2 text-sm" />
+                        <p className="text-xs text-gray-400 mt-1">Months of free access included with purchase</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Monthly Price (NZD)</label>
+                        <input type="number" step="0.01" min={0} value={form.subscriptionConfig.monthlyPrice} onChange={(e) => setForm({ ...form, subscriptionConfig: { ...form.subscriptionConfig, monthlyPrice: parseFloat(e.target.value) || 0 } })} className="w-full border rounded-md px-3 py-2 text-sm" />
+                        <p className="text-xs text-gray-400 mt-1">Price shown after free period expires</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Grace Period (weeks)</label>
+                        <input type="number" min={0} value={form.subscriptionConfig.gracePeriodWeeks} onChange={(e) => setForm({ ...form, subscriptionConfig: { ...form.subscriptionConfig, gracePeriodWeeks: parseInt(e.target.value) || 0 } })} className="w-full border rounded-md px-3 py-2 text-sm" />
+                        <p className="text-xs text-gray-400 mt-1">Weeks after expiry before tag is deactivated</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="border-t pt-4">

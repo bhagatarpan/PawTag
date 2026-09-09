@@ -107,6 +107,7 @@ function toCardProduct(p: PawTagProduct, guardianTier: string, isGoldMember: boo
       sku: p.sku,
       stock: available,
       monthlyPrice: p.subscriptionConfig?.monthlyPrice,
+      freePeriodMonths: p.subscriptionConfig?.freePeriodMonths,
       badge: badge ? { label: badge.label, color: badge.color } : null,
       featureHighlights: p.featureHighlights && p.featureHighlights.length > 0
         ? p.featureHighlights.map(h => ({ icon: h.icon, description: h.description }))

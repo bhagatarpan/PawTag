@@ -27,6 +27,7 @@ export interface ProductCardProduct {
    sku: string;
     stock: number;
     monthlyPrice?: number;
+    freePeriodMonths?: number;
     badge?: { label: string; color: string } | null;
     /** Product feature highlights for display in shop and product detail */
     featureHighlights?: IFeatureHighlight[];
@@ -87,7 +88,7 @@ export const ProductCard = React.memo(function ProductCard({
           </div>
           {product.monthlyPrice != null && product.monthlyPrice > 0 && (
             <p className="text-xs text-gray-400 mt-1">
-              + ${product.monthlyPrice.toFixed(2)}/mo after 12 months free
+              + ${product.monthlyPrice.toFixed(2)}/mo{product.freePeriodMonths ? ` after ${product.freePeriodMonths} months free` : ''}
             </p>
           )}
           {product.pointsEarning && (
