@@ -34,9 +34,11 @@ const cache = new Map<string, CacheEntry>();
  * These match the seed data in `seed-cms.ts`.
  */
 export const GUARDIAN_DEFAULTS: Record<string, number> = {
-  // Points earning rates
+  // Points earning rates (purchaseRate points earned per purchaseSpentAmount dollars spent)
   purchaseRateGuardian: 1,
   purchaseRateGold: 2,
+  purchaseSpentAmount: 1,
+  purchaseSpentAmountGold: 1,
   repeatPurchaseBonusGuardian: 10,
   repeatPurchaseBonusGold: 20,
 

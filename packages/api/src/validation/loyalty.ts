@@ -15,6 +15,8 @@ const numberSetting = z.coerce.number().min(0).max(1000);
 export const guardianSettingsSchema = z.object({
   purchaseRateGuardian: numberSetting.optional(),
   purchaseRateGold: numberSetting.optional(),
+  purchaseSpentAmount: numberSetting.optional(),
+  purchaseSpentAmountGold: numberSetting.optional(),
   repeatPurchaseBonusGuardian: numberSetting.optional(),
   repeatPurchaseBonusGold: numberSetting.optional(),
   reviewTextPoints: numberSetting.optional(),

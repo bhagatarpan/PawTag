@@ -128,10 +128,14 @@ export async function awardPurchasePoints(
   const isGoldMember = await isGoldSubscription(subscription);
 
   // Calculate base points (read from CMS settings)
+  // Formula: points = (orderTotal ÷ spentAmount) × purchaseRate
   const rate = isGoldMember
     ? await getGuardianNumber('purchaseRateGold')
     : await getGuardianNumber('purchaseRateGuardian');
-  let points = Math.floor(orderTotal * rate);
+  const spentAmount = isGoldMember
+    ? await getGuardianNumber('purchaseSpentAmountGold')
+    : await getGuardianNumber('purchaseSpentAmount');
+  let points = Math.floor((orderTotal / spentAmount) * rate);
 
   // Check for repeat purchase bonus (3rd+ order)
   const orderCount = await Order.countDocuments({ userId, status: { $in: ['paid', 'delivered'] } });

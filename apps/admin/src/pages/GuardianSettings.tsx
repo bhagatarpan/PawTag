@@ -3,9 +3,11 @@ import { Link } from 'react-router-dom';
 import api from '../lib/api';
 
 interface GuardianSettings {
-  // Points earning rates
+  // Points earning rates (purchaseRate points earned per purchaseSpentAmount dollars spent)
   purchaseRateGuardian: number;
   purchaseRateGold: number;
+  purchaseSpentAmount: number;
+  purchaseSpentAmountGold: number;
   repeatPurchaseBonusGuardian: number;
   repeatPurchaseBonusGold: number;
   
@@ -73,6 +75,8 @@ interface GuardianSettings {
 const DEFAULT_SETTINGS: GuardianSettings = {
   purchaseRateGuardian: 1,
   purchaseRateGold: 2,
+  purchaseSpentAmount: 1,
+  purchaseSpentAmountGold: 1,
   repeatPurchaseBonusGuardian: 10,
   repeatPurchaseBonusGold: 20,
   reviewTextPoints: 5,
