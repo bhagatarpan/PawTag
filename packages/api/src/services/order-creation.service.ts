@@ -19,7 +19,7 @@
  * ```
  */
 
-import { Order, Invoice, InvoiceAccessToken, User, Notification, Tag } from '@pawtag/db';
+import { Order, Invoice, InvoiceAccessToken, User, Notification, Tag, Subscription } from '@pawtag/db';
 import { DuplicateOrderError } from '../commerce/errors';
 import { sendOrderConfirmation, sendInvoiceEmail, sendMail } from './email.service';
 import { generateInvoiceHtml } from './invoice-html.service';
@@ -370,39 +370,39 @@ export async function createPawTagOrder(params: CreateOrderParams): Promise<Crea
     }).catch(() => {});
 
     // 13. Send post-purchase points notification email (non-blocking)
-    import('./email.service').then(({ sendMail }) => {
-      import('./email/templates/guardian-purchase-points').then(({ renderPurchasePointsEmail }) => {
-        User.findById(userId).then((user) => {
-          if (!user || !user.guardianMember) return;
-          const tier = user.guardianTier || 'CARE';
-          const isGoldMember = user.subscriptionStatus === 'active';
-          const pointsEarned = Math.floor(total * (isGoldMember ? 2 : 1));
-          const totalPoints = user.guardianPoints || 0;
-          const pointsToNextTier = tier === 'CARE' ? 500 - totalPoints :
-            tier === 'NURTURE' ? 2000 - totalPoints :
-            tier === 'PROTECTOR' ? 5000 - totalPoints : null;
-          const nextTier = tier === 'CARE' ? 'NURTURE' :
-            tier === 'NURTURE' ? 'PROTECTOR' :
-            tier === 'PROTECTOR' ? 'SAFEGUARD' : null;
+    (async () => {
+      try {
+        const { renderPurchasePointsEmail } = await import('./email/templates/guardian-purchase-points');
+        const user = await User.findById(userId).select('email fullName guardianTier guardianPoints').lean();
+        if (!user || !user.guardianTier) return;
 
-          sendMail({
-            to: user.email,
-            subject: `You earned ${pointsEarned} Guardian Points!`,
-            html: renderPurchasePointsEmail({
-              customerName: user.fullName || user.email,
-              orderNumber,
-              pointsEarned,
-              totalPoints,
-              tier,
-              pointsToNextTier,
-              nextTier,
-              isGoldMember,
-              dashboardUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/guardian`,
-            }),
-          }).catch((err) => logger.error({ err, orderNumber }, 'Post-purchase points email error'));
-        }).catch(() => {});
-      }).catch(() => {});
-    }).catch(() => {});
+        const { calculateTier } = await import('./loyalty/tier.service');
+        const [tierInfo, goldSub] = await Promise.all([
+          calculateTier(userId),
+          Subscription.findOne({ userId, status: 'active', planType: 'monthly', price: 1.99 }).lean(),
+        ]);
+        const isGoldMember = !!goldSub;
+        const pointsEarned = Math.floor(total * (isGoldMember ? 2 : 1));
+
+        await sendMail(
+          user.email,
+          `You earned ${pointsEarned} Guardian Points!`,
+          renderPurchasePointsEmail({
+            customerName: user.fullName || user.email,
+            orderNumber,
+            pointsEarned,
+            totalPoints: tierInfo.points,
+            tier: tierInfo.tier,
+            pointsToNextTier: tierInfo.pointsToNextTier,
+            nextTier: tierInfo.nextTier,
+            isGoldMember,
+            dashboardUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/guardian`,
+          }),
+        );
+      } catch (err) {
+        logger.error({ err, orderNumber }, 'Post-purchase points email error');
+      }
+    })();
 
   logger.info({ orderNumber, total, userId }, 'Order created successfully');
 

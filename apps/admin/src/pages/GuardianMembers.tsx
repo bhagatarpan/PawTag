@@ -9,7 +9,7 @@ interface GuardianMember {
   guardianTier: string;
   guardianPoints: number;
   pawRewardsBalance: number;
-  subscriptionPlan: string;
+  isGoldMember: boolean;
   createdAt: string;
 }
 
@@ -20,13 +20,6 @@ const TIER_BADGES: Record<string, string> = {
   SAFEGUARD: 'bg-amber-100 text-amber-700',
 };
 
-const STATUS_BADGES: Record<string, string> = {
-  active: 'bg-green-100 text-green-700',
-  grace_period: 'bg-amber-100 text-amber-700',
-  expired: 'bg-red-100 text-red-700',
-  cancelled: 'bg-gray-100 text-gray-700',
-};
-
 export default function GuardianMembers() {
   const [members, setMembers] = useState<GuardianMember[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,7 +28,7 @@ export default function GuardianMembers() {
   const [hasMore, setHasMore] = useState(true);
   const [filters, setFilters] = useState({
     tier: '',
-    status: '',
+    membership: '',
     search: '',
   });
 
@@ -51,7 +44,7 @@ export default function GuardianMembers() {
       });
 
       if (filters.tier) params.append('tier', filters.tier);
-      if (filters.status) params.append('status', filters.status);
+      if (filters.membership) params.append('membership', filters.membership);
       if (filters.search) params.append('search', filters.search);
 
       const res = await api.get(`/admin/guardian/members?${params.toString()}`);
@@ -145,22 +138,20 @@ export default function GuardianMembers() {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Membership</label>
             <select
-              value={filters.status}
-              onChange={(e) => { setFilters({ ...filters, status: e.target.value }); setPage(1); }}
+              value={filters.membership}
+              onChange={(e) => { setFilters({ ...filters, membership: e.target.value }); setPage(1); }}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
             >
-              <option value="">All Statuses</option>
-              <option value="active">Active</option>
-              <option value="grace_period">Grace Period</option>
-              <option value="expired">Expired</option>
-              <option value="cancelled">Cancelled</option>
+              <option value="">All Memberships</option>
+              <option value="gold">Gold</option>
+              <option value="guardian">Guardian</option>
             </select>
           </div>
           <div className="flex items-end">
             <button
-              onClick={() => { setFilters({ tier: '', status: '', search: '' }); setPage(1); }}
+              onClick={() => { setFilters({ tier: '', membership: '', search: '' }); setPage(1); }}
               className="w-full px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
             >
               Clear Filters
@@ -193,9 +184,11 @@ export default function GuardianMembers() {
                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${TIER_BADGES[member.guardianTier] || 'bg-gray-100 text-gray-700'}`}>
                            {member.guardianTier}
                          </span>
-                         <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_BADGES[member.subscriptionPlan] || 'bg-gray-100 text-gray-700'}`}>
-                           {member.subscriptionPlan.replace('_', ' ') || 'Unknown'}
-                         </span>
+                         {member.isGoldMember && (
+                           <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+                             Gold
+                           </span>
+                         )}
                        </div>
                     </div>
                   </div>

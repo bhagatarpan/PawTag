@@ -14,7 +14,7 @@ export async function requireGoldMember(req: AuthRequest, res: Response, next: N
       return res.status(401).json({ success: false, error: 'Not authenticated' });
     }
 
-    const user = await User.findById(userId).select('subscriptionPlan').lean();
+    const user = await User.findById(userId).select('fullName email').lean();
     if (!user) {
       return res.status(404).json({ success: false, error: 'User not found' });
     }

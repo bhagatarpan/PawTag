@@ -675,7 +675,7 @@ router.post('/pets/:id/mark-lost', requirePermission('pet.update'), async (req: 
     await pet.save();
 
     // Award Guardian Points for lost pet report (non-blocking)
-    import('./services/loyalty/points-earning.service').then(({ awardLostPetReportPoints }) => {
+    import('../services/loyalty/points-earning.service').then(({ awardLostPetReportPoints }) => {
       awardLostPetReportPoints(req.user!.id, pet._id.toString())
         .catch((err) => logger.error({ err, petId: pet._id }, 'Guardian lost pet report points error'));
     }).catch(() => {});
@@ -749,7 +749,7 @@ router.post('/pets/:id/mark-found', requirePermission('pet.update'), async (req:
 
     // Award Guardian Points for pet reunited (only if pet was found by a finder)
     if (wasFoundByFinder) {
-      import('./services/loyalty/points-earning.service').then(({ awardPetReunitedPoints }) => {
+      import('../services/loyalty/points-earning.service').then(({ awardPetReunitedPoints }) => {
         awardPetReunitedPoints(req.user!.id, pet._id.toString())
           .catch((err) => logger.error({ err, petId: pet._id }, 'Guardian pet reunited points error'));
       }).catch(() => {});

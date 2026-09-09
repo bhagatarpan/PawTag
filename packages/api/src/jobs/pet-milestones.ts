@@ -187,10 +187,18 @@ export async function runPetMilestonesJob(): Promise<void> {
  */
 export function startPetMilestonesJob(): void {
   // Run immediately on startup
-  runPetMilestonesJob();
+  runPetMilestonesJob().catch((error) => {
+    logger.error({ err: error }, 'Pet milestones initial run failed');
+  });
 
   // Then run every 24 hours
-  setInterval(runPetMilestonesJob, 24 * 60 * 60 * 1000);
+  setInterval(async () => {
+    try {
+      await runPetMilestonesJob();
+    } catch (error) {
+      logger.error({ err: error }, '[PetMilestonesJob] Error');
+    }
+  }, 24 * 60 * 60 * 1000);
   
   logger.info('Pet milestones job started (runs daily)');
 }

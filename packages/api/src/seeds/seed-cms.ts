@@ -211,6 +211,56 @@ async function run() {
         // Sync (retained for polling)
         { key: 'sync.polling.enabled', value: 'true', displayValue: 'Customer Polling Enabled', category: 'sync', description: 'Enable automatic order list polling on the customer Orders page' },
         { key: 'sync.polling.intervalSeconds', value: '30', displayValue: 'Customer Polling Interval (seconds)', category: 'sync', description: 'How often the customer Orders page polls for updates' },
+        // Guardian Loyalty Program — Points Earning
+        { key: 'guardian.purchaseRateGuardian', value: '1', displayValue: 'Purchase Rate (Guardian)', category: 'guardian', description: 'Points earned per $1 spent (Guardian members)' },
+        { key: 'guardian.purchaseRateGold', value: '2', displayValue: 'Purchase Rate (Gold)', category: 'guardian', description: 'Points earned per $1 spent (Gold members)' },
+        { key: 'guardian.repeatPurchaseBonusGuardian', value: '10', displayValue: 'Repeat Purchase Bonus (Guardian)', category: 'guardian', description: 'Bonus points on 3rd+ order (Guardian members)' },
+        { key: 'guardian.repeatPurchaseBonusGold', value: '20', displayValue: 'Repeat Purchase Bonus (Gold)', category: 'guardian', description: 'Bonus points on 3rd+ order (Gold members)' },
+        // Guardian Loyalty Program — Review Points
+        { key: 'guardian.reviewTextPoints', value: '5', displayValue: 'Text Review Points', category: 'guardian', description: 'Points for writing a text review' },
+        { key: 'guardian.reviewPhotoPoints', value: '15', displayValue: 'Photo Review Points', category: 'guardian', description: 'Points for a review with photo' },
+        { key: 'guardian.reviewVideoPoints', value: '25', displayValue: 'Video Review Points', category: 'guardian', description: 'Points for a review with video' },
+        // Guardian Loyalty Program — Referral Points
+        { key: 'guardian.referralSignupPoints', value: '20', displayValue: 'Referral Signup Points', category: 'guardian', description: 'Points when a referred user signs up' },
+        { key: 'guardian.referralPurchasePoints', value: '50', displayValue: 'Referral Purchase Points', category: 'guardian', description: 'Points when a referred user makes a purchase' },
+        // Guardian Loyalty Program — Pet Milestones
+        { key: 'guardian.petProfilePoints', value: '15', displayValue: 'Pet Profile Points', category: 'guardian', description: 'Points for completing a pet profile' },
+        { key: 'guardian.petBirthdayPoints', value: '10', displayValue: 'Pet Birthday Points', category: 'guardian', description: 'Points awarded on pet birthday' },
+        { key: 'guardian.petAnniversaryPoints', value: '10', displayValue: 'Adoption Anniversary Points', category: 'guardian', description: 'Points on adoption anniversary' },
+        // Guardian Loyalty Program — Membership Milestones
+        { key: 'guardian.monthlyAnniversaryPoints', value: '5', displayValue: 'Monthly Membership Points', category: 'guardian', description: 'Points per month of membership' },
+        { key: 'guardian.annualAnniversaryPoints', value: '25', displayValue: 'Annual Membership Points', category: 'guardian', description: 'Points per year of membership' },
+        // Guardian Loyalty Program — Tag Scans & Lost Pet
+        { key: 'guardian.tagScanPoints', value: '2', displayValue: 'Tag Scan Points', category: 'guardian', description: 'Points per tag scan' },
+        { key: 'guardian.tagScanDailyLimit', value: '3', displayValue: 'Tag Scan Daily Limit', category: 'guardian', description: 'Maximum scan-point awards per day' },
+        { key: 'guardian.lostPetReportPoints', value: '5', displayValue: 'Lost Pet Report Points', category: 'guardian', description: 'Points for filing a lost pet report' },
+        { key: 'guardian.petReunitedPoints', value: '20', displayValue: 'Pet Reunited Points', category: 'guardian', description: 'Points when a pet is reunited' },
+        { key: 'guardian.socialSharePoints', value: '3', displayValue: 'Social Share Points', category: 'guardian', description: 'Points for social media share' },
+        // Guardian Loyalty Program — Gold
+        { key: 'guardian.goldMultiplier', value: '2', displayValue: 'Gold Points Multiplier', category: 'guardian', description: 'Points multiplier for Gold members' },
+        // Guardian Loyalty Program — Annual Caps
+        { key: 'guardian.annualCapReviewText', value: '30', displayValue: 'Annual Cap: Text Reviews', category: 'guardian', description: 'Annual cap for text review points' },
+        { key: 'guardian.annualCapReviewPhoto', value: '50', displayValue: 'Annual Cap: Photo Reviews', category: 'guardian', description: 'Annual cap for photo review points' },
+        { key: 'guardian.annualCapReviewVideo', value: '75', displayValue: 'Annual Cap: Video Reviews', category: 'guardian', description: 'Annual cap for video review points' },
+        { key: 'guardian.annualCapReferralSignup', value: '200', displayValue: 'Annual Cap: Referral Signups', category: 'guardian', description: 'Annual cap for referral signup points' },
+        { key: 'guardian.annualCapTagScan', value: '100', displayValue: 'Annual Cap: Tag Scans', category: 'guardian', description: 'Annual cap for tag scan points' },
+        // Guardian Loyalty Program — Tier Thresholds
+        { key: 'guardian.tierThresholdNurture', value: '100', displayValue: 'Nurture Tier Threshold', category: 'guardian', description: 'Points required for Nurture tier' },
+        { key: 'guardian.tierThresholdProtector', value: '200', displayValue: 'Protector Tier Threshold', category: 'guardian', description: 'Points required for Protector tier' },
+        { key: 'guardian.tierThresholdSafeguard', value: '300', displayValue: 'Safeguard Tier Threshold', category: 'guardian', description: 'Points required for Safeguard tier' },
+        // Guardian Loyalty Program — PawRewards Allocation
+        { key: 'guardian.pawRewardsCare', value: '2.00', displayValue: 'PawRewards Monthly (Care)', category: 'guardian', description: 'Monthly NZD PawRewards for Care tier' },
+        { key: 'guardian.pawRewardsNurture', value: '3.00', displayValue: 'PawRewards Monthly (Nurture)', category: 'guardian', description: 'Monthly NZD PawRewards for Nurture tier' },
+        { key: 'guardian.pawRewardsProtector', value: '5.00', displayValue: 'PawRewards Monthly (Protector)', category: 'guardian', description: 'Monthly NZD PawRewards for Protector tier' },
+        { key: 'guardian.pawRewardsSafeguard', value: '8.00', displayValue: 'PawRewards Monthly (Safeguard)', category: 'guardian', description: 'Monthly NZD PawRewards for Safeguard tier' },
+        // Guardian Loyalty Program — PawRewards Earning
+        { key: 'guardian.pawRewardsEarningRateGuardian', value: '50', displayValue: 'PawRewards Earning Rate (Guardian)', category: 'guardian', description: 'NZD spent per $1 PawReward (Guardian members)' },
+        { key: 'guardian.pawRewardsEarningRateGold', value: '25', displayValue: 'PawRewards Earning Rate (Gold)', category: 'guardian', description: 'NZD spent per $1 PawReward (Gold members)' },
+        // Guardian Loyalty Program — PawRewards Rules
+        { key: 'guardian.pawRewardsMinRedemption', value: '2.00', displayValue: 'PawRewards Minimum Redemption', category: 'guardian', description: 'Minimum redemption amount (NZD)' },
+        { key: 'guardian.pawRewardsExpirationMonths', value: '6', displayValue: 'PawRewards Expiration (Months)', category: 'guardian', description: 'Months before unused rewards expire' },
+        { key: 'guardian.pawRewardsMaxBalanceGuardian', value: '20.00', displayValue: 'PawRewards Max Balance (Guardian)', category: 'guardian', description: 'Maximum PawRewards balance for Guardian members (NZD)' },
+        { key: 'guardian.pawRewardsMaxBalanceGold', value: '40.00', displayValue: 'PawRewards Max Balance (Gold)', category: 'guardian', description: 'Maximum PawRewards balance for Gold members (NZD)' },
       ];
 
       let settingsCreated = 0;

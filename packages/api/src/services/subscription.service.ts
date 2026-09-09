@@ -1170,10 +1170,8 @@ async function attemptPaymentCharge(subscription: any): Promise<boolean> {
 
     const invoice = invoices.data[0];
 
-    // Attempt to pay the invoice
-    const paidInvoice = await stripe.invoices.pay(invoice.id, {
-      payment_method_types: ['card'],
-    });
+    // Attempt to pay the invoice using the customer's default payment method
+    const paidInvoice = await stripe.invoices.pay(invoice.id);
 
     return paidInvoice.status === 'paid';
   } catch (err) {

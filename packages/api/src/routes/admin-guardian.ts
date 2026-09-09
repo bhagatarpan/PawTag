@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { AuthRequest, authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
-import { User, Setting } from '@pawtag/db';
+import { User, Setting, Subscription } from '@pawtag/db';
 import { auditService, type AuditContext } from '../services/audit';
 import { createAuditContextFromRequest, type AuditRequest } from '../middleware/audit';
 import { guardianSettingsSchema, membersQuerySchema, activityQuerySchema } from '../validation/loyalty';
@@ -78,8 +78,13 @@ router.get('/stats', requirePermission('setting.read'), async (req: AuthRequest,
     ]);
     const totalRewardsRedeemed = totalRedeemedResult[0]?.total || 0;
 
-    // Get Gold members
-    const goldMembers = await User.countDocuments({ subscriptionPlan: 'gold' });
+    // Get Gold members (active monthly subscription at $1.99)
+    const goldMembersResult = await Subscription.aggregate([
+      { $match: { status: 'active', planType: 'monthly', price: 1.99 } },
+      { $group: { _id: '$userId' } },
+      { $count: 'total' },
+    ]);
+    const goldMembers = goldMembersResult[0]?.total || 0;
 
     await auditAdminGuardianEvent(req, {
       action: 'guardian_stats_viewed',
@@ -152,12 +157,24 @@ router.get('/members', requirePermission('setting.read'), async (req: AuthReques
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;
     const tier = req.query.tier as string;
+    const membership = req.query.membership as string;
     const search = req.query.search as string;
 
     const query: any = { guardianTier: { $exists: true, $ne: null } };
 
     if (tier) {
       query.guardianTier = tier;
+    }
+
+    // Membership filter via Subscription collection (Gold = active monthly $1.99)
+    if (membership === 'gold' || membership === 'guardian') {
+      const goldSubs = await Subscription.find({
+        status: 'active',
+        planType: 'monthly',
+        price: 1.99,
+      }).select('userId').lean();
+      const goldIds = goldSubs.map(s => s.userId);
+      query._id = membership === 'gold' ? { $in: goldIds } : { $nin: goldIds };
     }
 
     if (search) {
@@ -168,13 +185,27 @@ router.get('/members', requirePermission('setting.read'), async (req: AuthReques
     }
 
     const members = await User.find(query)
-      .select('email fullName guardianTier guardianPoints pawRewardsBalance subscriptionPlan createdAt')
+      .select('email fullName guardianTier guardianPoints pawRewardsBalance createdAt')
       .sort({ guardianPoints: -1 })
       .skip((page - 1) * limit)
       .limit(limit)
       .lean();
 
     const total = await User.countDocuments(query);
+
+    // Enrich with Gold membership status from Subscription collection
+    const memberIds = members.map(m => m._id);
+    const goldSubscriptions = await Subscription.find({
+      userId: { $in: memberIds },
+      status: 'active',
+      planType: 'monthly',
+      price: 1.99,
+    }).select('userId').lean();
+    const goldUserIds = new Set(goldSubscriptions.map(s => s.userId.toString()));
+    const enrichedMembers = members.map(m => ({
+      ...m,
+      isGoldMember: goldUserIds.has(m._id.toString()),
+    }));
 
     await auditAdminGuardianEvent(req, {
       action: 'guardian_members_viewed',
@@ -188,7 +219,7 @@ router.get('/members', requirePermission('setting.read'), async (req: AuthReques
     res.json({
       success: true,
       data: {
-        members,
+        members: enrichedMembers,
         pagination: {
           page,
           limit,
