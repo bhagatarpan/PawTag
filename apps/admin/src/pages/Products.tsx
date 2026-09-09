@@ -272,6 +272,17 @@ function DetailDrawer({
                 {product.customizable && <DetailRow label="Extra Cost" value={`$${(product.customizationPrice || 0).toFixed(2)} NZD`} />}
               </Section>
 
+              {product.isSubscription && (
+                <Section title="Subscription" icon={<Activity size={16} />}>
+                  <DetailRow label="Subscription" value="Yes" />
+                  <DetailRow label="Tag Product" value={product.isTagProduct ? 'Yes' : 'No'} />
+                  <DetailRow label="Billing Cycle" value={product.subscriptionConfig?.type === 'monthly' ? 'Monthly' : 'Annual'} />
+                  <DetailRow label="Free Period" value={`${product.subscriptionConfig?.freePeriodMonths ?? 0} months`} />
+                  <DetailRow label="Monthly Price" value={`$${(product.subscriptionConfig?.monthlyPrice ?? 0).toFixed(2)} NZD`} />
+                  <DetailRow label="Grace Period" value={`${product.subscriptionConfig?.gracePeriodWeeks ?? 0} weeks`} />
+                </Section>
+              )}
+
               <Section title="Quick Actions" icon={<Activity size={16} />}>
                 <div className="flex flex-wrap gap-2">
                   <button onClick={() => onEdit(product)} className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-primary-700 bg-primary-100 hover:bg-primary-200 rounded-lg">
@@ -825,7 +836,7 @@ const openEdit = (p: Product) => {
                     <div className="grid grid-cols-2 gap-4 ml-6">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Tag Product</label>
-                        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.isTagProduct} onChange={(e) => setForm({ ...form, isTagProduct: e.target.checked })} className="rounded" /> Physical QR/NFC tag (creates tag subscription)</label>
+                        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.isTagProduct} onChange={(e) => setForm({ ...form, isTagProduct: e.target.checked })} className="rounded" /> Physical Tag Subscription (creates tag subscription)</label>
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Billing Cycle</label>
