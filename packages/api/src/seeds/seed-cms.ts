@@ -1195,11 +1195,30 @@ async function run() {
               },
             },
             {
+              stepId: 'guardian',
+              title: 'Join Guardian — Earn Rewards',
+              subtitle: "Turn every purchase into points, PawRewards, and exclusive benefits. It's free to join.",
+              icon: 'Shield',
+              order: 3,
+              isActive: true,
+              type: 'info',
+              content: {
+                storyHeading: 'Your pet safety journey comes with rewards',
+                storyText: "Guardian is PawTag's free loyalty program. Every purchase earns Points that unlock PawRewards (store credit) and better tier benefits. The more you engage, the more you earn.\n\nGold members earn 2× Points on every purchase and start at a higher tier.",
+                callout: {
+                  icon: 'Star',
+                  title: 'Start Earning Immediately',
+                  text: "As soon as you join Guardian, you start earning Points on eligible purchases. Points convert to PawRewards that you can spend on products. Higher tiers unlock better shipping, bigger rewards, and exclusive perks.",
+                  variant: 'tip',
+                },
+              },
+            },
+            {
               stepId: 'contact-details',
               title: 'How Finders Will Reach You',
               subtitle: "Finders don't have the PawTag app — your phone and email are their only way to contact you.",
               icon: 'Phone',
-              order: 3,
+              order: 4,
               isActive: true,
               type: 'form',
               formFields: ['phoneNumber', 'email'],
@@ -1222,7 +1241,7 @@ async function run() {
               title: 'Help Finders Know Where You Are',
               subtitle: "When someone finds your pet, they'll see your suburb and city. The closer they know you are, the faster your pet gets home.",
               icon: 'MapPin',
-              order: 4,
+              order: 5,
               isActive: true,
               type: 'form',
               formFields: ['address.line1', 'address.line2', 'address.city', 'address.state', 'address.zip'],
@@ -1240,7 +1259,7 @@ async function run() {
               title: 'Add Your Backup Lifeline',
               subtitle: "What if you miss the alert? Your emergency contact is the person who gets notified if you can't.",
               icon: 'PhoneCall',
-              order: 5,
+              order: 6,
               isActive: true,
               type: 'form',
               formFields: ['emergencyContact.name', 'emergencyContact.relationship', 'emergencyContact.phone', 'emergencyContact.email'],
@@ -1264,7 +1283,7 @@ async function run() {
               title: "You're All Set!",
               subtitle: "Your pet now has the best chance of finding their way home.",
               icon: 'CheckCircle',
-              order: 6,
+              order: 7,
               isActive: true,
               type: 'info',
               content: {
@@ -1283,7 +1302,7 @@ async function run() {
           },
           updatedBy: adminId,
         }], { session });
-        console.log('  Created 7 onboarding steps');
+        console.log('  Created 8 onboarding steps');
       } else {
         const FULL_RELATIONSHIP_OPTIONS = ['Spouse', 'Partner', 'Fiancé', 'Ex-Spouse', 'Ex-Partner', 'Parent', 'Stepparent', 'Parent-in-law', 'Grandparent', 'Sibling', 'Step-Sibling', 'Sibling-in-law', 'Child', 'Stepchild', 'Child-in-law', 'Grandchild', 'Uncle', 'Aunt', 'Cousin', 'Godparent', 'Godchild', 'Friend', 'Neighbour', 'Housemate', 'Work Colleague', 'Manager', 'Client', 'Mentor', 'Teacher', 'Caregiver', 'Other'];
         existingOnboarding.globalSettings = existingOnboarding.globalSettings || {};

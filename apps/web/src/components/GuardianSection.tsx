@@ -180,21 +180,57 @@ export default function GuardianSection() {
         {/* CTA */}
         <div className="text-center mt-12">
           {user ? (
-            <Link
-              to="/account/guardian"
-              className="inline-flex items-center gap-2 px-6 py-3 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 transition-colors"
-            >
-              View Your Guardian Dashboard <ArrowRight size={18} />
-            </Link>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Link
+                to="/account/guardian"
+                className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 transition-colors"
+              >
+                View Your Guardian Dashboard <ArrowRight size={18} />
+              </Link>
+              {!guardianData?.isGoldMember && (
+                <Link
+                  to="/gold"
+                  className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-amber-500 text-white rounded-xl font-semibold hover:bg-amber-600 transition-colors"
+                >
+                  <Crown size={18} /> Upgrade to Gold
+                </Link>
+              )}
+            </div>
           ) : (
-            <Link
-              to="/shop"
-              className="inline-flex items-center gap-2 px-6 py-3 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 transition-colors"
-            >
-              Start Earning Points <ArrowRight size={18} />
-            </Link>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Link
+                to="/guardian"
+                className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 transition-colors"
+              >
+                Join Guardian — It's Free <ArrowRight size={18} />
+              </Link>
+              <Link
+                to="/gold"
+                className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-amber-500 text-white rounded-xl font-semibold hover:bg-amber-600 transition-colors"
+              >
+                <Crown size={18} /> Learn About Gold
+              </Link>
+            </div>
           )}
         </div>
+
+        {/* Gold Callout */}
+        {!guardianData?.isGoldMember && (
+          <div className="mt-8 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-6 text-center">
+            <Crown className="h-8 w-8 text-amber-500 mx-auto mb-3" />
+            <h3 className="font-semibold text-amber-900 mb-2">Want to Earn Even More?</h3>
+            <p className="text-sm text-amber-700 mb-4">
+              Gold members earn <strong>2× Points</strong> on every purchase and start at Nurture tier.
+              Just $1.99/month — less than a coffee.
+            </p>
+            <Link
+              to="/gold"
+              className="inline-flex items-center gap-2 text-amber-600 font-medium hover:text-amber-700"
+            >
+              Learn About Gold <ArrowRight size={16} />
+            </Link>
+          </div>
+        )}
       </div>
     </section>
   );

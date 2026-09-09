@@ -260,6 +260,11 @@ export default function ProductDetail() {
                   <span>Join Guardian to earn points on this purchase</span>
                 </Link>
               )}
+              {guardianTier && !isGoldMember && (
+                <p className="text-xs text-amber-600 mt-1 ml-6">
+                  Gold members earn 2× Points on this item — <Link to="/gold" className="underline">learn about Gold</Link>
+                </p>
+              )}
             </div>
 
             {/* Stock status */}

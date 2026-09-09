@@ -69,6 +69,19 @@ const defaultSlides: SlideData[] = [
     imageUrl: '',
     imageAlt: '',
   },
+  {
+    id: 4,
+    tag: 'Guardian',
+    headline: 'Earn rewards for being a great pet parent',
+    sub: 'Join Guardian and turn every purchase into points, PawRewards, and exclusive benefits.',
+    cta: { text: 'Join Guardian Free', to: '/guardian' },
+    bg: 'from-amber-600 via-amber-700 to-orange-600',
+    visualType: 'heart',
+    stats: [],
+    flowSteps: [],
+    imageUrl: '',
+    imageAlt: '',
+  },
 ];
 
 function SlideVisual({ slide, companyName }: { slide: SlideData; companyName: string }) {

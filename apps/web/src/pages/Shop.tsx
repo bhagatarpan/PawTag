@@ -14,7 +14,7 @@
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useCartInteraction } from '../context/CartInteractionContext';
 import { useAuth } from '../context/AuthContext';
@@ -23,7 +23,7 @@ import SeoHead from '../components/SeoHead';
 import { useShopPage, useSiteSettings } from '../hooks/useCms';
 import { getProductBadge } from '../utils/productHelpers';
 import api from '../lib/api';
-import { Package, Shield } from 'lucide-react';
+import { Package, Shield, Crown } from 'lucide-react';
 import analytics from '../lib/analytics';
 
 /* ------------------------------------------------------------------ */
@@ -93,6 +93,9 @@ function toCardProduct(p: PawTagProduct, guardianTier: string, isGoldMember: boo
      };
    }
 
+   // Show Gold upsell for Guardian members who are not Gold
+   const showGoldUpsell = !!guardianTier && !isGoldMember;
+
    return {
       id: p._id,
       slug: p.slug,
@@ -106,13 +109,10 @@ function toCardProduct(p: PawTagProduct, guardianTier: string, isGoldMember: boo
       monthlyPrice: p.subscriptionConfig?.monthlyPrice,
       badge: badge ? { label: badge.label, color: badge.color } : null,
       featureHighlights: p.featureHighlights && p.featureHighlights.length > 0
-        ? p.featureHighlights
-        : [
-            { icon: 'Check', description: `${p.subscriptionConfig?.freePeriodMonths || 12} months free subscription included` },
-            { icon: 'Shield', description: `${p.warrantyMonths || 12} month warranty` },
-            { icon: 'Truck', description: p.shippingDescription || 'Free NZ-wide shipping' },
-          ],
+        ? p.featureHighlights.map(h => ({ icon: h.icon, description: h.description }))
+        : undefined,
       pointsEarning,
+      showGoldUpsell,
     };
  }
 
@@ -246,17 +246,22 @@ export default function Shop() {
           {/* Guardian Loyalty Banner */}
           {!user && (
             <div className="mb-6 p-4 bg-gradient-to-r from-primary-50 to-amber-50 border border-primary-100 rounded-xl">
-              <div className="flex items-center gap-3">
-                <Shield className="h-5 w-5 text-primary-600 flex-shrink-0" />
-                <div>
-                  <p className="text-sm font-medium text-primary-800">
-                    <strong>Every purchase can earn rewards.</strong>{' '}
-                    <span className="text-primary-600">Guardian members earn Points with every eligible purchase.</span>
-                  </p>
-                  <p className="text-xs text-primary-600 mt-1">
-                    Join free and start earning PawRewards today.
-                  </p>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Shield className="h-5 w-5 text-primary-600 flex-shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-primary-800">
+                      <strong>Every purchase can earn rewards.</strong>{' '}
+                      <span className="text-primary-600">Guardian members earn Points with every eligible purchase.</span>
+                    </p>
+                    <p className="text-xs text-primary-600 mt-1">
+                      Join free and start earning PawRewards today.
+                    </p>
+                  </div>
                 </div>
+                <Link to="/guardian" className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition-colors whitespace-nowrap">
+                  Learn More
+                </Link>
               </div>
             </div>
           )}
@@ -280,6 +285,31 @@ export default function Shop() {
                 </div>
                 <Link to="/account/guardian" className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 transition-colors whitespace-nowrap">
                   Join Free
+                </Link>
+              </div>
+            </div>
+          )}
+
+          {/* Gold Callout - for logged-in non-Gold users */}
+          {user && !isGoldMember && (
+            <div className="mb-6 p-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
+                    <Crown className="h-5 w-5 text-amber-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-amber-900">
+                      <strong>Earn 2× Points with Gold.</strong>
+                    </p>
+                    <p className="text-xs text-amber-700 mt-0.5">
+                      Gold members earn double points on every purchase and start at Nurture tier.
+                      Just $1.99/month.
+                    </p>
+                  </div>
+                </div>
+                <Link to="/gold" className="px-4 py-2 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600 transition-colors whitespace-nowrap">
+                  Learn About Gold
                 </Link>
               </div>
             </div>

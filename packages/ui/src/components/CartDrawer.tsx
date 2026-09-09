@@ -78,6 +78,10 @@ export const CartDrawer = React.memo(function CartDrawer({
         {isGuest && items.length > 0 && (
           <div className="mx-4 mt-3 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">
             You're shopping as a guest. <strong>Log in</strong> to save your cart and check out.
+            <br />
+            <a href="/guardian" className="text-primary-600 hover:underline mt-1 inline-block">
+              Join Guardian and earn rewards on every purchase
+            </a>
           </div>
         )}
 
@@ -94,7 +98,9 @@ export const CartDrawer = React.memo(function CartDrawer({
             {!guardianTier && isGuest ? (
               <div className="px-3 py-2 bg-primary-50 border border-primary-100 rounded-lg text-xs text-primary-700">
                 <strong>You could be earning rewards on this purchase.</strong>{' '}
-                Join Guardian and start earning Points.
+                <a href="/guardian" className="text-primary-600 hover:underline">
+                  Join Guardian and start earning Points
+                </a>.
               </div>
             ) : pointsEarning && pointsEarning.points > 0 ? (
               <div className={`px-3 py-2 rounded-lg text-xs ${pointsEarning.isGoldMember ? 'bg-amber-50 border border-amber-200 text-amber-700' : 'bg-primary-50 border border-primary-100 text-primary-700'}`}>

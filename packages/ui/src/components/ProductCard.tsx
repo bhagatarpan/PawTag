@@ -32,6 +32,8 @@ export interface ProductCardProduct {
     featureHighlights?: IFeatureHighlight[];
     /** Points earning info for Guardian members */
     pointsEarning?: { points: number; label?: string } | null;
+    /** Show Gold upsell text (true when user is not a Gold member) */
+    showGoldUpsell?: boolean;
  }
 
  export interface ProductCardProps {
@@ -91,6 +93,11 @@ export const ProductCard = React.memo(function ProductCard({
           {product.pointsEarning && (
             <p className="text-xs text-primary-600 font-medium mt-1">
               Earn {product.pointsEarning.points} Points{product.pointsEarning.label ? ` — ${product.pointsEarning.label}` : ''}
+            </p>
+          )}
+          {product.showGoldUpsell && (
+            <p className="text-xs text-amber-600 font-medium mt-1">
+              Gold members earn 2× Points on this item
             </p>
           )}
         </div>

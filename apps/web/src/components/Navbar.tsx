@@ -141,12 +141,22 @@ export default function Navbar() {
                   {link.label}
                 </Link>
               ))}
-              {user && (
-                <Link to="/account/guardian" className="px-4 py-2 rounded-lg text-sm font-medium text-primary-600 hover:bg-primary-50 transition-all flex items-center gap-1">
-                  <Shield className="h-4 w-4" />
-                  Guardian
-                </Link>
-              )}
+              <Link
+                to={user ? '/account/guardian' : '/guardian'}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-1 ${
+                  isActive('/guardian') || isActive('/account/guardian')
+                    ? 'bg-primary-50 text-primary-700'
+                    : 'text-primary-600 hover:bg-primary-50'
+                }`}
+              >
+                <Shield className="h-4 w-4" />
+                Guardian
+                {guardianData?.tier && (
+                  <span className="ml-1 px-1.5 py-0.5 bg-primary-100 text-primary-700 rounded text-[10px] font-semibold">
+                    {guardianData.points || 0} pts
+                  </span>
+                )}
+              </Link>
             </div>
 
             {/* Right Side */}
@@ -251,12 +261,19 @@ export default function Navbar() {
                   {link.label}
                 </Link>
               ))}
-              {user && (
-                <Link to="/account/guardian" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 px-4 py-3 rounded-lg font-medium text-primary-600 hover:bg-primary-50 transition-all">
-                  <Shield className="h-4 w-4" />
-                  Guardian
-                </Link>
-              )}
+              <Link
+                to={user ? '/account/guardian' : '/guardian'}
+                onClick={() => setMobileOpen(false)}
+                className="flex items-center gap-2 px-4 py-3 rounded-lg font-medium text-primary-600 hover:bg-primary-50 transition-all"
+              >
+                <Shield className="h-4 w-4" />
+                Guardian
+                {guardianData?.tier && (
+                  <span className="ml-auto px-2 py-0.5 bg-primary-100 text-primary-700 rounded text-xs font-semibold">
+                    {guardianData.points || 0} pts
+                  </span>
+                )}
+              </Link>
               {!user && (
                 <Link to="/login" onClick={() => setMobileOpen(false)} className="block px-4 py-3 bg-primary-600 text-white rounded-lg font-medium text-center mt-4">
                   Sign In

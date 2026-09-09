@@ -44,6 +44,9 @@ import GuardianRewards from './pages/account/GuardianRewards';
 import SubscriptionUpgrade from './pages/account/SubscriptionUpgrade';
 import GoldBenefits from './pages/account/GoldBenefits';
 import FloatingLoyaltyBadge from './components/FloatingLoyaltyBadge';
+import GuardianLanding from './pages/GuardianLanding';
+import GoldLanding from './pages/GoldLanding';
+import AnnouncementBar from './components/AnnouncementBar';
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const token = localStorage.getItem('pawtag_token');
@@ -54,6 +57,7 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
 function PublicLayout({ children, showEmergency = true }: { children: ReactNode; showEmergency?: boolean }) {
   return (
     <div className="min-h-screen flex flex-col">
+      <AnnouncementBar />
       <Navbar />
       <main className="flex-1">{children}</main>
       <Footer />
@@ -110,6 +114,8 @@ export default function App() {
         <Route path="/faq" element={<PublicLayout><Faq /></PublicLayout>} />
         <Route path="/contact" element={<PublicLayout><Contact /></PublicLayout>} />
         <Route path="/refer" element={<PublicLayout showEmergency={false}><Refer /></PublicLayout>} />
+        <Route path="/guardian" element={<PublicLayout><GuardianLanding /></PublicLayout>} />
+        <Route path="/gold" element={<PublicLayout><GoldLanding /></PublicLayout>} />
 
         {/* Account routes */}
         <Route path="/account" element={<ProtectedRoute><AccountLayout><AccountDashboard /></AccountLayout></ProtectedRoute>} />
