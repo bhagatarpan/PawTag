@@ -998,8 +998,8 @@ export default function Checkout() {
                                 />
                                 <div>
                                   <p className="text-sm font-medium text-gray-900">{option.name}</p>
-                                  {option.type?.description && (
-                                    <p className="text-xs text-gray-500">{option.type.description}</p>
+                                  {option.description && (
+                                    <p className="text-xs text-gray-500">{option.description}</p>
                                   )}
                                 </div>
                               </div>

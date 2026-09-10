@@ -156,6 +156,7 @@ export default function ShippingMethods() {
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Name</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Description</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Rate Type</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Rate</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Carrier</th>
@@ -168,6 +169,7 @@ export default function ShippingMethods() {
               {methods.map((m) => (
                 <tr key={m._id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-medium text-gray-900">{m.name}</td>
+                  <td className="px-4 py-3 text-sm text-gray-500">{m.description || '-'}</td>
                   <td className="px-4 py-3 text-sm text-gray-500">{rateTypes[m.rateType] || m.rateType}</td>
                   <td className="px-4 py-3 text-right text-sm font-semibold text-gray-900">
                     {m.rateType === 'free' ? 'Free' : `$${m.rate.toFixed(2)}`}
