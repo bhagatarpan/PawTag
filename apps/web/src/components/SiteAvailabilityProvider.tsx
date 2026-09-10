@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import axios from 'axios';
+import { API } from '@pawtag/shared/api';
 import { SiteAvailabilityStatus } from '@pawtag/shared';
 
 interface AvailabilityMessages {
@@ -43,7 +44,7 @@ export function SiteAvailabilityProvider({ children }: { children: ReactNode }) 
 
   const fetchStatus = useCallback(async () => {
     try {
-      const res = await axios.get(`${apiBase}/public/system/status`);
+      const res = await axios.get(`${apiBase}${API.public.system.status}`);
       const data = res.data.data;
       const newStatus = data.status || SiteAvailabilityStatus.ONLINE;
 
@@ -55,7 +56,7 @@ export function SiteAvailabilityProvider({ children }: { children: ReactNode }) 
 
       if (newStatus === SiteAvailabilityStatus.MAINTENANCE || newStatus === SiteAvailabilityStatus.OFFLINE) {
         try {
-          const detailRes = await axios.get(`${apiBase}/admin/site-availability/status`);
+          const detailRes = await axios.get(`${apiBase}${API.admin.siteAvailability.status}`);
           const detail = detailRes.data.data;
           const newMessages = detail.messages;
           // Only update if messages changed

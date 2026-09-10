@@ -16,6 +16,7 @@
  */
 
 import { useEffect, useState, useCallback } from 'react';
+import { API } from '@pawtag/shared/api';
 import { Search, Loader2, Plus, Edit2, Trash2, ChevronRight, FolderTree, X } from 'lucide-react';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
@@ -45,7 +46,7 @@ export default function Categories() {
   const fetchCategories = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await api.get('/admin/commerce/categories', { params: { search, limit: 100 } });
+      const res = await api.get(API.admin.commerce.categories.list, { params: { search, limit: 100 } });
       setCategories(res.data?.data?.items || []);
     } catch { toast.error('Failed to load categories'); }
     finally { setLoading(false); }
@@ -61,7 +62,7 @@ export default function Categories() {
         await api.put(`/admin/commerce/categories/${editingCategory._id}`, form);
         toast.success('Category updated');
       } else {
-        await api.post('/admin/commerce/categories', form);
+        await api.post(API.admin.commerce.categories.list, form);
         toast.success('Category created');
       }
       setShowForm(false);

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
 
 interface SubscriptionDetail {
@@ -64,7 +65,7 @@ export default function SubscriptionDetailPage() {
 
   async function fetchDetail() {
     try {
-      const res = await api.get(`/admin/subscriptions/${id}`);
+      const res = await api.get(API.admin.subscriptions.get(id!));
       setData(res.data.data);
     } catch (err) {
       console.error('Failed to fetch subscription:', err);
@@ -77,7 +78,7 @@ export default function SubscriptionDetailPage() {
     if (!confirm(`Change subscription status to "${newStatus}"?`)) return;
     setActionLoading(true);
     try {
-      await api.put(`/admin/subscriptions/${id}/status`, {
+      await api.put(API.admin.subscriptions.setStatus(id!), {
         status: newStatus,
         reason: `Admin changed to ${newStatus}`,
       });
@@ -92,7 +93,7 @@ export default function SubscriptionDetailPage() {
   async function handleExtend() {
     setActionLoading(true);
     try {
-      await api.post(`/admin/subscriptions/${id}/extend`, {
+      await api.post(API.admin.subscriptions.extend(id!), {
         days: extendDays,
         reason: extendReason || 'Admin support',
       });

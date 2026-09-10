@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ShoppingBag, ChevronRight, Clock, Package, Truck, CheckCircle, Ban, RefreshCw, ExternalLink, FileText, CreditCard, MapPin, Eye } from 'lucide-react';
 import { StatusBadge, EmptyState, OrderProgressStepper, OrderStatusBanner } from '@pawtag/ui';
 import { ORDER_STATUS_LABELS, getStatusBadgeVariant, getStatusBorderColor, getTrackingUrl, isTerminalStatus, getPaymentStatusLabel, getPaymentStatusBadgeVariant } from '@pawtag/shared';
+import { API } from '@pawtag/shared/api';
 import api from '../../lib/api';
 import type { Order } from '../../types';
 
@@ -124,7 +125,7 @@ export default function Orders() {
 
   const fetchOrders = async () => {
     try {
-      const r = await api.get('/customer/orders');
+      const r = await api.get(API.customer.orders.list);
       setOrders(r.data.data);
       setError(null);
     } catch (err: any) {
@@ -183,7 +184,7 @@ export default function Orders() {
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700 flex items-center gap-2">
           {error}
-          <button onClick={() => { setError(null); setLoading(true); api.get('/customer/orders').then((r) => setOrders(r.data.data)).catch((err) => setError(err.response?.data?.error || 'Failed to load orders')).finally(() => setLoading(false)); }} className="underline hover:no-underline ml-2">Try Again</button>
+          <button onClick={() => { setError(null); setLoading(true); api.get(API.customer.orders.list).then((r) => setOrders(r.data.data)).catch((err) => setError(err.response?.data?.error || 'Failed to load orders')).finally(() => setLoading(false)); }} className="underline hover:no-underline ml-2">Try Again</button>
         </div>
       )}
 

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import api from '../lib/api';
+import { API } from '@pawtag/shared';
 
 export default function VerifyEmail() {
   const [searchParams] = useSearchParams();
@@ -21,7 +22,7 @@ export default function VerifyEmail() {
     // remount). The cancelled flag prevents the first (cleaned-up) invocation from overwriting
     // the state of the second one, and the API is idempotent so a re-run is harmless.
     let cancelled = false;
-    api.get(`/auth/verify-email?token=${token}`)
+    api.get(`${API.auth.verifyEmail}?token=${token}`)
       .then((res) => {
         if (cancelled) return;
         if (res.data.success) {

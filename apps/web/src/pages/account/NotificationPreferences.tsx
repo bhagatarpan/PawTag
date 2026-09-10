@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Save } from 'lucide-react';
+import { API } from '@pawtag/shared/api';
 import api from '../../lib/api';
 
 interface Prefs {
@@ -27,7 +28,7 @@ export default function NotificationPreferences() {
   const [msg, setMsg] = useState('');
 
   useEffect(() => {
-    api.get('/customer/notification-preferences')
+    api.get(API.customer.notificationPreferences.get)
       .then(r => setPrefs(r.data.data))
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -37,7 +38,7 @@ export default function NotificationPreferences() {
     setSaving(true);
     setMsg('');
     try {
-      await api.put('/customer/notification-preferences', prefs);
+      await api.put(API.customer.notificationPreferences.update, prefs);
       setMsg('Preferences saved');
       setTimeout(() => setMsg(''), 3000);
     } catch {

@@ -6,6 +6,7 @@
  */
 
 import { useEffect, useState, useCallback } from 'react';
+import { API } from '@pawtag/shared/api';
 import { Search, Loader2, Plus, Edit2, Trash2, Target, X } from 'lucide-react';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
@@ -34,7 +35,7 @@ export default function Brands() {
   const fetchBrands = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await api.get('/admin/commerce/brands', { params: { search, limit: 100 } });
+      const res = await api.get(API.admin.commerce.brands.list, { params: { search, limit: 100 } });
       setBrands(res.data?.data?.items || []);
     } catch { toast.error('Failed to load brands'); }
     finally { setLoading(false); }
@@ -50,7 +51,7 @@ export default function Brands() {
         await api.put(`/admin/commerce/brands/${editing._id}`, form);
         toast.success('Brand updated');
       } else {
-        await api.post('/admin/commerce/brands', form);
+        await api.post(API.admin.commerce.brands.list, form);
         toast.success('Brand created');
       }
       setShowForm(false);

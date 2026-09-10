@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
 
 interface GuardianMember {
@@ -47,7 +48,7 @@ export default function GuardianMembers() {
       if (filters.membership) params.append('membership', filters.membership);
       if (filters.search) params.append('search', filters.search);
 
-      const res = await api.get(`/admin/guardian/members?${params.toString()}`);
+      const res = await api.get(`${API.admin.guardian.members}?${params.toString()}`);
       
       if (page === 1) {
         setMembers(res.data.data.members);

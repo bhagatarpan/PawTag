@@ -7,6 +7,7 @@ import { useAuth } from '../../context/AuthContext';
 import api from '../../lib/api';
 import SaveToast from '../../components/SaveToast';
 import { validatePassword } from '@pawtag/shared';
+import { API } from '@pawtag/shared';
 
 export default function Profile() {
   const { user, refreshUser } = useAuth();
@@ -58,7 +59,7 @@ export default function Profile() {
       const ecRaw: Record<string, string> = { name: form.emergencyContact.name, phone: form.emergencyContact.phone, email: form.emergencyContact.email, relationship: form.emergencyContact.relationship };
       const ec = Object.fromEntries(Object.entries(ecRaw).filter(([_, v]) => v !== ''));
       if (Object.keys(ec).length > 0) payload.emergencyContact = ec;
-      await api.put('/auth/profile', payload); setShowSaved(true); refreshUser();
+      await api.put(API.auth.profile, payload); setShowSaved(true); refreshUser();
     }
     catch (err: any) { setError(err.response?.data?.error || 'Update failed'); }
     finally { setSaving(false); }
@@ -177,7 +178,7 @@ function ChangePasswordForm() {
     const passwordValidation = validatePassword(newPassword);
     if (!passwordValidation.valid) { setError(passwordValidation.error!); return; }
     setSaving(true);
-    try { await api.post('/auth/change-password', { currentPassword, newPassword }); setShowSaved(true); setCurrentPassword(''); setNewPassword(''); setConfirmPassword(''); }
+    try { await api.post(API.auth.changePassword, { currentPassword, newPassword }); setShowSaved(true); setCurrentPassword(''); setNewPassword(''); setConfirmPassword(''); }
     catch (err: any) { setError(err.response?.data?.error || 'Failed to change password'); }
     finally { setSaving(false); }
   };

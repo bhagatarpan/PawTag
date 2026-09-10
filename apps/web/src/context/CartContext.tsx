@@ -13,6 +13,7 @@
  */
 
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
 
 /* ------------------------------------------------------------------ */
@@ -182,7 +183,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     // Authenticated: load from server
     try {
       setLoading(true);
-      const res = await api.get('/cart');
+      const res = await api.get(API.cart.get);
       const data = res.data?.data;
       if (data?.cart) {
         setItems(data.cart.items || []);
@@ -219,7 +220,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     // First, fetch the current server cart to detect duplicates
     let serverCart: CartItem[] = [];
     try {
-      const res = await api.get('/cart');
+      const res = await api.get(API.cart.get);
       serverCart = res.data?.data?.cart?.items || [];
     } catch {
       // If we can't fetch, just add all items
@@ -236,12 +237,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
       try {
         if (existing) {
           // Item already on server — update quantity (add guest qty to server qty)
-          await api.put(`/cart/items/${existing._id}`, {
+          await api.put(API.cart.updateItem(existing._id), {
             quantity: existing.quantity + item.quantity,
           });
         } else {
           // New item — add to server
-          await api.post('/cart/items', {
+          await api.post(API.cart.addItem, {
             productId: item.productId,
             quantity: item.quantity,
             customisation: cust,
@@ -344,7 +345,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     try {
       setLoading(true);
       setError(null);
-      const res = await api.post('/cart/items', {
+      const res = await api.post(API.cart.addItem, {
         productId: item.productId,
         quantity: item.quantity,
         customisation: cust,
@@ -434,7 +435,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     // Authenticated: remove from server
     try {
       setLoading(true);
-      const res = await api.delete(`/cart/items/${itemId}`);
+      const res = await api.delete(API.cart.removeItem(itemId));
       const data = res.data?.data;
       if (data?.cart) {
         setItems(data.cart.items || []);
@@ -476,7 +477,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     // Authenticated: update on server
     try {
       setLoading(true);
-      const res = await api.put(`/cart/items/${itemId}`, { quantity });
+      const res = await api.put(API.cart.updateItem(itemId), { quantity });
       const data = res.data?.data;
       if (data?.cart) {
         setItems(data.cart.items || []);
@@ -504,7 +505,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
     try {
       setLoading(true);
-      await api.delete('/cart');
+      await api.delete(API.cart.clear);
       setItems([]);
       setTotals(EMPTY_TOTALS);
     } catch (err: any) {

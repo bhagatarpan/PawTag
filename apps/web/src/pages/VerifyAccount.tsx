@@ -4,6 +4,7 @@ import { Mail, Phone, CheckCircle2, Clock, ArrowRight, RefreshCw, Loader2, Alert
 import api from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import OtpInput from '../components/verification/OtpInput';
+import { API } from '@pawtag/shared';
 
 type VerificationStatus = {
   emailVerified: boolean;
@@ -45,7 +46,7 @@ export default function VerifyAccount() {
     try {
       const lookupEmail = emailParam || authUser?.email || '';
       const params = lookupEmail ? `?email=${encodeURIComponent(lookupEmail)}` : '';
-      const res = await api.get(`/auth/verification-status${params}`);
+      const res = await api.get(`${API.auth.verificationStatus}${params}`);
       setStatus(res.data.data);
       setCooldown(res.data.data?.otpCooldown || 0);
     } catch {
@@ -102,7 +103,7 @@ export default function VerifyAccount() {
     setError('');
     setSuccess('');
     try {
-      await api.post('/auth/resend-email-verification', { email: effectiveEmail });
+      await api.post(API.auth.resendEmailVerification, { email: effectiveEmail });
       setSuccess('Verification email sent! Check your inbox.');
       setEmailSent(true);
       setCooldown(60);
@@ -118,7 +119,7 @@ export default function VerifyAccount() {
     setError('');
     setSuccess('');
     try {
-      await api.post('/auth/send-phone-otp', { phoneNumber: effectivePhone });
+      await api.post(API.auth.sendPhoneOtp, { phoneNumber: effectivePhone });
       setSuccess('OTP sent to your phone number.');
       setPhoneOtpSent(true);
       setCooldown(60);
@@ -138,7 +139,7 @@ export default function VerifyAccount() {
     setError('');
     setSuccess('');
     try {
-      await api.post('/auth/verify-phone', { otp: otpValue, phoneNumber: effectivePhone });
+      await api.post(API.auth.verifyPhone, { otp: otpValue, phoneNumber: effectivePhone });
       setSuccess('Phone number verified successfully!');
       setOtpValue('');
       setPhoneOtpSent(false);
@@ -192,7 +193,7 @@ export default function VerifyAccount() {
       const payload: Record<string, string> = {};
       if (editingField === 'email') payload.email = editValue;
       if (editingField === 'phone') payload.phoneNumber = editValue;
-      await api.put('/auth/profile', payload);
+      await api.put(API.auth.profile, payload);
       // Reset verification for changed field
       if (editingField === 'email') {
         setEmailSent(false);

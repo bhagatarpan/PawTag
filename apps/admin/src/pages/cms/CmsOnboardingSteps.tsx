@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { API } from '@pawtag/shared/api';
 import {
   Plus, Trash2, GripVertical, Save, Eye, EyeOff, ChevronDown, ChevronUp,
   Heart, AlertTriangle, Zap, Phone, MapPin, PhoneCall, CheckCircle,
@@ -75,7 +76,7 @@ export default function CmsOnboardingStepsPage() {
   const [showGlobalSettings, setShowGlobalSettings] = useState(false);
 
   useEffect(() => {
-    api.get('/admin/cms/onboarding')
+    api.get(API.admin.cms.onboarding.get)
       .then((res) => {
         setSteps(res.data.data?.steps || []);
         setGlobalSettings(res.data.data?.globalSettings || {});
@@ -189,7 +190,7 @@ export default function CmsOnboardingStepsPage() {
   async function handleSave() {
     setSaving(true);
     try {
-      await api.put('/admin/cms/onboarding', { steps, globalSettings });
+      await api.put(API.admin.cms.onboarding.get, { steps, globalSettings });
       toast.success('Onboarding config saved');
     } catch {
       toast.error('Failed to save');

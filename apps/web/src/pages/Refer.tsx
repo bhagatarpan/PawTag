@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Gift, CheckCircle, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
 
 export default function Refer() {
@@ -14,7 +15,7 @@ export default function Refer() {
     if (code) {
       // Store referral code for checkout
       localStorage.setItem('pawtag_referral_code', code);
-      api.get(`/finder/referral/${code}`)
+      api.get(API.finder.referral(code))
         .then(r => setValidation(r.data.data))
         .catch(() => setValidation({ valid: false }))
         .finally(() => setLoading(false));

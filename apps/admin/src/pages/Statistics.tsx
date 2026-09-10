@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
 import { BarChart3, TrendingUp, Users, PawPrint, Clock, AlertTriangle, CheckCircle, ShieldAlert, ShieldCheck } from 'lucide-react';
 
@@ -35,7 +36,7 @@ export default function Statistics() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.get('/admin/stats/lost-found')
+    api.get(API.admin.stats.lostFound)
       .then((r) => setStats(r.data.data))
       .catch(console.error)
       .finally(() => setLoading(false));

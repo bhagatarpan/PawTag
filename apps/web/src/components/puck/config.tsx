@@ -1,5 +1,6 @@
 import type { Config } from '@puckeditor/core';
 import React, { useState } from 'react';
+import { API } from '@pawtag/shared/api';
 import { useSiteSettings } from '../../hooks/useCms';
 
 type PawtagComponents = {
@@ -332,7 +333,7 @@ export const pawtagConfig: Config<PawtagComponents> = {
           setSubmitting(true);
           setError('');
           try {
-            const res = await fetch('/api/support/contact', {
+            const res = await fetch(`/api${API.support.contact}`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(formData),

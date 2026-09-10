@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { API } from '@pawtag/shared/api';
 import api, { PaginatedData } from '../lib/api';
 import { toast } from '../lib/toast';
 import {
@@ -171,7 +172,7 @@ function PhotoManager({ photos, onChange }: { photos: PhotoItem[]; onChange: (p:
     try {
       const formData = new FormData();
       formData.append('photo', file);
-      const res = await api.post('/upload/pet-photo', formData, {
+      const res = await api.post(API.upload.petPhoto, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       addPhoto(res.data.data.url, captionInput || undefined);
@@ -264,13 +265,13 @@ export function DetailDrawer({
 
   // Fetch RBAC roles for user drawer
   useEffect(() => {
-    api.get('/admin/rbac/roles').then((r) => setRbacRoles(r.data.data || [])).catch(() => {});
+    api.get(API.admin.rbac.roles.list).then((r) => setRbacRoles(r.data.data || [])).catch(() => {});
   }, []);
 
   const handleTagClick = async (tagId: string) => {
     setSelectedTagLoading(true);
     try {
-      const res = await api.get(`/admin/tags/${tagId}`);
+      const res = await api.get(API.admin.tags.get(tagId));
       setSelectedTag(res.data.data);
     } catch {
       toast.error('Failed to load tag details');
@@ -281,7 +282,7 @@ export function DetailDrawer({
 
   const handleOwnerClick = async (ownerId: string) => {
     try {
-      const res = await api.get(`/admin/users/${ownerId}`);
+      const res = await api.get(API.admin.users.get(ownerId));
       setSelectedOwner(res.data.data);
     } catch {
       toast.error('Failed to load owner details');
@@ -319,7 +320,7 @@ export function DetailDrawer({
     try {
       const payload: any = { ...form, species: form.petType, photos };
       if (form.breedOrigin !== 'Mixed Breed' && form.breedOrigin !== 'Designer Breed') payload.secondaryBreed = 'Unknown';
-      await api.put(`/admin/pets/${pet._id}`, payload);
+      await api.put(API.admin.pets.update(pet._id), payload);
       toast.success('Pet updated');
       setEditMode(false);
       onRefresh();
@@ -333,7 +334,7 @@ export function DetailDrawer({
   const handleStatusChange = async (status: string) => {
     setActionLoading('status');
     try {
-      await api.put(`/admin/pets/${pet._id}/status`, { status });
+      await api.put(API.admin.pets.setStatus(pet._id), { status });
       toast.success(`Status changed to ${formatStatusLabel(status)}`);
       onRefresh();
     } catch (err: any) {
@@ -347,7 +348,7 @@ export function DetailDrawer({
     if (!window.confirm(`Delete pet "${pet.name}"? This cannot be undone.`)) return;
     setActionLoading('delete');
     try {
-      await api.delete(`/admin/pets/${pet._id}`);
+      await api.delete(API.admin.pets.delete(pet._id));
       toast.success('Pet deleted');
       onClose();
       onRefresh();
@@ -763,14 +764,14 @@ export default function Pets() {
 
   // Fetch owners for the form
   useEffect(() => {
-    api.get('/admin/users', { params: { limit: 500 } }).then((r) => setOwners(r.data.data.items || [])).catch(console.error);
+    api.get(API.admin.users.list, { params: { limit: 500 } }).then((r) => setOwners(r.data.data.items || [])).catch(console.error);
   }, []);
 
   // Fetch summary
   const fetchSummary = useCallback(async () => {
     setSummaryLoading(true);
     try {
-      const res = await api.get('/admin/pets', { params: { limit: 10000 } });
+      const res = await api.get(API.admin.pets.list, { params: { limit: 10000 } });
       const items = res.data.data.items || [];
       const total = res.data.data.total || 0;
       const dogs = items.filter((p: PetRecord) => p.petType === 'Dog').length;
@@ -798,7 +799,7 @@ export default function Pets() {
       if (ownerName) params.ownerName = ownerName;
       if (ownerEmail) params.ownerEmail = ownerEmail;
       if (ownerPhone) params.ownerPhone = ownerPhone;
-      const res = await api.get('/admin/pets', { params });
+      const res = await api.get(API.admin.pets.list, { params });
       setData(res.data.data);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to load pets');
@@ -833,10 +834,10 @@ export default function Pets() {
       const payload: any = { ...form, species: form.petType, photos };
       if (form.breedOrigin !== 'Mixed Breed' && form.breedOrigin !== 'Designer Breed') payload.secondaryBreed = 'Unknown';
       if (editingPet) {
-        await api.put(`/admin/pets/${editingPet._id}`, payload);
+        await api.put(API.admin.pets.update(editingPet._id), payload);
         toast.success('Pet updated');
       } else {
-        await api.post('/admin/pets', payload);
+        await api.post(API.admin.pets.create, payload);
         toast.success('Pet created');
       }
       cancelForm();
@@ -860,7 +861,7 @@ export default function Pets() {
       if (petBreed) params.petBreed = petBreed;
       if (statusFilter) params.status = statusFilter;
 
-      const res = await api.get('/admin/pets', { params });
+      const res = await api.get(API.admin.pets.list, { params });
       const items = res.data.data.items || [];
 
       if (format === 'json') {

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { API } from '@pawtag/shared/api';
 import axios from 'axios';
 
 export interface SiteSettings {
@@ -17,7 +18,7 @@ export function useSiteSettings() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    axios.get(`${apiBase}/public/cms/settings`)
+    axios.get(`${apiBase}${API.public.cms.settings}`)
       .then((res) => {
         if (!cancelled) {
           setSettings(res.data.data || {});

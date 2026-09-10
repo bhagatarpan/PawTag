@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { API } from '@pawtag/shared/api';
 import { RefreshCw, CheckCircle, XCircle, Clock, AlertTriangle, Copy, ExternalLink } from 'lucide-react';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
@@ -83,7 +84,7 @@ export default function RefundStatusCard({
   const handleSync = async () => {
     setSyncing(true);
     try {
-      const res = await api.post(`/admin/commerce/refunds/${orderId}/sync`);
+      const res = await api.post(API.admin.commerce.refunds.sync(orderId));
       if (res.data.success) {
         toast.success('Refund synced with Stripe');
         onSynced?.();
@@ -100,7 +101,7 @@ export default function RefundStatusCard({
   const handleRetry = async () => {
     setRetrying(true);
     try {
-      const res = await api.post(`/admin/commerce/refunds/${orderId}/retry`);
+      const res = await api.post(API.admin.commerce.refunds.retry(orderId));
       if (res.data.success) {
         toast.success('Refund retry initiated');
         onSynced?.();

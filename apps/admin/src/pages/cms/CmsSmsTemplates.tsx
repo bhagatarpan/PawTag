@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { API } from '@pawtag/shared/api';
 import { MessageSquare, Plus, Search, Edit, Trash2, Eye, EyeOff, Copy } from 'lucide-react';
 import api from '../../lib/api';
 
@@ -52,7 +53,7 @@ export default function CmsSmsTemplates() {
       if (editingTemplate) {
         await api.put(`/admin/cms/sms/sms-templates/${editingTemplate._id}`, form);
       } else {
-        await api.post('/admin/cms/sms/sms-templates', form);
+        await api.post(API.admin.cms.smsTemplates.list, form);
       }
       setShowForm(false);
       setEditingTemplate(null);

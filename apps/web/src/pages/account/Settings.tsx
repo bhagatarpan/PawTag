@@ -8,6 +8,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { ConfirmDialog, StatusBadge } from '@pawtag/ui';
 import SaveToast from '../../components/SaveToast';
+import { API } from '@pawtag/shared/api';
 import api from '../../lib/api';
 
 /* ------------------------------------------------------------------ */
@@ -47,7 +48,7 @@ export default function Settings() {
 
   async function fetchMFA() {
     try {
-      const res = await api.get('/customer/settings/mfa');
+      const res = await api.get(API.customer.settings.mfa.get);
       setMfa(res.data.data);
     } catch {
       // MFA endpoint may not exist yet — fail silently
@@ -58,7 +59,7 @@ export default function Settings() {
 
   async function fetchFinderPrivacy() {
     try {
-      const res = await api.get('/customer/settings/finder-privacy');
+      const res = await api.get(API.customer.settings.finderPrivacy.get);
       setFinderPrivacy(res.data.data);
     } catch {
       // fail silently
@@ -72,7 +73,7 @@ export default function Settings() {
     setFinderPrivacyActionLoading(true);
     try {
       const newValue = !finderPrivacy.showOwnerNameInFinder;
-      await api.put('/customer/settings/finder-privacy', { showOwnerNameInFinder: newValue });
+      await api.put(API.customer.settings.finderPrivacy.update, { showOwnerNameInFinder: newValue });
       setFinderPrivacy({ showOwnerNameInFinder: newValue });
       setShowSaved(true);
     } catch (err: any) {
@@ -89,7 +90,7 @@ export default function Settings() {
       if (mfa.mfaEnabled) {
         setShowDisableMfa(true);
       } else {
-        await api.put('/customer/settings/mfa', { mfaEnabled: true });
+        await api.put(API.customer.settings.mfa.update, { mfaEnabled: true });
         setMfa({ ...mfa, mfaEnabled: true });
         await refreshUser();
         setShowSaved(true);
@@ -104,7 +105,7 @@ export default function Settings() {
   async function handleDisableMFA() {
     setMfaActionLoading(true);
     try {
-      await api.put('/customer/settings/mfa', { mfaEnabled: false });
+      await api.put(API.customer.settings.mfa.update, { mfaEnabled: false });
       setMfa(mfa ? { ...mfa, mfaEnabled: false } : null);
       await refreshUser();
       setShowDisableMfa(false);
@@ -119,7 +120,7 @@ export default function Settings() {
   async function handleExportData() {
     setExportLoading(true);
     try {
-      const res = await api.get('/customer/pets');
+      const res = await api.get(API.customer.pets.list);
       const pets = res.data.data || [];
       const data = {
         exportDate: new Date().toISOString(),
@@ -149,7 +150,7 @@ export default function Settings() {
     if (deleteConfirmText !== user?.email) return;
     setDeleteLoading(true);
     try {
-      await api.delete('/auth/account');
+      await api.delete(API.auth.deleteAccount);
       localStorage.removeItem('pawtag_token');
       window.location.href = '/';
     } catch (err: any) {

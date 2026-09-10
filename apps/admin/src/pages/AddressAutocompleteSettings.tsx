@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { MapPin, Key, Globe, Info, Save, Loader2, CheckCircle, Shield } from 'lucide-react';
+import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
 
@@ -23,7 +24,7 @@ export default function AddressAutocompleteSettings() {
 
   const fetchSettings = async () => {
     try {
-      const res = await api.get('/admin/settings');
+      const res = await api.get(API.admin.settings.list);
       const settingsList = res.data.data || [];
       const map: Record<string, string> = {};
       for (const s of settingsList) {
@@ -49,9 +50,9 @@ export default function AddressAutocompleteSettings() {
   const saveSetting = async (key: string, value: string) => {
     setSaving(true);
     try {
-      await api.put(`/admin/settings/addressAutocomplete.${key}`, { value });
+      await api.put(API.admin.settings.update(`addressAutocomplete.${key}`), { value });
       // Invalidate backend cache
-      await api.post('/address/invalidate-cache');
+      await api.post(API.address.invalidateCache);
       toast.success('Setting updated');
     } catch {
       toast.error('Failed to update setting');

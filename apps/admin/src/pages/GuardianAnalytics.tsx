@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { TrendingUp, Users, Star, Gift, DollarSign, RefreshCw } from 'lucide-react';
+import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
 
 interface GuardianAnalytics {
@@ -26,7 +27,7 @@ export default function GuardianAnalytics() {
 
   async function fetchAnalytics() {
     try {
-      const res = await api.get('/admin/guardian/stats');
+      const res = await api.get(API.admin.guardian.stats);
       const stats = res.data.data;
       
       // Calculate additional metrics

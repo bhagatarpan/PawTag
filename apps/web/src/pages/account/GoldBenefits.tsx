@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Crown, Check, Star, Truck, Headphones, Zap, Shield, Gift, ArrowRight } from 'lucide-react';
+import { API } from '@pawtag/shared/api';
 import api from '../../lib/api';
 
 type TierName = 'CARE' | 'NURTURE' | 'PROTECTOR' | 'SAFEGUARD';
@@ -45,7 +46,7 @@ export default function GoldBenefits() {
 
   async function fetchBenefits() {
     try {
-      const res = await api.get('/customer/guardian/points');
+      const res = await api.get(API.customer.guardian.points);
       setTierData(res.data.data);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to load benefits');

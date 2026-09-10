@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { API } from '@pawtag/shared/api';
 import { Save, Mail } from 'lucide-react';
 import api from '../../lib/api';
 
@@ -38,7 +39,7 @@ export default function CmsInvoiceTemplate() {
   const [showVars, setShowVars] = useState(false);
 
   useEffect(() => {
-    api.get('/admin/cms/email/email-templates/slug/invoice-template')
+    api.get(API.admin.cms.emailTemplates.getInvoiceTemplate)
       .then((res) => {
         const t = res.data.data;
         setTemplate(t);
@@ -57,7 +58,7 @@ export default function CmsInvoiceTemplate() {
       if (template?._id) {
         await api.put(`/admin/cms/email/email-templates/${template._id}`, { body });
       } else {
-        await api.post('/admin/cms/email/email-templates', {
+        await api.post(API.admin.cms.emailTemplates.list, {
           name: 'Invoice Template',
           slug: 'invoice-template',
           subject: 'Invoice {{invoice.number}}',

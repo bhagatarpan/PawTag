@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
+import { API } from '@pawtag/shared/api';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import api from '../lib/api';
@@ -395,8 +396,8 @@ function DetailDrawer({
     setRelatedLoading(true);
     try {
       const endpoint = ev.transactionId
-        ? `/admin/audit/transaction/${ev.transactionId}`
-        : `/admin/audit/correlation/${ev.correlationId}`;
+        ? API.admin.audit.transaction(ev.transactionId)
+        : API.admin.audit.correlation(ev.correlationId!);
       const res = await api.get(endpoint);
       setRelatedEvents((res.data.data || []).filter((e: AuditEvent) => e.auditEventId !== ev.auditEventId));
     } catch {
@@ -410,7 +411,7 @@ function DetailDrawer({
     if (!ev.resourceType || !ev.resourceId) return;
     setEntityLoading(true);
     try {
-      const res = await api.get(`/admin/audit/entity/${ev.resourceType}/${ev.resourceId}`, { params: { limit: 20 } });
+      const res = await api.get(API.admin.audit.entity(ev.resourceType!, ev.resourceId!), { params: { limit: 20 } });
       setEntityHistory((res.data.data || []).filter((e: AuditEvent) => e.auditEventId !== ev.auditEventId));
     } catch {
       setEntityHistory([]);
@@ -1013,7 +1014,7 @@ export default function AuditTrail() {
   const fetchSummary = useCallback(async () => {
     setSummaryLoading(true);
     try {
-      const res = await api.get('/admin/audit/summary');
+      const res = await api.get(API.admin.audit.summary);
       setSummary(res.data.data);
     } catch {
       // Summary is non-critical
@@ -1088,7 +1089,7 @@ export default function AuditTrail() {
     if (!purgeRange) return;
     setPurging(true);
     try {
-      const res = await api.post('/admin/audit/purge', {
+      const res = await api.post(API.admin.audit.purge, {
         startDate: purgeRange.start,
         endDate: purgeRange.end,
       });
@@ -1124,7 +1125,7 @@ export default function AuditTrail() {
       params.sortBy = filters.sortBy;
       params.sortDir = filters.sortDir;
 
-      const res = await api.get('/admin/audit', { params });
+      const res = await api.get(API.admin.audit.list, { params });
       setEvents(res.data.data.items || []);
       setTotal(res.data.data.total || 0);
       setTotalPages(res.data.data.totalPages || 0);
@@ -1143,7 +1144,7 @@ export default function AuditTrail() {
     setVerifyLoading(true);
     setVerify(null);
     try {
-      const res = await api.get('/admin/audit/verify-chain');
+      const res = await api.get(API.admin.audit.verifyChain);
       setVerify(res.data.data);
       if (res.data.data.valid) {
         toast.success(`Chain intact — ${res.data.data.checked} event(s) verified`);
@@ -1174,7 +1175,7 @@ export default function AuditTrail() {
       if (filters.startDate) params.startDate = filters.startDate;
       if (filters.endDate) params.endDate = filters.endDate;
 
-      const res = await api.get('/admin/audit/export', { params, responseType: 'blob' });
+      const res = await api.get(API.admin.audit.export, { params, responseType: 'blob' });
       const blob = new Blob([res.data]);
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -1370,7 +1371,7 @@ export default function AuditTrail() {
               {/* Settings and Refresh buttons */}
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => navigate('/admin/audit/settings')}
+                  onClick={() => navigate(API.admin.audit.settings.get)}
                   className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-700 bg-white rounded-lg hover:bg-gray-50 transition-colors"
                   disabled={!hasPermission('audit.admin')}
                   title="Audit Settings"

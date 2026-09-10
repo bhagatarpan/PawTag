@@ -53,6 +53,7 @@ import {
 import { useAuth } from '../lib/auth';
 import { useTheme } from '../hooks/useTheme';
 import { useSidebarCollapse } from '../hooks/useSidebarCollapse';
+import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
 
 interface SidebarLink {
@@ -260,7 +261,7 @@ export default function Sidebar() {
 
   useEffect(() => {
     const fetchCount = () => {
-      api.get('/admin/notifications/unread-count')
+      api.get(API.admin.notifications.unreadCount)
         .then((res) => setUnreadCount(res.data.data?.count || 0))
         .catch(() => {});
     };

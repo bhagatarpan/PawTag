@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Users, CheckCircle, Clock, Gift, ExternalLink } from 'lucide-react';
+import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
 
 export default function Referrals() {
@@ -11,8 +12,8 @@ export default function Referrals() {
   const fetchData = () => {
     setLoading(true);
     Promise.all([
-      api.get('/admin/referrals', { params: { page, limit: 20 } }),
-      api.get('/admin/referrals/stats'),
+      api.get(API.admin.referrals.list, { params: { page, limit: 20 } }),
+      api.get(API.admin.referrals.stats),
     ]).then(([listRes, statsRes]) => {
       setData(listRes.data.data);
       setStats(statsRes.data.data);

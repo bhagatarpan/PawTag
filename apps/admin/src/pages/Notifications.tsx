@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
 import { Bell, CheckCheck, ExternalLink } from 'lucide-react';
 
@@ -23,7 +24,7 @@ export default function Notifications() {
 
   const fetchNotifications = async () => {
     try {
-      const res = await api.get('/admin/notifications');
+      const res = await api.get(API.admin.notifications.list);
       setNotifications(res.data.data || []);
     } catch {
     } finally {
@@ -33,7 +34,7 @@ export default function Notifications() {
 
   const markAsRead = async (id: string) => {
     try {
-      await api.put(`/admin/notifications/${id}/read`);
+      await api.put(API.admin.notifications.markRead(id));
       setNotifications((prev) =>
         prev.map((n) => (n._id === id ? { ...n, read: true } : n))
       );
@@ -43,7 +44,7 @@ export default function Notifications() {
 
   const markAllAsRead = async () => {
     try {
-      await api.put('/admin/notifications/mark-all-read');
+      await api.put(API.admin.notifications.markAllRead);
       setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
     } catch {
     }

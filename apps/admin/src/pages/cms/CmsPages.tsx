@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { API } from '@pawtag/shared/api';
 import { useNavigate } from 'react-router-dom';
 import api, { PaginatedData } from '../../lib/api';
 
@@ -25,7 +26,7 @@ export default function CmsPages() {
 
   const fetchData = () => {
     setLoading(true);
-    api.get('/admin/cms/pages', { params: { page, limit: 20, search: search || undefined, status: statusFilter || undefined } })
+    api.get(API.admin.cms.pages.list, { params: { page, limit: 20, search: search || undefined, status: statusFilter || undefined } })
       .then((res) => setData(res.data.data))
       .catch(console.error)
       .finally(() => setLoading(false));

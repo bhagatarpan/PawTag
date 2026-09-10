@@ -4,6 +4,7 @@ import {
   QrCode, Info,
 } from 'lucide-react';
 import { EmptyState } from '@pawtag/ui';
+import { API } from '@pawtag/shared/api';
 import api from '../../lib/api';
 import type { Notification } from '../../types';
 
@@ -51,7 +52,7 @@ export default function Notifications() {
   const [timers, setTimers] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    api.get('/customer/notifications')
+    api.get(API.customer.notifications.list)
       .then((r) => setNotifications(r.data.data))
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -77,21 +78,21 @@ export default function Notifications() {
 
   const markRead = async (id: string) => {
     try {
-      await api.put(`/customer/notifications/${id}/read`);
+      await api.put(API.customer.notifications.markRead(id));
       setNotifications((prev) => prev.map((n) => n._id === id ? { ...n, read: true } : n));
     } catch {}
   };
 
   const markAllRead = async () => {
     try {
-      await api.put('/customer/notifications/mark-all-read');
+      await api.put(API.customer.notifications.markAllRead);
       setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
     } catch {}
   };
 
   const clearRead = async () => {
     try {
-      await api.delete('/customer/notifications/clear-read');
+      await api.delete(API.customer.notifications.clearRead);
       setNotifications((prev) => prev.filter((n) => !n.read));
     } catch {}
   };

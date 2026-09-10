@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Mail, Smartphone, CheckCircle, Loader2, ArrowRight, Shield, LogIn, Pencil, X, Check } from 'lucide-react';
 import api from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import { API } from '@pawtag/shared';
 
 interface VerificationStatus {
   verified: boolean;
@@ -149,7 +150,7 @@ export default function CheckoutVerificationGate({ children }: CheckoutVerificat
       const payload: Record<string, string> = {};
       if (editingField === 'email') payload.email = editValue;
       if (editingField === 'phone') payload.phoneNumber = editValue;
-      await api.put('/auth/profile', payload);
+      await api.put(API.auth.profile, payload);
       // Reset verification state for the changed field
       if (editingField === 'email') {
         setEmailStep('idle');

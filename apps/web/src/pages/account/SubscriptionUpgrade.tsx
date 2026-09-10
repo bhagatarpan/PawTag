@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Check, ArrowRight } from 'lucide-react';
+import { API } from '@pawtag/shared/api';
 import api from '../../lib/api';
 
 interface SubscriptionData {
@@ -55,9 +56,9 @@ export default function SubscriptionUpgrade() {
   async function fetchData() {
     try {
       const [subsRes, plansRes, tierRes] = await Promise.all([
-        api.get('/customer/subscriptions').catch(() => ({ data: { data: [] } })),
-        api.get('/admin/products?isSubscription=true&isActive=true').catch(() => ({ data: { data: [] } })),
-        api.get('/customer/guardian/points').catch(() => ({ data: { data: null } })),
+        api.get(API.customer.subscriptions.list).catch(() => ({ data: { data: [] } })),
+        api.get(`${API.admin.products.list}?isSubscription=true&isActive=true`).catch(() => ({ data: { data: [] } })),
+        api.get(API.customer.guardian.points).catch(() => ({ data: { data: null } })),
       ]);
 
       const subs = subsRes.data.data;
@@ -79,7 +80,7 @@ export default function SubscriptionUpgrade() {
 
     setUpgrading(true);
     try {
-      await api.post(`/customer/subscriptions/${subscription._id}/change-plan`, {
+      await api.post(API.customer.subscriptions.changePlan(subscription._id), {
         planId,
       });
       await fetchData();

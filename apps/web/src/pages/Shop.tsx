@@ -22,6 +22,7 @@ import { ProductCard, type ProductCardProduct } from '@pawtag/ui';
 import SeoHead from '../components/SeoHead';
 import { useShopPage, useSiteSettings } from '../hooks/useCms';
 import { getProductBadge } from '../utils/productHelpers';
+import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
 import { Package, Shield, Crown } from 'lucide-react';
 import analytics from '../lib/analytics';
@@ -146,7 +147,7 @@ export default function Shop() {
 
   /* ---- Fetch products from PawTag API ---- */
   useEffect(() => {
-    api.get('/products', { params: { limit: 50 } })
+    api.get(API.products.list, { params: { limit: 50 } })
       .then((res) => {
         const data = res.data?.data;
         setProducts(data?.items || []);
@@ -158,7 +159,7 @@ export default function Shop() {
   // Fetch Guardian tier for points earning display
   useEffect(() => {
     if (user) {
-      api.get('/customer/guardian/tier')
+      api.get(API.customer.guardian.tier)
         .then(res => {
           const tierData = res.data.data;
           setGuardianTier(tierData.tier || 'CARE');
@@ -170,7 +171,7 @@ export default function Shop() {
 
   // Fetch points rates for accurate per-product points display
   useEffect(() => {
-    api.get('/public/points/rates')
+    api.get(API.public.points.rates)
       .then(res => setPointsRates(res.data.data))
       .catch(() => {});
   }, []);

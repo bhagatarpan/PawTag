@@ -4,6 +4,7 @@
  */
 
 import { useEffect, useState, useCallback } from 'react';
+import { API } from '@pawtag/shared/api';
 import { Search, Loader2, Tag, Plus, Edit2, Trash2, X } from 'lucide-react';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
@@ -44,7 +45,7 @@ export default function Discounts() {
       setLoading(true);
       const params: Record<string, any> = { page, limit: 20 };
       if (search) params.search = search;
-      const res = await api.get('/admin/commerce/promo-codes', { params });
+      const res = await api.get(API.admin.commerce.promoCodes.list, { params });
       const data = res.data?.data;
       setCodes(data?.items || []);
       setTotalPages(data?.totalPages || 1);
@@ -65,7 +66,7 @@ export default function Discounts() {
         await api.put(`/admin/commerce/promo-codes/${editing._id}`, form);
         toast.success('Discount code updated');
       } else {
-        await api.post('/admin/commerce/promo-codes', form);
+        await api.post(API.admin.commerce.promoCodes.list, form);
         toast.success('Discount code created');
       }
       setShowForm(false);

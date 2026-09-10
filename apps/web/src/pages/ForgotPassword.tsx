@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { PawPrint, Mail, ArrowLeft, CheckCircle2, Loader2 } from 'lucide-react';
 import api from '../lib/api';
 import { useAuthPage } from '../hooks/useCms';
+import { API } from '@pawtag/shared';
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');
@@ -16,7 +17,7 @@ export default function ForgotPassword() {
     setError('');
     setLoading(true);
     try {
-      await api.post('/auth/forgot-password', { email });
+      await api.post(API.auth.forgotPassword, { email });
       setSuccess(true);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to send reset email. Please try again.');

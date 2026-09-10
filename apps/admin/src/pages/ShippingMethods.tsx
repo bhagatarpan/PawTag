@@ -10,6 +10,7 @@
  */
 
 import { useEffect, useState, useCallback } from 'react';
+import { API } from '@pawtag/shared/api';
 import { Search, Loader2, Plus, Edit2, Trash2, Truck, X } from 'lucide-react';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
@@ -65,7 +66,7 @@ export default function ShippingMethods() {
 
   // Load settings for rate types and carriers
   useEffect(() => {
-    api.get('/admin/commerce/settings').then((res) => {
+    api.get(API.admin.commerce.settings).then((res) => {
       const settings: CommerceSetting[] = res.data?.data || [];
       const rateTypesSetting = settings.find(s => s.key === 'commerce.shipping.rateTypes');
       const carriersSetting = settings.find(s => s.key === 'commerce.shipping.carriers');
@@ -91,7 +92,7 @@ export default function ShippingMethods() {
   const fetchMethods = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await api.get('/admin/commerce/shipping-methods', { params: { search, limit: 100 } });
+      const res = await api.get(API.admin.commerce.shippingMethods.list, { params: { search, limit: 100 } });
       setMethods(res.data?.data?.items || []);
     } catch { toast.error('Failed to load shipping methods'); }
     finally { setLoading(false); }
@@ -107,7 +108,7 @@ export default function ShippingMethods() {
         await api.put(`/admin/commerce/shipping-methods/${editing._id}`, form);
         toast.success('Shipping method updated');
       } else {
-        await api.post('/admin/commerce/shipping-methods', form);
+        await api.post(API.admin.commerce.shippingMethods.list, form);
         toast.success('Shipping method created');
       }
       setShowForm(false);

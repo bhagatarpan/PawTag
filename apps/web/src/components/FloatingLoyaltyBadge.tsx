@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Shield, ChevronUp, ChevronDown } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
 
 interface GuardianData {
@@ -17,7 +18,7 @@ export default function FloatingLoyaltyBadge() {
 
   useEffect(() => {
     if (user) {
-      api.get('/customer/guardian/tier')
+      api.get(API.customer.guardian.tier)
         .then(res => setData(res.data.data))
         .catch(() => {});
     }

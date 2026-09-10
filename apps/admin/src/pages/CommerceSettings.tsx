@@ -4,6 +4,7 @@
  */
 
 import { useEffect, useState, useCallback } from 'react';
+import { API } from '@pawtag/shared/api';
 import { Link } from 'react-router-dom';
 import { Save, Loader2, RefreshCcw, CreditCard, Truck, Receipt, Package, ShoppingCart, Clock, RotateCcw, Settings, Shield, Bell, Info, Plus, Trash2, Ban, X, Database, Link2, Unlink } from 'lucide-react';
 import api from '../lib/api';
@@ -141,7 +142,7 @@ export default function CommerceSettings() {
   const fetchSettings = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await api.get('/admin/commerce/settings');
+      const res = await api.get(API.admin.commerce.settings);
       const data = res.data?.data || res.data;
       setSettings(data);
       setEditedValues(Object.fromEntries(data.map((s: CommerceSetting) => [s.key, s.value])));
@@ -155,7 +156,7 @@ export default function CommerceSettings() {
 
   const fetchCancellationReasons = useCallback(async () => {
     try {
-      const res = await api.get('/admin/commerce/cancellation-reasons');
+      const res = await api.get(API.admin.commerce.cancellationReasons);
       if (Array.isArray(res.data?.data)) {
         setCancellationReasons(res.data.data);
       }
@@ -167,7 +168,7 @@ export default function CommerceSettings() {
   const saveCancellationReasons = async () => {
     setSavingReasons(true);
     try {
-      const res = await api.put('/admin/commerce/cancellation-reasons', { reasons: cancellationReasons });
+      const res = await api.put(API.admin.commerce.cancellationReasons, { reasons: cancellationReasons });
       if (Array.isArray(res.data?.data)) {
         setCancellationReasons(res.data.data);
       }
@@ -221,7 +222,7 @@ export default function CommerceSettings() {
 
   const fetchXeroStatus = useCallback(async () => {
     try {
-      const res = await api.get('/admin/commerce/accounting/status');
+      const res = await api.get(API.admin.commerce.accounting.status);
       setXeroStatus(res.data.data.xero);
     } catch {
       setXeroStatus({ connected: false });
@@ -231,7 +232,7 @@ export default function CommerceSettings() {
   const handleConnectXero = async () => {
     setXeroConnecting(true);
     try {
-      const res = await api.get('/admin/commerce/accounting/connect/xero');
+      const res = await api.get(API.admin.commerce.accounting.connectXero);
       if (res.data.success && res.data.data.authUrl) {
         window.location.href = res.data.data.authUrl;
       } else {
@@ -248,7 +249,7 @@ export default function CommerceSettings() {
     if (!window.confirm('Disconnect Xero? You will need to reconnect to export refunds.')) return;
     setXeroDisconnecting(true);
     try {
-      await api.delete('/admin/commerce/accounting/disconnect/xero');
+      await api.delete(API.admin.commerce.accounting.disconnectXero);
       toast.success('Xero disconnected');
       fetchXeroStatus();
     } catch (err: any) {
@@ -279,7 +280,7 @@ export default function CommerceSettings() {
         toast.info('No changes to save');
         return;
       }
-      await api.put('/admin/commerce/settings', { settings: changed });
+      await api.put(API.admin.commerce.settings, { settings: changed });
       toast.success(`Saved ${Object.keys(changed).length} setting(s)`);
       setHasChanges(false);
       fetchSettings();

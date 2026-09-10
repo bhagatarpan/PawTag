@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Shield, Star, Zap, Crown, ArrowRight, TrendingUp } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
 
 const tiers = [
@@ -55,7 +56,7 @@ export default function GuardianSection() {
 
   useEffect(() => {
     if (user) {
-      api.get('/customer/guardian/tier')
+      api.get(API.customer.guardian.tier)
         .then(res => setGuardianData(res.data.data))
         .catch(() => {});
     }

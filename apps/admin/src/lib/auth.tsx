@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { API } from '@pawtag/shared/api';
 import api from './api';
 
 interface User {
@@ -39,7 +40,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (token) {
       api
-        .get('/auth/me')
+        .get(API.auth.me)
         .then((res) => {
           const u = res.data.data;
           const isAdmin = u.rbacRoles?.some((r: any) =>
@@ -53,7 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           } else {
             setUser(u);
             // Fetch effective permissions for this user
-            return api.get(`/admin/rbac/users/${u.id}/effective-permissions`);
+            return api.get(API.admin.rbac.effectivePermissions(u.id));
           }
         })
         .then((res) => {
@@ -84,7 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       payload.captchaToken = captchaToken;
       payload.captchaAnswer = parseInt(captchaAnswer, 10);
     }
-    const res = await api.post('/auth/login', payload);
+    const res = await api.post(API.auth.login, payload);
     const data = res.data.data;
 
     // If MFA is required, return the data for the login page to handle

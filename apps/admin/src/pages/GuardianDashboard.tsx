@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
 
 interface GuardianStats {
@@ -40,8 +41,8 @@ export default function GuardianDashboard() {
   async function fetchData() {
     try {
       const [statsRes, activityRes] = await Promise.all([
-        api.get('/admin/guardian/stats'),
-        api.get('/admin/guardian/activity?limit=10'),
+        api.get(API.admin.guardian.stats),
+        api.get(`${API.admin.guardian.activity}?limit=10`),
       ]);
 
 setStats(statsRes.data.data);

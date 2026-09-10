@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
 
 interface FeatureFlag {
@@ -20,7 +21,7 @@ export default function FeatureFlags() {
   const fetchFlags = () => {
     setLoading(true);
     api
-      .get('/admin/feature-flags')
+      .get(API.admin.featureFlags.create)
       .then((res) => setFlags(res.data.data))
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -29,13 +30,13 @@ export default function FeatureFlags() {
   useEffect(() => { fetchFlags(); }, []);
 
   const toggleFlag = async (key: string, isEnabled: boolean) => {
-    await api.put(`/admin/feature-flags/${key}`, { isEnabled: !isEnabled });
+    await api.put(API.admin.featureFlags.toggle(key), { isEnabled: !isEnabled });
     fetchFlags();
   };
 
   const createFlag = async (e: React.FormEvent) => {
     e.preventDefault();
-    await api.post('/admin/feature-flags', form);
+    await api.post(API.admin.featureFlags.create, form);
     setShowForm(false);
     setForm({ key: '', name: '', description: '', isEnabled: false });
     fetchFlags();
@@ -43,7 +44,7 @@ export default function FeatureFlags() {
 
   const deleteFlag = async (key: string) => {
     if (!confirm('Delete this feature flag?')) return;
-    await api.delete(`/admin/feature-flags/${key}`);
+    await api.delete(API.admin.featureFlags.toggle(key));
     fetchFlags();
   };
 

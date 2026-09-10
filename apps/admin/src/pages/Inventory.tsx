@@ -19,6 +19,7 @@
  */
 
 import { useEffect, useState, useCallback } from 'react';
+import { API } from '@pawtag/shared/api';
 import { Search, Loader2, Package, AlertTriangle, Plus, Minus, History, ChevronDown, ChevronUp } from 'lucide-react';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
@@ -93,7 +94,7 @@ export default function Inventory() {
       const params: Record<string, any> = { limit: 100 };
       if (search) params.search = search;
 
-      const res = await api.get('/admin/commerce/products', { params });
+      const res = await api.get(API.admin.commerce.products, { params });
       const data = res.data?.data;
       setProducts(data?.items || []);
     } catch {

@@ -7,6 +7,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import { API } from '@pawtag/shared/api';
 import { Loader2, AlertTriangle, CheckCircle, RefreshCw, CreditCard, ExternalLink } from 'lucide-react';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
@@ -37,7 +38,7 @@ export default function PaymentReconciliation() {
   const runReconciliation = async () => {
     try {
       setChecking(true);
-      const res = await api.get('/admin/commerce/payments/reconciliation');
+      const res = await api.get(API.admin.commerce.payments.reconciliation);
       setResult(res.data?.data);
     } catch {
       toast.error('Failed to run reconciliation');

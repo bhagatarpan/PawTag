@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { Shield, RefreshCw, Printer, ArrowLeft } from 'lucide-react';
+import { API } from '@pawtag/shared/api';
 
 export default function InvoiceView() {
   const { token } = useParams<{ token: string }>();
@@ -32,7 +33,7 @@ export default function InvoiceView() {
 
   async function checkStatus() {
     try {
-      const res = await fetch(`/api/invoice/${token}/status`);
+      const res = await fetch(`/api${API.invoice.status(token!)}`);
       const data = await res.json();
       if (!res.ok) {
         setError(data.error || 'Invalid link');
@@ -58,7 +59,7 @@ export default function InvoiceView() {
     setOtpLoading(true);
     setOtpError('');
     try {
-      const res = await fetch(`/api/invoice/${token}/verify`, {
+      const res = await fetch(`/api${API.invoice.verify(token!)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ otp: code }),
@@ -83,7 +84,7 @@ export default function InvoiceView() {
   async function handleResendOtp() {
     setResendCooldown(60);
     try {
-      await fetch(`/api/invoice/${token}/resend-otp`, { method: 'POST' });
+      await fetch(`/api${API.invoice.resendOtp(token!)}`, { method: 'POST' });
     } catch {}
   }
 

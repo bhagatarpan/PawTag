@@ -4,6 +4,7 @@
  */
 
 import { useEffect, useState, useCallback } from 'react';
+import { API } from '@pawtag/shared/api';
 import { Search, Loader2, RotateCcw, Filter, Eye } from 'lucide-react';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
@@ -38,7 +39,7 @@ export default function Returns() {
       setLoading(true);
       const params: Record<string, any> = { limit: 50 };
       if (statusFilter !== 'all') params.status = statusFilter;
-      const res = await api.get('/admin/commerce/returns', { params });
+      const res = await api.get(API.admin.commerce.returns.list, { params });
       setReturns(res.data?.data?.items || []);
     } catch { toast.error('Failed to load returns'); }
     finally { setLoading(false); }

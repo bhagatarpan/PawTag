@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { API } from '@pawtag/shared/api';
 import { ShieldCheck } from 'lucide-react';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
@@ -64,7 +65,7 @@ export default function AuditSettings() {
 
   const fetchPolicy = () => {
     setLoading(true);
-    api.get('/admin/audit/settings')
+    api.get(API.admin.audit.settings.get)
       .then((res) => {
         setPolicy(res.data.data);
         // Set master enabled based on all categories and actors being enabled
@@ -84,7 +85,7 @@ export default function AuditSettings() {
     const id = `${kind}:${item.key}`;
     setSaving(id);
     try {
-      await api.put(`/admin/audit/settings/${kind}/${item.key}`, { enabled: !item.enabled });
+      await api.put(API.admin.audit.settings.update(kind, item.key), { enabled: !item.enabled });
       setPolicy((current) => current && {
         ...current,
         [kind === 'category' ? 'categories' : 'actors']: (kind === 'category' ? current.categories : current.actors)

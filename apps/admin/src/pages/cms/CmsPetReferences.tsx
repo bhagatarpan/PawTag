@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { API } from '@pawtag/shared/api';
 import { Database, Plus, Search, Edit, Trash2, Filter, Upload, Eye, EyeOff } from 'lucide-react';
 import api from '../../lib/api';
 
@@ -63,7 +64,7 @@ export default function CmsPetReferences() {
       if (editingRef) {
         await api.put(`/admin/cms/pet-refs/pet-references/${editingRef._id}`, form);
       } else {
-        await api.post('/admin/cms/pet-refs/pet-references', form);
+        await api.post(API.admin.cms.petReferences.list, form);
       }
       setShowForm(false);
       setEditingRef(null);
@@ -82,7 +83,7 @@ export default function CmsPetReferences() {
         label: line.trim(),
         value: line.trim().toLowerCase().replace(/\s+/g, '_'),
       }));
-      await api.post('/admin/cms/pet-refs/pet-references/bulk', { items });
+      await api.post(API.admin.cms.petReferences.bulk, { items });
       setShowBulkForm(false);
       fetchReferences();
     } catch (err: any) {

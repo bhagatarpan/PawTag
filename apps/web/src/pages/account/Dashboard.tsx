@@ -5,6 +5,7 @@ import {
   CheckCircle, Clock, ChevronRight, Shield, QrCode, Forward, X, Gift,
 } from 'lucide-react';
 import { SummaryCards, EmptyState, StatusBadge } from '@pawtag/ui';
+import { API } from '@pawtag/shared/api';
 import api from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import type { Pet, Tag as TagType, Subscription, Order, Notification } from '../../types';
@@ -125,13 +126,13 @@ export default function AccountDashboard() {
     async function fetchDashboard() {
       try {
         const [petsRes, tagsRes, subsRes, ordersRes, notifsRes, escRes, guardianRes] = await Promise.all([
-          api.get('/customer/pets').catch(() => ({ data: { data: [] } })),
-          api.get('/customer/tags').catch(() => ({ data: { data: [] } })),
-          api.get('/customer/subscriptions').catch(() => ({ data: { data: [] } })),
-          api.get('/customer/orders').catch(() => ({ data: { data: [] } })),
-          api.get('/customer/notifications').catch(() => ({ data: { data: [] } })),
-          api.get('/customer/escalations?status=pending').catch(() => ({ data: { data: [] } })),
-          api.get('/customer/guardian/points').catch(() => ({ data: { data: null } })),
+          api.get(API.customer.pets.list).catch(() => ({ data: { data: [] } })),
+          api.get(API.customer.tags.list).catch(() => ({ data: { data: [] } })),
+          api.get(API.customer.subscriptions.list).catch(() => ({ data: { data: [] } })),
+          api.get(API.customer.orders.list).catch(() => ({ data: { data: [] } })),
+          api.get(API.customer.notifications.list).catch(() => ({ data: { data: [] } })),
+          api.get(`${API.customer.escalations.list}?status=pending`).catch(() => ({ data: { data: [] } })),
+          api.get(API.customer.guardian.points).catch(() => ({ data: { data: null } })),
         ]);
         setData({
           pets: petsRes.data.data || [],
@@ -341,7 +342,7 @@ export default function AccountDashboard() {
                       <button
                         onClick={async () => {
                           if (confirm('Mark as resolved? This means you have made contact with the finder.')) {
-                            await api.post(`/customer/escalations/${esc._id}/resolve`);
+                            await api.post(API.customer.escalations.resolve(esc._id));
                             setData((prev) => prev ? { ...prev, escalations: prev.escalations.filter((e) => e._id !== esc._id) } : prev);
                           }
                         }}
@@ -352,7 +353,7 @@ export default function AccountDashboard() {
                       <button
                         onClick={async () => {
                           if (confirm('Forward this alert to your emergency contact now?')) {
-                            await api.post(`/customer/escalations/${esc._id}/forward`);
+                            await api.post(API.customer.escalations.forward(esc._id));
                             setData((prev) => prev ? { ...prev, escalations: prev.escalations.filter((e) => e._id !== esc._id) } : prev);
                           }
                         }}

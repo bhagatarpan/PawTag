@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { API } from '@pawtag/shared/api';
 import api from '../../lib/api';
 
 interface PointsData {
@@ -66,8 +67,8 @@ export default function GuardianPoints() {
   async function fetchPointsData() {
     try {
       const [pointsRes, historyRes] = await Promise.all([
-        api.get('/customer/guardian/points'),
-        api.get(`/customer/guardian/activity?limit=20&offset=${(page - 1) * 20}`),
+        api.get(API.customer.guardian.points),
+        api.get(`${API.customer.guardian.activity}?limit=20&offset=${(page - 1) * 20}`),
       ]);
 
       if (page === 1) {

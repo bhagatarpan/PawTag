@@ -11,6 +11,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Package, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { API } from '@pawtag/shared/api';
 import api from '../../lib/api';
 
 interface OrderItem {
@@ -51,7 +52,7 @@ export default function ReturnRequest() {
 
   useEffect(() => {
     if (!id) return;
-    api.get(`/customer/orders/${id}`)
+    api.get(API.customer.orders.get(id))
       .then((res) => setOrder(res.data.data))
       .catch(() => setError('Order not found'))
       .finally(() => setLoading(false));
@@ -90,7 +91,7 @@ export default function ReturnRequest() {
         quantity,
       }));
 
-      await api.post('/customer/returns', {
+      await api.post(API.customer.returns.create, {
         orderId: id,
         reason: returnReason,
         items,

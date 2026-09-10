@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
+import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
 import { ConfirmDialog } from '@pawtag/ui';
@@ -118,8 +119,8 @@ export default function RbacPermissions() {
     const params: any = {};
     if (groupFilter) params.groupId = groupFilter;
     Promise.all([
-      api.get('/admin/rbac/permissions', { params }),
-      api.get('/admin/rbac/permission-groups'),
+      api.get(API.admin.rbac.permissions.list, { params }),
+      api.get(API.admin.rbac.permissionGroups.list),
     ]).then(([pRes, gRes]) => {
       setPermissions(pRes.data.data);
       setGroups(gRes.data.data);
@@ -157,7 +158,7 @@ export default function RbacPermissions() {
     setFormError('');
     setSaving(true);
     try {
-      await api.post('/admin/rbac/permissions', form);
+      await api.post(API.admin.rbac.permissions.list, form);
       toast.success('Permission created');
       resetForm();
       setShowCreate(false);

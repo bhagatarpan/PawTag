@@ -4,6 +4,7 @@ import { PawPrint, Lock, Eye, EyeOff, CheckCircle2, Loader2, ArrowLeft } from 'l
 import api from '../lib/api';
 import { useAuthPage } from '../hooks/useCms';
 import { validatePassword } from '@pawtag/shared';
+import { API } from '@pawtag/shared';
 
 export default function ResetPassword() {
   const [searchParams] = useSearchParams();
@@ -50,7 +51,7 @@ export default function ResetPassword() {
 
     setLoading(true);
     try {
-      await api.post('/auth/reset-password', { token, newPassword: password });
+      await api.post(API.auth.resetPassword, { token, newPassword: password });
       setSuccess(true);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to reset password. Please try again.');

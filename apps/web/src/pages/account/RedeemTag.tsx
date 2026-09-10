@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { QrCode, CheckCircle, ArrowRight, Home } from 'lucide-react';
+import { API } from '@pawtag/shared/api';
 import api from '../../lib/api';
 
 export default function RedeemTag() {
@@ -17,7 +18,7 @@ export default function RedeemTag() {
     setLoading(true);
 
     try {
-      const res = await api.post('/customer/tags/redeem', { tagId: tagId.trim().toUpperCase() });
+      const res = await api.post(API.customer.tags.redeem, { tagId: tagId.trim().toUpperCase() });
       setRedeemedTag(res.data.data);
       setSuccess(true);
     } catch (err: any) {

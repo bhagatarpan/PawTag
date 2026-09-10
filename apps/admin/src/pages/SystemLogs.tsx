@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { API } from '@pawtag/shared/api';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
@@ -154,7 +155,7 @@ export default function SystemLogs() {
       if (startDate) params.startDate = new Date(startDate).toISOString();
       if (endDate) params.endDate = new Date(endDate + 'T23:59:59').toISOString();
 
-      const res = await api.get('/admin/system-logs', { params });
+      const res = await api.get(API.admin.systemLogs.list, { params });
       const data = res.data.data;
       setItems(data.items);
       setTotal(data.total);
@@ -168,7 +169,7 @@ export default function SystemLogs() {
 
   const fetchSummary = useCallback(async () => {
     try {
-      const res = await api.get('/admin/system-logs/summary');
+      const res = await api.get(API.admin.systemLogs.summary);
       setSummary(res.data.data);
     } catch { /* ignore */ }
   }, []);
@@ -257,7 +258,7 @@ export default function SystemLogs() {
       if (endDate) params.endDate = new Date(endDate + 'T23:59:59').toISOString();
 
       if (format === 'pdf') {
-        const res = await api.get('/admin/system-logs/export', { params });
+        const res = await api.get(API.admin.systemLogs.export, { params });
         const data = res.data.data || res.data;
         const logs = Array.isArray(data) ? data : [];
         const win = window.open('', '_blank');
@@ -272,7 +273,7 @@ export default function SystemLogs() {
         return;
       }
 
-      const res = await api.get('/admin/system-logs/export', { params, responseType: 'blob' });
+      const res = await api.get(API.admin.systemLogs.export, { params, responseType: 'blob' });
       const url = URL.createObjectURL(res.data);
       const a = document.createElement('a');
       a.href = url;
@@ -289,7 +290,7 @@ export default function SystemLogs() {
     setRelatedLogs([]);
     if (log.requestId) {
       try {
-        const res = await api.get(`/admin/system-logs/request/${log.requestId}`);
+        const res = await api.get(API.admin.systemLogs.request(log.requestId));
         setRelatedLogs(res.data.data.filter((r: SystemLogEntry) => r.logId !== log.logId));
       } catch { /* ignore */ }
     }
@@ -371,7 +372,7 @@ export default function SystemLogs() {
     if (!purgeRange) return;
     setPurging(true);
     try {
-      const res = await api.post('/admin/system-logs/purge', {
+      const res = await api.post(API.admin.systemLogs.purge, {
         startDate: purgeRange.start,
         endDate: purgeRange.end,
       });

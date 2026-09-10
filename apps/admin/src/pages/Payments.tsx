@@ -4,6 +4,7 @@
  */
 
 import { useEffect, useState, useCallback } from 'react';
+import { API } from '@pawtag/shared/api';
 import { Search, Loader2, CreditCard, Filter, Eye, RotateCcw } from 'lucide-react';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
@@ -39,7 +40,7 @@ export default function Payments() {
   const fetchTransactions = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await api.get('/admin/commerce/orders', { params: { page, limit: 20, search } });
+      const res = await api.get(API.admin.commerce.orders, { params: { page, limit: 20, search } });
       const data = res.data?.data;
       // Map orders to payment transactions
       const txns = (data?.items || []).map((o: any) => ({

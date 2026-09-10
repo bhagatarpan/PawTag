@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { API } from '@pawtag/shared/api';
 import { RefreshCw, Download, Filter, Search, XCircle, CheckCircle, Clock, AlertTriangle, ChevronDown, ChevronRight, RotateCcw } from 'lucide-react';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
@@ -78,7 +79,7 @@ export default function OrderRefunds() {
   const handleReconcileNow = async () => {
     setReconciling(true);
     try {
-      const res = await api.post('/admin/commerce/refunds/reconcile');
+      const res = await api.post(API.admin.commerce.refunds.reconcile);
       if (res.data.success) {
         const d = res.data.data;
         toast.success(`Reconciliation done: ${d.synced} synced, ${d.retried} retried, ${d.errors} errors`);
@@ -113,7 +114,7 @@ export default function OrderRefunds() {
       }
       if (search) params.search = search;
 
-      const res = await api.get('/admin/commerce/refunds', { params });
+      const res = await api.get(API.admin.commerce.refunds.list, { params });
       setData(res.data.data);
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Failed to load refunds');
@@ -144,7 +145,7 @@ export default function OrderRefunds() {
         const d = new Date(); d.setDate(1);
         params.dateFrom = d.toISOString();
       }
-      const res = await api.get('/admin/commerce/refunds/export', {
+      const res = await api.get(API.admin.commerce.refunds.export, {
         params,
         responseType: format === 'csv' || format === 'gl' ? 'blob' : 'json',
       });

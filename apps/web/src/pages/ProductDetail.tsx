@@ -26,6 +26,7 @@ import {
 import { ICON_MAP } from '@pawtag/ui';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
+import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
 import { getProductBadge } from '../utils/productHelpers';
 import analytics from '../lib/analytics';
@@ -96,7 +97,7 @@ export default function ProductDetail() {
 /* ---- Fetch product ---- */
    useEffect(() => {
      if (!id) return;
-     api.get(`/products/slug/${id}`)
+      api.get(API.products.bySlug(id!))
        .then((res) => {
          const productData = res.data?.data;
          setProduct(productData);
@@ -116,7 +117,7 @@ export default function ProductDetail() {
   // Fetch Guardian tier for points earning display
   useEffect(() => {
     if (user) {
-      api.get('/customer/guardian/tier')
+      api.get(API.customer.guardian.tier)
         .then(res => {
           const tierData = res.data.data;
           setGuardianTier(tierData.tier || 'CARE');
@@ -128,7 +129,7 @@ export default function ProductDetail() {
 
   // Fetch points rates for accurate points display
   useEffect(() => {
-    api.get('/public/points/rates')
+    api.get(API.public.points.rates)
       .then(res => setPointsRates(res.data.data))
       .catch(() => {});
   }, []);

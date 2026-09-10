@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
+import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
 import { ConfirmDialog } from '@pawtag/ui';
@@ -86,7 +87,7 @@ export default function RbacScopes() {
 
   const fetchScopes = () => {
     setLoading(true);
-    api.get('/admin/rbac/scopes')
+    api.get(API.admin.rbac.scopes.list)
       .then((res) => setScopes(res.data.data))
       .catch(() => toast.error('Failed to load scopes'))
       .finally(() => setLoading(false));
@@ -118,7 +119,7 @@ export default function RbacScopes() {
     setFormError('');
     setSaving(true);
     try {
-      await api.post('/admin/rbac/scopes', form);
+      await api.post(API.admin.rbac.scopes.list, form);
       toast.success('Scope created');
       setForm({ code: '', name: '', description: '' });
       setShowCreate(false);

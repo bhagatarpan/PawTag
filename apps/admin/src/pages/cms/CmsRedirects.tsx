@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { API } from '@pawtag/shared/api';
 import api, { PaginatedData } from '../../lib/api';
 import { Plus, Trash2 } from 'lucide-react';
 
@@ -23,7 +24,7 @@ export default function CmsRedirects() {
 
   const fetchData = () => {
     setLoading(true);
-    api.get('/admin/cms/redirects', { params: { page, limit: 20, search: search || undefined } })
+    api.get(API.admin.cms.redirects.list, { params: { page, limit: 20, search: search || undefined } })
       .then((res) => setData(res.data.data))
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -34,7 +35,7 @@ export default function CmsRedirects() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await api.post('/admin/cms/redirects', form);
+      await api.post(API.admin.cms.redirects.list, form);
       setShowForm(false);
       setForm({ from: '', to: '', type: 'permanent', status: 'active' });
       fetchData();

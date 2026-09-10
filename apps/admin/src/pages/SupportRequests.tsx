@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import axios from 'axios';
+import { API } from '@pawtag/shared/api';
+import api from '../lib/api';
 
 interface SupportRequest {
   _id: string;
@@ -35,7 +36,7 @@ export default function SupportRequests() {
       const params: Record<string, string> = { page: String(page), limit: '20' };
       if (filter === 'pending') params.resolved = 'false';
       if (filter === 'resolved') params.resolved = 'true';
-      const { data } = await axios.get('/api/admin/support-requests', { params });
+      const { data } = await api.get(API.admin.supportRequests.list, { params });
       if (data.success) {
         setRequests(data.data.requests);
         setPagination(data.data.pagination);
@@ -51,7 +52,7 @@ export default function SupportRequests() {
 
   const handleResolve = async (id: string) => {
     try {
-      await axios.patch(`/api/admin/support-requests/${id}/resolve`, { notes: resolveNotes });
+      await api.patch(API.admin.supportRequests.resolve(id), { notes: resolveNotes });
       setSelectedRequest(null);
       setResolveNotes('');
       fetchRequests(pagination.page);

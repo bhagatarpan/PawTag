@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { API } from '@pawtag/shared/api';
 import api, { PaginatedData } from '../lib/api';
 import { toast } from '../lib/toast';
 import { StatusBadge, AddressAutocomplete } from '@pawtag/ui';
@@ -219,7 +220,7 @@ export function DetailDrawer({
     if (!user) return;
     const handleEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', handleEsc);
-    api.get('/public/cms/onboarding').then((r) => {
+    api.get(API.public.cms.onboarding).then((r) => {
       setRelationshipOptions(r.data.data?.globalSettings?.relationshipOptions || ['Spouse', 'Partner', 'Parent', 'Sibling', 'Child', 'Uncle', 'Aunt', 'Cousin', 'Friend', 'Neighbour', 'Work Colleague', 'Other']);
     }).catch(() => {});
     return () => document.removeEventListener('keydown', handleEsc);
@@ -270,7 +271,7 @@ export function DetailDrawer({
     if (!user) return;
     setUserOrdersLoading(true);
     try {
-      const res = await api.get(`/admin/users/${user._id}/orders`, { params: { limit: 50 } });
+      const res = await api.get(API.admin.users.orders(user._id), { params: { limit: 50 } });
       setUserOrders(res.data.data?.items || []);
       setUserOrdersTotal(res.data.data?.total || 0);
     } catch { /* non-critical */ } finally { setUserOrdersLoading(false); }
@@ -280,7 +281,7 @@ export function DetailDrawer({
     if (!user) return;
     setUserSubscriptionsLoading(true);
     try {
-      const res = await api.get(`/admin/users/${user._id}/subscriptions`, { params: { limit: 50 } });
+      const res = await api.get(API.admin.users.subscriptions(user._id), { params: { limit: 50 } });
       setUserSubscriptions(res.data.data?.items || []);
       setUserSubscriptionsTotal(res.data.data?.total || 0);
     } catch { /* non-critical */ } finally { setUserSubscriptionsLoading(false); }
@@ -290,7 +291,7 @@ export function DetailDrawer({
     if (!user) return;
     setUserReferralsLoading(true);
     try {
-      const res = await api.get(`/admin/users/${user._id}/referrals`);
+      const res = await api.get(API.admin.users.referrals(user._id));
       setUserReferrals(res.data.data);
     } catch { /* non-critical */ } finally { setUserReferralsLoading(false); }
   }, [user]);
@@ -338,7 +339,7 @@ export function DetailDrawer({
     setEditSaving(true);
     setEditError('');
     try {
-      await api.put(`/admin/users/${user._id}`, editForm);
+      await api.put(API.admin.users.update(user._id), editForm);
       toast.success('User updated');
       setEditMode(false);
       onRefresh();
@@ -368,7 +369,7 @@ export function DetailDrawer({
     setResetLoading(true);
     setResetMsg('');
     try {
-      await api.post(`/admin/users/${user._id}/reset-password`, { newPassword: resetPw });
+      await api.post(API.admin.users.resetPassword(user._id), { newPassword: resetPw });
       setResetMsg('Password reset successfully');
       setResetPw('');
       toast.success('Password reset');
@@ -383,7 +384,7 @@ export function DetailDrawer({
   const handleLock = async () => {
     setActionLoading('lock');
     try {
-      await api.put(`/admin/users/${user._id}/lock`);
+      await api.put(API.admin.users.lock(user._id));
       toast.success('Account locked');
       onRefresh();
     } catch (err: any) {
@@ -396,7 +397,7 @@ export function DetailDrawer({
   const handleUnlock = async () => {
     setActionLoading('unlock');
     try {
-      await api.put(`/admin/users/${user._id}/unlock`);
+      await api.put(API.admin.users.unlock(user._id));
       toast.success('Account unlocked');
       onRefresh();
     } catch (err: any) {
@@ -410,7 +411,7 @@ export function DetailDrawer({
     if (!window.confirm(`Soft-delete user "${user.fullName}"? They will be hidden from lists but data is preserved.`)) return;
     setActionLoading('delete');
     try {
-      await api.delete(`/admin/users/${user._id}`);
+      await api.delete(API.admin.users.delete(user._id));
       toast.success('User soft-deleted');
       onClose();
       onRefresh();
@@ -424,7 +425,7 @@ export function DetailDrawer({
   const handleRoleAssign = async (roleId: string) => {
     setActionLoading('role');
     try {
-      await api.put(`/admin/users/${user._id}/role`, { roleId });
+      await api.put(API.admin.users.setRole(user._id), { roleId });
       toast.success('Role assigned');
       setRoleDropdownOpen(false);
       onRefresh();
@@ -438,7 +439,7 @@ export function DetailDrawer({
   const handleStatusChange = async (status: string) => {
     setActionLoading('status');
     try {
-      await api.put(`/admin/users/${user._id}/status`, { status });
+      await api.put(API.admin.users.setStatus(user._id), { status });
       toast.success('Status updated');
       onRefresh();
     } catch (err: any) {
@@ -451,7 +452,7 @@ export function DetailDrawer({
   const handleToggleMfa = async () => {
     setActionLoading('mfa');
     try {
-      await api.put(`/admin/users/${user._id}`, { mfaEnabled: user.mfaEnabled === false });
+      await api.put(API.admin.users.update(user._id), { mfaEnabled: user.mfaEnabled === false });
       toast.success(user.mfaEnabled === false ? 'MFA enabled' : 'MFA disabled');
       onRefresh();
     } catch (err: any) {
@@ -464,7 +465,7 @@ export function DetailDrawer({
   const handleToggleSkipOtp = async (skip: boolean) => {
     setActionLoading('skipOtp');
     try {
-      await api.put(`/admin/users/${user._id}/skip-invoice-otp`, { skip });
+      await api.put(API.admin.users.skipInvoiceOtp(user._id), { skip });
       toast.success(skip ? 'Skip OTP enabled for 24h' : 'Skip OTP disabled');
       onRefresh();
     } catch (err: any) {
@@ -980,7 +981,7 @@ export function DetailDrawer({
                               e.stopPropagation();
                               if (!confirm('Renew this subscription now?')) return;
                               try {
-                                await api.put(`/admin/subscriptions/${sub._id}/status`, { status: 'active' });
+                                await api.put(API.admin.subscriptions.setStatus(sub._id), { status: 'active' });
                                 toast.success('Subscription renewed');
                                 fetchUserSubscriptions();
                               } catch (err: any) {
@@ -1165,7 +1166,7 @@ export function DetailDrawer({
                       try {
                         const newVal = editForm.showOwnerNameInFinder === false;
                         setEditForm({ ...editForm, showOwnerNameInFinder: newVal });
-                        await api.put(`/admin/users/${user._id}`, { showOwnerNameInFinder: newVal });
+                        await api.put(API.admin.users.update(user._id), { showOwnerNameInFinder: newVal });
                         toast.success(newVal ? 'Name visible to finders' : 'Name hidden from finders');
                         onRefresh();
                       } catch (err: any) {
@@ -1202,7 +1203,7 @@ export function DetailDrawer({
                             const newVal = !editForm.notificationPreferences[key];
                             setEditForm({ ...editForm, notificationPreferences: { ...editForm.notificationPreferences, [key]: newVal } });
                             try {
-                              await api.put(`/admin/users/${user._id}`, { notificationPreferences: { [key]: newVal } });
+                              await api.put(API.admin.users.update(user._id), { notificationPreferences: { [key]: newVal } });
                               toast.success(`${label} notifications ${newVal ? 'enabled' : 'disabled'}`);
                               onRefresh();
                             } catch (err: any) {
@@ -1236,7 +1237,7 @@ export function DetailDrawer({
                               const newVal = !editForm.notificationPreferences.channels[key];
                               setEditForm({ ...editForm, notificationPreferences: { ...editForm.notificationPreferences, channels: { ...editForm.notificationPreferences.channels, [key]: newVal } } });
                               try {
-                                await api.put(`/admin/users/${user._id}`, { notificationPreferences: { channels: { [key]: newVal } } });
+                                await api.put(API.admin.users.update(user._id), { notificationPreferences: { channels: { [key]: newVal } } });
                                 toast.success(`${label} ${newVal ? 'enabled' : 'disabled'}`);
                                 onRefresh();
                               } catch (err: any) {
@@ -1400,7 +1401,7 @@ export default function Users({ defaultRoleFilter }: UsersProps) {
 
   // Fetch roles
   useEffect(() => {
-    api.get('/admin/rbac/roles').then((res) => setRbacRoles(res.data.data || [])).catch(console.error);
+    api.get(API.admin.rbac.roles.list).then((res) => setRbacRoles(res.data.data || [])).catch(console.error);
   }, []);
 
   // Apply default role filter from props
@@ -1421,7 +1422,7 @@ export default function Users({ defaultRoleFilter }: UsersProps) {
   const fetchSummary = useCallback(async () => {
     setSummaryLoading(true);
     try {
-      const res = await api.get('/admin/users', { params: { limit: 1000 } });
+      const res = await api.get(API.admin.users.list, { params: { limit: 1000 } });
       const items = res.data.data.items || [];
       const total = res.data.data.total || 0;
       const active = items.filter((u: UserRecord) => u.status === 'active').length;
@@ -1451,7 +1452,7 @@ export default function Users({ defaultRoleFilter }: UsersProps) {
         params.roleId = roleFilter;
       }
       
-      const res = await api.get('/admin/users', { params });
+      const res = await api.get(API.admin.users.list, { params });
       let items = res.data.data.items || [];
       
       // Client-side filter for admin view: exclude CUSTOMER role
@@ -1490,7 +1491,7 @@ export default function Users({ defaultRoleFilter }: UsersProps) {
         params.roleId = roleFilter;
       }
 
-      const res = await api.get('/admin/users', { params });
+      const res = await api.get(API.admin.users.list, { params });
       let items = res.data.data.items || [];
       
       // Client-side filter for admin view: exclude CUSTOMER role

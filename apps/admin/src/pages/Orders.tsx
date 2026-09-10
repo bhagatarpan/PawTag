@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
+import { API } from '@pawtag/shared/api';
 import api, { PaginatedData } from '../lib/api';
 import { toast } from '../lib/toast';
 import {
@@ -291,7 +292,7 @@ export function OrderDetailDrawer({
   const handleStatusChange = async (newStatus: string) => {
     setActionLoading('status');
     try {
-      await api.put(`/admin/orders/${order._id}/status`, { status: newStatus });
+      await api.put(API.admin.orders.setStatus(order._id), { status: newStatus });
       toast.success(`Order status updated to ${ORDER_STATUS_LABELS[newStatus]}`);
       onRefresh();
     } catch (err: any) {
@@ -304,7 +305,7 @@ export function OrderDetailDrawer({
   const handleCreateShipment = async () => {
     setActionLoading('shipment');
     try {
-      const res = await api.post(`/admin/orders/${order._id}/create-shipment`);
+      const res = await api.post(API.admin.orders.createShipment(order._id));
       toast.success(`Shipment created — Tracking: ${res.data.data.trackingNumber}`);
       onRefresh();
     } catch (err: any) {
@@ -317,7 +318,7 @@ export function OrderDetailDrawer({
   const handleMarkDelivered = async () => {
     setActionLoading('deliver');
     try {
-      await api.post(`/admin/orders/${order._id}/mark-delivered`);
+      await api.post(API.admin.orders.markDelivered(order._id));
       toast.success('Order marked as delivered');
       onRefresh();
     } catch (err: any) {
@@ -333,13 +334,13 @@ export function OrderDetailDrawer({
     setActionLoading(`invoice-${action}`);
     try {
       if (action === 'view') {
-        const res = await api.get(`/admin/invoices/${id}/view`);
+        const res = await api.get(API.admin.invoices.view(id));
         if (res.data.success) window.open(res.data.data.secureUrl, '_blank');
       } else if (action === 'email') {
-        const res = await api.post(`/admin/invoices/${id}/email`);
+        const res = await api.post(API.admin.invoices.email(id));
         toast.success(res.data.data?.message || 'Invoice emailed');
       } else {
-        const res = await api.get(`/admin/invoices/${id}/print`);
+        const res = await api.get(API.admin.invoices.print(id));
         const w = window.open('', '_blank');
         if (w) { w.document.write(res.data); w.document.close(); }
       }
@@ -1015,7 +1016,7 @@ export default function Orders() {
       const params: any = { page, limit: pageSize };
       if (statusFilter) params.status = statusFilter;
       if (search.trim()) params.search = search.trim();
-      const res = await api.get('/admin/orders', { params });
+      const res = await api.get(API.admin.orders.list, { params });
       setData(res.data.data);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to load orders');
@@ -1026,7 +1027,7 @@ export default function Orders() {
 
   const fetchSummary = useCallback(async () => {
     try {
-      const res = await api.get('/admin/orders', { params: { limit: 1000 } });
+      const res = await api.get(API.admin.orders.list, { params: { limit: 1000 } });
       const items: Order[] = res.data.data?.items || [];
       const s: SummaryData = {
         total: res.data.data?.total || 0,
@@ -1063,7 +1064,7 @@ export default function Orders() {
   useEffect(() => { fetchSummary(); }, [fetchSummary]);
 
   useEffect(() => {
-    api.get('/admin/commerce/cancellation-reasons')
+    api.get(API.admin.commerce.cancellationReasons)
       .then((res) => {
         if (Array.isArray(res.data?.data)) {
           setCancellationReasons(res.data.data);
@@ -1103,7 +1104,7 @@ export default function Orders() {
       if (actionModal.action === 'refund' && refundAmount) {
         payload.amount = parseFloat(refundAmount);
       }
-      await api.post(`/admin/orders/${actionModal.orderId}/${actionModal.action}`, payload);
+      await api.post(API.admin.orders.action(actionModal.orderId, actionModal.action), payload);
       toast.success(actionModal.action === 'cancel' ? 'Order cancelled' : 'Order refunded');
       setActionModal(null);
       setReason('');

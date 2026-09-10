@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { API } from '@pawtag/shared/api';
 import { useSearchParams } from 'react-router-dom';
 import { ImagePlus, X, Upload, Loader2, Search, SlidersHorizontal, ChevronDown, ChevronLeft, ChevronRight, Download, Trash2, Edit2, Save, Settings, AlertTriangle, RotateCcw, Database, FileText, Package, Activity, CheckCircle, AlertCircle, Info, Copy, Eye, Plus, GripVertical } from 'lucide-react';
 import { IconPicker, ICON_MAP, type IconPickerProps } from '@pawtag/ui';
@@ -145,7 +146,7 @@ function DetailDrawer({
   const handleToggleActive = async () => {
     setActionLoading('toggle');
     try {
-      await api.put(`/admin/products/${product._id}`, { isActive: !product.isActive });
+      await api.put(API.admin.products.update(product._id), { isActive: !product.isActive });
       toast.success(product.isActive ? 'Product deactivated' : 'Product activated');
       onRefresh();
     } catch (err: any) {
@@ -159,7 +160,7 @@ function DetailDrawer({
     if (!window.confirm(`Delete product "${product.name}"? This cannot be undone.`)) return;
     setActionLoading('delete');
     try {
-      await api.delete(`/admin/products/${product._id}`);
+      await api.delete(API.admin.products.delete(product._id));
       toast.success('Product deleted');
       onClose();
       onRefresh();
@@ -532,7 +533,7 @@ const [form, setForm] = useState({
     // Persist to server
     setReorderSaving(true);
     const items = reordered.map((p, i) => ({ id: p._id, sortOrder: i }));
-    api.put('/admin/commerce/products/reorder', { items })
+    api.put(API.admin.commerce.reorderProducts, { items })
       .then(() => toast.success('Display order saved'))
       .catch(() => toast.error('Failed to save display order'))
       .finally(() => setReorderSaving(false));
@@ -552,7 +553,7 @@ const [form, setForm] = useState({
   const fetchSummary = useCallback(async () => {
     setSummaryLoading(true);
     try {
-      const res = await api.get('/admin/products', { params: { limit: 10000 } });
+      const res = await api.get(API.admin.products.list, { params: { limit: 10000 } });
       const items = res.data.data.items || [];
       const total = res.data.data.total || 0;
       const active = items.filter((p: Product) => p.isActive).length;
@@ -586,7 +587,7 @@ const [form, setForm] = useState({
       if (category) params.category = category;
       if (isActive) params.isActive = isActive;
       if (stockStatus) params.stockStatus = stockStatus;
-      const res = await api.get('/admin/products', { params });
+      const res = await api.get(API.admin.products.list, { params });
       setData(res.data.data);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to load products');
@@ -652,10 +653,10 @@ const openEdit = (p: Product) => {
     try {
       const payload = { ...form, category: 'PawTag', variants, images };
       if (editing) {
-        await api.put(`/admin/products/${editing._id}`, payload);
+        await api.put(API.admin.products.update(editing._id), payload);
         toast.success('Product updated');
       } else {
-        await api.post('/admin/products', payload);
+        await api.post(API.admin.products.create, payload);
         toast.success('Product created');
       }
       setShowForm(false);
@@ -675,7 +676,7 @@ const openEdit = (p: Product) => {
     try {
       const formData = new FormData();
       Array.from(files).forEach((file) => formData.append('images', file));
-      const res = await api.post('/upload/product-images', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+      const res = await api.post(API.upload.productImages, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
       const uploaded = res.data.data.images.map((img: { url: string }) => img.url);
       setImages((prev) => [...prev, ...uploaded]);
       toast.success('Images uploaded');
@@ -691,7 +692,7 @@ const openEdit = (p: Product) => {
     if (!window.confirm('Delete this image?')) return;
     try {
       const filename = imageUrl.split('/').pop();
-      if (filename) await api.delete(`/upload/product-images/${filename}`);
+      if (filename) await api.delete(API.upload.deleteProductImage(filename));
       setImages((prev) => prev.filter((url) => url !== imageUrl));
       toast.success('Image deleted');
     } catch (err: any) {
@@ -734,7 +735,7 @@ const openEdit = (p: Product) => {
       if (category) params.category = category;
       if (isActive) params.isActive = isActive;
       if (stockStatus) params.stockStatus = stockStatus;
-      const res = await api.get('/admin/products', { params });
+      const res = await api.get(API.admin.products.list, { params });
       const items = res.data.data.items || [];
       if (format === 'json') {
         const blob = new Blob([JSON.stringify(items, null, 2)], { type: 'application/json' });

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { API } from '@pawtag/shared/api';
 import api, { PaginatedData } from '../../lib/api';
 import { Plus, Trash2 } from 'lucide-react';
 
@@ -32,7 +33,7 @@ export default function CmsAnnouncements() {
 
   const fetchData = () => {
     setLoading(true);
-    api.get('/admin/cms/announcements', { params: { page, limit: 20 } })
+    api.get(API.admin.cms.announcements.list, { params: { page, limit: 20 } })
       .then((res) => setData(res.data.data))
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -68,7 +69,7 @@ export default function CmsAnnouncements() {
       if (editing) {
         await api.put(`/admin/cms/announcements/${editing._id}`, payload);
       } else {
-        await api.post('/admin/cms/announcements', payload);
+        await api.post(API.admin.cms.announcements.list, payload);
       }
       setShowForm(false);
       fetchData();

@@ -7,6 +7,7 @@
  */
 
 import { useEffect, useState, useCallback } from 'react';
+import { API } from '@pawtag/shared/api';
 import { Search, Loader2, ClipboardCheck, Clock, Package, CheckCircle, Filter } from 'lucide-react';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
@@ -45,7 +46,7 @@ export default function Fulfilment() {
       const params: Record<string, any> = { page, limit: 20 };
       if (statusFilter !== 'all') params.status = statusFilter;
       if (search) params.search = search;
-      const res = await api.get('/admin/commerce/fulfilments', { params });
+      const res = await api.get(API.admin.commerce.fulfilments.list, { params });
       const data = res.data?.data;
       setFulfilments(data?.items || []);
       setTotalPages(data?.totalPages || 1);

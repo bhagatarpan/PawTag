@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PawPrint, Plus, CheckCircle, X, Save, Upload, Info, QrCode, Camera, Sparkles } from 'lucide-react';
+import { API } from '@pawtag/shared/api';
 import api from '../../lib/api';
 import HealthRecords from './HealthRecords';
 import SaveToast from '../../components/SaveToast';
@@ -69,7 +70,7 @@ function PhotoManager({ photos, onChange }: { photos: PhotoItem[]; onChange: (ph
     try {
       const formData = new FormData();
       formData.append('photo', file);
-      const res = await api.post('/upload/pet-photo', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+      const res = await api.post(API.upload.petPhoto, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
       addPhoto(res.data.data.url, captionInput || undefined);
       setCaptionInput('');
     } catch (err: any) { setError(err.response?.data?.error || 'Upload failed'); }
@@ -138,7 +139,7 @@ export default function MyPets() {
 
   const refreshPets = () => {
     setLoading(true);
-    api.get('/customer/pets')
+    api.get(API.customer.pets.list)
       .then((r) => setPets(r.data.data))
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -146,13 +147,13 @@ export default function MyPets() {
   useEffect(() => { refreshPets(); }, []);
 
   useEffect(() => {
-    api.get('/customer/tags/unredeemed-count').then((r) => setUnredeemedCount(r.data.data.count)).catch(() => {});
+    api.get(API.customer.tags.unredeemedCount).then((r) => setUnredeemedCount(r.data.data.count)).catch(() => {});
   }, []);
 
   useEffect(() => {
     const foundPets = pets.filter((p) => p.status === 'found');
     foundPets.forEach((pet) => {
-      api.get(`/customer/pets/${pet._id}/found-timer`).then((r) => {
+      api.get(API.customer.pets.foundTimer(pet._id)).then((r) => {
         if (r.data.data.active) setFoundTimers((prev) => ({ ...prev, [pet._id]: r.data.data }));
       }).catch(() => {});
     });
@@ -210,17 +211,17 @@ export default function MyPets() {
     if (form.dateOfBirth) payload.dateOfBirth = form.dateOfBirth;
     if (form.age !== '') payload.age = parseFloat(form.age);
     try {
-      if (editingPet) { await api.put(`/customer/pets/${editingPet._id}`, payload); } else { await api.post('/customer/pets', payload); }
+      if (editingPet) { await api.put(API.customer.pets.update(editingPet._id), payload); } else { await api.post(API.customer.pets.create, payload); }
       cancelForm(); refreshPets(); setShowSaved(true);
     } catch (err: any) {
       alert(err.response?.data?.error || 'Failed to save pet');
     }
   };
 
-  const markLost = async (id: string) => { try { await api.post(`/customer/pets/${id}/mark-lost`); refreshPets(); } catch {} };
+  const markLost = async (id: string) => { try { await api.post(API.customer.pets.markLost(id)); refreshPets(); } catch {} };
   const markFound = async (id: string) => {
     try {
-      const res = await api.post(`/customer/pets/${id}/mark-found`);
+      const res = await api.post(API.customer.pets.markFound(id));
       const timeMs = res.data.data.timeToFoundMs;
       if (timeMs) {
         const hours = Math.floor(timeMs / (1000 * 60 * 60));
@@ -234,9 +235,9 @@ export default function MyPets() {
   };
   const markTerminal = async (id: string, reason: string) => {
     if (!confirm(`Mark pet as ${reason}? This action cannot be undone from the portal.`)) return;
-    try { await api.post(`/customer/pets/${id}/mark-terminal`, { reason }); refreshPets(); } catch {}
+    try { await api.post(API.customer.pets.markTerminal(id), { reason }); refreshPets(); } catch {}
   };
-  const deletePet = async (id: string) => { if (confirm('Delete this pet? This cannot be undone.')) { try { await api.delete(`/customer/pets/${id}`); refreshPets(); } catch {} } };
+  const deletePet = async (id: string) => { if (confirm('Delete this pet? This cannot be undone.')) { try { await api.delete(API.customer.pets.delete(id)); refreshPets(); } catch {} } };
 
   return (
     <div className="max-w-5xl">

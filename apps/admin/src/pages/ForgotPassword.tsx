@@ -1,5 +1,6 @@
 import { useState, FormEvent } from 'react';
 import { Link } from 'react-router-dom';
+import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
 
 export default function ForgotPassword() {
@@ -13,7 +14,7 @@ export default function ForgotPassword() {
     setError('');
     setLoading(true);
     try {
-      await api.post('/auth/forgot-password', { email });
+      await api.post(API.auth.forgotPassword, { email });
       setSuccess(true);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Request failed. Please try again.');

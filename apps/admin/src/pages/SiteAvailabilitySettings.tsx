@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import { API } from '@pawtag/shared/api';
 import { SiteAvailabilityStatus } from '@pawtag/shared';
 import { StatusBadge, ConfirmDialog } from '@pawtag/ui';
 import { Globe, AlertTriangle, WifiOff } from 'lucide-react';
@@ -54,7 +55,7 @@ export default function SiteAvailabilitySettings() {
 
   const fetchStatus = useCallback(async () => {
     try {
-      const res = await api.get('/admin/site-availability/status');
+      const res = await api.get(API.admin.siteAvailability.status);
       const d = res.data.data;
       setData(d);
       setMaintenanceTitle(d.messages.maintenanceTitle);
@@ -74,7 +75,7 @@ export default function SiteAvailabilitySettings() {
   const updateField = async (field: string, value: boolean | string | number) => {
     setSaving(true);
     try {
-      const res = await api.put('/admin/site-availability/status', { [field]: value });
+      const res = await api.put(API.admin.siteAvailability.status, { [field]: value });
       setData(res.data.data);
       toast.success('Setting updated');
     } catch {
@@ -121,7 +122,7 @@ export default function SiteAvailabilitySettings() {
   const handleSaveMessages = async () => {
     setSaving(true);
     try {
-      await api.put('/admin/site-availability/status', {
+      await api.put(API.admin.siteAvailability.status, {
         maintenanceTitle,
         maintenanceMessage,
         offlineTitle,
@@ -138,7 +139,7 @@ export default function SiteAvailabilitySettings() {
   const handleSavePollingInterval = async () => {
     setSaving(true);
     try {
-      await api.put('/admin/site-availability/status', { pollingInterval });
+      await api.put(API.admin.siteAvailability.status, { pollingInterval });
       toast.success('Polling interval updated');
     } catch {
       toast.error('Failed to update polling interval');

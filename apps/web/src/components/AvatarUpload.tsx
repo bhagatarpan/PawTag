@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { Camera, Loader2, X } from 'lucide-react';
 import api from '../lib/api';
+import { API } from '@pawtag/shared';
 
 interface AvatarUploadProps {
   currentPicture?: string | null;
@@ -89,7 +90,7 @@ export default function AvatarUpload({ currentPicture, userName, onUploadComplet
 
   const handleRemove = async () => {
     try {
-      await api.put('/auth/profile', { profilePicture: '' });
+      await api.put(API.auth.profile, { profilePicture: '' });
       onUploadComplete('');
       setShowModal(false);
       setPreview(null);

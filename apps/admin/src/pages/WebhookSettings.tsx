@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import { API } from '@pawtag/shared/api';
 import { RefreshCw, Zap, Shield, Monitor, Clock, AlertTriangle, CheckCircle, XCircle, Loader2, Trash2, ChevronDown, ChevronUp, ArrowRight } from 'lucide-react';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
@@ -139,7 +140,7 @@ export default function WebhookSettings() {
 
   const fetchStatus = useCallback(async () => {
     try {
-      const res = await api.get('/admin/webhooks/status');
+      const res = await api.get(API.admin.webhooks.status);
       setStatus(res.data.data);
       setSettings({
         reconciliationEnabled: res.data.data.layer2_reconciliation.enabled,
@@ -157,7 +158,7 @@ export default function WebhookSettings() {
 
   const fetchDeadLetters = useCallback(async () => {
     try {
-      const res = await api.get('/admin/webhooks/dead-letter');
+      const res = await api.get(API.admin.webhooks.deadLetter);
       setDeadLetters(res.data.data.events);
     } catch {
       toast.error('Failed to load dead-letter events');
@@ -173,7 +174,7 @@ export default function WebhookSettings() {
   const triggerAction = async (action: string, label: string) => {
     setTriggering(action);
     try {
-      await api.post(`/admin/webhooks/${action}`);
+      await api.post(API.admin.webhooks.action(action));
       toast.success(`${label} triggered successfully`);
       setTimeout(fetchStatus, 2000);
     } catch (err: any) {
@@ -185,7 +186,7 @@ export default function WebhookSettings() {
 
   const retryEvent = async (eventId: string) => {
     try {
-      await api.post(`/admin/webhooks/retry/${eventId}`);
+      await api.post(API.admin.webhooks.retry(eventId));
       toast.success('Event retried successfully');
       fetchDeadLetters();
       fetchStatus();
@@ -197,7 +198,7 @@ export default function WebhookSettings() {
   const retryAll = async () => {
     setTriggering('retry-all');
     try {
-      const res = await api.post('/admin/webhooks/retry-all');
+      const res = await api.post(API.admin.webhooks.retryAll);
       toast.success(res.data.data.message);
       fetchDeadLetters();
       fetchStatus();
@@ -210,7 +211,7 @@ export default function WebhookSettings() {
 
   const purgeDeadLetters = async () => {
     try {
-      const res = await api.delete('/admin/webhooks/dead-letter');
+      const res = await api.delete(API.admin.webhooks.deadLetter);
       toast.success(`Purged ${res.data.data.deletedCount} dead-letter events`);
       fetchDeadLetters();
       fetchStatus();
@@ -222,7 +223,7 @@ export default function WebhookSettings() {
   const saveSettings = async () => {
     setSaving(true);
     try {
-      await api.put('/admin/webhooks/settings', settings);
+      await api.put(API.admin.webhooks.settings, settings);
       toast.success('Settings saved');
       fetchStatus();
     } catch (err: any) {

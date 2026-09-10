@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Copy, Share2, Users, Gift, Clock, CheckCircle } from 'lucide-react';
+import { API } from '@pawtag/shared/api';
 import api from '../../lib/api';
 
 export default function Referrals() {
@@ -12,9 +13,9 @@ export default function Referrals() {
 
   useEffect(() => {
     Promise.all([
-      api.get('/customer/referral'),
-      api.get('/customer/referral/stats'),
-      api.get('/customer/referral/history'),
+      api.get(API.customer.referral.get),
+      api.get(API.customer.referral.stats),
+      api.get(API.customer.referral.history),
     ]).then(([codeRes, statsRes, historyRes]) => {
       setCode(codeRes.data.data.code);
       setShareUrl(codeRes.data.data.shareUrl);

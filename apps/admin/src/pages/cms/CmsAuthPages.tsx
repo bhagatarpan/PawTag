@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { API } from '@pawtag/shared/api';
 import { Edit2, Save, X, Eye, EyeOff } from 'lucide-react';
 import api from '../../lib/api';
 import JsonEditor from '../../components/JsonEditor';
@@ -31,7 +32,7 @@ export default function CmsAuthPages() {
   const fetchPages = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await api.get('/admin/cms/auth-pages');
+      const res = await api.get(API.admin.cms.authPages.list);
       setPages(res.data.data || []);
     } catch {
       setError('Failed to load pages');

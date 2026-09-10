@@ -5,6 +5,7 @@ import api from '../lib/api';
 import { useAuthPage } from '../hooks/useCms';
 import { useAuth } from '../context/AuthContext';
 import { validatePassword } from '@pawtag/shared';
+import { API } from '@pawtag/shared';
 
 export default function Register() {
   const { login } = useAuth();
@@ -44,7 +45,7 @@ export default function Register() {
 
     setLoading(true);
     try {
-      await api.post('/auth/register', {
+      await api.post(API.auth.register, {
         fullName: form.fullName,
         email: form.email,
         phoneNumber: form.phoneNumber,

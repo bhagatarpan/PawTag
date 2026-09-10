@@ -1,4 +1,5 @@
 import { useState, FormEvent } from 'react';
+import { API } from '@pawtag/shared/api';
 import api from '../../lib/api';
 import { X, Plus, Trash2, Syringe, Cpu, Pill, AlertTriangle, Stethoscope, Scissors, Weight, Heart, Activity, Edit2 } from 'lucide-react';
 import SaveToast from '../../components/SaveToast';
@@ -45,7 +46,7 @@ export default function HealthRecords({ pet, onClose }: { pet: Pet; onClose: () 
   const fetchData = async (section: string) => {
     try {
       const apiSection = section === 'vetDetails' ? 'vet-details' : section === 'healthConditions' ? 'health-conditions' : section === 'weightHistory' ? 'weight-history' : section;
-      const res = await api.get(`/customer/pets/${pet._id}/${apiSection}`);
+      const res = await api.get(API.customer.pets.section(pet._id, apiSection));
       if (section === 'desexing') setDesexing(res.data.data);
       else setData((prev) => ({ ...prev, [section]: res.data.data }));
     } catch {}
@@ -57,11 +58,11 @@ export default function HealthRecords({ pet, onClose }: { pet: Pet; onClose: () 
       const isDesexing = tab === 'desexing';
       const apiSection = tab === 'vetDetails' ? 'vet-details' : tab === 'healthConditions' ? 'health-conditions' : tab === 'weightHistory' ? 'weight-history' : tab;
       if (editing?._id) {
-        if (isDesexing) await api.put(`/customer/pets/${pet._id}/${apiSection}`, editing);
-        else await api.put(`/customer/pets/${pet._id}/${apiSection}/${editing._id}`, editing);
+        if (isDesexing) await api.put(API.customer.pets.desexing(pet._id), editing);
+        else await api.put(API.customer.pets.sectionItem(pet._id, apiSection, editing._id), editing);
       } else {
-        if (isDesexing) await api.put(`/customer/pets/${pet._id}/${apiSection}`, editing);
-        else await api.post(`/customer/pets/${pet._id}/${apiSection}`, editing);
+        if (isDesexing) await api.put(API.customer.pets.desexing(pet._id), editing);
+        else await api.post(API.customer.pets.section(pet._id, apiSection), editing);
       }
       await fetchData(isDesexing ? 'desexing' : tab);
       setShowForm(false); setEditing(null); setShowSaved(true);
@@ -73,7 +74,7 @@ export default function HealthRecords({ pet, onClose }: { pet: Pet; onClose: () 
     if (!confirm('Delete this record?')) return;
     try {
       const apiSection = section === 'vetDetails' ? 'vet-details' : section === 'healthConditions' ? 'health-conditions' : section === 'weightHistory' ? 'weight-history' : section;
-      await api.delete(`/customer/pets/${pet._id}/${apiSection}/${id}`);
+      await api.delete(API.customer.pets.sectionItem(pet._id, apiSection, id));
       await fetchData(section);
     } catch (err: any) { setSaveError(err.response?.data?.error || 'Failed to delete record'); }
   };
@@ -98,7 +99,7 @@ export default function HealthRecords({ pet, onClose }: { pet: Pet; onClose: () 
         <div className="flex-1 overflow-y-auto p-6">
           {saveError && <div className="bg-red-50 text-red-600 text-sm p-3 rounded mb-4">{saveError}</div>}
           {tab === 'desexing' ? (
-            <DesexingSection desexing={desexing} onEdit={() => { setEditing({ ...desexing }); setShowForm(true); }} onSave={async (val: any) => { setSaving(true); setSaveError(''); try { await api.put(`/customer/pets/${pet._id}/desexing`, val); setDesexing(val); setShowSaved(true); } catch (err: any) { setSaveError(err.response?.data?.error || 'Failed to save'); } setSaving(false); }} saving={saving} />
+            <DesexingSection desexing={desexing} onEdit={() => { setEditing({ ...desexing }); setShowForm(true); }} onSave={async (val: any) => { setSaving(true); setSaveError(''); try { await api.put(API.customer.pets.desexing(pet._id), val); setDesexing(val); setShowSaved(true); } catch (err: any) { setSaveError(err.response?.data?.error || 'Failed to save'); } setSaving(false); }} saving={saving} />
           ) : showForm ? (
             <FormSection tab={tab} petType={pet.petType} editing={editing} onChange={setEditing} onSave={handleSave} onCancel={() => { setShowForm(false); setEditing(null); }} saving={saving} />
           ) : (

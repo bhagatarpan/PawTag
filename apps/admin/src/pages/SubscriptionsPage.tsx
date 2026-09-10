@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
 
 interface Subscription {
@@ -65,7 +66,7 @@ export default function SubscriptionsPage() {
 
   async function fetchStats() {
     try {
-      const res = await api.get('/admin/subscriptions/stats');
+      const res = await api.get(API.admin.subscriptions.stats);
       setStats(res.data.data);
     } catch (err) {
       console.error('Failed to fetch stats:', err);
@@ -82,7 +83,7 @@ export default function SubscriptionsPage() {
       params.set('page', String(page));
       params.set('limit', '20');
 
-      const res = await api.get(`/admin/subscriptions?${params.toString()}`);
+      const res = await api.get(`${API.admin.subscriptions.list}?${params.toString()}`);
       setSubscriptions(res.data.data.items);
       setTotalPages(res.data.data.totalPages);
     } catch (err) {

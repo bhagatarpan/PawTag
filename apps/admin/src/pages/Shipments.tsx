@@ -7,6 +7,7 @@
  */
 
 import { useEffect, useState, useCallback } from 'react';
+import { API } from '@pawtag/shared/api';
 import { Search, Loader2, Truck, Package, CheckCircle, Clock, AlertTriangle, ExternalLink, RefreshCw, Filter } from 'lucide-react';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
@@ -62,7 +63,7 @@ export default function Shipments() {
       const params: Record<string, any> = { page, limit: 20 };
       if (statusFilter !== 'all') params.status = statusFilter;
       if (search) params.search = search;
-      const res = await api.get('/admin/commerce/shipments', { params });
+      const res = await api.get(API.admin.commerce.shipments.list, { params });
       const data = res.data?.data;
       setShipments(data?.items || []);
       setTotalPages(data?.totalPages || 1);
@@ -106,7 +107,7 @@ export default function Shipments() {
   const pollTracking = async () => {
     try {
       setPolling(true);
-      const res = await api.post('/admin/commerce/shipments/poll-tracking');
+      const res = await api.post(API.admin.commerce.shipments.pollTracking);
       const data = res.data?.data;
       toast.success(`Tracking updated: ${data?.updated || 0} shipments, ${data?.errors || 0} errors`);
       fetchShipments();

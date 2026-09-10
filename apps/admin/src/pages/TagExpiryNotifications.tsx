@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { API } from '@pawtag/shared/api';
 import { AlertTriangle, CheckCircle, Bell } from 'lucide-react';
 import api from '../lib/api';
 
@@ -12,8 +13,8 @@ export default function TagExpiryNotifications() {
   const fetchData = () => {
     setLoading(true);
     Promise.all([
-      api.get('/admin/tag-expiry-notifications', { params: { page, limit: 20, acknowledged: showAcknowledged } }),
-      api.get('/admin/tag-expiry-notifications/stats'),
+      api.get(API.admin.tagExpiryNotifications.list, { params: { page, limit: 20, acknowledged: showAcknowledged } }),
+      api.get(API.admin.tagExpiryNotifications.stats),
     ]).then(([listRes, statsRes]) => {
       setData(listRes.data.data);
       setStats(statsRes.data.data);
@@ -23,7 +24,7 @@ export default function TagExpiryNotifications() {
   useEffect(() => { fetchData(); }, [page, showAcknowledged]);
 
   const acknowledge = async (id: string) => {
-    await api.put(`/admin/tag-expiry-notifications/${id}/acknowledge`);
+    await api.put(API.admin.tagExpiryNotifications.acknowledge(id));
     fetchData();
   };
 

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
 
 interface GuardianSettings {
@@ -118,7 +119,7 @@ export default function GuardianSettings() {
 
   async function fetchSettings() {
     try {
-      const res = await api.get('/admin/guardian/settings');
+      const res = await api.get(API.admin.guardian.settings);
       setSettings({ ...DEFAULT_SETTINGS, ...res.data.data });
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to load settings');
@@ -133,7 +134,7 @@ export default function GuardianSettings() {
     setSuccess(null);
 
     try {
-      await api.put('/admin/guardian/settings', settings);
+      await api.put(API.admin.guardian.settings, settings);
       setSuccess('Settings saved successfully');
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to save settings');

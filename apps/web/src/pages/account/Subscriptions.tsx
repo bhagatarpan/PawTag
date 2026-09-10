@@ -1,5 +1,6 @@
 import { useState, useEffect, Component, ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import { API } from '@pawtag/shared/api';
 import api from '../../lib/api';
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
@@ -76,7 +77,7 @@ function SubscriptionsInner() {
 
   async function fetchSubscriptions() {
     try {
-      const res = await api.get('/customer/subscriptions');
+      const res = await api.get(API.customer.subscriptions.list);
       setSubscriptions(res.data.data);
     } catch (err) {
       console.error('Failed to fetch subscriptions:', err);
@@ -89,8 +90,8 @@ function SubscriptionsInner() {
     setDetailLoading(true);
     try {
       const [subRes, invRes] = await Promise.all([
-        api.get(`/customer/subscriptions/${id}`),
-        api.get(`/customer/subscriptions/${id}/invoices`),
+        api.get(API.customer.subscriptions.get(id)),
+        api.get(API.customer.subscriptions.invoices(id)),
       ]);
       const sub = subRes.data?.data;
       const invs = invRes.data?.data || [];
@@ -112,7 +113,7 @@ function SubscriptionsInner() {
     if (!confirm('Renew this subscription now?')) return;
     setActionLoading(true);
     try {
-      await api.put(`/customer/subscriptions/${id}/renew`);
+      await api.put(API.customer.subscriptions.renew(id));
       await fetchSubscriptions();
       if (selectedId === id) await fetchDetail(id);
     } catch (err: any) {
@@ -126,7 +127,7 @@ function SubscriptionsInner() {
     if (!confirm('Cancel this subscription? It will remain active until the end of the current billing period.')) return;
     setActionLoading(true);
     try {
-      await api.put(`/customer/subscriptions/${id}/cancel`, { reason: 'Customer request' });
+      await api.put(API.customer.subscriptions.cancel(id), { reason: 'Customer request' });
       await fetchSubscriptions();
       if (selectedId === id) await fetchDetail(id);
     } catch (err: any) {
@@ -139,7 +140,7 @@ function SubscriptionsInner() {
   async function handleToggleAutoRenew(id: string, current: boolean) {
     setActionLoading(true);
     try {
-      await api.put(`/customer/subscriptions/${id}/auto-renew`, { autoRenew: !current });
+      await api.put(API.customer.subscriptions.autoRenew(id), { autoRenew: !current });
       await fetchSubscriptions();
       if (selectedId === id) await fetchDetail(id);
     } catch (err: any) {
@@ -152,7 +153,7 @@ function SubscriptionsInner() {
   async function handleChangePlan(id: string, planType: string) {
     setActionLoading(true);
     try {
-      await api.post(`/customer/subscriptions/${id}/change-plan`, { planType });
+      await api.post(API.customer.subscriptions.changePlan(id), { planType });
       setShowChangePlan(false);
       await fetchSubscriptions();
       if (selectedId === id) await fetchDetail(id);
@@ -410,7 +411,7 @@ function SubscriptionsInner() {
                         onClick={async (e) => {
                           e.stopPropagation();
                           try {
-                            const res = await api.post(`/customer/invoices/${inv._id}/access`);
+                            const res = await api.post(API.customer.invoices.access(inv._id));
                             if (res.data.success) window.open(res.data.data.secureUrl, '_blank');
                           } catch {}
                         }}

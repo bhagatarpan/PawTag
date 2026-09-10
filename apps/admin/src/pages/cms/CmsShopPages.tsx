@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { API } from '@pawtag/shared/api';
 import { Plus, Edit2, Trash2, Save, X, Eye, EyeOff } from 'lucide-react';
 import api from '../../lib/api';
 import JsonEditor from '../../components/JsonEditor';
@@ -35,7 +36,7 @@ export default function CmsShopPages() {
   const fetchPages = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await api.get('/admin/cms/shop-pages');
+      const res = await api.get(API.admin.cms.shopPages.list);
       setPages(res.data.data || []);
     } catch {
       setError('Failed to load pages');
@@ -96,7 +97,7 @@ export default function CmsShopPages() {
       };
 
       if (editingId === 'new') {
-        await api.post('/admin/cms/shop-pages', payload);
+        await api.post(API.admin.cms.shopPages.list, payload);
       } else {
         await api.put(`/admin/cms/shop-pages/${editingId}`, payload);
       }

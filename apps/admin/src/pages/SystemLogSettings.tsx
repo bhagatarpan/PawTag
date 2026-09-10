@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { API } from '@pawtag/shared/api';
 import { Terminal } from 'lucide-react';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
@@ -44,7 +45,7 @@ export default function SystemLogSettings() {
 
   const fetchSettings = () => {
     setLoading(true);
-    api.get('/admin/system-logs/settings')
+    api.get(API.admin.systemLogs.settings.get)
       .then((res) => setSettings(res.data.data))
       .catch(() => toast.error('Failed to load system log settings'))
       .finally(() => setLoading(false));
@@ -55,7 +56,7 @@ export default function SystemLogSettings() {
   const updateSetting = async (key: string, value: string) => {
     setSaving(key);
     try {
-      await api.put(`/admin/system-logs/settings/${key}`, { value });
+      await api.put(API.admin.systemLogs.settings.update(key), { value });
       toast.success('Setting updated');
     } catch {
       toast.error('Failed to update setting');

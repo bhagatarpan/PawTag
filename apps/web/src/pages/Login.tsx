@@ -4,6 +4,7 @@ import { PawPrint, Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useAuthPage, useSiteSettings } from '../hooks/useCms';
 import api from '../lib/api';
+import { API } from '@pawtag/shared';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -36,7 +37,7 @@ export default function Login() {
 
   const fetchCaptcha = async () => {
     try {
-      const res = await api.get('/auth/captcha');
+      const res = await api.get(API.auth.captcha);
       setCaptchaQuestion(res.data.data.question);
       setCaptchaToken(res.data.data.token);
       setCaptchaAnswer('');
@@ -108,7 +109,7 @@ export default function Login() {
     setMfaLoading(true);
     setError('');
     try {
-      const res = await api.post('/auth/mfa/verify', {
+      const res = await api.post(API.auth.mfa.verify, {
         tempToken: mfaTempToken,
         otp: mfaOtp,
       });
@@ -155,7 +156,7 @@ export default function Login() {
 
   const handleResendOtp = async () => {
     try {
-      await api.post('/auth/mfa/send-otp', { tempToken: mfaTempToken });
+      await api.post(API.auth.mfa.sendOtp, { tempToken: mfaTempToken });
       setMfaExpiry(300);
       setError('');
     } catch (err: any) {

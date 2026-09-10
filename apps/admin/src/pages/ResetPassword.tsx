@@ -1,5 +1,6 @@
 import { useState, FormEvent } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
+import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
 import { validatePassword } from '@pawtag/shared';
 
@@ -45,7 +46,7 @@ export default function ResetPassword() {
 
     setLoading(true);
     try {
-      await api.post('/auth/reset-password', { token, newPassword: password });
+      await api.post(API.auth.resetPassword, { token, newPassword: password });
       setSuccess(true);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to reset password. Please try again.');

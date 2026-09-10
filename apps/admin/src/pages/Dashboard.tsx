@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
 import { Users, PawPrint, QrCode, ShoppingBag, AlertTriangle, Activity, TrendingUp, Package, Repeat } from 'lucide-react';
 
@@ -35,7 +36,7 @@ export default function Dashboard() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    api.get('/admin/analytics/overview')
+    api.get(API.admin.analytics.overview)
       .then((res) => setAnalytics(res.data.data))
       .catch((e) => setError(e.response?.data?.error || 'Failed to load analytics'))
       .finally(() => setLoading(false));

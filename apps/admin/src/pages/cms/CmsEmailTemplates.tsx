@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { API } from '@pawtag/shared/api';
 import { Mail, Plus, Search, Edit, Trash2, Eye, EyeOff, Copy } from 'lucide-react';
 import api from '../../lib/api';
 import RichTextEditor from '../../components/RichTextEditor';
@@ -60,7 +61,7 @@ export default function CmsEmailTemplates() {
       if (editingTemplate) {
         await api.put(`/admin/cms/email/email-templates/${editingTemplate._id}`, form);
       } else {
-        await api.post('/admin/cms/email/email-templates', form);
+        await api.post(API.admin.cms.emailTemplates.list, form);
       }
       setShowForm(false);
       setEditingTemplate(null);

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { API } from '@pawtag/shared/api';
 import api from '../../lib/api';
 
 interface RewardsData {
@@ -54,8 +55,8 @@ export default function GuardianRewards() {
   async function fetchRewardsData() {
     try {
       const [balanceRes, historyRes] = await Promise.all([
-        api.get('/customer/guardian/rewards'),
-        api.get('/customer/guardian/rewards/history'),
+        api.get(API.customer.guardian.rewards),
+        api.get(API.customer.guardian.rewardsHistory),
       ]);
 
       setData({
@@ -77,7 +78,7 @@ export default function GuardianRewards() {
 
     setRedeeming(true);
     try {
-      await api.post('/customer/guardian/rewards/redeem', {
+      await api.post(API.customer.guardian.redeemRewards, {
         amount: parseFloat(redeemAmount),
       });
       setRedeemModalOpen(false);

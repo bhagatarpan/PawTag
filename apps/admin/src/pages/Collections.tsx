@@ -7,6 +7,7 @@
  */
 
 import { useEffect, useState, useCallback } from 'react';
+import { API } from '@pawtag/shared/api';
 import { Search, Loader2, Plus, Edit2, Trash2, Database, X } from 'lucide-react';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
@@ -35,7 +36,7 @@ export default function Collections() {
   const fetchCollections = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await api.get('/admin/commerce/collections', { params: { search, limit: 100 } });
+      const res = await api.get(API.admin.commerce.collections.list, { params: { search, limit: 100 } });
       setCollections(res.data?.data?.items || []);
     } catch { toast.error('Failed to load collections'); }
     finally { setLoading(false); }
@@ -51,7 +52,7 @@ export default function Collections() {
         await api.put(`/admin/commerce/collections/${editing._id}`, form);
         toast.success('Collection updated');
       } else {
-        await api.post('/admin/commerce/collections', form);
+        await api.post(API.admin.commerce.collections.list, form);
         toast.success('Collection created');
       }
       setShowForm(false);

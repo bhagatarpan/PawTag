@@ -17,6 +17,7 @@ import {
   Trash2,
   KeyRound,
 } from 'lucide-react';
+import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
 import { validatePassword } from '@pawtag/shared';
@@ -243,7 +244,7 @@ export default function Settings() {
   }, []);
 
   const saveSetting = async (key: string, value: string) => {
-    await api.put(`/admin/settings/${key}`, { value });
+    await api.put(API.admin.settings.update(key), { value });
     fetchSettings();
   };
 
@@ -259,7 +260,7 @@ export default function Settings() {
     setCreating(true);
     setError('');
     try {
-      await api.post('/admin/settings', {
+      await api.post(API.admin.settings.create, {
         key: newKey.trim(),
         value: newValue.trim(),
         displayValue: newDisplayValue.trim() || undefined,
@@ -284,7 +285,7 @@ export default function Settings() {
   const deleteSetting = async (key: string) => {
     if (!confirm(`Delete setting "${key}"? This cannot be undone.`)) return;
     try {
-      await api.delete(`/admin/settings/${key}`);
+      await api.delete(API.admin.settings.delete(key));
       fetchSettings();
     } catch (err: any) {
       alert(err.response?.data?.error || 'Failed to delete setting');
@@ -491,7 +492,7 @@ function ChangePasswordSection() {
     }
     setSaving(true);
     try {
-      await api.post('/auth/change-password', { currentPassword, newPassword });
+      await api.post(API.auth.changePassword, { currentPassword, newPassword });
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');

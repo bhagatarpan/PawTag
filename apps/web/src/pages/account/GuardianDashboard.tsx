@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Shield, Gift, ArrowUpRight, Award, Star, Trophy, Target, ShoppingBag, MessageSquare, Users, TrendingUp, Zap, Crown, Heart, Flame, Medal, CheckCircle } from 'lucide-react';
+import { API } from '@pawtag/shared/api';
 import api from '../../lib/api';
 
 type TierName = 'CARE' | 'NURTURE' | 'PROTECTOR' | 'SAFEGUARD';
@@ -204,10 +205,10 @@ export default function GuardianDashboard() {
   async function fetchGuardianData() {
     try {
       const [pointsRes, rewardsRes, tierRes, historyRes] = await Promise.all([
-        api.get('/customer/guardian/points'),
-        api.get('/customer/guardian/rewards'),
-        api.get('/customer/guardian/tier'),
-        api.get('/customer/guardian/history'),
+        api.get(API.customer.guardian.points),
+        api.get(API.customer.guardian.rewards),
+        api.get(API.customer.guardian.tier),
+        api.get(API.customer.guardian.history),
       ]);
 
       setData({

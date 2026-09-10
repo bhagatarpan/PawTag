@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
 
 // Navigation types
@@ -108,7 +109,7 @@ export function useNavigation(location: 'header' | 'footer' | 'sidebar' | 'mobil
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    api.get(`/public/cms/navigation/${location}`)
+    api.get(API.public.cms.navigation(location))
       .then((res) => {
         if (!cancelled) {
           setMenus(res.data.data || []);
@@ -139,7 +140,7 @@ export function useFooter() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    api.get('/public/cms/footer')
+    api.get(API.public.cms.footer)
       .then((res) => {
         if (!cancelled) {
           setFooter(res.data.data);
@@ -170,7 +171,7 @@ export function useCmsPage(slug: string) {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    api.get(`/public/cms/pages/${slug}`)
+    api.get(API.public.cms.page(slug))
       .then((res) => {
         if (!cancelled) {
           setPage(res.data.data);
@@ -215,7 +216,7 @@ export function useSiteSettings() {
     }
     let cancelled = false;
     setLoading(true);
-    api.get('/public/cms/settings')
+    api.get(API.public.cms.settings)
       .then((res) => {
         if (!cancelled) {
           const data = res.data.data || {};
@@ -261,7 +262,7 @@ export function usePetReferences(type?: string, petSpecies?: string) {
     if (type) params.set('type', type);
     if (petSpecies) params.set('petSpecies', petSpecies);
     const queryString = params.toString();
-    const url = `/public/cms/pet-references${queryString ? `?${queryString}` : ''}`;
+    const url = `${API.public.cms.petReferences}${queryString ? `?${queryString}` : ''}`;
     
     api.get(url)
       .then((res) => {
@@ -294,7 +295,7 @@ export function useGroupedPetReferences() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    api.get('/public/cms/pet-references/grouped')
+    api.get(API.public.cms.petReferencesGrouped)
       .then((res) => {
         if (!cancelled) {
           setGrouped(res.data.data || {});
@@ -337,7 +338,7 @@ export function useHomepageSections(sectionType?: string) {
     let cancelled = false;
     setLoading(true);
     const params = sectionType ? `?sectionType=${sectionType}` : '';
-    api.get(`/public/cms/homepage/sections${params}`)
+    api.get(`${API.public.cms.homepageSections}${params}`)
       .then((res) => {
         if (!cancelled) {
           setSections(res.data.data || []);
@@ -380,7 +381,7 @@ export function useShopPage(slug: string) {
     if (!slug) { setLoading(false); return; }
     let cancelled = false;
     setLoading(true);
-    api.get(`/public/cms/shop/${slug}`)
+    api.get(API.public.cms.shopPage(slug))
       .then((res) => {
         if (!cancelled) {
           setPage(res.data.data || null);
@@ -421,7 +422,7 @@ export function useAuthPage(pageType: string) {
     if (!pageType) { setLoading(false); return; }
     let cancelled = false;
     setLoading(true);
-    api.get(`/public/cms/auth/${pageType}`)
+    api.get(API.public.cms.authPage(pageType))
       .then((res) => {
         if (!cancelled) {
           setPage(res.data.data || null);

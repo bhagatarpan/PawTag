@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { API } from '@pawtag/shared/api';
 import { Download, RefreshCw, FileText, Database, FileSpreadsheet } from 'lucide-react';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
@@ -32,7 +33,7 @@ export default function RefundReport() {
   const [xeroStatus, setXeroStatus] = useState<{ connected: boolean } | null>(null);
 
   useEffect(() => {
-    api.get('/admin/commerce/accounting/status')
+    api.get(API.admin.commerce.accounting.status)
       .then((res) => setXeroStatus(res.data.data.xero))
       .catch(() => {});
   }, []);
@@ -68,14 +69,14 @@ export default function RefundReport() {
       }
 
       if (format === 'xero') {
-        const res = await api.get('/admin/commerce/refunds/export', { params });
+        const res = await api.get(API.admin.commerce.refunds.export, { params });
         if (res.data.success) {
           toast.success(`Created ${res.data.data.created} Xero journals (${res.data.data.failed} failed)`);
         } else {
           toast.error(res.data.error || res.data.data?.errors?.[0] || 'Xero export failed');
         }
       } else {
-        const res = await api.get('/admin/commerce/refunds/export', {
+        const res = await api.get(API.admin.commerce.refunds.export, {
           params,
           responseType: 'blob',
         });

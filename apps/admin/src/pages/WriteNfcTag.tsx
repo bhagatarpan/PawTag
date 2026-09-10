@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
 
 export default function WriteNfcTag() {
@@ -17,7 +18,7 @@ export default function WriteNfcTag() {
     setLoading(true);
 
     try {
-      const res = await api.get(`/admin/tags?search=${tagId.trim().toUpperCase()}`);
+      const res = await api.get(API.admin.tags.list, { params: { search: tagId.trim().toUpperCase() } });
       const tags = res.data.data;
       const found = tags.find((t: any) => t.tagId === tagId.trim().toUpperCase());
       if (found) {
@@ -59,7 +60,7 @@ export default function WriteNfcTag() {
       });
 
       // Update the tag in the database
-      await api.put(`/admin/tags/${tagInfo._id}`, { nfcEnabled: true });
+      await api.put(API.admin.tags.update(tagInfo._id), { nfcEnabled: true });
 
       setSuccess(`NFC tag written successfully! Tag ${tagInfo.tagId} is now NFC-enabled.`);
       setTagInfo({ ...tagInfo, nfcEnabled: true });

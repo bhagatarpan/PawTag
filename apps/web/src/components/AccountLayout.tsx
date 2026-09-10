@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { PawPrint, LogOut, User, ShoppingBag, Bell, Settings, ChevronRight, CreditCard, QrCode, Gift, LayoutDashboard, Home, Shield } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSiteSettings } from '../hooks/useCms';
+import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
 import AvatarUpload from './AvatarUpload';
 import OnboardingWizard from './OnboardingWizard';
@@ -42,9 +43,9 @@ export default function AccountLayout({ children }: { children: ReactNode }) {
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
-    api.get('/customer/notifications/unread-count').then((r) => setUnreadCount(r.data.data.count)).catch(() => {});
+    api.get(API.customer.notifications.unreadCount).then((r) => setUnreadCount(r.data.data.count)).catch(() => {});
     const interval = setInterval(() => {
-      api.get('/customer/notifications/unread-count').then((r) => setUnreadCount(r.data.data.count)).catch(() => {});
+      api.get(API.customer.notifications.unreadCount).then((r) => setUnreadCount(r.data.data.count)).catch(() => {});
     }, 30000);
     return () => clearInterval(interval);
   }, []);

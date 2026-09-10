@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useMemo, useCallback, ReactNode } from 'react';
 import api from '../lib/api';
 import { User } from '../types';
+import { API } from '@pawtag/shared';
 
 interface AuthContextType {
   user: User | null;
@@ -20,7 +21,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (token) {
-      api.get('/auth/me')
+      api.get(API.auth.me)
         .then((res) => setUser(res.data.data))
         .catch(() => {
           localStorage.removeItem('pawtag_token');
@@ -39,7 +40,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       payload.captchaToken = captchaToken;
       payload.captchaAnswer = parseInt(captchaAnswer, 10);
     }
-    const res = await api.post('/auth/login', payload);
+    const res = await api.post(API.auth.login, payload);
     const data = res.data;
 
     if (data.code === 'REQUIRES_VERIFICATION' || data.code === 'CAPTCHA_REQUIRED') {
@@ -73,7 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refreshUser = useCallback(async () => {
     if (!token) return;
     try {
-      const res = await api.get('/auth/me');
+      const res = await api.get(API.auth.me);
       setUser(res.data.data);
     } catch {
       // silently fail — token may be expired

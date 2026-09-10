@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { API } from '@pawtag/shared/api';
 import api, { PaginatedData } from '../lib/api';
 import { toast } from '../lib/toast';
 import {
@@ -196,12 +197,12 @@ export function DetailDrawer({
 
   // Fetch RBAC roles for user drawer
   useEffect(() => {
-    api.get('/admin/rbac/roles').then((r) => setRbacRoles(r.data.data || [])).catch(() => {});
+    api.get(API.admin.rbac.roles.list).then((r) => setRbacRoles(r.data.data || [])).catch(() => {});
   }, []);
 
   const handleOwnerClick = async (ownerId: string) => {
     try {
-      const res = await api.get(`/admin/users/${ownerId}`);
+      const res = await api.get(API.admin.users.get(ownerId));
       setSelectedOwner(res.data.data);
     } catch {
       toast.error('Failed to load owner details');
@@ -210,7 +211,7 @@ export function DetailDrawer({
 
   const handlePetClick = async (petId: string) => {
     try {
-      const res = await api.get(`/admin/pets/${petId}`);
+      const res = await api.get(API.admin.pets.get(petId));
       setSelectedPet(res.data.data);
     } catch {
       toast.error('Failed to load pet details');
@@ -235,7 +236,7 @@ export function DetailDrawer({
   const handleStatusChange = async (status: string) => {
     setActionLoading('status');
     try {
-      await api.put(`/admin/tags/${tag._id}`, { status });
+      await api.put(API.admin.tags.update(tag._id), { status });
       toast.success(`Tag marked as ${status}`);
       onRefresh();
     } catch (err: any) {
@@ -249,7 +250,7 @@ export function DetailDrawer({
     if (!window.confirm(`Delete tag "${tag.tagId}"? This cannot be undone.`)) return;
     setActionLoading('delete');
     try {
-      await api.delete(`/admin/tags/${tag._id}`);
+      await api.delete(API.admin.tags.delete(tag._id));
       toast.success('Tag deleted');
       onClose();
       onRefresh();
@@ -635,15 +636,15 @@ export default function Tags() {
 
   // Fetch supporting data
   useEffect(() => {
-    api.get('/admin/pets', { params: { limit: 500 } }).then((r) => setPets(r.data.data.items || [])).catch(console.error);
-    api.get('/admin/users', { params: { limit: 500 } }).then((r) => setOwners(r.data.data.items || [])).catch(console.error);
+    api.get(API.admin.pets.list, { params: { limit: 500 } }).then((r) => setPets(r.data.data.items || [])).catch(console.error);
+    api.get(API.admin.users.list, { params: { limit: 500 } }).then((r) => setOwners(r.data.data.items || [])).catch(console.error);
   }, []);
 
   // Fetch summary
   const fetchSummary = useCallback(async () => {
     setSummaryLoading(true);
     try {
-      const res = await api.get('/admin/tags', { params: { limit: 10000 } });
+      const res = await api.get(API.admin.tags.list, { params: { limit: 10000 } });
       const items = res.data.data.items || [];
       const total = res.data.data.total || 0;
       const active = items.filter((t: TagItem) => t.status === 'active').length;
@@ -667,7 +668,7 @@ export default function Tags() {
       if (debouncedSearch) params.search = debouncedSearch;
       if (statusFilter) params.status = statusFilter;
       if (typeFilter) params.tagType = typeFilter;
-      const res = await api.get('/admin/tags', { params });
+      const res = await api.get(API.admin.tags.list, { params });
       setData(res.data.data);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to load tags');
@@ -698,10 +699,10 @@ export default function Tags() {
     setFormError('');
     try {
       if (editingTag) {
-        await api.put(`/admin/tags/${editingTag._id}`, { petId: form.petId || undefined, ownerId: form.ownerId || undefined, tagType: form.tagType, status: form.status });
+        await api.put(API.admin.tags.update(editingTag._id), { petId: form.petId || undefined, ownerId: form.ownerId || undefined, tagType: form.tagType, status: form.status });
         toast.success('Tag updated');
       } else {
-        await api.post('/admin/tags', { petId: form.petId, ownerId: form.ownerId, tagId: form.tagId || undefined, tagType: form.tagType, status: form.status });
+        await api.post(API.admin.tags.create, { petId: form.petId, ownerId: form.ownerId, tagId: form.tagId || undefined, tagType: form.tagType, status: form.status });
         toast.success('Tag created');
       }
       cancelForm();
@@ -724,7 +725,7 @@ export default function Tags() {
       if (debouncedSearch) params.search = debouncedSearch;
       if (statusFilter) params.status = statusFilter;
       if (typeFilter) params.tagType = typeFilter;
-      const res = await api.get('/admin/tags', { params });
+      const res = await api.get(API.admin.tags.list, { params });
       const items = res.data.data.items || [];
       if (format === 'json') {
         const blob = new Blob([JSON.stringify(items, null, 2)], { type: 'application/json' });

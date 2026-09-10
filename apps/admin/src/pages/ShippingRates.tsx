@@ -13,6 +13,7 @@
  */
 
 import { useEffect, useState, useCallback } from 'react';
+import { API } from '@pawtag/shared/api';
 import { Loader2, Save, DollarSign, Percent, Weight, Tag } from 'lucide-react';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
@@ -40,7 +41,7 @@ export default function ShippingRates() {
   const fetchSettings = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await api.get('/admin/commerce/settings');
+      const res = await api.get(API.admin.commerce.settings);
       const all: CommerceSetting[] = res.data?.data || [];
       const map: Record<string, string> = {};
       for (const s of all) {
@@ -58,7 +59,7 @@ export default function ShippingRates() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await api.put('/admin/commerce/settings', { settings });
+      await api.put(API.admin.commerce.settings, { settings });
       toast.success('Shipping rates saved');
       fetchSettings();
     } catch { toast.error('Failed to save'); }

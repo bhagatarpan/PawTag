@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { API } from '@pawtag/shared/api';
 import api from '../../lib/api';
 import { Plus, Trash2 } from 'lucide-react';
 
@@ -17,7 +18,7 @@ export default function CmsFooter() {
 
   const fetchFooters = () => {
     setLoading(true);
-    api.get('/admin/cms/footer')
+    api.get(API.admin.cms.footer.list)
       .then((res) => setFooters(res.data.data))
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -48,7 +49,7 @@ export default function CmsFooter() {
       if (editing) {
         await api.put(`/admin/cms/footer/${editing._id}`, payload);
       } else {
-        await api.post('/admin/cms/footer', payload);
+        await api.post(API.admin.cms.footer.list, payload);
       }
       setShowForm(false);
       fetchFooters();

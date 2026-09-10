@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Package, Loader2 } from 'lucide-react';
 import { OrderDetailView, ConfirmDialog } from '@pawtag/ui';
 import type { OrderData, InvoiceData } from '@pawtag/ui';
+import { API } from '@pawtag/shared/api';
 import api from '../../lib/api';
 
 const DEFAULT_REASONS = [
@@ -33,7 +34,7 @@ export default function OrderDetail() {
   const fetchOrder = async () => {
     if (!id) return;
     try {
-      const res = await api.get(`/customer/orders/${id}`);
+      const res = await api.get(API.customer.orders.get(id));
       setOrder(res.data.data);
       setError('');
     } catch (err: any) {
@@ -49,11 +50,11 @@ export default function OrderDetail() {
     if (!id) return;
     fetchOrder();
 
-    api.get(`/customer/orders/${id}/invoice`)
+    api.get(API.customer.orders.invoice(id))
       .then((res) => setInvoice(res.data.data))
       .catch(() => {});
 
-    api.get('/public/commerce/cancellation-reasons')
+    api.get(API.public.commerce.cancellationReasons)
       .then((res) => {
         if (Array.isArray(res.data?.data) && res.data.data.length > 0) {
           setReasons(res.data.data);
@@ -121,7 +122,7 @@ export default function OrderDetail() {
   const handleViewInvoice = async () => {
     if (!invoice) return;
     try {
-      const res = await api.post(`/customer/invoices/${invoice._id}/access`);
+      const res = await api.post(API.customer.invoices.access(invoice._id));
       const { secureUrl } = res.data.data;
       if (secureUrl) window.open(secureUrl, '_blank');
     } catch {
@@ -140,7 +141,7 @@ export default function OrderDetail() {
     if (selectedReason === 'Other' && !notes.trim()) return;
     setCancelLoading(true);
     try {
-      await api.post(`/customer/returns/orders/${order._id}/cancel`, {
+      await api.post(API.customer.orders.cancel(order._id), {
         reason: selectedReason,
         notes: selectedReason === 'Other' ? notes : undefined,
         portal: 'customer-web',

@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
+import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
 import { ConfirmDialog } from '@pawtag/ui';
@@ -132,7 +133,7 @@ export default function RbacRoles() {
 
   const fetchRoles = () => {
     setLoading(true);
-    api.get('/admin/rbac/roles')
+    api.get(API.admin.rbac.roles.list)
       .then((res) => setRoles(res.data.data))
       .catch(() => toast.error('Failed to load roles'))
       .finally(() => setLoading(false));
@@ -167,7 +168,7 @@ export default function RbacRoles() {
     setFormError('');
     setSaving(true);
     try {
-      await api.post('/admin/rbac/roles', form);
+      await api.post(API.admin.rbac.roles.list, form);
       toast.success('Role created');
       resetForm();
       setShowCreate(false);
@@ -231,9 +232,9 @@ export default function RbacRoles() {
     setPermSearch('');
     try {
       const [pgRes, pRes, sRes, rpRes] = await Promise.all([
-        api.get('/admin/rbac/permission-groups'),
-        api.get('/admin/rbac/permissions'),
-        api.get('/admin/rbac/scopes'),
+        api.get(API.admin.rbac.permissionGroups.list),
+        api.get(API.admin.rbac.permissions.list),
+        api.get(API.admin.rbac.scopes.list),
         api.get(`/admin/rbac/roles/${role._id}/permissions`),
       ]);
       setPermGroups(pgRes.data.data);

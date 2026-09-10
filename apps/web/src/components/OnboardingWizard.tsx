@@ -8,6 +8,7 @@ import { AddressAutocomplete } from '@pawtag/ui';
 import type { AddressComponents } from '@pawtag/ui';
 import api from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import { API } from '@pawtag/shared';
 
 interface OnboardingStep {
   stepId: string;
@@ -154,7 +155,7 @@ export default function OnboardingWizard() {
         };
       }
       if (Object.keys(payload).length > 0) {
-        await api.put('/auth/profile', payload);
+        await api.put(API.auth.profile, payload);
         await refreshUser();
       }
     } catch {

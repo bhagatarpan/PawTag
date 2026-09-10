@@ -4,6 +4,7 @@
  */
 
 import { useEffect, useState, useCallback } from 'react';
+import { API } from '@pawtag/shared/api';
 import { Loader2, TrendingUp, DollarSign, ShoppingCart, Users } from 'lucide-react';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
@@ -24,8 +25,8 @@ export default function Reports() {
     try {
       setLoading(true);
       const [ordersRes, usersRes] = await Promise.all([
-        api.get('/admin/commerce/orders', { params: { limit: 100 } }),
-        api.get('/admin/users', { params: { limit: 1 } }).catch(() => ({ data: { data: { total: 0 } } })),
+        api.get(API.admin.commerce.orders, { params: { limit: 100 } }),
+        api.get(API.admin.users.list, { params: { limit: 1 } }).catch(() => ({ data: { data: { total: 0 } } })),
       ]);
 
       const orders = ordersRes.data?.data?.items || [];

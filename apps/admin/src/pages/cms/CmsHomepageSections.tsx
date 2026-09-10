@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { API } from '@pawtag/shared/api';
 import { Plus, Edit2, Trash2, Save, X, GripVertical, Eye, EyeOff, ArrowUp, ArrowDown } from 'lucide-react';
 import api from '../../lib/api';
 import SectionContentEditor from '../../components/SectionContentEditor';
@@ -96,7 +97,7 @@ export default function CmsHomepageSections() {
       };
 
       if (editingId === 'new') {
-        await api.post('/admin/cms/homepage', payload);
+        await api.post(API.admin.cms.homepage.list, payload);
       } else {
         await api.put(`/admin/cms/homepage/${editingId}`, payload);
       }

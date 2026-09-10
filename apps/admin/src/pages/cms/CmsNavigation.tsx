@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { API } from '@pawtag/shared/api';
 import api from '../../lib/api';
 import { Plus, Trash2 } from 'lucide-react';
 
@@ -31,7 +32,7 @@ export default function CmsNavigation() {
 
   const fetchMenus = () => {
     setLoading(true);
-    api.get('/admin/cms/navigation')
+    api.get(API.admin.cms.navigation.list)
       .then((res) => setMenus(res.data.data))
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -60,7 +61,7 @@ export default function CmsNavigation() {
       if (editing) {
         await api.put(`/admin/cms/navigation/${editing._id}`, payload);
       } else {
-        await api.post('/admin/cms/navigation', payload);
+        await api.post(API.admin.cms.navigation.list, payload);
       }
       setShowForm(false);
       fetchMenus();

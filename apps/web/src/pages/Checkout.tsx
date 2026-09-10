@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { AddressAutocomplete } from '@pawtag/ui';
 import type { AddressComponents } from '@pawtag/ui';
+import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
 import axios from 'axios';
 import { useCart } from '../context/CartContext';
@@ -108,7 +109,7 @@ export default function Checkout() {
   useEffect(() => {
     if (!form.line1) return;
     setShippingLoading(true);
-    api.get('/shipping/rates', {
+    api.get(API.shipping.rates, {
       params: { line1: form.line1, city: form.city, state: form.state, zip: form.zip, country: form.country },
     })
       .then((res) => {
@@ -132,7 +133,7 @@ export default function Checkout() {
     prevShippingRef.current = selectedShippingOption;
     const option = shippingOptions.find(o => o.id === selectedShippingOption);
     if (option) {
-      api.post('/shipping/select', {
+      api.post(API.shipping.select, {
         methodId: option.id,
         methodName: option.name,
         cost: option.cost || 0,
@@ -206,7 +207,7 @@ export default function Checkout() {
   // Fetch estimated points from backend when order total or membership changes
   useEffect(() => {
     if (orderTotal > 0) {
-      api.get('/public/points/estimate', { params: { total: orderTotal, isGoldMember: String(isGoldMember) } })
+      api.get(API.public.points.estimate, { params: { total: orderTotal, isGoldMember: String(isGoldMember) } })
         .then(res => setEstimatedPoints(res.data.data.points || 0))
         .catch(() => setEstimatedPoints(0));
     } else {
@@ -237,7 +238,7 @@ export default function Checkout() {
     // Guest: validate promo code via public endpoint (no auth required)
     if (!user) {
       try {
-        const res = await axios.post('/api/public/promo/validate', { code: promoCode });
+        const res = await axios.post(`/api${API.public.promo.validate}`, { code: promoCode });
         const data = res.data.data;
         if (data.valid) {
           setGuestPromoInfo(data);
@@ -257,7 +258,7 @@ export default function Checkout() {
 
     // Logged in: apply promo code to server-side cart
     try {
-      await api.post('/cart/promo', { code: promoCode });
+      await api.post(API.cart.promo.apply, { code: promoCode });
       await refreshCart();
       setPromoApplied(true);
       setPromoDiscount(totals.discount || 0);
@@ -275,7 +276,7 @@ export default function Checkout() {
 
   const removePromoCode = async () => {
     try {
-      if (user) await api.delete('/cart/promo');
+      if (user) await api.delete(API.cart.promo.remove);
       setPromoApplied(false);
       setPromoDiscount(0);
       setPromoCode('');
@@ -335,7 +336,7 @@ export default function Checkout() {
     setError(null);
     try {
       // 0. Verify cart has items from server (not stale React state)
-      const cartCheck = await api.get('/cart');
+      const cartCheck = await api.get(API.cart.get);
       const serverItems = cartCheck.data?.data?.cart?.items || [];
       if (serverItems.length === 0) {
         setError('Your cart is empty. Please go back and add items before checking out.');
@@ -344,7 +345,7 @@ export default function Checkout() {
       }
 
       // 1. Create payment intent via PawTag checkout API
-      const checkoutRes = await api.post('/checkout/payment-intent', {
+      const checkoutRes = await api.post(API.checkout.paymentIntent, {
         shippingAddress: {
           line1: form.line1,
           line2: form.line2,
@@ -403,7 +404,7 @@ export default function Checkout() {
       let invoice = null;
       let invoiceUrl = '';
       try {
-        const confirmRes = await api.post('/checkout/confirm', { paymentIntentId, portal: 'customer-web' });
+        const confirmRes = await api.post(API.checkout.confirm, { paymentIntentId, portal: 'customer-web' });
         pawtagOrder = confirmRes.data.data.order;
         invoice = confirmRes.data.data.invoice;
         invoiceUrl = confirmRes.data.data.invoiceUrl;

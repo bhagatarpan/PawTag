@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
+import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
 import { ConfirmDialog, IconPicker, ICON_MAP } from '@pawtag/ui';
@@ -88,7 +89,7 @@ export default function RbacPermissionGroups() {
 
   const fetchGroups = () => {
     setLoading(true);
-    api.get('/admin/rbac/permission-groups')
+    api.get(API.admin.rbac.permissionGroups.list)
       .then((res) => setGroups(res.data.data))
       .catch(() => toast.error('Failed to load permission groups'))
       .finally(() => setLoading(false));
@@ -117,7 +118,7 @@ export default function RbacPermissionGroups() {
     setFormError('');
     setSaving(true);
     try {
-      await api.post('/admin/rbac/permission-groups', form);
+      await api.post(API.admin.rbac.permissionGroups.list, form);
       toast.success('Permission group created');
       setForm({ name: '', displayName: '', description: '', icon: '', sortOrder: 0 });
       setShowCreate(false);

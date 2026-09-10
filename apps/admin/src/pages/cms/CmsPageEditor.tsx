@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { API } from '@pawtag/shared/api';
 import { useNavigate, useParams } from 'react-router-dom';
 import api from '../../lib/api';
 import { Code, Layout } from 'lucide-react';
@@ -70,7 +71,7 @@ export default function CmsPageEditor() {
         ...(publishAfter ? { status: 'published' } : {}),
       };
       if (isNew) {
-        const res = await api.post('/admin/cms/pages', payload);
+        const res = await api.post(API.admin.cms.pages.list, payload);
         navigate(`/cms/pages/${res.data.data._id}`);
       } else {
         await api.put(`/admin/cms/pages/${id}`, payload);

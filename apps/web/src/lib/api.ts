@@ -1,84 +1,11 @@
-import axios from 'axios';
+import { createApiClient, createLocalStorageTokenStorage } from '@pawtag/shared/api';
 
-const api = axios.create({
+const api = createApiClient({
   baseURL: '/api',
-  headers: { 'Content-Type': 'application/json' },
+  storage: createLocalStorageTokenStorage('pawtag_token', 'pawtag_refresh_token'),
+  refreshEndpoint: '/api/auth/refresh',
+  // Web app: don't redirect on auth failure — let CartContext/AuthContext handle it
+  // to avoid race conditions with concurrent requests.
 });
-
-let isRefreshing = false;
-let failedQueue: Array<{ resolve: (token: string) => void; reject: (error: any) => void }> = [];
-
-const processQueue = (error: any, token: string | null) => {
-  failedQueue.forEach((promise) => {
-    if (error) {
-      promise.reject(error);
-    } else {
-      promise.resolve(token!);
-    }
-  });
-  failedQueue = [];
-};
-
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('pawtag_token');
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
-});
-
-api.interceptors.response.use(
-  (res) => res,
-  async (err) => {
-    const originalRequest = err.config;
-
-    if (err.response?.status === 401 && !originalRequest._retry) {
-      const refreshToken = localStorage.getItem('pawtag_refresh_token');
-
-      if (!refreshToken) {
-        // No refresh token — let the calling code handle 401.
-        // Don't remove tokens here to avoid race conditions with CartContext.
-        return Promise.reject(err);
-      }
-
-      if (isRefreshing) {
-        return new Promise((resolve, reject) => {
-          failedQueue.push({ resolve, reject });
-        })
-          .then((token) => {
-            originalRequest.headers.Authorization = `Bearer ${token}`;
-            return api(originalRequest);
-          })
-          .catch((error) => Promise.reject(error));
-      }
-
-      originalRequest._retry = true;
-      isRefreshing = true;
-
-      try {
-        const res = await axios.post('/api/auth/refresh', { refreshToken });
-        const { token: newAccessToken, refreshToken: newRefreshToken } = res.data.data;
-
-        localStorage.setItem('pawtag_token', newAccessToken);
-        localStorage.setItem('pawtag_refresh_token', newRefreshToken);
-
-        api.defaults.headers.common.Authorization = `Bearer ${newAccessToken}`;
-        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
-
-        processQueue(null, newAccessToken);
-
-        return api(originalRequest);
-      } catch (refreshError) {
-        processQueue(refreshError, null);
-        // Refresh failed — let the calling code handle 401 cleanup.
-        // Don't remove tokens or redirect here; doing so races with
-        // CartContext/AuthContext which also handle 401 gracefully.
-        return Promise.reject(refreshError);
-      } finally {
-        isRefreshing = false;
-      }
-    }
-
-    return Promise.reject(err);
-  }
-);
 
 export default api;

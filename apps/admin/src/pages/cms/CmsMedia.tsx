@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
+import { API } from '@pawtag/shared/api';
 import api, { PaginatedData } from '../../lib/api';
 import { Upload, Trash2, Search, Grid, List } from 'lucide-react';
 
@@ -30,7 +31,7 @@ export default function CmsMedia() {
 
   const fetchData = () => {
     setLoading(true);
-    api.get('/admin/cms/media', { params: { page, limit: 20, search: search || undefined } })
+    api.get(API.admin.cms.media.list, { params: { page, limit: 20, search: search || undefined } })
       .then((res) => setData(res.data.data))
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -45,7 +46,7 @@ export default function CmsMedia() {
     try {
       const formData = new FormData();
       Array.from(files).forEach((file) => formData.append('files', file));
-      await api.post('/admin/cms/media/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+      await api.post(API.admin.cms.media.upload, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
       fetchData();
     } catch (err: any) {
       alert(err.response?.data?.error || 'Upload failed');
