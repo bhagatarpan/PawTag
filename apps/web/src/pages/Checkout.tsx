@@ -35,7 +35,7 @@ const STEPS = [
 ];
 
 export default function Checkout() {
-  const { items, total, totals, clearCart, refreshCart, updateItemTexts, toggleCustomisation } = useCart();
+  const { items, total, totals, clearCart, refreshCart, updateItemTexts, toggleCustomisation, error: cartError } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -84,6 +84,7 @@ export default function Checkout() {
   // Engraving editing state — tracks texts being edited per cart item
   const [editingTexts, setEditingTexts] = useState<Record<string, string[]>>({});
   const [savingTexts, setSavingTexts] = useState<Record<string, boolean>>({});
+  const [savedTexts, setSavedTexts] = useState<Record<string, boolean>>({});
   const [expandedEngraving, setExpandedEngraving] = useState<Record<string, boolean>>({});
 
   // Shipping address
@@ -231,17 +232,36 @@ export default function Checkout() {
 
   const handleToggleEngraving = async (itemId: string, item: any, enable: boolean) => {
     if (enable) {
-      // Enable engraving — initialize texts
+      // Enable engraving — copy saved texts into editing state (or initialize empty)
+      const saved = item.customisationTexts || [];
       const qty = item.quantity || 1;
-      const texts = Array(qty).fill('');
+      const texts = saved.length > 0
+        ? [...saved, ...Array(Math.max(0, qty - saved.length)).fill('')]
+        : Array(qty).fill('');
       setEditingTexts(prev => ({ ...prev, [itemId]: texts }));
+      setExpandedEngraving(prev => ({ ...prev, [itemId]: true }));
     } else {
-      // Disable engraving — clear texts
+      // Disable engraving — clear texts and collapse
       setEditingTexts(prev => ({ ...prev, [itemId]: [] }));
+      setExpandedEngraving(prev => ({ ...prev, [itemId]: false }));
     }
     // Toggle customisation flag (handles both guest and server)
     await toggleCustomisation(itemId, enable);
     await refreshCart();
+  };
+
+  const handleExpandEngraving = (itemId: string, item: any) => {
+    setExpandedEngraving(prev => {
+      const isExpanding = !prev[itemId];
+      // When expanding, initialize editingTexts from saved texts if not already set
+      if (isExpanding && !editingTexts[itemId]) {
+        const saved = item.customisationTexts || [];
+        const qty = item.quantity || 1;
+        const texts = [...saved, ...Array(Math.max(0, qty - saved.length)).fill('')];
+        setEditingTexts(prev2 => ({ ...prev2, [itemId]: texts }));
+      }
+      return { ...prev, [itemId]: isExpanding };
+    });
   };
 
   const handleTextChange = (itemId: string, index: number, value: string) => {
@@ -259,6 +279,19 @@ export default function Checkout() {
     await updateItemTexts(itemId, texts);
     await refreshCart();
     setSavingTexts(prev => ({ ...prev, [itemId]: false }));
+    // Show success state briefly
+    setSavedTexts(prev => ({ ...prev, [itemId]: true }));
+    setTimeout(() => setSavedTexts(prev => ({ ...prev, [itemId]: false })), 2000);
+  };
+
+  // Auto-save all unsaved texts before proceeding to payment
+  const saveAllEngraving = async () => {
+    for (const item of items) {
+      const itemId = item._id || item.productId || '';
+      if (item.customisation && editingTexts[itemId]) {
+        await updateItemTexts(itemId, editingTexts[itemId]);
+      }
+    }
   };
 
   const canProceedToCheckout = items.length > 0;
@@ -381,7 +414,10 @@ export default function Checkout() {
     setLoading(true);
     setError(null);
     try {
-      // 0. Verify cart has items from server (not stale React state)
+      // 0. Auto-save any unsaved engraving texts before payment
+      await saveAllEngraving();
+
+      // 1. Verify cart has items from server (not stale React state)
       const cartCheck = await api.get(API.cart.get);
       const serverItems = cartCheck.data?.data?.cart?.items || [];
       if (serverItems.length === 0) {
@@ -618,7 +654,7 @@ export default function Checkout() {
                                   description={texts.filter(t => t).map(t => `Pet name: ${t}`).join(', ') || 'No name added yet'}
                                   variant="success"
                                   onRemove={() => handleToggleEngraving(itemId, item, false)}
-                                  onExpand={() => setExpandedEngraving(prev => ({ ...prev, [itemId]: !prev[itemId] }))}
+                                  onExpand={() => handleExpandEngraving(itemId, item)}
                                   expanded={expandedEngraving[itemId] || false}
                                 >
                                   <div className="space-y-2 mt-2">
@@ -633,16 +669,32 @@ export default function Checkout() {
                                           maxLength={16}
                                           className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                                         />
-                                        <button
-                                          onClick={() => handleSaveTexts(itemId)}
-                                          disabled={savingTexts[itemId]}
-                                          className="p-1.5 text-green-600 hover:text-green-800 disabled:opacity-50"
-                                          title="Save"
-                                        >
-                                          {savingTexts[itemId] ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
-                                        </button>
                                       </div>
                                     ))}
+                                    {/* Single Save button */}
+                                    <div className="flex items-center justify-between mt-3 pt-2 border-t border-green-100">
+                                      {savedTexts[itemId] ? (
+                                        <span className="text-xs text-green-600 font-medium flex items-center gap-1">
+                                          <Check size={14} /> Saved
+                                        </span>
+                                      ) : (
+                                        <span className="text-xs text-gray-400">Max 16 characters per name</span>
+                                      )}
+                                      <button
+                                        onClick={() => handleSaveTexts(itemId)}
+                                        disabled={savingTexts[itemId]}
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+                                      >
+                                        {savingTexts[itemId] ? (
+                                          <><Loader2 size={12} className="animate-spin" /> Saving...</>
+                                        ) : (
+                                          <><Check size={12} /> Save</>
+                                        )}
+                                      </button>
+                                    </div>
+                                    {cartError && (
+                                      <p className="text-xs text-red-500 mt-1">{cartError}</p>
+                                    )}
                                   </div>
                                 </InlineEditBanner>
                               )}

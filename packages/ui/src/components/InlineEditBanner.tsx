@@ -1,5 +1,5 @@
 import React from 'react';
-import { X } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 
 export interface InlineEditBannerProps {
   /** Icon displayed on the left */
@@ -28,18 +28,21 @@ const variantStyles = {
     icon: 'text-green-600',
     label: 'text-green-700',
     description: 'text-green-600',
+    chevron: 'text-green-400',
   },
   info: {
     banner: 'bg-blue-50 border border-blue-200',
     icon: 'text-blue-600',
     label: 'text-blue-700',
     description: 'text-blue-600',
+    chevron: 'text-blue-400',
   },
   warning: {
     banner: 'bg-amber-50 border border-amber-200',
     icon: 'text-amber-600',
     label: 'text-amber-700',
     description: 'text-amber-600',
+    chevron: 'text-amber-400',
   },
 };
 
@@ -69,14 +72,22 @@ export function InlineEditBanner({
             <span className={`${styles.description} truncate`}>{description}</span>
           )}
         </div>
-        {onRemove && (
-          <button
-            onClick={(e) => { e.stopPropagation(); onRemove(); }}
-            className="text-xs text-gray-500 hover:text-red-500 font-medium ml-2 shrink-0"
-          >
-            Remove
-          </button>
-        )}
+        <div className="flex items-center gap-2 shrink-0">
+          {onRemove && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onRemove(); }}
+              className="text-xs text-gray-500 hover:text-red-500 font-medium"
+            >
+              Remove
+            </button>
+          )}
+          {onExpand && (
+            <ChevronDown
+              size={16}
+              className={`${styles.chevron} transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
+            />
+          )}
+        </div>
       </div>
       {expanded && children && (
         <div className="px-3 pb-3">
