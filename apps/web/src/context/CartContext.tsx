@@ -68,10 +68,11 @@ export interface CartTotals {
 
 interface CartContextType {
   items: CartItem[];
-  addItem: (item: { productId: string; quantity: number; customisation?: boolean; customisationTexts?: string[]; name?: string; price?: number; image?: string; sku?: string }) => Promise<void>;
+  addItem: (item: { productId: string; quantity: number; customisation?: boolean; customisationTexts?: string[]; name?: string; price?: number; image?: string; sku?: string; customizable?: boolean; customizationLabel?: string; customizationPrice?: number }) => Promise<void>;
   removeItem: (itemId: string) => void;
   updateQuantity: (itemId: string, quantity: number) => void;
   updateItemTexts: (itemId: string, texts: string[]) => void;
+  toggleCustomisation: (itemId: string, enable: boolean) => Promise<void>;
   clearCart: () => void;
   refreshCart: () => Promise<void>;
   totals: CartTotals;
@@ -303,7 +304,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, [refreshCart]);
 
   /* ---- Add item ---- */
-  const addItem = useCallback(async (item: { productId: string; quantity: number; customisation?: boolean; customisationTexts?: string[]; name?: string; price?: number; image?: string; sku?: string }) => {
+  const addItem = useCallback(async (item: { productId: string; quantity: number; customisation?: boolean; customisationTexts?: string[]; name?: string; price?: number; image?: string; sku?: string; customizable?: boolean; customizationLabel?: string; customizationPrice?: number }) => {
     const token = localStorage.getItem('pawtag_token');
     const cust = normCustom(item.customisation);
     const custTexts = (item.customisationTexts || []).map(t => t.trim()).filter(Boolean);
@@ -319,6 +320,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
       if (existing) {
         existing.quantity += item.quantity;
         existing.customisationTexts = [...(existing.customisationTexts || []), ...custTexts];
+        // Backfill metadata if missing
+        if (item.customizable !== undefined && existing.customizable === undefined) existing.customizable = item.customizable;
+        if (item.customizationLabel !== undefined && existing.customizationLabel === undefined) existing.customizationLabel = item.customizationLabel;
+        if (item.customizationPrice !== undefined && existing.customizationPrice === undefined) existing.customizationPrice = item.customizationPrice;
       } else {
         guestItems.push({
           _id: item.productId,
@@ -333,6 +338,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
           image: item.image,
           customisation: cust,
           customisationTexts: custTexts,
+          customizable: item.customizable,
+          customizationLabel: item.customizationLabel,
+          customizationPrice: item.customizationPrice,
           addedAt: new Date().toISOString(),
         });
       }
@@ -449,6 +457,50 @@ export function CartProvider({ children }: { children: ReactNode }) {
     try {
       setLoading(true);
       const res = await api.put(API.cart.updateItem(itemId), { customisationTexts: texts });
+      const data = res.data?.data;
+      if (data?.cart) {
+        setItems(data.cart.items || []);
+        setTotals(data.totals || EMPTY_TOTALS);
+      }
+    } catch (err: any) {
+      if (err?.response?.status !== 401) {
+        setError('Failed to update engraving');
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  /* ---- Toggle customisation on/off ---- */
+  const toggleCustomisation = useCallback(async (itemId: string, enable: boolean) => {
+    const token = localStorage.getItem('pawtag_token');
+
+    if (!token) {
+      // Guest: update in localStorage
+      const guestItems = getGuestCart();
+      const item = guestItems.find((i) => i._id === itemId || i.productId === itemId);
+      if (item) {
+        item.customisation = enable;
+        if (!enable) {
+          item.customisationTexts = [];
+          item.customizationTotal = 0;
+        } else {
+          item.customizationTotal = item.customizationPrice || 0;
+          // Initialize texts array with empty strings
+          const qty = item.quantity || 1;
+          item.customisationTexts = Array(qty).fill('');
+        }
+        setGuestCart(guestItems);
+        setItems([...guestItems]);
+        setTotals(calculateTotals(guestItems));
+      }
+      return;
+    }
+
+    // Authenticated: update on server
+    try {
+      setLoading(true);
+      const res = await api.put(API.cart.updateItem(itemId), { customisation: enable });
       const data = res.data?.data;
       if (data?.cart) {
         setItems(data.cart.items || []);
@@ -581,6 +633,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     removeItem,
     updateQuantity,
     updateItemTexts,
+    toggleCustomisation,
     clearCart,
     refreshCart,
     totals,

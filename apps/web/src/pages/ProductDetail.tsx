@@ -151,6 +151,9 @@ export default function ProductDetail() {
         image: product.images?.[0],
         customisation,
         customisationTexts: customisation ? customisationTexts.filter(t => t.trim()) : [],
+        customizable: product.customizable,
+        customizationLabel: product.customizationLabel,
+        customizationPrice: product.customizationPrice,
       });
       setAdded(true);
       setTimeout(() => setAdded(false), 1500);

@@ -74,6 +74,7 @@ weight?: number;
     featureHighlights?: IFeatureHighlight[];
     customizable?: boolean;
     customizationLabel?: string;
+    customizationPrice?: number;
   }
 
 /* ------------------------------------------------------------------ */
@@ -208,6 +209,9 @@ export default function Shop() {
         name: product.name,
         price: product.salePrice ?? product.price,
         image: product.images?.[0],
+        customizable: product.customizable,
+        customizationLabel: product.customizationLabel,
+        customizationPrice: product.customizationPrice,
       });
 
       // Track add to cart event
