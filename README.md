@@ -994,6 +994,66 @@ In development, when `mfa.testMode` is `true` (default):
 http://localhost:5000/api
 ```
 
+### API Architecture (Centralized)
+
+All API endpoints are defined in a single source of truth: `packages/shared/src/api/endpoints.ts`. Frontend apps consume them via typed constants.
+
+```
+packages/shared/src/api/
+├── endpoints.ts          # ALL 204+ API paths as typed constants
+├── client-factory.ts     # Shared axios factory (401 refresh, interceptors)
+└── index.ts              # Barrel export
+```
+
+**Usage in frontend code:**
+
+```typescript
+import { API } from '@pawtag/shared/api';
+import api from '../lib/api';  // configured via createApiClient
+
+// Static endpoints
+const res = await api.get(API.auth.login);
+const pets = await api.get(API.customer.pets.list);
+
+// Dynamic endpoints (functions)
+const user = await api.get(API.admin.users.get(userId));
+const tag = await api.get(API.finder.tag(tagId));
+```
+
+**Adding a new endpoint:**
+
+1. Add to `packages/shared/src/api/endpoints.ts`:
+   ```typescript
+   export const API = {
+     // ...
+     admin: {
+       newFeature: {
+         list: '/admin/new-feature',
+         get: (id: string) => `/admin/new-feature/${id}` as const,
+       },
+     },
+   } as const;
+   ```
+
+2. Use it — no client changes needed:
+   ```typescript
+   const res = await api.get(API.admin.newFeature.list);
+   ```
+
+**Client factory** — each app creates its client once:
+
+```typescript
+import { createApiClient, createLocalStorageTokenStorage } from '@pawtag/shared/api';
+
+export default createApiClient({
+  baseURL: '/api',
+  storage: createLocalStorageTokenStorage('pawtag_token', 'pawtag_refresh_token'),
+  refreshEndpoint: '/api/auth/refresh',
+});
+```
+
+See `skills/api-architecture/SKILL.md` for full rules.
+
 ### API Documentation (Swagger)
 
 ```

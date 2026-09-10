@@ -413,6 +413,7 @@ If something could not be completed, clearly explain why and what is required.
 PawTag/
 ├── skills/
 │   ├── coding-practice/SKILL.md 
+│   ├── api-architecture/SKILL.md
 ├── apps/
 │   ├── admin/       → Admin portal (port 3001) - 44 pages, god-mode CRUD
 │   ├── web/         → Public site, shop, auth & customer portal (port 3000) - 31 pages
@@ -457,6 +458,41 @@ packages/api/src/commerce/
     ├── shipping.service.ts     # Shipping rates and shipment creation
     └── refund.service.ts       # Full/partial refund processing
 ```
+
+### API Architecture (Centralized)
+
+**All API endpoints are centralized in `packages/shared/src/api/`.** Frontend apps consume them via typed constants and a shared client factory.
+
+```
+packages/shared/src/api/
+├── endpoints.ts          # ALL 204+ API paths as typed constants
+├── client-factory.ts     # Shared axios factory (401 refresh, interceptors, storage)
+└── index.ts              # Barrel export
+```
+
+**Endpoint constants** — single source of truth:
+```typescript
+import { API } from '@pawtag/shared/api';
+api.get(API.auth.login);                    // static path
+api.get(API.admin.users.get(userId));       // dynamic path (function)
+api.get(API.customer.guardian.points);      // nested domain
+```
+
+**Client factory** — eliminates 3x duplicated token refresh logic:
+```typescript
+import { createApiClient, createLocalStorageTokenStorage } from '@pawtag/shared/api';
+export default createApiClient({
+  baseURL: '/api',
+  storage: createLocalStorageTokenStorage('pawtag_token', 'pawtag_refresh_token'),
+  refreshEndpoint: '/api/auth/refresh',
+});
+```
+
+**Rules:**
+- All new endpoints MUST be added to `packages/shared/src/api/endpoints.ts`
+- All frontend API calls MUST use `API.xxx` constants — no hard-coded strings
+- All clients MUST be created via `createApiClient` — no raw `axios.create()`
+- See `skills/api-architecture/SKILL.md` for full rules
 
 ### Database Architecture
 
