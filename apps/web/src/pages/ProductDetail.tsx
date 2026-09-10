@@ -91,6 +91,7 @@ export default function ProductDetail() {
   const { user } = useAuth();
   const [guardianTier, setGuardianTier] = useState<string>('');
   const [isGoldMember, setIsGoldMember] = useState(false);
+  const [pointsRates, setPointsRates] = useState<{ guardianRate: number; guardianSpentAmount: number; goldRate: number; goldSpentAmount: number } | null>(null);
 
 /* ---- Fetch product ---- */
    useEffect(() => {
@@ -124,6 +125,13 @@ export default function ProductDetail() {
         .catch(() => {});
     }
   }, [user]);
+
+  // Fetch points rates for accurate points display
+  useEffect(() => {
+    api.get('/public/points/rates')
+      .then(res => setPointsRates(res.data.data))
+      .catch(() => {});
+  }, []);
 
   /* ---- Add to cart ---- */
   const handleAddToCart = async () => {
@@ -244,13 +252,13 @@ export default function ProductDetail() {
               {!user ? (
                 <div className="flex items-center gap-2 text-sm text-primary-600">
                   <Shield size={16} />
-                  <span>Join Guardian to earn <strong>{Math.floor(effectivePrice)}</strong> points on this purchase</span>
+                  <span>Join Guardian to earn <strong>{pointsRates ? Math.floor(effectivePrice / pointsRates.guardianSpentAmount * pointsRates.guardianRate) : Math.floor(effectivePrice)}</strong> points on this purchase</span>
                 </div>
               ) : guardianTier ? (
                 <div className={`flex items-center gap-2 text-sm ${isGoldMember ? 'text-amber-600' : 'text-primary-600'}`}>
                   <Star size={16} />
                   <span>
-                    Earn <strong>{Math.floor(effectivePrice * (isGoldMember ? 2 : 1))}</strong> Guardian Points
+                    Earn <strong>{pointsRates ? Math.floor(effectivePrice / (isGoldMember ? pointsRates.goldSpentAmount : pointsRates.guardianSpentAmount) * (isGoldMember ? pointsRates.goldRate : pointsRates.guardianRate)) : Math.floor(effectivePrice * (isGoldMember ? 2 : 1))}</strong> Guardian Points
                     {isGoldMember && ' (Gold 2x)'}
                   </span>
                 </div>

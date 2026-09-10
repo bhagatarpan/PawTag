@@ -74,6 +74,7 @@ export default function Checkout() {
   const [pointsToNextTier, setPointsToNextTier] = useState<number | null>(null);
   const [nextTierName, setNextTierName] = useState<string>('');
   const [isGoldMember, setIsGoldMember] = useState(false);
+  const [estimatedPoints, setEstimatedPoints] = useState(0);
 
   // Verification status
   const [emailVerified, setEmailVerified] = useState(false);
@@ -201,6 +202,17 @@ export default function Checkout() {
   const itemsSubtotal = totals.subtotal || total;
   const pawRewardsDiscount = Math.min(pawRewardsRedemption, itemsSubtotal + shippingCost + taxAmount - discountAmount);
   const orderTotal = totals.total || (itemsSubtotal + shippingCost + taxAmount - discountAmount - pawRewardsDiscount);
+
+  // Fetch estimated points from backend when order total or membership changes
+  useEffect(() => {
+    if (orderTotal > 0) {
+      api.get('/public/points/estimate', { params: { total: orderTotal, isGoldMember: String(isGoldMember) } })
+        .then(res => setEstimatedPoints(res.data.data.points || 0))
+        .catch(() => setEstimatedPoints(0));
+    } else {
+      setEstimatedPoints(0);
+    }
+  }, [orderTotal, isGoldMember]);
 
   const canProceedToCheckout = items.length > 0;
   const canProceedToPayment = emailVerified && mobileVerified && form.line1 && form.city && form.zip;
@@ -666,7 +678,7 @@ export default function Checkout() {
                         {isGoldMember && <span className="text-xs bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded-full font-medium">2x Points</span>}
                       </div>
                       <p className={`text-sm ${isGoldMember ? 'text-amber-700' : 'text-primary-700'}`}>
-                        This order will earn you approximately <strong>{Math.floor(orderTotal * (isGoldMember ? 2 : 1))} Points</strong>
+                        This order will earn you approximately <strong>{estimatedPoints} Points</strong>
                       </p>
                       {pointsToNextTier && pointsToNextTier > 0 && (
                         <p className="text-xs text-gray-500 mt-1">
@@ -1007,11 +1019,11 @@ export default function Checkout() {
                 <PawPrint className="h-5 w-5 text-primary-600 mt-0.5 flex-shrink-0" />
                 <div>
                   <p className="text-sm font-medium text-primary-800">
-                    You earned <strong>{Math.floor(confirmedTotal * (isGoldMember ? 2 : 1))} Guardian Points</strong> from this order!
+                    You earned <strong>{estimatedPoints} Guardian Points</strong> from this order!
                   </p>
                   {pointsToNextTier && pointsToNextTier > 0 && (
                     <p className="text-sm text-primary-600 mt-1">
-                      You're now {pointsToNextTier - Math.floor(confirmedTotal * (isGoldMember ? 2 : 1))} Points away from {nextTierName}.
+                      You're now {pointsToNextTier - estimatedPoints} Points away from {nextTierName}.
                     </p>
                   )}
                   <Link to="/account/guardian" className="text-xs font-medium text-primary-700 underline mt-1 inline-block">

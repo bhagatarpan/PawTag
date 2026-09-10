@@ -77,16 +77,22 @@ weight?: number;
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
 
-function toCardProduct(p: PawTagProduct, guardianTier: string, isGoldMember: boolean): ProductCardProduct {
+function toCardProduct(
+  p: PawTagProduct,
+  guardianTier: string,
+  isGoldMember: boolean,
+  rates: { guardianRate: number; guardianSpentAmount: number; goldRate: number; goldSpentAmount: number } | null
+): ProductCardProduct {
    const effectivePrice = p.salePrice ?? p.price;
    const badge = getProductBadge(p.sku) || (p.badge ? { label: p.badge, color: 'teal' } : null);
    const available = p.stock - p.reserved;
 
-   // Calculate points earning for this product
+   // Calculate points earning for this product using CMS-driven formula
    let pointsEarning: { points: number; label?: string } | null = null;
    if (guardianTier) {
-     const multiplier = isGoldMember ? 2 : 1;
-     const points = Math.floor(effectivePrice * multiplier);
+     const rate = rates ? (isGoldMember ? rates.goldRate : rates.guardianRate) : (isGoldMember ? 2 : 1);
+     const spentAmount = rates ? (isGoldMember ? rates.goldSpentAmount : rates.guardianSpentAmount) : 1;
+     const points = Math.floor((effectivePrice / spentAmount) * rate);
      pointsEarning = {
        points,
        label: isGoldMember ? 'Gold 2x' : undefined,
@@ -136,6 +142,7 @@ export default function Shop() {
   // Guardian loyalty state
   const [guardianTier, setGuardianTier] = useState<string>('');
   const [isGoldMember, setIsGoldMember] = useState(false);
+  const [pointsRates, setPointsRates] = useState<{ guardianRate: number; guardianSpentAmount: number; goldRate: number; goldSpentAmount: number } | null>(null);
 
   /* ---- Fetch products from PawTag API ---- */
   useEffect(() => {
@@ -161,8 +168,15 @@ export default function Shop() {
     }
   }, [user]);
 
+  // Fetch points rates for accurate per-product points display
+  useEffect(() => {
+    api.get('/public/points/rates')
+      .then(res => setPointsRates(res.data.data))
+      .catch(() => {});
+  }, []);
+
   /* ---- Derived data ---- */
-  const cardProducts = useMemo(() => products.map(p => toCardProduct(p, guardianTier, isGoldMember)), [products, guardianTier, isGoldMember]);
+  const cardProducts = useMemo(() => products.map(p => toCardProduct(p, guardianTier, isGoldMember, pointsRates)), [products, guardianTier, isGoldMember, pointsRates]);
 
   const shopTitle = useMemo(() =>
     (shopPage?.content as Record<string, unknown>)?.heroTitle as string || shopPage?.title || `Shop ${companyName}`,
