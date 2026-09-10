@@ -161,18 +161,30 @@ async function seedProducts() {
 
     // Idempotent: only add missing products (don't clear existing ones)
     let added = 0;
+    let updated = 0;
     let skipped = 0;
     for (const productData of products) {
       const existing = await Product.findOne({ sku: productData.sku });
       if (existing) {
-        skipped++;
+        // Update customisation fields on existing products if they differ
+        const updates: Record<string, any> = {};
+        if (existing.customizable !== productData.customizable) updates.customizable = productData.customizable;
+        if (existing.customizationLabel !== productData.customizationLabel) updates.customizationLabel = productData.customizationLabel;
+        if (existing.customizationPrice !== productData.customizationPrice) updates.customizationPrice = productData.customizationPrice;
+        if (Object.keys(updates).length > 0) {
+          await Product.updateOne({ _id: existing._id }, { $set: updates });
+          updated++;
+          console.log(`  ~ ${productData.name} (${productData.sku}) — updated customisation`);
+        } else {
+          skipped++;
+        }
         continue;
       }
       await Product.create(productData);
       added++;
       console.log(`  + ${productData.name} (${productData.sku})`);
     }
-    console.log(`Products: ${added} added, ${skipped} already existed`);
+    console.log(`Products: ${added} added, ${updated} updated, ${skipped} unchanged`);
 
     // Seed company settings
     const companySettings = [

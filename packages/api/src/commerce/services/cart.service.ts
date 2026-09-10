@@ -126,6 +126,24 @@ export class CartService {
     } else {
       // Update last accessed time
       cart.lastAccessedAt = new Date();
+
+      // Backfill product metadata for existing cart items (customizable, label, price)
+      let needsSave = false;
+      for (const item of cart.items) {
+        if (item.customizable === undefined || item.customizable === null) {
+          try {
+            const product = await Product.findById(item.productId);
+            if (product) {
+              item.customizable = (product as any).customizable ?? false;
+              item.customizationLabel = (product as any).customizationLabel || '';
+              item.customizationPrice = (product as any).customizationPrice || 0;
+              needsSave = true;
+            }
+          } catch {
+            // Product not found or error — skip backfill for this item
+          }
+        }
+      }
       await cart.save();
     }
 
