@@ -35,6 +35,10 @@ export interface ProductCardProduct {
     pointsEarning?: { points: number; label?: string } | null;
     /** Show Gold upsell text (true when user is not a Gold member) */
     showGoldUpsell?: boolean;
+    /** Whether product supports engraving/customisation */
+    customizable?: boolean;
+    /** Label for the customisation field (e.g., "Pet name") */
+    customizationLabel?: string;
  }
 
  export interface ProductCardProps {
@@ -99,6 +103,11 @@ export const ProductCard = React.memo(function ProductCard({
           {product.showGoldUpsell && (
             <p className="text-xs text-amber-600 font-medium mt-1">
               Gold members earn 2× Points on this item
+            </p>
+          )}
+          {product.customizable && (
+            <p className="text-xs text-primary-600 font-medium mt-1">
+              {product.customizationLabel ? `✓ ${product.customizationLabel} engraving available` : '✓ Engraving available'}
             </p>
           )}
         </div>

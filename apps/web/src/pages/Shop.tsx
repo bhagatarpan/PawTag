@@ -72,7 +72,9 @@ weight?: number;
     warrantyMonths: number;
     shippingDescription?: string;
     featureHighlights?: IFeatureHighlight[];
- }
+    customizable?: boolean;
+    customizationLabel?: string;
+  }
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
@@ -121,6 +123,8 @@ function toCardProduct(
         : undefined,
       pointsEarning,
       showGoldUpsell,
+      customizable: p.customizable,
+      customizationLabel: p.customizationLabel,
     };
  }
 

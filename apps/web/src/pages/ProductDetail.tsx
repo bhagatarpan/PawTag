@@ -321,11 +321,11 @@ export default function ProductDetail() {
                       value={customisationText}
                       onChange={(e) => setCustomisationText(e.target.value)}
                       placeholder={product.customizationLabel || 'Enter text'}
-                      maxLength={20}
+                      maxLength={16}
                       className="w-full px-3 py-2 border border-primary-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                     />
                     <p className="text-xs text-gray-500 mt-1">
-                      {customisationText.length}/20 characters
+                      {customisationText.length}/16 characters
                     </p>
                   </div>
                 )}
