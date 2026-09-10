@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Lock, CreditCard, PawPrint, CheckCircle, Truck, Tag, Loader2,
   Mail, Smartphone, Shield, ChevronRight, Edit3, Check, Package, Clock,
-  ShieldCheck, Headphones, RefreshCw, FileText, Download, Printer, Share2, Home, ExternalLink
+  ShieldCheck, Headphones, RefreshCw, FileText, Download, Printer, Share2, Home, ExternalLink, Crown
 } from 'lucide-react';
 import { AddressAutocomplete, InlineEditBanner } from '@pawtag/ui';
 import type { AddressComponents } from '@pawtag/ui';
@@ -1105,23 +1105,59 @@ export default function Checkout() {
                   <div className="text-center p-3 bg-gray-50 rounded-xl"><Headphones className="h-5 w-5 text-primary-600 mx-auto mb-1" /><p className="text-xs font-medium text-gray-900">24/7 Support</p><p className="text-xs text-gray-500">We're here to help</p></div>
                 </div>
 
-                {/* Guardian membership CTA */}
-                <div className="bg-gradient-to-r from-primary-50 to-amber-50 border border-primary-100 rounded-xl p-4">
-                  <div className="flex items-center gap-3">
-                    <Shield className="h-5 w-5 text-primary-600 flex-shrink-0" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-primary-800">
-                        <strong>Earn rewards on this order.</strong>
-                      </p>
-                      <p className="text-xs text-primary-600 mt-0.5">
-                        Guardian members earn points on every purchase. Join free today.
-                      </p>
+                {/* Guardian/Gold membership CTA — context-aware */}
+                {isGoldMember ? (
+                  /* Already Gold — show status */
+                  <div className="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-xl p-4">
+                    <div className="flex items-center gap-3">
+                      <Crown className="h-5 w-5 text-amber-600 flex-shrink-0" />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-amber-800">
+                          <strong>You're earning 2× Gold Points on this order!</strong>
+                        </p>
+                        <p className="text-xs text-amber-600 mt-0.5">
+                          Thank you for being a Gold member.
+                        </p>
+                      </div>
                     </div>
-                    <Link to="/guardian" className="px-3 py-1.5 bg-primary-600 text-white rounded-lg text-xs font-medium hover:bg-primary-700 transition-colors whitespace-nowrap">
-                      Learn More
-                    </Link>
                   </div>
-                </div>
+                ) : guardianTier ? (
+                  /* Guardian member — upsell Gold */
+                  <div className="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-xl p-4">
+                    <div className="flex items-center gap-3">
+                      <Crown className="h-5 w-5 text-amber-600 flex-shrink-0" />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-amber-800">
+                          <strong>Earn 2× points on this order with Gold.</strong>
+                        </p>
+                        <p className="text-xs text-amber-600 mt-0.5">
+                          Just $1.99/month — less than a coffee. Upgrade anytime.
+                        </p>
+                      </div>
+                      <Link to="/gold" className="px-3 py-1.5 bg-amber-600 text-white rounded-lg text-xs font-medium hover:bg-amber-700 transition-colors whitespace-nowrap">
+                        Go Gold
+                      </Link>
+                    </div>
+                  </div>
+                ) : (
+                  /* Not a Guardian member — promote free Guardian */
+                  <div className="bg-gradient-to-r from-primary-50 to-amber-50 border border-primary-100 rounded-xl p-4">
+                    <div className="flex items-center gap-3">
+                      <Shield className="h-5 w-5 text-primary-600 flex-shrink-0" />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-primary-800">
+                          <strong>Earn rewards on this order.</strong>
+                        </p>
+                        <p className="text-xs text-primary-600 mt-0.5">
+                          Guardian members earn points on every purchase. Join free today.
+                        </p>
+                      </div>
+                      <Link to="/guardian" className="px-3 py-1.5 bg-primary-600 text-white rounded-lg text-xs font-medium hover:bg-primary-700 transition-colors whitespace-nowrap">
+                        Join Free
+                      </Link>
+                    </div>
+                  </div>
+                )}
 
                 <p className="text-xs text-gray-400 text-center">By placing this order, you agree to our <Link to="/terms" className="underline">Terms of Service</Link> and <Link to="/privacy" className="underline">Privacy Policy</Link>.</p>
                 <p className="text-xs text-gray-400 text-center">Powered by Stripe</p>
@@ -1180,6 +1216,24 @@ export default function Checkout() {
                   )}
                   <Link to="/account/guardian" className="text-xs font-medium text-primary-700 underline mt-1 inline-block">
                     View your Guardian Dashboard
+                  </Link>
+                </div>
+              </div>
+            )}
+
+            {/* Gold upsell — for non-Gold Guardian members after purchase */}
+            {user && guardianTier && !isGoldMember && (
+              <div className="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-2xl p-5 flex items-start gap-3" style={{ animation: 'fade-in-up 0.4s ease-out 0.65s both' }}>
+                <Crown className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-amber-800">
+                    With Gold, you'd have earned <strong>{estimatedPoints * 2} Points</strong> on this order!
+                  </p>
+                  <p className="text-xs text-amber-600 mt-1">
+                    Gold members earn 2× points on every purchase — just $1.99/month.
+                  </p>
+                  <Link to="/gold" className="text-xs font-medium text-amber-700 underline mt-1 inline-block">
+                    Upgrade to Gold →
                   </Link>
                 </div>
               </div>

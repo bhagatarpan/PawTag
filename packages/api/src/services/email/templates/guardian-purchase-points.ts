@@ -46,6 +46,18 @@ export function renderPurchasePointsEmail(data: PurchasePointsEmailData): string
       Every purchase brings you closer to the next tier and more rewards. Keep earning!
     </p>
     ${renderCtaButton(dashboardUrl, 'View Your Guardian Dashboard')}
+    ${!isGoldMember ? `
+    <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin:20px 0;">
+      <tr>
+        <td style="padding:12px 16px;background-color:#fffbeb;border-radius:8px;border-left:3px solid #f59e0b;">
+          <p style="margin:0;color:#92400e;font-size:14px;line-height:1.6;">
+            <strong>Did you know? Gold members earn 2× points on every purchase.</strong><br/>
+            With Gold, you'd have earned <strong>${pointsEarned * 2} Points</strong> from this order. Upgrade for just $1.99/month.
+          </p>
+        </td>
+      </tr>
+    </table>
+    ` : ''}
     <p style="color:#6b7280;font-size:13px;line-height:1.6;margin-top:24px;">
       Thank you for being a PawTag Guardian. Your support helps us reunite lost pets with their families.
     </p>

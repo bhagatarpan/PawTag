@@ -111,6 +111,12 @@ export const CartDrawer = React.memo(function CartDrawer({
               <div className={`px-3 py-2 rounded-lg text-xs ${pointsEarning.isGoldMember ? 'bg-amber-50 border border-amber-200 text-amber-700' : 'bg-primary-50 border border-primary-100 text-primary-700'}`}>
                 This order could earn you <strong>{pointsEarning.points} Guardian Points</strong>
                 {pointsEarning.isGoldMember && ' (Gold 2x)'}.
+                {/* Gold upsell for non-Gold Guardian members */}
+                {!pointsEarning.isGoldMember && (
+                  <a href="/gold" className="text-amber-600 hover:underline ml-1 font-medium">
+                    Earn 2× with Gold →
+                  </a>
+                )}
               </div>
             ) : null}
           </div>

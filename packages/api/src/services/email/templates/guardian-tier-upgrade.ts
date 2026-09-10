@@ -7,6 +7,7 @@ interface TierUpgradeEmailData {
   points: number;
   benefits: string[];
   dashboardUrl: string;
+  isGoldMember?: boolean;
 }
 
 const TIER_COLORS: Record<string, string> = {
@@ -17,7 +18,7 @@ const TIER_COLORS: Record<string, string> = {
 };
 
 export function renderTierUpgradeEmail(data: TierUpgradeEmailData): string {
-  const { customerName, previousTier, newTier, points, benefits, dashboardUrl } = data;
+  const { customerName, previousTier, newTier, points, benefits, dashboardUrl, isGoldMember } = data;
 
   const color = TIER_COLORS[newTier] || '#10b981';
 
@@ -41,6 +42,18 @@ export function renderTierUpgradeEmail(data: TierUpgradeEmailData): string {
       </ul>
     `)}
     ${renderCtaButton(dashboardUrl, 'View Your Dashboard')}
+    ${!isGoldMember ? `
+    <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin:20px 0;">
+      <tr>
+        <td style="padding:12px 16px;background-color:#fffbeb;border-radius:8px;border-left:3px solid #f59e0b;">
+          <p style="margin:0;color:#92400e;font-size:14px;line-height:1.6;">
+            <strong>Going places? Go Gold for 2× points.</strong><br/>
+            Gold members earn double points on every purchase and start at Nurture tier. Just $1.99/month.
+          </p>
+        </td>
+      </tr>
+    </table>
+    ` : ''}
   `;
 
   return renderBase({

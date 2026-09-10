@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Crown, Check, ArrowRight, Shield, Star, Zap, Truck, Clock, Gift, Headphones, Sparkles } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import SeoHead from '../components/SeoHead';
 import PageHero from '../components/PageHero';
 
@@ -30,6 +31,10 @@ const scenarios = [
 ];
 
 export default function GoldLanding() {
+  const { user } = useAuth();
+  // Logged-in users go to upgrade page; guests go to register
+  const goldCtaTo = user ? '/account/upgrade' : '/register';
+
   return (
     <div className="min-h-screen bg-gray-50">
       <SeoHead
@@ -49,7 +54,7 @@ export default function GoldLanding() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
-              to="/register"
+              to={goldCtaTo}
               className="inline-flex items-center justify-center gap-2 bg-white text-amber-600 px-8 py-3 rounded-xl font-semibold hover:bg-amber-50 transition-colors"
             >
               Upgrade to Gold <ArrowRight size={18} />
@@ -165,7 +170,7 @@ export default function GoldLanding() {
             <strong>That's a 50% return on your membership.</strong>
           </p>
           <Link
-            to="/register"
+            to={goldCtaTo}
             className="inline-flex items-center justify-center gap-2 bg-white text-amber-600 px-8 py-3 rounded-xl font-semibold hover:bg-amber-50 transition-colors"
           >
             Upgrade to Gold <ArrowRight size={18} />
@@ -204,7 +209,7 @@ export default function GoldLanding() {
             Join Gold today and start earning 2× points on every purchase.
           </p>
           <Link
-            to="/register"
+            to={goldCtaTo}
             className="inline-flex items-center justify-center gap-2 bg-amber-500 text-white px-8 py-3 rounded-xl font-semibold hover:bg-amber-600 transition-colors"
           >
             Upgrade to Gold <ArrowRight size={18} />

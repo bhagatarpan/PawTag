@@ -60,6 +60,18 @@ export function renderOrderConfirmationEmail(data: {
 
     ${renderCtaButton(data.viewOrderUrl, 'View Order')}
 
+    <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin:20px 0;">
+      <tr>
+        <td style="padding:12px 16px;background-color:#fffbeb;border-radius:8px;border-left:3px solid #f59e0b;">
+          <p style="margin:0;color:#92400e;font-size:14px;line-height:1.6;">
+            <strong>Earn 2× points on your next order with Gold.</strong><br/>
+            Just $1.99/month — less than a coffee.
+            <a href="${data.viewOrderUrl.replace('/account/orders', '/gold')}" style="color:#d97706;text-decoration:underline;font-weight:600;">Upgrade to Gold →</a>
+          </p>
+        </td>
+      </tr>
+    </table>
+
     <p style="margin:20px 0 0;color:#9ca3af;font-size:13px;">
       Questions? Reply to this email or contact <a href="mailto:support@pawtag.co.nz" style="color:#0d9488;text-decoration:none;">support@pawtag.co.nz</a>
     </p>

@@ -20,6 +20,18 @@ export function renderWelcomeEmail(data: { name: string; accountUrl: string }): 
 
     ${renderCtaButton(data.accountUrl, 'Go to My Account')}
 
+    <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin:20px 0;">
+      <tr>
+        <td style="padding:12px 16px;background-color:#fffbeb;border-radius:8px;border-left:3px solid #f59e0b;">
+          <p style="margin:0;color:#92400e;font-size:14px;line-height:1.6;">
+            <strong>Want to earn 2× points on every purchase?</strong><br/>
+            Upgrade to Gold for just $1.99/month — less than a coffee.
+            <a href="${data.accountUrl.replace('/account', '/gold')}" style="color:#d97706;text-decoration:underline;font-weight:600;">Learn about Gold →</a>
+          </p>
+        </td>
+      </tr>
+    </table>
+
     <p style="margin:24px 0 0;color:#6b7280;font-size:14px;line-height:1.5;">
       Need help? Contact us at <a href="mailto:support@pawtag.co.nz" style="color:#0d9488;text-decoration:none;">support@pawtag.co.nz</a>
     </p>

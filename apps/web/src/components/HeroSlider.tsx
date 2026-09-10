@@ -82,6 +82,23 @@ const defaultSlides: SlideData[] = [
     imageUrl: '',
     imageAlt: '',
   },
+  {
+    id: 5,
+    tag: 'Gold',
+    headline: 'Go Gold. Get 2× the Rewards.',
+    sub: 'Earn double points on every purchase, free shipping over $50, and start at Nurture tier. Just $1.99/month — less than a coffee.',
+    cta: { text: 'Upgrade to Gold', to: '/gold' },
+    bg: 'from-amber-500 via-yellow-500 to-amber-600',
+    visualType: 'stats',
+    stats: [
+      { number: '2×', label: 'Points Earned' },
+      { number: '$3/mo', label: 'PawRewards' },
+      { number: '$50+', label: 'Free Shipping' },
+    ],
+    flowSteps: [],
+    imageUrl: '',
+    imageAlt: '',
+  },
 ];
 
 function SlideVisual({ slide, companyName }: { slide: SlideData; companyName: string }) {

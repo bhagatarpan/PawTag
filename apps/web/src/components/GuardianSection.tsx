@@ -22,7 +22,7 @@ const tiers = [
     rewards: '$3/mo',
     shipping: 'Over $75',
     color: 'bg-teal-100 text-teal-700',
-    minPoints: 500,
+    minPoints: 100,
   },
   {
     name: 'Protector',
@@ -31,7 +31,7 @@ const tiers = [
     rewards: '$5/mo',
     shipping: 'Over $50',
     color: 'bg-purple-100 text-purple-700',
-    minPoints: 2000,
+    minPoints: 200,
   },
   {
     name: 'Safeguard',
@@ -40,7 +40,7 @@ const tiers = [
     rewards: '$8/mo',
     shipping: 'Free',
     color: 'bg-amber-100 text-amber-700',
-    minPoints: 5000,
+    minPoints: 300,
   },
 ];
 

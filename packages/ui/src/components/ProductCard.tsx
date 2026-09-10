@@ -101,9 +101,9 @@ export const ProductCard = React.memo(function ProductCard({
             </p>
           )}
           {product.showGoldUpsell && (
-            <p className="text-xs text-amber-600 font-medium mt-1">
-              Gold members earn 2× Points on this item
-            </p>
+            <a href="/gold" className="text-xs text-amber-600 font-medium mt-1 hover:underline">
+              Gold members earn 2× Points on this item →
+            </a>
           )}
           {product.customizable && (
             <p className="text-xs text-primary-600 font-medium mt-1">

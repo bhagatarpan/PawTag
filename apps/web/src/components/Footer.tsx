@@ -14,6 +14,7 @@ export default function Footer() {
         { label: 'Shop', url: '/shop', type: 'custom' as const },
         { label: 'About', url: '/about', type: 'custom' as const },
         { label: 'Guardian Rewards', url: '/account/guardian', type: 'custom' as const },
+        { label: 'Gold Membership', url: '/gold', type: 'custom' as const },
         { label: 'Sign In', url: '/login', type: 'custom' as const },
       ],
     },
