@@ -35,7 +35,7 @@ const STEPS = [
 ];
 
 export default function Checkout() {
-  const { items, total, totals, clearCart, refreshCart } = useCart();
+  const { items, total, totals, clearCart, refreshCart, updateItemTexts } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -80,6 +80,10 @@ export default function Checkout() {
   // Verification status
   const [emailVerified, setEmailVerified] = useState(false);
   const [mobileVerified, setMobileVerified] = useState(false);
+
+  // Engraving editing state — tracks texts being edited per cart item
+  const [editingTexts, setEditingTexts] = useState<Record<string, string[]>>({});
+  const [savingTexts, setSavingTexts] = useState<Record<string, boolean>>({});
 
   // Shipping address
   const [addressMode, setAddressMode] = useState<'saved' | 'custom'>('saved');
@@ -214,6 +218,47 @@ export default function Checkout() {
       setEstimatedPoints(0);
     }
   }, [orderTotal, isGoldMember]);
+
+  // --- Engraving helpers ---
+  const getItemTexts = (itemId: string, item: any): string[] => {
+    // Use editing state if available, otherwise fall back to saved texts
+    if (editingTexts[itemId]) return editingTexts[itemId];
+    const saved = item.customisationTexts || [];
+    // Pad to quantity with empty strings
+    return [...saved, ...Array(Math.max(0, (item.quantity || 1) - saved.length)).fill('')];
+  };
+
+  const handleToggleEngraving = async (itemId: string, item: any, enable: boolean) => {
+    if (enable) {
+      // Enable engraving — initialize texts array with empty strings
+      const qty = item.quantity || 1;
+      const texts = Array(qty).fill('');
+      setEditingTexts(prev => ({ ...prev, [itemId]: texts }));
+      await updateItemTexts(itemId, texts);
+    } else {
+      // Disable engraving — clear texts
+      setEditingTexts(prev => ({ ...prev, [itemId]: [] }));
+      await updateItemTexts(itemId, []);
+    }
+    await refreshCart();
+  };
+
+  const handleTextChange = (itemId: string, index: number, value: string) => {
+    setEditingTexts(prev => {
+      const current = prev[itemId] || [];
+      const updated = [...current];
+      updated[index] = value.slice(0, 16); // Max 16 chars
+      return { ...prev, [itemId]: updated };
+    });
+  };
+
+  const handleSaveTexts = async (itemId: string) => {
+    const texts = editingTexts[itemId] || [];
+    setSavingTexts(prev => ({ ...prev, [itemId]: true }));
+    await updateItemTexts(itemId, texts);
+    await refreshCart();
+    setSavingTexts(prev => ({ ...prev, [itemId]: false }));
+  };
 
   const canProceedToCheckout = items.length > 0;
   const canProceedToPayment = emailVerified && mobileVerified && form.line1 && form.city && form.zip;
@@ -525,41 +570,96 @@ export default function Checkout() {
                 </div>
               </div>
 
-              {/* Items Table */}
-              <div className="px-6">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-gray-100">
-                      <th className="text-left py-3 text-sm font-semibold text-gray-500">Item</th>
-                      <th className="text-right py-3 text-sm font-semibold text-gray-500">Price</th>
-                      <th className="text-center py-3 text-sm font-semibold text-gray-500">Qty</th>
-                      <th className="text-right py-3 text-sm font-semibold text-gray-500">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {items.map((item) => (
-                      <tr key={item.productId || item.variantId} className="border-b border-gray-50">
-                        <td className="py-4">
+              {/* Items */}
+              <div className="px-6 space-y-4">
+                    {items.map((item) => {
+                      const itemId = item._id || item.productId || '';
+                      const texts = getItemTexts(itemId, item);
+                      const hasCustomisation = item.customisation === true;
+                      const isCustomizable = item.customizable === true;
+                      const labelText = item.customizationLabel || 'customisation';
+                      const engravingPrice = item.customizationPrice || 0;
+
+                      return (
+                        <div key={itemId} className="border-b border-gray-50 pb-4 last:border-0">
                           <div className="flex items-center gap-3">
                             <div className="h-14 w-14 bg-primary-50 rounded-lg flex-shrink-0 flex items-center justify-center overflow-hidden">
                               {item.image ? <img src={item.image} alt="" className="h-full w-full object-cover" /> : <PawPrint className="h-6 w-6 text-primary-300" />}
                             </div>
-                            <div>
+                            <div className="flex-1">
                               <p className="font-medium text-gray-900">{item.productName || item.name}</p>
-                              {item.customisationText && (
-                                <p className="text-xs text-primary-600">Pet name: {item.customisationText}</p>
-                              )}
-                              <p className="text-xs text-gray-500">{item.quantity > 1 ? `Qty: ${item.quantity}` : ''}</p>
+                              <p className="text-xs text-gray-500">Qty: {item.quantity} × NZ${(item.unitPrice || item.price || 0).toFixed(2)}</p>
                             </div>
+                            <p className="text-sm font-semibold text-gray-900">NZ${((item.unitPrice || item.price || 0) * item.quantity).toFixed(2)}</p>
                           </div>
-                        </td>
-                        <td className="text-right text-sm text-gray-600">NZ${(item.unitPrice || item.price || 0).toFixed(2)}</td>
-                        <td className="text-center text-sm text-gray-600">{item.quantity}</td>
-                        <td className="text-right text-sm font-semibold text-gray-900">NZ${((item.unitPrice || item.price || 0) * item.quantity).toFixed(2)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+
+                          {/* Engraving section — only for customizable products */}
+                          {isCustomizable && (
+                            <div className="mt-3 ml-17">
+                              {!hasCustomisation ? (
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    onChange={(e) => handleToggleEngraving(itemId, item, e.target.checked)}
+                                    className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                                  />
+                                  <span className="text-sm text-primary-700">
+                                    Add {labelText}
+                                  </span>
+                                  {engravingPrice > 0 && (
+                                    <span className="text-xs text-gray-500">(+NZ${engravingPrice.toFixed(2)})</span>
+                                  )}
+                                </label>
+                              ) : (
+                                <div className="space-y-2">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <input
+                                      type="checkbox"
+                                      checked
+                                      readOnly
+                                      className="rounded border-gray-300 text-primary-600"
+                                    />
+                                    <span className="text-sm font-medium text-primary-700">
+                                      {labelText}
+                                    </span>
+                                    {engravingPrice > 0 && (
+                                      <span className="text-xs text-gray-500">(+NZ${engravingPrice.toFixed(2)})</span>
+                                    )}
+                                    <button
+                                      onClick={() => handleToggleEngraving(itemId, item, false)}
+                                      className="text-xs text-gray-400 hover:text-red-500 ml-1"
+                                    >
+                                      Remove
+                                    </button>
+                                  </div>
+                                  {texts.map((text, idx) => (
+                                    <div key={idx} className="flex items-center gap-2">
+                                      <span className="text-xs text-gray-400 w-16 shrink-0">Pet name #{idx + 1}:</span>
+                                      <input
+                                        type="text"
+                                        value={text}
+                                        onChange={(e) => handleTextChange(itemId, idx, e.target.value)}
+                                        placeholder={`Enter ${labelText.toLowerCase()}`}
+                                        maxLength={16}
+                                        className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                      />
+                                      <button
+                                        onClick={() => handleSaveTexts(itemId)}
+                                        disabled={savingTexts[itemId]}
+                                        className="p-1.5 text-primary-600 hover:text-primary-800 disabled:opacity-50"
+                                        title="Save"
+                                      >
+                                        {savingTexts[itemId] ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
               </div>
 
               {/* Summary */}
@@ -900,8 +1000,12 @@ export default function Checkout() {
                       </div>
                       <div className="flex-1">
                         <p className="font-medium text-gray-900">{item.productName || item.name}</p>
-                        {item.customisationText && (
-                          <p className="text-xs text-primary-600">Pet name: {item.customisationText}</p>
+                        {item.customisationTexts && item.customisationTexts.length > 0 && item.customisationTexts.some(t => t) && (
+                          <div className="text-xs text-primary-600">
+                            {item.customisationTexts.filter(t => t).map((t, i) => (
+                              <p key={i}>Pet name: {t}</p>
+                            ))}
+                          </div>
                         )}
                         <p className="text-xs text-gray-500">Qty: {item.quantity}</p>
                       </div>
@@ -1084,8 +1188,12 @@ export default function Checkout() {
                         </div>
                         <div>
                           <p className="text-sm font-medium text-gray-900">{item.productName || item.name}</p>
-                          {item.customisationText && (
-                            <p className="text-xs text-primary-600">Pet name: {item.customisationText}</p>
+                          {item.customisationTexts && item.customisationTexts.length > 0 && item.customisationTexts.some((t: string) => t) && (
+                            <div className="text-xs text-primary-600">
+                              {item.customisationTexts.filter((t: string) => t).map((t: string, i: number) => (
+                                <p key={i}>Pet name: {t}</p>
+                              ))}
+                            </div>
                           )}
                           <p className="text-xs text-gray-500">Qty: {item.quantity}</p>
                         </div>

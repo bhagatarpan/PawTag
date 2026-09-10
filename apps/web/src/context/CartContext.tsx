@@ -33,7 +33,10 @@ export interface CartItem {
   quantity: number;
   image?: string;
   customisation?: boolean;
-  customisationText?: string;
+  customisationTexts?: string[];
+  customizable?: boolean;
+  customizationLabel?: string;
+  customizationPrice?: number;
   addedAt?: string;
 }
 
@@ -65,9 +68,10 @@ export interface CartTotals {
 
 interface CartContextType {
   items: CartItem[];
-  addItem: (item: { productId: string; quantity: number; customisation?: boolean; customisationText?: string; name?: string; price?: number; image?: string; sku?: string }) => Promise<void>;
+  addItem: (item: { productId: string; quantity: number; customisation?: boolean; customisationTexts?: string[]; name?: string; price?: number; image?: string; sku?: string }) => Promise<void>;
   removeItem: (itemId: string) => void;
   updateQuantity: (itemId: string, quantity: number) => void;
+  updateItemTexts: (itemId: string, texts: string[]) => void;
   clearCart: () => void;
   refreshCart: () => Promise<void>;
   totals: CartTotals;
@@ -299,20 +303,22 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, [refreshCart]);
 
   /* ---- Add item ---- */
-  const addItem = useCallback(async (item: { productId: string; quantity: number; customisation?: boolean; customisationText?: string; name?: string; price?: number; image?: string; sku?: string }) => {
+  const addItem = useCallback(async (item: { productId: string; quantity: number; customisation?: boolean; customisationTexts?: string[]; name?: string; price?: number; image?: string; sku?: string }) => {
     const token = localStorage.getItem('pawtag_token');
     const cust = normCustom(item.customisation);
-    const custText = (item.customisationText || '').trim();
+    const custTexts = (item.customisationTexts || []).map(t => t.trim()).filter(Boolean);
 
     if (!token) {
       // Guest: add to localStorage
       const guestItems = getGuestCart();
+      // Merge by product + customisation (not by text)
       const existing = guestItems.find(
-        (i) => i.productId === item.productId && normCustom(i.customisation) === cust && (i.customisationText || '') === custText
+        (i) => i.productId === item.productId && normCustom(i.customisation) === cust
       );
 
       if (existing) {
         existing.quantity += item.quantity;
+        existing.customisationTexts = [...(existing.customisationTexts || []), ...custTexts];
       } else {
         guestItems.push({
           _id: item.productId,
@@ -326,7 +332,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           quantity: item.quantity,
           image: item.image,
           customisation: cust,
-          customisationText: custText || undefined,
+          customisationTexts: custTexts,
           addedAt: new Date().toISOString(),
         });
       }
@@ -352,7 +358,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         productId: item.productId,
         quantity: item.quantity,
         customisation: cust,
-        customisationText: custText || undefined,
+        customisationTexts: custTexts,
       });
       const data = res.data?.data;
       if (data?.cart) {
@@ -417,6 +423,40 @@ export function CartProvider({ children }: { children: ReactNode }) {
         const msg = err?.response?.data?.error || 'Failed to add item. Please try again.';
         setError(msg);
         throw new Error(msg);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  /* ---- Update item customisation texts ---- */
+  const updateItemTexts = useCallback(async (itemId: string, texts: string[]) => {
+    const token = localStorage.getItem('pawtag_token');
+
+    if (!token) {
+      // Guest: update in localStorage
+      const guestItems = getGuestCart();
+      const item = guestItems.find((i) => i._id === itemId || i.productId === itemId);
+      if (item) {
+        item.customisationTexts = texts;
+        setGuestCart(guestItems);
+        setItems([...guestItems]);
+      }
+      return;
+    }
+
+    // Authenticated: update on server
+    try {
+      setLoading(true);
+      const res = await api.put(API.cart.updateItem(itemId), { customisationTexts: texts });
+      const data = res.data?.data;
+      if (data?.cart) {
+        setItems(data.cart.items || []);
+        setTotals(data.totals || EMPTY_TOTALS);
+      }
+    } catch (err: any) {
+      if (err?.response?.status !== 401) {
+        setError('Failed to update engraving');
       }
     } finally {
       setLoading(false);
@@ -540,6 +580,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     addItem,
     removeItem,
     updateQuantity,
+    updateItemTexts,
     clearCart,
     refreshCart,
     totals,

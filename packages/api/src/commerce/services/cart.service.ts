@@ -40,7 +40,7 @@ export interface AddToCartInput {
   productId: string;
   quantity: number;
   customisation?: boolean;
-  customisationText?: string;
+  customisationTexts?: string[];
   variantName?: string;
 }
 
@@ -49,7 +49,8 @@ export interface AddToCartInput {
  */
 export interface UpdateCartItemInput {
   itemId: string;
-  quantity: number;
+  quantity?: number;
+  customisationTexts?: string[];
 }
 
 /**
@@ -155,14 +156,14 @@ export class CartService {
 
     // Normalise customisation for consistent comparison
     const inputCust = input.customisation === true;
-    const inputText = (input.customisationText || '').trim();
+    const inputTexts = (input.customisationTexts || []).map(t => t.trim()).filter(Boolean);
 
-    // Check if item already in cart (same product, same customisation state, same text)
+    // Check if item already in cart (same product, same customisation state)
+    // When customised, merge texts into existing line instead of creating separate lines
     const existingItem = cart.items.find(
       (item) =>
         String(item.productId) === input.productId &&
-        (item.customisation === true) === inputCust &&
-        (item.customisationText || '') === inputText,
+        (item.customisation === true) === inputCust,
     );
 
     // Check max cart items limit (only for new items)
@@ -187,11 +188,13 @@ export class CartService {
     }
 
     if (existingItem) {
-      // Increment quantity
+      // Merge: append new texts and increase quantity
+      const existingTexts = existingItem.customisationTexts || [];
+      const mergedTexts = [...existingTexts, ...inputTexts];
       existingItem.quantity += input.quantity;
       existingItem.unitPrice = product.salePrice ?? product.price;
       existingItem.customizationTotal = input.customisation ? product.customizationPrice : 0;
-      existingItem.customisationText = inputText || undefined;
+      existingItem.customisationTexts = mergedTexts;
     } else {
       // Add new item
       cart.items.push({
@@ -204,7 +207,10 @@ export class CartService {
         quantity: input.quantity,
         image: product.images?.[0],
         customisation: input.customisation ?? false,
-        customisationText: inputText || undefined,
+        customisationTexts: inputTexts,
+        customizable: product.customizable ?? false,
+        customizationLabel: product.customizationLabel || '',
+        customizationPrice: product.customizationPrice || 0,
         addedAt: new Date(),
       });
     }
@@ -231,10 +237,15 @@ export class CartService {
       throw new NotFoundError('Cart item');
     }
 
-    if (input.quantity <= 0) {
+    // Update customisation texts if provided
+    if (input.customisationTexts !== undefined) {
+      item.customisationTexts = input.customisationTexts;
+    }
+
+    if (input.quantity !== undefined && input.quantity <= 0) {
       // Remove item if quantity is 0 or negative
       cart.items.pull(item);
-    } else {
+    } else if (input.quantity !== undefined) {
       // Validate stock
       const canFulfill = await inventoryService.canFulfill(String(item.productId), input.quantity);
       if (!canFulfill) {
@@ -245,6 +256,15 @@ export class CartService {
         );
       }
       item.quantity = input.quantity;
+      // Sync texts array length with quantity
+      if (item.customisation && item.customisationTexts) {
+        while (item.customisationTexts.length < item.quantity) {
+          item.customisationTexts.push('');
+        }
+        if (item.customisationTexts.length > item.quantity) {
+          item.customisationTexts = item.customisationTexts.slice(0, item.quantity);
+        }
+      }
     }
 
     cart.lastAccessedAt = new Date();

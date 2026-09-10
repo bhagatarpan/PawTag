@@ -467,7 +467,7 @@ export interface OrderItem {
   variantName?: string;
   petName?: string;
   customizationTotal?: number;
-  customisationText?: string;
+  customisationTexts?: string[];
 }
 
 export interface PaymentInfo {

@@ -12,7 +12,11 @@ export interface CartItem {
   quantity: number;
   image?: string;
   petName?: string;
-  customisationText?: string;
+  customisationTexts?: string[];
+  customizable?: boolean;
+  customizationLabel?: string;
+  customizationPrice?: number;
+  customisation?: boolean;
 }
 
 export interface CartDrawerProps {
@@ -141,8 +145,12 @@ export const CartDrawer = React.memo(function CartDrawer({
                   {item.petName && (
                     <p className="text-xs text-gray-400">For {item.petName}</p>
                   )}
-                  {item.customisationText && (
-                    <p className="text-xs text-primary-600">Pet name: {item.customisationText}</p>
+                  {item.customisationTexts && item.customisationTexts.length > 0 && item.customisationTexts.some(t => t) && (
+                    <div className="text-xs text-primary-600">
+                      {item.customisationTexts.filter(t => t).map((t, i) => (
+                        <p key={i}>Pet name: {t}</p>
+                      ))}
+                    </div>
                   )}
                   <p className="text-sm font-bold text-primary-700 mt-1">
                     ${(itemPrice * item.quantity).toFixed(2)}

@@ -33,7 +33,7 @@ export interface IPendingOrderItem {
   quantity: number;
   image?: string;
   customisation?: boolean;
-  customisationText?: string;
+  customisationTexts?: string[];
 }
 
 export interface IPendingOrderDocument extends Document {
@@ -116,7 +116,7 @@ const PendingOrderItemSchema = new Schema<IPendingOrderItem>({
   quantity: { type: Number, required: true, min: 1 },
   image: { type: String },
   customisation: { type: Boolean, default: false },
-  customisationText: { type: String, default: '' },
+  customisationTexts: { type: [String], default: [] },
 }, { _id: false });
 
 const PendingOrderSchema = new Schema<IPendingOrderDocument>(

@@ -239,7 +239,7 @@ export interface OrderItemData {
   tagId?: string;
   image?: string;
   customizationTotal?: number;
-  customisationText?: string;
+  customisationTexts?: string[];
 }
 
 export interface OrderData {

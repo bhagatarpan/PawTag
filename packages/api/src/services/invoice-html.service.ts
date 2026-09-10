@@ -86,7 +86,9 @@ function buildDefaultInvoiceHtml(data: InvoiceData, company: Record<string, stri
               <strong>${escapeHtml(item.productName)}</strong>
               ${item.variantName ? `<br><span style="color:#6b7280;font-size:12px;">${escapeHtml(item.variantName)}</span>` : ''}
               ${item.petName ? `<br><span style="color:#0d9488;font-size:12px;">For: ${escapeHtml(item.petName)}</span>` : ''}
-              ${item.customisationText ? `<br><span style="color:#0d9488;font-size:12px;">Pet name: ${escapeHtml(item.customisationText)}</span>` : ''}
+              ${item.customisationTexts && item.customisationTexts.length > 0 && item.customisationTexts.some((t: string) => t)
+                ? item.customisationTexts.filter((t: string) => t).map((t: string) => `<br><span style="color:#0d9488;font-size:12px;">Pet name: ${escapeHtml(t)}</span>`).join('')
+                : ''}
               ${item.tagId ? `<br><span style="color:#0d9488;font-size:12px;">Tag: ${escapeHtml(item.tagId)}</span>` : ''}
             </td>
             <td>${item.quantity}</td>

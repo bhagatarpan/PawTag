@@ -97,7 +97,7 @@ export default function ProductDetail() {
   const [isGoldMember, setIsGoldMember] = useState(false);
   const [pointsRates, setPointsRates] = useState<{ guardianRate: number; guardianSpentAmount: number; goldRate: number; goldSpentAmount: number } | null>(null);
   const [customisation, setCustomisation] = useState(false);
-  const [customisationText, setCustomisationText] = useState('');
+  const [customisationTexts, setCustomisationTexts] = useState<string[]>(['']);
 
 /* ---- Fetch product ---- */
    useEffect(() => {
@@ -150,7 +150,7 @@ export default function ProductDetail() {
         price: product.salePrice ?? product.price,
         image: product.images?.[0],
         customisation,
-        customisationText: customisation ? customisationText : undefined,
+        customisationTexts: customisation ? customisationTexts.filter(t => t.trim()) : [],
       });
       setAdded(true);
       setTimeout(() => setAdded(false), 1500);
@@ -301,7 +301,7 @@ export default function ProductDetail() {
                     checked={customisation}
                     onChange={(e) => {
                       setCustomisation(e.target.checked);
-                      if (!e.target.checked) setCustomisationText('');
+                      if (!e.target.checked) setCustomisationTexts(['']);
                     }}
                     className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                   />
@@ -315,17 +315,28 @@ export default function ProductDetail() {
                   )}
                 </label>
                 {customisation && (
-                  <div className="mt-3">
-                    <input
-                      type="text"
-                      value={customisationText}
-                      onChange={(e) => setCustomisationText(e.target.value)}
-                      placeholder={product.customizationLabel || 'Enter text'}
-                      maxLength={16}
-                      className="w-full px-3 py-2 border border-primary-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      {customisationText.length}/16 characters
+                  <div className="mt-3 space-y-2">
+                    {Array.from({ length: quantity }).map((_, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        {quantity > 1 && (
+                          <span className="text-xs text-gray-400 w-16 shrink-0">Name #{idx + 1}:</span>
+                        )}
+                        <input
+                          type="text"
+                          value={customisationTexts[idx] || ''}
+                          onChange={(e) => {
+                            const updated = [...customisationTexts];
+                            updated[idx] = e.target.value.slice(0, 16);
+                            setCustomisationTexts(updated);
+                          }}
+                          placeholder={product.customizationLabel || 'Enter text'}
+                          maxLength={16}
+                          className="w-full px-3 py-2 border border-primary-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                        />
+                      </div>
+                    ))}
+                    <p className="text-xs text-gray-500">
+                      {customisationTexts.filter(t => t).join(', ').length || 0}/16 characters per name
                     </p>
                   </div>
                 )}

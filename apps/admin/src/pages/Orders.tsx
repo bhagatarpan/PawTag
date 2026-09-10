@@ -39,7 +39,7 @@ interface OrderItem {
   unitPrice: number;
   totalPrice: number;
   customizationTotal?: number;
-  customisationText?: string;
+  customisationTexts?: string[];
 }
 
 export interface Order {
@@ -742,8 +742,12 @@ export function OrderDetailDrawer({
                             {item.petName && (
                               <div className="text-xs text-gray-500">For: {item.petName}</div>
                             )}
-                            {item.customisationText && (
-                              <div className="text-xs text-primary-600">Engraving: {item.customisationText}</div>
+                            {item.customisationTexts && item.customisationTexts.length > 0 && item.customisationTexts.some(t => t) && (
+                              <div className="text-xs text-primary-600">
+                                {item.customisationTexts.filter(t => t).map((t, i) => (
+                                  <div key={i}>Engraving: {t}</div>
+                                ))}
+                              </div>
                             )}
                             {productCategory && (
                               <div className="text-xs text-gray-400 mt-0.5">{productCategory}</div>

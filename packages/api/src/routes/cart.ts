@@ -56,11 +56,11 @@ router.get('/', async (req: AuthRequest, res: Response) => {
  * POST /api/cart/items
  *
  * Add an item to the cart.
- * Body: { productId, quantity, customisation?, customisationText?, variantName? }
+ * Body: { productId, quantity, customisation?, customisationTexts?, variantName? }
  */
 router.post('/items', async (req: AuthRequest, res: Response) => {
   try {
-    const { productId, quantity, customisation, customisationText, variantName } = req.body;
+    const { productId, quantity, customisation, customisationTexts, variantName } = req.body;
 
     if (!productId || !quantity || quantity < 1) {
       res.status(400).json({ success: false, error: 'productId and quantity (>= 1) are required' });
@@ -71,7 +71,7 @@ router.post('/items', async (req: AuthRequest, res: Response) => {
       productId,
       quantity,
       customisation,
-      customisationText,
+      customisationTexts,
       variantName,
     });
 
@@ -91,21 +91,22 @@ router.post('/items', async (req: AuthRequest, res: Response) => {
 /**
  * PUT /api/cart/items/:id
  *
- * Update item quantity.
- * Body: { quantity }
+ * Update item quantity or customisation texts.
+ * Body: { quantity?, customisationTexts? }
  */
 router.put('/items/:id', async (req: AuthRequest, res: Response) => {
   try {
-    const { quantity } = req.body;
+    const { quantity, customisationTexts } = req.body;
 
-    if (quantity === undefined) {
-      res.status(400).json({ success: false, error: 'quantity is required' });
+    if (quantity === undefined && customisationTexts === undefined) {
+      res.status(400).json({ success: false, error: 'quantity or customisationTexts is required' });
       return;
     }
 
     const cart = await cartService.updateItem(req.user!.id, {
       itemId: req.params.id,
       quantity,
+      customisationTexts,
     });
 
     const totals = await cartService.calculateTotals(req.user!.id);
