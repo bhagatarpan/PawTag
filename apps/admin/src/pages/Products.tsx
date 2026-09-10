@@ -36,8 +36,9 @@ interface Product {
    isActive: boolean;
    images: string[];
    variants: ProductVariant[];
-   customizable: boolean;
-   customizationPrice: number;
+    customizable: boolean;
+    customizationLabel?: string;
+    customizationPrice: number;
    createdAt: string;
    slug?: string;
    sortOrder?: number;
@@ -277,6 +278,7 @@ function DetailDrawer({
 
               <Section title="Customization" icon={<Settings size={16} />}>
                 <DetailRow label="Engraving" value={product.customizable ? 'Allowed' : 'Not allowed'} />
+                {product.customizable && product.customizationLabel && <DetailRow label="Engraving Label" value={product.customizationLabel} />}
                 {product.customizable && <DetailRow label="Extra Cost" value={`$${(product.customizationPrice || 0).toFixed(2)} NZD`} />}
               </Section>
 
@@ -492,7 +494,7 @@ export default function Products() {
   const [editing, setEditing] = useState<Product | null>(null);
 const [form, setForm] = useState({
       name: '', description: '', shortDescription: '', price: 0, category: 'PawTag',
-      stock: 0, sku: '', currency: 'NZD', isActive: true, customizable: false, customizationPrice: 0,
+      stock: 0, sku: '', currency: 'NZD', isActive: true, customizable: false, customizationLabel: '', customizationPrice: 0,
       featureHighlights: DEFAULT_FEATURE_HIGHLIGHTS as IFeatureHighlight[],
       slug: '',
       isSubscription: false,
@@ -606,7 +608,7 @@ const [form, setForm] = useState({
       setEditing(null);
       setForm({
         name: '', description: '', shortDescription: '', price: 0, category: 'PawTag',
-        stock: 0, sku: '', currency: 'NZD', isActive: true, customizable: false, customizationPrice: 0,
+        stock: 0, sku: '', currency: 'NZD', isActive: true, customizable: false, customizationLabel: '', customizationPrice: 0,
         featureHighlights: [...DEFAULT_FEATURE_HIGHLIGHTS], slug: '', isSubscription: true, isTagProduct: false,
         subscriptionConfig: { type: 'annual', freePeriodMonths: 12, monthlyPrice: 0, gracePeriodWeeks: 4 },
       });
@@ -619,7 +621,7 @@ const [form, setForm] = useState({
   // Form handlers
 const openCreate = () => {
      setEditing(null);
-     setForm({ name: '', description: '', shortDescription: '', price: 0, category: 'PawTag', stock: 0, sku: '', currency: 'NZD', isActive: true, customizable: false, customizationPrice: 0, featureHighlights: [...DEFAULT_FEATURE_HIGHLIGHTS], slug: '', isSubscription: false, isTagProduct: false, subscriptionConfig: { type: 'annual', freePeriodMonths: 12, monthlyPrice: 0, gracePeriodWeeks: 4 } });
+      setForm({ name: '', description: '', shortDescription: '', price: 0, category: 'PawTag', stock: 0, sku: '', currency: 'NZD', isActive: true, customizable: false, customizationLabel: '', customizationPrice: 0, featureHighlights: [...DEFAULT_FEATURE_HIGHLIGHTS], slug: '', isSubscription: false, isTagProduct: false, subscriptionConfig: { type: 'annual', freePeriodMonths: 12, monthlyPrice: 0, gracePeriodWeeks: 4 } });
     setVariants([]);
     setImages([]);
     setShowForm(true);
@@ -630,7 +632,7 @@ const openEdit = (p: Product) => {
      setForm({
        name: p.name, description: p.description || '', shortDescription: p.shortDescription || '',
        price: p.price, category: p.category, stock: p.stock, sku: p.sku, currency: 'NZD',
-       isActive: p.isActive, customizable: p.customizable || false, customizationPrice: p.customizationPrice || 0,
+       isActive: p.isActive, customizable: p.customizable || false, customizationLabel: p.customizationLabel || '', customizationPrice: p.customizationPrice || 0,
        featureHighlights: p.featureHighlights && p.featureHighlights.length > 0 ? [...p.featureHighlights] : [...DEFAULT_FEATURE_HIGHLIGHTS],
        slug: p.slug || '',
        isSubscription: p.isSubscription || false,
@@ -951,7 +953,19 @@ const openEdit = (p: Product) => {
                 <h3 className="text-sm font-semibold text-gray-700 mb-3">Customization</h3>
                 <div className="flex items-center gap-6">
                   <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.customizable} onChange={(e) => setForm({ ...form, customizable: e.target.checked })} className="rounded" /> Allow pet name engraving</label>
-                  {form.customizable && <div className="flex items-center gap-2"><label className="text-sm text-gray-600">Extra cost:</label><input type="number" step="0.01" value={form.customizationPrice} onChange={(e) => setForm({ ...form, customizationPrice: parseFloat(e.target.value) || 0 })} className="w-24 border rounded-md px-3 py-2 text-sm" /><span className="text-sm text-gray-500">NZD</span></div>}
+                  {form.customizable && (
+                    <>
+                      <div className="flex items-center gap-2">
+                        <label className="text-sm text-gray-600">Label:</label>
+                        <input type="text" value={form.customizationLabel} onChange={(e) => setForm({ ...form, customizationLabel: e.target.value })} placeholder="e.g., Pet name" className="w-40 border rounded-md px-3 py-2 text-sm" />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <label className="text-sm text-gray-600">Extra cost:</label>
+                        <input type="number" step="0.01" value={form.customizationPrice} onChange={(e) => setForm({ ...form, customizationPrice: parseFloat(e.target.value) || 0 })} className="w-24 border rounded-md px-3 py-2 text-sm" />
+                        <span className="text-sm text-gray-500">NZD</span>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
               <div className="border-t pt-4">

@@ -55,6 +55,9 @@ export interface ICartItem {
   /** Whether customisation is applied */
   customisation?: boolean;
 
+  /** Customisation text (e.g., pet name for engraving) */
+  customisationText?: string;
+
   /** Timestamp when item was added */
   addedAt: Date;
 }
@@ -107,6 +110,7 @@ const CartItemSchema = new Schema<ICartItem>({
   quantity: { type: Number, required: true, min: 1 },
   image: { type: String },
   customisation: { type: Boolean, default: false },
+  customisationText: { type: String, default: '' },
   addedAt: { type: Date, default: Date.now },
 }, { _id: true });
 

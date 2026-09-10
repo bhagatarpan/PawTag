@@ -12,6 +12,7 @@ export interface CartItem {
   quantity: number;
   image?: string;
   petName?: string;
+  customisationText?: string;
 }
 
 export interface CartDrawerProps {
@@ -139,6 +140,9 @@ export const CartDrawer = React.memo(function CartDrawer({
                   <h4 className="text-sm font-semibold text-gray-900 truncate">{itemName}</h4>
                   {item.petName && (
                     <p className="text-xs text-gray-400">For {item.petName}</p>
+                  )}
+                  {item.customisationText && (
+                    <p className="text-xs text-primary-600">Pet name: {item.customisationText}</p>
                   )}
                   <p className="text-sm font-bold text-primary-700 mt-1">
                     ${(itemPrice * item.quantity).toFixed(2)}

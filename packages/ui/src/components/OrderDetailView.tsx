@@ -217,6 +217,9 @@ function OrderItemsList({ order }: { order: OrderData }) {
               {item.petName && (
                 <p className="text-sm text-primary-600">For: {item.petName}</p>
               )}
+              {item.customisationText && (
+                <p className="text-sm text-primary-600">Pet name: {item.customisationText}</p>
+              )}
               {item.sku && (
                 <p className="text-xs text-gray-400 mt-1">SKU: {item.sku}</p>
               )}

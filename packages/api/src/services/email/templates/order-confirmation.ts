@@ -3,7 +3,7 @@ import { renderBase, renderCtaButton } from './base';
 export function renderOrderConfirmationEmail(data: {
   name: string;
   orderNumber: string;
-  items: Array<{ productName: string; quantity: number; unitPrice: number; variantName?: string; petName?: string }>;
+  items: Array<{ productName: string; quantity: number; unitPrice: number; variantName?: string; petName?: string; customisationText?: string }>;
   total: number;
   shippingAddress: { line1: string; city: string; state: string; zip: string };
   viewOrderUrl: string;
@@ -14,6 +14,7 @@ export function renderOrderConfirmationEmail(data: {
         ${item.productName}
         ${item.variantName ? `<br><span style="color:#6b7280;font-size:12px;">${item.variantName}</span>` : ''}
         ${item.petName ? `<br><span style="color:#0d9488;font-size:12px;">For: ${item.petName}</span>` : ''}
+        ${item.customisationText ? `<br><span style="color:#0d9488;font-size:12px;">Pet name: ${item.customisationText}</span>` : ''}
       </td>
       <td style="padding:12px 16px;border-bottom:1px solid #f3f4f6;text-align:center;color:#374151;font-size:14px;">${item.quantity}</td>
       <td style="padding:12px 16px;border-bottom:1px solid #f3f4f6;text-align:right;color:#374151;font-size:14px;">$${(item.unitPrice * item.quantity).toFixed(2)}</td>

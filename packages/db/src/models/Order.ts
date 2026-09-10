@@ -16,6 +16,7 @@ export interface IOrderDocument extends Document {
     unitPrice: number;
     totalPrice: number;
     customizationTotal?: number;
+    customisationText?: string;
   }>;
   subtotal?: number;
   shippingCost?: number;
@@ -111,6 +112,7 @@ const OrderSchema = new Schema<IOrderDocument>(
         unitPrice: { type: Number, required: true },
         totalPrice: { type: Number, required: true },
         customizationTotal: { type: Number, default: 0 },
+        customisationText: { type: String, default: '' },
       },
     ],
     subtotal: { type: Number },

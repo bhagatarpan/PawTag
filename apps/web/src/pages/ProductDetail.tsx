@@ -66,6 +66,9 @@ const getIconByName = (iconName: string) => {
    isActive: boolean;
    isSubscription: boolean;
    isTagProduct: boolean;
+   customizable?: boolean;
+   customizationLabel?: string;
+   customizationPrice?: number;
 subscriptionConfig?: {
       type: 'annual' | 'monthly';
       freePeriodMonths: number;
@@ -93,6 +96,8 @@ export default function ProductDetail() {
   const [guardianTier, setGuardianTier] = useState<string>('');
   const [isGoldMember, setIsGoldMember] = useState(false);
   const [pointsRates, setPointsRates] = useState<{ guardianRate: number; guardianSpentAmount: number; goldRate: number; goldSpentAmount: number } | null>(null);
+  const [customisation, setCustomisation] = useState(false);
+  const [customisationText, setCustomisationText] = useState('');
 
 /* ---- Fetch product ---- */
    useEffect(() => {
@@ -144,6 +149,8 @@ export default function ProductDetail() {
         name: product.name,
         price: product.salePrice ?? product.price,
         image: product.images?.[0],
+        customisation,
+        customisationText: customisation ? customisationText : undefined,
       });
       setAdded(true);
       setTimeout(() => setAdded(false), 1500);
@@ -284,6 +291,46 @@ export default function ProductDetail() {
                 <span className="text-sm text-red-600">Out of stock</span>
               )}
             </div>
+
+            {/* Customisation / Engraving */}
+            {product.customizable && (
+              <div className="mt-4 p-4 bg-primary-50 border border-primary-100 rounded-lg">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={customisation}
+                    onChange={(e) => {
+                      setCustomisation(e.target.checked);
+                      if (!e.target.checked) setCustomisationText('');
+                    }}
+                    className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                  />
+                  <span className="text-sm font-medium text-primary-800">
+                    Add {product.customizationLabel || 'customisation'}
+                  </span>
+                  {product.customizationPrice != null && product.customizationPrice > 0 && (
+                    <span className="text-xs text-primary-600">
+                      (+${product.customizationPrice.toFixed(2)})
+                    </span>
+                  )}
+                </label>
+                {customisation && (
+                  <div className="mt-3">
+                    <input
+                      type="text"
+                      value={customisationText}
+                      onChange={(e) => setCustomisationText(e.target.value)}
+                      placeholder={product.customizationLabel || 'Enter text'}
+                      maxLength={20}
+                      className="w-full px-3 py-2 border border-primary-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      {customisationText.length}/20 characters
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Quantity + Add to Cart */}
             <div className="flex items-center gap-4 mt-6">

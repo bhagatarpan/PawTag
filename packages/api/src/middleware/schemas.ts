@@ -166,6 +166,7 @@ export const createProductSchema = z.object({
     .optional(),
   isActive: z.boolean().optional(),
   customizable: z.boolean().optional(),
+  customizationLabel: z.string().optional(),
   customizationPrice: z.number().min(0).optional(),
   variants: z.array(z.object({
     name: z.string(),

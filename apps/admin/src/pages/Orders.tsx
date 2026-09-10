@@ -39,6 +39,7 @@ interface OrderItem {
   unitPrice: number;
   totalPrice: number;
   customizationTotal?: number;
+  customisationText?: string;
 }
 
 export interface Order {
@@ -740,6 +741,9 @@ export function OrderDetailDrawer({
                             <div className="font-medium text-gray-900">{item.productName}</div>
                             {item.petName && (
                               <div className="text-xs text-gray-500">For: {item.petName}</div>
+                            )}
+                            {item.customisationText && (
+                              <div className="text-xs text-primary-600">Engraving: {item.customisationText}</div>
                             )}
                             {productCategory && (
                               <div className="text-xs text-gray-400 mt-0.5">{productCategory}</div>

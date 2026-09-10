@@ -149,6 +149,9 @@ export interface IProductVariant {
   /** Whether product supports customisation */
   customizable: boolean;
 
+  /** Label for the customisation field (e.g., "Pet name", "Engraving text") */
+  customizationLabel?: string;
+
   /** Additional price for customisation */
   customizationPrice: number;
 
@@ -252,6 +255,7 @@ const ProductSchema = new Schema<IProductDocument>(
 
     // ─── Customisation ───────────────────────────────────
     customizable: { type: Boolean, default: false },
+    customizationLabel: { type: String, default: '' },
     customizationPrice: { type: Number, default: 0, min: 0 },
 
      // ─── Shipping ────────────────────────────────────────

@@ -33,6 +33,7 @@ export interface CartItem {
   quantity: number;
   image?: string;
   customisation?: boolean;
+  customisationText?: string;
   addedAt?: string;
 }
 
@@ -64,7 +65,7 @@ export interface CartTotals {
 
 interface CartContextType {
   items: CartItem[];
-  addItem: (item: { productId: string; quantity: number; customisation?: boolean; name?: string; price?: number; image?: string; sku?: string }) => Promise<void>;
+  addItem: (item: { productId: string; quantity: number; customisation?: boolean; customisationText?: string; name?: string; price?: number; image?: string; sku?: string }) => Promise<void>;
   removeItem: (itemId: string) => void;
   updateQuantity: (itemId: string, quantity: number) => void;
   clearCart: () => void;
@@ -298,15 +299,16 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, [refreshCart]);
 
   /* ---- Add item ---- */
-  const addItem = useCallback(async (item: { productId: string; quantity: number; customisation?: boolean; name?: string; price?: number; image?: string; sku?: string }) => {
+  const addItem = useCallback(async (item: { productId: string; quantity: number; customisation?: boolean; customisationText?: string; name?: string; price?: number; image?: string; sku?: string }) => {
     const token = localStorage.getItem('pawtag_token');
     const cust = normCustom(item.customisation);
+    const custText = (item.customisationText || '').trim();
 
     if (!token) {
       // Guest: add to localStorage
       const guestItems = getGuestCart();
       const existing = guestItems.find(
-        (i) => i.productId === item.productId && normCustom(i.customisation) === cust
+        (i) => i.productId === item.productId && normCustom(i.customisation) === cust && (i.customisationText || '') === custText
       );
 
       if (existing) {
@@ -324,6 +326,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           quantity: item.quantity,
           image: item.image,
           customisation: cust,
+          customisationText: custText || undefined,
           addedAt: new Date().toISOString(),
         });
       }
@@ -349,6 +352,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         productId: item.productId,
         quantity: item.quantity,
         customisation: cust,
+        customisationText: custText || undefined,
       });
       const data = res.data?.data;
       if (data?.cart) {

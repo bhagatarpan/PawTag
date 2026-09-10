@@ -546,6 +546,9 @@ export default function Checkout() {
                             </div>
                             <div>
                               <p className="font-medium text-gray-900">{item.productName || item.name}</p>
+                              {item.customisationText && (
+                                <p className="text-xs text-primary-600">Pet name: {item.customisationText}</p>
+                              )}
                               <p className="text-xs text-gray-500">{item.quantity > 1 ? `Qty: ${item.quantity}` : ''}</p>
                             </div>
                           </div>
@@ -897,6 +900,9 @@ export default function Checkout() {
                       </div>
                       <div className="flex-1">
                         <p className="font-medium text-gray-900">{item.productName || item.name}</p>
+                        {item.customisationText && (
+                          <p className="text-xs text-primary-600">Pet name: {item.customisationText}</p>
+                        )}
                         <p className="text-xs text-gray-500">Qty: {item.quantity}</p>
                       </div>
                       <p className="font-semibold text-gray-900">NZ${(item.unitPrice || item.price || 0).toFixed(2)}</p>
@@ -1078,6 +1084,9 @@ export default function Checkout() {
                         </div>
                         <div>
                           <p className="text-sm font-medium text-gray-900">{item.productName || item.name}</p>
+                          {item.customisationText && (
+                            <p className="text-xs text-primary-600">Pet name: {item.customisationText}</p>
+                          )}
                           <p className="text-xs text-gray-500">Qty: {item.quantity}</p>
                         </div>
                       </div>

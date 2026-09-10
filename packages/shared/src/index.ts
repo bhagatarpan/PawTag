@@ -391,8 +391,9 @@ export interface Product {
    weight?: number;
    dimensions?: ProductDimensions;
    variants?: ProductVariant[];
-   customizable?: boolean;
-   customizationPrice?: number;
+    customizable?: boolean;
+    customizationLabel?: string;
+    customizationPrice?: number;
    shippingCost?: number;
    warrantyMonths?: number;
    isSubscription?: boolean;
@@ -466,6 +467,7 @@ export interface OrderItem {
   variantName?: string;
   petName?: string;
   customizationTotal?: number;
+  customisationText?: string;
 }
 
 export interface PaymentInfo {

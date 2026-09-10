@@ -40,6 +40,7 @@ export interface AddToCartInput {
   productId: string;
   quantity: number;
   customisation?: boolean;
+  customisationText?: string;
   variantName?: string;
 }
 
@@ -154,10 +155,14 @@ export class CartService {
 
     // Normalise customisation for consistent comparison
     const inputCust = input.customisation === true;
+    const inputText = (input.customisationText || '').trim();
 
-    // Check if item already exists in cart
+    // Check if item already in cart (same product, same customisation state, same text)
     const existingItem = cart.items.find(
-      (item) => String(item.productId) === input.productId && (item.customisation === true) === inputCust,
+      (item) =>
+        String(item.productId) === input.productId &&
+        (item.customisation === true) === inputCust &&
+        (item.customisationText || '') === inputText,
     );
 
     // Check max cart items limit (only for new items)
@@ -186,6 +191,7 @@ export class CartService {
       existingItem.quantity += input.quantity;
       existingItem.unitPrice = product.salePrice ?? product.price;
       existingItem.customizationTotal = input.customisation ? product.customizationPrice : 0;
+      existingItem.customisationText = inputText || undefined;
     } else {
       // Add new item
       cart.items.push({
@@ -198,6 +204,7 @@ export class CartService {
         quantity: input.quantity,
         image: product.images?.[0],
         customisation: input.customisation ?? false,
+        customisationText: inputText || undefined,
         addedAt: new Date(),
       });
     }
