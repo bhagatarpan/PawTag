@@ -35,7 +35,7 @@ const STEPS = [
 ];
 
 export default function Checkout() {
-  const { items, total, totals, clearCart, refreshCart, updateItemTexts, toggleCustomisation, error: cartError } = useCart();
+  const { items, total, totals, clearCart, refreshCart, updateItemTexts, toggleCustomisation, error: cartError, promoCode, promoApplied, setPromoCode: setPromoCodeCtx, setPromoApplied: setPromoAppliedCtx } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -57,9 +57,7 @@ export default function Checkout() {
   const [confirmedInvoice, setConfirmedInvoice] = useState<any>(null);
   const [confirmedPawTagOrder, setConfirmedPawTagOrder] = useState<any>(null);
 
-  // Promo code
-  const [promoCode, setPromoCode] = useState('');
-  const [promoApplied, setPromoApplied] = useState(false);
+  // Promo code — promoCode and promoApplied come from CartContext (persisted server-side)
   const [promoLoading, setPromoLoading] = useState(false);
   const [promoDiscount, setPromoDiscount] = useState(0);
   const [guestPromoInfo, setGuestPromoInfo] = useState<any>(null);
@@ -324,11 +322,11 @@ export default function Checkout() {
           setPromoError('');
         } else {
           setPromoError(data.error || 'Invalid promo code');
-          setPromoCode('');
+          setPromoCodeCtx('');
         }
       } catch {
         setPromoError('Failed to validate promo code');
-        setPromoCode('');
+        setPromoCodeCtx('');
       } finally {
         setPromoLoading(false);
       }
@@ -339,7 +337,7 @@ export default function Checkout() {
     try {
       await api.post(API.cart.promo.apply, { code: promoCode });
       await refreshCart();
-      setPromoApplied(true);
+      setPromoAppliedCtx(true);
       setPromoDiscount(totals.discount || 0);
       setPromoError('');
     } catch (err: any) {
@@ -347,7 +345,7 @@ export default function Checkout() {
         ? 'Your session expired. Please log in again to continue.'
         : err?.response?.data?.error || 'Invalid promo code';
       setPromoError(msg);
-      setPromoCode('');
+      setPromoCodeCtx('');
     } finally {
       setPromoLoading(false);
     }
@@ -356,9 +354,9 @@ export default function Checkout() {
   const removePromoCode = async () => {
     try {
       if (user) await api.delete(API.cart.promo.remove);
-      setPromoApplied(false);
+      setPromoAppliedCtx(false);
       setPromoDiscount(0);
-      setPromoCode('');
+      setPromoCodeCtx('');
       setGuestPromoInfo(null);
       if (user) await refreshCart();
     } catch (err: any) {
@@ -731,14 +729,14 @@ export default function Checkout() {
                           {guestPromoInfo.minOrderAmount > 0 && ` (min order: NZ$${guestPromoInfo.minOrderAmount})`}
                         </span>
                       </div>
-                      <button onClick={() => { setGuestPromoInfo(null); setPromoCode(''); }} className="text-xs text-gray-500 hover:text-red-500 font-medium ml-2">Remove</button>
+                      <button onClick={() => { setGuestPromoInfo(null); setPromoCodeCtx(''); }} className="text-xs text-gray-500 hover:text-red-500 font-medium ml-2">Remove</button>
                     </div>
                     <p className="text-xs text-blue-600 mt-1">Log in to apply this discount to your order</p>
                   </div>
                 ) : (
                   <>
                     <div className="flex gap-2 mb-1">
-                      <input type="text" value={promoCode} onChange={e => { setPromoCode(e.target.value.toUpperCase()); setPromoError(''); }} placeholder="Add promo code" disabled={promoApplied} className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-primary-500 disabled:bg-gray-50 disabled:text-gray-400" />
+                      <input type="text" value={promoCode || ''} onChange={e => { setPromoCodeCtx(e.target.value.toUpperCase()); setPromoError(''); }} placeholder="Add promo code" disabled={promoApplied} className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-primary-500 disabled:bg-gray-50 disabled:text-gray-400" />
                       <button onClick={applyPromoCode} disabled={!promoCode || promoLoading || promoApplied} className="px-4 py-2 text-sm text-primary-600 border border-primary-200 rounded-lg hover:bg-primary-50 disabled:opacity-50">
                         {promoLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Apply'}
                       </button>

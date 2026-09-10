@@ -86,6 +86,14 @@ interface CartContextType {
   isGuest: boolean;
   /** Price of item when added vs current DB price — set if price changed */
   priceChanged: boolean;
+  /** Applied promo code (persisted server-side) */
+  promoCode: string | null;
+  /** Whether a promo code is applied */
+  promoApplied: boolean;
+  /** Set promo code (called by Checkout when applying/removing) */
+  setPromoCode: (code: string | null) => void;
+  /** Set promo applied state */
+  setPromoApplied: (applied: boolean) => void;
 }
 
 /* ------------------------------------------------------------------ */
@@ -165,6 +173,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [lastAddedItem, setLastAddedItem] = useState<AddedItem | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [priceChanged, setPriceChanged] = useState(false);
+  const [promoCode, setPromoCodeState] = useState<string | null>(null);
+  const [promoApplied, setPromoApplied] = useState(false);
 
   // Check auth state
   useEffect(() => {
@@ -194,6 +204,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
       if (data?.cart) {
         setItems(data.cart.items || []);
         setTotals(data.totals || EMPTY_TOTALS);
+        // Restore promo state from server cart
+        if (data.cart.promoCode) {
+          setPromoCodeState(data.cart.promoCode);
+          setPromoApplied(true);
+        } else {
+          setPromoCodeState(null);
+          setPromoApplied(false);
+        }
       } else {
         // Server returned empty cart
         setItems([]);
@@ -646,6 +664,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
     clearLastAddedItem,
     isGuest,
     priceChanged,
+    promoCode,
+    promoApplied,
+    setPromoCode: setPromoCodeState,
+    setPromoApplied,
   };
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
