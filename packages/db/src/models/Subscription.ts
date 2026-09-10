@@ -2,7 +2,7 @@ import mongoose, { Schema, Document } from 'mongoose';
 
 export interface ISubscriptionDocument extends Document {
   userId: mongoose.Types.ObjectId;
-  tagId: mongoose.Types.ObjectId;
+  tagId?: mongoose.Types.ObjectId;
   orderId?: mongoose.Types.ObjectId;
 
   planId?: mongoose.Types.ObjectId;
@@ -55,7 +55,7 @@ export interface ISubscriptionDocument extends Document {
 const SubscriptionSchema = new Schema<ISubscriptionDocument>(
   {
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-    tagId: { type: Schema.Types.ObjectId, ref: 'Tag', required: true, index: true },
+    tagId: { type: Schema.Types.ObjectId, ref: 'Tag', index: true },
     orderId: { type: Schema.Types.ObjectId, ref: 'Order' },
 
     planId: { type: Schema.Types.ObjectId, ref: 'Product' },

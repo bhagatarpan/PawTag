@@ -8,6 +8,7 @@ import {
   renewSubscription,
   cancelSubscription,
   changeSubscriptionPlan,
+  createGoldSubscription,
 } from '../services/subscription.service';
 import logger from '../lib/logger';
 
@@ -461,6 +462,47 @@ router.post('/portal-link', requirePermission('customer.read'), async (req: Auth
   } catch (error: any) {
     logger.error({ err: error, userId: req.user?.id }, '[Subscriptions] Portal link error');
     res.status(500).json({ success: false, error: error.message || 'Failed to create portal session' });
+  }
+});
+
+/**
+ * POST /gold/subscribe
+ *
+ * Subscribe to Gold membership. Creates a Gold subscription for the user.
+ * No physical Tag required — Gold is a standalone digital membership.
+ *
+ * Body: { price?: number } (optional, defaults to $1.99)
+ */
+router.post('/gold/subscribe', async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+
+    // Check if user already has an active Gold subscription
+    const existingGold = await Subscription.findOne({
+      userId,
+      planName: 'Gold Membership',
+      status: { $in: ['active', 'grace_period'] },
+      deletedAt: null,
+    });
+
+    if (existingGold) {
+      res.status(409).json({ success: false, error: 'You already have an active Gold membership' });
+      return;
+    }
+
+    const { price } = req.body || {};
+    const subscription = await createGoldSubscription(userId, price);
+
+    res.json({
+      success: true,
+      data: {
+        subscription,
+        message: 'Gold membership activated! You are now earning 2× points on every purchase.',
+      },
+    });
+  } catch (error: any) {
+    logger.error({ err: error, userId: req.user?.id }, '[Subscriptions] Gold subscribe error');
+    res.status(500).json({ success: false, error: error.message || 'Failed to create Gold subscription' });
   }
 });
 

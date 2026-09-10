@@ -147,9 +147,9 @@ export function startSubscriptionService() {
 
 export async function createSubscription(data: {
   userId: string;
-  tagId: string;
+  tagId?: string;
   orderId?: string;
-  planType?: 'annual' | 'monthly' | 'free';
+  planType?: 'annual' | 'monthly' | 'free' | 'gold';
   planId?: string;
   price?: number;
 }) {
@@ -200,11 +200,13 @@ export async function createSubscription(data: {
     },
   });
 
-  await Tag.findByIdAndUpdate(data.tagId, {
-    subscriptionStatus: 'active',
-    subscriptionId: subscription._id,
-    activatedAt: now,
-  });
+  if (data.tagId) {
+    await Tag.findByIdAndUpdate(data.tagId, {
+      subscriptionStatus: 'active',
+      subscriptionId: subscription._id,
+      activatedAt: now,
+    });
+  }
 
   await auditJobEvent({
     action: 'subscription_created',
@@ -230,6 +232,66 @@ export async function createSubscription(data: {
   });
 
   incrementCounter(METRICS.SUBSCRIPTION_CREATED_TOTAL, { planType });
+
+  return subscription;
+}
+
+/**
+ * Create a Gold membership subscription.
+ * Gold is a standalone digital membership — no physical Tag required.
+ *
+ * @param userId - The user purchasing Gold
+ * @param price - The price charged (default: $1.99 from CMS settings)
+ * @returns The created subscription document
+ */
+export async function createGoldSubscription(userId: string, price?: number) {
+  const now = new Date();
+  const goldPrice = price ?? 1.99; // Default Gold price, CMS-driven in production
+
+  // Gold billing is monthly
+  const currentPeriodEnd = new Date(now);
+  currentPeriodEnd.setMonth(currentPeriodEnd.getMonth() + 1);
+
+  const subscription = await Subscription.create({
+    userId,
+    planName: 'Gold Membership',
+    planType: 'monthly',
+    status: 'active',
+    price: goldPrice,
+    currency: 'NZD',
+    startDate: now,
+    currentPeriodStart: now,
+    currentPeriodEnd,
+    autoRenew: true,
+    renewalMethod: 'monthly',
+    totalScans: 0,
+    reminderStates: {
+      reminder30dSent: false,
+      reminder7dSent: false,
+      reminder1dSent: false,
+      graceWeeklySentCount: 0,
+    },
+  });
+
+  await auditJobEvent({
+    action: 'gold_subscription_created',
+    eventType: 'subscription_create',
+    eventCategory: 'FINANCIAL',
+    operationType: 'CREATE',
+    resourceType: 'Subscription',
+    resourceId: subscription._id.toString(),
+    outcome: 'SUCCESS',
+    severity: 'HIGH',
+    metadata: {
+      userId,
+      planType: 'monthly',
+      planName: 'Gold Membership',
+      price: goldPrice,
+      currency: 'NZD',
+    },
+  });
+
+  incrementCounter(METRICS.SUBSCRIPTION_CREATED_TOTAL, { planType: 'gold' });
 
   return subscription;
 }

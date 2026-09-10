@@ -17,6 +17,7 @@ interface SubscriptionData {
 interface SubscriptionPlan {
   _id: string;
   name: string;
+  sku?: string;
   price: number;
   subscriptionConfig: {
     type: 'annual' | 'monthly';
@@ -75,14 +76,18 @@ export default function SubscriptionUpgrade() {
     }
   }
 
-  async function handleUpgrade(planId: string) {
-    if (!subscription) return;
-
+  async function handleUpgrade(planId: string, isGold: boolean) {
     setUpgrading(true);
     try {
-      await api.post(API.customer.subscriptions.changePlan(subscription._id), {
-        planId,
-      });
+      if (isGold) {
+        // Gold membership — call dedicated Gold subscribe endpoint
+        await api.post(API.customer.subscriptions.goldSubscribe);
+      } else if (subscription) {
+        // Existing subscriber — change plan (annual ↔ monthly)
+        await api.post(API.customer.subscriptions.changePlan(subscription._id), {
+          planType: 'monthly', // Default to monthly for plan changes
+        });
+      }
       await fetchData();
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to upgrade subscription');
@@ -185,7 +190,7 @@ export default function SubscriptionUpgrade() {
                   </button>
                 ) : (
                   <button
-                    onClick={() => handleUpgrade(plan._id)}
+                    onClick={() => handleUpgrade(plan._id, plan.name.toLowerCase().includes('gold') || plan.sku === 'PT-GOLD-001')}
                     disabled={upgrading}
                     className="w-full py-3 px-4 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                   >

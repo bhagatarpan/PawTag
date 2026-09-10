@@ -492,6 +492,7 @@ export const API = {
       cancel: (id: string) => `/customer/subscriptions/${id}/cancel` as const,
       autoRenew: (id: string) => `/customer/subscriptions/${id}/auto-renew` as const,
       changePlan: (id: string) => `/customer/subscriptions/${id}/change-plan` as const,
+      goldSubscribe: '/customer/subscriptions/gold/subscribe',
     },
     guardian: {
       points: '/customer/guardian/points',

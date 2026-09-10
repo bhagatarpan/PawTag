@@ -9,7 +9,7 @@ import { API } from '@pawtag/shared';
 
 export default function Register() {
   const { login } = useAuth();
-  const [form, setForm] = useState({ fullName: '', email: '', phoneNumber: '', password: '', confirmPassword: '', acceptTerms: false });
+  const [form, setForm] = useState({ fullName: '', email: '', phoneNumber: '', password: '', confirmPassword: '', acceptTerms: false, addGold: false });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -60,6 +60,15 @@ export default function Register() {
       } catch {
         // Login may fail if email verification is required — that's OK
         // User will see verification prompts on the verify-account page
+      }
+
+      // If user opted into Gold, create Gold subscription
+      if (form.addGold) {
+        try {
+          await api.post(API.customer.subscriptions.goldSubscribe);
+        } catch {
+          // Gold subscription creation failed — non-critical, user can upgrade later
+        }
       }
 
       setSuccess(true);
@@ -185,6 +194,23 @@ export default function Register() {
                 <Link to="/terms" className="text-teal-600 font-medium hover:text-teal-700">Terms of Service</Link>
                 {' '}and{' '}
                 <Link to="/privacy" className="text-teal-600 font-medium hover:text-teal-700">Privacy Policy</Link>
+              </label>
+            </div>
+
+            {/* Gold membership upsell */}
+            <div className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <input
+                type="checkbox"
+                id="addGold"
+                checked={form.addGold}
+                onChange={(e) => setForm({ ...form, addGold: e.target.checked })}
+                className="mt-1 h-4 w-4 text-amber-600 border-gray-300 rounded focus:ring-amber-500"
+              />
+              <label htmlFor="addGold" className="text-sm">
+                <span className="font-medium text-amber-800">Add Gold Membership — $1.99/month</span>
+                <span className="text-amber-600 block text-xs mt-0.5">
+                  Earn 2× points on every purchase, free shipping over $50, and more.
+                </span>
               </label>
             </div>
 
