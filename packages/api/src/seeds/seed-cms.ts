@@ -466,8 +466,32 @@ async function run() {
             order: 3,
             isActive: true,
           },
+          {
+            sectionType: 'hero_slide',
+            title: 'Hero Slide 5',
+            content: {
+              tag: 'Gold',
+              headline: 'Go Gold. Get 2× the Rewards.',
+              sub: 'Earn double points on every purchase, free shipping over $50, and start at Nurture tier. Just $1.99/month — less than a coffee.',
+              ctaText: 'Upgrade to Gold',
+              ctaUrl: '/gold',
+              bg: 'from-amber-500 via-yellow-500 to-amber-600',
+              visualType: 'stats',
+              duration: 5,
+              stats: [
+                { number: '2×', label: 'Points Earned' },
+                { number: '$3/mo', label: 'PawRewards' },
+                { number: '$50+', label: 'Free Shipping' },
+              ],
+              flowSteps: [],
+              imageUrl: '',
+              imageAlt: '',
+            },
+            order: 4,
+            isActive: true,
+          },
         ], { session });
-        console.log('  Created 4 hero slides');
+        console.log('  Created 5 hero slides');
       } else {
         // Idempotent: add Guardian hero slide if missing
         const hasGuardianSlide = await CmsHomepageSection.findOne({
@@ -502,6 +526,43 @@ async function run() {
           console.log('  Added Guardian hero slide');
         } else {
           console.log('  Hero slides already exist');
+        }
+
+        // Idempotent: add Gold hero slide if missing
+        const hasGoldSlide = await CmsHomepageSection.findOne({
+          sectionType: 'hero_slide',
+          'content.tag': 'Gold',
+          deletedAt: null,
+        }).session(session);
+        if (!hasGoldSlide) {
+          const maxOrderGold = await CmsHomepageSection.findOne({ sectionType: 'hero_slide', deletedAt: null })
+            .sort({ order: -1 })
+            .session(session);
+          await CmsHomepageSection.create([{
+            sectionType: 'hero_slide',
+            title: 'Hero Slide 5',
+            content: {
+              tag: 'Gold',
+              headline: 'Go Gold. Get 2× the Rewards.',
+              sub: 'Earn double points on every purchase, free shipping over $50, and start at Nurture tier. Just $1.99/month — less than a coffee.',
+              ctaText: 'Upgrade to Gold',
+              ctaUrl: '/gold',
+              bg: 'from-amber-500 via-yellow-500 to-amber-600',
+              visualType: 'stats',
+              duration: 5,
+              stats: [
+                { number: '2×', label: 'Points Earned' },
+                { number: '$3/mo', label: 'PawRewards' },
+                { number: '$50+', label: 'Free Shipping' },
+              ],
+              flowSteps: [],
+              imageUrl: '',
+              imageAlt: '',
+            },
+            order: (maxOrderGold?.order ?? 3) + 1,
+            isActive: true,
+          }], { session });
+          console.log('  Added Gold hero slide');
         }
       }
 
