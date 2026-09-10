@@ -84,8 +84,8 @@ describe('Verification Email', () => {
 });
 
 describe('Welcome Email', () => {
-  it('includes user name and account URL', () => {
-    const html = renderWelcomeEmail({ name: 'Jane', accountUrl: 'https://app.com/account' });
+  it('includes user name and account URL', async () => {
+    const html = await renderWelcomeEmail({ name: 'Jane', accountUrl: 'https://app.com/account' });
     expect(html).toContain('Jane');
     expect(html).toContain('https://app.com/account');
   });
@@ -182,8 +182,8 @@ describe('Guardian Welcome Email', () => {
 });
 
 describe('Tier Upgrade Email', () => {
-  it('includes previous and new tier', () => {
-    const html = renderTierUpgradeEmail({
+  it('includes previous and new tier', async () => {
+    const html = await renderTierUpgradeEmail({
       customerName: 'Bob', previousTier: 'Care', newTier: 'Nurture', points: 150,
       benefits: ['Monthly PawRewards: $3.00'], dashboardUrl: 'https://app.com/guardian',
     });
@@ -191,8 +191,8 @@ describe('Tier Upgrade Email', () => {
     expect(html).toContain('Nurture');
   });
 
-  it('includes benefits list', () => {
-    const html = renderTierUpgradeEmail({
+  it('includes benefits list', async () => {
+    const html = await renderTierUpgradeEmail({
       customerName: 'Bob', previousTier: 'Nurture', newTier: 'Protector', points: 250,
       benefits: ['Early access', 'Priority support'], dashboardUrl: 'https://app.com/guardian',
     });
@@ -271,8 +271,8 @@ describe('Guardian Renewal Reminder Email', () => {
 });
 
 describe('Post-Purchase Points Email', () => {
-  it('includes points earned and order number', () => {
-    const html = renderPurchasePointsEmail({
+  it('includes points earned and order number', async () => {
+    const html = await renderPurchasePointsEmail({
       customerName: 'Sarah',
       orderNumber: 'PT-12345',
       pointsEarned: 100,
@@ -289,8 +289,8 @@ describe('Post-Purchase Points Email', () => {
     expect(html).toContain('CARE');
   });
 
-  it('shows Gold 2x bonus for Gold members', () => {
-    const html = renderPurchasePointsEmail({
+  it('shows Gold 2x bonus for Gold members', async () => {
+    const html = await renderPurchasePointsEmail({
       customerName: 'Mike',
       orderNumber: 'PT-67890',
       pointsEarned: 200,
@@ -305,8 +305,8 @@ describe('Post-Purchase Points Email', () => {
     expect(html).toContain('200');
   });
 
-  it('shows progress to next tier', () => {
-    const html = renderPurchasePointsEmail({
+  it('shows progress to next tier', async () => {
+    const html = await renderPurchasePointsEmail({
       customerName: 'Emma',
       orderNumber: 'PT-11111',
       pointsEarned: 50,

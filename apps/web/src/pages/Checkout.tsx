@@ -149,6 +149,8 @@ export default function Checkout() {
 
   // CMS settings for trust badges
   const { settings } = useSiteSettings();
+  const goldPrice = settings?.['guardian.goldPrice'] || '1.99';
+  const checkoutUpsellText = settings?.['guardian.gold.checkoutUpsellText'] || 'Earn 2× points on this order with Gold';
   const trustBadgeTitle = settings?.['checkout.trustBadges.title'] || 'All PawTag devices come with';
   const trustBadgeItems: string[] = useMemo(() => {
     try {
@@ -1128,10 +1130,10 @@ export default function Checkout() {
                       <Crown className="h-5 w-5 text-amber-600 flex-shrink-0" />
                       <div className="flex-1">
                         <p className="text-sm font-medium text-amber-800">
-                          <strong>Earn 2× points on this order with Gold.</strong>
+                          <strong>{checkoutUpsellText}.</strong>
                         </p>
                         <p className="text-xs text-amber-600 mt-0.5">
-                          Just $1.99/month — less than a coffee. Upgrade anytime.
+                          Just ${goldPrice}/month — less than a coffee. Upgrade anytime.
                         </p>
                       </div>
                       <Link to="/gold" className="px-3 py-1.5 bg-amber-600 text-white rounded-lg text-xs font-medium hover:bg-amber-700 transition-colors whitespace-nowrap">
@@ -1230,7 +1232,7 @@ export default function Checkout() {
                     With Gold, you'd have earned <strong>{estimatedPoints * 2} Points</strong> on this order!
                   </p>
                   <p className="text-xs text-amber-600 mt-1">
-                    Gold members earn 2× points on every purchase — just $1.99/month.
+                    Gold members earn 2× points on every purchase — just ${goldPrice}/month.
                   </p>
                   <Link to="/gold" className="text-xs font-medium text-amber-700 underline mt-1 inline-block">
                     Upgrade to Gold →

@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { AuthRequest } from './auth';
 import { User, Subscription, Setting } from '@pawtag/db';
+import { getGuardianNumber } from '../services/loyalty/guardian-config';
 import logger from '../lib/logger';
 
 /**
@@ -62,11 +63,12 @@ export async function checkGoldBenefits(req: AuthRequest, _res: Response, next: 
       return next();
     }
 
+    const goldPrice = await getGuardianNumber('goldPrice');
     const goldSubscription = await Subscription.findOne({
       userId,
       status: 'active',
       planType: 'monthly',
-      price: 1.99,
+      price: goldPrice,
     }).lean();
 
     (req as any).isGoldMember = !!goldSubscription;
@@ -87,11 +89,14 @@ export async function checkGoldBenefits(req: AuthRequest, _res: Response, next: 
 }
 
 /**
- * Check if user gets free shipping (Gold members: free over $50)
+ * Check if user gets free shipping (Gold members: free over configurable threshold)
  */
-export function getsFreeShipping(isGoldMember: boolean, orderTotal: number): boolean {
-  if (isGoldMember && orderTotal >= 50) {
-    return true;
+export async function getsFreeShipping(isGoldMember: boolean, orderTotal: number): Promise<boolean> {
+  if (isGoldMember) {
+    const threshold = await getGuardianNumber('goldFreeShippingThreshold');
+    if (orderTotal >= threshold) {
+      return true;
+    }
   }
   return false;
 }
@@ -99,9 +104,10 @@ export function getsFreeShipping(isGoldMember: boolean, orderTotal: number): boo
 /**
  * Get Gold member benefits description
  */
-export function getGoldBenefitsDescription(): string[] {
+export async function getGoldBenefitsDescription(): Promise<string[]> {
+  const threshold = await getGuardianNumber('goldFreeShippingThreshold');
   return [
-    'Free shipping on orders over $50',
+    `Free shipping on orders over $${threshold}`,
     'Priority customer support',
     'Early access to new products',
     'Double points on all purchases',

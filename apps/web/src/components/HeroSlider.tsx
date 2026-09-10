@@ -353,6 +353,7 @@ export default function HeroSlider() {
   const { sections } = useHomepageSections('hero_slide');
   const { settings } = useSiteSettings();
   const companyName = settings?.['company.name'] || 'PawTag';
+  const goldPrice = settings?.['guardian.goldPrice'] || '1.99';
   const [current, setCurrent] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [touchStart, setTouchStart] = useState<number | null>(null);
@@ -423,7 +424,7 @@ export default function HeroSlider() {
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white leading-tight mb-4">
               {slide.headline}
             </h1>
-            <p className="text-lg md:text-xl text-white/80 mb-8 max-w-lg">{slide.sub}</p>
+            <p className="text-lg md:text-xl text-white/80 mb-8 max-w-lg">{slide.sub.replace('$1.99', `$${goldPrice}`)}</p>
             <Link
               to={slide.cta.to}
               className="inline-flex items-center gap-2 bg-white text-primary-700 px-8 py-3.5 rounded-xl font-semibold hover:bg-primary-50 transition-all duration-200 shadow-lg hover:shadow-xl hover:scale-[1.02]"

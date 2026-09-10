@@ -5,10 +5,11 @@
  * Routes:
  * - GET /api/public/points/estimate?total=9.99&isGoldMember=false
  * - GET /api/public/points/rates — returns rate and spentAmount for Guardian and Gold
+ * - GET /api/public/points/gold-content — returns CMS-driven Gold marketing content
  */
 
 import { Router, Request, Response } from 'express';
-import { getGuardianNumber } from '../services/loyalty/guardian-config';
+import { getGuardianNumber, getGuardianString } from '../services/loyalty/guardian-config';
 import logger from '../lib/logger';
 
 const router = Router();
@@ -75,6 +76,50 @@ router.get('/rates', async (_req: Request, res: Response) => {
   } catch (err) {
     logger.error({ err }, 'Failed to fetch points rates');
     res.status(500).json({ success: false, error: 'Failed to fetch points rates' });
+  }
+});
+
+/**
+ * GET /api/public/points/gold-content
+ *
+ * Return CMS-driven Gold marketing content.
+ * Parses JSON strings for benefits and comparison arrays.
+ */
+router.get('/gold-content', async (_req: Request, res: Response) => {
+  try {
+    const [heroHeadline, heroSubtext, benefitsRaw, comparisonRaw, emailUpsellText, checkoutUpsellText] = await Promise.all([
+      getGuardianString('gold.heroHeadline'),
+      getGuardianString('gold.heroSubtext'),
+      getGuardianString('gold.benefits'),
+      getGuardianString('gold.comparison'),
+      getGuardianString('gold.emailUpsellText'),
+      getGuardianString('gold.checkoutUpsellText'),
+    ]);
+
+    let benefits: Array<{ title: string; description: string }> = [];
+    if (benefitsRaw) {
+      try { benefits = JSON.parse(benefitsRaw); } catch { /* ignore malformed JSON */ }
+    }
+
+    let comparison: Array<{ feature: string; guardian: string; gold: string }> = [];
+    if (comparisonRaw) {
+      try { comparison = JSON.parse(comparisonRaw); } catch { /* ignore malformed JSON */ }
+    }
+
+    res.json({
+      success: true,
+      data: {
+        heroHeadline,
+        heroSubtext,
+        benefits,
+        comparison,
+        emailUpsellText,
+        checkoutUpsellText,
+      },
+    });
+  } catch (err) {
+    logger.error({ err }, 'Failed to fetch gold content');
+    res.status(500).json({ success: false, error: 'Failed to fetch gold content' });
   }
 });
 

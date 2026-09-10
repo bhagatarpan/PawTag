@@ -98,6 +98,13 @@ export interface SiteSettings {
   'checkout.otp.expiryMinutes'?: string;
   'checkout.otp.requireEmail'?: string;
   'checkout.otp.requireSms'?: string;
+  'guardian.goldPrice'?: string;
+  'guardian.gold.heroHeadline'?: string;
+  'guardian.gold.heroSubtext'?: string;
+  'guardian.gold.benefits'?: string;
+  'guardian.gold.comparison'?: string;
+  'guardian.gold.emailUpsellText'?: string;
+  'guardian.gold.checkoutUpsellText'?: string;
 }
 
 // Hook for navigation

@@ -346,10 +346,10 @@ router.get('/tier', async (req: AuthRequest, res: Response) => {
     }
 
     // Import tier service dynamically to avoid circular dependencies
-    const { calculateTier, TIER_BENEFITS } = require('../services/loyalty/tier.service');
+    const { calculateTier } = require('../services/loyalty/tier.service');
 
     const tierInfo = await calculateTier(userId);
-    const benefits = TIER_BENEFITS[tierInfo.tier] || TIER_BENEFITS.CARE;
+    const benefits = tierInfo.benefits;
 
     await auditCustomerGuardianEvent(req, {
       action: 'guardian_tier_viewed',

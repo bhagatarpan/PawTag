@@ -619,6 +619,7 @@ export const API = {
     points: {
       estimate: '/public/points/estimate',
       rates: '/public/points/rates',
+      goldContent: '/public/points/gold-content',
     },
     promo: {
       validate: '/public/promo/validate',

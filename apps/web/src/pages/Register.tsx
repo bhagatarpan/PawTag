@@ -2,13 +2,15 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { PawPrint, Mail, Lock, User, Phone, Eye, EyeOff, CheckCircle, Loader2 } from 'lucide-react';
 import api from '../lib/api';
-import { useAuthPage } from '../hooks/useCms';
+import { useAuthPage, useSiteSettings } from '../hooks/useCms';
 import { useAuth } from '../context/AuthContext';
 import { validatePassword } from '@pawtag/shared';
 import { API } from '@pawtag/shared';
 
 export default function Register() {
   const { login } = useAuth();
+  const { settings } = useSiteSettings();
+  const goldPrice = settings?.['guardian.goldPrice'] || '1.99';
   const [form, setForm] = useState({ fullName: '', email: '', phoneNumber: '', password: '', confirmPassword: '', acceptTerms: false, addGold: false });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
@@ -207,7 +209,7 @@ export default function Register() {
                 className="mt-1 h-4 w-4 text-amber-600 border-gray-300 rounded focus:ring-amber-500"
               />
               <label htmlFor="addGold" className="text-sm">
-                <span className="font-medium text-amber-800">Add Gold Membership — $1.99/month</span>
+                <span className="font-medium text-amber-800">Add Gold Membership — ${goldPrice}/month</span>
                 <span className="text-amber-600 block text-xs mt-0.5">
                   Earn 2× points on every purchase, free shipping over $50, and more.
                 </span>

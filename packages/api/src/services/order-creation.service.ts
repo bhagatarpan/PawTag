@@ -388,7 +388,7 @@ export async function createPawTagOrder(params: CreateOrderParams): Promise<Crea
         await sendMail(
           user.email,
           `You earned ${pointsEarned} Guardian Points!`,
-          renderPurchasePointsEmail({
+          await renderPurchasePointsEmail({
             customerName: user.fullName || user.email,
             orderNumber,
             pointsEarned,

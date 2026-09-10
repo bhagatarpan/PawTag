@@ -1,6 +1,12 @@
 import { renderBase, renderCtaButton } from './base';
+import { getGuardianNumber, getGuardianString } from '../../loyalty/guardian-config';
 
-export function renderWelcomeEmail(data: { name: string; accountUrl: string }): string {
+export async function renderWelcomeEmail(data: { name: string; accountUrl: string }): Promise<string> {
+  const [goldPrice, goldUpsellText] = await Promise.all([
+    getGuardianNumber('goldPrice'),
+    getGuardianString('gold.emailUpsellText'),
+  ]);
+  const upsellHeading = goldUpsellText || 'Want to earn 2× points on every purchase?';
   const bodyHtml = `
     <p style="margin:0 0 20px;color:#374151;font-size:16px;">Hi <strong>${data.name}</strong>,</p>
     <p style="margin:0 0 20px;color:#374151;font-size:16px;line-height:1.6;">
@@ -24,8 +30,8 @@ export function renderWelcomeEmail(data: { name: string; accountUrl: string }): 
       <tr>
         <td style="padding:12px 16px;background-color:#fffbeb;border-radius:8px;border-left:3px solid #f59e0b;">
           <p style="margin:0;color:#92400e;font-size:14px;line-height:1.6;">
-            <strong>Want to earn 2× points on every purchase?</strong><br/>
-            Upgrade to Gold for just $1.99/month — less than a coffee.
+            <strong>${upsellHeading}</strong><br/>
+            Upgrade to Gold for just $${goldPrice.toFixed(2)}/month — less than a coffee.
             <a href="${data.accountUrl.replace('/account', '/gold')}" style="color:#d97706;text-decoration:underline;font-weight:600;">Learn about Gold →</a>
           </p>
         </td>

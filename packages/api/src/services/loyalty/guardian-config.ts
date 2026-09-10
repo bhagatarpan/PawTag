@@ -68,6 +68,7 @@ export const GUARDIAN_DEFAULTS: Record<string, number> = {
 
   // Gold multiplier
   goldMultiplier: 2,
+  goldPrice: 1.99,
 
   // Annual caps
   annualCapReviewText: 30,
@@ -95,6 +96,19 @@ export const GUARDIAN_DEFAULTS: Record<string, number> = {
   pawRewardsExpirationMonths: 6,
   pawRewardsMaxBalanceGuardian: 20.00,
   pawRewardsMaxBalanceGold: 40.00,
+
+  // Gold benefits & tier rules
+  goldFreeShippingThreshold: 50,
+  tierDowngradeGraceDays: 90,
+  lifetimeSafeguardYears: 3,
+
+  // Gold marketing content (CMS-driven strings, stored as empty defaults)
+  'gold.heroHeadline': '' as unknown as number,
+  'gold.heroSubtext': '' as unknown as number,
+  'gold.benefits': '' as unknown as number,
+  'gold.comparison': '' as unknown as number,
+  'gold.emailUpsellText': '' as unknown as number,
+  'gold.checkoutUpsellText': '' as unknown as number,
 };
 
 export type GuardianSettingKey = keyof typeof GUARDIAN_DEFAULTS;
@@ -145,9 +159,62 @@ export async function getAllGuardianSettings(): Promise<Record<GuardianSettingKe
   return result;
 }
 
+/** String cache entry with TTL */
+interface StringCacheEntry {
+  value: string;
+  expiresAt: number;
+}
+
+/** In-memory string settings cache */
+const stringCache = new Map<string, StringCacheEntry>();
+
+/**
+ * Get a Guardian setting value as a string from the database with caching.
+ *
+ * @param key - Setting key (e.g., 'gold.heroHeadline')
+ * @returns Setting value as string
+ */
+export async function getGuardianString(key: string): Promise<string> {
+  const cached = stringCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.value;
+  }
+
+  try {
+    const setting = await Setting.findOne({ key: `guardian.${key}` }).lean();
+    const value = setting?.value ?? '';
+
+    stringCache.set(key, {
+      value,
+      expiresAt: Date.now() + CACHE_TTL_MS,
+    });
+
+    return value;
+  } catch (err) {
+    logger.warn({ err, key }, 'Failed to read guardian string setting, using default');
+    return '';
+  }
+}
+
+/**
+ * Get all Guardian string settings (for admin UI).
+ */
+export async function getAllGuardianStrings(): Promise<Record<string, string>> {
+  const keys = [
+    'gold.heroHeadline', 'gold.heroSubtext', 'gold.benefits',
+    'gold.comparison', 'gold.emailUpsellText', 'gold.checkoutUpsellText',
+  ];
+  const result: Record<string, string> = {};
+  for (const key of keys) {
+    result[key] = await getGuardianString(key);
+  }
+  return result;
+}
+
 /**
  * Clear the Guardian settings cache (e.g., after admin saves).
  */
 export function clearGuardianCache(): void {
   cache.clear();
+  stringCache.clear();
 }

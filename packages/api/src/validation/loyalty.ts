@@ -32,6 +32,7 @@ export const guardianSettingsSchema = z.object({
   tagActivationPoints: numberSetting.optional(),
   socialSharePoints: numberSetting.optional(),
   goldMultiplier: numberSetting.optional(),
+  goldPrice: numberSetting.optional(),
   annualCapReviewText: numberSetting.optional(),
   annualCapReviewPhoto: numberSetting.optional(),
   annualCapReviewVideo: numberSetting.optional(),
@@ -49,6 +50,9 @@ export const guardianSettingsSchema = z.object({
   pawRewardsExpirationMonths: numberSetting.optional(),
   pawRewardsMaxBalanceGuardian: numberSetting.optional(),
   pawRewardsMaxBalanceGold: numberSetting.optional(),
+  goldFreeShippingThreshold: numberSetting.optional(),
+  tierDowngradeGraceDays: numberSetting.optional(),
+  lifetimeSafeguardYears: numberSetting.optional(),
 }).refine(
   (data) => Object.keys(data).length > 0,
   { message: 'At least one setting must be provided' }

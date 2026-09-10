@@ -140,6 +140,7 @@ export default function Shop() {
   const { addItem, error: cartError, clearError } = useCart();
   const { page: shopPage } = useShopPage('shop');
   const { settings } = useSiteSettings();
+  const goldPrice = settings?.['guardian.goldPrice'] || '1.99';
   const { user } = useAuth();
   const companyName = settings?.['company.name'] || 'PawTag';
   const navigate = useNavigate();
@@ -328,7 +329,7 @@ export default function Shop() {
                     </p>
                     <p className="text-xs text-amber-700 mt-0.5">
                       Gold members earn double points on every purchase and start at Nurture tier.
-                      Just $1.99/month.
+                      Just ${goldPrice}/month.
                     </p>
                   </div>
                 </div>

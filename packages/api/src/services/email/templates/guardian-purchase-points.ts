@@ -1,4 +1,5 @@
 import { renderBase, renderCtaButton } from './base';
+import { getGuardianNumber, getGuardianString } from '../../loyalty/guardian-config';
 
 interface PurchasePointsEmailData {
   customerName: string;
@@ -12,7 +13,12 @@ interface PurchasePointsEmailData {
   dashboardUrl: string;
 }
 
-export function renderPurchasePointsEmail(data: PurchasePointsEmailData): string {
+export async function renderPurchasePointsEmail(data: PurchasePointsEmailData): Promise<string> {
+  const [goldPrice, goldUpsellText] = await Promise.all([
+    getGuardianNumber('goldPrice'),
+    getGuardianString('gold.emailUpsellText'),
+  ]);
+  const upsellHeading = goldUpsellText || 'Did you know? Gold members earn 2× points on every purchase.';
   const {
     customerName,
     orderNumber,
@@ -51,8 +57,8 @@ export function renderPurchasePointsEmail(data: PurchasePointsEmailData): string
       <tr>
         <td style="padding:12px 16px;background-color:#fffbeb;border-radius:8px;border-left:3px solid #f59e0b;">
           <p style="margin:0;color:#92400e;font-size:14px;line-height:1.6;">
-            <strong>Did you know? Gold members earn 2× points on every purchase.</strong><br/>
-            With Gold, you'd have earned <strong>${pointsEarned * 2} Points</strong> from this order. Upgrade for just $1.99/month.
+            <strong>${upsellHeading}</strong><br/>
+            With Gold, you'd have earned <strong>${pointsEarned * 2} Points</strong> from this order. Upgrade for just $${goldPrice.toFixed(2)}/month.
           </p>
         </td>
       </tr>

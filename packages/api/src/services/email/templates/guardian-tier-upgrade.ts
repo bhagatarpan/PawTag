@@ -1,4 +1,5 @@
 import { renderBase, renderCtaButton, renderInfoBox } from './base';
+import { getGuardianNumber, getGuardianString } from '../../loyalty/guardian-config';
 
 interface TierUpgradeEmailData {
   customerName: string;
@@ -17,7 +18,12 @@ const TIER_COLORS: Record<string, string> = {
   SAFEGUARD: '#f59e0b',
 };
 
-export function renderTierUpgradeEmail(data: TierUpgradeEmailData): string {
+export async function renderTierUpgradeEmail(data: TierUpgradeEmailData): Promise<string> {
+  const [goldPrice, goldUpsellText] = await Promise.all([
+    getGuardianNumber('goldPrice'),
+    getGuardianString('gold.emailUpsellText'),
+  ]);
+  const upsellHeading = goldUpsellText || 'Going places? Go Gold for 2× points.';
   const { customerName, previousTier, newTier, points, benefits, dashboardUrl, isGoldMember } = data;
 
   const color = TIER_COLORS[newTier] || '#10b981';
@@ -47,8 +53,8 @@ export function renderTierUpgradeEmail(data: TierUpgradeEmailData): string {
       <tr>
         <td style="padding:12px 16px;background-color:#fffbeb;border-radius:8px;border-left:3px solid #f59e0b;">
           <p style="margin:0;color:#92400e;font-size:14px;line-height:1.6;">
-            <strong>Going places? Go Gold for 2× points.</strong><br/>
-            Gold members earn double points on every purchase and start at Nurture tier. Just $1.99/month.
+            <strong>${upsellHeading}</strong><br/>
+            Gold members earn double points on every purchase and start at Nurture tier. Just $${goldPrice.toFixed(2)}/month.
           </p>
         </td>
       </tr>

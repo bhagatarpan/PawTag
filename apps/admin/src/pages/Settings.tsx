@@ -40,7 +40,8 @@ const CATEGORY_META: Record<string, { label: string; icon: React.ElementType; de
   urls: { label: 'URLs', icon: Link2, description: 'Internal URLs used by the platform.' },
   emails: { label: 'Email', icon: Mail, description: 'Sender and support email addresses.' },
   checkout: { label: 'Checkout', icon: ShoppingBag, description: 'Defaults used during checkout.' },
-  mfa: { label: 'Security', icon: ShieldCheck, description: 'Two-factor and verification behavior.' },
+  auth: { label: 'Auth & Security', icon: ShieldCheck, description: 'Login attempts, lockout, and CAPTCHA settings.' },
+  mfa: { label: 'MFA', icon: ShieldCheck, description: 'Two-factor and verification behavior.' },
   otp: { label: 'OTP', icon: ShieldCheck, description: 'One-time password skip toggles for registration and invoice access.' },
   finder: { label: 'Finder', icon: Search, description: 'Finder portal behavior and privacy settings.' },
 };

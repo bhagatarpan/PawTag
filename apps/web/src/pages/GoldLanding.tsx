@@ -1,19 +1,24 @@
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Crown, Check, ArrowRight, Shield, Star, Zap, Truck, Clock, Gift, Headphones, Sparkles } from 'lucide-react';
+import { API } from '@pawtag/shared/api';
+import api from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import { useSiteSettings } from '../hooks/useCms';
 import SeoHead from '../components/SeoHead';
-import PageHero from '../components/PageHero';
 
-const goldBenefits = [
-  { icon: <Sparkles className="h-6 w-6" />, title: '2× Points', description: 'Earn double points on every purchase' },
-  { icon: <Star className="h-6 w-6" />, title: 'Nurture Starting Tier', description: 'Skip Care and start with better benefits' },
-  { icon: <Truck className="h-6 w-6" />, title: 'Free Shipping Over $50', description: 'Lower threshold than Guardian tiers' },
-  { icon: <Clock className="h-6 w-6" />, title: 'Early Access', description: 'Get new products before anyone else' },
-  { icon: <Headphones className="h-6 w-6" />, title: 'Priority Support', description: 'Faster response times from our team' },
-  { icon: <Gift className="h-6 w-6" />, title: '$3/mo PawRewards', description: 'Monthly store credit to spend on products' },
+const BENEFIT_ICONS = [Sparkles, Star, Truck, Clock, Headphones, Gift];
+
+const DEFAULT_BENEFITS = [
+  { title: '2× Points', description: 'Earn double points on every purchase' },
+  { title: 'Nurture Starting Tier', description: 'Skip Care and start with better benefits' },
+  { title: 'Free Shipping Over $50', description: 'Lower threshold than Guardian tiers' },
+  { title: 'Early Access', description: 'Get new products before anyone else' },
+  { title: 'Priority Support', description: 'Faster response times from our team' },
+  { title: '$3/mo PawRewards', description: 'Monthly store credit to spend on products' },
 ];
 
-const comparison = [
+const DEFAULT_COMPARISON = [
   { feature: 'Points on purchases', guardian: '1×', gold: '2×' },
   { feature: 'Starting tier', guardian: 'Care', gold: 'Nurture' },
   { feature: 'Monthly PawRewards', guardian: '$2/mo', gold: '$3/mo' },
@@ -30,10 +35,41 @@ const scenarios = [
   { monthly: 200, guardianPoints: 200, goldPoints: 400, guardianRewards: 2, goldRewards: 3 },
 ];
 
+interface GoldContent {
+  heroHeadline: string;
+  heroSubtext: string;
+  benefits: Array<{ title: string; description: string }>;
+  comparison: Array<{ feature: string; guardian: string; gold: string }>;
+}
+
 export default function GoldLanding() {
   const { user } = useAuth();
-  // Logged-in users go to upgrade page; guests go to register
+  const { settings } = useSiteSettings();
+  const goldPrice = settings?.['guardian.goldPrice'] || '1.99';
   const goldCtaTo = user ? '/account/upgrade' : '/register';
+
+  const [content, setContent] = useState<GoldContent>({
+    heroHeadline: 'Go Gold. Get 2× the Rewards.',
+    heroSubtext: 'Earn double points on every purchase, free shipping over $50, and start at Nurture tier.',
+    benefits: DEFAULT_BENEFITS,
+    comparison: DEFAULT_COMPARISON,
+  });
+
+  useEffect(() => {
+    api.get(API.public.points.goldContent)
+      .then((res) => {
+        if (res.data?.success && res.data?.data) {
+          const d = res.data.data;
+          setContent({
+            heroHeadline: d.heroHeadline || 'Go Gold. Get 2× the Rewards.',
+            heroSubtext: d.heroSubtext || 'Earn double points on every purchase, free shipping over $50, and start at Nurture tier.',
+            benefits: d.benefits?.length ? d.benefits : DEFAULT_BENEFITS,
+            comparison: d.comparison?.length ? d.comparison : DEFAULT_COMPARISON,
+          });
+        }
+      })
+      .catch(() => { /* use defaults */ });
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -47,10 +83,10 @@ export default function GoldLanding() {
       <div className="bg-gradient-to-r from-amber-500 to-orange-500 text-white py-20">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <Crown className="h-16 w-16 text-white mx-auto mb-6" />
-          <h1 className="text-4xl md:text-5xl font-bold mb-4">Go Gold. Get 2× the Rewards.</h1>
+          <h1 className="text-4xl md:text-5xl font-bold mb-4">{content.heroHeadline}</h1>
           <p className="text-amber-100 text-xl mb-8">
-            Earn double points, unlock exclusive benefits, and start at a higher tier.
-            Just $1.99/month — less than a coffee.
+            {content.heroSubtext}
+            {' '}Just ${goldPrice}/month — less than a coffee.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
@@ -77,17 +113,20 @@ export default function GoldLanding() {
             <p className="text-gray-500 text-lg">Everything you get with Gold membership</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {goldBenefits.map((benefit, i) => (
-              <div key={i} className="flex items-start gap-4">
-                <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center shrink-0">
-                  {benefit.icon}
+            {content.benefits.map((benefit, i) => {
+              const Icon = BENEFIT_ICONS[i % BENEFIT_ICONS.length];
+              return (
+                <div key={i} className="flex items-start gap-4">
+                  <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center shrink-0">
+                    <Icon className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900 mb-1">{benefit.title}</h3>
+                    <p className="text-sm text-gray-500">{benefit.description}</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900 mb-1">{benefit.title}</h3>
-                  <p className="text-sm text-gray-500">{benefit.description}</p>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </section>
@@ -109,7 +148,7 @@ export default function GoldLanding() {
                 </tr>
               </thead>
               <tbody>
-                {comparison.map((row, i) => (
+                {content.comparison.map((row, i) => (
                   <tr key={i} className="border-b border-gray-50 last:border-0">
                     <td className="px-6 py-4 text-sm text-gray-900">{row.feature}</td>
                     <td className="px-6 py-4 text-sm text-center text-gray-600">
@@ -153,7 +192,7 @@ export default function GoldLanding() {
             ))}
           </div>
           <p className="text-center text-sm text-gray-400 mt-6">
-            Gold costs $1.99/month. Spend $50+/month and Gold pays for itself.
+            Gold costs ${goldPrice}/month. Spend $50+/month and Gold pays for itself.
           </p>
         </div>
       </section>
@@ -163,7 +202,7 @@ export default function GoldLanding() {
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl font-bold text-white mb-4">Less Than a Coffee a Month</h2>
           <p className="text-amber-100 text-xl mb-6">
-            Gold is just <strong>$1.99/month</strong> — that's $23.88/year.
+            Gold is just <strong>${goldPrice}/month</strong> — that's ${(parseFloat(goldPrice) * 12).toFixed(2)}/year.
             Spend $50/month and you'll earn $36 in PawRewards annually.
           </p>
           <p className="text-amber-100 text-lg mb-8">

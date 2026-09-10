@@ -1,13 +1,19 @@
 import { renderBase, renderCtaButton } from './base';
+import { getGuardianNumber, getGuardianString } from '../../loyalty/guardian-config';
 
-export function renderOrderConfirmationEmail(data: {
+export async function renderOrderConfirmationEmail(data: {
   name: string;
   orderNumber: string;
   items: Array<{ productName: string; quantity: number; unitPrice: number; variantName?: string; petName?: string; customisationTexts?: string[] }>;
   total: number;
   shippingAddress: { line1: string; city: string; state: string; zip: string };
   viewOrderUrl: string;
-}): string {
+  }): Promise<string> {
+  const [goldPrice, goldUpsellText] = await Promise.all([
+    getGuardianNumber('goldPrice'),
+    getGuardianString('gold.emailUpsellText'),
+  ]);
+  const upsellHeading = goldUpsellText || 'Earn 2× points on your next order with Gold.';
   const itemRows = data.items.map((item) => `
     <tr>
       <td style="padding:12px 16px;border-bottom:1px solid #f3f4f6;color:#374151;font-size:14px;">
@@ -64,8 +70,8 @@ export function renderOrderConfirmationEmail(data: {
       <tr>
         <td style="padding:12px 16px;background-color:#fffbeb;border-radius:8px;border-left:3px solid #f59e0b;">
           <p style="margin:0;color:#92400e;font-size:14px;line-height:1.6;">
-            <strong>Earn 2× points on your next order with Gold.</strong><br/>
-            Just $1.99/month — less than a coffee.
+            <strong>${upsellHeading}</strong><br/>
+            Just $${goldPrice.toFixed(2)}/month — less than a coffee.
             <a href="${data.viewOrderUrl.replace('/account/orders', '/gold')}" style="color:#d97706;text-decoration:underline;font-weight:600;">Upgrade to Gold →</a>
           </p>
         </td>

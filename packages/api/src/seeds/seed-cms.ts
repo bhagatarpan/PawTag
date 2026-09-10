@@ -107,6 +107,11 @@ async function run() {
         { key: 'escalation.enableManualForward', value: 'true', displayValue: 'Manual Forward to Emergency Contact', category: 'escalation', description: 'Allow owner to manually forward found notification to emergency contact' },
         { key: 'otp.skipOtpDuringRegistration', value: 'false', displayValue: 'Skip Phone OTP During Registration', category: 'otp', description: 'When true, system-wide registration phone OTP is skipped. Use during SMS service outages.' },
         { key: 'otp.skipOtpForInvoice', value: 'false', displayValue: 'Skip OTP for Invoice Access', category: 'otp', description: 'When true, system-wide invoice OTP is skipped. Use during OTP service outages.' },
+        // Auth / Security Settings
+        { key: 'auth.maxLoginAttempts', value: '5', displayValue: 'Max Login Attempts', category: 'auth', description: 'Failed login attempts before account lockout' },
+        { key: 'auth.lockoutMinutes', value: '30', displayValue: 'Lockout Duration (minutes)', category: 'auth', description: 'Minutes to lock account after max failed attempts' },
+        { key: 'auth.captchaRequiredAfterAttempts', value: '2', displayValue: 'CAPTCHA Required After Attempts', category: 'auth', description: 'Show CAPTCHA after this many failed login attempts' },
+        { key: 'auth.captchaTokenExpiryMinutes', value: '5', displayValue: 'CAPTCHA Token Expiry (minutes)', category: 'auth', description: 'Minutes before a CAPTCHA token expires' },
         ...auditCategories.map((value) => ({ key: `audit.policy.category.${value.toLowerCase()}`, value: 'true', displayValue: `Audit: ${value}`, category: 'audit', description: `Enable audit logging for ${value} events` })),
         ...auditActors.map((value) => ({ key: `audit.policy.actor.${value.toLowerCase()}`, value: 'true', displayValue: `Audit: ${value} Actor`, category: 'audit', description: `Enable audit logging for ${value} actors` })),
         { key: 'audit.settings.identifyAnonymousActors', value: 'true', displayValue: 'Identify Anonymous Actors', category: 'audit', description: 'When enabled, attempts to identify anonymous users from JWT tokens even when auth fails' },
@@ -214,6 +219,7 @@ async function run() {
         // Guardian Loyalty Program — Points Earning
         { key: 'guardian.purchaseRateGuardian', value: '1', displayValue: 'Purchase Rate (Guardian)', category: 'guardian', description: 'Points earned per $1 spent (Guardian members)' },
         { key: 'guardian.purchaseRateGold', value: '2', displayValue: 'Purchase Rate (Gold)', category: 'guardian', description: 'Points earned per $1 spent (Gold members)' },
+        { key: 'guardian.goldPrice', value: '1.99', displayValue: 'Gold Membership Price', category: 'guardian', description: 'Monthly price for Gold membership (NZD)' },
         { key: 'guardian.repeatPurchaseBonusGuardian', value: '10', displayValue: 'Repeat Purchase Bonus (Guardian)', category: 'guardian', description: 'Bonus points on 3rd+ order (Guardian members)' },
         { key: 'guardian.repeatPurchaseBonusGold', value: '20', displayValue: 'Repeat Purchase Bonus (Gold)', category: 'guardian', description: 'Bonus points on 3rd+ order (Gold members)' },
         // Guardian Loyalty Program — Review Points
@@ -257,6 +263,33 @@ async function run() {
         { key: 'guardian.pawRewardsExpirationMonths', value: '6', displayValue: 'PawRewards Expiration (Months)', category: 'guardian', description: 'Months before unused rewards expire' },
         { key: 'guardian.pawRewardsMaxBalanceGuardian', value: '20.00', displayValue: 'PawRewards Max Balance (Guardian)', category: 'guardian', description: 'Maximum PawRewards balance for Guardian members (NZD)' },
         { key: 'guardian.pawRewardsMaxBalanceGold', value: '40.00', displayValue: 'PawRewards Max Balance (Gold)', category: 'guardian', description: 'Maximum PawRewards balance for Gold members (NZD)' },
+        // Guardian Loyalty Program — Gold Benefits & Tier Rules
+        { key: 'guardian.goldFreeShippingThreshold', value: '50', displayValue: 'Gold Free Shipping Threshold (NZD)', category: 'guardian', description: 'Minimum order total for Gold member free shipping benefit' },
+        { key: 'guardian.tierDowngradeGraceDays', value: '90', displayValue: 'Tier Downgrade Grace Period (days)', category: 'guardian', description: 'Number of days before a tier downgrade is applied' },
+        { key: 'guardian.lifetimeSafeguardYears', value: '3', displayValue: 'Lifetime Safeguard Years', category: 'guardian', description: 'Consecutive years at Safeguard required for lifetime status' },
+        // Guardian Gold Marketing Content (CMS-driven)
+        { key: 'guardian.gold.heroHeadline', value: 'Go Gold. Get 2× the Rewards.', displayValue: 'Gold Hero Headline', category: 'guardian', description: 'Main headline on Gold landing page' },
+        { key: 'guardian.gold.heroSubtext', value: 'Earn double points on every purchase, free shipping over $50, and start at Nurture tier.', displayValue: 'Gold Hero Subtext', category: 'guardian', description: 'Subtitle on Gold landing page' },
+        { key: 'guardian.gold.benefits', value: JSON.stringify([
+          { title: '2× Points', description: 'Earn double points on every purchase' },
+          { title: 'Nurture Starting Tier', description: 'Skip Care and start with better benefits' },
+          { title: 'Free Shipping Over $50', description: 'Lower threshold than Guardian tiers' },
+          { title: 'Early Access', description: 'Get new products before anyone else' },
+          { title: 'Priority Support', description: 'Faster response times from our team' },
+          { title: '$3/mo PawRewards', description: 'Monthly store credit to spend on products' },
+        ]), displayValue: 'Gold Benefits Grid', category: 'guardian', description: 'JSON array of Gold benefit items' },
+        { key: 'guardian.gold.comparison', value: JSON.stringify([
+          { feature: 'Points on purchases', guardian: '1×', gold: '2×' },
+          { feature: 'Starting tier', guardian: 'Care', gold: 'Nurture' },
+          { feature: 'Monthly PawRewards', guardian: '$2/mo', gold: '$3/mo' },
+          { feature: 'Free shipping threshold', guardian: '$100', gold: '$50' },
+          { feature: 'Early access to products', guardian: '—', gold: '✓' },
+          { feature: 'Priority support', guardian: '—', gold: '✓' },
+          { feature: 'Exclusive promotions', guardian: '✓', gold: '✓' },
+          { feature: 'Guardian badge', guardian: '✓', gold: '✓' },
+        ]), displayValue: 'Gold Comparison Table', category: 'guardian', description: 'JSON array of comparison rows' },
+        { key: 'guardian.gold.emailUpsellText', value: 'Earn 2× points on every purchase', displayValue: 'Gold Email Upsell Text', category: 'guardian', description: 'Short text used in email Gold upsell sections' },
+        { key: 'guardian.gold.checkoutUpsellText', value: 'Earn 2× points on this order with Gold', displayValue: 'Gold Checkout Upsell Text', category: 'guardian', description: 'Text shown at checkout for non-Gold members' },
       ];
 
       let settingsCreated = 0;

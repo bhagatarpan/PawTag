@@ -8,6 +8,7 @@ import { AddressAutocomplete } from '@pawtag/ui';
 import type { AddressComponents } from '@pawtag/ui';
 import api from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import { useSiteSettings } from '../hooks/useCms';
 import { API } from '@pawtag/shared';
 
 interface OnboardingStep {
@@ -71,6 +72,8 @@ function ConfettiParticle({ color, delay, x, size }: { color: string; delay: num
 
 export default function OnboardingWizard() {
   const { user, refreshUser } = useAuth();
+  const { settings } = useSiteSettings();
+  const goldPrice = settings?.['guardian.goldPrice'] || '1.99';
   const [steps, setSteps] = useState<OnboardingStep[]>([]);
   const [globalSettings, setGlobalSettings] = useState<GlobalSettings>({});
   const [currentIdx, setCurrentIdx] = useState(0);
@@ -621,7 +624,7 @@ export default function OnboardingWizard() {
                 <Crown className="h-5 w-5 text-amber-600 flex-shrink-0" />
                 <div className="flex-1">
                   <p className="text-sm font-medium text-amber-800">
-                    Upgrade to Gold — $1.99/month
+                    Upgrade to Gold — ${goldPrice}/month
                   </p>
                   <p className="text-xs text-amber-600 mt-0.5">
                     Earn 2× points on every purchase. Cancel anytime.

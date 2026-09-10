@@ -33,6 +33,7 @@ import {
 import { sendVerificationEmail, sendPasswordResetEmail, sendPasswordChangedEmail, sendWelcomeEmail, sendLoginNotification, sendLoginOtpEmail } from '../services/email.service';
 import { sendPhoneOtpSMS } from '../services/sms.service';
 import { isRegistrationOtpDisabled } from '../services/otp-settings.service';
+import { getMaxLoginAttempts, getLockoutMinutes, getCaptchaRequiredAfterAttempts, getCaptchaTokenExpiryMinutes } from '../services/auth-settings.service';
 import { User, Role, UserRole, VerificationToken, Setting, AuditEvent } from '@pawtag/db';
 import { auditService, resolveActorType, type AuditContext } from '../services/audit';
 import { createAuditContextFromRequest, setAuditActor, type AuditRequest } from '../middleware/audit';
@@ -253,7 +254,7 @@ router.post('/register', registerLimiter, validate(registerSchema), async (req, 
 });
 
 // CAPTCHA endpoint: generates a simple math challenge
-router.get('/captcha', (_req, res: Response) => {
+router.get('/captcha', async (_req, res: Response) => {
   const a = Math.floor(Math.random() * 10) + 1;
   const b = Math.floor(Math.random() * 10) + 1;
   const operators = ['+', '-', '×'];
@@ -268,7 +269,8 @@ router.get('/captcha', (_req, res: Response) => {
     default: answer = a + b; question = `${a} + ${b}`;
   }
 
-  const token = jwt.sign({ captchaAnswer: answer }, config.jwtSecret, { expiresIn: '5m' });
+  const captchaExpiryMinutes = await getCaptchaTokenExpiryMinutes();
+  const token = jwt.sign({ captchaAnswer: answer }, config.jwtSecret, { expiresIn: `${captchaExpiryMinutes}m` });
 
   res.json({
     success: true,
@@ -283,8 +285,9 @@ router.post('/login', loginLimiter, validate(loginSchema), async (req, res: Resp
 
     const user = await User.findOne({ email, deletedAt: null });
 
-    // CAPTCHA check: after 2 failed attempts, require CAPTCHA
-    if (user && (user.failedLoginAttempts || 0) >= 2 && !captchaToken) {
+    // CAPTCHA check: after N failed attempts, require CAPTCHA (CMS-driven)
+    const captchaRequiredAfter = await getCaptchaRequiredAfterAttempts();
+    if (user && (user.failedLoginAttempts || 0) >= captchaRequiredAfter && !captchaToken) {
       res.status(400).json({
         success: false,
         error: 'CAPTCHA required. Please complete the verification.',
@@ -346,13 +349,13 @@ router.post('/login', loginLimiter, validate(loginSchema), async (req, res: Resp
 
     const valid = await verifyPassword(password, user.passwordHash);
     if (!valid) {
-      // Track failed login attempts
+      // Track failed login attempts (CMS-driven thresholds)
       user.failedLoginAttempts = (user.failedLoginAttempts || 0) + 1;
-      const MAX_ATTEMPTS = 5;
-      const LOCKOUT_MINUTES = 30;
-      const lockoutTriggered = user.failedLoginAttempts >= MAX_ATTEMPTS;
+      const maxAttempts = await getMaxLoginAttempts();
+      const lockoutMinutes = await getLockoutMinutes();
+      const lockoutTriggered = user.failedLoginAttempts >= maxAttempts;
       if (lockoutTriggered) {
-        user.lockedUntil = new Date(Date.now() + LOCKOUT_MINUTES * 60 * 1000);
+        user.lockedUntil = new Date(Date.now() + lockoutMinutes * 60 * 1000);
         await auditAuthEvent(req as AuditRequest, {
           action: 'account_locked',
           eventType: 'account_lockout',
@@ -362,7 +365,7 @@ router.post('/login', loginLimiter, validate(loginSchema), async (req, res: Resp
           resourceId: user._id.toString(),
           outcome: 'SUCCESS',
           severity: 'HIGH',
-          metadata: { reason: 'too_many_failed_logins', attempts: user.failedLoginAttempts, maxAttempts: MAX_ATTEMPTS },
+          metadata: { reason: 'too_many_failed_logins', attempts: user.failedLoginAttempts, maxAttempts },
           businessOperation: 'Account locked after too many failed login attempts',
         }, { actorType: 'SYSTEM' });
       }
@@ -374,7 +377,7 @@ router.post('/login', loginLimiter, validate(loginSchema), async (req, res: Resp
         reason: lockoutTriggered ? 'invalid_credentials_and_locked' : 'invalid_credentials',
         resourceId: user._id.toString(),
         actorEmail: user.email,
-        metadata: { attempts: user.failedLoginAttempts, maxAttempts: MAX_ATTEMPTS },
+        metadata: { attempts: user.failedLoginAttempts, maxAttempts },
       });
 
       // Send notification for failed admin login attempts

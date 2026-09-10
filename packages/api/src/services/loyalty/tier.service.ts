@@ -35,8 +35,24 @@ export const TIER_THRESHOLDS = {
   SAFEGUARD: { min: 300, max: Infinity },
 } as const;
 
-// Tier benefits
-export const TIER_BENEFITS = {
+// Tier benefits — populated at runtime from CMS settings
+export const TIER_BENEFITS: Record<TierName, {
+  name: string;
+  displayName: string;
+  pointsMultiplier: number;
+  pawRewardsMonthly: number;
+  freeShippingThreshold: number;
+  earlyAccess: boolean;
+  prioritySupport: boolean;
+  exclusivePromotions: boolean;
+  monthlyProgressEmail: boolean;
+  guardianBadge: boolean;
+  communityAccess: boolean;
+  photoReviewBonus?: boolean;
+  quarterlySurprise?: boolean;
+  annualGift?: boolean;
+  referralBonusBoost?: boolean;
+}> = {
   CARE: {
     name: 'Care',
     displayName: 'Care Guardian',
@@ -101,6 +117,25 @@ export const TIER_BENEFITS = {
   },
 } as const;
 
+/**
+ * Get tier benefits with CMS-overridden values (pawRewardsMonthly, freeShippingThreshold).
+ * Returns a fresh object — does NOT mutate the static TIER_BENEFITS.
+ */
+async function getCmsTierBenefits(): Promise<Record<TierName, typeof TIER_BENEFITS[TierName]>> {
+  const pawRewardsCare = await getGuardianNumber('pawRewardsCare');
+  const pawRewardsNurture = await getGuardianNumber('pawRewardsNurture');
+  const pawRewardsProtector = await getGuardianNumber('pawRewardsProtector');
+  const pawRewardsSafeguard = await getGuardianNumber('pawRewardsSafeguard');
+
+  return {
+    ...TIER_BENEFITS,
+    CARE: { ...TIER_BENEFITS.CARE, pawRewardsMonthly: pawRewardsCare },
+    NURTURE: { ...TIER_BENEFITS.NURTURE, pawRewardsMonthly: pawRewardsNurture },
+    PROTECTOR: { ...TIER_BENEFITS.PROTECTOR, pawRewardsMonthly: pawRewardsProtector },
+    SAFEGUARD: { ...TIER_BENEFITS.SAFEGUARD, pawRewardsMonthly: pawRewardsSafeguard },
+  };
+}
+
 export type TierName = keyof typeof TIER_THRESHOLDS;
 
 export interface TierCalculationResult {
@@ -111,6 +146,14 @@ export interface TierCalculationResult {
   benefits: typeof TIER_BENEFITS[TierName];
   isLifetime: boolean;
   consecutiveYearsAtSafeguard: number;
+}
+
+/**
+ * Get tier benefits with CMS-overridden values (async, DB-backed).
+ */
+export async function getTierBenefits(tier: TierName): Promise<typeof TIER_BENEFITS[TierName]> {
+  const cms = await getCmsTierBenefits();
+  return cms[tier];
 }
 
 /**
@@ -164,12 +207,15 @@ export async function calculateTier(userId: string): Promise<TierCalculationResu
     nextTier = null;
   }
 
+  // Get CMS-overridden benefits
+  const cmsBenefits = await getCmsTierBenefits();
+
   return {
     tier,
     points,
     pointsToNextTier,
     nextTier,
-    benefits: TIER_BENEFITS[tier],
+    benefits: cmsBenefits[tier],
     isLifetime,
     consecutiveYearsAtSafeguard,
   };
@@ -211,15 +257,16 @@ export async function updateTier(userId: string): Promise<TierCalculationResult>
     const gracePeriodEndsAt = user?.tierGracePeriodEndsAt;
 
     if (!gracePeriodEndsAt) {
-      // First downgrade detection — start 90-day grace period
+      // First downgrade detection — start CMS-configured grace period
+      const graceDays = await getGuardianNumber('tierDowngradeGraceDays');
       const graceEnd = new Date(now);
-      graceEnd.setDate(graceEnd.getDate() + 90);
+      graceEnd.setDate(graceEnd.getDate() + graceDays);
 
       await User.findByIdAndUpdate(userId, {
         tierGracePeriodEndsAt: graceEnd,
       });
 
-      await sendTierDowngradeWarningEmail(userId, previousTier, currentTier.tier, currentTier.points, 90);
+      await sendTierDowngradeWarningEmail(userId, previousTier, currentTier.tier, currentTier.points, graceDays);
 
       logger.info({
         userId,
@@ -326,30 +373,28 @@ async function checkLifetimeStatus(userId: string): Promise<{
   isLifetime: boolean;
   consecutiveYears: number;
 }> {
-  // Get tier history for the last 3 years
-  const threeYearsAgo = new Date();
-  threeYearsAgo.setFullYear(threeYearsAgo.getFullYear() - 3);
+  const lifetimeYears = await getGuardianNumber('lifetimeSafeguardYears');
+  const lookbackYears = lifetimeYears + 1; // need slightly more history than required years
+
+  // Get tier history for the last N years
+  const lookbackDate = new Date();
+  lookbackDate.setFullYear(lookbackDate.getFullYear() - lookbackYears);
 
   const tierHistory = await GuardianTierHistory.find({
     userId,
     tier: 'SAFEGUARD',
-    effectiveFrom: { $gte: threeYearsAgo },
+    effectiveFrom: { $gte: lookbackDate },
   }).sort({ effectiveFrom: 1 }).lean();
 
-  // Check for 3 consecutive years
-  if (tierHistory.length < 3) {
-    return { isLifetime: false, consecutiveYears: tierHistory.length };
-  }
-
-  // Check if each year has been at Safeguard
+  // Check for consecutive years
   let consecutiveYears = 0;
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < lifetimeYears; i++) {
     const yearStart = new Date();
-    yearStart.setFullYear(yearStart.getFullYear() - (2 - i));
+    yearStart.setFullYear(yearStart.getFullYear() - (lifetimeYears - 1 - i));
     yearStart.setMonth(0, 1);
     
     const yearEnd = new Date();
-    yearEnd.setFullYear(yearEnd.getFullYear() - (2 - i));
+    yearEnd.setFullYear(yearEnd.getFullYear() - (lifetimeYears - 1 - i));
     yearEnd.setMonth(11, 31);
 
     const hasSafeguardThisYear = tierHistory.some(
@@ -366,7 +411,7 @@ async function checkLifetimeStatus(userId: string): Promise<{
   }
 
   return {
-    isLifetime: consecutiveYears >= 3,
+    isLifetime: consecutiveYears >= lifetimeYears,
     consecutiveYears,
   };
 }
@@ -412,14 +457,14 @@ async function sendTierChangeEmail(
   const user = await User.findById(userId).select('email fullName').lean();
   if (!user?.email) return;
 
-  const tierBenefits = TIER_BENEFITS[newTier];
+  const tierBenefits = await getCmsTierBenefits();
   const benefits = [
-    `Monthly PawRewards: $${tierBenefits.pawRewardsMonthly.toFixed(2)}`,
-    `Free shipping on orders over $${tierBenefits.freeShippingThreshold}`,
-    ...(tierBenefits.earlyAccess ? ['Early access to new products'] : []),
-    ...(tierBenefits.prioritySupport ? ['Priority customer support'] : []),
-    ...('annualGift' in tierBenefits && tierBenefits.annualGift ? ['Annual surprise gift'] : []),
-    ...('referralBonusBoost' in tierBenefits && tierBenefits.referralBonusBoost ? ['Enhanced referral rewards'] : []),
+    `Monthly PawRewards: $${tierBenefits[newTier].pawRewardsMonthly.toFixed(2)}`,
+    `Free shipping on orders over $${tierBenefits[newTier].freeShippingThreshold}`,
+    ...(tierBenefits[newTier].earlyAccess ? ['Early access to new products'] : []),
+    ...(tierBenefits[newTier].prioritySupport ? ['Priority customer support'] : []),
+    ...('annualGift' in tierBenefits[newTier] && tierBenefits[newTier].annualGift ? ['Annual surprise gift'] : []),
+    ...('referralBonusBoost' in tierBenefits[newTier] && tierBenefits[newTier].referralBonusBoost ? ['Enhanced referral rewards'] : []),
   ];
 
   await sendTierUpgradeEmail(
@@ -445,6 +490,7 @@ export async function getAllTiers(): Promise<Array<{
   const nurtureMin = await getGuardianNumber('tierThresholdNurture');
   const protectorMin = await getGuardianNumber('tierThresholdProtector');
   const safeguardMin = await getGuardianNumber('tierThresholdSafeguard');
+  const cmsBenefits = await getCmsTierBenefits();
 
   return [
     {
@@ -452,28 +498,28 @@ export async function getAllTiers(): Promise<Array<{
       displayName: 'Care Guardian',
       minPoints: 0,
       maxPoints: nurtureMin - 1,
-      benefits: TIER_BENEFITS.CARE,
+      benefits: cmsBenefits.CARE,
     },
     {
       name: 'NURTURE',
       displayName: 'Nurture Guardian',
       minPoints: nurtureMin,
       maxPoints: protectorMin - 1,
-      benefits: TIER_BENEFITS.NURTURE,
+      benefits: cmsBenefits.NURTURE,
     },
     {
       name: 'PROTECTOR',
       displayName: 'Protector Guardian',
       minPoints: protectorMin,
       maxPoints: safeguardMin - 1,
-      benefits: TIER_BENEFITS.PROTECTOR,
+      benefits: cmsBenefits.PROTECTOR,
     },
     {
       name: 'SAFEGUARD',
       displayName: 'Safeguard Guardian',
       minPoints: safeguardMin,
       maxPoints: Infinity,
-      benefits: TIER_BENEFITS.SAFEGUARD,
+      benefits: cmsBenefits.SAFEGUARD,
     },
   ];
 }

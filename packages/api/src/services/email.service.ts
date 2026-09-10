@@ -141,7 +141,7 @@ export async function sendWelcomeEmail(
   const accountUrl = `${frontendUrl}/account`;
   const cms = await renderCmsEmail('welcome', { name, accountUrl });
   if (cms) return sendMail(to, cms.subject, cms.html, cms.from);
-  const html = renderWelcomeEmail({ name, accountUrl });
+  const html = await renderWelcomeEmail({ name, accountUrl });
   return sendMail(to, 'Welcome to PawTag! 🐾', html);
 }
 
@@ -251,7 +251,7 @@ export async function sendOrderConfirmation(data: OrderEmailData): Promise<Email
   };
   const cms = await renderCmsEmail('order-confirmation', vars);
   if (cms) return sendMail(data.to, cms.subject, cms.html, cms.from);
-  const html = renderOrderConfirmationEmail({
+  const html = await renderOrderConfirmationEmail({
     name: data.customerName,
     orderNumber: data.orderNumber,
     items: data.items,
@@ -440,7 +440,7 @@ export async function sendTierUpgradeEmail(
   const vars = { customerName, previousTier, newTier, points: String(points), benefits: benefits.join(', '), dashboardUrl };
   const cms = await renderCmsEmail('guardian-tier-upgrade', vars);
   if (cms) return sendMail(to, cms.subject, cms.html, cms.from);
-  const html = renderTierUpgradeEmail({ customerName, previousTier, newTier, points, benefits, dashboardUrl });
+  const html = await renderTierUpgradeEmail({ customerName, previousTier, newTier, points, benefits, dashboardUrl });
   return sendMail(to, `Congratulations! You've been promoted to ${newTier} — PawTag`, html);
 }
 

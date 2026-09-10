@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Shield, Star, Zap, Crown, ArrowRight, TrendingUp } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useSiteSettings } from '../hooks/useCms';
 import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
 
@@ -52,6 +53,8 @@ interface GuardianData {
 
 export default function GuardianSection() {
   const { user } = useAuth();
+  const { settings } = useSiteSettings();
+  const goldPrice = settings?.['guardian.goldPrice'] || '1.99';
   const [guardianData, setGuardianData] = useState<GuardianData | null>(null);
 
   useEffect(() => {
@@ -222,7 +225,7 @@ export default function GuardianSection() {
             <h3 className="font-semibold text-amber-900 mb-2">Want to Earn Even More?</h3>
             <p className="text-sm text-amber-700 mb-4">
               Gold members earn <strong>2× Points</strong> on every purchase and start at Nurture tier.
-              Just $1.99/month — less than a coffee.
+              Just ${goldPrice}/month — less than a coffee.
             </p>
             <Link
               to="/gold"

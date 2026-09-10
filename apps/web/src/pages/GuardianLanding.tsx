@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Shield, Star, Zap, Crown, Check, ArrowRight, PawPrint, Gift, Truck, Clock, Users, TrendingUp } from 'lucide-react';
+import { useSiteSettings } from '../hooks/useCms';
 import SeoHead from '../components/SeoHead';
 import PageHero from '../components/PageHero';
 
@@ -62,10 +63,12 @@ const faqs = [
   { q: 'How do I earn points?', a: 'Earn points on every purchase, when your pet hits milestones, for leaving reviews, referring friends, and more.' },
   { q: 'What are PawRewards?', a: 'PawRewards are store credit you earn monthly based on your tier. You can spend them on any product.' },
   { q: 'How do I level up?', a: 'Earn points through purchases and activities. Your tier upgrades automatically as you accumulate points.' },
-  { q: 'What is Gold?', a: 'Gold is a premium membership at $1.99/month. You earn 2× points on every purchase and start at Nurture tier.' },
+  { q: 'What is Gold?', a: 'Gold is a premium membership. You earn 2× points on every purchase and start at Nurture tier.' },
 ];
 
 export default function GuardianLanding() {
+  const { settings } = useSiteSettings();
+  const goldPrice = settings?.['guardian.goldPrice'] || '1.99';
   return (
     <div className="min-h-screen bg-gray-50">
       <SeoHead
@@ -102,7 +105,7 @@ export default function GuardianLanding() {
           <h2 className="text-2xl md:text-3xl font-bold text-white mb-3">Want to Earn Even More?</h2>
           <p className="text-amber-100 text-lg mb-5">
             Gold members earn <strong>2× Points</strong> on every purchase and start at Nurture tier.
-            That's $1.99/month — less than a coffee.
+            That's ${goldPrice}/month — less than a coffee.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Link
@@ -240,7 +243,7 @@ export default function GuardianLanding() {
             {faqs.map((faq, i) => (
               <div key={i} className="bg-gray-50 rounded-xl p-6">
                 <h3 className="font-semibold text-gray-900 mb-2">{faq.q}</h3>
-                <p className="text-gray-600 text-sm">{faq.a}</p>
+                <p className="text-gray-600 text-sm">{faq.q === 'What is Gold?' ? `Gold is a premium membership at $${goldPrice}/month. You earn 2× points on every purchase and start at Nurture tier.` : faq.a}</p>
               </div>
             ))}
           </div>

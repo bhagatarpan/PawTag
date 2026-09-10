@@ -48,7 +48,7 @@ router.get('/rates', async (req: AuthRequest, res: Response) => {
     if (isGoldMember) {
       // Gold members get free shipping on orders over $50
       const cartTotal = parseFloat((req.query.cartTotal as string) || '0');
-      if (getsFreeShipping(true, cartTotal)) {
+      if (await getsFreeShipping(true, cartTotal)) {
         // Override all shipping costs to $0 for Gold members
         const freeRates = rates.map((rate) => ({
           ...rate,
