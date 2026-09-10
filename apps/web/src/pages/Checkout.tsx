@@ -5,7 +5,7 @@ import {
   Mail, Smartphone, Shield, ChevronRight, Edit3, Check, Package, Clock,
   ShieldCheck, Headphones, RefreshCw, FileText, Download, Printer, Share2, Home, ExternalLink
 } from 'lucide-react';
-import { AddressAutocomplete } from '@pawtag/ui';
+import { AddressAutocomplete, InlineEditBanner } from '@pawtag/ui';
 import type { AddressComponents } from '@pawtag/ui';
 import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
@@ -84,6 +84,7 @@ export default function Checkout() {
   // Engraving editing state — tracks texts being edited per cart item
   const [editingTexts, setEditingTexts] = useState<Record<string, string[]>>({});
   const [savingTexts, setSavingTexts] = useState<Record<string, boolean>>({});
+  const [expandedEngraving, setExpandedEngraving] = useState<Record<string, boolean>>({});
 
   // Shipping address
   const [addressMode, setAddressMode] = useState<'saved' | 'custom'>('saved');
@@ -611,49 +612,39 @@ export default function Checkout() {
                                   )}
                                 </label>
                               ) : (
-                                <div className="space-y-2">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <input
-                                      type="checkbox"
-                                      checked
-                                      readOnly
-                                      className="rounded border-gray-300 text-primary-600"
-                                    />
-                                    <span className="text-sm font-medium text-primary-700">
-                                      {labelText}
-                                    </span>
-                                    {engravingPrice > 0 && (
-                                      <span className="text-xs text-gray-500">(+NZ${engravingPrice.toFixed(2)})</span>
-                                    )}
-                                    <button
-                                      onClick={() => handleToggleEngraving(itemId, item, false)}
-                                      className="text-xs text-gray-400 hover:text-red-500 ml-1"
-                                    >
-                                      Remove
-                                    </button>
+                                <InlineEditBanner
+                                  icon={<PawPrint className="h-4 w-4" />}
+                                  label={labelText}
+                                  description={texts.filter(t => t).map(t => `Pet name: ${t}`).join(', ') || 'No name added yet'}
+                                  variant="success"
+                                  onRemove={() => handleToggleEngraving(itemId, item, false)}
+                                  onExpand={() => setExpandedEngraving(prev => ({ ...prev, [itemId]: !prev[itemId] }))}
+                                  expanded={expandedEngraving[itemId] || false}
+                                >
+                                  <div className="space-y-2 mt-2">
+                                    {texts.map((text, idx) => (
+                                      <div key={idx} className="flex items-center gap-2">
+                                        <span className="text-xs text-gray-500 w-16 shrink-0">Name #{idx + 1}:</span>
+                                        <input
+                                          type="text"
+                                          value={text}
+                                          onChange={(e) => handleTextChange(itemId, idx, e.target.value)}
+                                          placeholder={`Enter ${labelText.toLowerCase()}`}
+                                          maxLength={16}
+                                          className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                        />
+                                        <button
+                                          onClick={() => handleSaveTexts(itemId)}
+                                          disabled={savingTexts[itemId]}
+                                          className="p-1.5 text-green-600 hover:text-green-800 disabled:opacity-50"
+                                          title="Save"
+                                        >
+                                          {savingTexts[itemId] ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
+                                        </button>
+                                      </div>
+                                    ))}
                                   </div>
-                                  {texts.map((text, idx) => (
-                                    <div key={idx} className="flex items-center gap-2">
-                                      <span className="text-xs text-gray-400 w-16 shrink-0">Pet name #{idx + 1}:</span>
-                                      <input
-                                        type="text"
-                                        value={text}
-                                        onChange={(e) => handleTextChange(itemId, idx, e.target.value)}
-                                        placeholder={`Enter ${labelText.toLowerCase()}`}
-                                        maxLength={16}
-                                        className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                                      />
-                                      <button
-                                        onClick={() => handleSaveTexts(itemId)}
-                                        disabled={savingTexts[itemId]}
-                                        className="p-1.5 text-primary-600 hover:text-primary-800 disabled:opacity-50"
-                                        title="Save"
-                                      >
-                                        {savingTexts[itemId] ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
-                                      </button>
-                                    </div>
-                                  ))}
-                                </div>
+                                </InlineEditBanner>
                               )}
                             </div>
                           )}

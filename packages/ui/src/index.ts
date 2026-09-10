@@ -41,6 +41,7 @@ export { SearchBar } from './components/SearchBar';
 export { Pagination } from './components/Pagination';
 export { EmptyState, ErrorState } from './components/EmptyState';
 export { StatusBadge } from './components/StatusBadge';
+export { InlineEditBanner } from './components/InlineEditBanner';
 export { ConfirmDialog } from './components/ConfirmDialog';
 export { AddressAutocomplete } from './components/AddressAutocomplete';
 export { OrderDetailView } from './components/OrderDetailView';
