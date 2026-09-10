@@ -230,15 +230,16 @@ export default function Checkout() {
 
   const handleToggleEngraving = async (itemId: string, item: any, enable: boolean) => {
     if (enable) {
-      // Enable engraving — initialize texts array with empty strings
+      // Enable engraving — initialize texts and set customisation flag
       const qty = item.quantity || 1;
       const texts = Array(qty).fill('');
       setEditingTexts(prev => ({ ...prev, [itemId]: texts }));
-      await updateItemTexts(itemId, texts);
+      // Send customisation=true to enable the engraving pricing
+      await api.put(API.cart.updateItem(itemId), { customisation: true, customisationTexts: texts });
     } else {
-      // Disable engraving — clear texts
+      // Disable engraving — clear texts and unset customisation flag
       setEditingTexts(prev => ({ ...prev, [itemId]: [] }));
-      await updateItemTexts(itemId, []);
+      await api.put(API.cart.updateItem(itemId), { customisation: false, customisationTexts: [] });
     }
     await refreshCart();
   };

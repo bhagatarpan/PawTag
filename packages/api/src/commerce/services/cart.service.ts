@@ -50,6 +50,7 @@ export interface AddToCartInput {
 export interface UpdateCartItemInput {
   itemId: string;
   quantity?: number;
+  customisation?: boolean;
   customisationTexts?: string[];
 }
 
@@ -127,24 +128,21 @@ export class CartService {
       // Update last accessed time
       cart.lastAccessedAt = new Date();
 
-      // Backfill product metadata for existing cart items (customizable, label, price)
+      // Backfill product metadata for existing cart items
       let needsSave = false;
       for (const item of cart.items) {
-        if (item.customizable === undefined || item.customizable === null) {
-          try {
-            const product = await Product.findById(item.productId);
-            if (product) {
-              item.customizable = (product as any).customizable ?? false;
-              item.customizationLabel = (product as any).customizationLabel || '';
-              item.customizationPrice = (product as any).customizationPrice || 0;
-              needsSave = true;
-            }
-          } catch {
-            // Product not found or error — skip backfill for this item
+        try {
+          const product = await Product.findById(item.productId);
+          if (product) {
+            const p = product as any;
+            if (item.customizable !== (p.customizable ?? false)) { item.customizable = p.customizable ?? false; needsSave = true; }
+            if (item.customizationLabel !== (p.customizationLabel || '')) { item.customizationLabel = p.customizationLabel || ''; needsSave = true; }
+            if (item.customizationPrice !== (p.customizationPrice || 0)) { item.customizationPrice = p.customizationPrice || 0; needsSave = true; }
           }
-        }
+        } catch { /* skip */ }
       }
-      await cart.save();
+      if (needsSave) await cart.save();
+      else await cart.save();
     }
 
     return cart;
@@ -255,7 +253,22 @@ export class CartService {
       throw new NotFoundError('Cart item');
     }
 
-    // Update customisation texts if provided
+    // Update customisation fields if provided
+    if (input.customisation !== undefined) {
+      item.customisation = input.customisation;
+      if (!input.customisation) {
+        // Disabling customisation — clear texts and reset price
+        item.customisationTexts = [];
+        item.customizationTotal = 0;
+      } else {
+        // Enabling customisation — set price from product
+        const product = await Product.findById(item.productId);
+        if (product) {
+          item.customizationPrice = (product as any).customizationPrice || 0;
+          item.customizationTotal = (product as any).customizationPrice || 0;
+        }
+      }
+    }
     if (input.customisationTexts !== undefined) {
       item.customisationTexts = input.customisationTexts;
     }

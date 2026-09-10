@@ -91,21 +91,22 @@ router.post('/items', async (req: AuthRequest, res: Response) => {
 /**
  * PUT /api/cart/items/:id
  *
- * Update item quantity or customisation texts.
- * Body: { quantity?, customisationTexts? }
+ * Update item quantity, customisation, or customisation texts.
+ * Body: { quantity?, customisation?, customisationTexts? }
  */
 router.put('/items/:id', async (req: AuthRequest, res: Response) => {
   try {
-    const { quantity, customisationTexts } = req.body;
+    const { quantity, customisation, customisationTexts } = req.body;
 
-    if (quantity === undefined && customisationTexts === undefined) {
-      res.status(400).json({ success: false, error: 'quantity or customisationTexts is required' });
+    if (quantity === undefined && customisation === undefined && customisationTexts === undefined) {
+      res.status(400).json({ success: false, error: 'quantity, customisation, or customisationTexts is required' });
       return;
     }
 
     const cart = await cartService.updateItem(req.user!.id, {
       itemId: req.params.id,
       quantity,
+      customisation,
       customisationTexts,
     });
 
