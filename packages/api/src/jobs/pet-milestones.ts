@@ -108,31 +108,21 @@ async function awardMilestonePoints(milestones: PetMilestone[]): Promise<void> {
  */
 async function sendMilestoneEmails(milestones: PetMilestone[]): Promise<void> {
   const { sendMail } = await import('../services/email.service');
+  const { renderPetBirthdayEmail, renderPetAnniversaryEmail } = await import('../services/email/templates');
   
   for (const milestone of milestones) {
     try {
       const user = await User.findById(milestone.ownerId).lean();
       if (!user?.email) continue;
 
+      const dashboardUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/guardian`;
       const subject = milestone.type === 'birthday' 
         ? `Happy Birthday ${milestone.petName}!`
         : `${milestone.petName}'s Adoption Anniversary!`;
 
       const body = milestone.type === 'birthday'
-        ? `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <h2 style="color: #ec4899;">🎂 Happy Birthday ${milestone.petName}!</h2>
-            <p>Hi ${user.fullName || 'there'},</p>
-            <p>Today is ${milestone.petName}'s birthday! We're celebrating by awarding you <strong>10 bonus points</strong>.</p>
-            <p>We hope ${milestone.petName} has a wonderful day filled with love and treats!</p>
-            <p>Thanks for being a PawTag Guardian!</p>
-          </div>`
-        : `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <h2 style="color: #10b981;">🎉 ${milestone.petName}'s Adoption Anniversary!</h2>
-            <p>Hi ${user.fullName || 'there'},</p>
-            <p>Today marks the anniversary of ${milestone.petName}'s adoption! We're celebrating by awarding you <strong>10 bonus points</strong>.</p>
-            <p>Thank you for giving ${milestone.petName} a loving home!</p>
-            <p>Thanks for being a PawTag Guardian!</p>
-          </div>`;
+        ? renderPetBirthdayEmail({ customerName: user.fullName || 'there', petName: milestone.petName, pointsEarned: 10, dashboardUrl })
+        : renderPetAnniversaryEmail({ customerName: user.fullName || 'there', petName: milestone.petName, yearsOwned: 1, pointsEarned: 10, dashboardUrl });
 
       await sendMail(user.email, subject, body);
       logger.info({
