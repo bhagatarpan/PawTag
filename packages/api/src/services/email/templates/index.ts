@@ -21,3 +21,14 @@ export { renderGuardianAnniversaryEmail } from './guardian-anniversary';
 export { renderGuardianRenewalReminderEmail } from './guardian-renewal-reminder';
 export { renderPurchasePointsEmail } from './guardian-purchase-points';
 export { renderGoldWelcomeEmail } from './gold-welcome';
+// ─── New templates (inline email extractions) ───
+export { renderNewOrderAlertEmail, renderOrderCancelledAlertEmail, renderRefundFailedAlertEmail, renderSupportRequestAlertEmail } from './admin-alert';
+export { renderOrderStatusEmail } from './order-status';
+export { renderSubscriptionWelcomeEmail, renderSubscriptionReminderEmail, renderGracePeriodReminderEmail, renderPaymentFailureEmail, renderGracePeriodStartedEmail, renderPaymentRetrySuccessEmail } from './subscription-lifecycle';
+export { renderReferralRewardEmail } from './referral-reward';
+export { renderTierDowngradeWarningEmail } from './tier-downgrade-warning';
+export { renderPetBirthdayEmail } from './pet-birthday';
+export { renderPetAnniversaryEmail } from './pet-anniversary';
+export { renderEmergencyEscalationEmail } from './emergency-escalation';
+export { renderGenericNotificationEmail } from './generic-notification';
+export { renderLowStockAlertEmail } from './low-stock-alert';

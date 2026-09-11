@@ -1344,3 +1344,113 @@ The following inconsistencies exist between the four web apps. These are documen
 4. **Custom animations in web only:** `animate-fade-in`, `animate-slide-up`, `animate-pulse-once`, `animate-slide-in-right` exist only in `apps/web/src/index.css`. **Recommendation:** Move to a shared CSS file or, for mobile, implement natively with the motion spec above.
 
 5. **Missing assets:** `SeoHead` references `/og-image.png` and `site.logo` setting, but no image files exist. **Recommendation:** Create brand assets before public launch.
+
+---
+
+## Email Design System
+
+All PawTag emails must use consistent design tokens defined here. These tokens are the single source of truth for email styling.
+
+### Email Layout
+
+| Token | Value | Usage |
+|-------|-------|-------|
+| `email.contentWidth` | `600px` | Standard email container max-width |
+| `email.invoiceWidth` | `800px` | Invoice email container max-width |
+| `email.outerPadding` | `32px 16px` | Outer email centering padding |
+| `email.bodyPadding` | `40px` | Main content cell padding |
+| `email.mobilePadding` | `24px` | Mobile override (< 600px) |
+
+### Email Color Themes
+
+| Theme | Header Gradient | Body Accent | Use Case |
+|-------|----------------|-------------|----------|
+| `default` | `#0d9488` → `#0f766e` | `#f0fdfa` | Standard transactional emails |
+| `warning` | `#f59e0b` → `#d97706` | `#fffbeb` | Expiry warnings, grace period, tier downgrade |
+| `danger` | `#dc2626` → `#ef4444` | `#fef2f2` | Emergency escalation, payment failures |
+| `success` | `#10b981` → `#059669` | `#f0fdf4` | Payment success, refund settled |
+
+### Email Typography
+
+| Token | Value | Usage |
+|-------|-------|-------|
+| `email.fontFamily` | `system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif` | Body font |
+| `email.monoFont` | `'Courier New', Courier, monospace` | OTP codes, tag IDs, order numbers |
+| `email.headingSize` | `22px` | Email heading (logo area) |
+| `email.bodySize` | `16px` | Primary body text |
+| `email.bodySizeAlt` | `15px` | Alternative body text (Guardian templates) |
+| `email.captionSize` | `14px` | Secondary text, descriptions |
+| `email.labelSize` | `13px` | Labels, meta information |
+| `email.smallSize` | `12px` | Uppercase labels, timestamps, footer |
+| `email.tinySize` | `11px` | Uppercase meta headers |
+| `email.bodyLineHeight` | `1.6` | Standard body line-height |
+| `email.bodyColor` | `#374151` | Primary body text color |
+| `email.mutedColor` | `#6b7280` | Secondary/muted text |
+| `email.subtleColor` | `#9ca3af` | Tertiary/subtle text |
+
+### Email Spacing
+
+| Token | Value | Usage |
+|-------|-------|-------|
+| `email.spacing.xs` | `4px` | Tightest gap |
+| `email.spacing.sm` | `8px` | Compact gap |
+| `email.spacing.md` | `16px` | Standard gap |
+| `email.spacing.lg` | `24px` | Major gap, CTA margin |
+| `email.spacing.xl` | `32px` | Large gap, header/footer padding |
+| `email.spacing.xxl` | `40px` | Content cell padding |
+
+### Email Borders
+
+| Token | Value | Usage |
+|-------|-------|-------|
+| `email.border.standard` | `1px solid #e5e7eb` | Standard borders |
+| `email.border.radius` | `8px` | Cards, info boxes, buttons |
+| `email.border.radiusLg` | `12px` | OTP containers, header/footer corners |
+| `email.border.radiusPill` | `20px` | Status badges |
+| `email.border.dashed` | `2px dashed #0d9488` | OTP code display |
+
+### Email Components
+
+| Component | Key Styles |
+|-----------|-----------|
+| **CTA Button** | `bg: #0d9488, color: white, padding: 14px 40px, border-radius: 10px, font-size: 16px, font-weight: 600, letter-spacing: 0.3px` |
+| **Info Box** | `bg: #f0fdfa, border: 1px solid #ccfbf1, border-radius: 8px, padding: 16px 20px` |
+| **Divider** | `border-top: 1px solid #e5e7eb, margin: 24px 0` |
+| **OTP Display** | `bg: #f0fdfa, border: 2px dashed #0d9488, border-radius: 12px, padding: 32px, code: 42px/800/letter-spacing: 10px` |
+| **Data Table** | `header: bg #f9fafb, border-bottom: 2px solid #e5e7eb, body: border-bottom: 1px solid #f3f4f6` |
+| **Status Badge** | `border-radius: 20px, padding: 4px 14px, font-size: 12px, font-weight: 700, uppercase, letter-spacing: 0.5px` |
+| **Uppercase Label** | `color: #6b7280, font-size: 12px, text-transform: uppercase, letter-spacing: 0.5px` |
+
+### Email Card Variants
+
+| Variant | Background | Border | Use Case |
+|---------|-----------|--------|----------|
+| Info | `#f0fdfa` | `1px solid #ccfbf1` | Informational callouts |
+| Warning | `#fffbeb` | `1px solid #fcd34d` | Expiry warnings, grace period |
+| Danger | `#fee2e2` | `1px solid #fca5a5` | Errors, failures |
+| Success | `#dcfce7` | `1px solid #86efac` | Completion, settlement |
+| Processing | `#dbeafe` | `1px solid #93c5fd` | Pending, in-progress |
+
+### Email Gradients
+
+| Gradient | Value | Usage |
+|----------|-------|-------|
+| Header default | `linear-gradient(135deg, #0d9488, #0f766e)` | Standard email header |
+| Header warning | `linear-gradient(135deg, #f59e0b, #d97706)` | Warning email header |
+| Header danger | `linear-gradient(135deg, #dc2626, #ef4444)` | Emergency email header |
+| Header success | `linear-gradient(135deg, #10b981, #059669)` | Success email header |
+
+### Email Responsive Breakpoint
+
+| Token | Value | Usage |
+|-------|-------|-------|
+| `email.breakpoint` | `600px` | Mobile breakpoint for responsive email |
+
+**Media query:**
+```css
+@media only screen and (max-width: 600px) {
+  .email-container { width: 100% !important; padding: 16px !important; }
+  .content-cell { padding: 24px !important; }
+  .cta-button { width: 100% !important; }
+}
+```
