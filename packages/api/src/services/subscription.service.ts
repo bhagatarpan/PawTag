@@ -1,6 +1,7 @@
 import { Subscription, Tag, Invoice, User, Notification, Product, TagExpiryNotification, Setting } from '@pawtag/db';
 import { sendMail } from './email.service';
 import { createAndDeliverNotification } from './notification-delivery.service';
+import { renderSubscriptionReminderEmail, renderGracePeriodReminderEmail, renderPaymentFailureEmail, renderGracePeriodStartedEmail, renderGoldWelcomeEmail, renderPaymentRetrySuccessEmail } from './email/templates';
 import { auditService, type AuditContext } from './audit';
 import { incrementCounter, METRICS } from '../lib/metrics';
 import logger from '../lib/logger';
@@ -967,54 +968,14 @@ async function sendReminderEmail(to: string, name: string, tagId: string, daysLe
   };
 
   const subject = subjects[type] || `PawTag subscription expiring soon`;
-  const msg = `Your PawTag subscription for tag ${tagId} will expire in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}. Renew now to keep your pet protected.`;
-
-  const html = `
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-      <div style="background: linear-gradient(135deg, #0d9488, #14b8a6); padding: 24px; border-radius: 12px 12px 0 0; text-align: center;">
-        <h1 style="color: white; font-size: 24px; margin: 0;">PawTag</h1>
-      </div>
-      <div style="background: #f9fafb; padding: 32px; border: 1px solid #e5e7eb;">
-        <h2 style="color: #111827; font-size: 20px;">Hi ${name},</h2>
-        <p style="color: #374151; font-size: 15px; line-height: 1.7;">${msg}</p>
-        <div style="background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin: 16px 0;">
-          <p style="color: #6b7280; font-size: 13px; margin: 0 0 4px;">Tag ID</p>
-          <p style="color: #111827; font-size: 16px; font-weight: 600; font-family: monospace; margin: 0;">${tagId}</p>
-        </div>
-        <a href="${renewUrl}" style="display: inline-block; background: #0d9488; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; margin: 16px 0;">Renew Now</a>
-        <p style="color: #9ca3af; font-size: 12px; margin-top: 24px;">If you don't renew, your tag will stop working after the grace period.</p>
-      </div>
-      <div style="text-align: center; padding: 16px; color: #9ca3af; font-size: 11px;">
-        PawTag — Reuniting lost pets with their families
-      </div>
-    </div>`;
+  const html = renderSubscriptionReminderEmail({ name, tagId, daysLeft, type, renewUrl });
 
   await sendMail(to, subject, html);
 }
 
 async function sendGraceReminderEmail(to: string, name: string, tagId: string, daysLeft: number) {
   const renewUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/subscriptions`;
-
-  const html = `
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-      <div style="background: linear-gradient(135deg, #f59e0b, #f97316); padding: 24px; border-radius: 12px 12px 0 0; text-align: center;">
-        <h1 style="color: white; font-size: 24px; margin: 0;">PawTag</h1>
-      </div>
-      <div style="background: #fffbeb; padding: 32px; border: 1px solid #fde68a;">
-        <h2 style="color: #111827; font-size: 20px;">Hi ${name},</h2>
-        <p style="color: #374151; font-size: 15px; line-height: 1.7;">
-          Your PawTag subscription for <strong>${tagId}</strong> is in the grace period.
-          You have <strong>${daysLeft} day${daysLeft !== 1 ? 's' : ''}</strong> remaining before your tag becomes inactive.
-        </p>
-        <p style="color: #374151; font-size: 15px; line-height: 1.7;">
-          During this time, your tag is still working. Renew now to restore full protection.
-        </p>
-        <a href="${renewUrl}" style="display: inline-block; background: #f59e0b; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; margin: 16px 0;">Renew Now</a>
-      </div>
-      <div style="text-align: center; padding: 16px; color: #9ca3af; font-size: 11px;">
-        PawTag — Reuniting lost pets with their families
-      </div>
-    </div>`;
+  const html = renderGracePeriodReminderEmail({ name, tagId, daysLeft, renewUrl });
 
   await sendMail(to, `Grace period: ${daysLeft} days left to renew — PawTag`, html);
 }
@@ -1180,59 +1141,15 @@ async function moveSubscriptionToGracePeriod(subscriptionId: string) {
 }
 
 async function sendPaymentFailureEmail(to: string, name: string, tagId: string, retryCount: number, retriesLeft: number) {
-  const renewUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/subscriptions`;
-
-  const html = `
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-      <div style="background: linear-gradient(135deg, #ef4444, #dc2626); padding: 24px; border-radius: 12px 12px 0 0; text-align: center;">
-        <h1 style="color: white; font-size: 24px; margin: 0;">PawTag</h1>
-      </div>
-      <div style="background: #fef2f2; padding: 32px; border: 1px solid #fecaca;">
-        <h2 style="color: #111827; font-size: 20px;">Hi ${name},</h2>
-        <p style="color: #374151; font-size: 15px; line-height: 1.7;">
-          We couldn't process your payment for PawTag subscription <strong>${tagId}</strong>.
-        </p>
-        <p style="color: #374151; font-size: 15px; line-height: 1.7;">
-          This is attempt <strong>${retryCount}</strong> of 4. We'll automatically retry ${retriesLeft} more time${retriesLeft !== 1 ? 's' : ''} before your subscription enters grace period.
-        </p>
-        <p style="color: #374151; font-size: 15px; line-height: 1.7;">
-          Please ensure your payment method is up to date or update it in your account settings.
-        </p>
-        <a href="${renewUrl}" style="display: inline-block; background: #ef4444; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; margin: 16px 0;">Update Payment Method</a>
-      </div>
-      <div style="text-align: center; padding: 16px; color: #9ca3af; font-size: 11px;">
-        PawTag — Reuniting lost pets with their families
-      </div>
-    </div>`;
+  const updatePaymentUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/subscriptions`;
+  const html = renderPaymentFailureEmail({ name, tagId, retryCount, retriesLeft, updatePaymentUrl });
 
   await sendMail(to, `Payment failed for your PawTag subscription — Retry ${retryCount}`, html);
 }
 
 async function sendGracePeriodEmail(to: string, name: string, tagId: string, gracePeriodWeeks: number) {
   const renewUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/subscriptions`;
-
-  const html = `
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-      <div style="background: linear-gradient(135deg, #f59e0b, #f97316); padding: 24px; border-radius: 12px 12px 0 0; text-align: center;">
-        <h1 style="color: white; font-size: 24px; margin: 0;">PawTag</h1>
-      </div>
-      <div style="background: #fffbeb; padding: 32px; border: 1px solid #fde68a;">
-        <h2 style="color: #111827; font-size: 20px;">Hi ${name},</h2>
-        <p style="color: #374151; font-size: 15px; line-height: 1.7;">
-          Your PawTag subscription for <strong>${tagId}</strong> has entered the grace period after multiple failed payment attempts.
-        </p>
-        <p style="color: #374151; font-size: 15px; line-height: 1.7;">
-          You have <strong>${gracePeriodWeeks} week${gracePeriodWeeks !== 1 ? 's' : ''}</strong> to renew before your tag becomes inactive.
-        </p>
-        <p style="color: #374151; font-size: 15px; line-height: 1.7;">
-          During this time, your tag is still working. Renew now to restore full protection.
-        </p>
-        <a href="${renewUrl}" style="display: inline-block; background: #f59e0b; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; margin: 16px 0;">Renew Now</a>
-      </div>
-      <div style="text-align: center; padding: 16px; color: #9ca3af; font-size: 11px;">
-        PawTag — Reuniting lost pets with their families
-      </div>
-    </div>`;
+  const html = renderGracePeriodStartedEmail({ name, tagId, gracePeriodWeeks, renewUrl });
 
   await sendMail(to, `Grace period started for your PawTag subscription`, html);
 }
@@ -1348,58 +1265,11 @@ async function attemptPaymentCharge(subscription: any): Promise<boolean> {
 }
 
 async function sendGoldWelcomeEmail(to: string, name: string, price: number, dashboardUrl: string) {
-  const html = `
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-      <div style="background: linear-gradient(135deg, #f59e0b, #d97706); padding: 24px; border-radius: 12px 12px 0 0; text-align: center;">
-        <h1 style="color: white; font-size: 24px; margin: 0;">PawTag Gold</h1>
-        <p style="color: rgba(255,255,255,0.9); font-size: 14px; margin: 8px 0 0;">Welcome to Gold Membership</p>
-      </div>
-      <div style="background: #fffbeb; padding: 32px; border: 1px solid #fde68a;">
-        <h2 style="color: #111827; font-size: 20px;">Hi ${name},</h2>
-        <p style="color: #374151; font-size: 15px; line-height: 1.7;">
-          Welcome to <strong>PawTag Gold Membership</strong>! You're now a Gold member at <strong>$${price.toFixed(2)}/month</strong>.
-        </p>
-        <div style="background: white; border: 1px solid #fde68a; border-radius: 8px; padding: 16px; margin: 16px 0;">
-          <p style="color: #92400e; font-size: 13px; font-weight: 600; margin: 0 0 8px;">Your Gold Benefits</p>
-          <ul style="color: #374151; font-size: 14px; line-height: 1.8; margin: 0; padding-left: 20px;">
-            <li>2× points on every purchase</li>
-            <li>Free shipping on orders over $50</li>
-            <li>Priority customer support</li>
-            <li>Early access to new products</li>
-          </ul>
-        </div>
-        <a href="${dashboardUrl}" style="display: inline-block; background: #f59e0b; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; margin: 16px 0;">View Your Dashboard</a>
-        <p style="color: #9ca3af; font-size: 12px; margin-top: 24px;">
-          Your membership will automatically renew each month. You can manage or cancel anytime from your dashboard.
-        </p>
-      </div>
-      <div style="text-align: center; padding: 16px; color: #9ca3af; font-size: 11px;">
-        PawTag — Reuniting lost pets with their families
-      </div>
-    </div>`;
-
+  const html = renderGoldWelcomeEmail({ customerName: name, price, dashboardUrl });
   await sendMail(to, 'Welcome to PawTag Gold Membership', html);
 }
 
 async function sendPaymentRetrySuccessEmail(to: string, name: string, tagId: string) {
-  const html = `
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-      <div style="background: linear-gradient(135deg, #10b981, #059669); padding: 24px; border-radius: 12px 12px 0 0; text-align: center;">
-        <h1 style="color: white; font-size: 24px; margin: 0;">PawTag</h1>
-      </div>
-      <div style="background: #ecfdf5; padding: 32px; border: 1px solid #a7f3d0;">
-        <h2 style="color: #111827; font-size: 20px;">Hi ${name},</h2>
-        <p style="color: #374151; font-size: 15px; line-height: 1.7;">
-          Great news! Your payment for PawTag subscription <strong>${tagId}</strong> was successfully processed.
-        </p>
-        <p style="color: #374151; font-size: 15px; line-height: 1.7;">
-          Your subscription is now active and your tag is fully protected.
-        </p>
-      </div>
-      <div style="text-align: center; padding: 16px; color: #9ca3af; font-size: 11px;">
-        PawTag — Reuniting lost pets with their families
-      </div>
-    </div>`;
-
+  const html = renderPaymentRetrySuccessEmail({ name, tagId });
   await sendMail(to, `Payment successful for your PawTag subscription`, html);
 }
