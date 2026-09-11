@@ -418,7 +418,7 @@ export default function Sidebar({ mobile, onClose }: SidebarContentProps & { mob
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 py-2 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+      <nav className="flex-1 py-2 overflow-y-auto overflow-x-hidden sidebar-nav">
         {filteredSections.map((section) => {
           const sectionCollapsedState = isSectionCollapsed(section.id);
           const active = isSectionActive(section.links);
