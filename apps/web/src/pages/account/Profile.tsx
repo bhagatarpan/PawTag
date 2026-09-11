@@ -150,6 +150,11 @@ export default function Profile() {
         </div>
         <div className="bg-white rounded-lg border p-6 space-y-4">
           <h2 className="text-lg font-semibold flex items-center gap-2"><Phone size={18} /> Emergency Contact</h2>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+            <p className="text-xs text-blue-700">
+              <strong>Why this matters:</strong> If your pet is found and you don't respond within 30 minutes, PawTag will automatically notify your emergency contact via email so they can help reunite you with your pet. Your emergency contact details are never visible to finders — they are only used by PawTag's automatic escalation system.
+            </p>
+          </div>
           <div className="grid grid-cols-2 gap-4">
             <div><label className="block text-xs text-gray-500 mb-1">Contact Name</label><input value={form.emergencyContact.name} onChange={(e) => setForm({ ...form, emergencyContact: { ...form.emergencyContact, name: e.target.value } })} className="w-full border rounded-md px-3 py-2 text-sm" /></div>
             <div><label className="block text-xs text-gray-500 mb-1">Relationship</label><select value={form.emergencyContact.relationship} onChange={(e) => setForm({ ...form, emergencyContact: { ...form.emergencyContact, relationship: e.target.value } })} className="w-full border rounded-md px-3 py-2 text-sm"><option value="">Select...</option>{relationshipOptions.map((r) => <option key={r} value={r}>{r}</option>)}</select></div>
