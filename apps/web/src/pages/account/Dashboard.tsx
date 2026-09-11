@@ -121,6 +121,7 @@ export default function AccountDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [nudgeDismissed, setNudgeDismissed] = useState(false);
+  const [howItWorksDismissed, setHowItWorksDismissed] = useState(false);
 
   useEffect(() => {
     async function fetchDashboard() {
@@ -262,6 +263,44 @@ export default function AccountDashboard() {
           <span className="text-sm font-medium text-gray-700">Referrals</span>
         </Link>
       </div>
+
+      {/* How PawTag Works */}
+      {!howItWorksDismissed && (
+        <div className="bg-white rounded-xl border border-gray-200 p-5 relative">
+          <button
+            onClick={() => setHowItWorksDismissed(true)}
+            className="absolute top-3 right-3 p-1 text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            <X size={16} />
+          </button>
+          <h3 className="text-sm font-semibold text-gray-700 mb-4">How PawTag Works</h3>
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1 text-center">
+              <div className="w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center mx-auto mb-2">
+                <PawPrint size={22} className="text-primary-600" />
+              </div>
+              <p className="text-sm font-medium text-gray-900">Attach Tag</p>
+              <p className="text-xs text-gray-500 mt-0.5">Tie the PawTag to your pet's collar</p>
+            </div>
+            <ChevronRight size={20} className="text-gray-300 mt-4 shrink-0 hidden sm:block" />
+            <div className="flex-1 text-center">
+              <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mx-auto mb-2">
+                <QrCode size={22} className="text-blue-600" />
+              </div>
+              <p className="text-sm font-medium text-gray-900">Someone Finds Them</p>
+              <p className="text-xs text-gray-500 mt-0.5">They scan the QR code on the tag</p>
+            </div>
+            <ChevronRight size={20} className="text-gray-300 mt-4 shrink-0 hidden sm:block" />
+            <div className="flex-1 text-center">
+              <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center mx-auto mb-2">
+                <Bell size={22} className="text-green-600" />
+              </div>
+              <p className="text-sm font-medium text-gray-900">You're Notified</p>
+              <p className="text-xs text-gray-500 mt-0.5">Instant alert via push notification + email</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Guardian Status Card */}
       {data?.guardian ? (
