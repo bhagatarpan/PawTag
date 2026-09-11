@@ -1,5 +1,6 @@
 import { ReferralCode, Referral, User, Subscription } from '@pawtag/db';
 import { sendMail } from './email.service';
+import { renderReferralRewardEmail } from './email/templates';
 import { auditService, type AuditContext } from './audit';
 import logger from '../lib/logger';
 
@@ -175,13 +176,8 @@ export async function completeReferralRewards(orderId: string): Promise<void> {
   // Notify referrer
   const referrer = await User.findById(referral.referrerId).select('fullName email');
   if (referrer) {
-    await sendMail((referrer as any).email, 'You earned a referral reward!', `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <h2 style="color: #0d9488;">Referral Reward!</h2>
-        <p>Hi ${(referrer as any).fullName},</p>
-        <p>Great news! Your friend signed up using your referral code. You've earned <strong>${rewardMonths} month${rewardMonths > 1 ? 's' : ''} free</strong> on your PawTag subscription!</p>
-        <p>Keep sharing your code to earn more rewards.</p>
-        <p>Thanks for spreading the word about PawTag!</p>
-      </div>`);
+    const html = renderReferralRewardEmail({ referrerName: (referrer as any).fullName, rewardMonths });
+    await sendMail((referrer as any).email, 'You earned a referral reward!', html);
   }
 
 // Award Guardian Points for referral (non-blocking)
