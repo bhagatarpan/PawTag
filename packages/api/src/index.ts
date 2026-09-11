@@ -290,7 +290,7 @@ app.use('/api/admin/commerce/shipments', adminShipmentRoutes);
 app.use('/api/admin/commerce/payments', adminPaymentRoutes);
 app.use('/api/admin/commerce/promo-codes', adminPromoCodeRoutes);
 app.use('/api/admin/commerce', adminRefundRoutes);
-app.use('/api/admin/stripe/report', adminStripeReportRoutes);
+app.use('/api/admin/stripe', adminStripeReportRoutes);
 app.use('/api/public/promo', promoPublicRoutes);
 app.use('/api/public/commerce', commercePublicRoutes);
 app.use('/api/public/points', pointsEstimateRoutes);
