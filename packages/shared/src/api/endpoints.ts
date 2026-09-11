@@ -310,6 +310,21 @@ export const API = {
         update: (id: string) => `/admin/cms/email/email-templates/${id}` as const,
         delete: (id: string) => `/admin/cms/email/email-templates/${id}` as const,
       },
+      communications: {
+        dashboard: '/admin/communications/dashboard',
+        templates: {
+          list: '/admin/communications/templates',
+          get: (id: string) => `/admin/communications/templates/${id}` as const,
+          update: (id: string) => `/admin/communications/templates/${id}` as const,
+          versions: (id: string) => `/admin/communications/templates/${id}/versions` as const,
+          version: (id: string, version: number) => `/admin/communications/templates/${id}/versions/${version}` as const,
+          sendTest: (id: string) => `/admin/communications/templates/${id}/send-test` as const,
+        },
+        audit: {
+          list: '/admin/communications/audit',
+          get: (id: string) => `/admin/communications/audit/${id}` as const,
+        },
+      },
       smsTemplates: {
         list: '/admin/cms/sms/sms-templates',
         create: '/admin/cms/sms/sms-templates',

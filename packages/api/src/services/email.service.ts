@@ -3,6 +3,7 @@ import { CmsEmailTemplate } from '@pawtag/db';
 import { renderBase, renderCtaButton } from './email/templates/base';
 import logger from '../lib/logger';
 import { logIntegration } from '../lib/timing';
+import { recordEmailAudit } from './email-audit.service';
 import {
   renderVerificationEmail,
   renderWelcomeEmail,
@@ -93,7 +94,7 @@ async function renderCmsEmail(slug: string, variables: Record<string, string>): 
   }
 }
 
-export async function sendMail(to: string, subject: string, html: string, from?: string): Promise<EmailResult> {
+export async function sendMail(to: string, subject: string, html: string, from?: string, auditMeta?: { templateSlug?: string; businessFlow?: string; relatedEntityType?: string; relatedEntityId?: string; relatedEntityDisplay?: string; isTest?: boolean }): Promise<EmailResult> {
   // In development, always use Resend's pre-verified test domain (onboarding@resend.dev)
   // so custom unverified domains like pawtag.co.nz don't cause rejections.
   const fromAddress = process.env.NODE_ENV === 'production' ? (from || defaultFrom) : defaultFrom;
@@ -101,6 +102,21 @@ export async function sendMail(to: string, subject: string, html: string, from?:
   if (isDemoMode) {
     const urlMatch = html.match(/href="(http[^"]*verify[^"]*|http[^"]*reset[^"]*|http[^"]*token[^"]*)"/i);
     logger.debug({ to, from: fromAddress, subject, link: urlMatch?.[1] }, 'DEMO EMAIL — No RESEND_API_KEY set');
+    // Record audit for demo mode
+    recordEmailAudit({
+      templateSlug: auditMeta?.templateSlug || 'unknown',
+      businessFlow: auditMeta?.businessFlow || 'other',
+      recipientEmail: to,
+      senderEmail: fromAddress,
+      senderName: 'PawTag',
+      subject,
+      htmlContent: html,
+      providerMessageId: `demo_${Date.now()}`,
+      relatedEntityType: auditMeta?.relatedEntityType as any,
+      relatedEntityId: auditMeta?.relatedEntityId,
+      relatedEntityDisplay: auditMeta?.relatedEntityDisplay,
+      isTest: auditMeta?.isTest || process.env.NODE_ENV !== 'production',
+    }).catch(() => {}); // fire-and-forget
     return { success: true, messageId: `demo_${Date.now()}` };
   }
 
@@ -114,10 +130,40 @@ export async function sendMail(to: string, subject: string, html: string, from?:
 
     if (error) {
       logger.error({ err: error, to, subject }, 'Resend email send failed');
+      // Record failed audit
+      recordEmailAudit({
+        templateSlug: auditMeta?.templateSlug || 'unknown',
+        businessFlow: auditMeta?.businessFlow || 'other',
+        recipientEmail: to,
+        senderEmail: fromAddress,
+        senderName: 'PawTag',
+        subject,
+        htmlContent: html,
+        providerResponse: { error: error.message },
+        relatedEntityType: auditMeta?.relatedEntityType as any,
+        relatedEntityId: auditMeta?.relatedEntityId,
+        relatedEntityDisplay: auditMeta?.relatedEntityDisplay,
+        isTest: auditMeta?.isTest || false,
+      }).catch(() => {}); // fire-and-forget
       return { success: false, error: error.message };
     }
 
     logger.info({ to, messageId: data?.id }, 'Email sent successfully');
+    // Record successful audit
+    recordEmailAudit({
+      templateSlug: auditMeta?.templateSlug || 'unknown',
+      businessFlow: auditMeta?.businessFlow || 'other',
+      recipientEmail: to,
+      senderEmail: fromAddress,
+      senderName: 'PawTag',
+      subject,
+      htmlContent: html,
+      providerMessageId: data?.id,
+      relatedEntityType: auditMeta?.relatedEntityType as any,
+      relatedEntityId: auditMeta?.relatedEntityId,
+      relatedEntityDisplay: auditMeta?.relatedEntityDisplay,
+      isTest: auditMeta?.isTest || false,
+    }).catch(() => {}); // fire-and-forget
     return { success: true, messageId: data?.id };
   }, { to, subject: subject.substring(0, 50) });
 }

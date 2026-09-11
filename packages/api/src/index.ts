@@ -56,6 +56,7 @@ import uploadRoutes from './routes/upload';
 import cmsAdminRoutes from './routes/cms-admin';
 import cmsPublicRoutes from './routes/cms-public';
 import cmsEmailAdminRoutes from './routes/cms-email-admin';
+import communicationsRoutes from './routes/communications';
 import cmsSmsAdminRoutes from './routes/cms-sms-admin';
 import cmsPetRefAdminRoutes from './routes/cms-pet-ref-admin';
 import cmsSettingsPublicRoutes from './routes/cms-settings-public';
@@ -102,6 +103,7 @@ import adminPromoCodeRoutes from './routes/admin-promocodes';
 import adminRefundRoutes from './routes/admin-refunds';
 import adminStripeReportRoutes from './routes/admin-stripe-report';
 import stripeWebhookRoutes from './routes/stripe-webhooks';
+import resendWebhookRoutes from './routes/resend-webhooks';
 import promoPublicRoutes from './routes/promo-public';
 import commercePublicRoutes from './routes/commerce-public';
 import pointsEstimateRoutes from './routes/points-estimate';
@@ -241,6 +243,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/admin/rbac', rbacRoutes);
 app.use('/api/admin/cms', cmsAdminRoutes);
 app.use('/api/admin/cms/email', cmsEmailAdminRoutes);
+app.use('/api/admin/communications', communicationsRoutes);
 app.use('/api/admin/cms/sms', cmsSmsAdminRoutes);
 app.use('/api/admin/cms/pet-refs', cmsPetRefAdminRoutes);
 app.use('/api/admin/cms/homepage', cmsHomepageAdminRoutes);
@@ -297,6 +300,9 @@ app.use('/api/public/points', pointsEstimateRoutes);
 
 // Stripe webhooks need raw body for signature verification
 app.use('/api/webhooks/stripe', express.raw({ type: 'application/json' }), stripeWebhookRoutes);
+
+// Resend webhooks for email delivery tracking
+app.use('/api/webhooks/resend', express.json(), resendWebhookRoutes);
 
 // --- Error Handling ---
 app.use(notFoundHandler);

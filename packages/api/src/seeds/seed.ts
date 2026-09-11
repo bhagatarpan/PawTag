@@ -316,6 +316,9 @@ async function seed() {
       { name: 'notification.delete', displayName: 'Delete Notifications', description: 'Delete notifications', resource: 'notification', action: 'delete', groupIndex: groupDefs.findIndex(g => g.name === 'NOTIFICATION_MANAGEMENT') },
       { name: 'notification.send', displayName: 'Send Notifications', description: 'Send notifications to users', resource: 'notification', action: 'send', groupIndex: groupDefs.findIndex(g => g.name === 'NOTIFICATION_MANAGEMENT') },
       { name: 'notification.template_manage', displayName: 'Manage Templates', description: 'Create and edit notification templates', resource: 'notification', action: 'template_manage', groupIndex: groupDefs.findIndex(g => g.name === 'NOTIFICATION_MANAGEMENT') },
+      // Communications — Email Audit
+      { name: 'communication.email_audit.read', displayName: 'Read Email Audit', description: 'View email audit records', resource: 'communication.email_audit', action: 'read', groupIndex: groupDefs.findIndex(g => g.name === 'NOTIFICATION_MANAGEMENT') },
+      { name: 'communication.email_template.send_test', displayName: 'Send Test Emails', description: 'Send test email renders', resource: 'communication.email_template', action: 'send_test', groupIndex: groupDefs.findIndex(g => g.name === 'NOTIFICATION_MANAGEMENT') },
 
       // CMS — Pages
       { name: 'cms.page.read', displayName: 'Read Pages', description: 'View CMS pages', resource: 'cms.page', action: 'read', groupIndex: groupDefs.findIndex(g => g.name === 'CMS_MANAGEMENT') },
@@ -594,6 +597,9 @@ async function seed() {
         { permissionName: 'cms.email_template.create' },
         { permissionName: 'cms.email_template.update' },
         { permissionName: 'cms.email_template.delete' },
+        // Communications — Email Audit
+        { permissionName: 'communication.email_audit.read' },
+        { permissionName: 'communication.email_template.send_test' },
         { permissionName: 'cms.sms_template.read' },
         { permissionName: 'cms.sms_template.create' },
         { permissionName: 'cms.sms_template.update' },

@@ -27,7 +27,9 @@ export { CmsFooter, type ICmsFooterDocument, type ICmsFooterGroup, type ICmsFoot
 export { CmsMedia, type ICmsMediaDocument } from './models/CmsMedia';
 export { CmsAnnouncement, type ICmsAnnouncementDocument } from './models/CmsAnnouncement';
 export { CmsRedirect, type ICmsRedirectDocument } from './models/CmsRedirect';
-export { CmsEmailTemplate, type ICmsEmailTemplateDocument } from './models/CmsEmailTemplate';
+export { CmsEmailTemplate, type ICmsEmailTemplateDocument, type IEmailVariableDefinition } from './models/CmsEmailTemplate';
+export { EmailTemplateVersion, type IEmailTemplateVersionDocument } from './models/EmailTemplateVersion';
+export { EmailAudit, type IEmailAuditDocument } from './models/EmailAudit';
 export { CmsSmsTemplate, type ICmsSmsTemplateDocument } from './models/CmsSmsTemplate';
 export { CmsPetReference, type ICmsPetReferenceDocument } from './models/CmsPetReference';
 export { default as CmsHomepageSection, type ICmsHomepageSectionDocument } from './models/CmsHomepageSection';
