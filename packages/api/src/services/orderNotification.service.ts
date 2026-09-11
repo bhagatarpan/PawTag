@@ -5,6 +5,10 @@ import {
   renderRefundProcessingEmail,
   renderRefundSettledEmail,
   renderRefundFailedEmail,
+  renderOrderStatusEmail,
+  renderNewOrderAlertEmail,
+  renderOrderCancelledAlertEmail,
+  renderRefundFailedAlertEmail,
 } from './email/templates';
 import logger from '../lib/logger';
 
@@ -69,38 +73,27 @@ const STATUS_NOTIFICATIONS: Record<string, { title: string; getMessage: (orderNu
 const STATUS_EMAILS: Record<string, { subject: (orderNumber: string) => string; html: (orderNumber: string, extra?: StatusChangeExtra) => string }> = {
   packing: {
     subject: (orderNumber) => `Order ${orderNumber} is being packed`,
-    html: (orderNumber) => `<h2>Order Being Packed</h2><p>Your order <strong>${orderNumber}</strong> is being prepared for shipping.</p>`,
+    html: (orderNumber) => renderOrderStatusEmail({ orderNumber, customerName: 'Customer', status: 'packing', viewOrderUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/orders` }),
   },
   paid: {
     subject: (orderNumber) => `Order ${orderNumber} confirmed`,
-    html: (orderNumber) => `<h2>Order Confirmed</h2><p>Your order <strong>${orderNumber}</strong> has been confirmed and is being processed.</p>`,
+    html: (orderNumber) => renderOrderStatusEmail({ orderNumber, customerName: 'Customer', status: 'paid', viewOrderUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/orders` }),
   },
   shipped: {
     subject: (orderNumber) => `Order ${orderNumber} has shipped`,
-    html: (orderNumber, extra) => {
-      const trackingUrl = getTrackingUrl(extra?.carrier || '', extra?.trackingNumber || '');
-      return `<h2>Order Shipped</h2>
-      <p>Your order <strong>${orderNumber}</strong> has shipped!</p>
-      <p><strong>Carrier:</strong> ${extra?.carrier || 'Courier'}</p>
-      <p><strong>Tracking:</strong> ${extra?.trackingNumber || 'N/A'}</p>
-      ${trackingUrl ? `<p><a href="${trackingUrl}" target="_blank" style="display:inline-block;background-color:#0d9488;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;padding:12px 24px;border-radius:12px;">Track Your Shipment →</a></p>` : ''}`;
-    },
+    html: (orderNumber, extra) => renderOrderStatusEmail({ orderNumber, customerName: 'Customer', status: 'shipped', trackingNumber: extra?.trackingNumber, carrier: extra?.carrier, trackingUrl: getTrackingUrl(extra?.carrier || '', extra?.trackingNumber || ''), viewOrderUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/orders` }),
   },
   delivered: {
     subject: (orderNumber) => `Order ${orderNumber} delivered`,
-    html: (orderNumber) => `<h2>Order Delivered</h2><p>Your order <strong>${orderNumber}</strong> has been delivered.</p>`,
+    html: (orderNumber) => renderOrderStatusEmail({ orderNumber, customerName: 'Customer', status: 'delivered', viewOrderUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/orders` }),
   },
   cancelled: {
     subject: (orderNumber) => `Order ${orderNumber} cancelled`,
-    html: (orderNumber, extra) => `<h2>Order Cancelled</h2>
-      <p>Your order <strong>${orderNumber}</strong> has been cancelled.</p>
-      ${extra?.reason ? `<p><strong>Reason:</strong> ${extra.reason}</p>` : ''}`,
+    html: (orderNumber, extra) => renderOrderStatusEmail({ orderNumber, customerName: 'Customer', status: 'cancelled', reason: extra?.reason, viewOrderUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/orders` }),
   },
   refunded: {
     subject: (orderNumber) => `Order ${orderNumber} refunded`,
-    html: (orderNumber, extra) => `<h2>Order Refunded</h2>
-      <p>Your order <strong>${orderNumber}</strong> has been refunded.</p>
-      ${extra?.reason ? `<p><strong>Reason:</strong> ${extra.reason}</p>` : ''}`,
+    html: (orderNumber, extra) => renderOrderStatusEmail({ orderNumber, customerName: 'Customer', status: 'refunded', reason: extra?.reason, viewOrderUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/orders` }),
   },
 };
 
@@ -221,11 +214,9 @@ export async function notifyCustomerOfStatusChange(
         sendMail(
           adminEmail,
           `Order ${order.orderNumber} ${newStatus}`,
-          `<h2>Order ${newStatus === 'cancelled' ? 'Cancelled' : 'Refunded'}</h2>
-           <p><strong>Order:</strong> ${order.orderNumber}</p>
-           <p><strong>Customer:</strong> ${customerName} (${email})</p>
-           <p><strong>Amount:</strong> $${order.payment?.amount?.toFixed(2) || '0.00'} NZD</p>
-           ${extra?.reason ? `<p><strong>Reason:</strong> ${extra.reason}</p>` : ''}`,
+          newStatus === 'cancelled'
+            ? renderOrderCancelledAlertEmail(order.orderNumber, customerName, email || '', order.payment?.amount || 0, extra?.reason)
+            : renderRefundFailedAlertEmail(order.orderNumber, '', order.payment?.amount || 0, 'NZD', extra?.reason || 'Refund processed', customerName, email || '', ''),
         ).catch((err) => {
           logger.error({ err }, 'Admin cancellation/refund notification email error');
         }),
@@ -356,13 +347,7 @@ export async function notifyRefundUpdate(
         ? sendMail(
             adminEmail,
             `[ACTION REQUIRED] Refund Failed — ${order.orderNumber}`,
-            `<h2>Refund Failed</h2>
-             <p><strong>Order:</strong> ${order.orderNumber}</p>
-             <p><strong>Refund ID:</strong> ${refundId}</p>
-             <p><strong>Amount:</strong> $${amount.toFixed(2)} ${currency}</p>
-             <p><strong>Reason:</strong> ${failureReason || 'Unknown'}</p>
-             <p><strong>Customer:</strong> ${user.fullName} (${user.email})</p>
-             <p><strong>Action needed:</strong> ${(order.refundAttemptCount || 0) < 1 ? 'Auto-retry scheduled in 2h.' : 'Manual intervention required.'}</p>`,
+            renderRefundFailedAlertEmail(order.orderNumber, refundId, amount, currency, failureReason || 'Unknown', user.fullName, user.email, (order.refundAttemptCount || 0) < 1 ? 'Auto-retry scheduled in 2h.' : 'Manual intervention required.'),
           ).catch(() => {})
         : Promise.resolve(),
     ]);
