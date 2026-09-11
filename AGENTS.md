@@ -956,6 +956,7 @@ Enterprise-grade admin portal with a redesigned navigation shell:
 | **Users & Pets** | Customers, Admin Users, Pets |
 | **Communication** | Notifications, Support Requests, Tag Expiry Alerts |
 | **Content (CMS)** | Pages, Homepage, Shop Pages, Auth Pages, Navigation, Footer, Announcements, Onboarding, Email Templates, SMS Templates, Invoice Template, Media, Redirects, Pet References |
+| **Communications** | Email Templates (with business flow, purpose, trigger, versioning), Email Audit (delivery tracking, rendered email snapshots) |
 | **Settings** | Commerce Settings, General Settings, Site Availability, Address Autocomplete |
 | **Security & Access** | Roles & Permissions, Permissions, Permission Groups, Access Scopes, Audit Trail, Audit Settings |
 | **Operations** | Feature Flags, Webhooks, System Logs, Log Settings, Statistics, Write NFC Tag |
@@ -1143,13 +1144,51 @@ Triggers on push/PR to `main` and `develop`. **6 jobs:**
 6. Build All Packages (15 min timeout)
 7. Test Coverage (main branch only, depends on smoke+unit+regression)
 
-### Email Templates (13)
+### Email Templates & Communications Centre
 
-Located in `packages/api/src/services/email/templates/`:
+PawTag has a centralised Email Communications Centre for managing all email templates and tracking email delivery.
+
+#### Architecture
+
+```
+COMMUNICATIONS (Admin Sidebar)
+├── Email Templates    — "What CAN/SHOULD PawTag send?"
+│   ├── Business Flow grouping (Account, Pet, Lost/Found, Orders, Subscriptions, Loyalty, Referrals, Admin)
+│   ├── Template metadata (purpose, trigger, recipient, email type)
+│   ├── Variable system with definitions (key, label, type, example, required, source)
+│   ├── Version history (immutable snapshots)
+│   ├── Preview & test send
+│   └── Status management (active, draft, inactive, archived)
+│
+└── Email Audit        — "What DID PawTag actually send?"
+    ├── Searchable audit records
+    ├── Rendered email snapshot (preserved at send time)
+    ├── Variable snapshot (resolved values)
+    ├── Delivery timeline (sent → delivered → opened → clicked)
+    ├── Technical details (provider message ID, response)
+    └── Related business records (customer, order, subscription, pet)
+```
+
+#### Email Provider
+- **Provider:** Resend (`resend@6.18.1`)
+- **Production sender:** `no-reply@pawtag.co.nz`
+- **Dev sender:** `onboarding@resend.dev` (Resend test domain)
+- **Webhook:** `POST /api/webhooks/resend` for delivery tracking
+
+#### Template System
+- **CMS Override:** Every `send*Email()` function first tries `renderCmsEmail(slug, vars)` — if an active CMS template exists, it's used; otherwise falls back to TypeScript renderer
+- **Template files:** `packages/api/src/services/email/templates/` (23 renderer functions)
+- **CMS model:** `CmsEmailTemplate` with enhanced fields (businessFlow, purpose, trigger, version, variableDefinitions)
+- **Versioning:** Every template edit creates an immutable `EmailTemplateVersion` record
+- **Audit:** Every email send creates an `EmailAudit` record (fire-and-forget)
+
+#### Email Templates (23 structured + 13 inline)
+
+**Structured templates** in `packages/api/src/services/email/templates/`:
 - `welcome.ts` — Welcome email
 - `verification-email.ts` — Email verification link
 - `mfa-otp.ts` — MFA OTP code
-- `phone-otp.ts` — Phone OTP code
+- `phone-otp.ts` — Phone OTP code (SMS, not email)
 - `password-reset.ts` — Password reset link
 - `password-changed.ts` — Password change confirmation
 - `login-notification.ts` — New login alert
@@ -1160,8 +1199,40 @@ Located in `packages/api/src/services/email/templates/`:
 - `refund-processing.ts` — Refund initiated (status: pending)
 - `refund-settled.ts` — Refund settled (status: succeeded, includes ARN)
 - `refund-failed.ts` — Refund failed (with retry info)
+- `guardian-welcome.ts` — Guardian loyalty welcome
+- `guardian-tier-upgrade.ts` — Tier upgrade celebration
+- `guardian-birthday.ts` — Pet birthday
+- `guardian-monthly-summary.ts` — Monthly activity summary
+- `guardian-pawrewards-reminder.ts` — PawRewards expiration warning
+- `guardian-anniversary.ts` — Adoption anniversary
+- `guardian-renewal-reminder.ts` — Membership renewal reminder
+- `guardian-purchase-points.ts` — Post-purchase points
+- `gold-welcome.ts` — Gold membership welcome
 - `base.ts` — Base email wrapper
 - `index.ts` — Template registry
+
+**Inline emails** (in service files, to be migrated):
+- Subscription welcome, invoice OTP, order status (6 variants), admin alerts, referral reward, tier downgrade, pet milestones, emergency escalation, generic notification
+
+#### Email Audit & Delivery
+- **Model:** `EmailAudit` with TTL index (1 year retention)
+- **Recording:** `recordEmailAudit()` called from `sendMail()` — fire-and-forget
+- **Webhook:** Resend webhooks update delivery status (delivered, bounced, complained, opened, clicked)
+- **Snapshots:** Rendered HTML and variable values preserved at send time
+
+#### Admin API Routes
+- `GET /api/admin/communications/dashboard` — Dashboard metrics
+- `GET /api/admin/communications/templates` — List templates with filters
+- `GET /api/admin/communications/templates/:id` — Template detail
+- `PUT /api/admin/communications/templates/:id` — Update template (creates version)
+- `GET /api/admin/communications/templates/:id/versions` — Version history
+- `POST /api/admin/communications/templates/:id/send-test` — Send test email
+- `GET /api/admin/communications/audit` — List audit records
+- `GET /api/admin/communications/audit/:id` — Audit detail
+
+#### RBAC Permissions
+- `communication.email_audit.read` — View email audit records
+- `communication.email_template.send_test` — Send test emails
 
 ### Mobile App (Maestro E2E Tests)
 

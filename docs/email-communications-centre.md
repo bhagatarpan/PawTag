@@ -83,7 +83,32 @@
 
 ## Completed Phases
 
-*None yet — implementation starting.*
+### Phase 1: Foundation & Data Model (Backend) ✅
+- Extended CmsEmailTemplate with businessFlow, purpose, trigger, emailType, version, variableDefinitions
+- Created EmailTemplateVersion model for immutable version snapshots
+- Created EmailAudit model for email delivery tracking with TTL index
+- Added Resend webhook endpoint for delivery status callbacks
+- Integrated email audit recording into sendMail (fire-and-forget)
+- Added communications admin routes (dashboard, templates CRUD, versions, audit)
+- Added RBAC permissions: communication.email_audit.read, communication.email_template.send_test
+- Registered communications API endpoints in shared endpoint constants
+
+### Phase 2: Admin Email Template Centre (Frontend) ✅
+- Added Communications section to admin sidebar (Email Templates + Email Audit)
+- Created Email Templates list page with dashboard metrics, search, filters
+- Created Email Template detail page with editing, version history, test send
+- Created Email Audit list page with search, date range filters, pagination
+- Created Email Audit detail page with rendered email preview, delivery timeline
+
+### Phase 3: Email Audit Library (Frontend + Backend) ✅
+- Implemented as part of Phase 2 (audit pages included)
+- Audit list with search, status/flow/date filters
+- Audit detail with rendered email preview, delivery timeline, variable snapshot, technical details
+
+### Phase 4: Migration & Cleanup (Partial) ✅
+- Updated all 8 seeded email templates with Communications Centre metadata
+- Added businessFlow, purpose, trigger, recipient, emailType, isCritical, variableDefinitions
+- Remaining inline email migration deferred to future phase (13 inline emails)
 
 ---
 
