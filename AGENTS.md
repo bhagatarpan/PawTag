@@ -415,7 +415,7 @@ PawTag/
 │   ├── coding-practice/SKILL.md 
 │   ├── api-architecture/SKILL.md
 ├── apps/
-│   ├── admin/       → Admin portal (port 3001) - 44 pages, god-mode CRUD
+│   ├── admin/       → Admin portal (port 3001) - 44 pages, god-mode CRUD, redesigned shell (Sidebar, TopBar, Breadcrumb, PageHeader, MobileSidebar)
 │   ├── web/         → Public site, shop, auth & customer portal (port 3000) - 31 pages
 │   ├── finder/      → Finder portal (port 3003) - 10 purpose-built components
 │   └── mobile/      → React Native (Expo) app - 14 screens, Maestro E2E tests
@@ -931,17 +931,17 @@ Address autocomplete with configurable provider (Photon or NZ Post):
 - **Integration:** Used in Checkout, Profile, OnboardingWizard, Admin Users pages
 - **System logging:** All requests logged via `writeLog()` with INTEGRATION category
 
-### Admin Portal Sidebar
+### Admin Portal Shell & Navigation
 
-Enterprise-grade sidebar with collapsible sections and dark/light mode:
+Enterprise-grade admin portal with a redesigned navigation shell:
 
-- **Sections:** 13 logical groups (Overview, Catalog, Inventory, Orders & Fulfilment, Payments & Refunds, Subscriptions & Loyalty, Discounts & Promotions, Users & Pets, Communication, Content (CMS), Settings, Security & Access, Operations)
-- **Collapsible:** Click section header to expand/collapse, state persists in localStorage
-- **Theme toggle:** Sun/Moon icon in sidebar header, persists in localStorage
-- **Active state:** Section auto-expands when child route is active
-- **Badges:** Notification unread count, Support request count
-- **Items:** Sorted alphabetically within each section
-- **Files:** `apps/admin/src/components/Sidebar.tsx`, `apps/admin/src/hooks/useTheme.ts`, `apps/admin/src/hooks/useSidebarCollapse.ts`
+- **Sidebar:** Deep PawTag teal (primary-900) background, collapsible to icon-only (72px) with tooltips, 3-level navigation hierarchy, category-colored icons, auto-expand active route ancestors, Guardian Rewards shortcut pinned at bottom
+- **Top Bar:** Global search bar, notification bell with unread badge, user dropdown with avatar/name/role
+- **Breadcrumbs:** Route-based, auto-generated, reusable `Breadcrumb` component
+- **Page Headers:** Modernized per-page headers with consistent layout
+- **Mobile:** Off-canvas drawer sidebar with backdrop overlay, responsive breakpoints
+- **Theme:** Dark/light mode toggle with localStorage persistence
+- **Files:** `apps/admin/src/components/Sidebar.tsx` (redesigned), `apps/admin/src/components/TopBar.tsx` (new), `apps/admin/src/components/Breadcrumb.tsx` (new), `apps/admin/src/components/PageHeader.tsx` (new), `apps/admin/src/components/MobileSidebar.tsx` (new), `apps/admin/src/hooks/useTheme.ts`, `apps/admin/src/hooks/useSidebarCollapse.ts`
 
 **Sidebar Structure:**
 | Section | Items |

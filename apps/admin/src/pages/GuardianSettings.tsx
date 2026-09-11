@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { Shield } from 'lucide-react';
 import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
+import PageHeader from '../components/PageHeader';
 
 interface GuardianSettings {
   // Points earning rates (purchaseRate points earned per purchaseSpentAmount dollars spent)
@@ -170,28 +172,28 @@ export default function GuardianSettings() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Guardian Settings</h1>
-          <p className="text-gray-500">Configure Guardian loyalty program settings</p>
-        </div>
-        <div className="flex gap-3">
-          <Link
-            to="/guardian"
-            className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            Back to Dashboard
-          </Link>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
-          >
-            {saving ? 'Saving...' : 'Save Settings'}
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        icon={<Shield size={20} className="text-primary-600" />}
+        title="Guardian Settings"
+        subtitle="Configure Guardian loyalty program settings"
+        actions={
+          <>
+            <Link
+              to="/guardian"
+              className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              Back to Dashboard
+            </Link>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
+            >
+              {saving ? 'Saving...' : 'Save Settings'}
+            </button>
+          </>
+        }
+      />
 
       {/* Success/Error Messages */}
       {success && (

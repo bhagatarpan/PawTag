@@ -922,6 +922,16 @@ The Admin Portal is the operational control centre of the application. It provid
 - Dark/light mode toggle with persistence
 - Cart settings management (TTL, max items, price revalidation toggle)
 
+### Admin Portal Shell (Redesigned)
+
+The admin portal shell was redesigned for a modern enterprise SaaS experience:
+
+- **Sidebar:** Deep PawTag teal background, collapsible to icon-only mode (72px) with tooltips, 3-level navigation hierarchy with category-colored icons, Guardian Rewards quick-access card pinned at bottom
+- **Top Bar:** Global search, notification bell with unread count badge, user dropdown menu
+- **Breadcrumbs:** Auto-generated from route, reusable component
+- **Page Headers:** Consistent layout across all admin pages
+- **Mobile:** Off-canvas drawer with backdrop overlay, fully responsive
+
 ---
 
 ## PuckEditor CMS Page Builder

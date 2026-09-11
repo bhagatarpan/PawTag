@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
-import { Users, PawPrint, QrCode, ShoppingBag, AlertTriangle, Activity, TrendingUp, Package, Repeat } from 'lucide-react';
+import { Users, PawPrint, QrCode, ShoppingBag, AlertTriangle, Activity, TrendingUp, Package, Repeat, LayoutDashboard } from 'lucide-react';
+import PageHeader from '../components/PageHeader';
 
 interface AnalyticsData {
   revenue: { today: number; thisWeek: number; thisMonth: number };
@@ -48,7 +49,11 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+      <PageHeader
+        icon={<LayoutDashboard size={20} className="text-primary-600" />}
+        title="Dashboard"
+        subtitle="Overview of your PawTag operations"
+      />
 
       {/* Revenue Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

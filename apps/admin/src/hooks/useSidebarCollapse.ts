@@ -1,18 +1,37 @@
 import { useState, useEffect, useCallback } from 'react';
 
-const STORAGE_KEY = 'pawtag-admin-sidebar-collapsed';
+const SIDEBAR_KEY = 'pawtag-admin-sidebar-collapsed';
+const SECTIONS_KEY = 'pawtag-admin-sidebar-sections';
 
-function getInitialCollapsed(): string[] {
+function getInitialSidebarCollapsed(): boolean {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
+    const stored = localStorage.getItem(SIDEBAR_KEY);
+    if (stored !== null) return stored === 'true';
+  } catch {}
+  return false;
+}
+
+function getInitialCollapsedSections(): string[] {
+  try {
+    const stored = localStorage.getItem(SECTIONS_KEY);
     if (stored) return JSON.parse(stored);
   } catch {}
-  // Default: all sections expanded except Operations
   return ['operations'];
 }
 
 export function useSidebarCollapse() {
-  const [collapsedSections, setCollapsedSections] = useState<string[]>(getInitialCollapsed);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(getInitialSidebarCollapsed);
+  const [collapsedSections, setCollapsedSections] = useState<string[]>(getInitialCollapsedSections);
+
+  const toggleSidebar = useCallback(() => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(SIDEBAR_KEY, String(next));
+      } catch {}
+      return next;
+    });
+  }, []);
 
   const toggleSection = useCallback((sectionId: string) => {
     setCollapsedSections((prev) => {
@@ -20,28 +39,34 @@ export function useSidebarCollapse() {
         ? prev.filter((id) => id !== sectionId)
         : [...prev, sectionId];
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+        localStorage.setItem(SECTIONS_KEY, JSON.stringify(next));
       } catch {}
       return next;
     });
   }, []);
 
-  const isCollapsed = useCallback(
+  const isSectionCollapsed = useCallback(
     (sectionId: string) => collapsedSections.includes(sectionId),
     [collapsedSections],
   );
 
-  // Auto-expand section containing active route
   const expandSection = useCallback((sectionId: string) => {
     setCollapsedSections((prev) => {
       if (!prev.includes(sectionId)) return prev;
       const next = prev.filter((id) => id !== sectionId);
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+        localStorage.setItem(SECTIONS_KEY, JSON.stringify(next));
       } catch {}
       return next;
     });
   }, []);
 
-  return { collapsedSections, toggleSection, isCollapsed, expandSection };
+  return {
+    sidebarCollapsed,
+    toggleSidebar,
+    collapsedSections,
+    toggleSection,
+    isSectionCollapsed,
+    expandSection,
+  };
 }
