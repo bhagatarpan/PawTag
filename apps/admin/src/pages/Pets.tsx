@@ -1204,7 +1204,7 @@ export default function Pets() {
               const mainPhoto = pet.photos && pet.photos.length > 0 ? (pet.photos.find((p) => p.isMain) || pet.photos[0])?.url : pet.photoUrl;
                   const genderLabel = pet.gender === 'male' ? 'Male' : pet.gender === 'female' ? 'Female' : 'Unknown';
                   return (
-                    <tr key={pet._id} className="hover:bg-gray-50 cursor-pointer transition-colors" onClick={() => setSelectedPet(pet)}>
+                    <tr key={pet._id} className="group hover:bg-gray-50 cursor-pointer transition-colors" onClick={() => setSelectedPet(pet)}>
                       <td className="px-4 py-3">
                         {mainPhoto ? (
                           <img src={mainPhoto} alt="" className="w-8 h-8 rounded-full object-cover border" onError={(e) => { (e.target as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><rect width="32" height="32" fill="%23f3f4f6" rx="16"/><text x="16" y="19" text-anchor="middle" fill="%239ca3af" font-size="9">?</text></svg>'; }} />
@@ -1215,9 +1215,19 @@ export default function Pets() {
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-gray-900">{pet.name}</span>
+                          <button onClick={(e) => { e.stopPropagation(); copyToClipboard(pet.name); }} className="text-gray-400 hover:text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity" title="Copy name">
+                            <Copy size={12} />
+                          </button>
                           {pet.photos && pet.photos.length > 1 && <span className="text-gray-400 text-xs">({pet.photos.length})</span>}
                         </div>
-                        {pet.petId && <span className="text-xs font-mono text-gray-400">{pet.petId}</span>}
+                        {pet.petId && (
+                          <span className="flex items-center gap-1">
+                            <span className="text-xs font-mono text-gray-400">{pet.petId}</span>
+                            <button onClick={(e) => { e.stopPropagation(); copyToClipboard(pet.petId!); }} className="text-gray-400 hover:text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity" title="Copy Pet ID">
+                              <Copy size={10} />
+                            </button>
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <span className="text-sm text-gray-600">{pet.petType}</span>
@@ -1228,6 +1238,9 @@ export default function Pets() {
                         {pet.linkedTag ? (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-mono rounded bg-primary-50 text-primary-700 border border-primary-200">
                             {pet.linkedTag.tagId}
+                            <button onClick={(e) => { e.stopPropagation(); copyToClipboard(pet.linkedTag!.tagId); }} className="text-primary-400 hover:text-primary-600" title="Copy Tag ID">
+                              <Copy size={10} />
+                            </button>
                             <span className={`w-1.5 h-1.5 rounded-full ${pet.linkedTag.status === 'active' ? 'bg-green-500' : pet.linkedTag.status === 'lost' ? 'bg-red-500' : 'bg-gray-400'}`} />
                           </span>
                         ) : <span className="text-gray-300 text-xs">No tag</span>}

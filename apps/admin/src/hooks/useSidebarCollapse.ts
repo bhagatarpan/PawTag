@@ -1,14 +1,20 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 
 const SIDEBAR_KEY = 'pawtag-admin-sidebar-collapsed';
 const SECTIONS_KEY = 'pawtag-admin-sidebar-sections';
+
+const ALL_SECTION_IDS = [
+  'overview', 'catalog', 'inventory', 'orders', 'payments',
+  'tag-subscriptions', 'guardian-loyalty', 'discounts', 'users',
+  'communication', 'content', 'settings', 'security', 'operations',
+];
 
 function getInitialSidebarCollapsed(): boolean {
   try {
     const stored = localStorage.getItem(SIDEBAR_KEY);
     if (stored !== null) return stored === 'true';
   } catch {}
-  return false;
+  return true;
 }
 
 function getInitialCollapsedSections(): string[] {
@@ -16,7 +22,7 @@ function getInitialCollapsedSections(): string[] {
     const stored = localStorage.getItem(SECTIONS_KEY);
     if (stored) return JSON.parse(stored);
   } catch {}
-  return ['operations'];
+  return [...ALL_SECTION_IDS];
 }
 
 export function useSidebarCollapse() {
@@ -61,6 +67,20 @@ export function useSidebarCollapse() {
     });
   }, []);
 
+  const expandAllSections = useCallback(() => {
+    setCollapsedSections([]);
+    try {
+      localStorage.setItem(SECTIONS_KEY, JSON.stringify([]));
+    } catch {}
+  }, []);
+
+  const collapseAllSections = useCallback(() => {
+    setCollapsedSections([...ALL_SECTION_IDS]);
+    try {
+      localStorage.setItem(SECTIONS_KEY, JSON.stringify(ALL_SECTION_IDS));
+    } catch {}
+  }, []);
+
   return {
     sidebarCollapsed,
     toggleSidebar,
@@ -68,5 +88,7 @@ export function useSidebarCollapse() {
     toggleSection,
     isSectionCollapsed,
     expandSection,
+    expandAllSections,
+    collapseAllSections,
   };
 }

@@ -55,6 +55,8 @@ import {
   Moon,
   ChevronsLeft,
   ChevronsRight,
+  ChevronsDown,
+  ChevronsUp,
 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { useTheme } from '../hooks/useTheme';
@@ -300,6 +302,8 @@ export default function Sidebar({ mobile, onClose }: SidebarContentProps & { mob
     isSectionCollapsed,
     toggleSection,
     expandSection,
+    expandAllSections,
+    collapseAllSections,
   } = useSidebarCollapse();
   const location = useLocation();
   const [unreadCount, setUnreadCount] = useState(0);
@@ -398,13 +402,39 @@ export default function Sidebar({ mobile, onClose }: SidebarContentProps & { mob
         )}
 
         {!mobile && (
-          <button
-            onClick={toggleSidebar}
-            className={`p-1.5 rounded-lg hover:bg-white/10 text-gray-400 hover:text-white transition-colors duration-150 ${collapsed ? 'hidden' : ''}`}
-            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          >
-            <ChevronsLeft size={18} />
-          </button>
+          collapsed ? (
+            <button
+              onClick={toggleSidebar}
+              className="p-1.5 rounded-lg hover:bg-white/10 text-gray-400 hover:text-white transition-colors duration-150"
+              title="Expand sidebar"
+            >
+              <ChevronsRight size={18} />
+            </button>
+          ) : (
+            <div className="flex items-center gap-0.5">
+              <button
+                onClick={expandAllSections}
+                className="p-1.5 rounded-lg hover:bg-white/10 text-gray-400 hover:text-white transition-colors duration-150"
+                title="Expand all sections"
+              >
+                <ChevronsDown size={16} />
+              </button>
+              <button
+                onClick={collapseAllSections}
+                className="p-1.5 rounded-lg hover:bg-white/10 text-gray-400 hover:text-white transition-colors duration-150"
+                title="Collapse all sections"
+              >
+                <ChevronsUp size={16} />
+              </button>
+              <button
+                onClick={toggleSidebar}
+                className="p-1.5 rounded-lg hover:bg-white/10 text-gray-400 hover:text-white transition-colors duration-150"
+                title="Collapse sidebar"
+              >
+                <ChevronsLeft size={16} />
+              </button>
+            </div>
+          )
         )}
 
         {mobile && (
@@ -450,11 +480,12 @@ export default function Sidebar({ mobile, onClose }: SidebarContentProps & { mob
                       }}
                       onMouseLeave={handleMouseLeave}
                     >
-                      <div className="ml-2 bg-gray-900 rounded-xl shadow-xl border border-white/10 py-1 min-w-[200px]">
+                      <div className="ml-2 bg-gray-900 rounded-xl shadow-xl border border-white/10 min-w-[200px]">
                         <div className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-gray-500">
                           {section.label}
                         </div>
-                        {section.links.map((link) => (
+                        <div className="bg-white/[0.05] rounded-lg mx-1 mb-1 py-0.5">
+                          {section.links.map((link) => (
                           <NavLink
                             key={link.to}
                             to={link.to}
@@ -476,7 +507,8 @@ export default function Sidebar({ mobile, onClose }: SidebarContentProps & { mob
                               </span>
                             )}
                           </NavLink>
-                        ))}
+                          ))}
+                        </div>
                       </div>
                     </div>
                   </Tooltip>
@@ -492,9 +524,9 @@ export default function Sidebar({ mobile, onClose }: SidebarContentProps & { mob
                     `}
                   >
                     {sectionCollapsedState ? (
-                      <ChevronRight size={14} className="text-gray-500 flex-shrink-0" />
+                      <ChevronRight size={14} className="text-gray-300 flex-shrink-0" />
                     ) : (
-                      <ChevronDown size={14} className="text-gray-500 flex-shrink-0" />
+                      <ChevronDown size={14} className="text-gray-300 flex-shrink-0" />
                     )}
                     <section.icon size={14} className={`${section.color} flex-shrink-0`} />
                     <span className="truncate">{section.label}</span>
@@ -502,7 +534,7 @@ export default function Sidebar({ mobile, onClose }: SidebarContentProps & { mob
 
                   {/* Section Links */}
                   {!sectionCollapsedState && (
-                    <div className="mt-0.5 space-y-0.5">
+                    <div className="mt-0.5 space-y-0.5 bg-white/[0.04] rounded-lg mx-1 py-1">
                       {section.links.map((link) => (
                         link.external ? (
                           <a
