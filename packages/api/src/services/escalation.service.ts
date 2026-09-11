@@ -1,5 +1,6 @@
 import { EscalationRecord, User, Notification, Setting } from '@pawtag/db';
 import { sendMail } from './email.service';
+import { renderEmergencyEscalationEmail } from './email/templates';
 import { sendPushToUser } from './push-notification.service';
 import logger from '../lib/logger';
 import { logJob } from '../lib/timing';
@@ -126,35 +127,15 @@ async function processEscalation(record: any): Promise<void> {
     // Send email to emergency contact
     if (ec.email) {
       const emailSubject = `Urgent: ${ownerName}'s pet ${petName} was found - action needed`;
-      const emailHtml = `
-        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <div style="background: linear-gradient(135deg, #dc2626, #ef4444); padding: 24px; border-radius: 12px 12px 0 0; text-align: center;">
-            <h1 style="color: white; font-size: 24px; margin: 0;">PawTag Emergency Contact</h1>
-          </div>
-          <div style="background: #f9fafb; padding: 24px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
-            <h2 style="color: #111827; margin: 0 0 16px;">${ownerName}'s pet ${petName} was found</h2>
-            <p style="color: #374151; line-height: 1.6;">
-              ${ownerName} registered you as their emergency contact. Someone found their pet <strong>${petName}</strong> (${tag?.tagId || 'N/A'}), 
-              but ${ownerName} hasn't responded to the notification yet.
-            </p>
-            <p style="color: #374151; line-height: 1.6;">
-              Please try to reach ${ownerName} directly to let them know their pet has been found.
-            </p>
-            ${record.finderName || record.finderPhone ? `
-              <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 16px; margin: 16px 0;">
-                <p style="color: #1e40af; font-weight: 600; margin: 0 0 8px;">Finder Contact Details:</p>
-                ${record.finderName ? `<p style="color: #374151; margin: 4px 0;">Name: ${record.finderName}</p>` : ''}
-                ${record.finderPhone ? `<p style="color: #374151; margin: 4px 0;">Phone: ${record.finderPhone}</p>` : ''}
-                ${record.finderEmail ? `<p style="color: #374151; margin: 4px 0;">Email: ${record.finderEmail}</p>` : ''}
-              </div>
-            ` : ''}
-            <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/account" 
-               style="display: inline-block; background: #dc2626; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; margin-top: 16px;">
-              View Details
-            </a>
-          </div>
-        </div>
-      `;
+      const emailHtml = renderEmergencyEscalationEmail({
+        ownerName,
+        petName,
+        tagId: tag?.tagId || 'N/A',
+        finderName: record.finderName,
+        finderPhone: record.finderPhone,
+        finderEmail: record.finderEmail,
+        viewDetailsUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account`,
+      });
 
       await sendMail(ec.email, emailSubject, emailHtml).catch(() => {});
     }
