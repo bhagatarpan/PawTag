@@ -152,8 +152,8 @@ function FinderPage() {
           <div className="px-6 pb-6 space-y-3">
             {foundTimer && <FoundTimer timer={foundTimer} />}
 
-            {/* Location and notify actions — blocked during maintenance */}
-            {!isMaintenance && !notified && !foundTimer?.active && (
+            {/* Location and notify actions — blocked during maintenance or safe pet masking */}
+            {!isMaintenance && !notified && !foundTimer?.active && !data.safePetMasking && (
               <LocationConsentBanner
                 consent={locationConsent}
                 hasLocation={!!finderLocation}
@@ -162,7 +162,7 @@ function FinderPage() {
               />
             )}
 
-            {!isMaintenance && !notified && !foundTimer?.active ? (
+            {!isMaintenance && !notified && !foundTimer?.active && !data.safePetMasking ? (
               <NotifyOwnerForm
                 tagId={tagId!}
                 location={finderLocation}
@@ -178,9 +178,13 @@ function FinderPage() {
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center text-gray-500 text-sm">
                 Actions are temporarily unavailable during maintenance.
               </div>
+            ) : data.safePetMasking ? (
+              <div className="bg-primary-50 border border-primary-200 rounded-lg p-4 text-center text-primary-700 text-sm">
+                This pet is safe and with its owner. No action needed.
+              </div>
             ) : null}
 
-            {data.ownerPhone && (
+            {data.ownerPhone && !data.safePetMasking && (
               <a
                 href={`tel:${data.ownerPhone}`}
                 className="block w-full border border-gray-300 text-gray-700 py-3 rounded-lg font-medium text-center hover:bg-gray-50 transition-colors"

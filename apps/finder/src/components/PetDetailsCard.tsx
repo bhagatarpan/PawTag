@@ -122,22 +122,22 @@ export default function PetDetailsCard({ data }: PetDetailsCardProps) {
           )}
         </div>
 
-        {/* Owner */}
-        <div className="mt-4 p-3 bg-purple-50 rounded-xl border border-purple-200">
-          <div className="flex items-center gap-2 mb-1">
-            <User size={16} className="text-purple-600" />
-            <span className="text-sm font-semibold text-purple-800">Owner</span>
+        {/* Owner — hidden when masked (safe pet in production) */}
+        {(data.ownerName || data.ownerLocation) && (
+          <div className="mt-4 p-3 bg-purple-50 rounded-xl border border-purple-200">
+            <div className="flex items-center gap-2 mb-1">
+              <User size={16} className="text-purple-600" />
+              <span className="text-sm font-semibold text-purple-800">Owner</span>
+            </div>
+            <p className="text-sm text-purple-700">
+              {data.ownerName
+                ? data.ownerLocation
+                  ? `${data.ownerName}, ${data.ownerLocation}`
+                  : data.ownerName
+                : data.ownerLocation}
+            </p>
           </div>
-          <p className="text-sm text-purple-700">
-            {data.ownerName
-              ? data.ownerLocation
-                ? `${data.ownerName}, ${data.ownerLocation}`
-                : data.ownerName
-              : data.ownerLocation
-                ? `Owner opted not to share their name; ${data.ownerLocation}`
-                : 'Owner opted not to share their name'}
-          </p>
-        </div>
+        )}
       </div>
 
       {/* Vaccinations */}

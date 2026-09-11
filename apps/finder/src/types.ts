@@ -50,6 +50,7 @@ export interface FinderData {
   ownerName: string | null;
   ownerLocation: string | null;
   ownerPhone?: string;
+  safePetMasking?: boolean;
 }
 
 export interface FoundTimerData {

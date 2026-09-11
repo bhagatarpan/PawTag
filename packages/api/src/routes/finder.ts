@@ -236,18 +236,28 @@ router.get('/:tagId', async (req: Request, res: Response) => {
     const ownerShowName = owner.showOwnerNameInFinder !== false; // default true
     const showOwnerName = adminShowName && ownerShowName;
 
-    // Build owner info based on privacy settings
+    // Status-based mask — safe pets don't expose owner info in production
+    const isDev = process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
+    const isSafe = pet.status === 'safe';
+    const maskOwner = isSafe && !isDev;
+
+    // Build owner info based on privacy settings and pet status
     let ownerName: string | null = null;
     let ownerLocation: string | null = null;
-    if (showOwnerName) {
-      ownerName = owner.fullName;
-      if (owner.address?.city) {
+    let ownerPhone: string | null = null;
+
+    if (!maskOwner) {
+      if (showOwnerName) {
+        ownerName = owner.fullName;
+        ownerPhone = owner.phone;
+        if (owner.address?.city) {
+          const parts = [owner.address.line2, owner.address.city].filter(Boolean);
+          ownerLocation = parts.join(', ');
+        }
+      } else if (owner.address?.city) {
         const parts = [owner.address.line2, owner.address.city].filter(Boolean);
-        ownerLocation = parts.join(', ');
+        ownerLocation = `located in ${parts.join(', ')}`;
       }
-    } else if (owner.address?.city) {
-      const parts = [owner.address.line2, owner.address.city].filter(Boolean);
-      ownerLocation = `located in ${parts.join(', ')}`;
     }
 
     res.json({
@@ -277,7 +287,8 @@ router.get('/:tagId', async (req: Request, res: Response) => {
         subscriptionStatus: tag.subscriptionStatus || 'none',
         ownerName,
         ownerLocation,
-        ownerPhone: showOwnerName ? owner.phone : null,
+        ownerPhone,
+        safePetMasking: maskOwner,
       },
     });
 
@@ -361,6 +372,13 @@ router.post('/:tagId/notify', finderNotifyLimiter, requireCaptcha, async (req: R
 
     const pet = tag.petId as any;
     const owner = tag.ownerId as any;
+
+    // Block notify for safe pets in production
+    const isDevNotify = process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
+    if (pet && pet.status === 'safe' && !isDevNotify) {
+      res.status(400).json({ success: false, error: 'This pet is safe and does not need assistance.' });
+      return;
+    }
 
     // Update scan record with finder contact details
     const scan = await FinderScan.findOne({ tagId: tag._id }).sort({ createdAt: -1 }) as any;
