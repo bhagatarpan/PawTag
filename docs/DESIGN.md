@@ -565,83 +565,771 @@ Use the existing `StatusBadge` component from `@pawtag/ui` to display the curren
 
 ## Admin Portal Design System
 
-### Sidebar Navigation
+The PawTag Admin Portal uses a **modern enterprise SaaS administration pattern** while retaining PawTag's warm, trustworthy brand identity.
 
-The admin sidebar is the primary navigation control. It uses a collapsible section pattern with 8 logical groups.
+The approved direction combines:
+- A **dark PawTag teal sidebar** for strong navigation hierarchy and brand recognition.
+- A **clean white/light-gray workspace** for high-density administrative content.
+- A **persistent top utility bar** containing global search and the authenticated administrator.
+- **Breadcrumb navigation** above page content.
+- **Hierarchical navigation** supporting parent items, children, and deeper sub-children.
+- Restrained use of **semantic/icon colors** to improve scanability without making the UI playful.
+- Clear active states, generous spacing, and predictable interaction patterns.
 
-#### Section Structure
+The admin portal should feel comparable to a high-quality modern enterprise SaaS product, not a generic template or a consumer dashboard.
 
-| Section | Purpose | Items |
-|---------|---------|-------|
-| **Overview** | Dashboard and analytics | Dashboard, Statistics |
-| **Business** | Core business operations | Orders, Products, Pets, Subscriptions, Tags, Users |
-| **Communication** | User engagement | Notifications, Support Requests, Referrals, Tag Expiry Alerts |
-| **Content** | CMS management | 13 CMS items (Announcements, Pages, Templates, etc.) |
-| **Settings** | System configuration | Address Autocomplete, Feature Flags, General Settings, Pet References, Site Availability |
-| **Security** | Access control and audit | Access Scopes, Audit Settings, Audit Trail, Permission Groups, Roles & Permissions |
-| **Operations** | Technical operations | System Log Settings, System Logs, Write NFC Tag |
+### Admin Visual Principles
 
-#### Behavior Rules
+1. **Navigation is dark; workspace is light.**
+   - Sidebar: deep PawTag teal.
+   - Main workspace: `gray-50` / white.
+   - Cards: white with subtle borders and restrained shadows.
 
-- **Collapsible sections:** Click section header to expand/collapse
-- **Chevron indicators:** `ChevronRight` (collapsed) / `ChevronDown` (expanded)
-- **Collapse persistence:** State saved in `localStorage` key: `pawtag-admin-sidebar-collapsed`
-- **Active section auto-expand:** Section containing active route auto-expands on navigation
-- **ASC ordering:** Items sorted alphabetically within each section
-- **Badges:** Notification count (red), Support request count (red)
+2. **PawTag teal remains the primary action color.**
+   - Primary buttons, active navigation, focus states, links and important indicators use the existing `primary-*` tokens.
+   - Do not introduce a new brand color.
 
-#### Theme Support
+3. **Use color to communicate meaning, not decoration.**
+   - Navigation icons may use restrained semantic colors where useful.
+   - Avoid rainbow-colored navigation.
+   - Icon color should reinforce category recognition while text remains neutral/white.
 
-The sidebar supports dark and light modes:
+4. **Information hierarchy must be obvious.**
+   - Brand → navigation → breadcrumb → page title → actions → content.
+   - Avoid visually competing elements.
 
-| Element | Dark Mode (default) | Light Mode |
-|---------|---------------------|------------|
-| Background | `gray-900` | `white` |
-| Link text | `gray-300` | `gray-600` |
-| Link hover | `gray-800` bg, `white` text | `gray-50` bg, `gray-900` text |
-| Active link | `primary-600` bg, `white` text | `primary-50` bg, `primary-700` text |
-| Section header | `gray-500` text | `gray-400` text |
-| Section hover | `gray-800` bg (dark), `gray-50` bg (light) | — |
-| Chevron/icon | `gray-500` (dark), `gray-400` (light) | — |
-| Border | `gray-700` | `gray-200` |
-| Footer | `gray-500` text, `gray-700` border | `gray-40` text, `gray-200` border |
+5. **Enterprise density without visual clutter.**
+   - Admin screens may be denser than customer-facing screens.
+   - Keep controls aligned, labels readable, and groups clearly separated.
+   - Prefer whitespace and hierarchy over heavy borders.
 
-**Theme toggle:** Sun/Moon icon button in sidebar header (top-right)
-**Persistence:** `localStorage` key: `pawtag-admin-sidebar-theme`
-**Default:** Dark
-
-#### Active State Styling
-
-When a link is active:
-- Background: `primary-600` (dark) / `primary-50` (light)
-- Text: `white` (dark) / `primary-700` (light)
-- Icon: `white` (dark) / `primary-600` (light)
-
-#### Layout Structure
-
-```
-┌─────────────────────────────────────────┐
-│ PawTag Admin Portal          [Sun/Moon] │  ← Header
-├─────────────────────────────────────────┤
-│ ▸ Overview                              │
-│ ▾ Business                              │  ← Collapsible sections
-│     Orders                              │
-│     Products                            │
-│     Pets                                │
-│     Subscriptions                       │
-│     Tags                                │
-│     Users                               │
-│ ▸ Communication                         │
-│ ▸ Content                               │
-│ ▸ Settings                              │
-│ ▸ Security                              │
-│ ▸ Operations                            │
-├─────────────────────────────────────────┤
-│ PawTag v0.1.0                           │  ← Footer
-└─────────────────────────────────────────┘
-```
+6. **No unnecessary visual effects.**
+   - Avoid excessive gradients, glassmorphism, oversized shadows, decorative blobs, or playful animations.
+   - Motion should communicate state and improve usability.
 
 ---
+
+### Admin Application Shell
+
+The desktop shell follows this structure:
+
+```text
+┌──────────────────────────────────────────────────────────────────────────┐
+│  SIDEBAR       │  Search anything...              🔔  Admin User  ▾      │
+│                ├──────────────────────────────────────────────────────────┤
+│  PawTag        │  Home > Settings > Loyalty > Guardian Settings          │
+│  Admin Portal  │                                                          │
+│                │  Guardian Settings                    [Back] [Save]     │
+│  Dashboard     │                                                          │
+│  Commerce   ▾  │  ┌───────────────────────────────────────────────────┐   │
+│  Customers  ▾  │  │ Points Earning                                    │   │
+│  Loyalty    ▾  │  │                                                   │   │
+│  Products   ▾  │  │ Form controls / configuration                     │   │
+│  Orders     ▾  │  └───────────────────────────────────────────────────┘   │
+│  Payments   ▾  │                                                          │
+│  Marketing  ▾  │  ┌───────────────────────────────────────────────────┐   │
+│  Reports    ▾  │  │ Review Points                                     │   │
+│  Settings   ▾  │  │                                                   │   │
+│                │  │ Form controls / configuration                     │   │
+│  SYSTEM        │  └───────────────────────────────────────────────────┘   │
+│  Integrations  │                                                          │
+│  Notifications │                                                          │
+│  Audit Logs    │                                                          │
+│                │                                                          │
+│  Guardian      │                                                          │
+│  Rewards       │                                                          │
+│                │                                                          │
+│  Admin User ▾  │                                                          │
+└──────────────────────────────────────────────────────────────────────────┘
+```
+
+### Sidebar Navigation
+
+The sidebar is the primary navigation structure for the admin portal.
+
+#### Sidebar Dimensions
+
+| Element | Specification |
+|---|---|
+| Desktop expanded width | `272px` |
+| Desktop collapsed width | `72px` |
+| Minimum content height | `100vh` |
+| Position | Fixed/sticky left navigation |
+| Background | Deep PawTag teal using `gray-900` / `primary-900`-inspired treatment |
+| Right border | Subtle `rgba(255,255,255,0.08)` |
+| Logo area height | Approximately `72px` |
+| Navigation item height | `40–44px` |
+| Parent item radius | `rounded-lg` |
+| Active item radius | `rounded-lg` |
+| Horizontal item padding | `12px` |
+| Navigation gap | `4px` |
+| Main section gap | `16–24px` |
+
+The sidebar should visually resemble the approved PawTag admin direction: dark, premium, compact, highly legible and clearly branded.
+
+#### Sidebar Background
+
+Use a deep teal treatment rather than plain black.
+
+Preferred visual hierarchy:
+- Base: `primary-900` / `gray-900`-inspired deep teal.
+- Slightly lighter hover surface.
+- Active surface: `primary-700` or a controlled teal gradient.
+- Active indicator: `primary-400` or a subtle left/inside accent.
+- Sidebar text: white / `gray-100`.
+- Secondary text: `gray-300`.
+- Muted text: `gray-400`.
+
+Do not use a saturated bright teal background for the entire sidebar.
+
+#### PawTag Sidebar Branding
+
+At the top of the sidebar:
+
+- PawPrint logo icon inside a rounded teal/green brand treatment.
+- "PawTag" wordmark.
+- "Admin Portal" as small secondary text.
+- Collapse/expand control aligned to the top-right.
+- Logo follows the shared Logo specification in this document.
+
+On the dark sidebar:
+- PawPrint icon: white.
+- Logo text: white for "Paw", `primary-300`/`primary-400` for "Tag" where contrast remains strong.
+- "Admin Portal": `gray-400`.
+
+---
+
+### Sidebar Navigation Hierarchy
+
+The navigation MUST support:
+
+- Top-level parent items.
+- Child items.
+- Sub-child items.
+- Additional nesting only when genuinely required.
+
+Example:
+
+```text
+Commerce
+  ├─ Overview
+  ├─ Products
+  │   ├─ All Products
+  │   ├─ Categories
+  │   ├─ Collections
+  │   └─ Brands
+  ├─ Orders & Fulfilment
+  │   ├─ Orders
+  │   ├─ Shipments
+  │   └─ Returns
+  └─ Suppliers
+      ├─ Supplier List
+      ├─ Product Sources
+      └─ Integrations
+```
+
+#### Hierarchy Rules
+
+- Parent items use a clear chevron:
+  - `ChevronRight` when collapsed.
+  - `ChevronDown` when expanded.
+- Child items are visually indented.
+- Sub-child items receive a second indentation level.
+- Never rely on indentation alone; maintain clear typography and connector/spacing cues.
+- A parent remains visually distinguishable from its children.
+- Active child/sub-child navigation automatically expands all required ancestor levels.
+- The current page is always visibly identifiable.
+- Do not make every navigation item look like a primary button.
+
+#### Indentation
+
+Recommended:
+- Parent: `pl-3`
+- Child: `pl-10`
+- Sub-child: `pl-16`
+
+Use a subtle vertical hierarchy line for deeply nested navigation where it improves scanning.
+
+#### Parent Navigation Behavior
+
+A parent item with children should support:
+- Clicking the label/icon to navigate when the parent itself has a destination.
+- Clicking the chevron to expand/collapse.
+- If the parent is purely a grouping item, clicking the parent row expands/collapses it.
+- Keyboard users must be able to expand/collapse parents.
+- Expansion state must be accessible via ARIA attributes.
+
+Avoid forcing users to click tiny chevrons only.
+
+---
+
+### Sidebar Navigation Groups
+
+Navigation should be organized into logical enterprise groups.
+
+The exact items may evolve with the application, but the visual grouping pattern should remain consistent.
+
+Recommended structure:
+
+| Group | Example Items |
+|---|---|
+| **Overview** | Dashboard, Commerce Reports |
+| **Commerce** | Products, Categories, Collections, Brands, Orders & Fulfilment, Suppliers |
+| **Customers** | Customers, Pets, Guardian & Loyalty |
+| **Payments & Finance** | Transactions, Refunds, Reconciliation, Accounting |
+| **Marketing** | Referrals, Promotions, Campaigns |
+| **Reports & Analytics** | Commerce Reports, Customer Analytics, Loyalty Analytics |
+| **System** | Integrations, Notifications, Audit Logs, System Logs |
+| **Settings** | General, Users & Permissions, Feature Flags, Site Settings |
+
+Do not create a new group merely to contain one item unless there is a strong information-architecture reason.
+
+The implementation must remain permission-aware: navigation items the current administrator cannot access should not be displayed.
+
+---
+
+### Sidebar Active State
+
+The active navigation item is one of the most important visual signals.
+
+#### Active Parent
+
+When the current page belongs to a parent group:
+- Parent background: subtle `primary-700` / teal surface.
+- Text: white.
+- Icon: white or a restrained semantic icon color.
+- Chevron: `gray-200`.
+- Parent remains expanded.
+
+#### Active Child / Sub-child
+
+- Background: `primary-600` with controlled opacity/surface treatment.
+- Text: white.
+- Icon: `primary-200` or white.
+- Font weight: `font-semibold`.
+- Radius: `rounded-lg`.
+
+The active state should be unmistakable without looking like a large bright button.
+
+#### Hover
+
+- Background: white at approximately 5–8% opacity or equivalent dark-sidebar hover surface.
+- Text: white.
+- Icon: white / semantic icon color.
+- Transition: `150–200ms ease-out`.
+
+---
+
+### Sidebar Icons
+
+Use the shared Lucide icon system wherever possible.
+
+Preferred icon characteristics:
+- Stroke-based.
+- 18–20px for navigation.
+- 20–22px for important group headers.
+- Consistent stroke width.
+- Clear silhouettes at small sizes.
+
+The existing `IconPicker` / `ICON_MAP` from `@pawtag/ui` remains the source for configurable icons.
+
+#### Icon Color Strategy
+
+Colored icons are allowed and encouraged **in moderation**.
+
+Use a consistent category color, not arbitrary colors per item.
+
+Suggested semantic/category mapping:
+
+| Category | Icon Color |
+|---|---|
+| Commerce | `text-primary-300` / `text-teal-300` |
+| Customers | `text-blue-300` |
+| Loyalty & Guardian | `text-yellow-300` / Gold |
+| Products | `text-purple-300` |
+| Orders & Fulfilment | `text-orange-300` |
+| Payments & Finance | `text-green-300` |
+| Marketing | `text-pink-300` |
+| Reports & Analytics | `text-cyan-300` |
+| Security / Audit | `text-red-300` |
+| System / Integrations | `text-gray-300` |
+| Settings | `text-gray-300` |
+
+These are **navigation icon accents**, not replacements for the existing semantic status colors.
+
+Rules:
+- Keep text primarily white/gray.
+- Use color on icons to improve recognition.
+- Active items may switch to white icons for stronger contrast.
+- Do not use more than one strong accent color inside a single navigation item.
+- Never use color as the only indication of state.
+
+---
+
+### Special Sidebar Feature Card
+
+The approved design includes a small contextual feature card near the lower portion of the navigation, for example:
+
+**Guardian Rewards**  
+Manage points, tiers & rewards
+
+Design:
+- Dark/teal translucent surface.
+- `primary-500` / `primary-400` border accent.
+- Paw/Guardian icon in a circular or rounded container.
+- White title.
+- Small muted description.
+- Chevron on the right.
+- `rounded-xl`.
+- Subtle hover elevation.
+
+This is a **contextual shortcut**, not a replacement for normal navigation.
+
+It should only appear if the feature exists and the administrator has permission to access it.
+
+---
+
+### Sidebar Footer / User Area
+
+The authenticated administrator is shown at the bottom of the sidebar.
+
+Recommended layout:
+
+```text
+┌──────────────────────────────┐
+│  [Avatar]  Admin User     ▾  │
+│            Administrator      │
+└──────────────────────────────┘
+```
+
+Rules:
+- Avatar: `36–40px`, `rounded-full`.
+- Optional online/status indicator.
+- Name: white, semibold.
+- Role: `gray-400`, `caption`.
+- Chevron: `gray-400`.
+- Clicking opens the administrator account menu.
+- Account menu may contain Profile, Preferences, Security and Logout as applicable.
+- Never expose permissions or security-sensitive information directly in the navigation unless needed.
+
+---
+
+### Sidebar Collapse / Expand
+
+Desktop sidebar supports expanded and collapsed modes.
+
+#### Expanded
+
+- Width: `272px`.
+- Logo and labels visible.
+- Hierarchical navigation fully readable.
+- Feature card visible where appropriate.
+- User details visible.
+
+#### Collapsed
+
+- Width: `72px`.
+- Icons remain visible.
+- Text labels hidden.
+- Tooltips show navigation labels on hover/focus.
+- Parent expansion may use a flyout/popup navigation panel when children exist.
+- The active item remains clearly visible.
+- The PawTag logo collapses to the PawPrint mark.
+
+Do not simply hide child navigation when collapsed; users must still be able to reach every permitted route.
+
+#### Persistence
+
+Persist preference using:
+
+`localStorage` key: `pawtag-admin-sidebar-collapsed`
+
+The preference is user/device UI state and must not affect authorization.
+
+---
+
+### Sidebar Responsive Behavior
+
+#### Desktop
+
+Use the full sidebar pattern.
+
+#### Tablet
+
+- Sidebar may start collapsed.
+- Allow explicit expansion.
+- Maintain full navigation hierarchy.
+
+#### Mobile
+
+Do not force the desktop sidebar into a narrow unusable column.
+
+Use:
+- Off-canvas drawer.
+- Full navigation hierarchy inside drawer.
+- Overlay backdrop.
+- Close control.
+- Current route remains visible.
+- Drawer closes after navigation where appropriate.
+
+The top utility bar remains available.
+
+---
+
+## Admin Top Utility Bar
+
+The main workspace has a clean top utility bar separate from the sidebar.
+
+### Layout
+
+Recommended:
+
+```text
+┌─────────────────────────────────────────────────────────────────────┐
+│  [Search anything...      ⌘ K]                 🔔   [Avatar] User ▾ │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Search
+
+Global admin search should:
+- Be visually prominent but not oversized.
+- Use a subtle `gray-50` / `gray-100` surface.
+- Have a search icon.
+- Support keyboard shortcut indication where implemented.
+- Use `rounded-lg` or `rounded-xl`.
+- Have clear focus state using `primary-500`.
+- Remain compact enough to leave room for administrator controls.
+
+Example:
+
+`Search anything...`
+
+Do not implement fake search functionality purely for visual purposes. If search is not yet implemented, the UI must not imply functionality that does not exist.
+
+### Notifications
+
+- Bell icon.
+- Small unread badge when applicable.
+- Use `red-500`/`red-600` only for actual unread notification count.
+- Tooltip/accessibility label required.
+- Clicking opens the notification surface.
+
+### Administrator Controls
+
+Top-right:
+- Avatar.
+- Name.
+- Role/title.
+- Chevron.
+- Account menu.
+
+The top-right administrator identity is always clearly separated from application navigation.
+
+---
+
+## Admin Breadcrumbs
+
+Breadcrumbs are displayed above the page title.
+
+Example:
+
+```text
+Home  >  Settings  >  Loyalty & Guardian  >  Guardian Settings
+```
+
+### Breadcrumb Rules
+
+- Start with a Home icon where appropriate.
+- Use `ChevronRight` as separator.
+- Previous levels: `text-gray-500`.
+- Current page: `text-gray-700` / `font-medium`.
+- Links use `primary-600` on hover.
+- Keep breadcrumbs compact.
+- Do not repeat the exact page title unnecessarily if the breadcrumb would become redundant on small screens.
+- Long breadcrumb chains may collapse intermediate levels responsively.
+
+Breadcrumbs should reflect the actual route/information architecture, not manually hard-coded decorative text.
+
+---
+
+## Admin Page Header
+
+The standard page header follows breadcrumbs.
+
+```text
+[Optional page icon]  Guardian Settings
+                      Configure Guardian loyalty program settings
+
+                                  [Back to Dashboard] [Save Settings]
+```
+
+### Rules
+
+- Page title uses `h1`.
+- Supporting description uses `body`/`body-sm`.
+- Page actions align right on desktop.
+- On smaller screens actions may wrap below the title.
+- Primary action uses the shared Primary Button.
+- Secondary action uses the shared Secondary Button.
+- Do not create unique button styling for individual admin pages.
+
+### Page Icon
+
+An optional contextual icon may appear beside the title.
+
+Recommended:
+- 40–48px rounded container.
+- `primary-50` / `primary-100` background.
+- `primary-600` icon.
+- Use a relevant Lucide icon.
+- Keep icon treatment consistent across pages.
+
+---
+
+## Admin Content Workspace
+
+### Page Background
+
+Use:
+- `gray-50` as the overall workspace background.
+- White content surfaces.
+- Subtle `gray-100` / `gray-200` borders.
+
+Avoid pure white across the entire screen because it weakens hierarchy.
+
+### Content Width
+
+Use a responsive max-width appropriate to the screen.
+
+Recommended:
+- Full-width for data-heavy tables and dashboards.
+- `max-w-7xl` or equivalent for standard configuration pages.
+- Avoid excessively narrow enterprise settings pages.
+
+### Cards
+
+Admin cards use a refined version of the shared card system:
+
+```text
+bg-white
+rounded-2xl
+border border-gray-100
+shadow-sm
+```
+
+Hover shadows should only be used for genuinely interactive cards.
+
+Static configuration cards should not jump/elevate merely because the cursor passes over them.
+
+### Card Header
+
+Recommended:
+
+```text
+[Icon]  Points Earning
+        Formula: (Order Total ÷ Spent Amount) × Rate = Points Earned
+```
+
+Rules:
+- Heading: `h3`.
+- Description/helper: `body-sm`, `gray-500`.
+- Optional icon container: `primary-50` / `primary-100`.
+- Divider only when it improves grouping.
+- Avoid excessive card headers.
+
+---
+
+## Admin Forms
+
+Use the shared Form Input patterns defined earlier in this document, with the following admin refinements:
+
+- Input height should feel consistent across the admin portal.
+- Labels remain clearly above fields.
+- Helper text is concise.
+- Related controls should be grouped in a grid.
+- Use 2-column layouts on desktop where appropriate.
+- Collapse to 1 column on smaller screens.
+- Keep labels and helper text aligned.
+- Do not put unrelated settings into the same visual group.
+
+### Form Density
+
+Admin forms may use slightly tighter spacing than customer forms:
+
+- Field-to-field: approximately `16–24px`.
+- Section-to-section: `24–32px`.
+- Card padding: `24px`.
+- Label-to-input: `6–8px`.
+
+Do not reduce spacing so far that fields become difficult to scan.
+
+---
+
+## Admin Tables
+
+For data-heavy screens:
+
+- Sticky table headers where useful.
+- Clear column alignment.
+- Compact but readable rows.
+- Zebra striping is optional and should not be the default.
+- Prefer subtle borders over heavy grid lines.
+- Use status badges from the shared design tokens.
+- Row hover should be subtle.
+- Bulk actions should appear only when rows are selected.
+- Pagination and page-size controls should be predictable and consistent.
+
+Never use color alone to communicate row status.
+
+---
+
+## Admin Navigation States
+
+Every navigation item must support:
+
+| State | Behavior |
+|---|---|
+| Default | White/gray text on dark sidebar |
+| Hover | Subtle lighter surface + white text |
+| Focus | Visible primary focus ring |
+| Active | Teal active surface + strong contrast |
+| Expanded parent | Chevron down + children visible |
+| Disabled | Reduced opacity + no pointer interaction |
+| Permission hidden | Not rendered at all |
+
+Disabled and permission-hidden are different:
+- **Disabled** means the item exists but cannot currently be used.
+- **Permission hidden** means the user should not see the item at all.
+
+---
+
+## Admin Motion
+
+Use the existing Motion & Interaction Specification.
+
+Additional sidebar-specific rules:
+- Expand/collapse: `200ms ease-out`.
+- Active route transition: immediate or `150ms` subtle transition.
+- Mobile drawer: `250–300ms ease-in-out`.
+- Flyout submenu: `150–200ms ease-out`.
+- Never animate every navigation label independently.
+- Respect `prefers-reduced-motion`.
+
+---
+
+## Admin Accessibility
+
+The enterprise admin portal must be keyboard and screen-reader usable.
+
+Required:
+- Visible focus states.
+- Correct semantic navigation landmarks.
+- `aria-expanded` for expandable parents.
+- `aria-current="page"` for the active route.
+- Tooltips for collapsed icon-only navigation.
+- Keyboard navigation for menus and nested navigation.
+- Sufficient color contrast.
+- Do not depend on icon color alone.
+- Touch targets should remain usable on tablet/mobile.
+- Escape closes open menus/drawers where appropriate.
+
+---
+
+## Admin Dark / Light Theme
+
+The **approved default admin appearance is the dark sidebar + light workspace shown in the final PawTag admin direction**.
+
+This is distinct from making the entire admin application dark.
+
+### Default
+
+- Sidebar: dark PawTag teal.
+- Workspace: light.
+- Cards: white.
+- Top bar: white.
+- Inputs: white.
+- Text: gray/near-black.
+
+### Full Dark Mode
+
+If full admin dark mode is implemented later, it must be treated as a deliberate extension of this design system and must define tokens for:
+- Workspace background.
+- Card background.
+- Borders.
+- Inputs.
+- Text hierarchy.
+- Sidebar.
+- Tables.
+- Modals.
+- Dropdowns.
+
+Do not partially implement dark mode with isolated `dark:` classes.
+
+---
+
+## Admin Design Anti-Patterns
+
+Do NOT introduce:
+
+- Generic template-dashboard appearance.
+- Bright white sidebar.
+- Black sidebar with no PawTag identity.
+- Excessive neon colors.
+- Rainbow navigation.
+- Huge navigation icons.
+- Oversized sidebar width.
+- Nested navigation that visually looks identical at every level.
+- Tiny unreadable labels.
+- Breadcrumbs that are decorative but not route-aware.
+- Fake search or notification functionality.
+- Excessive gradients.
+- Excessive glassmorphism.
+- Excessive rounded cards.
+- Heavy drop shadows on every component.
+- Large animated navigation transitions.
+- Different sidebar styles between admin sections.
+- Hard-coded business colors outside the design tokens.
+
+The admin portal should feel **premium, calm, fast, structured and trustworthy**.
+
+---
+
+## Admin Reference Layout
+
+The approved visual direction is:
+
+```text
+DARK PAWTAG SIDEBAR
+    ↓
+Brand
+    ↓
+Parent navigation
+    ↓
+Child navigation
+    ↓
+Sub-child navigation
+    ↓
+System links
+    ↓
+Contextual Guardian shortcut
+    ↓
+Administrator profile
+
+LIGHT ADMIN WORKSPACE
+    ↓
+Top utility bar
+    ↓
+Breadcrumbs
+    ↓
+Page title + description + actions
+    ↓
+White configuration/data cards
+    ↓
+Clear forms / tables / reports
+```
+
+This structure is the authoritative visual direction for future PawTag Admin Portal UI work.
 
 ## Findings — Web App Inconsistencies
 

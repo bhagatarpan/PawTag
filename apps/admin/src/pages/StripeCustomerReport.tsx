@@ -189,6 +189,7 @@ export default function StripeCustomerReport() {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<ReportData | null>(null);
   const [searched, setSearched] = useState(false);
+  const [matches, setMatches] = useState<Array<{ id: string; name: string; email: string }>>([]);
 
   const handleSearch = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -196,16 +197,37 @@ export default function StripeCustomerReport() {
 
     setLoading(true);
     setSearched(true);
+    setMatches([]);
+    setData(null);
     try {
-      const res = await api.get(API.admin.stripe.report(query.trim()));
-      setData(res.data.data);
+      const res = await api.get(API.admin.stripe.search, { params: { q: query.trim() } });
+      const result = res.data.data;
+      if (result.report) {
+        setData(result.report);
+      } else if (result.matches?.length > 0) {
+        setMatches(result.matches);
+      }
     } catch (err: any) {
       setData(null);
-      toast.error(err.response?.data?.error || 'Failed to load Stripe report');
+      toast.error(err.response?.data?.error || 'Failed to search');
     } finally {
       setLoading(false);
     }
-  }, [query]);
+  }, []);
+
+  const handleSelectMatch = useCallback(async (userId: string) => {
+    setLoading(true);
+    setMatches([]);
+    try {
+      const res = await api.get(API.admin.stripe.report(userId));
+      setData(res.data.data);
+    } catch (err: any) {
+      setData(null);
+      toast.error(err.response?.data?.error || 'Failed to load report');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   /** Computed KPI metrics from the report data */
   const metrics = useMemo(() => {
@@ -226,14 +248,15 @@ export default function StripeCustomerReport() {
       </div>
 
       {/* Search */}
-      <form onSubmit={handleSearch} className="flex gap-3 max-w-xl">
-        <div className="relative flex-1">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
+      <form onSubmit={handleSearch} className="max-w-xl space-y-2">
+        <div className="flex gap-3">
+          <div className="relative flex-1">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by email or user ID..."
+            placeholder="Search by name, email, phone, order #, or invoice #..."
             className="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
           />
         </div>
@@ -244,7 +267,34 @@ export default function StripeCustomerReport() {
         >
           {loading ? <Loader2 className="animate-spin" size={16} /> : 'Search'}
         </button>
+        </div>
+        <p className="text-xs text-gray-400">Search by customer name, email, phone number, order number, or invoice number</p>
       </form>
+
+      {/* Multiple matches */}
+      {!loading && matches.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100">
+            <h3 className="font-semibold text-gray-900">{matches.length} customers found</h3>
+            <p className="text-xs text-gray-500 mt-1">Select a customer to view their Stripe data</p>
+          </div>
+          <div className="divide-y divide-gray-100">
+            {matches.map((m) => (
+              <button
+                key={m.id}
+                onClick={() => handleSelectMatch(m.id)}
+                className="w-full px-6 py-3 text-left hover:bg-gray-50 flex items-center justify-between"
+              >
+                <div>
+                  <p className="font-medium text-gray-900">{m.name}</p>
+                  <p className="text-sm text-gray-500">{m.email}</p>
+                </div>
+                <ExternalLink size={14} className="text-gray-400" />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Loading */}
       {loading && (

@@ -462,6 +462,7 @@ export const API = {
     // ---------------------------------------------------------------------------
     stripe: {
       report: (userId: string) => `/admin/stripe/report/${userId}` as const,
+      search: '/admin/stripe/search',
     },
   },
 
