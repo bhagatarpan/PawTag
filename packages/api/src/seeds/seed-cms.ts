@@ -1256,14 +1256,30 @@ async function run() {
       ];
 
       let emailCreated = 0;
+      let emailUpdated = 0;
       for (const t of emailTemplates) {
         const existing = await CmsEmailTemplate.findOne({ slug: t.slug }).session(session);
         if (!existing) {
           await CmsEmailTemplate.create([{ ...t, createdBy: adminId, updatedBy: adminId }], { session });
           emailCreated++;
+        } else {
+          // Update existing templates with new Communications Centre fields
+          const updateFields: Record<string, any> = {};
+          if (!existing.businessFlow || existing.businessFlow === 'other') updateFields.businessFlow = t.businessFlow;
+          if (!existing.purpose) updateFields.purpose = t.purpose;
+          if (!existing.triggerDescription) updateFields.triggerDescription = t.triggerDescription;
+          if (!existing.recipientDescription) updateFields.recipientDescription = t.recipientDescription;
+          if (!existing.emailType) updateFields.emailType = t.emailType;
+          if (existing.isCritical === undefined) updateFields.isCritical = t.isCritical;
+          if (!existing.version || existing.version === 1) updateFields.version = t.version;
+          if (!existing.variableDefinitions || existing.variableDefinitions.length === 0) updateFields.variableDefinitions = t.variableDefinitions;
+          if (Object.keys(updateFields).length > 0) {
+            await CmsEmailTemplate.updateOne({ _id: existing._id }, { $set: updateFields }).session(session);
+            emailUpdated++;
+          }
         }
       }
-      console.log(`  ${emailCreated} new email templates created (${emailTemplates.length} total)\n`);
+      console.log(`  ${emailCreated} new, ${emailUpdated} updated email templates (${emailTemplates.length} total)\n`);
 
       // ═══════════════════════════════════════
       // 7. SMS TEMPLATES
