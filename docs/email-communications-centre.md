@@ -105,10 +105,22 @@
 - Audit list with search, status/flow/date filters
 - Audit detail with rendered email preview, delivery timeline, variable snapshot, technical details
 
-### Phase 4: Migration & Cleanup (Partial) ✅
+### Phase 4: Migration & Cleanup ✅
 - Updated all 8 seeded email templates with Communications Centre metadata
 - Added businessFlow, purpose, trigger, recipient, emailType, isCritical, variableDefinitions
-- Remaining inline email migration deferred to future phase (13 inline emails)
+- **Extracted 25 inline emails** to use template renderers:
+  - subscription.service.ts: 6 emails (reminder, grace, payment failure/success, gold welcome)
+  - orderNotification.service.ts: 8 emails (6 order status + 2 admin alerts)
+  - referral.service.ts: 1 email (referral reward)
+  - tier.service.ts: 1 email (tier downgrade warning)
+  - escalation.service.ts: 1 email (emergency escalation)
+  - notification-delivery.service.ts: 1 email (generic notification)
+  - pet-milestones.ts: 2 emails (birthday, anniversary)
+  - lowStockCheck.ts: 1 email (low stock alert)
+  - support.ts: 1 email (support request)
+  - order-creation.service.ts: 1 email (admin order alert)
+- **Fixed Gold Welcome bug** — subscription.service.ts now uses existing template instead of inline HTML
+- Remaining: 5 emails in email.service.ts (subscription welcome, invoice OTP, invoice) still have CMS fallback patterns
 
 ---
 
