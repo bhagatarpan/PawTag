@@ -213,7 +213,7 @@ export default function StripeCustomerReport() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [query]);
 
   const handleSelectMatch = useCallback(async (userId: string) => {
     setLoading(true);
