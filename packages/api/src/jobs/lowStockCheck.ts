@@ -1,5 +1,6 @@
 import { Product, Setting, Notification, User } from '@pawtag/db';
 import { sendMail } from '../services/email.service';
+import { renderLowStockAlertEmail } from '../services/email/templates';
 import { auditService, type AuditContext } from '../services/audit';
 import logger from '../lib/logger';
 
@@ -63,27 +64,7 @@ export async function checkLowStock(): Promise<{ alerted: boolean; count: number
   if (!adminEmail) {
     logger.info('[LowStockCheck] No ADMIN_ALERT_EMAIL configured, skipping email alert');
   } else {
-    const rows = lowStockProducts
-      .map((p) => `<tr><td style="padding:8px;border:1px solid #e5e7eb;">${p.name}</td><td style="padding:8px;border:1px solid #e5e7eb;text-align:center;">${p.sku}</td><td style="padding:8px;border:1px solid #e5e7eb;text-align:center;font-weight:bold;color:${p.stock === 0 ? '#dc2626' : '#d97706'};">${p.stock}</td><td style="padding:8px;border:1px solid #e5e7eb;text-align:right;">$${p.price.toFixed(2)}</td></tr>`)
-      .join('');
-
-    const html = `
-      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
-        <h2 style="color:#1e40af;">⚠️ Low Stock Alert</h2>
-        <p>The following products are at or below the low stock threshold of <strong>${threshold}</strong> units:</p>
-        <table style="border-collapse:collapse;width:100%;margin:16px 0;">
-          <thead>
-            <tr style="background:#f3f4f6;">
-              <th style="padding:8px;border:1px solid #e5e7eb;text-align:left;">Product</th>
-              <th style="padding:8px;border:1px solid #e5e7eb;text-align:left;">SKU</th>
-              <th style="padding:8px;border:1px solid #e5e7eb;text-align:center;">Stock</th>
-              <th style="padding:8px;border:1px solid #e5e7eb;text-align:right;">Price</th>
-            </tr>
-          </thead>
-          <tbody>${rows}</tbody>
-        </table>
-        <p style="color:#6b7280;font-size:13px;">Please restock these items to avoid stockouts.</p>
-      </div>`;
+    const html = renderLowStockAlertEmail({ threshold, products: lowStockProducts });
 
     await sendMail(adminEmail, `[PawTag] Low Stock Alert — ${lowStockProducts.length} product(s)`, html);
   }
