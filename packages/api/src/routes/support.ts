@@ -4,6 +4,7 @@ import rateLimit from 'express-rate-limit';
 import mongoose from 'mongoose';
 import { SupportRequest } from '@pawtag/db';
 import { sendMail } from '../services/email.service';
+import { renderSupportRequestAlertEmail } from '../services/email/templates';
 import { AuthRequest, authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
 import { auditService, type AuditContext } from '../services/audit';
@@ -54,19 +55,7 @@ publicRouter.post('/contact', contactLimiter, async (req: Request, res: Response
 
     const adminEmail = process.env.ADMIN_ALERT_EMAIL;
     if (adminEmail) {
-      const html = `
-        <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
-          <h2 style="color:#1e40af;">📩 New Support Request</h2>
-          <table style="border-collapse:collapse;width:100%;margin:16px 0;">
-            <tr><td style="padding:8px;font-weight:bold;width:100px;">Name</td><td style="padding:8px;">${name}</td></tr>
-            <tr><td style="padding:8px;font-weight:bold;">Email</td><td style="padding:8px;">${email}</td></tr>
-            <tr><td style="padding:8px;font-weight:bold;">Submitted</td><td style="padding:8px;">${new Date().toISOString()}</td></tr>
-          </table>
-          <div style="background:#f3f4f6;padding:16px;border-radius:8px;margin:16px 0;">
-            <p style="margin:0;white-space:pre-wrap;">${message}</p>
-          </div>
-          <p style="color:#6b7280;font-size:13px;">Support Request ID: ${supportRequest._id}</p>
-        </div>`;
+      const html = renderSupportRequestAlertEmail(name, email, message, supportRequest._id.toString());
       await sendMail(adminEmail, `[PawTag Support] New message from ${name}`, html);
     }
 
