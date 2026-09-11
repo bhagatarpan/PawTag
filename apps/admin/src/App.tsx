@@ -66,6 +66,7 @@ import Fulfilment from './pages/Fulfilment';
 import Returns from './pages/Returns';
 import Payments from './pages/Payments';
 import PaymentReconciliation from './pages/PaymentReconciliation';
+import StripeCustomerReport from './pages/StripeCustomerReport';
 import Discounts from './pages/Discounts';
 import Reports from './pages/Reports';
 
@@ -245,6 +246,7 @@ export default function App() {
       <Route path="/payments" element={<ProtectedRoute><Payments /></ProtectedRoute>} />
       <Route path="/payments/refunds" element={<ProtectedRoute><Payments /></ProtectedRoute>} />
       <Route path="/payments/reconciliation" element={<ProtectedRoute><PaymentReconciliation /></ProtectedRoute>} />
+      <Route path="/stripe-report" element={<ProtectedRoute><StripeCustomerReport /></ProtectedRoute>} />
       <Route path="/shipping/methods" element={<ProtectedRoute><ShippingMethods /></ProtectedRoute>} />
       <Route path="/shipping/rates" element={<ProtectedRoute><ShippingRates /></ProtectedRoute>} />
       <Route path="/shipping/shipments" element={<ProtectedRoute><Shipments /></ProtectedRoute>} />

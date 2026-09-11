@@ -199,9 +199,9 @@ function SubscriptionsInner() {
               <div>
                 <div className="flex items-center gap-2 mb-1">
                   <div className="w-2 h-2 rounded-full bg-white/80 animate-pulse" />
-                  <span className="text-white/80 text-xs font-medium uppercase tracking-wider">Active Tag</span>
+                  <span className="text-white/80 text-xs font-medium uppercase tracking-wider">{sub.planType === 'gold' ? 'Gold Membership' : 'Active Tag'}</span>
                 </div>
-                <h1 className="text-2xl font-bold text-white tracking-tight">{sub.tagId?.tagId || 'N/A'}</h1>
+                <h1 className="text-2xl font-bold text-white tracking-tight">{sub.planType === 'gold' ? 'Gold Membership' : (sub.tagId?.tagId || 'N/A')}</h1>
               </div>
               <span className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide ${isActive ? 'bg-white/20 text-white' : isGrace ? 'bg-white/20 text-white' : 'bg-white/10 text-white/70'}`}>
                 {sub.status.replace('_', ' ')}
@@ -344,14 +344,16 @@ function SubscriptionsInner() {
                     <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><circle cx="12" cy="5" r="2"/><line x1="12" x2="12" y1="3" y2="7"/></svg> Enable Auto-renew</>
                   )}
                 </button>
-                <button
-                  onClick={() => setShowChangePlan(true)}
-                  disabled={actionLoading}
-                  className="inline-flex items-center gap-2 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50 transition-all"
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></svg>
-                  Change Plan
-                </button>
+                {sub.planType !== 'gold' && (
+                  <button
+                    onClick={() => setShowChangePlan(true)}
+                    disabled={actionLoading}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50 transition-all"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></svg>
+                    Change Plan
+                  </button>
+                )}
                 <button
                   onClick={() => handleCancel(sub._id)}
                   disabled={actionLoading}
@@ -525,7 +527,10 @@ function SubscriptionsInner() {
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="font-mono font-bold text-gray-900 text-sm">{sub.tagId?.tagId || 'N/A'}</span>
+                          <span className="font-mono font-bold text-gray-900 text-sm">{sub.planType === 'gold' ? 'Gold Membership' : (sub.tagId?.tagId || 'N/A')}</span>
+                          {sub.planType === 'gold' && (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-amber-100 text-amber-700">Gold</span>
+                          )}
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${isActive ? 'bg-emerald-50 text-emerald-700' : isGrace ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700'}`}>
                             {sub.status.replace('_', ' ')}
                           </span>

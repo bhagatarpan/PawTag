@@ -23,6 +23,7 @@ interface TierBenefits {
 interface GuardianData {
   points: number;
   tier: TierName;
+  isGoldMember: boolean;
   pawRewards: {
     balance: number;
     totalEarned: number;
@@ -214,6 +215,7 @@ export default function GuardianDashboard() {
       setData({
         points: pointsRes.data.data.points,
         tier: pointsRes.data.data.tier,
+        isGoldMember: tierRes.data.data.isGoldMember || false,
         pawRewards: {
           balance: rewardsRes.data.data.balance,
           totalEarned: rewardsRes.data.data.totalEarned,
@@ -324,6 +326,24 @@ const unlockedCount = achievements.filter((a) => a.unlocked).length;
           </div>
         )}
       </div>
+
+      {/* Gold Membership Indicator */}
+      {data.isGoldMember && (
+        <div className="bg-gradient-to-r from-amber-500 to-orange-500 rounded-2xl p-6 text-white">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center">
+                <Crown size={28} className="text-white" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold">Gold Member</h3>
+                <p className="text-white/80 text-sm">2× points on all purchases · Priority support · Early access</p>
+              </div>
+            </div>
+            <span className="px-4 py-2 bg-white/20 rounded-full text-sm font-bold uppercase tracking-wide">Active</span>
+          </div>
+        </div>
+      )}
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

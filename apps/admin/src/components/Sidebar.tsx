@@ -132,6 +132,7 @@ const sections: SidebarSection[] = [
       { to: '/refund-report', label: 'Refund Report', icon: FileText, permission: 'order.refund' },
       { to: '/payments/reconciliation', label: 'Reconciliation', icon: AlertTriangle, permission: 'order.read' },
       { to: '/shipping/methods', label: 'Shipping Methods', icon: Truck, permission: 'setting.read' },
+      { to: '/stripe-report', label: 'Stripe Report', icon: CreditCard, permission: 'setting.read' },
     ],
   },
   // ─── Tag Subscriptions ─────────────────────────────────────

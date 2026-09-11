@@ -47,9 +47,8 @@ export async function getGoldPrice(): Promise<number> {
  * Check if a subscription represents Gold membership.
  */
 export async function isGoldSubscription(subscription: { planType?: string; price?: number } | null): Promise<boolean> {
-  if (!subscription || subscription.planType !== 'monthly') return false;
-  const goldPrice = await getGoldPrice();
-  return subscription.price === goldPrice;
+  if (!subscription) return false;
+  return subscription.planType === 'gold';
 }
 
 // Points earning activities with base rates

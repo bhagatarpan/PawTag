@@ -459,6 +459,79 @@ packages/api/src/commerce/
     └── refund.service.ts       # Full/partial refund processing
 ```
 
+### Gold Membership & Stripe Integration
+
+**Gold Membership** is PawTag's premium subscription tier. Customers pay a monthly fee via Stripe to receive enhanced benefits including free shipping, increased loyalty points multipliers, and priority support.
+
+#### Gold Overview
+
+| Attribute | Value |
+|-----------|-------|
+| **Plan Type** | `gold` (stored in `User.planType`) |
+| **Monthly Price** | CMS setting `gold.price.monthly` (default: NZD $14.99) |
+| **Loyalty Multiplier** | CMS setting `gold.pointsMultiplier` (default: 2x Guardian points) |
+| **Free Shipping Threshold** | CMS setting `gold.freeShippingThreshold` (default: $0 — always free) |
+| **Subscription Product** | Linked via `product.metadata.isGoldSubscription: true` |
+
+**Benefits:**
+- Free NZ-wide shipping on all orders
+- 2x Guardian loyalty points on every purchase
+- Gold member badge on profile
+- Priority customer support
+
+#### Gold Stripe Integration
+
+Gold billing uses Stripe Subscriptions for recurring monthly charges:
+
+1. **Customer subscribes** via `POST /api/customer/subscriptions/gold/subscribe`
+2. **Backend creates** a Stripe Customer (if not exists), creates a Stripe Subscription, and stores the `stripeCustomerId` and `stripeSubscriptionId` on the User model
+3. **Stripe charges** the customer monthly via the subscription
+4. **Webhook** updates subscription status (active, past_due, cancelled)
+5. **Gold benefits** are active while `User.planType === 'gold'` and subscription is active
+
+**Key fields on User model:**
+- `planType: 'free' | 'gold'`
+- `stripeCustomerId: string` — Stripe Customer ID
+- `stripeSubscriptionId: string` — Stripe Subscription ID
+- `goldSubscribedAt: Date` — When Gold was activated
+- `goldCancelledAt: Date` — When Gold was cancelled (if applicable)
+
+#### Gold Admin Controls (CMS Settings)
+
+| Setting Key | Default | Purpose |
+|-------------|---------|---------|
+| `gold.price.monthly` | `14.99` | Monthly subscription price (NZD) |
+| `gold.pointsMultiplier` | `2` | Loyalty points multiplier for Gold members |
+| `gold.freeShippingThreshold` | `0` | Minimum order for free shipping (0 = always free) |
+| `gold.enabled` | `true` | Enable/disable Gold subscriptions |
+| `gold.trialDays` | `0` | Free trial period (days) |
+
+Settings are managed via the Admin Portal and stored in the `settings` collection with `gold.*` prefix.
+
+#### Gold Detection
+
+Gold status is identified by `User.planType === 'gold'`. This is checked in:
+- **Shipping service:** Free shipping for Gold members
+- **Points earning engine:** 2x multiplier applied to all points calculations
+- **Frontend:** Gold badge display, member-only UI elements
+- **Checkout:** Free shipping automatically applied
+
+#### Stripe Reporting Dashboard
+
+Admin page (`/admin/stripe-report`) for viewing per-customer Stripe data:
+- Stripe Customer details (ID, email, created date)
+- Active subscriptions and billing history
+- Payment methods on file
+- Recent charges and refunds
+- Subscription lifecycle events
+
+#### Gold API Routes
+
+| Route | Purpose |
+|-------|---------|
+| `POST /api/customer/subscriptions/gold/subscribe` | Subscribe to Gold membership |
+| `GET /api/admin/stripe/report/:userId` | Stripe customer report (admin) |
+
 ### API Architecture (Centralized)
 
 **All API endpoints are centralized in `packages/shared/src/api/`.** Frontend apps consume them via typed constants and a shared client factory.
@@ -684,6 +757,8 @@ Production uses the configured domain sender.
   - `GET /admin/guardian/activity` — Recent points/rewards activity feed
   - `GET /admin/guardian/settings` — Guardian program settings
   - `PUT /admin/guardian/settings` — Update Guardian settings
+- `/api/customer/subscriptions/gold/subscribe` — Subscribe to Gold membership
+- `/api/admin/stripe/report/:userId` — Stripe customer report (admin)
 - `/api/finder/*` — Public tag lookup, location sharing (no auth required)
 - `/api/public/cms/*` — Public CMS content (pages, navigation, footer, settings, onboarding config)
 - `/api/address/*` — Address autocomplete proxy (Photon or NZ Post provider)
@@ -875,7 +950,7 @@ Enterprise-grade sidebar with collapsible sections and dark/light mode:
 | **Catalog** | Products, Categories, Collections, Brands, Tags |
 | **Inventory** | Stock, Adjustments, Stock History |
 | **Orders & Fulfilment** | All Orders, Pending, Processing, Invoices, Shipments, Returns |
-| **Payments & Refunds** | Transactions, Refunds, Refund Report, Reconciliation, Shipping Methods |
+| **Payments & Refunds** | Transactions, Refunds, Refund Report, Reconciliation, Shipping Methods, Stripe Report |
 | **Subscriptions & Loyalty** | Subscription Plans, Customer Subscriptions, Guardian Dashboard, Members, Analytics, Guardian Settings |
 | **Discounts & Promotions** | Discount Codes, Referral Program |
 | **Users & Pets** | Customers, Admin Users, Pets |
@@ -1152,12 +1227,14 @@ Located in `apps/mobile/e2e/`:
 | `apps/web/src/pages/account/GuardianDashboard.tsx` | Customer Guardian dashboard |
 | `apps/web/src/pages/account/GuardianPoints.tsx` | Customer points history |
 | `apps/web/src/pages/account/GuardianRewards.tsx` | Customer PawRewards management |
-| `apps/web/src/pages/account/SubscriptionUpgrade.tsx` | Gold membership upgrade page |
 | `packages/api/src/routes/checkout-otp.ts` | Dual OTP checkout verification |
 | `apps/web/src/components/CheckoutVerificationGate.tsx` | OTP verification gatekeeper |
-
 | `apps/web/src/components/OnboardingWizard.tsx` | Dynamic onboarding wizard with success screen |
 | `apps/web/src/components/AccountLayout.tsx` | Customer portal layout + wizard gating |
+| `apps/web/src/pages/account/SubscriptionUpgrade.tsx` | Gold membership upgrade page |
+| `packages/api/src/routes/customer-subscriptions.ts` | Gold subscription API routes |
+| `packages/api/src/routes/admin-stripe-report.ts` | Stripe customer report (admin) |
+| `apps/admin/src/pages/StripeReport.tsx` | Stripe reporting dashboard |
 | `apps/finder/src/App.tsx` | Finder portal (decomposed into components) |
 
 ## Product Management

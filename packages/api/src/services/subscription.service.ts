@@ -165,6 +165,7 @@ export async function createSubscription(data: {
     annual: 'PawTag Annual',
     monthly: 'PawTag Monthly',
     free: 'PawTag Free',
+    gold: 'Gold Membership',
   };
 
   // Get free period from CMS settings
@@ -237,25 +238,105 @@ export async function createSubscription(data: {
 }
 
 /**
- * Create a Gold membership subscription.
+ * Create a Gold membership subscription with Stripe billing.
  * Gold is a standalone digital membership — no physical Tag required.
  *
  * @param userId - The user purchasing Gold
- * @param price - The price charged (default: $1.99 from CMS settings)
+ * @param price - The price charged (default: from CMS setting `guardian.goldPrice`)
  * @returns The created subscription document
  */
 export async function createGoldSubscription(userId: string, price?: number) {
   const now = new Date();
-  const goldPrice = price ?? 1.99; // Default Gold price, CMS-driven in production
+
+  // Load Gold price from CMS settings
+  const goldPriceSetting = await Setting.findOne({ key: 'guardian.goldPrice' }).lean();
+  const goldPrice = price ?? parseFloat(goldPriceSetting?.value || '1.99');
 
   // Gold billing is monthly
   const currentPeriodEnd = new Date(now);
   currentPeriodEnd.setMonth(currentPeriodEnd.getMonth() + 1);
 
+  // Get user info for Stripe customer creation
+  const user = await User.findById(userId).select('fullName email stripeCustomerId').lean();
+  if (!user) throw new Error('User not found');
+
+  let stripeCustomerId = user.stripeCustomerId;
+  let stripeSubscriptionId: string | undefined;
+  let stripePaymentIntentId: string | undefined;
+
+  // Determine if we're in demo mode (no real Stripe key)
+  const isDemoMode = !process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY === 'sk_test_demo_key';
+
+  if (!isDemoMode) {
+    try {
+      const Stripe = (await import('stripe')).default;
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+        apiVersion: '2024-06-20' as any,
+      });
+
+      // Create Stripe Customer if user doesn't have one
+      if (!stripeCustomerId) {
+        const customer = await stripe.customers.create({
+          email: user.email,
+          name: user.fullName || undefined,
+          metadata: { userId: userId.toString(), source: 'pawtag-gold' },
+        });
+        stripeCustomerId = customer.id;
+
+        // Store Stripe Customer ID on User
+        await User.findByIdAndUpdate(userId, { stripeCustomerId: customer.id });
+        logger.info({ userId, stripeCustomerId: customer.id }, '[Gold] Created Stripe customer');
+      }
+
+      // Create a Stripe Price for Gold membership
+      const priceObj = await stripe.prices.create({
+        unit_amount: Math.round(goldPrice * 100),
+        currency: 'nzd',
+        recurring: { interval: 'month' },
+        product_data: {
+          name: 'PawTag Gold Membership',
+          metadata: { plan: 'gold' },
+        },
+        metadata: { userId: userId.toString(), plan: 'gold' },
+      });
+
+      // Create Stripe Subscription
+      const stripeSubscription = await stripe.subscriptions.create({
+        customer: stripeCustomerId,
+        items: [{ price: priceObj.id }],
+        payment_behavior: 'default_incomplete',
+        payment_settings: { save_default_payment_method: 'on_subscription' },
+        metadata: { userId: userId.toString(), plan: 'gold' },
+        expand: ['latest_invoice.payment_intent'],
+      });
+
+      stripeSubscriptionId = stripeSubscription.id;
+
+      // Extract PaymentIntent from the expanded latest_invoice
+      const latestInvoice = stripeSubscription.latest_invoice as any;
+      if (latestInvoice?.payment_intent) {
+        stripePaymentIntentId = latestInvoice.payment_intent.id;
+      }
+
+      logger.info({
+        userId,
+        stripeCustomerId,
+        stripeSubscriptionId,
+        stripePaymentIntentId,
+      }, '[Gold] Created Stripe subscription');
+    } catch (err) {
+      logger.error({ err, userId }, '[Gold] Stripe subscription creation failed — falling back to demo mode');
+      // Fall back to demo mode on Stripe failure
+      stripeCustomerId = undefined;
+      stripeSubscriptionId = undefined;
+    }
+  }
+
+  // Create PawTag subscription
   const subscription = await Subscription.create({
     userId,
     planName: 'Gold Membership',
-    planType: 'monthly',
+    planType: 'gold',
     status: 'active',
     price: goldPrice,
     currency: 'NZD',
@@ -264,6 +345,8 @@ export async function createGoldSubscription(userId: string, price?: number) {
     currentPeriodEnd,
     autoRenew: true,
     renewalMethod: 'monthly',
+    stripeCustomerId: stripeCustomerId || undefined,
+    stripeSubscriptionId: stripeSubscriptionId || undefined,
     totalScans: 0,
     reminderStates: {
       reminder30dSent: false,
@@ -271,6 +354,24 @@ export async function createGoldSubscription(userId: string, price?: number) {
       reminder1dSent: false,
       graceWeeklySentCount: 0,
     },
+  });
+
+  // Create Invoice in PawTag DB
+  await createInvoice({
+    subscriptionId: subscription._id.toString(),
+    userId: userId,
+    amount: goldPrice,
+    billingPeriodStart: now,
+    billingPeriodEnd: currentPeriodEnd,
+    status: stripePaymentIntentId ? 'paid' : 'paid', // In demo mode, auto-mark as paid
+    paymentMethod: stripePaymentIntentId ? 'stripe' : 'demo',
+  });
+
+  // Send Gold welcome email (fire-and-forget)
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+  const dashboardUrl = `${frontendUrl}/account/guardian`;
+  sendGoldWelcomeEmail(user.email, user.fullName || 'there', goldPrice, dashboardUrl).catch((err) => {
+    logger.error({ err, userId }, '[Gold] Failed to send welcome email');
   });
 
   await auditJobEvent({
@@ -284,10 +385,14 @@ export async function createGoldSubscription(userId: string, price?: number) {
     severity: 'HIGH',
     metadata: {
       userId,
-      planType: 'monthly',
+      planType: 'gold',
       planName: 'Gold Membership',
       price: goldPrice,
       currency: 'NZD',
+      stripeCustomerId: stripeCustomerId || 'demo',
+      stripeSubscriptionId: stripeSubscriptionId || 'demo',
+      stripePaymentIntentId: stripePaymentIntentId || 'demo',
+      isDemoMode,
     },
   });
 
@@ -1240,6 +1345,40 @@ async function attemptPaymentCharge(subscription: any): Promise<boolean> {
     logger.error({ err, subscriptionId: subscription._id }, 'Stripe payment retry failed');
     return false;
   }
+}
+
+async function sendGoldWelcomeEmail(to: string, name: string, price: number, dashboardUrl: string) {
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+      <div style="background: linear-gradient(135deg, #f59e0b, #d97706); padding: 24px; border-radius: 12px 12px 0 0; text-align: center;">
+        <h1 style="color: white; font-size: 24px; margin: 0;">PawTag Gold</h1>
+        <p style="color: rgba(255,255,255,0.9); font-size: 14px; margin: 8px 0 0;">Welcome to Gold Membership</p>
+      </div>
+      <div style="background: #fffbeb; padding: 32px; border: 1px solid #fde68a;">
+        <h2 style="color: #111827; font-size: 20px;">Hi ${name},</h2>
+        <p style="color: #374151; font-size: 15px; line-height: 1.7;">
+          Welcome to <strong>PawTag Gold Membership</strong>! You're now a Gold member at <strong>$${price.toFixed(2)}/month</strong>.
+        </p>
+        <div style="background: white; border: 1px solid #fde68a; border-radius: 8px; padding: 16px; margin: 16px 0;">
+          <p style="color: #92400e; font-size: 13px; font-weight: 600; margin: 0 0 8px;">Your Gold Benefits</p>
+          <ul style="color: #374151; font-size: 14px; line-height: 1.8; margin: 0; padding-left: 20px;">
+            <li>2× points on every purchase</li>
+            <li>Free shipping on orders over $50</li>
+            <li>Priority customer support</li>
+            <li>Early access to new products</li>
+          </ul>
+        </div>
+        <a href="${dashboardUrl}" style="display: inline-block; background: #f59e0b; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; margin: 16px 0;">View Your Dashboard</a>
+        <p style="color: #9ca3af; font-size: 12px; margin-top: 24px;">
+          Your membership will automatically renew each month. You can manage or cancel anytime from your dashboard.
+        </p>
+      </div>
+      <div style="text-align: center; padding: 16px; color: #9ca3af; font-size: 11px;">
+        PawTag — Reuniting lost pets with their families
+      </div>
+    </div>`;
+
+  await sendMail(to, 'Welcome to PawTag Gold Membership', html);
 }
 
 async function sendPaymentRetrySuccessEmail(to: string, name: string, tagId: string) {

@@ -172,6 +172,7 @@ export default function SubscriptionsPage() {
               <option value="">All Plans</option>
               <option value="annual">Annual</option>
               <option value="monthly">Monthly</option>
+              <option value="gold">Gold</option>
               <option value="free">Free</option>
             </select>
           </div>
@@ -213,7 +214,12 @@ export default function SubscriptionsPage() {
                     <span className="text-sm font-mono text-gray-900">{sub.tagId?.tagId || 'N/A'}</span>
                   </td>
                   <td className="px-6 py-4">
-                    <div className="text-sm text-gray-900">{sub.planName}</div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-900">{sub.planName}</span>
+                      {sub.planType === 'gold' && (
+                        <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">Gold</span>
+                      )}
+                    </div>
                     <div className="text-xs text-gray-500 capitalize">{sub.planType}</div>
                   </td>
                   <td className="px-6 py-4">

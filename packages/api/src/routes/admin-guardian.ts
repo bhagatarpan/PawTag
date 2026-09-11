@@ -79,11 +79,9 @@ router.get('/stats', requirePermission('setting.read'), async (req: AuthRequest,
     ]);
     const totalRewardsRedeemed = totalRedeemedResult[0]?.total || 0;
 
-    // Get Gold members (active monthly subscription at Gold price)
-    const goldPriceSetting = await Setting.findOne({ key: 'guardian.goldPrice' }).lean();
-    const goldPrice = parseFloat(goldPriceSetting?.value || '1.99');
+    // Get Gold members (active Gold subscription)
     const goldMembersResult = await Subscription.aggregate([
-      { $match: { status: 'active', planType: 'monthly', price: goldPrice } },
+      { $match: { status: 'active', planType: 'gold' } },
       { $group: { _id: '$userId' } },
       { $count: 'total' },
     ]);
@@ -169,12 +167,11 @@ router.get('/members', requirePermission('setting.read'), async (req: AuthReques
       query.guardianTier = tier;
     }
 
-    // Membership filter via Subscription collection (Gold = active monthly $1.99)
+    // Membership filter via Subscription collection (Gold = active Gold subscription)
     if (membership === 'gold' || membership === 'guardian') {
       const goldSubs = await Subscription.find({
         status: 'active',
-        planType: 'monthly',
-        price: 1.99,
+        planType: 'gold',
       }).select('userId').lean();
       const goldIds = goldSubs.map(s => s.userId);
       query._id = membership === 'gold' ? { $in: goldIds } : { $nin: goldIds };
@@ -197,14 +194,11 @@ router.get('/members', requirePermission('setting.read'), async (req: AuthReques
     const total = await User.countDocuments(query);
 
     // Enrich with Gold membership status from Subscription collection
-    const goldPriceSetting = await Setting.findOne({ key: 'guardian.goldPrice' }).lean();
-    const goldPrice = parseFloat(goldPriceSetting?.value || '1.99');
     const memberIds = members.map(m => m._id);
     const goldSubscriptions = await Subscription.find({
       userId: { $in: memberIds },
       status: 'active',
-      planType: 'monthly',
-      price: goldPrice,
+      planType: 'gold',
     }).select('userId').lean();
     const goldUserIds = new Set(goldSubscriptions.map(s => s.userId.toString()));
     const enrichedMembers = members.map(m => ({

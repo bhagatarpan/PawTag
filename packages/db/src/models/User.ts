@@ -59,6 +59,7 @@ export interface IUserDocument extends Document {
   pawRewardsTotalEarned: number;
   pawRewardsTotalRedeemed: number;
   pawRewardsTotalExpired: number;
+  stripeCustomerId?: string;
   deletedAt?: Date;
 }
 
@@ -130,6 +131,7 @@ const UserSchema = new Schema<IUserDocument>(
     pawRewardsTotalEarned: { type: Number, default: 0, min: 0 },
     pawRewardsTotalRedeemed: { type: Number, default: 0, min: 0 },
     pawRewardsTotalExpired: { type: Number, default: 0, min: 0 },
+    stripeCustomerId: { type: String },
     deletedAt: { type: Date, default: null },
   },
   { timestamps: true },

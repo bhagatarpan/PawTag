@@ -7,7 +7,7 @@ export interface ISubscriptionDocument extends Document {
 
   planId?: mongoose.Types.ObjectId;
   planName: string;
-  planType: 'annual' | 'monthly' | 'free';
+  planType: 'annual' | 'monthly' | 'free' | 'gold';
 
   status: 'active' | 'expired' | 'grace_period' | 'cancelled' | 'pending_payment';
 
@@ -60,7 +60,7 @@ const SubscriptionSchema = new Schema<ISubscriptionDocument>(
 
     planId: { type: Schema.Types.ObjectId, ref: 'Product' },
     planName: { type: String, required: true },
-    planType: { type: String, enum: ['annual', 'monthly', 'free'], required: true },
+    planType: { type: String, enum: ['annual', 'monthly', 'free', 'gold'], required: true },
 
     status: {
       type: String,

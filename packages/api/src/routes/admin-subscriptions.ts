@@ -189,13 +189,15 @@ router.put('/:id/status', requirePermission('subscription.update'), async (req: 
 
     await subscription.save();
 
-    // Update tag subscription status
-    if (status === 'active') {
-      await Tag.findByIdAndUpdate(subscription.tagId, { subscriptionStatus: 'active' });
-    } else if (status === 'expired') {
-      await Tag.findByIdAndUpdate(subscription.tagId, { subscriptionStatus: 'expired' });
-    } else if (status === 'grace_period') {
-      await Tag.findByIdAndUpdate(subscription.tagId, { subscriptionStatus: 'grace_period' });
+    // Update tag subscription status (skip for Gold memberships — no physical tag)
+    if (subscription.tagId) {
+      if (status === 'active') {
+        await Tag.findByIdAndUpdate(subscription.tagId, { subscriptionStatus: 'active' });
+      } else if (status === 'expired') {
+        await Tag.findByIdAndUpdate(subscription.tagId, { subscriptionStatus: 'expired' });
+      } else if (status === 'grace_period') {
+        await Tag.findByIdAndUpdate(subscription.tagId, { subscriptionStatus: 'grace_period' });
+      }
     }
 
     res.json({
@@ -240,7 +242,9 @@ router.post('/:id/extend', requirePermission('subscription.update'), async (req:
 
     if (subscription.status === 'grace_period' || subscription.status === 'expired') {
       subscription.status = 'active';
-      await Tag.findByIdAndUpdate(subscription.tagId, { subscriptionStatus: 'active' });
+      if (subscription.tagId) {
+        await Tag.findByIdAndUpdate(subscription.tagId, { subscriptionStatus: 'active' });
+      }
     }
 
     subscription.reminderStates = {

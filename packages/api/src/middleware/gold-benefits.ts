@@ -20,15 +20,11 @@ export async function requireGoldMember(req: AuthRequest, res: Response, next: N
       return res.status(404).json({ success: false, error: 'User not found' });
     }
 
-    // Check if user has Gold subscription (price from CMS setting)
-    const goldPriceSetting = await Setting.findOne({ key: 'guardian.goldPrice' }).lean();
-    const goldPrice = parseFloat(goldPriceSetting?.value || '1.99');
-    
+    // Check if user has Gold subscription (planType: 'gold')
     const goldSubscription = await Subscription.findOne({
       userId,
       status: 'active',
-      planType: 'monthly',
-      price: goldPrice,
+      planType: 'gold',
     }).lean();
 
     if (!goldSubscription) {
@@ -63,12 +59,10 @@ export async function checkGoldBenefits(req: AuthRequest, _res: Response, next: 
       return next();
     }
 
-    const goldPrice = await getGuardianNumber('goldPrice');
     const goldSubscription = await Subscription.findOne({
       userId,
       status: 'active',
-      planType: 'monthly',
-      price: goldPrice,
+      planType: 'gold',
     }).lean();
 
     (req as any).isGoldMember = !!goldSubscription;

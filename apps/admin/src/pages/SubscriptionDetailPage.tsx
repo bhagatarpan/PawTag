@@ -171,8 +171,15 @@ export default function SubscriptionDetailPage() {
                   {sub.status.replace('_', ' ')}
                 </span>
               </InfoRow>
-              <InfoRow label="Plan" value={sub.planName} />
-              <InfoRow label="Price" value={`$${sub.price.toFixed(2)}/mo`} />
+              <InfoRow label="Plan">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium">{sub.planName}</span>
+                  {sub.planType === 'gold' && (
+                    <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">Gold</span>
+                  )}
+                </div>
+              </InfoRow>
+              <InfoRow label="Price" value={sub.planType === 'gold' ? 'Gold Membership' : `$${sub.price.toFixed(2)}/mo`} />
               <InfoRow label="Auto-renew" value={sub.autoRenew ? 'Yes' : 'No'} />
               <InfoRow label="Start Date" value={formatDate(sub.startDate)} />
               <InfoRow label="Free Period Ends" value={sub.freePeriodEndsAt ? formatDate(sub.freePeriodEndsAt) : 'N/A'} />
@@ -303,21 +310,39 @@ export default function SubscriptionDetailPage() {
           </div>
 
           <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Tag</h2>
-            <div className="space-y-3">
-              <div>
-                <div className="text-sm text-gray-500">Tag ID</div>
-                <div className="text-sm font-mono font-medium">{sub.tagId?.tagId || 'N/A'}</div>
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">{sub.planType === 'gold' ? 'Gold Membership' : 'Tag'}</h2>
+            {sub.planType === 'gold' ? (
+              <div className="space-y-3">
+                <div>
+                  <div className="text-sm text-gray-500">Tag</div>
+                  <div className="text-sm font-medium">No physical tag required</div>
+                </div>
+                <div>
+                  <div className="text-sm text-gray-500">Benefits</div>
+                  <ul className="text-sm text-gray-700 space-y-1 mt-1">
+                    <li className="flex items-center gap-2"><span className="text-amber-500">★</span> 2× Guardian Points on all purchases</li>
+                    <li className="flex items-center gap-2"><span className="text-amber-500">★</span> Higher PawRewards balance</li>
+                    <li className="flex items-center gap-2"><span className="text-amber-500">★</span> Priority support &amp; early access</li>
+                    <li className="flex items-center gap-2"><span className="text-amber-500">★</span> Gold badge on profile</li>
+                  </ul>
+                </div>
               </div>
-              <div>
-                <div className="text-sm text-gray-500">Type</div>
-                <div className="text-sm font-medium capitalize">{sub.tagId?.tagType || 'N/A'}</div>
+            ) : (
+              <div className="space-y-3">
+                <div>
+                  <div className="text-sm text-gray-500">Tag ID</div>
+                  <div className="text-sm font-mono font-medium">{sub.tagId?.tagId || 'N/A'}</div>
+                </div>
+                <div>
+                  <div className="text-sm text-gray-500">Type</div>
+                  <div className="text-sm font-medium capitalize">{sub.tagId?.tagType || 'N/A'}</div>
+                </div>
+                <div>
+                  <div className="text-sm text-gray-500">Status</div>
+                  <div className="text-sm font-medium capitalize">{sub.tagId?.status || 'N/A'}</div>
+                </div>
               </div>
-              <div>
-                <div className="text-sm text-gray-500">Status</div>
-                <div className="text-sm font-medium capitalize">{sub.tagId?.status || 'N/A'}</div>
-              </div>
-            </div>
+            )}
           </div>
         </div>
       </div>

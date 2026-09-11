@@ -15,6 +15,7 @@ A comprehensive pet recovery platform using QR code and NFC tags. When a pet goe
 - [Database](#database)
 - [Running the Application](#running-the-application)
 - [Application Workflows](#application-workflows)
+- [Gold Membership](#gold-membership)
 - [User Roles and Permissions](#user-roles-and-permissions)
 - [Admin Portal](#admin-portal)
 - [PuckEditor CMS Page Builder](#puckeditor-cms-page-builder)
@@ -88,6 +89,15 @@ PawTag is a pet recovery platform that solves the problem of reuniting lost pets
 - Discount/promo code management (percentage, fixed, usage limits)
 - CMS-driven commerce settings (35+ configurable settings)
 - Cart configuration via CMS: TTL, max items per cart, price revalidation toggle
+
+### Gold Membership
+- Premium subscription tier with monthly Stripe billing
+- Free NZ-wide shipping on all orders
+- 2x Guardian loyalty points on every purchase
+- Gold member badge on profile
+- CMS-driven pricing and benefits (admin-configurable)
+- Stripe Subscription integration for recurring billing
+- Admin Stripe reporting dashboard for per-customer billing data
 
 ### Mobile App (React Native/Expo)
 - QR code scanning
@@ -613,6 +623,49 @@ Products are managed through PawTag's admin portal. The product catalog supports
 | Shop page | `apps/web` | Fetches from PawTag API, displays with PawTag UI |
 | Subscription logic | `packages/api` (MongoDB) | Reads product metadata for subscription config |
 
+### Gold Membership
+
+Gold is PawTag's premium subscription tier. Customers pay a monthly fee via Stripe to receive enhanced benefits.
+
+**How customers get Gold:**
+- Upgrade via the customer portal (`/account/subscription-upgrade`)
+- Subscribe during onboarding (if enabled)
+- Admin can manually upgrade a user's `planType` to `gold`
+
+**Gold Benefits:**
+- Free NZ-wide shipping on all orders (no minimum)
+- 2x Guardian loyalty points on every purchase
+- Gold member badge on profile
+- Priority customer support
+
+**Gold Detection:**
+Gold status is identified by `User.planType === 'gold'`. Benefits are applied automatically in:
+- Shipping service (free shipping)
+- Points earning engine (2x multiplier)
+- Checkout (free shipping applied)
+- Frontend (Gold badge display)
+
+**Stripe Integration:**
+Gold billing uses Stripe Subscriptions for recurring monthly charges:
+1. Customer subscribes via `POST /api/customer/subscriptions/gold/subscribe`
+2. Backend creates a Stripe Customer (if not exists) and Stripe Subscription
+3. Stripe charges the customer monthly
+4. Webhook updates subscription status (active, past_due, cancelled)
+5. Gold benefits are active while `planType === 'gold'` and subscription is active
+
+**CMS Settings (admin-configurable):**
+
+| Setting Key | Default | Purpose |
+|-------------|---------|---------|
+| `gold.price.monthly` | `14.99` | Monthly subscription price (NZD) |
+| `gold.pointsMultiplier` | `2` | Loyalty points multiplier |
+| `gold.freeShippingThreshold` | `0` | Minimum order for free shipping (0 = always free) |
+| `gold.enabled` | `true` | Enable/disable Gold subscriptions |
+| `gold.trialDays` | `0` | Free trial period (days) |
+
+**Admin Stripe Reporting:**
+The `/admin/stripe-report` page provides per-customer Stripe data including Customer details, active subscriptions, billing history, payment methods, recent charges, and refund status.
+
 ### Order Lifecycle
 
 ```mermaid
@@ -842,7 +895,7 @@ The Admin Portal is the operational control centre of the application. It provid
 | **Catalog** | Product catalog — Products, Categories, Collections, Brands, Tags |
 | **Inventory** | Stock management — Stock, Adjustments, Stock History |
 | **Orders & Fulfilment** | Order lifecycle — All Orders, Pending, Processing, Invoices, Shipments, Returns |
-| **Payments & Refunds** | Financial — Transactions, Refunds, Refund Report, Reconciliation, Shipping Methods |
+| **Payments & Refunds** | Financial — Transactions, Refunds, Refund Report, Reconciliation, Shipping Methods, Stripe Report |
 | **Subscriptions & Loyalty** | Subscription Plans, Customer Subscriptions, Guardian Dashboard, Members, Analytics, Guardian Settings |
 | **Discounts & Promotions** | Discount Codes, Referral Program |
 | **Users & Pets** | User management — Customers, Admin Users, Pets |

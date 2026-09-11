@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import { AuthRequest, authenticate } from '../middleware/auth';
-import { User } from '@pawtag/db';
+import { User, Subscription } from '@pawtag/db';
 import { auditService, type AuditContext } from '../services/audit';
 import { createAuditContextFromRequest, type AuditRequest } from '../middleware/audit';
 import { createDbRateLimiter } from '../lib/rate-limiter';
@@ -351,6 +351,14 @@ router.get('/tier', async (req: AuthRequest, res: Response) => {
     const tierInfo = await calculateTier(userId);
     const benefits = tierInfo.benefits;
 
+    // Check Gold membership
+    const goldSubscription = await Subscription.findOne({
+      userId,
+      status: 'active',
+      planType: 'gold',
+    }).lean();
+    const isGoldMember = !!goldSubscription;
+
     await auditCustomerGuardianEvent(req, {
       action: 'guardian_tier_viewed',
       eventType: 'CUSTOMER_ACTION',
@@ -368,6 +376,7 @@ router.get('/tier', async (req: AuthRequest, res: Response) => {
         nextTier: tierInfo.nextTier,
         pointsToNextTier: tierInfo.pointsToNextTier,
         benefits,
+        isGoldMember,
       },
     });
   } catch (error) {

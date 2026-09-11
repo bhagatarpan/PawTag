@@ -55,7 +55,7 @@ function setupMocks(points: number, isGold = false, orderCount = 0) {
 
   mockSubscription.findOne.mockReturnValue({
     lean: vi.fn().mockReturnValue(
-      isGold ? { planType: 'monthly', price: 1.99 } : { planType: 'annual', price: 0.99 }
+      isGold ? { planType: 'gold', price: 1.99 } : { planType: 'annual', price: 0.99 }
     ),
   } as any);
 
@@ -603,12 +603,12 @@ describe('Subscription type detection', () => {
     expect(result.isGoldMember).toBe(false);
   });
 
-  it('monthly subscription at wrong price is not Gold', async () => {
+  it('monthly subscription is not Gold', async () => {
     mockUser.findById.mockReturnValue({
       lean: vi.fn().mockReturnValue({ _id: 'u1', guardianPoints: 50 }),
     } as any);
     mockSubscription.findOne.mockReturnValue({
-      lean: vi.fn().mockReturnValue({ planType: 'monthly', price: 9.99 }),
+      lean: vi.fn().mockReturnValue({ planType: 'monthly', price: 1.99 }),
     } as any);
     mockOrder.countDocuments.mockResolvedValue(0);
     mockLedger.countDocuments.mockResolvedValue(0);
