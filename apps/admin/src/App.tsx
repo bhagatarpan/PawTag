@@ -54,6 +54,10 @@ import SiteAvailabilitySettings from './pages/SiteAvailabilitySettings';
 import WebhookSettings from './pages/WebhookSettings';
 import AddressAutocompleteSettings from './pages/AddressAutocompleteSettings';
 import CommerceSettings from './pages/CommerceSettings';
+import CommunicationsTemplates from './pages/communications/CommunicationsTemplates';
+import CommunicationsTemplateDetail from './pages/communications/CommunicationsTemplateDetail';
+import CommunicationsAudit from './pages/communications/CommunicationsAudit';
+import CommunicationsAuditDetail from './pages/communications/CommunicationsAuditDetail';
 import Invoices from './pages/Invoices';
 import Inventory from './pages/Inventory';
 import Categories from './pages/Categories';
@@ -227,6 +231,10 @@ export default function App() {
       <Route path="/webhooks" element={<ProtectedRoute><WebhookSettings /></ProtectedRoute>} />
       <Route path="/address-autocomplete" element={<ProtectedRoute><AddressAutocompleteSettings /></ProtectedRoute>} />
       <Route path="/commerce-settings" element={<ProtectedRoute><CommerceSettings /></ProtectedRoute>} />
+      <Route path="/communications/templates" element={<ProtectedRoute><CommunicationsTemplates /></ProtectedRoute>} />
+      <Route path="/communications/templates/:id" element={<ProtectedRoute><CommunicationsTemplateDetail /></ProtectedRoute>} />
+      <Route path="/communications/audit" element={<ProtectedRoute><CommunicationsAudit /></ProtectedRoute>} />
+      <Route path="/communications/audit/:id" element={<ProtectedRoute><CommunicationsAuditDetail /></ProtectedRoute>} />
       <Route path="/invoices" element={<ProtectedRoute><Invoices /></ProtectedRoute>} />
       <Route path="/inventory" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
       <Route path="/inventory/adjustments" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />

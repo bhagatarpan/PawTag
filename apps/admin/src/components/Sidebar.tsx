@@ -231,6 +231,17 @@ const sections: SidebarSection[] = [
       { to: '/cms/pet-references', label: 'Pet References', icon: PawPrint, permission: 'cms.pet_reference.read' },
     ],
   },
+  // ─── Communications ──────────────────────────────────────
+  {
+    id: 'communications',
+    label: 'Communications',
+    icon: Mail,
+    color: 'text-blue-300',
+    links: [
+      { to: '/communications/templates', label: 'Email Templates', icon: Mail, permission: 'cms.email_template.read' },
+      { to: '/communications/audit', label: 'Email Audit', icon: Database, permission: 'communication.email_audit.read' },
+    ],
+  },
   // ─── Settings ─────────────────────────────────────────────
   {
     id: 'settings',
