@@ -231,10 +231,10 @@ const sections: SidebarSection[] = [
       { to: '/cms/pet-references', label: 'Pet References', icon: PawPrint, permission: 'cms.pet_reference.read' },
     ],
   },
-  // ─── Communications ──────────────────────────────────────
+  // ─── Email Communication Centre ─────────────────────────
   {
     id: 'communications',
-    label: 'Communications',
+    label: 'Email Communication Centre',
     icon: Mail,
     color: 'text-blue-300',
     links: [
