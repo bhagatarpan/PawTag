@@ -120,6 +120,10 @@ const PUBLIC_SETTING_KEYS = [
   'seo.defaultKeywords',
   'contact.businessHours',
   'contact.businessHoliday',
+  // Gold membership settings (used by frontend for dynamic pricing)
+  'guardian.goldPrice',
+  'guardian.goldFreeShippingThreshold',
+  'guardian.goldMultiplier',
 ];
 
 router.get('/settings', async (_req: Request, res: Response) => {
