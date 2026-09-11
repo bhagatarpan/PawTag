@@ -22,6 +22,7 @@
 import { Order, Invoice, InvoiceAccessToken, User, Notification, Tag, Subscription } from '@pawtag/db';
 import { DuplicateOrderError } from '../commerce/errors';
 import { sendOrderConfirmation, sendInvoiceEmail, sendMail } from './email.service';
+import { renderNewOrderAlertEmail } from './email/templates';
 import { generateInvoiceHtml } from './invoice-html.service';
 import { sendPushToUser } from './push-notification.service';
 import { generateSecureToken, hashToken } from './auth.service';
@@ -313,10 +314,7 @@ export async function createPawTagOrder(params: CreateOrderParams): Promise<Crea
         sendMail(
           adminEmail,
           `New PawTag order: ${orderNumber}`,
-          `<h2>New Order Received</h2>
-           <p><strong>Order:</strong> ${orderNumber}</p>
-           <p><strong>Customer:</strong> ${user.fullName || 'Unknown'} (${user.email})</p>
-           <p><strong>Amount:</strong> $${total.toFixed(2)} NZD</p>`,
+          renderNewOrderAlertEmail(orderNumber, user.fullName || 'Unknown', user.email, total),
         ).catch((err) => logger.error({ err }, 'Admin notification email error')),
       );
     }
