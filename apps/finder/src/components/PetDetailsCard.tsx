@@ -1,4 +1,4 @@
-import { Syringe, Cpu } from 'lucide-react';
+import { Syringe, Cpu, User } from 'lucide-react';
 import type { FinderData, Vaccination, Microchip } from '../types';
 
 interface PetDetailsCardProps {
@@ -122,20 +122,22 @@ export default function PetDetailsCard({ data }: PetDetailsCardProps) {
           )}
         </div>
 
-        {/* Row 3: Owner */}
-        <DetailRow
-          icon={<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>}
-          label="Owner"
-          value={
-            data.ownerName
+        {/* Owner */}
+        <div className="mt-4 p-3 bg-purple-50 rounded-xl border border-purple-200">
+          <div className="flex items-center gap-2 mb-1">
+            <User size={16} className="text-purple-600" />
+            <span className="text-sm font-semibold text-purple-800">Owner</span>
+          </div>
+          <p className="text-sm text-purple-700">
+            {data.ownerName
               ? data.ownerLocation
                 ? `${data.ownerName}, ${data.ownerLocation}`
                 : data.ownerName
               : data.ownerLocation
                 ? `Owner opted not to share their name; ${data.ownerLocation}`
-                : 'Owner opted not to share their name'
-          }
-        />
+                : 'Owner opted not to share their name'}
+          </p>
+        </div>
       </div>
 
       {/* Vaccinations */}
