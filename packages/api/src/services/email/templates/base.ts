@@ -52,10 +52,10 @@ export function renderBase(data: BaseTemplateData): string {
     }
   </style>
 </head>
-<body style="margin:0;padding:0;background-color:#14b8a6;font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;">
+<body style="margin:0;padding:0;background-color:#134e4a;font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;">
   <span style="display:none !important;visibility:hidden;mso-hide:all;font-size:1px;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">${preheader}</span>
 
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#14b8a6;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#134e4a;">
     <tr>
       <td align="center" style="padding:32px 16px;">
         <table role="presentation" class="email-container" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
@@ -65,7 +65,7 @@ export function renderBase(data: BaseTemplateData): string {
             <td style="background:${t.gradient};padding:32px 40px;border-radius:12px 12px 0 0;text-align:center;">
               <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto;">
                 <tr>
-                  <td style="background:rgba(255,255,255,0.15);border-radius:10px;padding:8px;vertical-align:middle;">
+                  <td style="background:linear-gradient(135deg,#14b8a6,#0d9488);border-radius:10px;padding:10px;vertical-align:middle;">
                     ${PAW_ICON_SVG}
                   </td>
                   <td style="padding-left:10px;vertical-align:middle;">
