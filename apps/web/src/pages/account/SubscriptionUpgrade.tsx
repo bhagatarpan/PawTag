@@ -58,7 +58,7 @@ export default function SubscriptionUpgrade() {
     try {
       const [subsRes, plansRes, tierRes] = await Promise.all([
         api.get(API.customer.subscriptions.list).catch(() => ({ data: { data: [] } })),
-        api.get(`${API.admin.products.list}?isSubscription=true&isActive=true`).catch(() => ({ data: { data: [] } })),
+        api.get(API.products.list).catch(() => ({ data: { data: [] } })),
         api.get(API.customer.guardian.points).catch(() => ({ data: { data: null } })),
       ]);
 
@@ -67,7 +67,9 @@ export default function SubscriptionUpgrade() {
         setSubscription(subs[0]);
       }
 
-      setPlans(plansRes.data.data || []);
+      const allProducts = plansRes.data.data || [];
+      const subscriptionPlans = allProducts.filter((p: any) => p.isSubscription === true);
+      setPlans(subscriptionPlans);
       setTierData(tierRes.data.data);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to load subscription data');
