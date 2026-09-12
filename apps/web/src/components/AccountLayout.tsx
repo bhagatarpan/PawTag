@@ -15,7 +15,7 @@ const NAV_ITEMS = [
   { path: '/account/orders', label: 'Orders', icon: ShoppingBag },
   { path: '/account/subscriptions', label: 'Subscriptions', icon: CreditCard },
   { path: '/account/guardian', label: 'Guardian', icon: Shield },
-  { path: '/account/upgrade', label: 'Go Gold', icon: Crown },
+  { path: '/account/gold', label: 'Go Gold', icon: Crown },
   { path: '/account/redeem-tag', label: 'Activate Tag', icon: QrCode },
   { path: '/account/notifications', label: 'Notifications', icon: Bell },
   { path: '/account/referrals', label: 'Referrals', icon: Gift },

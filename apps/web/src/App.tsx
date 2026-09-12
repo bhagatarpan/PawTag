@@ -42,6 +42,7 @@ import GuardianDashboard from './pages/account/GuardianDashboard';
 import GuardianPoints from './pages/account/GuardianPoints';
 import GuardianRewards from './pages/account/GuardianRewards';
 import SubscriptionUpgrade from './pages/account/SubscriptionUpgrade';
+import GoldUpgrade from './pages/account/GoldUpgrade';
 import GoldBenefits from './pages/account/GoldBenefits';
 import FloatingLoyaltyBadge from './components/FloatingLoyaltyBadge';
 import GuardianLanding from './pages/GuardianLanding';
@@ -130,6 +131,7 @@ export default function App() {
         <Route path="/account/guardian/rewards" element={<ProtectedRoute><AccountLayout><GuardianRewards /></AccountLayout></ProtectedRoute>} />
         <Route path="/account/guardian/benefits" element={<ProtectedRoute><AccountLayout><GoldBenefits /></AccountLayout></ProtectedRoute>} />
         <Route path="/account/upgrade" element={<ProtectedRoute><AccountLayout><SubscriptionUpgrade /></AccountLayout></ProtectedRoute>} />
+        <Route path="/account/gold" element={<ProtectedRoute><AccountLayout><GoldUpgrade /></AccountLayout></ProtectedRoute>} />
         <Route path="/account/notifications" element={<ProtectedRoute><AccountLayout><Notifications /></AccountLayout></ProtectedRoute>} />
         <Route path="/account/notification-preferences" element={<ProtectedRoute><AccountLayout><NotificationPreferences /></AccountLayout></ProtectedRoute>} />
         <Route path="/account/redeem-tag" element={<ProtectedRoute><AccountLayout><RedeemTag /></AccountLayout></ProtectedRoute>} />

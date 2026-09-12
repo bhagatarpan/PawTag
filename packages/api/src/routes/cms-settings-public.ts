@@ -113,6 +113,12 @@ const PUBLIC_SETTING_KEYS = [
   'checkout.currencyLabel',
   'pricing.bundle2Discount',
   'pricing.bundle3Discount',
+  'guardian.goldPrice',
+  'guardian.goldMultiplier',
+  'guardian.goldFreeShippingThreshold',
+  'guardian.gold.benefits',
+  'guardian.gold.heroHeadline',
+  'guardian.gold.heroSubtext',
 ];
 
 router.get('/settings', async (_req: Request, res: Response) => {
