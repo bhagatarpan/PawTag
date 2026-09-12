@@ -74,6 +74,18 @@ router.get('/points', async (req: AuthRequest, res: Response) => {
       .limit(50)
       .lean();
 
+    // Get tier benefits and next tier info
+    const { getTierBenefits, TIER_THRESHOLDS } = require('../services/loyalty/tier.service');
+    type TierName = 'CARE' | 'NURTURE' | 'PROTECTOR' | 'SAFEGUARD';
+    const tier = (user.guardianTier || 'CARE') as TierName;
+    const benefits = await getTierBenefits(tier);
+
+    // Calculate next tier and points needed
+    const tierOrder: TierName[] = ['CARE', 'NURTURE', 'PROTECTOR', 'SAFEGUARD'];
+    const currentIndex = tierOrder.indexOf(tier);
+    const nextTier = currentIndex < tierOrder.length - 1 ? tierOrder[currentIndex + 1] : null;
+    const pointsToNextTier = nextTier ? (TIER_THRESHOLDS[nextTier].min - (user.guardianPoints || 0)) : null;
+
     await auditCustomerGuardianEvent(req, {
       action: 'guardian_points_viewed',
       eventType: 'CUSTOMER_ACTION',
@@ -87,9 +99,13 @@ router.get('/points', async (req: AuthRequest, res: Response) => {
       success: true,
       data: {
         points: user.guardianPoints || 0,
-        tier: user.guardianTier || 'CARE',
+        tier,
         pawRewardsBalance: user.pawRewardsBalance || 0,
         recentHistory,
+        benefits,
+        pointsToNextTier: pointsToNextTier !== null ? Math.max(0, pointsToNextTier) : null,
+        nextTier,
+        displayName: benefits.displayName,
       },
     });
   } catch (error) {
