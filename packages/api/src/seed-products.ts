@@ -166,15 +166,17 @@ async function seedProducts() {
     for (const productData of products) {
       const existing = await Product.findOne({ sku: productData.sku });
       if (existing) {
-        // Update customisation fields on existing products if they differ
-        const updates: Record<string, any> = {};
-        if (existing.customizable !== productData.customizable) updates.customizable = productData.customizable;
-        if (existing.customizationLabel !== productData.customizationLabel) updates.customizationLabel = productData.customizationLabel;
-        if (existing.customizationPrice !== productData.customizationPrice) updates.customizationPrice = productData.customizationPrice;
-        if (Object.keys(updates).length > 0) {
+      // Update fields on existing products if they differ
+      const updates: Record<string, any> = {};
+      if (existing.customizable !== productData.customizable) updates.customizable = productData.customizable;
+      if (existing.customizationLabel !== productData.customizationLabel) updates.customizationLabel = productData.customizationLabel;
+      if (existing.customizationPrice !== productData.customizationPrice) updates.customizationPrice = productData.customizationPrice;
+      if (existing.isActive !== productData.isActive) updates.isActive = productData.isActive;
+      if (existing.isSubscription !== productData.isSubscription) updates.isSubscription = productData.isSubscription;
+      if (Object.keys(updates).length > 0) {
           await Product.updateOne({ _id: existing._id }, { $set: updates });
           updated++;
-          console.log(`  ~ ${productData.name} (${productData.sku}) — updated customisation`);
+          console.log(`  ~ ${productData.name} (${productData.sku}) — updated fields`);
         } else {
           skipped++;
         }
