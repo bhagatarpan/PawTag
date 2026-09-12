@@ -4,6 +4,8 @@ import { renderBase, renderCtaButton } from './email/templates/base';
 import logger from '../lib/logger';
 import { logIntegration } from '../lib/timing';
 import { recordEmailAudit } from './email-audit.service';
+import { parseUserAgent } from '../lib/user-agent';
+import { getLocationFromIp } from '../lib/geo-location';
 import {
   renderVerificationEmail,
   renderWelcomeEmail,
@@ -210,11 +212,14 @@ export async function sendPasswordChangedEmail(
   name: string,
   changedBy: 'self' | string,
   ipAddress?: string,
+  userAgent?: string,
 ): Promise<EmailResult> {
-  const vars = { name, changedBy, ipAddress: ipAddress || '' };
+  const { browser, device } = userAgent ? parseUserAgent(userAgent) : { browser: undefined, device: undefined };
+  const location = ipAddress ? await getLocationFromIp(ipAddress).catch(() => undefined) : undefined;
+  const vars = { name, changedBy, ipAddress: ipAddress || '', browser: browser || '', device: device || '', location: location || '' };
   const cms = await renderCmsEmail('password-changed', vars);
   if (cms) return sendMail(to, cms.subject, cms.html, cms.from);
-  const html = renderPasswordChangedEmail({ name, changedBy, ipAddress });
+  const html = renderPasswordChangedEmail({ name, changedBy, ipAddress, browser, device, location });
   return sendMail(to, 'Your password has been changed — PawTag', html);
 }
 
@@ -256,7 +261,9 @@ export async function sendLoginNotification(
   success: boolean,
 ): Promise<EmailResult> {
   const timestamp = new Date().toLocaleString('en-NZ', { timeZone: 'Pacific/Auckland' });
-  const html = renderLoginNotificationEmail({ name, email, ipAddress, userAgent, timestamp, success });
+  const { browser, device } = parseUserAgent(userAgent);
+  const location = await getLocationFromIp(ipAddress).catch(() => 'Unknown');
+  const html = renderLoginNotificationEmail({ name, email, ipAddress, userAgent, timestamp, success, browser, device, location });
   const subject = success
     ? 'New login to your PawTag admin account'
     : 'Failed login attempt on your PawTag admin account';

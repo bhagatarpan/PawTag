@@ -7,6 +7,8 @@ export function renderLoginNotificationEmail(data: {
   userAgent: string;
   timestamp: string;
   success: boolean;
+  browser?: string;
+  device?: string;
   location?: string;
 }): string {
   const statusColor = data.success ? '#0d9488' : '#dc2626';
@@ -39,12 +41,16 @@ export function renderLoginNotificationEmail(data: {
           <td style="padding:4px 0;color:#374151;font-weight:500;">${data.email}</td>
         </tr>
         <tr>
-          <td style="padding:4px 0;color:#6b7280;">IP Address</td>
-          <td style="padding:4px 0;color:#374151;font-weight:500;">${data.ipAddress}</td>
+          <td style="padding:4px 0;color:#6b7280;">Browser</td>
+          <td style="padding:4px 0;color:#374151;font-weight:500;">${data.browser || 'Unknown'}</td>
         </tr>
         <tr>
-          <td style="padding:4px 0;color:#6b7280;">Time</td>
-          <td style="padding:4px 0;color:#374151;font-weight:500;">${data.timestamp}</td>
+          <td style="padding:4px 0;color:#6b7280;">Device</td>
+          <td style="padding:4px 0;color:#374151;font-weight:500;">${data.device || 'Unknown'}</td>
+        </tr>
+        <tr>
+          <td style="padding:4px 0;color:#6b7280;">IP Address</td>
+          <td style="padding:4px 0;color:#374151;font-weight:500;font-family:monospace;">${data.ipAddress}</td>
         </tr>
         ${data.location ? `
         <tr>
@@ -53,8 +59,8 @@ export function renderLoginNotificationEmail(data: {
         </tr>
         ` : ''}
         <tr>
-          <td style="padding:4px 0;color:#6b7280;">Device</td>
-          <td style="padding:4px 0;color:#374151;font-weight:500;word-break:break-all;">${data.userAgent}</td>
+          <td style="padding:4px 0;color:#6b7280;">Time</td>
+          <td style="padding:4px 0;color:#374151;font-weight:500;">${data.timestamp}</td>
         </tr>
       </table>
     `)}
@@ -75,8 +81,8 @@ export function renderLoginNotificationEmail(data: {
     title: data.success ? 'Admin Login Notification' : 'Admin Login Alert',
     subtitle: 'PawTag security notification',
     preheader: data.success
-      ? `New login detected on your PawTag admin account from ${data.ipAddress}`
-      : `Failed login attempt detected on your PawTag admin account from ${data.ipAddress}`,
+      ? `New login detected on your PawTag admin account from ${data.browser || 'unknown device'}`
+      : `Failed login attempt detected on your PawTag admin account from ${data.browser || 'unknown device'}`,
     bodyHtml,
   });
 }

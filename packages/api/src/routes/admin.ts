@@ -581,7 +581,7 @@ router.post('/users/:id/reset-password', requirePermission('user.reset_password'
     });
 
     const clientInfo = { ipAddress: req.ip || req.connection?.remoteAddress, userAgent: req.headers['user-agent'] };
-    sendPasswordChangedEmail(user.email, user.fullName, req.user!.id, clientInfo.ipAddress).catch((err) => {
+    sendPasswordChangedEmail(user.email, user.fullName, req.user!.id, clientInfo.ipAddress, clientInfo.userAgent).catch((err) => {
       logger.error({ err, targetUserId: req.params.id, targetEmail: user.email }, 'Failed to send password changed email');
     });
 
