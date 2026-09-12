@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Crown, Check, ArrowRight, Star, Shield } from 'lucide-react';
 import { API } from '@pawtag/shared/api';
@@ -60,6 +60,14 @@ export default function GoldUpgrade() {
   const goldBenefits: GoldBenefits[] = (() => {
     try {
       const raw = settings['guardian.gold.benefits'];
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  })();
+  const goldComparison: Array<{ feature: string; guardian: string; gold: string }> = (() => {
+    try {
+      const raw = settings['guardian.gold.comparison'];
       return raw ? JSON.parse(raw) : [];
     } catch {
       return [];
@@ -168,25 +176,13 @@ export default function GoldUpgrade() {
           <div className="font-medium text-gray-500">Guardian</div>
           <div className="font-medium text-amber-600">Gold</div>
 
-          <div className="py-2 border-t border-gray-100">Points multiplier</div>
-          <div className="py-2 border-t border-gray-100">1×</div>
-          <div className="py-2 border-t border-gray-100 font-semibold text-amber-600">{goldMultiplier}×</div>
-
-          <div className="py-2 border-t border-gray-100">Monthly PawRewards</div>
-          <div className="py-2 border-t border-gray-100">$2/mo</div>
-          <div className="py-2 border-t border-gray-100 font-semibold text-amber-600">$3/mo</div>
-
-          <div className="py-2 border-t border-gray-100">Free shipping</div>
-          <div className="py-2 border-t border-gray-100">Over $100</div>
-          <div className="py-2 border-t border-gray-100 font-semibold text-amber-600">Over $50</div>
-
-          <div className="py-2 border-t border-gray-100">Early access</div>
-          <div className="py-2 border-t border-gray-100 text-gray-400">—</div>
-          <div className="py-2 border-t border-gray-100 font-semibold text-amber-600">✓</div>
-
-          <div className="py-2 border-t border-gray-100">Priority support</div>
-          <div className="py-2 border-t border-gray-100 text-gray-400">—</div>
-          <div className="py-2 border-t border-gray-100 font-semibold text-amber-600">✓</div>
+          {goldComparison.map((row, index) => (
+            <React.Fragment key={index}>
+              <div className="py-2 border-t border-gray-100">{row.feature}</div>
+              <div className="py-2 border-t border-gray-100">{row.guardian}</div>
+              <div className="py-2 border-t border-gray-100 font-semibold text-amber-600">{row.gold}</div>
+            </React.Fragment>
+          ))}
         </div>
       </div>
     </div>

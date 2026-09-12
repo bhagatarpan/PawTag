@@ -119,6 +119,7 @@ const PUBLIC_SETTING_KEYS = [
   'guardian.gold.benefits',
   'guardian.gold.heroHeadline',
   'guardian.gold.heroSubtext',
+  'guardian.gold.comparison',
 ];
 
 router.get('/settings', async (_req: Request, res: Response) => {
