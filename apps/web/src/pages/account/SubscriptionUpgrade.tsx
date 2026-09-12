@@ -67,7 +67,7 @@ export default function SubscriptionUpgrade() {
         setSubscription(subs[0]);
       }
 
-      const allProducts = plansRes.data.data || [];
+      const allProducts = plansRes.data.data?.items || [];
       const subscriptionPlans = allProducts.filter((p: any) => p.isSubscription === true);
       setPlans(subscriptionPlans);
       setTierData(tierRes.data.data);
