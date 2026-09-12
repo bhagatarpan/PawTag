@@ -5,6 +5,7 @@ import { requirePermission } from '../middleware/permission';
 import { CmsEmailTemplate, EmailAudit, EmailTemplateVersion } from '@pawtag/db';
 import { auditService, type AuditContext } from '../services/audit';
 import { type AuditRequest } from '../middleware/audit';
+import { sendMail } from '../services/email.service';
 
 const router = Router();
 router.use(authenticate);
@@ -287,6 +288,51 @@ router.post('/templates/:id/send-test', requirePermission('communication.email_t
     const template = await CmsEmailTemplate.findOne({ _id: req.params.id, deletedAt: null });
     if (!template) { res.status(404).json({ success: false, error: 'Template not found' }); return; }
 
+    // Process conditionals and replace variables with sample data
+    const sampleVars: Record<string, string> = {};
+    for (const v of (template.variableDefinitions || [])) {
+      sampleVars[v.key] = v.example || `[${v.label}]`;
+    }
+
+    let body = template.body || '';
+    body = body.replace(/\{\{#(\w+)\}\}([\s\S]*?)\{\{\/\1\}\}/g, (_match, key, inner) => {
+      return sampleVars[key] ? inner : '';
+    });
+    body = body.replace(/\{\{(\w+)\}\}/g, (match, key) => sampleVars[key] ?? match);
+
+    // Convert plain text body to HTML paragraphs
+    const bodyHtml = body
+      .split('\n\n')
+      .map((p: string) => `<p style="color:#374151;font-size:15px;line-height:1.7;margin:0 0 16px;">${p.replace(/\n/g, '<br>')}</p>`)
+      .join('');
+
+    // Add CTA button if present
+    let contentHtml = bodyHtml;
+    const ctaUrl = template.ctaUrl ? template.ctaUrl.replace(/\{\{(\w+)\}\}/g, (_m: string, k: string) => sampleVars[k] ?? '') : '';
+    if (template.ctaText && ctaUrl) {
+      const { renderCtaButton } = await import('../services/email/templates/base');
+      contentHtml += renderCtaButton(ctaUrl, template.ctaText);
+    }
+
+    // Render with base template
+    const { renderBase } = await import('../services/email/templates/base');
+    const html = renderBase({
+      title: (template.title || '').replace(/\{\{(\w+)\}\}/g, (_m: string, k: string) => sampleVars[k] ?? ''),
+      subtitle: template.subtitle ? template.subtitle.replace(/\{\{(\w+)\}\}/g, (_m: string, k: string) => sampleVars[k] ?? '') : undefined,
+      preheader: template.preheader ? template.preheader.replace(/\{\{(\w+)\}\}/g, (_m: string, k: string) => sampleVars[k] ?? '') : undefined,
+      bodyHtml: contentHtml,
+    });
+
+    const subject = (template.subject || '').replace(/\{\{(\w+)\}\}/g, (_m: string, k: string) => sampleVars[k] ?? '');
+    const from = template.senderEmail ? `"${template.senderName}" <${template.senderEmail}>` : undefined;
+
+    // Actually send the email
+    const result = await sendMail(recipientEmail, subject, html, from, {
+      templateSlug: template.slug,
+      businessFlow: template.businessFlow || 'other',
+      isTest: true,
+    });
+
     // Update last tested
     template.lastTestedAt = new Date();
     template.lastTestedBy = new mongoose.Types.ObjectId(req.user!.id);
@@ -299,12 +345,16 @@ router.post('/templates/:id/send-test', requirePermission('communication.email_t
       operationType: 'CREATE',
       resourceType: 'CmsEmailTemplate',
       resourceId: req.params.id,
-      metadata: { slug: template.slug, recipientEmail },
-      outcome: 'SUCCESS',
+      metadata: { slug: template.slug, recipientEmail, success: result.success },
+      outcome: result.success ? 'SUCCESS' : 'FAILURE',
       severity: 'LOW',
     });
 
-    res.json({ success: true, data: { message: `Test email queued for ${recipientEmail}` } });
+    if (result.success) {
+      res.json({ success: true, data: { message: `Test email sent to ${recipientEmail}`, messageId: result.messageId } });
+    } else {
+      res.status(500).json({ success: false, error: result.error || 'Failed to send test email' });
+    }
   } catch {
     res.status(500).json({ success: false, error: 'Failed to send test email' });
   }
