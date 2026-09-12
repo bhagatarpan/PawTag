@@ -65,11 +65,9 @@ export function renderBase(data: BaseTemplateData): string {
             <td style="background:${t.gradient};padding:32px 40px;border-radius:12px 12px 0 0;text-align:center;">
               <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto;">
                 <tr>
-                  <td style="background:linear-gradient(135deg,#14b8a6,#0d9488);border-radius:10px;padding:10px;vertical-align:middle;">
-                    ${PAW_ICON_SVG}
-                  </td>
-                  <td style="padding-left:10px;vertical-align:middle;">
-                    <span style="font-size:22px;font-weight:700;color:#ffffff;letter-spacing:-0.5px;">Paw<span style="color:#ccfbf1;">Tag</span></span>
+                  <td style="padding:10px 0;vertical-align:middle;text-align:center;">
+                    <span style="font-size:28px;font-weight:800;color:#ffffff;letter-spacing:-0.5px;">Paw<span style="color:#ccfbf1;">Tag</span></span>
+                    <p style="margin:4px 0 0;font-size:11px;color:rgba(255,255,255,0.7);letter-spacing:1px;text-transform:uppercase;">Pet Recovery</p>
                   </td>
                 </tr>
               </table>
