@@ -490,14 +490,52 @@ export async function cancelSubscription(subscriptionId: string, reason?: string
   const subscription = await Subscription.findById(subscriptionId);
   if (!subscription) throw new Error('Subscription not found');
 
+  // Prevent double-cancel
+  if (subscription.cancelledAt) {
+    throw new Error('Subscription is already cancelled');
+  }
+
   const oldStatus = subscription.status;
   const userId = subscription.userId instanceof Object ? subscription.userId.toString() : String(subscription.userId);
   const tagId = subscription.tagId instanceof Object ? subscription.tagId.toString() : String(subscription.tagId);
+
+  // Disable auto-renewal and record cancellation
   subscription.autoRenew = false;
   subscription.cancelledAt = new Date();
   subscription.cancellationReason = reason;
 
+  // Cancel Stripe subscription if it exists
+  if (subscription.stripeSubscriptionId && process.env.STRIPE_SECRET_KEY) {
+    try {
+      const Stripe = (await import('stripe')).default;
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2024-06-20' as any });
+      await stripe.subscriptions.cancel(subscription.stripeSubscriptionId);
+      logger.info({ subscriptionId: subscription._id, stripeSubscriptionId: subscription.stripeSubscriptionId }, 'Stripe subscription cancelled');
+    } catch (stripeErr: any) {
+      // Log but don't fail the PawTag cancellation — the local record is still updated
+      logger.error({ err: stripeErr, subscriptionId: subscription._id }, 'Failed to cancel Stripe subscription — PawTag cancellation still recorded');
+    }
+  }
+
   await subscription.save();
+
+  // Send cancellation confirmation email
+  try {
+    const user = await User.findById(userId).select('fullName email').lean();
+    if (user?.email) {
+      const { sendMail } = await import('./email.service');
+      const { renderCancellationEmail } = await import('./email/templates/cancellation');
+      const html = renderCancellationEmail({
+        name: user.fullName || 'there',
+        planName: subscription.planName || 'PawTag Subscription',
+        cancelledAt: subscription.cancelledAt!.toLocaleDateString('en-NZ', { dateStyle: 'full' }),
+        currentPeriodEnd: subscription.currentPeriodEnd?.toLocaleDateString('en-NZ', { dateStyle: 'full' }) || 'current billing period',
+      });
+      await sendMail(user.email, `Your ${subscription.planName || 'PawTag'} subscription has been cancelled`, html).catch(() => {});
+    }
+  } catch (emailErr) {
+    logger.error({ err: emailErr, subscriptionId: subscription._id }, 'Failed to send cancellation email');
+  }
 
   await auditJobEvent({
     action: 'subscription_cancelled',
@@ -512,11 +550,11 @@ export async function cancelSubscription(subscriptionId: string, reason?: string
       userId,
       tagId,
       oldStatus,
-      newStatus: 'cancelled',
       cancellationReason: reason,
       cancelledAt: subscription.cancelledAt,
       planType: subscription.planType,
       planName: subscription.planName,
+      benefitsUntil: subscription.currentPeriodEnd,
     },
   });
 

@@ -34,3 +34,4 @@ export { renderGenericNotificationEmail } from './generic-notification';
 export { renderLowStockAlertEmail } from './low-stock-alert';
 export { renderSubscriptionWelcomeEmail as renderSubscriptionWelcomeTemplateEmail } from './subscription-welcome';
 export { renderInvoiceOtpEmail as renderInvoiceOtpTemplateEmail } from './invoice-otp';
+export { renderCancellationEmail } from './cancellation';
