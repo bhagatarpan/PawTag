@@ -100,6 +100,7 @@ router.get('/points', async (req: AuthRequest, res: Response) => {
       data: {
         points: user.guardianPoints || 0,
         tier,
+        currentTier: tier,
         pawRewardsBalance: user.pawRewardsBalance || 0,
         recentHistory,
         benefits,
