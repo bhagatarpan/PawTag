@@ -5,7 +5,7 @@ import api, { PaginatedData } from '../lib/api';
 import { toast } from '../lib/toast';
 import {
   SummaryCards, SearchBar, FilterChips, Pagination, EmptyState, ErrorState,
-  DetailDrawer, Section, DetailRow, StatusBadge, ConfirmDialog,
+  DetailDrawer, Section, DetailRow, StatusBadge, ConfirmDialog, CancellationInfoCard,
 } from '@pawtag/ui';
 import { OrderProgressStepper, OrderStatusBanner } from '@pawtag/ui';
 import RefundStatusCard from '../components/RefundStatusCard';
@@ -646,39 +646,7 @@ export function OrderDetailDrawer({
             </Section>
           )}
 
-          {order.status === 'cancelled' && (order.cancelledBy || order.cancellationReason) && (
-            <Section title="Cancellation Details" icon={<Ban size={16} />}>
-              {order.cancelledByDescription && (
-                <div className="mb-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
-                  {order.cancelledByDescription}
-                </div>
-              )}
-              {order.cancelledBy && <DetailRow label="Cancelled by" value={order.cancelledBy} />}
-              {order.cancelledByType && <DetailRow label="Role" value={order.cancelledByType} />}
-              {order.cancelledByPortal && (
-                <DetailRow
-                  label="Portal"
-                  value={
-                    order.cancelledByPortal === 'customer-web' ? 'Customer Web Portal' :
-                    order.cancelledByPortal === 'customer-mobile' ? 'Customer Mobile App' :
-                    order.cancelledByPortal === 'admin-web' ? 'Admin Web Portal' :
-                    order.cancelledByPortal === 'system' ? 'System (Auto)' :
-                    order.cancelledByPortal
-                  }
-                />
-              )}
-              {order.cancellationReason && <DetailRow label="Reason" value={order.cancellationReason} />}
-              {order.cancellationNotes && <DetailRow label="Additional notes" value={order.cancellationNotes} />}
-              {order.cancelledAt && (
-                <DetailRow
-                  label="Cancelled at"
-                  value={new Date(order.cancelledAt).toLocaleString('en-NZ', {
-                    day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
-                  })}
-                />
-              )}
-            </Section>
-          )}
+          <CancellationInfoCard data={order} />
 
           {order.status === 'cancelled' && order.refundStatus && (
             <div className="mt-3">

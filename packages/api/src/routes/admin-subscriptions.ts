@@ -5,6 +5,7 @@ import { Subscription, Invoice, Tag, User } from '@pawtag/db';
 import {
   renewSubscription,
   cancelSubscription,
+  createGoldSubscription,
 } from '../services/subscription.service';
 
 const router = Router();
@@ -180,13 +181,31 @@ router.put('/:id/status', requirePermission('subscription.update'), async (req: 
     }
 
     const oldStatus = subscription.status;
-    subscription.status = status;
 
+    // Use service layer for cancellation (handles Stripe, email, audit, metadata)
     if (status === 'cancelled') {
-      subscription.cancelledAt = new Date();
-      subscription.cancellationReason = reason || 'Admin override';
+      const adminUser = await User.findById(req.user!.id).select('fullName roles').lean();
+      const roleName = (adminUser?.roles as any[])?.[0] || 'Admin';
+
+      const cancelled = await cancelSubscription(subscription._id.toString(), reason || 'Admin override', {
+        sourceIp: (req.auditContext as any)?.sourceIp || req.ip,
+        userAgent: (req.auditContext as any)?.userAgent,
+        actorId: req.user?.id,
+        actorFullName: adminUser?.fullName || 'Admin',
+        actorRoleName: roleName,
+        portal: 'admin-web',
+      });
+
+      res.json({
+        success: true,
+        data: cancelled,
+        message: `Subscription cancelled`,
+      });
+      return;
     }
 
+    // For non-cancelled status changes, update directly
+    subscription.status = status;
     await subscription.save();
 
     // Update tag subscription status (skip for Gold memberships — no physical tag)
@@ -280,6 +299,53 @@ router.post('/:id/extend', requirePermission('subscription.update'), async (req:
     });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to extend subscription' });
+  }
+});
+
+/**
+ * @swagger
+ * /api/admin/subscriptions/gold/subscribe:
+ *   post:
+ *     summary: Subscribe a customer to Gold membership (admin action)
+ *     tags: [Admin Subscriptions]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.post('/gold/subscribe', requirePermission('subscription.update'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { userId, price } = req.body;
+    if (!userId) {
+      res.status(400).json({ success: false, error: 'userId is required' });
+      return;
+    }
+
+    const user = await User.findById(userId).select('fullName email').lean();
+    if (!user) {
+      res.status(404).json({ success: false, error: 'User not found' });
+      return;
+    }
+
+    // Check for existing active Gold subscription
+    const existing = await Subscription.findOne({
+      userId,
+      planName: 'Gold Membership',
+      status: { $in: ['active', 'grace_period'] },
+      deletedAt: null,
+    });
+    if (existing) {
+      res.status(409).json({ success: false, error: 'User already has an active Gold membership' });
+      return;
+    }
+
+    const subscription = await createGoldSubscription(userId, price);
+
+    res.json({
+      success: true,
+      data: subscription,
+      message: `Gold membership activated for ${user.fullName || user.email}`,
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message || 'Failed to create Gold subscription' });
   }
 });
 

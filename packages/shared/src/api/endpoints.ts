@@ -165,6 +165,7 @@ export const API = {
       get: (id: string) => `/admin/subscriptions/${id}` as const,
       setStatus: (id: string) => `/admin/subscriptions/${id}/status` as const,
       extend: (id: string) => `/admin/subscriptions/${id}/extend` as const,
+      goldSubscribe: '/admin/subscriptions/gold/subscribe',
     },
 
     // ---------------------------------------------------------------------------

@@ -242,7 +242,16 @@ router.put('/:id/cancel', requirePermission('customer.read'), async (req: AuthRe
       return;
     }
 
-    const cancelled = await cancelSubscription(subscription._id.toString(), req.body.reason);
+    const ctx = req.auditContext as any;
+    const cancelled = await cancelSubscription(subscription._id.toString(), req.body.reason, {
+      sourceIp: ctx?.sourceIp || req.ip,
+      userAgent: ctx?.userAgent,
+      deviceId: ctx?.deviceId,
+      actorId: req.user?.id,
+      actorFullName: (req.user as any)?.fullName,
+      actorRoleName: 'Customer',
+      portal: 'customer-web',
+    });
 
     res.json({ success: true, data: cancelled });
   } catch (error: any) {

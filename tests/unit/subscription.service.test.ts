@@ -140,11 +140,13 @@ describe('Subscription Service', () => {
   });
 
   describe('cancelSubscription', () => {
-    it('should set autoRenew to false and cancelledAt', async () => {
+    it('should set status to cancelled, autoRenew to false, and cancelledAt', async () => {
       const mockSub = {
         _id: new mongoose.Types.ObjectId(),
         status: 'active',
         autoRenew: true,
+        planName: 'Gold Membership',
+        planType: 'gold',
         save: vi.fn().mockResolvedValue(true),
       };
 
@@ -153,9 +155,38 @@ describe('Subscription Service', () => {
 
       const result = await cancelSubscription(mockSub._id.toString(), 'Too expensive');
 
+      expect(result.status).toBe('cancelled');
       expect(result.autoRenew).toBe(false);
       expect(result.cancelledAt).toBeDefined();
       expect(result.cancellationReason).toBe('Too expensive');
+    });
+
+    it('should populate cancellation metadata when context provided', async () => {
+      const mockSub = {
+        _id: new mongoose.Types.ObjectId(),
+        status: 'active',
+        autoRenew: true,
+        planName: 'Gold Membership',
+        planType: 'gold',
+        save: vi.fn().mockResolvedValue(true),
+      };
+
+      const { Subscription } = await import('@pawtag/db');
+      (Subscription.findById as any).mockResolvedValue(mockSub);
+
+      const context = {
+        actorFullName: 'John Smith',
+        actorRoleName: 'Customer',
+        portal: 'customer-web' as const,
+        sourceIp: '1.2.3.4',
+        userAgent: 'Chrome/120',
+      };
+      const result = await cancelSubscription(mockSub._id.toString(), 'Too expensive', context);
+
+      expect(result.cancelledBy).toContain('John Smith');
+      expect(result.cancelledByPortal).toBe('customer-web');
+      expect(result.cancelledByType).toBe('Customer');
+      expect(result.cancelledByDescription).toContain('Cancelled via Customer Web Portal');
     });
 
     it('should throw error if subscription not found', async () => {
@@ -164,6 +195,21 @@ describe('Subscription Service', () => {
 
       await expect(cancelSubscription(new mongoose.Types.ObjectId().toString()))
         .rejects.toThrow('Subscription not found');
+    });
+
+    it('should throw error if already cancelled', async () => {
+      const mockSub = {
+        _id: new mongoose.Types.ObjectId(),
+        status: 'active',
+        cancelledAt: new Date(),
+        save: vi.fn(),
+      };
+
+      const { Subscription } = await import('@pawtag/db');
+      (Subscription.findById as any).mockResolvedValue(mockSub);
+
+      await expect(cancelSubscription(mockSub._id.toString()))
+        .rejects.toThrow('Subscription is already cancelled');
     });
   });
 

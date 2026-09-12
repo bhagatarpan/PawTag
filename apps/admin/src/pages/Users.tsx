@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { API } from '@pawtag/shared/api';
 import api, { PaginatedData } from '../lib/api';
 import { toast } from '../lib/toast';
-import { StatusBadge, AddressAutocomplete } from '@pawtag/ui';
+import { StatusBadge, AddressAutocomplete, CancellationInfoCard } from '@pawtag/ui';
 import { OrderProgressStepper, OrderStatusBanner } from '@pawtag/ui';
 import type { AddressComponents } from '@pawtag/ui';
 import { ORDER_STATUS_LABELS, getStatusBadgeVariant, getStatusBorderColor, isTerminalStatus } from '@pawtag/shared';
@@ -47,6 +47,7 @@ import {
   Phone,
   Bell,
   Eye,
+  XCircle,
   EyeOff,
   Package,
   Gift,
@@ -920,6 +921,7 @@ export function DetailDrawer({
                   const isActive = sub.status === 'active';
                   const isGrace = sub.status === 'grace_period';
                   const isExpired = sub.status === 'expired';
+                  const isCancelled = sub.status === 'cancelled';
                   return (
                     <div key={sub._id} className="bg-white rounded-xl border border-gray-100 overflow-hidden hover:border-gray-200 hover:shadow-sm transition-all duration-200">
                       <div onClick={() => { onClose(); navigate(`/customer-subscriptions/${sub._id}`); }} className="p-5 cursor-pointer">
@@ -930,8 +932,11 @@ export function DetailDrawer({
                             </div>
                             <div>
                               <div className="flex items-center gap-2">
-                                <span className="font-mono font-bold text-gray-900 text-sm">{sub.tagId?.tagId || 'N/A'}</span>
-                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${isActive ? 'bg-emerald-50 text-emerald-700' : isGrace ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700'}`}>
+                                <span className="font-mono font-bold text-gray-900 text-sm">{sub.tagId?.tagId || sub.planName || 'N/A'}</span>
+                                {sub.planType === 'gold' && (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-amber-100 text-amber-700">Gold</span>
+                                )}
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${isCancelled ? 'bg-gray-100 text-gray-600' : isActive ? 'bg-emerald-50 text-emerald-700' : isGrace ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700'}`}>
                                   {sub.status.replace('_', ' ')}
                                 </span>
                               </div>
@@ -966,10 +971,21 @@ export function DetailDrawer({
                                 Grace ends {formatDate(sub.gracePeriodEndsAt)}
                               </span>
                             )}
+                            {isCancelled && sub.currentPeriodEnd && (
+                              <span className="flex items-center gap-1 text-amber-600 font-medium">
+                                <Clock size={12} />
+                                Benefits until {formatDate(sub.currentPeriodEnd)}
+                              </span>
+                            )}
                           </div>
                           <ChevronRight size={16} className="text-gray-400" />
                         </div>
                       </div>
+                      {isCancelled && (
+                        <div className="px-5 py-3">
+                          <CancellationInfoCard data={sub} />
+                        </div>
+                      )}
                       {(isGrace || isExpired) && (
                         <div className="px-5 py-3 bg-gradient-to-r from-amber-50 to-orange-50 border-t border-amber-100/60 flex items-center justify-between">
                           <div className="flex items-center gap-2 text-sm text-amber-700">
@@ -991,6 +1007,20 @@ export function DetailDrawer({
                             className="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-lg text-sm font-semibold hover:from-emerald-700 hover:to-teal-700 shadow-sm transition-all"
                           >
                             Renew — ${sub.planId?.price?.toFixed(2) || '0.00'}{sub.renewalMethod === 'annual' ? '/yr' : '/mo'}
+                          </button>
+                        </div>
+                      )}
+                      {isCancelled && sub.planType === 'gold' && (
+                        <div className="px-5 py-3 bg-gradient-to-r from-amber-50 to-orange-50 border-t border-amber-100/60 flex items-center justify-between">
+                          <div className="flex items-center gap-2 text-sm text-amber-700">
+                            <XCircle size={14} />
+                            <span>Gold membership cancelled — benefits until {formatDate(sub.currentPeriodEnd)}</span>
+                          </div>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); onClose(); navigate(`/customer-subscriptions/${sub._id}`); }}
+                            className="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-lg text-sm font-semibold hover:from-amber-600 hover:to-orange-600 shadow-sm transition-all"
+                          >
+                            View & Re-subscribe
                           </button>
                         </div>
                       )}

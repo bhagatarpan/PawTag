@@ -21,6 +21,11 @@ export interface ISubscriptionDocument extends Document {
   gracePeriodEndsAt?: Date;
   cancelledAt?: Date;
   cancellationReason?: string;
+  cancelledBy?: string;
+  cancelledByType?: string;
+  cancelledByPortal?: 'customer-web' | 'customer-mobile' | 'admin-web' | 'system';
+  cancelledByDescription?: string;
+  cancelledBenefitsExpiryReminderSent?: boolean;
 
   autoRenew: boolean;
   renewalMethod: 'annual' | 'monthly';
@@ -79,6 +84,11 @@ const SubscriptionSchema = new Schema<ISubscriptionDocument>(
     gracePeriodEndsAt: { type: Date },
     cancelledAt: { type: Date },
     cancellationReason: { type: String },
+    cancelledBy: { type: String },
+    cancelledByType: { type: String },
+    cancelledByPortal: { type: String, enum: ['customer-web', 'customer-mobile', 'admin-web', 'system'] },
+    cancelledByDescription: { type: String },
+    cancelledBenefitsExpiryReminderSent: { type: Boolean, default: false },
 
     autoRenew: { type: Boolean, default: true },
     renewalMethod: { type: String, enum: ['annual', 'monthly'], default: 'annual' },

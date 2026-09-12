@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
+import { CancellationInfoCard } from '@pawtag/ui';
 
 interface SubscriptionDetail {
   subscription: {
@@ -19,6 +20,10 @@ interface SubscriptionDetail {
     gracePeriodEndsAt?: string;
     cancelledAt?: string;
     cancellationReason?: string;
+    cancelledBy?: string;
+    cancelledByType?: string;
+    cancelledByPortal?: string;
+    cancelledByDescription?: string;
     autoRenew: boolean;
     totalScans: number;
     lastScannedAt?: string;
@@ -198,6 +203,21 @@ export default function SubscriptionDetailPage() {
               {sub.lastScannedAt && <InfoRow label="Last Scanned" value={formatDateTime(sub.lastScannedAt)} />}
             </div>
           </div>
+
+          {/* Cancellation Details */}
+          {sub.status === 'cancelled' && (
+            <CancellationInfoCard data={sub} />
+          )}
+
+          {/* Benefits Countdown for Cancelled */}
+          {sub.status === 'cancelled' && sub.currentPeriodEnd && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+              <div className="text-sm font-semibold text-amber-900 mb-1">Benefits Expiring</div>
+              <div className="text-sm text-amber-700">
+                Active until {formatDate(sub.currentPeriodEnd)}
+              </div>
+            </div>
+          )}
 
           {/* Invoices */}
           <div className="bg-white rounded-lg border border-gray-200 p-6">

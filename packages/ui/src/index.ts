@@ -53,6 +53,8 @@ export { ProductCard } from './components/ProductCard';
 export { PriceDisplay } from './components/PriceDisplay';
 export { ProductBadge, getProductBadgeVariant } from './components/ProductBadge';
 export { CartDrawer } from './components/CartDrawer';
+export { CancellationInfoCard } from './components/CancellationInfoCard';
+export type { CancellationInfoData } from './components/CancellationInfoCard';
 
 // Animation components
 export { FadeIn } from './components/FadeIn';

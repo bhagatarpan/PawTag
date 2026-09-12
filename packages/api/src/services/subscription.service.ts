@@ -289,22 +289,57 @@ export async function createGoldSubscription(userId: string, price?: number) {
         logger.info({ userId, stripeCustomerId: customer.id }, '[Gold] Created Stripe customer');
       }
 
-      // Create a Stripe Price for Gold membership
-      const priceObj = await stripe.prices.create({
-        unit_amount: Math.round(goldPrice * 100),
-        currency: 'nzd',
-        recurring: { interval: 'month' },
-        product_data: {
-          name: 'PawTag Gold Membership',
+      // Look up or create a reusable Stripe Price for Gold membership
+      let goldStripePriceId = (await Setting.findOne({ key: 'gold.stripePriceId' }).lean())?.value;
+      let goldStripeProductId = (await Setting.findOne({ key: 'gold.stripeProductId' }).lean())?.value;
+
+      if (goldStripePriceId) {
+        // Verify price still active and matches current amount
+        try {
+          const existingPrice = await stripe.prices.retrieve(goldStripePriceId) as any;
+          if (existingPrice.status !== 'active' || existingPrice.unit_amount !== Math.round(goldPrice * 100)) {
+            goldStripePriceId = null as any;
+          }
+        } catch {
+          goldStripePriceId = null as any;
+        }
+      }
+
+      if (!goldStripePriceId) {
+        // Ensure product exists
+        if (!goldStripeProductId) {
+          const product = await stripe.products.create({
+            name: 'PawTag Gold Membership',
+            metadata: { plan: 'gold' },
+          });
+          goldStripeProductId = product.id;
+          await Setting.findOneAndUpdate(
+            { key: 'gold.stripeProductId' },
+            { key: 'gold.stripeProductId', value: product.id },
+            { upsert: true },
+          );
+        }
+
+        // Create price for existing product
+        const priceObj = await stripe.prices.create({
+          product: goldStripeProductId,
+          unit_amount: Math.round(goldPrice * 100),
+          currency: 'nzd',
+          recurring: { interval: 'month' },
           metadata: { plan: 'gold' },
-        },
-        metadata: { userId: userId.toString(), plan: 'gold' },
-      });
+        });
+        goldStripePriceId = priceObj.id;
+        await Setting.findOneAndUpdate(
+          { key: 'gold.stripePriceId' },
+          { key: 'gold.stripePriceId', value: priceObj.id },
+          { upsert: true },
+        );
+      }
 
       // Create Stripe Subscription
       const stripeSubscription = await stripe.subscriptions.create({
         customer: stripeCustomerId,
-        items: [{ price: priceObj.id }],
+        items: [{ price: goldStripePriceId }],
         payment_behavior: 'default_incomplete',
         payment_settings: { save_default_payment_method: 'on_subscription' },
         metadata: { userId: userId.toString(), plan: 'gold' },
@@ -494,7 +529,21 @@ export async function renewSubscription(subscriptionId: string, paymentMethod?: 
   return subscription;
 }
 
-export async function cancelSubscription(subscriptionId: string, reason?: string) {
+export interface CancelSubscriptionContext {
+  sourceIp?: string;
+  userAgent?: string;
+  deviceId?: string;
+  actorId?: string;
+  actorFullName?: string;
+  actorRoleName?: string;
+  portal?: 'customer-web' | 'customer-mobile' | 'admin-web' | 'system';
+}
+
+export async function cancelSubscription(
+  subscriptionId: string,
+  reason?: string,
+  context?: CancelSubscriptionContext,
+) {
   const subscription = await Subscription.findById(subscriptionId);
   if (!subscription) throw new Error('Subscription not found');
 
@@ -505,12 +554,29 @@ export async function cancelSubscription(subscriptionId: string, reason?: string
 
   const oldStatus = subscription.status;
   const userId = subscription.userId instanceof Object ? subscription.userId.toString() : String(subscription.userId);
-  const tagId = subscription.tagId instanceof Object ? subscription.tagId.toString() : String(subscription.tagId);
+  const tagId = subscription.tagId ? subscription.tagId.toString() : null;
 
-  // Disable auto-renewal and record cancellation
+  // Set status, disable auto-renewal, and record cancellation
+  subscription.status = 'cancelled';
   subscription.autoRenew = false;
   subscription.cancelledAt = new Date();
   subscription.cancellationReason = reason;
+
+  // Populate cancellation metadata when context is provided
+  if (context?.actorFullName) {
+    const portalLabel = context.portal === 'customer-web' ? 'Customer Web Portal'
+      : context.portal === 'customer-mobile' ? 'Customer Mobile App'
+      : context.portal === 'admin-web' ? 'Admin Web Portal'
+      : context.portal === 'system' ? 'System (Auto)'
+      : 'Customer Web Portal';
+    const roleDisplay = context.actorRoleName || 'Customer';
+    subscription.cancelledBy = roleDisplay.toLowerCase() === 'customer'
+      ? `Customer (${context.actorFullName})`
+      : `${context.actorFullName} (${roleDisplay})`;
+    subscription.cancelledByType = roleDisplay;
+    subscription.cancelledByPortal = context.portal || 'customer-web';
+    subscription.cancelledByDescription = `${subscription.planName} is Cancelled via ${portalLabel} by ${context.actorFullName} (${roleDisplay})`;
+  }
 
   // Cancel Stripe subscription if it exists
   if (subscription.stripeSubscriptionId && process.env.STRIPE_SECRET_KEY) {
@@ -545,6 +611,20 @@ export async function cancelSubscription(subscriptionId: string, reason?: string
     logger.error({ err: emailErr, subscriptionId: subscription._id }, 'Failed to send cancellation email');
   }
 
+  // Log audit event with request context when available
+  const auditContext = context?.actorId ? {
+    actorType: 'USER' as const,
+    actorId: context.actorId,
+    actorUsername: context.actorFullName || 'unknown',
+    sourceIp: context.sourceIp || 'unknown',
+    userAgent: context.userAgent || 'unknown',
+    deviceId: context.deviceId,
+    applicationName: 'pawtag-api',
+    applicationVersion: '1.0.0',
+    apiVersion: 'v1',
+    environment: process.env.NODE_ENV || 'development',
+  } : undefined;
+
   await auditJobEvent({
     action: 'subscription_cancelled',
     eventType: 'subscription_cancellation',
@@ -563,8 +643,10 @@ export async function cancelSubscription(subscriptionId: string, reason?: string
       planType: subscription.planType,
       planName: subscription.planName,
       benefitsUntil: subscription.currentPeriodEnd,
+      cancelledBy: subscription.cancelledBy,
+      cancelledByPortal: subscription.cancelledByPortal,
     },
-  });
+  }, auditContext);
 
   incrementCounter(METRICS.SUBSCRIPTION_CANCELLED_TOTAL, { planType: subscription.planType });
 
@@ -989,6 +1071,52 @@ async function checkTagExpiryNotifications() {
   }
 }
 
+async function checkCancelledBenefitsExpiry(): Promise<void> {
+  const now = new Date();
+  const in3Days = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+
+  const expiringCancelled = await Subscription.find({
+    status: 'cancelled',
+    currentPeriodEnd: { $lte: in3Days, $gt: now },
+    deletedAt: null,
+  }).populate('userId', 'fullName email');
+
+  for (const sub of expiringCancelled) {
+    const user = sub.userId as any;
+    if (!user?.email) continue;
+
+    // Dedup: skip if reminder already sent
+    if ((sub as any).cancelledBenefitsExpiryReminderSent) continue;
+
+    const daysLeft = Math.ceil((sub.currentPeriodEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    if (daysLeft <= 0) continue;
+
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const reSubscribeUrl = `${frontendUrl}/account/upgrade`;
+
+    const { renderCancelledBenefitsExpiringEmail } = await import('./email/templates/cancelled-benefits-expiring');
+    const html = renderCancelledBenefitsExpiringEmail({
+      name: user.fullName || 'there',
+      planName: sub.planName || 'Gold Membership',
+      daysLeft,
+      benefitsUntil: sub.currentPeriodEnd.toLocaleDateString('en-NZ', { dateStyle: 'full' }),
+      reSubscribeUrl,
+    });
+
+    await sendMail(
+      user.email,
+      `Your ${sub.planName} benefits expire in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}`,
+      html,
+    ).catch(() => {});
+
+    // Mark as sent to prevent duplicate emails
+    (sub as any).cancelledBenefitsExpiryReminderSent = true;
+    await sub.save().catch(() => {});
+
+    logger.info({ subscriptionId: sub._id, daysLeft, email: user.email }, 'Sent cancelled benefits expiry reminder');
+  }
+}
+
 async function runSubscriptionChecks() {
   logger.info('[SubscriptionService] Running subscription checks');
 
@@ -999,6 +1127,7 @@ async function runSubscriptionChecks() {
   await processAutoRenewals();
   await resetExpiredSkipOtp();
   await checkTagExpiryNotifications();
+  await checkCancelledBenefitsExpiry();
 
   logger.info('[SubscriptionService] Subscription checks complete');
 }

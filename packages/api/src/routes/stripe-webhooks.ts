@@ -301,9 +301,66 @@ async function handleSubscriptionDeleted(subscription: any): Promise<void> {
   if (!sub) return;
 
   sub.status = 'cancelled';
+  sub.autoRenew = false;
   sub.cancelledAt = new Date();
   sub.cancellationReason = 'Cancelled via Stripe';
+  sub.cancelledBy = 'System (Stripe)';
+  sub.cancelledByType = 'System';
+  sub.cancelledByPortal = 'system';
+  sub.cancelledByDescription = `${sub.planName} is Cancelled via System (Stripe) by System (Stripe)`;
   await sub.save();
+
+  // Send cancellation email
+  try {
+    const user = await User.findById(sub.userId).select('fullName email').lean();
+    if (user?.email) {
+      const { sendMail } = await import('../services/email.service');
+      const { renderCancellationEmail } = await import('../services/email/templates/cancellation');
+      const html = renderCancellationEmail({
+        name: user.fullName || 'there',
+        planName: sub.planName || 'Subscription',
+        cancelledAt: new Date().toLocaleDateString('en-NZ', { dateStyle: 'full' }),
+        currentPeriodEnd: sub.currentPeriodEnd?.toLocaleDateString('en-NZ', { dateStyle: 'full' }) || 'current period',
+      });
+      await sendMail(user.email, `Your ${sub.planName} subscription has been cancelled`, html).catch(() => {});
+    }
+  } catch (err) {
+    logger.error({ err }, 'Failed to send cancellation email from webhook');
+  }
+
+  // Log audit event
+  try {
+    const { auditService } = await import('../services/audit');
+    await auditService.log({
+      actorType: 'SYSTEM',
+      actorId: 'stripe-webhook',
+      actorUsername: 'stripe-webhook',
+      sourceIp: 'stripe',
+      userAgent: 'stripe-webhook',
+      applicationName: 'pawtag-api',
+      applicationVersion: '1.0.0',
+      apiVersion: 'v1',
+      environment: process.env.NODE_ENV || 'development',
+    }, {
+      action: 'subscription_cancelled',
+      eventType: 'subscription_cancellation',
+      eventCategory: 'FINANCIAL',
+      operationType: 'UPDATE',
+      resourceType: 'Subscription',
+      resourceId: sub._id.toString(),
+      outcome: 'SUCCESS',
+      severity: 'HIGH',
+      metadata: {
+        userId: sub.userId?.toString(),
+        planType: sub.planType,
+        planName: sub.planName,
+        cancellationReason: 'Cancelled via Stripe',
+        cancelledAt: sub.cancelledAt,
+      },
+    });
+  } catch (err) {
+    logger.error({ err }, 'Failed to audit subscription cancellation from webhook');
+  }
 
   logger.info({ subscriptionId: sub._id }, 'Subscription cancelled via Stripe');
 }

@@ -125,9 +125,10 @@ function SubscriptionsInner() {
 
   async function handleCancel(id: string) {
     if (!confirm('Cancel this subscription? It will remain active until the end of the current billing period.')) return;
+    const reason = prompt('Reason for cancellation (optional):');
     setActionLoading(true);
     try {
-      await api.put(API.customer.subscriptions.cancel(id), { reason: 'Customer request' });
+      await api.put(API.customer.subscriptions.cancel(id), { reason: reason || 'Customer request' });
       await fetchSubscriptions();
       if (selectedId === id) await fetchDetail(id);
     } catch (err: any) {
@@ -180,6 +181,7 @@ function SubscriptionsInner() {
     const isActive = sub.status === 'active';
     const isGrace = sub.status === 'grace_period';
     const isExpired = sub.status === 'expired';
+    const isCancelled = sub.status === 'cancelled';
     const priceLabel = sub.renewalMethod === 'annual' ? '/yr' : '/mo';
     const billingAmount = sub.renewalMethod === 'annual' ? (sub.price * 12) : sub.price;
 
@@ -191,7 +193,7 @@ function SubscriptionsInner() {
         </button>
 
         {/* Hero Header */}
-        <div className={`relative overflow-hidden rounded-2xl p-6 ${isActive ? 'bg-gradient-to-br from-emerald-600 to-teal-700' : isGrace ? 'bg-gradient-to-br from-amber-500 to-orange-600' : 'bg-gradient-to-br from-gray-700 to-gray-900'}`}>
+        <div className={`relative overflow-hidden rounded-2xl p-6 ${isActive ? 'bg-gradient-to-br from-emerald-600 to-teal-700' : isGrace ? 'bg-gradient-to-br from-amber-500 to-orange-600' : isCancelled ? 'bg-gradient-to-br from-gray-600 to-gray-800' : 'bg-gradient-to-br from-gray-700 to-gray-900'}`}>
           <div className="absolute top-0 right-0 w-48 h-48 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
           <div className="absolute bottom-0 left-0 w-32 h-32 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
           <div className="relative">
@@ -248,6 +250,20 @@ function SubscriptionsInner() {
             )}
           </div>
         </div>
+
+        {/* Benefits Countdown for Cancelled */}
+        {isCancelled && sub.currentPeriodEnd && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              <span className="text-sm font-semibold text-amber-900">Benefits Expiring</span>
+            </div>
+            <p className="text-sm text-amber-700">
+              Your {sub.planName} benefits remain active until <strong>{formatDate(sub.currentPeriodEnd)}</strong>.
+              {daysUntil(sub.currentPeriodEnd) > 0 && <> That's <strong>{daysUntil(sub.currentPeriodEnd)} day{daysUntil(sub.currentPeriodEnd) !== 1 ? 's' : ''}</strong> from now.</>}
+            </p>
+          </div>
+        )}
 
         {/* Upgrade CTA */}
         {isActive && sub.planType !== 'annual' && (
@@ -330,6 +346,15 @@ function SubscriptionsInner() {
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
                 Renew — ${sub.price.toFixed(2)}{priceLabel}
               </button>
+            )}
+            {isCancelled && sub.planType === 'gold' && (
+              <a
+                href="/account/upgrade"
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl text-sm font-semibold hover:from-amber-600 hover:to-orange-600 shadow-sm transition-all"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M2 12h20"/></svg>
+                Re-subscribe to Gold
+              </a>
             )}
             {isActive && (
               <>
@@ -511,6 +536,7 @@ function SubscriptionsInner() {
             const isActive = sub.status === 'active';
             const isGrace = sub.status === 'grace_period';
             const isExpired = sub.status === 'expired';
+            const isCancelled = sub.status === 'cancelled';
             return (
               <div
                 key={sub._id}
@@ -531,7 +557,7 @@ function SubscriptionsInner() {
                           {sub.planType === 'gold' && (
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-amber-100 text-amber-700">Gold</span>
                           )}
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${isActive ? 'bg-emerald-50 text-emerald-700' : isGrace ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700'}`}>
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${isCancelled ? 'bg-gray-100 text-gray-600' : isActive ? 'bg-emerald-50 text-emerald-700' : isGrace ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700'}`}>
                             {sub.status.replace('_', ' ')}
                           </span>
                         </div>
@@ -570,20 +596,44 @@ function SubscriptionsInner() {
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="group-hover:stroke-gray-400 transition-colors"><path d="m9 18 6-6-6-6"/></svg>
                   </div>
                 </div>
-                {(isGrace || isExpired) && (
+                {(isGrace || isExpired || isCancelled) && (
                   <div className="px-5 py-3 bg-gradient-to-r from-amber-50 to-orange-50 border-t border-amber-100/60 flex items-center justify-between">
                     <div className="flex items-center gap-2 text-sm text-amber-700">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                      <span>{isGrace && sub.gracePeriodEndsAt ? `Grace period ends ${formatDate(sub.gracePeriodEndsAt)}` : 'Subscription expired'}</span>
+                      {isCancelled ? (
+                        <>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" x2="9" y1="9" y2="15"/><line x1="9" x2="15" y1="9" y2="15"/></svg>
+                          <span>Cancelled — benefits until {formatDate(sub.currentPeriodEnd)}</span>
+                        </>
+                      ) : isGrace ? (
+                        <>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                          <span>Grace period ends {formatDate(sub.gracePeriodEndsAt || '')}</span>
+                        </>
+                      ) : (
+                        <>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                          <span>Subscription expired</span>
+                        </>
+                      )}
                     </div>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleRenew(sub._id); }}
-                      disabled={actionLoading}
-                      className="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-lg text-sm font-semibold hover:from-emerald-700 hover:to-teal-700 disabled:opacity-50 shadow-sm transition-all"
-                    >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
-                      Renew — ${sub.price.toFixed(2)}{sub.renewalMethod === 'annual' ? '/yr' : '/mo'}
-                    </button>
+                    {isCancelled && sub.planType === 'gold' ? (
+                      <a
+                        href="/account/upgrade"
+                        onClick={(e) => e.stopPropagation()}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-lg text-sm font-semibold hover:from-amber-600 hover:to-orange-600 shadow-sm transition-all"
+                      >
+                        Re-subscribe — Gold
+                      </a>
+                    ) : (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleRenew(sub._id); }}
+                        disabled={actionLoading}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-lg text-sm font-semibold hover:from-emerald-700 hover:to-teal-700 disabled:opacity-50 shadow-sm transition-all"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
+                        Renew — ${sub.price.toFixed(2)}{sub.renewalMethod === 'annual' ? '/yr' : '/mo'}
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
