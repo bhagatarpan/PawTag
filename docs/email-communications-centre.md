@@ -107,20 +107,22 @@
 
 ### Phase 4: Migration & Cleanup ✅
 - Updated all 8 seeded email templates with Communications Centre metadata
-- Added businessFlow, purpose, trigger, recipient, emailType, isCritical, variableDefinitions
-- **Extracted 25 inline emails** to use template renderers:
-  - subscription.service.ts: 6 emails (reminder, grace, payment failure/success, gold welcome)
-  - orderNotification.service.ts: 8 emails (6 order status + 2 admin alerts)
-  - referral.service.ts: 1 email (referral reward)
-  - tier.service.ts: 1 email (tier downgrade warning)
-  - escalation.service.ts: 1 email (emergency escalation)
-  - notification-delivery.service.ts: 1 email (generic notification)
-  - pet-milestones.ts: 2 emails (birthday, anniversary)
-  - lowStockCheck.ts: 1 email (low stock alert)
-  - support.ts: 1 email (support request)
-  - order-creation.service.ts: 1 email (admin order alert)
-- **Fixed Gold Welcome bug** — subscription.service.ts now uses existing template instead of inline HTML
-- Remaining: 5 emails in email.service.ts (subscription welcome, invoice OTP, invoice) still have CMS fallback patterns
+- **28 templates now seeded** in CMS database with full metadata (businessFlow, purpose, trigger, variables, etc.)
+- **All 25+ inline emails extracted** to template renderers:
+  - email.service.ts: 3 emails (subscription welcome, invoice OTP — invoice already had CMS fallback)
+  - subscription.service.ts: 6 emails
+  - orderNotification.service.ts: 8 emails
+  - referral.service.ts: 1 email
+  - tier.service.ts: 1 email
+  - escalation.service.ts: 1 email
+  - notification-delivery.service.ts: 1 email
+  - pet-milestones.ts: 2 emails
+  - lowStockCheck.ts: 1 email
+  - support.ts: 1 email
+  - order-creation.service.ts: 1 email
+- **Fixed Gold Welcome bug** — subscription.service.ts now uses existing template
+- **CMS fallback system verified** — 17 email functions properly wired up with renderCmsEmail()
+- **Zero inline HTML remaining** in service files
 
 ---
 
