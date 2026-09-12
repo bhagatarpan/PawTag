@@ -1,5 +1,5 @@
 import { Subscription, Tag, Invoice, User, Notification, Product, TagExpiryNotification, Setting } from '@pawtag/db';
-import { sendMail } from './email.service';
+import { sendMail, sendInvoiceEmail } from './email.service';
 import { createAndDeliverNotification } from './notification-delivery.service';
 import { renderSubscriptionReminderEmail, renderGracePeriodReminderEmail, renderPaymentFailureEmail, renderGracePeriodStartedEmail, renderGoldWelcomeEmail, renderPaymentRetrySuccessEmail } from './email/templates';
 import { auditService, type AuditContext } from './audit';
@@ -358,7 +358,7 @@ export async function createGoldSubscription(userId: string, price?: number) {
   });
 
   // Create Invoice in PawTag DB
-  await createInvoice({
+  const invoice = await createInvoice({
     subscriptionId: subscription._id.toString(),
     userId: userId,
     amount: goldPrice,
@@ -374,6 +374,14 @@ export async function createGoldSubscription(userId: string, price?: number) {
   sendGoldWelcomeEmail(user.email, user.fullName || 'there', goldPrice, dashboardUrl).catch((err) => {
     logger.error({ err, userId }, '[Gold] Failed to send welcome email');
   });
+
+  // Send invoice email (fire-and-forget)
+  if (invoice) {
+    const invoiceUrl = `${frontendUrl}/account/subscriptions`;
+    sendInvoiceEmail(user.email, user.fullName || 'there', invoice.invoiceNumber, '', invoiceUrl, goldPrice).catch((err) => {
+      logger.error({ err, userId }, '[Gold] Failed to send invoice email');
+    });
+  }
 
   await auditJobEvent({
     action: 'gold_subscription_created',
