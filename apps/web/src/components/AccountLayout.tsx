@@ -42,6 +42,7 @@ export default function AccountLayout({ children }: { children: ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [unreadCount, setUnreadCount] = useState(0);
+  const [guardianData, setGuardianData] = useState<any>(null);
 
   useEffect(() => {
     api.get(API.customer.notifications.unreadCount).then((r) => setUnreadCount(r.data.data.count)).catch(() => {});
@@ -50,6 +51,29 @@ export default function AccountLayout({ children }: { children: ReactNode }) {
     }, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  // Fetch Guardian data
+  useEffect(() => {
+    if (!user) return;
+    const fetchGuardianData = async () => {
+      try {
+        const [pointsRes, rewardsRes, tierRes] = await Promise.all([
+          api.get('/customer/guardian/points').catch(() => ({ data: { data: null } })),
+          api.get('/customer/guardian/rewards').catch(() => ({ data: { data: null } })),
+          api.get('/customer/guardian/tier').catch(() => ({ data: { data: null } })),
+        ]);
+        if (pointsRes.data.data) {
+          setGuardianData({
+            points: pointsRes.data.data.points || 0,
+            tier: pointsRes.data.data.tier,
+            pawRewardsBalance: rewardsRes.data.data?.balance || 0,
+            ...tierRes.data.data,
+          });
+        }
+      } catch { /* ignore */ }
+    };
+    fetchGuardianData();
+  }, [user]);
 
   const handleLogout = () => { logout(); navigate('/'); };
 
@@ -61,9 +85,6 @@ export default function AccountLayout({ children }: { children: ReactNode }) {
   const companyName = settings?.['company.name'] || 'PawTag';
 
   // Show onboarding wizard for users who haven't completed or dismissed it.
-  // - onboardingCompleted=false + onboardingSkipped=false → show wizard (hasn't acted yet)
-  // - onboardingCompleted=false + onboardingSkipped=true → skip wizard (user chose "Maybe later")
-  // - onboardingCompleted=true → never show (user completed or chose "Don't show me again")
   const shouldShowWizard = user?.onboardingCompleted === false && user?.onboardingSkipped !== true;
   if (shouldShowWizard) {
     return <OnboardingWizard />;
@@ -143,15 +164,39 @@ export default function AccountLayout({ children }: { children: ReactNode }) {
                 />
 
                 {/* Dropdown Menu */}
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-200 py-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
-                  <div className="px-4 py-2 border-b border-gray-100 sm:hidden">
+                <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-gray-200 py-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                  {/* User Info Header */}
+                  <div className="px-4 py-3 border-b border-gray-100">
                     <p className="text-sm font-medium text-gray-900">{user?.fullName}</p>
-                    {user?.lastLogin && (
-                      <p className="text-xs text-gray-400">Last login: {formatLastLogin(user.lastLogin)}</p>
-                    )}
+                    <p className="text-xs text-gray-400">{user?.email}</p>
                   </div>
+
+                  {/* Guardian Info */}
+                  {guardianData && (
+                    <div className="px-4 py-2 border-b border-gray-100 bg-gray-50">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600">Guardian Tier:</span>
+                        <span className={`font-semibold ${guardianData.tier === 'GOLD' || guardianData.isGoldMember ? 'text-amber-600' : 'text-teal-600'}`}>
+                          {guardianData.tier === 'GOLD' || guardianData.isGoldMember ? 'GOLD' : guardianData.tier}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600">Points:</span>
+                        <span className="text-teal-600 font-semibold">{guardianData.points || 0}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600">PawRewards:</span>
+                        <span className="text-amber-600 font-semibold">${(guardianData.pawRewardsBalance || 0).toFixed(2)}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Menu Links */}
                   <Link to="/account/profile" className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                     <User size={16} /> Profile
+                  </Link>
+                  <Link to="/account/guardian" className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                    <Shield size={16} /> Guardian
                   </Link>
                   <Link to="/account/settings" className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                     <Settings size={16} /> Settings
