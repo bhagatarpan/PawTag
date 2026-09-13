@@ -19,6 +19,7 @@ import VerifyEmail from './pages/VerifyEmail';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import About from './pages/About';
+import PetRecovery from './pages/PetRecovery';
 import Privacy from './pages/Privacy';
 import Terms from './pages/Terms';
 import Faq from './pages/Faq';
@@ -110,6 +111,7 @@ export default function App() {
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/about" element={<PublicLayout><About /></PublicLayout>} />
+        <Route path="/pet-recovery" element={<PublicLayout><PetRecovery /></PublicLayout>} />
         <Route path="/privacy" element={<PublicLayout><Privacy /></PublicLayout>} />
         <Route path="/terms" element={<PublicLayout><Terms /></PublicLayout>} />
         <Route path="/faq" element={<PublicLayout><Faq /></PublicLayout>} />
