@@ -34,7 +34,7 @@ export default function CmsPageEditor() {
 
   useEffect(() => {
     if (!isNew && id) {
-      api.get(`/admin/cms/pages/${id}`)
+      api.get(API.admin.cms.pages.get(id))
         .then((res) => {
           const page = res.data.data;
           setForm({
@@ -74,7 +74,7 @@ export default function CmsPageEditor() {
         const res = await api.post(API.admin.cms.pages.list, payload);
         navigate(`/cms/pages/${res.data.data._id}`);
       } else {
-        await api.put(`/admin/cms/pages/${id}`, payload);
+        await api.put(API.admin.cms.pages.update(id), payload);
       }
     } catch (err: any) {
       alert(err.response?.data?.error || 'Failed to save page');

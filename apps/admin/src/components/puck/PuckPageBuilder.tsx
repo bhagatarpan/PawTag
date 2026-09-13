@@ -23,6 +23,16 @@ function puckTypeToSectionType(puckType: string): string {
     TimelineSection: 'timeline', StatsCounter: 'statistics',
     VideoEmbed: 'video', CtaBanner: 'cta', PartnersLogos: 'partners',
     MapBlock: 'map', CustomHtml: 'custom', ContactForm: 'contact_form',
+    SpacerBlock: 'spacer', ImageTextBlock: 'image_text',
+    TextBlock: 'text', ImageBlock: 'image', ButtonBlock: 'button',
+    DividerBlock: 'divider', AlertBlock: 'alert',
+    NewsletterSignupBlock: 'newsletter_signup', TeamBlock: 'team',
+    AccordionBlock: 'accordion', TabsBlock: 'tabs',
+    IconListBlock: 'icon_list', BadgeBlock: 'badge',
+    EmbedBlock: 'embed', BackToTopBlock: 'back_to_top',
+    MarqueeBlock: 'marquee', SocialLinksBlock: 'social_links',
+    AnnouncementBarBlock: 'announcement_bar', CountdownBlock: 'countdown',
+    GuardianGoldComparison: 'GuardianGoldComparison',
   };
   return map[puckType] || puckType;
 }
@@ -35,6 +45,16 @@ function sectionTypeToPuckType(sectionType: string): string {
     timeline: 'TimelineSection', statistics: 'StatsCounter',
     video: 'VideoEmbed', cta: 'CtaBanner', partners: 'PartnersLogos',
     map: 'MapBlock', custom: 'CustomHtml', contact_form: 'ContactForm',
+    spacer: 'SpacerBlock', image_text: 'ImageTextBlock',
+    text: 'TextBlock', image: 'ImageBlock', button: 'ButtonBlock',
+    divider: 'DividerBlock', alert: 'AlertBlock',
+    newsletter_signup: 'NewsletterSignupBlock', team: 'TeamBlock',
+    accordion: 'AccordionBlock', tabs: 'TabsBlock',
+    icon_list: 'IconListBlock', badge: 'BadgeBlock',
+    embed: 'EmbedBlock', back_to_top: 'BackToTopBlock',
+    marquee: 'MarqueeBlock', social_links: 'SocialLinksBlock',
+    announcement_bar: 'AnnouncementBarBlock', countdown: 'CountdownBlock',
+    GuardianGoldComparison: 'GuardianGoldComparison',
   };
   return map[sectionType] || sectionType;
 }

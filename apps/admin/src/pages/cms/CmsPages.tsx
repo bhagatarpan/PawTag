@@ -43,7 +43,7 @@ export default function CmsPages() {
   const handleDelete = async (id: string, title: string) => {
     if (!confirm(`Delete "${title}"? This cannot be undone.`)) return;
     try {
-      await api.delete(`/admin/cms/pages/${id}`);
+      await api.delete(API.admin.cms.pages.delete(id));
       fetchData();
     } catch (err: any) {
       alert(err.response?.data?.error || 'Failed to delete page');
@@ -52,7 +52,7 @@ export default function CmsPages() {
 
   const handlePublish = async (id: string) => {
     try {
-      await api.put(`/admin/cms/pages/${id}/publish`);
+      await api.put(API.admin.cms.pages.publish(id));
       fetchData();
     } catch (err: any) {
       alert(err.response?.data?.error || 'Failed to publish page');
