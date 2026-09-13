@@ -1,5 +1,5 @@
 import { Resend } from 'resend';
-import { CmsEmailTemplate } from '@pawtag/db';
+import { CmsEmailTemplate, Setting } from '@pawtag/db';
 import { renderBase, renderCtaButton } from './email/templates/base';
 import logger from '../lib/logger';
 import { logIntegration } from '../lib/timing';
@@ -99,6 +99,19 @@ async function renderCmsEmail(slug: string, variables: Record<string, string>): 
 }
 
 export async function sendMail(to: string, subject: string, html: string, from?: string, auditMeta?: { templateSlug?: string; businessFlow?: string; relatedEntityType?: string; relatedEntityId?: string; relatedEntityDisplay?: string; isTest?: boolean }): Promise<EmailResult> {
+  // In dev mode with test mode enabled, route ALL emails to test address
+  if (process.env.NODE_ENV !== 'production') {
+    try {
+      const testMode = (await Setting.findOne({ key: 'site.testMode' }).lean())?.value === 'true';
+      if (testMode) {
+        const testEmail = (await Setting.findOne({ key: 'site.testEmail' }).lean())?.value;
+        if (testEmail) to = testEmail;
+      }
+    } catch {
+      // Settings query failed — continue with original recipient
+    }
+  }
+
   // In development, always use Resend's pre-verified test domain (onboarding@resend.dev)
   // so custom unverified domains like pawtag.co.nz don't cause rejections.
   const fromAddress = process.env.NODE_ENV === 'production' ? (from || defaultFrom) : defaultFrom;

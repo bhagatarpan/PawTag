@@ -154,21 +154,21 @@ async function checkAndActivateUser(userId: string) {
   }
 }
 
-/** In development with MFA test mode enabled, route verification emails to the test email. */
+/** In development with test mode enabled, route verification emails to the test email. */
 async function resolveVerificationRecipient(originalEmail: string): Promise<string> {
   if (config.nodeEnv !== 'development') return originalEmail;
-  const mfaTestMode = (await Setting.findOne({ key: 'mfa.testMode' }).lean())?.value === 'true';
-  if (!mfaTestMode) return originalEmail;
-  const mfaTestEmail = (await Setting.findOne({ key: 'mfa.testEmail' }).lean())?.value || 'arpanbhagat@yahoo.com';
-  return mfaTestEmail;
+  const testMode = (await Setting.findOne({ key: 'site.testMode' }).lean())?.value === 'true';
+  if (!testMode) return originalEmail;
+  const testEmail = (await Setting.findOne({ key: 'site.testEmail' }).lean())?.value;
+  return testEmail || originalEmail;
 }
 
-/** In development with MFA test mode enabled, return the test email for sending OTPs, else null. */
+/** In development with test mode enabled, return the test email for sending OTPs, else null. */
 export async function getTestEmailRecipient(): Promise<string | null> {
   if (config.nodeEnv !== 'development') return null;
-  const mfaTestMode = (await Setting.findOne({ key: 'mfa.testMode' }).lean())?.value === 'true';
-  if (!mfaTestMode) return null;
-  return (await Setting.findOne({ key: 'mfa.testEmail' }).lean())?.value || 'arpanbhagat@yahoo.com';
+  const testMode = (await Setting.findOne({ key: 'site.testMode' }).lean())?.value === 'true';
+  if (!testMode) return null;
+  return (await Setting.findOne({ key: 'site.testEmail' }).lean())?.value || null;
 }
 
 router.post('/register', registerLimiter, validate(registerSchema), async (req, res: Response) => {
@@ -464,8 +464,8 @@ if (user.status === 'inactive') {
     // MFA check: determine if MFA is required for this user
     const mfaAdminEnabled = (await Setting.findOne({ key: 'mfa.adminEnabled' }).lean())?.value === 'true';
     const mfaCustomerEnabled = (await Setting.findOne({ key: 'mfa.customerEnabled' }).lean())?.value === 'true';
-    const mfaTestMode = (await Setting.findOne({ key: 'mfa.testMode' }).lean())?.value === 'true';
-    const mfaTestEmail = (await Setting.findOne({ key: 'mfa.testEmail' }).lean())?.value || 'arpanbhagat@yahoo.com';
+    const siteTestMode = (await Setting.findOne({ key: 'site.testMode' }).lean())?.value === 'true';
+    const siteTestEmail = (await Setting.findOne({ key: 'site.testEmail' }).lean())?.value;
 
     let mfaRequired = false;
     if (isAdmin) {
@@ -500,7 +500,7 @@ if (user.status === 'inactive') {
       });
 
       // Send OTP email (test mode: send to test email)
-      const recipient = mfaTestMode ? mfaTestEmail : user.email;
+      const recipient = siteTestMode && siteTestEmail ? siteTestEmail : user.email;
       const ip = req.ip || req.connection?.remoteAddress || 'unknown';
       const ua = req.headers['user-agent'] || 'unknown';
       sendLoginOtpEmail(recipient, user.fullName, otp, `${mfaOtpExpiry} minutes`).catch(() => {});
@@ -514,7 +514,7 @@ if (user.status === 'inactive') {
         resourceId: user._id.toString(),
         outcome: 'SUCCESS',
         severity: 'MEDIUM',
-        metadata: { mfaType: 'email_otp', recipient: mfaTestMode ? 'test_email' : 'user_email', otpExpiryMinutes: mfaOtpExpiry },
+        metadata: { mfaType: 'email_otp', recipient: siteTestMode ? 'test_email' : 'user_email', otpExpiryMinutes: mfaOtpExpiry },
         businessOperation: 'Sent verification code',
       });
 
@@ -1533,9 +1533,9 @@ router.post('/mfa/send-otp', mfaSendLimiter, async (req: AuthRequest, res: Respo
     });
 
     // Check test mode
-    const mfaTestMode = (await Setting.findOne({ key: 'mfa.testMode' }).lean())?.value === 'true';
-    const mfaTestEmail = (await Setting.findOne({ key: 'mfa.testEmail' }).lean())?.value || 'arpanbhagat@yahoo.com';
-    const recipient = mfaTestMode ? mfaTestEmail : user.email;
+    const siteTestMode = (await Setting.findOne({ key: 'site.testMode' }).lean())?.value === 'true';
+    const siteTestEmail = (await Setting.findOne({ key: 'site.testEmail' }).lean())?.value;
+    const recipient = siteTestMode && siteTestEmail ? siteTestEmail : user.email;
 
     // Send OTP email
     const ip = req.ip || req.connection?.remoteAddress || 'unknown';
@@ -1551,7 +1551,7 @@ router.post('/mfa/send-otp', mfaSendLimiter, async (req: AuthRequest, res: Respo
       resourceId: user._id.toString(),
       outcome: 'SUCCESS',
       severity: 'MEDIUM',
-      metadata: { mfaType: 'email_otp', recipient: mfaTestMode ? 'test_email' : 'user_email', otpExpiryMinutes: mfaOtpExpiry, tempTokenUsed: true },
+      metadata: { mfaType: 'email_otp', recipient: siteTestMode ? 'test_email' : 'user_email', otpExpiryMinutes: mfaOtpExpiry, tempTokenUsed: true },
       businessOperation: 'Sent verification code',
     }, { actorType: 'USER', authenticationMethod: 'temp_token' });
 
