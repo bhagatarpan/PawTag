@@ -56,6 +56,11 @@ export { CartDrawer } from './components/CartDrawer';
 export { CancellationInfoCard } from './components/CancellationInfoCard';
 export type { CancellationInfoData } from './components/CancellationInfoCard';
 
+// CMS page components
+export { CmsPageSkeleton } from './components/CmsPageSkeleton';
+export { ComparisonTable } from './components/ComparisonTable';
+export type { ComparisonRow } from './components/ComparisonTable';
+
 // Animation components
 export { FadeIn } from './components/FadeIn';
 

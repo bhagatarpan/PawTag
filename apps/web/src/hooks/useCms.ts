@@ -63,6 +63,11 @@ export interface Page {
   title: string;
   slug: string;
   sections: PageSection[];
+  metaTitle?: string;
+  metaDescription?: string;
+  metaKeywords?: string[];
+  ogImage?: string;
+  canonicalUrl?: string;
   seo?: {
     title?: string;
     description?: string;

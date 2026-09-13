@@ -2,6 +2,7 @@ import type { Config } from '@puckeditor/core';
 import React, { useState } from 'react';
 import { API } from '@pawtag/shared/api';
 import { useSiteSettings } from '../../hooks/useCms';
+import { ComparisonTable } from '@pawtag/ui';
 
 type PawtagComponents = {
   HeroBanner: {
@@ -192,6 +193,11 @@ type PawtagComponents = {
     formTitle: string;
     formButtonText: string;
     formSuccessMessage: string;
+  };
+  GuardianGoldComparison: {
+    heading: string;
+    subheading: string;
+    rows: { feature: string; guardian: string; gold: string }[];
   };
 };
 
@@ -570,28 +576,77 @@ export const pawtagConfig: Config<PawtagComponents> = {
           arrayFields: {
             name: { type: 'text', label: 'Plan Name' },
             price: { type: 'text', label: 'Price' },
+            subtitle: { type: 'text', label: 'Subtitle (e.g. "Or Upgrade to")' },
             features: { type: 'textarea', label: 'Features (one per line)' },
             cta: { type: 'text', label: 'Button Text' },
             ctaUrl: { type: 'text', label: 'Button URL' },
             highlighted: { type: 'text', label: 'Highlighted (true/false)' },
-          },
+          } as any,
         },
       },
       defaultProps: { heading: 'Pricing', plans: [] },
-      render: ({ heading, plans }) => (
+      render: ({ heading, plans }: any) => (
         <section className="py-12 px-6">
           <h2 className="text-3xl font-bold text-center mb-8">{heading || 'Pricing'}</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-            {(plans || []).map((plan, i) => (
-              <div key={i} className={`p-6 rounded-xl border ${plan.highlighted === 'true' ? 'border-primary-500 shadow-lg' : 'border-gray-200'}`}>
-                <h3 className="text-xl font-bold mb-2">{plan.name}</h3>
-                <p className="text-3xl font-bold text-primary-600 mb-4">{plan.price}</p>
-                <div className="text-sm text-gray-600 mb-6 whitespace-pre-line">{plan.features}</div>
-                {plan.cta && <a href={plan.ctaUrl} className="block text-center bg-primary-600 text-white py-2 rounded-lg hover:bg-primary-700 transition">{plan.cta}</a>}
-              </div>
-            ))}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+            {(plans || []).map((plan: any, i: number) => {
+              const isGold = plan.highlighted === 'true';
+              return (
+                <div key={i} className={`p-8 rounded-2xl border-2 ${isGold ? 'border-amber-400 bg-gradient-to-br from-amber-50 to-orange-50 shadow-xl' : 'border-gray-200 bg-white'}`}>
+                  <h3 className="text-xl font-bold mb-1">{plan.name}</h3>
+                  {plan.subtitle && <p className="text-sm text-gray-500 mb-2">{plan.subtitle}</p>}
+                  <p className={`text-3xl font-bold mb-4 ${isGold ? 'text-amber-600' : 'text-primary-600'}`}>{plan.price}</p>
+                  <div className="space-y-2 mb-6">
+                    {(plan.features || '').split('\n').filter(Boolean).map((f: string, j: number) => (
+                      <div key={j} className="flex items-center gap-2 text-sm text-gray-600">
+                        <span className={isGold ? 'text-amber-500' : 'text-green-500'}>✓</span> {f}
+                      </div>
+                    ))}
+                  </div>
+                  {plan.cta && (
+                    <a href={plan.ctaUrl || '#'} className={`block text-center py-3 rounded-xl font-semibold transition ${isGold ? 'bg-amber-500 text-white hover:bg-amber-600' : 'bg-primary-600 text-white hover:bg-primary-700'}`}>
+                      {plan.cta}
+                    </a>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </section>
+      ),
+    },
+
+    GuardianGoldComparison: {
+      fields: {
+        heading: { type: 'text', label: 'Heading' },
+        subheading: { type: 'text', label: 'Subheading' },
+        rows: {
+          type: 'array',
+          label: 'Comparison Rows',
+          defaultItemProps: { feature: '', guardian: '', gold: '' },
+          arrayFields: {
+            feature: { type: 'text', label: 'Feature' },
+            guardian: { type: 'text', label: 'Guardian Value' },
+            gold: { type: 'text', label: 'Gold Value' },
+          },
+        },
+      },
+      defaultProps: {
+        heading: 'Guardian vs Gold',
+        subheading: 'See the difference Gold makes',
+        rows: [
+          { feature: 'Points on purchases', guardian: '1×', gold: '2×' },
+          { feature: 'Starting tier', guardian: 'Care', gold: 'Nurture' },
+          { feature: 'Monthly PawRewards', guardian: '$2/mo', gold: '$3/mo' },
+          { feature: 'Free shipping threshold', guardian: '$100', gold: '$50' },
+          { feature: 'Early access to products', guardian: '—', gold: '✓' },
+          { feature: 'Priority support', guardian: '—', gold: '✓' },
+          { feature: 'Exclusive promotions', guardian: '✓', gold: '✓' },
+          { feature: 'Guardian badge', guardian: '✓', gold: '✓' },
+        ],
+      },
+      render: ({ heading, subheading, rows }: any) => (
+        <ComparisonTable heading={heading} subheading={subheading} rows={rows || []} />
       ),
     },
 

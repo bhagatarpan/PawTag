@@ -1027,6 +1027,244 @@ async function run() {
       }
       console.log('');
 
+      // Pet Recovery
+      const existingPetRecovery = await CmsPage.findOne({ slug: 'pet-recovery', deletedAt: null }).session(session);
+      if (!existingPetRecovery) {
+        await CmsPage.create([{
+          slug: 'pet-recovery',
+          title: 'Pet Recovery — Scan, Locate, Reunite',
+          metaTitle: 'Pet Recovery Made Simple — Scan, Locate, Reunite | PawTag',
+          metaDescription: 'Learn how PawTag QR pet recovery works. From lost to home in minutes. Scan the tag, get instant alerts, share GPS location. Trusted by 14,000+ NZ pet owners.',
+          metaKeywords: ['pet recovery NZ', 'QR pet tag', 'lost pet system', 'pet safety New Zealand', 'scan to reunite', 'pet ID tag', 'GPS pet tracking'],
+          canonicalUrl: '/pet-recovery',
+          sections: [
+            {
+              sectionId: 'hero-banner',
+              type: 'hero',
+              title: 'Hero Banner',
+              content: {
+                heading: 'Your Pet\'s Safety Journey',
+                subheading: 'Every year, thousands of pets go missing in New Zealand. PawTag makes sure yours always has a way home. Our QR-powered recovery system connects finders with pet owners in seconds — no app required.',
+                buttonText: 'Shop PawTag Now',
+                buttonUrl: '/shop',
+              },
+              visible: true,
+              order: 0,
+              status: 'published',
+            },
+            {
+              sectionId: 'process-timeline',
+              type: 'timeline',
+              title: '4-Step Process',
+              content: {
+                heading: 'From Lost to Home in Four Simple Steps',
+                items: [
+                  { year: 'Step 1', title: 'Register Your Pet', description: 'Create your pet\'s online profile with their name, photo, breed, and medical information. This is what finders will see when they scan the tag.' },
+                  { year: 'Step 2', title: 'Attach the PawTag', description: 'Clip the durable QR tag to your pet\'s collar. It\'s lightweight, waterproof, and designed to last. No batteries or electronics needed.' },
+                  { year: 'Step 3', title: 'Finder Scans the Tag', description: 'If your pet goes missing, anyone who finds them can scan the QR code with their phone camera. No app needed — it works on any smartphone.' },
+                  { year: 'Step 4', title: 'You\'re Reunited', description: 'The finder sees your pet\'s profile and can call you directly, share their location, or notify you through the PawTag system. Most pets are home within hours.' },
+                ],
+              },
+              visible: true,
+              order: 1,
+              status: 'published',
+            },
+            {
+              sectionId: 'how-it-works',
+              type: 'features',
+              title: 'How It Works',
+              content: {
+                heading: 'How PawTag Pet Recovery Works',
+                items: [
+                  { icon: 'Bell', title: 'Instant Notifications', description: 'Get alerted the moment someone scans your pet\'s tag, with their location and contact details.' },
+                  { icon: 'MapPin', title: 'GPS Location Sharing', description: 'Finders can share their exact GPS coordinates, so you know exactly where your pet is.' },
+                  { icon: 'Smartphone', title: 'No App Required', description: 'Anyone with a smartphone camera can scan the tag — no downloads, no accounts, no friction.' },
+                  { icon: 'Clock', title: '24/7 Availability', description: 'Your pet\'s profile is always online and accessible, even on weekends and holidays.' },
+                  { icon: 'Heart', title: 'Medical Alert Display', description: 'Display critical medical information — allergies, medications, conditions — that could save your pet\'s life.' },
+                  { icon: 'Users', title: 'Community Powered', description: 'Join a network of pet owners who look out for each other\'s pets in their neighbourhood.' },
+                ],
+              },
+              visible: true,
+              order: 2,
+              status: 'published',
+            },
+            {
+              sectionId: 'spacer-1',
+              type: 'spacer',
+              title: 'Spacer',
+              content: { height: '48' },
+              visible: true,
+              order: 3,
+              status: 'published',
+            },
+            {
+              sectionId: 'stats',
+              type: 'statistics',
+              title: 'Recovery Stats',
+              content: {
+                heading: 'Trusted by Thousands of NZ Pet Owners',
+                stats: [
+                  { label: 'Pets Protected', value: '14000', suffix: '+' },
+                  { label: 'Successfully Reunited', value: '1200', suffix: '+' },
+                  { label: 'Recovery Success Rate', value: '98', suffix: '%' },
+                  { label: 'NZ-Wide Coverage', value: '100', suffix: '%' },
+                ],
+              },
+              visible: true,
+              order: 4,
+              status: 'published',
+            },
+            {
+              sectionId: 'spacer-2',
+              type: 'spacer',
+              title: 'Spacer',
+              content: { height: '48' },
+              visible: true,
+              order: 5,
+              status: 'published',
+            },
+            {
+              sectionId: 'guardian-gold-pricing',
+              type: 'pricing',
+              title: 'Guardian vs Gold Pricing',
+              content: {
+                heading: 'Choose the Right Plan for Your Pet',
+                plans: [
+                  {
+                    name: 'Guardian',
+                    subtitle: 'Start Free',
+                    price: 'Free',
+                    features: 'QR Pet Recovery Tag\nBasic Pet Profile\nFinder Contact Notifications\nCommunity Support\nBasic Activity Tracking\nEmail Notifications',
+                    cta: 'Join Guardian Free',
+                    ctaUrl: '/guardian',
+                    highlighted: 'false',
+                  },
+                  {
+                    name: 'Gold',
+                    subtitle: 'Or Upgrade to',
+                    price: '$2.99/mo',
+                    features: 'Everything in Guardian\n2x Guardian Points on Every Purchase\nFree NZ-Wide Shipping\nPriority Customer Support\nEnhanced PawRewards Balance\nGold Badge on Profile\nEarly Access to New Products\nMonthly PawRewards Credits',
+                    cta: 'Upgrade to Gold',
+                    ctaUrl: '/gold',
+                    highlighted: 'true',
+                  },
+                ],
+              },
+              visible: true,
+              order: 6,
+              status: 'published',
+            },
+            {
+              sectionId: 'spacer-3',
+              type: 'spacer',
+              title: 'Spacer',
+              content: { height: '48' },
+              visible: true,
+              order: 7,
+              status: 'published',
+            },
+            {
+              sectionId: 'guardian-gold-comparison',
+              type: 'GuardianGoldComparison',
+              title: 'Guardian vs Gold Comparison',
+              content: {
+                heading: 'Guardian vs Gold',
+                subheading: 'See the difference Gold makes',
+                rows: [
+                  { feature: 'Points on purchases', guardian: '1×', gold: '2×' },
+                  { feature: 'Starting tier', guardian: 'Care', gold: 'Nurture' },
+                  { feature: 'Monthly PawRewards', guardian: '$2/mo', gold: '$3/mo' },
+                  { feature: 'Free shipping threshold', guardian: '$100', gold: '$50' },
+                  { feature: 'Early access to products', guardian: '—', gold: '✓' },
+                  { feature: 'Priority support', guardian: '—', gold: '✓' },
+                  { feature: 'Exclusive promotions', guardian: '✓', gold: '✓' },
+                  { feature: 'Guardian badge', guardian: '✓', gold: '✓' },
+                ],
+              },
+              visible: true,
+              order: 8,
+              status: 'published',
+            },
+            {
+              sectionId: 'spacer-4',
+              type: 'spacer',
+              title: 'Spacer',
+              content: { height: '48' },
+              visible: true,
+              order: 9,
+              status: 'published',
+            },
+            {
+              sectionId: 'testimonials',
+              type: 'testimonials',
+              title: 'Customer Stories',
+              content: {
+                heading: 'Real Stories from Real Pet Owners',
+                items: [
+                  { name: 'Sarah M.', role: 'Owner of a Golden Retriever', quote: 'My dog got out last month. A neighbour scanned his PawTag and I had him back within 20 minutes. I couldn\'t believe how fast it worked.', avatar: '' },
+                  { name: 'James K.', role: 'Owner of a Tabby Cat', quote: 'Setting up was so easy. I just scanned the tag, filled in Bella\'s info, and clipped it on. Peace of mind for less than a cup of coffee.', avatar: '' },
+                  { name: 'Priya D.', role: 'Owner of a Labrador', quote: 'The medical alert feature is brilliant. Max has allergies and now anyone who finds him knows exactly what to avoid. Worth every penny.', avatar: '' },
+                ],
+              },
+              visible: true,
+              order: 10,
+              status: 'published',
+            },
+            {
+              sectionId: 'spacer-5',
+              type: 'spacer',
+              title: 'Spacer',
+              content: { height: '48' },
+              visible: true,
+              order: 11,
+              status: 'published',
+            },
+            {
+              sectionId: 'faq',
+              type: 'faq',
+              title: 'Frequently Asked Questions',
+              content: {
+                heading: 'Frequently Asked Questions',
+                items: [
+                  { question: 'How does the QR code tag work?', answer: 'Each PawTag has a unique QR code. When someone scans it with their phone camera, they\'re taken to your pet\'s online profile — showing their name, photo, medical info, and your contact details. No app is needed.' },
+                  { question: 'What if my pet goes missing while I\'m offline?', answer: 'Your pet\'s profile is always online, even when you\'re not. The PawTag cloud stores all the information, so finders can access it anytime. You\'ll receive an email notification as soon as someone scans the tag.' },
+                  { question: 'Is the tag waterproof and durable?', answer: 'Yes. PawTag tags are made from high-grade materials that are waterproof, scratch-resistant, and designed to withstand outdoor conditions. The QR code is laser-etched and won\'t fade or wear off.' },
+                  { question: 'Does the finder need to download an app?', answer: 'No. The QR code works with any smartphone camera — iPhone or Android. Just open the camera, point at the tag, and tap the notification to view the pet\'s profile.' },
+                  { question: 'Can I update my pet\'s profile after buying a tag?', answer: 'Absolutely. You can update your pet\'s photo, medical information, and contact details anytime through your PawTag account. Changes go live immediately.' },
+                  { question: 'What\'s the difference between Guardian and Gold?', answer: 'Guardian is free and includes the QR tag, pet profile, and basic notifications. Gold ($2.99/month) adds 2x loyalty points, free NZ-wide shipping, priority support, PawRewards credits, and early access to new products.' },
+                  { question: 'How many pets can I register?', answer: 'You can register as many pets as you like. Each pet gets their own profile and QR tag. Guardian members earn points on every tag purchase.' },
+                  { question: 'Is my personal information visible to finders?', answer: 'Finders see your pet\'s name, photo, and medical information — plus a way to contact you. Your full address and personal details are never shared. You control what\'s visible on the profile.' },
+                ],
+              },
+              visible: true,
+              order: 12,
+              status: 'published',
+            },
+            {
+              sectionId: 'cta-banner',
+              type: 'cta',
+              title: 'Final CTA',
+              content: {
+                heading: 'Ready to Protect Your Pet?',
+                subheading: 'Join 14,000+ New Zealand pet owners who trust PawTag to keep their pets safe. Order your QR tag today and give your pet the best chance of coming home.',
+                buttonText: 'Shop PawTag Now',
+                buttonUrl: '/shop',
+              },
+              visible: true,
+              order: 13,
+              status: 'published',
+            },
+          ],
+          status: 'published',
+          createdBy: adminId,
+          updatedBy: adminId,
+        }], { session });
+        console.log('  Created Pet Recovery page');
+      } else {
+        console.log('  Pet Recovery page already exists');
+      }
+      console.log('');
+
       // ═══════════════════════════════════════
       // 6. EMAIL TEMPLATES
       // ═══════════════════════════════════════
