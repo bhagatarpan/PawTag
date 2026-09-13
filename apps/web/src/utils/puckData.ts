@@ -15,6 +15,8 @@ const TYPE_MAP: Record<string, string> = {
   map: 'MapBlock',
   custom: 'CustomHtml',
   contact_form: 'ContactForm',
+  spacer: 'SpacerBlock',
+  image_text: 'ImageTextBlock',
 };
 
 export function sectionsToPuckData(sections: any[], options?: { filterPublished?: boolean }) {
