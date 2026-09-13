@@ -3,6 +3,9 @@ import { useState } from 'react';
 import { useSiteSettings } from '../../hooks/useSiteSettings';
 import RichTextEditor from '../RichTextEditor';
 import { ComparisonTable } from '@pawtag/ui';
+import { Bell, MapPin, Smartphone, Clock, Heart, Users, Shield, Star, Award, Check, Home, Scan, Tag, UserPlus, Search, Lock, Eye, Zap, Globe, Camera, Gift, Headphones, Package } from 'lucide-react';
+
+const iconComponents: Record<string, typeof Bell> = { Bell, MapPin, Smartphone, Clock, Heart, Users, Shield, Star, Award, Check, Home, Scan, Tag, UserPlus, Search, Lock, Eye, Zap, Globe, Camera, Gift, Headphones, Package };
 
 type PawtagComponents = {
   HeroBanner: {
@@ -245,7 +248,7 @@ export const pawtagConfig: Config<PawtagComponents> = {
           label: 'Features',
           defaultItemProps: { icon: '', title: '', description: '' },
           arrayFields: {
-            icon: { type: 'text', label: 'Icon (emoji or text)' },
+            icon: { type: 'text', label: 'Icon (Lucide name, emoji, or text)' },
             title: { type: 'text', label: 'Title' },
             description: { type: 'textarea', label: 'Description' },
           },
@@ -254,22 +257,27 @@ export const pawtagConfig: Config<PawtagComponents> = {
       defaultProps: {
         heading: 'Features',
         items: [
-          { icon: '🔍', title: 'QR Scan Recovery', description: 'Anyone who finds your pet can scan the QR code to contact you instantly.' },
-          { icon: '📍', title: 'Live Location Sharing', description: 'Get GPS coordinates when your pet\'s tag is scanned.' },
-          { icon: '🏆', title: 'Responsibility Score', description: 'Build trust in the community with your pet care reputation.' },
+          { icon: 'Scan', title: 'QR Scan Recovery', description: 'Anyone who finds your pet can scan the QR code to contact you instantly.' },
+          { icon: 'MapPin', title: 'Live Location Sharing', description: 'Get GPS coordinates when your pet\'s tag is scanned.' },
+          { icon: 'Award', title: 'Responsibility Score', description: 'Build trust in the community with your pet care reputation.' },
         ],
       },
       render: ({ heading, items }) => (
         <section className="py-16 px-6">
           <h2 className="text-3xl font-bold text-center mb-12">{heading || 'Features'}</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            {(items || []).map((item, i) => (
-              <div key={i} className="text-center p-6 rounded-xl border border-gray-200 hover:shadow-lg transition">
-                <div className="text-4xl mb-4">{item.icon}</div>
-                <h3 className="text-lg font-semibold mb-2">{item.title}</h3>
-                <p className="text-gray-600 text-sm">{item.description}</p>
-              </div>
-            ))}
+            {(items || []).map((item: any, i: number) => {
+              const Icon = iconComponents[item.icon];
+              return (
+                <div key={i} className="text-center p-6 rounded-xl border border-gray-200 hover:shadow-lg transition">
+                  <div className="text-4xl mb-4">
+                    {Icon ? <Icon size={40} className="mx-auto text-primary-600" /> : item.icon}
+                  </div>
+                  <h3 className="text-lg font-semibold mb-2">{item.title}</h3>
+                  <p className="text-gray-600 text-sm">{item.description}</p>
+                </div>
+              );
+            })}
           </div>
         </section>
       ),
