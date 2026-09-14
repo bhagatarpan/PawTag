@@ -34,21 +34,32 @@ export function MembershipCheckboxes({
         </label>
       </div>
 
-      {/* Gold membership upsell */}
-      <div className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+      {/* Gold membership */}
+      <div className={`flex items-start gap-3 p-3 rounded-lg ${goldJoined ? 'bg-amber-50 border border-amber-200 opacity-80' : 'bg-amber-50 border border-amber-200'}`}>
         <input
           type="checkbox"
           id="addGold"
           checked={addGold}
           onChange={(e) => onGoldChange(e.target.checked)}
           disabled={goldJoined}
-          className="mt-1 h-4 w-4 text-amber-600 border-gray-300 rounded focus:ring-amber-500 disabled:opacity-50"
+          className="mt-1 h-4 w-4 text-amber-600 border-gray-300 rounded focus:ring-amber-500 disabled:opacity-50 cursor-not-allowed"
         />
         <label htmlFor="addGold" className="text-sm">
-          <span className="font-medium text-amber-800">Add Gold Membership — ${goldPrice}/month</span>
-          <span className="text-amber-600 block text-xs mt-0.5">
-            Earn 2× points on every purchase, free shipping over $50, and more.
-          </span>
+          {goldJoined ? (
+            <>
+              <span className="font-medium text-amber-800">Gold Membership — Active ✓</span>
+              <span className="text-amber-600 block text-xs mt-0.5">
+                Your Gold membership is already active.
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="font-medium text-amber-800">Add Gold Membership — ${goldPrice}/month</span>
+              <span className="text-amber-600 block text-xs mt-0.5">
+                Earn 2× points on every purchase, free shipping over $50, and more.
+              </span>
+            </>
+          )}
         </label>
       </div>
 

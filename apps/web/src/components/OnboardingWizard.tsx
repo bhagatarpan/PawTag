@@ -107,6 +107,18 @@ export default function OnboardingWizard() {
       .finally(() => setLoading(false));
   }, []);
 
+  // Check if user already has an active Gold subscription
+  useEffect(() => {
+    api.get(API.customer.guardian.tier)
+      .then((res) => {
+        if (res.data.data?.isGoldMember) {
+          setGoldJoined(true);
+          setAddGold(true);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   const step = steps[currentIdx];
   const isFirst = currentIdx === 0;
   const isLast = currentIdx === steps.length - 1;
