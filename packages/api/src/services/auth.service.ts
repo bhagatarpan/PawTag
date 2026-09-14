@@ -2,7 +2,7 @@ import jwt, { SignOptions } from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { config } from '../config';
-import { RefreshToken } from '@pawtag/db';
+import { RefreshToken, Setting } from '@pawtag/db';
 
 export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, 12);
@@ -23,8 +23,12 @@ export function generateRefreshToken(): { token: string; tokenHash: string } {
   return { token, tokenHash };
 }
 
-export async function storeRefreshToken(userId: string, tokenHash: string, deviceInfo?: string): Promise<void> {
-  const expiresAt = new Date(Date.now() + config.refreshTokenExpiresInDays * 24 * 60 * 60 * 1000);
+export async function storeRefreshToken(userId: string, tokenHash: string, deviceInfo?: string, rememberMe?: boolean): Promise<void> {
+  const settingKey = rememberMe ? 'auth.session.rememberMeDays' : 'auth.session.defaultDays';
+  const defaultDays = rememberMe ? 30 : 1;
+  const setting = await Setting.findOne({ key: settingKey }).lean();
+  const sessionDays = parseInt(setting?.value || String(defaultDays), 10);
+  const expiresAt = new Date(Date.now() + sessionDays * 24 * 60 * 60 * 1000);
   await RefreshToken.create({
     userId,
     tokenHash,

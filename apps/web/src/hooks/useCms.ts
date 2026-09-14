@@ -110,6 +110,8 @@ export interface SiteSettings {
   'guardian.gold.comparison'?: string;
   'guardian.gold.emailUpsellText'?: string;
   'guardian.gold.checkoutUpsellText'?: string;
+  'auth.session.defaultDays'?: string;
+  'auth.session.rememberMeDays'?: string;
 }
 
 // Hook for navigation

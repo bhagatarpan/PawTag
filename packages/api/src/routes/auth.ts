@@ -538,7 +538,7 @@ if (user.status === 'inactive') {
     const token = generateToken({ id: user._id.toString(), email: user.email, role: user.role });
 
     const refreshTokens = generateRefreshToken();
-    await storeRefreshToken(user._id.toString(), refreshTokens.tokenHash);
+    await storeRefreshToken(user._id.toString(), refreshTokens.tokenHash, undefined, req.body.rememberMe);
 
     await auditAuthEvent(req as AuditRequest, {
       action: 'login',
@@ -549,7 +549,7 @@ if (user.status === 'inactive') {
       resourceId: user._id.toString(),
       outcome: 'SUCCESS',
       severity: 'MEDIUM',
-      metadata: { mfaRequired: false, isAdmin, rbacRoles: rbacRoles.map((r: any) => r.name) },
+      metadata: { mfaRequired: false, isAdmin, rememberMe: !!req.body.rememberMe, rbacRoles: rbacRoles.map((r: any) => r.name) },
       businessOperation: 'Logged in successfully',
     }, { actorType: resolveActorType(user.role), authenticationMethod: 'password' });
 
@@ -1728,7 +1728,7 @@ router.post('/mfa/verify', mfaVerifyLimiter, async (req: AuthRequest, res: Respo
     // Generate real tokens
     const jwtToken = generateToken({ id: user._id.toString(), email: user.email, role: user.role });
     const refreshTokens = generateRefreshToken();
-    await storeRefreshToken(user._id.toString(), refreshTokens.tokenHash);
+    await storeRefreshToken(user._id.toString(), refreshTokens.tokenHash, undefined, req.body.rememberMe);
 
     // Get RBAC roles
     const userRoles = await UserRole.find({ userId: user._id, isActive: true })
@@ -1748,7 +1748,7 @@ router.post('/mfa/verify', mfaVerifyLimiter, async (req: AuthRequest, res: Respo
       resourceId: user._id.toString(),
       outcome: 'SUCCESS',
       severity: 'MEDIUM',
-      metadata: { mfaType: 'email_otp', isAdmin, rbacRoles: rbacRoles.map((r: any) => r.name) },
+      metadata: { mfaType: 'email_otp', isAdmin, rememberMe: !!req.body.rememberMe, rbacRoles: rbacRoles.map((r: any) => r.name) },
       businessOperation: 'Verified two-factor code',
     }, { actorType: resolveActorType(user.role), authenticationMethod: 'mfa_email_otp' });
 

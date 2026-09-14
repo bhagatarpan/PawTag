@@ -112,6 +112,8 @@ async function run() {
         { key: 'auth.lockoutMinutes', value: '30', displayValue: 'Lockout Duration (minutes)', category: 'auth', description: 'Minutes to lock account after max failed attempts' },
         { key: 'auth.captchaRequiredAfterAttempts', value: '2', displayValue: 'CAPTCHA Required After Attempts', category: 'auth', description: 'Show CAPTCHA after this many failed login attempts' },
         { key: 'auth.captchaTokenExpiryMinutes', value: '5', displayValue: 'CAPTCHA Token Expiry (minutes)', category: 'auth', description: 'Minutes before a CAPTCHA token expires' },
+        { key: 'auth.session.defaultDays', value: '1', displayValue: 'Default Session Duration (days)', category: 'auth', description: 'Days before a session expires when "Remember me" is not checked' },
+        { key: 'auth.session.rememberMeDays', value: '30', displayValue: 'Remember Me Duration (days)', category: 'auth', description: 'Days before a session expires when "Remember me" is checked' },
         ...auditCategories.map((value) => ({ key: `audit.policy.category.${value.toLowerCase()}`, value: 'true', displayValue: `Audit: ${value}`, category: 'audit', description: `Enable audit logging for ${value} events` })),
         ...auditActors.map((value) => ({ key: `audit.policy.actor.${value.toLowerCase()}`, value: 'true', displayValue: `Audit: ${value} Actor`, category: 'audit', description: `Enable audit logging for ${value} actors` })),
         { key: 'audit.settings.identifyAnonymousActors', value: 'true', displayValue: 'Identify Anonymous Actors', category: 'audit', description: 'When enabled, attempts to identify anonymous users from JWT tokens even when auth fails' },

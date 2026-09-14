@@ -20,6 +20,7 @@ export const loginSchema = z.object({
   password: z.string().min(1, 'Password is required'),
   captchaToken: z.string().optional(),
   captchaAnswer: z.number().int().optional(),
+  rememberMe: z.boolean().optional(),
 });
 
 export const verifyEmailSchema = z.object({

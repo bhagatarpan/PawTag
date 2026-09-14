@@ -6,7 +6,7 @@ import { API } from '@pawtag/shared';
 interface AuthContextType {
   user: User | null;
   token: string | null;
-  login: (email: string, password: string, captchaToken?: string, captchaAnswer?: string) => Promise<any>;
+  login: (email: string, password: string, captchaToken?: string, captchaAnswer?: string, rememberMe?: boolean) => Promise<any>;
   logout: () => void;
   refreshUser: () => Promise<void>;
   isLoading: boolean;
@@ -34,11 +34,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [token]);
 
-  const login = useCallback(async (email: string, password: string, captchaToken?: string, captchaAnswer?: string): Promise<any> => {
+  const login = useCallback(async (email: string, password: string, captchaToken?: string, captchaAnswer?: string, rememberMe?: boolean): Promise<any> => {
     const payload: any = { email, password };
     if (captchaToken && captchaAnswer) {
       payload.captchaToken = captchaToken;
       payload.captchaAnswer = parseInt(captchaAnswer, 10);
+    }
+    if (rememberMe !== undefined) {
+      payload.rememberMe = rememberMe;
     }
     const res = await api.post(API.auth.login, payload);
     const data = res.data;

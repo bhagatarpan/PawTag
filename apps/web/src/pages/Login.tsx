@@ -16,6 +16,7 @@ export default function Login() {
   const [captchaQuestion, setCaptchaQuestion] = useState('');
   const [captchaToken, setCaptchaToken] = useState('');
   const [captchaAnswer, setCaptchaAnswer] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
 
   // MFA state
   const [mfaRequired, setMfaRequired] = useState(false);
@@ -51,7 +52,7 @@ export default function Login() {
     setError('');
     setLoading(true);
     try {
-      const result = await login(email, password, captchaRequired ? captchaToken : undefined, captchaRequired ? captchaAnswer : undefined);
+      const result = await login(email, password, captchaRequired ? captchaToken : undefined, captchaRequired ? captchaAnswer : undefined, rememberMe);
 
       // Check if MFA is required
       if (result?.code === 'MFA_REQUIRED') {
@@ -112,6 +113,7 @@ export default function Login() {
       const res = await api.post(API.auth.mfa.verify, {
         tempToken: mfaTempToken,
         otp: mfaOtp,
+        rememberMe,
       });
       const { token: newToken, refreshToken: newRefreshToken, user: userData } = res.data.data;
       localStorage.setItem('pawtag_token', newToken);
@@ -364,6 +366,19 @@ export default function Login() {
                   Forgot password?
                 </Link>
               </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="rememberMe"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="h-4 w-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500"
+              />
+              <label htmlFor="rememberMe" className="text-sm text-gray-600">
+                Remember me on this device for {settings?.['auth.session.rememberMeDays'] || '30'} days
+              </label>
             </div>
 
             {captchaRequired && (
