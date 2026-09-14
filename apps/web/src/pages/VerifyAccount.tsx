@@ -84,6 +84,20 @@ export default function VerifyAccount() {
     }
   }, [emailStatus, fetchStatus, status, emailParam, phoneParam]);
 
+  // Capture tokens from URL params (when redirected from email verification after activation)
+  useEffect(() => {
+    const tokenParam = searchParams.get('token');
+    const refreshTokenParam = searchParams.get('refreshToken');
+    if (tokenParam && refreshTokenParam) {
+      localStorage.setItem('pawtag_token', tokenParam);
+      localStorage.setItem('pawtag_refresh_token', refreshTokenParam);
+      // Clean URL params
+      searchParams.delete('token');
+      searchParams.delete('refreshToken');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
+
   useEffect(() => {
     if (cooldown <= 0) return;
     const timer = setInterval(() => {
@@ -139,7 +153,13 @@ export default function VerifyAccount() {
     setError('');
     setSuccess('');
     try {
-      await api.post(API.auth.verifyPhone, { otp: otpValue, phoneNumber: effectivePhone });
+      const res = await api.post(API.auth.verifyPhone, { otp: otpValue, phoneNumber: effectivePhone });
+      // Store tokens if user was just activated
+      const { token, refreshToken } = res.data.data || {};
+      if (token && refreshToken) {
+        localStorage.setItem('pawtag_token', token);
+        localStorage.setItem('pawtag_refresh_token', refreshToken);
+      }
       setSuccess('Phone number verified successfully!');
       setOtpValue('');
       setPhoneOtpSent(false);
@@ -436,13 +456,13 @@ export default function VerifyAccount() {
               <p className="text-sm text-gray-600 mb-4">
                 {localStorage.getItem('pawtag_return_url')
                   ? 'Your account is active. Please log in to continue.'
-                  : 'Your account is now active.'}
+                  : "Your account is verified! Let's set up your Pet Recovery."}
               </p>
               <button
                 onClick={handleContinue}
                 className="w-full py-3 bg-teal-600 text-white rounded-xl font-semibold hover:bg-teal-700 transition-all"
               >
-                {localStorage.getItem('pawtag_return_url') ? 'Log in to Continue' : 'Continue to Dashboard'}
+                {localStorage.getItem('pawtag_return_url') ? 'Log in to Continue' : "Let's Get You Started"}
               </button>
             </div>
           )}
@@ -453,7 +473,7 @@ export default function VerifyAccount() {
                 onClick={handleContinue}
                 className="w-full py-3 bg-teal-600 text-white rounded-xl font-semibold hover:bg-teal-700 transition-all"
               >
-                {localStorage.getItem('pawtag_return_url') ? 'Continue to Checkout' : 'Go to Dashboard'}
+                {localStorage.getItem('pawtag_return_url') ? 'Continue to Checkout' : "Let's Get You Started"}
               </button>
             </div>
           )}

@@ -144,14 +144,21 @@ async function auditSecurityFailure(
   }
 }
 
-async function checkAndActivateUser(userId: string) {
+async function checkAndActivateUser(userId: string): Promise<{ token?: string; refreshToken?: string }> {
   const user = await User.findById(userId);
-  if (!user) return;
+  if (!user) return {};
   if (user.emailVerified && user.phoneVerified && user.status === 'pending_verification') {
     user.status = 'active';
     await user.save();
     await sendWelcomeEmail(user.email, user.fullName);
+
+    // Generate tokens so the user can be authenticated immediately
+    const token = generateToken({ id: user._id.toString(), email: user.email, role: user.role });
+    const refreshTokens = generateRefreshToken();
+    await storeRefreshToken(user._id.toString(), refreshTokens.tokenHash);
+    return { token, refreshToken: refreshTokens.token };
   }
+  return {};
 }
 
 /** In development with test mode enabled, route verification emails to the test email. */
@@ -654,13 +661,16 @@ router.get('/verify-email', async (req, res: Response) => {
       businessOperation: 'Verified email address',
     }, { actorType: 'USER' });
 
-    await checkAndActivateUser(user._id.toString());
+    const activationTokens = await checkAndActivateUser(user._id.toString());
 
     if (isAjax) {
-      res.json({ success: true, data: { message: 'Email verified successfully!', email: user.email, phoneNumber: user.phoneNumber } });
+      res.json({ success: true, data: { message: 'Email verified successfully!', email: user.email, phoneNumber: user.phoneNumber, ...activationTokens } });
       return;
     }
-    res.redirect(`${config.frontendUrl}/verify-account?email_status=verified`);
+    const redirectParams = new URLSearchParams({ email_status: 'verified' });
+    if (activationTokens.token) redirectParams.set('token', activationTokens.token);
+    if (activationTokens.refreshToken) redirectParams.set('refreshToken', activationTokens.refreshToken);
+    res.redirect(`${config.frontendUrl}/verify-account?${redirectParams.toString()}`);
   } catch (error) {
     logger.error({ err: error }, 'Email verification error');
     res.redirect(`${config.frontendUrl}/verify-account?email_status=error`);
@@ -992,9 +1002,9 @@ router.post('/verify-phone', validate(verifyPhoneSchema), async (req: AuthReques
       businessOperation: 'Verified phone number',
     }, { actorType: 'USER' });
 
-    await checkAndActivateUser(user._id.toString());
+    const activationTokens = await checkAndActivateUser(user._id.toString());
 
-    res.json({ success: true, data: { message: 'Phone number verified successfully.' } });
+    res.json({ success: true, data: { message: 'Phone number verified successfully.', ...activationTokens } });
   } catch (error) {
     logger.error({ err: error }, 'Verify phone error');
     res.status(500).json({ success: false, error: 'Verification failed' });
