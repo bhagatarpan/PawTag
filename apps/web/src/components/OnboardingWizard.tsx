@@ -108,7 +108,21 @@ export default function OnboardingWizard() {
   }, []);
 
   // Check if user already has an active Gold subscription
+  // Also check localStorage for deferred Gold preference from registration
   useEffect(() => {
+    // First check if user opted into Gold during registration but subscription wasn't created
+    const goldPreference = localStorage.getItem('pawtag_subscribe_gold');
+    if (goldPreference) {
+      localStorage.removeItem('pawtag_subscribe_gold');
+      api.post(API.customer.subscriptions.goldSubscribe)
+        .then(() => {
+          setGoldJoined(true);
+          setAddGold(true);
+        })
+        .catch(() => {});
+    }
+
+    // Then check if user already has an active Gold subscription
     api.get(API.customer.guardian.tier)
       .then((res) => {
         if (res.data.data?.isGoldMember) {

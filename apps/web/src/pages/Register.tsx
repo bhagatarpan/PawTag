@@ -65,13 +65,10 @@ export default function Register() {
         // User will see verification prompts on the verify-account page
       }
 
-      // If user opted into Gold, create Gold subscription
+      // Store Gold preference — subscription will be created after verification
+      // (when user has a valid auth token)
       if (form.addGold) {
-        try {
-          await api.post(API.customer.subscriptions.goldSubscribe);
-        } catch {
-          // Gold subscription creation failed — non-critical, user can upgrade later
-        }
+        localStorage.setItem('pawtag_subscribe_gold', 'true');
       }
 
       setSuccess(true);

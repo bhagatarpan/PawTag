@@ -189,7 +189,18 @@ export default function VerifyAccount() {
     }
   };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
+    // If user opted into Gold during registration, subscribe now (token is available)
+    const goldPreference = localStorage.getItem('pawtag_subscribe_gold');
+    if (goldPreference) {
+      localStorage.removeItem('pawtag_subscribe_gold');
+      try {
+        await api.post(API.customer.subscriptions.goldSubscribe);
+      } catch {
+        // Non-critical — user can upgrade later from the dashboard
+      }
+    }
+
     // Check if there's a return URL (e.g., from checkout)
     const returnUrl = localStorage.getItem('pawtag_return_url');
     if (returnUrl) {
