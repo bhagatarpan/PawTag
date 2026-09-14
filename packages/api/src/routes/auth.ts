@@ -30,7 +30,7 @@ import {
   rotateRefreshToken,
   revokeRefreshToken,
 } from '../services/auth.service';
-import { sendVerificationEmail, sendPasswordResetEmail, sendPasswordChangedEmail, sendWelcomeEmail, sendLoginNotification, sendLoginOtpEmail } from '../services/email.service';
+import { sendVerificationEmail, sendPasswordResetEmail, sendPasswordChangedEmail, sendWelcomeEmail, sendLoginNotification, sendLoginOtpEmail, sendGuardianWelcomeEmail } from '../services/email.service';
 import { sendPhoneOtpSMS } from '../services/sms.service';
 import { isRegistrationOtpDisabled } from '../services/otp-settings.service';
 import { getMaxLoginAttempts, getLockoutMinutes, getCaptchaRequiredAfterAttempts, getCaptchaTokenExpiryMinutes } from '../services/auth-settings.service';
@@ -151,6 +151,10 @@ async function checkAndActivateUser(userId: string): Promise<{ token?: string; r
     user.status = 'active';
     await user.save();
     await sendWelcomeEmail(user.email, user.fullName);
+    // Send Guardian welcome email (fire-and-forget)
+    sendGuardianWelcomeEmail(user.email, user.fullName, 'Care', 0).catch((err) => {
+      logger.error({ err, userId: userId }, 'Failed to send Guardian welcome email');
+    });
 
     // Generate tokens so the user can be authenticated immediately
     const token = generateToken({ id: user._id.toString(), email: user.email, role: user.role });

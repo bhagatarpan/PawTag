@@ -456,12 +456,61 @@ export async function sendGuardianWelcomeEmail(
   tier: string,
   points: number,
 ): Promise<EmailResult> {
+  // Read CMS settings for Guardian/Gold configuration
+  const settingKeys = [
+    'guardian.purchaseRateGuardian',
+    'guardian.reviewTextPoints',
+    'guardian.reviewPhotoPoints',
+    'guardian.reviewVideoPoints',
+    'guardian.referralSignupPoints',
+    'guardian.referralPurchasePoints',
+    'guardian.petProfilePoints',
+    'guardian.tagActivationPoints',
+    'guardian.tierThresholdNurture',
+    'guardian.tierThresholdProtector',
+    'guardian.tierThresholdSafeguard',
+    'guardian.pawRewardsCare',
+    'guardian.pawRewardsNurture',
+    'guardian.pawRewardsProtector',
+    'guardian.pawRewardsSafeguard',
+    'guardian.goldPrice',
+  ];
+  const settings = await Setting.find({ key: { $in: settingKeys } }).lean();
+  const s = Object.fromEntries(settings.map((st) => [st.key, st.value]));
+
+  const pointsPerDollar = s['guardian.purchaseRateGuardian'] || '1';
+  const goldLandingUrl = `${frontendUrl}/gold`;
   const dashboardUrl = `${frontendUrl}/account/guardian`;
-  const vars = { customerName, tier, points: String(points), dashboardUrl };
+
+  const vars: Record<string, string> = {
+    customerName,
+    tier,
+    points: String(points),
+    dashboardUrl,
+    goldLandingUrl,
+    pointsPerDollar,
+    pointsPerDollarPlural: pointsPerDollar === '1' ? '' : 's',
+    reviewTextPoints: s['guardian.reviewTextPoints'] || '5',
+    reviewPhotoPoints: s['guardian.reviewPhotoPoints'] || '15',
+    reviewVideoPoints: s['guardian.reviewVideoPoints'] || '25',
+    referralSignupPoints: s['guardian.referralSignupPoints'] || '20',
+    referralPurchasePoints: s['guardian.referralPurchasePoints'] || '50',
+    petProfilePoints: s['guardian.petProfilePoints'] || '15',
+    tagActivationPoints: s['guardian.tagActivationPoints'] || '10',
+    tierThresholdNurture: s['guardian.tierThresholdNurture'] || '100',
+    tierThresholdProtector: s['guardian.tierThresholdProtector'] || '200',
+    tierThresholdSafeguard: s['guardian.tierThresholdSafeguard'] || '300',
+    pawRewardsCare: s['guardian.pawRewardsCare'] || '2.00',
+    pawRewardsNurture: s['guardian.pawRewardsNurture'] || '3.00',
+    pawRewardsProtector: s['guardian.pawRewardsProtector'] || '5.00',
+    pawRewardsSafeguard: s['guardian.pawRewardsSafeguard'] || '8.00',
+    goldPrice: s['guardian.goldPrice'] || '1.99',
+  };
+
   const cms = await renderCmsEmail('guardian-welcome', vars);
   if (cms) return sendMail(to, cms.subject, cms.html, cms.from);
-  const html = renderGuardianWelcomeEmail({ customerName, tier, points, dashboardUrl });
-  return sendMail(to, 'Welcome to Guardian — PawTag', html);
+  const html = renderGuardianWelcomeEmail(vars);
+  return sendMail(to, 'Welcome to Guardian — Your Pet Safety Journey Begins', html);
 }
 
 export async function sendTierUpgradeEmail(

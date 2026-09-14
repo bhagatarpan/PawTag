@@ -2027,28 +2027,96 @@ async function run() {
         {
           name: 'Guardian Welcome',
           slug: 'guardian-welcome',
-          subject: 'Welcome to Guardian — PawTag',
+          subject: 'Welcome to Guardian — Your Pet Safety Journey Begins',
           title: 'Welcome to Guardian',
           subtitle: 'Your loyalty journey begins',
-          body: 'Hi {{customerName}},\n\nWelcome to the PawTag Guardian loyalty program!\n\nYou\'re starting at the {{tier}} tier with {{points}} points.\n\nEarn points through purchases, referrals, and keeping your pet\'s profile complete.',
-          ctaText: 'View Dashboard',
+          body: `Hi {{customerName}},
+
+Welcome to Guardian — your pet safety journey just got rewarding!
+
+You're starting at the {{tier}} tier with {{points}} points. Every purchase, review, and engagement earns you points that unlock real rewards.
+
+HOW YOU EARN POINTS
+
+• Every $1 spent → {{pointsPerDollar}} point{{pointsPerDollarPlural}}
+• Text review → {{reviewTextPoints}} points
+• Photo review → {{reviewPhotoPoints}} points
+• Video review → {{reviewVideoPoints}} points
+• Refer a friend (signup) → {{referralSignupPoints}} points
+• Refer a friend (purchase) → {{referralPurchasePoints}} points
+• Complete pet profile → {{petProfilePoints}} points
+• Activate a tag → {{tagActivationPoints}} points
+
+YOUR PATH TO BETTER REWARDS
+
+As you earn points, you unlock higher tiers with better monthly PawRewards:
+
+• Care (0 pts) → ${{pawRewardsCare}}/month PawRewards
+• Nurture ({{tierThresholdNurture}} pts) → ${{pawRewardsNurture}}/month PawRewards
+• Protector ({{tierThresholdProtector}} pts) → ${{pawRewardsProtector}}/month PawRewards
+• Safeguard ({{tierThresholdSafeguard}} pts) → ${{pawRewardsSafeguard}}/month PawRewards
+
+PawRewards are store credit you can spend on any purchase. The higher your tier, the more you earn every month.
+
+GO GOLD — GET 2× THE REWARDS
+
+Want even more? Gold members get double points on every purchase, plus exclusive benefits:
+
+• 2× points on every purchase (vs 1× for Guardian)
+• Start at Nurture tier (skip Care)
+• ${{pawRewardsNurture}}/month PawRewards (vs ${{pawRewardsCare}}/month)
+• Free shipping over $50 (vs $100 for Guardian)
+• Early access to new products
+• Priority customer support
+
+Gold membership is just ${{goldPrice}}/month — less than a coffee.
+
+Learn more about Gold: {{goldLandingUrl}}
+
+YOUR GUARDIAN DASHBOARD
+
+Track your points, view your tier progress, and manage your rewards from your personal dashboard.
+
+Questions? Reply to this email or visit our help center.
+
+Welcome to the pack!
+The PawTag Team`,
+          ctaText: 'View Your Dashboard',
           ctaUrl: '{{dashboardUrl}}',
           senderEmail: 'no-reply@pawtag.co.nz',
           senderName: 'PawTag',
-          variables: ['customerName', 'tier', 'points', 'dashboardUrl'],
+          variables: ['customerName', 'tier', 'points', 'dashboardUrl', 'goldLandingUrl', 'pointsPerDollar', 'pointsPerDollarPlural', 'reviewTextPoints', 'reviewPhotoPoints', 'reviewVideoPoints', 'referralSignupPoints', 'referralPurchasePoints', 'petProfilePoints', 'tagActivationPoints', 'tierThresholdNurture', 'tierThresholdProtector', 'tierThresholdSafeguard', 'pawRewardsCare', 'pawRewardsNurture', 'pawRewardsProtector', 'pawRewardsSafeguard', 'goldPrice'],
           status: 'active' as const,
           businessFlow: 'guardian_loyalty' as const,
-          purpose: 'Welcomes new Guardian loyalty members and shows starting tier/points.',
-          triggerDescription: 'Sent when a customer joins the Guardian program.',
+          purpose: 'Comprehensive welcome email for new Guardian members — explains points system, tier progression, PawRewards, and includes Gold upgrade section.',
+          triggerDescription: 'Sent when a customer becomes active (email + phone verified).',
           recipientDescription: 'New Guardian member',
           emailType: 'transactional' as const,
           isCritical: false,
-          version: 1,
+          version: 2,
           variableDefinitions: [
             { key: 'customerName', label: 'Customer Name', description: 'First name of the customer', type: 'string', example: 'John', required: true, source: 'Customer' },
             { key: 'tier', label: 'Tier', description: 'Starting Guardian tier', type: 'string', example: 'Care', required: true, source: 'Guardian' },
-            { key: 'points', label: 'Points', description: 'Starting points balance', type: 'number', example: '100', required: true, source: 'Guardian' },
+            { key: 'points', label: 'Points', description: 'Starting points balance', type: 'number', example: '0', required: true, source: 'Guardian' },
             { key: 'dashboardUrl', label: 'Dashboard URL', description: 'Link to Guardian dashboard', type: 'string', example: 'https://pawtag.co.nz/account/guardian', required: true, source: 'System' },
+            { key: 'goldLandingUrl', label: 'Gold Landing URL', description: 'Link to Gold membership page', type: 'string', example: 'https://pawtag.co.nz/gold', required: true, source: 'System' },
+            { key: 'pointsPerDollar', label: 'Points Per Dollar', description: 'Points earned per $1 spent (Guardian)', type: 'number', example: '1', required: true, source: 'CMS: guardian.purchaseRateGuardian' },
+            { key: 'pointsPerDollarPlural', label: 'Points Plural', description: 'Plural suffix for points (empty or s)', type: 'string', example: '', required: false, source: 'System' },
+            { key: 'reviewTextPoints', label: 'Text Review Points', description: 'Points for text review', type: 'number', example: '5', required: true, source: 'CMS: guardian.reviewTextPoints' },
+            { key: 'reviewPhotoPoints', label: 'Photo Review Points', description: 'Points for photo review', type: 'number', example: '15', required: true, source: 'CMS: guardian.reviewPhotoPoints' },
+            { key: 'reviewVideoPoints', label: 'Video Review Points', description: 'Points for video review', type: 'number', example: '25', required: true, source: 'CMS: guardian.reviewVideoPoints' },
+            { key: 'referralSignupPoints', label: 'Referral Signup Points', description: 'Points for referral signup', type: 'number', example: '20', required: true, source: 'CMS: guardian.referralSignupPoints' },
+            { key: 'referralPurchasePoints', label: 'Referral Purchase Points', description: 'Points for referral purchase', type: 'number', example: '50', required: true, source: 'CMS: guardian.referralPurchasePoints' },
+            { key: 'petProfilePoints', label: 'Pet Profile Points', description: 'Points for completing pet profile', type: 'number', example: '15', required: true, source: 'CMS: guardian.petProfilePoints' },
+            { key: 'tagActivationPoints', label: 'Tag Activation Points', description: 'Points for activating a tag', type: 'number', example: '10', required: true, source: 'CMS: guardian.tagActivationPoints' },
+            { key: 'tierThresholdNurture', label: 'Nurture Threshold', description: 'Points needed for Nurture tier', type: 'number', example: '100', required: true, source: 'CMS: guardian.tierThresholdNurture' },
+            { key: 'tierThresholdProtector', label: 'Protector Threshold', description: 'Points needed for Protector tier', type: 'number', example: '200', required: true, source: 'CMS: guardian.tierThresholdProtector' },
+            { key: 'tierThresholdSafeguard', label: 'Safeguard Threshold', description: 'Points needed for Safeguard tier', type: 'number', example: '300', required: true, source: 'CMS: guardian.tierThresholdSafeguard' },
+            { key: 'pawRewardsCare', label: 'PawRewards (Care)', description: 'Monthly PawRewards for Care tier (NZD)', type: 'number', example: '2.00', required: true, source: 'CMS: guardian.pawRewardsCare' },
+            { key: 'pawRewardsNurture', label: 'PawRewards (Nurture)', description: 'Monthly PawRewards for Nurture tier (NZD)', type: 'number', example: '3.00', required: true, source: 'CMS: guardian.pawRewardsNurture' },
+            { key: 'pawRewardsProtector', label: 'PawRewards (Protector)', description: 'Monthly PawRewards for Protector tier (NZD)', type: 'number', example: '5.00', required: true, source: 'CMS: guardian.pawRewardsProtector' },
+            { key: 'pawRewardsSafeguard', label: 'PawRewards (Safeguard)', description: 'Monthly PawRewards for Safeguard tier (NZD)', type: 'number', example: '8.00', required: true, source: 'CMS: guardian.pawRewardsSafeguard' },
+            { key: 'goldPrice', label: 'Gold Price', description: 'Gold membership monthly price (NZD)', type: 'number', example: '1.99', required: true, source: 'CMS: guardian.goldPrice' },
           ],
         },
         {
