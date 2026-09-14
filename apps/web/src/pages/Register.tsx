@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { PawPrint, Mail, Lock, User, Phone, Eye, EyeOff, CheckCircle, Loader2 } from 'lucide-react';
+import { MembershipCheckboxes } from '@pawtag/ui';
 import api from '../lib/api';
 import { useAuthPage, useSiteSettings } from '../hooks/useCms';
 import { useAuth } from '../context/AuthContext';
@@ -199,39 +200,11 @@ export default function Register() {
               </label>
             </div>
 
-            {/* Guardian membership — included free */}
-            <div className="flex items-start gap-3 p-3 bg-teal-50 border border-teal-200 rounded-lg opacity-80">
-              <input
-                type="checkbox"
-                id="guardianMembership"
-                checked={true}
-                disabled={true}
-                className="mt-1 h-4 w-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500 cursor-not-allowed"
-              />
-              <label htmlFor="guardianMembership" className="text-sm">
-                <span className="font-medium text-teal-800">Guardian Membership — Free for life</span>
-                <span className="text-teal-600 block text-xs mt-0.5">
-                  Earn rewards on every purchase, track your pet's health, and more.
-                </span>
-              </label>
-            </div>
-
-            {/* Gold membership upsell */}
-            <div className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-              <input
-                type="checkbox"
-                id="addGold"
-                checked={form.addGold}
-                onChange={(e) => setForm({ ...form, addGold: e.target.checked })}
-                className="mt-1 h-4 w-4 text-amber-600 border-gray-300 rounded focus:ring-amber-500"
-              />
-              <label htmlFor="addGold" className="text-sm">
-                <span className="font-medium text-amber-800">Add Gold Membership — ${goldPrice}/month</span>
-                <span className="text-amber-600 block text-xs mt-0.5">
-                  Earn 2× points on every purchase, free shipping over $50, and more.
-                </span>
-              </label>
-            </div>
+            <MembershipCheckboxes
+              goldPrice={goldPrice}
+              addGold={form.addGold}
+              onGoldChange={(checked) => setForm({ ...form, addGold: checked })}
+            />
 
             <button type="submit" disabled={loading} className="w-full py-3 bg-teal-600 text-white rounded-lg font-semibold hover:bg-teal-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2">
               {loading ? <><Loader2 className="animate-spin h-4 w-4" /> Creating account...</> : 'Create Account'}

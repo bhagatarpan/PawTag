@@ -4,7 +4,7 @@ import {
   Shield, Info, Star, Gift, Bell, ArrowRight, ArrowLeft, Lock,
   PawPrint, Scan, Crown,
 } from 'lucide-react';
-import { AddressAutocomplete } from '@pawtag/ui';
+import { AddressAutocomplete, MembershipCheckboxes } from '@pawtag/ui';
 import type { AddressComponents } from '@pawtag/ui';
 import api from '../lib/api';
 import { useAuth } from '../context/AuthContext';
@@ -81,6 +81,7 @@ export default function OnboardingWizard() {
   const [saving, setSaving] = useState(false);
   const [goldJoined, setGoldJoined] = useState(false);
   const [goldError, setGoldError] = useState('');
+  const [addGold, setAddGold] = useState(false);
   const [completed, setCompleted] = useState(false);
 
   // Form state
@@ -115,6 +116,16 @@ export default function OnboardingWizard() {
   async function handleNext() {
     if (step?.type === 'form') {
       await saveStepData();
+    }
+    // Subscribe to Gold if opted in on guardian step
+    if (step?.stepId === 'guardian' && addGold && !goldJoined) {
+      try {
+        await api.post(API.customer.subscriptions.goldSubscribe);
+        setGoldJoined(true);
+      } catch (err: any) {
+        setGoldError(err.response?.data?.error || 'Failed to join Gold');
+        return; // Don't advance if Gold subscription fails
+      }
     }
     if (isLast) {
       await completeOnboarding();
@@ -617,35 +628,16 @@ export default function OnboardingWizard() {
           {/* Callout */}
           {renderCallout(step.content?.callout)}
 
-          {/* Gold purchase button — only on guardian step */}
+          {/* Membership checkboxes — only on guardian step */}
           {step.stepId === 'guardian' && (
-            <div className="mt-6 p-4 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-xl">
-              <div className="flex items-center gap-3">
-                <Crown className="h-5 w-5 text-amber-600 flex-shrink-0" />
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-amber-800">
-                    Upgrade to Gold — ${goldPrice}/month
-                  </p>
-                  <p className="text-xs text-amber-600 mt-0.5">
-                    Earn 2× points on every purchase. Cancel anytime.
-                  </p>
-                </div>
-                <button
-                  onClick={async () => {
-                    try {
-                      await api.post(API.customer.subscriptions.goldSubscribe);
-                      setGoldJoined(true);
-                    } catch (err: any) {
-                      setGoldError(err.response?.data?.error || 'Failed to join Gold');
-                    }
-                  }}
-                  disabled={goldJoined}
-                  className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 disabled:opacity-50 transition-colors whitespace-nowrap"
-                >
-                  {goldJoined ? '✓ Joined' : 'Join Gold'}
-                </button>
-              </div>
-              {goldError && <p className="text-xs text-red-500 mt-2">{goldError}</p>}
+            <div className="mt-6">
+              <MembershipCheckboxes
+                goldPrice={goldPrice}
+                addGold={addGold}
+                onGoldChange={setAddGold}
+                goldJoined={goldJoined}
+                goldError={goldError}
+              />
             </div>
           )}
 

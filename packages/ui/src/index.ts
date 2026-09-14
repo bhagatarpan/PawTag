@@ -31,6 +31,7 @@ export type { CartItem, CartDrawerProps } from './components/CartDrawer';
 export type { OrderProgressStepperProps } from './components/OrderProgressStepper';
 export type { OrderStatusBannerProps } from './components/OrderStatusBanner';
 export type { IconPickerProps } from './types';
+export type { MembershipCheckboxesProps } from './components/MembershipCheckboxes';
 
 // Components
 export { SummaryCards } from './components/SummaryCards';
@@ -66,3 +67,6 @@ export { FadeIn } from './components/FadeIn';
 
 // Picker components
 export { IconPicker, ICON_MAP } from './components/IconPicker';
+
+// Membership components
+export { MembershipCheckboxes } from './components/MembershipCheckboxes';
