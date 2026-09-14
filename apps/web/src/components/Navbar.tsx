@@ -247,9 +247,14 @@ export default function Navbar() {
                   )}
                 </div>
               ) : (
-                <Link to="/login" className="hidden md:flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition-all">
-                  <User className="h-4 w-4" /> Sign In
-                </Link>
+                <div className="hidden md:flex items-center gap-3">
+                  <Link to="/login" className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition-all">
+                    <User className="h-4 w-4" /> Sign In
+                  </Link>
+                  <Link to="/register" className="text-sm text-gray-600 hover:text-primary-600 transition-colors">
+                    Register
+                  </Link>
+                </div>
               )}
 
               {/* Mobile Menu Toggle */}
@@ -285,9 +290,14 @@ export default function Navbar() {
                 )}
               </Link>
               {!user && (
-                <Link to="/login" onClick={() => setMobileOpen(false)} className="block px-4 py-3 bg-primary-600 text-white rounded-lg font-medium text-center mt-4">
-                  Sign In
-                </Link>
+                <div className="mt-4 space-y-2">
+                  <Link to="/login" onClick={() => setMobileOpen(false)} className="block px-4 py-3 bg-primary-600 text-white rounded-lg font-medium text-center">
+                    Sign In
+                  </Link>
+                  <Link to="/register" onClick={() => setMobileOpen(false)} className="block px-4 py-3 text-primary-600 text-center text-sm font-medium">
+                    Register
+                  </Link>
+                </div>
               )}
             </div>
           </div>
