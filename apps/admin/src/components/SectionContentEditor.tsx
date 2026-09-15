@@ -1,4 +1,5 @@
 import { Plus, Trash2, GripVertical } from 'lucide-react';
+import ImagePicker from './ImagePicker';
 
 interface SectionContentEditorProps {
   sectionType: string;
@@ -372,7 +373,11 @@ function HeroSlideEditor({ content, onChange }: { content: Record<string, unknow
         {visualType === 'image' && (
           <div className="space-y-3">
             <FieldRow label="Image URL">
-              <TextInput value={(content.imageUrl as string) || ''} onChange={v => update('imageUrl', v)} placeholder="https://example.com/image.jpg" />
+              <ImagePicker
+                value={(content.imageUrl as string) || ''}
+                onChange={(v) => update('imageUrl', v)}
+                placeholder="https://example.com/image.jpg"
+              />
             </FieldRow>
             <FieldRow label="Image Alt Text">
               <TextInput value={(content.imageAlt as string) || ''} onChange={v => update('imageAlt', v)} placeholder="Description of the image" />

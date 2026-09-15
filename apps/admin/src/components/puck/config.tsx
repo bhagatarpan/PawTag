@@ -2,6 +2,7 @@ import type { Config } from '@puckeditor/core';
 import { useState } from 'react';
 import { useSiteSettings } from '../../hooks/useSiteSettings';
 import RichTextEditor from '../RichTextEditor';
+import ImagePicker from '../ImagePicker';
 import { ComparisonTable } from '@pawtag/ui';
 import { Bell, MapPin, Smartphone, Clock, Heart, Users, Shield, Star, Award, Check, Home, Scan, Tag, UserPlus, Search, Lock, Eye, Zap, Globe, Camera, Gift, Headphones, Package } from 'lucide-react';
 
@@ -212,7 +213,13 @@ export const pawtagConfig: Config<PawtagComponents> = {
         subheading: { type: 'text', label: 'Subheading' },
         buttonText: { type: 'text', label: 'Button Text' },
         buttonUrl: { type: 'text', label: 'Button URL' },
-        backgroundUrl: { type: 'text', label: 'Background Image URL' },
+        backgroundUrl: {
+          type: 'custom',
+          label: 'Background Image',
+          render: ({ value, onChange }) => (
+            <ImagePicker value={(value as string) || ''} onChange={onChange} placeholder="https://example.com/hero.jpg" />
+          ),
+        },
       },
       defaultProps: {
         heading: 'Welcome to PawTag',
@@ -311,7 +318,13 @@ export const pawtagConfig: Config<PawtagComponents> = {
           label: 'Images',
           defaultItemProps: { url: '' },
           arrayFields: {
-            url: { type: 'text', label: 'Image URL' },
+            url: {
+              type: 'custom',
+              label: 'Image',
+              render: ({ value, onChange }) => (
+                <ImagePicker value={(value as string) || ''} onChange={onChange} placeholder="https://example.com/image.jpg" />
+              ),
+            },
           },
         },
       },
@@ -465,7 +478,13 @@ export const pawtagConfig: Config<PawtagComponents> = {
             name: { type: 'text', label: 'Name' },
             role: { type: 'text', label: 'Role' },
             quote: { type: 'textarea', label: 'Quote' },
-            avatar: { type: 'text', label: 'Avatar URL' },
+            avatar: {
+              type: 'custom',
+              label: 'Avatar',
+              render: ({ value, onChange }) => (
+                <ImagePicker value={(value as string) || ''} onChange={onChange} placeholder="https://example.com/avatar.jpg" />
+              ),
+            },
           },
         },
       },
@@ -677,7 +696,13 @@ export const pawtagConfig: Config<PawtagComponents> = {
           label: 'Logo URLs',
           defaultItemProps: { url: '' },
           arrayFields: {
-            url: { type: 'text', label: 'Logo URL' },
+            url: {
+              type: 'custom',
+              label: 'Logo',
+              render: ({ value, onChange }) => (
+                <ImagePicker value={(value as string) || ''} onChange={onChange} placeholder="https://example.com/logo.png" />
+              ),
+            },
           },
         },
       },
@@ -751,7 +776,13 @@ export const pawtagConfig: Config<PawtagComponents> = {
 
     ImageBlock: {
       fields: {
-        url: { type: 'text', label: 'Image URL' },
+        url: {
+          type: 'custom',
+          label: 'Image',
+          render: ({ value, onChange }) => (
+            <ImagePicker value={(value as string) || ''} onChange={onChange} placeholder="https://example.com/image.jpg" />
+          ),
+        },
         alt: { type: 'text', label: 'Alt Text' },
         caption: { type: 'text', label: 'Caption' },
         width: { type: 'select', label: 'Width', options: [{ label: 'Full', value: 'full' }, { label: 'Large', value: 'large' }, { label: 'Medium', value: 'medium' }, { label: 'Small', value: 'small' }] },
@@ -774,7 +805,13 @@ export const pawtagConfig: Config<PawtagComponents> = {
 
     ImageTextBlock: {
       fields: {
-        imageUrl: { type: 'text', label: 'Image URL' },
+        imageUrl: {
+          type: 'custom',
+          label: 'Image',
+          render: ({ value, onChange }) => (
+            <ImagePicker value={(value as string) || ''} onChange={onChange} placeholder="https://example.com/image.jpg" />
+          ),
+        },
         imageAlt: { type: 'text', label: 'Image Alt Text' },
         heading: { type: 'text', label: 'Heading' },
         content: { type: 'textarea', label: 'Content' },
@@ -858,7 +895,13 @@ export const pawtagConfig: Config<PawtagComponents> = {
           arrayFields: {
             heading: { type: 'text', label: 'Heading' },
             content: { type: 'textarea', label: 'Content' },
-            imageUrl: { type: 'text', label: 'Image URL' },
+            imageUrl: {
+              type: 'custom',
+              label: 'Image',
+              render: ({ value, onChange }) => (
+                <ImagePicker value={(value as string) || ''} onChange={onChange} placeholder="https://example.com/image.jpg" />
+              ),
+            },
           },
         },
       },
@@ -947,7 +990,13 @@ export const pawtagConfig: Config<PawtagComponents> = {
             name: { type: 'text', label: 'Name' },
             role: { type: 'text', label: 'Role' },
             bio: { type: 'textarea', label: 'Bio' },
-            avatar: { type: 'text', label: 'Avatar URL' },
+            avatar: {
+              type: 'custom',
+              label: 'Avatar',
+              render: ({ value, onChange }) => (
+                <ImagePicker value={(value as string) || ''} onChange={onChange} placeholder="https://example.com/avatar.jpg" />
+              ),
+            },
             linkedin: { type: 'text', label: 'LinkedIn URL' },
           },
         },
