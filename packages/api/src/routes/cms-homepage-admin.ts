@@ -112,4 +112,56 @@ router.put('/:id/toggle', requirePermission('cms.homepage.update'), async (req: 
   }
 });
 
+// POST /api/admin/cms/homepage/:id/duplicate - Duplicate a section
+router.post('/:id/duplicate', requirePermission('cms.homepage.create'), async (req: AuthRequest, res: Response) => {
+  try {
+    const section = await CmsHomepageSection.findOne({ _id: req.params.id, deletedAt: null });
+    if (!section) {
+      return res.status(404).json({ success: false, error: 'Section not found' });
+    }
+
+    // Find max order for this section type
+    const maxOrder = await CmsHomepageSection.findOne({ sectionType: section.sectionType, deletedAt: null })
+      .sort({ order: -1 })
+      .lean();
+    const newOrder = (maxOrder?.order || 0) + 1;
+
+    const duplicated = await CmsHomepageSection.create({
+      sectionType: section.sectionType,
+      title: `${section.title} (Copy)`,
+      subtitle: section.subtitle,
+      content: JSON.parse(JSON.stringify(section.content)), // Deep copy
+      order: newOrder,
+      isActive: false, // Duplicates start as inactive/draft
+      status: 'draft',
+    });
+
+    res.json({ success: true, data: duplicated });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to duplicate section' });
+  }
+});
+
+// PUT /api/admin/cms/homepage/reorder - Batch reorder sections
+router.put('/reorder', requirePermission('cms.homepage.update'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { items } = req.body; // [{ id: string, order: number }]
+    if (!Array.isArray(items)) {
+      return res.status(400).json({ success: false, error: 'items must be an array' });
+    }
+
+    const operations = items.map((item: { id: string; order: number }) => ({
+      updateOne: {
+        filter: { _id: item.id },
+        update: { $set: { order: item.order } },
+      },
+    }));
+
+    await CmsHomepageSection.bulkWrite(operations);
+    res.json({ success: true, message: 'Order updated successfully' });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to reorder sections' });
+  }
+});
+
 export default router;

@@ -293,6 +293,8 @@ export const API = {
         update: (id: string) => `/admin/cms/homepage/${id}` as const,
         toggle: (id: string) => `/admin/cms/homepage/${id}/toggle` as const,
         delete: (id: string) => `/admin/cms/homepage/${id}` as const,
+        duplicate: (id: string) => `/admin/cms/homepage/${id}/duplicate` as const,
+        reorder: '/admin/cms/homepage/reorder',
       },
       announcements: {
         list: '/admin/cms/announcements',

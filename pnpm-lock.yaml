@@ -167,7 +167,7 @@ importers:
         version: 3.29.0
       axios:
         specifier: ^1.18.1
-        version: 1.18.1
+        version: 1.18.1(debug@4.4.3)
       lowlight:
         specifier: ^3.3.0
         version: 3.3.0
@@ -219,7 +219,7 @@ importers:
         version: link:../../packages/ui
       axios:
         specifier: ^1.18.1
-        version: 1.18.1
+        version: 1.18.1(debug@4.4.3)
       lucide-react:
         specifier: ^0.378.0
         version: 0.378.0(react@18.3.1)
@@ -274,7 +274,7 @@ importers:
         version: 7.18.6(@react-navigation/native@7.3.14(react-native@0.81.5(@babel/core@7.29.7)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0))(react-native-safe-area-context@5.6.2(react-native@0.81.5(@babel/core@7.29.7)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0))(react-native-screens@4.16.0(react-native@0.81.5(@babel/core@7.29.7)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0))(react-native@0.81.5(@babel/core@7.29.7)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
       axios:
         specifier: ^1.7.0
-        version: 1.18.1
+        version: 1.18.1(debug@4.4.3)
       expo:
         specifier: ~54.0.36
         version: 54.0.36(@babel/core@7.29.7)(graphql@16.14.2)(react-native@0.81.5(@babel/core@7.29.7)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)(typescript@5.9.3)
@@ -350,7 +350,7 @@ importers:
         version: 9.14.0
       axios:
         specifier: ^1.18.1
-        version: 1.18.1
+        version: 1.18.1(debug@4.4.3)
       lucide-react:
         specifier: ^0.378.0
         version: 0.378.0(react@18.3.1)
@@ -369,6 +369,9 @@ importers:
       react-router-dom:
         specifier: ^6.23.0
         version: 6.30.4(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      swiper:
+        specifier: ^14.2.0
+        version: 14.2.0
     devDependencies:
       '@types/react':
         specifier: ^18.3.0
@@ -572,7 +575,7 @@ importers:
     dependencies:
       axios:
         specifier: ^1.7.0
-        version: 1.18.1
+        version: 1.18.1(debug@4.4.3)
     devDependencies:
       typescript:
         specifier: ^5.5.0
@@ -7147,6 +7150,10 @@ packages:
     peerDependencies:
       express: '>=4.0.0 || >=5.0.0-beta'
 
+  swiper@14.2.0:
+    resolution: {integrity: sha512-GsL4M9Fq7Sg22OyL3SjdNj/0bxTfIxPJJHHW394Li0u5vYtExi0a09iBUc8CuLafJi5pAlH2AHUe1PocxHl45g==}
+    engines: {node: '>= 4.7.0'}
+
   symbol-tree@3.2.4:
     resolution: {integrity: sha512-9QNk5KwDF+Bvz+PyObkmSYjI5ksVUYtjW7AU22r2NKcfLJcXp96hkDWU3+XndOsUb+AQ9QhfzfCT2O+CNWT5Tw==}
 
@@ -11745,7 +11752,7 @@ snapshots:
     dependencies:
       possible-typed-array-names: 1.1.0
 
-  axios@1.18.1:
+  axios@1.18.1(debug@4.4.3):
     dependencies:
       follow-redirects: 1.16.0(debug@4.4.3)
       form-data: 4.0.6
@@ -15541,6 +15548,8 @@ snapshots:
     dependencies:
       express: 4.22.2
       swagger-ui-dist: 5.32.11
+
+  swiper@14.2.0: {}
 
   symbol-tree@3.2.4: {}
 

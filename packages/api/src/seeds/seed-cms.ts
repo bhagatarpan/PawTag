@@ -292,6 +292,20 @@ async function run() {
         ]), displayValue: 'Gold Comparison Table', category: 'guardian', description: 'JSON array of comparison rows' },
         { key: 'guardian.gold.emailUpsellText', value: 'Earn 2× points on every purchase', displayValue: 'Gold Email Upsell Text', category: 'guardian', description: 'Short text used in email Gold upsell sections' },
         { key: 'guardian.gold.checkoutUpsellText', value: 'Earn 2× points on this order with Gold', displayValue: 'Gold Checkout Upsell Text', category: 'guardian', description: 'Text shown at checkout for non-Gold members' },
+        // Hero Slider Settings
+        { key: 'heroSlider.enabled', value: 'true', displayValue: 'Hero Slider Enabled', category: 'heroSlider', description: 'Enable/disable the homepage hero slider' },
+        { key: 'heroSlider.autoplay', value: 'true', displayValue: 'Autoplay Enabled', category: 'heroSlider', description: 'Auto-advance between slides' },
+        { key: 'heroSlider.duration', value: '5000', displayValue: 'Slide Duration (ms)', category: 'heroSlider', description: 'Milliseconds between slide advances' },
+        { key: 'heroSlider.pauseOnHover', value: 'true', displayValue: 'Pause on Hover', category: 'heroSlider', description: 'Pause autoplay when mouse enters slider' },
+        { key: 'heroSlider.transition', value: 'fade', displayValue: 'Transition Effect', category: 'heroSlider', description: 'Slide transition effect: slide, fade, cube, flip, creative' },
+        { key: 'heroSlider.speed', value: '300', displayValue: 'Transition Speed (ms)', category: 'heroSlider', description: 'Duration of transition animation in milliseconds' },
+        { key: 'heroSlider.loop', value: 'false', displayValue: 'Loop Mode', category: 'heroSlider', description: 'Enable infinite looping through slides' },
+        { key: 'heroSlider.showArrows', value: 'true', displayValue: 'Show Navigation Arrows', category: 'heroSlider', description: 'Display prev/next navigation arrows' },
+        { key: 'heroSlider.showPagination', value: 'true', displayValue: 'Show Pagination Dots', category: 'heroSlider', description: 'Display dot indicators at bottom' },
+        { key: 'heroSlider.paginationType', value: 'bullets', displayValue: 'Pagination Type', category: 'heroSlider', description: 'Type of pagination: bullets, fraction, or progressbar' },
+        { key: 'heroSlider.keyboard', value: 'true', displayValue: 'Keyboard Navigation', category: 'heroSlider', description: 'Enable arrow key navigation' },
+        { key: 'heroSlider.touchSwipe', value: 'true', displayValue: 'Touch Swipe', category: 'heroSlider', description: 'Enable touch/swipe on mobile devices' },
+        { key: 'heroSlider.respectReducedMotion', value: 'true', displayValue: 'Respect Reduced Motion', category: 'heroSlider', description: 'Disable animations for users who prefer reduced motion' },
       ];
 
       let settingsCreated = 0;

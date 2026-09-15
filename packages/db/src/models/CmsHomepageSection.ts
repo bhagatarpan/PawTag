@@ -7,6 +7,10 @@ export interface ICmsHomepageSectionDocument extends Document {
   content: Record<string, unknown>;
   order: number;
   isActive: boolean;
+  status?: 'draft' | 'published';
+  duration?: number;
+  transition?: string;
+  thumbnail?: string;
   deletedAt?: Date;
 }
 
@@ -22,6 +26,10 @@ const CmsHomepageSectionSchema = new Schema<ICmsHomepageSectionDocument>(
     content: { type: Schema.Types.Mixed, required: true, default: {} },
     order: { type: Number, required: true, default: 0 },
     isActive: { type: Boolean, required: true, default: true },
+    status: { type: String, enum: ['draft', 'published'], default: 'published' },
+    duration: { type: Number }, // Per-slide autoplay duration in ms
+    transition: { type: String }, // Per-slide transition override
+    thumbnail: { type: String }, // Auto-generated preview thumbnail URL
     deletedAt: { type: Date },
   },
   { timestamps: true }
@@ -29,6 +37,7 @@ const CmsHomepageSectionSchema = new Schema<ICmsHomepageSectionDocument>(
 
 CmsHomepageSectionSchema.index({ sectionType: 1, order: 1 });
 CmsHomepageSectionSchema.index({ isActive: 1 });
+CmsHomepageSectionSchema.index({ status: 1 });
 
 const CmsHomepageSection = mongoose.models.CmsHomepageSection || mongoose.model<ICmsHomepageSectionDocument>(
   'CmsHomepageSection',
