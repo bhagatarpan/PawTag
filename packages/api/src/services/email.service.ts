@@ -66,11 +66,20 @@ async function renderCmsEmail(slug: string, variables: Record<string, string>): 
     let body = processConditionals(template.body, variables);
     body = replaceVariables(body, variables);
 
-    // Convert plain text body to HTML (newlines → <br>, preserve paragraphs)
-    const bodyHtml = body
-      .split('\n\n')
-      .map(p => `<p style="color:#374151;font-size:15px;line-height:1.7;margin:0 0 16px;">${p.replace(/\n/g, '<br>')}</p>`)
-      .join('');
+    // Detect if body contains HTML (starts with < or has HTML tags)
+    const isHtml = body.trim().startsWith('<') || /<[a-z][\s\S]*>/i.test(body);
+
+    let bodyHtml: string;
+    if (isHtml) {
+      // Body is already HTML — use as-is (after variable replacement)
+      bodyHtml = body;
+    } else {
+      // Body is plain text — convert to HTML paragraphs
+      bodyHtml = body
+        .split('\n\n')
+        .map(p => `<p style="color:#374151;font-size:15px;line-height:1.7;margin:0 0 16px;">${p.replace(/\n/g, '<br>')}</p>`)
+        .join('');
+    }
 
     // Build full HTML
     let contentHtml = bodyHtml;

@@ -2030,64 +2030,86 @@ async function run() {
           subject: 'Welcome to Guardian — Your Pet Safety Journey Begins',
           title: 'Welcome to Guardian',
           subtitle: 'Your loyalty journey begins',
-          body: `Hi {{customerName}},
-
-Welcome to PawTag Guardian!
-
-Your pet's safety comes first. Now your everyday PawTag activity can earn rewards too.
-
-You're starting at the {{tier}} tier with {{points}} points.
-
-YOUR GUARDIAN STATUS
-
-Current Tier: {{tier}}
-Your Points: {{points}}
-
-HOW YOU EARN POINTS
-
-$1 Spent: {{pointsPerDollar}} point{{pointsPerDollarPlural}}
-Text Review: {{reviewTextPoints}} points
-Photo Review: {{reviewPhotoPoints}} points
-Video Review: {{reviewVideoPoints}} points
-Refer a Friend: {{referralSignupPoints}} points
-Friend Purchases: {{referralPurchasePoints}} points
-Pet Profile: {{petProfilePoints}} points
-Activate a Tag: {{tagActivationPoints}} points
-
-YOUR PATH TO BETTER REWARDS
-
-As you earn points, you unlock higher tiers with better monthly PawRewards:
-
-Care (Starting tier) — \${{pawRewardsCare}}/month PawRewards
-Nurture ({{tierThresholdNurture}} points) — \${{pawRewardsNurture}}/month PawRewards
-Protector ({{tierThresholdProtector}} points) — \${{pawRewardsProtector}}/month PawRewards
-Safeguard ({{tierThresholdSafeguard}} points) — \${{pawRewardsSafeguard}}/month PawRewards
-
-YOUR POINTS TURN INTO REAL VALUE
-
-PawRewards are store credit you can use toward PawTag purchases. The higher your Guardian tier, the more you receive each month.
-
-GO GOLD — GET 2× THE REWARDS
-
-Gold members enjoy exclusive benefits:
-
-• 2× points on every purchase
-• Start at Nurture tier (skip Care)
-• \${{pawRewardsNurture}}/month PawRewards
-• Free shipping over $50
-• Early access to new products
-• Priority customer support
-
-Only \${{goldPrice}}/month — less than a coffee.
-
-YOUR GUARDIAN DASHBOARD
-
-Track your points, view your tier progress, and manage your rewards from your personal dashboard.
-
-Questions? Reply to this email or visit our help center.
-
-Welcome to the pack!
-The PawTag Team`,
+          body: `<p style="color:#374151;font-size:15px;line-height:1.7;margin:0 0 8px;">Hi {{customerName}},</p>
+<p style="color:#374151;font-size:15px;line-height:1.7;margin:0 0 24px;">Your pet's safety comes first. Now your everyday PawTag activity can earn rewards too.</p>
+<div style="background:linear-gradient(135deg,#f0fdfa,#ccfbf1);border:1px solid #99f6e4;border-radius:12px;padding:24px;margin:0 0 24px;text-align:center;">
+  <p style="color:#6b7280;font-size:11px;text-transform:uppercase;letter-spacing:1px;margin:0 0 8px;font-weight:600;">Welcome to PawTag Guardian</p>
+  <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto;"><tr>
+    <td style="padding:0 16px;text-align:center;">
+      <p style="color:#6b7280;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 4px;">Current Tier</p>
+      <div style="background-color:#0d9488;border-radius:20px;padding:6px 16px;display:inline-block;"><span style="color:#ffffff;font-size:13px;font-weight:700;letter-spacing:0.5px;">{{tier}}</span></div>
+    </td>
+    <td style="width:1px;background-color:#d1d5db;padding:0;"></td>
+    <td style="padding:0 16px;text-align:center;">
+      <p style="color:#6b7280;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 4px;">Your Points</p>
+      <p style="color:#0d9488;font-size:28px;font-weight:800;margin:0;">{{points}}</p>
+    </td>
+  </tr></table>
+</div>
+<hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;">
+<p style="color:#111827;font-size:15px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;margin:0 0 16px;">How You Earn Points</p>
+<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 8px;">
+<tr>
+  <td style="width:50%;padding:0 6px 12px 0;vertical-align:top;"><div style="background-color:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:14px 12px;text-align:center;"><p style="color:#6b7280;font-size:10px;text-transform:uppercase;letter-spacing:0.8px;margin:0 0 6px;font-weight:600;">$1 Spent</p><p style="color:#0d9488;font-size:20px;font-weight:700;margin:0;">{{pointsPerDollar}}</p><p style="color:#9ca3af;font-size:11px;margin:4px 0 0;">point{{pointsPerDollarPlural}}</p></div></td>
+  <td style="width:50%;padding:0 0 12px 6px;vertical-align:top;"><div style="background-color:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:14px 12px;text-align:center;"><p style="color:#6b7280;font-size:10px;text-transform:uppercase;letter-spacing:0.8px;margin:0 0 6px;font-weight:600;">Text Review</p><p style="color:#0d9488;font-size:20px;font-weight:700;margin:0;">{{reviewTextPoints}}</p><p style="color:#9ca3af;font-size:11px;margin:4px 0 0;">points</p></div></td>
+</tr>
+<tr>
+  <td style="width:50%;padding:0 6px 12px 0;vertical-align:top;"><div style="background-color:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:14px 12px;text-align:center;"><p style="color:#6b7280;font-size:10px;text-transform:uppercase;letter-spacing:0.8px;margin:0 0 6px;font-weight:600;">Photo Review</p><p style="color:#0d9488;font-size:20px;font-weight:700;margin:0;">{{reviewPhotoPoints}}</p><p style="color:#9ca3af;font-size:11px;margin:4px 0 0;">points</p></div></td>
+  <td style="width:50%;padding:0 0 12px 6px;vertical-align:top;"><div style="background-color:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:14px 12px;text-align:center;"><p style="color:#6b7280;font-size:10px;text-transform:uppercase;letter-spacing:0.8px;margin:0 0 6px;font-weight:600;">Video Review</p><p style="color:#0d9488;font-size:20px;font-weight:700;margin:0;">{{reviewVideoPoints}}</p><p style="color:#9ca3af;font-size:11px;margin:4px 0 0;">points</p></div></td>
+</tr>
+<tr>
+  <td style="width:50%;padding:0 6px 12px 0;vertical-align:top;"><div style="background-color:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:14px 12px;text-align:center;"><p style="color:#6b7280;font-size:10px;text-transform:uppercase;letter-spacing:0.8px;margin:0 0 6px;font-weight:600;">Refer a Friend</p><p style="color:#0d9488;font-size:20px;font-weight:700;margin:0;">{{referralSignupPoints}}</p><p style="color:#9ca3af;font-size:11px;margin:4px 0 0;">points</p></div></td>
+  <td style="width:50%;padding:0 0 12px 6px;vertical-align:top;"><div style="background-color:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:14px 12px;text-align:center;"><p style="color:#6b7280;font-size:10px;text-transform:uppercase;letter-spacing:0.8px;margin:0 0 6px;font-weight:600;">Friend Purchases</p><p style="color:#0d9488;font-size:20px;font-weight:700;margin:0;">{{referralPurchasePoints}}</p><p style="color:#9ca3af;font-size:11px;margin:4px 0 0;">points</p></div></td>
+</tr>
+<tr>
+  <td style="width:50%;padding:0 6px 12px 0;vertical-align:top;"><div style="background-color:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:14px 12px;text-align:center;"><p style="color:#6b7280;font-size:10px;text-transform:uppercase;letter-spacing:0.8px;margin:0 0 6px;font-weight:600;">Pet Profile</p><p style="color:#0d9488;font-size:20px;font-weight:700;margin:0;">{{petProfilePoints}}</p><p style="color:#9ca3af;font-size:11px;margin:4px 0 0;">points</p></div></td>
+  <td style="width:50%;padding:0 0 12px 6px;vertical-align:top;"><div style="background-color:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:14px 12px;text-align:center;"><p style="color:#6b7280;font-size:10px;text-transform:uppercase;letter-spacing:0.8px;margin:0 0 6px;font-weight:600;">Activate a Tag</p><p style="color:#0d9488;font-size:20px;font-weight:700;margin:0;">{{tagActivationPoints}}</p><p style="color:#9ca3af;font-size:11px;margin:4px 0 0;">points</p></div></td>
+</tr>
+</table>
+<hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;">
+<p style="color:#111827;font-size:15px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;margin:0 0 16px;">Your Path to Better Rewards</p>
+<p style="color:#374151;font-size:14px;line-height:1.6;margin:0 0 16px;">As you earn points, you unlock higher tiers with better monthly PawRewards:</p>
+<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin:0;">
+<tr><td style="padding:0;width:24px;vertical-align:top;"><table role="presentation" cellpadding="0" cellspacing="0" style="width:24px;"><tr><td style="width:24px;height:24px;border-radius:50%;background-color:#e5e7eb;text-align:center;vertical-align:middle;"><span style="color:#6b7280;font-size:11px;font-weight:700;">1</span></td></tr><tr><td style="width:2px;height:20px;background-color:#e5e7eb;"></td></tr></table></td><td style="padding:0 0 8px 12px;vertical-align:top;"><div style="background-color:#ffffff;border:1px solid #e5e7eb;border-radius:8px;padding:12px 16px;"><table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;"><tr><td><p style="color:#374151;font-size:14px;font-weight:700;margin:0;">Care</p><p style="color:#6b7280;font-size:12px;margin:2px 0 0;">Starting tier</p></td><td style="text-align:right;"><p style="color:#0d9488;font-size:14px;font-weight:700;margin:0;">\${{pawRewardsCare}}</p><p style="color:#9ca3af;font-size:11px;margin:2px 0 0;">/month</p></td></tr></table></div></td></tr>
+<tr><td style="padding:0;width:24px;vertical-align:top;"><table role="presentation" cellpadding="0" cellspacing="0" style="width:24px;"><tr><td style="width:24px;height:24px;border-radius:50%;background-color:#e5e7eb;text-align:center;vertical-align:middle;"><span style="color:#6b7280;font-size:11px;font-weight:700;">2</span></td></tr><tr><td style="width:2px;height:20px;background-color:#e5e7eb;"></td></tr></table></td><td style="padding:0 0 8px 12px;vertical-align:top;"><div style="background-color:#ffffff;border:1px solid #e5e7eb;border-radius:8px;padding:12px 16px;"><table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;"><tr><td><p style="color:#374151;font-size:14px;font-weight:700;margin:0;">Nurture</p><p style="color:#6b7280;font-size:12px;margin:2px 0 0;">{{tierThresholdNurture}} points</p></td><td style="text-align:right;"><p style="color:#0d9488;font-size:14px;font-weight:700;margin:0;">\${{pawRewardsNurture}}</p><p style="color:#9ca3af;font-size:11px;margin:2px 0 0;">/month</p></td></tr></table></div></td></tr>
+<tr><td style="padding:0;width:24px;vertical-align:top;"><table role="presentation" cellpadding="0" cellspacing="0" style="width:24px;"><tr><td style="width:24px;height:24px;border-radius:50%;background-color:#e5e7eb;text-align:center;vertical-align:middle;"><span style="color:#6b7280;font-size:11px;font-weight:700;">3</span></td></tr><tr><td style="width:2px;height:20px;background-color:#e5e7eb;"></td></tr></table></td><td style="padding:0 0 8px 12px;vertical-align:top;"><div style="background-color:#ffffff;border:1px solid #e5e7eb;border-radius:8px;padding:12px 16px;"><table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;"><tr><td><p style="color:#374151;font-size:14px;font-weight:700;margin:0;">Protector</p><p style="color:#6b7280;font-size:12px;margin:2px 0 0;">{{tierThresholdProtector}} points</p></td><td style="text-align:right;"><p style="color:#0d9488;font-size:14px;font-weight:700;margin:0;">\${{pawRewardsProtector}}</p><p style="color:#9ca3af;font-size:11px;margin:2px 0 0;">/month</p></td></tr></table></div></td></tr>
+<tr><td style="padding:0;width:24px;vertical-align:top;"><table role="presentation" cellpadding="0" cellspacing="0" style="width:24px;"><tr><td style="width:24px;height:24px;border-radius:50%;background-color:#e5e7eb;text-align:center;vertical-align:middle;"><span style="color:#6b7280;font-size:11px;font-weight:700;">4</span></td></tr></table></td><td style="padding:0 0 0 12px;vertical-align:top;"><div style="background-color:#ffffff;border:1px solid #e5e7eb;border-radius:8px;padding:12px 16px;"><table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;"><tr><td><p style="color:#374151;font-size:14px;font-weight:700;margin:0;">Safeguard</p><p style="color:#6b7280;font-size:12px;margin:2px 0 0;">{{tierThresholdSafeguard}} points</p></td><td style="text-align:right;"><p style="color:#0d9488;font-size:14px;font-weight:700;margin:0;">\${{pawRewardsSafeguard}}</p><p style="color:#9ca3af;font-size:11px;margin:2px 0 0;">/month</p></td></tr></table></div></td></tr>
+</table>
+<hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;">
+<div style="background-color:#f0fdfa;border-left:3px solid #0d9488;border-radius:0 8px 8px 0;padding:16px 20px;margin:20px 0;">
+  <p style="color:#115e59;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 8px;">Your Points Turn Into Real Value</p>
+  <p style="color:#374151;font-size:14px;line-height:1.6;margin:0;">PawRewards are store credit you can use toward PawTag purchases. The higher your Guardian tier, the more you receive each month.</p>
+</div>
+<hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;">
+<div style="background-color:#fffbeb;border:1px solid #fcd34d;border-radius:12px;padding:24px;margin:24px 0;">
+  <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 16px;"><tr>
+    <td><p style="color:#92400e;font-size:15px;font-weight:700;margin:0;">GO GOLD</p><p style="color:#b45309;font-size:12px;margin:4px 0 0;">Get 2× the rewards</p></td>
+    <td style="text-align:right;"><div style="background-color:#f59e0b;border-radius:20px;padding:6px 14px;display:inline-block;"><span style="color:#ffffff;font-size:12px;font-weight:700;">MEMBERSHIP</span></div></td>
+  </tr></table>
+  <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin:0;">
+  <tr><td style="width:20px;vertical-align:top;padding:4px 0;"><span style="color:#0d9488;font-size:14px;font-weight:700;">✓</span></td><td style="padding:4px 0;"><p style="color:#374151;font-size:13px;line-height:1.5;margin:0;"><strong>2× points</strong> on every purchase</p></td></tr>
+  <tr><td style="width:20px;vertical-align:top;padding:4px 0;"><span style="color:#0d9488;font-size:14px;font-weight:700;">✓</span></td><td style="padding:4px 0;"><p style="color:#374151;font-size:13px;line-height:1.5;margin:0;">Start at <strong>Nurture</strong> tier (skip Care)</p></td></tr>
+  <tr><td style="width:20px;vertical-align:top;padding:4px 0;"><span style="color:#0d9488;font-size:14px;font-weight:700;">✓</span></td><td style="padding:4px 0;"><p style="color:#374151;font-size:13px;line-height:1.5;margin:0;"><strong>\${{pawRewardsNurture}}/month</strong> PawRewards</p></td></tr>
+  <tr><td style="width:20px;vertical-align:top;padding:4px 0;"><span style="color:#0d9488;font-size:14px;font-weight:700;">✓</span></td><td style="padding:4px 0;"><p style="color:#374151;font-size:13px;line-height:1.5;margin:0;">Free shipping over $50</p></td></tr>
+  <tr><td style="width:20px;vertical-align:top;padding:4px 0;"><span style="color:#0d9488;font-size:14px;font-weight:700;">✓</span></td><td style="padding:4px 0;"><p style="color:#374151;font-size:13px;line-height:1.5;margin:0;">Early access to new products</p></td></tr>
+  <tr><td style="width:20px;vertical-align:top;padding:4px 0;"><span style="color:#0d9488;font-size:14px;font-weight:700;">✓</span></td><td style="padding:4px 0;"><p style="color:#374151;font-size:13px;line-height:1.5;margin:0;">Priority customer support</p></td></tr>
+  </table>
+  <div style="border-top:1px solid #fcd34d;margin:16px 0;padding-top:16px;">
+    <p style="color:#92400e;font-size:18px;font-weight:800;margin:0;">Only \${{goldPrice}}/month</p>
+    <p style="color:#b45309;font-size:12px;margin:4px 0 0;font-style:italic;">less than a coffee</p>
+  </div>
+  <table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px auto;"><tr><td align="center" style="background-color:#f59e0b;border-radius:10px;"><a href="{{goldLandingUrl}}" target="_blank" style="display:inline-block;padding:14px 40px;color:#ffffff;font-size:16px;font-weight:600;text-decoration:none;letter-spacing:0.3px;">Explore Gold</a></td></tr></table>
+</div>
+<hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;">
+<div style="text-align:center;margin:8px 0 24px;">
+  <p style="color:#111827;font-size:15px;font-weight:700;margin:0 0 8px;">Your Guardian Dashboard</p>
+  <p style="color:#6b7280;font-size:14px;line-height:1.6;margin:0 0 16px;">Track your points, view your tier progress,<br>and manage your rewards from your personal dashboard.</p>
+  <table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px auto;"><tr><td align="center" style="background-color:#0d9488;border-radius:10px;"><a href="{{dashboardUrl}}" target="_blank" style="display:inline-block;padding:14px 40px;color:#ffffff;font-size:16px;font-weight:600;text-decoration:none;letter-spacing:0.3px;">View My Guardian Dashboard</a></td></tr></table>
+</div>
+<p style="color:#9ca3af;font-size:12px;margin:0 0 16px;text-align:center;">Questions? Reply to this email or visit our help center.</p>
+<div style="border-top:1px solid #e5e7eb;padding-top:20px;margin-top:8px;">
+  <p style="color:#374151;font-size:14px;margin:0;text-align:center;">Welcome to the pack!<br><strong>The PawTag Team</strong></p>
+</div>`,
           ctaText: 'View My Guardian Dashboard',
           ctaUrl: '{{dashboardUrl}}',
           senderEmail: 'no-reply@pawtag.co.nz',
@@ -2100,7 +2122,7 @@ The PawTag Team`,
           recipientDescription: 'New Guardian member',
           emailType: 'transactional' as const,
           isCritical: false,
-          version: 4,
+          version: 5,
           variableDefinitions: [
             { key: 'customerName', label: 'Customer Name', description: 'First name of the customer', type: 'string', example: 'John', required: true, source: 'Customer' },
             { key: 'tier', label: 'Tier', description: 'Starting Guardian tier', type: 'string', example: 'Care', required: true, source: 'Guardian' },
