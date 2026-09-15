@@ -532,6 +532,78 @@ Admin page (`/admin/stripe-report`) for viewing per-customer Stripe data:
 | `POST /api/customer/subscriptions/gold/subscribe` | Subscribe to Gold membership |
 | `GET /api/admin/stripe/report/:userId` | Stripe customer report (admin) |
 
+### Enterprise Hero Slider (WYSIWYG)
+
+**PawTag has a fully CMS-managed hero slider** with WYSIWYG editing, drag-and-drop reordering, and SwiperJS transitions.
+
+#### Hero Slider Architecture
+
+```
+Admin Portal (/cms/hero-slider)
+  ├── HeroSliderManager (list, CRUD, drag-and-drop reorder)
+  ├── HeroSlideEditor (Puck-based WYSIWYG editor)
+  └── HeroSliderSettings (central slider configuration)
+         ↓
+CMS Database (CmsHomepageSection)
+         ↓
+Public API (GET /public/cms/homepage/sections?sectionType=hero_slide)
+         ↓
+Web Application
+  ├── HeroSliderNew.tsx (SwiperJS wrapper)
+  └── heroSliderConfig.tsx (shared component definitions)
+```
+
+#### Key Components
+
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| `HeroComponents.tsx` | `apps/web/src/components/hero/` | 16 PawTag-approved components (shared) |
+| `heroSliderConfig.tsx` | `apps/web/src/components/hero/` | Puck configuration (shared) |
+| `HeroSliderNew.tsx` | `apps/web/src/components/hero/` | SwiperJS frontend renderer |
+| `HeroSliderManager.tsx` | `apps/admin/src/components/hero/` | Admin slide list with DnD |
+| `HeroSlideEditor.tsx` | `apps/admin/src/components/hero/` | WYSIWYG editor with Puck |
+| `HeroSliderSettings.tsx` | `apps/admin/src/components/hero/` | Central slider settings |
+| `HeroSliderPage.tsx` | `apps/admin/src/pages/cms/` | Admin page (slides + settings tabs) |
+
+#### Hero Slider CMS Settings
+
+| Setting Key | Default | Description |
+|-------------|---------|-------------|
+| `heroSlider.enabled` | `true` | Enable/disable slider |
+| `heroSlider.autoplay` | `true` | Auto-advance slides |
+| `heroSlider.duration` | `5000` | ms between slides |
+| `heroSlider.transition` | `fade` | slide, fade, cube, flip, creative |
+| `heroSlider.speed` | `300` | Transition duration (ms) |
+| `heroSlider.loop` | `false` | Infinite scrolling |
+| `heroSlider.showArrows` | `true` | Navigation arrows |
+| `heroSlider.showPagination` | `true` | Dot indicators |
+| `heroSlider.paginationType` | `bullets` | bullets, fraction, progressbar |
+| `heroSlider.keyboard` | `true` | Arrow key navigation |
+| `heroSlider.touchSwipe` | `true` | Mobile swipe |
+| `heroSlider.respectReducedMotion` | `true` | Accessibility support |
+
+#### Hero Slider API Routes
+
+| Route | Purpose |
+|-------|---------|
+| `GET /admin/cms/homepage` | List all sections |
+| `POST /admin/cms/homepage` | Create section |
+| `PUT /admin/cms/homepage/:id` | Update section |
+| `DELETE /admin/cms/homepage/:id` | Soft delete |
+| `PUT /admin/cms/homepage/:id/toggle` | Toggle active |
+| `POST /admin/cms/homepage/:id/duplicate` | Duplicate slide |
+| `PUT /admin/cms/homepage/reorder` | Batch reorder |
+
+#### Hero Slider Licensing
+
+| Component | License | Cost |
+|-----------|---------|------|
+| SwiperJS | MIT | Free forever |
+| Puck Editor | MIT | Free forever |
+| @dnd-kit | MIT | Free forever |
+
+**Total ongoing cost: $0**
+
 ### API Architecture (Centralized)
 
 **All API endpoints are centralized in `packages/shared/src/api/`.** Frontend apps consume them via typed constants and a shared client factory.
