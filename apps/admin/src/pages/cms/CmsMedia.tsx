@@ -121,7 +121,7 @@ export default function CmsMedia() {
       ) : viewMode === 'grid' ? (
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
           {data?.items.map((media) => (
-            <div key={media._id} className="bg-white border border-gray-200 rounded-lg overflow-hidden group cursor-pointer" onClick={() => setEditingMedia(media)}>
+            <div key={media._id} className="bg-white border border-gray-200 rounded-lg overflow-hidden group cursor-pointer relative" onClick={() => setEditingMedia(media)}>
               <div className="aspect-square bg-gray-100 flex items-center justify-center overflow-hidden">
                 {media.mimeType.startsWith('image/') ? (
                   <img src={media.url} alt={media.alt || media.originalName} className="w-full h-full object-cover" />
@@ -135,6 +135,13 @@ export default function CmsMedia() {
                 <p className="text-xs font-medium truncate">{media.originalName}</p>
                 <p className="text-xs text-gray-400">{formatSize(media.size)}</p>
               </div>
+              <button
+                onClick={(e) => { e.stopPropagation(); handleDelete(media._id); }}
+                className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                title="Delete"
+              >
+                <Trash2 className="h-3 w-3" />
+              </button>
             </div>
           ))}
         </div>
