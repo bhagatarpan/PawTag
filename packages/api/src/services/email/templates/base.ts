@@ -1,7 +1,5 @@
 const CURRENT_YEAR = new Date().getFullYear();
 
-const PAW_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="4" r="2"/><circle cx="18" cy="8" r="2"/><circle cx="20" cy="16" r="2"/><path d="M9 10a5 5 0 0 1 5 5v3.5a3.5 3.5 0 0 1-6.84 1.045Q6.52 17.48 4.46 16.84A3.5 3.5 0 0 1 5.5 10Z"/></svg>`;
-
 // ─── Email Design Tokens (from DESIGN.md) ──────────────────────────
 
 export type EmailTheme = 'default' | 'warning' | 'danger' | 'success';
@@ -63,17 +61,8 @@ export function renderBase(data: BaseTemplateData): string {
           <!-- Header -->
           <tr>
             <td style="background-color:${t.accent};padding:32px 40px;border-radius:12px 12px 0 0;text-align:center;">
-              <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto;">
-                <tr>
-                  <td style="padding:8px;vertical-align:middle;">
-                    ${PAW_ICON_SVG}
-                  </td>
-                  <td style="padding-left:10px;vertical-align:middle;">
-                    <span style="font-size:22px;font-weight:700;color:#ffffff;letter-spacing:-0.5px;">Paw<span style="color:#ccfbf1;">Tag</span></span>
-                  </td>
-                </tr>
-              </table>
-              ${data.subtitle ? `<p style="color:#ffffff;margin:16px 0 0;font-size:16px;">${data.subtitle}</p>` : ''}
+              <p style="font-size:24px;font-weight:700;color:#ffffff;letter-spacing:-0.5px;margin:0;">Paw<span style="color:#ccfbf1;">Tag</span></p>
+              ${data.subtitle ? `<p style="color:#ffffff;margin:12px 0 0;font-size:16px;">${data.subtitle}</p>` : ''}
             </td>
           </tr>
 
