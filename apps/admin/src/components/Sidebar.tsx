@@ -38,6 +38,7 @@ import {
   MapPin,
   ChevronRight,
   ChevronDown,
+  Sliders,
   ExternalLink,
   Zap,
   Package,
@@ -217,6 +218,7 @@ const sections: SidebarSection[] = [
     links: [
       { to: '/cms/pages', label: 'Pages', icon: Layout, permission: 'cms.page.read' },
       { to: '/cms/homepage', label: 'Homepage', icon: Monitor, permission: 'cms.homepage.read' },
+      { to: '/cms/hero-slider', label: 'Hero Slider', icon: Sliders, permission: 'cms.homepage.read' },
       { to: '/cms/shop-pages', label: 'Shop Pages', icon: ShoppingCart, permission: 'cms.shop_page.read' },
       { to: '/cms/auth-pages', label: 'Auth Pages', icon: LogIn, permission: 'cms.auth_page.read' },
       { to: '/cms/navigation', label: 'Navigation', icon: Navigation, permission: 'cms.navigation.read' },
