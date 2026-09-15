@@ -2051,10 +2051,10 @@ YOUR PATH TO BETTER REWARDS
 
 As you earn points, you unlock higher tiers with better monthly PawRewards:
 
-• Care (0 pts) → ${{pawRewardsCare}}/month PawRewards
-• Nurture ({{tierThresholdNurture}} pts) → ${{pawRewardsNurture}}/month PawRewards
-• Protector ({{tierThresholdProtector}} pts) → ${{pawRewardsProtector}}/month PawRewards
-• Safeguard ({{tierThresholdSafeguard}} pts) → ${{pawRewardsSafeguard}}/month PawRewards
+• Care (0 pts) → \${{pawRewardsCare}}/month PawRewards
+• Nurture ({{tierThresholdNurture}} pts) → \${{pawRewardsNurture}}/month PawRewards
+• Protector ({{tierThresholdProtector}} pts) → \${{pawRewardsProtector}}/month PawRewards
+• Safeguard ({{tierThresholdSafeguard}} pts) → \${{pawRewardsSafeguard}}/month PawRewards
 
 PawRewards are store credit you can spend on any purchase. The higher your tier, the more you earn every month.
 
@@ -2064,12 +2064,12 @@ Want even more? Gold members get double points on every purchase, plus exclusive
 
 • 2× points on every purchase (vs 1× for Guardian)
 • Start at Nurture tier (skip Care)
-• ${{pawRewardsNurture}}/month PawRewards (vs ${{pawRewardsCare}}/month)
+• \${{pawRewardsNurture}}/month PawRewards (vs \${{pawRewardsCare}}/month)
 • Free shipping over $50 (vs $100 for Guardian)
 • Early access to new products
 • Priority customer support
 
-Gold membership is just ${{goldPrice}}/month — less than a coffee.
+Gold membership is just \${{goldPrice}}/month — less than a coffee.
 
 Learn more about Gold: {{goldLandingUrl}}
 
@@ -2396,13 +2396,25 @@ The PawTag Team`,
         } else {
           // Update existing templates with new Communications Centre fields
           const updateFields: Record<string, any> = {};
+
+          // Update content when seed version is higher than DB version
+          if (t.version > (existing.version || 1)) {
+            updateFields.body = t.body;
+            updateFields.subject = t.subject;
+            updateFields.title = t.title;
+            updateFields.subtitle = t.subtitle;
+            updateFields.variables = t.variables;
+            updateFields.ctaText = t.ctaText;
+            updateFields.ctaUrl = t.ctaUrl;
+            updateFields.version = t.version;
+          }
+
           if (!existing.businessFlow || existing.businessFlow === 'other') updateFields.businessFlow = t.businessFlow;
           if (!existing.purpose) updateFields.purpose = t.purpose;
           if (!existing.triggerDescription) updateFields.triggerDescription = t.triggerDescription;
           if (!existing.recipientDescription) updateFields.recipientDescription = t.recipientDescription;
           if (!existing.emailType) updateFields.emailType = t.emailType;
           if (existing.isCritical === undefined) updateFields.isCritical = t.isCritical;
-          if (!existing.version || existing.version === 1) updateFields.version = t.version;
           if (!existing.variableDefinitions || existing.variableDefinitions.length === 0) updateFields.variableDefinitions = t.variableDefinitions;
           if (Object.keys(updateFields).length > 0) {
             await CmsEmailTemplate.updateOne({ _id: existing._id }, { $set: updateFields }).session(session);
