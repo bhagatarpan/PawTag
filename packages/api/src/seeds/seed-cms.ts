@@ -2100,7 +2100,7 @@ The PawTag Team`,
           recipientDescription: 'New Guardian member',
           emailType: 'transactional' as const,
           isCritical: false,
-          version: 3,
+          version: 4,
           variableDefinitions: [
             { key: 'customerName', label: 'Customer Name', description: 'First name of the customer', type: 'string', example: 'John', required: true, source: 'Customer' },
             { key: 'tier', label: 'Tier', description: 'Starting Guardian tier', type: 'string', example: 'Care', required: true, source: 'Guardian' },
@@ -2411,6 +2411,7 @@ The PawTag Team`,
             updateFields.title = t.title;
             updateFields.subtitle = t.subtitle;
             updateFields.variables = t.variables;
+            updateFields.variableDefinitions = t.variableDefinitions;
             updateFields.ctaText = t.ctaText;
             updateFields.ctaUrl = t.ctaUrl;
             updateFields.version = t.version;
