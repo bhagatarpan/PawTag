@@ -62,7 +62,7 @@ export function renderBase(data: BaseTemplateData): string {
 
           <!-- Header -->
           <tr>
-            <td style="background:${t.gradient};padding:32px 40px;border-radius:12px 12px 0 0;text-align:center;">
+            <td style="background-color:${t.accent};padding:32px 40px;border-radius:12px 12px 0 0;text-align:center;">
               <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto;">
                 <tr>
                   <td style="background:rgba(255,255,255,0.15);border-radius:10px;padding:8px;vertical-align:middle;">
