@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { API } from '@pawtag/shared/api';
-import api from '../../lib/api';
+import api from '../lib/api';
 import { Search, Upload, X, Image as ImageIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface MediaItem {
