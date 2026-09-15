@@ -197,3 +197,115 @@ export function renderCard(content: string, variant: keyof typeof CARD_STYLES = 
     ${content}
   </div>`;
 }
+
+// ─── Tier Colors (shared across Guardian emails) ───────────────────
+
+export const TIER_COLORS: Record<string, string> = {
+  CARE: '#10b981',
+  NURTURE: '#0d9488',
+  PROTECTOR: '#8b5cf6',
+  SAFEGUARD: '#f59e0b',
+};
+
+// ─── Section Heading ───────────────────────────────────────────────
+
+export function renderSectionHeading(text: string): string {
+  return `<p style="color:#111827;font-size:15px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;margin:0 0 16px;">${text}</p>`;
+}
+
+// ─── 2-Column Responsive Grid ──────────────────────────────────────
+
+export function renderTwoColumnGrid(items: Array<{ label: string; value: string; subtext?: string }>): string {
+  const rows: string[] = [];
+  for (let i = 0; i < items.length; i += 2) {
+    const left = items[i];
+    const right = items[i + 1];
+    rows.push(`
+      <tr>
+        <td style="width:50%;padding:0 6px 12px 0;vertical-align:top;">
+          <div style="background-color:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:14px 12px;text-align:center;">
+            <p style="color:#6b7280;font-size:10px;text-transform:uppercase;letter-spacing:0.8px;margin:0 0 6px;font-weight:600;">${left.label}</p>
+            <p style="color:#0d9488;font-size:20px;font-weight:700;margin:0;">${left.value}</p>
+            ${left.subtext ? `<p style="color:#9ca3af;font-size:11px;margin:4px 0 0;">${left.subtext}</p>` : ''}
+          </div>
+        </td>
+        ${right ? `
+        <td style="width:50%;padding:0 0 12px 6px;vertical-align:top;">
+          <div style="background-color:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:14px 12px;text-align:center;">
+            <p style="color:#6b7280;font-size:10px;text-transform:uppercase;letter-spacing:0.8px;margin:0 0 6px;font-weight:600;">${right.label}</p>
+            <p style="color:#0d9488;font-size:20px;font-weight:700;margin:0;">${right.value}</p>
+            ${right.subtext ? `<p style="color:#9ca3af;font-size:11px;margin:4px 0 0;">${right.subtext}</p>` : ''}
+          </div>
+        </td>` : '<td style="width:50%;"></td>'}
+      </tr>`);
+  }
+  return `<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 8px;">
+    ${rows.join('')}
+  </table>`;
+}
+
+// ─── Vertical Tier Progression ─────────────────────────────────────
+
+export function renderTierProgression(tiers: Array<{ name: string; threshold: string; rewards: string; isCurrent: boolean }>): string {
+  const tierHtml = tiers.map((tier, idx) => {
+    const color = TIER_COLORS[tier.name] || '#10b981';
+    const isLast = idx === tiers.length - 1;
+    const bgColor = tier.isCurrent ? '#f0fdfa' : '#ffffff';
+    const borderColor = tier.isCurrent ? color : '#e5e7eb';
+    const textColor = tier.isCurrent ? color : '#374151';
+    const badgeBg = tier.isCurrent ? color : '#e5e7eb';
+    const badgeText = tier.isCurrent ? '#ffffff' : '#6b7280';
+
+    return `
+      <tr>
+        <td style="padding:0;width:24px;vertical-align:top;">
+          <table role="presentation" cellpadding="0" cellspacing="0" style="width:24px;">
+            <tr>
+              <td style="width:24px;height:24px;border-radius:50%;background-color:${badgeBg};text-align:center;vertical-align:middle;">
+                <span style="color:${badgeText};font-size:11px;font-weight:700;">${idx + 1}</span>
+              </td>
+            </tr>
+            ${!isLast ? `<tr><td style="width:2px;height:20px;background-color:#e5e7eb;margin:0 auto;padding:0 11px;"><div style="width:2px;height:20px;background-color:#e5e7eb;"></div></td></tr>` : ''}
+          </table>
+        </td>
+        <td style="padding:0 0 ${isLast ? '0' : '8px'} 12px;vertical-align:top;">
+          <div style="background-color:${bgColor};border:1px solid ${borderColor};border-radius:8px;padding:12px 16px;${tier.isCurrent ? 'border-left:3px solid ' + color + ';' : ''}">
+            <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;">
+              <tr>
+                <td>
+                  <p style="color:${textColor};font-size:14px;font-weight:700;margin:0;">${tier.name}</p>
+                  <p style="color:#6b7280;font-size:12px;margin:2px 0 0;">${tier.threshold}</p>
+                </td>
+                <td style="text-align:right;">
+                  <p style="color:#0d9488;font-size:14px;font-weight:700;margin:0;">${tier.rewards}</p>
+                  <p style="color:#9ca3af;font-size:11px;margin:2px 0 0;">/month</p>
+                </td>
+              </tr>
+            </table>
+          </div>
+        </td>
+      </tr>`;
+  }).join('');
+
+  return `<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin:0;">
+    ${tierHtml}
+  </table>`;
+}
+
+// ─── Benefits List with Checkmarks ─────────────────────────────────
+
+export function renderBenefitsList(items: string[]): string {
+  const listHtml = items.map(item => `
+    <tr>
+      <td style="width:20px;vertical-align:top;padding:4px 0;">
+        <span style="color:#0d9488;font-size:14px;font-weight:700;">✓</span>
+      </td>
+      <td style="padding:4px 0;">
+        <p style="color:#374151;font-size:13px;line-height:1.5;margin:0;">${item}</p>
+      </td>
+    </tr>`).join('');
+
+  return `<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin:0;">
+    ${listHtml}
+  </table>`;
+}

@@ -2032,46 +2032,53 @@ async function run() {
           subtitle: 'Your loyalty journey begins',
           body: `Hi {{customerName}},
 
-Welcome to Guardian — your pet safety journey just got rewarding!
+Welcome to PawTag Guardian!
 
-You're starting at the {{tier}} tier with {{points}} points. Every purchase, review, and engagement earns you points that unlock real rewards.
+Your pet's safety comes first. Now your everyday PawTag activity can earn rewards too.
+
+You're starting at the {{tier}} tier with {{points}} points.
+
+YOUR GUARDIAN STATUS
+
+Current Tier: {{tier}}
+Your Points: {{points}}
 
 HOW YOU EARN POINTS
 
-• Every $1 spent → {{pointsPerDollar}} point{{pointsPerDollarPlural}}
-• Text review → {{reviewTextPoints}} points
-• Photo review → {{reviewPhotoPoints}} points
-• Video review → {{reviewVideoPoints}} points
-• Refer a friend (signup) → {{referralSignupPoints}} points
-• Refer a friend (purchase) → {{referralPurchasePoints}} points
-• Complete pet profile → {{petProfilePoints}} points
-• Activate a tag → {{tagActivationPoints}} points
+$1 Spent: {{pointsPerDollar}} point{{pointsPerDollarPlural}}
+Text Review: {{reviewTextPoints}} points
+Photo Review: {{reviewPhotoPoints}} points
+Video Review: {{reviewVideoPoints}} points
+Refer a Friend: {{referralSignupPoints}} points
+Friend Purchases: {{referralPurchasePoints}} points
+Pet Profile: {{petProfilePoints}} points
+Activate a Tag: {{tagActivationPoints}} points
 
 YOUR PATH TO BETTER REWARDS
 
 As you earn points, you unlock higher tiers with better monthly PawRewards:
 
-• Care (0 pts) → \${{pawRewardsCare}}/month PawRewards
-• Nurture ({{tierThresholdNurture}} pts) → \${{pawRewardsNurture}}/month PawRewards
-• Protector ({{tierThresholdProtector}} pts) → \${{pawRewardsProtector}}/month PawRewards
-• Safeguard ({{tierThresholdSafeguard}} pts) → \${{pawRewardsSafeguard}}/month PawRewards
+Care (Starting tier) — \${{pawRewardsCare}}/month PawRewards
+Nurture ({{tierThresholdNurture}} points) — \${{pawRewardsNurture}}/month PawRewards
+Protector ({{tierThresholdProtector}} points) — \${{pawRewardsProtector}}/month PawRewards
+Safeguard ({{tierThresholdSafeguard}} points) — \${{pawRewardsSafeguard}}/month PawRewards
 
-PawRewards are store credit you can spend on any purchase. The higher your tier, the more you earn every month.
+YOUR POINTS TURN INTO REAL VALUE
+
+PawRewards are store credit you can use toward PawTag purchases. The higher your Guardian tier, the more you receive each month.
 
 GO GOLD — GET 2× THE REWARDS
 
-Want even more? Gold members get double points on every purchase, plus exclusive benefits:
+Gold members enjoy exclusive benefits:
 
-• 2× points on every purchase (vs 1× for Guardian)
+• 2× points on every purchase
 • Start at Nurture tier (skip Care)
-• \${{pawRewardsNurture}}/month PawRewards (vs \${{pawRewardsCare}}/month)
-• Free shipping over $50 (vs $100 for Guardian)
+• \${{pawRewardsNurture}}/month PawRewards
+• Free shipping over $50
 • Early access to new products
 • Priority customer support
 
-Gold membership is just \${{goldPrice}}/month — less than a coffee.
-
-Learn more about Gold: {{goldLandingUrl}}
+Only \${{goldPrice}}/month — less than a coffee.
 
 YOUR GUARDIAN DASHBOARD
 
@@ -2081,19 +2088,19 @@ Questions? Reply to this email or visit our help center.
 
 Welcome to the pack!
 The PawTag Team`,
-          ctaText: 'View Your Dashboard',
+          ctaText: 'View My Guardian Dashboard',
           ctaUrl: '{{dashboardUrl}}',
           senderEmail: 'no-reply@pawtag.co.nz',
           senderName: 'PawTag',
           variables: ['customerName', 'tier', 'points', 'dashboardUrl', 'goldLandingUrl', 'pointsPerDollar', 'pointsPerDollarPlural', 'reviewTextPoints', 'reviewPhotoPoints', 'reviewVideoPoints', 'referralSignupPoints', 'referralPurchasePoints', 'petProfilePoints', 'tagActivationPoints', 'tierThresholdNurture', 'tierThresholdProtector', 'tierThresholdSafeguard', 'pawRewardsCare', 'pawRewardsNurture', 'pawRewardsProtector', 'pawRewardsSafeguard', 'goldPrice'],
           status: 'active' as const,
           businessFlow: 'guardian_loyalty' as const,
-          purpose: 'Comprehensive welcome email for new Guardian members — explains points system, tier progression, PawRewards, and includes Gold upgrade section.',
+          purpose: 'Premium welcome email for new Guardian members — explains points system, tier progression, PawRewards, and includes Gold upgrade section.',
           triggerDescription: 'Sent when a customer becomes active (email + phone verified).',
           recipientDescription: 'New Guardian member',
           emailType: 'transactional' as const,
           isCritical: false,
-          version: 2,
+          version: 3,
           variableDefinitions: [
             { key: 'customerName', label: 'Customer Name', description: 'First name of the customer', type: 'string', example: 'John', required: true, source: 'Customer' },
             { key: 'tier', label: 'Tier', description: 'Starting Guardian tier', type: 'string', example: 'Care', required: true, source: 'Guardian' },

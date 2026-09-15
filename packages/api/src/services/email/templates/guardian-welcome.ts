@@ -1,4 +1,8 @@
-import { renderBase, renderCtaButton, renderInfoBox, renderDataTable, renderDivider } from './base';
+import {
+  renderBase, renderCtaButton, renderInfoBox, renderDivider,
+  renderSectionHeading, renderTwoColumnGrid, renderTierProgression,
+  renderBenefitsList, renderCard, TIER_COLORS,
+} from './base';
 
 interface GuardianWelcomeEmailData {
   customerName: string;
@@ -34,124 +38,148 @@ export function renderGuardianWelcomeEmail(data: GuardianWelcomeEmailData): stri
     goldPrice,
   } = data;
 
-  const pointsTable = renderDataTable([
-    { label: 'Every $1 spent', value: `${pointsPerDollar} point${pointsPerDollar === '1' ? '' : 's'}` },
-    { label: 'Text review', value: `${reviewTextPoints} points` },
-    { label: 'Photo review', value: `${reviewPhotoPoints} points` },
-    { label: 'Video review', value: `${reviewVideoPoints} points` },
-    { label: 'Refer a friend (signup)', value: `${referralSignupPoints} points` },
-    { label: 'Refer a friend (purchase)', value: `${referralPurchasePoints} points` },
-    { label: 'Complete pet profile', value: `${petProfilePoints} points` },
-    { label: 'Activate a tag', value: `${tagActivationPoints} points` },
-  ]);
+  const tierColor = TIER_COLORS[tier.toUpperCase()] || '#10b981';
 
-  const tierTable = renderDataTable([
-    { label: 'Care (0 pts)', value: `$${pawRewardsCare}/month PawRewards` },
-    { label: `Nurture (${tierThresholdNurture} pts)`, value: `$${pawRewardsNurture}/month PawRewards` },
-    { label: `Protector (${tierThresholdProtector} pts)`, value: `$${pawRewardsProtector}/month PawRewards` },
-    { label: `Safeguard (${tierThresholdSafeguard} pts)`, value: `$${pawRewardsSafeguard}/month PawRewards` },
-  ]);
-
-  const comparisonTable = `
-    <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;border-collapse:separate;margin:20px 0;">
-      <tr style="background-color:#f9fafb;">
-        <td style="font-weight:600;color:#374151;font-size:13px;padding:12px 16px;border-bottom:1px solid #e5e7eb;">Feature</td>
-        <td style="font-weight:600;color:#374151;font-size:13px;padding:12px 16px;border-bottom:1px solid #e5e7eb;text-align:center;">Guardian</td>
-        <td style="font-weight:600;color:#92400e;font-size:13px;padding:12px 16px;border-bottom:1px solid #e5e7eb;text-align:center;">Gold</td>
-      </tr>
-      <tr>
-        <td style="color:#374151;font-size:13px;padding:12px 16px;border-bottom:1px solid #e5e7eb;">Points on purchases</td>
-        <td style="color:#6b7280;font-size:13px;padding:12px 16px;border-bottom:1px solid #e5e7eb;text-align:center;">1×</td>
-        <td style="color:#92400e;font-size:13px;padding:12px 16px;border-bottom:1px solid #e5e7eb;text-align:center;font-weight:600;">2×</td>
-      </tr>
-      <tr>
-        <td style="color:#374151;font-size:13px;padding:12px 16px;border-bottom:1px solid #e5e7eb;">Starting tier</td>
-        <td style="color:#6b7280;font-size:13px;padding:12px 16px;border-bottom:1px solid #e5e7eb;text-align:center;">Care</td>
-        <td style="color:#92400e;font-size:13px;padding:12px 16px;border-bottom:1px solid #e5e7eb;text-align:center;font-weight:600;">Nurture</td>
-      </tr>
-      <tr>
-        <td style="color:#374151;font-size:13px;padding:12px 16px;border-bottom:1px solid #e5e7eb;">Monthly PawRewards</td>
-        <td style="color:#6b7280;font-size:13px;padding:12px 16px;border-bottom:1px solid #e5e7eb;text-align:center;">$${pawRewardsCare}/mo</td>
-        <td style="color:#92400e;font-size:13px;padding:12px 16px;border-bottom:1px solid #e5e7eb;text-align:center;font-weight:600;">$${pawRewardsNurture}/mo</td>
-      </tr>
-      <tr>
-        <td style="color:#374151;font-size:13px;padding:12px 16px;border-bottom:1px solid #e5e7eb;">Free shipping threshold</td>
-        <td style="color:#6b7280;font-size:13px;padding:12px 16px;border-bottom:1px solid #e5e7eb;text-align:center;">$100</td>
-        <td style="color:#92400e;font-size:13px;padding:12px 16px;border-bottom:1px solid #e5e7eb;text-align:center;font-weight:600;">$50</td>
-      </tr>
-      <tr>
-        <td style="color:#374151;font-size:13px;padding:12px 16px;border-bottom:1px solid #e5e7eb;">Early access</td>
-        <td style="color:#6b7280;font-size:13px;padding:12px 16px;border-bottom:1px solid #e5e7eb;text-align:center;">—</td>
-        <td style="color:#92400e;font-size:13px;padding:12px 16px;border-bottom:1px solid #e5e7eb;text-align:center;font-weight:600;">✓</td>
-      </tr>
-      <tr>
-        <td style="color:#374151;font-size:13px;padding:12px 16px;">Priority support</td>
-        <td style="color:#6b7280;font-size:13px;padding:12px 16px;text-align:center;">—</td>
-        <td style="color:#92400e;font-size:13px;padding:12px 16px;text-align:center;font-weight:600;">✓</td>
-      </tr>
-    </table>`;
-
-  const bodyHtml = `
-    <p style="color:#374151;font-size:15px;line-height:1.7;">
+  // ─── B. Hero / Welcome Section ─────────────────────────────────
+  const heroSection = `
+    <p style="color:#374151;font-size:15px;line-height:1.7;margin:0 0 8px;">
       Hi ${customerName},
     </p>
-    <p style="color:#374151;font-size:15px;line-height:1.7;">
-      Welcome to <strong>Guardian</strong> — your pet safety journey just got rewarding!
+    <p style="color:#374151;font-size:15px;line-height:1.7;margin:0 0 24px;">
+      Your pet's safety comes first. Now your everyday PawTag activity can earn rewards too.
     </p>
-    ${renderInfoBox(`
-      <p style="color:#0d9488;font-size:13px;font-weight:600;margin:0 0 4px;">Your Starting Points</p>
-      <p style="color:#111827;font-size:24px;font-weight:700;margin:0;">${points}</p>
-      <p style="color:#6b7280;font-size:12px;margin:4px 0 0;">Tier: ${tier}</p>
-    `)}
-    <p style="color:#374151;font-size:15px;line-height:1.7;">
-      Every purchase, review, and engagement earns you points that unlock real rewards.
-    </p>
+    <div style="background:linear-gradient(135deg,#f0fdfa,#ccfbf1);border:1px solid #99f6e4;border-radius:12px;padding:24px;margin:0 0 24px;text-align:center;">
+      <p style="color:#6b7280;font-size:11px;text-transform:uppercase;letter-spacing:1px;margin:0 0 8px;font-weight:600;">Welcome to PawTag Guardian</p>
+      <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto;">
+        <tr>
+          <td style="padding:0 16px;text-align:center;">
+            <p style="color:#6b7280;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 4px;">Current Tier</p>
+            <div style="background-color:${tierColor};border-radius:20px;padding:6px 16px;display:inline-block;">
+              <span style="color:#ffffff;font-size:13px;font-weight:700;letter-spacing:0.5px;">${tier}</span>
+            </div>
+          </td>
+          <td style="width:1px;background-color:#d1d5db;padding:0;"></td>
+          <td style="padding:0 16px;text-align:center;">
+            <p style="color:#6b7280;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 4px;">Your Points</p>
+            <p style="color:#0d9488;font-size:28px;font-weight:800;margin:0;">${points}</p>
+          </td>
+        </tr>
+      </table>
+    </div>`;
+
+  // ─── D. How You Earn Points ────────────────────────────────────
+  const pointsGrid = renderTwoColumnGrid([
+    { label: '$1 Spent', value: `${pointsPerDollar}`, subtext: `point${pointsPerDollar === '1' ? '' : 's'}` },
+    { label: 'Text Review', value: reviewTextPoints, subtext: 'points' },
+    { label: 'Photo Review', value: reviewPhotoPoints, subtext: 'points' },
+    { label: 'Video Review', value: reviewVideoPoints, subtext: 'points' },
+    { label: 'Refer a Friend', value: referralSignupPoints, subtext: 'points' },
+    { label: 'Friend Purchases', value: referralPurchasePoints, subtext: 'points' },
+    { label: 'Pet Profile', value: petProfilePoints, subtext: 'points' },
+    { label: 'Activate a Tag', value: tagActivationPoints, subtext: 'points' },
+  ]);
+
+  // ─── E. Tier Progression ───────────────────────────────────────
+  const tierProgression = renderTierProgression([
+    { name: 'Care', threshold: 'Starting tier', rewards: `$${pawRewardsCare}`, isCurrent: tier.toUpperCase() === 'CARE' },
+    { name: 'Nurture', threshold: `${tierThresholdNurture} points`, rewards: `$${pawRewardsNurture}`, isCurrent: tier.toUpperCase() === 'NURTURE' },
+    { name: 'Protector', threshold: `${tierThresholdProtector} points`, rewards: `$${pawRewardsProtector}`, isCurrent: tier.toUpperCase() === 'PROTECTOR' },
+    { name: 'Safeguard', threshold: `${tierThresholdSafeguard} points`, rewards: `$${pawRewardsSafeguard}`, isCurrent: tier.toUpperCase() === 'SAFEGUARD' },
+  ]);
+
+  // ─── F. PawRewards Explanation ─────────────────────────────────
+  const pawRewardsCallout = `
+    <div style="background-color:#f0fdfa;border-left:3px solid #0d9488;border-radius:0 8px 8px 0;padding:16px 20px;margin:20px 0;">
+      <p style="color:#115e59;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 8px;">Your Points Turn Into Real Value</p>
+      <p style="color:#374151;font-size:14px;line-height:1.6;margin:0;">
+        PawRewards are store credit you can use toward PawTag purchases. The higher your Guardian tier, the more you receive each month.
+      </p>
+    </div>`;
+
+  // ─── G. Gold Membership ────────────────────────────────────────
+  const goldBenefits = renderBenefitsList([
+    '<strong>2× points</strong> on every purchase',
+    `Start at <strong>Nurture</strong> tier (skip Care)`,
+    `<strong>$${pawRewardsNurture}/month</strong> PawRewards`,
+    'Free shipping over $50',
+    'Early access to new products',
+    'Priority customer support',
+  ]);
+
+  const goldSection = `
+    <div style="background-color:#fffbeb;border:1px solid #fcd34d;border-radius:12px;padding:24px;margin:24px 0;">
+      <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 16px;">
+        <tr>
+          <td>
+            <p style="color:#92400e;font-size:15px;font-weight:700;margin:0;">GO GOLD</p>
+            <p style="color:#b45309;font-size:12px;margin:4px 0 0;">Get 2× the rewards</p>
+          </td>
+          <td style="text-align:right;">
+            <div style="background-color:#f59e0b;border-radius:20px;padding:6px 14px;display:inline-block;">
+              <span style="color:#ffffff;font-size:12px;font-weight:700;">${goldBenefits ? 'MEMBERSHIP' : ''}</span>
+            </div>
+          </td>
+        </tr>
+      </table>
+      ${goldBenefits}
+      <div style="border-top:1px solid #fcd34d;margin:16px 0;padding-top:16px;">
+        <p style="color:#92400e;font-size:18px;font-weight:800;margin:0;">Only $${goldPrice}/month</p>
+        <p style="color:#b45309;font-size:12px;margin:4px 0 0;font-style:italic;">less than a coffee</p>
+      </div>
+      ${renderCtaButton(goldLandingUrl, 'Explore Gold', 'warning')}
+    </div>`;
+
+  // ─── Assemble Full Email ───────────────────────────────────────
+  const bodyHtml = `
+    ${heroSection}
 
     ${renderDivider()}
 
-    <p style="color:#111827;font-size:16px;font-weight:600;margin:0 0 12px;">How You Earn Points</p>
-    ${pointsTable}
+    ${renderSectionHeading('How You Earn Points')}
+    ${pointsGrid}
 
     ${renderDivider()}
 
-    <p style="color:#111827;font-size:16px;font-weight:600;margin:0 0 12px;">Your Path to Better Rewards</p>
-    <p style="color:#374151;font-size:14px;line-height:1.6;margin:0 0 12px;">
+    ${renderSectionHeading('Your Path to Better Rewards')}
+    <p style="color:#374151;font-size:14px;line-height:1.6;margin:0 0 16px;">
       As you earn points, you unlock higher tiers with better monthly PawRewards:
     </p>
-    ${tierTable}
-    <p style="color:#374151;font-size:14px;line-height:1.6;margin:0;">
-      PawRewards are store credit you can spend on any purchase. The higher your tier, the more you earn every month.
-    </p>
+    ${tierProgression}
 
     ${renderDivider()}
 
-    <p style="color:#111827;font-size:16px;font-weight:600;margin:0 0 12px;">Go Gold — Get 2× the Rewards</p>
-    <p style="color:#374151;font-size:14px;line-height:1.6;margin:0 0 12px;">
-      Want even more? Gold members get double points on every purchase, plus exclusive benefits:
-    </p>
-    ${comparisonTable}
-    ${renderInfoBox(`
-      <p style="color:#92400e;font-size:14px;font-weight:600;margin:0 0 4px;">Gold Membership</p>
-      <p style="color:#374151;font-size:13px;margin:0;">Just $${goldPrice}/month — less than a coffee.</p>
-    `, 'warning')}
-    ${renderCtaButton(goldLandingUrl, 'Learn About Gold', 'warning')}
+    ${pawRewardsCallout}
 
     ${renderDivider()}
 
-    ${renderCtaButton(dashboardUrl, 'View Your Dashboard')}
+    ${goldSection}
 
-    <p style="color:#9ca3af;font-size:12px;margin-top:24px;">
+    ${renderDivider()}
+
+    <div style="text-align:center;margin:8px 0 24px;">
+      <p style="color:#111827;font-size:15px;font-weight:700;margin:0 0 8px;">Your Guardian Dashboard</p>
+      <p style="color:#6b7280;font-size:14px;line-height:1.6;margin:0 0 16px;">
+        Track your points, view your tier progress,<br>
+        and manage your rewards from your personal dashboard.
+      </p>
+      ${renderCtaButton(dashboardUrl, 'View My Guardian Dashboard')}
+    </div>
+
+    <p style="color:#9ca3af;font-size:12px;margin:0 0 16px;text-align:center;">
       Questions? Reply to this email or visit our help center.
     </p>
-    <p style="color:#374151;font-size:14px;margin-top:16px;">
-      Welcome to the pack!<br>
-      <strong>The PawTag Team</strong>
-    </p>
+    <div style="border-top:1px solid #e5e7eb;padding-top:20px;margin-top:8px;">
+      <p style="color:#374151;font-size:14px;margin:0;text-align:center;">
+        Welcome to the pack!<br>
+        <strong>The PawTag Team</strong>
+      </p>
+    </div>
   `;
 
   return renderBase({
     title: 'Welcome to Guardian',
     subtitle: 'Your loyalty journey begins',
+    preheader: `${customerName}, welcome to PawTag Guardian! You're starting at ${tier} tier with ${points} points.`,
     bodyHtml,
   });
 }
