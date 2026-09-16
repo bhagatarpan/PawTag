@@ -115,6 +115,34 @@ function FinderPage() {
   if (error) return <FinderErrorState message={error} />;
   if (!data) return null;
 
+  // Handle expired tag
+  if (data.tagActive === false) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="max-w-md w-full text-center">
+          <div className="mx-auto w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mb-6">
+            <AlertTriangle size={40} className="text-red-600" />
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-3">Tag Expired</h1>
+          <p className="text-lg text-gray-600 mb-6">
+            This PawTag is no longer active. No pet information is available for this tag.
+          </p>
+          <p className="text-sm text-gray-500 mb-6">
+            If you found a pet wearing this tag, please contact PawTag directly:
+          </p>
+          <a
+            href="mailto:support@pawtag.co.nz"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 transition-colors"
+          >
+            <Phone size={18} />
+            Contact PawTag Support
+          </a>
+          <p className="text-xs text-gray-400 mt-8">PawTag — Reuniting lost pets with their families</p>
+        </div>
+      </div>
+    );
+  }
+
   const isMaintenance = siteStatus === SiteAvailabilityStatus.MAINTENANCE;
   const bgColor = data.pet.status === 'lost' ? 'bg-red-50' : data.pet.status === 'found' ? 'bg-amber-50' : 'bg-gray-50';
 
