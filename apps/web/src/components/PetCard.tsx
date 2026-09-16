@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import {
   PawPrint, ShieldAlert, ShieldCheck, Clock, AlertTriangle,
   CheckCircle, Star, Skull, EyeOff, ChevronRight, ShoppingBag,
@@ -276,6 +277,14 @@ export default function PetCard({
                     {pet.linkedTag.subscription.status === 'active' ? 'Active' :
                      pet.linkedTag.subscription.status === 'grace_period' ? 'Expiring' : 'Expired'}
                   </span>
+                  {(pet.linkedTag.subscription.status === 'expired' || pet.linkedTag.subscription.status === 'grace_period') && (
+                    <Link
+                      to="/account/subscriptions"
+                      className="text-[10px] font-medium text-teal-600 hover:text-teal-800 underline"
+                    >
+                      Renew
+                    </Link>
+                  )}
                   <span className="text-[11px] text-teal-500">${pet.linkedTag.subscription.price}/mo</span>
                 </div>
               ) : (
