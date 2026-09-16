@@ -450,11 +450,15 @@ Copy `packages/api/.env.example` to `packages/api/.env` and configure:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `R2_ACCESS_KEY_ID` | *(empty)* | R2 API access key ID |
-| `R2_SECRET_ACCESS_KEY` | *(empty)* | R2 API secret access key |
-| `R2_BUCKET_NAME` | *(empty)* | R2 bucket name |
-| `R2_ENDPOINT` | *(empty)* | R2 endpoint URL |
-| `R2_PUBLIC_URL` | *(empty)* | Public URL for serving uploaded files |
+| `STORAGE_DRIVER` | `local` | `local` (development) or `r2` (production) |
+| `R2_ACCESS_KEY_ID` | *(empty)* | R2 API access key ID (required when `STORAGE_DRIVER=r2`) |
+| `R2_SECRET_ACCESS_KEY` | *(empty)* | R2 API secret access key (required when `STORAGE_DRIVER=r2`) |
+| `R2_BUCKET_NAME` | *(empty)* | R2 bucket name (required when `STORAGE_DRIVER=r2`) |
+| `R2_ENDPOINT` | *(empty)* | R2 endpoint URL (required when `STORAGE_DRIVER=r2`) |
+| `R2_PUBLIC_URL` | *(empty)* | Public URL for serving uploaded files (required when `STORAGE_DRIVER=r2`) |
+
+**Development:** Files stored in `packages/api/uploads/` directory (no Cloudflare account needed).
+**Production:** Files stored in Cloudflare R2. Requires R2 bucket and API credentials.
 
 ### Server
 
