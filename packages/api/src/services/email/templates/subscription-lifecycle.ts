@@ -172,3 +172,141 @@ export function renderPaymentRetrySuccessEmail(data: PaymentRetrySuccessData): s
     theme: 'success',
   });
 }
+
+// ─── Free Period Reminder — 2 Weeks ────────────────────────────────
+
+interface FreePeriodReminder2WeekData {
+  name: string;
+  tagId: string;
+  productName: string;
+  freePeriodEndsAt: string;
+  monthlyPrice: number;
+  autoRenew: boolean;
+  subscriptionsUrl: string;
+}
+
+export function renderFreePeriodReminder2WeekEmail(data: FreePeriodReminder2WeekData): string {
+  const bodyHtml = `
+    <p style="color:#374151;font-size:16px;line-height:1.6;margin:0 0 20px;">Hi ${data.name},</p>
+    <p style="color:#374151;font-size:16px;line-height:1.6;margin:0 0 20px;">
+      Your PawTag <strong>${data.productName}</strong> free subscription period is ending soon.
+    </p>
+    ${renderDataTable([
+      { label: 'Tag ID', value: data.tagId },
+      { label: 'Free Period Ends', value: data.freePeriodEndsAt },
+      { label: 'Monthly Price After', value: `$${data.monthlyPrice.toFixed(2)}/month` },
+      { label: 'Auto-Renew', value: data.autoRenew ? 'ON' : 'OFF' },
+    ])}
+    ${data.autoRenew
+      ? renderStatusCard('info', 'Auto-Renew is ON', 'Your subscription will automatically continue at $' + data.monthlyPrice.toFixed(2) + '/month after the free period ends. No action needed.')
+      : renderStatusCard('warning', 'Auto-Renew is OFF', 'Your subscription will NOT automatically renew. Renew before ' + data.freePeriodEndsAt + ' to keep your pet protected.')
+    }
+    ${renderCtaButton(data.subscriptionsUrl, 'Manage Subscription')}
+  `;
+
+  return renderBase({
+    title: 'Your Free Subscription Period is Ending',
+    subtitle: '2 Weeks Remaining',
+    bodyHtml,
+    theme: 'warning',
+  });
+}
+
+// ─── Free Period Reminder — 3 Days ─────────────────────────────────
+
+interface FreePeriodReminder3DayData {
+  name: string;
+  tagId: string;
+  productName: string;
+  freePeriodEndsAt: string;
+  monthlyPrice: number;
+  autoRenew: boolean;
+  subscriptionsUrl: string;
+}
+
+export function renderFreePeriodReminder3DayEmail(data: FreePeriodReminder3DayData): string {
+  const bodyHtml = `
+    <p style="color:#374151;font-size:16px;line-height:1.6;margin:0 0 20px;">Hi ${data.name},</p>
+    <p style="color:#374151;font-size:16px;line-height:1.6;margin:0 0 20px;">
+      <strong>Only 3 days left!</strong> Your PawTag <strong>${data.productName}</strong> free subscription period ends on <strong>${data.freePeriodEndsAt}</strong>.
+    </p>
+    ${renderDataTable([
+      { label: 'Tag ID', value: data.tagId },
+      { label: 'Free Period Ends', value: data.freePeriodEndsAt },
+      { label: 'Monthly Price After', value: `$${data.monthlyPrice.toFixed(2)}/month` },
+      { label: 'Auto-Renew', value: data.autoRenew ? 'ON' : 'OFF' },
+    ])}
+    ${data.autoRenew
+      ? renderStatusCard('success', 'Auto-Renew is ON', 'Your subscription will automatically continue. Your card will be charged $' + data.monthlyPrice.toFixed(2) + '/month after the free period.')
+      : renderStatusCard('danger', 'Action Required', 'Auto-renew is OFF. Renew now to keep your pet protected without interruption.')
+    }
+    ${renderCtaButton(data.subscriptionsUrl, 'Manage Subscription')}
+  `;
+
+  return renderBase({
+    title: 'URGENT: Free Subscription Ends in 3 Days',
+    subtitle: 'Action May Be Required',
+    bodyHtml,
+    theme: 'danger',
+  });
+}
+
+// ─── Grace Period Reminder — 3 Days ────────────────────────────────
+
+interface GracePeriodReminder3DayData {
+  name: string;
+  tagId: string;
+  gracePeriodEndsAt: string;
+  renewUrl: string;
+}
+
+export function renderGracePeriodReminder3DayEmail(data: GracePeriodReminder3DayData): string {
+  const bodyHtml = `
+    <p style="color:#374151;font-size:16px;line-height:1.6;margin:0 0 20px;">Hi ${data.name},</p>
+    <p style="color:#374151;font-size:16px;line-height:1.6;margin:0 0 20px;">
+      <strong>URGENT:</strong> Your PawTag subscription for tag <strong>${data.tagId}</strong> grace period ends in <strong>3 days</strong>.
+    </p>
+    ${renderStatusCard('danger', 'Grace Period Ending', 'After ' + data.gracePeriodEndsAt + ', your tag will become EXPIRED and cannot be renewed. You will need to purchase a new tag.')}
+    <p style="color:#374151;font-size:16px;line-height:1.6;margin:0 0 20px;">
+      Renew now to keep your pet protected and maintain access to Guardian benefits.
+    </p>
+    ${renderCtaButton(data.renewUrl, 'Renew Now — Avoid Expiration')}
+  `;
+
+  return renderBase({
+    title: 'URGENT: Grace Period Ends in 3 Days',
+    subtitle: 'Renew Now to Avoid Tag Expiration',
+    bodyHtml,
+    theme: 'danger',
+  });
+}
+
+// ─── Tag Expired ───────────────────────────────────────────────────
+
+interface TagExpiredData {
+  name: string;
+  tagId: string;
+  productName: string;
+  shopUrl: string;
+}
+
+export function renderTagExpiredEmail(data: TagExpiredData): string {
+  const bodyHtml = `
+    <p style="color:#374151;font-size:16px;line-height:1.6;margin:0 0 20px;">Hi ${data.name},</p>
+    <p style="color:#374151;font-size:16px;line-height:1.6;margin:0 0 20px;">
+      Your PawTag <strong>${data.productName}</strong> subscription for tag <strong>${data.tagId}</strong> has expired.
+    </p>
+    ${renderStatusCard('danger', 'Tag Expired', 'This tag is no longer active. When someone scans this tag, they will NOT see your pet\'s information.')}
+    <p style="color:#374151;font-size:16px;line-height:1.6;margin:0 0 20px;">
+      To restore pet recovery protection for your pet, you will need to purchase a new PawTag.
+    </p>
+    ${renderCtaButton(data.shopUrl, 'Buy a New PawTag')}
+  `;
+
+  return renderBase({
+    title: 'Your PawTag Has Expired',
+    subtitle: 'Subscription Notice',
+    bodyHtml,
+    theme: 'danger',
+  });
+}
