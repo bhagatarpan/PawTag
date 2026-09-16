@@ -25,6 +25,10 @@ export interface Microchip {
 }
 
 export interface FinderData {
+  tagActive?: boolean;
+  subscriptionStatus?: string;
+  message?: string;
+  petInfo?: null;
   pet: {
     name: string;
     petId?: string;

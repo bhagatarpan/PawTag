@@ -90,10 +90,8 @@ export const COMMERCE_SETTINGS = {
   },
 
   // ─── Subscriptions ────────────────────────────────────────
-  'commerce.subscriptions.annualPrice': { default: '0.99', description: 'Annual subscription price (NZD)' },
-  'commerce.subscriptions.monthlyPrice': { default: '1.99', description: 'Monthly subscription price (NZD)' },
-  'commerce.subscriptions.freePeriodMonths': { default: '12', description: 'Free period in months' },
-  'commerce.subscriptions.gracePeriodWeeks': { default: '4', description: 'Grace period in weeks' },
+  // Pricing and free/grace period are now read from Product.subscriptionConfig
+  // Only operational settings remain here
 
   // ─── Refunds ──────────────────────────────────────────────
   'commerce.refunds.enabled': { default: 'true', description: 'Allow refunds' },

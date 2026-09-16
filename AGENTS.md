@@ -615,7 +615,7 @@ Safety nets:
 
 ### Commerce Settings (CMS-Driven)
 
-All business values stored in `settings` collection with `commerce.*` prefix. 35+ settings across: Payment, Shipping, Tax, Inventory, Cart, Checkout, Orders, Subscriptions, Refunds, Notifications, Feature Flags.
+All business values stored in `settings` collection with `commerce.*` prefix. Settings across: Payment, Shipping, Tax, Inventory, Cart, Checkout, Orders, Subscriptions, Refunds, Notifications, Feature Flags.
 
 **Cart settings (seeded in `seed-cms.ts`):**
 | Key | Default | Purpose |
@@ -623,6 +623,43 @@ All business values stored in `settings` collection with `commerce.*` prefix. 35
 | `commerce.cart.ttlDays` | 30 | Cart expiry for guest/anonymous carts (days) |
 | `commerce.cart.priceRevalidation` | `true` | Re-validate prices from DB on every cart load |
 | `commerce.cart.maxItems` | 50 | Maximum items allowed in a single cart |
+
+**Subscription settings (operational only — pricing is per-product):**
+| Key | Default | Purpose |
+|-----|---------|---------|
+| `commerce.subscriptions.autoRenewEnabled` | `true` | Global toggle for auto-renewal |
+| `commerce.subscriptions.defaultAutoRenew` | `true` | Default auto-renew state for new subscriptions |
+| `commerce.subscriptions.maxRetries` | `4` | Max payment retries before grace period |
+| `commerce.subscriptions.retryDelaysHours` | `[0,1,24,72]` | Retry delay schedule (hours) |
+
+**Note:** Subscription pricing, free period, and grace period are now configured per-product via `Product.subscriptionConfig`, NOT via CMS settings.
+
+### PawTag Classic Subscription Lifecycle
+
+**Product pricing (configured in Admin → Products):**
+| Product | Price | Free Period | Grace Period | Monthly Price |
+|---------|-------|-------------|--------------|---------------|
+| PawTag Scan | $10.99 | 3 months | 4 weeks | $0.99/mo |
+| PawTag Classic | $20.99 | 3 months | 4 weeks | $1.99/mo |
+| PawTag Plus | $40.99 | 3 months | 4 weeks | $2.99/mo |
+
+**Lifecycle states:**
+```
+ACTIVE (free period) → ACTIVE (paid) → GRACE_PERIOD → EXPIRED
+     ↑                    ↑                ↑
+     └── auto-renew ON ───┘                │
+     └── auto-renew OFF ──────────────────→│
+                                           └── Buy New Tag
+```
+
+**Key rules:**
+- Customer pays product price (e.g., $20.99) at purchase
+- 3 months FREE subscription included
+- Auto-renew toggle at checkout (default ON)
+- If auto-renew ON: Stripe charges $X.XX/mo after free period
+- If auto-renew OFF: 1-month grace period, then tag expires
+- Expired tags cannot be renewed — must buy new tag
+- Finder scanning expired tag sees "Tag Expired" screen (no pet data)
 
 ### Checkout Flow (4-Step Wizard)
 

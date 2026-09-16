@@ -59,6 +59,7 @@ export interface IOrderDocument extends Document {
   shippingLabelUrl?: string;
   notes?: string;
   referredByCode?: string;
+  autoRenew?: boolean;
   createdBy?: string;
   createdByType?: string;
   createdByPortal?: 'customer-web' | 'customer-mobile' | 'admin-web' | 'system';
@@ -161,6 +162,7 @@ const OrderSchema = new Schema<IOrderDocument>(
     shippingLabelUrl: String,
     notes: String,
     referredByCode: { type: String },
+    autoRenew: { type: Boolean, default: true },
     createdBy: { type: String, index: true },
     createdByType: { type: String, index: true },
     createdByPortal: {

@@ -175,10 +175,6 @@ async function run() {
         { key: 'commerce.orders.numberPrefix', value: 'PT', displayValue: 'Order Number Prefix', category: 'commerce', description: 'Order number prefix' },
         { key: 'commerce.orders.numberLength', value: '6', displayValue: 'Order Number Length', category: 'commerce', description: 'Order number length after prefix' },
         // Subscriptions
-        { key: 'commerce.subscriptions.annualPrice', value: '0.99', displayValue: 'Annual Subscription Price', category: 'commerce', description: 'Annual subscription price (NZD)' },
-        { key: 'commerce.subscriptions.monthlyPrice', value: '1.99', displayValue: 'Monthly Subscription Price', category: 'commerce', description: 'Monthly subscription price (NZD)' },
-        { key: 'commerce.subscriptions.freePeriodMonths', value: '12', displayValue: 'Free Period (months)', category: 'commerce', description: 'Free period in months' },
-        { key: 'commerce.subscriptions.gracePeriodWeeks', value: '4', displayValue: 'Grace Period (weeks)', category: 'commerce', description: 'Grace period in weeks' },
         { key: 'commerce.subscriptions.autoRenewEnabled', value: 'true', displayValue: 'Auto-Renew Enabled', category: 'commerce', description: 'Allow subscriptions to auto-renew (global toggle)' },
         { key: 'commerce.subscriptions.defaultAutoRenew', value: 'true', displayValue: 'Default Auto-Renew', category: 'commerce', description: 'Default auto-renew state for new subscriptions' },
         { key: 'commerce.subscriptions.maxRetries', value: '4', displayValue: 'Max Payment Retries', category: 'commerce', description: 'Maximum number of payment retry attempts before grace period' },

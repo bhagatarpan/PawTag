@@ -1,7 +1,7 @@
 import { Subscription, Tag, Invoice, User, Notification, Product, TagExpiryNotification, Setting } from '@pawtag/db';
 import { sendMail, sendInvoiceEmail } from './email.service';
 import { createAndDeliverNotification } from './notification-delivery.service';
-import { renderSubscriptionReminderEmail, renderGracePeriodReminderEmail, renderPaymentFailureEmail, renderGracePeriodStartedEmail, renderGoldWelcomeEmail, renderPaymentRetrySuccessEmail } from './email/templates';
+import { renderSubscriptionReminderEmail, renderGracePeriodReminderEmail, renderPaymentFailureEmail, renderGracePeriodStartedEmail, renderGoldWelcomeEmail, renderPaymentRetrySuccessEmail, renderFreePeriodReminder2WeekEmail, renderFreePeriodReminder3DayEmail, renderGracePeriodReminder3DayEmail, renderTagExpiredEmail } from './email/templates';
 import { auditService, type AuditContext } from './audit';
 import { incrementCounter, METRICS } from '../lib/metrics';
 import logger from '../lib/logger';
@@ -23,10 +23,6 @@ async function loadSettings(): Promise<Record<string, string>> {
     const settings = await Setting.find({
       key: {
         $in: [
-          'commerce.subscriptions.annualPrice',
-          'commerce.subscriptions.monthlyPrice',
-          'commerce.subscriptions.freePeriodMonths',
-          'commerce.subscriptions.gracePeriodWeeks',
           'commerce.subscriptions.autoRenewEnabled',
           'commerce.subscriptions.defaultAutoRenew',
           'commerce.subscriptions.maxRetries',
@@ -45,10 +41,6 @@ async function loadSettings(): Promise<Record<string, string>> {
     logger.error({ err: error }, 'Failed to load subscription settings');
     // Return defaults if DB fails
     return {
-      'commerce.subscriptions.annualPrice': '0.99',
-      'commerce.subscriptions.monthlyPrice': '1.99',
-      'commerce.subscriptions.freePeriodMonths': '12',
-      'commerce.subscriptions.gracePeriodWeeks': '4',
       'commerce.subscriptions.autoRenewEnabled': 'true',
       'commerce.subscriptions.defaultAutoRenew': 'true',
       'commerce.subscriptions.maxRetries': '4',
@@ -60,26 +52,6 @@ async function loadSettings(): Promise<Record<string, string>> {
 async function getSettingValue(key: string, defaultValue: string): Promise<string> {
   const settings = await loadSettings();
   return settings[key] || defaultValue;
-}
-
-async function getGracePeriodWeeks(): Promise<number> {
-  const value = await getSettingValue('commerce.subscriptions.gracePeriodWeeks', '4');
-  return parseInt(value, 10) || 4;
-}
-
-async function getFreePeriodMonths(): Promise<number> {
-  const value = await getSettingValue('commerce.subscriptions.freePeriodMonths', '12');
-  return parseInt(value, 10) || 12;
-}
-
-async function getAnnualPrice(): Promise<number> {
-  const value = await getSettingValue('commerce.subscriptions.annualPrice', '0.99');
-  return parseFloat(value) || 0.99;
-}
-
-async function getMonthlyPrice(): Promise<number> {
-  const value = await getSettingValue('commerce.subscriptions.monthlyPrice', '1.99');
-  return parseFloat(value) || 1.99;
 }
 
 async function getAutoRenewEnabled(): Promise<boolean> {
@@ -153,15 +125,11 @@ export async function createSubscription(data: {
   planType?: 'annual' | 'monthly' | 'free' | 'gold';
   planId?: string;
   price?: number;
+  autoRenew?: boolean;
 }) {
   const now = new Date();
   const planType = data.planType || 'annual';
   
-  // Get prices from CMS settings
-  const annualPrice = await getAnnualPrice();
-  const monthlyPrice = await getMonthlyPrice();
-  const price = data.price ?? (planType === 'annual' ? annualPrice : planType === 'monthly' ? monthlyPrice : 0);
-
   const planNames: Record<string, string> = {
     annual: 'PawTag Annual',
     monthly: 'PawTag Monthly',
@@ -169,9 +137,22 @@ export async function createSubscription(data: {
     gold: 'Gold Membership',
   };
 
-  // Get free period from CMS settings
-  const freePeriodMonths = await getFreePeriodMonths();
-  const defaultAutoRenew = await getDefaultAutoRenew();
+  // Read pricing and config from Product (not CMS settings)
+  let price = data.price ?? 0;
+  let freePeriodMonths = 3;
+  let productName = planNames[planType];
+
+  if (data.planId) {
+    const product = await Product.findById(data.planId).lean();
+    if (product) {
+      price = data.price ?? product.subscriptionConfig?.monthlyPrice ?? product.price ?? 0;
+      freePeriodMonths = product.subscriptionConfig?.freePeriodMonths ?? 3;
+      productName = product.name || productName;
+    }
+  }
+
+  // Use customer's auto-renew preference, falling back to CMS default
+  const defaultAutoRenew = data.autoRenew !== undefined ? data.autoRenew : await getDefaultAutoRenew();
   const freePeriodEndsAt = new Date(now);
   freePeriodEndsAt.setMonth(freePeriodEndsAt.getMonth() + freePeriodMonths);
 
@@ -182,7 +163,7 @@ export async function createSubscription(data: {
     tagId: data.tagId,
     orderId: data.orderId,
     planId: data.planId,
-    planName: planNames[planType],
+    planName: productName,
     planType,
     status: 'active',
     price,
@@ -744,9 +725,11 @@ export async function processAutoRenewals() {
 export async function checkExpiringSubscriptions() {
   const now = new Date();
 
-  // 30 days before free period or billing period ends
+  // Time thresholds
   const in30Days = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+  const in14Days = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
   const in7Days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const in3Days = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
   const in1Day = new Date(now.getTime() + 1 * 24 * 60 * 60 * 1000);
 
   // Find active subscriptions expiring within 30 days
@@ -754,11 +737,12 @@ export async function checkExpiringSubscriptions() {
     status: 'active',
     currentPeriodEnd: { $lte: in30Days, $gt: now },
     deletedAt: null,
-  }).populate('userId', 'fullName email').populate('tagId', 'tagId');
+  }).populate('userId', 'fullName email').populate('tagId', 'tagId').populate('planId', 'name subscriptionConfig');
 
   for (const sub of expiringSubs) {
     const user = sub.userId as any;
     const tag = sub.tagId as any;
+    const product = sub.planId as any;
     if (!user) continue;
 
     const daysUntilExpiry = Math.ceil(
@@ -766,16 +750,31 @@ export async function checkExpiringSubscriptions() {
     );
 
     const reminderStates = sub.reminderStates || { graceWeeklySentCount: 0 };
+    const isFreePeriod = sub.freePeriodEndsAt && sub.currentPeriodEnd.getTime() === sub.freePeriodEndsAt.getTime();
+    const monthlyPrice = product?.subscriptionConfig?.monthlyPrice || sub.price || 1.99;
+    const productName = product?.name || sub.planName || 'PawTag';
 
-    if (daysUntilExpiry <= 1 && !reminderStates.reminder1dSent) {
-      await sendReminderEmail(user.email, user.fullName, tag?.tagId || 'Unknown', daysUntilExpiry, '1-day');
-      reminderStates.reminder1dSent = true;
-    } else if (daysUntilExpiry <= 7 && !reminderStates.reminder7dSent) {
-      await sendReminderEmail(user.email, user.fullName, tag?.tagId || 'Unknown', daysUntilExpiry, '7-day');
-      reminderStates.reminder7dSent = true;
-    } else if (daysUntilExpiry <= 30 && !reminderStates.reminder30dSent) {
-      await sendReminderEmail(user.email, user.fullName, tag?.tagId || 'Unknown', daysUntilExpiry, '30-day');
-      reminderStates.reminder30dSent = true;
+    // Free period reminders (2-week and 3-day)
+    if (isFreePeriod) {
+      if (daysUntilExpiry <= 3 && !reminderStates.reminder1dSent) {
+        await sendFreePeriodReminder3DayEmail(user.email, user.fullName, tag?.tagId || 'Unknown', productName, sub.currentPeriodEnd, monthlyPrice, sub.autoRenew);
+        reminderStates.reminder1dSent = true;
+      } else if (daysUntilExpiry <= 14 && !reminderStates.reminder7dSent) {
+        await sendFreePeriodReminder2WeekEmail(user.email, user.fullName, tag?.tagId || 'Unknown', productName, sub.currentPeriodEnd, monthlyPrice, sub.autoRenew);
+        reminderStates.reminder7dSent = true;
+      }
+    } else {
+      // Billing period reminders (existing logic)
+      if (daysUntilExpiry <= 1 && !reminderStates.reminder1dSent) {
+        await sendReminderEmail(user.email, user.fullName, tag?.tagId || 'Unknown', daysUntilExpiry, '1-day');
+        reminderStates.reminder1dSent = true;
+      } else if (daysUntilExpiry <= 7 && !reminderStates.reminder7dSent) {
+        await sendReminderEmail(user.email, user.fullName, tag?.tagId || 'Unknown', daysUntilExpiry, '7-day');
+        reminderStates.reminder7dSent = true;
+      } else if (daysUntilExpiry <= 30 && !reminderStates.reminder30dSent) {
+        await sendReminderEmail(user.email, user.fullName, tag?.tagId || 'Unknown', daysUntilExpiry, '30-day');
+        reminderStates.reminder30dSent = true;
+      }
     }
 
     sub.reminderStates = reminderStates;
@@ -794,12 +793,6 @@ export async function checkExpiringSubscriptions() {
       severity: 'MEDIUM',
       metadata: {
         checkedCount: expiringSubs.length,
-        remindersSent: expiringSubs.filter(s => {
-          const days = Math.ceil((s.currentPeriodEnd.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-          return (days <= 1 && !s.reminderStates?.reminder1dSent) ||
-                 (days <= 7 && !s.reminderStates?.reminder7dSent) ||
-                 (days <= 30 && !s.reminderStates?.reminder30dSent);
-        }).length,
       },
     });
   }
@@ -816,12 +809,19 @@ export async function checkExpiredSubscriptions() {
     deletedAt: null,
   });
 
-  // Get grace period from CMS settings
-  const gracePeriodWeeks = await getGracePeriodWeeks();
-
   for (const sub of expiredSubs) {
     const oldStatus = sub.status;
     sub.status = 'grace_period';
+    
+    // Read grace period from Product (not CMS settings)
+    let gracePeriodWeeks = 4; // default
+    if (sub.planId) {
+      const product = await Product.findById(sub.planId).lean();
+      if (product?.subscriptionConfig?.gracePeriodWeeks) {
+        gracePeriodWeeks = product.subscriptionConfig.gracePeriodWeeks;
+      }
+    }
+    
     const graceEnd = new Date(now);
     graceEnd.setDate(graceEnd.getDate() + gracePeriodWeeks * 7);
     sub.gracePeriodEndsAt = graceEnd;
@@ -850,7 +850,6 @@ export async function checkExpiredSubscriptions() {
       severity: 'HIGH',
       metadata: {
         transitionedCount: expiredSubs.length,
-        gracePeriodWeeks,
         subscriptions: expiredSubs.map(s => ({
           subscriptionId: s._id.toString(),
           userId: s.userId.toString(),
@@ -871,16 +870,24 @@ export async function checkGracePeriodExpiry() {
     status: 'grace_period',
     gracePeriodEndsAt: { $lte: now },
     deletedAt: null,
-  });
+  }).populate('userId', 'fullName email').populate('tagId', 'tagId').populate('planId', 'name');
 
   for (const sub of graceExpired) {
-    const oldStatus = sub.status;
+    const user = sub.userId as any;
+    const tag = sub.tagId as any;
+    const product = sub.planId as any;
+    
     sub.status = 'expired';
     await sub.save();
 
     await Tag.findByIdAndUpdate(sub.tagId, {
       subscriptionStatus: 'expired',
     });
+
+    // Send tag expired email
+    if (user?.email) {
+      await sendTagExpiredEmail(user.email, user.fullName || 'Customer', tag?.tagId || 'Unknown', product?.name || 'PawTag');
+    }
 
     logger.info({ subscriptionId: sub._id }, '[SubscriptionService] Subscription expired — tag deactivated');
   }
@@ -914,7 +921,7 @@ export async function sendGracePeriodReminders() {
   const graceSubs = await Subscription.find({
     status: 'grace_period',
     deletedAt: null,
-  }).populate('userId', 'fullName email').populate('tagId', 'tagId');
+  }).populate('userId', 'fullName email').populate('tagId', 'tagId').populate('planId', 'name');
 
   let remindersSent = 0;
   for (const sub of graceSubs) {
@@ -929,9 +936,19 @@ export async function sendGracePeriodReminders() {
     if (daysLeft <= 0) continue;
 
     const reminderStates = sub.reminderStates || { graceWeeklySentCount: 0 };
-    const lastReminder = reminderStates.lastGraceReminderAt;
+    
+    // Send 3-day grace warning
+    if (daysLeft <= 3 && !reminderStates.reminder1dSent) {
+      await sendGracePeriodReminder3DayEmail(user.email, user.fullName || 'Customer', tag?.tagId || 'Unknown', sub.gracePeriodEndsAt);
+      reminderStates.reminder1dSent = true;
+      sub.reminderStates = reminderStates;
+      await sub.save();
+      remindersSent++;
+      continue;
+    }
 
     // Send weekly reminder
+    const lastReminder = reminderStates.lastGraceReminderAt;
     const shouldSend = !lastReminder ||
       (now.getTime() - new Date(lastReminder).getTime()) >= 7 * 24 * 60 * 60 * 1000;
 
@@ -1155,14 +1172,69 @@ async function sendGraceReminderEmail(to: string, name: string, tagId: string, d
   await sendMail(to, `Grace period: ${daysLeft} days left to renew — PawTag`, html);
 }
 
+async function sendFreePeriodReminder2WeekEmail(to: string, name: string, tagId: string, productName: string, freePeriodEndsAt: Date, monthlyPrice: number, autoRenew: boolean) {
+  const subscriptionsUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/subscriptions`;
+  const html = renderFreePeriodReminder2WeekEmail({
+    name,
+    tagId,
+    productName,
+    freePeriodEndsAt: freePeriodEndsAt.toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' }),
+    monthlyPrice,
+    autoRenew,
+    subscriptionsUrl,
+  });
+
+  await sendMail(to, `Your free ${productName} subscription ends in 2 weeks`, html);
+}
+
+async function sendFreePeriodReminder3DayEmail(to: string, name: string, tagId: string, productName: string, freePeriodEndsAt: Date, monthlyPrice: number, autoRenew: boolean) {
+  const subscriptionsUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/subscriptions`;
+  const html = renderFreePeriodReminder3DayEmail({
+    name,
+    tagId,
+    productName,
+    freePeriodEndsAt: freePeriodEndsAt.toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' }),
+    monthlyPrice,
+    autoRenew,
+    subscriptionsUrl,
+  });
+
+  await sendMail(to, `URGENT: Your free ${productName} subscription ends in 3 days`, html);
+}
+
+async function sendGracePeriodReminder3DayEmail(to: string, name: string, tagId: string, gracePeriodEndsAt: Date) {
+  const renewUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/subscriptions`;
+  const html = renderGracePeriodReminder3DayEmail({
+    name,
+    tagId,
+    gracePeriodEndsAt: gracePeriodEndsAt.toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' }),
+    renewUrl,
+  });
+
+  await sendMail(to, `URGENT: Your PawTag grace period ends in 3 days`, html);
+}
+
+async function sendTagExpiredEmail(to: string, name: string, tagId: string, productName: string) {
+  const shopUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/shop`;
+  const html = renderTagExpiredEmail({ name, tagId, productName, shopUrl });
+
+  await sendMail(to, `Your PawTag has expired — Buy a new tag`, html);
+}
+
 export async function changeSubscriptionPlan(subscriptionId: string, newPlanType: 'annual' | 'monthly') {
   const subscription = await Subscription.findById(subscriptionId);
   if (!subscription) throw new Error('Subscription not found');
   if (subscription.status !== 'active') throw new Error('Can only change plan for active subscriptions');
 
-  const annualPrice = await getAnnualPrice();
-  const monthlyPrice = await getMonthlyPrice();
-  const prices: Record<string, number> = { annual: annualPrice, monthly: monthlyPrice };
+  // Read price from Product (not CMS settings)
+  let newPrice = subscription.price; // default to current price
+  if (subscription.planId) {
+    const product = await Product.findById(subscription.planId).lean();
+    if (product?.subscriptionConfig?.monthlyPrice) {
+      newPrice = product.subscriptionConfig.monthlyPrice;
+    }
+  }
+
   const planNames: Record<string, string> = { annual: 'PawTag Annual', monthly: 'PawTag Monthly' };
 
   const oldPlanType = subscription.planType;
@@ -1171,7 +1243,7 @@ export async function changeSubscriptionPlan(subscriptionId: string, newPlanType
 
   subscription.planType = newPlanType;
   subscription.planName = planNames[newPlanType];
-  subscription.price = prices[newPlanType];
+  subscription.price = newPrice;
   subscription.renewalMethod = newPlanType;
 
   await subscription.save();
@@ -1195,7 +1267,7 @@ export async function changeSubscriptionPlan(subscriptionId: string, newPlanType
     afterState: {
       planType: newPlanType,
       planName: planNames[newPlanType],
-      price: prices[newPlanType],
+      price: newPrice,
       status: subscription.status,
       autoRenew: subscription.autoRenew,
     },
@@ -1273,7 +1345,16 @@ async function moveSubscriptionToGracePeriod(subscriptionId: string) {
   if (!subscription) return;
 
   const now = new Date();
-  const gracePeriodWeeks = await getGracePeriodWeeks();
+  
+  // Read grace period from Product (not CMS settings)
+  let gracePeriodWeeks = 4; // default
+  if (subscription.planId) {
+    const product = await Product.findById(subscription.planId).lean();
+    if (product?.subscriptionConfig?.gracePeriodWeeks) {
+      gracePeriodWeeks = product.subscriptionConfig.gracePeriodWeeks;
+    }
+  }
+  
   const graceEnd = new Date(now);
   graceEnd.setDate(graceEnd.getDate() + gracePeriodWeeks * 7);
 
