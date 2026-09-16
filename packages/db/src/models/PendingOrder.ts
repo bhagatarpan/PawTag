@@ -93,6 +93,9 @@ export interface IPendingOrderDocument extends Document {
   /** Referral code from cart */
   referralCode?: string;
 
+  /** Auto-renew preference for subscription */
+  autoRenew?: boolean;
+
   /** Timestamp when this checkout expires */
   expiresAt: Date;
 
@@ -150,6 +153,7 @@ const PendingOrderSchema = new Schema<IPendingOrderDocument>(
       index: true,
     },
     referralCode: { type: String },
+    autoRenew: { type: Boolean, default: true },
     expiresAt: { type: Date, required: true, index: { expireAfterSeconds: 0 } },
     lastAccessedAt: { type: Date, default: Date.now },
     convertedOrderId: { type: Schema.Types.ObjectId, ref: 'Order' },

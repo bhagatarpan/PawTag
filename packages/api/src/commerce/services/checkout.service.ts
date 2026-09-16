@@ -26,7 +26,7 @@
  * ```
  */
 
-import { PendingOrder, Order, Invoice, InvoiceAccessToken, Cart, User, PaymentTransaction, type IPendingOrderDocument } from '@pawtag/db';
+import { PendingOrder, Order, Invoice, InvoiceAccessToken, Cart, User, PaymentTransaction, Product, type IPendingOrderDocument } from '@pawtag/db';
 import { NotFoundError } from '../../lib/app-errors';
 import { InvalidCartError, CheckoutExpiredError, DuplicateOrderError, PaymentFailedError, PriceMismatchError } from '../errors';
 import { stripePaymentProvider } from '../providers/stripe';
@@ -89,7 +89,7 @@ export class CheckoutService {
    * @param userId - User ID
    * @returns Payment intent details for frontend
    */
-  async createPaymentIntent(userId: string, shippingAddress?: { line1: string; line2?: string; city: string; state: string; zip: string; country?: string }): Promise<CheckoutPaymentIntent> {
+  async createPaymentIntent(userId: string, shippingAddress?: { line1: string; line2?: string; city: string; state: string; zip: string; country?: string }, autoRenew?: boolean): Promise<CheckoutPaymentIntent> {
     // 1. Get and validate cart
     const cart = await Cart.findOne({ userId, status: 'active' });
     logger.info({ userId, cartFound: !!cart, itemCount: cart?.items?.length || 0 }, 'Payment intent cart lookup');
@@ -163,6 +163,7 @@ export class CheckoutService {
       shippingAddress: shippingAddress || undefined,
       status: 'pending',
       referralCode: cart.promoCode,
+      autoRenew: autoRenew !== false, // default to true
       expiresAt,
       lastAccessedAt: new Date(),
     });
@@ -320,6 +321,7 @@ export class CheckoutService {
           },
           shippingAddress: pending.shippingAddress,
           referredByCode: pending.referralCode,
+          autoRenew: pending.autoRenew !== false,
           notes: `Stripe PaymentIntent: ${paymentIntentId}`,
           createdBy,
           createdByType: 'Customer',
@@ -362,6 +364,45 @@ export class CheckoutService {
     // 8. Confirm stock (deduct actual inventory)
     for (const item of pending.items) {
       await inventoryService.confirmSale(String(item.productId), item.quantity, order.orderNumber);
+    }
+
+    // 8b. Create Tag and Subscription for tag products
+    try {
+      const { Tag: TagModel } = await import('@pawtag/db');
+      const { createSubscription } = await import('../../services/subscription.service');
+      const { generateTagId } = await import('../../lib/tag-id');
+      
+      for (const item of pending.items) {
+        const product = await Product.findById(item.productId).lean();
+        if (product?.isTagProduct) {
+          // Generate tag ID
+          const tagIdStr = generateTagId();
+          
+          // Create Tag
+          const tag = await TagModel.create({
+            tagId: tagIdStr,
+            tagType: 'QR',
+            petId: null,
+            ownerId: userId,
+            status: 'inactive',
+            subscriptionStatus: 'none',
+          });
+
+          // Create Subscription
+          await createSubscription({
+            userId,
+            tagId: tag._id.toString(),
+            orderId: order._id.toString(),
+            planId: product._id.toString(),
+            planType: product.subscriptionConfig?.type || 'annual',
+            autoRenew: pending.autoRenew !== false,
+          });
+
+          logger.info({ tagId: tagIdStr, orderId: order.orderNumber }, 'Tag and Subscription created for tag product');
+        }
+      }
+    } catch (err) {
+      logger.error({ err, orderId: order._id }, 'Failed to create Tag/Subscription (non-blocking)');
     }
 
     // 9. Create Invoice
