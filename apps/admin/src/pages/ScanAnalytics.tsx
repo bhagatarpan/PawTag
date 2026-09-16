@@ -2,7 +2,17 @@ import { useState, useEffect } from 'react';
 import { Scan, Calendar, Filter, ChevronDown, Monitor, Smartphone, Tablet, Globe, Eye, Bell, MapPin } from 'lucide-react';
 import api from '../lib/api';
 import { API } from '@pawtag/shared/api';
-import { formatDistanceToNow } from 'date-fns';
+
+function timeAgo(date: string | Date): string {
+  const seconds = Math.floor((Date.now() - new Date(date).getTime()) / 1000);
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
 
 interface ScanAnalytics {
   summary: {
@@ -416,7 +426,7 @@ function ScanAnalyticsPage() {
                       {analytics.recentScans.map((scan) => (
                         <tr key={scan._id} className="hover:bg-gray-50">
                           <td className="py-3 text-sm text-gray-600">
-                            {formatDistanceToNow(new Date(scan.createdAt), { addSuffix: true })}
+                            {timeAgo(scan.createdAt)}
                           </td>
                           <td className="py-3 text-sm font-mono text-gray-600">
                             {scan.tagId?.tagId || 'N/A'}
