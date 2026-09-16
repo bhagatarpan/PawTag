@@ -35,7 +35,7 @@ interface ScanAnalytics {
   scansByDay: Array<{ date: string; count: number }>;
   recentScans: Array<{
     _id: string;
-    tagId: { tagId: string } | null;
+    tagId: { _id: string; tagId: string } | null;
     petId: { _id: string; name: string } | null;
     deviceType: string;
     deviceBrowser: string;
@@ -447,13 +447,13 @@ function ScanAnalyticsPage() {
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                       {analytics.recentScans.map((scan) => (
-                        <tr key={scan._id} className="hover:bg-gray-50 cursor-pointer transition-colors" onClick={() => scan.tagId?.tagId && handleTagClick(scan.tagId.tagId)}>
+                        <tr key={scan._id} className="hover:bg-gray-50 cursor-pointer transition-colors" onClick={() => scan.tagId?._id && handleTagClick(scan.tagId._id)}>
                           <td className="py-3 text-sm text-gray-600">
                             {timeAgo(scan.createdAt)}
                           </td>
                           <td className="py-3 text-sm font-mono">
                             <button
-                              onClick={(e) => { e.stopPropagation(); if (scan.tagId?.tagId) handleTagClick(scan.tagId.tagId); }}
+                              onClick={(e) => { e.stopPropagation(); if (scan.tagId?._id) handleTagClick(scan.tagId._id); }}
                               className="text-primary-600 hover:underline font-medium"
                             >
                               {scan.tagId?.tagId || 'N/A'}
