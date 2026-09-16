@@ -67,6 +67,9 @@ export default function Checkout() {
   const [pawRewardsRedemption, setPawRewardsRedemption] = useState(0);
   const [pawRewardsLoading, setPawRewardsLoading] = useState(false);
 
+  // Auto-renew preference for subscriptions
+  const [autoRenew, setAutoRenew] = useState(true);
+
   // Guardian loyalty data
   const [guardianTier, setGuardianTier] = useState<string>('');
   const [guardianPoints, setGuardianPoints] = useState(0);
@@ -209,6 +212,9 @@ export default function Checkout() {
   const itemsSubtotal = totals.subtotal || total;
   const pawRewardsDiscount = Math.min(pawRewardsRedemption, itemsSubtotal + shippingCost + taxAmount - discountAmount);
   const orderTotal = totals.total || (itemsSubtotal + shippingCost + taxAmount - discountAmount - pawRewardsDiscount);
+  
+  // Check if cart has subscription products (for auto-renew toggle)
+  const hasSubscriptionItems = items.some((item: any) => item.isSubscription || item.subscriptionConfig);
 
   // Fetch estimated points from backend when order total or membership changes
   useEffect(() => {
@@ -436,6 +442,7 @@ export default function Checkout() {
           zip: form.zip,
           country: form.country || 'NZ',
         },
+        autoRenew,
       });
       const { paymentIntentId, clientSecret, pendingOrderId } = checkoutRes.data?.data;
 
@@ -835,6 +842,37 @@ export default function Checkout() {
                     </div>
                   )}
                 </div>
+
+                {/* Auto-Renew Toggle */}
+                {hasSubscriptionItems && (
+                  <div className="border-t border-gray-100 pt-4 mt-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-gray-900">
+                          Auto-renew subscription after 3 months free
+                        </p>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          $1.99/month after free period. Cancel anytime.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setAutoRenew(!autoRenew)}
+                        className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 ${
+                          autoRenew ? 'bg-primary-600' : 'bg-gray-200'
+                        }`}
+                        role="switch"
+                        aria-checked={autoRenew}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                            autoRenew ? 'translate-x-5' : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 <div className="space-y-2 pt-2">
                   <div className="flex justify-between text-sm text-gray-600"><span>Subtotal</span><span>NZ${itemsSubtotal.toFixed(2)}</span></div>
