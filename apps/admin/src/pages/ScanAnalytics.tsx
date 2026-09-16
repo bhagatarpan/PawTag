@@ -36,7 +36,7 @@ interface ScanAnalytics {
   recentScans: Array<{
     _id: string;
     tagId: { tagId: string } | null;
-    petId: { name: string } | null;
+    petId: { _id: string; name: string } | null;
     deviceType: string;
     deviceBrowser: string;
     deviceOS: string;

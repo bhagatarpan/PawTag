@@ -4015,7 +4015,7 @@ router.get('/finder-scans', requirePermission('finder_scan.read'), async (req, r
     const total = await FinderScan.countDocuments(filter);
     const scans = await FinderScan.find(filter)
       .populate('tagId', 'tagId')
-      .populate('petId', 'name species breed')
+      .populate('petId', '_id name petId')
       .sort({ createdAt: -1 })
       .skip((Number(page) - 1) * Number(limit))
       .limit(Number(limit));
@@ -4145,7 +4145,7 @@ router.get('/finder-scans/analytics', requirePermission('finder_scan.read'), asy
     // Get recent scans
     const recentScans = await FinderScan.find(dateFilter)
       .populate('tagId', 'tagId')
-      .populate('petId', 'name')
+      .populate('petId', '_id name')
       .sort({ createdAt: -1 })
       .limit(10);
 
