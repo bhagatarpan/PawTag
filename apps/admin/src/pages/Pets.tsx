@@ -8,7 +8,7 @@ import {
   Loader2, AlertTriangle, Users as UsersIcon, Dog, Cat,
   Activity, CheckCircle, AlertCircle, Clock, Copy, Settings,
   Database, FileText, User, Shield, Lock, Unlock, RotateCcw,
-  ExternalLink,
+  ExternalLink, Scan, Monitor, Smartphone, Tablet,
 } from 'lucide-react';
 import { BREED_ORIGINS, getBreedsForOrigin, PET_BREEDS } from '@pawtag/shared';
 import type { PetType } from '@pawtag/shared';
@@ -250,7 +250,7 @@ export function DetailDrawer({
   onRefresh: () => void;
   owners: any[];
 }) {
-  const [activeTab, setActiveTab] = useState<'profile' | 'settings'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'settings' | 'scans'>('profile');
   const [editMode, setEditMode] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
@@ -262,6 +262,11 @@ export function DetailDrawer({
   const [selectedTag, setSelectedTag] = useState<TagItem | null>(null);
   const [selectedTagLoading, setSelectedTagLoading] = useState(false);
   const [rbacRoles, setRbacRoles] = useState<any[]>([]);
+  const [scans, setScans] = useState<any[]>([]);
+  const [scansLoading, setScansLoading] = useState(false);
+  const [scansPage, setScansPage] = useState(1);
+  const [scansTotal, setScansTotal] = useState(0);
+  const [scansTotalPages, setScansTotalPages] = useState(0);
 
   // Fetch RBAC roles for user drawer
   useEffect(() => {
@@ -311,6 +316,28 @@ export function DetailDrawer({
       setActiveTab('profile');
     }
   }, [pet]);
+
+  // Fetch scans when scans tab is selected
+  useEffect(() => {
+    if (activeTab !== 'scans' || !pet || !pet.petId) return;
+    
+    const fetchScans = async () => {
+      setScansLoading(true);
+      try {
+        const params = new URLSearchParams({ page: String(scansPage), limit: '20' });
+        const res = await api.get(API.admin.finderScans.byPet(pet.petId!) + `?${params.toString()}`);
+        setScans(res.data.data.items || []);
+        setScansTotal(res.data.data.total || 0);
+        setScansTotalPages(res.data.data.totalPages || 0);
+      } catch {
+        toast.error('Failed to load scan history');
+      } finally {
+        setScansLoading(false);
+      }
+    };
+    
+    fetchScans();
+  }, [activeTab, pet, scansPage]);
 
   if (!pet) return null;
 
@@ -367,6 +394,7 @@ export function DetailDrawer({
   const tabs = [
     { key: 'profile' as const, label: 'Profile' },
     { key: 'settings' as const, label: 'Settings' },
+    { key: 'scans' as const, label: 'Scan History' },
   ];
 
   return (
@@ -663,6 +691,87 @@ export function DetailDrawer({
                 >
                   {actionLoading === 'delete' ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />} Delete Pet
                 </button>
+              </Section>
+            </div>
+          )}
+
+          {activeTab === 'scans' && (
+            <div className="space-y-4">
+              <Section title="Scan History" icon={<Scan size={16} />}>
+                {scansLoading ? (
+                  <div className="space-y-3">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="animate-pulse h-16 bg-gray-100 rounded-lg" />
+                    ))}
+                  </div>
+                ) : scans.length > 0 ? (
+                  <>
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b border-gray-200">
+                            <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider pb-3">Time</th>
+                            <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider pb-3">Tag</th>
+                            <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider pb-3">Device</th>
+                            <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider pb-3">Browser</th>
+                            <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider pb-3">Location</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {scans.map((scan) => (
+                            <tr key={scan._id} className="hover:bg-gray-50">
+                              <td className="py-3 text-sm text-gray-600">
+                                {new Date(scan.createdAt).toLocaleDateString()} {new Date(scan.createdAt).toLocaleTimeString()}
+                              </td>
+                              <td className="py-3 text-sm font-mono text-gray-600">
+                                {scan.tagId?.tagId || 'N/A'}
+                              </td>
+                              <td className="py-3">
+                                <span className="inline-flex items-center gap-1 text-xs font-medium text-gray-600">
+                                  {scan.deviceType === 'mobile' && <Smartphone size={14} />}
+                                  {scan.deviceType === 'tablet' && <Tablet size={14} />}
+                                  {scan.deviceType === 'desktop' && <Monitor size={14} />}
+                                  {scan.deviceType || 'Unknown'}
+                                </span>
+                              </td>
+                              <td className="py-3 text-sm text-gray-600">
+                                {scan.deviceBrowser || 'Unknown'}
+                              </td>
+                              <td className="py-3 text-sm text-gray-600">
+                                {scan.ipLocation?.city || 'Unknown'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {scansTotalPages > 1 && (
+                      <div className="flex items-center justify-between pt-4">
+                        <p className="text-sm text-gray-500">
+                          Showing {((scansPage - 1) * 20) + 1}-{Math.min(scansPage * 20, scansTotal)} of {scansTotal}
+                        </p>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setScansPage(p => Math.max(1, p - 1))}
+                            disabled={scansPage === 1}
+                            className="px-3 py-1 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                          >
+                            Previous
+                          </button>
+                          <button
+                            onClick={() => setScansPage(p => Math.min(scansTotalPages, p + 1))}
+                            disabled={scansPage === scansTotalPages}
+                            className="px-3 py-1 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                          >
+                            Next
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-sm text-gray-500 text-center py-8">No scan history available</p>
+                )}
               </Section>
             </div>
           )}

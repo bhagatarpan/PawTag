@@ -856,6 +856,33 @@ The finder portal (`/api/finder/*`) is **public — no auth required**. Security
 - **Audit logging:** All finder actions logged via `auditFinderEvent()` (fire-and-forget)
 - **Privacy:** Owner phone/name gated by privacy setting; finder contacts hidden from `/found-timer`
 
+### Finder Scan Analytics
+
+The admin portal provides a comprehensive Scan Analytics dashboard for monitoring finder activity:
+
+**Dashboard Features:**
+- Summary cards (total scans, period scans, unique tags/pets)
+- Device type breakdown (desktop/mobile/tablet)
+- Browser breakdown (Chrome, Safari, Firefox, Edge)
+- Operating system breakdown (Windows, macOS, iOS, Android, Linux)
+- Action breakdown (viewed, notified_owner, shared_location)
+- Top scanned tags and pets
+- Scans by day chart
+- Recent scans feed
+
+**Data Captured:**
+- Device info: browser name, OS, device type (parsed from User-Agent)
+- IP geolocation: city, region, country (via MaxMind GeoLite2 database)
+- GPS location: coordinates, accuracy (only when finder explicitly shares)
+
+**Admin Routes:**
+- `GET /admin/finder-scans/analytics` — Dashboard stats
+- `GET /admin/finder-scans` — List all scans with filters
+- `GET /admin/tags/:id/scans` — Tag scan history
+- `GET /admin/pets/:id/scans` — Pet scan history
+
+**RBAC Permission:** `finder_scan.read`
+
 ### Escalation System
 
 When a pet is found and the owner doesn't respond within 30 minutes:

@@ -73,6 +73,7 @@ import PaymentReconciliation from './pages/PaymentReconciliation';
 import StripeCustomerReport from './pages/StripeCustomerReport';
 import Discounts from './pages/Discounts';
 import Reports from './pages/Reports';
+import ScanAnalytics from './pages/ScanAnalytics';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
@@ -265,6 +266,7 @@ export default function App() {
       <Route path="/fulfilment/fulfilled" element={<ProtectedRoute><Fulfilment /></ProtectedRoute>} />
       <Route path="/returns" element={<ProtectedRoute><Returns /></ProtectedRoute>} />
       <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
+      <Route path="/scan-analytics" element={<ProtectedRoute><ScanAnalytics /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

@@ -57,6 +57,7 @@ import {
   ChevronsRight,
   ChevronsDown,
   ChevronsUp,
+  Scan,
 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { useTheme } from '../hooks/useTheme';
@@ -91,6 +92,7 @@ const sections: SidebarSection[] = [
     links: [
       { to: '/', label: 'Dashboard', icon: LayoutDashboard, permission: 'dashboard.read' },
       { to: '/reports', label: 'Commerce Reports', icon: BarChart3, permission: 'stats.read' },
+      { to: '/scan-analytics', label: 'Scan Analytics', icon: Scan, permission: 'finder_scan.read' },
     ],
   },
   // ─── Catalog ──────────────────────────────────────────────

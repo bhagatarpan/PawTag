@@ -9,6 +9,7 @@ export interface BreadcrumbItem {
 
 const ROUTE_MAP: Record<string, { section: string; page: string }> = {
   '/': { section: '', page: 'Dashboard' },
+  '/scan-analytics': { section: 'Overview', page: 'Scan Analytics' },
   // Users & Pets
   '/users/customers': { section: 'Users & Pets', page: 'Customers' },
   '/users/admin': { section: 'Users & Pets', page: 'Admin Users' },
