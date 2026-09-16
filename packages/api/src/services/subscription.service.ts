@@ -23,10 +23,6 @@ async function loadSettings(): Promise<Record<string, string>> {
     const settings = await Setting.find({
       key: {
         $in: [
-          'commerce.subscriptions.annualPrice',
-          'commerce.subscriptions.monthlyPrice',
-          'commerce.subscriptions.freePeriodMonths',
-          'commerce.subscriptions.gracePeriodWeeks',
           'commerce.subscriptions.autoRenewEnabled',
           'commerce.subscriptions.defaultAutoRenew',
           'commerce.subscriptions.maxRetries',
@@ -45,10 +41,6 @@ async function loadSettings(): Promise<Record<string, string>> {
     logger.error({ err: error }, 'Failed to load subscription settings');
     // Return defaults if DB fails
     return {
-      'commerce.subscriptions.annualPrice': '0.99',
-      'commerce.subscriptions.monthlyPrice': '1.99',
-      'commerce.subscriptions.freePeriodMonths': '12',
-      'commerce.subscriptions.gracePeriodWeeks': '4',
       'commerce.subscriptions.autoRenewEnabled': 'true',
       'commerce.subscriptions.defaultAutoRenew': 'true',
       'commerce.subscriptions.maxRetries': '4',
@@ -60,26 +52,6 @@ async function loadSettings(): Promise<Record<string, string>> {
 async function getSettingValue(key: string, defaultValue: string): Promise<string> {
   const settings = await loadSettings();
   return settings[key] || defaultValue;
-}
-
-async function getGracePeriodWeeks(): Promise<number> {
-  const value = await getSettingValue('commerce.subscriptions.gracePeriodWeeks', '4');
-  return parseInt(value, 10) || 4;
-}
-
-async function getFreePeriodMonths(): Promise<number> {
-  const value = await getSettingValue('commerce.subscriptions.freePeriodMonths', '12');
-  return parseInt(value, 10) || 12;
-}
-
-async function getAnnualPrice(): Promise<number> {
-  const value = await getSettingValue('commerce.subscriptions.annualPrice', '0.99');
-  return parseFloat(value) || 0.99;
-}
-
-async function getMonthlyPrice(): Promise<number> {
-  const value = await getSettingValue('commerce.subscriptions.monthlyPrice', '1.99');
-  return parseFloat(value) || 1.99;
 }
 
 async function getAutoRenewEnabled(): Promise<boolean> {
@@ -153,15 +125,11 @@ export async function createSubscription(data: {
   planType?: 'annual' | 'monthly' | 'free' | 'gold';
   planId?: string;
   price?: number;
+  autoRenew?: boolean;
 }) {
   const now = new Date();
   const planType = data.planType || 'annual';
   
-  // Get prices from CMS settings
-  const annualPrice = await getAnnualPrice();
-  const monthlyPrice = await getMonthlyPrice();
-  const price = data.price ?? (planType === 'annual' ? annualPrice : planType === 'monthly' ? monthlyPrice : 0);
-
   const planNames: Record<string, string> = {
     annual: 'PawTag Annual',
     monthly: 'PawTag Monthly',
@@ -169,9 +137,22 @@ export async function createSubscription(data: {
     gold: 'Gold Membership',
   };
 
-  // Get free period from CMS settings
-  const freePeriodMonths = await getFreePeriodMonths();
-  const defaultAutoRenew = await getDefaultAutoRenew();
+  // Read pricing and config from Product (not CMS settings)
+  let price = data.price ?? 0;
+  let freePeriodMonths = 3;
+  let productName = planNames[planType];
+
+  if (data.planId) {
+    const product = await Product.findById(data.planId).lean();
+    if (product) {
+      price = data.price ?? product.subscriptionConfig?.monthlyPrice ?? product.price ?? 0;
+      freePeriodMonths = product.subscriptionConfig?.freePeriodMonths ?? 3;
+      productName = product.name || productName;
+    }
+  }
+
+  // Use customer's auto-renew preference, falling back to CMS default
+  const defaultAutoRenew = data.autoRenew !== undefined ? data.autoRenew : await getDefaultAutoRenew();
   const freePeriodEndsAt = new Date(now);
   freePeriodEndsAt.setMonth(freePeriodEndsAt.getMonth() + freePeriodMonths);
 
@@ -182,7 +163,7 @@ export async function createSubscription(data: {
     tagId: data.tagId,
     orderId: data.orderId,
     planId: data.planId,
-    planName: planNames[planType],
+    planName: productName,
     planType,
     status: 'active',
     price,
@@ -816,12 +797,19 @@ export async function checkExpiredSubscriptions() {
     deletedAt: null,
   });
 
-  // Get grace period from CMS settings
-  const gracePeriodWeeks = await getGracePeriodWeeks();
-
   for (const sub of expiredSubs) {
     const oldStatus = sub.status;
     sub.status = 'grace_period';
+    
+    // Read grace period from Product (not CMS settings)
+    let gracePeriodWeeks = 4; // default
+    if (sub.planId) {
+      const product = await Product.findById(sub.planId).lean();
+      if (product?.subscriptionConfig?.gracePeriodWeeks) {
+        gracePeriodWeeks = product.subscriptionConfig.gracePeriodWeeks;
+      }
+    }
+    
     const graceEnd = new Date(now);
     graceEnd.setDate(graceEnd.getDate() + gracePeriodWeeks * 7);
     sub.gracePeriodEndsAt = graceEnd;
@@ -850,7 +838,6 @@ export async function checkExpiredSubscriptions() {
       severity: 'HIGH',
       metadata: {
         transitionedCount: expiredSubs.length,
-        gracePeriodWeeks,
         subscriptions: expiredSubs.map(s => ({
           subscriptionId: s._id.toString(),
           userId: s.userId.toString(),
@@ -1160,9 +1147,15 @@ export async function changeSubscriptionPlan(subscriptionId: string, newPlanType
   if (!subscription) throw new Error('Subscription not found');
   if (subscription.status !== 'active') throw new Error('Can only change plan for active subscriptions');
 
-  const annualPrice = await getAnnualPrice();
-  const monthlyPrice = await getMonthlyPrice();
-  const prices: Record<string, number> = { annual: annualPrice, monthly: monthlyPrice };
+  // Read price from Product (not CMS settings)
+  let newPrice = subscription.price; // default to current price
+  if (subscription.planId) {
+    const product = await Product.findById(subscription.planId).lean();
+    if (product?.subscriptionConfig?.monthlyPrice) {
+      newPrice = product.subscriptionConfig.monthlyPrice;
+    }
+  }
+
   const planNames: Record<string, string> = { annual: 'PawTag Annual', monthly: 'PawTag Monthly' };
 
   const oldPlanType = subscription.planType;
@@ -1171,7 +1164,7 @@ export async function changeSubscriptionPlan(subscriptionId: string, newPlanType
 
   subscription.planType = newPlanType;
   subscription.planName = planNames[newPlanType];
-  subscription.price = prices[newPlanType];
+  subscription.price = newPrice;
   subscription.renewalMethod = newPlanType;
 
   await subscription.save();
@@ -1195,7 +1188,7 @@ export async function changeSubscriptionPlan(subscriptionId: string, newPlanType
     afterState: {
       planType: newPlanType,
       planName: planNames[newPlanType],
-      price: prices[newPlanType],
+      price: newPrice,
       status: subscription.status,
       autoRenew: subscription.autoRenew,
     },
@@ -1273,7 +1266,16 @@ async function moveSubscriptionToGracePeriod(subscriptionId: string) {
   if (!subscription) return;
 
   const now = new Date();
-  const gracePeriodWeeks = await getGracePeriodWeeks();
+  
+  // Read grace period from Product (not CMS settings)
+  let gracePeriodWeeks = 4; // default
+  if (subscription.planId) {
+    const product = await Product.findById(subscription.planId).lean();
+    if (product?.subscriptionConfig?.gracePeriodWeeks) {
+      gracePeriodWeeks = product.subscriptionConfig.gracePeriodWeeks;
+    }
+  }
+  
   const graceEnd = new Date(now);
   graceEnd.setDate(graceEnd.getDate() + gracePeriodWeeks * 7);
 
