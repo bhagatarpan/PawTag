@@ -712,27 +712,17 @@ router.delete('/redirects/:id', requirePermission('cms.redirect.delete'), async 
 });
 
 // ═══════════════════════════════════════════
-// MEDIA UPLOAD (via existing upload route)
+// MEDIA UPLOAD (unified storage service)
 // ═══════════════════════════════════════════
 
 import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
 import crypto from 'crypto';
+import { uploadMedia, deleteMedia } from '../services/storage';
 
-const cmsMediaStorage = multer.diskStorage({
-  destination: (_req, _file, cb) => {
-    const uploadDir = path.join(__dirname, '../../uploads/cms');
-    if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
-    cb(null, uploadDir);
-  },
-  filename: (_req, file, cb) => {
-    cb(null, file.originalname);
-  },
-});
+const cmsMemoryStorage = multer.memoryStorage();
 
 const cmsUpload = multer({
-  storage: cmsMediaStorage,
+  storage: cmsMemoryStorage,
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     const allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/avif', 'video/mp4', 'video/webm', 'application/pdf'];
@@ -753,35 +743,41 @@ router.post('/media/upload', requirePermission('cms.media.upload'), (req: AuthRe
     }
 
     try {
-      const baseUrl = `${req.protocol}://${req.get('host')}/api/uploads/cms`;
       const uploaded = [];
+      const folder = req.body.folder || 'general';
 
       for (const file of req.files) {
-        const fileBuffer = fs.readFileSync(file.path);
-        const hash = crypto.createHash('md5').update(fileBuffer).digest('hex');
+        const hash = crypto.createHash('md5').update(file.buffer).digest('hex');
 
         // Check for duplicate
         const existingMedia = await CmsMedia.findOne({ hash, deletedAt: null });
         if (existingMedia) {
-          // Delete the duplicate file
-          fs.unlinkSync(file.path);
           uploaded.push(existingMedia);
           continue;
         }
 
+        // Upload to storage provider
+        const result = await uploadMedia(
+          'cms-media',
+          file.originalname,
+          file.buffer,
+          file.mimetype,
+          { folder },
+        );
+
         const media = await CmsMedia.create({
-          filename: file.filename,
+          filename: result.filename,
           originalName: file.originalname,
           mimeType: file.mimetype,
           size: file.size,
-          url: `${baseUrl}/${file.filename}`,
+          url: result.url,
           hash,
-          folder: req.body.folder || '/',
+          folder,
           tags: req.body.tags ? (Array.isArray(req.body.tags) ? req.body.tags : [req.body.tags]) : [],
           uploadedBy: req.user!.id,
         });
 
-        await auditCmsEvent(req, 'upload', 'CmsMedia', media._id.toString(), { filename: file.filename });
+        await auditCmsEvent(req, 'upload', 'CmsMedia', media._id.toString(), { filename: result.filename });
         uploaded.push(media);
       }
 
@@ -790,6 +786,37 @@ router.post('/media/upload', requirePermission('cms.media.upload'), (req: AuthRe
       res.status(500).json({ success: false, error: 'Failed to process uploads' });
     }
   });
+});
+
+router.delete('/media/:id', requirePermission('cms.media.delete'), async (req: AuthRequest, res: Response) => {
+  try {
+    const media = await CmsMedia.findById(req.params.id);
+    if (!media || media.deletedAt) {
+      res.status(404).json({ success: false, error: 'Media not found' });
+      return;
+    }
+
+    // Soft delete the database record
+    media.deletedAt = new Date();
+    await media.save();
+
+    // Attempt to delete the file from storage (best-effort)
+    try {
+      // Extract key from URL - handles both local and R2 URLs
+      const urlParts = media.url.split('/api/uploads/');
+      if (urlParts.length > 1) {
+        await deleteMedia(urlParts[1]);
+      }
+    } catch (deleteErr) {
+      // Log but don't fail the request if file deletion fails
+      console.error('Failed to delete media file:', deleteErr);
+    }
+
+    await auditCmsEvent(req, 'delete', 'CmsMedia', media._id.toString(), { filename: media.filename });
+    res.json({ success: true, data: { message: 'Media deleted' } });
+  } catch (e) {
+    res.status(500).json({ success: false, error: 'Failed to delete media' });
+  }
 });
 
 export default router;
