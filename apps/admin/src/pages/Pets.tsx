@@ -319,13 +319,13 @@ export function DetailDrawer({
 
   // Fetch scans when scans tab is selected
   useEffect(() => {
-    if (activeTab !== 'scans' || !pet) return;
+    if (activeTab !== 'scans' || !pet || !pet.petId) return;
     
     const fetchScans = async () => {
       setScansLoading(true);
       try {
         const params = new URLSearchParams({ page: String(scansPage), limit: '20' });
-        const res = await api.get(API.admin.finderScans.byPet(pet.petId) + `?${params.toString()}`);
+        const res = await api.get(API.admin.finderScans.byPet(pet.petId!) + `?${params.toString()}`);
         setScans(res.data.data.items || []);
         setScansTotal(res.data.data.total || 0);
         setScansTotalPages(res.data.data.totalPages || 0);
