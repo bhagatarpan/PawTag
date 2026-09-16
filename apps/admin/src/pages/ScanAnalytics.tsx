@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react';
 import { Scan, Calendar, Filter, ChevronDown, Monitor, Smartphone, Tablet, Globe, Eye, Bell, MapPin } from 'lucide-react';
 import api from '../lib/api';
 import { API } from '@pawtag/shared/api';
+import { toast } from '../lib/toast';
+import { DetailDrawer as TagDetailDrawer, type TagItem } from './Tags';
+import { DetailDrawer as PetDetailDrawer, type PetRecord } from './Pets';
 
 function timeAgo(date: string | Date): string {
   const seconds = Math.floor((Date.now() - new Date(date).getTime()) / 1000);
@@ -138,6 +141,8 @@ function ScanAnalyticsPage() {
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
   const [showDateDropdown, setShowDateDropdown] = useState(false);
+  const [selectedTag, setSelectedTag] = useState<TagItem | null>(null);
+  const [selectedPet, setSelectedPet] = useState<PetRecord | null>(null);
 
   const fetchAnalytics = async () => {
     try {
@@ -162,6 +167,24 @@ function ScanAnalyticsPage() {
   useEffect(() => {
     fetchAnalytics();
   }, [datePreset, customStart, customEnd]);
+
+  const handleTagClick = async (tagId: string) => {
+    try {
+      const res = await api.get(API.admin.tags.get(tagId));
+      setSelectedTag(res.data.data);
+    } catch {
+      toast.error('Failed to load tag details');
+    }
+  };
+
+  const handlePetClick = async (petId: string) => {
+    try {
+      const res = await api.get(API.admin.pets.get(petId));
+      setSelectedPet(res.data.data);
+    } catch {
+      toast.error('Failed to load pet details');
+    }
+  };
 
   if (loading && !analytics) {
     return (
@@ -424,15 +447,25 @@ function ScanAnalyticsPage() {
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                       {analytics.recentScans.map((scan) => (
-                        <tr key={scan._id} className="hover:bg-gray-50">
+                        <tr key={scan._id} className="hover:bg-gray-50 cursor-pointer transition-colors" onClick={() => scan.tagId?.tagId && handleTagClick(scan.tagId.tagId)}>
                           <td className="py-3 text-sm text-gray-600">
                             {timeAgo(scan.createdAt)}
                           </td>
-                          <td className="py-3 text-sm font-mono text-gray-600">
-                            {scan.tagId?.tagId || 'N/A'}
+                          <td className="py-3 text-sm font-mono">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); if (scan.tagId?.tagId) handleTagClick(scan.tagId.tagId); }}
+                              className="text-primary-600 hover:underline font-medium"
+                            >
+                              {scan.tagId?.tagId || 'N/A'}
+                            </button>
                           </td>
-                          <td className="py-3 text-sm text-gray-600">
-                            {scan.petId?.name || 'Unknown'}
+                          <td className="py-3 text-sm">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); if (scan.petId?._id) handlePetClick(scan.petId._id); }}
+                              className="text-primary-600 hover:underline"
+                            >
+                              {scan.petId?.name || 'Unknown'}
+                            </button>
                           </td>
                           <td className="py-3">
                             <span className="inline-flex items-center gap-1 text-xs font-medium text-gray-600">
@@ -459,6 +492,19 @@ function ScanAnalyticsPage() {
             </div>
           </>
         )}
+
+        {/* Detail Drawers */}
+        <TagDetailDrawer
+          tag={selectedTag}
+          onClose={() => setSelectedTag(null)}
+          onRefresh={fetchAnalytics}
+        />
+        <PetDetailDrawer
+          pet={selectedPet}
+          onClose={() => setSelectedPet(null)}
+          onRefresh={fetchAnalytics}
+          owners={[]}
+        />
       </div>
     </div>
   );
