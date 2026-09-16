@@ -56,10 +56,8 @@ const COMMERCE_SEED_SETTINGS = [
   { key: 'commerce.orders.numberLength', value: '6', description: 'Order number length after prefix' },
 
   // ─── Subscriptions ────────────────────────────────────────
-  { key: 'commerce.subscriptions.annualPrice', value: '0.99', description: 'Annual subscription price (NZD)' },
-  { key: 'commerce.subscriptions.monthlyPrice', value: '1.99', description: 'Monthly subscription price (NZD)' },
-  { key: 'commerce.subscriptions.freePeriodMonths', value: '12', description: 'Free period in months' },
-  { key: 'commerce.subscriptions.gracePeriodWeeks', value: '4', description: 'Grace period in weeks' },
+  // Pricing and free/grace period are now configured per-product via Product.subscriptionConfig
+  // Only operational settings remain here
 
   // ─── Refunds ──────────────────────────────────────────────
   { key: 'commerce.refunds.enabled', value: 'true', description: 'Allow refunds' },
