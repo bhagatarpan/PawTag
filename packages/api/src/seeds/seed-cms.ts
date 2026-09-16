@@ -885,13 +885,27 @@ async function run() {
                 html: `<p class="text-lg text-gray-600 mb-4">Last updated: ${new Date().toLocaleDateString()}</p>
 <h2 class="text-xl font-semibold mt-6">1. Information We Collect</h2>
 <p>We collect information you provide directly to us, such as when you create an account, register a pet, purchase a tag, or contact us for support.</p>
-<h2 class="text-xl font-semibold mt-6">2. How We Use Your Information</h2>
+<h2 class="text-xl font-semibold mt-6">2. Automated Information Collection</h2>
+<p>When you use PawTag services, we automatically collect certain information for security and analytics purposes:</p>
+<ul class="list-disc pl-6 mb-4">
+<li>Your IP address and approximate geographic location (city/region level)</li>
+<li>Your browser type and version</li>
+<li>Your device type and operating system</li>
+</ul>
+<p>This information is used for:</p>
+<ul class="list-disc pl-6 mb-4">
+<li>Security notifications (login alerts, account activity)</li>
+<li>Fraud detection and prevention</li>
+<li>Service improvement and analytics</li>
+</ul>
+<p>Location data is processed locally on our servers using MaxMind's GeoLite2 database. Your IP address is not sent to third-party geolocation services.</p>
+<h2 class="text-xl font-semibold mt-6">3. How We Use Your Information</h2>
 <p>We use the information we collect to provide, maintain, and improve our services, to process transactions, and to send you technical notices and support messages.</p>
-<h2 class="text-xl font-semibold mt-6">3. Information Sharing</h2>
+<h2 class="text-xl font-semibold mt-6">4. Information Sharing</h2>
 <p>We do not sell your personal information. We may share your information only when you direct us to (such as when a finder scans your pet's tag) or as required by law.</p>
-<h2 class="text-xl font-semibold mt-6">4. Data Security</h2>
+<h2 class="text-xl font-semibold mt-6">5. Data Security</h2>
 <p>We implement appropriate technical and organizational measures to protect your personal information against unauthorized access, alteration, disclosure, or destruction.</p>
-<h2 class="text-xl font-semibold mt-6">5. Contact Us</h2>
+<h2 class="text-xl font-semibold mt-6">6. Contact Us</h2>
 <p>If you have questions about this Privacy Policy, please contact us at support@pawtag.co.nz.</p>`,
               },
               visible: true,

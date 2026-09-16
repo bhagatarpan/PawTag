@@ -5,6 +5,25 @@ export interface IFinderScanDocument extends Document {
   petId: mongoose.Types.ObjectId;
   scannedBy?: string;
   deviceInfo: string;
+  // Parsed device info (from User-Agent)
+  deviceBrowser?: string;
+  deviceOS?: string;
+  deviceType?: string;
+  // IP-based geolocation (approximate, no consent needed)
+  ipLocation?: {
+    city?: string;
+    region?: string;
+    country?: string;
+    latitude?: number;
+    longitude?: number;
+  };
+  // GPS location (only when finder explicitly shares)
+  gpsLocation?: {
+    latitude: number;
+    longitude: number;
+    accuracy?: number;
+  };
+  // Legacy field (kept for backward compatibility)
   location?: {
     latitude: number;
     longitude: number;
@@ -29,6 +48,25 @@ const FinderScanSchema = new Schema<IFinderScanDocument>(
     petId: { type: Schema.Types.ObjectId, ref: 'Pet', required: true, index: true },
     scannedBy: { type: String },
     deviceInfo: { type: String, required: true },
+    // Parsed device info (from User-Agent)
+    deviceBrowser: { type: String },
+    deviceOS: { type: String },
+    deviceType: { type: String, enum: ['desktop', 'mobile', 'tablet'] },
+    // IP-based geolocation (approximate, no consent needed)
+    ipLocation: {
+      city: { type: String },
+      region: { type: String },
+      country: { type: String },
+      latitude: { type: Number },
+      longitude: { type: Number },
+    },
+    // GPS location (only when finder explicitly shares)
+    gpsLocation: {
+      latitude: { type: Number },
+      longitude: { type: Number },
+      accuracy: { type: Number },
+    },
+    // Legacy field (kept for backward compatibility)
     location: {
       latitude: Number,
       longitude: Number,
@@ -57,5 +95,10 @@ FinderScanSchema.index({ tagId: 1, createdAt: -1 });
 FinderScanSchema.index({ petId: 1 });
 FinderScanSchema.index({ petId: 1, action: 1, notifiedAt: -1 });
 FinderScanSchema.index({ createdAt: -1 });
+// New indexes for analytics
+FinderScanSchema.index({ deviceType: 1 });
+FinderScanSchema.index({ deviceBrowser: 1 });
+FinderScanSchema.index({ 'ipLocation.country': 1 });
+FinderScanSchema.index({ action: 1, createdAt: -1 });
 
 export const FinderScan = mongoose.model<IFinderScanDocument>('FinderScan', FinderScanSchema);

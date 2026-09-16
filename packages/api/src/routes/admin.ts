@@ -3922,8 +3922,8 @@ router.delete('/feature-flags/:key', requirePermission('feature_flag.delete'), a
  * /api/admin/finder-scans:
  *   get:
  *     tags: [Admin - Finder Scans]
- *     summary: Get all finder scans with pagination
- *     description: Returns a paginated list of all finder scan events.
+ *     summary: Get all finder scans with pagination and filtering
+ *     description: Returns a paginated list of all finder scan events with optional filters.
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -3937,6 +3937,45 @@ router.delete('/feature-flags/:key', requirePermission('feature_flag.delete'), a
  *         schema:
  *           type: integer
  *         description: Items per page
+ *       - in: query
+ *         name: tagId
+ *         schema:
+ *           type: string
+ *         description: Filter by tag ID
+ *       - in: query
+ *         name: petId
+ *         schema:
+ *           type: string
+ *         description: Filter by pet ID
+ *       - in: query
+ *         name: action
+ *         schema:
+ *           type: string
+ *           enum: [viewed, notified_owner, shared_location]
+ *         description: Filter by action type
+ *       - in: query
+ *         name: deviceType
+ *         schema:
+ *           type: string
+ *           enum: [desktop, mobile, tablet]
+ *         description: Filter by device type
+ *       - in: query
+ *         name: startDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Start date (YYYY-MM-DD)
+ *       - in: query
+ *         name: endDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: End date (YYYY-MM-DD)
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search by tag ID, pet name, finder email
  *     responses:
  *       200:
  *         description: Paginated list of finder scans
@@ -3947,9 +3986,34 @@ router.delete('/feature-flags/:key', requirePermission('feature_flag.delete'), a
  */
 router.get('/finder-scans', requirePermission('finder_scan.read'), async (req, res: Response) => {
   try {
-    const { page = 1, limit = 20 } = req.query;
-    const total = await FinderScan.countDocuments();
-    const scans = await FinderScan.find()
+    const { page = 1, limit = 20, tagId, petId, action, deviceType, startDate, endDate, search } = req.query;
+    
+    // Build filter
+    const filter: any = {};
+    if (tagId) filter.tagId = tagId;
+    if (petId) filter.petId = petId;
+    if (action) filter.action = action;
+    if (deviceType) filter.deviceType = deviceType;
+    if (startDate || endDate) {
+      filter.createdAt = {};
+      if (startDate) filter.createdAt.$gte = new Date(startDate as string);
+      if (endDate) filter.createdAt.$lte = new Date(endDate as string);
+    }
+    
+    // Build search query
+    if (search) {
+      const searchRegex = { $regex: search, $options: 'i' };
+      filter.$or = [
+        { finderEmail: searchRegex },
+        { finderName: searchRegex },
+        { deviceBrowser: searchRegex },
+        { deviceOS: searchRegex },
+        { 'ipLocation.city': searchRegex },
+      ];
+    }
+    
+    const total = await FinderScan.countDocuments(filter);
+    const scans = await FinderScan.find(filter)
       .populate('tagId', 'tagId')
       .populate('petId', 'name species breed')
       .sort({ createdAt: -1 })
@@ -3962,6 +4026,352 @@ router.get('/finder-scans', requirePermission('finder_scan.read'), async (req, r
     });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch finder scans' });
+  }
+});
+
+/**
+ * @swagger
+ * /api/admin/finder-scans/analytics:
+ *   get:
+ *     tags: [Admin - Finder Scans]
+ *     summary: Get finder scan analytics
+ *     description: Returns aggregated analytics data for finder scans within a date range.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: startDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Start date (YYYY-MM-DD), default: first of this month
+ *       - in: query
+ *         name: endDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: End date (YYYY-MM-DD), default: now
+ *     responses:
+ *       200:
+ *         description: Analytics data
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Insufficient permissions
+ */
+router.get('/finder-scans/analytics', requirePermission('finder_scan.read'), async (req, res: Response) => {
+  try {
+    const now = new Date();
+    const defaultStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startDate = req.query.startDate ? new Date(req.query.startDate as string) : defaultStart;
+    const endDate = req.query.endDate ? new Date(req.query.endDate as string) : now;
+    endDate.setHours(23, 59, 59, 999);
+
+    // Build date filter
+    const dateFilter = { createdAt: { $gte: startDate, $lte: endDate } };
+
+    // Get summary counts
+    const [totalScans, scansInPeriod, uniqueTags, uniquePets, notifiedCount, locationSharedCount] = await Promise.all([
+      FinderScan.countDocuments(),
+      FinderScan.countDocuments(dateFilter),
+      FinderScan.distinct('tagId', dateFilter).then(ids => ids.length),
+      FinderScan.distinct('petId', dateFilter).then(ids => ids.length),
+      FinderScan.countDocuments({ ...dateFilter, action: 'notified_owner' }),
+      FinderScan.countDocuments({ ...dateFilter, action: 'shared_location' }),
+    ]);
+
+    // Get breakdowns
+    const [byDeviceType, byBrowser, byOS, byAction] = await Promise.all([
+      FinderScan.aggregate([
+        { $match: dateFilter },
+        { $group: { _id: '$deviceType', count: { $sum: 1 } } },
+        { $project: { type: '$_id', count: 1, _id: 0 } },
+        { $sort: { count: -1 } },
+      ]),
+      FinderScan.aggregate([
+        { $match: dateFilter },
+        { $group: { _id: '$deviceBrowser', count: { $sum: 1 } } },
+        { $project: { browser: '$_id', count: 1, _id: 0 } },
+        { $sort: { count: -1 } },
+      ]),
+      FinderScan.aggregate([
+        { $match: dateFilter },
+        { $group: { _id: '$deviceOS', count: { $sum: 1 } } },
+        { $project: { os: '$_id', count: 1, _id: 0 } },
+        { $sort: { count: -1 } },
+      ]),
+      FinderScan.aggregate([
+        { $match: dateFilter },
+        { $group: { _id: '$action', count: { $sum: 1 } } },
+        { $project: { action: '$_id', count: 1, _id: 0 } },
+        { $sort: { count: -1 } },
+      ]),
+    ]);
+
+    // Calculate percentages
+    const addPercentages = (items: Array<{ count: number; [key: string]: any }>) =>
+      items.map(item => ({ ...item, percentage: scansInPeriod > 0 ? Math.round((item.count / scansInPeriod) * 100) : 0 }));
+
+    // Get top tags and pets
+    const [topTags, topPets] = await Promise.all([
+      FinderScan.aggregate([
+        { $match: dateFilter },
+        { $group: { _id: '$tagId', scanCount: { $sum: 1 } } },
+        { $lookup: { from: 'tags', localField: '_id', foreignField: '_id', as: 'tag' } },
+        { $unwind: { path: '$tag', preserveNullAndEmptyArrays: true } },
+        { $project: { tagId: '$tag.tagId', tagName: '$tag.petId', scanCount: 1, _id: 0 } },
+        { $sort: { scanCount: -1 } },
+        { $limit: 10 },
+      ]),
+      FinderScan.aggregate([
+        { $match: dateFilter },
+        { $group: { _id: '$petId', scanCount: { $sum: 1 } } },
+        { $lookup: { from: 'pets', localField: '_id', foreignField: '_id', as: 'pet' } },
+        { $unwind: { path: '$pet', preserveNullAndEmptyArrays: true } },
+        { $project: { petId: '$pet.petId', petName: '$pet.name', scanCount: 1, _id: 0 } },
+        { $sort: { scanCount: -1 } },
+        { $limit: 10 },
+      ]),
+    ]);
+
+    // Get scans by day
+    const scansByDay = await FinderScan.aggregate([
+      { $match: dateFilter },
+      { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } }, count: { $sum: 1 } } },
+      { $project: { date: '$_id', count: 1, _id: 0 } },
+      { $sort: { date: 1 } },
+    ]);
+
+    // Get recent scans
+    const recentScans = await FinderScan.find(dateFilter)
+      .populate('tagId', 'tagId')
+      .populate('petId', 'name')
+      .sort({ createdAt: -1 })
+      .limit(10);
+
+    res.json({
+      success: true,
+      data: {
+        summary: {
+          totalScans,
+          scansInPeriod,
+          uniqueTags,
+          uniquePets,
+          notifiedCount,
+          locationSharedCount,
+        },
+        byDeviceType: addPercentages(byDeviceType),
+        byBrowser: addPercentages(byBrowser),
+        byOS: addPercentages(byOS),
+        byAction: addPercentages(byAction),
+        topTags,
+        topPets,
+        scansByDay,
+        recentScans,
+      },
+    });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to fetch analytics' });
+  }
+});
+
+/**
+ * @swagger
+ * /api/admin/tags/{tagId}/scans:
+ *   get:
+ *     tags: [Admin - Finder Scans]
+ *     summary: Get scan history for a specific tag
+ *     description: Returns paginated scan history for a tag with date range and filters.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: tagId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Tag ID
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *         description: Items per page
+ *       - in: query
+ *         name: startDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Start date (YYYY-MM-DD), default: 30 days ago
+ *       - in: query
+ *         name: endDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: End date (YYYY-MM-DD), default: now
+ *       - in: query
+ *         name: action
+ *         schema:
+ *           type: string
+ *           enum: [viewed, notified_owner, shared_location]
+ *         description: Filter by action type
+ *       - in: query
+ *         name: deviceType
+ *         schema:
+ *           type: string
+ *           enum: [desktop, mobile, tablet]
+ *         description: Filter by device type
+ *     responses:
+ *       200:
+ *         description: Paginated scan history
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Insufficient permissions
+ */
+router.get('/tags/:tagId/scans', requirePermission('finder_scan.read'), async (req, res: Response) => {
+  try {
+    const { tagId } = req.params;
+    const { page = 1, limit = 20, startDate, endDate, action, deviceType } = req.query;
+    
+    // Find tag first
+    const tag = await Tag.findOne({ tagId });
+    if (!tag) {
+      res.status(404).json({ success: false, error: 'Tag not found' });
+      return;
+    }
+    
+    // Build filter
+    const filter: any = { tagId: tag._id };
+    
+    // Date range (default: last 30 days)
+    const now = new Date();
+    const defaultStart = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    filter.createdAt = {
+      $gte: startDate ? new Date(startDate as string) : defaultStart,
+      $lte: endDate ? new Date(endDate as string) : now,
+    };
+    
+    if (action) filter.action = action;
+    if (deviceType) filter.deviceType = deviceType;
+    
+    const total = await FinderScan.countDocuments(filter);
+    const scans = await FinderScan.find(filter)
+      .populate('petId', 'name petId')
+      .sort({ createdAt: -1 })
+      .skip((Number(page) - 1) * Number(limit))
+      .limit(Number(limit));
+
+    res.json({
+      success: true,
+      data: { items: scans, total, page: Number(page), limit: Number(limit), totalPages: Math.ceil(total / Number(limit)) },
+    });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to fetch tag scans' });
+  }
+});
+
+/**
+ * @swagger
+ * /api/admin/pets/{petId}/scans:
+ *   get:
+ *     tags: [Admin - Finder Scans]
+ *     summary: Get scan history for a specific pet
+ *     description: Returns paginated scan history for a pet with date range and filters.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: petId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Pet ID
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *         description: Items per page
+ *       - in: query
+ *         name: startDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Start date (YYYY-MM-DD), default: 30 days ago
+ *       - in: query
+ *         name: endDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: End date (YYYY-MM-DD), default: now
+ *       - in: query
+ *         name: action
+ *         schema:
+ *           type: string
+ *           enum: [viewed, notified_owner, shared_location]
+ *         description: Filter by action type
+ *       - in: query
+ *         name: deviceType
+ *         schema:
+ *           type: string
+ *           enum: [desktop, mobile, tablet]
+ *         description: Filter by device type
+ *     responses:
+ *       200:
+ *         description: Paginated scan history
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Insufficient permissions
+ */
+router.get('/pets/:petId/scans', requirePermission('finder_scan.read'), async (req, res: Response) => {
+  try {
+    const { petId } = req.params;
+    const { page = 1, limit = 20, startDate, endDate, action, deviceType } = req.query;
+    
+    // Find pet first
+    const pet = await Pet.findOne({ petId });
+    if (!pet) {
+      res.status(404).json({ success: false, error: 'Pet not found' });
+      return;
+    }
+    
+    // Build filter
+    const filter: any = { petId: pet._id };
+    
+    // Date range (default: last 30 days)
+    const now = new Date();
+    const defaultStart = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    filter.createdAt = {
+      $gte: startDate ? new Date(startDate as string) : defaultStart,
+      $lte: endDate ? new Date(endDate as string) : now,
+    };
+    
+    if (action) filter.action = action;
+    if (deviceType) filter.deviceType = deviceType;
+    
+    const total = await FinderScan.countDocuments(filter);
+    const scans = await FinderScan.find(filter)
+      .populate('tagId', 'tagId')
+      .sort({ createdAt: -1 })
+      .skip((Number(page) - 1) * Number(limit))
+      .limit(Number(limit));
+
+    res.json({
+      success: true,
+      data: { items: scans, total, page: Number(page), limit: Number(limit), totalPages: Math.ceil(total / Number(limit)) },
+    });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to fetch pet scans' });
   }
 });
 

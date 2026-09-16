@@ -5,9 +5,20 @@ import { sendPetFoundEmail } from '../services/email.service';
 import { auditService, type AuditContext } from '../services/audit';
 import { createDbRateLimiter } from '../lib/rate-limiter';
 import { requireCaptcha } from '../middleware/captcha';
+import { parseUserAgent } from '../lib/user-agent';
+import { getIpGeoData } from '../lib/geo-location';
 import logger from '../lib/logger';
 
 const router = Router();
+
+// Helper to detect device type from User-Agent
+function detectDeviceType(ua: string): 'desktop' | 'mobile' | 'tablet' {
+  if (!ua) return 'desktop';
+  const lower = ua.toLowerCase();
+  if (lower.includes('tablet') || lower.includes('ipad')) return 'tablet';
+  if (lower.includes('mobile') || lower.includes('android') || lower.includes('iphone')) return 'mobile';
+  return 'desktop';
+}
 
 // Finder-specific rate limiters — values from DB settings
 const finderNotifyLimiter = createDbRateLimiter({
@@ -174,10 +185,18 @@ router.get('/:tagId', async (req: Request, res: Response) => {
 
     if (!isActiveForFinder) {
       // Tag subscription expired — still log the scan but return limited info
+      const userAgent = (req.headers['user-agent'] as string) || 'unknown';
+      const { browser, device } = parseUserAgent(userAgent);
+      const ipGeo = await getIpGeoData(req.ip || req.headers['x-forwarded-for']?.toString().split(',')[0]?.trim() || '');
+
       await FinderScan.create({
         tagId: tag._id,
         petId: pet?._id || tag._id,
-        deviceInfo: req.headers['user-agent'] || 'unknown',
+        deviceInfo: userAgent,
+        deviceBrowser: browser,
+        deviceOS: device,
+        deviceType: detectDeviceType(userAgent),
+        ipLocation: ipGeo || undefined,
         action: 'viewed',
       });
 
@@ -211,10 +230,18 @@ router.get('/:tagId', async (req: Request, res: Response) => {
     }
 
     // Log the scan
+    const userAgent = (req.headers['user-agent'] as string) || 'unknown';
+    const { browser, device } = parseUserAgent(userAgent);
+    const ipGeo = await getIpGeoData(req.ip || req.headers['x-forwarded-for']?.toString().split(',')[0]?.trim() || '');
+
     await FinderScan.create({
       tagId: tag._id,
       petId: pet._id,
-      deviceInfo: req.headers['user-agent'] || 'unknown',
+      deviceInfo: userAgent,
+      deviceBrowser: browser,
+      deviceOS: device,
+      deviceType: detectDeviceType(userAgent),
+      ipLocation: ipGeo || undefined,
       action: 'viewed',
     });
 
@@ -312,6 +339,12 @@ router.get('/:tagId', async (req: Request, res: Response) => {
         showOwnerName,
         fieldsAccessed: ['pet.name', 'pet.petId', 'pet.species', 'pet.breed', 'pet.medicalAlerts', 'pet.status', 'ownerName', 'ownerPhone'],
         subscriptionActive: isActiveForFinder,
+        deviceBrowser: browser,
+        deviceOS: device,
+        deviceType: detectDeviceType(userAgent),
+        ipCity: ipGeo?.city,
+        ipRegion: ipGeo?.region,
+        ipCountry: ipGeo?.country,
       },
     });
   } catch {
@@ -389,9 +422,9 @@ router.post('/:tagId/notify', finderNotifyLimiter, requireCaptcha, async (req: R
       scan.finderPhone = finderPhone || undefined;
       scan.finderEmail = finderEmail || undefined;
       scan.finderName = finderName || undefined;
-      // Store location if provided
+      // Store GPS location if provided
       if (latitude && longitude) {
-        scan.location = { latitude, longitude };
+        scan.gpsLocation = { latitude, longitude, accuracy };
         scan.action = 'shared_location';
       }
       // Store consent for audit trail

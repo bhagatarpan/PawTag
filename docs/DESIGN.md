@@ -1295,6 +1295,46 @@ The admin portal should feel **premium, calm, fast, structured and trustworthy**
 
 ---
 
+## Scan Analytics Dashboard
+
+The Scan Analytics dashboard follows the standard admin dashboard pattern.
+
+### Design Tokens
+
+| Element | Token/Class |
+|---------|-------------|
+| Page background | `bg-gray-50` |
+| Card | `bg-white rounded-2xl shadow-sm border border-gray-100 p-6` |
+| Card header | `h3` (text-lg font-semibold text-gray-900) |
+| Stat value | `text-3xl font-bold text-gray-900` |
+| Stat label | `text-sm text-gray-500` |
+| Bar chart bar | `bg-primary-500` |
+| Bar chart background | `bg-gray-100` |
+| Clickable card hover | `hover:border-primary-200 hover:shadow-md transition-all duration-300` |
+| Primary button | `bg-primary-600 text-white rounded-xl font-semibold px-6 py-3 hover:bg-primary-700` |
+| Date range picker | `border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500` |
+| Tab active | `border-b-2 border-primary-600 text-primary-700` |
+| Tab inactive | `border-b-2 border-transparent text-gray-500 hover:text-gray-700` |
+
+### Layout
+
+The dashboard consists of:
+- Header with title and date range picker
+- Summary cards (total scans, period scans, unique tags/pets)
+- Horizontal bar charts (device type, browser, OS, action)
+- Top scanned tags and pets (clickable)
+- Recent scans feed
+
+### Charts
+
+No external chart library is used. Horizontal bar charts are built with `div` elements:
+- Bar color: `bg-primary-500`
+- Bar background: `bg-gray-100`
+- Labels: `text-sm text-gray-600`
+- Values: `text-sm font-medium text-gray-900`
+
+---
+
 ## Admin Reference Layout
 
 The approved visual direction is:

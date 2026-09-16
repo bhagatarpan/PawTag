@@ -254,6 +254,16 @@ export const API = {
     },
 
     // ---------------------------------------------------------------------------
+    // Admin — Finder Scans
+    // ---------------------------------------------------------------------------
+    finderScans: {
+      list: '/admin/finder-scans',
+      analytics: '/admin/finder-scans/analytics',
+      byTag: (tagId: string) => `/admin/tags/${tagId}/scans` as const,
+      byPet: (petId: string) => `/admin/pets/${petId}/scans` as const,
+    },
+
+    // ---------------------------------------------------------------------------
     // Admin — Notifications
     // ---------------------------------------------------------------------------
     notifications: {
