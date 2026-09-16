@@ -958,6 +958,56 @@ Address autocomplete with configurable provider (Photon or NZ Post):
 - **Integration:** Used in Checkout, Profile, OnboardingWizard, Admin Users pages
 - **System logging:** All requests logged via `writeLog()` with INTEGRATION category
 
+### Media Storage (Unified)
+
+PawTag uses a unified storage architecture supporting both local development and Cloudflare R2 production storage.
+
+**Architecture:**
+```
+packages/api/src/services/storage/
+├── index.ts              # Barrel export
+├── storage-provider.ts   # StorageProvider interface
+├── local-provider.ts     # LocalStorageProvider (uploads/ directory)
+├── r2-provider.ts        # R2StorageProvider (Cloudflare R2)
+├── media-service.ts      # MediaService (upload, delete, getUrl)
+└── config.ts             # STORAGE_DRIVER, validation rules
+```
+
+**Storage driver:** Controlled by `STORAGE_DRIVER` env var:
+- `local` (default) — Files stored in `packages/api/uploads/` directory
+- `r2` — Files stored in Cloudflare R2 bucket (requires R2_* env vars)
+
+**Upload routes using unified storage:**
+| Route | Purpose | Auth |
+|-------|---------|------|
+| `POST /api/upload/pet-photo` | Pet photos | JWT |
+| `POST /api/upload/profile-picture` | Profile pictures | JWT |
+| `POST /api/upload/product-images` | Product images (up to 5) | JWT + `product.update` |
+| `DELETE /api/upload/product-images/:filename` | Delete product image | JWT + `product.update` |
+| `POST /api/admin/cms/media/upload` | CMS media library | JWT + `cms.media.upload` |
+
+**Object key structure:**
+- `pets/{petId}/{uuid}.{ext}` — Pet photos
+- `avatars/{userId}/{uuid}.{ext}` — Profile pictures
+- `products/{productId}/{uuid}.{ext}` — Product images
+- `cms/{folder}/{uuid}.{ext}` — CMS media
+
+**Usage in routes:**
+```typescript
+import { uploadMedia, deleteMedia, getMediaUrl } from '../services/storage';
+
+// Upload
+const result = await uploadMedia('pet-photo', 'photo.jpg', buffer, 'image/jpeg', { petId });
+
+// Get URL
+const url = getMediaUrl(result.key);
+
+// Delete
+await deleteMedia(result.key);
+```
+
+**Important:** Production MUST use `STORAGE_DRIVER=r2`. Local storage is for development only.
+
 ### Admin Portal Shell & Navigation
 
 Enterprise-grade admin portal with a redesigned navigation shell:

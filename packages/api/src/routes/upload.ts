@@ -1,25 +1,14 @@
 import { Router, Response } from 'express';
 import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
 import { AuthRequest, authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
 import { createAuditContextFromRequest, type AuditRequest } from '../middleware/audit';
 import { auditService, type AuditContext } from '../services/audit';
-import { uploadToR2, deleteFromR2, generateUniqueFilename, isR2Configured } from '../services/r2.service';
+import { uploadMedia, deleteMedia } from '../services/storage';
 import { User } from '@pawtag/db';
 import logger from '../lib/logger';
 
 const router = Router();
-
-// Local storage fallback for development
-const LOCAL_UPLOAD_DIR = path.join(__dirname, '../../uploads/avatars');
-
-function ensureLocalDir(dir: string) {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-}
 
 async function auditUploadEvent(
   req: AuditRequest,
@@ -45,10 +34,10 @@ async function auditUploadEvent(
   logAudit();
 }
 
-// Configure multer for memory storage (R2 only — no local disk fallback)
+// Configure multer for memory storage
 const memoryStorage = multer.memoryStorage();
 
-const fileFilter = (_req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+const imageFilter = (_req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
   const allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/avif'];
   if (allowed.includes(file.mimetype)) {
     cb(null, true);
@@ -59,7 +48,7 @@ const fileFilter = (_req: any, file: Express.Multer.File, cb: multer.FileFilterC
 
 const upload = multer({
   storage: memoryStorage,
-  fileFilter,
+  fileFilter: imageFilter,
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
 });
 
@@ -129,21 +118,21 @@ router.post('/pet-photo', authenticate, async (req: AuthRequest, res: Response) 
     }
 
     try {
-      if (!isR2Configured()) {
-        res.status(500).json({ success: false, error: 'File storage is not configured. Please set R2 environment variables.' });
-        return;
-      }
+      const petId = (req.query.petId as string) || (req.body?.petId as string) || undefined;
 
-      const filename = generateUniqueFilename(req.file.originalname);
-      const key = `pets/${filename}`;
-      const photoUrl = await uploadToR2(key, req.file.buffer, req.file.mimetype);
+      const result = await uploadMedia(
+        'pet-photo',
+        req.file.originalname,
+        req.file.buffer,
+        req.file.mimetype,
+        { petId },
+      );
 
       res.json({
         success: true,
-        data: { url: photoUrl, filename },
+        data: { url: result.url, filename: result.filename },
       });
 
-      const petId = (req.query.petId as string) || (req.body?.petId as string) || undefined;
       await auditUploadEvent(req, {
         action: 'upload_pet_photo',
         eventType: 'upload_pet_photo',
@@ -154,12 +143,12 @@ router.post('/pet-photo', authenticate, async (req: AuthRequest, res: Response) 
         outcome: 'SUCCESS',
         severity: 'MEDIUM',
         metadata: {
-          file: filename,
-          filename,
+          file: result.filename,
+          filename: result.filename,
           size: req.file.size,
           mimeType: req.file.mimetype,
           petId,
-          url: photoUrl,
+          url: result.url,
         },
       });
     } catch (uploadError) {
@@ -233,26 +222,18 @@ router.post('/profile-picture', authenticate, async (req: AuthRequest, res: Resp
     }
 
     try {
-      const filename = generateUniqueFilename(req.file.originalname);
-      let photoUrl: string;
-
-      if (isR2Configured()) {
-        // Use R2 storage in production
-        const key = `avatars/${filename}`;
-        photoUrl = await uploadToR2(key, req.file.buffer, req.file.mimetype);
-      } else {
-        // Use local storage fallback in development
-        ensureLocalDir(LOCAL_UPLOAD_DIR);
-        const filePath = path.join(LOCAL_UPLOAD_DIR, filename);
-        fs.writeFileSync(filePath, req.file.buffer);
-        photoUrl = `/api/uploads/avatars/${filename}`;
-        logger.info({ filename }, 'Profile picture saved to local storage (development mode)');
-      }
+      const result = await uploadMedia(
+        'profile-picture',
+        req.file.originalname,
+        req.file.buffer,
+        req.file.mimetype,
+        { userId: req.user!.id },
+      );
 
       // Update user's profilePicture in database
       const user = await User.findByIdAndUpdate(
         req.user!.id,
-        { profilePicture: photoUrl },
+        { profilePicture: result.url },
         { new: true }
       ).select('-passwordHash');
 
@@ -263,7 +244,7 @@ router.post('/profile-picture', authenticate, async (req: AuthRequest, res: Resp
 
       res.json({
         success: true,
-        data: { url: photoUrl, user },
+        data: { url: result.url, user },
       });
 
       await auditUploadEvent(req, {
@@ -276,10 +257,10 @@ router.post('/profile-picture', authenticate, async (req: AuthRequest, res: Resp
         outcome: 'SUCCESS',
         severity: 'MEDIUM',
         metadata: {
-          filename,
+          filename: result.filename,
           size: req.file.size,
           mimeType: req.file.mimetype,
-          url: photoUrl,
+          url: result.url,
         },
       });
     } catch (uploadError) {
@@ -346,18 +327,18 @@ router.post('/product-images', authenticate, requirePermission('product.update')
     }
 
     try {
-      if (!isR2Configured()) {
-        res.status(500).json({ success: false, error: 'File storage is not configured. Please set R2 environment variables.' });
-        return;
-      }
-
+      const productId = (req.query.productId as string) || (req.body?.productId as string) || undefined;
       const uploaded = [];
 
       for (const file of req.files) {
-        const filename = generateUniqueFilename(file.originalname);
-        const key = `products/${filename}`;
-        const url = await uploadToR2(key, file.buffer, file.mimetype);
-        uploaded.push({ url, filename });
+        const result = await uploadMedia(
+          'product-image',
+          file.originalname,
+          file.buffer,
+          file.mimetype,
+          { productId },
+        );
+        uploaded.push({ url: result.url, filename: result.filename });
       }
 
       res.json({
@@ -365,7 +346,6 @@ router.post('/product-images', authenticate, requirePermission('product.update')
         data: { images: uploaded },
       });
 
-      const productId = (req.query.productId as string) || (req.body?.productId as string) || undefined;
       await auditUploadEvent(req, {
         action: 'upload_product_image',
         eventType: 'upload_product_image',
@@ -416,17 +396,12 @@ router.post('/product-images', authenticate, requirePermission('product.update')
 router.delete('/product-images/:filename', authenticate, requirePermission('product.update'), async (req: AuthRequest, res: Response) => {
   try {
     const { filename } = req.params;
+    const productId = (req.query.productId as string) || (req.body?.productId as string) || undefined;
 
-    if (!isR2Configured()) {
-      res.status(500).json({ success: false, error: 'File storage is not configured. Please set R2 environment variables.' });
-      return;
-    }
-
-    await deleteFromR2(`products/${filename}`);
+    await deleteMedia(`products/${filename}`);
 
     res.json({ success: true, data: { message: 'Image deleted' } });
 
-    const productId = (req.query.productId as string) || (req.body?.productId as string) || undefined;
     await auditUploadEvent(req, {
       action: 'upload_product_image_delete',
       eventType: 'upload_product_image_delete',
