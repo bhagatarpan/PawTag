@@ -1355,13 +1355,9 @@ Products are managed through the PawTag Commerce module (`packages/api/src/comme
 
 ### Deprecated Systems
 
-The following are deprecated but still exist in the codebase:
-- MongoDB `Cart` model (no routes populate it)
+The following endpoints have been removed:
 - `POST /customer/orders` endpoint (removed — was broken)
 - `POST /customer/orders/:orderNumber/confirm-payment` endpoint (removed)
-- `restoreOrderStock()` service (writes to deprecated MongoDB Product)
-- `checkout-otp.ts` endpoint (built but unused by frontend)
-- `bundle-pricing.service.ts` (only used in legacy checkout)
 
 ## Next Move
 

@@ -10,7 +10,11 @@
 
 import mongoose from 'mongoose';
 
-const DB_URL = process.env.DB_URL || 'mongodb+srv://mongo-db-user:mongo-db-user@api-node-mongo-cluster.aitgweu.mongodb.net/pawtag?retryWrites=true&w=majority';
+const DB_URL = process.env.DB_URL;
+if (!DB_URL) {
+  console.error('DB_URL environment variable is required');
+  process.exit(1);
+}
 
 async function migrate() {
   console.log('Connecting to database...');

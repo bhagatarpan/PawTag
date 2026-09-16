@@ -60,8 +60,5 @@
     "vitest": "^4.1.10",
     "zod": "^3.25.76"
   },
-  "dependencies": {
-    "@types/uuid": "^11.0.0",
-    "uuid": "^14.0.1"
-  }
+  "dependencies": {}
 }
