@@ -430,6 +430,11 @@ export async function renewSubscription(subscriptionId: string, paymentMethod?: 
   const subscription = await Subscription.findById(subscriptionId);
   if (!subscription) throw new Error('Subscription not found');
 
+  // Business rule: expired subscriptions cannot be renewed — must buy new tag
+  if ((subscription as any).status === 'expired') {
+    throw new Error('This tag has expired. Please purchase a new PawTag.');
+  }
+
   const oldStatus = subscription.status;
   const oldPeriodEnd = subscription.currentPeriodEnd;
   const now = new Date();

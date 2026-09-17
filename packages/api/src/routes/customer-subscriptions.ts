@@ -207,6 +207,12 @@ router.put('/:id/renew', requirePermission('customer.read'), async (req: AuthReq
       return;
     }
 
+    // Business rule: expired subscriptions cannot be renewed — must buy new tag
+    if (subscription.status === 'expired') {
+      res.status(400).json({ success: false, error: 'This tag has expired. Please purchase a new PawTag.' });
+      return;
+    }
+
     const renewed = await renewSubscription(subscription._id.toString(), 'card');
 
     res.json({ success: true, data: renewed });
