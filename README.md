@@ -1,1926 +1,1654 @@
-# PawTag — Pet Recovery Platform
+# PawTag — Pet Recovery & Commerce Platform
 
-A comprehensive pet recovery platform using QR code and NFC tags. When a pet goes missing, anyone who finds it can scan the tag to notify the owner and facilitate a reunion.
+PawTag is a pet recovery platform built around QR/NFC-enabled pet tags, owner profiles, finder-assisted recovery, notifications, and supporting commerce.
 
-## Table of Contents
+The core product loop is:
 
-- [Project Overview](#project-overview)
-- [Key Features](#key-features)
-- [Application Architecture](#application-architecture)
-- [Technology Stack](#technology-stack)
+> **Acquire/activate a tag → attach it to a pet → mark the pet lost → a finder scans the tag → the owner is notified → owner and finder reconnect safely.**
+
+This repository also contains customer commerce, subscriptions/Guardian benefits, an admin portal, CMS capabilities, operational tooling, and a React Native mobile application.
+
+> [!IMPORTANT]
+> **Current status: pre-MVP production hardening.**
+>
+> The application contains substantial implemented functionality, but the repository should **not be treated as production-ready solely because a feature exists in code**. A pre-MVP audit identified several production-only and failure-path issues that must be fixed or validated before the first real customer launch.
+>
+> The source code is the source of truth. Documentation describes intent and operating guidance, but it must not override observed runtime behaviour.
+
+---
+
+## Contents
+
+- [Product Purpose](#product-purpose)
+- [Current MVP Status](#current-mvp-status)
+- [First-Customer Launch Principle](#first-customer-launch-principle)
+- [Applications](#applications)
+- [Architecture](#architecture)
 - [Repository Structure](#repository-structure)
+- [Technology Stack](#technology-stack)
 - [Prerequisites](#prerequisites)
-- [Installation](#installation)
+- [Local Setup](#local-setup)
 - [Environment Configuration](#environment-configuration)
+- [Running the Platform](#running-the-platform)
+- [Build, Typecheck, Lint and Tests](#build-typecheck-lint-and-tests)
 - [Database](#database)
-- [Running the Application](#running-the-application)
-- [Application Workflows](#application-workflows)
-- [Gold Membership](#gold-membership)
-- [User Roles and Permissions](#user-roles-and-permissions)
+- [Authentication and Authorization](#authentication-and-authorization)
+- [Finder Experience](#finder-experience)
+- [Commerce and Payments](#commerce-and-payments)
+- [Cart UX Direction](#cart-ux-direction)
+- [Mobile Strategy](#mobile-strategy)
 - [Admin Portal](#admin-portal)
-- [PuckEditor CMS Page Builder](#puckeditor-cms-page-builder)
-- [Support & Contact System](#support--contact-system)
-- [Tag Sticker & QR Code Generation](#tag-sticker--qr-code-generation)
-- [CI/CD Pipeline (GitHub Actions)](#cicd-pipeline-github-actions)
-- [Email Templates (13)](#email-templates-13)
-- [API Documentation](#api-documentation)
-- [Authentication and Security](#authentication-and-security)
-- [Testing](#testing)
-- [Build](#build)
+- [Background Jobs](#background-jobs)
+- [External Integrations](#external-integrations)
+- [Observability](#observability)
+- [Production Readiness Gaps](#production-readiness-gaps)
 - [Deployment](#deployment)
-- [Background Jobs and Scheduled Tasks](#background-jobs-and-scheduled-tasks)
-- [Integrations](#integrations)
-- [Notifications](#notifications)
-- [Logging and Monitoring](#logging-and-monitoring)
-- [Troubleshooting](#troubleshooting)
-- [Development Guidelines](#development-guidelines)
-- [Git Workflow](#git-workflow)
-- [Known Limitations](#known-limitations)
-- [Future Considerations](#future-considerations)
+- [AI-Assisted Development Rules](#ai-assisted-development-rules)
+- [Documentation Map](#documentation-map)
+- [Development Conventions](#development-conventions)
+- [MVP Scope Guidance](#mvp-scope-guidance)
+- [Definition of Ready for First Customer](#definition-of-ready-for-first-customer)
 
 ---
 
-## Project Overview
+# Product Purpose
 
-PawTag is a pet recovery platform that solves the problem of reuniting lost pets with their owners. The platform uses QR code and NFC tags attached to pet collars. When a pet goes missing, anyone who finds it can scan the tag with their phone, which opens a finder portal where they can report the found pet and notify the owner.
+PawTag exists to make it easier and faster to reunite lost pets with their owners.
 
-**Primary Purpose:** Enable fast, reliable pet reunions through technology
+## Primary users
 
-**Target Users:**
-- **Pet Owners:** Purchase tags, create pet profiles, manage health records, receive notifications when pets are found
-- **Finders:** Scan QR/NFC tags to report found pets, share location, notify owners
-- **Administrators:** Manage the platform, orders, products, users, and content
+### Pet owners
 
----
+Pet owners can use PawTag to:
 
-## Key Features
+- create and manage an account;
+- create pet profiles;
+- store pet information and health-related details;
+- activate PawTag tags;
+- mark a pet as lost;
+- receive finder/recovery notifications;
+- manage contacts and notification preferences;
+- shop for PawTag products;
+- manage carts, checkout, orders, invoices and eligible subscriptions;
+- access customer account settings and support.
 
-### Pet Recovery
-- QR code and NFC tag scanning
-- Real-time owner notifications
-- Location sharing from finders
-- 30-minute escalation system for unresponsive owners
-- Emergency contact notification
-- Real-time scan analytics dashboard
-- Device and browser breakdowns
-- Geographic distribution of scans
-- Tag and pet scan history
+### Finders
 
-### Pet Management
-- Complete pet profiles (breed, color, photos, medical records)
-- Vaccination tracking
-- Microchip information
-- Medication and allergy records
-- Health conditions and surgery history
-- Weight tracking
+A finder may be a stranger who has just found a lost pet. They may:
 
-### E-Commerce (PawTag Commerce)
-- Product catalog with variants and inventory management
-- Server-side cart with promo codes (guests can validate, logged-in apply)
-- Cart with server-side price re-validation on every item load (price change detection)
-- Guest mode with visual indicator in the cart drawer
-- 4-step checkout wizard with Stripe payment processing
-- Order lifecycle management with idempotent creation
-- Subscription management
-- Invoice generation and email delivery
-- NZ domestic shipping via NZ Post API (with demo fallback)
-- Shipment tracking with automated carrier polling (5-min intervals)
-- Payment transaction audit trail and reconciliation
-- Self-service returns and order cancellation with auto-refund
-- **Order cancellation with reason selection** — predefined reasons in CMS (8 defaults), customer and admin both select from dropdown, "Other" prompts for notes (required)
-- **Full cancellation audit trail** — captures `cancelledBy` (e.g., "Customer (Sarah Johnson)" or "Dave Macenzie (Customer Service)"), `cancelledByType` (role name), `cancelledByPortal` (`customer-web`, `customer-mobile`, `admin-web`, `system`), `cancelledByDescription`, `cancelledAt` timestamp
-- **Admin-managed cancellation reasons** — edit, add, remove, reorder via `/admin/commerce-settings`
-- Discount/promo code management (percentage, fixed, usage limits)
-- CMS-driven commerce settings (35+ configurable settings)
-- Cart configuration via CMS: TTL, max items per cart, price revalidation toggle
+- be using a phone;
+- have poor connectivity;
+- be stressed or in a hurry;
+- have no PawTag account;
+- have never seen PawTag before.
 
-### Gold Membership
-- Premium subscription tier with monthly Stripe billing
-- Free NZ-wide shipping on all orders
-- 2x Guardian loyalty points on every purchase
-- Gold member badge on profile
-- CMS-driven pricing and benefits (admin-configurable)
-- Stripe Subscription integration for recurring billing
-- Admin Stripe reporting dashboard for per-customer billing data
+The finder journey must therefore remain one of the smallest, fastest and least complicated experiences in the platform.
 
-### Mobile App (React Native/Expo)
-- QR code scanning
-- NFC tag activation
-- Push notifications
-- Offline-capable pet profiles
-- Lost mode toggle
+### PawTag staff
 
-### Admin Portal
-- Full CRUD for all entities
-- Role-based access control (RBAC)
-- Analytics dashboard
-- CMS content management
-- Order fulfillment with shipment management
-- Payment reconciliation dashboard
-- Returns and refund processing
-- Discount/promo code management
-- Commerce settings with human-readable labels and tooltips
-- Subscription management
+Admin/CSR/editor users operate the system through the admin portal, including:
 
-### Security
-- JWT authentication with refresh tokens
-- Multi-factor authentication (email/phone OTP)
-- Rate limiting (DB-driven, configurable)
-- CAPTCHA protection
-- Account lockout after failed attempts
-- Enterprise audit logging with SHA-256 hash chain
+- user/pet/tag administration;
+- commerce and order operations;
+- payments/refunds;
+- subscriptions;
+- CMS/content management;
+- support;
+- audit/system logs;
+- RBAC and configuration.
 
 ---
 
-## Application Architecture
+# Current MVP Status
+
+The repository is not a thin prototype. It contains real implementations for authentication, RBAC, pet/tag management, finder flows, commerce, Stripe integration, notifications, audit logging, CMS functions, background jobs, mobile-native integrations, CI and automated tests.
+
+However, **implemented does not mean launch-ready**.
+
+The current engineering stage is:
+
+> **Feature-rich pre-MVP application undergoing production hardening, cross-layer validation and launch-scope reduction.**
+
+## Readiness overview
+
+| Area | Current state | MVP position |
+|---|---|---|
+| Customer web | Substantially implemented | Needs production hardening and E2E validation |
+| Pet profiles | Implemented | Validate critical workflows |
+| Tag activation | Implemented | Validate end-to-end |
+| Lost mode / recovery | Implemented | Critical path; must be production-tested |
+| Finder portal | Implemented | Contains launch-blocking integration/privacy concerns to resolve |
+| Cart | Implemented | Functional foundation; UX redesign planned |
+| Checkout | Implemented | Requires security/data-integrity hardening |
+| Stripe payments | Implemented | Requires webhook/configuration/failure-path validation |
+| Orders/refunds | Implemented | Requires reconciliation and idempotency validation |
+| Guardian/subscriptions | Implemented in code | Validate billing lifecycle before depending on it commercially |
+| Admin portal | Broadly implemented | Focus on operational safety, RBAC and destructive actions |
+| CMS | Broadly implemented | Supporting feature; not core to first-customer proof |
+| Mobile app | Meaningfully implemented | Not yet recommended as a first-customer launch dependency |
+| Background jobs | Implemented in API process | Requires controlled worker/concurrency strategy |
+| Automated API tests | Substantial | Critical browser/native E2E coverage still needed |
+| Deployment | Docker/CI foundations exist | Production environment still needs rehearsal and validation |
+| Observability | Logging/Sentry/OpenTelemetry hooks exist | Alerts/runbooks must be validated in staging/production-like conditions |
+
+---
+
+# First-Customer Launch Principle
+
+The first customer launch is not blocked by architectural perfection.
+
+It **is** blocked if any of the following are true:
+
+- a finder cannot reliably notify an owner;
+- anonymous users can access data they should not see;
+- one customer can affect another customer's order/payment state;
+- Stripe events cannot be verified and processed reliably;
+- a customer can be charged without PawTag reaching a recoverable order state;
+- inventory or refunds can be duplicated through retries/concurrency;
+- demo/test behaviour can accidentally run in live commerce;
+- critical jobs can execute multiple times with financial or customer consequences;
+- production configuration is not fail-safe;
+- backups, monitoring and rollback have never been exercised;
+- the primary user journeys have only been validated manually in development mode.
+
+PawTag should optimize for:
+
+1. safety;
+2. reliability;
+3. customer/finder experience;
+4. maintainability;
+5. reasonable implementation effort;
+6. scalability when usage actually requires it.
+
+Do **not** introduce large infrastructure or framework migrations simply to make the architecture look more "enterprise".
+
+---
+
+# Applications
+
+PawTag is a pnpm workspace monorepo with four applications and shared packages.
+
+| Application | Path | Dev port | Primary audience |
+|---|---|---:|---|
+| Customer Web | `apps/web` | `3000` | Public visitors and pet owners |
+| Admin | `apps/admin` | `3001` | PawTag staff |
+| Finder | `apps/finder` | `3003` | Anyone who scans a PawTag |
+| Mobile | `apps/mobile` | Expo | Pet owners |
+| API | `packages/api` | `5000` | All clients |
+
+## Customer web
+
+`apps/web` contains:
+
+- public site/shop;
+- authentication;
+- customer account areas;
+- pet/tag management;
+- checkout and commerce UI;
+- Guardian/reward/subscription-related UI;
+- support/profile/settings experiences.
+
+## Admin
+
+`apps/admin` contains desktop-oriented operational interfaces for:
+
+- users;
+- pets;
+- tags;
+- products/catalog;
+- orders;
+- payments/refunds;
+- fulfilment/shipping;
+- subscriptions;
+- Guardian/rewards;
+- CMS;
+- support;
+- RBAC;
+- audit and system logs;
+- settings and integrations.
+
+Admin is primarily a **desktop operational tool**. Perfect mobile responsiveness is not a first-MVP priority unless a specific staff workflow requires it.
+
+## Finder
+
+`apps/finder` is intentionally separate from the main web app.
+
+That separation is valuable because the finder experience has different priorities:
+
+- extremely fast initial load;
+- minimal UI complexity;
+- no account requirement;
+- mobile-first interaction;
+- resilient errors;
+- careful public-data exposure;
+- strong abuse protection without unnecessarily blocking legitimate finders.
+
+## Mobile
+
+`apps/mobile` is a React Native / Expo application with native capabilities including:
+
+- camera/QR interaction;
+- NFC;
+- push notifications;
+- secure token storage;
+- native navigation;
+- pet/tag/account screens.
+
+The mobile application should share **business logic, API contracts, validation and design tokens** where practical, while keeping native rendering and native-device behaviour platform-specific.
+
+---
+
+# Architecture
 
 ```mermaid
 flowchart TD
-    subgraph Frontends
-        Web["apps/web<br/>Public Site + Shop<br/>Customer Portal<br/>:3000"]
-        Admin["apps/admin<br/>Admin Portal<br/>:3001"]
-        Finder["apps/finder<br/>Finder Portal<br/>:3003"]
-        Mobile["apps/mobile<br/>React Native App"]
-    end
+    Web["Customer Web\napps/web"] --> API["Express API\npackages/api"]
+    Admin["Admin\napps/admin"] --> API
+    Finder["Finder\napps/finder"] --> API
+    Mobile["Mobile\napps/mobile"] --> API
 
-    subgraph Backend
-        API["packages/api<br/>Express API<br/>:5000"]
-    end
+    API --> Services["Services / Commerce / Jobs"]
+    Services --> DBLayer["Mongoose Models\npackages/db"]
+    DBLayer --> Mongo[(MongoDB)]
 
-    subgraph Database
-        MongoDB[(MongoDB Atlas)]
-    end
+    Web --> Shared["packages/shared"]
+    Admin --> Shared
+    Finder --> Shared
+    Mobile --> Shared
 
-    subgraph External Services
-        Stripe["Stripe<br/>Payments"]
-        Resend["Resend<br/>Email"]
-        Twilio["Twilio<br/>SMS"]
-        Firebase["Firebase<br/>Push Notifications"]
-        R2["Cloudflare R2<br/>File Storage"]
-        Sentry["Sentry<br/>Error Tracking"]
-    end
+    Web --> UI["packages/ui\nWeb UI components"]
+    Admin --> UI
+    Finder --> UI
 
-    Web --> API
-    Admin --> API
-    Finder --> API
-    Mobile --> API
-
-    API --> MongoDB
-    API --> Stripe
-    API --> Resend
-    API --> Twilio
-    API --> Firebase
-    API --> R2
-    API --> Sentry
+    API --> Stripe[Stripe]
+    API --> Email[Email / Resend-SMTP]
+    API --> SMS[Twilio / SMS]
+    API --> Storage[Cloudflare R2 / local storage]
+    API --> Push[Push notifications]
+    API --> Monitoring[Sentry / OpenTelemetry]
 ```
 
-### One Backend
+## Intended dependency direction
 
-A single Express API (`packages/api`) serves all clients. There is no API duplication; each client consumes the same endpoints with different permission levels.
+The practical architecture is:
 
-- **Port 5000** in development
-- JWT-based authentication with RBAC
-- Zod validation on all inputs
-- Consistent `{ success, data?, error? }` response shape
+```text
+Applications
+    ↓
+shared contracts / web UI
+    ↓
+API routes + middleware
+    ↓
+services / domain orchestration
+    ↓
+database models + external integrations
+```
 
-### Frontends
+Routes should generally:
 
-| App | Port | Audience | Auth | Purpose |
-|-----|------|----------|------|---------|
-| `apps/web` | 3000 | Public/Pet owners | Optional | Marketing site, shop, checkout, auth, customer portal |
-| `apps/admin` | 3001 | Staff | Admin RBAC | Full CRUD, dashboard, order management, CMS |
-| `apps/finder` | 3003 | Strangers | None | Public tag lookup — must be tiny and fast |
+1. validate input;
+2. authenticate/authorize;
+3. call a domain/service function;
+4. map the result to an HTTP response.
 
-The finder page is intentionally kept minimal — it's the page a stressed stranger opens on their phone with poor signal to report a found pet.
+Business rules should not be duplicated across clients or hidden only in frontend validation.
 
-### Mobile App
+## Important architectural reality
 
-The mobile app (`apps/mobile`) is a React Native (Expo) app for pet owners with:
-- Camera-based QR scanning
-- NFC tag activation
-- Push notifications
-- Secure token storage via `expo-secure-store`
-- 14 screens across auth, home, pets, tags, health, orders, subscriptions, settings, and offline support
+PawTag is **not strict traditional MVC**, and it does not need to become strict MVC.
 
-### Mobile E2E Tests (Maestro)
+The useful layering target is:
 
-Located in `apps/mobile/e2e/`:
-- `qr-activation.yaml` — QR code scanning and tag activation flow
-- `nfc-activation.yaml` — NFC tag scanning and activation flow
-- `lost-mode.yaml` — Lost mode toggle flow
+> **Route/controller → domain/service → persistence/integration**
 
----
-
-## Technology Stack
-
-### Backend
-- **Runtime:** Node.js >= 18
-- **Framework:** Express.js 4.18
-- **Language:** TypeScript 5.5 (strict mode)
-- **Database:** MongoDB Atlas with Mongoose 7
-- **Commerce:** PawTag Commerce module (in-app)
-- **Authentication:** JWT (jsonwebtoken) + bcryptjs
-- **Validation:** Zod 3.23
-- **Rate Limiting:** express-rate-limit (DB-driven)
-- **Security:** Helmet, CORS
-- **Logging:** Pino, Morgan
-- **Error Tracking:** Sentry
-
-### Frontend
-- **Framework:** React 18
-- **Build Tool:** Vite 5.4
-- **Language:** TypeScript 5.5
-- **Styling:** Tailwind CSS 3.4
-- **Routing:** React Router v6
-- **State Management:** React Context
-- **HTTP Client:** Axios
-- **Icons:** Lucide React
-
-### Mobile
-- **Framework:** React Native 0.81 (Expo SDK 54)
-- **Navigation:** React Navigation 7
-- **Camera:** expo-camera
-- **NFC:** react-native-nfc-manager
-- **Push Notifications:** expo-notifications
-- **Secure Storage:** expo-secure-store
-
-### Database
-
-- **Database:** MongoDB Atlas
-- **ODM:** Mongoose 7
-- **Models:** 44 models
-
-### Package Management
-- **Package Manager:** pnpm 9+
-- **Monorepo:** pnpm workspaces
-
-### Testing
-- **Test Runner:** Vitest 4.1
-- **API Testing:** Supertest
-- **E2E Testing:** Maestro (mobile)
-
-### Build & Deployment
-- **Containerization:** Docker
-- **Web Server:** Nginx (for frontend static files)
-- **CI/CD:** GitHub Actions (implemented)
+Some older/larger route files currently contain more orchestration than this target. Refactor these incrementally when modifying the relevant feature; do not perform a repository-wide rewrite solely for architectural purity.
 
 ---
 
-## Repository Structure
+# Repository Structure
 
 ```text
 PawTag/
 ├── apps/
-│   ├── admin/          → Admin portal (port 3001) - 44 pages
-│   │   └── src/
-│   │       ├── components/
-│   │       ├── context/
-│   │       ├── lib/
-│   │       └── pages/
-│   ├── finder/         → Finder portal (port 3003) - 10 components
-│   │   └── src/
-│   │       └── components/
-│   ├── mobile/         → React Native (Expo) app - 14 screens
-│   │   ├── src/
-│   │   │   ├── components/
-│   │   │   ├── context/
-│   │   │   ├── screens/
-│   │   │   └── theme/
-│   │   ├── e2e/        → Maestro E2E tests (3 files)
-│   │   └── app.json
-│   └── web/            → Public site, shop, auth & customer portal (port 3000) - 31 pages
-│       └── src/
-│           ├── components/
-│           ├── context/
-│           └── pages/
+│   ├── web/                  # Customer/public React application
+│   ├── admin/                # Staff/admin React application
+│   ├── finder/               # Public finder React application
+│   └── mobile/               # React Native / Expo application
+│
 ├── packages/
-│   ├── api/            → Express backend (port 5000) - 30 route files, 21+ services
-│   │   └── src/
-│   │       ├── config/
-│   │       ├── lib/
-│   │       ├── middleware/
-│   │       ├── routes/
-│   │       ├── seeds/
-│   │       └── services/
-│   ├── db/             → MongoDB models & connection (45 models)
-│   │   └── src/
-│   │       └── models/
-│   ├── shared/         → Shared TypeScript types & validation
-│   │   └── src/
-│   └── ui/             → Shared React component library (13 components)
-│       └── src/
-│           └── components/
-├── tests/              → 77+ test files (41 unit, 35 integration, 1 smoke, 2 regression)
-│   ├── integration/    → Integration tests (MongoDB Memory Server)
-│   ├── regression/     → Regression tests
-│   ├── smoke/          → API smoke tests
-│   └── unit/           → Unit tests
-├── docker/             → Docker configurations (4 services)
-├── docs/               → Documentation (15 files)
-├── scripts/            → Build and utility scripts
-├── .github/workflows/  → GitHub Actions CI/CD pipeline
-├── ARCHITECTURE.md     → System architecture
-├── DESIGN.md           → Design system
-├── AGENTS.md           → AI development guide
-└── package.json        → Root package.json
+│   ├── api/                  # Express API, routes, services, jobs, integrations
+│   ├── db/                   # Mongoose models and DB connection
+│   ├── shared/               # Shared TypeScript/API contracts and helpers
+│   └── ui/                   # Shared WEB React UI components + Tailwind preset
+│
+├── tests/
+│   ├── unit/
+│   ├── integration/
+│   ├── regression/
+│   └── smoke/
+│
+├── docs/                     # Architecture, operations, product and engineering docs
+├── docker/                   # Dockerfiles, nginx config, compose config
+├── scripts/                  # Maintenance/backfill/index scripts
+├── .github/workflows/        # CI workflow
+├── AGENTS.md                 # AI/developer operating guidance
+├── opencode.json             # OpenCode configuration
+├── pnpm-workspace.yaml
+├── vitest.config.ts
+└── package.json
 ```
 
-### Key Directories
+## Repository snapshot
 
-| Directory | Purpose |
-|-----------|---------|
-| `apps/*` | Frontend applications (web, admin, finder, mobile) |
-| `packages/api` | Express backend with all routes, services, and middleware |
-| `packages/db` | Mongoose models and database connection |
-| `packages/shared` | TypeScript types, enums, and validation constants |
-| `packages/ui` | Shared React components (DataTable, StatusBadge, IconPicker, etc.) |
-| `tests/` | Test suites (unit, integration, smoke, regression) |
-| `docker/` | Dockerfiles and docker-compose configuration |
-| `docs/` | Documentation files |
+At the time of this README refresh, the tree contains approximately:
 
----
+- **63** Mongoose model files in `packages/db/src/models`;
+- **57** API route files in `packages/api/src/routes`;
+- **22** top-level API service files in `packages/api/src/services` plus additional domain/service folders;
+- **54** admin page components;
+- **22** customer-web page components;
+- **10** finder components;
+- **15** mobile screen files;
+- **24** web UI components in `packages/ui/src/components`;
+- **94** root test files: 56 unit, 35 integration, 2 regression and 1 smoke;
+- **3** Maestro mobile E2E flow files.
 
-## Prerequisites
-
-- **Node.js** >= 18
-- **pnpm** >= 9 (install: `npm install -g pnpm`)
-- **MongoDB Atlas** account (or local MongoDB for development)
-- **Git**
-
-### Optional (for full functionality)
-- **Stripe account** (for payments)
-- **Resend account** (for email)
-- **Twilio account** (for SMS)
-- **Cloudflare R2 account** (for file storage)
-- **Sentry account** (for error tracking)
+These counts are descriptive only and will change over time. **Do not use counts as a proxy for quality or readiness.**
 
 ---
 
-## Installation
+# Technology Stack
+
+## Backend
+
+- Node.js (repository engine: `>=18`; CI currently uses Node 20)
+- TypeScript
+- Express 4
+- MongoDB / Mongoose 7
+- Zod
+- JWT / bcryptjs
+- Stripe SDK
+- Pino / pino-http
+- Sentry
+- OpenTelemetry
+- AWS S3-compatible SDK for Cloudflare R2
+
+## Web/Admin/Finder
+
+- React 18
+- TypeScript
+- Vite
+- React Router 6
+- Axios
+- Tailwind CSS / shared Tailwind preset
+- Lucide icons
+- Stripe.js / React Stripe.js in customer web
+
+## Mobile
+
+- Expo SDK 54
+- React Native 0.81
+- React 19
+- React Navigation 7
+- `expo-camera`
+- `react-native-nfc-manager`
+- `expo-notifications`
+- `expo-secure-store`
+
+## Tooling
+
+- pnpm workspaces
+- Vitest 4
+- Supertest
+- MongoDB Memory Server
+- Maestro mobile E2E
+- ESLint
+- Prettier
+- GitHub Actions
+- Docker / Nginx
+
+---
+
+# Prerequisites
+
+For local development:
+
+- Node.js 20 recommended to match CI;
+- pnpm 9+;
+- Git;
+- MongoDB connection (local MongoDB or Atlas);
+- optional provider accounts depending on the feature being exercised.
+
+Install pnpm if needed:
 
 ```bash
-# Clone the repository
+npm install -g pnpm@9
+```
+
+---
+
+# Local Setup
+
+```bash
+# Clone
 git clone https://github.com/bhagatarpan/PawTag.git
 cd PawTag
 
-# Install all dependencies
+# Install workspace dependencies
 pnpm install
 
-# Set up environment variables
+# API environment
 cp packages/api/.env.example packages/api/.env
-# Edit packages/api/.env with your values (see Environment Configuration)
 
-# Seed the database (creates default admin + test data)
-cd packages/api && pnpm seed && cd ../..
+# Edit packages/api/.env before starting the API
 
-# Start all services in parallel
+# Optional development seed
+pnpm --filter @pawtag/api seed
+
+# Start API + web + admin + finder
 pnpm dev:all
 ```
 
-### Default Accounts (After Seeding)
+## Important seed warning
 
-| Role | Email | Password |
-|------|-------|----------|
-| Admin | admin@pawtag.co.nz | |
-| Test Customer | arpanbhagat@yahoo.com | |
+Development seed data and demo credentials are **development conveniences**, not production configuration.
 
----
+Never assume seeded accounts/settings are safe for a live environment. In particular:
 
-## Environment Configuration
-
-Copy `packages/api/.env.example` to `packages/api/.env` and configure:
-
-### Required
-
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `DB_URL` | MongoDB Atlas connection string | `mongodb+srv://user:pass@cluster.mongodb.net/pawtag` |
-| `JWT_SECRET` | Secret key for JWT signing (min 32 chars) | `your-random-secret-here` |
-
-### Authentication & Sessions
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `JWT_ACCESS_EXPIRES_IN` | `30m` | Access token lifetime |
-| `REFRESH_TOKEN_EXPIRES_IN_DAYS` | `30` | Refresh token lifetime in days |
-
-### Seed Credentials
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `BOOTSTRAP_ADMIN_EMAIL` | `admin@pawtag.co.nz` | Admin account email |
-| `BOOTSTRAP_ADMIN_PASSWORD` | *(random if unset)* | Admin account password |
-| `BOOTSTRAP_TEST_EMAIL` | `arpanbhagat@yahoo.com` | Test customer email |
-
-### Frontend URLs
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `FRONTEND_URL` | `http://localhost:3000` | Public web app URL |
-| `ADMIN_URL` | `http://localhost:3001` | Admin portal URL |
-| `FINDER_URL` | `http://localhost:3003` | Finder page URL |
-| `ALLOWED_ORIGINS` | `localhost:3000-3003` | Comma-separated CORS allowed origins |
-
-### Payment (Stripe)
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `STRIPE_SECRET_KEY` | *(demo mode)* | Stripe API secret key |
-
-### Email (SMTP/Resend)
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `SMTP_HOST` | `localhost` | SMTP server hostname |
-| `SMTP_PORT` | `587` | SMTP server port |
-| `SMTP_SECURE` | `false` | Use TLS for SMTP connection |
-| `SMTP_USER` | *(empty)* | SMTP username |
-| `SMTP_PASS` | *(empty)* | SMTP password |
-
-### SMS (Twilio)
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `SMS_PROVIDER` | `demo` | `demo` (logs OTP to console) or `twilio` |
-| `TWILIO_ACCOUNT_SID` | *(empty)* | Twilio Account SID |
-| `TWILIO_AUTH_TOKEN` | *(empty)* | Twilio Auth Token |
-| `TWILIO_FROM_NUMBER` | *(empty)* | Twilio phone number |
-
-### Object Storage (Cloudflare R2)
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `STORAGE_DRIVER` | `local` | `local` (development) or `r2` (production) |
-| `R2_ACCESS_KEY_ID` | *(empty)* | R2 API access key ID (required when `STORAGE_DRIVER=r2`) |
-| `R2_SECRET_ACCESS_KEY` | *(empty)* | R2 API secret access key (required when `STORAGE_DRIVER=r2`) |
-| `R2_BUCKET_NAME` | *(empty)* | R2 bucket name (required when `STORAGE_DRIVER=r2`) |
-| `R2_ENDPOINT` | *(empty)* | R2 endpoint URL (required when `STORAGE_DRIVER=r2`) |
-| `R2_PUBLIC_URL` | *(empty)* | Public URL for serving uploaded files (required when `STORAGE_DRIVER=r2`) |
-
-**Development:** Files stored in `packages/api/uploads/` directory (no Cloudflare account needed).
-**Production:** Files stored in Cloudflare R2. Requires R2 bucket and API credentials.
-
-### Server
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PORT` | `5000` | API server port |
-| `NODE_ENV` | `development` | `development`, `staging`, or `production` |
-| `LOG_LEVEL` | `info` | Logging level: `silent`, `fatal`, `error`, `warn`, `info`, `debug`, `trace` |
-
-### Monitoring
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `SENTRY_DSN` | *(empty)* | Sentry DSN for error tracking |
-
-### Environment Strategy
-
-| Environment | DB | Stripe | Email | SMS |
-|-------------|-----|--------|-------|-----|
-| **Local** | Local MongoDB or Atlas free tier | Test mode (`sk_test_...`) | Console logging | `demo` |
-| **Staging** | Separate Atlas cluster | Test mode | Real SMTP (staging) | `demo` or Twilio |
-| **Production** | Atlas paid tier with backups | Live mode (`sk_live_...`) | Real SMTP (production) | Twilio |
+- set a strong explicit production bootstrap admin password;
+- do not seed demo customers into production unless intentionally required;
+- review commerce/payment mode after seeding;
+- do not deploy `sk_test_demo_key` or equivalent demo provider values;
+- do not expose OTPs or secrets through production logs.
 
 ---
 
-## Database
+# Environment Configuration
 
-### MongoDB Atlas
-
-PawTag uses MongoDB Atlas with Mongoose ODM. The database contains 45 models covering:
-
-- **Core Business:** Users, Pets, Tags, Orders, Products, Subscriptions, Invoices
-- **Finder & Escalation:** FinderScan, LocationEvent, EscalationRecord
-- **Notifications:** Notification, PushToken, TagExpiryNotification
-- **Auth & Security:** RefreshToken, VerificationToken, InvoiceAccessToken
-- **RBAC:** Role, Permission, PermissionGroup, PermissionScope, RolePermission, UserRole
-- **CMS:** CmsPage, CmsNavigation, CmsFooter, CmsEmailTemplate, CmsSmsTemplate, CmsOnboarding, and more
-- **Other:** Setting, FeatureFlag, Cart, ReferralCode, Referral, SupportRequest, AuditEvent
-
-### Seeding
-
-```bash
-# Seed RBAC permissions and roles
-cd packages/api && pnpm seed
-
-# Seed CMS content and settings
-cd packages/api && pnpm seed:cms
-
-# Seed products
-cd packages/api && pnpm seed:products
-```
-
-### Database Indexes
-
-The database includes 120+ indexes for performance optimization. Key indexes include:
-- User: email, phoneNumber, roles, status
-- Pet: petId (unique), ownerId + deletedAt + createdAt
-- Tag: tagId (unique), petId + deletedAt
-- Order: orderNumber (unique), userId + createdAt
-- Subscription: userId + tagId, status + currentPeriodEnd
-
-See `docs/database-schema.md` for the full model reference.
-
----
-
-## Running the Application
-
-### Development Mode
-
-```bash
-# Start all services in parallel
-pnpm dev:all
-
-# Or start individual services
-pnpm dev:api       # API on :5000
-pnpm dev:admin     # Admin on :3001
-pnpm dev:web       # Public site on :3000
-pnpm dev:finder    # Finder on :3003
-
-```
-
-### Mobile App
-
-```bash
-# Start the mobile app (requires API running on port 5000)
-cd apps/mobile
-npx expo start
-```
-
-Scan the QR code with your phone:
-- **iPhone:** Open Camera app, point at QR code, tap the notification
-- **Android:** Open Expo Go app, tap "Scan QR code"
-
-### Production Build
-
-```bash
-# Build all packages
-pnpm build
-
-# Build individual packages
-pnpm build:api
-pnpm build:admin
-pnpm build:web
-pnpm build:finder
-
-```
-
-### Production Start
-
-```bash
-# Start the API in production mode
-cd packages/api
-node dist/index.js
-```
-
----
-
-## Application Workflows
-
-### Tag Recovery Flow
-
-```mermaid
-sequenceDiagram
-    participant Owner
-    participant Pet
-    participant Tag
-    participant Finder
-    participant API
-    participant OwnerNotification
-
-    Owner->>Pet: Creates pet profile
-    Owner->>Tag: Purchases and activates tag
-    Tag->>API: Links tag to pet
-    Pet->>Pet: Status set to "lost"
-    Finder->>Tag: Scans QR/NFC tag
-    Tag->>API: Opens finder portal
-    Finder->>API: Submits contact info
-    API->>OwnerNotification: Sends notification
-    Owner->>Finder: Contacts finder
-    Owner->>Pet: Status set to "safe"
-```
-
-### E-Commerce Flow (4-Step Checkout Wizard)
-
-1. **Cart** — Review items, apply promo code (guests validate only, logged-in apply), see totals with server-side price re-validation
-2. **Checkout** — Contact verification (email + mobile verified), shipping address
-3. **Payment** — Order summary, Stripe card form, pay button
-4. **Confirmed** — Success page with order number
-
-**Cart behavior:**
-- Server-side price re-validation on every cart load detects price changes and alerts the user
-- Guest users see a visual indicator in the cart drawer indicating guest mode
-- Cart configuration (TTL, max items, price revalidation) managed via CMS settings
-
-**Verification gate:** Users must have both email and mobile verified before proceeding to payment. The checkout page checks `user.emailVerified` and `user.phoneVerified` and shows verification status with links to verify.
-
-**Payment:** Stripe demo mode (no real key = simulated success). Real Stripe when key is configured.
-
-### Product Management
-
-Products are managed through PawTag's admin portal. The product catalog supports variants, inventory tracking, and pricing.
-
-| What | Where | Purpose |
-|------|-------|---------|
-| Product catalog | Admin portal (`:3001`) | Create/edit/delete products, prices, variants |
-| Product metadata | MongoDB Product model | Subscription config, tag flags, warranty, shipping, feature highlights, affiliate fields |
-| Product URLs | URL slugs (e.g., `/shop/pawtag-scan`) | SEO-friendly URLs instead of MongoDB ObjectIDs |
-| Inventory | PawTag inventory service | Stock levels at PawTag Warehouse |
-| Prices | PawTag pricing service | Per-variant, per-region pricing |
-| Shop page | `apps/web` | Fetches from PawTag API, displays with PawTag UI |
-| Subscription logic | `packages/api` (MongoDB) | Reads product metadata for subscription config |
-
-### Gold Membership
-
-Gold is PawTag's premium subscription tier. Customers pay a monthly fee via Stripe to receive enhanced benefits.
-
-**How customers get Gold:**
-- Upgrade via the customer portal (`/account/subscription-upgrade`)
-- Subscribe during onboarding (if enabled)
-- Admin can manually upgrade a user's `planType` to `gold`
-
-**Gold Benefits:**
-- Free NZ-wide shipping on all orders (no minimum)
-- 2x Guardian loyalty points on every purchase
-- Gold member badge on profile
-- Priority customer support
-
-**Gold Detection:**
-Gold status is identified by `User.planType === 'gold'`. Benefits are applied automatically in:
-- Shipping service (free shipping)
-- Points earning engine (2x multiplier)
-- Checkout (free shipping applied)
-- Frontend (Gold badge display)
-
-**Stripe Integration:**
-Gold billing uses Stripe Subscriptions for recurring monthly charges:
-1. Customer subscribes via `POST /api/customer/subscriptions/gold/subscribe`
-2. Backend creates a Stripe Customer (if not exists) and Stripe Subscription
-3. Stripe charges the customer monthly
-4. Webhook updates subscription status (active, past_due, cancelled)
-5. Gold benefits are active while `planType === 'gold'` and subscription is active
-
-**CMS Settings (admin-configurable):**
-
-| Setting Key | Default | Purpose |
-|-------------|---------|---------|
-| `gold.price.monthly` | `14.99` | Monthly subscription price (NZD) |
-| `gold.pointsMultiplier` | `2` | Loyalty points multiplier |
-| `gold.freeShippingThreshold` | `0` | Minimum order for free shipping (0 = always free) |
-| `gold.enabled` | `true` | Enable/disable Gold subscriptions |
-| `gold.trialDays` | `0` | Free trial period (days) |
-
-**Admin Stripe Reporting:**
-The `/admin/stripe-report` page provides per-customer Stripe data including Customer details, active subscriptions, billing history, payment methods, recent charges, and refund status.
-
-### Order Lifecycle
-
-```mermaid
-stateDiagram-v2
-    [*] --> pending
-    pending --> pending_payment : Card payment
-    pending --> paid : Non-card payment
-    pending --> cancelled : Admin cancel
-    pending_payment --> paid : Stripe webhook
-    pending_payment --> cancelled : Payment failed
-    paid --> packing : Admin fulfillment
-    paid --> cancelled : Admin cancel
-    paid --> refunded : Admin refund
-    packing --> shipped : Shipping label
-    packing --> cancelled : Admin cancel
-    shipped --> delivered : Mark delivered
-    delivered --> refunded : Post-delivery refund
-    cancelled --> [*]
-    refunded --> [*]
-```
-
-### Order Cancellation Workflow
-
-Orders can be cancelled from three sources — each captures the same rich audit fields (`cancelledBy`, `cancelledByType`, `cancelledByPortal`, `cancelledByDescription`, `cancelledAt`):
-
-| Source | Endpoint | When Allowed |
-|--------|----------|--------------|
-| **Customer** | `POST /api/customer/orders/:id/cancel` | Status `paid` or `packing` |
-| **Admin** | `POST /api/admin/orders/:id/cancel` | Valid status transition to `cancelled` |
-| **System (auto)** | Background job `jobs/orderAutoCancel.ts` | `pending_payment` older than `commerce.orders.autoCancelMinutes` |
-
-**Customer cancellation flow:**
-
-1. Customer opens an order in `paid` or `packing` status → clicks "Cancel Order"
-2. Modal opens with title "Cancel Order", a warning (no refund warning — that only shows in admin), a **reason dropdown** populated from `GET /api/public/commerce/cancellation-reasons` (8 default reasons)
-3. If the customer selects "Other" → an **Additional notes** textarea appears and becomes required
-4. Customer confirms → `POST /api/customer/orders/:id/cancel` with `{ reason, notes?, portal: 'customer-web' }`
-5. Server: status check, refund via Stripe (if payment completed), set all 6 cancellation fields, release stock, record activity, notify customer
-6. Order detail refreshes showing the "Cancellation Details" section
-
-**Admin cancellation flow:**
-
-1. Admin opens an order in the detail drawer → clicks "Cancel Order"
-2. Modal opens with title "Cancel Order", warning ("This will cancel the order, restore stock, and process a refund if payment was completed. This action cannot be undone."), a **reason dropdown** populated from `GET /api/admin/commerce/cancellation-reasons`
-3. If the admin selects "Other" → an **Additional notes** textarea appears and becomes required
-4. Admin confirms → `POST /api/admin/orders/:id/cancel` with `{ reason, notes? }`
-5. Server: resolve actor's full name and RBAC role via `resolveActor()`, set all 6 fields with `cancelledByPortal: 'admin-web'`, release stock, record activity, audit, notify customer
-6. List refreshes; order shows the "Cancellation Details" section
-
-**Auto-cancel (system) flow:**
-
-1. Job runs every 60 seconds, finds `pending_payment` orders older than threshold
-2. Sets `cancelledBy = "CANCELLED BY SYSTEM (AUTO)"`, `cancelledByType = "System"`, `cancelledByPortal = "system"`, `cancelledByDescription = "Order is auto-cancelled by System after no payment received within X minutes"`, `cancelledAt`, reason = `"Auto-cancelled: no payment received within X minutes"`
-3. Releases stock, records activity (`"Order auto-cancelled by System: <reason> : AT : <timestamp>"`), notifies customer
-
-**Activity log message format:**
-
-| Actor | Format |
-|-------|--------|
-| Customer | `Order cancelled by <Customer FullName> (Customer): <Reason> : AT : <ISO Timestamp>` |
-| Admin | `Order cancelled by <Admin FullName> (<Role DisplayName>): <Reason> : AT : <ISO Timestamp>` |
-| System | `Order auto-cancelled by System: <Reason> : AT : <ISO Timestamp>` |
-
-**Data model (`Order` schema):**
-
-| Field | Type | Notes |
-|-------|------|-------|
-| `cancellationReason` | `String` | Selected reason (e.g., "Ordered by mistake") |
-| `cancellationNotes` | `String` | Free-text additional notes when "Other" selected |
-| `cancelledBy` | `String` | Human-readable: `"Customer (Sarah Johnson)"` or `"Dave Macenzie (Customer Service)"` or `"CANCELLED BY SYSTEM (AUTO)"` |
-| `cancelledByType` | `String` | **Not an enum** — RBAC roles are dynamic; uses `Role.displayName` from populated `User.roles[]` |
-| `cancelledByPortal` | `enum: 'customer-web' \| 'customer-mobile' \| 'admin-web' \| 'system'` | Fixed list of known portals |
-| `cancelledByDescription` | `String` | Full human description (e.g., `"Order is Cancelled via Admin Web Portal by Dave Macenzie (Customer Service)"`) |
-| `cancelledAt` | `Date` | Timestamp of cancellation |
-| `createdBy` | `String` | Human-readable: `"Customer (Sarah Johnson)"` — set on order creation |
-| `createdByType` | `String` | Role display name (e.g., `"Customer"`) |
-| `createdByPortal` | `enum: 'customer-web' \| 'customer-mobile' \| 'admin-web' \| 'system'` | Source portal where order was created |
-| `createdByDescription` | `String` | Full description (e.g., `"Order placed via Customer Web Portal by Sarah Johnson"`) |
-| `createdByEmail` | `String` | Creator's email address |
-| `refundedBy` | `String` | Human-readable: `"Dave Macenzie (Admin)"` — set on refund |
-| `refundedByType` | `String` | Role display name (e.g., `"Admin"`) |
-| `refundedByPortal` | `enum: 'customer-web' \| 'customer-mobile' \| 'admin-web' \| 'system'` | Source portal where refund was processed |
-| `refundedByDescription` | `String` | Full description (e.g., `"Order refunded via Admin Web Portal by Dave Macenzie (Admin)"`) |
-| `refundedAt` | `Date` | Timestamp of refund |
-
-**Helper (`packages/api/src/lib/actor.ts`):**
-
-- `resolveActor(userId, fallbackType)` — picks the highest-privileged active role from `User.roles[]` (sorted by `isSuperAdmin DESC, isSystemRole DESC`), falls back to legacy `User.role`
-- `formatCancelledBy(fullName, roleDisplayName)` — produces the `cancelledBy` string
-- `formatCancelledByDescription(portal, fullName, roleLabel)` — produces the full description
-- `formatActivityMessage(cancelledBy, reason, at?)` — canonical log message
-- `formatSystemActivityMessage(reason, at?)` — system-prefixed log message
-- `formatCreatedBy(fullName, roleDisplayName)` — produces the `createdBy` string for order creation
-- `formatCreatedByDescription(portal, fullName)` — produces the full description for order creation
-- `formatRefundedBy(fullName, roleDisplayName)` — produces the `refundedBy` string for refund
-- `formatRefundedByDescription(portal, fullName, roleLabel)` — produces the full description for refund
-
-**Admin-managed reasons:** `/admin/commerce-settings` → "Cancellation Reasons" card allows admins to add, remove, and reorder the predefined list. Changes are audited (`cancellation_reasons_updated` event, MEDIUM severity) and immediately reflected in the customer modal.
-
-**Modal reuse:** The shared `ConfirmDialog` (`packages/ui/src/components/ConfirmDialog.tsx`) was extended (not duplicated) with optional props: `reasons`, `selectedReason`, `onReasonChange`, `showNotes`, `notesRequired`, `notes`, `onNotesChange`, `notesLabel`, `notesPlaceholder`. Both the admin Orders page and customer OrderDetail page consume the same component with their own context.
-
-### Refund Status & Accounting
-
-When an order is cancelled, a refund is created via Stripe and tracked through the full lifecycle:
-
-**Refund status values:** `Refund Processing` → `Refund Succeeded` (with ARN) or `Failed` (auto-retried)
-
-**Customer-facing:**
-- Order detail page shows refund status with amount, ARN, expected arrival date
-- Customer receives 3 emails: processing (immediate), settled (when complete), failed (with retry info)
-
-**Admin-facing:**
-- `/admin/refunds` — List all refunds with filters (status, date, search), per-row "Sync with Stripe" button
-- `/admin/refund-report` — Export to CSV/GL/Xero with date picker and column selection
-- "Retry" button for failed refunds (manual)
-- Auto-retry: 2h first attempt, 24h second attempt (via daily reconciliation job)
-
-**Accounting exports (3 formats):**
-- **CSV (Full)** — All columns: Date, Order, Customer, Refund ID, ARN, Status, Amount, etc.
-- **CSV (Xero)** — Xero-compatible columns: Date, Reference, Description, Amount
-- **CSV (Configurable)** — Admin picks which columns to include
-- **GL (General Ledger)** — Debit/Credit journal entries (account codes from CMS settings)
-- **Xero** — Push directly to Xero via OAuth 2.0 (Manual Journals)
-
-**Stripe metadata sent:** orderId, orderNumber, cancelledBy, cancelledByType (Customer/Admin role), cancelledByPortal (web/mobile/system), cancellationReason, cancellationNotes, initiatedBy, environment
-
-**Configuration (CMS settings):**
-- `commerce.stripe.statementDescriptor` — Text on bank statement (default: `PAWTAG NZ`)
-- `commerce.accounting.exportFormat` — Default format (csv/gl/xero)
-- `commerce.accounting.csvColumnMode` — full/xero/configurable
-- `commerce.accounting.glAccountCode` — Sales account (default: 1200)
-- `commerce.accounting.glRefundAccountCode` — Refund clearing account (default: 2200)
-- `commerce.accounting.taxCode` — Tax code (default: GST)
-- `commerce.refunds.reconciliationHour` — Daily job hour in NZ time (default: 2am)
-- `commerce.refunds.retryFirstHours` — First auto-retry delay (default: 2h)
-- `commerce.refunds.retrySecondHours` — Second auto-retry delay (default: 24h)
-- `commerce.refunds.maxAutoRetries` — Max auto-retry count (default: 1)
-
-**Xero setup:**
-1. Create a Xero app at https://developer.xero.com
-2. Set `XERO_CLIENT_ID`, `XERO_CLIENT_SECRET`, `XERO_REDIRECT_URI` in `.env`
-3. Admin clicks "Connect to Xero" in Commerce Settings → Accounting
-4. OAuth flow stores encrypted tokens in `IntegrationConnection` model
-
-**MYOB:** Stubbed — returns "coming soon" message. Falls back to CSV export.
-
-### Escalation System
-
-When a pet is found and the owner doesn't respond within 30 minutes:
-1. `EscalationRecord` created with `escalationDeadline`
-2. `escalation.service.ts` polls every 1 minute for overdue escalations
-3. Emergency contact receives email + in-app notification
-4. Owner can manually forward to emergency contact via dashboard
-
----
-
-## User Roles and Permissions
-
-### RBAC Model
-
-PawTag implements Role-Based Access Control with the following hierarchy:
-
-```mermaid
-flowchart LR
-    User["User"] --> UserRole["UserRole"]
-    UserRole --> Role["Role"]
-    Role --> RolePermission["RolePermission"]
-    RolePermission --> Permission["Permission"]
-    RolePermission --> PermissionScope["PermissionScope"]
-    Permission --> PermissionGroup["PermissionGroup"]
-```
-
-### Available Roles
-
-| Role | Description | Access Level | Super Admin |
-|------|-------------|--------------|-------------|
-| `SUPER_ADMIN` | Full system access | All resources, all scopes | ✅ Yes |
-| `ADMIN` | Full system access (same as Super Admin) | All resources, all scopes | ✅ Yes |
-| `CUSTOMER_SERVICE` | Customer support | User management, orders, support | ❌ No |
-| `WEBSITE_EDITOR` | Content management | CMS content, pages, navigation | ❌ No |
-| `CUSTOMER` | Pet owner | Own pets, orders, subscriptions | ❌ No |
-
-### Permission Structure
-
-Permissions follow the pattern `resource.action` with optional scope:
-
-- **Resource:** The entity being accessed (e.g., `users`, `pets`, `orders`)
-- **Action:** The operation (e.g., `create`, `read`, `update`, `delete`)
-- **Scope:** `OWN` (own records only) or `ALL` (all records)
-
-### Key Permissions
-
-| Permission | Description |
-|------------|-------------|
-| `users.create` | Create new users |
-| `users.read` | View user details |
-| `users.update` | Update user information |
-| `users.delete` | Delete users |
-| `pets.create` | Create pet profiles |
-| `pets.read` | View pet details |
-| `pets.update` | Update pet information |
-| `pets.delete` | Delete pets |
-| `orders.create` | Create orders |
-| `orders.read` | View order details |
-| `orders.update` | Update order status |
-| `products.create` | Create products |
-| `products.read` | View products |
-| `products.update` | Update products |
-| `settings.read` | View system settings |
-| `settings.update` | Update system settings |
-
-### Super Admin Bypass
-
-Roles with `isSuperAdmin: true` bypass all permission checks entirely. Both `SUPER_ADMIN` and `ADMIN` roles have this flag set, giving them unrestricted "GOD mode" access to all functionality.
-
----
-
-## Admin Portal
-
-The Admin Portal is the operational control centre of the application. It provides full CRUD operations for all entities with RBAC enforcement.
-
-### Available Administrative Areas
-
-| Area | Purpose |
-|------|---------|
-| **Overview** | Dashboard analytics, Commerce Reports |
-| **Catalog** | Product catalog — Products, Categories, Collections, Brands, Tags |
-| **Inventory** | Stock management — Stock, Adjustments, Stock History |
-| **Orders & Fulfilment** | Order lifecycle — All Orders, Pending, Processing, Invoices, Shipments, Returns |
-| **Payments & Refunds** | Financial — Transactions, Refunds, Refund Report, Reconciliation, Shipping Methods, Stripe Report |
-| **Subscriptions & Loyalty** | Subscription Plans, Customer Subscriptions, Guardian Dashboard, Members, Analytics, Guardian Settings |
-| **Discounts & Promotions** | Discount Codes, Referral Program |
-| **Users & Pets** | User management — Customers, Admin Users, Pets |
-| **Communication** | Notifications, Support Requests, Tag Expiry Alerts |
-| **Content (CMS)** | Pages, Homepage, Shop Pages, Auth Pages, Navigation, Footer, Announcements, Onboarding, Email Templates, SMS Templates, Invoice Template, Media, Redirects, Pet References |
-| **Settings** | Commerce Settings, General Settings, Site Availability, Address Autocomplete |
-| **Security & Access** | Roles & Permissions, Permissions, Permission Groups, Access Scopes, Audit Trail, Audit Settings |
-| **Operations** | Feature Flags, Webhooks, System Logs, Log Settings, Statistics, Write NFC Tag |
-
-### Admin Portal Features
-
-- Full CRUD operations on all entities
-- Role-based access control
-- Audit logging for all admin actions
-- Toast notifications for user feedback
-- Search, filtering, and pagination
-- Detail drawers for entity inspection
-- Confirmation dialogs for destructive actions
-- Responsive design
-- PuckEditor visual page builder (36 block types)
-- TipTap rich text editor (13 extensions)
-- Monaco JSON editor for advanced content editing
-- Enterprise-grade sidebar with collapsible sections
-- Dark/light mode toggle with persistence
-- Cart settings management (TTL, max items, price revalidation toggle)
-
-### Admin Portal Shell (Redesigned)
-
-The admin portal shell was redesigned for a modern enterprise SaaS experience:
-
-- **Sidebar:** Deep PawTag teal background, collapsible to icon-only mode (72px) with tooltips, 3-level navigation hierarchy with category-colored icons, Guardian Rewards quick-access card pinned at bottom
-- **Top Bar:** Global search, notification bell with unread count badge, user dropdown menu
-- **Breadcrumbs:** Auto-generated from route, reusable component
-- **Page Headers:** Consistent layout across all admin pages
-- **Mobile:** Off-canvas drawer with backdrop overlay, fully responsive
-
----
-
-## PuckEditor CMS Page Builder
-
-Both admin and web apps include a visual page builder using `@puckeditor/core`:
-
-### Block Types (36)
-
-| Category | Blocks |
-|----------|--------|
-| **Layout** | HeroBanner, CtaBanner, FeaturesGrid, CardsGrid, ColumnsBlock, ImageTextBlock |
-| **Content** | RichTextBlock, TextBlock, ImageBlock, ImageGallery, VideoEmbed, CustomHtml, AccordionBlock, TabsBlock, IconListBlock, BadgeBlock |
-| **Commerce** | PricingTable |
-| **Social** | TestimonialsSection, TeamBlock, PartnersLogos, SocialLinksBlock |
-| **Interactive** | FaqAccordion, ContactForm, NewsletterSignupBlock |
-| **Utility** | ButtonBlock, SpacerBlock, DividerBlock, EmbedBlock, BackToTopBlock, MarqueeBlock, AlertBlock |
-| **Data** | TimelineSection, StatsCounter, MapBlock, CountdownBlock, AnnouncementBarBlock |
-
-### Implementation
-
-- **Admin:** `apps/admin/src/components/puck/PuckPageBuilder.tsx` + `config.tsx`
-- **Web:** `apps/web/src/components/puck/config.tsx`
-- **CMS Pages:** Pages are stored as Puck JSON in `CmsPage.content` field
-- **Rendering:** Public pages rendered via Puck renderer in `apps/web`
-
----
-
-## Support & Contact System
-
-### Public Contact Form
-
-- **Route:** `POST /api/support/contact`
-- **Page:** `apps/web/src/pages/Contact.tsx`
-- **Model:** `SupportRequest` in `packages/db/src/models/SupportRequest.ts`
-- **Fields:** name, email, subject, message, category, priority
-- **Notifications:** Admin receives in-app notification for new requests
-
-### Admin Support Management
-
-- **Page:** `apps/admin/src/pages/SupportRequests.tsx`
-- **Route:** `/api/admin/support-requests`
-- **Features:** List, filter, update status, assign staff, add internal notes
-
----
-
-## Tag Sticker & QR Code Generation
-
-### QR Code Generation
-
-- **Endpoint:** `GET /api/tags/:tagId/qr`
-- **Output:** PNG image of QR code
-- **Usage:** Dynamic QR codes for tags, can be embedded in web pages
-
-### Printable Sticker
-
-- **Endpoint:** `GET /api/tags/:tagId/sticker`
-- **Output:** HTML page with QR code and tag info
-- **Usage:** Physical tag stickers for pet collars
-
----
-
-## CI/CD Pipeline (GitHub Actions)
-
-**File:** `.github/workflows/ci.yml`
-
-Triggers on push/PR to `main` and `develop` branches.
-
-### Pipeline Jobs
-
-| Job | Timeout | Description |
-|-----|---------|-------------|
-| Smoke Tests | 5 min | Basic API health and endpoint checks |
-| Unit Tests | 10 min | Unit test suite (25 files) |
-| Integration Tests | 15 min | Integration tests with MongoDB service container (32 files) |
-| Regression Tests | 10 min | Auth and security regression tests (2 files) |
-| Type Check | 10 min | TypeScript type checking across all packages |
-| Build All Packages | 15 min | Build API, admin, web, and finder |
-| Test Coverage | - | Coverage report (main branch only, depends on smoke+unit+regression) |
-
-### Test Configuration
-
-- **Test Runner:** Vitest 4.1
-- **Database:** MongoDB Memory Server (in-memory)
-- **Coverage Provider:** v8
-- **Coverage Thresholds:** 15% lines, 15% functions, 10% branches, 15% statements
-
----
-
-## Email Templates (13)
-
-All email templates are located in `packages/api/src/services/email/templates/`:
-
-| Template | Purpose |
-|----------|---------|
-| `welcome.ts` | Welcome email for new users |
-| `verification-email.ts` | Email verification link |
-| `mfa-otp.ts` | MFA OTP code |
-| `phone-otp.ts` | Phone OTP code |
-| `password-reset.ts` | Password reset link |
-| `password-changed.ts` | Password change confirmation |
-| `login-notification.ts` | New login alert |
-| `account-status.ts` | Account status change |
-| `order-confirmation.ts` | Order placed confirmation |
-| `shipping-notification.ts` | Shipping notification |
-| `pet-found.ts` | Pet found notification |
-| `base.ts` | Base email wrapper (HTML structure) |
-| `index.ts` | Template registry |
-
-### Dev-Time Email Routing
-
-In development, when `mfa.testMode` is `true` (default):
-- All emails routed to test email (`mfa.testEmail`)
-- SMS OTPs printed in API terminal + emailed to test email
-- Production uses real recipient addresses
-
----
-
-## API Documentation
-
-### Base Path
-
-```
-http://localhost:5000/api
-```
-
-### API Architecture (Centralized)
-
-All API endpoints are defined in a single source of truth: `packages/shared/src/api/endpoints.ts`. Frontend apps consume them via typed constants.
-
-```
-packages/shared/src/api/
-├── endpoints.ts          # ALL 204+ API paths as typed constants
-├── client-factory.ts     # Shared axios factory (401 refresh, interceptors)
-└── index.ts              # Barrel export
-```
-
-**Usage in frontend code:**
-
-```typescript
-import { API } from '@pawtag/shared/api';
-import api from '../lib/api';  // configured via createApiClient
-
-// Static endpoints
-const res = await api.get(API.auth.login);
-const pets = await api.get(API.customer.pets.list);
-
-// Dynamic endpoints (functions)
-const user = await api.get(API.admin.users.get(userId));
-const tag = await api.get(API.finder.tag(tagId));
-```
-
-**Adding a new endpoint:**
-
-1. Add to `packages/shared/src/api/endpoints.ts`:
-   ```typescript
-   export const API = {
-     // ...
-     admin: {
-       newFeature: {
-         list: '/admin/new-feature',
-         get: (id: string) => `/admin/new-feature/${id}` as const,
-       },
-     },
-   } as const;
-   ```
-
-2. Use it — no client changes needed:
-   ```typescript
-   const res = await api.get(API.admin.newFeature.list);
-   ```
-
-**Client factory** — each app creates its client once:
-
-```typescript
-import { createApiClient, createLocalStorageTokenStorage } from '@pawtag/shared/api';
-
-export default createApiClient({
-  baseURL: '/api',
-  storage: createLocalStorageTokenStorage('pawtag_token', 'pawtag_refresh_token'),
-  refreshEndpoint: '/api/auth/refresh',
-});
-```
-
-See `skills/api-architecture/SKILL.md` for full rules.
-
-### API Documentation (Swagger)
-
-```
-http://localhost:5000/api/docs
-```
-
-### Response Format
-
-All API responses follow the format:
-
-```json
-{
-  "success": true,
-  "data": { ... }
-}
-```
-
-or on error:
-
-```json
-{
-  "success": false,
-  "error": "Error message"
-}
-```
-
-### Major Endpoints
-
-#### Authentication (`/api/auth`)
-
-| Method | Endpoint | Description | Auth Required |
-|--------|----------|-------------|---------------|
-| POST | `/register` | Register new user | No |
-| POST | `/login` | User login | No |
-| POST | `/verify-email` | Verify email address | No |
-| POST | `/verify-phone` | Verify phone number | No |
-| POST | `/forgot-password` | Request password reset | No |
-| POST | `/reset-password` | Reset password | No |
-| POST | `/refresh-token` | Refresh access token | No |
-| POST | `/mfa/send-otp` | Send MFA OTP | No |
-| POST | `/mfa/verify` | Verify MFA OTP | No |
-| GET | `/captcha` | Get CAPTCHA challenge | No |
-| GET | `/me` | Get current user | Yes |
-
-#### Public Products (`/api/products`)
-
-| Method | Endpoint | Description | Auth Required |
-|--------|----------|-------------|---------------|
-| GET | `/` | List active, published products | No |
-| GET | `/:id` | Get product by ID | No |
-| GET | `/sku/:sku` | Get product by SKU | No |
-| GET | `/slug/:slug` | Get product by slug (SEO-friendly) | No |
-
-| Method | Endpoint | Description | Auth Required |
-|--------|----------|-------------|---------------|
-| GET | `/pets` | List user's pets | Yes |
-| POST | `/pets` | Create pet | Yes |
-| GET | `/pets/:petId` | Get pet details | Yes |
-| PUT | `/pets/:petId` | Update pet | Yes |
-| DELETE | `/pets/:petId` | Delete pet | Yes |
-| GET | `/tags` | List user's tags | Yes |
-| POST | `/tags/redeem` | Activate a tag | Yes |
-| GET | `/orders` | List user's orders | Yes |
-| GET | `/orders/:orderNumber` | Get order details | Yes |
-| POST | `/orders/:orderNumber/confirm-payment` | Confirm demo payment | Yes |
-| GET | `/subscriptions` | List user's subscriptions | Yes |
-| POST | `/subscriptions/:id/cancel` | Cancel subscription | Yes |
-| PUT | `/settings/mfa` | Toggle MFA | Yes |
-| GET | `/notifications` | List notifications | Yes |
-| PUT | `/notifications/:id/read` | Mark notification read | Yes |
-| POST | `/escalations/:id/forward` | Forward to emergency contact | Yes |
-
-#### Public Products (`/api/products`)
-
-| Method | Endpoint | Description | Auth Required |
-|--------|----------|-------------|---------------|
-| GET | `/` | List active, published products | No |
-| GET | `/:id` | Get product by ID | No |
-| GET | `/sku/:sku` | Get product by SKU | No |
-| GET | `/slug/:slug` | Get product by slug (SEO-friendly) | No |
-
-#### Admin (`/api/admin`)
-
-| Method | Endpoint | Description | Auth Required |
-|--------|----------|-------------|---------------|
-| GET | `/users` | List all users | Yes (RBAC) |
-| GET | `/users/:id` | Get user details | Yes (RBAC) |
-| PUT | `/users/:id` | Update user | Yes (RBAC) |
-| PUT | `/users/:id/status` | Update user status | Yes (RBAC) |
-| GET | `/pets` | List all pets | Yes (RBAC) |
-| GET | `/pets/:id` | Get pet details | Yes (RBAC) |
-| GET | `/tags` | List all tags | Yes (RBAC) |
-| GET | `/products` | List all products | Yes (RBAC) |
-| POST | `/products` | Create product | Yes (RBAC) |
-| PUT | `/products/:id` | Update product | Yes (RBAC) |
-| DELETE | `/products/:id` | Delete product | Yes (RBAC) |
-| GET | `/orders` | List all orders | Yes (RBAC) |
-| GET | `/orders/:orderNumber` | Get order details | Yes (RBAC) |
-| PUT | `/orders/:orderNumber/status` | Update order status | Yes (RBAC) |
-| POST | `/orders/:orderNumber/ship` | Ship order | Yes (RBAC) |
-| POST | `/orders/:orderNumber/cancel` | Cancel order | Yes (RBAC) |
-| POST | `/orders/:orderNumber/refund` | Refund order | Yes (RBAC) |
-| GET | `/analytics/overview` | Dashboard analytics | Yes (RBAC) |
-| GET | `/subscriptions` | List all subscriptions | Yes (RBAC) |
-| GET | `/subscriptions/:id` | Get subscription details | Yes (RBAC) |
-| PUT | `/subscriptions/:id` | Update subscription | Yes (RBAC) |
-| GET | `/support-requests` | List support requests | Yes (RBAC) |
-| PUT | `/support-requests/:id` | Update support request | Yes (RBAC) |
-| GET | `/audit` | View audit trail | Yes (RBAC) |
-| GET | `/audit/settings` | Get audit settings | Yes (RBAC) |
-| PUT | `/audit/settings` | Update audit settings | Yes (RBAC) |
-| GET | `/system-logs` | List system logs | Yes (RBAC) |
-| GET | `/system-logs/summary` | System log summary | Yes (RBAC) |
-| GET | `/system-logs/export` | Export system logs | Yes (RBAC) |
-| GET | `/system-logs/settings` | Get system log settings | Yes (RBAC) |
-| PUT | `/system-logs/settings/:key` | Update system log setting | Yes (RBAC) |
-| POST | `/system-logs/purge` | Purge system logs | Yes (RBAC) |
-
-#### Admin RBAC (`/api/admin/rbac`)
-
-| Method | Endpoint | Description | Auth Required |
-|--------|----------|-------------|---------------|
-| GET | `/roles` | List all roles | Yes (RBAC) |
-| POST | `/roles` | Create role | Yes (RBAC) |
-| PUT | `/roles/:id` | Update role | Yes (RBAC) |
-| DELETE | `/roles/:id` | Delete role | Yes (RBAC) |
-| GET | `/permissions` | List all permissions | Yes (RBAC) |
-| GET | `/permission-groups` | List permission groups | Yes (RBAC) |
-| GET | `/scopes` | List permission scopes | Yes (RBAC) |
-
-#### Admin CMS (`/api/admin/cms`)
-
-| Method | Endpoint | Description | Auth Required |
-|--------|----------|-------------|---------------|
-| GET | `/pages` | List CMS pages | Yes (RBAC) |
-| POST | `/pages` | Create CMS page | Yes (RBAC) |
-| PUT | `/pages/:id` | Update CMS page | Yes (RBAC) |
-| DELETE | `/pages/:id` | Delete CMS page | Yes (RBAC) |
-| GET | `/navigation` | List navigation items | Yes (RBAC) |
-| POST | `/navigation` | Create navigation | Yes (RBAC) |
-| PUT | `/navigation/:id` | Update navigation | Yes (RBAC) |
-| GET | `/footer` | List footer groups | Yes (RBAC) |
-| POST | `/footer` | Create footer group | Yes (RBAC) |
-| PUT | `/footer/:id` | Update footer group | Yes (RBAC) |
-| GET | `/email` | List email templates | Yes (RBAC) |
-| POST | `/email` | Create email template | Yes (RBAC) |
-| PUT | `/email/:id` | Update email template | Yes (RBAC) |
-| GET | `/sms` | List SMS templates | Yes (RBAC) |
-| POST | `/sms` | Create SMS template | Yes (RBAC) |
-| PUT | `/sms/:id` | Update SMS template | Yes (RBAC) |
-| GET | `/pet-refs` | List pet references | Yes (RBAC) |
-| POST | `/pet-refs` | Create pet reference | Yes (RBAC) |
-| PUT | `/pet-refs/:id` | Update pet reference | Yes (RBAC) |
-| GET | `/homepage` | List homepage sections | Yes (RBAC) |
-| POST | `/homepage` | Create homepage section | Yes (RBAC) |
-| PUT | `/homepage/:id` | Update homepage section | Yes (RBAC) |
-| GET | `/shop-pages` | List shop pages | Yes (RBAC) |
-| POST | `/shop-pages` | Create shop page | Yes (RBAC) |
-| PUT | `/shop-pages/:id` | Update shop page | Yes (RBAC) |
-| GET | `/auth-pages` | List auth pages | Yes (RBAC) |
-| PUT | `/auth-pages/:id` | Update auth page | Yes (RBAC) |
-| GET | `/onboarding` | Get onboarding config | Yes (RBAC) |
-| PUT | `/onboarding` | Update onboarding config | Yes (RBAC) |
-| GET | `/announcements` | List announcements | Yes (RBAC) |
-| POST | `/announcements` | Create announcement | Yes (RBAC) |
-| PUT | `/announcements/:id` | Update announcement | Yes (RBAC) |
-| GET | `/media` | List media files | Yes (RBAC) |
-| POST | `/media` | Upload media | Yes (RBAC) |
-| DELETE | `/media/:id` | Delete media | Yes (RBAC) |
-| GET | `/redirects` | List redirects | Yes (RBAC) |
-| POST | `/redirects` | Create redirect | Yes (RBAC) |
-| PUT | `/redirects/:id` | Update redirect | Yes (RBAC) |
-| DELETE | `/redirects/:id` | Delete redirect | Yes (RBAC) |
-
-#### Finder (`/api/finder`)
-
-| Method | Endpoint | Description | Auth Required |
-|--------|----------|-------------|---------------|
-| GET | `/tags/:tagId` | View pet information | No* |
-| POST | `/tags/:tagId/notify` | Notify owner | No* |
-| POST | `/tags/:tagId/location` | Share location | No* |
-| GET | `/tags/:tagId/found-timer` | Get found timer status | No |
-| POST | `/tags/:tagId/reminders` | Set reminders | No |
-
-*Rate-limited and CAPTCHA-protected in production
-
-#### Public CMS (`/api/public/cms`)
-
-| Method | Endpoint | Description | Auth Required |
-|--------|----------|-------------|---------------|
-| GET | `/pages/:slug` | Get page content | No |
-| GET | `/navigation` | Get navigation | No |
-| GET | `/footer` | Get footer | No |
-| GET | `/settings` | Get public settings | No |
-| GET | `/announcements` | Get active announcements | No |
-| GET | `/homepage` | Get homepage sections | No |
-| GET | `/onboarding` | Get onboarding config | No |
-
----
-
-## Authentication and Security
-
-### Authentication Mechanism
-
-PawTag uses JWT-based authentication with refresh tokens:
-
-- **Access Token:** Short-lived (30 minutes), contains `{ id, email, role }`
-- **Refresh Token:** Long-lived (30 days), stored in database, rotated on each use
-- **Token Storage:** localStorage (web), expo-secure-store (mobile)
-
-### Token Flow
-
-```mermaid
-sequenceDiagram
-    participant Client
-    participant API
-    participant DB
-
-    Client->>API: POST /auth/login
-    API->>DB: Verify credentials
-    API->>Client: { accessToken, refreshToken }
-    
-    Client->>API: GET /resource (with accessToken)
-    API->>API: Verify JWT
-    API->>Client: { data }
-    
-    Note over Client,API: When accessToken expires...
-    
-    Client->>API: POST /auth/refresh-token
-    API->>DB: Verify refresh token
-    API->>Client: { new accessToken, new refreshToken }
-```
-
-### Security Measures
-
-- **Password Hashing:** bcrypt with 12 salt rounds
-- **JWT Signing:** HS256 with configurable secret
-- **Rate Limiting:** DB-driven, configurable per endpoint
-- **CAPTCHA:** Math-based, required after 2+ failed login attempts
-- **Account Lockout:** After 5 failed attempts, locked for 30 minutes
-- **MFA:** Email/phone OTP, configurable per role
-- **CORS:** Origin allowlisting
-- **Security Headers:** Helmet (CSP, CORP disabled for dev)
-- **Input Validation:** Zod schemas on all endpoints
-- **Audit Logging:** SHA-256 hash chain for tamper evidence
-
-### Dev-Time Email Routing
-
-In development, when `mfa.testMode` is `true` (default via seed):
-- Registration/email-verification links → sent to test email (`mfa.testEmail`)
-- Login MFA OTPs → sent to test email
-- Phone (SMS) OTPs → printed in API terminal + emailed to test email
-
-This allows registration with any email while receiving links/codes in a real inbox.
-
----
-
-## Testing
-
-### Test Structure
+The checked-in starting point is:
 
 ```text
-tests/
-├── unit/              → Unit tests (25 files)
-├── integration/       → Integration tests (32 files, MongoDB Memory Server)
-├── smoke/             → API smoke tests (1 file)
-├── regression/        → Regression tests (2 files)
-├── setup.ts           → Test setup
-└── AUDIT-REPORT.md    → Audit report
+packages/api/.env.example
 ```
 
-### Test Commands
+The application reads additional integration/observability variables in code, so `.env.example` should be kept synchronized as integrations evolve.
 
-```bash
-# Run all tests
-pnpm test
+## Core variables
 
-# Run specific suites
-pnpm test:unit           # 25 unit test files
-pnpm test:integration    # 32 integration test files
-pnpm test:smoke          # 1 smoke test file
-pnpm test:regression     # 2 regression test files
+| Variable | Purpose | Production expectation |
+|---|---|---|
+| `NODE_ENV` | Runtime mode | `production` in live API |
+| `PORT` | API port | Deployment-specific |
+| `DB_URL` | MongoDB connection | Required |
+| `JWT_SECRET` | JWT signing secret | Required; strong secret |
+| `JWT_ACCESS_EXPIRES_IN` | Access-token lifetime | Review before launch |
+| `REFRESH_TOKEN_EXPIRES_IN_DAYS` | Refresh lifetime | Review before launch |
+| `ALLOWED_ORIGINS` | CORS origins | Explicit live domains |
+| `FRONTEND_URL` | Customer web URL | Live customer domain |
+| `ADMIN_URL` | Admin URL | Live admin domain |
+| `FINDER_URL` | Finder URL | Live finder domain |
 
-# Run with coverage
-pnpm test:coverage
+## Bootstrap variables
 
-# Run in watch mode
-pnpm test:watch
-```
+| Variable | Purpose |
+|---|---|
+| `BOOTSTRAP_ADMIN_EMAIL` | Initial admin email |
+| `BOOTSTRAP_ADMIN_PASSWORD` | Initial admin password |
+| `BOOTSTRAP_TEST_EMAIL` | Development test user |
+| `BOOTSTRAP_TEST_PASSWORD` | Development test password |
 
-### Test Configuration
+## Payments
 
-- **Test Runner:** Vitest 4.1
-- **Test Environment:** Node.js
-- **Database:** MongoDB Memory Server (in-memory)
-- **Coverage Provider:** v8
-- **Coverage Thresholds:** 15% lines, 15% functions, 10% branches, 15% statements
+| Variable | Purpose |
+|---|---|
+| `STRIPE_SECRET_KEY` | Stripe server API key |
+| `STRIPE_WEBHOOK_SECRET` | Stripe webhook signature secret |
+| `VITE_STRIPE_PUBLISHABLE_KEY` | Customer-web Stripe publishable key |
 
-### Test Statistics
+> [!CAUTION]
+> PawTag has code/configuration paths for demo/test payment behaviour. **A production deployment must explicitly prove that live checkout cannot silently operate in demo mode.** Production startup/configuration should fail safely when required payment configuration is missing or unsafe.
 
-- **Test Files:** 77 (25 unit, 32 integration, 1 smoke, 2 regression)
-- **Tests:** 1100+ passing (99% pass rate)
-- **Duration:** ~60 seconds
-- **Cart Service Tests:** 18 unit tests covering price re-validation, guest mode, price change detection, and cart configuration
+## Email and SMS
+
+Common variables used by the API include:
+
+- `RESEND_API_KEY`
+- `SMTP_HOST`
+- `SMTP_PORT`
+- `SMTP_SECURE`
+- `SMTP_USER`
+- `SMTP_PASS`
+- `ADMIN_ALERT_EMAIL`
+- `SMS_PROVIDER`
+- `TWILIO_ACCOUNT_SID`
+- `TWILIO_AUTH_TOKEN`
+- `TWILIO_FROM_NUMBER`
+
+## Storage
+
+- `STORAGE_DRIVER`
+- `LOCAL_UPLOADS_DIR`
+- `R2_ACCESS_KEY_ID`
+- `R2_SECRET_ACCESS_KEY`
+- `R2_BUCKET_NAME`
+- `R2_ENDPOINT`
+- `R2_PUBLIC_URL`
+
+Local filesystem storage is appropriate for development. Production storage should use durable object storage and must not rely on ephemeral container disk.
+
+## Push notifications
+
+The API contains Firebase-related configuration paths including:
+
+- `FIREBASE_PROJECT_ID`
+- `FIREBASE_CLIENT_EMAIL`
+- `FIREBASE_PRIVATE_KEY`
+
+The mobile application also depends on the Expo/EAS project configuration for production push behaviour.
+
+## Observability
+
+Common variables include:
+
+- `LOG_LEVEL`
+- `SENTRY_DSN`
+- `SENTRY_RELEASE`
+- `SENTRY_SAMPLE_RATE`
+- `SENTRY_TRACES_SAMPLE_RATE`
+- `SERVICE_NAME`
+- `SERVICE_VERSION`
+- `OTEL_EXPORTER_OTLP_ENDPOINT`
+- `OTEL_SAMPLE_RATE`
+- `OTEL_CONSOLE_EXPORTER`
+
+## Other integrations
+
+The codebase also contains integration/configuration paths for shipping/address services and Xero, including variables such as:
+
+- `SHIPPING_PROVIDER_API_KEY`
+- `NZPOST_CLIENT_ID`
+- `COMMERCE_SHIPPING_NZPOST_CLIENT_ID`
+- `XERO_CLIENT_ID`
+- `XERO_CLIENT_SECRET`
+- `XERO_REDIRECT_URI`
+
+Do not configure integrations merely because support exists in code. Enable only the capabilities required by the current launch scope.
 
 ---
+
+# Running the Platform
+
+## All browser/API applications
+
+```bash
+pnpm dev:all
+```
+
+This starts:
+
+- API: `http://localhost:5000`
+- Customer web: `http://localhost:3000`
+- Admin: `http://localhost:3001`
+- Finder: `http://localhost:3003`
+
+## Individual services
+
+```bash
+pnpm dev:api
+pnpm dev:web
+pnpm dev:admin
+pnpm dev:finder
+```
+
+## Mobile
+
+```bash
+cd apps/mobile
+pnpm start
+```
+
+Or:
+
+```bash
+pnpm android
+pnpm ios
+```
+
+Native features such as NFC, push notifications and some camera behaviour require appropriate physical-device builds/configuration and should not be considered validated solely through a simulator or Expo web mode.
+
+## API documentation
+
+When the API is running:
+
+```text
+http://localhost:5000/api/docs
+http://localhost:5000/api/docs.json
+```
+
+Swagger coverage is useful but should not be assumed to enumerate every implementation detail or guarantee endpoint correctness.
+
+---
+
+# Build, Typecheck, Lint and Tests
 
 ## Build
 
-### Build Commands
+```bash
+pnpm build
+```
+
+Individual builds:
 
 ```bash
-# Build all packages
-pnpm build
-
-# Build individual packages
+pnpm build:shared
+pnpm build:db
 pnpm build:api
-pnpm build:admin
 pnpm build:web
+pnpm build:admin
 pnpm build:finder
+```
 
-# Type-check all packages
+The root build currently builds shared/db first and then API/admin/web/finder.
+
+Mobile production builds are managed separately through Expo/EAS rather than the root `pnpm build` command.
+
+## Typecheck
+
+```bash
 pnpm typecheck
+```
 
-# Lint all packages
+## Lint
+
+```bash
 pnpm lint
 ```
 
-### Build Output
-
-- **API:** Compiled to `packages/api/dist/`
-- **Admin:** Compiled to `apps/admin/dist/`
-- **Web:** Compiled to `apps/web/dist/`
-- **Finder:** Compiled to `apps/finder/dist/`
-
-### Build Verification
+## Tests
 
 ```bash
-# Run build and verify no errors
-pnpm build
-
-# Run type-check
-pnpm typecheck
-
-# Run lint
-pnpm lint
-
-# Run tests
+# Default Vitest run
 pnpm test
+
+# Suites
+pnpm test:unit
+pnpm test:integration
+pnpm test:smoke
+pnpm test:regression
+
+# Combined named suites
+pnpm test:all
+
+# Coverage
+pnpm test:coverage
+
+# Watch mode
+pnpm test:watch
 ```
 
----
+## Mobile E2E
 
-## Deployment
-
-### Docker Deployment
+From `apps/mobile`:
 
 ```bash
-# Build and start all services
-docker-compose -f docker/docker-compose.yml up -d
-
-# Build individual services
-docker-compose -f docker/docker-compose.yml build api
-docker-compose -f docker/docker-compose.yml build web
-docker-compose -f docker/docker-compose.yml build admin
-docker-compose -f docker/docker-compose.yml build finder
+pnpm e2e
+pnpm e2e:qr
+pnpm e2e:nfc
+pnpm e2e:lost
 ```
 
-### Docker Services
+The repository contains Maestro flows for QR activation, NFC activation and lost mode. These flows should be validated on appropriately configured device builds before mobile launch.
 
-| Service | Port | Purpose |
-|---------|------|---------|
-| api | 5000 | Express backend |
-| web | 3000 | Public site |
-| admin | 3001 | Admin portal |
-| finder | 3003 | Finder portal |
+## Current coverage configuration
 
-### Production Deployment (Pending)
+`vitest.config.ts` currently enforces relatively low global API thresholds:
 
-Production deployment requires:
+- lines: 15%
+- functions: 15%
+- branches: 10%
+- statements: 15%
 
-1. **Render account** for API hosting
-2. **Vercel account** for frontend hosting
-3. **MongoDB Atlas** production cluster
-4. **Stripe** live-mode account
-5. **Resend/Twilio** production accounts
-6. **Cloudflare R2** bucket for file storage
-7. **Sentry** project for error tracking
+These thresholds are a floor, **not a readiness target**.
 
-### Deployment Architecture
+For MVP, confidence should come from testing the important business journeys and failure paths, not from chasing an arbitrary percentage.
 
-```mermaid
-flowchart TD
-    subgraph Frontend
-        Vercel["Vercel<br/>(Web, Admin, Finder)"]
-    end
-    
-    subgraph Backend
-        Render["Render<br/>(API)"]
-    end
-    
-    subgraph Database
-        Atlas["MongoDB Atlas"]
-    end
-    
-    subgraph Services
-        Stripe["Stripe"]
-        Resend["Resend"]
-        Twilio["Twilio"]
-        R2["Cloudflare R2"]
-        Sentry["Sentry"]
-    end
-    
-    Vercel --> Render
-    Render --> Atlas
-    Render --> Stripe
-    Render --> Resend
-    Render --> Twilio
-    Render --> R2
-    Render --> Sentry
+## CI
+
+`.github/workflows/ci.yml` currently runs on pushes/pull requests to `main` and `develop` and includes:
+
+- smoke tests;
+- unit tests;
+- integration tests with MongoDB;
+- regression tests;
+- TypeScript typecheck;
+- root build;
+- coverage generation on `main`.
+
+The root CI workflow does **not currently constitute full browser/native end-to-end certification**.
+
+---
+
+# Database
+
+PawTag uses MongoDB with Mongoose.
+
+`packages/db/src/models` contains the persistent domain models for areas including:
+
+- accounts/authentication;
+- pets/tags;
+- finder/recovery events;
+- notifications;
+- products/catalog;
+- carts/orders/payments/refunds;
+- subscriptions/rewards;
+- fulfilment/shipping;
+- CMS;
+- RBAC;
+- audit/system logs;
+- integrations/settings.
+
+## Database guidance
+
+When modifying data behaviour:
+
+- enforce important invariants server-side;
+- use unique/compound indexes when they protect correctness or real query patterns;
+- avoid adding indexes speculatively without understanding write/storage cost;
+- use transactions selectively for multi-document operations that must remain consistent;
+- design retries/idempotency for operations involving external systems;
+- use explicit ownership conditions in customer-scoped queries;
+- treat soft-delete filters consistently;
+- test concurrent commerce/recovery scenarios where duplicate processing matters.
+
+## Utility scripts
+
+The repository includes scripts for indexes, backfills and migrations under `scripts/`.
+
+Treat any data-changing script as an operational change:
+
+1. review it;
+2. run against staging/test data first;
+3. capture backups where appropriate;
+4. make it idempotent or explicitly one-time;
+5. document the expected result;
+6. verify before running against production.
+
+---
+
+# Authentication and Authorization
+
+The application contains:
+
+- JWT access tokens;
+- persisted refresh tokens;
+- refresh-token rotation/revocation;
+- password hashing;
+- email/phone verification flows;
+- password-reset flows;
+- MFA/OTP capability;
+- account lockout/rate-limit mechanisms;
+- RBAC permissions for staff/admin actions;
+- audit logging.
+
+## Current web token model
+
+The browser clients currently use local-storage-based token storage through the shared API client.
+
+That architecture is functional but increases impact if browser XSS occurs. Migration of long-lived browser credentials toward secure `HttpOnly` cookie-based handling is a security-hardening consideration.
+
+Do not make authentication architecture changes casually. Changes must preserve:
+
+- refresh rotation;
+- logout/session invalidation;
+- admin/customer separation;
+- mobile SecureStore support;
+- CSRF protections if cookie-based authentication is introduced.
+
+## Authorization rule
+
+Authentication is not authorization.
+
+Every customer-owned resource must be protected by server-side ownership checks. Never rely on:
+
+- hidden UI controls;
+- route names;
+- frontend state;
+- possession of a resource/payment identifier;
+- client-side validation.
+
+Staff/admin operations must use the correct RBAC permission and should generate appropriate audit records for sensitive actions.
+
+---
+
+# Finder Experience
+
+The Finder experience is a **tier-one critical workflow**.
+
+The intended flow is:
+
+```text
+Scan QR/NFC
+   ↓
+Load public pet/recovery view
+   ↓
+Finder decides whether/how to contact owner
+   ↓
+Optional location sharing with clear consent
+   ↓
+Notify owner
+   ↓
+Clear confirmation + next-step guidance
 ```
 
-### CI/CD Pipeline (GitHub Actions)
+## Finder rules
 
-**File:** `.github/workflows/ci.yml`
+The Finder application must remain:
 
-Triggers on push/PR to `main` and `develop`. **7 jobs:**
-1. Smoke Tests (5 min timeout)
-2. Unit Tests (10 min timeout)
-3. Integration Tests (15 min timeout, MongoDB service container)
-4. Regression Tests (10 min timeout)
-5. Type Check (10 min timeout)
-6. Build All Packages (15 min timeout)
-7. Test Coverage (main branch only, depends on smoke+unit+regression)
+- accountless;
+- mobile-first;
+- understandable under stress;
+- tolerant of poor connectivity;
+- careful with location consent;
+- explicit about success/failure;
+- resistant to abuse/spam;
+- intentionally minimal in the private data it exposes.
 
----
+## Public-data design
 
-## Background Jobs and Scheduled Tasks
+Do not return an internal Pet document shape to an anonymous finder and rely on the frontend to hide fields.
 
-### Scheduled Services
+Use an explicit public Finder DTO/projection containing only information intentionally approved for public display.
 
-| Service | Interval | Purpose |
-|---------|----------|---------|
-| `startReminderService()` | 1 hour | Finder reminders (24h after scan) + onboarding nudges (3+ days skipped) |
-| `startSubscriptionService()` | 1 minute | Subscription expiry checks, grace period transitions, auto-renewal, payment retries |
-| `startEscalationService()` | 1 minute | Overdue escalation detection (30-min deadline after pet found) |
-| `startLowStockService()` | 24 hours (1h initial delay) | Low stock alerts via email + in-app notification to admin |
+Health, owner-contact and identifier data require special care.
 
-### Job Behavior
+## Production validation
 
-- **Retry:** Jobs run on fixed intervals, no retry logic
-- **Failure Handling:** Jobs log errors and continue on next interval
-- **Concurrency:** Jobs run in the main process, no separate workers
+A Finder feature is not considered complete until its client/server contract has been exercised under **production-like middleware/configuration**, including abuse-protection behaviour.
+
+This matters because development/test bypasses can hide integration defects that only appear under `NODE_ENV=production` semantics.
 
 ---
 
-## Integrations
+# Commerce and Payments
 
-### Stripe (Payments)
+PawTag Commerce includes code for:
 
-- **Purpose:** Payment processing, subscriptions, customer portal
-- **Communication:** REST API + Webhooks
-- **Authentication:** API key (`STRIPE_SECRET_KEY`)
-- **Failure Impact:** **Critical** — no purchases or subscriptions
-- **Demo Mode:** Fallback when key not set
+- catalog/products/variants;
+- carts;
+- server-side price calculation/revalidation;
+- promo/discount handling;
+- shipping;
+- Stripe PaymentIntents;
+- pending orders;
+- orders;
+- payment transactions;
+- inventory reservation/movement;
+- fulfilment/shipments;
+- invoices;
+- cancellations;
+- returns/refunds;
+- subscriptions/Guardian-related billing;
+- reconciliation jobs and operational admin tools.
 
-### Resend (Email)
+## Commerce correctness principles
 
-- **Purpose:** Transactional email (verification, notifications, invoices)
-- **Communication:** REST API
-- **Authentication:** API key
-- **Failure Impact:** **High** — emails logged to console
-- **Dev Mode:** Sends from `onboarding@resend.dev`
+### Never trust client pricing
 
-### Twilio (SMS)
+The server must remain authoritative for:
 
-- **Purpose:** Phone verification OTP
-- **Communication:** REST API
-- **Authentication:** Account SID + Auth Token
-- **Failure Impact:** **Medium** — OTP falls back to demo mode (logged to console)
+- product price;
+- variant/customization price;
+- discounts;
+- loyalty/reward application;
+- shipping;
+- tax/GST treatment;
+- order totals.
 
-### Firebase (Push Notifications)
+### Make retries safe
 
-- **Purpose:** Push notifications to mobile and web
-- **Communication:** Firebase Cloud Messaging
-- **Authentication:** Service account key
-- **Failure Impact:** **Medium** — push notifications fail silently
+Financial actions may be retried due to:
 
-### Cloudflare R2 (File Storage)
+- browser refresh;
+- network timeout;
+- mobile reconnect;
+- provider retry;
+- webhook retry;
+- worker restart;
+- user double submission.
 
-- **Purpose:** Pet photos, product images, PDFs
-- **Communication:** S3-compatible API
-- **Authentication:** Access key + Secret key
-- **Failure Impact:** **Low** — falls back to local disk in dev
+Important actions therefore need explicit idempotency behaviour.
 
-### Sentry (Error Tracking)
+### Payment success is not the end of the transaction
 
-- **Purpose:** Error tracking and performance monitoring
-- **Communication:** Sentry SDK
-- **Authentication:** DSN
-- **Failure Impact:** **Low** — errors only visible in server logs
+A customer payment can succeed while a later local operation fails.
 
-### Address Autocomplete (Photon/NZ Post)
+The system must be able to detect and repair states such as:
 
-- **Purpose:** Address autocomplete for checkout, profile, onboarding
-- **Communication:** Backend proxy to provider API
-- **Authentication:** NZ Post requires OAuth 2.0; Photon is free (no key)
-- **Failure Impact:** **Low** — manual address entry fallback
-- **Default Provider:** Photon (free, ~80-85% NZ accuracy)
-- **Admin Config:** `/address-autocomplete` — provider selector, credentials, default country
-- **Settings:** `addressAutocomplete.provider`, `addressAutocomplete.nzpostClientId`, `addressAutocomplete.nzpostClientSecret`, `addressAutocomplete.defaultCountry`
-- **Integration:** Used in Checkout, Profile, OnboardingWizard, Admin Users pages
-
----
-
-## Notifications
-
-### Notification Types
-
-| Type | Trigger | Channels |
-|------|---------|----------|
-| `pet_lost` | Owner marks pet as lost | In-app, Push, Email |
-| `pet_found` | Finder reports found pet | In-app, Push, Email |
-| `finder_scan` | Finder scans tag | In-app, Push |
-| `finder_reminder` | 24h after finder scan | In-app, Email |
-| `order_update` | Order status changes | In-app, Push, Email |
-| `new_order` | New order placed | In-app, Email (admin) |
-| `subscription_expiring` | Subscription expiring | In-app, Email |
-| `tag_expiry_warning` | Tag expiring | In-app, Email |
-| `referral_reward` | Referral bonus | In-app, Email |
-| `escalation` | Pet found, owner unresponsive | In-app, Push, Email |
-| `support_request` | New support request | In-app (admin) |
-| `low_stock` | Product low stock | In-app (admin) |
-| `system` | System announcements | In-app |
-
-### Notification Delivery
-
-The `notification-delivery.service.ts` handles unified delivery:
-1. Creates in-app notification record
-2. Optionally sends push notification (if user has push token)
-3. Optionally sends email (if user has email notifications enabled)
-4. Respects user notification preferences
-
-### User Notification Preferences
-
-```typescript
-{
-  email: true,
-  push: true,
-  inApp: true,
-  channels: {
-    petFound: true,
-    orderUpdate: true,
-    subscriptionReminder: true,
-    referral: true,
-    marketing: false
-  }
-}
+```text
+Stripe succeeded
+but
+order/tag/subscription/invoice/inventory finalization did not fully complete
 ```
 
----
+Do not solve this by swallowing errors. Persist enough state to reconcile or alert an operator.
 
-## Logging and Monitoring
+### Webhook integrity
 
-### Application Logging
+Stripe webhook handling must preserve the raw request body required for signature verification and should reject unverifiable events.
 
-- **API Logging:** Pino (structured JSON logging)
-- **HTTP Logging:** Morgan (request/response logging)
-- **Log Levels:** `silent`, `fatal`, `error`, `warn`, `info`, `debug`, `trace`
-
-### System Logging (MongoDB)
-
-All application logs are stored in MongoDB via Pino with a wrapper-based level interception:
-- **Logger:** `packages/api/src/lib/logger.ts` — wraps each level method to fire `writeLog()`
-- **Log writer:** `packages/api/src/lib/log-writer.ts` — batched async writes to `SystemLog` collection
-- **Settings cache:** `packages/api/src/lib/system-log-settings.ts` — 60s TTL cache
-- **Model:** `packages/db/src/models/SystemLog.ts` — TTL index + 8 compound indexes
-- **Admin UI:** Viewer with search, filters, pagination, detail drawer, purge, export (CSV/JSON/PDF)
-- **Settings UI:** Master toggle, level/category toggles, sampling sliders, retention
-- **RBAC:** `systemlogs.read` (ADMIN, CUSTOMER_SERVICE, WEBSITE_EDITOR), `systemlogs.admin` (ADMIN only)
-- **Manual purge:** `POST /admin/system-logs/purge` with date range presets + custom range
-- **Settings:** 22 `systemLog.*` settings (seeded in `seed-cms.ts`)
-
-### Audit Logging
-
-Enterprise-grade audit system with:
-- **SHA-256 hash chain:** Each event links to the previous via `previousEventHash`
-- **UUIDv7 event IDs:** Time-sortable
-- **Actor types:** USER, ADMIN, CSR, WEB_EDITOR, SERVICE, SYSTEM, FINDER, etc.
-- **Event categories:** AUTH, CREATE, UPDATE, DELETE, READ, EXPORT, FINANCIAL, SECURITY, etc.
-- **Severity levels:** INFO, LOW, MEDIUM, HIGH, CRITICAL
-- **Sensitive field redaction:** Passwords, tokens, API keys automatically redacted
-- **Policy engine:** Configurable per-category and per-actor toggles
-- **Retention policies:** Configurable per category (90 days standard, 7 years for auth/financial)
-- **Legal holds:** Place/remove holds on specific events
-- **Audit subsystem files:** `packages/api/src/services/audit/` (6 files)
-
-### Error Tracking
-
-- **Sentry:** Initialized in production, captures errors with context
-- **Health Check:** `GET /health` endpoint for uptime monitoring
+Webhook event IDs should remain idempotently tracked to prevent replay/duplicate side effects.
 
 ---
 
-## Troubleshooting
+# Cart UX Direction
 
-### Port Conflicts
+The target PawTag cart is **not** a single flat list with a basic subtotal.
 
-If a port is already in use, stop the conflicting process or change the port in the app's `vite.config.ts`.
+The recommended MVP commerce pattern is:
 
-### Database Connection
+## Mini-cart drawer
 
-Ensure `DB_URL` in `packages/api/.env` points to a valid MongoDB instance. For local development, use MongoDB Atlas free tier or a local MongoDB server.
+Use the drawer for immediate feedback after add-to-cart:
 
-### TypeScript Errors
+- product image/name;
+- selected variant;
+- engraving/customization summary;
+- quantity control;
+- concise price;
+- obvious remove control;
+- cart item count;
+- subtotal/estimated summary;
+- prominent `View cart` / `Checkout` actions.
 
-Run `pnpm typecheck` to see all type errors across the monorepo. The root `tsconfig.base.json` provides shared compiler options.
+The mini-cart should be fast and compact. It should **not** be forced to carry the full checkout-information architecture.
 
-### Build Failures
+## Full cart page — premium desktop layout
 
-1. Clean node_modules: `pnpm clean`
-2. Reinstall dependencies: `pnpm install`
-3. Run typecheck: `pnpm typecheck`
-4. Run build: `pnpm build`
+Desktop/tablet target:
 
-### Test Failures
-
-1. Ensure MongoDB Memory Server is running (should be automatic)
-2. Check for port conflicts
-3. Run specific test suite: `pnpm test:integration`
-
-### Email Not Sending
-
-- Check `SMTP_*` environment variables
-- In development, emails are logged to console
-- Verify Resend API key if using Resend
-
-### SMS Not Sending
-
-- Check `SMS_PROVIDER` is set to `twilio` (not `demo`)
-- Verify Twilio credentials
-- In demo mode, OTPs are printed in console
-
----
-
-## Development Guidelines
-
-### Code Conventions
-
-- **TypeScript:** Strict mode enabled
-- **Formatting:** Prettier (semi, trailing comma, single quotes, 100 char width)
-- **Linting:** ESLint with TypeScript plugin
-- **Imports:** Absolute imports using `@pawtag/*` aliases
-- **Naming:** camelCase for variables/functions, PascalCase for components/classes
-
-### Database Conventions
-
-- **Model Files:** `packages/db/src/models/ModelName.ts`
-- **Schema Fields:** Use `required`, `default`, `enum`, `min`, `max` validators
-- **Indexes:** Define in schema with `{ index: true }` or `schema.index()`
-- **Soft Deletes:** Use `deletedAt` field instead of hard deletes
-- **Timestamps:** Enable `createdAt` and `updatedAt` where appropriate
-
-### API Conventions
-
-- **Route Files:** `packages/api/src/routes/routeName.ts`
-- **Response Format:** `{ success: boolean, data?: any, error?: string }`
-- **Validation:** Zod schemas in `middleware/schemas.ts`
-- **Authentication:** `authenticate` middleware for protected routes
-- **Authorization:** `requirePermission('resource.action')` middleware
-- **Audit Logging:** Automatic via `audit.ts` middleware
-
-### Frontend Conventions
-
-- **Component Files:** PascalCase filenames (e.g., `UserProfile.tsx`)
-- **Page Files:** PascalCase with `Page` suffix (e.g., `DashboardPage.tsx`)
-- **Context Files:** PascalCase with `Context` suffix (e.g., `AuthContext.tsx`)
-- **Styling:** Tailwind CSS utility classes
-- **State Management:** React Context for global state
-
-### Testing Conventions
-
-- **Test Files:** `*.test.ts` or `*.test.tsx`
-- **Test Location:** Colocated with source or in `tests/` directory
-- **Test Structure:** Describe/It blocks with clear descriptions
-- **Mocking:** Use `vi.mock()` for module mocking
-- **Database Tests:** Use MongoDB Memory Server
-
----
-
-## Git Workflow
-
-### Branch Strategy
-
-- `main` — Production-ready code
-- `develop` — Development integration branch
-- `feature/*` — Feature branches
-- `fix/*` — Bug fix branches
-- `release/*` — Release preparation branches
-
-### Commit Conventions
-
-Use conventional commits:
-
-```
-feat: add new feature
-fix: bug fix
-docs: documentation changes
-style: formatting changes
-refactor: code refactoring
-test: adding tests
-chore: maintenance tasks
+```text
+┌───────────────────────────────────────────────────────────────┐
+│                         YOUR CART                             │
+├────────────────────────────────────────────┬──────────────────┤
+│                                            │                  │
+│  ~70% CART CONTENT                         │  ~30% SUMMARY    │
+│                                            │  sticky          │
+│  Product card                              │                  │
+│  Image                                     │  Subtotal        │
+│  Product / variant                         │  Discounts       │
+│  Engraving / personalization               │  Shipping info   │
+│  Quantity                                  │  GST/tax note    │
+│  Availability / changes                    │  Gold benefits   │
+│  Unit + line price                         │  Savings         │
+│                                            │  ─────────────   │
+│  Additional products                       │  Estimated total │
+│                                            │                  │
+│  Relevant benefits / reassurance           │  CHECKOUT CTA    │
+│                                            │                  │
+└────────────────────────────────────────────┴──────────────────┘
 ```
 
-### Pull Request Process
+### Desktop principles
 
-1. Create feature branch from `develop`
-2. Make changes, ensure `pnpm typecheck` and `pnpm test` pass
-3. Commit with descriptive message
-4. Push and create pull request
-5. CI runs tests automatically
-6. Review and merge to `develop`
-7. `develop` merges to `main` for production deployment
+- roughly **70/30** content-to-summary split;
+- sticky order summary while cart items scroll;
+- strong product imagery and hierarchy;
+- visible personalization/engraving;
+- explicit price/inventory changes;
+- transparent savings and totals;
+- Gold/Guardian benefits shown once, clearly;
+- useful reassurance near checkout without clutter;
+- accessible buttons and quantity controls;
+- no decorative motion that competes with checkout.
 
----
+### Mobile principles
 
-## Known Limitations
+Do **not** force 70/30 onto mobile.
 
-### Current Limitations
+Use a deliberate single-column mobile composition with:
 
-1. **Token Storage:** JWT tokens stored in localStorage (vulnerable to XSS)
-   - See `docs/security_improvement.md` for improvement plan
-2. **Password Rules:** Minimum 8 characters (industry best practice is 12+)
-3. **No HIBP Integration:** Breached passwords not checked
-4. **Rate Limiting:** Per-process in-memory (not Redis-backed for multi-instance)
+- product cards first;
+- condensed summary below or in a clear collapsible section;
+- optionally a sticky bottom checkout bar with total + CTA;
+- large touch targets;
+- no hover-dependent interactions;
+- preserved context after quantity/remove changes.
 
-### Pending Implementation
+### Accessibility
 
-1. **CI/CD Pipeline:** GitHub Actions implemented, Render/Vercel deployment pending
-2. **E2E Tests:** Maestro tests for mobile, Playwright for web pending
-3. **Frontend Sentry:** Error boundaries for all frontend apps
-4. **Affiliate Marketplace:** Phases 27-32 not started
+The drawer/page must include:
 
-### Technical Debt
+- accessible names for icon-only actions;
+- keyboard-operable quantity/remove controls;
+- appropriate dialog semantics/focus management for the drawer;
+- visible focus states;
+- live feedback where totals or validation change;
+- reduced-motion respect.
 
-- Legacy `role: string` field on User model (being replaced by RBAC)
-
----
-
-## Future Considerations
-
-### Planned Features (Phases 27-32)
-
-- Affiliate marketplace with Amazon Associates integration
-- Affiliate storefront with browse and product pages
-- Click tracking and redirect service
-- Conversion and commission ingestion
-
-### Potential Improvements
-
-- Migrate JWT tokens to httpOnly cookies
-- Add HIBP integration for breached password checking
-- Add Redis-backed rate limiting for multi-instance deployment
-- Add TOTP (authenticator app) support for MFA
-- Implement E2E test suite with Playwright
+The cart redesign should **reuse the existing commerce/domain logic** unless correctness findings require service changes. Do not rewrite the cart backend solely to achieve a new visual layout.
 
 ---
 
-## License
+# Mobile Strategy
 
-Not currently documented / unable to determine from the repository.
+The goal is **high reuse without forcing artificial 100% UI sharing**.
+
+## Share where it makes sense
+
+Good cross-platform candidates include:
+
+- API endpoint definitions;
+- DTOs/types;
+- validation/business rules;
+- formatting helpers;
+- domain state/reducers where platform-neutral;
+- design tokens;
+- component contracts/specifications;
+- analytics/event names.
+
+## Keep platform-specific where appropriate
+
+Native-specific implementations should remain native for areas such as:
+
+- navigation;
+- camera;
+- QR scanning;
+- NFC;
+- push notifications;
+- permissions;
+- secure storage;
+- gestures;
+- native pickers/controls;
+- app lifecycle;
+- deep links/background behaviour.
+
+## UI architecture direction
+
+`packages/ui` should remain a **web React component library**.
+
+Do not attempt to render existing DOM/Tailwind components directly inside React Native.
+
+A future platform-neutral design-token package can provide one source of truth for:
+
+- semantic colours;
+- spacing;
+- typography scales;
+- radii;
+- motion duration/easing;
+- status semantics.
+
+Web and mobile can then render those shared concepts using their appropriate platform components.
+
+Do not migrate the whole product to React Native Web, Tamagui, NativeWind, gluestack or another cross-platform framework simply to increase code-sharing percentage. Introduce a new framework only if a real measured problem justifies the migration cost.
 
 ---
 
-## Documentation
+# Admin Portal
+
+The Admin Portal is an operational interface, not a consumer mobile product.
+
+MVP priorities are:
+
+- correctness;
+- RBAC;
+- clear permission boundaries;
+- safe destructive actions;
+- auditability;
+- efficient desktop workflows;
+- searchable/filterable data;
+- accessible dialogs/forms/tables;
+- clear financial state;
+- clear success/failure feedback.
+
+High-risk actions include:
+
+- refunding money;
+- cancelling orders;
+- changing subscriptions;
+- changing payment/test configuration;
+- changing roles/permissions;
+- destructive content/media actions;
+- operational overrides.
+
+Sensitive operations should provide appropriate confirmation and audit context, including actor, timestamp, previous/current state and external transaction identifiers where relevant.
+
+Avoid spending first-MVP effort making every admin table perfect on narrow mobile screens unless staff genuinely need that workflow in the field.
+
+---
+
+# Background Jobs
+
+The API currently starts multiple scheduled/background services from the main API process.
+
+Current job categories include behaviour for areas such as:
+
+- reminders;
+- subscription lifecycle;
+- escalation;
+- low stock;
+- pet milestones;
+- rewards;
+- orphan payment detection;
+- order auto-cancellation;
+- shipment tracking polling;
+- webhook retry;
+- payment reconciliation;
+- refund reconciliation.
+
+## Production rule
+
+Do not horizontally scale API instances while assuming process-local timers will magically become distributed jobs.
+
+For first-customer MVP, a simple architecture is acceptable:
+
+```text
+HTTP API process(es)
+        ↓
+      MongoDB
+
+ONE controlled worker/scheduler
+        ↓
+MongoDB + external providers
+```
+
+Alternatively, jobs that can execute from multiple instances must atomically claim/lease work and remain idempotent.
+
+A full enterprise queue platform is **not required for MVP** unless real workload/operational evidence justifies it.
+
+---
+
+# External Integrations
+
+The repository contains integration code/configuration for several external services.
+
+| Integration | Use |
+|---|---|
+| Stripe | Payments/subscriptions/refunds |
+| Resend / SMTP | Email |
+| Twilio | SMS/OTP |
+| Firebase / Expo | Push-related capabilities |
+| Cloudflare R2 | Durable object storage |
+| Shipping/address providers | Shipping/tracking/address assistance |
+| Xero | Accounting-related integration paths |
+| Sentry | Error monitoring |
+| OpenTelemetry | Tracing/telemetry |
+
+## Integration rule
+
+Every external integration needs explicit behaviour for:
+
+- credentials missing;
+- provider timeout;
+- provider error;
+- duplicate request/event;
+- retry;
+- local success + remote failure;
+- remote success + local failure;
+- staging vs production configuration.
+
+Demo fallbacks are useful during development, but **must never create false success in production**.
+
+---
+
+# Observability
+
+The API contains structured logging and monitoring foundations including:
+
+- Pino / pino-http;
+- database-backed system logging;
+- audit events;
+- Sentry integration;
+- OpenTelemetry tracing hooks;
+- request metrics middleware;
+- process-level fatal exception handling;
+- health-related routes.
+
+## Production-readiness rule
+
+Logging is not the same as monitoring.
+
+Before launch, validate that critical conditions create actionable signals, for example:
+
+- webhook processing failures;
+- paid-but-not-finalized orders;
+- reconciliation mismatches;
+- repeated notification failures;
+- worker/job failures;
+- elevated authentication abuse;
+- storage/provider outages;
+- API health degradation.
+
+An alert should have an owner and a response path.
+
+---
+
+# Production Readiness Gaps
+
+A code-level pre-MVP audit identified several areas that must be fixed or validated before real-customer launch.
+
+This section deliberately describes categories rather than publishing exploit instructions.
+
+## Must address before first customer
+
+### Finder production contract
+
+The Finder notify flow must be exercised under production-like CAPTCHA/abuse-protection configuration. Development/test bypasses must not hide client/server contract failures.
+
+### Payment/webhook correctness
+
+Verify raw Stripe webhook signature processing, event idempotency and provider failure handling end-to-end.
+
+### Checkout authorization
+
+Customer checkout/order/payment recovery paths must preserve strict ownership boundaries under every fallback/retry path.
+
+### Financial consistency and recovery
+
+Checkout involves multiple local/external operations. Define what must be atomic and what must enter a durable repair/reconciliation state when later steps fail.
+
+### Safe production payment configuration
+
+Production must not silently run demo/test payment behaviour when commerce is enabled.
+
+### Finder privacy projection
+
+Anonymous Finder responses must expose only explicitly approved public fields rather than broad internal health/contact subdocuments.
+
+### Background-job ownership
+
+Scheduled work needs either a single controlled worker or distributed claiming/idempotency before multiple API instances are used.
+
+### Browser/native E2E validation
+
+Critical cross-layer journeys need automated production-like tests. API unit/integration coverage alone is not sufficient.
+
+### Mobile launch gate
+
+Before mobile is treated as launch-ready, validate its authentication storage adapter, QR scanning, NFC decoding, push configuration, permissions and real-device lifecycle behaviour.
+
+### Deployment/recovery rehearsal
+
+Builds, production environment validation, database backup/restore, alerting and rollback must be exercised before first customer.
+
+## Security reporting
+
+If a detailed security audit or vulnerability report is maintained, keep exploit-sensitive details in an appropriate non-public engineering/security document rather than this README.
+
+---
+
+# Deployment
+
+The repository contains:
+
+- `docker/Dockerfile.api`
+- `docker/Dockerfile.web`
+- `docker/docker-compose.yml`
+- `docker/nginx.conf`
+- GitHub Actions CI
+- environment/release/rollback documentation under `docs/`.
+
+These are deployment foundations, **not proof of production readiness**.
+
+## Local Docker
+
+```bash
+docker compose -f docker/docker-compose.yml up -d
+```
+
+Build individual services as required:
+
+```bash
+docker compose -f docker/docker-compose.yml build api
+docker compose -f docker/docker-compose.yml build web
+docker compose -f docker/docker-compose.yml build admin
+docker compose -f docker/docker-compose.yml build finder
+```
+
+## Before production
+
+At minimum validate:
+
+1. clean build from the committed lockfile;
+2. actual production container/static builds;
+3. environment-variable fail-fast behaviour;
+4. MongoDB indexes/migrations/backfills;
+5. CORS/live domains;
+6. Stripe live/test separation and webhooks;
+7. durable media storage;
+8. outbound email/SMS behaviour;
+9. worker ownership;
+10. monitoring/alerts;
+11. backup restoration;
+12. rollback procedure;
+13. production-like E2E journeys.
+
+Do not choose Render, Vercel, AWS, Azure or any other hosting platform merely because old documentation names it. Choose hosting based on the current operational requirements and validate the actual deployment configuration used.
+
+---
+
+# AI-Assisted Development Rules
+
+PawTag has been developed heavily with AI assistance. AI coding is an accepted part of this project, but generated code must be treated like code from any other contributor: **inspect, test and verify it**.
+
+OpenCode/AI assistants should follow these rules.
+
+## 1. Read before editing
+
+Before changing a feature:
+
+- inspect the route/component/service/model involved;
+- inspect callers and tests;
+- inspect shared types/contracts;
+- search for duplicate implementations;
+- understand the failure path, not only the happy path.
+
+Do not infer behaviour from this README alone.
+
+## 2. Work in small work packets
+
+Prefer:
+
+> one problem → focused change → tests → verification → commit
+
+Avoid prompts such as:
+
+> "Make PawTag production-ready."
+
+Large autonomous refactors make regressions and hidden assumptions difficult to detect.
+
+## 3. Do not weaken security to make a test/UI work
+
+Never resolve an integration issue by:
+
+- removing authorization;
+- broadening resource queries;
+- bypassing ownership checks;
+- disabling CAPTCHA/rate limits in production;
+- accepting unsigned webhooks;
+- trusting client prices;
+- turning a provider error into fake success.
+
+Fix the actual client/server contract.
+
+## 4. Do not hide type problems with `as any`
+
+Use `any`/casts only when unavoidable and justified.
+
+If the compiler identifies a mismatch between async/sync storage, API types, model data or provider SDK shapes, fix the contract rather than suppressing it.
+
+## 5. Backend enforcement is authoritative
+
+Frontend validation improves UX. It is **not** a security/business-rule boundary.
+
+The API must enforce:
+
+- ownership;
+- permissions;
+- pricing;
+- inventory rules;
+- allowed state transitions;
+- refund/cancellation rules;
+- input validation.
+
+## 6. Preserve idempotency
+
+Any work involving payments, orders, inventory, notifications, refunds, webhooks or jobs must explicitly consider duplicate execution.
+
+## 7. Add regression tests for every production bug
+
+A bug fix is incomplete if the same bug can silently return later.
+
+For cross-layer defects, prefer a test at the layer that would actually have caught the issue.
+
+## 8. Do not over-engineer
+
+Do not introduce:
+
+- microservices;
+- Redis;
+- Kafka;
+- new state-management frameworks;
+- a new UI framework;
+- a repository-wide pattern rewrite
+
+unless a demonstrated current problem requires them.
+
+## 9. Keep documentation honest
+
+When functionality changes:
+
+- update relevant docs;
+- remove stale claims;
+- do not write "production-ready" without evidence;
+- describe limitations explicitly.
+
+## 10. Stop at acceptance criteria
+
+For phased MVP work, complete one defined work packet, verify it, report the changed files/tests, then stop for review rather than expanding scope opportunistically.
+
+---
+
+# Documentation Map
+
+The repository contains detailed documents under `docs/`. Useful starting points include:
 
 | Document | Purpose |
-|----------|---------|
-| `ARCHITECTURE.md` | System architecture overview |
-| `DESIGN.md` | Design system |
-| `AGENTS.md` | AI development guide |
-| `docs/developer-setup.md` | Local development setup |
-| `docs/environments.md` | Environment variable reference |
-| `docs/database-schema.md` | All 45 Mongoose models |
-| `docs/business-workflows.md` | Business logic flows |
-| `docs/security_improvement.md` | Security audit and improvement plan |
-| `docs/launch-checklist.md` | Pre-launch verification |
-| `docs/disaster-recovery.md` | Infrastructure failure recovery |
-| `docs/support-runbook.md` | Customer support procedures |
-| `docs/mobile-ux-audit.md` | Mobile UX quality audit |
-| `docs/release-process.md` | How to ship safely |
-| `docs/rollback.md` | How to undo deployments |
-| `docs/AI-THEME-ENGINE-IMPLEMENTATION.md` | AI theme engine implementation details |
-| `docs/deployment/staging.md` | Staging deployment guide |
-| `docs/deployment/production.md` | Production deployment guide |
-| `docs/deployment/mobile-release.md` | Mobile app store submission |
-| `docs/site-availability.md` | Maintenance/offline mode controls |
-| `docs/LOGGING.md` | Structured logging setup |
-| `docs/OBSERVABILITY-ARCHITECTURE.md` | Observability stack architecture |
+|---|---|
+| `docs/ARCHITECTURE.md` | Architecture context |
+| `docs/COMPLETE-ARCHITECTURE.md` | Broader architecture reference |
+| `docs/DESIGN.md` | Design language/system guidance |
+| `docs/database-schema.md` | Database reference |
+| `docs/business-workflows.md` | Business workflow notes |
+| `docs/BUSINESS-RULES.md` | Business rules |
+| `docs/AUTH-FLOWS.md` | Authentication flows |
+| `docs/environments.md` | Environment guidance |
+| `docs/release-process.md` | Release process |
+| `docs/rollback.md` | Rollback guidance |
+| `docs/disaster-recovery.md` | Disaster-recovery notes |
+| `docs/launch-checklist.md` | Launch checklist |
+| `docs/OBSERVABILITY-ARCHITECTURE.md` | Observability design |
+| `docs/OBSERVABILITY-RUNBOOK.md` | Monitoring/runbook guidance |
+| `docs/LOGGING.md` | Logging guidance |
+| `docs/mobile-ux-audit.md` | Mobile UX review |
+| `docs/ORDER-DATA-FLOWS.md` | Commerce/order data-flow notes |
+| `docs/STRIPE_REFUND_IMPLEMENTATION.md` | Refund implementation notes |
+
+> Documentation may lag implementation. Always verify important claims against source code and tests.
+
+## AI/development material
+
+- `AGENTS.md`
+- `opencode.json`
+- `skills/`
+
+These are development/AI-coding aids. They are not a production MCP/Model Context Protocol feature of the customer application.
+
+---
+
+# Development Conventions
+
+## TypeScript
+
+- keep strict typing meaningful;
+- prefer explicit domain types over broad casts;
+- avoid duplicate request/response interfaces when a shared contract exists;
+- handle null/undefined intentionally.
+
+## API
+
+- validate public mutations;
+- authenticate and authorize server-side;
+- keep route handlers thin where practical;
+- place reusable business behaviour in services/domain modules;
+- return consistent error semantics;
+- avoid leaking internal provider/database errors to clients.
+
+## Database
+
+- preserve ownership filters;
+- understand query/index impact;
+- use transactions where multi-document consistency requires them;
+- use atomic updates/claims for concurrent work;
+- keep soft-delete behaviour consistent.
+
+## React
+
+- split components/pages by responsibility when they become difficult to reason about;
+- do not extract tiny components solely to satisfy a file-size target;
+- keep data/business behaviour out of purely presentational components;
+- provide loading, empty, success and error states;
+- do not rely on effects with stale dependencies/state.
+
+## UX
+
+Every important workflow should handle:
+
+- initial loading;
+- empty state;
+- validation;
+- recoverable error;
+- non-recoverable error;
+- success confirmation;
+- disabled/in-progress actions;
+- mobile layout;
+- keyboard/focus behaviour where relevant.
+
+## Accessibility
+
+At minimum consider:
+
+- semantic HTML;
+- labels;
+- keyboard navigation;
+- focus management;
+- accessible dialog/drawer behaviour;
+- visible focus;
+- screen-reader names for icon buttons;
+- status/error announcements;
+- touch targets;
+- reduced motion.
+
+---
+
+# MVP Scope Guidance
+
+The first customer launch should prove the core PawTag value, not every possible platform capability.
+
+## MVP core
+
+Prioritize:
+
+- account/authentication required for customers;
+- pet profile;
+- tag activation;
+- lost mode;
+- Finder scan/recovery;
+- owner notifications;
+- safe owner/finder reconnection;
+- buying a tag/product;
+- reliable checkout/payment/order creation;
+- basic order/refund/support operations;
+- minimum staff administration required to operate safely.
+
+## MVP supporting
+
+Keep only where required by launch/business model:
+
+- Guardian/Gold membership;
+- rewards;
+- basic CMS;
+- shipping integration;
+- notification preferences;
+- subscriptions.
+
+## Strong candidates to defer/simplify
+
+Depending on launch needs:
+
+- advanced CMS/editor capability;
+- extensive analytics;
+- complex loyalty/referral mechanics;
+- accounting/Xero automation;
+- affiliate/marketplace plans;
+- nonessential administrative customization;
+- mobile release if responsive web is sufficient for first customers.
+
+Deferring a feature does not require deleting it. It may simply mean hiding it from launch scope until its workflow has been hardened and supported operationally.
+
+---
+
+# Definition of Ready for First Customer
+
+PawTag is ready for a controlled first-customer release only after the team can provide evidence for the following.
+
+## Recovery
+
+- [ ] A real/production-like tag can be scanned on a phone.
+- [ ] Public Finder data is intentionally minimized.
+- [ ] Finder can notify the owner under production abuse-protection settings.
+- [ ] Location permission denial has a usable fallback.
+- [ ] Duplicate/repeated finder actions do not create harmful duplicate side effects.
+- [ ] Notification failure is visible/recoverable.
+- [ ] Owner can acknowledge/complete the recovery workflow.
+
+## Authentication/security
+
+- [ ] Registration/login/verification/password reset work end-to-end.
+- [ ] Refresh/logout/session behaviour has been tested.
+- [ ] Ownership tests cover customer-scoped resources.
+- [ ] Admin destructive/financial actions require correct permissions.
+- [ ] Live secrets are not committed/logged.
+- [ ] Production CORS/rate-limit/proxy configuration has been validated.
+
+## Commerce
+
+- [ ] Server remains authoritative for all totals.
+- [ ] Live/test Stripe configuration cannot be confused.
+- [ ] Stripe webhook signatures are verified successfully.
+- [ ] Duplicate payment/webhook actions are idempotent.
+- [ ] Concurrent inventory behaviour has been tested.
+- [ ] Paid-but-incomplete orders enter a repairable/alerted state.
+- [ ] Refund/cancellation workflows are idempotent and auditable.
+- [ ] Reconciliation has been exercised against test Stripe data.
+
+## Cart/checkout UX
+
+- [ ] Mini-cart is accessible and gives clear add/update feedback.
+- [ ] Full cart uses the approved premium 70/30 desktop composition.
+- [ ] Mobile cart has a deliberate single-column design.
+- [ ] Customization/engraving, discounts, shipping/GST information and totals are clear.
+- [ ] Checkout errors preserve customer progress where safe.
+
+## Operations
+
+- [ ] Background jobs have clear single-worker/claim ownership.
+- [ ] Production build/deployment has been rehearsed.
+- [ ] Backup **restore** has been tested, not only backup creation.
+- [ ] Monitoring alerts reach a real person.
+- [ ] Rollback has been rehearsed.
+- [ ] Staff know how to identify and repair payment/order exceptions.
+
+## Testing
+
+- [ ] Critical browser E2E covers the core recovery journey.
+- [ ] Critical browser E2E covers cart/checkout/order creation.
+- [ ] Production-only middleware/configuration is represented in relevant tests.
+- [ ] Regression tests exist for all launch-blocking defects fixed during hardening.
+- [ ] Mobile native flows pass on real devices if mobile is included in launch.
+
+## Launch decision
+
+The launch decision should be based on verified behaviour, not feature count.
+
+The final question is:
+
+> **Can a real customer buy/activate PawTag, can a real stranger help recover the pet, can the owner be notified safely, can money/order state remain correct under failures/retries, and can staff support the customer when something goes wrong?**
+
+If the answer is demonstrably yes, PawTag is ready for a controlled first-customer release.
+
+---
+
+# License / Ownership
+
+Add the appropriate project license, copyright and contribution terms here if/when the repository is intended for public contribution or external distribution.
+
