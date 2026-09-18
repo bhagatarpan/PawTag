@@ -2,6 +2,8 @@ import { Router, Response } from 'express';
 import multer from 'multer';
 import { AuthRequest, authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
+import { validate } from '../middleware/validation';
+import { deleteProductImageSchema } from '../middleware/schemas';
 import { createAuditContextFromRequest, type AuditRequest } from '../middleware/audit';
 import { auditService, type AuditContext } from '../services/audit';
 import { uploadMedia, deleteMedia } from '../services/storage';
@@ -401,14 +403,9 @@ router.post('/product-images', authenticate, requirePermission('product.update')
  *       404:
  *         description: Image not found
  */
-router.delete('/product-images/:filename', authenticate, requirePermission('product.update'), async (req: AuthRequest, res: Response) => {
+router.delete('/product-images/:filename', authenticate, requirePermission('product.update'), validate(deleteProductImageSchema), async (req: AuthRequest, res: Response) => {
   try {
     const { filename } = req.params;
-
-    if (/\.\.|[\\/]/.test(filename) || !/^[a-zA-Z0-9._-]+$/.test(filename)) {
-      res.status(400).json({ success: false, error: 'Invalid filename' });
-      return;
-    }
 
     const productId = (req.query.productId as string) || (req.body?.productId as string) || undefined;
 

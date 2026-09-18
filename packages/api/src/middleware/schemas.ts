@@ -312,3 +312,38 @@ export const verifyCheckoutOtpSchema = z.object({
   channel: z.enum(['email', 'sms'], { errorMap: () => ({ message: 'Channel must be "email" or "sms"' }) }),
   otp: z.string().regex(/^\d{6}$/, 'OTP must be exactly 6 digits'),
 });
+
+// --- Order Cancellation Schemas ---
+export const cancelOrderSchema = z.object({
+  reason: z.string().min(1, 'Cancellation reason is required').max(500, 'Reason must be 500 characters or less'),
+  notes: z.string().max(1000, 'Notes must be 1000 characters or less').optional(),
+  portal: z.enum(['customer-web', 'customer-mobile']).optional(),
+});
+
+// --- Finder Notify Schemas ---
+export const finderNotifySchema = z.object({
+  finderPhone: z.string().optional(),
+  finderEmail: z.string().email('Invalid email address').optional(),
+  finderName: z.string().max(100, 'Name must be 100 characters or less').optional(),
+  latitude: z.number().min(-90).max(90).optional(),
+  longitude: z.number().min(-180).max(180).optional(),
+  accuracy: z.number().min(0).optional(),
+  consent: z.object({
+    locationConsent: z.enum(['granted', 'denied', 'skipped', 'unavailable']),
+    consentedAt: z.string().optional(),
+    consentVersion: z.string().optional(),
+  }).optional(),
+  captchaToken: z.string().min(1, 'CAPTCHA token is required'),
+  captchaAnswer: z.number().int('CAPTCHA answer must be an integer'),
+}).refine((data) => data.finderPhone || data.finderEmail, {
+  message: 'Please provide at least a phone number or email',
+});
+
+// --- Upload Schemas ---
+export const uploadPetPhotoSchema = z.object({
+  petId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid pet ID format').optional(),
+});
+
+export const deleteProductImageSchema = z.object({
+  filename: z.string().regex(/^[a-zA-Z0-9._-]+$/, 'Invalid filename format'),
+});

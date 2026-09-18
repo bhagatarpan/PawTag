@@ -10,6 +10,8 @@
 
 import { Router, Response } from 'express';
 import { AuthRequest, authenticate } from '../middleware/auth';
+import { validate } from '../middleware/validation';
+import { cancelOrderSchema } from '../middleware/schemas';
 import { Order, Return, PaymentTransaction, User } from '@pawtag/db';
 import { cancelOrder } from '../commerce/services/cancellation.service';
 import { toAppError } from '../lib/app-errors';
@@ -174,15 +176,10 @@ router.get('/', async (req: AuthRequest, res: Response) => {
  * POST /api/customer/orders/:id/cancel
  * Cancel an order (only if not yet shipped).
  */
-router.post('/orders/:id/cancel', async (req: AuthRequest, res: Response) => {
+router.post('/orders/:id/cancel', validate(cancelOrderSchema), async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user?.id;
     const { reason, notes, portal } = req.body;
-
-    if (!reason || typeof reason !== 'string' || !reason.trim()) {
-      res.status(400).json({ success: false, error: 'Cancellation reason is required' });
-      return;
-    }
 
     // Verify ownership
     const order = await Order.findById(req.params.id);

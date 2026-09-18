@@ -59,7 +59,7 @@
 - [ ] 4.1 Browser refresh-token hardening (HttpOnly cookies — deferred)
 - [x] 4.2 Session invalidation matrix
 - [x] 4.3 Proxy/rate-limit correctness
-- [ ] 4.4 Input validation consistency (schema validation deferred)
+- [x] 4.4 Input validation consistency
 - [x] 4.5 Object-level authorization audit
 - [x] 4.6 Upload/storage security
 - [ ] 5.1-5.9 Premium cart redesign
