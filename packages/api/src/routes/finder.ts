@@ -464,6 +464,33 @@ router.post('/:tagId/notify', finderNotifyLimiter, requireCaptcha, async (req: R
 
     // Create notification to owner
     if (owner) {
+      // IDEMPOTENCY: Check if a notification already exists for this tag + finder contact recently.
+      // This prevents duplicate notifications from double-taps, browser retries, or network issues.
+      const recentCutoff = new Date(Date.now() - 5 * 60 * 1000); // 5 minutes
+      const existingNotification = await Notification.findOne({
+        userId: owner._id,
+        type: 'pet_found',
+        'data.tagId': tag.tagId,
+        'data.finderPhone': finderPhone || null,
+        'data.finderEmail': finderEmail || null,
+        createdAt: { $gte: recentCutoff },
+      }).sort({ createdAt: -1 });
+
+      if (existingNotification) {
+        // Already notified — return existing result instead of creating duplicate
+        logger.info({ tagId: tag.tagId, notificationId: existingNotification._id }, 'Duplicate finder notify — returning existing notification');
+        res.json({
+          success: true,
+          data: {
+            message: 'Owner has been notified successfully! Thank you for helping reunite this pet with its owner.',
+            petFound: false,
+            locationShared: locationSaved,
+            duplicate: true,
+          },
+        });
+        return;
+      }
+
       const notifTitle = `Your pet ${pet?.name || 'Unknown'} has been found!`;
       const notifMessage = `A kind person found your pet ${pet?.name || ''} (${pet?.petId || ''}). They left their contact details so you can reach them. ${contactInfo}${locationContext ? '\n\n' + locationContext : ''}`;
 
@@ -508,25 +535,33 @@ router.post('/:tagId/notify', finderNotifyLimiter, requireCaptcha, async (req: R
       }
 
       // Create escalation record for 30-minute follow-up
-      const escalationDelaySetting = await Setting.findOne({ key: 'escalation.delayMinutes' });
-      const delayMinutes = parseInt(escalationDelaySetting?.value || '30', 10);
-      const escalationDeadline = new Date(Date.now() + delayMinutes * 60 * 1000);
-
-      await EscalationRecord.create({
-        petId: pet?._id,
-        ownerId: owner._id,
+      // IDEMPOTENCY: Check if an escalation already exists for this tag recently
+      const existingEscalation = await EscalationRecord.findOne({
         tagId: tag._id,
-        finderScanId: scan?._id || tag._id,
-        status: 'pending',
-        foundAt: new Date(),
-        ownerNotifiedAt: new Date(),
-        escalationDeadline,
-        finderName: finderName || null,
-        finderPhone: finderPhone || null,
-        finderEmail: finderEmail || null,
-        finderMessage: contactInfo || null,
-        scanLocation: locationSaved ? { latitude, longitude, accuracy } : undefined,
-      });
+        createdAt: { $gte: recentCutoff },
+      }).sort({ createdAt: -1 });
+
+      if (!existingEscalation) {
+        const escalationDelaySetting = await Setting.findOne({ key: 'escalation.delayMinutes' });
+        const delayMinutes = parseInt(escalationDelaySetting?.value || '30', 10);
+        const escalationDeadline = new Date(Date.now() + delayMinutes * 60 * 1000);
+
+        await EscalationRecord.create({
+          petId: pet?._id,
+          ownerId: owner._id,
+          tagId: tag._id,
+          finderScanId: scan?._id || tag._id,
+          status: 'pending',
+          foundAt: new Date(),
+          ownerNotifiedAt: new Date(),
+          escalationDeadline,
+          finderName: finderName || null,
+          finderPhone: finderPhone || null,
+          finderEmail: finderEmail || null,
+          finderMessage: contactInfo || null,
+          scanLocation: locationSaved ? { latitude, longitude, accuracy } : undefined,
+        });
+      }
     }
 
     res.json({

@@ -47,7 +47,7 @@
 - [x] 1.6 Inventory reservation compensation
 - [x] 2.1 Public Finder DTO
 - [x] 2.2 Recovery state semantics
-- [ ] 2.3 Finder idempotency
+- [x] 2.3 Finder idempotency
 - [ ] 2.4 Finder degraded-network UX
 - [ ] 2.5 Finder privacy retention
 - [ ] 3.1 Payment/order idempotency
