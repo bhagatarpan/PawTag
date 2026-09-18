@@ -42,6 +42,7 @@ export interface AddToCartInput {
   customisation?: boolean;
   customisationTexts?: string[];
   variantName?: string;
+  autoRenew?: boolean;
 }
 
 /**
@@ -52,6 +53,7 @@ export interface UpdateCartItemInput {
   quantity?: number;
   customisation?: boolean;
   customisationTexts?: string[];
+  autoRenew?: boolean;
 }
 
 /**
@@ -227,6 +229,10 @@ export class CartService {
         customizable: product.customizable ?? false,
         customizationLabel: product.customizationLabel || '',
         customizationPrice: product.customizationPrice || 0,
+        autoRenew: input.autoRenew ?? true,
+        isSubscription: (product as any).isSubscription ?? false,
+        monthlyPrice: (product as any).subscriptionConfig?.monthlyPrice,
+        freePeriodMonths: (product as any).subscriptionConfig?.freePeriodMonths,
         addedAt: new Date(),
       });
     }
@@ -271,6 +277,9 @@ export class CartService {
     }
     if (input.customisationTexts !== undefined) {
       item.customisationTexts = input.customisationTexts;
+    }
+    if (input.autoRenew !== undefined) {
+      item.autoRenew = input.autoRenew;
     }
 
     if (input.quantity !== undefined && input.quantity <= 0) {

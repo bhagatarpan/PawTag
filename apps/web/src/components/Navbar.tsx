@@ -58,7 +58,7 @@ export default function Navbar() {
    const [guardianLoading, setGuardianLoading] = useState(false);
    const location = useLocation();
    const navigate = useNavigate();
-   const { items, total, removeItem, updateQuantity, clearCart, isGuest, priceChanged } = useCart();
+   const { items, total, removeItem, updateQuantity, clearCart, toggleAutoRenew, isGuest, priceChanged } = useCart();
    const { user, logout } = useAuth();
    const { menus, loading } = useNavigation('header');
 
@@ -317,6 +317,7 @@ export default function Navbar() {
           onCheckout={handleCheckout}
           isGuest={isGuest}
           priceChanged={priceChanged}
+          onToggleAutoRenew={toggleAutoRenew}
           guardianTier={guardianData?.tier || null}
           pointsEarning={guardianData ? {
             points: Math.floor(total * (guardianData.tier === 'GOLD' || (guardianData as any).isGoldMember ? 2 : 1)),

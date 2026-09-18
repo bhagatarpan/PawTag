@@ -96,6 +96,9 @@ export interface IPendingOrderDocument extends Document {
   /** Auto-renew preference for subscription */
   autoRenew?: boolean;
 
+  /** Per-item auto-renew map (keyed by productId) */
+  autoRenewMap?: Record<string, boolean>;
+
   /** Timestamp when this checkout expires */
   expiresAt: Date;
 
@@ -154,6 +157,7 @@ const PendingOrderSchema = new Schema<IPendingOrderDocument>(
     },
     referralCode: { type: String },
     autoRenew: { type: Boolean, default: true },
+    autoRenewMap: { type: Schema.Types.Mixed },
     expiresAt: { type: Date, required: true, index: { expireAfterSeconds: 0 } },
     lastAccessedAt: { type: Date, default: Date.now },
     convertedOrderId: { type: Schema.Types.ObjectId, ref: 'Order' },

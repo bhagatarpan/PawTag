@@ -60,6 +60,7 @@ export interface IOrderDocument extends Document {
   notes?: string;
   referredByCode?: string;
   autoRenew?: boolean;
+  autoRenewMap?: Record<string, boolean>;
   createdBy?: string;
   createdByType?: string;
   createdByPortal?: 'customer-web' | 'customer-mobile' | 'admin-web' | 'system';
@@ -163,6 +164,7 @@ const OrderSchema = new Schema<IOrderDocument>(
     notes: String,
     referredByCode: { type: String },
     autoRenew: { type: Boolean, default: true },
+    autoRenewMap: { type: Schema.Types.Mixed },
     createdBy: { type: String, index: true },
     createdByType: { type: String, index: true },
     createdByPortal: {

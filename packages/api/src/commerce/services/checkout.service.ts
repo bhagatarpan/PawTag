@@ -89,7 +89,7 @@ export class CheckoutService {
    * @param userId - User ID
    * @returns Payment intent details for frontend
    */
-  async createPaymentIntent(userId: string, shippingAddress?: { line1: string; line2?: string; city: string; state: string; zip: string; country?: string }, autoRenew?: boolean): Promise<CheckoutPaymentIntent> {
+  async createPaymentIntent(userId: string, shippingAddress?: { line1: string; line2?: string; city: string; state: string; zip: string; country?: string }, autoRenew?: boolean | Record<string, boolean>): Promise<CheckoutPaymentIntent> {
     // 1. Get and validate cart
     const cart = await Cart.findOne({ userId, status: 'active' });
     logger.info({ userId, cartFound: !!cart, itemCount: cart?.items?.length || 0 }, 'Payment intent cart lookup');
@@ -163,7 +163,8 @@ export class CheckoutService {
       shippingAddress: shippingAddress || undefined,
       status: 'pending',
       referralCode: cart.promoCode,
-      autoRenew: autoRenew !== false, // default to true
+      autoRenew: typeof autoRenew === 'boolean' ? autoRenew : (autoRenew !== undefined ? true : true),
+      autoRenewMap: typeof autoRenew === 'object' && autoRenew !== null ? autoRenew : undefined,
       expiresAt,
       lastAccessedAt: new Date(),
     });
@@ -322,6 +323,7 @@ export class CheckoutService {
           shippingAddress: pending.shippingAddress,
           referredByCode: pending.referralCode,
           autoRenew: pending.autoRenew !== false,
+          autoRenewMap: pending.autoRenewMap,
           notes: `Stripe PaymentIntent: ${paymentIntentId}`,
           createdBy,
           createdByType: 'Customer',
@@ -389,13 +391,14 @@ export class CheckoutService {
           });
 
           // Create Subscription
+          const productAutoRenew = pending.autoRenewMap?.[product._id.toString()];
           await createSubscription({
             userId,
             tagId: tag._id.toString(),
             orderId: order._id.toString(),
             planId: product._id.toString(),
             planType: product.subscriptionConfig?.type || 'annual',
-            autoRenew: pending.autoRenew !== false,
+            autoRenew: productAutoRenew !== undefined ? productAutoRenew : (pending.autoRenew !== false),
           });
 
           logger.info({ tagId: tagIdStr, orderId: order.orderNumber }, 'Tag and Subscription created for tag product');

@@ -98,6 +98,7 @@ export default function ProductDetail() {
   const [pointsRates, setPointsRates] = useState<{ guardianRate: number; guardianSpentAmount: number; goldRate: number; goldSpentAmount: number } | null>(null);
   const [customisation, setCustomisation] = useState(false);
   const [customisationTexts, setCustomisationTexts] = useState<string[]>(['']);
+  const [autoRenew, setAutoRenew] = useState(true);
 
 /* ---- Fetch product ---- */
    useEffect(() => {
@@ -154,6 +155,7 @@ export default function ProductDetail() {
         customizable: product.customizable,
         customizationLabel: product.customizationLabel,
         customizationPrice: product.customizationPrice,
+        autoRenew,
       });
       setAdded(true);
       setTimeout(() => setAdded(false), 1500);
@@ -408,6 +410,35 @@ export default function ProductDetail() {
                   )}
                 </div>
               )}
+
+            {/* Auto-renew toggle for subscription products */}
+            {product.isSubscription && product.subscriptionConfig?.monthlyPrice && (
+              <div className="mt-6 pt-6 border-t border-gray-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">Auto-renew subscription</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      ${product.subscriptionConfig.monthlyPrice.toFixed(2)}/mo after {product.subscriptionConfig.freePeriodMonths || 3} months free. Cancel anytime.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={autoRenew}
+                    onClick={() => setAutoRenew(!autoRenew)}
+                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 ${
+                      autoRenew ? 'bg-teal-600' : 'bg-gray-200'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        autoRenew ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Description */}
             {product.description && (

@@ -60,7 +60,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
  */
 router.post('/items', async (req: AuthRequest, res: Response) => {
   try {
-    const { productId, quantity, customisation, customisationTexts, variantName } = req.body;
+    const { productId, quantity, customisation, customisationTexts, variantName, autoRenew } = req.body;
 
     if (!productId || !quantity || quantity < 1) {
       res.status(400).json({ success: false, error: 'productId and quantity (>= 1) are required' });
@@ -73,6 +73,7 @@ router.post('/items', async (req: AuthRequest, res: Response) => {
       customisation,
       customisationTexts,
       variantName,
+      autoRenew,
     });
 
     const totals = await cartService.calculateTotals(req.user!.id);
@@ -96,10 +97,10 @@ router.post('/items', async (req: AuthRequest, res: Response) => {
  */
 router.put('/items/:id', async (req: AuthRequest, res: Response) => {
   try {
-    const { quantity, customisation, customisationTexts } = req.body;
+    const { quantity, customisation, customisationTexts, autoRenew } = req.body;
 
-    if (quantity === undefined && customisation === undefined && customisationTexts === undefined) {
-      res.status(400).json({ success: false, error: 'quantity, customisation, or customisationTexts is required' });
+    if (quantity === undefined && customisation === undefined && customisationTexts === undefined && autoRenew === undefined) {
+      res.status(400).json({ success: false, error: 'quantity, customisation, customisationTexts, or autoRenew is required' });
       return;
     }
 
@@ -108,6 +109,7 @@ router.put('/items/:id', async (req: AuthRequest, res: Response) => {
       quantity,
       customisation,
       customisationTexts,
+      autoRenew,
     });
 
     const totals = await cartService.calculateTotals(req.user!.id);

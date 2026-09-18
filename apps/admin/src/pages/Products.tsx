@@ -107,7 +107,12 @@ function SkeletonRow() {
       <td className="px-4 py-3"><div className="h-4 bg-gray-200 rounded w-32" /></td>
       <td className="px-4 py-3 hidden md:table-cell"><div className="h-4 bg-gray-200 rounded w-20" /></td>
       <td className="px-4 py-3"><div className="h-4 bg-gray-200 rounded w-16" /></td>
+      <td className="px-4 py-3 hidden lg:table-cell"><div className="h-4 bg-gray-200 rounded w-14" /></td>
+      <td className="px-4 py-3 hidden lg:table-cell"><div className="h-4 bg-gray-200 rounded w-14" /></td>
+      <td className="px-4 py-3 hidden lg:table-cell"><div className="h-4 bg-gray-200 rounded w-14" /></td>
       <td className="px-4 py-3 hidden lg:table-cell"><div className="h-5 bg-gray-200 rounded-full w-16" /></td>
+      <td className="px-4 py-3"><div className="h-5 bg-gray-200 rounded-full w-14" /></td>
+      <td className="px-4 py-3 text-right"><div className="w-6 h-6 rounded bg-gray-200 ml-auto" /></td>
     </tr>
   );
 }
@@ -442,6 +447,15 @@ function SortableProductRow({
       </td>
       <td className="px-4 py-3 hidden md:table-cell font-mono text-gray-600 text-xs" onClick={() => onSelect(product)}>{product.sku}</td>
       <td className="px-4 py-3 font-medium" onClick={() => onSelect(product)}>${product.price.toFixed(2)}</td>
+      <td className="px-4 py-3 hidden lg:table-cell text-sm text-gray-600" onClick={() => onSelect(product)}>
+        {product.subscriptionConfig?.freePeriodMonths != null ? `${product.subscriptionConfig.freePeriodMonths} mo` : '—'}
+      </td>
+      <td className="px-4 py-3 hidden lg:table-cell text-sm text-gray-600" onClick={() => onSelect(product)}>
+        {product.subscriptionConfig?.gracePeriodWeeks != null ? `${product.subscriptionConfig.gracePeriodWeeks} wk` : '—'}
+      </td>
+      <td className="px-4 py-3 hidden lg:table-cell text-sm text-gray-600" onClick={() => onSelect(product)}>
+        {product.subscriptionConfig?.monthlyPrice != null ? `$${product.subscriptionConfig.monthlyPrice.toFixed(2)}` : '—'}
+      </td>
       <td className="px-4 py-3 hidden lg:table-cell" onClick={() => onSelect(product)}>
         <span className={`text-xs px-2 py-0.5 rounded-full ${totalStock === 0 ? 'bg-red-100 text-red-700' : totalStock <= 10 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
           {totalStock}
@@ -1051,6 +1065,9 @@ const openEdit = (p: Product) => {
                   <th className="text-left px-4 py-3 font-medium text-gray-500">Name</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-500 hidden md:table-cell">SKU</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-500">Price</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-500 hidden lg:table-cell">Free Period</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-500 hidden lg:table-cell">Grace Period</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-500 hidden lg:table-cell">Monthly Price</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-500 hidden lg:table-cell">Stock</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-500">Status</th>
                   <th className="text-right px-4 py-3 font-medium text-gray-500"></th>
@@ -1061,7 +1078,7 @@ const openEdit = (p: Product) => {
                   <><SkeletonRow /><SkeletonRow /><SkeletonRow /><SkeletonRow /><SkeletonRow /></>
                 ) : error ? (
                   <tr>
-                    <td colSpan={8} className="px-4 py-12 text-center">
+                    <td colSpan={11} className="px-4 py-12 text-center">
                       <div className="flex flex-col items-center gap-3">
                         <AlertTriangle size={32} className="text-red-400" />
                         <p className="text-sm text-red-600">{error}</p>
@@ -1071,7 +1088,7 @@ const openEdit = (p: Product) => {
                   </tr>
                 ) : data?.items.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-4 py-12 text-center">
+                    <td colSpan={11} className="px-4 py-12 text-center">
                       <div className="flex flex-col items-center gap-3">
                         <Package size={32} className="text-gray-300" />
                         <p className="text-sm text-gray-500">No products found</p>

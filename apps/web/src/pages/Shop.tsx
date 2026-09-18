@@ -137,7 +137,7 @@ export default function Shop() {
   const [products, setProducts] = useState<PawTagProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [addedId, setAddedId] = useState<string | null>(null);
-  const { addItem, error: cartError, clearError } = useCart();
+  const { addItem, toggleAutoRenew: cartToggleAutoRenew, error: cartError, clearError } = useCart();
   const { page: shopPage } = useShopPage('shop');
   const { settings } = useSiteSettings();
   const goldPrice = settings?.['guardian.goldPrice'] || '1.99';
@@ -150,6 +150,13 @@ export default function Shop() {
   const [guardianTier, setGuardianTier] = useState<string>('');
   const [isGoldMember, setIsGoldMember] = useState(false);
   const [pointsRates, setPointsRates] = useState<{ guardianRate: number; guardianSpentAmount: number; goldRate: number; goldSpentAmount: number } | null>(null);
+
+  // Per-product auto-renew state (keyed by productId)
+  const [autoRenewMap, setAutoRenewMap] = useState<Record<string, boolean>>({});
+
+  const handleToggleAutoRenew = useCallback((productId: string, value: boolean) => {
+    setAutoRenewMap(prev => ({ ...prev, [productId]: value }));
+  }, []);
 
   /* ---- Fetch products from PawTag API ---- */
   useEffect(() => {
@@ -213,6 +220,7 @@ export default function Shop() {
         customizable: product.customizable,
         customizationLabel: product.customizationLabel,
         customizationPrice: product.customizationPrice,
+        autoRenew: autoRenewMap[product._id] ?? true,
       });
 
       // Track add to cart event
@@ -232,7 +240,7 @@ export default function Shop() {
     } catch {
       // Error already set in CartContext — toast will display it
     }
-  }, [products, addItem, triggerFly]);
+  }, [products, addItem, triggerFly, autoRenewMap]);
 
 /* ---- Product click handler ---- */
    const handleProductClick = useCallback((cardProduct: ProductCardProduct) => {
@@ -356,6 +364,8 @@ export default function Shop() {
                   onAddToCart={(_p, e) => handleAddToCart(product, e)}
                   onDetails={() => handleProductClick(product)}
                   added={addedId === product.id}
+                  autoRenew={autoRenewMap[product.id] ?? true}
+                  onToggleAutoRenew={(value) => handleToggleAutoRenew(product.id, value)}
                 />
               ))
             )}

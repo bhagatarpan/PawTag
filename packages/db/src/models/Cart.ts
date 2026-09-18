@@ -67,6 +67,18 @@ export interface ICartItem {
   /** Price for customisation (from Product model) */
   customizationPrice?: number;
 
+  /** Whether subscription auto-renew is enabled for this item (default: true) */
+  autoRenew?: boolean;
+
+  /** Whether this product is a subscription product */
+  isSubscription?: boolean;
+
+  /** Monthly recurring price (from Product.subscriptionConfig) */
+  monthlyPrice?: number;
+
+  /** Free period in months (from Product.subscriptionConfig) */
+  freePeriodMonths?: number;
+
   /** Timestamp when item was added */
   addedAt: Date;
 }
@@ -123,6 +135,10 @@ const CartItemSchema = new Schema<ICartItem>({
   customizable: { type: Boolean, default: false },
   customizationLabel: { type: String, default: '' },
   customizationPrice: { type: Number, default: 0, min: 0 },
+  autoRenew: { type: Boolean, default: true },
+  isSubscription: { type: Boolean, default: false },
+  monthlyPrice: { type: Number },
+  freePeriodMonths: { type: Number },
   addedAt: { type: Date, default: Date.now },
 }, { _id: true });
 

@@ -37,6 +37,10 @@ export interface CartItem {
   customizable?: boolean;
   customizationLabel?: string;
   customizationPrice?: number;
+  autoRenew?: boolean;
+  isSubscription?: boolean;
+  monthlyPrice?: number;
+  freePeriodMonths?: number;
   addedAt?: string;
 }
 
@@ -68,11 +72,12 @@ export interface CartTotals {
 
 interface CartContextType {
   items: CartItem[];
-  addItem: (item: { productId: string; quantity: number; customisation?: boolean; customisationTexts?: string[]; name?: string; price?: number; image?: string; sku?: string; customizable?: boolean; customizationLabel?: string; customizationPrice?: number }) => Promise<void>;
+  addItem: (item: { productId: string; quantity: number; customisation?: boolean; customisationTexts?: string[]; name?: string; price?: number; image?: string; sku?: string; customizable?: boolean; customizationLabel?: string; customizationPrice?: number; autoRenew?: boolean }) => Promise<void>;
   removeItem: (itemId: string) => void;
   updateQuantity: (itemId: string, quantity: number) => void;
   updateItemTexts: (itemId: string, texts: string[]) => void;
   toggleCustomisation: (itemId: string, enable: boolean) => Promise<void>;
+  toggleAutoRenew: (itemId: string, autoRenew: boolean) => Promise<void>;
   clearCart: () => void;
   refreshCart: () => Promise<void>;
   totals: CartTotals;
@@ -322,7 +327,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, [refreshCart]);
 
   /* ---- Add item ---- */
-  const addItem = useCallback(async (item: { productId: string; quantity: number; customisation?: boolean; customisationTexts?: string[]; name?: string; price?: number; image?: string; sku?: string; customizable?: boolean; customizationLabel?: string; customizationPrice?: number }) => {
+  const addItem = useCallback(async (item: { productId: string; quantity: number; customisation?: boolean; customisationTexts?: string[]; name?: string; price?: number; image?: string; sku?: string; customizable?: boolean; customizationLabel?: string; customizationPrice?: number; autoRenew?: boolean }) => {
     const token = localStorage.getItem('pawtag_token');
     const cust = normCustom(item.customisation);
     const custTexts = (item.customisationTexts || []).map(t => t.trim()).filter(Boolean);
@@ -359,6 +364,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           customizable: item.customizable,
           customizationLabel: item.customizationLabel,
           customizationPrice: item.customizationPrice,
+          autoRenew: item.autoRenew ?? true,
           addedAt: new Date().toISOString(),
         });
       }
@@ -385,6 +391,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         quantity: item.quantity,
         customisation: cust,
         customisationTexts: custTexts,
+        autoRenew: item.autoRenew,
       });
       const data = res.data?.data;
       if (data?.cart) {
@@ -486,6 +493,32 @@ export function CartProvider({ children }: { children: ReactNode }) {
       }
     } finally {
       setLoading(false);
+    }
+  }, []);
+
+  /* ---- Toggle auto-renew for a cart item ---- */
+  const toggleAutoRenew = useCallback(async (itemId: string, autoRenew: boolean) => {
+    const token = localStorage.getItem('pawtag_token');
+
+    if (!token) {
+      const guestItems = getGuestCart();
+      const item = guestItems.find((i) => i._id === itemId || i.productId === itemId);
+      if (item) {
+        item.autoRenew = autoRenew;
+        setGuestCart(guestItems);
+        setItems([...guestItems]);
+      }
+      return;
+    }
+
+    try {
+      const res = await api.put(API.cart.updateItem(itemId), { autoRenew });
+      const data = res.data?.data;
+      if (data?.cart) {
+        setItems(data.cart.items || []);
+      }
+    } catch {
+      // Silently fail — toggle is non-critical
     }
   }, []);
 
@@ -652,6 +685,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     updateQuantity,
     updateItemTexts,
     toggleCustomisation,
+    toggleAutoRenew,
     clearCart,
     refreshCart,
     totals,

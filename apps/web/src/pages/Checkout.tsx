@@ -67,9 +67,6 @@ export default function Checkout() {
   const [pawRewardsRedemption, setPawRewardsRedemption] = useState(0);
   const [pawRewardsLoading, setPawRewardsLoading] = useState(false);
 
-  // Auto-renew preference for subscriptions
-  const [autoRenew, setAutoRenew] = useState(true);
-
   // Guardian loyalty data
   const [guardianTier, setGuardianTier] = useState<string>('');
   const [guardianPoints, setGuardianPoints] = useState(0);
@@ -214,7 +211,14 @@ export default function Checkout() {
   const orderTotal = totals.total || (itemsSubtotal + shippingCost + taxAmount - discountAmount - pawRewardsDiscount);
   
   // Check if cart has subscription products (for auto-renew toggle)
-  const hasSubscriptionItems = items.some((item: any) => item.isSubscription || item.subscriptionConfig);
+  const hasSubscriptionItems = items.some((item: any) => item.isSubscription || item.monthlyPrice);
+
+  // Derive per-item auto-renew map from cart items
+  const autoRenewMap: Record<string, boolean> = {};
+  items.forEach((item: any) => {
+    const key = item._id || item.productId;
+    if (key) autoRenewMap[key] = item.autoRenew !== false;
+  });
 
   // Fetch estimated points from backend when order total or membership changes
   useEffect(() => {
@@ -442,7 +446,7 @@ export default function Checkout() {
           zip: form.zip,
           country: form.country || 'NZ',
         },
-        autoRenew,
+        autoRenew: autoRenewMap,
       });
       const { paymentIntentId, clientSecret, pendingOrderId } = checkoutRes.data?.data;
 
@@ -843,34 +847,22 @@ export default function Checkout() {
                   )}
                 </div>
 
-                {/* Auto-Renew Toggle */}
+                {/* Auto-Renew Status */}
                 {hasSubscriptionItems && (
                   <div className="border-t border-gray-100 pt-4 mt-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-900">
-                          Auto-renew subscription after 3 months free
-                        </p>
-                        <p className="text-xs text-gray-500 mt-0.5">
-                          $1.99/month after free period. Cancel anytime.
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setAutoRenew(!autoRenew)}
-                        className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 ${
-                          autoRenew ? 'bg-primary-600' : 'bg-gray-200'
-                        }`}
-                        role="switch"
-                        aria-checked={autoRenew}
-                      >
-                        <span
-                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                            autoRenew ? 'translate-x-5' : 'translate-x-0'
-                          }`}
-                        />
-                      </button>
-                    </div>
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Subscription Auto-Renew</p>
+                    {items.filter((item: any) => item.isSubscription || item.monthlyPrice).map((item: any) => {
+                      const key = item._id || item.productId;
+                      const isOn = autoRenewMap[key] !== false;
+                      return (
+                        <div key={key} className="flex items-center justify-between py-1">
+                          <span className="text-sm text-gray-700">{item.productName || item.name}</span>
+                          <span className={`text-xs font-medium ${isOn ? 'text-primary-600' : 'text-gray-400'}`}>
+                            {isOn ? 'Auto-renew on' : 'Auto-renew off'}
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
 

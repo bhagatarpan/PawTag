@@ -17,6 +17,9 @@ export interface CartItem {
   customizationLabel?: string;
   customizationPrice?: number;
   customisation?: boolean;
+  autoRenew?: boolean;
+  isSubscription?: boolean;
+  monthlyPrice?: number;
 }
 
 export interface CartDrawerProps {
@@ -35,6 +38,8 @@ export interface CartDrawerProps {
   pointsEarning?: { points: number; isGoldMember?: boolean } | null;
   /** User's Guardian tier */
   guardianTier?: string | null;
+  /** Toggle auto-renew for a subscription cart item */
+  onToggleAutoRenew?: (itemId: string, autoRenew: boolean) => void;
 }
 
 export const CartDrawer = React.memo(function CartDrawer({
@@ -51,6 +56,7 @@ export const CartDrawer = React.memo(function CartDrawer({
   className = '',
   pointsEarning = null,
   guardianTier = null,
+  onToggleAutoRenew,
 }: CartDrawerProps) {
   if (!open) return null;
 
@@ -161,6 +167,26 @@ export const CartDrawer = React.memo(function CartDrawer({
                   <p className="text-sm font-bold text-primary-700 mt-1">
                     ${(itemPrice * item.quantity).toFixed(2)}
                   </p>
+                  {item.isSubscription && item.monthlyPrice != null && onToggleAutoRenew && (
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <span className="text-[10px] text-gray-400">Auto-renew</span>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={item.autoRenew !== false}
+                        onClick={() => onToggleAutoRenew(itemId, item.autoRenew === false)}
+                        className={`relative inline-flex h-4 w-7 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                          item.autoRenew !== false ? 'bg-primary-600' : 'bg-gray-200'
+                        }`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                            item.autoRenew !== false ? 'translate-x-3' : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <div className="flex flex-col items-end gap-1">
                   <button

@@ -48,6 +48,10 @@ export interface ProductCardProduct {
    added?: boolean;
    disabled?: boolean;
    className?: string;
+   /** Auto-renew subscription toggle (controlled) */
+   autoRenew?: boolean;
+   /** Callback when auto-renew toggle is changed */
+   onToggleAutoRenew?: (autoRenew: boolean) => void;
  }
 
 export const ProductCard = React.memo(function ProductCard({
@@ -57,6 +61,8 @@ export const ProductCard = React.memo(function ProductCard({
   added = false,
   disabled = false,
   className = '',
+  autoRenew = true,
+  onToggleAutoRenew,
 }: ProductCardProps) {
   const isOutOfStock = product.stock <= 0;
   const isHighlight = product.badge?.label === 'Most Ordered';
@@ -94,6 +100,29 @@ export const ProductCard = React.memo(function ProductCard({
             <p className="text-xs text-gray-400 mt-1">
               + ${product.monthlyPrice.toFixed(2)}/mo{product.freePeriodMonths ? ` after ${product.freePeriodMonths} months free` : ''}
             </p>
+          )}
+          {product.monthlyPrice != null && product.monthlyPrice > 0 && onToggleAutoRenew && (
+            <div className="flex items-center gap-2 mt-2">
+              <span className="text-xs text-gray-500">Auto-renew</span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={autoRenew}
+                onClick={() => onToggleAutoRenew(!autoRenew)}
+                className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-1 ${
+                  autoRenew ? 'bg-primary-600' : 'bg-gray-200'
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    autoRenew ? 'translate-x-4' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+              <span className={`text-xs font-medium ${autoRenew ? 'text-primary-600' : 'text-gray-400'}`}>
+                {autoRenew ? 'on' : 'off'}
+              </span>
+            </div>
           )}
           {product.pointsEarning && (
             <p className="text-xs text-primary-600 font-medium mt-1">
