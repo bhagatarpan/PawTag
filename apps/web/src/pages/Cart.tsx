@@ -1,33 +1,28 @@
 import { useNavigate } from 'react-router-dom';
-import { ShoppingCart } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import CartHeader from '../components/cart/CartHeader';
+import CartEmptyState from '../components/cart/CartEmptyState';
+import CartSkeleton from '../components/cart/CartSkeleton';
 import CartIssueBanner from '../components/cart/CartIssueBanner';
+import CartPriceChangeBanner from '../components/cart/CartPriceChangeBanner';
+import CartInventoryBanner from '../components/cart/CartInventoryBanner';
 import CartItemCard from '../components/cart/CartItemCard';
 import OrderSummary from '../components/cart/OrderSummary';
 
 export default function CartPage() {
   const navigate = useNavigate();
-  const { items, totals, loading, updateQuantity, removeItem } = useCart();
+  const { items, totals, loading, error, updateQuantity, removeItem, refreshCart } = useCart();
   const { user } = useAuth();
 
   const handleCheckout = () => {
     navigate('/checkout');
   };
 
-  const isEmpty = items.length === 0;
-
-  // Check for cart issues (stock/price)
-  const issues: string[] = [];
-  items.forEach((item) => {
-    if (item.quantity <= 0) {
-      issues.push(`${item.productName} has invalid quantity`);
-    }
-  });
+  const isEmpty = items.length === 0 && !loading;
+  const isGuest = !user;
 
   // Guardian/Gold points calculation
-  const isGuest = !user;
   const guardianTier = (user as any)?.rbacRoles?.find((r: any) => r.name === 'GOLD') ? 'GOLD' : null;
   const pointsEarning = totals && totals.total > 0 ? {
     points: Math.floor(totals.total * (guardianTier === 'GOLD' ? 2 : 1)),
@@ -39,37 +34,53 @@ export default function CartPage() {
       <div className="max-w-6xl mx-auto">
         <CartHeader itemCount={items.length} />
 
-        <CartIssueBanner issues={issues} />
-
-        {isEmpty ? (
-          /* Empty State */
-          <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-            <ShoppingCart size={48} className="text-gray-300 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">Your cart is empty</h2>
-            <p className="text-gray-500 mb-6">Browse our tags and find the perfect one for your pet.</p>
-            <a
-              href="/shop"
-              className="inline-flex items-center gap-2 px-6 py-3 bg-primary-600 text-white rounded-lg font-semibold hover:bg-primary-700 transition-colors"
-            >
-              Shop Now
-            </a>
-          </div>
+        {/* Loading state */}
+        {loading && items.length === 0 ? (
+          <CartSkeleton />
+        ) : isEmpty ? (
+          /* Empty state */
+          <CartEmptyState />
         ) : (
-          /* 70/30 Layout */
+          /* Cart with items */
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
             {/* Left 70% - Cart Items */}
-            <div className="bg-white rounded-xl border border-gray-200 p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Cart Items</h2>
-              <div className="divide-y divide-gray-100">
-                {items.map((item) => (
-                  <CartItemCard
-                    key={item._id || item.productId}
-                    item={item}
-                    onUpdateQuantity={updateQuantity}
-                    onRemove={removeItem}
-                  />
-                ))}
+            <div>
+              {/* Error banner */}
+              {error && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4 text-sm text-red-700">
+                  {error}
+                  <button
+                    onClick={refreshCart}
+                    className="ml-2 text-red-600 hover:text-red-800 underline"
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
+
+              <div className="bg-white rounded-xl border border-gray-200 p-6">
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">Cart Items</h2>
+                <div className="divide-y divide-gray-100">
+                  {items.map((item) => (
+                    <CartItemCard
+                      key={item._id || item.productId}
+                      item={item}
+                      onUpdateQuantity={updateQuantity}
+                      onRemove={removeItem}
+                    />
+                  ))}
+                </div>
               </div>
+
+              {/* Guest info */}
+              {isGuest && (
+                <div className="bg-primary-50 border border-primary-100 rounded-lg p-4 mt-4">
+                  <p className="text-sm text-primary-800">
+                    <strong>Guest checkout:</strong> Your cart is saved in this browser.{' '}
+                    <a href="/login" className="text-primary-600 hover:underline">Sign in</a> to save it to your account and earn Guardian Points.
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Right 30% - Order Summary (sticky) */}
