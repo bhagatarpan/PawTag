@@ -56,13 +56,13 @@
 - [x] 3.4 Cancellation correctness
 - [x] 3.5 Subscription entitlement integrity
 - [x] 3.6 NZ timezone assumptions
-- [ ] 4.1 Browser refresh-token hardening (HttpOnly cookies — deferred)
+- [x] 4.1 Browser refresh-token hardening (HttpOnly cookies)
 - [x] 4.2 Session invalidation matrix
 - [x] 4.3 Proxy/rate-limit correctness
 - [x] 4.4 Input validation consistency
 - [x] 4.5 Object-level authorization audit
 - [x] 4.6 Upload/storage security
-- [ ] 5.1-5.9 Premium cart redesign
+- [x] 5.1 Establish cart information architecture
 - [ ] 6.1-6.3 Checkout/customer critical UX
 - [ ] 7.1 Critical web E2E
 - [ ] 7.2 CI quality gates
