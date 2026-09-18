@@ -11,8 +11,7 @@
 import { Router, Response } from 'express';
 import { AuthRequest, authenticate } from '../middleware/auth';
 import { Order, Return, PaymentTransaction, User } from '@pawtag/db';
-import { stripePaymentProvider } from '../commerce/providers/stripe';
-import { inventoryService } from '../commerce/services/inventory.service';
+import { cancelOrder } from '../commerce/services/cancellation.service';
 import { toAppError } from '../lib/app-errors';
 import { notifyCustomerOfStatusChange } from '../services/orderNotification.service';
 import { formatActivityMessage, formatCancelledBy, formatCancelledByDescription, formatCancellationPortalLabel } from '../lib/actor';
@@ -185,6 +184,7 @@ router.post('/orders/:id/cancel', async (req: AuthRequest, res: Response) => {
       return;
     }
 
+    // Verify ownership
     const order = await Order.findById(req.params.id);
     if (!order) {
       res.status(404).json({ success: false, error: 'Order not found' });
@@ -196,135 +196,33 @@ router.post('/orders/:id/cancel', async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    if (!isValidTransition(order.status, 'cancelled')) {
-      res.status(400).json({
-        success: false,
-        error: `Order in status '${order.status}' cannot be cancelled. Contact support for assistance.`,
-      });
-      return;
-    }
-
-    const resolvedPortal: 'customer-web' | 'customer-mobile' =
-      portal === 'customer-mobile' ? 'customer-mobile' : 'customer-web';
+    const resolvedPortal = portal === 'customer-mobile' ? 'customer-mobile' : 'customer-web';
 
     const user = await User.findById(userId).select('fullName').lean();
     const customerFullName = user?.fullName || 'Customer';
 
-    // Process refund inline for paid orders
-    let refundCreated = false;
-    if (order.payment?.status === 'completed' && order.payment?.stripePaymentIntentId) {
-      const paymentIntentId = order.payment.stripePaymentIntentId;
-      if (!paymentIntentId.startsWith('pi_demo_')) {
-        try {
-          const refundResult = await stripePaymentProvider.createRefund({
-            paymentIntentId,
-            amount: order.payment.amount,
-            reason: 'requested_by_customer',
-            metadata: {
-              orderId: String(order._id),
-              orderNumber: order.orderNumber,
-              cancelledBy: 'Cancelled by Customer',
-              cancelledByType: 'Customer',
-              cancelledByPortal: resolvedPortal,
-              cancellationReason: reason,
-              cancellationNotes: notes || '',
-              initiatedBy: 'customer',
-              environment: process.env.NODE_ENV === 'production' ? 'production' : 'development',
-            },
-          });
-
-          if (refundResult.refundId) {
-            order.refundId = refundResult.refundId;
-            order.refundStatus = (refundResult.status as any) || 'pending';
-            order.refundLastSyncedAt = new Date();
-            refundCreated = true;
-          }
-
-          await PaymentTransaction.create({
-            orderId: order._id,
-            orderNumber: order.orderNumber,
-            type: 'refund',
-            status: refundResult.status === 'succeeded' ? 'succeeded' : 'pending',
-            amount: order.payment.amount,
-            currency: order.payment.currency || 'NZD',
-            provider: 'stripe',
-            providerTransactionId: refundResult.refundId || paymentIntentId,
-            providerStatus: refundResult.status,
-            arn: refundResult.arn,
-            expectedArrival: refundResult.expectedArrival,
-            initiatedBy: 'customer',
-            attemptCount: 0,
-            notes: notes ? `${reason} — ${notes}` : reason,
-          });
-        } catch (err: any) {
-          logger.error({ err, orderId: String(order._id) }, 'Failed to process refund for cancelled order');
-          res.status(502).json({ success: false, error: 'Failed to process refund. Please contact support.' });
-          return;
-        }
-      }
-    }
-
-    const cancelledAt = new Date();
-    const cancelledBy = formatCancelledBy(customerFullName, 'Customer');
-    const cancelledByDescription = formatCancelledByDescription(resolvedPortal, customerFullName, 'Customer');
-
-    order.status = 'cancelled';
-    order.cancellationReason = reason;
-    order.cancellationNotes = notes;
-    order.cancelledBy = cancelledBy;
-    order.cancelledByType = 'Customer';
-    order.cancelledByPortal = resolvedPortal;
-    order.cancelledByDescription = cancelledByDescription;
-    order.cancelledAt = cancelledAt;
-    if (refundCreated && order.payment) {
-      order.payment.status = 'refunded';
-    }
-    await order.save();
-
-    try {
-      await inventoryService.releaseForOrder(order._id.toString(), order.items.map((item) => ({
-        productId: String(item.productId),
-        quantity: item.quantity,
-      })));
-    } catch {
-      // Best-effort stock release
-    }
-
-    const activityMessage = formatActivityMessage(cancelledBy, reason, cancelledAt);
-    await Order.updateOne(
-      { _id: order._id },
-      {
-        $push: {
-          activity: {
-            type: 'cancelled',
-            message: activityMessage,
-            timestamp: cancelledAt,
-            actor: 'customer',
-            metadata: {
-              reason,
-              notes,
-              cancelledBy,
-              cancelledByType: 'Customer',
-              cancelledByPortal: resolvedPortal,
-              cancelledAt: cancelledAt.toISOString(),
-            },
-          },
-        },
-      },
-    );
-
-    notifyCustomerOfStatusChange(order, 'cancelled', { reason }).catch(() => {});
-
-    logger.info({
-      orderId: String(order._id),
-      orderNumber: order.orderNumber,
-      userId,
+    // Use central cancellation service (requireRefundSuccess=true for customer)
+    const result = await cancelOrder({
+      orderId: req.params.id,
       reason,
-      cancelledBy,
-      cancelledByPortal: resolvedPortal,
-    }, 'Order cancelled by customer');
+      notes,
+      actor: {
+        name: customerFullName,
+        type: 'Customer',
+        portal: resolvedPortal,
+      },
+      requireRefundSuccess: true,
+    });
 
-    res.json({ success: true, data: { status: 'cancelled', refundAmount: order.payment?.amount || 0 } });
+    if (!result.success) {
+      const statusCode = result.error?.includes('cannot be cancelled') ? 400 : 500;
+      res.status(statusCode).json({ success: false, error: result.error });
+      return;
+    }
+
+    notifyCustomerOfStatusChange(result.order, 'cancelled', { reason }).catch(() => {});
+
+    res.json({ success: true, data: { status: 'cancelled', refundAmount: result.order.payment?.amount || 0 } });
   } catch (err) {
     res.status(500).json({ success: false, error: toAppError(err).userMessage });
   }

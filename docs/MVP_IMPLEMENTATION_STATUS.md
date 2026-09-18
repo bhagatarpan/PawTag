@@ -50,18 +50,18 @@
 - [x] 2.3 Finder idempotency
 - [x] 2.4 Finder degraded-network UX
 - [x] 2.5 Finder privacy retention
-- [ ] 3.1 Payment/order idempotency
-- [ ] 3.2 Webhook state/claiming
-- [ ] 3.3 Refund correctness
-- [ ] 3.4 Cancellation correctness
-- [ ] 3.5 Subscription entitlement integrity
-- [ ] 3.6 NZ timezone assumptions
-- [ ] 4.1 Browser refresh-token hardening
-- [ ] 4.2 Session invalidation matrix
-- [ ] 4.3 Proxy/rate-limit correctness
-- [ ] 4.4 Input validation consistency
-- [ ] 4.5 Object-level authorization audit
-- [ ] 4.6 Upload/storage security
+- [x] 3.1 Payment/order idempotency
+- [x] 3.2 Webhook state/claiming
+- [x] 3.3 Refund correctness
+- [x] 3.4 Cancellation correctness
+- [x] 3.5 Subscription entitlement integrity
+- [x] 3.6 NZ timezone assumptions
+- [ ] 4.1 Browser refresh-token hardening (HttpOnly cookies — deferred)
+- [x] 4.2 Session invalidation matrix
+- [x] 4.3 Proxy/rate-limit correctness
+- [ ] 4.4 Input validation consistency (schema validation deferred)
+- [x] 4.5 Object-level authorization audit
+- [x] 4.6 Upload/storage security
 - [ ] 5.1-5.9 Premium cart redesign
 - [ ] 6.1-6.3 Checkout/customer critical UX
 - [ ] 7.1 Critical web E2E
