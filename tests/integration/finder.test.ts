@@ -214,7 +214,7 @@ describe('Integration: Finder - Notify Owner', () => {
     expect(notifs[0].type).toBe('pet_found');
   });
 
-  it('POST /api/finder/:tagId/notify marks pet as found if lost', async () => {
+  it('POST /api/finder/:tagId/notify keeps pet as "lost" (finder report, not recovery)', async () => {
     const ownerId = await createCustomer();
     const petId = await createPet(ownerId, { status: 'lost' });
     await createTag(ownerId, petId, { tagId: 'TAG-NOTIFY-FOUND' });
@@ -224,8 +224,9 @@ describe('Integration: Finder - Notify Owner', () => {
       .send({ finderPhone: '+64211111111' });
 
     const pet = await mongoose.connection.collections.pets.findOne({ _id: new mongoose.Types.ObjectId(petId) });
-    expect(pet?.status).toBe('found');
-    expect(pet?.foundByFinderAt).toBeDefined();
+    // Pet stays 'lost' — finder report is evidence, owner confirms recovery
+    expect(pet?.status).toBe('lost');
+    expect(pet?.foundByFinderAt).toBeFalsy();
   });
 
   it('POST /api/finder/:tagId/notify returns 404 for non-existent tag', async () => {

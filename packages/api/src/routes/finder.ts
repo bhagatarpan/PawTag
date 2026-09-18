@@ -440,14 +440,11 @@ router.post('/:tagId/notify', finderNotifyLimiter, requireCaptcha, async (req: R
       locationSaved = true;
     }
 
-    // Auto-mark pet as found
-    if (pet && pet.status === 'lost') {
-      pet.status = 'found';
-      pet.foundByFinderAt = new Date();
-      await pet.save();
-      await Tag.updateMany({ petId: pet._id, deletedAt: null }, { status: 'active' });
-
-    }
+    // IMPORTANT: Do NOT auto-mark pet as 'found' here.
+    // A finder report is evidence, not final recovery.
+    // The pet stays 'lost' until the owner explicitly confirms recovery
+    // via the mark-found endpoint. The EscalationRecord tracks the finder report.
+    // See Work Packet 2.2 — finder report vs recovery confirmed.
 
     // Build contact info string for notification
     const contactParts: string[] = [];

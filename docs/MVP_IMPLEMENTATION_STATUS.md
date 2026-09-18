@@ -46,7 +46,7 @@
 - [x] 1.5 Checkout consistency/recovery state machine
 - [x] 1.6 Inventory reservation compensation
 - [x] 2.1 Public Finder DTO
-- [ ] 2.2 Recovery state semantics
+- [x] 2.2 Recovery state semantics
 - [ ] 2.3 Finder idempotency
 - [ ] 2.4 Finder degraded-network UX
 - [ ] 2.5 Finder privacy retention
