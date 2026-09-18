@@ -49,7 +49,7 @@
 - [x] 2.2 Recovery state semantics
 - [x] 2.3 Finder idempotency
 - [x] 2.4 Finder degraded-network UX
-- [ ] 2.5 Finder privacy retention
+- [x] 2.5 Finder privacy retention
 - [ ] 3.1 Payment/order idempotency
 - [ ] 3.2 Webhook state/claiming
 - [ ] 3.3 Refund correctness
