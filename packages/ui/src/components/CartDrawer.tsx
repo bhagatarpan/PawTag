@@ -235,6 +235,12 @@ export const CartDrawer = React.memo(function CartDrawer({
                 Checkout — ${total.toFixed(2)}
               </button>
             )}
+            <a
+              href="/cart"
+              className="block w-full text-center text-sm text-primary-600 hover:text-primary-700 font-medium py-1"
+            >
+              View Cart
+            </a>
             <button
               onClick={onClearCart}
               className="w-full text-sm text-gray-500 hover:text-red-500 transition-colors py-1"

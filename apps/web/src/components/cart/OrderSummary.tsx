@@ -1,4 +1,5 @@
-import { Lock, Shield } from 'lucide-react';
+import { useState } from 'react';
+import { Lock, Shield, Tag, Loader2, X } from 'lucide-react';
 
 interface OrderSummaryProps {
   subtotal: number;
@@ -9,9 +10,87 @@ interface OrderSummaryProps {
   currency: string;
   itemCount: number;
   promoCode?: string;
+  promoApplied?: boolean;
+  onApplyPromo?: (code: string) => Promise<void>;
+  onRemovePromo?: () => void;
   onCheckout: () => void;
   isGuest?: boolean;
   loading?: boolean;
+  promoLoading?: boolean;
+}
+
+function PromoCodeControl({
+  promoCode,
+  promoApplied,
+  onApply,
+  onRemove,
+  loading,
+}: {
+  promoCode?: string;
+  promoApplied?: boolean;
+  onApply?: (code: string) => Promise<void>;
+  onRemove?: () => void;
+  loading?: boolean;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [code, setCode] = useState('');
+
+  if (promoApplied && promoCode) {
+    return (
+      <div className="flex items-center justify-between bg-green-50 rounded-lg px-3 py-2">
+        <div className="flex items-center gap-2 text-sm text-green-700">
+          <Tag size={14} />
+          <span className="font-medium">{promoCode}</span>
+          <span>applied</span>
+        </div>
+        <button
+          onClick={onRemove}
+          className="text-green-600 hover:text-green-800 p-1"
+          aria-label="Remove promo code"
+        >
+          <X size={14} />
+        </button>
+      </div>
+    );
+  }
+
+  if (!isOpen) {
+    return (
+      <button
+        onClick={() => setIsOpen(true)}
+        className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+      >
+        Have a promo code?
+      </button>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={code}
+          onChange={(e) => setCode(e.target.value.toUpperCase())}
+          placeholder="Enter code"
+          className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+        />
+        <button
+          onClick={() => onApply?.(code)}
+          disabled={!code || loading}
+          className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 disabled:opacity-50 transition-colors"
+        >
+          {loading ? <Loader2 size={14} className="animate-spin" /> : 'Apply'}
+        </button>
+      </div>
+      <button
+        onClick={() => { setIsOpen(false); setCode(''); }}
+        className="text-xs text-gray-500 hover:text-gray-700"
+      >
+        Cancel
+      </button>
+    </div>
+  );
 }
 
 export default function OrderSummary({
@@ -23,9 +102,13 @@ export default function OrderSummary({
   currency,
   itemCount,
   promoCode,
+  promoApplied,
+  onApplyPromo,
+  onRemovePromo,
   onCheckout,
   isGuest = false,
   loading = false,
+  promoLoading = false,
 }: OrderSummaryProps) {
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-6">
@@ -66,6 +149,19 @@ export default function OrderSummary({
           </div>
         </div>
       </div>
+
+      {/* Promo Code */}
+      {onApplyPromo && (
+        <div className="mt-4">
+          <PromoCodeControl
+            promoCode={promoCode}
+            promoApplied={promoApplied}
+            onApply={onApplyPromo}
+            onRemove={onRemovePromo}
+            loading={promoLoading}
+          />
+        </div>
+      )}
 
       {/* Checkout Button */}
       <button

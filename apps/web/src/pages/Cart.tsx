@@ -1,6 +1,8 @@
 import { useNavigate } from 'react-router-dom';
-import { ShoppingCart, ArrowLeft } from 'lucide-react';
+import { ShoppingCart } from 'lucide-react';
 import { useCart } from '../context/CartContext';
+import CartHeader from '../components/cart/CartHeader';
+import CartIssueBanner from '../components/cart/CartIssueBanner';
 import CartItemCard from '../components/cart/CartItemCard';
 import OrderSummary from '../components/cart/OrderSummary';
 
@@ -14,25 +16,20 @@ export default function CartPage() {
 
   const isEmpty = items.length === 0;
 
+  // Check for cart issues (stock/price)
+  const issues: string[] = [];
+  items.forEach((item) => {
+    if (item.quantity <= 0) {
+      issues.push(`${item.productName} has invalid quantity`);
+    }
+  });
+
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4">
       <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Your Cart</h1>
-            <p className="text-sm text-gray-500 mt-1">
-              {items.length} item{items.length !== 1 ? 's' : ''}
-            </p>
-          </div>
-          <a
-            href="/shop"
-            className="flex items-center gap-1 text-sm text-primary-600 hover:text-primary-700 transition-colors"
-          >
-            <ArrowLeft size={16} />
-            Continue Shopping
-          </a>
-        </div>
+        <CartHeader itemCount={items.length} />
+
+        <CartIssueBanner issues={issues} />
 
         {isEmpty ? (
           /* Empty State */
