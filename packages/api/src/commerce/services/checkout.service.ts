@@ -115,16 +115,39 @@ export class CheckoutService {
     const user = await User.findById(userId).lean();
     if (!user) throw new NotFoundError('User');
 
+    // 4b. Ensure Stripe Customer exists (for saving payment method for future renewals)
+    let stripeCustomerId = user.stripeCustomerId;
+    const isDemoMode = !process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY === 'sk_test_demo_key';
+    if (!stripeCustomerId && !isDemoMode) {
+      try {
+        const Stripe = (await import('stripe')).default;
+        const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+          apiVersion: '2024-06-20' as any,
+        });
+        const customer = await stripe.customers.create({
+          email: user.email,
+          name: user.fullName || undefined,
+          metadata: { userId: userId.toString(), source: 'pawtag-checkout' },
+        });
+        stripeCustomerId = customer.id;
+        await User.findByIdAndUpdate(userId, { stripeCustomerId: customer.id });
+        logger.info({ userId, stripeCustomerId: customer.id }, 'Created Stripe customer at checkout');
+      } catch (err) {
+        logger.error({ err, userId }, 'Failed to create Stripe customer — checkout will proceed without saved payment method');
+      }
+    }
+
     // 5. Generate order number for PendingOrder
     const orderNumber = await this.generateOrderNumber();
 
-    // 6. Create Stripe PaymentIntent
+    // 7. Create Stripe PaymentIntent
     const paymentIntent = await stripePaymentProvider.createPaymentIntent({
       amount: totals.total,
       currency: totals.currency,
       orderId: orderNumber,
       customerEmail: user.email,
       customerName: user.fullName,
+      stripeCustomerId: stripeCustomerId || undefined,
       metadata: {
         userId,
         orderNumber,

@@ -141,6 +141,8 @@ export class StripePaymentProvider implements IPaymentProvider {
       address: { line1: string; line2?: string; city: string; state: string; postal_code: string; country: string };
     };
     metadata?: Record<string, string>;
+    /** Stripe Customer ID — attaches PI to customer and enables setup_future_usage */
+    stripeCustomerId?: string;
   }): Promise<PaymentIntent> {
     // Demo mode: auto-succeed
     const isTestMode = await getBooleanSetting('commerce.payment.testMode');
@@ -190,6 +192,12 @@ export class StripePaymentProvider implements IPaymentProvider {
         description,
         metadata,
       };
+
+      // Attach to Stripe Customer and save payment method for future off-session charges
+      if (params.stripeCustomerId) {
+        intentParams.customer = params.stripeCustomerId;
+        intentParams.setup_future_usage = 'off_session';
+      }
 
       if (statementDescriptor) {
         intentParams.statement_descriptor = statementDescriptor.slice(0, 22);

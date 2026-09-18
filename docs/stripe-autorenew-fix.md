@@ -1,6 +1,6 @@
 # Plan: Real Stripe Subscription Renewal Charging
 
-**Status:** Saved for later implementation
+**Status:** Implementing
 **Date:** 2026-09-18
 
 ---
@@ -18,7 +18,7 @@ The `processAutoRenewals()` function (`subscription.service.ts:642-728`) finds a
 - Stripe handles invoicing, charging, retries, and dunning automatically
 - Existing `invoice.payment_succeeded` and `invoice.payment_failed` webhook handlers already work for Stripe-managed subscriptions
 - No need for custom retry logic — Stripe's built-in retry is more reliable
-- `processAutoRenewals()` becomes a fallback/safety net, not the primary mechanism
+- `processAutoRenewals()` becomes a fallback/safety net for non-Stripe subscriptions only
 
 ---
 
@@ -49,142 +49,87 @@ ONGOING MONTHLY/YEARLY
 
 ---
 
+## State Machine
+
+```
+STRIPE STATES          →  PAWTAG STATES
+trialing               →  active (freePeriodEndsAt in future)
+active                 →  active
+past_due               →  active (with paymentRetryCount > 0)
+canceled               →  cancelled
+unpaid                 →  grace_period
+```
+
+---
+
 ## Changes Required
 
-### 1. Store payment method at checkout (Stripe provider)
+### 1. Stripe provider — setup_future_usage, customer, idempotency
 
 **File:** `packages/api/src/commerce/providers/stripe/index.ts`
 
-- Add `setup_future_usage: 'off_session'` to `createPaymentIntent()` (line ~185-212)
+- Add `setup_future_usage: 'off_session'` to `createPaymentIntent()` to save payment method
 - Accept optional `customer` (Stripe Customer ID) parameter
-- Accept optional `customerIdempotencyKey` for deduplication
+- Pass `customer` to Stripe API when provided
 
-### 2. Create Stripe Customer at checkout
+### 2. Checkout — create Stripe Customer, correct creation order
 
 **File:** `packages/api/src/commerce/services/checkout.service.ts`
 
-- Before creating the PaymentIntent (line ~122), check if user has `stripeCustomerId`
-- If not, create a Stripe Customer (same pattern as Gold, line 260-270)
+- Before creating PaymentIntent, check if user has `stripeCustomerId`
+- If not, create Stripe Customer (same pattern as Gold)
 - Store `stripeCustomerId` on User model
 - Pass `customer` to `stripePaymentProvider.createPaymentIntent()`
+- **Create Stripe Subscription BEFORE PawTag records** — if Stripe fails, don't create orphaned local records
 
-### 3. Create Stripe Subscription at checkout (for tag products)
-
-**File:** `packages/api/src/services/subscription.service.ts` — `createSubscription()`
-
-After creating the PawTag Subscription (line ~170), if:
-- `autoRenew: true` AND
-- Product has `subscriptionConfig.monthlyPrice` AND
-- Not demo mode
-
-Then:
-1. Look up or create a Stripe Price for the product (same pattern as Gold, lines 274-318)
-2. Create a Stripe Subscription:
-   ```ts
-   stripe.subscriptions.create({
-     customer: stripeCustomerId,
-     items: [{ price: stripePriceId }],
-     trial_end: Math.floor(freePeriodEndsAt.getTime() / 1000),
-     payment_behavior: 'default_incomplete',
-     payment_settings: { save_default_payment_method: 'on_subscription' },
-     metadata: { userId, subscriptionId: pawtagSub._id.toString(), plan: 'tag' },
-     expand: ['latest_invoice.payment_intent'],
-   })
-   ```
-3. Store `stripeSubscriptionId` and `stripeCustomerId` on the PawTag Subscription
-
-### 4. Skip local auto-renewal for Stripe-managed subscriptions
-
-**File:** `packages/api/src/services/subscription.service.ts` — `processAutoRenewals()`
-
-Add a filter to exclude subscriptions that have a `stripeSubscriptionId`:
-
-```ts
-const subsToRenew = await Subscription.find({
-  status: 'active',
-  autoRenew: true,
-  currentPeriodEnd: { $lte: now },
-  stripeSubscriptionId: { $exists: false },  // NEW: skip Stripe-managed
-  deletedAt: null,
-});
-```
-
-### 5. Enhance webhook handlers
-
-**File:** `packages/api/src/routes/stripe-webhooks.ts`
-
-**`handleInvoicePaymentSucceeded` (line 252-268):**
-- Already works — finds subscription by `stripeSubscriptionId`, updates status/period
-- Add: reset `paymentRetryCount` to 0
-- Add: create a PawTag Invoice record (currently only updates the subscription)
-
-**`handleInvoicePaymentFailed` (line 273-294):**
-- Currently only creates a notification
-- Add: call `handlePaymentFailure()` from subscription.service.ts to start dunning
-- Add: increment `paymentRetryCount`
-- Add: set `nextPaymentAttemptAt` based on retry schedule
-
-**Add `customer.subscription.updated` handler:**
-- Sync status changes from Stripe (e.g., `past_due`, `canceled`)
-- Update PawTag subscription status accordingly
-
-### 6. Add Stripe Price lookup/creation for tag products
+### 3. Subscription service — create Stripe Sub with trial, idempotency, audit
 
 **File:** `packages/api/src/services/subscription.service.ts`
 
-Create a helper function `getOrCreateStripePrice(product, stripe)` that:
-- Checks CMS setting `{product.sku}.stripePriceId` for cached price
-- Verifies price is active and matches current amount
-- If missing/stale, creates a new Stripe Price on the product
-- Stores the Stripe Price ID in CMS settings for reuse
+**In `createSubscription()`:**
+- After creating PawTag Subscription, if `autoRenew: true` AND product has `monthlyPrice` AND not demo mode:
+  - Check idempotency: skip if `stripeSubscriptionId` already exists for this order
+  - Look up or create Stripe Price for the product
+  - Create Stripe Subscription with `trial_end` set to `freePeriodEndsAt`
+  - Store `stripeSubscriptionId` and `stripeCustomerId` on PawTag Subscription
+  - Add audit event: `subscription_stripe_created`
 
-Same pattern as Gold (lines 274-318).
+**In `processAutoRenewals()`:**
+- Add filter: `stripeSubscriptionId: { $exists: false }` to skip Stripe-managed subscriptions
+- This makes it a safety net only
+
+### 4. Webhook handlers — idempotency, ownership, enhanced dunning
+
+**File:** `packages/api/src/routes/stripe-webhooks.ts`
+
+**`handleInvoicePaymentSucceeded`:**
+- Add idempotency: check if PawTag Invoice already exists for this `stripeInvoiceId`
+- Reset `paymentRetryCount` to 0
+- Create PawTag Invoice with `stripeInvoiceId` for dedup
+- Add audit event: `subscription_stripe_renewed`
+
+**`handleInvoicePaymentFailed`:**
+- Add idempotency: check if already processed
+- Call `handlePaymentFailure()` to start dunning
+- Add audit event: `subscription_stripe_payment_failed`
+
+**Add `customer.subscription.updated`:**
+- Sync status changes from Stripe (past_due, canceled)
+- Update PawTag subscription status accordingly
+
+**Add `customer.subscription.deleted`:**
+- Already exists — verify it handles PawTag-managed subscriptions too
 
 ---
 
-## Files Changed (6 files)
+## Files Changed (5 files)
 
 | # | File | Change |
 |---|------|--------|
-| 1 | `packages/api/src/commerce/providers/stripe/index.ts` | Add `setup_future_usage`, `customer` param to `createPaymentIntent` |
-| 2 | `packages/api/src/commerce/services/checkout.service.ts` | Create Stripe Customer at checkout, pass to PaymentIntent |
-| 3 | `packages/api/src/services/subscription.service.ts` | Create Stripe Subscription with trial in `createSubscription`; skip Stripe-managed subs in `processAutoRenewals` |
-| 4 | `packages/api/src/routes/stripe-webhooks.ts` | Enhance `invoice.payment_succeeded/failed` handlers; add `customer.subscription.updated` |
-| 5 | `packages/db/src/models/Subscription.ts` | Already has `stripeSubscriptionId` and `stripeCustomerId` — no change needed |
-| 6 | `packages/db/src/models/User.ts` | Already has `stripeCustomerId` — no change needed |
-
----
-
-## What we get after implementation
-
-| Capability | Before | After |
-|------------|--------|-------|
-| Customer pays at checkout | ✅ | ✅ |
-| Payment method saved for renewal | ❌ | ✅ |
-| Stripe charges customer after free period | ❌ | ✅ |
-| Automatic retries on payment failure | ❌ | ✅ (Stripe handles) |
-| Grace period after failed retries | ❌ | ✅ (Stripe + PawTag) |
-| Customer receives renewal invoices | ❌ | ✅ (Stripe emails) |
-| PawTag subscription stays in sync | ❌ | ✅ (webhooks) |
-| Admin can see real payment status | ❌ | ✅ (Stripe dashboard + webhooks) |
-
----
-
-## What `processAutoRenewals()` becomes
-
-A **safety net** for edge cases where Stripe is unavailable or a subscription was created without Stripe. It only runs for subscriptions without `stripeSubscriptionId`.
-
----
-
-## Reference: Gold Membership Implementation
-
-The Gold membership (`createGoldSubscription()` in `subscription.service.ts:222-427`) is the only fully-wired Stripe Subscription implementation and serves as the reference pattern:
-
-- Creates Stripe Customer if needed (lines 260-270)
-- Looks up or creates Stripe Price (lines 274-318)
-- Creates Stripe Subscription with `payment_behavior: 'default_incomplete'` (lines 321-328)
-- Stores `stripeCustomerId` and `stripeSubscriptionId` on PawTag Subscription (lines 353-374)
-- Webhooks handle `invoice.payment_succeeded` and `invoice.payment_failed`
+| 1 | `packages/api/src/commerce/providers/stripe/index.ts` | Add `setup_future_usage`, `customer` param |
+| 2 | `packages/api/src/commerce/services/checkout.service.ts` | Create Stripe Customer, pass to PI |
+| 3 | `packages/api/src/services/subscription.service.ts` | Create Stripe Sub with trial, skip in processAutoRenewals, audit |
+| 4 | `packages/api/src/routes/stripe-webhooks.ts` | Idempotent handlers, enhanced dunning, new handlers |
 
 ---
 
@@ -192,5 +137,6 @@ The Gold membership (`createGoldSubscription()` in `subscription.service.ts:222-
 
 1. `pnpm typecheck` — all packages pass
 2. `pnpm build` — all apps build
-3. Manual test: purchase a tag → verify Stripe Customer created → verify Stripe Subscription with trial → wait for trial end → verify charge → verify webhook updates PawTag subscription
-4. Test payment failure: use a Stripe test card that fails on retry → verify dunning flow
+3. Manual test: purchase tag → verify Stripe Customer created → verify Stripe Subscription with trial → verify trial end charges → verify webhooks update PawTag
+4. Test payment failure: Stripe test card that fails → verify dunning flow
+5. Test idempotency: replay webhook → verify no duplicate invoices

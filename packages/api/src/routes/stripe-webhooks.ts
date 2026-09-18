@@ -174,6 +174,9 @@ async function handleEvent(type: string, data: any): Promise<void> {
     case 'customer.subscription.deleted':
       await handleSubscriptionDeleted(data);
       break;
+    case 'customer.subscription.updated':
+      await handleSubscriptionUpdated(data);
+      break;
     default:
       logger.info({ type }, 'Unhandled Stripe event type');
   }
@@ -255,16 +258,49 @@ async function handleInvoicePaymentSucceeded(invoice: any): Promise<void> {
   const subscription = await Subscription.findOne({ stripeSubscriptionId: invoice.subscription });
   if (!subscription) return;
 
+  // Idempotency: skip if we already created an invoice for this Stripe invoice
+  if (invoice.id) {
+    const existingInvoice = await Invoice.findOne({ stripeInvoiceId: invoice.id });
+    if (existingInvoice) {
+      logger.info({ stripeInvoiceId: invoice.id }, 'Invoice already processed — skipping');
+      return;
+    }
+  }
+
+  // Update subscription state
   subscription.status = 'active';
   subscription.lastPaymentDate = new Date();
-  subscription.lastPaymentAmount = invoice.amount_paid / 100;
-  subscription.currentPeriodStart = new Date(invoice.period_start * 1000);
-  subscription.currentPeriodEnd = new Date(invoice.period_end * 1000);
+  subscription.lastPaymentAmount = (invoice.amount_paid || 0) / 100;
+  subscription.currentPeriodStart = new Date((invoice.period_start || Date.now() / 1000) * 1000);
+  subscription.currentPeriodEnd = new Date((invoice.period_end || Date.now() / 1000) * 1000);
+  subscription.paymentRetryCount = 0;
+  subscription.nextPaymentAttemptAt = undefined;
   await subscription.save();
 
-  await Tag.findByIdAndUpdate(subscription.tagId, { subscriptionStatus: 'active' });
+  // Update tag status
+  if (subscription.tagId) {
+    await Tag.findByIdAndUpdate(subscription.tagId, { subscriptionStatus: 'active' });
+  }
 
-  logger.info({ subscriptionId: subscription._id }, 'Subscription renewed via Stripe');
+  // Create PawTag Invoice for reconciliation
+  const count = await Invoice.countDocuments();
+  await Invoice.create({
+    subscriptionId: subscription._id,
+    userId: subscription.userId,
+    invoiceNumber: `INV-${String(count + 1).padStart(6, '0')}`,
+    amount: (invoice.amount_paid || 0) / 100,
+    currency: (invoice.currency || 'nzd').toUpperCase(),
+    status: 'paid',
+    stripeInvoiceId: invoice.id,
+    stripePaymentIntentId: invoice.payment_intent,
+    billingPeriod: {
+      start: new Date((invoice.period_start || Date.now() / 1000) * 1000),
+      end: new Date((invoice.period_end || Date.now() / 1000) * 1000),
+    },
+    paidAt: new Date(),
+  });
+
+  logger.info({ subscriptionId: subscription._id, stripeInvoiceId: invoice.id }, 'Subscription renewed via Stripe');
 }
 
 /**
@@ -276,6 +312,40 @@ async function handleInvoicePaymentFailed(invoice: any): Promise<void> {
   const subscription = await Subscription.findOne({ stripeSubscriptionId: invoice.subscription });
   if (!subscription) return;
 
+  // Idempotency: skip if we already created a failed invoice for this Stripe invoice
+  if (invoice.id) {
+    const existingInvoice = await Invoice.findOne({ stripeInvoiceId: invoice.id });
+    if (existingInvoice) {
+      logger.info({ stripeInvoiceId: invoice.id }, 'Failed invoice already processed — skipping');
+      return;
+    }
+  }
+
+  // Create a failed invoice record
+  const count = await Invoice.countDocuments();
+  await Invoice.create({
+    subscriptionId: subscription._id,
+    userId: subscription.userId,
+    invoiceNumber: `INV-${String(count + 1).padStart(6, '0')}`,
+    amount: (invoice.amount_due || 0) / 100,
+    currency: (invoice.currency || 'nzd').toUpperCase(),
+    status: 'failed',
+    stripeInvoiceId: invoice.id,
+    billingPeriod: {
+      start: new Date((invoice.period_start || Date.now() / 1000) * 1000),
+      end: new Date((invoice.period_end || Date.now() / 1000) * 1000),
+    },
+  });
+
+  // Trigger dunning flow via subscription service
+  try {
+    const { handlePaymentFailure } = await import('../services/subscription.service');
+    await handlePaymentFailure(subscription._id.toString());
+  } catch (err) {
+    logger.error({ err, subscriptionId: subscription._id }, 'Failed to trigger dunning from webhook');
+  }
+
+  // Also send notification
   const user = await User.findById(subscription.userId);
   if (user) {
     await Notification.create({
@@ -290,7 +360,53 @@ async function handleInvoicePaymentFailed(invoice: any): Promise<void> {
     });
   }
 
-  logger.info({ subscriptionId: subscription._id }, 'Subscription payment failed');
+  logger.info({ subscriptionId: subscription._id, stripeInvoiceId: invoice.id }, 'Subscription payment failed — dunning initiated');
+}
+
+/**
+ * Handle customer.subscription.updated.
+ * Sync Stripe subscription status changes to PawTag.
+ */
+async function handleSubscriptionUpdated(stripeSubscription: any): Promise<void> {
+  if (!stripeSubscription?.id) return;
+
+  const sub = await Subscription.findOne({ stripeSubscriptionId: stripeSubscription.id });
+  if (!sub) return;
+
+  const oldStatus = sub.status;
+
+  // Map Stripe status to PawTag status
+  const statusMap: Record<string, string> = {
+    active: 'active',
+    past_due: 'active', // Keep active but dunning handles retry
+    trialing: 'active',
+    canceled: 'cancelled',
+    unpaid: 'grace_period',
+    incomplete_expired: 'expired',
+  };
+
+  const newStatus = statusMap[stripeSubscription.status] || sub.status;
+  if (newStatus !== oldStatus) {
+    sub.status = newStatus as any;
+
+    if (newStatus === 'cancelled') {
+      sub.autoRenew = false;
+      sub.cancelledAt = new Date();
+      sub.cancellationReason = 'Updated via Stripe';
+      sub.cancelledBy = 'System (Stripe)';
+      sub.cancelledByType = 'System';
+      sub.cancelledByPortal = 'system';
+    }
+
+    await sub.save();
+
+    logger.info({
+      subscriptionId: sub._id,
+      oldStatus,
+      newStatus,
+      stripeStatus: stripeSubscription.status,
+    }, 'Subscription status synced from Stripe');
+  }
 }
 
 /**

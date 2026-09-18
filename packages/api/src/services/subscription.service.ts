@@ -191,6 +191,94 @@ export async function createSubscription(data: {
     });
   }
 
+  // Create Stripe Subscription for auto-renewing products (with trial period)
+  if (defaultAutoRenew && price > 0) {
+    try {
+      const isDemoMode = !process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY === 'sk_test_demo_key';
+      if (!isDemoMode) {
+        const user = await User.findById(data.userId).select('stripeCustomerId email fullName').lean();
+        if (user?.stripeCustomerId) {
+          const Stripe = (await import('stripe')).default;
+          const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+            apiVersion: '2024-06-20' as any,
+          });
+
+          // Look up or create Stripe Price for this product
+          let stripePriceId: string | undefined;
+          if (data.planId) {
+            const priceCacheKey = `${data.planId}.stripePriceId`;
+            const cached = (await Setting.findOne({ key: priceCacheKey }).lean())?.value;
+            if (cached) {
+              try {
+                const existingPrice = await stripe.prices.retrieve(cached) as any;
+                if (existingPrice.status === 'active' && existingPrice.unit_amount === Math.round(price * 100)) {
+                  stripePriceId = cached;
+                }
+              } catch {
+                // Price no longer valid — will create new one
+              }
+            }
+
+            if (!stripePriceId) {
+              const product = await Product.findById(data.planId).lean();
+              const stripeProduct = await stripe.products.create({
+                name: product?.name || productName,
+                metadata: { planId: data.planId, planType },
+              });
+              const newPrice = await stripe.prices.create({
+                product: stripeProduct.id,
+                unit_amount: Math.round(price * 100),
+                currency: 'nzd',
+                recurring: { interval: planType === 'monthly' ? 'month' : 'year' },
+                metadata: { planId: data.planId },
+              });
+              stripePriceId = newPrice.id;
+              await Setting.findOneAndUpdate(
+                { key: `${data.planId}.stripePriceId` },
+                { key: `${data.planId}.stripePriceId`, value: newPrice.id },
+                { upsert: true },
+              );
+            }
+          }
+
+          if (stripePriceId) {
+            // Create Stripe Subscription with trial period
+            const trialEnd = Math.floor(freePeriodEndsAt.getTime() / 1000);
+            const stripeSubscription = await stripe.subscriptions.create({
+              customer: user.stripeCustomerId,
+              items: [{ price: stripePriceId }],
+              trial_end: trialEnd,
+              payment_behavior: 'default_incomplete',
+              payment_settings: { save_default_payment_method: 'on_subscription' },
+              metadata: {
+                userId: data.userId.toString(),
+                subscriptionId: subscription._id.toString(),
+                plan: 'tag',
+              },
+              expand: ['latest_invoice.payment_intent'],
+            });
+
+            // Store Stripe IDs on PawTag Subscription
+            await Subscription.findByIdAndUpdate(subscription._id, {
+              stripeCustomerId: user.stripeCustomerId,
+              stripeSubscriptionId: stripeSubscription.id,
+            });
+
+            logger.info({
+              userId: data.userId,
+              stripeSubscriptionId: stripeSubscription.id,
+              trialEnd: freePeriodEndsAt,
+            }, 'Created Stripe Subscription with trial for tag');
+          }
+        }
+      }
+    } catch (err) {
+      // Non-blocking — PawTag Subscription is already created
+      // Renewal will fall back to processAutoRenewals() safety net
+      logger.error({ err, userId: data.userId, subscriptionId: subscription._id }, 'Failed to create Stripe Subscription — falling back to local renewal');
+    }
+  }
+
   await auditJobEvent({
     action: 'subscription_created',
     eventType: 'subscription_create',
@@ -651,6 +739,7 @@ export async function processAutoRenewals() {
     status: 'active',
     autoRenew: true,
     currentPeriodEnd: { $lte: now },
+    stripeSubscriptionId: { $exists: false }, // Skip Stripe-managed subs (webhooks handle those)
     deletedAt: null,
   });
 
