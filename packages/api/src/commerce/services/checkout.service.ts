@@ -27,6 +27,7 @@
  */
 
 import { PendingOrder, Order, Invoice, InvoiceAccessToken, Cart, User, PaymentTransaction, Product, type IPendingOrderDocument } from '@pawtag/db';
+import crypto from 'crypto';
 import { NotFoundError } from '../../lib/app-errors';
 import { InvalidCartError, CheckoutExpiredError, DuplicateOrderError, PaymentFailedError, PriceMismatchError } from '../errors';
 import { stripePaymentProvider } from '../providers/stripe';
@@ -192,13 +193,19 @@ export class CheckoutService {
       lastAccessedAt: new Date(),
     });
 
-    // 8. Reserve stock for all items
-    for (const item of cart.items) {
-      await inventoryService.reserve({
+    // 8. Reserve stock for all items (with compensation on failure)
+    const reservationResult = await inventoryService.reserveAll(
+      cart.items.map((item) => ({
         productId: String(item.productId),
         quantity: item.quantity,
-        orderId: String(pendingOrder._id),
-      });
+      })),
+      String(pendingOrder._id),
+    );
+
+    if (!reservationResult.success) {
+      // Reservation failed and was compensated — clean up the pending order
+      await PendingOrder.findByIdAndDelete(pendingOrder._id);
+      throw new InvalidCartError(`Could not reserve stock: ${reservationResult.error}`);
     }
 
     logger.info({
@@ -229,27 +236,25 @@ export class CheckoutService {
    * @returns Checkout result with order and invoice
    */
   async confirmCheckout(userId: string, paymentIntentId: string, portal: string = 'customer-web'): Promise<CheckoutResult> {
-    logger.info({ userId, paymentIntentId }, 'Checkout confirm started');
+    const correlationId = crypto.randomUUID();
+    logger.info({ userId, paymentIntentId, correlationId }, 'Checkout confirm started');
 
-    // 1. Find PendingOrder — try exact match first
-    let pending = await PendingOrder.findOne({
+    // 1. Find PendingOrder — MUST match both paymentIntentId AND userId (ownership enforced)
+    const pending = await PendingOrder.findOne({
       stripePaymentIntentId: paymentIntentId,
       userId,
     });
 
-    // Fallback: find by paymentIntentId alone (userId may have changed after token refresh)
     if (!pending) {
-      pending = await PendingOrder.findOne({ stripePaymentIntentId: paymentIntentId });
-      if (pending) {
-        logger.warn({ pendingUserId: String(pending.userId), requestUserId: userId }, 'PendingOrder found with different userId — token may have refreshed');
-      }
-    }
-
-    if (!pending) {
-      // Check if it was already converted
+      // Check if it was already converted — but still require ownership
       const anyPending = await PendingOrder.findOne({ stripePaymentIntentId: paymentIntentId });
       if (anyPending) {
-        logger.error({ status: anyPending.status, userId: String(anyPending.userId) }, 'PendingOrder exists but with wrong status or userId');
+        // Ownership check: only the PendingOrder owner can retrieve it
+        if (String(anyPending.userId) !== userId) {
+          logger.warn({ pendingUserId: String(anyPending.userId), requestUserId: userId }, 'Unauthorized checkout attempt — userId mismatch');
+          throw new NotFoundError('Pending order');
+        }
+        logger.error({ status: anyPending.status, userId: String(anyPending.userId) }, 'PendingOrder exists but with wrong status');
         if (anyPending.status === 'converted' && anyPending.convertedOrderId) {
           const existingOrder = await Order.findById(anyPending.convertedOrderId);
           if (existingOrder) {
@@ -332,6 +337,8 @@ export class CheckoutService {
           tax: pending.tax,
           discount: pending.discount > 0 ? { percent: 0, amount: pending.discount, reason: pending.promoCode || '' } : undefined,
           status: 'paid',
+          completionStatus: 'pending',
+          completionCorrelationId: correlationId,
           payment: {
             method: 'card',
             status: 'completed',
@@ -386,9 +393,19 @@ export class CheckoutService {
       initiatedBy: 'customer',
     });
 
+    // 8-10. Post-payment completion steps with error tracking
+    // Each step is tracked individually so failures are queryable and retryable.
+    const completionErrors: Array<{ step: string; error: string; timestamp: Date }> = [];
+
     // 8. Confirm stock (deduct actual inventory)
-    for (const item of pending.items) {
-      await inventoryService.confirmSale(String(item.productId), item.quantity, order.orderNumber);
+    try {
+      for (const item of pending.items) {
+        await inventoryService.confirmSale(String(item.productId), item.quantity, order.orderNumber);
+      }
+    } catch (err: any) {
+      const errorMsg = err?.message || String(err);
+      logger.error({ err, orderId: order._id, correlationId }, 'Completion step failed: inventory confirmation');
+      completionErrors.push({ step: 'inventory_confirmation', error: errorMsg, timestamp: new Date() });
     }
 
     // 8b. Create Tag and Subscription for tag products
@@ -424,15 +441,24 @@ export class CheckoutService {
             autoRenew: productAutoRenew !== undefined ? productAutoRenew : (pending.autoRenew !== false),
           });
 
-          logger.info({ tagId: tagIdStr, orderId: order.orderNumber }, 'Tag and Subscription created for tag product');
+          logger.info({ tagId: tagIdStr, orderId: order.orderNumber, correlationId }, 'Tag and Subscription created for tag product');
         }
       }
-    } catch (err) {
-      logger.error({ err, orderId: order._id }, 'Failed to create Tag/Subscription (non-blocking)');
+    } catch (err: any) {
+      const errorMsg = err?.message || String(err);
+      logger.error({ err, orderId: order._id, correlationId }, 'Completion step failed: tag/subscription creation');
+      completionErrors.push({ step: 'tag_subscription_creation', error: errorMsg, timestamp: new Date() });
     }
 
     // 9. Create Invoice
-    const invoice = await this.createInvoice(order, userId, pending.total);
+    let invoice: any;
+    try {
+      invoice = await this.createInvoice(order, userId, pending.total);
+    } catch (err: any) {
+      const errorMsg = err?.message || String(err);
+      logger.error({ err, orderId: order._id, correlationId }, 'Completion step failed: invoice creation');
+      completionErrors.push({ step: 'invoice_creation', error: errorMsg, timestamp: new Date() });
+    }
 
     // 10. Mark PendingOrder as converted
     pending.status = 'converted';
@@ -441,14 +467,38 @@ export class CheckoutService {
     await pending.save();
 
     // 11. Clear cart
-    await cartService.markConverted(userId);
+    try {
+      await cartService.markConverted(userId);
+    } catch (err: any) {
+      const errorMsg = err?.message || String(err);
+      logger.error({ err, orderId: order._id, correlationId }, 'Completion step failed: cart clearing');
+      completionErrors.push({ step: 'cart_clearing', error: errorMsg, timestamp: new Date() });
+    }
+
+    // Update order completion status based on errors
+    const completionStatus = completionErrors.length > 0 ? 'repair_required' : 'complete';
+    await Order.findByIdAndUpdate(order._id, {
+      completionStatus,
+      ...(completionErrors.length > 0 ? { completionErrors } : {}),
+    });
+
+    if (completionErrors.length > 0) {
+      logger.warn({
+        orderId: order._id,
+        orderNumber: order.orderNumber,
+        correlationId,
+        failedSteps: completionErrors.map(e => e.step),
+      }, 'Checkout completed with repair-required steps');
+    } else {
+      logger.info({ orderId: order._id, orderNumber: order.orderNumber, correlationId }, 'Checkout completed — all steps succeeded');
+    }
 
     // 12. Generate invoice URL
-    const invoiceUrl = await this.getInvoiceUrl(invoice._id.toString(), userId);
+    const invoiceUrl = invoice ? await this.getInvoiceUrl(invoice._id.toString(), userId) : '';
 
     // 13. Fire-and-forget: emails, notifications, referrals
     this.sendPostCheckoutNotifications(order, invoice, invoiceUrl, userId).catch((err) => {
-      logger.error({ err, orderNumber: order.orderNumber }, 'Post-checkout notification error');
+      logger.error({ err, orderNumber: order.orderNumber, correlationId }, 'Post-checkout notification error');
     });
 
     // 14. Audit log
@@ -459,7 +509,7 @@ export class CheckoutService {
       currency: pending.currency,
     });
 
-    logger.info({ orderNumber: order.orderNumber, userId, total: pending.total }, 'Checkout confirmed');
+    logger.info({ orderNumber: order.orderNumber, userId, total: pending.total, correlationId, completionStatus }, 'Checkout confirmed');
 
     return { order, invoice, invoiceUrl, isNew: true };
   }

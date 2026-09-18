@@ -2,6 +2,13 @@ import mongoose, { Schema, Document } from 'mongoose';
 
 export type OrderStatus = 'pending' | 'pending_payment' | 'paid' | 'packing' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
 
+/**
+ * Post-payment completion status.
+ * Tracks whether all post-payment steps (entitlements, invoice, etc.) completed.
+ * Orders with 'repair_required' are recoverable via reconciliation.
+ */
+export type OrderCompletionStatus = 'pending' | 'complete' | 'repair_required';
+
 export interface IOrderDocument extends Document {
   orderNumber: string;
   userId: mongoose.Types.ObjectId;
@@ -89,6 +96,12 @@ export interface IOrderDocument extends Document {
   refundedAt?: Date;
   deliveredAt?: Date;
   deletedAt?: Date;
+  /** Post-payment completion status — tracks entitlement/invoice recovery */
+  completionStatus: OrderCompletionStatus;
+  /** Errors from failed completion steps (for repair) */
+  completionErrors?: Array<{ step: string; error: string; timestamp: Date }>;
+  /** Correlation ID for tracing across checkout steps */
+  completionCorrelationId?: string;
   activity: Array<{
     type: string;
     message: string;
@@ -206,6 +219,18 @@ const OrderSchema = new Schema<IOrderDocument>(
     refundedAt: { type: Date, index: true },
     deliveredAt: { type: Date },
     deletedAt: { type: Date, default: null },
+    completionStatus: {
+      type: String,
+      enum: ['pending', 'complete', 'repair_required'],
+      default: 'pending',
+      index: true,
+    },
+    completionErrors: [{
+      step: { type: String, required: true },
+      error: { type: String, required: true },
+      timestamp: { type: Date, default: Date.now },
+    }],
+    completionCorrelationId: { type: String, index: true },
     activity: [
       {
         type: { type: String, required: true },
@@ -225,5 +250,6 @@ OrderSchema.index({ createdAt: -1 });
 OrderSchema.index({ deletedAt: 1 });
 OrderSchema.index({ userId: 1, createdAt: -1 });
 OrderSchema.index({ status: 1, createdAt: -1 });
+OrderSchema.index({ completionStatus: 1 });
 
 export const Order = mongoose.model<IOrderDocument>('Order', OrderSchema);

@@ -1,6 +1,6 @@
 import { createApiClient, createLocalStorageTokenStorage, API } from '@pawtag/shared/api';
 import { SiteAvailabilityStatus } from '@pawtag/shared';
-import type { FinderData, FoundTimerData, NotifyPayload } from '../types';
+import type { FinderData, FoundTimerData, NotifyPayload, CaptchaChallenge } from '../types';
 
 const api = createApiClient({
   baseURL: import.meta.env.VITE_API_URL || '/api',
@@ -24,6 +24,11 @@ export async function fetchTagData(tagId: string): Promise<FinderData> {
 
 export async function fetchFoundTimer(tagId: string): Promise<FoundTimerData> {
   const res = await api.get(API.finder.foundTimer(tagId));
+  return res.data.data;
+}
+
+export async function fetchCaptcha(): Promise<CaptchaChallenge> {
+  const res = await api.get(API.auth.captcha);
   return res.data.data;
 }
 

@@ -150,13 +150,16 @@ export class InventoryService {
    * Called when checkout fails, expires, or is cancelled.
    *
    * @param reservationId - Reservation ID (format: productId:orderId)
+   * @param quantity - Quantity to release (defaults to 1 for backward compatibility)
    */
-  async release(reservationId: string): Promise<void> {
+  async release(reservationId: string, quantity: number = 1): Promise<void> {
     const [productId, orderId] = reservationId.split(':');
 
+    if (quantity <= 0) return;
+
     const result = await Product.findOneAndUpdate(
-      { _id: productId, reserved: { $gt: 0 } },
-      { $inc: { reserved: -1 } },
+      { _id: productId, reserved: { $gte: quantity } },
+      { $inc: { reserved: -quantity } },
       { new: true },
     );
 
@@ -164,14 +167,14 @@ export class InventoryService {
       await StockMovement.create({
         productId,
         type: 'release',
-        quantity: 1,
+        quantity,
         stockAfter: result.stock - result.reserved,
         referenceId: orderId,
         reason: `Reservation released for order ${orderId}`,
         actor: 'system',
       });
 
-      logger.info({ productId, orderId, available: result.stock - result.reserved }, 'Stock reservation released');
+      logger.info({ productId, orderId, quantity, available: result.stock - result.reserved }, 'Stock reservation released');
     }
   }
 
@@ -183,9 +186,7 @@ export class InventoryService {
    */
   async releaseForOrder(orderId: string, items: Array<{ productId: string; quantity: number }>): Promise<void> {
     for (const item of items) {
-      for (let i = 0; i < item.quantity; i++) {
-        await this.release(`${item.productId}:${orderId}`);
-      }
+      await this.release(`${item.productId}:${orderId}`, item.quantity);
     }
   }
 
@@ -290,6 +291,57 @@ export class InventoryService {
     const status = await this.getStatus(productId);
     if (status.stockPolicy === 'allow') return true;
     return status.available >= quantity;
+  }
+
+  /**
+   * Reserve stock for multiple items atomically with compensation.
+   *
+   * If any reservation fails, all previously made reservations for this
+   * checkout are released. This prevents partial reservation leaks.
+   *
+   * @param items - Array of items to reserve
+   * @param checkoutId - Stable checkout identifier (PendingOrder ID)
+   * @returns Reservation result
+   */
+  async reserveAll(
+    items: Array<{ productId: string; quantity: number }>,
+    checkoutId: string,
+  ): Promise<{ success: boolean; error?: string; reserved: Array<{ productId: string; quantity: number }> }> {
+    const reserved: Array<{ productId: string; quantity: number }> = [];
+
+    try {
+      for (const item of items) {
+        const result = await this.reserve({
+          productId: item.productId,
+          quantity: item.quantity,
+          orderId: checkoutId,
+        });
+
+        if (!result.success) {
+          // Compensation: release all previously reserved items
+          if (reserved.length > 0) {
+            logger.warn({
+              checkoutId,
+              failedProduct: item.productId,
+              reservedCount: reserved.length,
+            }, 'Reservation failed — compensating by releasing previously reserved stock');
+            await this.releaseForOrder(checkoutId, reserved);
+          }
+          return { success: false, error: result.error, reserved: [] };
+        }
+
+        reserved.push({ productId: item.productId, quantity: item.quantity });
+      }
+
+      return { success: true, reserved };
+    } catch (err: any) {
+      // Unexpected error — compensate by releasing all reserved items
+      if (reserved.length > 0) {
+        logger.error({ err, checkoutId }, 'Unexpected error during reservation — compensating');
+        await this.releaseForOrder(checkoutId, reserved).catch(() => {});
+      }
+      throw err;
+    }
   }
 }
 

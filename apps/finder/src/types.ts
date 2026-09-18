@@ -84,4 +84,11 @@ export interface NotifyPayload {
     consentedAt: string;
     consentVersion: string;
   };
+  captchaToken: string;
+  captchaAnswer: number;
+}
+
+export interface CaptchaChallenge {
+  question: string;
+  token: string;
 }

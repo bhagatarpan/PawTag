@@ -146,6 +146,14 @@ app.use(cors({
   },
   credentials: true,
 }));
+
+// --- Stripe webhooks MUST be before express.json() to preserve raw body ---
+// Stripe signature verification requires the exact raw request payload.
+// express.json() consumes the stream and parses it, so express.raw() after it
+// would receive an object instead of a Buffer. Mounting here ensures the raw
+// body is preserved for signature verification.
+app.use('/api/webhooks/stripe', express.raw({ type: 'application/json' }), stripeWebhookRoutes);
+
 app.use(express.json({ limit: '10mb' }));
 
 // Structured HTTP request logging via pino-http
@@ -295,9 +303,6 @@ app.use('/api/admin/stripe', adminStripeReportRoutes);
 app.use('/api/public/promo', promoPublicRoutes);
 app.use('/api/public/commerce', commercePublicRoutes);
 app.use('/api/public/points', pointsEstimateRoutes);
-
-// Stripe webhooks need raw body for signature verification
-app.use('/api/webhooks/stripe', express.raw({ type: 'application/json' }), stripeWebhookRoutes);
 
 // Resend webhooks for email delivery tracking
 app.use('/api/webhooks/resend', express.json(), resendWebhookRoutes);

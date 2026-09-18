@@ -50,7 +50,15 @@ router.post('/', async (req: Request, res: Response) => {
   const sig = req.headers['stripe-signature'];
 
   // ─── Demo mode ────────────────────────────────────────────
+  // Demo mode is ONLY allowed in development/test. In production, the startup
+  // validation should have already rejected missing/demo Stripe configuration.
+  // This guard is a safety net in case startup validation is bypassed.
   if (!process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY === 'sk_test_demo_key') {
+    if (process.env.NODE_ENV === 'production') {
+      logger.error('Stripe webhook received in production with demo configuration — this should never happen');
+      res.status(500).json({ success: false, error: 'Payment system misconfigured' });
+      return;
+    }
     const event = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
     logger.info({ eventType: event.type }, 'Received demo Stripe webhook');
 
