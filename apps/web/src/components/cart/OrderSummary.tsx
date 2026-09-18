@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Lock, Shield, Tag, Loader2, X } from 'lucide-react';
+import { Lock, Shield, Tag, Loader2, X, ArrowLeft } from 'lucide-react';
 
 interface OrderSummaryProps {
   subtotal: number;
@@ -14,6 +14,7 @@ interface OrderSummaryProps {
   onApplyPromo?: (code: string) => Promise<void>;
   onRemovePromo?: () => void;
   onCheckout: () => void;
+  onContinueShopping?: () => void;
   isGuest?: boolean;
   loading?: boolean;
   promoLoading?: boolean;
@@ -106,21 +107,25 @@ export default function OrderSummary({
   onApplyPromo,
   onRemovePromo,
   onCheckout,
+  onContinueShopping,
   isGuest = false,
   loading = false,
   promoLoading = false,
 }: OrderSummaryProps) {
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-6">
+      {/* 1. Order summary heading */}
       <h2 className="text-lg font-bold text-gray-900 mb-4">Order Summary</h2>
 
-      {/* Line items */}
+      {/* 2-7. Price breakdown */}
       <div className="space-y-3 text-sm">
+        {/* 2. Merchandise subtotal */}
         <div className="flex justify-between text-gray-600">
           <span>Subtotal ({itemCount} item{itemCount !== 1 ? 's' : ''})</span>
           <span className="font-medium text-gray-900">${subtotal.toFixed(2)}</span>
         </div>
 
+        {/* 3. Discount/promo (only if API validated) */}
         {discount > 0 && (
           <div className="flex justify-between text-green-600">
             <span>Discount{promoCode ? ` (${promoCode})` : ''}</span>
@@ -128,6 +133,7 @@ export default function OrderSummary({
           </div>
         )}
 
+        {/* 4. Shipping */}
         <div className="flex justify-between text-gray-600">
           <span>Shipping</span>
           <span className="font-medium text-gray-900">
@@ -135,18 +141,21 @@ export default function OrderSummary({
           </span>
         </div>
 
+        {/* 5. GST/tax */}
         {tax > 0 && (
           <div className="flex justify-between text-gray-600">
-            <span>GST</span>
+            <span>GST (included)</span>
             <span className="font-medium text-gray-900">${tax.toFixed(2)}</span>
           </div>
         )}
 
+        {/* 6. Divider + Estimated total */}
         <div className="border-t border-gray-200 pt-3 mt-3">
-          <div className="flex justify-between">
+          <div className="flex justify-between items-baseline">
             <span className="text-base font-bold text-gray-900">Estimated Total</span>
             <span className="text-lg font-bold text-gray-900">${total.toFixed(2)} {currency}</span>
           </div>
+          <p className="text-xs text-gray-500 mt-1">Final total at checkout</p>
         </div>
       </div>
 
@@ -163,21 +172,32 @@ export default function OrderSummary({
         </div>
       )}
 
-      {/* Checkout Button */}
+      {/* 8. Primary Checkout button */}
       <button
         onClick={onCheckout}
         disabled={loading || itemCount === 0}
         className="w-full mt-6 bg-primary-600 text-white py-3 rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
         <Lock size={16} />
-        {loading ? 'Processing...' : 'Continue to Checkout'}
+        {loading ? 'Processing...' : 'Secure Checkout'}
       </button>
 
-      {/* Security reassurance */}
-      <div className="flex items-center justify-center gap-2 mt-4 text-xs text-gray-500">
+      {/* 9. Payment/security reassurance */}
+      <div className="flex items-center justify-center gap-2 mt-3 text-xs text-gray-500">
         <Shield size={12} />
         <span>Secure checkout powered by Stripe</span>
       </div>
+
+      {/* 10. Continue shopping link */}
+      {onContinueShopping && (
+        <button
+          onClick={onContinueShopping}
+          className="w-full mt-3 text-sm text-gray-500 hover:text-gray-700 flex items-center justify-center gap-1 py-1"
+        >
+          <ArrowLeft size={14} />
+          Continue Shopping
+        </button>
+      )}
 
       {/* Guest prompt */}
       {isGuest && (

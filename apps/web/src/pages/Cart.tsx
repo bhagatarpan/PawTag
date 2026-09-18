@@ -73,6 +73,7 @@ export default function CartPage() {
                 currency={totals?.currency || 'NZD'}
                 itemCount={items.length}
                 onCheckout={handleCheckout}
+                onContinueShopping={() => navigate('/shop')}
                 loading={loading}
               />
             </div>
