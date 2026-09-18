@@ -1,4 +1,4 @@
-import { Router, Response } from 'express';
+import { Router, Response, Request } from 'express';
 import jwt from 'jsonwebtoken';
 import { AuthRequest, authenticate } from '../middleware/auth';
 import { validate } from '../middleware/validation';
@@ -84,6 +84,40 @@ const mfaVerifyLimiter = createDbRateLimiter({
   message: 'Too many verification attempts. Please try again later.',
   keySuffix: 'auth:mfaVerify',
 });
+
+// --- Cookie helpers for refresh token HttpOnly cookies ---
+
+const REFRESH_COOKIE_NAME = process.env.REFRESH_TOKEN_COOKIE_NAME || 'pawtag_refresh_token';
+
+function isBrowserRequest(req: Request): boolean {
+  const clientPlatform = req.headers['x-client-platform'];
+  if (clientPlatform === 'ios' || clientPlatform === 'android') return false;
+  return true;
+}
+
+function setRefreshTokenCookie(res: Response, token: string): void {
+  const maxAge = parseInt(process.env.REFRESH_TOKEN_EXPIRES_IN_DAYS || '30', 10) * 24 * 60 * 60 * 1000;
+  res.cookie(REFRESH_COOKIE_NAME, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: (process.env.COOKIE_SAME_SITE || (process.env.NODE_ENV === 'production' ? 'strict' : 'lax')) as any,
+    path: '/',
+    maxAge,
+  });
+}
+
+function clearRefreshTokenCookie(res: Response): void {
+  res.clearCookie(REFRESH_COOKIE_NAME, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: (process.env.COOKIE_SAME_SITE || (process.env.NODE_ENV === 'production' ? 'strict' : 'lax')) as any,
+    path: '/',
+  });
+}
+
+function getRefreshTokenFromRequest(req: Request): string | undefined {
+  return req.cookies?.[REFRESH_COOKIE_NAME] || req.body?.refreshToken;
+}
 
 function getClientInfo(req: any) {
   return { ipAddress: req.ip || req.connection?.remoteAddress, userAgent: req.headers['user-agent'] };
@@ -587,6 +621,13 @@ if (user.status === 'inactive') {
         },
       },
     });
+
+    // Set refresh token as HttpOnly cookie for browser clients
+    try {
+      if (isBrowserRequest(req)) {
+        setRefreshTokenCookie(res, refreshTokens.token);
+      }
+    } catch { /* non-critical */ }
   } catch (error) {
     logger.error({ err: error, email: req.body?.email }, 'Login error');
     res.status(500).json({ success: false, error: 'Login failed' });
@@ -1411,7 +1452,8 @@ router.post('/change-password', authenticate, validate(changePasswordSchema), as
 
 router.post('/refresh', async (req, res: Response) => {
   try {
-    const { refreshToken } = req.body;
+    // Read refresh token from cookie (browser) or body (mobile)
+    const refreshToken = getRefreshTokenFromRequest(req);
     if (!refreshToken) {
       res.status(400).json({ success: false, error: 'Refresh token is required' });
       return;
@@ -1457,6 +1499,13 @@ router.post('/refresh', async (req, res: Response) => {
         refreshToken: newRefreshTokens.token,
       },
     });
+
+    // Set new refresh token as HttpOnly cookie for browser clients
+    try {
+      if (isBrowserRequest(req)) {
+        setRefreshTokenCookie(res, newRefreshTokens.token);
+      }
+    } catch { /* non-critical */ }
   } catch {
     res.status(500).json({ success: false, error: 'Failed to refresh token' });
   }
@@ -1464,7 +1513,8 @@ router.post('/refresh', async (req, res: Response) => {
 
 router.post('/logout', async (req: AuthRequest, res: Response) => {
   try {
-    const { refreshToken } = req.body;
+    // Read refresh token from cookie or body
+    const refreshToken = getRefreshTokenFromRequest(req);
 
     // Logout intentionally remains usable without an access token, but a valid
     // refresh token still gives us enough identity to attribute the event.
@@ -1503,6 +1553,13 @@ router.post('/logout', async (req: AuthRequest, res: Response) => {
     }, { actorType: req.user ? resolveActorType(req.user.role) : 'UNKNOWN' });
 
     res.json({ success: true, data: { message: 'Logged out successfully' } });
+
+    // Clear refresh token cookie for browser clients
+    try {
+      if (isBrowserRequest(req)) {
+        clearRefreshTokenCookie(res);
+      }
+    } catch { /* non-critical */ }
   } catch {
     res.status(500).json({ success: false, error: 'Failed to logout' });
   }

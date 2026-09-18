@@ -29,6 +29,7 @@ if (process.env.NODE_ENV !== 'test') {
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import cookieParser from 'cookie-parser';
 import pinoHttp from 'pino-http';
 import swaggerUi from 'swagger-ui-express';
 import path from 'path';
@@ -161,6 +162,7 @@ app.use(cors({
 // body is preserved for signature verification.
 app.use('/api/webhooks/stripe', express.raw({ type: 'application/json' }), stripeWebhookRoutes);
 
+app.use(cookieParser());
 app.use(express.json({ limit: '10mb' }));
 
 // Structured HTTP request logging via pino-http
