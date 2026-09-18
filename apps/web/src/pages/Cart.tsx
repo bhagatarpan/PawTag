@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { ShoppingCart } from 'lucide-react';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
 import CartHeader from '../components/cart/CartHeader';
 import CartIssueBanner from '../components/cart/CartIssueBanner';
 import CartItemCard from '../components/cart/CartItemCard';
@@ -9,6 +10,7 @@ import OrderSummary from '../components/cart/OrderSummary';
 export default function CartPage() {
   const navigate = useNavigate();
   const { items, totals, loading, updateQuantity, removeItem } = useCart();
+  const { user } = useAuth();
 
   const handleCheckout = () => {
     navigate('/checkout');
@@ -23,6 +25,14 @@ export default function CartPage() {
       issues.push(`${item.productName} has invalid quantity`);
     }
   });
+
+  // Guardian/Gold points calculation
+  const isGuest = !user;
+  const guardianTier = (user as any)?.rbacRoles?.find((r: any) => r.name === 'GOLD') ? 'GOLD' : null;
+  const pointsEarning = totals && totals.total > 0 ? {
+    points: Math.floor(totals.total * (guardianTier === 'GOLD' ? 2 : 1)),
+    isGoldMember: guardianTier === 'GOLD',
+  } : null;
 
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4">
@@ -75,6 +85,9 @@ export default function CartPage() {
                 onCheckout={handleCheckout}
                 onContinueShopping={() => navigate('/shop')}
                 loading={loading}
+                isGuest={isGuest}
+                pointsEarning={pointsEarning}
+                guardianTier={guardianTier}
               />
             </div>
           </div>

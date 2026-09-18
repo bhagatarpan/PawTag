@@ -18,6 +18,10 @@ interface OrderSummaryProps {
   isGuest?: boolean;
   loading?: boolean;
   promoLoading?: boolean;
+  /** Guardian points earning info */
+  pointsEarning?: { points: number; isGoldMember?: boolean } | null;
+  /** User's Guardian tier */
+  guardianTier?: string | null;
 }
 
 function PromoCodeControl({
@@ -111,6 +115,8 @@ export default function OrderSummary({
   isGuest = false,
   loading = false,
   promoLoading = false,
+  pointsEarning = null,
+  guardianTier = null,
 }: OrderSummaryProps) {
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-6">
@@ -169,6 +175,35 @@ export default function OrderSummary({
             onRemove={onRemovePromo}
             loading={promoLoading}
           />
+        </div>
+      )}
+
+      {/* Guardian/Gold benefit — compact module */}
+      {pointsEarning && pointsEarning.points > 0 && (
+        <div className={`mt-4 p-3 rounded-lg text-sm ${
+          pointsEarning.isGoldMember
+            ? 'bg-amber-50 border border-amber-200'
+            : 'bg-primary-50 border border-primary-100'
+        }`}>
+          {pointsEarning.isGoldMember ? (
+            <>
+              <p className="font-medium text-amber-800">Guardian Gold</p>
+              <p className="text-amber-700 text-xs mt-1">
+                You'll earn <strong>{pointsEarning.points} PawRewards</strong> on this order (2x Gold bonus)
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="font-medium text-primary-800">
+                Earn {pointsEarning.points} PawRewards
+              </p>
+              {!guardianTier && isGuest && (
+                <a href="/guardian" className="text-primary-600 hover:underline text-xs mt-1 inline-block">
+                  Join Guardian to start earning →
+                </a>
+              )}
+            </>
+          )}
         </div>
       )}
 
