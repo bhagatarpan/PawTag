@@ -1,10 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, Routes, Route } from 'react-router-dom';
 import { Phone, PawPrint, WifiOff, AlertTriangle } from 'lucide-react';
 import { SiteAvailabilityStatus } from '@pawtag/shared';
 import { useSiteSettings } from './hooks/useSiteSettings';
 import { fetchTagData, fetchFoundTimer, fetchSystemStatus } from './lib/finderApi';
-import type { FinderData, FoundTimerData, LocationData, PetPhoto } from './types';
+import type { FinderData, FoundTimerData, LocationData } from './types';
 import StatusBanner from './components/StatusBanner';
 import PetPhotoCarousel from './components/PetPhotoCarousel';
 import PetDetailsCard from './components/PetDetailsCard';
@@ -15,6 +15,13 @@ import FoundTimer from './components/FoundTimer';
 import FinderLoadingState from './components/FinderLoadingState';
 import FinderErrorState from './components/FinderErrorState';
 
+/**
+ * Simple session cache for Finder data.
+ * Stores the last loaded pet data in sessionStorage so page refreshes
+ * don't require a full re-fetch. Cleared on tag change or manual refresh.
+ */
+const finderCache = new Map<string, { data: FinderData; timestamp: number }>();
+const CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
 
 function OfflineScreen({ title, message }: { title: string; message: string }) {
   return (
@@ -39,6 +46,7 @@ function FinderPage() {
   const [data, setData] = useState<FinderData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [isNetworkError, setIsNetworkError] = useState(false);
   const [notified, setNotified] = useState(false);
   const [foundTimer, setFoundTimer] = useState<FoundTimerData | null>(null);
   const [siteStatus, setSiteStatus] = useState<SiteAvailabilityStatus>(SiteAvailabilityStatus.ONLINE);
@@ -48,9 +56,14 @@ function FinderPage() {
   const [finderLocation, setFinderLocation] = useState<LocationData | null>(null);
   const [consentTimestamp, setConsentTimestamp] = useState<Date | null>(null);
 
+  // Track if location was denied to avoid re-prompting
+  const locationDeniedRef = useRef(false);
+
   const checkSiteStatus = useCallback(async () => {
-    const status = await fetchSystemStatus();
-    setSiteStatus(status);
+    // Non-blocking — site status check should not prevent pet display
+    fetchSystemStatus()
+      .then((status) => setSiteStatus(status))
+      .catch(() => {}); // Silently ignore failures
   }, []);
 
   useEffect(() => {
@@ -59,25 +72,63 @@ function FinderPage() {
     return () => clearInterval(interval);
   }, [checkSiteStatus]);
 
-  useEffect(() => {
-    if (!tagId) { setError('No tag ID provided'); setLoading(false); return; }
-    fetchTagData(tagId)
-      .then((res) => {
-        setData(res);
-        if (res.pet.status === 'found') {
-          loadFoundTimer();
-        }
-      })
-      .catch((err) => setError(err.response?.data?.error || 'Tag not found'))
-      .finally(() => setLoading(false));
-  }, [tagId]);
+  const loadTagData = useCallback(async (id: string, forceRefresh = false) => {
+    if (!id) { setError('No tag ID provided'); setLoading(false); return; }
 
-  const loadFoundTimer = async () => {
-    if (!tagId) return;
+    // Check cache first (unless force refresh)
+    if (!forceRefresh) {
+      const cached = finderCache.get(id);
+      if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+        setData(cached.data);
+        setLoading(false);
+        if (cached.data.pet.status === 'found') {
+          loadFoundTimer(id);
+        }
+        return;
+      }
+    }
+
     try {
-      const timer = await fetchFoundTimer(tagId);
+      const res = await fetchTagData(id);
+      setData(res);
+      // Cache the result
+      finderCache.set(id, { data: res, timestamp: Date.now() });
+      if (res.pet.status === 'found') {
+        loadFoundTimer(id);
+      }
+      setError('');
+      setIsNetworkError(false);
+    } catch (err: any) {
+      // Distinguish network errors from invalid tags
+      const isNetwork = !err.response || err.code === 'ECONNABORTED' || err.message?.includes('network');
+      setIsNetworkError(isNetwork);
+      if (isNetwork) {
+        setError('Unable to connect. Please check your internet connection and try again.');
+      } else if (err.response?.status === 404) {
+        setError('This tag was not found. Please check the QR code and try again.');
+      } else {
+        setError(err.response?.data?.error || 'Something went wrong. Please try again.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadTagData(tagId || '');
+  }, [tagId, loadTagData]);
+
+  const loadFoundTimer = async (id: string) => {
+    try {
+      const timer = await fetchFoundTimer(id);
       setFoundTimer(timer);
     } catch { /* ignore */ }
+  };
+
+  const handleRetry = () => {
+    setLoading(true);
+    setError('');
+    loadTagData(tagId || '', true);
   };
 
   const handleLocationGrant = () => {
@@ -96,23 +147,27 @@ function FinderPage() {
           accuracy: pos.coords.accuracy,
         });
       },
-      () => { setLocationConsent('denied'); },
+      () => {
+        setLocationConsent('denied');
+        locationDeniedRef.current = true;
+      },
       { enableHighAccuracy: true, timeout: 10000 },
     );
   };
 
   const handleLocationDecline = () => {
     setLocationConsent('denied');
+    locationDeniedRef.current = true;
     setConsentTimestamp(new Date());
   };
 
   const handleNotified = () => {
     setNotified(true);
-    loadFoundTimer();
+    loadFoundTimer(tagId || '');
   };
 
   if (loading) return <FinderLoadingState />;
-  if (error) return <FinderErrorState message={error} />;
+  if (error) return <FinderErrorState message={error} isNetworkError={isNetworkError} onRetry={handleRetry} />;
   if (!data) return null;
 
   // Handle expired tag

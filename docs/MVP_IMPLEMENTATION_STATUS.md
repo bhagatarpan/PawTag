@@ -48,7 +48,7 @@
 - [x] 2.1 Public Finder DTO
 - [x] 2.2 Recovery state semantics
 - [x] 2.3 Finder idempotency
-- [ ] 2.4 Finder degraded-network UX
+- [x] 2.4 Finder degraded-network UX
 - [ ] 2.5 Finder privacy retention
 - [ ] 3.1 Payment/order idempotency
 - [ ] 3.2 Webhook state/claiming
