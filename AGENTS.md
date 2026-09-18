@@ -1764,19 +1764,130 @@ Do not turn `AGENTS.md` back into a second giant product/API reference manual.
 
 # 55. Repository-Local Skills
 
-Repository-local guidance may exist under:
+OpenCode is configured to load repository-local skills from:
 
 ```text
-skills/coding-practice/SKILL.md
-skills/api-architecture/SKILL.md
+skills/
 ```
 
-Use relevant guidance when it helps the task, but verify it against current source and this file.
+Skills are specialist playbooks. They do **not** replace this file and they do **not** redefine product truth.
 
-If a local skill conflicts with current code reality or the MVP safety rules, do not blindly follow the stale instruction. Surface the conflict and use the safer current approach.
+## Instruction precedence
+
+When guidance conflicts, use this order:
+
+```text
+1. Actual security/data-integrity constraints and current source behavior
+2. AGENTS.md global engineering/safety rules
+3. The explicitly requested MVP master-plan work packet
+4. Relevant repository-local SKILL.md playbooks
+5. README.md and other documentation
+```
+
+Documentation never overrides contradictory runtime behavior. A skill must never be used to bypass a stricter safety rule in `AGENTS.md`.
+
+## Available specialist skills
+
+Use only the skills relevant to the current task:
+
+```text
+skills/work-packet-executor/          One-work-packet execution discipline
+skills/production-readiness-review/  Implemented vs genuinely production-ready
+skills/security-boundary-review/     Auth, ownership, RBAC, privacy, sensitive resources
+skills/commerce-safety/               Stripe, checkout, orders, inventory, refunds, subscriptions
+skills/finder-recovery/               Lost-pet Finder flow, privacy, abuse controls, recovery UX
+skills/cart-checkout-experience/      Mini-cart + premium full cart/checkout experience
+skills/pawtag-ui-ux/                  PawTag design system, accessibility, responsive UX
+skills/mobile-native/                 Expo/RN, SecureStore, QR, NFC, push, native validation
+skills/database-integrity/            Mongo/Mongoose, transactions, indexes, concurrency
+skills/background-jobs/               Jobs, leases, retries, idempotency, worker safety
+skills/testing-regression/            Risk-based regression, integration and E2E testing
+skills/api-architecture/              Routes, services, validation, shared API contracts
+skills/coding-practice/               Type safety, abstractions, React/async maintainability
+skills/release-readiness/             Staging and first-customer launch gates
+```
+
+## Skill selection rules
+
+For a master-plan implementation packet, normally use:
+
+```text
+work-packet-executor
++ the relevant domain skill(s)
++ testing-regression
+```
+
+Examples:
+
+### Stripe webhook or checkout safety
+
+```text
+work-packet-executor
+commerce-safety
+security-boundary-review      # when ownership/auth boundaries are touched
+testing-regression
+production-readiness-review   # before claiming completion/readiness
+```
+
+### Finder change
+
+```text
+work-packet-executor
+finder-recovery
+pawtag-ui-ux                  # when UI/interaction changes
+testing-regression
+production-readiness-review
+```
+
+### Cart redesign
+
+```text
+work-packet-executor
+cart-checkout-experience
+pawtag-ui-ux
+testing-regression
+```
+
+### Mobile QR/NFC/auth
+
+```text
+work-packet-executor
+mobile-native
+security-boundary-review      # for auth/storage changes
+testing-regression
+```
+
+### Database/background-job change
+
+```text
+work-packet-executor
+database-integrity
+background-jobs               # when scheduled/worker behavior is involved
+testing-regression
+```
+
+## Do not over-load skills
+
+Do not load every skill for every task. Use the smallest relevant set so instructions remain focused and do not consume unnecessary model context.
+
+## Skills are guidance, not proof
+
+A skill can describe the desired engineering method. It does not certify that the current code follows that method.
+
+Always inspect the actual implementation before editing or making readiness claims.
+
+## Maintaining skills
+
+When architecture or product rules materially change:
+
+1. update `AGENTS.md` if the change affects global engineering policy;
+2. update the relevant skill if the change affects a specialist workflow;
+3. update the master plan if sequencing or launch requirements change;
+4. update `README.md` if the repository/current-state description changes.
+
+Do not duplicate volatile repository counts or giant feature inventories inside skills. Keep skills compact and procedural.
 
 ---
-
 # 56. Development Commands
 
 Common root commands:
