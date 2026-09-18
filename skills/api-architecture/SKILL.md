@@ -1,132 +1,44 @@
 ---
 name: api-architecture
-description: Use when creating, modifying, or reviewing API calls, endpoints, or client configuration. Enforces centralized API endpoint definitions, shared client factory usage, and prohibits hard-coded API paths. Mandatory before any API-related change.
+description: Implement or review PawTag API routes, services, shared endpoint definitions, request/response contracts, validation, pagination, errors, and frontend API usage. Use when adding/changing endpoints, moving route logic into services, updating packages/shared API clients, or resolving web/mobile/API contract drift. Preserve practical route-service-model boundaries without forcing unnecessary abstraction.
 ---
 
-# API Architecture & Centralization Rules
+# API Architecture
 
-## Core Rule
+Follow `AGENTS.md` first.
 
-ALL API endpoints MUST be defined in `packages/shared/src/api/endpoints.ts`.
-ALL API client instances MUST be created via `createApiClient` from `@pawtag/shared/api`.
-NO hard-coded API path strings allowed in frontend code.
+## Preferred layering
 
-## Single Source of Truth
+`route/controller -> validation/auth middleware -> service/domain logic -> model/repository/integration`
 
-### Endpoint Constants
+Routes should primarily:
+- parse/validate input,
+- authenticate/authorize,
+- call a service,
+- map service result/errors to HTTP.
 
-Every API path is defined in `packages/shared/src/api/endpoints.ts` as part of the `API` object:
+Move substantial reusable business orchestration out of giant route files when touching that behavior. Do not perform a repository-wide refactor merely to satisfy layering aesthetics.
 
-```typescript
-import { API } from '@pawtag/shared/api';
+## Shared contracts
 
-// Static paths
-api.get(API.auth.login);
-api.get(API.customer.pets.list);
+Frontend application API calls should use centralized endpoint definitions and shared DTO/types where those abstractions genuinely fit. New shared application endpoints should normally be represented in `packages/shared`.
 
-// Dynamic paths (functions)
-api.get(API.admin.users.get(userId));
-api.get(API.finder.tag(tagId));
-```
+Do not certify an existing shared abstraction as correct without tracing its consumers. In particular, storage/token APIs used by both browser and React Native should use explicit types/contracts rather than runtime guessing.
 
-**Convention:**
-- Static paths: `API.domain.resource` (e.g., `API.auth.login`)
-- Dynamic paths: `API.domain.resource(id)` — functions return the full path
-- All paths are relative to the API base URL (typically `/api`)
+## Validation
 
-### Client Factory
+Validate all public mutations, commerce mutations, security-sensitive input, and destructive admin actions server-side. Do not rely on frontend schemas for security.
 
-Each app creates its API client using `createApiClient`:
+Prefer schemas that can be shared only when server and client semantics are truly identical.
 
-```typescript
-import { createApiClient, createLocalStorageTokenStorage } from '@pawtag/shared/api';
+## Responses/errors
 
-export default createApiClient({
-  baseURL: '/api',
-  storage: createLocalStorageTokenStorage('pawtag_token', 'pawtag_refresh_token'),
-  refreshEndpoint: '/api/auth/refresh',
-  onAuthFailure: () => { /* app-specific cleanup */ },
-});
-```
+Keep status codes and error shapes consistent enough for clients to handle predictably. Avoid leaking internal stack/provider details. Include actionable machine-readable error codes for expected business failures where useful.
 
-**Factory features:**
-- Queue-based 401 token refresh (concurrent requests share one refresh call)
-- Sync storage (localStorage) or async storage (SecureStore) support
-- Per-app `onAuthFailure` callback (redirect, clear tokens, etc.)
-- Optional response interceptors (admin auto-toast, etc.)
+## Collection endpoints
 
-## Rules
+Use bounded pagination for potentially large collections. Define sorting/filtering explicitly. Avoid returning full internal Mongoose documents when a response DTO/projection is more appropriate.
 
-### MUST
+## Versioning
 
-1. **Import `API` from `@pawtag/shared/api`** — never hard-code path strings
-2. **Use the shared client instance** — never create raw `axios.create()` instances
-3. **Use `API.domain.resource(id)` for dynamic paths** — never interpolate strings
-4. **Add new endpoints to `endpoints.ts`** before using them in frontend code
-5. **Keep endpoint functions pure** — no side effects, just return the path string
-
-### MUST NOT
-
-1. **Never use raw `axios.get()`/`axios.post()`** — always use the configured client
-2. **Never hard-code `/api/...` paths** in frontend call sites
-3. **Never duplicate the token refresh logic** — use `createApiClient`
-4. **Never skip the client's interceptors** by importing axios directly
-5. **Never put API base URLs in frontend code** — use the client's `baseURL` config
-
-### EXCEPTIONS
-
-- **Backend routes** (`packages/api/src/routes/`) — these DEFINE the endpoints, they don't consume them
-- **Finder app `useSiteSettings`** — may use raw axios for simple unauthenticated calls (document why)
-- **Mobile token storage** — uses async `AsyncTokenStorage` interface, not localStorage
-
-## Adding a New Endpoint
-
-1. Add the endpoint to `packages/shared/src/api/endpoints.ts`:
-   ```typescript
-   export const API = {
-     // ... existing endpoints
-     admin: {
-       // ... existing admin endpoints
-       newFeature: {
-         list: '/admin/new-feature',
-         get: (id: string) => `/admin/new-feature/${id}` as const,
-       },
-     },
-   } as const;
-   ```
-
-2. Use it in the frontend:
-   ```typescript
-   import { API } from '@pawtag/shared/api';
-   
-   const res = await api.get(API.admin.newFeature.list);
-   const item = await api.get(API.admin.newFeature.get('123'));
-   ```
-
-3. No changes needed to the client factory or app-specific `api.ts` files.
-
-## File Structure
-
-```
-packages/shared/src/api/
-├── endpoints.ts          # ALL endpoint paths (single source of truth)
-├── client-factory.ts     # Shared axios factory (refresh, interceptors, storage)
-└── index.ts              # Barrel export
-
-apps/web/src/lib/api.ts      # Uses createApiClient + localStorage
-apps/admin/src/lib/api.ts    # Uses createApiClient + auto-toast interceptor
-apps/finder/src/lib/finderApi.ts  # Uses createApiClient (unauthenticated)
-apps/mobile/src/api/client.ts     # Uses createApiClient + async SecureStore
-```
-
-## Verification Checklist
-
-Before submitting any API-related PR:
-
-- [ ] No hard-coded `/api/...` strings in frontend files
-- [ ] All new endpoints added to `endpoints.ts`
-- [ ] No raw `axios` imports in frontend (except documented exceptions)
-- [ ] No duplicated token refresh logic
-- [ ] New endpoints have tests in `tests/unit/api-endpoints.test.ts`
-- [ ] `pnpm --filter @pawtag/shared typecheck` passes
-- [ ] `pnpm vitest run tests/unit/api-endpoints.test.ts` passes
+Do not add versioning machinery without a real compatibility requirement. Preserve backward compatibility for released clients where relevant.

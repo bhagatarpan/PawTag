@@ -1,0 +1,3 @@
+interface:
+  display_name: "Database Integrity"
+  short_description: "Keep PawTag MongoDB data correct under concurrency and change."

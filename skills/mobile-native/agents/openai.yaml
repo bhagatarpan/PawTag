@@ -1,0 +1,3 @@
+interface:
+  display_name: "Mobile Native"
+  short_description: "Build PawTag Expo/React Native features with native-device correctness."

@@ -1,0 +1,3 @@
+interface:
+  display_name: "Release Readiness"
+  short_description: "Gate PawTag staging and first-customer launch with evidence."

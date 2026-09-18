@@ -1,0 +1,3 @@
+interface:
+  display_name: "Testing Regression"
+  short_description: "Protect PawTag behavior with risk-based regression and E2E tests."

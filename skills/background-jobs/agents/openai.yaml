@@ -1,0 +1,3 @@
+interface:
+  display_name: "Background Jobs"
+  short_description: "Make PawTag scheduled work safe across retries and workers."

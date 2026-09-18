@@ -1,0 +1,3 @@
+interface:
+  display_name: "API Architecture"
+  short_description: "Keep PawTag API contracts, services, validation, and clients coherent."
