@@ -38,12 +38,13 @@ let reconcileTimer: ReturnType<typeof setTimeout> | null = null;
  */
 function calculateDelayMs(hour: number): number {
   const now = new Date();
-  // NZ timezone offset (NZST = UTC+12, NZDT = UTC+13)
-  // Using a simple approximation: try UTC+12
-  const nzOffsetHours = 12;
-
-  const nowUtc = now.getTime();
-  const nowNzHour = (now.getUTCHours() + nzOffsetHours) % 24;
+  const nowNzHour = Number(
+    new Intl.DateTimeFormat('en-NZ', {
+      timeZone: 'Pacific/Auckland',
+      hour: 'numeric',
+      hour12: false,
+    }).format(now),
+  );
 
   let hoursUntilNext = (hour - nowNzHour + 24) % 24;
   if (hoursUntilNext === 0) {

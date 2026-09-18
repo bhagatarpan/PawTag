@@ -5,7 +5,7 @@ import { requirePermission } from '../middleware/permission';
 import { createAuditContextFromRequest, type AuditRequest } from '../middleware/audit';
 import { auditService, type AuditContext } from '../services/audit';
 import { uploadMedia, deleteMedia } from '../services/storage';
-import { User } from '@pawtag/db';
+import { Pet, User } from '@pawtag/db';
 import logger from '../lib/logger';
 
 const router = Router();
@@ -119,6 +119,14 @@ router.post('/pet-photo', authenticate, async (req: AuthRequest, res: Response) 
 
     try {
       const petId = (req.query.petId as string) || (req.body?.petId as string) || undefined;
+
+      if (petId) {
+        const pet = await Pet.findOne({ _id: petId, ownerId: req.user!.id, deletedAt: null });
+        if (!pet) {
+          res.status(403).json({ success: false, error: 'You do not have permission to upload a photo for this pet' });
+          return;
+        }
+      }
 
       const result = await uploadMedia(
         'pet-photo',
@@ -396,6 +404,12 @@ router.post('/product-images', authenticate, requirePermission('product.update')
 router.delete('/product-images/:filename', authenticate, requirePermission('product.update'), async (req: AuthRequest, res: Response) => {
   try {
     const { filename } = req.params;
+
+    if (/\.\.|[\\/]/.test(filename) || !/^[a-zA-Z0-9._-]+$/.test(filename)) {
+      res.status(400).json({ success: false, error: 'Invalid filename' });
+      return;
+    }
+
     const productId = (req.query.productId as string) || (req.body?.productId as string) || undefined;
 
     await deleteMedia(`products/${filename}`);

@@ -77,7 +77,7 @@ router.get('/', requirePermission('customer.read'), async (req: AuthRequest, res
     const petIds = subscriptions
       .map((s) => (s.tagId as any)?.petId)
       .filter(Boolean);
-    const pets = await Pet.find({ _id: { $in: petIds } }).select('name petType breed');
+    const pets = await Pet.find({ _id: { $in: petIds }, ownerId: req.user!.id, deletedAt: null }).select('name petType breed');
     const petMap = new Map(pets.map((p) => [p._id.toString(), p]));
 
     const enriched = subscriptions.map((s) => {
@@ -126,7 +126,7 @@ router.get('/:id', requirePermission('customer.read'), async (req: AuthRequest, 
     let petName = null;
     let petType = null;
     if (tag?.petId) {
-      const pet = await Pet.findById(tag.petId).select('name petType breed');
+      const pet = await Pet.findOne({ _id: tag.petId, ownerId: req.user!.id, deletedAt: null }).select('name petType breed');
       if (pet) {
         petName = pet.name;
         petType = pet.petType;

@@ -29,6 +29,7 @@ import {
   verifyRefreshToken,
   rotateRefreshToken,
   revokeRefreshToken,
+  revokeAllUserRefreshTokens,
 } from '../services/auth.service';
 import { sendVerificationEmail, sendPasswordResetEmail, sendPasswordChangedEmail, sendWelcomeEmail, sendLoginNotification, sendLoginOtpEmail, sendGuardianWelcomeEmail } from '../services/email.service';
 import { sendPhoneOtpSMS } from '../services/sms.service';
@@ -1234,6 +1235,9 @@ router.post('/reset-password', validate(resetPasswordSchema), async (req, res: R
     user.passwordHash = await hashPassword(newPassword);
     await user.save();
 
+    // Invalidate all existing sessions — password reset implies possible compromise
+    await revokeAllUserRefreshTokens(user._id.toString());
+
     verificationToken.usedAt = new Date();
     await verificationToken.save();
 
@@ -1378,6 +1382,9 @@ router.post('/change-password', authenticate, validate(changePasswordSchema), as
 
     user.passwordHash = await hashPassword(newPassword);
     await user.save();
+
+    // Invalidate all other sessions — the user must re-authenticate on other devices
+    await revokeAllUserRefreshTokens(user._id.toString());
 
     await auditAuthEvent(req as AuditRequest, {
       action: 'password_changed',

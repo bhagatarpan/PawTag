@@ -73,4 +73,15 @@ InvoiceSchema.index({ orderId: 1, createdAt: -1 });
 InvoiceSchema.index({ subscriptionId: 1, createdAt: -1 });
 InvoiceSchema.index({ userId: 1, subscriptionId: 1, createdAt: -1 });
 
+// Idempotency: prevent duplicate invoices for the same Stripe Invoice ID
+InvoiceSchema.index(
+  { stripeInvoiceId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      stripeInvoiceId: { $type: 'string' },
+    },
+  },
+);
+
 export const Invoice = mongoose.model<IInvoiceDocument>('Invoice', InvoiceSchema);

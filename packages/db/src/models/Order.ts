@@ -252,4 +252,15 @@ OrderSchema.index({ userId: 1, createdAt: -1 });
 OrderSchema.index({ status: 1, createdAt: -1 });
 OrderSchema.index({ completionStatus: 1 });
 
+// Idempotency: prevent duplicate orders for the same Stripe PaymentIntent
+OrderSchema.index(
+  { 'payment.stripePaymentIntentId': 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      'payment.stripePaymentIntentId': { $type: 'string' },
+    },
+  },
+);
+
 export const Order = mongoose.model<IOrderDocument>('Order', OrderSchema);

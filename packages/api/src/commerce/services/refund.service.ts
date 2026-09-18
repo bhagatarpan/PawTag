@@ -13,6 +13,7 @@
  */
 
 import { Order, PaymentTransaction, type IOrderDocument } from '@pawtag/db';
+import mongoose from 'mongoose';
 import { NotFoundError } from '../../lib/app-errors';
 import { RefundError } from '../errors';
 import { stripePaymentProvider } from '../providers/stripe';
@@ -86,19 +87,52 @@ export class RefundService {
       throw new RefundError(`Refund window of ${maxDays} days has passed`);
     }
 
-    // 4. Determine refund amount
-    const refundAmount = params.amount ?? order.payment.amount;
-    if (refundAmount <= 0 || refundAmount > order.payment.amount) {
+    // 4. Idempotency check - return existing refund if one already exists
+    const existingRefund = await PaymentTransaction.findOne({
+      orderId: order._id,
+      type: 'refund',
+      status: { $in: ['pending', 'succeeded'] },
+    }).sort({ createdAt: -1 });
+
+    if (existingRefund) {
+      logger.info({
+        orderId,
+        orderNumber: order.orderNumber,
+        existingRefundId: existingRefund.providerTransactionId,
+        status: existingRefund.status,
+      }, 'Returning existing refund (idempotency)');
+      return {
+        success: true,
+        refundId: existingRefund.providerTransactionId,
+        amount: existingRefund.amount,
+        order,
+      };
+    }
+
+    // 5. Calculate cumulative refund amount and validate
+    const capturedAmount = order.payment.amount;
+    const totalRefunded = await this.calculateTotalRefunded(order._id);
+    const refundAmount = params.amount ?? capturedAmount;
+
+    if (refundAmount <= 0) {
       throw new RefundError(`Invalid refund amount: $${refundAmount}`);
     }
 
-    // 5. Get Stripe payment intent ID
+    if (totalRefunded + refundAmount > capturedAmount) {
+      const remainingRefundable = capturedAmount - totalRefunded;
+      throw new RefundError(
+        `Refund amount of $${refundAmount.toFixed(2)} would exceed captured amount of $${capturedAmount.toFixed(2)}. ` +
+        `Already refunded: $${totalRefunded.toFixed(2)}. Remaining refundable: $${remainingRefundable.toFixed(2)}`,
+      );
+    }
+
+    // 6. Get Stripe payment intent ID
     const paymentIntentId = order.payment.stripePaymentIntentId || order.payment.transactionId;
     if (!paymentIntentId) {
       throw new RefundError('No payment intent found for this order');
     }
 
-    // 6. Process refund via Stripe
+    // 7. Process refund via Stripe
     const stripeResult = await stripePaymentProvider.createRefund({
       paymentIntentId,
       amount: refundAmount,
@@ -112,15 +146,15 @@ export class RefundService {
       };
     }
 
-    // 7. Update order
-    const isFullRefund = refundAmount >= order.payment.amount;
+    // 8. Update order
+    const isFullRefund = refundAmount >= capturedAmount;
     order.status = isFullRefund ? 'refunded' : order.status;
     order.payment.status = isFullRefund ? 'refunded' : order.payment.status;
     order.refundReason = params.reason;
 
     await order.save();
 
-    // 8. Record activity
+    // 9. Record activity
     await Order.updateOne(
       { _id: orderId },
       {
@@ -141,7 +175,7 @@ export class RefundService {
       },
     );
 
-    // 9. Audit log
+    // 10. Audit log
     await logRefundEvent('succeeded', {
       refundId: stripeResult.refundId,
       orderId,
@@ -151,7 +185,7 @@ export class RefundService {
       reason: params.reason,
     });
 
-    // 10. Record payment transaction for audit trail
+    // 11. Record payment transaction for audit trail
     await PaymentTransaction.create({
       orderId: order._id,
       orderNumber: order.orderNumber,
@@ -190,6 +224,32 @@ export class RefundService {
   private isRefundable(order: IOrderDocument): boolean {
     const refundableStatuses = ['paid', 'packing', 'shipped', 'delivered'];
     return refundableStatuses.includes(order.status);
+  }
+
+  /**
+   * Calculate the total amount already refunded for an order.
+   *
+   * @param orderId - Order ID
+   * @returns Total refunded amount in cents/currency units
+   */
+  private async calculateTotalRefunded(orderId: mongoose.Types.ObjectId): Promise<number> {
+    const result = await PaymentTransaction.aggregate([
+      {
+        $match: {
+          orderId,
+          type: 'refund',
+          status: 'succeeded',
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: '$amount' },
+        },
+      },
+    ]);
+
+    return result.length > 0 ? result[0].total : 0;
   }
 }
 

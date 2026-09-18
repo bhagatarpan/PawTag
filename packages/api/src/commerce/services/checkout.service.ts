@@ -363,9 +363,25 @@ export class CheckoutService {
         });
         break; // success
       } catch (err: any) {
-        if (err?.code === 11000 && attempt < 2) {
-          logger.warn({ attempt, paymentIntentId }, 'Order number duplicate, retrying');
-          continue;
+        if (err?.code === 11000) {
+          // Duplicate key — determine which index was violated
+          const keyPattern = err?.keyPattern || {};
+          if (keyPattern['payment.stripePaymentIntentId']) {
+            // Another concurrent request already created an order for this PaymentIntent.
+            // Fetch the existing order and return it idempotently.
+            logger.warn({ attempt, paymentIntentId }, 'Order duplicate on stripePaymentIntentId — returning existing order');
+            const existingOrder = await Order.findOne({ 'payment.stripePaymentIntentId': paymentIntentId });
+            if (existingOrder) {
+              const existingInvoice = await Invoice.findOne({ orderId: existingOrder._id });
+              const existingInvoiceUrl = existingInvoice ? await this.getInvoiceUrl(existingInvoice._id.toString(), userId) : '';
+              return { order: existingOrder, invoice: existingInvoice, invoiceUrl: existingInvoiceUrl, isNew: false };
+            }
+          }
+          // Order number duplicate — retry with a new number
+          if (attempt < 2) {
+            logger.warn({ attempt, paymentIntentId }, 'Order number duplicate, retrying');
+            continue;
+          }
         }
         throw err;
       }

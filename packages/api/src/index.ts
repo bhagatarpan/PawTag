@@ -120,6 +120,13 @@ import { startPetMilestonesJob } from './jobs/pet-milestones';
 
 const app = express();
 
+// --- Trust proxy (required for correct req.ip behind reverse proxy) ---
+// Production: trust first proxy (nginx/cloud). Dev/test: disabled.
+// Set TRUST_PROXY env var to override (e.g. 'true', 'loopback', 'linklocal', or a CIDR).
+if (config.trustProxy !== 'false') {
+  app.set('trust proxy', config.trustProxy === 'true' ? true : config.trustProxy);
+}
+
 // --- Serve uploads BEFORE Helmet (no CSP/CORP restrictions on images) ---
 app.use('/api/uploads', express.static(path.join(__dirname, '../uploads')));
 

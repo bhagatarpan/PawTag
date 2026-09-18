@@ -34,4 +34,5 @@ export const config = {
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
   smsProvider: process.env.SMS_PROVIDER || 'demo',
   allowedOrigins: parseAllowedOrigins(),
+  trustProxy: process.env.TRUST_PROXY || (process.env.NODE_ENV === 'production' ? '1' : 'false'),
 };

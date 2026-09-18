@@ -145,6 +145,17 @@ PaymentTransactionSchema.index({ providerTransactionId: 1 });
 PaymentTransactionSchema.index({ status: 1, createdAt: -1 });
 PaymentTransactionSchema.index({ provider: 1, status: 1 });
 
+// Idempotency: prevent duplicate refund/capture transactions for the same provider transaction
+PaymentTransactionSchema.index(
+  { providerTransactionId: 1, type: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      providerTransactionId: { $type: 'string' },
+    },
+  },
+);
+
 export const PaymentTransaction = mongoose.model<IPaymentTransactionDocument>(
   'PaymentTransaction',
   PaymentTransactionSchema,

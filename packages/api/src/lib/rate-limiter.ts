@@ -74,7 +74,7 @@ export function createDbRateLimiter(opts: {
     if (skipDev && isDev()) return next();
 
     const max = await getNumericSetting(opts.settingKey, opts.defaultValue);
-    const ip = req.ip || req.headers['x-forwarded-for']?.toString().split(',')[0]?.trim() || 'unknown';
+    const ip = req.ip || 'unknown';
     const storeKey = `${ip}:${opts.keySuffix || opts.settingKey}`;
     const now = Date.now();
 
