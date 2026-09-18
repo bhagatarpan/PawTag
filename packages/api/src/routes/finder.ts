@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { Tag, FinderScan, LocationEvent, Notification, Subscription, User, Pet, SiteContent, Setting, EscalationRecord } from '@pawtag/db';
+import { toFinderPetView } from '@pawtag/shared';
 import { sendPushToUser } from '../services/push-notification.service';
 import { sendPetFoundEmail } from '../services/email.service';
 import { auditService, type AuditContext } from '../services/audit';
@@ -290,25 +291,7 @@ router.get('/:tagId', async (req: Request, res: Response) => {
     res.json({
       success: true,
       data: {
-        pet: {
-          name: pet.name,
-          petId: pet.petId,
-          species: pet.species,
-          breed: pet.breed,
-          breedOrigin: pet.breedOrigin,
-          secondaryBreed: pet.secondaryBreed,
-          color: pet.color,
-          pattern: pet.pattern,
-          gender: pet.gender,
-          age: pet.age,
-          favouriteFood: pet.favouriteFood,
-          photos: pet.photos,
-          photoUrl: pet.photoUrl,
-          medicalAlerts: pet.medicalAlerts,
-          vaccinations: pet.vaccinations || [],
-          microchips: pet.microchips || [],
-          status: pet.status,
-        },
+        pet: toFinderPetView(pet),
         tagId: tag.tagId,
         tagStatus: tag.status,
         subscriptionStatus: tag.subscriptionStatus || 'none',

@@ -31,22 +31,14 @@ export interface FinderData {
   petInfo?: null;
   pet: {
     name: string;
-    petId?: string;
-    petType?: string;
     species: string;
     breed: string;
-    breedOrigin?: string;
-    secondaryBreed?: string;
     color: string;
     pattern?: string;
     gender?: string;
-    age?: number;
-    favouriteFood?: string;
-    photos: PetPhoto[];
     photoUrl?: string;
+    photos?: PetPhoto[];
     medicalAlerts?: string;
-    vaccinations?: Vaccination[];
-    microchips?: Microchip[];
     status: string;
   };
   tagId: string;

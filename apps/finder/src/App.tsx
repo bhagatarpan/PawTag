@@ -166,7 +166,7 @@ function FinderPage() {
 
         <div className="bg-white rounded-xl shadow-md overflow-hidden">
           <PetPhotoCarousel
-            photos={data.pet.photos}
+            photos={data.pet.photos || []}
             fallbackUrl={data.pet.photoUrl}
             petName={data.pet.name}
           />

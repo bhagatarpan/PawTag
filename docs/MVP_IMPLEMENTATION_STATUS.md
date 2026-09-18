@@ -45,7 +45,7 @@
 - [x] 1.4 Production payment config guardrails
 - [x] 1.5 Checkout consistency/recovery state machine
 - [x] 1.6 Inventory reservation compensation
-- [ ] 2.1 Public Finder DTO
+- [x] 2.1 Public Finder DTO
 - [ ] 2.2 Recovery state semantics
 - [ ] 2.3 Finder idempotency
 - [ ] 2.4 Finder degraded-network UX

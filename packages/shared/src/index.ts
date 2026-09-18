@@ -4,6 +4,7 @@
 
 export * from './constants';
 export * from './api';
+export * from './finder-dto';
 
 // --- Enums & Constants ---
 
