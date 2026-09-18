@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { X, Plus, Minus, Trash2, ShoppingCart } from 'lucide-react';
 
 export interface CartItem {
@@ -58,6 +58,42 @@ export const CartDrawer = React.memo(function CartDrawer({
   guardianTier = null,
   onToggleAutoRenew,
 }: CartDrawerProps) {
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+
+  // Focus management: move focus into drawer when opened
+  useEffect(() => {
+    if (open && closeButtonRef.current) {
+      closeButtonRef.current.focus();
+    }
+  }, [open]);
+
+  // Keyboard handling: Escape to close
+  useEffect(() => {
+    if (!open) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [open, onClose]);
+
+  // Prevent body scroll when drawer is open
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [open]);
+
   if (!open) return null;
 
   return (
@@ -66,10 +102,15 @@ export const CartDrawer = React.memo(function CartDrawer({
       <div
         className="fixed inset-0 bg-black/50 z-40 transition-opacity"
         onClick={onClose}
+        aria-hidden="true"
       />
 
       {/* Drawer */}
       <div
+        ref={drawerRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Shopping cart"
         className={`fixed right-0 top-0 h-full w-full max-w-md bg-white shadow-xl z-50 flex flex-col transform transition-transform duration-300 ${className}`}
       >
         {/* Header */}
@@ -78,8 +119,10 @@ export const CartDrawer = React.memo(function CartDrawer({
             Your Cart ({items.length})
           </h2>
           <button
+            ref={closeButtonRef}
             onClick={onClose}
-            className="p-2 text-gray-400 hover:text-gray-600 transition-colors rounded-lg hover:bg-gray-50"
+            className="p-2 text-gray-400 hover:text-gray-600 transition-colors rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
+            aria-label="Close cart"
           >
             <X className="h-5 w-5" />
           </button>
@@ -87,7 +130,7 @@ export const CartDrawer = React.memo(function CartDrawer({
 
         {/* Guest mode banner */}
         {isGuest && items.length > 0 && (
-          <div className="mx-4 mt-3 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">
+          <div className="mx-4 mt-3 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700" role="status">
             You're shopping as a guest. <strong>Log in</strong> to save your cart and check out.
             <br />
             <a href="/guardian" className="text-primary-600 hover:underline mt-1 inline-block">
@@ -98,14 +141,14 @@ export const CartDrawer = React.memo(function CartDrawer({
 
         {/* Price changed warning */}
         {priceChanged && (
-          <div className="mx-4 mt-3 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700">
+          <div className="mx-4 mt-3 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700" role="status">
             A price in your cart has been updated to reflect current pricing.
           </div>
         )}
 
         {/* Loyalty messaging */}
         {items.length > 0 && (
-          <div className="mx-4 mt-3">
+          <div className="mx-4 mt-3" role="status">
             {!guardianTier && isGuest ? (
               <div className="px-3 py-2 bg-primary-50 border border-primary-100 rounded-lg text-xs text-primary-700">
                 <strong>You could be earning rewards on this purchase.</strong>{' '}
@@ -129,7 +172,7 @@ export const CartDrawer = React.memo(function CartDrawer({
         )}
 
         {/* Items */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <div className="flex-1 overflow-y-auto p-4 space-y-4" role="list" aria-label="Cart items">
           {items.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-gray-400">
               <ShoppingCart className="h-12 w-12 mb-3" />
@@ -144,6 +187,7 @@ export const CartDrawer = React.memo(function CartDrawer({
               <div
                 key={itemId}
                 className="flex gap-3 p-3 bg-gray-50 rounded-xl"
+                role="listitem"
               >
                 <div className="w-16 h-16 bg-gradient-to-br from-primary-50 to-primary-100 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden">
                   {item.image ? (
@@ -174,8 +218,9 @@ export const CartDrawer = React.memo(function CartDrawer({
                         type="button"
                         role="switch"
                         aria-checked={item.autoRenew !== false}
+                        aria-label={`Auto-renew for ${itemName}`}
                         onClick={() => onToggleAutoRenew(itemId, item.autoRenew === false)}
-                        className={`relative inline-flex h-4 w-7 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        className={`relative inline-flex h-4 w-7 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 ${
                           item.autoRenew !== false ? 'bg-primary-600' : 'bg-gray-200'
                         }`}
                       >
@@ -191,23 +236,27 @@ export const CartDrawer = React.memo(function CartDrawer({
                 <div className="flex flex-col items-end gap-1">
                   <button
                     onClick={() => onRemoveItem(itemId)}
-                    className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                    className="p-1 text-gray-400 hover:text-red-500 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 rounded"
+                    aria-label={`Remove ${itemName} from cart`}
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
                   <div className="flex items-center gap-1">
                     <button
                       onClick={() => onUpdateQuantity(itemId, Math.max(1, item.quantity - 1))}
-                      className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                      disabled={item.quantity <= 1}
+                      className="p-1 text-gray-400 hover:text-gray-600 transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                      aria-label={`Decrease quantity of ${itemName}`}
                     >
                       <Minus className="h-3 w-3" />
                     </button>
-                    <span className="text-sm font-medium text-gray-700 w-6 text-center">
+                    <span className="text-sm font-medium text-gray-700 w-6 text-center" aria-label={`Quantity: ${item.quantity}`}>
                       {item.quantity}
                     </span>
                     <button
                       onClick={() => onUpdateQuantity(itemId, item.quantity + 1)}
-                      className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                      className="p-1 text-gray-400 hover:text-gray-600 transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 rounded"
+                      aria-label={`Increase quantity of ${itemName}`}
                     >
                       <Plus className="h-3 w-3" />
                     </button>
@@ -230,7 +279,7 @@ export const CartDrawer = React.memo(function CartDrawer({
             {onCheckout && (
               <button
                 onClick={onCheckout}
-                className="w-full bg-primary-600 text-white rounded-xl font-semibold px-6 py-3 hover:bg-primary-700 active:bg-primary-800 transition-all"
+                className="w-full bg-primary-600 text-white rounded-xl font-semibold px-6 py-3 hover:bg-primary-700 active:bg-primary-800 transition-all focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
               >
                 Checkout — ${total.toFixed(2)}
               </button>
@@ -243,7 +292,8 @@ export const CartDrawer = React.memo(function CartDrawer({
             </a>
             <button
               onClick={onClearCart}
-              className="w-full text-sm text-gray-500 hover:text-red-500 transition-colors py-1"
+              className="w-full text-sm text-gray-500 hover:text-red-500 transition-colors py-1 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 rounded"
+              aria-label="Clear all items from cart"
             >
               Clear Cart
             </button>
