@@ -1,10 +1,72 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import NfcManager, { NfcTech } from 'react-native-nfc-manager';
 import { colors, typography, spacing, borderRadius } from '../../theme/tokens';
 
 interface NFCScannerScreenProps {
   navigation: any;
+}
+
+/**
+ * NDEF URI prefix codes.
+ * The first byte of a URI record payload indicates the URI scheme.
+ * @see https://nfc-wallet.readthedocs.io/en/latest/ndef/record-type-definition.html
+ */
+const NDEF_URI_PREFIXES: Record<number, string> = {
+  0x00: '',                     // No prepend
+  0x01: 'http://www.',          // http://www.
+  0x02: 'https://www.',         // https://www.
+  0x03: 'http://',              // http://
+  0x04: 'https://',             // https://
+  0x05: 'tel:',                 // tel:
+  0x06: 'mailto:',              // mailto:
+  0x07: 'ftp://anonymous:anonymous@', // ftp://anonymous:anonymous@
+  0x08: 'ftp://ftp.',           // ftp://ftp.
+  0x09: 'ftps://',              // ftps://
+  0x0A: 'sftp://',              // sftp://
+  0x0B: 'smb://',               // smb://
+  0x0C: 'nfs://',               // nfs://
+  0x0D: 'ftp://',               // ftp://
+  0x0E: 'dav://',               // dav://
+  0x0F: 'news:',                // news:
+  0x10: 'telnet://',            // telnet://
+  0x11: 'imap:',                // imap:
+  0x12: 'rtsp://',              // rtsp://
+  0x13: 'urn:',                 // urn:
+  0x14: 'pop:',                 // pop:
+  0x15: 'sip:',                 // sip:
+  0x16: 'sips:',                // sips:
+  0x17: 'tftp:',                // tftp:
+  0x18: 'btspp://',             // btspp://
+  0x19: 'btl2cap://',           // btl2cap://
+  0x1A: 'btgoep://',            // btgoep://
+  0x1B: 'tcpobex://',           // tcpobex://
+  0x1C: 'irdaobex://',          // irdaobex://
+  0x1D: 'file://',              // file://
+  0x1E: 'urn:epc:id:',          // urn:epc:id:
+  0x1F: 'urn:epc:tag:',         // urn:epc:tag:
+  0x20: 'urn:epc:pat:',         // urn:epc:pat:
+  0x21: 'urn:epc:raw:',         // urn:epc:raw:
+  0x22: 'urn:epc:',             // urn:epc:
+  0x23: 'urn:nfc:',             // urn:nfc:
+};
+
+/**
+ * Decode an NDEF URI record payload to a full URL string.
+ *
+ * NDEF URI records have a prefix byte followed by the URI body.
+ * For example, a PawTag QR URL like "https://pawtag.co.nz/finder/PT-123456"
+ * would be encoded as: [0x04, 'pawtag.co.nz/finder/PT-123456']
+ * where 0x04 = 'https://' prefix.
+ */
+function decodeNdefUriPayload(payload: number[]): string {
+  if (payload.length === 0) return '';
+
+  const prefixCode = payload[0];
+  const prefix = NDEF_URI_PREFIXES[prefixCode] ?? '';
+  const uriBody = String.fromCharCode(...payload.slice(1));
+
+  return prefix + uriBody;
 }
 
 export function NFCScannerScreen({ navigation }: NFCScannerScreenProps) {
@@ -37,18 +99,17 @@ export function NFCScannerScreen({ navigation }: NFCScannerScreenProps) {
       let tagId = '';
 
       if (ndefMessage && ndefMessage.length > 0) {
-        // Look for a URL record
+        // Look for a URL record (type 'U')
         for (const record of ndefMessage) {
           if (record.type === 'U') {
-            // URI record
-            const payload = record.payload;
-            // The payload contains the URL — extract tagId from it
-            const url = String.fromCharCode(...payload);
+            // URI record — decode with prefix byte semantics
+            const url = decodeNdefUriPayload(record.payload);
             try {
               const parsedUrl = new URL(url);
               const pathParts = parsedUrl.pathname.split('/');
               tagId = pathParts[pathParts.length - 1];
             } catch {
+              // Not a valid URL, try to extract tag ID directly
               tagId = url;
             }
             break;
@@ -62,14 +123,22 @@ export function NFCScannerScreen({ navigation }: NFCScannerScreenProps) {
       }
 
       if (!tagId) {
-        throw new Error('Could not read tag ID');
+        throw new Error('Could not read tag ID from NFC tag');
       }
 
       NfcManager.cancelTechnologyRequest();
       navigation.navigate('RedeemTag', { tagId });
     } catch (error: any) {
+      // Show meaningful error for non-cancel scenarios
       if (error.message !== 'User cancelled') {
-        // User cancelled scanning
+        Alert.alert(
+          'NFC Read Error',
+          error.message || 'Failed to read NFC tag. Please try again.',
+          [
+            { text: 'Try Again', onPress: () => setReading(false) },
+            { text: 'Cancel', onPress: () => navigation.goBack() },
+          ]
+        );
       }
     } finally {
       setReading(false);
