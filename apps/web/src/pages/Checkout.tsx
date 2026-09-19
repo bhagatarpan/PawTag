@@ -649,7 +649,7 @@ export default function Checkout() {
         {currentStep === 'cart' && (
           <div className="max-w-4xl mx-auto">
             <h1 className="text-2xl font-bold text-gray-900 mb-6">Your Cart</h1>
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
               <div className="p-6 border-b border-gray-100">
                 <div className="flex flex-wrap items-center gap-2 text-sm text-gray-500">
                   <ShieldCheck className="h-4 w-4 text-primary-600 flex-shrink-0" />
@@ -681,9 +681,9 @@ export default function Checkout() {
                             </div>
                             <div className="flex-1">
                               <p className="font-medium text-gray-900">{item.productName || item.name}</p>
-                              <p className="text-xs text-gray-500">Qty: {item.quantity} × NZ${(item.unitPrice || item.price || 0).toFixed(2)}</p>
+                              <p className="text-xs text-gray-500">Qty: {item.quantity} × ${(item.unitPrice || item.price || 0).toFixed(2)}</p>
                             </div>
-                            <p className="text-sm font-semibold text-gray-900">NZ${((item.unitPrice || item.price || 0) * item.quantity).toFixed(2)}</p>
+                            <p className="text-sm font-semibold text-gray-900">${((item.unitPrice || item.price || 0) * item.quantity).toFixed(2)}</p>
                           </div>
 
                           {/* Engraving section — only for customizable products */}
@@ -700,7 +700,7 @@ export default function Checkout() {
                                     Add {labelText}
                                   </span>
                                   {engravingPrice > 0 && (
-                                    <span className="text-xs text-gray-500">(+NZ${engravingPrice.toFixed(2)})</span>
+                                    <span className="text-xs text-gray-500">(+${engravingPrice.toFixed(2)})</span>
                                   )}
                                 </label>
                               ) : (
@@ -762,7 +762,7 @@ export default function Checkout() {
               </div>
 
               {/* Summary */}
-              <div className="px-6 py-4 border-t border-gray-100">
+              <div className="px-6 py-4 border-t border-gray-200">
                 {/* Promo code section */}
                   <div className="mb-4">
                   {promoApplied ? (
@@ -770,7 +770,7 @@ export default function Checkout() {
                     <div className="flex items-center gap-2">
                       <Tag className="h-4 w-4 text-green-600" />
                       <span className="font-medium text-green-700">{promoCode}</span>
-                      <span className="text-green-600">applied — saved NZ${discountAmount.toFixed(2)}</span>
+                      <span className="text-green-600">applied — saved ${discountAmount.toFixed(2)}</span>
                     </div>
                     <button onClick={removePromoCode} className="text-xs text-gray-500 hover:text-red-500 font-medium ml-2">Remove</button>
                   </div>
@@ -783,8 +783,8 @@ export default function Checkout() {
                         <span className="text-blue-600">
                           — {guestPromoInfo.discountType === 'percentage'
                             ? `${guestPromoInfo.discountValue}% off`
-                            : `NZ$${guestPromoInfo.discountValue} off`}
-                          {guestPromoInfo.minOrderAmount > 0 && ` (min order: NZ$${guestPromoInfo.minOrderAmount})`}
+                            : `$${guestPromoInfo.discountValue} off`}
+                          {guestPromoInfo.minOrderAmount > 0 && ` (min order: $${guestPromoInfo.minOrderAmount})`}
                         </span>
                       </div>
                       <button onClick={() => { setGuestPromoInfo(null); setPromoCodeCtx(''); }} className="text-xs text-gray-500 hover:text-red-500 font-medium ml-2">Remove</button>
@@ -806,7 +806,7 @@ export default function Checkout() {
 
                 {/* PawRewards Redemption */}
                 {user && pawRewardsBalance > 0 && (
-                  <div className="border-t border-gray-100 pt-4 mt-4">
+                  <div className="border-t border-gray-200 pt-4 mt-4">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
                         <PawPrint className="h-4 w-4 text-amber-500" />
@@ -853,7 +853,7 @@ export default function Checkout() {
                 )}
 
                 {/* Guardian Loyalty Messaging */}
-                <div className="border-t border-gray-100 pt-4 mt-4">
+                <div className="border-t border-gray-200 pt-4 mt-4">
                   {!user ? (
                     // Guest — prompt to join Guardian
                     <div className="flex items-start gap-3 p-3 bg-primary-50 border border-primary-100 rounded-lg">
@@ -894,7 +894,7 @@ export default function Checkout() {
 
                 {/* Auto-Renew Status */}
                 {hasSubscriptionItems && (
-                  <div className="border-t border-gray-100 pt-4 mt-4">
+                  <div className="border-t border-gray-200 pt-4 mt-4">
                     <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Subscription Auto-Renew</p>
                     {items.filter((item: any) => item.isSubscription || item.monthlyPrice).map((item: any) => {
                       const key = item._id || item.productId;
@@ -912,16 +912,16 @@ export default function Checkout() {
                 )}
 
                 <div className="space-y-2 pt-2">
-                  <div className="flex justify-between text-sm text-gray-600"><span>Subtotal</span><span>NZ${itemsSubtotal.toFixed(2)}</span></div>
-                  {discountAmount > 0 && <div className="flex justify-between text-sm text-green-600"><span>Discount</span><span>-NZ${discountAmount.toFixed(2)}</span></div>}
-                  {pawRewardsDiscount > 0 && <div className="flex justify-between text-sm text-amber-600"><span>PawRewards</span><span>-NZ${pawRewardsDiscount.toFixed(2)}</span></div>}
-                  <div className="flex justify-between text-sm text-gray-600"><span>Shipping</span><span className={`font-medium ${shippingCost === 0 ? 'text-green-600' : 'text-gray-900'}`}>{shippingCost === 0 ? 'FREE' : `NZ$${shippingCost.toFixed(2)}`}</span></div>
-                  <div className="flex justify-between text-sm text-gray-600"><span>Tax (Included)</span><span>NZ${taxAmount.toFixed(2)}</span></div>
-                  <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-100"><span>Total (NZD)</span><span className="text-primary-700">NZ${orderTotal.toFixed(2)}</span></div>
+                  <div className="flex justify-between text-sm text-gray-600"><span>Subtotal</span><span>${itemsSubtotal.toFixed(2)}</span></div>
+                  {discountAmount > 0 && <div className="flex justify-between text-sm text-green-600"><span>Discount</span><span>-${discountAmount.toFixed(2)}</span></div>}
+                  {pawRewardsDiscount > 0 && <div className="flex justify-between text-sm text-amber-600"><span>PawRewards</span><span>-${pawRewardsDiscount.toFixed(2)}</span></div>}
+                  <div className="flex justify-between text-sm text-gray-600"><span>Shipping</span><span className={`font-medium ${shippingCost === 0 ? 'text-green-600' : 'text-gray-900'}`}>{shippingCost === 0 ? 'FREE' : `$${shippingCost.toFixed(2)}`}</span></div>
+                  <div className="flex justify-between text-sm text-gray-600"><span>Tax (Included)</span><span>${taxAmount.toFixed(2)}</span></div>
+                  <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-200"><span>Total (NZD)</span><span className="text-primary-700">${orderTotal.toFixed(2)}</span></div>
                 </div>
               </div>
 
-              <div className="px-6 py-4 border-t border-gray-100 bg-gray-50">
+              <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
                 <div className="flex items-center gap-2 text-xs text-gray-500 mb-4">
                   <Lock className="h-4 w-4" /> <span>Secure & Trusted Checkout</span>
                 </div>
@@ -962,7 +962,7 @@ export default function Checkout() {
                 </div>
 
                 {/* Contact Verification — only shown for authenticated users */}
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-4">
+                <div className="bg-white rounded-xl border border-gray-200 p-6 mb-4">
                   <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2"><Mail className="h-5 w-5 text-primary-600" /> Contact Verification</h2>
 
                   <div className={`flex items-center justify-between p-4 rounded-xl mb-3 ${emailVerified ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'}`}>
@@ -990,7 +990,7 @@ export default function Checkout() {
                 </div>
 
                 {/* Shipping Address */}
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                <div className="bg-white rounded-xl border border-gray-200 p-6">
                   <div className="flex items-center justify-between mb-4">
                     <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2"><Truck className="h-5 w-5 text-primary-600" /> Shipping Address</h2>
                     {user?.address?.line1 && addressMode === 'saved' && (
@@ -1043,7 +1043,7 @@ export default function Checkout() {
 
                   {/* Shipping Method — shown after address is entered */}
                   {form.line1 && (
-                    <div className="mt-6 pt-6 border-t border-gray-100">
+                    <div className="mt-6 pt-6 border-t border-gray-200">
                       <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2 mb-3">
                         <Truck className="h-4 w-4 text-primary-600" /> Shipping Method
                       </h3>
@@ -1079,7 +1079,7 @@ export default function Checkout() {
                                 </div>
                               </div>
                               <span className={`text-sm font-semibold ${(option.cost || 0) === 0 ? 'text-green-600' : 'text-gray-900'}`}>
-                                {(option.cost || 0) === 0 ? 'FREE' : `NZ$${(option.cost || 0).toFixed(2)}`}
+                                {(option.cost || 0) === 0 ? 'FREE' : `$${(option.cost || 0).toFixed(2)}`}
                               </span>
                             </label>
                           ))}
@@ -1108,7 +1108,7 @@ export default function Checkout() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               {/* Left: Order Summary */}
               <div className="space-y-4">
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                <div className="bg-white rounded-xl border border-gray-200 p-6">
                   <h2 className="text-lg font-semibold text-gray-900 mb-4">Order Summary</h2>
                   <button onClick={() => goToStep('cart')} className="text-sm text-primary-600 hover:text-primary-700 mb-4">Edit Cart</button>
                   {items.map((item) => (
@@ -1127,23 +1127,23 @@ export default function Checkout() {
                         )}
                         <p className="text-xs text-gray-500">Qty: {item.quantity}</p>
                       </div>
-                      <p className="font-semibold text-gray-900">NZ${(item.unitPrice || item.price || 0).toFixed(2)}</p>
+                      <p className="font-semibold text-gray-900">${(item.unitPrice || item.price || 0).toFixed(2)}</p>
                     </div>
                   ))}
                   <div className="space-y-2 pt-4">
-                    <div className="flex justify-between text-sm"><span className="text-gray-600">Subtotal</span><span className="text-gray-900">NZ${itemsSubtotal.toFixed(2)}</span></div>
-                    {discountAmount > 0 && <div className="flex justify-between text-sm"><span className="text-green-600">Discount</span><span className="text-green-600">-NZ${discountAmount.toFixed(2)}</span></div>}
+                    <div className="flex justify-between text-sm"><span className="text-gray-600">Subtotal</span><span className="text-gray-900">${itemsSubtotal.toFixed(2)}</span></div>
+                    {discountAmount > 0 && <div className="flex justify-between text-sm"><span className="text-green-600">Discount</span><span className="text-green-600">-${discountAmount.toFixed(2)}</span></div>}
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">Shipping{selectedShippingOption ? ` — ${shippingOptions.find(o => o.id === selectedShippingOption)?.name || ''}` : ''}</span>
-                      <span className={`font-medium ${shippingCost === 0 ? 'text-green-600' : 'text-gray-900'}`}>{shippingCost === 0 ? 'FREE' : `NZ$${shippingCost.toFixed(2)}`}</span>
+                      <span className={`font-medium ${shippingCost === 0 ? 'text-green-600' : 'text-gray-900'}`}>{shippingCost === 0 ? 'FREE' : `$${shippingCost.toFixed(2)}`}</span>
                     </div>
-                    <div className="flex justify-between text-sm"><span className="text-gray-600">Tax (Included)</span><span className="text-gray-900">NZ${taxAmount.toFixed(2)}</span></div>
-                    <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-100"><span>Total (NZD)</span><span className="text-primary-700">NZ${orderTotal.toFixed(2)}</span></div>
+                    <div className="flex justify-between text-sm"><span className="text-gray-600">Tax (Included)</span><span className="text-gray-900">${taxAmount.toFixed(2)}</span></div>
+                    <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-200"><span>Total (NZD)</span><span className="text-primary-700">${orderTotal.toFixed(2)}</span></div>
                   </div>
 
                   {/* Shipping Address */}
                   {form.line1 && (
-                    <div className="mt-4 pt-4 border-t border-gray-100">
+                    <div className="mt-4 pt-4 border-t border-gray-200">
                       <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Shipping to</p>
                       <p className="text-sm text-gray-900">{user?.fullName || 'Customer'}</p>
                       <p className="text-sm text-gray-600">{form.line1}{form.line2 ? `, ${form.line2}` : ''}</p>
@@ -1156,7 +1156,7 @@ export default function Checkout() {
 
               {/* Right: Payment Method */}
               <div className="space-y-4">
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                <div className="bg-white rounded-xl border border-gray-200 p-6">
                   <h2 className="text-lg font-semibold text-gray-900 mb-4">Payment Method</h2>
                   {paymentClientSecret ? (
                     <CheckoutErrorBoundary onReset={() => setPaymentClientSecret('')}>
