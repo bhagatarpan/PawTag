@@ -148,9 +148,10 @@ export class StripePaymentProvider implements IPaymentProvider {
     const isTestMode = await getBooleanSetting('commerce.payment.testMode');
     if (isTestMode) {
       const demoId = `pi_demo_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      const demoSecret = Math.random().toString(36).slice(2, 10);
       return {
         id: demoId,
-        clientSecret: `${demoId}_secret_demo`,
+        clientSecret: `${demoId}_secret_${demoSecret}`,
         amount: params.amount,
         currency: params.currency.toLowerCase(),
         status: 'succeeded',
