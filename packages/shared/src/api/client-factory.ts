@@ -7,14 +7,17 @@
  * - 401 response interception with queue-based token refresh
  * - Configurable auth failure behavior per app
  *
+ * All token storage is unambiguously async. Browser adapters use
+ * `Promise.resolve()` wrappers around localStorage for consistency.
+ *
  * @example
  * ```typescript
  * import { createApiClient } from '@pawtag/shared/api';
  *
  * export default createApiClient({
  *   baseURL: '/api',
- *   tokenKey: 'pawtag_token',
- *   refreshTokenKey: 'pawtag_refresh_token',
+ *   storage: createLocalStorageTokenStorage('token', 'refresh'),
+ *   refreshEndpoint: '/api/auth/refresh',
  * });
  * ```
  */
@@ -25,39 +28,27 @@ import axios, { type AxiosInstance, type InternalAxiosRequestConfig } from 'axio
 // Types
 // ---------------------------------------------------------------------------
 
+/**
+ * Unambiguously async token storage interface.
+ * All methods return Promises — no inference needed.
+ * Browser adapters wrap localStorage with Promise.resolve().
+ */
 export interface TokenStorage {
-  /** Synchronously read the access token (localStorage) */
-  getAccessToken(): string | null;
-  /** Synchronously read the refresh token (localStorage) */
-  getRefreshToken(): string | null;
-  /** Synchronously write tokens */
-  setTokens(accessToken: string, refreshToken: string): void;
-  /** Synchronously clear tokens */
-  clearTokens(): void;
-}
-
-export interface AsyncTokenStorage {
-  /** Asynchronously read the access token (SecureStore, AsyncStorage) */
+  /** Read the access token */
   getAccessToken(): Promise<string | null>;
-  /** Asynchronously read the refresh token */
+  /** Read the refresh token */
   getRefreshToken(): Promise<string | null>;
-  /** Asynchronously write tokens */
+  /** Write tokens */
   setTokens(accessToken: string, refreshToken: string): Promise<void>;
-  /** Asynchronously clear tokens */
+  /** Clear tokens */
   clearTokens(): Promise<void>;
-}
-
-/** Type guard to check if storage is async */
-function isAsyncStorage(storage: TokenStorage | AsyncTokenStorage): storage is AsyncTokenStorage {
-  return typeof (storage as AsyncTokenStorage).getAccessToken === 'function' &&
-    (storage as AsyncTokenStorage).getAccessToken.constructor.name === 'AsyncFunction';
 }
 
 export interface ApiClientConfig {
   /** Base URL for all requests (e.g., '/api' or 'http://localhost:5000/api') */
   baseURL: string;
-  /** Token storage implementation (sync for web, async for mobile) */
-  storage: TokenStorage | AsyncTokenStorage;
+  /** Async token storage implementation */
+  storage: TokenStorage;
   /** Full URL for the refresh endpoint (e.g., '/api/auth/refresh' or 'auth/refresh') */
   refreshEndpoint: string;
   /** Absolute refresh URL (when baseURL is relative but refresh needs absolute) */
@@ -83,7 +74,7 @@ export interface ApiClientConfig {
  * - Response interceptor: catches 401, refreshes token, retries request
  * - Queue-based refresh: concurrent 401s share a single refresh call
  *
- * Supports both sync (localStorage) and async (SecureStore) token storage.
+ * All token storage operations are async for consistency across platforms.
  */
 export function createApiClient(config: ApiClientConfig): AxiosInstance {
   const {
@@ -117,14 +108,9 @@ export function createApiClient(config: ApiClientConfig): AxiosInstance {
     failedQueue = [];
   };
 
-  // Determine if storage is async
-  const useAsyncStorage = isAsyncStorage(storage);
-
   // --- Request interceptor ---
   client.interceptors.request.use(async (cfg: InternalAxiosRequestConfig) => {
-    const token = useAsyncStorage
-      ? await (storage as AsyncTokenStorage).getAccessToken()
-      : (storage as TokenStorage).getAccessToken();
+    const token = await storage.getAccessToken();
     if (token) {
       cfg.headers.Authorization = `Bearer ${token}`;
     }
@@ -139,9 +125,7 @@ export function createApiClient(config: ApiClientConfig): AxiosInstance {
 
       if (err.response?.status === 401 && !originalRequest._retry) {
         // Get refresh token
-        const refreshToken = useAsyncStorage
-          ? await (storage as AsyncTokenStorage).getRefreshToken()
-          : (storage as TokenStorage).getRefreshToken();
+        const refreshToken = await storage.getRefreshToken();
 
         if (!refreshToken) {
           onAuthFailure?.();
@@ -169,11 +153,7 @@ export function createApiClient(config: ApiClientConfig): AxiosInstance {
           const { token: newAccessToken, refreshToken: newRefreshToken } = res.data.data;
 
           // Store new tokens
-          if (useAsyncStorage) {
-            await (storage as AsyncTokenStorage).setTokens(newAccessToken, newRefreshToken);
-          } else {
-            (storage as TokenStorage).setTokens(newAccessToken, newRefreshToken);
-          }
+          await storage.setTokens(newAccessToken, newRefreshToken);
 
           client.defaults.headers.common.Authorization = `Bearer ${newAccessToken}`;
           originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
@@ -182,11 +162,7 @@ export function createApiClient(config: ApiClientConfig): AxiosInstance {
           return client(originalRequest);
         } catch (refreshError) {
           processQueue(refreshError, null);
-          if (useAsyncStorage) {
-            await (storage as AsyncTokenStorage).clearTokens();
-          } else {
-            (storage as TokenStorage).clearTokens();
-          }
+          await storage.clearTokens();
           onAuthFailure?.();
           return Promise.reject(refreshError);
         } finally {
@@ -214,26 +190,29 @@ export function createApiClient(config: ApiClientConfig): AxiosInstance {
 }
 
 // ---------------------------------------------------------------------------
-// Convenience: sync localStorage storage (used by web & admin)
+// Convenience: localStorage-based storage (used by web & admin)
 // ---------------------------------------------------------------------------
 
 /**
  * Create a localStorage-based token storage for browser apps.
+ * Wraps synchronous localStorage with Promise.resolve() for async consistency.
  */
 export function createLocalStorageTokenStorage(
   tokenKey: string,
   refreshTokenKey: string
 ): TokenStorage {
   return {
-    getAccessToken: () => localStorage.getItem(tokenKey),
-    getRefreshToken: () => localStorage.getItem(refreshTokenKey),
+    getAccessToken: () => Promise.resolve(localStorage.getItem(tokenKey)),
+    getRefreshToken: () => Promise.resolve(localStorage.getItem(refreshTokenKey)),
     setTokens: (accessToken: string, refreshToken: string) => {
       localStorage.setItem(tokenKey, accessToken);
       localStorage.setItem(refreshTokenKey, refreshToken);
+      return Promise.resolve();
     },
     clearTokens: () => {
       localStorage.removeItem(tokenKey);
       localStorage.removeItem(refreshTokenKey);
+      return Promise.resolve();
     },
   };
 }

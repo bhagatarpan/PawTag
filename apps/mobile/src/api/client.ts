@@ -6,10 +6,10 @@ const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/a
 const api = createApiClient({
   baseURL: API_BASE_URL,
   storage: {
-    getAccessToken: () => getAccessToken() as any,
-    getRefreshToken: () => getRefreshToken() as any,
-    setTokens: (at: string, rt: string) => setTokens(at, rt) as any,
-    clearTokens: () => clearTokens() as any,
+    getAccessToken,
+    getRefreshToken,
+    setTokens,
+    clearTokens,
   },
   refreshEndpoint: `${API_BASE_URL}/auth/refresh`,
 });
