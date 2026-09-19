@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { colors, typography, spacing, borderRadius, shadows } from '../../theme/tokens';
@@ -9,12 +9,21 @@ interface QRScannerScreenProps {
   navigation: any;
 }
 
+/** Debounce interval in ms to prevent duplicate scans */
+const SCAN_DEBOUNCE_MS = 2000;
+
 export function QRScannerScreen({ navigation }: QRScannerScreenProps) {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanning, setScanning] = useState(true);
+  const lastScanRef = useRef<number>(0);
 
-  const handleBarcodeScanned = async (scanningResult: { type: string; data: string }) => {
-    if (!scanning) return;
+  const handleBarcodeScanned = useCallback(async (scanningResult: { type: string; data: string }) => {
+    // Debounce: prevent duplicate scans within SCAN_DEBOUNCE_MS
+    const now = Date.now();
+    if (now - lastScanRef.current < SCAN_DEBOUNCE_MS) return;
+    lastScanRef.current = now;
+
+    // Disable scanning immediately to prevent further scans
     setScanning(false);
 
     const rawData = scanningResult.data;
@@ -41,7 +50,7 @@ export function QRScannerScreen({ navigation }: QRScannerScreenProps) {
     hapticSuccess();
     // Navigate to redemption with the scanned tagId
     navigation.navigate('RedeemTag', { tagId });
-  };
+  }, [navigation]);
 
   if (!permission) {
     return (
@@ -73,7 +82,7 @@ export function QRScannerScreen({ navigation }: QRScannerScreenProps) {
       <CameraView
         style={styles.camera}
         barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
-        onBarcodeScanned={scanning ? undefined : handleBarcodeScanned}
+        onBarcodeScanned={scanning ? handleBarcodeScanned : undefined}
       />
       <View style={styles.overlay}>
         <View style={styles.scanArea} />
