@@ -114,6 +114,7 @@ These are fundamentally broken test setups that require significant rework. They
 ### Phase 11 — Deployment and Production Configuration
 - [x] 11.1 Fix and prove Docker/workspace builds
 - [x] 11.2 Production environment schema
+- [x] 11.3 Health/readiness checks
 - [ ] 11.3 Health/readiness checks
 - [ ] 11.4 Backup and restore rehearsal
 - [ ] 11.5 Rollback procedure
@@ -166,7 +167,7 @@ These are fundamentally broken test setups that require significant rework. They
 | Phase 8 — Mobile | ✅ Complete | 5/5 |
 | Phase 9 — Admin Safety | ✅ Complete | 4/4 |
 | Phase 10 — Background Jobs | ✅ Complete | 3/3 |
-| Phase 11 — Deployment | ✅ Complete | 2/5 |
+| Phase 11 — Deployment | ✅ Complete | 3/5 |
 | Phase 12 — Observability | Not started | 0/3 |
 | Phase 13 — Accessibility | Not started | 0/3 |
 | Phase 14 — Design System | Not started | 0/3 |
@@ -175,7 +176,7 @@ These are fundamentally broken test setups that require significant rework. They
 | Phase 17 — Production Rehearsal | Not started | 0/3 |
 | Phase 18 — Launch | Not started | 0/1 |
 
-**Total: 49/65 work packets complete (75%)**
+**Total: 50/65 work packets complete (77%)**
 
 ## Next Recommended Work Packet
 
