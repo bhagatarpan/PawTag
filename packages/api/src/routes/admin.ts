@@ -4044,13 +4044,13 @@ router.get('/finder-scans', requirePermission('finder_scan.read'), async (req, r
  *         schema:
  *           type: string
  *           format: date
- *         description: Start date (YYYY-MM-DD), default: first of this month
+ *         description: 'Start date (YYYY-MM-DD), default: first of this month'
  *       - in: query
  *         name: endDate
  *         schema:
  *           type: string
  *           format: date
- *         description: End date (YYYY-MM-DD), default: now
+ *         description: 'End date (YYYY-MM-DD), default: now'
  *     responses:
  *       200:
  *         description: Analytics data
@@ -4206,13 +4206,13 @@ router.get('/finder-scans/analytics', requirePermission('finder_scan.read'), asy
  *         schema:
  *           type: string
  *           format: date
- *         description: Start date (YYYY-MM-DD), default: 30 days ago
+ *         description: 'Start date (YYYY-MM-DD), default: 30 days ago'
  *       - in: query
  *         name: endDate
  *         schema:
  *           type: string
  *           format: date
- *         description: End date (YYYY-MM-DD), default: now
+ *         description: 'End date (YYYY-MM-DD), default: now'
  *       - in: query
  *         name: action
  *         schema:
@@ -4306,13 +4306,13 @@ router.get('/tags/:tagId/scans', requirePermission('finder_scan.read'), async (r
  *         schema:
  *           type: string
  *           format: date
- *         description: Start date (YYYY-MM-DD), default: 30 days ago
+ *         description: 'Start date (YYYY-MM-DD), default: 30 days ago'
  *       - in: query
  *         name: endDate
  *         schema:
  *           type: string
  *           format: date
- *         description: End date (YYYY-MM-DD), default: now
+ *         description: 'End date (YYYY-MM-DD), default: now'
  *       - in: query
  *         name: action
  *         schema:

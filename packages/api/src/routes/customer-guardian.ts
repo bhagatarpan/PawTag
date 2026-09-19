@@ -42,7 +42,7 @@ router.use(authenticate);
  *   get:
  *     tags: [Customer - Guardian]
  *     summary: Get Guardian points balance and history
- *     description: 'Returns the authenticated user\'s Guardian points balance and recent history.'
+ *     description: "Returns the authenticated user's Guardian points balance and recent history."
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -121,7 +121,7 @@ router.get('/points', async (req: AuthRequest, res: Response) => {
  *   get:
  *     tags: [Customer - Guardian]
  *     summary: Get PawRewards balance and history
- *     description: 'Returns the authenticated user\'s PawRewards balance and recent history.'
+ *     description: "Returns the authenticated user's PawRewards balance and recent history."
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -338,7 +338,7 @@ router.get('/history', async (req: AuthRequest, res: Response) => {
  *   get:
  *     tags: [Customer - Guardian]
  *     summary: Get Guardian tier information
- *     description: 'Returns the user\'s current tier, progress to next tier, and benefits.'
+ *     description: "Returns the user's current tier, progress to next tier, and benefits."
  *     security:
  *       - bearerAuth: []
  *     responses:
