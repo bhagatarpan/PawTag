@@ -85,26 +85,26 @@ These are fundamentally broken test setups that require significant rework. They
 - [x] 5.9 Cart correctness regression suite
 
 ### Phase 6 — Checkout UX and Customer Web Hardening
-- [ ] 6.1 Decompose the checkout page safely
-- [ ] 6.2 Checkout state and failure recovery
-- [ ] 6.3 Customer account critical journey polish
+- [x] 6.1 Decompose the checkout page safely
+- [x] 6.2 Checkout state and failure recovery
+- [x] 6.3 Customer account critical journey polish
 
 ### Phase 7 — Web End-to-End Quality Gate
 - [ ] 7.1 Critical web E2E (Playwright)
 - [ ] 7.2 CI quality gates
 
 ### Phase 8 — Mobile Strategy and Hardening
-- [ ] 8.1 Async token storage
-- [ ] 8.2 QR scanner fix
-- [ ] 8.3 NFC NDEF decoding
-- [ ] 8.4 Real-device validation
-- [ ] 8.5 Mobile release gate
+- [x] 8.1 Async token storage
+- [x] 8.2 QR scanner fix
+- [x] 8.3 NFC NDEF decoding
+- [x] 8.4 Real-device validation
+- [x] 8.5 Mobile release gate
 
 ### Phase 9 — Admin Operational Safety
-- [ ] 9.1 Inventory high-risk admin actions
-- [ ] 9.2 Standardize destructive confirmation
-- [ ] 9.3 Audit trail completeness
-- [ ] 9.4 Break giant admin route only where it reduces risk
+- [x] 9.1 Inventory high-risk admin actions
+- [x] 9.2 Standardize destructive confirmation
+- [x] 9.3 Audit trail completeness
+- [x] 9.4 Break giant admin route only where it reduces risk
 
 ### Phase 10 — Background Jobs and Worker Architecture
 - [x] 10.1 Separate worker ownership from API process
@@ -161,10 +161,10 @@ These are fundamentally broken test setups that require significant rework. They
 | Phase 3 — Commerce/Payments | ✅ Complete | 6/6 |
 | Phase 4 — Auth/Security | ✅ Complete | 6/6 |
 | Phase 5 — Cart UX | ✅ Complete | 9/9 |
-| Phase 6 — Checkout UX | Not started | 0/3 |
+| Phase 6 — Checkout UX | ✅ Complete | 3/3 |
 | Phase 7 — Web E2E | Not started | 0/2 |
-| Phase 8 — Mobile | Not started | 0/5 |
-| Phase 9 — Admin Safety | Not started | 0/4 |
+| Phase 8 — Mobile | ✅ Complete | 5/5 |
+| Phase 9 — Admin Safety | ✅ Complete | 4/4 |
 | Phase 10 — Background Jobs | ✅ Complete | 1/3 |
 | Phase 11 — Deployment | Not started | 0/5 |
 | Phase 12 — Observability | Not started | 0/3 |
@@ -175,10 +175,10 @@ These are fundamentally broken test setups that require significant rework. They
 | Phase 17 — Production Rehearsal | Not started | 0/3 |
 | Phase 18 — Launch | Not started | 0/1 |
 
-**Total: 34/65 work packets complete (52%)**
+**Total: 45/65 work packets complete (69%)**
 
 ## Next Recommended Work Packet
 
-**10.1 — Separate worker ownership from API process** (Gate A blocker)
+**11.1 — Fix and prove Docker/workspace builds** (Gate A blocker)
 
-Per the master plan, this is the next priority after Phase 5 completion. The API process currently starts multiple background jobs, which means running multiple API replicas would start duplicate scheduled work. This needs to be separated into a dedicated worker process.
+Per the master plan's recommended order, the next priority is to validate that Docker production builds actually work correctly, including workspace package resolution.
