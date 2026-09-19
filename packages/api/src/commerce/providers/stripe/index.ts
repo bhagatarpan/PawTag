@@ -162,9 +162,10 @@ export class StripePaymentProvider implements IPaymentProvider {
     if (!apiKey || apiKey.startsWith('sk_test_') || apiKey.startsWith('rk_test_')) {
       logger.warn({ orderId: params.orderId }, 'Stripe test key detected — using demo mode');
       const demoId = `pi_demo_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      const demoSecret = Math.random().toString(36).slice(2, 10);
       return {
         id: demoId,
-        clientSecret: `${demoId}_secret_demo`,
+        clientSecret: `${demoId}_secret_${demoSecret}`,
         amount: params.amount,
         currency: params.currency.toLowerCase(),
         status: 'succeeded',
