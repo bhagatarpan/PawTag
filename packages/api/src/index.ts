@@ -329,48 +329,50 @@ async function start() {
     await connectDatabase(config.dbUrl);
     logger.info('Database connected');
 
-    // Start 24-hour reminder service
-    startReminderService();
+    // Only start background jobs if this is NOT a dedicated worker process.
+    // In production, set PAWTAG_WORKER_ROLE=worker on the worker process
+    // and leave it unset (or 'api') on the API process.
+    const workerRole = process.env.PAWTAG_WORKER_ROLE;
+    const isWorker = workerRole === 'worker';
 
-    // Start subscription lifecycle service
-    startSubscriptionService();
+    if (!isWorker) {
+      // API process: start background jobs (development/staging only)
+      // In production, the dedicated worker process handles jobs.
+      if (config.nodeEnv !== 'production') {
+        logger.info('Starting background jobs (non-production mode)');
 
-    // Start escalation polling service
-    startEscalationService();
+        startReminderService();
+        startSubscriptionService();
+        startEscalationService();
+        startLowStockService();
+        startPetMilestonesJob();
 
-    // Start daily low stock check service
-    startLowStockService();
+        const { startPawRewardsJob } = await import('./jobs/pawrewards');
+        startPawRewardsJob();
 
-    // Start pet milestones job (daily)
-    startPetMilestonesJob();
+        const { startOrphanPaymentJob } = await import('./jobs/orphanPaymentDetection');
+        startOrphanPaymentJob();
 
-    // Start PawRewards job (daily allocation + expiration)
-    const { startPawRewardsJob } = await import('./jobs/pawrewards');
-    startPawRewardsJob();
+        const { startOrderAutoCancelJob } = await import('./jobs/orderAutoCancel');
+        startOrderAutoCancelJob();
 
-    // Start orphan payment detection job
-    const { startOrphanPaymentJob } = await import('./jobs/orphanPaymentDetection');
-    startOrphanPaymentJob();
+        const { startTrackingPollJob } = await import('./jobs/shippingTrackingPoll');
+        startTrackingPollJob();
 
-    // Start order auto-cancel job
-    const { startOrderAutoCancelJob } = await import('./jobs/orderAutoCancel');
-    startOrderAutoCancelJob();
+        const { startWebhookRetryJob } = await import('./jobs/webhookRetry');
+        startWebhookRetryJob();
 
-    // Start shipping tracking poll job
-    const { startTrackingPollJob } = await import('./jobs/shippingTrackingPoll');
-    startTrackingPollJob();
+        const { startPaymentReconciliationJob } = await import('./jobs/paymentReconciliation');
+        startPaymentReconciliationJob();
 
-    // Start webhook retry job
-    const { startWebhookRetryJob } = await import('./jobs/webhookRetry');
-    startWebhookRetryJob();
-
-    // Start payment reconciliation job
-    const { startPaymentReconciliationJob } = await import('./jobs/paymentReconciliation');
-    startPaymentReconciliationJob();
-
-    // Start refund reconciliation job (daily)
-    const { startRefundReconciliationJob } = await import('./jobs/refundReconciliation');
-    startRefundReconciliationJob();
+        const { startRefundReconciliationJob } = await import('./jobs/refundReconciliation');
+        startRefundReconciliationJob();
+      } else {
+        logger.info('Production API process — background jobs handled by dedicated worker');
+      }
+    } else {
+      logger.info('Worker process — jobs handled by worker.ts entry point');
+    }
 
     const server = app.listen(config.port, () => {
       logger.info(`PawTag API running on port ${config.port}`);

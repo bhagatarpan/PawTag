@@ -5,8 +5,10 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
+    "dev:worker": "PAWTAG_WORKER_ROLE=worker tsx watch src/worker.ts",
     "build": "tsc",
     "start": "node dist/index.js",
+    "start:worker": "PAWTAG_WORKER_ROLE=worker node dist/worker.js",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext .ts",
     "seed": "tsx src/seeds/seed.ts",
