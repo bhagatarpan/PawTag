@@ -1,0 +1,17 @@
+{
+  "name": "@pawtag/design-tokens",
+  "version": "0.1.0",
+  "description": "Platform-neutral design tokens for PawTag",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}
