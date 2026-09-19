@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import NfcManager, { NfcTech } from 'react-native-nfc-manager';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, typography, spacing, borderRadius } from '../../theme/tokens';
 
 interface NFCScannerScreenProps {
@@ -72,6 +73,7 @@ function decodeNdefUriPayload(payload: number[]): string {
 export function NFCScannerScreen({ navigation }: NFCScannerScreenProps) {
   const [supported, setSupported] = useState(true);
   const [reading, setReading] = useState(false);
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     NfcManager.isSupported().then((isSupported) => {
@@ -176,7 +178,7 @@ export function NFCScannerScreen({ navigation }: NFCScannerScreenProps) {
         )}
       </View>
 
-      <View style={styles.bottomBar}>
+      <View style={[styles.bottomBar, { paddingBottom: insets.bottom + spacing[6] }]}>
         <TouchableOpacity
           style={[styles.scanButton, reading && styles.buttonDisabled]}
           onPress={readNFC}

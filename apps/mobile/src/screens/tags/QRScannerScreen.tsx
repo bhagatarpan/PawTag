@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, typography, spacing, borderRadius, shadows } from '../../theme/tokens';
 import api from '../../api/client';
 import { hapticSuccess } from '../../lib/haptics';
@@ -16,6 +17,7 @@ export function QRScannerScreen({ navigation }: QRScannerScreenProps) {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanning, setScanning] = useState(true);
   const lastScanRef = useRef<number>(0);
+  const insets = useSafeAreaInsets();
 
   const handleBarcodeScanned = useCallback(async (scanningResult: { type: string; data: string }) => {
     // Debounce: prevent duplicate scans within SCAN_DEBOUNCE_MS
@@ -88,7 +90,7 @@ export function QRScannerScreen({ navigation }: QRScannerScreenProps) {
         <View style={styles.scanArea} />
         <Text style={styles.instruction}>Point your camera at the QR code on your tag</Text>
       </View>
-      <View style={styles.bottomBar}>
+      <View style={[styles.bottomBar, { paddingBottom: insets.bottom + spacing[6] }]}>
         <TouchableOpacity style={styles.cancelBottomButton} onPress={() => navigation.goBack()}>
           <Text style={styles.cancelBottomText}>Cancel</Text>
         </TouchableOpacity>

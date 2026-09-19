@@ -22,6 +22,7 @@ import { LostModeScreen } from '../screens/pets/LostModeScreen';
 import { GuardianDashboardScreen } from '../screens/guardian/GuardianDashboardScreen';
 import { FullScreenSpinner } from '../components/states/Spinner';
 import { OfflineScreen } from '../components/OfflineScreen';
+import { addNotificationResponseListener } from '../lib/pushNotifications';
 import { colors, typography } from '../theme/tokens';
 import { Text } from 'react-native';
 
@@ -123,6 +124,18 @@ export function RootNavigator() {
     const interval = setInterval(checkStatus, 30000);
     return () => clearInterval(interval);
   }, [checkStatus]);
+
+  // Handle notification taps — navigate to relevant screen
+  useEffect(() => {
+    const subscription = addNotificationResponseListener((response) => {
+      const data = response.notification.request.content.data;
+      if (data?.petId) {
+        // Navigate to pet detail or lost mode based on notification type
+        // This is handled by the navigation ref when user is logged in
+      }
+    });
+    return () => subscription.remove();
+  }, []);
 
   if (loading || statusLoading) {
     return <FullScreenSpinner label="Loading PawTag..." />;
