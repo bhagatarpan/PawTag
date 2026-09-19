@@ -1,6 +1,11 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import {
+  ArrowLeft, Lock, CreditCard, PawPrint, CheckCircle, Truck, Tag, Loader2,
+  Mail, Smartphone, Shield, ChevronRight, Edit3, Check, Package, Clock,
+  ShieldCheck, Headphones, RefreshCw, FileText, Download, Printer, Share2, Home, ExternalLink, Crown
+} from 'lucide-react';
+import { AddressAutocomplete, InlineEditBanner } from '@pawtag/ui';
 import type { AddressComponents } from '@pawtag/ui';
 import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
@@ -8,27 +13,37 @@ import axios from 'axios';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useSiteSettings } from '../hooks/useCms';
+import CheckoutAuth from '../components/CheckoutAuth';
 import StripePaymentForm from '../components/StripePaymentForm';
 import CheckoutErrorBoundary from '../components/CheckoutErrorBoundary';
-import CheckoutHeader from '../components/checkout/CheckoutHeader';
-import CheckoutSkeleton from '../components/checkout/CheckoutSkeleton';
-import CheckoutEmptyState from '../components/checkout/CheckoutEmptyState';
-import CartReviewStep from '../components/checkout/steps/CartReviewStep';
-import ShippingStep from '../components/checkout/steps/ShippingStep';
-import PaymentStep from '../components/checkout/steps/PaymentStep';
-import ConfirmationStep from '../components/checkout/steps/ConfirmationStep';
-import CheckoutBanners from '../components/checkout/shared/CheckoutBanners';
-import CheckoutAuth from '../components/CheckoutAuth';
+import CheckoutStepIndicator from '../components/checkout/CheckoutStepIndicator';
+import CheckoutConfirmationStep from '../components/checkout/CheckoutConfirmationStep';
 import analytics from '../lib/analytics';
 
+// Confirmation page animations
+const confirmationStyles = `
+@keyframes scale-in { 0% { transform: scale(0); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+@keyframes check-draw { 0% { transform: scale(0) rotate(-45deg); opacity: 0; } 100% { transform: scale(1) rotate(0deg); opacity: 1; } }
+@keyframes fade-in-up { 0% { transform: translateY(12px); opacity: 0; } 100% { transform: translateY(0); opacity: 1; } }
+`;
+
 type Step = 'cart' | 'checkout' | 'payment' | 'confirmed';
+
+const STEPS = [
+  { key: 'cart' as Step, label: 'Cart', icon: Package },
+  { key: 'checkout' as Step, label: 'Checkout', icon: Truck },
+  { key: 'payment' as Step, label: 'Payment', icon: CreditCard },
+  { key: 'confirmed' as Step, label: 'Confirmed', icon: CheckCircle },
+];
 
 export default function Checkout() {
   const { items, total, totals, clearCart, refreshCart, updateItemTexts, toggleCustomisation, error: cartError, promoCode, promoApplied, setPromoCode: setPromoCodeCtx, setPromoApplied: setPromoAppliedCtx } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  // Step management
+  // Step management — always start at cart step on mount.
+  // sessionStorage restoration caused a race condition: step restored before
+  // cart loaded from server, rendering step 2/3 with empty items = blank screen.
   const [currentStep, setCurrentStep] = useState<Step>('cart');
 
   // Form state
@@ -37,26 +52,34 @@ export default function Checkout() {
   const [orderNumber, setOrderNumber] = useState(() => sessionStorage.getItem('pawtag_checkout_order') || '');
   const [success, setSuccess] = useState(() => sessionStorage.getItem('pawtag_checkout_success') === 'true');
   const [paymentClientSecret, setPaymentClientSecret] = useState('');
-  const [recoveringPayment, setRecoveringPayment] = useState(false);
 
-  // Confirmed order data
+  // Ref-based double-click protection for payment
+  const paymentInProgressRef = useRef(false);
+
+  // Payment state recovery on re-entry
+  const [recoveringPayment, setRecoveringPayment] = useState(false);
+  const storedPaymentIntentId = sessionStorage.getItem('pawtag_checkout_payment_intent');
+  const storedPendingOrderId = sessionStorage.getItem('pawtag_checkout_pending_order');
+
+  // Confirmed order data (preserved before clearCart for the confirmation page)
   const [confirmedItems, setConfirmedItems] = useState<any[]>([]);
   const [confirmedTotal, setConfirmedTotal] = useState(0);
   const [confirmedInvoice, setConfirmedInvoice] = useState<any>(null);
   const [confirmedPawTagOrder, setConfirmedPawTagOrder] = useState<any>(null);
 
-  // Promo code
+  // Promo code — promoCode and promoApplied come from CartContext (persisted server-side)
   const [promoLoading, setPromoLoading] = useState(false);
   const [promoDiscount, setPromoDiscount] = useState(0);
   const [guestPromoInfo, setGuestPromoInfo] = useState<any>(null);
-  const [promoError, setPromoError] = useState('');
 
   // PawRewards
   const [pawRewardsBalance, setPawRewardsBalance] = useState(0);
   const [pawRewardsRedemption, setPawRewardsRedemption] = useState(0);
+  const [pawRewardsLoading, setPawRewardsLoading] = useState(false);
 
   // Guardian loyalty data
   const [guardianTier, setGuardianTier] = useState<string>('');
+  const [guardianPoints, setGuardianPoints] = useState(0);
   const [pointsToNextTier, setPointsToNextTier] = useState<number | null>(null);
   const [nextTierName, setNextTierName] = useState<string>('');
   const [isGoldMember, setIsGoldMember] = useState(false);
@@ -66,25 +89,20 @@ export default function Checkout() {
   const [emailVerified, setEmailVerified] = useState(false);
   const [mobileVerified, setMobileVerified] = useState(false);
 
+  // Engraving editing state — tracks texts being edited per cart item
+  const [editingTexts, setEditingTexts] = useState<Record<string, string[]>>({});
+  const [savingTexts, setSavingTexts] = useState<Record<string, boolean>>({});
+  const [savedTexts, setSavedTexts] = useState<Record<string, boolean>>({});
+  const [expandedEngraving, setExpandedEngraving] = useState<Record<string, boolean>>({});
+
   // Shipping address
-  const [form, setForm] = useState<AddressComponents>({
-    line1: '', line2: '', city: '', state: '', zip: '', country: 'NZ',
+  const [addressMode, setAddressMode] = useState<'saved' | 'custom'>('saved');
+  const [form, setForm] = useState({
+    line1: '', line2: '', city: '', state: '', zip: '', country: 'nz',
   });
-
-  // Shipping options
-  const [shippingOptions, setShippingOptions] = useState<any[]>([]);
-  const [selectedShippingOption, setSelectedShippingOption] = useState<string>('');
-  const [shippingLoading, setShippingLoading] = useState(false);
-
-  // CMS settings
-  const { settings } = useSiteSettings();
-  const goldPrice = settings?.['guardian.goldPrice'] || '1.99';
-
-  // ─── Effects ───────────────────────────────────────────────────────────────
-
-  // Prepopulate address from user profile
+  // Prepopulate from user profile on mount / login
   useEffect(() => {
-    if (user?.address?.line1) {
+    if (user?.address?.line1 && addressMode === 'saved') {
       setForm({
         line1: user.address.line1 || '',
         line2: user.address.line2 || '',
@@ -94,24 +112,14 @@ export default function Checkout() {
         country: user.address.country || 'NZ',
       });
     }
-  }, [user]);
+  }, [user, addressMode]);
 
-  // Check verification status
-  useEffect(() => {
-    if (user) {
-      setEmailVerified(!!user.emailVerified);
-      setMobileVerified(!!user.phoneVerified);
-    }
-  }, [user]);
+  // Shipping options
+  const [shippingOptions, setShippingOptions] = useState<any[]>([]);
+  const [selectedShippingOption, setSelectedShippingOption] = useState<string>('');
+  const [shippingLoading, setShippingLoading] = useState(false);
 
-  // Save return URL for post-login redirect
-  useEffect(() => {
-    if (!user) {
-      localStorage.setItem('pawtag_return_url', '/checkout');
-    }
-  }, [user]);
-
-  // Fetch shipping options
+  // Fetch shipping options when address is entered
   useEffect(() => {
     if (!form.line1) return;
     setShippingLoading(true);
@@ -121,6 +129,7 @@ export default function Checkout() {
       .then((res) => {
         const rates = res.data?.data || [];
         setShippingOptions(rates);
+        // Auto-select first option if none selected
         if (rates.length > 0 && !selectedShippingOption) {
           setSelectedShippingOption(rates[0].id);
         }
@@ -129,32 +138,112 @@ export default function Checkout() {
       .finally(() => setShippingLoading(false));
   }, [form.line1, form.city, form.state, form.zip, form.country]);
 
-  // Sync shipping method to cart
+  // Sync shipping method to cart when selection changes
+  const prevShippingRef = useRef(selectedShippingOption);
   useEffect(() => {
     if (!selectedShippingOption) return;
+    // Skip initial mount — only sync on user-initiated changes
+    if (prevShippingRef.current === selectedShippingOption) return;
+    prevShippingRef.current = selectedShippingOption;
     const option = shippingOptions.find(o => o.id === selectedShippingOption);
     if (option) {
       api.post(API.shipping.select, {
         methodId: option.id,
         methodName: option.name,
         cost: option.cost || 0,
-      }).then(() => refreshCart()).catch(() => {});
+      }).then(() => refreshCart()).catch((err) => {
+        console.warn('[Checkout] Shipping select failed:', err?.response?.data || err.message);
+      });
     }
   }, [selectedShippingOption, shippingOptions]);
 
-  // Fetch Guardian data
+  // CMS settings for trust badges
+  const { settings } = useSiteSettings();
+  const goldPrice = settings?.['guardian.goldPrice'] || '1.99';
+  const checkoutUpsellText = settings?.['guardian.gold.checkoutUpsellText'] || 'Earn 2× points on this order with Gold';
+  const trustBadgeTitle = settings?.['checkout.trustBadges.title'] || 'All PawTag devices come with';
+  const trustBadgeItems: string[] = useMemo(() => {
+    try {
+      const raw = settings?.['checkout.trustBadges.items'];
+      return raw ? JSON.parse(raw) : ['Lifetime activation', 'Replace if lost', '24/7 support'];
+    } catch { return ['Lifetime activation', 'Replace if lost', '24/7 support']; }
+  }, [settings]);
+
+  // Check verification status on mount
+  useEffect(() => {
+    if (user) {
+      setEmailVerified(!!user.emailVerified);
+      setMobileVerified(!!user.phoneVerified);
+    }
+  }, [user]);
+
+  // Save return URL for post-login/register redirect — only when not authenticated
+  useEffect(() => {
+    if (!user) {
+      localStorage.setItem('pawtag_return_url', '/checkout');
+    }
+  }, [user]);
+
+  // Payment state recovery on re-entry
+  // If user refreshes during payment, check if order was already created
+  useEffect(() => {
+    if (!user || success || currentStep !== 'cart' || !storedPaymentIntentId) return;
+
+    const recoverPayment = async () => {
+      setRecoveringPayment(true);
+      try {
+        // Check if order already exists for this payment intent
+        const res = await api.get('/api/checkout/pending');
+        const pending = res.data?.data;
+
+        if (pending && pending.status === 'converted' && pending.convertedOrderId) {
+          // Order was created — show confirmation
+          setSuccess(true);
+          setOrderNumber(pending.orderNumber || storedPaymentIntentId.slice(-8));
+          sessionStorage.setItem('pawtag_checkout_success', 'true');
+          sessionStorage.setItem('pawtag_checkout_order', pending.orderNumber || storedPaymentIntentId.slice(-8));
+          setCurrentStep('confirmed');
+        } else if (pending && pending.status === 'pending') {
+          // Payment still pending — offer to retry
+          setPaymentClientSecret(pending.stripeClientSecret || '');
+          setCurrentStep('payment');
+        } else {
+          // Stale state — clear it
+          sessionStorage.removeItem('pawtag_checkout_payment_intent');
+          sessionStorage.removeItem('pawtag_checkout_pending_order');
+        }
+      } catch {
+        // Recovery failed — clear stale state
+        sessionStorage.removeItem('pawtag_checkout_payment_intent');
+        sessionStorage.removeItem('pawtag_checkout_pending_order');
+      } finally {
+        setRecoveringPayment(false);
+      }
+    };
+
+    recoverPayment();
+  }, [user, success, currentStep, storedPaymentIntentId]);
+
+  // Fetch PawRewards balance when user is logged in
   useEffect(() => {
     if (user) {
       api.get('/customer/guardian/rewards')
-        .then(res => setPawRewardsBalance(res.data.data.balance || 0))
-        .catch(() => setPawRewardsBalance(0));
+        .then(res => {
+          setPawRewardsBalance(res.data.data.balance || 0);
+        })
+        .catch(() => {
+          setPawRewardsBalance(0);
+        });
 
+      // Fetch Guardian tier and points
       Promise.all([
         api.get('/customer/guardian/tier').catch(() => ({ data: { data: {} } })),
         api.get('/customer/guardian/points').catch(() => ({ data: { data: {} } })),
       ]).then(([tierRes, pointsRes]) => {
         const tierData = tierRes.data.data;
+        const pointsData = pointsRes.data.data;
         setGuardianTier(tierData.tier || 'CARE');
+        setGuardianPoints(pointsData.balance || 0);
         setPointsToNextTier(tierData.pointsToNextTier || null);
         setNextTierName(tierData.nextTier || '');
         setIsGoldMember(tierData.isGoldMember || false);
@@ -162,87 +251,137 @@ export default function Checkout() {
     }
   }, [user]);
 
-  // Fetch estimated points
+  // Derived values — use PawTag cart totals
+  const selectedShippingPrice = shippingOptions.find(o => o.id === selectedShippingOption)?.cost || 0;
+  const shippingCost = selectedShippingPrice;
+  const taxAmount = totals.tax || 0;
+  const discountAmount = totals.discount || promoDiscount;
+  const itemsSubtotal = totals.subtotal || total;
+  const pawRewardsDiscount = Math.min(pawRewardsRedemption, itemsSubtotal + shippingCost + taxAmount - discountAmount);
+  const orderTotal = totals.total || (itemsSubtotal + shippingCost + taxAmount - discountAmount - pawRewardsDiscount);
+  
+  // Check if cart has subscription products (for auto-renew toggle)
+  const hasSubscriptionItems = items.some((item: any) => item.isSubscription || item.monthlyPrice);
+
+  // Derive per-item auto-renew map from cart items
+  const autoRenewMap: Record<string, boolean> = {};
+  items.forEach((item: any) => {
+    const key = item._id || item.productId;
+    if (key) autoRenewMap[key] = item.autoRenew !== false;
+  });
+
+  // Fetch estimated points from backend when order total or membership changes
   useEffect(() => {
-    const orderTotal = totals?.total || total;
     if (orderTotal > 0) {
       api.get(API.public.points.estimate, { params: { total: orderTotal, isGoldMember: String(isGoldMember) } })
         .then(res => setEstimatedPoints(res.data.data.points || 0))
         .catch(() => setEstimatedPoints(0));
+    } else {
+      setEstimatedPoints(0);
     }
-  }, [totals?.total, total, isGoldMember]);
+  }, [orderTotal, isGoldMember]);
 
-  // Payment state recovery
-  useEffect(() => {
-    if (!user || success || currentStep !== 'cart') return;
-    const storedPaymentIntentId = sessionStorage.getItem('pawtag_checkout_payment_intent');
-    if (!storedPaymentIntentId) return;
+  // --- Engraving helpers ---
+  const getItemTexts = (itemId: string, item: any): string[] => {
+    // Use editing state if available, otherwise fall back to saved texts
+    if (editingTexts[itemId]) return editingTexts[itemId];
+    const saved = item.customisationTexts || [];
+    // Pad to quantity with empty strings
+    return [...saved, ...Array(Math.max(0, (item.quantity || 1) - saved.length)).fill('')];
+  };
 
-    const recoverPayment = async () => {
-      setRecoveringPayment(true);
-      try {
-        const res = await api.get('/api/checkout/pending');
-        const pending = res.data?.data;
-        if (pending && pending.status === 'converted' && pending.convertedOrderId) {
-          setSuccess(true);
-          setOrderNumber(pending.orderNumber || storedPaymentIntentId.slice(-8));
-          sessionStorage.setItem('pawtag_checkout_success', 'true');
-          sessionStorage.setItem('pawtag_checkout_order', pending.orderNumber || storedPaymentIntentId.slice(-8));
-          setCurrentStep('confirmed');
-        } else if (pending && pending.status === 'pending') {
-          setPaymentClientSecret(pending.stripeClientSecret || '');
-          setCurrentStep('payment');
-        } else {
-          sessionStorage.removeItem('pawtag_checkout_payment_intent');
-          sessionStorage.removeItem('pawtag_checkout_pending_order');
-        }
-      } catch {
-        sessionStorage.removeItem('pawtag_checkout_payment_intent');
-        sessionStorage.removeItem('pawtag_checkout_pending_order');
-      } finally {
-        setRecoveringPayment(false);
+  const handleToggleEngraving = async (itemId: string, item: any, enable: boolean) => {
+    if (enable) {
+      // Enable engraving — copy saved texts into editing state (or initialize empty)
+      const saved = item.customisationTexts || [];
+      const qty = item.quantity || 1;
+      const texts = saved.length > 0
+        ? [...saved, ...Array(Math.max(0, qty - saved.length)).fill('')]
+        : Array(qty).fill('');
+      setEditingTexts(prev => ({ ...prev, [itemId]: texts }));
+      setExpandedEngraving(prev => ({ ...prev, [itemId]: true }));
+    } else {
+      // Disable engraving — clear texts and collapse
+      setEditingTexts(prev => ({ ...prev, [itemId]: [] }));
+      setExpandedEngraving(prev => ({ ...prev, [itemId]: false }));
+    }
+    // Toggle customisation flag (handles both guest and server)
+    await toggleCustomisation(itemId, enable);
+    await refreshCart();
+  };
+
+  const handleExpandEngraving = (itemId: string, item: any) => {
+    setExpandedEngraving(prev => {
+      const isExpanding = !prev[itemId];
+      // When expanding, initialize editingTexts from saved texts if not already set
+      if (isExpanding && !editingTexts[itemId]) {
+        const saved = item.customisationTexts || [];
+        const qty = item.quantity || 1;
+        const texts = [...saved, ...Array(Math.max(0, qty - saved.length)).fill('')];
+        setEditingTexts(prev2 => ({ ...prev2, [itemId]: texts }));
       }
-    };
-    recoverPayment();
-  }, [user, success, currentStep]);
+      return { ...prev, [itemId]: isExpanding };
+    });
+  };
 
-  // ─── Derived Values ─────────────────────────────────────────────────────────
+  const handleTextChange = (itemId: string, index: number, value: string) => {
+    setEditingTexts(prev => {
+      const current = prev[itemId] || [];
+      const updated = [...current];
+      updated[index] = value.slice(0, 16); // Max 16 chars
+      return { ...prev, [itemId]: updated };
+    });
+  };
 
-  const orderTotal = totals?.total || total;
+  const handleSaveTexts = async (itemId: string) => {
+    const texts = editingTexts[itemId] || [];
+    setSavingTexts(prev => ({ ...prev, [itemId]: true }));
+    await updateItemTexts(itemId, texts);
+    await refreshCart();
+    setSavingTexts(prev => ({ ...prev, [itemId]: false }));
+    // Show success state briefly
+    setSavedTexts(prev => ({ ...prev, [itemId]: true }));
+    setTimeout(() => setSavedTexts(prev => ({ ...prev, [itemId]: false })), 2000);
+  };
+
+  // Auto-save all unsaved texts before proceeding to payment
+  const saveAllEngraving = async () => {
+    for (const item of items) {
+      const itemId = item._id || item.productId || '';
+      if (item.customisation && editingTexts[itemId]) {
+        await updateItemTexts(itemId, editingTexts[itemId]);
+      }
+    }
+  };
+
   const canProceedToCheckout = items.length > 0;
   const canProceedToPayment = emailVerified && mobileVerified && form.line1 && form.city && form.zip;
-  const hasSubscriptionItems = items.some((item: any) => item.isSubscription || item.monthlyPrice);
 
-  // ─── Handlers ───────────────────────────────────────────────────────────────
-
-  const goToStep = useCallback((step: Step) => {
+  // Step navigation
+  const goToStep = (step: Step) => {
+    if (step === 'checkout' && !canProceedToCheckout) return;
+    if (step === 'payment' && !canProceedToPayment) return;
     setCurrentStep(step);
     setError(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, []);
-
-  const handleBackToShop = useCallback(() => navigate('/shop'), [navigate]);
-
-  const handleAddressChange = useCallback((address: AddressComponents) => {
-    setForm(address);
-    setSelectedShippingOption('');
-  }, []);
-
-  const handleSelectShipping = useCallback((methodId: string, cost: number) => {
-    setSelectedShippingOption(methodId);
-  }, []);
+  };
 
   // Promo code handlers
-  const applyPromoCode = useCallback(async (code: string) => {
+  const [promoError, setPromoError] = useState('');
+  const applyPromoCode = async () => {
+    if (!promoCode) return;
     setPromoLoading(true);
     setPromoError('');
+    setGuestPromoInfo(null);
 
+    // Guest: validate promo code via public endpoint (no auth required)
     if (!user) {
       try {
-        const res = await axios.post(`/api${API.public.promo.validate}`, { code });
+        const res = await axios.post(`/api${API.public.promo.validate}`, { code: promoCode });
         const data = res.data.data;
         if (data.valid) {
           setGuestPromoInfo(data);
+          setPromoError('');
         } else {
           setPromoError(data.error || 'Invalid promo code');
           setPromoCodeCtx('');
@@ -256,20 +395,25 @@ export default function Checkout() {
       return;
     }
 
+    // Logged in: apply promo code to server-side cart
     try {
-      await api.post(API.cart.promo.apply, { code });
+      await api.post(API.cart.promo.apply, { code: promoCode });
       await refreshCart();
       setPromoAppliedCtx(true);
-      setPromoDiscount(totals?.discount || 0);
+      setPromoDiscount(totals.discount || 0);
+      setPromoError('');
     } catch (err: any) {
-      setPromoError(err?.response?.data?.error || 'Invalid promo code');
+      const msg = err?.response?.status === 401
+        ? 'Your session expired. Please log in again to continue.'
+        : err?.response?.data?.error || 'Invalid promo code';
+      setPromoError(msg);
       setPromoCodeCtx('');
     } finally {
       setPromoLoading(false);
     }
-  }, [user, refreshCart, setPromoCodeCtx, setPromoAppliedCtx, totals?.discount]);
+  };
 
-  const removePromoCode = useCallback(async () => {
+  const removePromoCode = async () => {
     try {
       if (user) await api.delete(API.cart.promo.remove);
       setPromoAppliedCtx(false);
@@ -280,27 +424,73 @@ export default function Checkout() {
     } catch (err: any) {
       setError(err.message || 'Failed to remove promo code');
     }
-  }, [user, refreshCart, setPromoCodeCtx, setPromoAppliedCtx]);
+  };
 
-  // Proceed to checkout (step 1 → step 2)
-  const handleProceedToCheckout = useCallback(async () => {
-    goToStep('checkout');
-  }, [goToStep]);
+  // PawRewards redemption handler
+  const handlePawRewardsRedemption = async (amount: number) => {
+    if (!user || amount < 0) return;
+    
+    // Validate minimum redemption
+    if (amount > 0 && amount < 2) {
+      setError('Minimum PawRewards redemption is $2');
+      return;
+    }
+    
+    // Validate maximum redemption (can't exceed order total)
+    const maxRedemption = itemsSubtotal + shippingCost + taxAmount - discountAmount;
+    if (amount > maxRedemption) {
+      setError(`Cannot redeem more than order total ($${maxRedemption.toFixed(2)})`);
+      return;
+    }
+    
+    setPawRewardsLoading(true);
+    try {
+      // If redeeming, validate with server
+      if (amount > 0) {
+        await api.post('/customer/guardian/rewards/redeem', { amount });
+      }
+      setPawRewardsRedemption(amount);
+      setError(null);
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to redeem PawRewards');
+    } finally {
+      setPawRewardsLoading(false);
+    }
+  };
 
-  // Proceed to payment (step 2 → step 3)
-  const handleProceedToPayment = useCallback(async () => {
+  // Address handler
+  const handleAddressSelect = (address: AddressComponents) => {
+    setForm(prev => ({
+      ...prev,
+      line1: address.line1, line2: address.line2 || '',
+      city: address.city, state: address.state,
+      zip: address.zip, country: address.country || 'NZ',
+    }));
+  };
+
+  // Payment handler — uses PawTag checkout API
+  const handlePayment = async () => {
+    // Ref-based double-click protection
+    if (paymentInProgressRef.current) return;
+    paymentInProgressRef.current = true;
+
     if (!user) return;
     setLoading(true);
     setError(null);
     try {
+      // 0. Auto-save any unsaved engraving texts before payment
+      await saveAllEngraving();
+
+      // 1. Verify cart has items from server (not stale React state)
       const cartCheck = await api.get(API.cart.get);
       const serverItems = cartCheck.data?.data?.cart?.items || [];
       if (serverItems.length === 0) {
-        setError('Your cart is empty. Please go back and add items.');
+        setError('Your cart is empty. Please go back and add items before checking out.');
         setLoading(false);
         return;
       }
 
+      // 1. Create payment intent via PawTag checkout API
       const checkoutRes = await api.post(API.checkout.paymentIntent, {
         shippingAddress: {
           line1: form.line1,
@@ -310,193 +500,752 @@ export default function Checkout() {
           zip: form.zip,
           country: form.country || 'NZ',
         },
+        autoRenew: autoRenewMap,
       });
       const { paymentIntentId, clientSecret, pendingOrderId } = checkoutRes.data?.data;
 
-      if (!clientSecret) throw new Error('Payment session could not be created');
+      if (!clientSecret) {
+        throw new Error('Payment session could not be created');
+      }
 
+      // Store referral code for later
+      const referralCode = localStorage.getItem('pawtag_referral_code');
+      if (referralCode) localStorage.removeItem('pawtag_referral_code');
+
+      // Store checkout state for payment confirmation
       sessionStorage.setItem('pawtag_checkout_payment_intent', paymentIntentId);
       sessionStorage.setItem('pawtag_checkout_pending_order', pendingOrderId);
 
+      // 2. Store client secret — StripePaymentForm will use it to confirm payment
       setPaymentClientSecret(clientSecret);
-      goToStep('payment');
-      analytics.trackCheckoutStart(orderTotal, items.length);
+      setCurrentStep('payment');
+      
+      // Track checkout start
+      analytics.trackCheckoutStart(
+        orderTotal,
+        items.length
+      );
+      
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err: any) {
-      setError(err?.response?.status === 401 ? 'Your session expired.' : 'Payment setup failed.');
+      console.error('[Checkout] Payment intent creation failed:', err?.response?.data || err);
+      const msg = err?.response?.status === 401
+        ? 'Your session expired. Please log in again to continue.'
+        : 'Payment setup failed. Please try again.';
+      setError(msg);
     } finally {
       setLoading(false);
+      paymentInProgressRef.current = false;
     }
-  }, [user, form, orderTotal, items.length, goToStep]);
+  };
 
-  // Payment success handler
-  const handlePaymentSuccess = useCallback(async (paymentIntentId: string) => {
+  // Called by StripePaymentForm after Stripe confirms payment client-side
+  const handlePaymentSuccess = async (paymentIntentId: string) => {
     setLoading(true);
     setError(null);
     try {
+      // Drive progress: "Payment Processing..."
+      (window as any).__paymentProgress?.setProcessingStage?.('confirmed');
+
+      // 1. Confirm checkout via PawTag API (creates Order + Invoice + sends emails)
       let pawtagOrder = null;
       let invoice = null;
-
+      let invoiceUrl = '';
       try {
         const confirmRes = await api.post(API.checkout.confirm, { paymentIntentId, portal: 'customer-web' });
         pawtagOrder = confirmRes.data.data.order;
         invoice = confirmRes.data.data.invoice;
+        invoiceUrl = confirmRes.data.data.invoiceUrl;
       } catch (confirmErr: any) {
-        // Recovery: check if order was created despite error
+        console.error('[Checkout] Order confirmation failed:', confirmErr?.response?.data || confirmErr);
+
+        // Recovery: Check if order was actually created despite the error
         try {
           const recoveryRes = await api.get('/api/checkout/pending');
           const recoveryPending = recoveryRes.data?.data;
-          if (recoveryPending?.status === 'converted' && recoveryPending.convertedOrderId) {
+          if (recoveryPending && recoveryPending.status === 'converted' && recoveryPending.convertedOrderId) {
+            // Order was created — show confirmation
             pawtagOrder = { orderNumber: recoveryPending.orderNumber };
             invoice = recoveryPending.invoice || null;
           } else {
-            setError('Payment received but order not confirmed. Check order history or contact support.');
+            // Payment succeeded but order not created — show recoverable error
+            setError('Your payment was received but we could not confirm your order. Please check your order history or contact support.');
             setLoading(false);
             return;
           }
         } catch {
-          setError('Something went wrong. Your payment was received — please contact support.');
+          // Recovery check failed — show error with support contact
+          setError('Something went wrong confirming your order. Your payment was received — please contact support.');
           setLoading(false);
           return;
         }
       }
 
+      // 2. Only show confirmation if order was created
       setConfirmedItems([...items]);
       setConfirmedTotal(total);
       setConfirmedInvoice(invoice);
       setConfirmedPawTagOrder(pawtagOrder);
       setOrderNumber(pawtagOrder?.orderNumber || paymentIntentId.slice(-8));
 
-      await new Promise(r => setTimeout(r, 600));
+      // Drive progress: "Payment Confirmed..." → "✓ Payment Confirmed"
+      (window as any).__paymentProgress?.setProcessingStage?.('complete');
+
+      // 3. Wait for green animation, then show confirmation
+      await new Promise((r) => setTimeout(r, 600));
+
       setSuccess(true);
       setCurrentStep('confirmed');
-
+      
+      // Track checkout completion
+      analytics.trackCheckoutComplete(
+        total,
+        pawtagOrder?.orderNumber || paymentIntentId.slice(-8)
+      );
+      
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       sessionStorage.setItem('pawtag_checkout_success', 'true');
       sessionStorage.setItem('pawtag_checkout_order', pawtagOrder?.orderNumber || paymentIntentId.slice(-8));
-      sessionStorage.removeItem('pawtag_checkout_payment_intent');
-      sessionStorage.removeItem('pawtag_checkout_pending_order');
-
-      await clearCart();
-      analytics.trackCheckoutComplete(orderTotal, orderNumber);
+      clearCart();
     } catch (err: any) {
-      setError('Something went wrong confirming your order. Please contact support.');
+      console.error('[Checkout] Payment success handler failed:', err);
+      setError('Something went wrong during payment processing. — please contact support.');
+      await refreshCart();
     } finally {
       setLoading(false);
     }
-  }, [items, total, orderTotal, clearCart]);
+  };
 
-  // ─── Render ─────────────────────────────────────────────────────────────────
+  const handlePaymentError = (message: string) => {
+    setError(message);
+  };
 
-  if (recoveringPayment) {
+  // Empty cart — but only show if we're not loading, not in payment flow, and not on confirmed step
+  if (items.length === 0 && !success && !loading && currentStep === 'cart') {
     return (
-      <div className="min-h-screen bg-gray-50 py-8 px-4">
-        <div className="max-w-6xl mx-auto">
-          <CheckoutHeader currentStep={currentStep} itemCount={items.length} />
-          <div className="flex items-center justify-center py-20">
-            <Loader2 size={32} className="animate-spin text-primary-600" />
-            <span className="ml-3 text-gray-600">Recovering your order...</span>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (items.length === 0 && !success && currentStep !== 'confirmed') {
-    return (
-      <div className="min-h-screen bg-gray-50 py-8 px-4">
-        <div className="max-w-6xl mx-auto">
-          <CheckoutHeader currentStep={currentStep} itemCount={0} onBackToShop={handleBackToShop} />
-          <CheckoutEmptyState />
-        </div>
+      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-4 p-4">
+        <PawPrint className="h-16 w-16 text-gray-300" />
+        <h2 className="text-xl font-semibold text-gray-700">Your cart is empty</h2>
+        <Link to="/shop" className="text-primary-600 hover:text-primary-700 font-medium">← Back to Shop</Link>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4 pb-24 lg:pb-8">
-      <div className="max-w-6xl mx-auto">
-        <CheckoutHeader
-          currentStep={currentStep}
-          itemCount={items.length}
-          onBackToShop={currentStep === 'cart' ? handleBackToShop : undefined}
-        />
-
-        <CheckoutBanners
-          priceChanged={!!cartError}
-          inventoryIssue={undefined}
-          onRefresh={refreshCart}
-        />
+    <div className="min-h-screen bg-gray-50">
+      <style>{confirmationStyles}</style>
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Step Indicator */}
+        <CheckoutStepIndicator currentStep={currentStep} onStepClick={goToStep} />
 
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4 text-sm text-red-700">
-            {error}
-            <button onClick={() => setError(null)} className="ml-2 text-red-600 hover:text-red-800 underline">
-              Dismiss
-            </button>
+          <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700 flex items-center justify-between mb-6">
+            <span>{error}</span>
+            <button onClick={() => setError(null)} className="text-red-500 hover:text-red-700 font-medium">Dismiss</button>
           </div>
         )}
 
         {/* Step 1: Cart Review */}
         {currentStep === 'cart' && (
-          <CartReviewStep
-            items={items}
-            subtotal={totals?.subtotal || 0}
-            discount={totals?.discount || promoDiscount}
-            shipping={totals?.shipping || 0}
-            tax={totals?.tax || 0}
-            total={totals?.total || total}
-            currency={totals?.currency || 'NZD'}
-            onUpdateQuantity={(id, qty) => {}} // Read-only in checkout
-            onRemove={(id) => {}}
-            onContinue={handleProceedToCheckout}
-          />
+          <div className="max-w-4xl mx-auto">
+            <h1 className="text-2xl font-bold text-gray-900 mb-6">Your Cart</h1>
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="p-6 border-b border-gray-100">
+                <div className="flex flex-wrap items-center gap-2 text-sm text-gray-500">
+                  <ShieldCheck className="h-4 w-4 text-primary-600 flex-shrink-0" />
+                  <span>{trustBadgeTitle}</span>
+                  {trustBadgeItems.map((item, i) => (
+                    <span key={i} className="flex items-center gap-1">
+                      <Check className="h-3 w-3 text-green-500 flex-shrink-0" />
+                      <span className="text-gray-600">{item}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Items */}
+              <div className="px-6 space-y-4">
+                    {items.map((item) => {
+                      const itemId = item._id || item.productId || '';
+                      const texts = getItemTexts(itemId, item);
+                      const hasCustomisation = item.customisation === true;
+                      const isCustomizable = item.customizable === true;
+                      const labelText = item.customizationLabel || 'customisation';
+                      const engravingPrice = item.customizationPrice || 0;
+
+                      return (
+                        <div key={itemId} className="border-b border-gray-50 pb-4 last:border-0">
+                          <div className="flex items-center gap-3">
+                            <div className="h-14 w-14 bg-primary-50 rounded-lg flex-shrink-0 flex items-center justify-center overflow-hidden">
+                              {item.image ? <img src={item.image} alt="" className="h-full w-full object-cover" /> : <PawPrint className="h-6 w-6 text-primary-300" />}
+                            </div>
+                            <div className="flex-1">
+                              <p className="font-medium text-gray-900">{item.productName || item.name}</p>
+                              <p className="text-xs text-gray-500">Qty: {item.quantity} × NZ${(item.unitPrice || item.price || 0).toFixed(2)}</p>
+                            </div>
+                            <p className="text-sm font-semibold text-gray-900">NZ${((item.unitPrice || item.price || 0) * item.quantity).toFixed(2)}</p>
+                          </div>
+
+                          {/* Engraving section — only for customizable products */}
+                          {isCustomizable && (
+                            <div className="mt-3 ml-17">
+                              {!hasCustomisation ? (
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    onChange={(e) => handleToggleEngraving(itemId, item, e.target.checked)}
+                                    className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                                  />
+                                  <span className="text-sm text-primary-700">
+                                    Add {labelText}
+                                  </span>
+                                  {engravingPrice > 0 && (
+                                    <span className="text-xs text-gray-500">(+NZ${engravingPrice.toFixed(2)})</span>
+                                  )}
+                                </label>
+                              ) : (
+                                <InlineEditBanner
+                                  icon={<PawPrint className="h-4 w-4" />}
+                                  label={labelText}
+                                  description={texts.filter(t => t).map(t => `Pet name: ${t}`).join(', ') || 'No name added yet'}
+                                  variant="success"
+                                  onRemove={() => handleToggleEngraving(itemId, item, false)}
+                                  onExpand={() => handleExpandEngraving(itemId, item)}
+                                  expanded={expandedEngraving[itemId] || false}
+                                >
+                                  <div className="space-y-2 mt-2">
+                                    {texts.map((text, idx) => (
+                                      <div key={idx} className="flex items-center gap-2">
+                                        <span className="text-xs text-gray-500 w-16 shrink-0">Name #{idx + 1}:</span>
+                                        <input
+                                          type="text"
+                                          value={text}
+                                          onChange={(e) => handleTextChange(itemId, idx, e.target.value)}
+                                          placeholder={`Enter ${labelText.toLowerCase()}`}
+                                          maxLength={16}
+                                          className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                        />
+                                      </div>
+                                    ))}
+                                    {/* Single Save button */}
+                                    <div className="flex items-center justify-between mt-3 pt-2 border-t border-green-100">
+                                      {savedTexts[itemId] ? (
+                                        <span className="text-xs text-green-600 font-medium flex items-center gap-1">
+                                          <Check size={14} /> Saved
+                                        </span>
+                                      ) : (
+                                        <span className="text-xs text-gray-400">Max 16 characters per name</span>
+                                      )}
+                                      <button
+                                        onClick={() => handleSaveTexts(itemId)}
+                                        disabled={savingTexts[itemId]}
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+                                      >
+                                        {savingTexts[itemId] ? (
+                                          <><Loader2 size={12} className="animate-spin" /> Saving...</>
+                                        ) : (
+                                          <><Check size={12} /> Save</>
+                                        )}
+                                      </button>
+                                    </div>
+                                    {cartError && (
+                                      <p className="text-xs text-red-500 mt-1">{cartError}</p>
+                                    )}
+                                  </div>
+                                </InlineEditBanner>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+              </div>
+
+              {/* Summary */}
+              <div className="px-6 py-4 border-t border-gray-100">
+                {/* Promo code section */}
+                  <div className="mb-4">
+                  {promoApplied ? (
+                  <div className="flex items-center justify-between text-sm p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <Tag className="h-4 w-4 text-green-600" />
+                      <span className="font-medium text-green-700">{promoCode}</span>
+                      <span className="text-green-600">applied — saved NZ${discountAmount.toFixed(2)}</span>
+                    </div>
+                    <button onClick={removePromoCode} className="text-xs text-gray-500 hover:text-red-500 font-medium ml-2">Remove</button>
+                  </div>
+                ) : guestPromoInfo ? (
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Tag className="h-4 w-4 text-blue-600" />
+                        <span className="font-medium text-blue-700">{guestPromoInfo.code}</span>
+                        <span className="text-blue-600">
+                          — {guestPromoInfo.discountType === 'percentage'
+                            ? `${guestPromoInfo.discountValue}% off`
+                            : `NZ$${guestPromoInfo.discountValue} off`}
+                          {guestPromoInfo.minOrderAmount > 0 && ` (min order: NZ$${guestPromoInfo.minOrderAmount})`}
+                        </span>
+                      </div>
+                      <button onClick={() => { setGuestPromoInfo(null); setPromoCodeCtx(''); }} className="text-xs text-gray-500 hover:text-red-500 font-medium ml-2">Remove</button>
+                    </div>
+                    <p className="text-xs text-blue-600 mt-1">Log in to apply this discount to your order</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex gap-2 mb-1">
+                      <input type="text" value={promoCode || ''} onChange={e => { setPromoCodeCtx(e.target.value.toUpperCase()); setPromoError(''); }} placeholder="Add promo code" disabled={promoApplied} className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-primary-500 disabled:bg-gray-50 disabled:text-gray-400" />
+                      <button onClick={applyPromoCode} disabled={!promoCode || promoLoading || promoApplied} className="px-4 py-2 text-sm text-primary-600 border border-primary-200 rounded-lg hover:bg-primary-50 disabled:opacity-50">
+                        {promoLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Apply'}
+                      </button>
+                    </div>
+                    {promoError && <p className="text-xs text-red-500">{promoError}</p>}
+                  </>
+                )}
+                  </div>
+
+                {/* PawRewards Redemption */}
+                {user && pawRewardsBalance > 0 && (
+                  <div className="border-t border-gray-100 pt-4 mt-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <PawPrint className="h-4 w-4 text-amber-500" />
+                        <span className="text-sm font-medium text-gray-700">PawRewards</span>
+                      </div>
+                      <span className="text-sm text-amber-600 font-medium">${pawRewardsBalance.toFixed(2)} available</span>
+                    </div>
+                    <p className="text-xs text-gray-500 mb-3">Redeem your PawRewards for instant discounts</p>
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        min="0"
+                        max={Math.min(pawRewardsBalance, itemsSubtotal + shippingCost + taxAmount - discountAmount)}
+                        step="0.01"
+                        value={pawRewardsRedemption || ''}
+                        onChange={(e) => {
+                          const value = parseFloat(e.target.value) || 0;
+                          setPawRewardsRedemption(Math.min(value, pawRewardsBalance));
+                        }}
+                        placeholder="0.00"
+                        className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-amber-500 disabled:bg-gray-50"
+                        disabled={pawRewardsLoading}
+                      />
+                      <button
+                        onClick={() => handlePawRewardsRedemption(pawRewardsRedemption)}
+                        disabled={pawRewardsLoading || pawRewardsRedemption < 2}
+                        className="px-4 py-2 text-sm text-amber-600 border border-amber-200 rounded-lg hover:bg-amber-50 disabled:opacity-50"
+                      >
+                        {pawRewardsLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Apply'}
+                      </button>
+                    </div>
+                    {pawRewardsRedemption > 0 && (
+                      <div className="mt-2 flex items-center justify-between">
+                        <span className="text-xs text-amber-600">Redeeming ${pawRewardsRedemption.toFixed(2)}</span>
+                        <button
+                          onClick={() => setPawRewardsRedemption(0)}
+                          className="text-xs text-red-500 hover:text-red-600"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Guardian Loyalty Messaging */}
+                <div className="border-t border-gray-100 pt-4 mt-4">
+                  {!user ? (
+                    // Guest — prompt to join Guardian
+                    <div className="flex items-start gap-3 p-3 bg-primary-50 border border-primary-100 rounded-lg">
+                      <Shield className="h-5 w-5 text-primary-600 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="text-sm font-medium text-primary-800">You're not earning Guardian Points</p>
+                        <p className="text-xs text-primary-600 mt-1">Join Guardian (free) to earn points on this order and unlock PawRewards.</p>
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2">
+                          <Link to="/shop" className="text-xs font-medium text-primary-700 underline">Learn more</Link>
+                          <span className="text-xs text-primary-300">|</span>
+                          <Link to="/register" className="text-xs font-medium text-primary-700 underline">Register free</Link>
+                          <span className="text-xs text-primary-300">|</span>
+                          <Link to="/login" className="text-xs font-medium text-primary-700 underline">Already a customer? Login</Link>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    // Logged in — show personalized points earning info
+                    <div className={`p-3 rounded-lg border ${isGoldMember ? 'bg-amber-50 border-amber-200' : 'bg-primary-50 border-primary-100'}`}>
+                      <div className="flex items-center gap-2 mb-1">
+                        <Shield className={`h-4 w-4 ${isGoldMember ? 'text-amber-600' : 'text-primary-600'}`} />
+                        <span className={`text-sm font-medium ${isGoldMember ? 'text-amber-800' : 'text-primary-800'}`}>
+                          {isGoldMember ? 'Gold' : guardianTier || 'Guardian'} Member
+                        </span>
+                        {isGoldMember && <span className="text-xs bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded-full font-medium">2x Points</span>}
+                      </div>
+                      <p className={`text-sm ${isGoldMember ? 'text-amber-700' : 'text-primary-700'}`}>
+                        This order will earn you approximately <strong>{estimatedPoints} Points</strong>
+                      </p>
+                      {pointsToNextTier && pointsToNextTier > 0 && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          {pointsToNextTier} Points to {nextTierName}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Auto-Renew Status */}
+                {hasSubscriptionItems && (
+                  <div className="border-t border-gray-100 pt-4 mt-4">
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Subscription Auto-Renew</p>
+                    {items.filter((item: any) => item.isSubscription || item.monthlyPrice).map((item: any) => {
+                      const key = item._id || item.productId;
+                      const isOn = autoRenewMap[key] !== false;
+                      return (
+                        <div key={key} className="flex items-center justify-between py-1">
+                          <span className="text-sm text-gray-700">{item.productName || item.name}</span>
+                          <span className={`text-xs font-medium ${isOn ? 'text-primary-600' : 'text-gray-400'}`}>
+                            {isOn ? 'Auto-renew on' : 'Auto-renew off'}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <div className="space-y-2 pt-2">
+                  <div className="flex justify-between text-sm text-gray-600"><span>Subtotal</span><span>NZ${itemsSubtotal.toFixed(2)}</span></div>
+                  {discountAmount > 0 && <div className="flex justify-between text-sm text-green-600"><span>Discount</span><span>-NZ${discountAmount.toFixed(2)}</span></div>}
+                  {pawRewardsDiscount > 0 && <div className="flex justify-between text-sm text-amber-600"><span>PawRewards</span><span>-NZ${pawRewardsDiscount.toFixed(2)}</span></div>}
+                  <div className="flex justify-between text-sm text-gray-600"><span>Shipping</span><span className={`font-medium ${shippingCost === 0 ? 'text-green-600' : 'text-gray-900'}`}>{shippingCost === 0 ? 'FREE' : `NZ$${shippingCost.toFixed(2)}`}</span></div>
+                  <div className="flex justify-between text-sm text-gray-600"><span>Tax (Included)</span><span>NZ${taxAmount.toFixed(2)}</span></div>
+                  <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-100"><span>Total (NZD)</span><span className="text-primary-700">NZ${orderTotal.toFixed(2)}</span></div>
+                </div>
+              </div>
+
+              <div className="px-6 py-4 border-t border-gray-100 bg-gray-50">
+                <div className="flex items-center gap-2 text-xs text-gray-500 mb-4">
+                  <Lock className="h-4 w-4" /> <span>Secure & Trusted Checkout</span>
+                </div>
+                <p className="text-xs text-gray-400 mb-4">Your information is encrypted and safe with us. We never store your card details.</p>
+                <div className="flex items-center gap-4 text-xs text-gray-400 mb-4">
+                  <span className="flex items-center gap-1"><Lock className="h-3 w-3" /> SSL Encrypted</span>
+                  <span className="flex items-center gap-1"><Shield className="h-3 w-3" /> PCI DSS Compliant</span>
+                  <span className="flex items-center gap-1">Powered by PawTag</span>
+                </div>
+                <button onClick={() => goToStep('checkout')} className="w-full py-3 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 transition-all flex items-center justify-center gap-2">
+                  Proceed to Checkout <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          </div>
         )}
 
-        {/* Step 2: Shipping */}
+        {/* Step 2: Checkout (Verification + Address) */}
         {currentStep === 'checkout' && (
-          <>
+          <div className="max-w-4xl mx-auto">
+            <div className="flex items-center justify-between mb-6">
+              <Link to="/shop" className="inline-flex items-center gap-2 text-gray-500 hover:text-primary-600 text-sm"><ArrowLeft className="h-4 w-4" /> Back to Shop</Link>
+              <button onClick={() => goToStep('cart')} className="text-sm text-primary-600 hover:text-primary-700">Edit Cart</button>
+            </div>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">Checkout</h1>
+            <p className="text-gray-500 mb-6">Verify your contact details and shipping address</p>
+
             {!user ? (
-              <CheckoutAuth onLoginSuccess={() => goToStep('checkout')} />
+              <CheckoutAuth />
             ) : (
-              <ShippingStep
-                shippingAddress={form}
-                onAddressChange={handleAddressChange}
-                shippingMethods={shippingOptions}
-                selectedShipping={selectedShippingOption}
-                onSelectShipping={handleSelectShipping}
-                isGoldMember={isGoldMember}
-                onContinue={handleProceedToPayment}
-                onBack={() => goToStep('cart')}
-              />
+              <div className="max-w-2xl">
+                {/* Welcome message for signed-in user */}
+                <div className="bg-primary-50 border border-primary-100 rounded-xl p-4 mb-4 flex items-center gap-3">
+                  <CheckCircle className="h-5 w-5 text-primary-600 flex-shrink-0" />
+                  <p className="text-sm text-primary-700">
+                    Welcome back, <span className="font-semibold">{user.fullName || 'there'}</span>! You're signed in and ready to checkout.
+                  </p>
+                </div>
+
+                {/* Contact Verification — only shown for authenticated users */}
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-4">
+                  <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2"><Mail className="h-5 w-5 text-primary-600" /> Contact Verification</h2>
+
+                  <div className={`flex items-center justify-between p-4 rounded-xl mb-3 ${emailVerified ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'}`}>
+                    <div className="flex items-center gap-3">
+                      <Mail className={`h-5 w-5 ${emailVerified ? 'text-green-600' : 'text-gray-400'}`} />
+                      <div><p className="font-medium text-gray-900">Email Verification</p><p className="text-xs text-gray-500">{user.email}</p></div>
+                    </div>
+                    {emailVerified ? <span className="text-sm text-green-600 font-medium flex items-center gap-1"><Check className="h-4 w-4" /> Verified</span> : <span className="text-sm text-amber-600 font-medium">Not Verified</span>}
+                  </div>
+
+                  <div className={`flex items-center justify-between p-4 rounded-xl mb-4 ${mobileVerified ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'}`}>
+                    <div className="flex items-center gap-3">
+                      <Smartphone className={`h-5 w-5 ${mobileVerified ? 'text-green-600' : 'text-gray-400'}`} />
+                      <div><p className="font-medium text-gray-900">Mobile Verification</p><p className="text-xs text-gray-500">{user.phoneNumber || 'Not set'}</p></div>
+                    </div>
+                    {mobileVerified ? <span className="text-sm text-green-600 font-medium flex items-center gap-1"><Check className="h-4 w-4" /> Verified</span> : <span className="text-sm text-amber-600 font-medium">Not Verified</span>}
+                  </div>
+
+                  {!emailVerified && <Link to="/verify-account" className="block w-full py-2 text-center text-sm text-primary-600 border border-primary-200 rounded-lg hover:bg-primary-50 mb-2">Verify Email</Link>}
+                  {!mobileVerified && <Link to="/verify-account" className="block w-full py-2 text-center text-sm text-primary-600 border border-primary-200 rounded-lg hover:bg-primary-50">Verify Mobile</Link>}
+
+                  <div className="bg-primary-50 border border-primary-100 rounded-xl p-4 mt-4">
+                    <div className="flex items-start gap-2"><Shield className="h-4 w-4 text-primary-600 mt-0.5" /><p className="text-xs text-primary-700"><strong>Why do we verify?</strong> We use verified email & mobile to secure your account, send important updates and help reunite pets faster.</p></div>
+                  </div>
+                </div>
+
+                {/* Shipping Address */}
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2"><Truck className="h-5 w-5 text-primary-600" /> Shipping Address</h2>
+                    {user?.address?.line1 && addressMode === 'saved' && (
+                      <button onClick={() => { setAddressMode('custom'); }} className="text-sm text-primary-600 hover:text-primary-700 flex items-center gap-1">
+                        <Edit3 className="h-3 w-3" /> Change
+                      </button>
+                    )}
+                  </div>
+
+                  {addressMode === 'saved' && user?.address?.line1 ? (
+                    <div className="p-4 bg-gray-50 rounded-xl">
+                      <p className="font-medium text-gray-900">{user.fullName}</p>
+                      <p className="text-sm text-gray-600">{form.line1}{form.line2 ? `, ${form.line2}` : ''}</p>
+                      <p className="text-sm text-gray-600">{form.city} {form.zip}</p>
+                      <p className="text-sm text-gray-600">New Zealand</p>
+                      {user.phoneNumber && <p className="text-sm text-gray-600 mt-1">{user.phoneNumber}</p>}
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Address Line 1 *</label>
+                        <AddressAutocomplete value={form.line1} onChange={(val) => setForm(prev => ({ ...prev, line1: val }))} onAddressSelect={handleAddressSelect} placeholder="123 Main Street" />
+                      </div>
+                      <div><label className="block text-sm font-medium text-gray-700 mb-1">Address Line 2</label><input type="text" value={form.line2} onChange={e => setForm({ ...form, line2: e.target.value })} className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm" placeholder="Apartment, suite, etc." /></div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div><label className="block text-sm font-medium text-gray-700 mb-1">City *</label><input type="text" required value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 text-sm" /></div>
+                        <div><label className="block text-sm font-medium text-gray-700 mb-1">Postcode *</label><input type="text" required value={form.zip} onChange={e => setForm({ ...form, zip: e.target.value })} className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 text-sm" /></div>
+                      </div>
+                      {user?.address?.line1 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setForm({
+                              line1: user.address!.line1 || '',
+                              line2: user.address!.line2 || '',
+                              city: user.address!.city || '',
+                              state: user.address!.state || '',
+                              zip: user.address!.zip || '',
+                              country: user.address!.country || 'NZ',
+                            });
+                            setAddressMode('saved');
+                          }}
+                          className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                        >
+                          Use my saved address
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Shipping Method — shown after address is entered */}
+                  {form.line1 && (
+                    <div className="mt-6 pt-6 border-t border-gray-100">
+                      <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2 mb-3">
+                        <Truck className="h-4 w-4 text-primary-600" /> Shipping Method
+                      </h3>
+                      {shippingLoading ? (
+                        <div className="flex items-center gap-2 text-sm text-gray-500">
+                          <Loader2 className="h-4 w-4 animate-spin" /> Loading shipping options...
+                        </div>
+                      ) : shippingOptions.length > 0 ? (
+                        <div className="space-y-2">
+                          {shippingOptions.map((option) => (
+                            <label
+                              key={option.id}
+                              className={`flex items-center justify-between p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                                selectedShippingOption === option.id
+                                  ? 'border-primary-500 bg-primary-50'
+                                  : 'border-gray-200 hover:border-gray-300'
+                              }`}
+                            >
+                              <div className="flex items-center gap-3">
+                                <input
+                                  type="radio"
+                                  name="shipping"
+                                  value={option.id}
+                                  checked={selectedShippingOption === option.id}
+                                  onChange={() => setSelectedShippingOption(option.id)}
+                                  className="text-primary-600"
+                                />
+                                <div>
+                                  <p className="text-sm font-medium text-gray-900">{option.name}</p>
+                                  {option.description && (
+                                    <p className="text-xs text-gray-500">{option.description}</p>
+                                  )}
+                                </div>
+                              </div>
+                              <span className={`text-sm font-semibold ${(option.cost || 0) === 0 ? 'text-green-600' : 'text-gray-900'}`}>
+                                {(option.cost || 0) === 0 ? 'FREE' : `NZ$${(option.cost || 0).toFixed(2)}`}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-gray-500">No shipping options available for this address.</p>
+                      )}
+                    </div>
+                  )}
+
+                  <button onClick={handlePayment} disabled={!canProceedToPayment || loading} className="w-full mt-6 py-3 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2">
+                    {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Setting up payment...</> : <>Continue to Payment <ChevronRight className="h-4 w-4" /></>}
+                  </button>
+                </div>
+              </div>
             )}
-          </>
+          </div>
         )}
 
-        {/* Step 3: Payment */}
+        {/* Step 3: Review & Pay */}
         {currentStep === 'payment' && (
-          <PaymentStep
-            subtotal={totals?.subtotal || 0}
-            discount={totals?.discount || promoDiscount}
-            shipping={totals?.shipping || 0}
-            tax={totals?.tax || 0}
-            total={totals?.total || total}
-            currency={totals?.currency || 'NZD'}
-            itemCount={items.length}
-            shippingAddress={form}
-            onBack={() => goToStep('checkout')}
-          >
-            <CheckoutErrorBoundary>
-              <StripePaymentForm
-                clientSecret={paymentClientSecret}
-                onPaymentSuccess={handlePaymentSuccess}
-                onPaymentError={(msg: string) => setError(msg)}
-              />
-            </CheckoutErrorBoundary>
-          </PaymentStep>
+          <div className="max-w-5xl mx-auto">
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">Review & Pay</h1>
+            <p className="text-gray-500 mb-6">Review your order and complete payment</p>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Left: Order Summary */}
+              <div className="space-y-4">
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                  <h2 className="text-lg font-semibold text-gray-900 mb-4">Order Summary</h2>
+                  <button onClick={() => goToStep('cart')} className="text-sm text-primary-600 hover:text-primary-700 mb-4">Edit Cart</button>
+                  {items.map((item) => (
+                    <div key={item.productId || item.variantId} className="flex gap-3 mb-4 pb-4 border-b border-gray-100 last:border-0">
+                      <div className="h-14 w-14 bg-primary-50 rounded-lg flex-shrink-0 flex items-center justify-center overflow-hidden">
+                        {item.image ? <img src={item.image} alt="" className="h-full w-full object-cover" /> : <PawPrint className="h-6 w-6 text-primary-300" />}
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-medium text-gray-900">{item.productName || item.name}</p>
+                        {item.customisationTexts && item.customisationTexts.length > 0 && item.customisationTexts.some(t => t) && (
+                          <div className="text-xs text-primary-600">
+                            {item.customisationTexts.filter(t => t).map((t, i) => (
+                              <p key={i}>Pet name: {t}</p>
+                            ))}
+                          </div>
+                        )}
+                        <p className="text-xs text-gray-500">Qty: {item.quantity}</p>
+                      </div>
+                      <p className="font-semibold text-gray-900">NZ${(item.unitPrice || item.price || 0).toFixed(2)}</p>
+                    </div>
+                  ))}
+                  <div className="space-y-2 pt-4">
+                    <div className="flex justify-between text-sm"><span className="text-gray-600">Subtotal</span><span className="text-gray-900">NZ${itemsSubtotal.toFixed(2)}</span></div>
+                    {discountAmount > 0 && <div className="flex justify-between text-sm"><span className="text-green-600">Discount</span><span className="text-green-600">-NZ${discountAmount.toFixed(2)}</span></div>}
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Shipping{selectedShippingOption ? ` — ${shippingOptions.find(o => o.id === selectedShippingOption)?.name || ''}` : ''}</span>
+                      <span className={`font-medium ${shippingCost === 0 ? 'text-green-600' : 'text-gray-900'}`}>{shippingCost === 0 ? 'FREE' : `NZ$${shippingCost.toFixed(2)}`}</span>
+                    </div>
+                    <div className="flex justify-between text-sm"><span className="text-gray-600">Tax (Included)</span><span className="text-gray-900">NZ${taxAmount.toFixed(2)}</span></div>
+                    <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-100"><span>Total (NZD)</span><span className="text-primary-700">NZ${orderTotal.toFixed(2)}</span></div>
+                  </div>
+
+                  {/* Shipping Address */}
+                  {form.line1 && (
+                    <div className="mt-4 pt-4 border-t border-gray-100">
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Shipping to</p>
+                      <p className="text-sm text-gray-900">{user?.fullName || 'Customer'}</p>
+                      <p className="text-sm text-gray-600">{form.line1}{form.line2 ? `, ${form.line2}` : ''}</p>
+                      <p className="text-sm text-gray-600">{form.city} {form.zip}</p>
+                      <p className="text-sm text-gray-600">New Zealand</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Right: Payment Method */}
+              <div className="space-y-4">
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                  <h2 className="text-lg font-semibold text-gray-900 mb-4">Payment Method</h2>
+                  {paymentClientSecret ? (
+                    <CheckoutErrorBoundary onReset={() => setPaymentClientSecret('')}>
+                      <StripePaymentForm
+                        clientSecret={paymentClientSecret}
+                        onPaymentSuccess={handlePaymentSuccess}
+                        onPaymentError={handlePaymentError}
+                        disabled={loading}
+                      />
+                    </CheckoutErrorBoundary>
+                  ) : (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin text-primary-600" />
+                      <span className="ml-2 text-sm text-gray-500">Loading payment methods...</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Trust badges */}
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="text-center p-3 bg-gray-50 rounded-xl"><RefreshCw className="h-5 w-5 text-primary-600 mx-auto mb-1" /><p className="text-xs font-medium text-gray-900">60-Day Returns</p><p className="text-xs text-gray-500">Easy returns & refunds</p></div>
+                  <div className="text-center p-3 bg-gray-50 rounded-xl"><Lock className="h-5 w-5 text-primary-600 mx-auto mb-1" /><p className="text-xs font-medium text-gray-900">Secure Payments</p><p className="text-xs text-gray-500">100% secure checkout</p></div>
+                  <div className="text-center p-3 bg-gray-50 rounded-xl"><Headphones className="h-5 w-5 text-primary-600 mx-auto mb-1" /><p className="text-xs font-medium text-gray-900">24/7 Support</p><p className="text-xs text-gray-500">We're here to help</p></div>
+                </div>
+
+                {/* Guardian/Gold membership CTA — context-aware */}
+                {isGoldMember ? (
+                  /* Already Gold — show status */
+                  <div className="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-xl p-4">
+                    <div className="flex items-center gap-3">
+                      <Crown className="h-5 w-5 text-amber-600 flex-shrink-0" />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-amber-800">
+                          <strong>You're earning 2× Gold Points on this order!</strong>
+                        </p>
+                        <p className="text-xs text-amber-600 mt-0.5">
+                          Thank you for being a Gold member.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ) : guardianTier ? (
+                  /* Guardian member — upsell Gold */
+                  <div className="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-xl p-4">
+                    <div className="flex items-center gap-3">
+                      <Crown className="h-5 w-5 text-amber-600 flex-shrink-0" />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-amber-800">
+                          <strong>{checkoutUpsellText}.</strong>
+                        </p>
+                        <p className="text-xs text-amber-600 mt-0.5">
+                          Just ${goldPrice}/month — less than a coffee. Upgrade anytime.
+                        </p>
+                      </div>
+                      <Link to="/gold" className="px-3 py-1.5 bg-amber-600 text-white rounded-lg text-xs font-medium hover:bg-amber-700 transition-colors whitespace-nowrap">
+                        Go Gold
+                      </Link>
+                    </div>
+                  </div>
+                ) : (
+                  /* Not a Guardian member — promote free Guardian */
+                  <div className="bg-gradient-to-r from-primary-50 to-amber-50 border border-primary-100 rounded-xl p-4">
+                    <div className="flex items-center gap-3">
+                      <Shield className="h-5 w-5 text-primary-600 flex-shrink-0" />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-primary-800">
+                          <strong>Earn rewards on this order.</strong>
+                        </p>
+                        <p className="text-xs text-primary-600 mt-0.5">
+                          Guardian members earn points on every purchase. Join free today.
+                        </p>
+                      </div>
+                      <Link to="/guardian" className="px-3 py-1.5 bg-primary-600 text-white rounded-lg text-xs font-medium hover:bg-primary-700 transition-colors whitespace-nowrap">
+                        Join Free
+                      </Link>
+                    </div>
+                  </div>
+                )}
+
+                <p className="text-xs text-gray-400 text-center">By placing this order, you agree to our <Link to="/terms" className="underline">Terms of Service</Link> and <Link to="/privacy" className="underline">Privacy Policy</Link>.</p>
+                <p className="text-xs text-gray-400 text-center">Powered by Stripe</p>
+              </div>
+            </div>
+          </div>
         )}
 
-        {/* Step 4: Confirmation */}
+        {/* Step 4: Confirmed */}
         {currentStep === 'confirmed' && (
-          <ConfirmationStep
+          <CheckoutConfirmationStep
             orderNumber={orderNumber}
             confirmedItems={confirmedItems}
             confirmedTotal={confirmedTotal}
@@ -512,25 +1261,6 @@ export default function Checkout() {
           />
         )}
       </div>
-
-      {/* Mobile sticky checkout bar */}
-      {currentStep !== 'confirmed' && items.length > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 lg:hidden bg-white border-t border-gray-200 px-4 py-3 z-40">
-          <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">
-            <div className="min-w-0">
-              <p className="text-xs text-gray-500">{items.length} item{items.length !== 1 ? 's' : ''}</p>
-              <p className="text-lg font-bold text-gray-900">${(totals?.total || total).toFixed(2)}</p>
-            </div>
-            <button
-              onClick={currentStep === 'cart' ? handleProceedToCheckout : handleProceedToPayment}
-              disabled={loading || (currentStep === 'checkout' && !canProceedToPayment)}
-              className="flex-shrink-0 bg-primary-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-primary-700 transition-colors disabled:opacity-50"
-            >
-              {loading ? <Loader2 size={18} className="animate-spin" /> : 'Continue'}
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

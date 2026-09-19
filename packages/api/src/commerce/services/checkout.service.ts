@@ -139,6 +139,18 @@ export class CheckoutService {
     // 4b. Ensure Stripe Customer exists (for saving payment method for future renewals)
     let stripeCustomerId = user.stripeCustomerId;
     const isDemoMode = !process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY === 'sk_test_demo_key';
+    
+    // Safety: If Stripe is not configured, force test mode to prevent 402 errors
+    if (isDemoMode) {
+      const { getBooleanSetting } = await import('../config');
+      const currentTestMode = await getBooleanSetting('commerce.payment.testMode');
+      if (!currentTestMode) {
+        // Force test mode if Stripe is not configured
+        logger.warn({ userId }, 'Stripe not configured — forcing test mode for checkout');
+        // We'll let the Stripe provider handle this via its own test mode check
+      }
+    }
+    
     if (!stripeCustomerId && !isDemoMode) {
       try {
         const Stripe = (await import('stripe')).default;

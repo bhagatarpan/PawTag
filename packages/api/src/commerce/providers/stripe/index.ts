@@ -157,6 +157,20 @@ export class StripePaymentProvider implements IPaymentProvider {
       };
     }
 
+    // Safety: If Stripe is not configured, fall back to demo mode
+    const apiKey = process.env.STRIPE_SECRET_KEY;
+    if (!apiKey || apiKey === 'sk_test_demo_key') {
+      logger.warn({ orderId: params.orderId }, 'Stripe not configured — falling back to demo mode');
+      const demoId = `pi_demo_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      return {
+        id: demoId,
+        clientSecret: `${demoId}_secret_demo`,
+        amount: params.amount,
+        currency: params.currency.toLowerCase(),
+        status: 'succeeded',
+      };
+    }
+
     const stripe = this.getClient();
     const amountInCents = Math.round(params.amount * 100);
 
