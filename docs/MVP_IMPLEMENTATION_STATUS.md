@@ -124,7 +124,7 @@ These are fundamentally broken test setups that require significant rework. They
 - [x] 12.3 Basic operations dashboard/runbook
 
 ### Phase 13 — Accessibility and UX Consistency
-- [ ] 13.1 Critical web accessibility pass
+- [x] 13.1 Critical web accessibility pass
 - [ ] 13.2 UX vocabulary consistency
 - [x] 13.3 Common feedback patterns
 
@@ -168,14 +168,14 @@ These are fundamentally broken test setups that require significant rework. They
 | Phase 10 — Background Jobs | ✅ Complete | 3/3 |
 | Phase 11 — Deployment | ✅ Complete | 5/5 |
 | Phase 12 — Observability | ✅ Complete | 3/3 |
-| Phase 13 — Accessibility | Partial | 1/3 |
+| Phase 13 — Accessibility | Partial | 2/3 |
 | Phase 14 — Design System | Not started | 0/3 |
 | Phase 15 — Performance | Not started | 0/3 |
 | Phase 16 — Code Quality | Not started | 0/3 |
 | Phase 17 — Production Rehearsal | Not started | 0/3 |
 | Phase 18 — Launch | Not started | 0/1 |
 
-**Total: 56/65 work packets complete (86%)**
+**Total: 57/65 work packets complete (88%)**
 
 ## Next Recommended Work Packet
 
