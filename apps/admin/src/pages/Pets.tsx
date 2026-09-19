@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { API } from '@pawtag/shared/api';
 import api, { PaginatedData } from '../lib/api';
 import { toast } from '../lib/toast';
+import { ConfirmDialog } from '@pawtag/ui';
 import {
   Search, X, ChevronDown, ChevronLeft, ChevronRight, Download,
   Trash2, Plus, Edit2, Save, Camera, Star, Upload, Info,
@@ -257,6 +258,7 @@ export function DetailDrawer({
   const [editError, setEditError] = useState('');
   const [editSaving, setEditSaving] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const drawerRef = useRef<HTMLDivElement>(null);
   const [selectedOwner, setSelectedOwner] = useState<UserRecord | null>(null);
   const [selectedTag, setSelectedTag] = useState<TagItem | null>(null);
@@ -372,7 +374,6 @@ export function DetailDrawer({
   };
 
   const handleDelete = async () => {
-    if (!window.confirm(`Delete pet "${pet.name}"? This cannot be undone.`)) return;
     setActionLoading('delete');
     try {
       await api.delete(API.admin.pets.delete(pet._id));
@@ -383,6 +384,7 @@ export function DetailDrawer({
       toast.error(err.response?.data?.error || 'Failed to delete');
     } finally {
       setActionLoading(null);
+      setShowDeleteConfirm(false);
     }
   };
 
@@ -685,13 +687,25 @@ export function DetailDrawer({
               <Section title="Danger Zone" icon={<Trash2 size={16} />}>
                 <p className="text-sm text-gray-500 mb-3">Permanently delete this pet. This action cannot be undone.</p>
                 <button
-                  onClick={handleDelete}
+                  onClick={() => setShowDeleteConfirm(true)}
                   disabled={actionLoading === 'delete'}
                   className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-red-700 bg-red-100 hover:bg-red-200 rounded-lg disabled:opacity-50"
                 >
                   {actionLoading === 'delete' ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />} Delete Pet
                 </button>
               </Section>
+
+              {/* Delete Confirmation Dialog */}
+              <ConfirmDialog
+                open={showDeleteConfirm}
+                onClose={() => setShowDeleteConfirm(false)}
+                onConfirm={handleDelete}
+                title="Delete Pet"
+                message={`Are you sure you want to delete "${pet.name}"? This will permanently remove the pet and all associated data. This action cannot be undone.`}
+                confirmLabel="Delete Pet"
+                variant="danger"
+                loading={actionLoading === 'delete'}
+              />
             </div>
           )}
 

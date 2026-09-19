@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
+import { ConfirmDialog } from '@pawtag/ui';
 
 interface FeatureFlag {
   _id: string;
@@ -17,6 +18,7 @@ export default function FeatureFlags() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ key: '', name: '', description: '', isEnabled: false });
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   const fetchFlags = () => {
     setLoading(true);
@@ -43,9 +45,9 @@ export default function FeatureFlags() {
   };
 
   const deleteFlag = async (key: string) => {
-    if (!confirm('Delete this feature flag?')) return;
     await api.delete(API.admin.featureFlags.toggle(key));
     fetchFlags();
+    setDeleteTarget(null);
   };
 
   return (
@@ -111,8 +113,8 @@ export default function FeatureFlags() {
                       }`} />
                     </button>
                   </td>
-                  <td className="px-5 py-3">
-                    <button onClick={() => deleteFlag(f.key)} className="text-red-500 hover:text-red-700 text-xs">Delete</button>
+                   <td className="px-5 py-3">
+                    <button onClick={() => setDeleteTarget(f.key)} className="text-red-500 hover:text-red-700 text-xs">Delete</button>
                   </td>
                 </tr>
               ))
@@ -120,6 +122,17 @@ export default function FeatureFlags() {
           </tbody>
         </table>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={() => deleteFlag(deleteTarget!)}
+        title="Delete Feature Flag"
+        message={`Are you sure you want to delete the feature flag "${deleteTarget}"? This will permanently remove it and may affect features that depend on it.`}
+        confirmLabel="Delete Flag"
+        variant="danger"
+      />
     </div>
   );
 }
