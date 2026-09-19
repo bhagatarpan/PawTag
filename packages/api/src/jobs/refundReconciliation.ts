@@ -25,8 +25,21 @@ import { stripePaymentProvider } from '../commerce/providers/stripe';
 import { getNumberSetting, getBooleanSetting } from '../commerce/config';
 import { processFailedRefundRetries } from '../commerce/services/refund-retry.service';
 import logger from '../lib/logger';
+import { createClaimedJob, generateWorkerId } from '../lib/job-claim';
 
 let reconcileTimer: ReturnType<typeof setTimeout> | null = null;
+const workerId = generateWorkerId();
+
+/**
+ * Wrapped version of runRefundReconciliation with claiming.
+ */
+const claimedRunRefundReconciliation = createClaimedJob(
+  'refund-reconciliation',
+  workerId,
+  async () => {
+    await runRefundReconciliation();
+  }
+);
 
 /**
  * Calculate the delay in ms until the next scheduled run.
@@ -185,7 +198,7 @@ async function scheduleNextRun(): Promise<void> {
 
   reconcileTimer = setTimeout(async () => {
     try {
-      await runRefundReconciliation();
+      await claimedRunRefundReconciliation();
     } catch (err) {
       logger.error({ err }, 'Refund reconciliation job error');
     }

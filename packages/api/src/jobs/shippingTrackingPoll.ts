@@ -18,16 +18,22 @@
 import { shipmentService } from '../commerce/services/shipment.service';
 import { getBooleanSetting } from '../commerce/config';
 import logger from '../lib/logger';
+import { createClaimedJob, generateWorkerId } from '../lib/job-claim';
 
 /** How often to poll for tracking updates (ms) */
 const POLL_INTERVAL_MS = 5 * 60_000; // 5 minutes
 
 let pollTimer: ReturnType<typeof setInterval> | null = null;
+const workerId = generateWorkerId();
 
 /**
  * Poll all active shipments for tracking updates.
+ * Wrapped with claiming to prevent duplicate execution across workers.
  */
-async function pollTrackingUpdates(): Promise<void> {
+const claimedPollTrackingUpdates = createClaimedJob(
+  'shipping-tracking-poll',
+  workerId,
+  async () => {
   try {
     const enabled = await getBooleanSetting('commerce.feature.trackingPollEnabled' as any).catch(() => true);
     if (!enabled) return;
@@ -43,7 +49,7 @@ async function pollTrackingUpdates(): Promise<void> {
   } catch (err) {
     logger.error({ err }, 'Shipping tracking poll failed');
   }
-}
+});
 
 /**
  * Start the tracking poll job.
@@ -54,8 +60,8 @@ export function startTrackingPollJob(): void {
 
   // Initial delay of 30 seconds to let the server start up
   setTimeout(() => {
-    pollTrackingUpdates();
-    pollTimer = setInterval(pollTrackingUpdates, POLL_INTERVAL_MS);
+    claimedPollTrackingUpdates();
+    pollTimer = setInterval(claimedPollTrackingUpdates, POLL_INTERVAL_MS);
     logger.info('Shipping tracking poll job started (interval: 5 minutes)');
   }, 30_000);
 }

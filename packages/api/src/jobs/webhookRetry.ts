@@ -16,16 +16,22 @@
 
 import { WebhookEvent } from '@pawtag/db';
 import logger from '../lib/logger';
+import { createClaimedJob, generateWorkerId } from '../lib/job-claim';
 
 /** How often to check for retryable events (ms) */
 const RETRY_INTERVAL_MS = 60_000; // 60 seconds
 
 let retryTimer: ReturnType<typeof setInterval> | null = null;
+const workerId = generateWorkerId();
 
 /**
  * Retry failed webhook events that are due for retry.
+ * Wrapped with claiming to prevent duplicate execution across workers.
  */
-async function retryFailedEvents(): Promise<void> {
+const claimedRetryFailedEvents = createClaimedJob(
+  'webhook-retry',
+  workerId,
+  async () => {
   try {
     // Find events that are due for retry
     const retryableEvents = await WebhookEvent.find({
@@ -90,7 +96,7 @@ async function retryFailedEvents(): Promise<void> {
   } catch (err) {
     logger.error({ err }, 'Webhook retry job error');
   }
-}
+});
 
 /**
  * Process a Stripe webhook event (re-process from stored payload).
@@ -110,8 +116,8 @@ export function startWebhookRetryJob(): void {
 
   // Initial delay of 10 seconds
   setTimeout(() => {
-    retryFailedEvents();
-    retryTimer = setInterval(retryFailedEvents, RETRY_INTERVAL_MS);
+    claimedRetryFailedEvents();
+    retryTimer = setInterval(claimedRetryFailedEvents, RETRY_INTERVAL_MS);
     logger.info('Webhook retry job started (interval: 60 seconds)');
   }, 10_000);
 }

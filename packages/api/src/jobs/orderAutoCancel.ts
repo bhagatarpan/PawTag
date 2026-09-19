@@ -22,14 +22,21 @@ import { notifyCustomerOfStatusChange } from '../services/orderNotification.serv
 import { logOrderEvent } from '../commerce/audit';
 import { formatSystemActivityMessage } from '../lib/actor';
 import logger from '../lib/logger';
+import { createClaimedJob, generateWorkerId } from '../lib/job-claim';
 
 /** How often to check for stale orders (ms) */
 const CHECK_INTERVAL_MS = 60_000; // 60 seconds
 
+const workerId = generateWorkerId();
+
 /**
  * Check for orders that have been in 'pending_payment' too long and auto-cancel them.
+ * Wrapped with claiming to prevent duplicate execution across workers.
  */
-async function checkAndCancelStaleOrders(): Promise<void> {
+const claimedCheckAndCancelStaleOrders = createClaimedJob(
+  'order-auto-cancel',
+  workerId,
+  async () => {
   try {
     const enabled = await getBooleanSetting('commerce.feature.orphanPaymentDetection');
     if (!enabled) return;
@@ -115,7 +122,7 @@ async function checkAndCancelStaleOrders(): Promise<void> {
   } catch (err) {
     logger.error({ err }, 'Order auto-cancel job error');
   }
-}
+});
 
 let autoCancelTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -127,7 +134,7 @@ export function startOrderAutoCancelJob(): void {
   if (autoCancelTimer) return;
   autoCancelTimer = setInterval(async () => {
     try {
-      await checkAndCancelStaleOrders();
+      await claimedCheckAndCancelStaleOrders();
     } catch (err) {
       logger.error({ err }, 'Order auto-cancel job error');
     }

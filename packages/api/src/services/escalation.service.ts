@@ -4,9 +4,22 @@ import { renderEmergencyEscalationEmail } from './email/templates';
 import { sendPushToUser } from './push-notification.service';
 import logger from '../lib/logger';
 import { logJob } from '../lib/timing';
+import { createClaimedJob, generateWorkerId } from '../lib/job-claim';
 
 const POLL_INTERVAL_MS = 60_000; // Check every minute
 let pollingTimer: ReturnType<typeof setInterval> | null = null;
+const workerId = generateWorkerId();
+
+/**
+ * Wrapped version of processOverdueEscalations with claiming.
+ */
+const claimedProcessOverdueEscalations = createClaimedJob(
+  'escalation',
+  workerId,
+  async () => {
+    await processOverdueEscalations();
+  }
+);
 
 /**
  * Start the escalation polling service.
@@ -16,7 +29,7 @@ export function startEscalationService(): void {
   if (pollingTimer) return;
 
   logger.info('[Escalation] Starting escalation polling service');
-  pollingTimer = setInterval(processOverdueEscalations, POLL_INTERVAL_MS);
+  pollingTimer = setInterval(claimedProcessOverdueEscalations, POLL_INTERVAL_MS);
 }
 
 /**

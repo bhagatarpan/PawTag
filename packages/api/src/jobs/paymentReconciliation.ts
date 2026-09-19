@@ -19,16 +19,22 @@ import { Order } from '@pawtag/db';
 import { stripePaymentProvider } from '../commerce/providers/stripe';
 import { getBooleanSetting } from '../commerce/config';
 import logger from '../lib/logger';
+import { createClaimedJob, generateWorkerId } from '../lib/job-claim';
 
 /** How often to reconcile (ms) */
 const RECONCILE_INTERVAL_MS = 5 * 60_000; // 5 minutes
 
 let reconcileTimer: ReturnType<typeof setInterval> | null = null;
+const workerId = generateWorkerId();
 
 /**
  * Reconcile PawTag orders against Stripe payment state.
+ * Wrapped with claiming to prevent duplicate execution across workers.
  */
-async function reconcilePayments(): Promise<void> {
+const claimedReconcilePayments = createClaimedJob(
+  'payment-reconciliation',
+  workerId,
+  async () => {
   try {
     const enabled = await getBooleanSetting('commerce.feature.paymentReconciliation' as any).catch(() => true);
     if (!enabled) return;
@@ -99,7 +105,7 @@ async function reconcilePayments(): Promise<void> {
   } catch (err) {
     logger.error({ err }, 'Payment reconciliation job error');
   }
-}
+});
 
 /**
  * Start the payment reconciliation job.
@@ -110,8 +116,8 @@ export function startPaymentReconciliationJob(): void {
 
   // Initial delay of 60 seconds
   setTimeout(() => {
-    reconcilePayments();
-    reconcileTimer = setInterval(reconcilePayments, RECONCILE_INTERVAL_MS);
+    claimedReconcilePayments();
+    reconcileTimer = setInterval(claimedReconcilePayments, RECONCILE_INTERVAL_MS);
     logger.info('Payment reconciliation job started (interval: 5 minutes)');
   }, 60_000);
 }
