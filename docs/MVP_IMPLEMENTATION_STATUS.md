@@ -135,7 +135,7 @@ These are fundamentally broken test setups that require significant rework. They
 
 ### Phase 15 — Performance Hardening
 - [x] 15.1 Finder latency budget
-- [ ] 15.2 API query review of critical endpoints
+- [x] 15.2 API query review of critical endpoints
 - [ ] 15.3 Frontend bundle and route loading
 
 ### Phase 16 — Code Quality Cleanup
@@ -170,12 +170,12 @@ These are fundamentally broken test setups that require significant rework. They
 | Phase 12 — Observability | ✅ Complete | 3/3 |
 | Phase 13 — Accessibility | ✅ Complete | 3/3 |
 | Phase 14 — Design System | ✅ Complete | 3/3 |
-| Phase 15 — Performance | Partial | 1/3 |
+| Phase 15 — Performance | Partial | 2/3 |
 | Phase 16 — Code Quality | Not started | 0/3 |
 | Phase 17 — Production Rehearsal | Not started | 0/3 |
 | Phase 18 — Launch | Not started | 0/1 |
 
-**Total: 62/65 work packets complete (95%)**
+**Total: 63/65 work packets complete (97%)**
 
 ## Next Recommended Work Packet
 
