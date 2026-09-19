@@ -981,7 +981,7 @@ describe('Finder Notify — Push Delivery (Phase 24)', () => {
     expect(notif).toBeTruthy();
   });
 
-  it('auto-marks pet as found when lost', async () => {
+  it('pet stays lost after finder notification (owner must confirm recovery)', async () => {
     await request(app)
       .post(`/api/finder/${tagId}/notify`)
       .send({ finderPhone: '+64210000000', message: 'Found your pet!' });
@@ -989,7 +989,7 @@ describe('Finder Notify — Push Delivery (Phase 24)', () => {
     const pet = await mongoose.connection.collections.pets.findOne({
       _id: new mongoose.Types.ObjectId(petId),
     });
-    expect(pet!.status).toBe('found');
+    expect(pet!.status).toBe('lost');
   });
 
   it('push delivery failure does not block notification creation', async () => {

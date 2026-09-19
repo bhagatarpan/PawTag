@@ -147,6 +147,7 @@ export const updatePetSchema = z.object({
 
 export const createProductSchema = z.object({
   name: z.string().min(1),
+  slug: z.string().min(1).optional(),
   description: z.string().min(1),
   shortDescription: z.string().optional(),
   price: z.number().positive(),

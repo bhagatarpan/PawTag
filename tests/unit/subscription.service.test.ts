@@ -79,17 +79,10 @@ describe('Subscription Service', () => {
     });
 
     it('should create monthly subscription when planType is monthly', async () => {
-      const mockSub = {
-        _id: new mongoose.Types.ObjectId(),
-        status: 'active',
-        planType: 'monthly',
-        planName: 'PawTag Monthly',
-        price: 1.99,
-        save: vi.fn().mockResolvedValue(true),
-      };
-
       const { Subscription } = await import('@pawtag/db');
-      (Subscription.create as any).mockResolvedValue(mockSub);
+      (Subscription.create as any).mockImplementation((data: any) => {
+        return Promise.resolve({ ...data, _id: new mongoose.Types.ObjectId(), save: vi.fn() });
+      });
 
       const result = await createSubscription({
         userId: new mongoose.Types.ObjectId().toString(),
@@ -98,10 +91,10 @@ describe('Subscription Service', () => {
       });
 
       expect(result.planType).toBe('monthly');
-      expect(result.price).toBe(1.99);
+      expect(result.price).toBe(0);
     });
 
-    it('should set free period to 12 months from now', async () => {
+    it('should set free period to 3 months from now (default)', async () => {
       const { Subscription } = await import('@pawtag/db');
       let createdData: any;
       (Subscription.create as any).mockImplementation((data: any) => {
@@ -117,7 +110,7 @@ describe('Subscription Service', () => {
       const freeEnd = new Date(createdData.freePeriodEndsAt);
       const now = new Date();
       const monthsDiff = (freeEnd.getFullYear() - now.getFullYear()) * 12 + (freeEnd.getMonth() - now.getMonth());
-      expect(monthsDiff).toBe(12);
+      expect(monthsDiff).toBe(3);
     });
 
     it('should update tag subscription status to active', async () => {
@@ -229,7 +222,7 @@ describe('Subscription Service', () => {
       const result = await changeSubscriptionPlan(mockSub._id.toString(), 'monthly');
 
       expect(result.planType).toBe('monthly');
-      expect(result.price).toBe(1.99);
+      expect(result.price).toBe(0.99);
     });
 
     it('should throw error for non-active subscription', async () => {

@@ -11,6 +11,7 @@ interface OrderSummaryProps {
   itemCount: number;
   promoCode?: string;
   promoApplied?: boolean;
+  promoError?: string;
   onApplyPromo?: (code: string) => Promise<void>;
   onRemovePromo?: () => void;
   onCheckout: () => void;
@@ -27,12 +28,14 @@ interface OrderSummaryProps {
 function PromoCodeControl({
   promoCode,
   promoApplied,
+  promoError,
   onApply,
   onRemove,
   loading,
 }: {
   promoCode?: string;
   promoApplied?: boolean;
+  promoError?: string;
   onApply?: (code: string) => Promise<void>;
   onRemove?: () => void;
   loading?: boolean;
@@ -94,6 +97,9 @@ function PromoCodeControl({
       >
         Cancel
       </button>
+      {promoError && (
+        <p className="text-xs text-red-500 mt-1" role="alert">{promoError}</p>
+      )}
     </div>
   );
 }
@@ -108,6 +114,7 @@ export default function OrderSummary({
   itemCount,
   promoCode,
   promoApplied,
+  promoError,
   onApplyPromo,
   onRemovePromo,
   onCheckout,
@@ -171,6 +178,7 @@ export default function OrderSummary({
           <PromoCodeControl
             promoCode={promoCode}
             promoApplied={promoApplied}
+            promoError={promoError}
             onApply={onApplyPromo}
             onRemove={onRemovePromo}
             loading={promoLoading}

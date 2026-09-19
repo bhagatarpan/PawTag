@@ -28,8 +28,8 @@ describe('Phase 19A — Low-Stock Check', () => {
       });
 
       await Product.create([
-        { name: 'High Stock', price: 9.99, stock: 50, category: 'tags', sku: 'HS-001', description: 'High stock product' },
-        { name: 'At Threshold', price: 9.99, stock: 6, category: 'tags', sku: 'AT-001', description: 'At threshold' },
+        { name: 'High Stock', slug: 'high-stock', price: 9.99, stock: 50, category: 'tags', sku: 'HS-001', description: 'High stock product' },
+        { name: 'At Threshold', slug: 'at-threshold', price: 9.99, stock: 6, category: 'tags', sku: 'AT-001', description: 'At threshold' },
       ]);
 
       const result = await checkLowStock();
@@ -47,9 +47,9 @@ describe('Phase 19A — Low-Stock Check', () => {
       });
 
       await Product.create([
-        { name: 'Low Stock', price: 9.99, stock: 3, category: 'tags', sku: 'LS-001', description: 'Low stock' },
-        { name: 'Out of Stock', price: 9.99, stock: 0, category: 'tags', sku: 'OOS-001', description: 'Out of stock' },
-        { name: 'OK Stock', price: 9.99, stock: 20, category: 'tags', sku: 'OK-001', description: 'OK stock' },
+        { name: 'Low Stock', slug: 'low-stock', price: 9.99, stock: 3, category: 'tags', sku: 'LS-001', description: 'Low stock' },
+        { name: 'Out of Stock', slug: 'out-of-stock', price: 9.99, stock: 0, category: 'tags', sku: 'OOS-001', description: 'Out of stock' },
+        { name: 'OK Stock', slug: 'ok-stock', price: 9.99, stock: 20, category: 'tags', sku: 'OK-001', description: 'OK stock' },
       ]);
 
       const result = await checkLowStock();
@@ -59,8 +59,8 @@ describe('Phase 19A — Low-Stock Check', () => {
 
     it('should default to threshold of 10 when no setting exists', async () => {
       await Product.create([
-        { name: 'Low', price: 9.99, stock: 5, category: 'tags', sku: 'L-001', description: 'Low' },
-        { name: 'OK', price: 9.99, stock: 15, category: 'tags', sku: 'OK-002', description: 'OK' },
+        { name: 'Low', slug: 'low', price: 9.99, stock: 5, category: 'tags', sku: 'L-001', description: 'Low' },
+        { name: 'OK', slug: 'ok', price: 9.99, stock: 15, category: 'tags', sku: 'OK-002', description: 'OK' },
       ]);
 
       const result = await checkLowStock();
@@ -86,7 +86,7 @@ describe('Phase 19A — Low-Stock Check', () => {
       });
 
       await Product.create([
-        { name: 'Critical Item', price: 19.99, stock: 1, category: 'tags', sku: 'CRIT-001', description: 'Critical' },
+        { name: 'Critical Item', slug: 'critical-item', price: 19.99, stock: 1, category: 'tags', sku: 'CRIT-001', description: 'Critical' },
       ]);
 
       await checkLowStock();
@@ -107,7 +107,7 @@ describe('Phase 19A — Low-Stock Check', () => {
       });
 
       await Product.create([
-        { name: 'Exactly At', price: 9.99, stock: 5, category: 'tags', sku: 'EA-001', description: 'Exactly at threshold' },
+        { name: 'Exactly At', slug: 'exactly-at', price: 9.99, stock: 5, category: 'tags', sku: 'EA-001', description: 'Exactly at threshold' },
       ]);
 
       const result = await checkLowStock();

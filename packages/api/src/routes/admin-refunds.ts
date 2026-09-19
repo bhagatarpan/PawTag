@@ -34,7 +34,6 @@ import logger from '../lib/logger';
 import { isMyobConnected } from '../integrations/accounting/myobExporter';
 import { runRefundReconciliation } from '../jobs/refundReconciliation';
 import { toAppError } from '../lib/app-errors';
-import logger from '../lib/logger';
 
 const router = Router();
 router.use(authenticate);

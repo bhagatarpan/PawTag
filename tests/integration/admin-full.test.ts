@@ -421,6 +421,7 @@ describe('Admin - Product Management', () => {
 
   const validProduct = {
     name: 'PawTag QR Tag',
+    slug: 'pawtag-qr-tag',
     description: 'Premium QR pet tag',
     price: 29.99,
     category: 'tags',

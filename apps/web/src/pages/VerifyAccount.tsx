@@ -17,7 +17,7 @@ type VerificationStatus = {
 
 export default function VerifyAccount() {
   const { user: authUser } = useAuth();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const [status, setStatus] = useState<VerificationStatus>(null);
   const [loading, setLoading] = useState(true);

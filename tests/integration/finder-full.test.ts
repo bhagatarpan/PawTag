@@ -172,7 +172,6 @@ describe('Integration: Finder Full - Notify Owner', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
-    expect(res.body.data.petFound).toBe(true);
 
     const notifs = await mongoose.connection.collections.notifications
       .find({ userId: new mongoose.Types.ObjectId(userId) })
@@ -211,7 +210,7 @@ describe('Integration: Finder Full - Notify Owner', () => {
     expect(notifs.length).toBeGreaterThanOrEqual(1);
   });
 
-  it('auto-marks pet as found when status was lost', async () => {
+  it('pet stays lost after finder notification (owner must confirm recovery)', async () => {
     const { userId } = await createCustomerWithRBAC();
     const petId = await createPet(userId, { status: 'lost' });
     await createTag(userId, petId, { tagId: 'TAG-NF-FOUND' });
@@ -221,8 +220,7 @@ describe('Integration: Finder Full - Notify Owner', () => {
       .send({ finderPhone: '+64219990000' });
 
     const pet = await mongoose.connection.collections.pets.findOne({ _id: new mongoose.Types.ObjectId(petId) });
-    expect(pet?.status).toBe('found');
-    expect(pet?.foundByFinderAt).toBeDefined();
+    expect(pet?.status).toBe('lost');
   });
 
   it('saves location when GPS coordinates included in notify', async () => {

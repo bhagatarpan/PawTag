@@ -302,3 +302,124 @@ describe('Integration: Cart - Unauthorized Access', () => {
     expect(addRes.status).toBe(401);
   });
 });
+
+// ═══════════════════════════════════════════
+// STOCK VALIDATION
+// ═══════════════════════════════════════════
+
+describe('Integration: Cart - Stock Validation', () => {
+  it('rejects add when stock is zero with deny policy', async () => {
+    const { email, password } = await createCustomer();
+    const productId = await createProduct({ name: 'Out of Stock Tag', stock: 0, stockPolicy: 'deny' });
+    const token = await loginAs(email, password);
+
+    const res = await request(app)
+      .post('/api/cart/items')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ productId, quantity: 1 });
+
+    expect(res.status).toBeGreaterThanOrEqual(400);
+  });
+
+  it('allows add when stock is available', async () => {
+    const { email, password } = await createCustomer();
+    const productId = await createProduct({ name: 'In Stock Tag', stock: 10, stockPolicy: 'deny' });
+    const token = await loginAs(email, password);
+
+    const res = await request(app)
+      .post('/api/cart/items')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ productId, quantity: 1 });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+  });
+});
+
+// ═══════════════════════════════════════════
+// PRICE RECALCULATION
+// ═══════════════════════════════════════════
+
+describe('Integration: Cart - Price Recalculation', () => {
+  it('totals reflect current DB prices, not stored prices', async () => {
+    const { email, password } = await createCustomer();
+    const productId = await createProduct({ name: 'Price Test Tag', price: 25.00 });
+    const token = await loginAs(email, password);
+
+    // Add item at $25
+    await request(app)
+      .post('/api/cart/items')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ productId, quantity: 2 });
+
+    // Get cart — subtotal should be $50
+    const getRes = await request(app)
+      .get('/api/cart')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(getRes.body.data.totals.subtotal).toBe(50.00);
+  });
+});
+
+// ═══════════════════════════════════════════
+// DUPLICATE ADD IDEMPOTENCY
+// ═══════════════════════════════════════════
+
+describe('Integration: Cart - Duplicate Add', () => {
+  it('adding same product twice merges into single item', async () => {
+    const { email, password } = await createCustomer();
+    const productId = await createProduct({ name: 'Merge Tag', price: 39.00 });
+    const token = await loginAs(email, password);
+
+    // Add 1 unit
+    await request(app)
+      .post('/api/cart/items')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ productId, quantity: 1 });
+
+    // Add 2 more units of same product
+    await request(app)
+      .post('/api/cart/items')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ productId, quantity: 2 });
+
+    // Should have 1 item with quantity 3, not 2 items
+    const getRes = await request(app)
+      .get('/api/cart')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(getRes.body.data.cart.items).toHaveLength(1);
+    expect(getRes.body.data.cart.items[0].quantity).toBe(3);
+  });
+});
+
+// ═══════════════════════════════════════════
+// CUSTOMIZED PRODUCTS
+// ═══════════════════════════════════════════
+
+describe('Integration: Cart - Customized Products', () => {
+  it('customized and non-customized are separate items', async () => {
+    const { email, password } = await createCustomer();
+    const productId = await createProduct({ name: 'Custom Tag', price: 39.00, customizationPrice: 5.00 });
+    const token = await loginAs(email, password);
+
+    // Add non-customized
+    await request(app)
+      .post('/api/cart/items')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ productId, quantity: 1, customisation: false });
+
+    // Add customized
+    await request(app)
+      .post('/api/cart/items')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ productId, quantity: 1, customisation: true, customisationTexts: ['Buddy'] });
+
+    // Should have 2 items
+    const getRes = await request(app)
+      .get('/api/cart')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(getRes.body.data.cart.items).toHaveLength(2);
+  });
+});

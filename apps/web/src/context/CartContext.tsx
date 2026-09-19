@@ -265,6 +265,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
       try {
         if (existing) {
+          if (!existing._id) continue;
           // Item already on server — update quantity (add guest qty to server qty)
           await api.put(API.cart.updateItem(existing._id), {
             quantity: existing.quantity + item.quantity,

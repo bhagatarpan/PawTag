@@ -181,6 +181,7 @@ describe('Phase 11 — Tag Activation & Redemption', () => {
       // Create a tag product
       const product = await Product.create({
         name: 'PawTag QR Tag',
+        slug: 'pawtag-qr-tag',
         sku: 'TAG-PRODUCT-001',
         description: 'QR code tag for pets',
         price: 29.99,

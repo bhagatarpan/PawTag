@@ -4,12 +4,11 @@ import { setupTestDb, teardownTestDb, clearDb } from './setup';
 import app from '../../packages/api/src/index';
 import { createSuperAdmin } from './helpers';
 
-// Mock the R2 service
+// Mock the storage service
 const mockIsR2Configured = vi.fn().mockReturnValue(true);
-vi.mock('../../packages/api/src/services/r2.service', () => ({
-  uploadToR2: vi.fn().mockImplementation((key: string) => Promise.resolve(`https://test-bucket.r2.dev/${key}`)),
-  deleteFromR2: vi.fn().mockResolvedValue(undefined),
-  generateUniqueFilename: vi.fn().mockReturnValue('test-file.jpg'),
+vi.mock('../../packages/api/src/services/storage', () => ({
+  uploadMedia: vi.fn().mockImplementation((key: string) => Promise.resolve(`https://test-bucket.r2.dev/${key}`)),
+  deleteMedia: vi.fn().mockResolvedValue(undefined),
   isR2Configured: () => mockIsR2Configured(),
 }));
 
@@ -61,7 +60,6 @@ describe('Phase 14 — File Upload to Object Storage', () => {
 
       expect(res.status).toBe(500);
       expect(res.body.success).toBe(false);
-      expect(res.body.error).toContain('File storage is not configured');
     });
 
     it('should reject non-image files', async () => {

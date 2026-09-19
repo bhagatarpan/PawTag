@@ -160,9 +160,9 @@ describe('Phase 18 — Admin Analytics Dashboard', () => {
       });
 
       await Product.create([
-        { name: 'Low Stock Tag', price: 9.99, stock: 3, category: 'tags', sku: 'LOW-001', description: 'Low stock' },
-        { name: 'OK Stock Tag', price: 9.99, stock: 50, category: 'tags', sku: 'OK-001', description: 'OK stock' },
-        { name: 'Out of Stock Tag', price: 9.99, stock: 0, category: 'tags', sku: 'OOS-001', description: 'Out of stock' },
+        { name: 'Low Stock Tag', slug: 'low-stock-tag', price: 9.99, stock: 3, category: 'tags', sku: 'LOW-001', description: 'Low stock' },
+        { name: 'OK Stock Tag', slug: 'ok-stock-tag', price: 9.99, stock: 50, category: 'tags', sku: 'OK-001', description: 'OK stock' },
+        { name: 'Out of Stock Tag', slug: 'out-of-stock-tag', price: 9.99, stock: 0, category: 'tags', sku: 'OOS-001', description: 'Out of stock' },
       ]);
 
       const res = await request(app)

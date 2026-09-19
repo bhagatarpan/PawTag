@@ -23,9 +23,9 @@ interface GuardianData {
 }
 
 const TIER_CONFIG: Record<string, { color: string; icon: string; benefits: string[] }> = {
-  CARE: { color: colors.emerald[500], icon: '🌿', benefits: ['1x points', '$2/mo PawRewards', 'Free shipping over $100'] },
-  NURTURE: { color: colors.teal[500], icon: '💚', benefits: ['1x points', '$3/mo PawRewards', 'Free shipping over $75'] },
-  PROTECTOR: { color: colors.violet[500], icon: '🛡️', benefits: ['1x points', '$5/mo PawRewards', 'Free shipping over $50'] },
+  CARE: { color: colors.green[500], icon: '🌿', benefits: ['1x points', '$2/mo PawRewards', 'Free shipping over $100'] },
+  NURTURE: { color: colors.primary[500], icon: '💚', benefits: ['1x points', '$3/mo PawRewards', 'Free shipping over $75'] },
+  PROTECTOR: { color: colors.purple[500], icon: '🛡️', benefits: ['1x points', '$5/mo PawRewards', 'Free shipping over $50'] },
   SAFEGUARD: { color: colors.amber[500], icon: '👑', benefits: ['2x points', '$8/mo PawRewards', 'Free shipping', 'Gold benefits'] },
 };
 
@@ -194,12 +194,12 @@ const styles = StyleSheet.create({
     paddingBottom: spacing[2],
   },
   title: {
-    fontSize: typography.fontSize['2xl'],
+    fontSize: typography.fontSize.h2,
     fontWeight: typography.fontWeight.bold,
     color: colors.gray[900],
   },
   subtitle: {
-    fontSize: typography.fontSize.sm,
+    fontSize: typography.fontSize.bodySm,
     color: colors.gray[500],
     marginTop: spacing[1],
   },
@@ -207,7 +207,7 @@ const styles = StyleSheet.create({
     margin: spacing[4],
     padding: spacing[5],
     borderRadius: borderRadius.xl,
-    ...shadows.md,
+    ...shadows.medium,
   },
   tierHeader: {
     flexDirection: 'row',
@@ -219,11 +219,11 @@ const styles = StyleSheet.create({
     fontSize: 32,
   },
   tierName: {
-    fontSize: typography.fontSize.xl,
+    fontSize: typography.fontSize.h3,
     fontWeight: typography.fontWeight.bold,
   },
   goldBadge: {
-    fontSize: typography.fontSize.xs,
+    fontSize: typography.fontSize.caption,
     color: colors.amber[600],
     fontWeight: typography.fontWeight.medium,
   },
@@ -237,7 +237,7 @@ const styles = StyleSheet.create({
     color: colors.primary[600],
   },
   pointsLabel: {
-    fontSize: typography.fontSize.sm,
+    fontSize: typography.fontSize.bodySm,
     color: colors.gray[600],
   },
   progressContainer: {
@@ -255,13 +255,13 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.full,
   },
   progressText: {
-    fontSize: typography.fontSize.xs,
+    fontSize: typography.fontSize.caption,
     color: colors.gray[600],
     textAlign: 'center',
     marginTop: spacing[2],
   },
   maxTierText: {
-    fontSize: typography.fontSize.sm,
+    fontSize: typography.fontSize.bodySm,
     color: colors.primary[600],
     fontWeight: typography.fontWeight.medium,
     textAlign: 'center',
@@ -274,20 +274,20 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.xl,
     borderWidth: 1,
     borderColor: colors.gray[100],
-    ...shadows.sm,
+    ...shadows.subtle,
   },
   rewardsLabel: {
-    fontSize: typography.fontSize.sm,
+    fontSize: typography.fontSize.bodySm,
     color: colors.gray[500],
   },
   rewardsValue: {
-    fontSize: typography.fontSize['3xl'],
+    fontSize: typography.fontSize.h1,
     fontWeight: typography.fontWeight.bold,
     color: colors.amber[600],
     marginTop: spacing[1],
   },
   rewardsSubtext: {
-    fontSize: typography.fontSize.xs,
+    fontSize: typography.fontSize.caption,
     color: colors.gray[400],
     marginTop: spacing[1],
   },
@@ -299,10 +299,10 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.xl,
     borderWidth: 1,
     borderColor: colors.gray[100],
-    ...shadows.sm,
+    ...shadows.subtle,
   },
   benefitsTitle: {
-    fontSize: typography.fontSize.lg,
+    fontSize: typography.fontSize.bodyLg,
     fontWeight: typography.fontWeight.semibold,
     color: colors.gray[900],
     marginBottom: spacing[3],
@@ -318,7 +318,7 @@ const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.bold,
   },
   benefitText: {
-    fontSize: typography.fontSize.sm,
+    fontSize: typography.fontSize.bodySm,
     color: colors.gray[700],
   },
   actionsContainer: {
@@ -333,7 +333,7 @@ const styles = StyleSheet.create({
   },
   actionButtonText: {
     color: colors.white,
-    fontSize: typography.fontSize.base,
+    fontSize: typography.fontSize.body,
     fontWeight: typography.fontWeight.semibold,
   },
 });
