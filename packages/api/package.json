@@ -13,7 +13,8 @@
     "lint": "eslint src --ext .ts",
     "seed": "tsx src/seeds/seed.ts",
     "seed:cms": "tsx src/seeds/seed-cms.ts",
-    "seed:products": "tsx src/seed-products.ts"
+    "seed:products": "tsx src/seed-products.ts",
+    "seed:demo": "tsx src/seeds/seed-demo-data.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1101.0",
