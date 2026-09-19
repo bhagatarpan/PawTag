@@ -53,6 +53,14 @@ export default function Checkout() {
   const [success, setSuccess] = useState(() => sessionStorage.getItem('pawtag_checkout_success') === 'true');
   const [paymentClientSecret, setPaymentClientSecret] = useState('');
 
+  // Ref-based double-click protection for payment
+  const paymentInProgressRef = useRef(false);
+
+  // Payment state recovery on re-entry
+  const [recoveringPayment, setRecoveringPayment] = useState(false);
+  const storedPaymentIntentId = sessionStorage.getItem('pawtag_checkout_payment_intent');
+  const storedPendingOrderId = sessionStorage.getItem('pawtag_checkout_pending_order');
+
   // Confirmed order data (preserved before clearCart for the confirmation page)
   const [confirmedItems, setConfirmedItems] = useState<any[]>([]);
   const [confirmedTotal, setConfirmedTotal] = useState(0);
@@ -175,6 +183,46 @@ export default function Checkout() {
       localStorage.setItem('pawtag_return_url', '/checkout');
     }
   }, [user]);
+
+  // Payment state recovery on re-entry
+  // If user refreshes during payment, check if order was already created
+  useEffect(() => {
+    if (!user || success || currentStep !== 'cart' || !storedPaymentIntentId) return;
+
+    const recoverPayment = async () => {
+      setRecoveringPayment(true);
+      try {
+        // Check if order already exists for this payment intent
+        const res = await api.get('/api/checkout/pending');
+        const pending = res.data?.data;
+
+        if (pending && pending.status === 'converted' && pending.convertedOrderId) {
+          // Order was created — show confirmation
+          setSuccess(true);
+          setOrderNumber(pending.orderNumber || storedPaymentIntentId.slice(-8));
+          sessionStorage.setItem('pawtag_checkout_success', 'true');
+          sessionStorage.setItem('pawtag_checkout_order', pending.orderNumber || storedPaymentIntentId.slice(-8));
+          setCurrentStep('confirmed');
+        } else if (pending && pending.status === 'pending') {
+          // Payment still pending — offer to retry
+          setPaymentClientSecret(pending.stripeClientSecret || '');
+          setCurrentStep('payment');
+        } else {
+          // Stale state — clear it
+          sessionStorage.removeItem('pawtag_checkout_payment_intent');
+          sessionStorage.removeItem('pawtag_checkout_pending_order');
+        }
+      } catch {
+        // Recovery failed — clear stale state
+        sessionStorage.removeItem('pawtag_checkout_payment_intent');
+        sessionStorage.removeItem('pawtag_checkout_pending_order');
+      } finally {
+        setRecoveringPayment(false);
+      }
+    };
+
+    recoverPayment();
+  }, [user, success, currentStep, storedPaymentIntentId]);
 
   // Fetch PawRewards balance when user is logged in
   useEffect(() => {
@@ -422,6 +470,10 @@ export default function Checkout() {
 
   // Payment handler — uses PawTag checkout API
   const handlePayment = async () => {
+    // Ref-based double-click protection
+    if (paymentInProgressRef.current) return;
+    paymentInProgressRef.current = true;
+
     if (!user) return;
     setLoading(true);
     setError(null);
@@ -483,6 +535,7 @@ export default function Checkout() {
       setError(msg);
     } finally {
       setLoading(false);
+      paymentInProgressRef.current = false;
     }
   };
 
@@ -505,10 +558,27 @@ export default function Checkout() {
         invoiceUrl = confirmRes.data.data.invoiceUrl;
       } catch (confirmErr: any) {
         console.error('[Checkout] Order confirmation failed:', confirmErr?.response?.data || confirmErr);
-        // Don't show confirmation page — show error instead
-        setError('Something went wrong confirming your order. Your payment was received — please contact support.');
-        setLoading(false);
-        return;
+
+        // Recovery: Check if order was actually created despite the error
+        try {
+          const recoveryRes = await api.get('/api/checkout/pending');
+          const recoveryPending = recoveryRes.data?.data;
+          if (recoveryPending && recoveryPending.status === 'converted' && recoveryPending.convertedOrderId) {
+            // Order was created — show confirmation
+            pawtagOrder = { orderNumber: recoveryPending.orderNumber };
+            invoice = recoveryPending.invoice || null;
+          } else {
+            // Payment succeeded but order not created — show recoverable error
+            setError('Your payment was received but we could not confirm your order. Please check your order history or contact support.');
+            setLoading(false);
+            return;
+          }
+        } catch {
+          // Recovery check failed — show error with support contact
+          setError('Something went wrong confirming your order. Your payment was received — please contact support.');
+          setLoading(false);
+          return;
+        }
       }
 
       // 2. Only show confirmation if order was created
