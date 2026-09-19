@@ -127,6 +127,7 @@ export default function MyPets() {
   const navigate = useNavigate();
   const [pets, setPets] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingPet, setEditingPet] = useState<any>(null);
   const [form, setForm] = useState(emptyForm);
@@ -139,9 +140,13 @@ export default function MyPets() {
 
   const refreshPets = () => {
     setLoading(true);
+    setError(null);
     api.get(API.customer.pets.list)
       .then((r) => setPets(r.data.data))
-      .catch(console.error)
+      .catch((err) => {
+        console.error('Failed to load pets:', err);
+        setError('Failed to load your pets. Please try again.');
+      })
       .finally(() => setLoading(false));
   };
   useEffect(() => { refreshPets(); }, []);
@@ -218,7 +223,15 @@ export default function MyPets() {
     }
   };
 
-  const markLost = async (id: string) => { try { await api.post(API.customer.pets.markLost(id)); refreshPets(); } catch {} };
+  const markLost = async (id: string) => {
+    try {
+      await api.post(API.customer.pets.markLost(id));
+      refreshPets();
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to mark pet as lost. Please try again.');
+    }
+  };
+
   const markFound = async (id: string) => {
     try {
       const res = await api.post(API.customer.pets.markFound(id));
@@ -231,13 +244,30 @@ export default function MyPets() {
         setTimeout(() => setTimeToFoundMsg(''), 8000);
       }
       refreshPets();
-    } catch {}
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to mark pet as found. Please try again.');
+    }
   };
+
   const markTerminal = async (id: string, reason: string) => {
     if (!confirm(`Mark pet as ${reason}? This action cannot be undone from the portal.`)) return;
-    try { await api.post(API.customer.pets.markTerminal(id), { reason }); refreshPets(); } catch {}
+    try {
+      await api.post(API.customer.pets.markTerminal(id), { reason });
+      refreshPets();
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to update pet status. Please try again.');
+    }
   };
-  const deletePet = async (id: string) => { if (confirm('Delete this pet? This cannot be undone.')) { try { await api.delete(API.customer.pets.delete(id)); refreshPets(); } catch {} } };
+
+  const deletePet = async (id: string) => {
+    if (!confirm('Delete this pet? This cannot be undone.')) return;
+    try {
+      await api.delete(API.customer.pets.delete(id));
+      refreshPets();
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to delete pet. Please try again.');
+    }
+  };
 
   return (
     <div className="max-w-5xl">
@@ -351,7 +381,7 @@ export default function MyPets() {
       )}
 
       {/* Pet Cards Grid */}
-      {!loading && pets.length > 0 && (
+      {!loading && !error && pets.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {pets.map((pet, index) => (
             <PetCard
@@ -367,6 +397,19 @@ export default function MyPets() {
               onDelete={deletePet}
             />
           ))}
+        </div>
+      )}
+
+      {/* Error state */}
+      {!loading && error && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
+          <p className="text-red-700 mb-3">{error}</p>
+          <button
+            onClick={refreshPets}
+            className="px-4 py-2 bg-red-100 text-red-700 rounded-lg text-sm font-medium hover:bg-red-200 transition-colors"
+          >
+            Try Again
+          </button>
         </div>
       )}
 
