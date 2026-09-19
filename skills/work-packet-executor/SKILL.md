@@ -30,6 +30,35 @@ Treat `AGENTS.md` as the global authority. This skill controls execution order f
 - Do not rewrite a subsystem unless the packet or evidence requires it.
 - Never weaken security, validation, ownership, privacy, idempotency, or data-integrity controls to make tests pass.
 
+## Critical lesson: Refactor, don't rewrite
+
+When improving existing code:
+
+1. **NEVER rewrite from scratch** — The existing code has carefully implemented business logic. A rewrite will lose functionality.
+
+2. **Extract incrementally** — Pull out one component/function at a time while keeping ALL business logic intact.
+
+3. **Preserve ALL existing functionality** — Every feature must work after the change.
+
+4. **Only improve what's broken or inconsistent** — Styling, layout, accessibility, code organization. Don't change working business logic.
+
+5. **Verify after each extraction** — Run typecheck, build, and testing after each change.
+
+**Example of correct approach:**
+```typescript
+// Step 1: Extract one component (keep all business logic in main file)
+// Step 2: Verify everything still works
+// Step 3: Extract another component (keep all business logic in main file)
+// Step 4: Verify everything still works
+// ... continue incrementally
+```
+
+**Example of WRONG approach:**
+```typescript
+// WRONG: Rewrote 1266-line file into new components
+// Result: Lost promo codes, engraving, auto-renew, PawRewards, etc.
+```
+
 ## Bug-fix protocol
 
 Prefer:

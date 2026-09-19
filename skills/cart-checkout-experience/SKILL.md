@@ -65,3 +65,34 @@ Use motion to communicate state only: drawer transition, add/remove, quantity/pr
 ## Acceptance standard
 
 Premium means confidence, hierarchy, transparency, recovery, responsiveness, and accessibility—not visual density or excessive effects.
+
+## Critical lesson: Refactor, don't rewrite
+
+**The checkout is a 1266-line monolith with carefully implemented business logic.**
+
+When improving the checkout:
+
+1. **NEVER rewrite from scratch** — The original has promo codes, engraving editing, auto-renew toggle, PawRewards redemption, Guardian messaging, verification status, trust badges, payment state recovery, and shipping sync. A rewrite will lose these.
+
+2. **Extract incrementally** — Pull out one component at a time (CheckoutHeader, CheckoutSkeleton, etc.) while keeping ALL business logic in the main Checkout.tsx.
+
+3. **Preserve ALL existing functionality** — Promo codes, engraving, auto-renew, PawRewards, Guardian messaging, verification status, trust badges, payment recovery, shipping sync must all work after the change.
+
+4. **Only improve what's broken or inconsistent** — Styling, layout, button text, accessibility. Don't change working business logic.
+
+5. **Verify after each extraction** — Run typecheck, build, and manual testing after each component extraction.
+
+**Example of correct approach:**
+```typescript
+// Step 1: Extract CheckoutHeader (keep all business logic in Checkout.tsx)
+// Step 2: Verify everything still works
+// Step 3: Extract CheckoutSkeleton (keep all business logic in Checkout.tsx)
+// Step 4: Verify everything still works
+// ... continue incrementally
+```
+
+**Example of WRONG approach (what happened):**
+```typescript
+// WRONG: Rewrote 1266-line file into new components
+// Result: Lost promo codes, engraving, auto-renew, PawRewards, etc.
+```
