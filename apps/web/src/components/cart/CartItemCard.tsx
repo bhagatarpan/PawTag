@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Minus, Plus, Trash2, Tag, Loader2, AlertCircle } from 'lucide-react';
+import { Minus, Plus, Trash2, Tag, Loader2 } from 'lucide-react';
 
 interface CartItemCardProps {
   item: {
@@ -18,9 +18,11 @@ interface CartItemCardProps {
   };
   onUpdateQuantity: (id: string, quantity: number) => void;
   onRemove: (id: string) => void;
+  /** Whether this item was just added (triggers highlight animation) */
+  isNew?: boolean;
 }
 
-export default function CartItemCard({ item, onUpdateQuantity, onRemove }: CartItemCardProps) {
+export default function CartItemCard({ item, onUpdateQuantity, onRemove, isNew = false }: CartItemCardProps) {
   const [updating, setUpdating] = useState(false);
   const lineTotal = (item.unitPrice + (item.customizationTotal || 0)) * item.quantity;
   const hasCustomization = item.customisation && item.customisationTexts && item.customisationTexts.length > 0;
@@ -36,9 +38,16 @@ export default function CartItemCard({ item, onUpdateQuantity, onRemove }: CartI
   };
 
   return (
-    <div className="flex gap-4 py-4 border-b border-gray-100 last:border-0">
+    <div
+      className={`flex gap-4 py-4 border-b border-gray-100 last:border-0 transition-all duration-300 ease-out ${
+        isNew ? 'bg-primary-50 -mx-2 px-2 rounded-lg animate-[highlight_0.5s_ease-out]' : ''
+      }`}
+      style={{
+        animation: isNew ? 'highlight 0.5s ease-out' : undefined,
+      }}
+    >
       {/* Product Image */}
-      <div className="w-24 h-24 flex-shrink-0 bg-gray-100 rounded-lg overflow-hidden">
+      <div className="w-24 h-24 flex-shrink-0 bg-gray-100 rounded-lg overflow-hidden transition-transform duration-200">
         {item.image ? (
           <img
             src={item.image}
@@ -67,9 +76,11 @@ export default function CartItemCard({ item, onUpdateQuantity, onRemove }: CartI
             )}
           </div>
 
-          {/* Line total */}
+          {/* Line total with transition */}
           <div className="text-right">
-            <p className="font-semibold text-gray-900">${lineTotal.toFixed(2)}</p>
+            <p className="font-semibold text-gray-900 transition-all duration-200">
+              ${lineTotal.toFixed(2)}
+            </p>
           </div>
         </div>
 
@@ -92,7 +103,9 @@ export default function CartItemCard({ item, onUpdateQuantity, onRemove }: CartI
 
         {/* Price breakdown */}
         <div className="flex items-center gap-3 mt-2 text-sm text-gray-500">
-          <span>${item.unitPrice.toFixed(2)} × {item.quantity}</span>
+          <span className="transition-all duration-200">
+            ${item.unitPrice.toFixed(2)} × {item.quantity}
+          </span>
           {hasCustomization && item.customizationTotal ? (
             <span className="text-primary-600">+ ${item.customizationTotal.toFixed(2)} customisation</span>
           ) : null}
@@ -105,15 +118,15 @@ export default function CartItemCard({ item, onUpdateQuantity, onRemove }: CartI
             <button
               onClick={() => handleQuantityChange(item.quantity - 1)}
               disabled={item.quantity <= 1 || updating}
-              className="w-9 h-9 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-gray-300 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              className="w-9 h-9 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-gray-300 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
               aria-label={`Decrease quantity of ${item.productName}`}
             >
               {updating ? <Loader2 size={14} className="animate-spin" /> : <Minus size={14} />}
             </button>
 
-            {/* Quantity display */}
+            {/* Quantity display with transition */}
             <span
-              className="w-10 text-center font-semibold text-gray-900"
+              className="w-10 text-center font-semibold text-gray-900 transition-all duration-200"
               aria-live="polite"
               aria-label={`Quantity: ${item.quantity}`}
             >
@@ -124,17 +137,17 @@ export default function CartItemCard({ item, onUpdateQuantity, onRemove }: CartI
             <button
               onClick={() => handleQuantityChange(item.quantity + 1)}
               disabled={updating}
-              className="w-9 h-9 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-gray-300 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              className="w-9 h-9 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-gray-300 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
               aria-label={`Increase quantity of ${item.productName}`}
             >
               {updating ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
             </button>
           </div>
 
-          {/* Remove button */}
+          {/* Remove button with transition */}
           <button
             onClick={() => onRemove(item._id || item.productId)}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+            className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
             aria-label={`Remove ${item.productName} from cart`}
           >
             <Trash2 size={14} />

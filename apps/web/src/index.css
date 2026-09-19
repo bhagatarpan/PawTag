@@ -179,6 +179,19 @@ body { @apply bg-white text-gray-900; }
   animation: cart-item-remove 0.35s ease-in forwards;
 }
 
+/* Cart item highlight (newly added) */
+@keyframes highlight {
+  0% { background-color: transparent; }
+  20% { background-color: rgba(13, 148, 136, 0.1); }
+  100% { background-color: transparent; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-\[highlight_0\.5s_ease-out\] {
+    animation: none;
+  }
+}
+
 /* SaveToast exit animation */
 @keyframes slide-out-right {
   from { opacity: 1; transform: translateX(0); }
