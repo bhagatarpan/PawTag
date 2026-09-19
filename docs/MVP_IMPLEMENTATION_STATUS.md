@@ -116,7 +116,7 @@ These are fundamentally broken test setups that require significant rework. They
 - [x] 11.2 Production environment schema
 - [x] 11.3 Health/readiness checks
 - [x] 11.4 Backup and restore rehearsal
-- [ ] 11.5 Rollback procedure
+- [x] 11.5 Rollback procedure
 
 ### Phase 12 — Observability and Incident Readiness
 - [ ] 12.1 Define actionable alerts
@@ -166,7 +166,7 @@ These are fundamentally broken test setups that require significant rework. They
 | Phase 8 — Mobile | ✅ Complete | 5/5 |
 | Phase 9 — Admin Safety | ✅ Complete | 4/4 |
 | Phase 10 — Background Jobs | ✅ Complete | 3/3 |
-| Phase 11 — Deployment | ✅ Complete | 4/5 |
+| Phase 11 — Deployment | ✅ Complete | 5/5 |
 | Phase 12 — Observability | Not started | 0/3 |
 | Phase 13 — Accessibility | Not started | 0/3 |
 | Phase 14 — Design System | Not started | 0/3 |
@@ -175,7 +175,7 @@ These are fundamentally broken test setups that require significant rework. They
 | Phase 17 — Production Rehearsal | Not started | 0/3 |
 | Phase 18 — Launch | Not started | 0/1 |
 
-**Total: 51/65 work packets complete (78%)**
+**Total: 52/65 work packets complete (80%)**
 
 ## Next Recommended Work Packet
 
