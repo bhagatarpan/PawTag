@@ -141,7 +141,7 @@ These are fundamentally broken test setups that require significant rework. They
 ### Phase 16 — Code Quality Cleanup
 - [x] 16.1 Remove dangerous `any` in boundaries
 - [x] 16.2 Reduce giant route/service files incrementally
-- [ ] 16.3 Remove demo/mock fallbacks from production paths
+- [x] 16.3 Remove demo/mock fallbacks from production paths
 
 ### Phase 17 — Production Rehearsal
 - [ ] 17.1 Staging dress rehearsal
@@ -171,7 +171,7 @@ These are fundamentally broken test setups that require significant rework. They
 | Phase 13 — Accessibility | ✅ Complete | 3/3 |
 | Phase 14 — Design System | ✅ Complete | 3/3 |
 | Phase 15 — Performance | ✅ Complete | 3/3 |
-| Phase 16 — Code Quality | Partial | 2/3 |
+| Phase 16 — Code Quality | ✅ Complete | 3/3 |
 | Phase 17 — Production Rehearsal | Not started | 0/3 |
 | Phase 18 — Launch | Not started | 0/1 |
 
