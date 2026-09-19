@@ -159,7 +159,7 @@ export class StripePaymentProvider implements IPaymentProvider {
 
     // Safety: If Stripe key is a test key, always use demo mode
     const apiKey = process.env.STRIPE_SECRET_KEY;
-    if (!apiKey || apiKey.startsWith('sk_test_')) {
+    if (!apiKey || apiKey.startsWith('sk_test_') || apiKey.startsWith('rk_test_')) {
       logger.warn({ orderId: params.orderId }, 'Stripe test key detected — using demo mode');
       const demoId = `pi_demo_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
       return {
