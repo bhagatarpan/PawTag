@@ -101,12 +101,15 @@ async function checkForOrphanedPayments(): Promise<void> {
   }
 }
 
+let orphanTimer: ReturnType<typeof setInterval> | null = null;
+
 /**
  * Start the orphan payment detection job.
  * Runs every 60 seconds.
  */
 export function startOrphanPaymentJob(): void {
-  setInterval(async () => {
+  if (orphanTimer) return;
+  orphanTimer = setInterval(async () => {
     try {
       await checkForOrphanedPayments();
     } catch (err) {
@@ -115,4 +118,12 @@ export function startOrphanPaymentJob(): void {
   }, CHECK_INTERVAL_MS);
 
   logger.info('[OrphanPaymentJob] Started — checks every 60s for orphaned payments');
+}
+
+export function stopOrphanPaymentJob(): void {
+  if (orphanTimer) {
+    clearInterval(orphanTimer);
+    orphanTimer = null;
+    logger.info('[OrphanPaymentJob] Stopped');
+  }
 }

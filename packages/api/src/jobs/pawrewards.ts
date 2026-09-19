@@ -102,8 +102,11 @@ async function awardMonthlyMembershipPoints(): Promise<void> {
   }
 }
 
+let pawRewardsTimer: ReturnType<typeof setInterval> | null = null;
+
 export function startPawRewardsJob(): void {
-  setInterval(async () => {
+  if (pawRewardsTimer) return;
+  pawRewardsTimer = setInterval(async () => {
     try {
       await runPawRewardsJobs();
     } catch (error) {
@@ -112,4 +115,12 @@ export function startPawRewardsJob(): void {
   }, DAILY_CHECK_INTERVAL_MS);
 
   logger.info('[PawRewardsJob] Started — runs daily for allocation, expiration, tier re-qualification, and membership points');
+}
+
+export function stopPawRewardsJob(): void {
+  if (pawRewardsTimer) {
+    clearInterval(pawRewardsTimer);
+    pawRewardsTimer = null;
+    logger.info('[PawRewardsJob] Stopped');
+  }
 }

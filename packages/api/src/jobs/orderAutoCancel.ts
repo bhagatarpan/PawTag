@@ -117,12 +117,15 @@ async function checkAndCancelStaleOrders(): Promise<void> {
   }
 }
 
+let autoCancelTimer: ReturnType<typeof setInterval> | null = null;
+
 /**
  * Start the order auto-cancel job.
  * Runs every 60 seconds.
  */
 export function startOrderAutoCancelJob(): void {
-  setInterval(async () => {
+  if (autoCancelTimer) return;
+  autoCancelTimer = setInterval(async () => {
     try {
       await checkAndCancelStaleOrders();
     } catch (err) {
@@ -131,4 +134,12 @@ export function startOrderAutoCancelJob(): void {
   }, CHECK_INTERVAL_MS);
 
   logger.info('[OrderAutoCancelJob] Started — checks every 60s for stale pending_payment orders');
+}
+
+export function stopOrderAutoCancelJob(): void {
+  if (autoCancelTimer) {
+    clearInterval(autoCancelTimer);
+    autoCancelTimer = null;
+    logger.info('[OrderAutoCancelJob] Stopped');
+  }
 }

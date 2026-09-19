@@ -172,17 +172,21 @@ export async function runPetMilestonesJob(): Promise<void> {
   }
 }
 
+let milestonesTimer: ReturnType<typeof setInterval> | null = null;
+
 /**
  * Start pet milestones job (runs daily at midnight)
  */
 export function startPetMilestonesJob(): void {
+  if (milestonesTimer) return;
+
   // Run immediately on startup
   runPetMilestonesJob().catch((error) => {
     logger.error({ err: error }, 'Pet milestones initial run failed');
   });
 
   // Then run every 24 hours
-  setInterval(async () => {
+  milestonesTimer = setInterval(async () => {
     try {
       await runPetMilestonesJob();
     } catch (error) {
@@ -191,4 +195,12 @@ export function startPetMilestonesJob(): void {
   }, 24 * 60 * 60 * 1000);
   
   logger.info('Pet milestones job started (runs daily)');
+}
+
+export function stopPetMilestonesJob(): void {
+  if (milestonesTimer) {
+    clearInterval(milestonesTimer);
+    milestonesTimer = null;
+    logger.info('[PetMilestonesJob] Stopped');
+  }
 }

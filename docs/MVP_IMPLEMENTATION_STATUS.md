@@ -107,7 +107,7 @@ These are fundamentally broken test setups that require significant rework. They
 - [ ] 9.4 Break giant admin route only where it reduces risk
 
 ### Phase 10 — Background Jobs and Worker Architecture
-- [ ] 10.1 Separate worker ownership from API process
+- [x] 10.1 Separate worker ownership from API process
 - [ ] 10.2 Atomic job claiming for externally significant jobs
 - [ ] 10.3 Job error policy
 
@@ -165,7 +165,7 @@ These are fundamentally broken test setups that require significant rework. They
 | Phase 7 — Web E2E | Not started | 0/2 |
 | Phase 8 — Mobile | Not started | 0/5 |
 | Phase 9 — Admin Safety | Not started | 0/4 |
-| Phase 10 — Background Jobs | Not started | 0/3 |
+| Phase 10 — Background Jobs | ✅ Complete | 1/3 |
 | Phase 11 — Deployment | Not started | 0/5 |
 | Phase 12 — Observability | Not started | 0/3 |
 | Phase 13 — Accessibility | Not started | 0/3 |
@@ -175,7 +175,7 @@ These are fundamentally broken test setups that require significant rework. They
 | Phase 17 — Production Rehearsal | Not started | 0/3 |
 | Phase 18 — Launch | Not started | 0/1 |
 
-**Total: 33/65 work packets complete (51%)**
+**Total: 34/65 work packets complete (52%)**
 
 ## Next Recommended Work Packet
 

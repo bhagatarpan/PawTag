@@ -105,8 +105,11 @@ async function auditJobEvent(
   logAudit();
 }
 
+let subscriptionTimer: ReturnType<typeof setInterval> | null = null;
+
 export function startSubscriptionService() {
-  setInterval(async () => {
+  if (subscriptionTimer) return;
+  subscriptionTimer = setInterval(async () => {
     try {
       await runSubscriptionChecks();
       await processPaymentRetries();
@@ -116,6 +119,14 @@ export function startSubscriptionService() {
   }, REMINDER_CHECK_INTERVAL_MS);
 
   logger.info('[SubscriptionService] Started — checks every hour for subscription lifecycle events and payment retries');
+}
+
+export function stopSubscriptionService() {
+  if (subscriptionTimer) {
+    clearInterval(subscriptionTimer);
+    subscriptionTimer = null;
+    logger.info('[SubscriptionService] Stopped');
+  }
 }
 
 export async function createSubscription(data: {

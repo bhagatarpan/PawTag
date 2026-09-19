@@ -32,8 +32,11 @@ async function auditJobEvent(
   logAudit();
 }
 
+let reminderTimer: ReturnType<typeof setInterval> | null = null;
+
 export function startReminderService() {
-  setInterval(async () => {
+  if (reminderTimer) return;
+  reminderTimer = setInterval(async () => {
     try {
       await sendFinderReminders();
       await sendOnboardingNudges();
@@ -43,6 +46,14 @@ export function startReminderService() {
   }, REMINDER_CHECK_INTERVAL_MS);
 
   logger.info('[ReminderService] Started — checks every hour for pets in "found" status > 24h + onboarding nudges');
+}
+
+export function stopReminderService() {
+  if (reminderTimer) {
+    clearInterval(reminderTimer);
+    reminderTimer = null;
+    logger.info('[ReminderService] Stopped');
+  }
 }
 
 async function sendFinderReminders() {
