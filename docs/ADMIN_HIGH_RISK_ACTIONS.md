@@ -186,3 +186,18 @@
 ### Hard-Delete Risks
 - Products, content, settings, feature flags are permanently deleted
 - No soft-delete mechanism for these entities
+
+---
+
+## Route Organization (Future Improvements)
+
+The following workflows in `admin.ts` should be moved to domain-specific files when they are next modified:
+
+| Workflow | Current Location | Target File | Reason |
+|----------|-----------------|-------------|--------|
+| Refund order | `admin.ts` (L2718-2881) | `admin-refunds.ts` | Reduce duplicate refund logic, consolidate audit |
+| Cancel order | `admin.ts` (L2551-2716) | `admin-commerce.ts` or new `admin-orders.ts` | Centralize order lifecycle management |
+| Subscription status | `admin-subscriptions.ts` | Already in domain file | Add missing audit logging |
+| Inventory adjust | `admin-commerce.ts` | Already in domain file | Add missing audit logging |
+
+**Rule:** Do not refactor for aesthetics. Only move workflows when fixing them for other reasons (audit gaps, bug fixes, feature additions).
