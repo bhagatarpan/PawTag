@@ -120,7 +120,7 @@ These are fundamentally broken test setups that require significant rework. They
 
 ### Phase 12 — Observability and Incident Readiness
 - [x] 12.1 Define actionable alerts
-- [ ] 12.2 Correlation IDs across critical flows
+- [x] 12.2 Correlation IDs across critical flows
 - [ ] 12.3 Basic operations dashboard/runbook
 
 ### Phase 13 — Accessibility and UX Consistency
@@ -167,7 +167,7 @@ These are fundamentally broken test setups that require significant rework. They
 | Phase 9 — Admin Safety | ✅ Complete | 4/4 |
 | Phase 10 — Background Jobs | ✅ Complete | 3/3 |
 | Phase 11 — Deployment | ✅ Complete | 5/5 |
-| Phase 12 — Observability | ✅ Complete | 1/3 |
+| Phase 12 — Observability | ✅ Complete | 2/3 |
 | Phase 13 — Accessibility | Not started | 0/3 |
 | Phase 14 — Design System | Not started | 0/3 |
 | Phase 15 — Performance | Not started | 0/3 |
@@ -175,7 +175,7 @@ These are fundamentally broken test setups that require significant rework. They
 | Phase 17 — Production Rehearsal | Not started | 0/3 |
 | Phase 18 — Launch | Not started | 0/1 |
 
-**Total: 53/65 work packets complete (82%)**
+**Total: 54/65 work packets complete (83%)**
 
 ## Next Recommended Work Packet
 
