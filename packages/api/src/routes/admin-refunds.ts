@@ -28,6 +28,9 @@ import {
   disconnectXero,
   exportRefundsToXero,
 } from '../integrations/accounting/xeroExporter';
+import { auditService, type AuditContext } from '../services/audit';
+import { createAuditContextFromRequest, type AuditRequest } from '../middleware/audit';
+import logger from '../lib/logger';
 import { isMyobConnected } from '../integrations/accounting/myobExporter';
 import { runRefundReconciliation } from '../jobs/refundReconciliation';
 import { toAppError } from '../lib/app-errors';
@@ -234,6 +237,32 @@ router.post('/refunds/:orderId/sync', requirePermission('order.update'), async (
       success: true,
       data: mapOrderToRefundListItem(order),
     });
+
+    // Audit log
+    const reqContext = (req as AuditRequest).auditContext;
+    if (reqContext) {
+      auditService.log({
+        ...reqContext,
+        actorType: 'ADMIN',
+        actorId: req.user!.id,
+        actorEmail: req.user!.email,
+      }, {
+        action: 'refund_sync',
+        eventType: 'admin_refund_sync',
+        eventCategory: 'FINANCIAL',
+        operationType: 'UPDATE',
+        resourceType: 'Order',
+        resourceId: req.params.orderId,
+        outcome: 'SUCCESS',
+        severity: 'MEDIUM',
+        metadata: {
+          orderNumber: order.orderNumber,
+          refundId: order.refundId,
+          previousStatus: order.refundStatus,
+          newStatus: refundResult.status,
+        },
+      }).catch(() => {});
+    }
   } catch (err) {
     const error = toAppError(err);
     res.status(error.httpStatus).json({ success: false, error: error.userMessage });
@@ -250,6 +279,30 @@ router.post('/refunds/:orderId/retry', requirePermission('order.update'), async 
     const result = await manualRefundRetry(req.params.orderId);
     if (result.success) {
       res.json({ success: true, data: { refundId: result.newRefundId } });
+
+      // Audit log
+      const reqContext = (req as AuditRequest).auditContext;
+      if (reqContext) {
+        auditService.log({
+          ...reqContext,
+          actorType: 'ADMIN',
+          actorId: req.user!.id,
+          actorEmail: req.user!.email,
+        }, {
+          action: 'refund_retry',
+          eventType: 'admin_refund_retry',
+          eventCategory: 'FINANCIAL',
+          operationType: 'CREATE',
+          resourceType: 'Order',
+          resourceId: req.params.orderId,
+          outcome: 'SUCCESS',
+          severity: 'MEDIUM',
+          metadata: {
+            orderId: req.params.orderId,
+            newRefundId: result.newRefundId,
+          },
+        }).catch(() => {});
+      }
     } else {
       res.status(400).json({ success: false, error: result.error || 'Retry failed' });
     }
