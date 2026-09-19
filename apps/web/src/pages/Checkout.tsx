@@ -762,7 +762,7 @@ export default function Checkout() {
               </div>
 
               {/* Summary */}
-              <div className="px-6 py-4 border-t border-gray-200">
+              <div className="px-6 py-4 border-t border-gray-100">
                 {/* Promo code section */}
                   <div className="mb-4">
                   {promoApplied ? (
@@ -806,7 +806,7 @@ export default function Checkout() {
 
                 {/* PawRewards Redemption */}
                 {user && pawRewardsBalance > 0 && (
-                  <div className="border-t border-gray-200 pt-4 mt-4">
+                  <div className="border-t border-gray-100 pt-4 mt-4">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
                         <PawPrint className="h-4 w-4 text-amber-500" />
@@ -853,7 +853,7 @@ export default function Checkout() {
                 )}
 
                 {/* Guardian Loyalty Messaging */}
-                <div className="border-t border-gray-200 pt-4 mt-4">
+                <div className="border-t border-gray-100 pt-4 mt-4">
                   {!user ? (
                     // Guest — prompt to join Guardian
                     <div className="flex items-start gap-3 p-3 bg-primary-50 border border-primary-100 rounded-lg">
@@ -894,7 +894,7 @@ export default function Checkout() {
 
                 {/* Auto-Renew Status */}
                 {hasSubscriptionItems && (
-                  <div className="border-t border-gray-200 pt-4 mt-4">
+                  <div className="border-t border-gray-100 pt-4 mt-4">
                     <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Subscription Auto-Renew</p>
                     {items.filter((item: any) => item.isSubscription || item.monthlyPrice).map((item: any) => {
                       const key = item._id || item.productId;
@@ -917,11 +917,11 @@ export default function Checkout() {
                   {pawRewardsDiscount > 0 && <div className="flex justify-between text-sm text-amber-600"><span>PawRewards</span><span>-${pawRewardsDiscount.toFixed(2)}</span></div>}
                   <div className="flex justify-between text-sm text-gray-600"><span>Shipping</span><span className={`font-medium ${shippingCost === 0 ? 'text-green-600' : 'text-gray-900'}`}>{shippingCost === 0 ? 'FREE' : `$${shippingCost.toFixed(2)}`}</span></div>
                   <div className="flex justify-between text-sm text-gray-600"><span>Tax (Included)</span><span>${taxAmount.toFixed(2)}</span></div>
-                  <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-200"><span>Total (NZD)</span><span className="text-primary-700">${orderTotal.toFixed(2)}</span></div>
+                  <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-100"><span>Estimated Total</span><span className="text-primary-700">${orderTotal.toFixed(2)}</span></div>
                 </div>
               </div>
 
-              <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+              <div className="px-6 py-4 border-t border-gray-100 bg-gray-50">
                 <div className="flex items-center gap-2 text-xs text-gray-500 mb-4">
                   <Lock className="h-4 w-4" /> <span>Secure & Trusted Checkout</span>
                 </div>
@@ -1043,7 +1043,7 @@ export default function Checkout() {
 
                   {/* Shipping Method — shown after address is entered */}
                   {form.line1 && (
-                    <div className="mt-6 pt-6 border-t border-gray-200">
+                    <div className="mt-6 pt-6 border-t border-gray-100">
                       <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2 mb-3">
                         <Truck className="h-4 w-4 text-primary-600" /> Shipping Method
                       </h3>
@@ -1138,12 +1138,12 @@ export default function Checkout() {
                       <span className={`font-medium ${shippingCost === 0 ? 'text-green-600' : 'text-gray-900'}`}>{shippingCost === 0 ? 'FREE' : `$${shippingCost.toFixed(2)}`}</span>
                     </div>
                     <div className="flex justify-between text-sm"><span className="text-gray-600">Tax (Included)</span><span className="text-gray-900">${taxAmount.toFixed(2)}</span></div>
-                    <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-200"><span>Total (NZD)</span><span className="text-primary-700">${orderTotal.toFixed(2)}</span></div>
+                    <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-100"><span>Estimated Total</span><span className="text-primary-700">${orderTotal.toFixed(2)}</span></div>
                   </div>
 
                   {/* Shipping Address */}
                   {form.line1 && (
-                    <div className="mt-4 pt-4 border-t border-gray-200">
+                    <div className="mt-4 pt-4 border-t border-gray-100">
                       <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Shipping to</p>
                       <p className="text-sm text-gray-900">{user?.fullName || 'Customer'}</p>
                       <p className="text-sm text-gray-600">{form.line1}{form.line2 ? `, ${form.line2}` : ''}</p>
