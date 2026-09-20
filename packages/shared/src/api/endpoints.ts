@@ -509,6 +509,13 @@ export const API = {
       sectionItem: (id: string, section: string, subId: string) => `/customer/pets/${id}/${section}/${subId}` as const,
       desexing: (id: string) => `/customer/pets/${id}/desexing` as const,
     },
+    addresses: {
+      list: '/customer/addresses',
+      create: '/customer/addresses',
+      update: (id: string) => `/customer/addresses/${id}` as const,
+      delete: (id: string) => `/customer/addresses/${id}` as const,
+      setDefault: (id: string) => `/customer/addresses/${id}/default` as const,
+    },
     orders: {
       list: '/customer/orders',
       get: (id: string) => `/customer/orders/${id}` as const,

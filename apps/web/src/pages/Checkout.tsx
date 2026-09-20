@@ -109,13 +109,67 @@ export default function Checkout() {
 
   // Shipping address
   const [addressMode, setAddressMode] = useState<'saved' | 'custom'>('saved');
+  const [savedAddresses, setSavedAddresses] = useState<Array<{
+    _id?: string;
+    label: string;
+    line1: string;
+    line2?: string;
+    city: string;
+    state: string;
+    zip: string;
+    country: string;
+    isDefault: boolean;
+  }>>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<string>('');
   const [form, setForm] = useState({
-    line1: '', line2: '', city: '', state: '', zip: '', country: 'nz',
+    label: '', line1: '', line2: '', city: '', state: '', zip: '', country: 'nz',
   });
+
+  // Fetch saved addresses on mount
+  useEffect(() => {
+    if (user) {
+      api.get(API.customer.addresses.list)
+        .then((res) => {
+          const addresses = res.data?.data || [];
+          setSavedAddresses(addresses);
+          // Select default address or first address
+          const defaultAddr = addresses.find((a: any) => a.isDefault);
+          if (defaultAddr) {
+            setSelectedAddressId(defaultAddr._id);
+            setForm({
+              label: defaultAddr.label || '',
+              line1: defaultAddr.line1 || '',
+              line2: defaultAddr.line2 || '',
+              city: defaultAddr.city || '',
+              state: defaultAddr.state || '',
+              zip: defaultAddr.zip || '',
+              country: defaultAddr.country || 'NZ',
+            });
+            setAddressMode('saved');
+          } else if (addresses.length > 0) {
+            setSelectedAddressId(addresses[0]._id);
+            setForm({
+              label: addresses[0].label || '',
+              line1: addresses[0].line1 || '',
+              line2: addresses[0].line2 || '',
+              city: addresses[0].city || '',
+              state: addresses[0].state || '',
+              zip: addresses[0].zip || '',
+              country: addresses[0].country || 'NZ',
+            });
+            setAddressMode('saved');
+          } else {
+            setAddressMode('custom');
+          }
+        })
+        .catch(() => setAddressMode('custom'));
+    }
+  }, [user]);
   // Prepopulate from user profile on mount / login
   useEffect(() => {
     if (user?.address?.line1 && addressMode === 'saved') {
       setForm({
+        label: '',
         line1: user.address.line1 || '',
         line2: user.address.line2 || '',
         city: user.address.city || '',
@@ -719,49 +773,113 @@ export default function Checkout() {
                 <div className="bg-white rounded-xl border border-gray-200 p-6">
                   <div className="flex items-center justify-between mb-4">
                     <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2"><Truck className="h-5 w-5 text-primary-600" /> Shipping Address</h2>
-                    {user?.address?.line1 && addressMode === 'saved' && (
+                    {addressMode === 'saved' && (
                       <button onClick={() => { setAddressMode('custom'); }} className="text-sm text-primary-600 hover:text-primary-700 flex items-center gap-1">
-                        <Edit3 className="h-3 w-3" /> Change
+                        <Edit3 className="h-3 w-3" /> Add New
                       </button>
                     )}
                   </div>
 
-                  {addressMode === 'saved' && user?.address?.line1 ? (
-                    <div className="p-4 bg-gray-50 rounded-xl">
-                      <p className="font-medium text-gray-900">{user.fullName}</p>
-                      <p className="text-sm text-gray-600">{form.line1}{form.line2 ? `, ${form.line2}` : ''}</p>
-                      <p className="text-sm text-gray-600">{form.city} {form.zip}</p>
-                      <p className="text-sm text-gray-600">New Zealand</p>
-                      {user.phoneNumber && <p className="text-sm text-gray-600 mt-1">{user.phoneNumber}</p>}
+                  {addressMode === 'saved' && savedAddresses.length > 0 ? (
+                    <div className="space-y-3">
+                      {savedAddresses.map((addr) => (
+                        <div
+                          key={addr._id}
+                          onClick={() => {
+                            setSelectedAddressId(addr._id || '');
+                            setForm({
+                              label: addr.label || '',
+                              line1: addr.line1 || '',
+                              line2: addr.line2 || '',
+                              city: addr.city || '',
+                              state: addr.state || '',
+                              zip: addr.zip || '',
+                              country: addr.country || 'NZ',
+                            });
+                          }}
+                          className={`p-4 rounded-xl border cursor-pointer transition-all ${
+                            selectedAddressId === addr._id
+                              ? 'border-primary-500 bg-primary-50'
+                              : 'border-gray-200 hover:border-gray-300 bg-white'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium text-gray-900">{addr.label}</span>
+                              {addr.isDefault && <span className="text-xs bg-primary-100 text-primary-700 px-2 py-0.5 rounded-full">Preferred</span>}
+                            </div>
+                            <input
+                              type="radio"
+                              name="saved-address"
+                              checked={selectedAddressId === addr._id}
+                              onChange={() => {
+                                setSelectedAddressId(addr._id || '');
+                                setForm({
+                                  label: addr.label || '',
+                                  line1: addr.line1 || '',
+                                  line2: addr.line2 || '',
+                                  city: addr.city || '',
+                                  state: addr.state || '',
+                                  zip: addr.zip || '',
+                                  country: addr.country || 'NZ',
+                                });
+                              }}
+                              className="w-4 h-4 text-primary-600"
+                            />
+                          </div>
+                          <p className="text-sm text-gray-600 mt-1">{form.line1}{form.line2 ? `, ${form.line2}` : ''}</p>
+                          <p className="text-sm text-gray-600">{addr.city} {addr.zip}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : addressMode === 'saved' && savedAddresses.length === 0 ? (
+                    <div className="text-center py-4">
+                      <p className="text-sm text-gray-500 mb-3">No saved addresses yet.</p>
+                      <button onClick={() => setAddressMode('custom')} className="text-sm text-primary-600 hover:text-primary-700 font-medium">
+                        Add your first address
+                      </button>
                     </div>
                   ) : (
                     <div className="space-y-4">
                       <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Address Label *</label>
+                        <input type="text" value={form.label || ''} onChange={e => setForm({ ...form, label: e.target.value } as any)} className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 text-sm" placeholder="e.g., Home, Office" />
+                      </div>
+                      <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Address Line 1 *</label>
                         <AddressAutocomplete value={form.line1} onChange={(val) => setForm(prev => ({ ...prev, line1: val }))} onAddressSelect={handleAddressSelect} placeholder="123 Main Street" />
                       </div>
-                      <div><label className="block text-sm font-medium text-gray-700 mb-1">Address Line 2</label><input type="text" value={form.line2} onChange={e => setForm({ ...form, line2: e.target.value })} className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm" placeholder="Apartment, suite, etc." /></div>
+                      <div><label className="block text-sm font-medium text-gray-700 mb-1">Address Line 2</label><input type="text" value={form.line2} onChange={e => setForm({ ...form, line2: e.target.value })} className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 text-sm" placeholder="Apartment, suite, etc." /></div>
                       <div className="grid grid-cols-2 gap-4">
                         <div><label className="block text-sm font-medium text-gray-700 mb-1">City *</label><input type="text" required value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 text-sm" /></div>
                         <div><label className="block text-sm font-medium text-gray-700 mb-1">Postcode *</label><input type="text" required value={form.zip} onChange={e => setForm({ ...form, zip: e.target.value })} className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 text-sm" /></div>
                       </div>
-                      {user?.address?.line1 && (
+                      <div className="flex items-center gap-2">
+                        <input type="checkbox" id="saveAddress" className="w-4 h-4 text-primary-600 rounded" />
+                        <label htmlFor="saveAddress" className="text-sm text-gray-700">Save this address to my account</label>
+                      </div>
+                      {savedAddresses.length > 0 && (
                         <button
                           type="button"
                           onClick={() => {
-                            setForm({
-                              line1: user.address!.line1 || '',
-                              line2: user.address!.line2 || '',
-                              city: user.address!.city || '',
-                              state: user.address!.state || '',
-                              zip: user.address!.zip || '',
-                              country: user.address!.country || 'NZ',
-                            });
-                            setAddressMode('saved');
+                            const defaultAddr = savedAddresses.find(a => a.isDefault) || savedAddresses[0];
+                            if (defaultAddr) {
+                              setSelectedAddressId(defaultAddr._id || '');
+                              setForm({
+                                label: defaultAddr.label || '',
+                                line1: defaultAddr.line1 || '',
+                                line2: defaultAddr.line2 || '',
+                                city: defaultAddr.city || '',
+                                state: defaultAddr.state || '',
+                                zip: defaultAddr.zip || '',
+                                country: defaultAddr.country || 'NZ',
+                              });
+                              setAddressMode('saved');
+                            }
                           }}
                           className="text-sm text-primary-600 hover:text-primary-700 font-medium"
                         >
-                          Use my saved address
+                          Use a saved address
                         </button>
                       )}
                     </div>

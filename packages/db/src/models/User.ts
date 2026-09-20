@@ -22,6 +22,17 @@ export interface IUserDocument extends Document {
     zip: string;
     country: string;
   };
+  addresses?: Array<{
+    _id?: mongoose.Types.ObjectId;
+    label: string;
+    line1: string;
+    line2?: string;
+    city: string;
+    state: string;
+    zip: string;
+    country: string;
+    isDefault: boolean;
+  }>;
   emergencyContact?: {
     name: string;
     phone: string;
@@ -90,6 +101,16 @@ const UserSchema = new Schema<IUserDocument>(
       zip: String,
       country: { type: String, default: 'NZ' },
     },
+    addresses: [{
+      label: { type: String, required: true },
+      line1: { type: String, required: true },
+      line2: String,
+      city: { type: String, required: true },
+      state: { type: String, default: '' },
+      zip: { type: String, required: true },
+      country: { type: String, default: 'NZ' },
+      isDefault: { type: Boolean, default: false },
+    }],
     emergencyContact: {
       name: String,
       phone: String,

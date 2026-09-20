@@ -2500,4 +2500,247 @@ router.post('/escalations/:id/forward', requirePermission('pet.update'), async (
   }
 });
 
+// ═══════════════════════════════════════════
+// SAVED ADDRESSES — CRUD
+// ═══════════════════════════════════════════
+
+/**
+ * GET /api/customer/addresses
+ * List all saved addresses for the authenticated user.
+ */
+router.get('/addresses', async (req: AuthRequest, res: Response) => {
+  try {
+    const user = await User.findById(req.user!.id).select('addresses').lean();
+    res.json({ success: true, data: user?.addresses || [] });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to fetch addresses' });
+  }
+});
+
+/**
+ * POST /api/customer/addresses
+ * Create a new saved address.
+ */
+router.post('/addresses', async (req: AuthRequest, res: Response) => {
+  try {
+    const { label, line1, line2, city, state, zip, country, isDefault } = req.body;
+
+    if (!label || !line1 || !city || !zip) {
+      res.status(400).json({ success: false, error: 'label, line1, city, and zip are required' });
+      return;
+    }
+
+    const user = await User.findById(req.user!.id);
+    if (!user) {
+      res.status(404).json({ success: false, error: 'User not found' });
+      return;
+    }
+
+    // Initialize addresses array if it doesn't exist
+    if (!user.addresses) {
+      user.addresses = [];
+    }
+
+    // If this is the first address or isDefault is true, unset other defaults
+    if (isDefault || user.addresses.length === 0) {
+      user.addresses.forEach((addr: any) => { addr.isDefault = false; });
+    }
+
+    // Add the new address
+    const newAddress = {
+      _id: new mongoose.Types.ObjectId(),
+      label,
+      line1,
+      line2: line2 || '',
+      city,
+      state: state || '',
+      zip,
+      country: country || 'NZ',
+      isDefault: isDefault || user.addresses.length === 0,
+    };
+
+    user.addresses.push(newAddress as any);
+    await user.save();
+
+    // Also update the legacy address field if this is the default
+    if (newAddress.isDefault) {
+      await User.findByIdAndUpdate(req.user!.id, {
+        address: {
+          line1: newAddress.line1,
+          line2: newAddress.line2,
+          city: newAddress.city,
+          state: newAddress.state,
+          zip: newAddress.zip,
+          country: newAddress.country,
+        },
+      });
+    }
+
+    res.status(201).json({ success: true, data: newAddress });
+  } catch (err) {
+    logger.error({ err }, 'Failed to create address');
+    res.status(500).json({ success: false, error: 'Failed to create address' });
+  }
+});
+
+/**
+ * PUT /api/customer/addresses/:id
+ * Update an existing saved address.
+ */
+router.put('/addresses/:id', async (req: AuthRequest, res: Response) => {
+  try {
+    const { label, line1, line2, city, state, zip, country, isDefault } = req.body;
+
+    const user = await User.findById(req.user!.id);
+    if (!user) {
+      res.status(404).json({ success: false, error: 'User not found' });
+      return;
+    }
+
+    if (!user.addresses) {
+      res.status(404).json({ success: false, error: 'No addresses found' });
+      return;
+    }
+
+    const address = user.addresses.find((a: any) => String(a._id) === req.params.id);
+    if (!address) {
+      res.status(404).json({ success: false, error: 'Address not found' });
+      return;
+    }
+
+    // Update fields
+    if (label !== undefined) address.label = label;
+    if (line1 !== undefined) address.line1 = line1;
+    if (line2 !== undefined) address.line2 = line2;
+    if (city !== undefined) address.city = city;
+    if (state !== undefined) address.state = state;
+    if (zip !== undefined) address.zip = zip;
+    if (country !== undefined) address.country = country;
+
+    // Handle default flag
+    if (isDefault) {
+      user.addresses.forEach((addr: any) => { addr.isDefault = false; });
+      address.isDefault = true;
+
+      // Update legacy address field
+      await User.findByIdAndUpdate(req.user!.id, {
+        address: {
+          line1: address.line1,
+          line2: address.line2,
+          city: address.city,
+          state: address.state,
+          zip: address.zip,
+          country: address.country,
+        },
+      });
+    }
+
+    await user.save();
+    res.json({ success: true, data: address });
+  } catch (err) {
+    logger.error({ err }, 'Failed to update address');
+    res.status(500).json({ success: false, error: 'Failed to update address' });
+  }
+});
+
+/**
+ * DELETE /api/customer/addresses/:id
+ * Delete a saved address.
+ */
+router.delete('/addresses/:id', async (req: AuthRequest, res: Response) => {
+  try {
+    const user = await User.findById(req.user!.id);
+    if (!user) {
+      res.status(404).json({ success: false, error: 'User not found' });
+      return;
+    }
+
+    if (!user.addresses) {
+      res.status(404).json({ success: false, error: 'No addresses found' });
+      return;
+    }
+
+    const addressIndex = user.addresses.findIndex((a: any) => String(a._id) === req.params.id);
+    if (addressIndex === -1) {
+      res.status(404).json({ success: false, error: 'Address not found' });
+      return;
+    }
+
+    const address = user.addresses[addressIndex];
+    const wasDefault = address.isDefault;
+    user.addresses.splice(addressIndex, 1);
+
+    // If deleted address was default, set first remaining as default
+    if (wasDefault && user.addresses.length > 0) {
+      const newDefault = user.addresses[0];
+      newDefault.isDefault = true;
+
+      // Update legacy address field
+      await User.findByIdAndUpdate(req.user!.id, {
+        address: {
+          line1: newDefault.line1,
+          line2: newDefault.line2,
+          city: newDefault.city,
+          state: newDefault.state,
+          zip: newDefault.zip,
+          country: newDefault.country,
+        },
+      });
+    }
+
+    await user.save();
+    res.json({ success: true, data: { message: 'Address deleted' } });
+  } catch (err) {
+    logger.error({ err }, 'Failed to delete address');
+    res.status(500).json({ success: false, error: 'Failed to delete address' });
+  }
+});
+
+/**
+ * PUT /api/customer/addresses/:id/default
+ * Set an address as the preferred/default address.
+ */
+router.put('/addresses/:id/default', async (req: AuthRequest, res: Response) => {
+  try {
+    const user = await User.findById(req.user!.id);
+    if (!user) {
+      res.status(404).json({ success: false, error: 'User not found' });
+      return;
+    }
+
+    if (!user.addresses) {
+      res.status(404).json({ success: false, error: 'No addresses found' });
+      return;
+    }
+
+    const address = user.addresses.find((a: any) => String(a._id) === req.params.id);
+    if (!address) {
+      res.status(404).json({ success: false, error: 'Address not found' });
+      return;
+    }
+
+    // Set this address as default, unset others
+    user.addresses.forEach((addr: any) => { addr.isDefault = false; });
+    address.isDefault = true;
+
+    // Update legacy address field
+    await User.findByIdAndUpdate(req.user!.id, {
+      address: {
+        line1: address.line1,
+        line2: address.line2,
+        city: address.city,
+        state: address.state,
+        zip: address.zip,
+        country: address.country,
+      },
+    });
+
+    await user.save();
+    res.json({ success: true, data: address });
+  } catch (err) {
+    logger.error({ err }, 'Failed to set default address');
+    res.status(500).json({ success: false, error: 'Failed to set default address' });
+  }
+});
+
 export default router;
