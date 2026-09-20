@@ -17,6 +17,10 @@ import StripePaymentForm from '../components/StripePaymentForm';
 import CheckoutErrorBoundary from '../components/CheckoutErrorBoundary';
 import CheckoutStepIndicator from '../components/checkout/CheckoutStepIndicator';
 import CheckoutConfirmationStep from '../components/checkout/CheckoutConfirmationStep';
+import PromoCodeControl from '../components/cart/PromoCodeControl';
+import ShippingMethodSelect from '../components/cart/ShippingMethodSelect';
+import AutoRenewToggle from '../components/cart/AutoRenewToggle';
+import GuardianPointsPreview from '../components/cart/GuardianPointsPreview';
 import analytics from '../lib/analytics';
 
 // Confirmation page animations
@@ -26,17 +30,17 @@ const confirmationStyles = `
 @keyframes fade-in-up { 0% { transform: translateY(12px); opacity: 0; } 100% { transform: translateY(0); opacity: 1; } }
 `;
 
-type Step = 'checkout' | 'payment' | 'review' | 'confirmed';
+type Step = 'checkout' | 'review' | 'payment' | 'confirmed';
 
 const STEPS = [
   { key: 'checkout' as Step, label: 'Delivery', icon: Truck },
-  { key: 'payment' as Step, label: 'Payment', icon: CreditCard },
   { key: 'review' as Step, label: 'Review', icon: ClipboardCheck },
+  { key: 'payment' as Step, label: 'Payment', icon: CreditCard },
   { key: 'confirmed' as Step, label: 'Confirmed', icon: CheckCircle },
 ];
 
 export default function Checkout() {
-  const { items, total, totals, clearCart, refreshCart, updateItemTexts, toggleCustomisation, error: cartError, promoCode, promoApplied, setPromoCode: setPromoCodeCtx, setPromoApplied: setPromoAppliedCtx } = useCart();
+  const { items, total, totals, clearCart, refreshCart, updateQuantity, removeItem, updateItemTexts, toggleCustomisation, error: cartError, promoCode, promoApplied, setPromoCode: setPromoCodeCtx, setPromoApplied: setPromoAppliedCtx } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -272,11 +276,12 @@ export default function Checkout() {
   const hasSubscriptionItems = items.some((item: any) => item.isSubscription || item.monthlyPrice);
 
   // Derive per-item auto-renew map from cart items
-  const autoRenewMap: Record<string, boolean> = {};
+  const computedAutoRenewMap: Record<string, boolean> = {};
   items.forEach((item: any) => {
     const key = item._id || item.productId;
-    if (key) autoRenewMap[key] = item.autoRenew !== false;
+    if (key) computedAutoRenewMap[key] = item.autoRenew !== false;
   });
+  const [editableAutoRenewMap, setEditableAutoRenewMap] = useState<Record<string, boolean>>(computedAutoRenewMap);
 
   // Fetch estimated points from backend when order total or membership changes
   useEffect(() => {
@@ -363,14 +368,14 @@ export default function Checkout() {
   };
 
   const canProceedToCheckout = items.length > 0;
-  const canProceedToPayment = emailVerified && mobileVerified && form.line1 && form.city && form.zip;
-  const canProceedToReview = canProceedToPayment && paymentClientSecret;
+  const canProceedToReview = emailVerified && mobileVerified && form.line1 && form.city && form.zip;
+  const canProceedToPayment = canProceedToReview && paymentClientSecret;
 
   // Step navigation
   const goToStep = (step: Step) => {
     if (step === 'checkout' && !canProceedToCheckout) return;
-    if (step === 'payment' && !canProceedToPayment) return;
     if (step === 'review' && !canProceedToReview) return;
+    if (step === 'payment' && !canProceedToPayment) return;
     setCurrentStep(step);
     setError(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -510,7 +515,7 @@ export default function Checkout() {
           zip: form.zip,
           country: (form.country || 'NZ').toUpperCase(),
         },
-        autoRenew: autoRenewMap,
+        autoRenew: editableAutoRenewMap,
         pawRewardsRedemption: pawRewardsRedemption || 0,
       });
       const { paymentIntentId, clientSecret, pendingOrderId } = checkoutRes.data?.data;
@@ -811,8 +816,8 @@ export default function Checkout() {
                     </div>
                   )}
 
-                  <button onClick={handlePayment} disabled={!canProceedToPayment || loading} className="w-full mt-6 py-3 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2">
-                    {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Setting up payment...</> : <>Continue to Payment <ChevronRight className="h-4 w-4" /></>}
+                  <button onClick={() => goToStep('review')} disabled={!canProceedToReview || loading} className="w-full mt-6 py-3 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2">
+                    Review Order <ChevronRight className="h-4 w-4" />
                   </button>
                 </div>
               </div>
@@ -964,123 +969,134 @@ export default function Checkout() {
           </div>
         )}
 
-        {/* Step 4: Review — Full summary before final confirmation */}
+        {/* Step 2: Review — Fully editable summary before payment */}
         {currentStep === 'review' && (
           <div className="max-w-[1280px] mx-auto">
             <h1 className="text-2xl font-bold text-gray-900 mb-2">Review Your Order</h1>
-            <p className="text-gray-500 mb-6">Please review all details before placing your order</p>
+            <p className="text-gray-500 mb-6">Review and edit all details before continuing to payment</p>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-              {/* Left 67%: Order Summary */}
+              {/* Left 67%: Editable Order Summary */}
               <div className="lg:col-span-8 space-y-4">
-                {/* Items */}
+                {/* Items - Editable (quantity controls, remove) */}
                 <div className="bg-white rounded-xl border border-gray-200 p-6">
                   <div className="flex items-center justify-between mb-4">
                     <h2 className="text-lg font-semibold text-gray-900">Items ({items.length})</h2>
                     <Link to="/cart" className="text-sm text-primary-600 hover:text-primary-700">Edit Cart</Link>
                   </div>
-                  {items.map((item) => (
-                    <div key={item.productId || item.variantId} className="flex gap-3 mb-4 pb-4 border-b border-gray-100 last:border-0">
-                      <div className="h-14 w-14 bg-primary-50 rounded-lg flex-shrink-0 flex items-center justify-center overflow-hidden">
-                        {item.image ? <img src={item.image} alt="" className="h-full w-full object-cover" /> : <PawPrint className="h-6 w-6 text-primary-300" />}
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-medium text-gray-900">{item.productName || item.name}</p>
-                        {item.customisationTexts && item.customisationTexts.length > 0 && item.customisationTexts.some(t => t) && (
-                          <div className="text-xs text-primary-600">
-                            {item.customisationTexts.filter(t => t).map((t, i) => (
-                              <p key={i}>Pet name: {t}</p>
-                            ))}
+                  {items.map((item) => {
+                    const itemId = item._id || item.productId || '';
+                    return (
+                      <div key={itemId} className="flex gap-3 mb-4 pb-4 border-b border-gray-100 last:border-0">
+                        <div className="h-14 w-14 bg-primary-50 rounded-lg flex-shrink-0 flex items-center justify-center overflow-hidden">
+                          {item.image ? <img src={item.image} alt="" className="h-full w-full object-cover" /> : <PawPrint className="h-6 w-6 text-primary-300" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-gray-900">{item.productName || item.name}</p>
+                          {item.customisationTexts && item.customisationTexts.length > 0 && item.customisationTexts.some(t => t) && (
+                            <div className="text-xs text-primary-600 mt-1">
+                              {item.customisationTexts.filter(t => t).map((t, i) => (
+                                <p key={i}>Pet name: {t}</p>
+                              ))}
+                            </div>
+                          )}
+                          <div className="flex items-center gap-2 mt-2">
+                            <div className="flex items-center gap-1 border border-gray-200 rounded-lg">
+                              <button onClick={() => updateQuantity(itemId, Math.max(1, (item.quantity || 1) - 1))} className="w-7 h-7 flex items-center justify-center text-gray-500 hover:bg-gray-50 rounded-l-lg">-</button>
+                              <span className="w-8 text-center text-sm font-medium">{item.quantity || 1}</span>
+                              <button onClick={() => updateQuantity(itemId, (item.quantity || 1) + 1)} className="w-7 h-7 flex items-center justify-center text-gray-500 hover:bg-gray-50 rounded-r-lg">+</button>
+                            </div>
+                            <button onClick={() => removeItem(itemId)} className="text-xs text-red-500 hover:text-red-700">Remove</button>
                           </div>
-                        )}
-                        <p className="text-xs text-gray-500">Qty: {item.quantity} x ${(item.unitPrice || item.price || 0).toFixed(2)}</p>
+                        </div>
+                        <p className="font-semibold text-gray-900">${((item.unitPrice || item.price || 0) * (item.quantity || 1)).toFixed(2)}</p>
                       </div>
-                      <p className="font-semibold text-gray-900">${((item.unitPrice || item.price || 0) * item.quantity).toFixed(2)}</p>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
-                {/* Promo Code */}
-                {promoCode && (
-                  <div className="bg-white rounded-xl border border-gray-200 p-6">
-                    <h3 className="text-sm font-semibold text-gray-900 mb-3">Promo Code</h3>
-                    <div className="flex items-center justify-between bg-green-50 rounded-xl px-4 py-3">
-                      <div className="flex items-center gap-2 text-sm text-green-700">
-                        <Tag size={14} />
-                        <span className="font-medium">{promoCode}</span>
-                        <span>applied</span>
-                        {discountAmount > 0 && <span className="text-green-600">(-${discountAmount.toFixed(2)})</span>}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Shipping Method */}
+                {/* Promo Code - Editable */}
                 <div className="bg-white rounded-xl border border-gray-200 p-6">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-sm font-semibold text-gray-900">Shipping Method</h3>
-                    <button onClick={() => goToStep('checkout')} className="text-sm text-primary-600 hover:text-primary-700">Change</button>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <Truck size={16} className="text-gray-400" />
-                    <span className="text-gray-900">{shippingOptions.find(o => o.id === selectedShippingOption)?.name || 'Standard Shipping'}</span>
-                    <span className={`font-medium ${shippingCost === 0 ? 'text-green-600' : 'text-gray-900'}`}>
-                      {shippingCost === 0 ? 'FREE' : `$${shippingCost.toFixed(2)}`}
-                    </span>
+                  <h3 className="text-sm font-semibold text-gray-900 mb-3">Promo Code</h3>
+                  <PromoCodeControl
+                    promoCode={promoCode || undefined}
+                    promoApplied={promoApplied}
+                    promoError={promoError}
+                    onApply={user ? applyPromoCode : undefined}
+                    onRemove={user ? removePromoCode : undefined}
+                    loading={promoLoading}
+                  />
+                </div>
+
+                {/* Shipping Method - Editable */}
+                <div className="bg-white rounded-xl border border-gray-200 p-6">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-3">Shipping Method</h3>
+                  <ShippingMethodSelect
+                    options={shippingOptions}
+                    selected={selectedShippingOption}
+                    onSelect={(option) => setSelectedShippingOption(option.id)}
+                    loading={shippingLoading}
+                  />
+                </div>
+
+                {/* Shipping Address - Editable */}
+                <div className="bg-white rounded-xl border border-gray-200 p-6">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-3">Shipping Address</h3>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                      <AddressAutocomplete
+                        value={form.line1}
+                        onAddressSelect={handleAddressSelect}
+                        onChange={(val) => setForm(prev => ({ ...prev, line1: val }))}
+                        placeholder="Start typing your address..."
+                        className="w-full"
+                      />
+                    </div>
+                    {form.line1 && (
+                      <>
+                        <input type="text" value={form.line2 || ''} onChange={(e) => setForm(prev => ({ ...prev, line2: e.target.value }))} placeholder="Apartment, suite, etc. (optional)" className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500" />
+                        <div className="grid grid-cols-2 gap-3">
+                          <input type="text" value={form.city} onChange={(e) => setForm(prev => ({ ...prev, city: e.target.value }))} placeholder="City" className="px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500" />
+                          <input type="text" value={form.zip} onChange={(e) => setForm(prev => ({ ...prev, zip: e.target.value }))} placeholder="Postcode" className="px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500" />
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
 
-                {/* Shipping Address */}
-                {form.line1 && (
-                  <div className="bg-white rounded-xl border border-gray-200 p-6">
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-sm font-semibold text-gray-900">Shipping Address</h3>
-                      <button onClick={() => goToStep('checkout')} className="text-sm text-primary-600 hover:text-primary-700">Change</button>
-                    </div>
-                    <p className="text-sm text-gray-900">{user?.fullName || 'Customer'}</p>
-                    <p className="text-sm text-gray-600">{form.line1}{form.line2 ? `, ${form.line2}` : ''}</p>
-                    <p className="text-sm text-gray-600">{form.city} {form.zip}</p>
-                    <p className="text-sm text-gray-600">New Zealand</p>
-                  </div>
-                )}
-
-                {/* Auto-Renew */}
+                {/* Auto-Renew - Editable Toggle */}
                 {items.some((item: any) => item.isSubscription || item.autoRenew) && (
                   <div className="bg-white rounded-xl border border-gray-200 p-6">
                     <h3 className="text-sm font-semibold text-gray-900 mb-3">Subscription Auto-Renew</h3>
                     {items.filter((item: any) => item.isSubscription || item.autoRenew).map((item: any) => {
                       const key = item._id || item.productId;
-                      const isOn = autoRenewMap[key] !== false;
+                      const isOn = editableAutoRenewMap[key] !== false;
                       return (
-                        <div key={key} className="flex items-center justify-between py-2">
-                          <span className="text-sm text-gray-700">{item.productName || item.name}</span>
-                          <span className={`text-xs font-medium px-2 py-1 rounded-full ${isOn ? 'bg-primary-100 text-primary-700' : 'bg-gray-100 text-gray-500'}`}>
-                            {isOn ? 'Auto-renew on' : 'Auto-renew off'}
-                          </span>
-                        </div>
+                        <AutoRenewToggle
+                          key={key}
+                          enabled={isOn}
+                          onChange={(enabled) => {
+                            const newMap = { ...editableAutoRenewMap, [key]: enabled };
+                            setEditableAutoRenewMap(newMap);
+                          }}
+                          productName={item.productName || item.name}
+                        />
                       );
                     })}
                   </div>
                 )}
 
-                {/* Guardian Points */}
-                {pointsEarning && pointsEarning.points > 0 && (
-                  <div className={`p-3 rounded-xl border ${
-                    pointsEarning.isGoldMember ? 'bg-amber-50 border-amber-200' : 'bg-primary-50 border-primary-100'
-                  }`}>
-                    <div className="flex items-center gap-2 mb-1">
-                      <Shield className={`h-4 w-4 ${pointsEarning.isGoldMember ? 'text-amber-600' : 'text-primary-600'}`} />
-                      <span className={`text-sm font-medium ${pointsEarning.isGoldMember ? 'text-amber-800' : 'text-primary-800'}`}>
-                        {pointsEarning.isGoldMember ? 'Guardian Gold' : guardianTier || 'Guardian'} Member
-                      </span>
-                    </div>
-                    <p className={`text-sm ${pointsEarning.isGoldMember ? 'text-amber-700' : 'text-primary-700'}`}>
-                      You&apos;ll earn <strong>{pointsEarning.points} Guardian Points</strong> on this order
-                    </p>
-                  </div>
-                )}
+                {/* Guardian Points - Read-only (derived) */}
+                <GuardianPointsPreview
+                  points={pointsEarning?.points || 0}
+                  isGoldMember={pointsEarning?.isGoldMember}
+                  tier={guardianTier}
+                  pointsToNextTier={pointsToNextTier}
+                  nextTierName={nextTierName}
+                />
 
-                {/* Price Breakdown */}
+                {/* Price Breakdown - Read-only (calculated) */}
                 <div className="bg-white rounded-xl border border-gray-200 p-6">
                   <h3 className="text-sm font-semibold text-gray-900 mb-3">Order Total</h3>
                   <div className="space-y-2">
@@ -1093,36 +1109,36 @@ export default function Checkout() {
                 </div>
               </div>
 
-              {/* Right 33%: Place Order */}
+              {/* Right 33%: Continue to Payment */}
               <div className="lg:col-span-4">
                 <div className="lg:sticky lg:top-24 lg:self-start">
                   <div className="bg-white rounded-xl border border-gray-200 p-6">
-                    <h2 className="text-lg font-semibold text-gray-900 mb-4">Place Order</h2>
+                    <h2 className="text-lg font-semibold text-gray-900 mb-4">Continue to Payment</h2>
                     
                     <div className="space-y-3 mb-6">
                       <div className="flex items-center gap-2 text-sm text-gray-600">
                         <ShieldCheck className="h-4 w-4 text-green-500" />
-                        <span>Payment confirmed by Stripe</span>
+                        <span>All details verified</span>
                       </div>
                       <div className="flex items-center gap-2 text-sm text-gray-600">
                         <Lock className="h-4 w-4 text-gray-400" />
-                        <span>Secure & encrypted</span>
+                        <span>Secure checkout</span>
                       </div>
                     </div>
 
                     <button
-                      onClick={handleConfirmOrder}
-                      disabled={loading}
+                      onClick={handlePayment}
+                      disabled={loading || !canProceedToPayment}
                       className="w-full bg-primary-600 text-white py-3 rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-primary-700 transition-colors disabled:opacity-50"
                     >
                       {loading ? (
-                        <><Loader2 size={16} className="animate-spin" /> Processing...</>
+                        <><Loader2 size={16} className="animate-spin" /> Setting up payment...</>
                       ) : (
-                        <><Lock size={16} /> Place Order — ${orderTotal.toFixed(2)}</>
+                        <>Continue to Payment <ChevronRight size={16} /></>
                       )}
                     </button>
 
-                    <p className="text-xs text-gray-400 text-center mt-3">By placing this order, you agree to our <Link to="/terms" className="underline">Terms of Service</Link> and <Link to="/privacy" className="underline">Privacy Policy</Link>.</p>
+                    <p className="text-xs text-gray-400 text-center mt-3">By continuing, you agree to our <Link to="/terms" className="underline">Terms of Service</Link> and <Link to="/privacy" className="underline">Privacy Policy</Link>.</p>
                   </div>
                 </div>
               </div>

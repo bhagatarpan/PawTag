@@ -43,7 +43,7 @@ function extractFakePaymentIntentId(secret: string): string {
  * 100% = "✓ Payment Confirmed" (green, hold 500ms before redirect)
  */
 const PAYMENT_STATES = [
-  { progress: 0, text: 'Pay', icon: 'lock' },
+  { progress: 0, text: 'Place Order - Pay Now', icon: 'lock' },
   { progress: 25, text: 'Payment Submitted...', icon: 'spinner' },
   { progress: 50, text: 'Payment Processing...', icon: 'spinner' },
   { progress: 75, text: 'Payment Confirmed...', icon: 'spinner' },
@@ -243,7 +243,7 @@ export default function StripePaymentForm({ clientSecret, onPaymentSuccess, onPa
           {fakeProcessing ? (
             <><Loader2 size={16} className="animate-spin" /> Processing...</>
           ) : (
-            <><Lock size={16} /> Complete Order</>
+            <><Lock size={16} /> Place Order - Pay Now</>
           )}
         </button>
       </div>
