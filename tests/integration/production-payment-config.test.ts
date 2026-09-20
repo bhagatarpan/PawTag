@@ -31,6 +31,7 @@ describe('Integration: Production Payment Configuration Guardrails', () => {
       process.env.ALLOWED_ORIGINS = 'https://app.pawtag.co.nz';
       process.env.FRONTEND_URL = 'https://app.pawtag.co.nz';
       process.env.PAYMENT_MODE = 'stripe_live';
+      process.env.RESEND_API_KEY = 're_test_key_123';
 
       const { validateEnv } = await import('../../packages/api/src/config/validateEnv');
       expect(() => validateEnv()).not.toThrow();

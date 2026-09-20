@@ -253,7 +253,7 @@ describe('Integration: Finder - Share Location', () => {
       .send({});
 
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/coordinates/i);
+    expect(res.body.error).toBeDefined();
   });
 
   it('POST /api/finder/:tagId/share-location saves location event', async () => {

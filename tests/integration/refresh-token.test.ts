@@ -59,6 +59,7 @@ beforeEach(async () => {
   });
   const loginRes = await request(app)
     .post('/api/auth/login')
+    .set('x-client-platform', 'ios') // Non-browser: get refresh token in body
     .send({ email: 'refresh-test2@example.com', password: 'TestPass123!' });
   refreshToken = loginRes.body.data.refreshToken;
 });
@@ -68,6 +69,7 @@ describe('Refresh Token Flow', () => {
     it('should return new tokens with valid refresh token', async () => {
       const res = await request(app)
         .post('/api/auth/refresh')
+        .set('x-client-platform', 'ios') // Non-browser: get refresh token in body
         .send({ refreshToken });
 
       expect(res.status).toBe(200);
@@ -151,9 +153,10 @@ describe('Refresh Token Flow', () => {
   });
 
   describe('Login returns refresh token', () => {
-    it('should include refreshToken in login response', async () => {
+    it('should include refreshToken in login response for non-browser clients', async () => {
       const res = await request(app)
         .post('/api/auth/login')
+        .set('x-client-platform', 'ios') // Non-browser: get refresh token in body
         .send({ email: 'refresh-test2@example.com', password: 'TestPass123!' });
 
       expect(res.status).toBe(200);

@@ -42,7 +42,7 @@ const contactSchema = z.object({
   message: z.string().min(10, 'Message must be at least 10 characters').max(5000),
 });
 
-publicRouter.post('/contact', contactLimiter, async (req: Request, res: Response) => {
+publicRouter.post('/contact', contactLimiter as any, async (req: Request, res: Response) => {
   try {
     const parsed = contactSchema.safeParse(req.body);
     if (!parsed.success) {

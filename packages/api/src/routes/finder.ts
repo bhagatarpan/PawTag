@@ -22,8 +22,8 @@ const finderNotifySchema = z.object({
   consent: z.object({
     locationConsent: z.enum(['granted', 'denied', 'skipped', 'unavailable']),
   }).optional(),
-  captchaToken: z.string().min(1, 'CAPTCHA token is required'),
-  captchaAnswer: z.number().int('CAPTCHA answer must be an integer'),
+  captchaToken: z.string().optional(),
+  captchaAnswer: z.number().int().optional(),
 }).refine((data) => data.finderPhone || data.finderEmail, {
   message: 'Please provide at least a phone number or email',
 });

@@ -36,6 +36,7 @@ async function createVerifiedUser(overrides: Partial<{ email: string; password: 
 async function loginAs(email: string, password: string) {
   const res = await request(app)
     .post('/api/auth/login')
+    .set('x-client-platform', 'ios') // Non-browser: get refresh token in body
     .send({ email, password });
   return {
     status: res.status,
@@ -108,6 +109,7 @@ describe('Integration: Session Invalidation Matrix', () => {
       // Login with new password should succeed
       const newLogin = await request(app)
         .post('/api/auth/login')
+        .set('x-client-platform', 'ios') // Non-browser: get refresh token in body
         .send({ email, password: newPassword });
       expect(newLogin.status).toBe(200);
       expect(newLogin.body.data.token).toBeDefined();

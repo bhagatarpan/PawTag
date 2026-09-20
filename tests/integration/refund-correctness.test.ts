@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import mongoose from 'mongoose';
 import { setupTestDb, teardownTestDb, clearDb } from './setup';
-import { User, Order, PaymentTransaction } from '../../packages/db';
+import { User, Order, PaymentTransaction } from '@pawtag/db';
 
 async function createTestUser(overrides: Partial<{ email: string }> = {}) {
   const email = overrides.email || `user-${Date.now()}@example.com`;
