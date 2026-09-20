@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Lock, CreditCard, PawPrint, CheckCircle, Truck, Tag, Loader2,
   Mail, Smartphone, Shield, ChevronRight, Edit3, Check, Package, Clock,
-  ShieldCheck, Headphones, RefreshCw, FileText, Download, Printer, Share2, Home, ExternalLink, Crown
+  ShieldCheck, Headphones, RefreshCw, FileText, Download, Printer, Share2, Home, ExternalLink, Crown, ClipboardCheck
 } from 'lucide-react';
 import { AddressAutocomplete, InlineEditBanner } from '@pawtag/ui';
 import type { AddressComponents } from '@pawtag/ui';
@@ -26,11 +26,12 @@ const confirmationStyles = `
 @keyframes fade-in-up { 0% { transform: translateY(12px); opacity: 0; } 100% { transform: translateY(0); opacity: 1; } }
 `;
 
-type Step = 'checkout' | 'payment' | 'confirmed';
+type Step = 'checkout' | 'payment' | 'review' | 'confirmed';
 
 const STEPS = [
   { key: 'checkout' as Step, label: 'Delivery', icon: Truck },
   { key: 'payment' as Step, label: 'Payment', icon: CreditCard },
+  { key: 'review' as Step, label: 'Review', icon: ClipboardCheck },
   { key: 'confirmed' as Step, label: 'Confirmed', icon: CheckCircle },
 ];
 
@@ -82,6 +83,15 @@ export default function Checkout() {
   const [nextTierName, setNextTierName] = useState<string>('');
   const [isGoldMember, setIsGoldMember] = useState(false);
   const [estimatedPoints, setEstimatedPoints] = useState(0);
+
+  // Computed points earning for display
+  const pointsEarning = useMemo(() => {
+    if (!totals || totals.total <= 0) return null;
+    return {
+      points: Math.floor(totals.total * (isGoldMember ? 2 : 1)),
+      isGoldMember,
+    };
+  }, [totals, isGoldMember]);
 
   // Verification status
   const [emailVerified, setEmailVerified] = useState(false);
@@ -354,11 +364,13 @@ export default function Checkout() {
 
   const canProceedToCheckout = items.length > 0;
   const canProceedToPayment = emailVerified && mobileVerified && form.line1 && form.city && form.zip;
+  const canProceedToReview = canProceedToPayment && paymentClientSecret;
 
   // Step navigation
   const goToStep = (step: Step) => {
     if (step === 'checkout' && !canProceedToCheckout) return;
     if (step === 'payment' && !canProceedToPayment) return;
+    if (step === 'review' && !canProceedToReview) return;
     setCurrentStep(step);
     setError(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -543,8 +555,28 @@ export default function Checkout() {
     setLoading(true);
     setError(null);
     try {
-      // Drive progress: "Payment Processing..."
-      (window as any).__paymentProgress?.setProcessingStage?.('confirmed');
+      // Payment confirmed by Stripe — go to Review step
+      // Order will be created when user clicks "Place Order" on Review step
+      setPaymentClientSecret(paymentIntentId); // Store for reference
+      setCurrentStep('review');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (err: any) {
+      console.error('[Checkout] Payment success handler failed:', err);
+      setError('Something went wrong during payment processing. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle final order confirmation from Review step
+  const handleConfirmOrder = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const paymentIntentId = sessionStorage.getItem('pawtag_checkout_payment_intent');
+      if (!paymentIntentId) {
+        throw new Error('No payment session found. Please start checkout again.');
+      }
 
       // 1. Confirm checkout via PawTag API (creates Order + Invoice + sends emails)
       let pawtagOrder = null;
@@ -563,40 +595,30 @@ export default function Checkout() {
           const recoveryRes = await api.get(API.checkout.pending);
           const recoveryPending = recoveryRes.data?.data;
           if (recoveryPending && recoveryPending.status === 'converted' && recoveryPending.convertedOrderId) {
-            // Order was created — show confirmation
             pawtagOrder = { orderNumber: recoveryPending.orderNumber };
             invoice = recoveryPending.invoice || null;
           } else {
-            // Payment succeeded but order not created — show recoverable error
             setError('Your payment was received but we could not confirm your order. Please check your order history or contact support.');
             setLoading(false);
             return;
           }
         } catch {
-          // Recovery check failed — show error with support contact
           setError('Something went wrong confirming your order. Your payment was received — please contact support.');
           setLoading(false);
           return;
         }
       }
 
-      // 2. Only show confirmation if order was created
+      // 2. Show confirmation
       setConfirmedItems([...items]);
       setConfirmedTotal(total);
       setConfirmedInvoice(invoice);
       setConfirmedPawTagOrder(pawtagOrder);
       setOrderNumber(pawtagOrder?.orderNumber || paymentIntentId.slice(-8));
 
-      // Drive progress: "Payment Confirmed..." → "✓ Payment Confirmed"
-      (window as any).__paymentProgress?.setProcessingStage?.('complete');
-
-      // 3. Wait for green animation, then show confirmation
-      await new Promise((r) => setTimeout(r, 600));
-
       setSuccess(true);
       setCurrentStep('confirmed');
       
-      // Track checkout completion
       analytics.trackCheckoutComplete(
         total,
         pawtagOrder?.orderNumber || paymentIntentId.slice(-8)
@@ -607,8 +629,8 @@ export default function Checkout() {
       sessionStorage.setItem('pawtag_checkout_order', pawtagOrder?.orderNumber || paymentIntentId.slice(-8));
       clearCart();
     } catch (err: any) {
-      console.error('[Checkout] Payment success handler failed:', err);
-      setError('Something went wrong during payment processing. — please contact support.');
+      console.error('[Checkout] Order confirmation failed:', err);
+      setError('Something went wrong during order confirmation. Please try again.');
       await refreshCart();
     } finally {
       setLoading(false);
@@ -942,7 +964,173 @@ export default function Checkout() {
           </div>
         )}
 
-        {/* Step 4: Confirmed */}
+        {/* Step 4: Review — Full summary before final confirmation */}
+        {currentStep === 'review' && (
+          <div className="max-w-[1280px] mx-auto">
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">Review Your Order</h1>
+            <p className="text-gray-500 mb-6">Please review all details before placing your order</p>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+              {/* Left 67%: Order Summary */}
+              <div className="lg:col-span-8 space-y-4">
+                {/* Items */}
+                <div className="bg-white rounded-xl border border-gray-200 p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-lg font-semibold text-gray-900">Items ({items.length})</h2>
+                    <Link to="/cart" className="text-sm text-primary-600 hover:text-primary-700">Edit Cart</Link>
+                  </div>
+                  {items.map((item) => (
+                    <div key={item.productId || item.variantId} className="flex gap-3 mb-4 pb-4 border-b border-gray-100 last:border-0">
+                      <div className="h-14 w-14 bg-primary-50 rounded-lg flex-shrink-0 flex items-center justify-center overflow-hidden">
+                        {item.image ? <img src={item.image} alt="" className="h-full w-full object-cover" /> : <PawPrint className="h-6 w-6 text-primary-300" />}
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-medium text-gray-900">{item.productName || item.name}</p>
+                        {item.customisationTexts && item.customisationTexts.length > 0 && item.customisationTexts.some(t => t) && (
+                          <div className="text-xs text-primary-600">
+                            {item.customisationTexts.filter(t => t).map((t, i) => (
+                              <p key={i}>Pet name: {t}</p>
+                            ))}
+                          </div>
+                        )}
+                        <p className="text-xs text-gray-500">Qty: {item.quantity} x ${(item.unitPrice || item.price || 0).toFixed(2)}</p>
+                      </div>
+                      <p className="font-semibold text-gray-900">${((item.unitPrice || item.price || 0) * item.quantity).toFixed(2)}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Promo Code */}
+                {promoCode && (
+                  <div className="bg-white rounded-xl border border-gray-200 p-6">
+                    <h3 className="text-sm font-semibold text-gray-900 mb-3">Promo Code</h3>
+                    <div className="flex items-center justify-between bg-green-50 rounded-xl px-4 py-3">
+                      <div className="flex items-center gap-2 text-sm text-green-700">
+                        <Tag size={14} />
+                        <span className="font-medium">{promoCode}</span>
+                        <span>applied</span>
+                        {discountAmount > 0 && <span className="text-green-600">(-${discountAmount.toFixed(2)})</span>}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Shipping Method */}
+                <div className="bg-white rounded-xl border border-gray-200 p-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-semibold text-gray-900">Shipping Method</h3>
+                    <button onClick={() => goToStep('checkout')} className="text-sm text-primary-600 hover:text-primary-700">Change</button>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <Truck size={16} className="text-gray-400" />
+                    <span className="text-gray-900">{shippingOptions.find(o => o.id === selectedShippingOption)?.name || 'Standard Shipping'}</span>
+                    <span className={`font-medium ${shippingCost === 0 ? 'text-green-600' : 'text-gray-900'}`}>
+                      {shippingCost === 0 ? 'FREE' : `$${shippingCost.toFixed(2)}`}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Shipping Address */}
+                {form.line1 && (
+                  <div className="bg-white rounded-xl border border-gray-200 p-6">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-sm font-semibold text-gray-900">Shipping Address</h3>
+                      <button onClick={() => goToStep('checkout')} className="text-sm text-primary-600 hover:text-primary-700">Change</button>
+                    </div>
+                    <p className="text-sm text-gray-900">{user?.fullName || 'Customer'}</p>
+                    <p className="text-sm text-gray-600">{form.line1}{form.line2 ? `, ${form.line2}` : ''}</p>
+                    <p className="text-sm text-gray-600">{form.city} {form.zip}</p>
+                    <p className="text-sm text-gray-600">New Zealand</p>
+                  </div>
+                )}
+
+                {/* Auto-Renew */}
+                {items.some((item: any) => item.isSubscription || item.autoRenew) && (
+                  <div className="bg-white rounded-xl border border-gray-200 p-6">
+                    <h3 className="text-sm font-semibold text-gray-900 mb-3">Subscription Auto-Renew</h3>
+                    {items.filter((item: any) => item.isSubscription || item.autoRenew).map((item: any) => {
+                      const key = item._id || item.productId;
+                      const isOn = autoRenewMap[key] !== false;
+                      return (
+                        <div key={key} className="flex items-center justify-between py-2">
+                          <span className="text-sm text-gray-700">{item.productName || item.name}</span>
+                          <span className={`text-xs font-medium px-2 py-1 rounded-full ${isOn ? 'bg-primary-100 text-primary-700' : 'bg-gray-100 text-gray-500'}`}>
+                            {isOn ? 'Auto-renew on' : 'Auto-renew off'}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Guardian Points */}
+                {pointsEarning && pointsEarning.points > 0 && (
+                  <div className={`p-3 rounded-xl border ${
+                    pointsEarning.isGoldMember ? 'bg-amber-50 border-amber-200' : 'bg-primary-50 border-primary-100'
+                  }`}>
+                    <div className="flex items-center gap-2 mb-1">
+                      <Shield className={`h-4 w-4 ${pointsEarning.isGoldMember ? 'text-amber-600' : 'text-primary-600'}`} />
+                      <span className={`text-sm font-medium ${pointsEarning.isGoldMember ? 'text-amber-800' : 'text-primary-800'}`}>
+                        {pointsEarning.isGoldMember ? 'Guardian Gold' : guardianTier || 'Guardian'} Member
+                      </span>
+                    </div>
+                    <p className={`text-sm ${pointsEarning.isGoldMember ? 'text-amber-700' : 'text-primary-700'}`}>
+                      You&apos;ll earn <strong>{pointsEarning.points} Guardian Points</strong> on this order
+                    </p>
+                  </div>
+                )}
+
+                {/* Price Breakdown */}
+                <div className="bg-white rounded-xl border border-gray-200 p-6">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-3">Order Total</h3>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm"><span className="text-gray-600">Subtotal</span><span className="text-gray-900">${itemsSubtotal.toFixed(2)}</span></div>
+                    {discountAmount > 0 && <div className="flex justify-between text-sm"><span className="text-green-600">Discount</span><span className="text-green-600">-${discountAmount.toFixed(2)}</span></div>}
+                    <div className="flex justify-between text-sm"><span className="text-gray-600">Shipping</span><span className={`font-medium ${shippingCost === 0 ? 'text-green-600' : 'text-gray-900'}`}>{shippingCost === 0 ? 'FREE' : `$${shippingCost.toFixed(2)}`}</span></div>
+                    <div className="flex justify-between text-sm"><span className="text-gray-600">Tax (Included)</span><span className="text-gray-900">${taxAmount.toFixed(2)}</span></div>
+                    <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-100"><span>Estimated Total</span><span className="text-primary-700">${orderTotal.toFixed(2)}</span></div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right 33%: Place Order */}
+              <div className="lg:col-span-4">
+                <div className="lg:sticky lg:top-24 lg:self-start">
+                  <div className="bg-white rounded-xl border border-gray-200 p-6">
+                    <h2 className="text-lg font-semibold text-gray-900 mb-4">Place Order</h2>
+                    
+                    <div className="space-y-3 mb-6">
+                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <ShieldCheck className="h-4 w-4 text-green-500" />
+                        <span>Payment confirmed by Stripe</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <Lock className="h-4 w-4 text-gray-400" />
+                        <span>Secure & encrypted</span>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={handleConfirmOrder}
+                      disabled={loading}
+                      className="w-full bg-primary-600 text-white py-3 rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-primary-700 transition-colors disabled:opacity-50"
+                    >
+                      {loading ? (
+                        <><Loader2 size={16} className="animate-spin" /> Processing...</>
+                      ) : (
+                        <><Lock size={16} /> Place Order — ${orderTotal.toFixed(2)}</>
+                      )}
+                    </button>
+
+                    <p className="text-xs text-gray-400 text-center mt-3">By placing this order, you agree to our <Link to="/terms" className="underline">Terms of Service</Link> and <Link to="/privacy" className="underline">Privacy Policy</Link>.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Step 5: Confirmed */}
         {currentStep === 'confirmed' && (
           <CheckoutConfirmationStep
             orderNumber={orderNumber}

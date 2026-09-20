@@ -1,6 +1,6 @@
-import { Check, CreditCard, Truck, CheckCircle } from 'lucide-react';
+import { Check, CreditCard, Truck, ClipboardCheck, CheckCircle } from 'lucide-react';
 
-type StepKey = 'checkout' | 'payment' | 'confirmed';
+type StepKey = 'checkout' | 'payment' | 'review' | 'confirmed';
 
 interface Step {
   key: StepKey;
@@ -11,6 +11,7 @@ interface Step {
 const STEPS: Step[] = [
   { key: 'checkout', label: 'Delivery', icon: Truck },
   { key: 'payment', label: 'Payment', icon: CreditCard },
+  { key: 'review', label: 'Review', icon: ClipboardCheck },
   { key: 'confirmed', label: 'Confirmed', icon: CheckCircle },
 ];
 
@@ -53,3 +54,5 @@ export default function CheckoutStepIndicator({ currentStep, onStepClick }: Chec
     </div>
   );
 }
+
+export type { StepKey };

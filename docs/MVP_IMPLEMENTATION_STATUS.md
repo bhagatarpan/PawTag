@@ -154,6 +154,22 @@ All quality gates pass:
 - [x] 13.2 Updated CheckoutStepIndicator — 3 steps (Delivery → Payment → Confirmed)
 - [x] 13.3 Updated checkout layout to consistent 70/30 shell — `lg:grid-cols-12` with 8/4 split on payment step
 
+### V2 Phase 14 — Checkout Review Step + Shared Components
+- [x] 14.1 Extracted `PromoCodeControl` as shared component from OrderSummary.tsx
+- [x] 14.2 Extracted `ShippingMethodSelect` as shared component
+- [x] 14.3 Created `AutoRenewToggle` component
+- [x] 14.4 Created `GuardianPointsPreview` component
+- [x] 14.5 Added 4th "Review" step to checkout flow (Delivery → Payment → Review → Confirmed)
+- [x] 14.6 Updated CheckoutStepIndicator to support 4 steps
+- [x] 14.7 Review step shows: items, promo code, shipping method, address, auto-renew, Guardian points, totals
+- [x] 14.8 Payment step now only shows Stripe form
+- [x] 14.9 Split handlePaymentSuccess into payment confirmation + order creation
+- [x] 14.10 Created `skills/api-urls/SKILL.md` — enforce centralized API endpoint usage
+- [x] 14.11 Fixed Checkout.tsx double-prefix bugs and direct axios import
+- [x] 14.12 Added VITE_API_URL support to web app
+- [x] 14.13 Fixed fake payment mode handling in StripePaymentForm
+- [x] 14.14 Fixed fake client secret format in Stripe provider
+
 ### Phase 2 — Finder and Pet Recovery Reliability
 - [x] 2.1 Public Finder DTO
 - [x] 2.2 Recovery state semantics
