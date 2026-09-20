@@ -27,11 +27,10 @@ const confirmationStyles = `
 @keyframes fade-in-up { 0% { transform: translateY(12px); opacity: 0; } 100% { transform: translateY(0); opacity: 1; } }
 `;
 
-type Step = 'cart' | 'checkout' | 'payment' | 'confirmed';
+type Step = 'checkout' | 'payment' | 'confirmed';
 
 const STEPS = [
-  { key: 'cart' as Step, label: 'Cart', icon: Package },
-  { key: 'checkout' as Step, label: 'Checkout', icon: Truck },
+  { key: 'checkout' as Step, label: 'Delivery', icon: Truck },
   { key: 'payment' as Step, label: 'Payment', icon: CreditCard },
   { key: 'confirmed' as Step, label: 'Confirmed', icon: CheckCircle },
 ];
@@ -44,7 +43,7 @@ export default function Checkout() {
   // Step management — always start at cart step on mount.
   // sessionStorage restoration caused a race condition: step restored before
   // cart loaded from server, rendering step 2/3 with empty items = blank screen.
-  const [currentStep, setCurrentStep] = useState<Step>('cart');
+  const [currentStep, setCurrentStep] = useState<Step>('checkout');
 
   // Form state
   const [loading, setLoading] = useState(false);
@@ -187,7 +186,7 @@ export default function Checkout() {
   // Payment state recovery on re-entry
   // If user refreshes during payment, check if order was already created
   useEffect(() => {
-    if (!user || success || currentStep !== 'cart' || !storedPaymentIntentId) return;
+    if (!user || success || currentStep !== 'checkout' || !storedPaymentIntentId) return;
 
     const recoverPayment = async () => {
       setRecoveringPayment(true);
@@ -620,15 +619,10 @@ export default function Checkout() {
     setError(message);
   };
 
-  // Empty cart — but only show if we're not loading, not in payment flow, and not on confirmed step
-  if (items.length === 0 && !success && !loading && currentStep === 'cart') {
-    return (
-      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-4 p-4">
-        <PawPrint className="h-16 w-16 text-gray-300" />
-        <h2 className="text-xl font-semibold text-gray-700">Your cart is empty</h2>
-        <Link to="/shop" className="text-primary-600 hover:text-primary-700 font-medium">← Back to Shop</Link>
-      </div>
-    );
+  // Empty cart — redirect to cart page
+  if (items.length === 0 && !success && !loading && currentStep === 'checkout') {
+    navigate('/cart');
+    return null;
   }
 
   return (
@@ -645,306 +639,11 @@ export default function Checkout() {
           </div>
         )}
 
-        {/* Step 1: Cart Review */}
-        {currentStep === 'cart' && (
-          <div className="max-w-4xl mx-auto">
-            <h1 className="text-2xl font-bold text-gray-900 mb-6">Your Cart</h1>
-            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-              <div className="p-6 border-b border-gray-100">
-                <div className="flex flex-wrap items-center gap-2 text-sm text-gray-500">
-                  <ShieldCheck className="h-4 w-4 text-primary-600 flex-shrink-0" />
-                  <span>{trustBadgeTitle}</span>
-                  {trustBadgeItems.map((item, i) => (
-                    <span key={i} className="flex items-center gap-1">
-                      <Check className="h-3 w-3 text-green-500 flex-shrink-0" />
-                      <span className="text-gray-600">{item}</span>
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              {/* Items */}
-              <div className="px-6 space-y-4">
-                    {items.map((item) => {
-                      const itemId = item._id || item.productId || '';
-                      const texts = getItemTexts(itemId, item);
-                      const hasCustomisation = item.customisation === true;
-                      const isCustomizable = item.customizable === true;
-                      const labelText = item.customizationLabel || 'customisation';
-                      const engravingPrice = item.customizationPrice || 0;
-
-                      return (
-                        <div key={itemId} className="border-b border-gray-50 pb-4 last:border-0">
-                          <div className="flex items-center gap-3">
-                            <div className="h-14 w-14 bg-primary-50 rounded-lg flex-shrink-0 flex items-center justify-center overflow-hidden">
-                              {item.image ? <img src={item.image} alt="" className="h-full w-full object-cover" /> : <PawPrint className="h-6 w-6 text-primary-300" />}
-                            </div>
-                            <div className="flex-1">
-                              <p className="font-medium text-gray-900">{item.productName || item.name}</p>
-                              <p className="text-xs text-gray-500">Qty: {item.quantity} × ${(item.unitPrice || item.price || 0).toFixed(2)}</p>
-                            </div>
-                            <p className="text-sm font-semibold text-gray-900">${((item.unitPrice || item.price || 0) * item.quantity).toFixed(2)}</p>
-                          </div>
-
-                          {/* Engraving section — only for customizable products */}
-                          {isCustomizable && (
-                            <div className="mt-3 ml-17">
-                              {!hasCustomisation ? (
-                                <label className="flex items-center gap-2 cursor-pointer">
-                                  <input
-                                    type="checkbox"
-                                    onChange={(e) => handleToggleEngraving(itemId, item, e.target.checked)}
-                                    className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                                  />
-                                  <span className="text-sm text-primary-700">
-                                    Add {labelText}
-                                  </span>
-                                  {engravingPrice > 0 && (
-                                    <span className="text-xs text-gray-500">(+${engravingPrice.toFixed(2)})</span>
-                                  )}
-                                </label>
-                              ) : (
-                                <InlineEditBanner
-                                  icon={<PawPrint className="h-4 w-4" />}
-                                  label={labelText}
-                                  description={texts.filter(t => t).map(t => `Pet name: ${t}`).join(', ') || 'No name added yet'}
-                                  variant="success"
-                                  onRemove={() => handleToggleEngraving(itemId, item, false)}
-                                  onExpand={() => handleExpandEngraving(itemId, item)}
-                                  expanded={expandedEngraving[itemId] || false}
-                                >
-                                  <div className="space-y-2 mt-2">
-                                    {texts.map((text, idx) => (
-                                      <div key={idx} className="flex items-center gap-2">
-                                        <span className="text-xs text-gray-500 w-16 shrink-0">Name #{idx + 1}:</span>
-                                        <input
-                                          type="text"
-                                          value={text}
-                                          onChange={(e) => handleTextChange(itemId, idx, e.target.value)}
-                                          placeholder={`Enter ${labelText.toLowerCase()}`}
-                                          maxLength={16}
-                                          className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                                        />
-                                      </div>
-                                    ))}
-                                    {/* Single Save button */}
-                                    <div className="flex items-center justify-between mt-3 pt-2 border-t border-green-100">
-                                      {savedTexts[itemId] ? (
-                                        <span className="text-xs text-green-600 font-medium flex items-center gap-1">
-                                          <Check size={14} /> Saved
-                                        </span>
-                                      ) : (
-                                        <span className="text-xs text-gray-400">Max 16 characters per name</span>
-                                      )}
-                                      <button
-                                        onClick={() => handleSaveTexts(itemId)}
-                                        disabled={savingTexts[itemId]}
-                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
-                                      >
-                                        {savingTexts[itemId] ? (
-                                          <><Loader2 size={12} className="animate-spin" /> Saving...</>
-                                        ) : (
-                                          <><Check size={12} /> Save</>
-                                        )}
-                                      </button>
-                                    </div>
-                                    {cartError && (
-                                      <p className="text-xs text-red-500 mt-1">{cartError}</p>
-                                    )}
-                                  </div>
-                                </InlineEditBanner>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-              </div>
-
-              {/* Summary */}
-              <div className="px-6 py-4 border-t border-gray-100">
-                {/* Promo code section */}
-                  <div className="mb-4">
-                  {promoApplied ? (
-                  <div className="flex items-center justify-between text-sm p-3 bg-green-50 border border-green-200 rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <Tag className="h-4 w-4 text-green-600" />
-                      <span className="font-medium text-green-700">{promoCode}</span>
-                      <span className="text-green-600">applied — saved ${discountAmount.toFixed(2)}</span>
-                    </div>
-                    <button onClick={removePromoCode} className="text-xs text-gray-500 hover:text-red-500 font-medium ml-2">Remove</button>
-                  </div>
-                ) : guestPromoInfo ? (
-                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Tag className="h-4 w-4 text-blue-600" />
-                        <span className="font-medium text-blue-700">{guestPromoInfo.code}</span>
-                        <span className="text-blue-600">
-                          — {guestPromoInfo.discountType === 'percentage'
-                            ? `${guestPromoInfo.discountValue}% off`
-                            : `$${guestPromoInfo.discountValue} off`}
-                          {guestPromoInfo.minOrderAmount > 0 && ` (min order: $${guestPromoInfo.minOrderAmount})`}
-                        </span>
-                      </div>
-                      <button onClick={() => { setGuestPromoInfo(null); setPromoCodeCtx(''); }} className="text-xs text-gray-500 hover:text-red-500 font-medium ml-2">Remove</button>
-                    </div>
-                    <p className="text-xs text-blue-600 mt-1">Log in to apply this discount to your order</p>
-                  </div>
-                ) : (
-                  <>
-                    <div className="flex gap-2 mb-1">
-                      <input type="text" value={promoCode || ''} onChange={e => { setPromoCodeCtx(e.target.value.toUpperCase()); setPromoError(''); }} placeholder="Add promo code" disabled={promoApplied} className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-primary-500 disabled:bg-gray-50 disabled:text-gray-400" />
-                      <button onClick={applyPromoCode} disabled={!promoCode || promoLoading || promoApplied} className="px-4 py-2 text-sm text-primary-600 border border-primary-200 rounded-lg hover:bg-primary-50 disabled:opacity-50">
-                        {promoLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Apply'}
-                      </button>
-                    </div>
-                    {promoError && <p className="text-xs text-red-500">{promoError}</p>}
-                  </>
-                )}
-                  </div>
-
-                {/* PawRewards Redemption */}
-                {user && pawRewardsBalance > 0 && (
-                  <div className="border-t border-gray-100 pt-4 mt-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <PawPrint className="h-4 w-4 text-amber-500" />
-                        <span className="text-sm font-medium text-gray-700">PawRewards</span>
-                      </div>
-                      <span className="text-sm text-amber-600 font-medium">${pawRewardsBalance.toFixed(2)} available</span>
-                    </div>
-                    <p className="text-xs text-gray-500 mb-3">Redeem your PawRewards for instant discounts</p>
-                    <div className="flex gap-2">
-                      <input
-                        type="number"
-                        min="0"
-                        max={Math.min(pawRewardsBalance, itemsSubtotal + shippingCost + taxAmount - discountAmount)}
-                        step="0.01"
-                        value={pawRewardsRedemption || ''}
-                        onChange={(e) => {
-                          const value = parseFloat(e.target.value) || 0;
-                          setPawRewardsRedemption(Math.min(value, pawRewardsBalance));
-                        }}
-                        placeholder="0.00"
-                        className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-amber-500 disabled:bg-gray-50"
-                        disabled={pawRewardsLoading}
-                      />
-                      <button
-                        onClick={() => handlePawRewardsRedemption(pawRewardsRedemption)}
-                        disabled={pawRewardsLoading || pawRewardsRedemption < 2}
-                        className="px-4 py-2 text-sm text-amber-600 border border-amber-200 rounded-lg hover:bg-amber-50 disabled:opacity-50"
-                      >
-                        {pawRewardsLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Apply'}
-                      </button>
-                    </div>
-                    {pawRewardsRedemption > 0 && (
-                      <div className="mt-2 flex items-center justify-between">
-                        <span className="text-xs text-amber-600">Redeeming ${pawRewardsRedemption.toFixed(2)}</span>
-                        <button
-                          onClick={() => setPawRewardsRedemption(0)}
-                          className="text-xs text-red-500 hover:text-red-600"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Guardian Loyalty Messaging */}
-                <div className="border-t border-gray-100 pt-4 mt-4">
-                  {!user ? (
-                    // Guest — prompt to join Guardian
-                    <div className="flex items-start gap-3 p-3 bg-primary-50 border border-primary-100 rounded-lg">
-                      <Shield className="h-5 w-5 text-primary-600 mt-0.5 flex-shrink-0" />
-                      <div>
-                        <p className="text-sm font-medium text-primary-800">You're not earning Guardian Points</p>
-                        <p className="text-xs text-primary-600 mt-1">Join Guardian (free) to earn points on this order and unlock PawRewards.</p>
-                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2">
-                          <Link to="/shop" className="text-xs font-medium text-primary-700 underline">Learn more</Link>
-                          <span className="text-xs text-primary-300">|</span>
-                          <Link to="/register" className="text-xs font-medium text-primary-700 underline">Register free</Link>
-                          <span className="text-xs text-primary-300">|</span>
-                          <Link to="/login" className="text-xs font-medium text-primary-700 underline">Already a customer? Login</Link>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    // Logged in — show personalized points earning info
-                    <div className={`p-3 rounded-lg border ${isGoldMember ? 'bg-amber-50 border-amber-200' : 'bg-primary-50 border-primary-100'}`}>
-                      <div className="flex items-center gap-2 mb-1">
-                        <Shield className={`h-4 w-4 ${isGoldMember ? 'text-amber-600' : 'text-primary-600'}`} />
-                        <span className={`text-sm font-medium ${isGoldMember ? 'text-amber-800' : 'text-primary-800'}`}>
-                          {isGoldMember ? 'Gold' : guardianTier || 'Guardian'} Member
-                        </span>
-                        {isGoldMember && <span className="text-xs bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded-full font-medium">2x Points</span>}
-                      </div>
-                      <p className={`text-sm ${isGoldMember ? 'text-amber-700' : 'text-primary-700'}`}>
-                        This order will earn you approximately <strong>{estimatedPoints} Points</strong>
-                      </p>
-                      {pointsToNextTier && pointsToNextTier > 0 && (
-                        <p className="text-xs text-gray-500 mt-1">
-                          {pointsToNextTier} Points to {nextTierName}
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Auto-Renew Status */}
-                {hasSubscriptionItems && (
-                  <div className="border-t border-gray-100 pt-4 mt-4">
-                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Subscription Auto-Renew</p>
-                    {items.filter((item: any) => item.isSubscription || item.monthlyPrice).map((item: any) => {
-                      const key = item._id || item.productId;
-                      const isOn = autoRenewMap[key] !== false;
-                      return (
-                        <div key={key} className="flex items-center justify-between py-1">
-                          <span className="text-sm text-gray-700">{item.productName || item.name}</span>
-                          <span className={`text-xs font-medium ${isOn ? 'text-primary-600' : 'text-gray-400'}`}>
-                            {isOn ? 'Auto-renew on' : 'Auto-renew off'}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                <div className="space-y-2 pt-2">
-                  <div className="flex justify-between text-sm text-gray-600"><span>Subtotal</span><span>${itemsSubtotal.toFixed(2)}</span></div>
-                  {discountAmount > 0 && <div className="flex justify-between text-sm text-green-600"><span>Discount</span><span>-${discountAmount.toFixed(2)}</span></div>}
-                  {pawRewardsDiscount > 0 && <div className="flex justify-between text-sm text-amber-600"><span>PawRewards</span><span>-${pawRewardsDiscount.toFixed(2)}</span></div>}
-                  <div className="flex justify-between text-sm text-gray-600"><span>Shipping</span><span className={`font-medium ${shippingCost === 0 ? 'text-green-600' : 'text-gray-900'}`}>{shippingCost === 0 ? 'FREE' : `$${shippingCost.toFixed(2)}`}</span></div>
-                  <div className="flex justify-between text-sm text-gray-600"><span>Tax (Included)</span><span>${taxAmount.toFixed(2)}</span></div>
-                  <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-100"><span>Estimated Total</span><span className="text-primary-700">${orderTotal.toFixed(2)}</span></div>
-                </div>
-              </div>
-
-              <div className="px-6 py-4 border-t border-gray-100 bg-gray-50">
-                <div className="flex items-center gap-2 text-xs text-gray-500 mb-4">
-                  <Lock className="h-4 w-4" /> <span>Secure & Trusted Checkout</span>
-                </div>
-                <p className="text-xs text-gray-400 mb-4">Your information is encrypted and safe with us. We never store your card details.</p>
-                <div className="flex items-center gap-4 text-xs text-gray-400 mb-4">
-                  <span className="flex items-center gap-1"><Lock className="h-3 w-3" /> SSL Encrypted</span>
-                  <span className="flex items-center gap-1"><Shield className="h-3 w-3" /> PCI DSS Compliant</span>
-                  <span className="flex items-center gap-1">Powered by PawTag</span>
-                </div>
-                <button onClick={() => goToStep('checkout')} className="w-full py-3 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 transition-all flex items-center justify-center gap-2">
-                  Proceed to Checkout <ChevronRight className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Step 2: Checkout (Verification + Address) */}
+        {/* Step 1: Checkout (Verification + Address) — 70/30 layout */}
         {currentStep === 'checkout' && (
-          <div className="max-w-4xl mx-auto">
+          <div className="max-w-[1280px] mx-auto">
             <div className="flex items-center justify-between mb-6">
-              <Link to="/shop" className="inline-flex items-center gap-2 text-gray-500 hover:text-primary-600 text-sm"><ArrowLeft className="h-4 w-4" /> Back to Shop</Link>
-              <button onClick={() => goToStep('cart')} className="text-sm text-primary-600 hover:text-primary-700">Edit Cart</button>
+              <Link to="/cart" className="inline-flex items-center gap-2 text-gray-500 hover:text-primary-600 text-sm"><ArrowLeft className="h-4 w-4" /> Back to Cart</Link>
             </div>
             <h1 className="text-2xl font-bold text-gray-900 mb-2">Checkout</h1>
             <p className="text-gray-500 mb-6">Verify your contact details and shipping address</p>
@@ -1099,18 +798,18 @@ export default function Checkout() {
           </div>
         )}
 
-        {/* Step 3: Review & Pay */}
+        {/* Step 3: Review & Pay — 70/30 layout */}
         {currentStep === 'payment' && (
-          <div className="max-w-5xl mx-auto">
+          <div className="max-w-[1280px] mx-auto">
             <h1 className="text-2xl font-bold text-gray-900 mb-2">Review & Pay</h1>
             <p className="text-gray-500 mb-6">Review your order and complete payment</p>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* Left: Order Summary */}
-              <div className="space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+              {/* Left 67%: Order Summary */}
+              <div className="lg:col-span-8 space-y-4">
                 <div className="bg-white rounded-xl border border-gray-200 p-6">
                   <h2 className="text-lg font-semibold text-gray-900 mb-4">Order Summary</h2>
-                  <button onClick={() => goToStep('cart')} className="text-sm text-primary-600 hover:text-primary-700 mb-4">Edit Cart</button>
+                  <Link to="/cart" className="text-sm text-primary-600 hover:text-primary-700 mb-4 inline-block">Edit Cart</Link>
                   {items.map((item) => (
                     <div key={item.productId || item.variantId} className="flex gap-3 mb-4 pb-4 border-b border-gray-100 last:border-0">
                       <div className="h-14 w-14 bg-primary-50 rounded-lg flex-shrink-0 flex items-center justify-center overflow-hidden">
@@ -1154,8 +853,8 @@ export default function Checkout() {
                 </div>
               </div>
 
-              {/* Right: Payment Method */}
-              <div className="space-y-4">
+              {/* Right 33%: Payment Method */}
+              <div className="lg:col-span-4 space-y-4">
                 <div className="bg-white rounded-xl border border-gray-200 p-6">
                   <h2 className="text-lg font-semibold text-gray-900 mb-4">Payment Method</h2>
                   {paymentClientSecret ? (

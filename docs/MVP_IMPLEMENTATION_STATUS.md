@@ -149,6 +149,11 @@ All quality gates pass:
 - [x] 12.3 Fixed guest messaging — changed "Guest checkout" to "Your cart is saved on this device. Sign in or create an account to continue to checkout and save your cart."
 - [x] 12.4 Order summary hierarchy preserved — subtotal, discount, shipping, GST, estimated total, promo, Guardian benefits, checkout CTA, trust cues
 
+### V2 Phase 13 — Checkout UX Redesign: Persistent Premium 70/30 Shell
+- [x] 13.1 Removed Cart step from checkout — flow now starts at Delivery (cart editing happens at /cart)
+- [x] 13.2 Updated CheckoutStepIndicator — 3 steps (Delivery → Payment → Confirmed)
+- [x] 13.3 Updated checkout layout to consistent 70/30 shell — `lg:grid-cols-12` with 8/4 split on payment step
+
 ### Phase 2 — Finder and Pet Recovery Reliability
 - [x] 2.1 Public Finder DTO
 - [x] 2.2 Recovery state semantics
@@ -267,6 +272,7 @@ All quality gates pass:
 | V2 Phase 10 — Auth/Session Security | ✅ Complete | 4/4 |
 | V2 Phase 11 — Finder Recovery/Privacy | ✅ Complete | 4/4 |
 | V2 Phase 12 — Premium Cart Redesign | ✅ Complete | 4/4 |
+| V2 Phase 13 — Checkout UX Redesign | ✅ Complete | 3/3 |
 | Phase 1 — Production Safety | ✅ Complete | 6/6 |
 | Phase 2 — Finder Reliability | ✅ Complete | 5/5 |
 | Phase 3 — Commerce/Payments | ✅ Complete | 6/6 |
@@ -290,6 +296,6 @@ All quality gates pass:
 
 ## Next Recommended Work Packet
 
-**V2 Phase 13 — Checkout UX and Customer Web Hardening**
+**V2 Phase 14 — Web End-to-End Quality Gate**
 
-Per the V2 plan, the next priority is decomposing the checkout page and adding proper state/failure recovery.
+Per the V2 plan, the next priority is establishing Playwright-based E2E tests for the critical web journeys.

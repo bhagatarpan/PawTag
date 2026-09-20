@@ -1,16 +1,15 @@
-import { Check, ShoppingCart, CreditCard, Truck, CheckCircle } from 'lucide-react';
+import { Check, CreditCard, Truck, CheckCircle } from 'lucide-react';
 
-type StepKey = 'cart' | 'checkout' | 'payment' | 'confirmed';
+type StepKey = 'checkout' | 'payment' | 'confirmed';
 
 interface Step {
   key: StepKey;
   label: string;
-  icon: typeof ShoppingCart;
+  icon: typeof Truck;
 }
 
 const STEPS: Step[] = [
-  { key: 'cart', label: 'Cart', icon: ShoppingCart },
-  { key: 'checkout', label: 'Details', icon: Truck },
+  { key: 'checkout', label: 'Delivery', icon: Truck },
   { key: 'payment', label: 'Payment', icon: CreditCard },
   { key: 'confirmed', label: 'Confirmed', icon: CheckCircle },
 ];
@@ -25,7 +24,7 @@ export default function CheckoutStepIndicator({ currentStep, onStepClick }: Chec
     <div className="flex items-center justify-center mb-8" role="navigation" aria-label="Checkout progress">
       {STEPS.map((step, i) => {
         const isActive = currentStep === step.key;
-        const isComplete = STEPS.findIndex(s => s.key === currentStep) > i && currentStep !== 'cart';
+        const isComplete = STEPS.findIndex(s => s.key === currentStep) > i;
         const StepIcon = step.icon;
         return (
           <div key={step.key} className="flex items-center">
