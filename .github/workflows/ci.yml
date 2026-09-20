@@ -7,8 +7,8 @@ on:
     branches: [main, develop]
 
 env:
-  NODE_VERSION: '20'
-  PNPM_VERSION: '9'
+  NODE_VERSION: '22'
+  PNPM_VERSION: '11.14.0'
 
 jobs:
   # ─── Smoke Tests (every push/PR) ────────────────────────────────
