@@ -965,71 +965,21 @@ router.get('/orders/:id/invoice', requirePermission('order.read'), async (req: A
 });
 
 /**
- * POST /api/customer/orders/place — Create PawTag order from confirmed payment.
+ * POST /api/customer/orders/place — DEPRECATED / REMOVED
  *
- * Called by the frontend after checkout confirmation to create the order,
- * invoice, and send emails.
+ * This endpoint has been removed as part of V2 Phase 5.
+ * Order creation is now centralized through the authoritative checkout path:
+ *   POST /api/checkout/payment-intent → POST /api/checkout/confirm
  *
- * The endpoint is idempotent — if the order already exists (e.g., webhook processed first),
- * it returns the existing order.
- *
- * @body { paymentIntentId: string }
- * @returns { order, invoice, invoiceUrl }
+ * The legacy endpoint accepted client-supplied financial data (items, totals,
+ * prices) without server-side validation, creating a price manipulation risk.
+ * No frontend currently calls this endpoint.
  */
-router.post('/orders/place', requirePermission('order.read'), async (req: AuthRequest, res: Response) => {
-  try {
-    const { paymentIntentId, items, totals, shippingAddress, referralCode, promoCode } = req.body;
-    if (!paymentIntentId) {
-      res.status(400).json({ success: false, error: 'paymentIntentId is required' });
-      return;
-    }
-
-    const { createPawTagOrder } = await import('../services/order-creation.service');
-    const result = await createPawTagOrder({
-      userId: req.user!.id,
-      items: items || [],
-      subtotal: totals?.subtotal || 0,
-      discount: totals?.discount || 0,
-      shipping: totals?.shipping || 0,
-      tax: totals?.tax || 0,
-      total: totals?.total || 0,
-      currency: totals?.currency || 'NZD',
-      paymentIntentId,
-      shippingAddress,
-      referralCode,
-      promoCode,
-    });
-
-    auditCustomerEvent(req, {
-      action: 'place_order',
-      eventType: 'business_operation',
-      eventCategory: 'FINANCIAL',
-      operationType: 'POST',
-      resourceType: 'Order',
-      resourceId: result.order._id.toString(),
-      outcome: 'SUCCESS',
-      severity: 'HIGH',
-      businessOperation: 'Order placed via checkout',
-      metadata: { paymentIntentId, orderNumber: result.order.orderNumber },
-    }).catch(() => {});
-
-    res.json({
-      success: true,
-      data: {
-        order: result.order,
-        invoice: result.invoice ? {
-          _id: result.invoice._id,
-          invoiceNumber: result.invoice.invoiceNumber,
-          amount: result.invoice.amount,
-          status: result.invoice.status,
-        } : null,
-        invoiceUrl: result.invoiceUrl,
-      },
-    });
-  } catch (err: any) {
-    logger.error({ err }, 'Failed to place order');
-    res.status(500).json({ success: false, error: err.message || 'Failed to create order' });
-  }
+router.post('/orders/place', requirePermission('order.read'), async (_req: AuthRequest, res: Response) => {
+  res.status(410).json({
+    success: false,
+    error: 'This endpoint has been removed. Use POST /api/checkout/confirm instead.',
+  });
 });
 
 // NOTE: POST /orders and POST /orders/:orderNumber/confirm-payment have been removed.

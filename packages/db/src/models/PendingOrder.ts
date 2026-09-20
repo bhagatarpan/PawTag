@@ -99,6 +99,12 @@ export interface IPendingOrderDocument extends Document {
   /** Per-item auto-renew map (keyed by productId) */
   autoRenewMap?: Record<string, boolean>;
 
+  /** PawRewards redemption amount (reserved, not yet committed) */
+  pawRewardsRedemption?: number;
+
+  /** Whether PawRewards are reserved on this checkout */
+  pawRewardsReserved?: boolean;
+
   /** Timestamp when this checkout expires */
   expiresAt: Date;
 
@@ -158,6 +164,8 @@ const PendingOrderSchema = new Schema<IPendingOrderDocument>(
     referralCode: { type: String },
     autoRenew: { type: Boolean, default: true },
     autoRenewMap: { type: Schema.Types.Mixed },
+    pawRewardsRedemption: { type: Number, default: 0, min: 0 },
+    pawRewardsReserved: { type: Boolean, default: false },
     expiresAt: { type: Date, required: true, index: { expireAfterSeconds: 0 } },
     lastAccessedAt: { type: Date, default: Date.now },
     convertedOrderId: { type: Schema.Types.ObjectId, ref: 'Order' },

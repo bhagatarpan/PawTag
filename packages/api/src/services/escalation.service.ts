@@ -107,7 +107,7 @@ async function processEscalation(record: any): Promise<void> {
         { email: ec.email },
         { phoneNumber: ec.phone },
       ],
-      deletedAt: { $ne: null },
+      deletedAt: null, // Find ACTIVE users only (not deleted)
     }).select('_id fullName email');
 
     // Send in-app notification if EC is a registered user

@@ -61,6 +61,7 @@ describe('Environment Validation', () => {
       process.env.JWT_SECRET = 'test-secret';
       process.env.ALLOWED_ORIGINS = 'https://example.com';
       process.env.FRONTEND_URL = 'https://example.com';
+      process.env.PAYMENT_MODE = 'stripe_live';
 
       expect(() => validateEnv()).toThrow(/STRIPE_SECRET_KEY/);
     });
@@ -73,6 +74,7 @@ describe('Environment Validation', () => {
       process.env.FRONTEND_URL = 'https://example.com';
       process.env.STRIPE_SECRET_KEY = 'sk_test_demo_key';
       process.env.STRIPE_WEBHOOK_SECRET = 'whsec_test';
+      process.env.PAYMENT_MODE = 'stripe_live';
 
       expect(() => validateEnv()).toThrow(/test\/demo key/);
     });
@@ -85,6 +87,7 @@ describe('Environment Validation', () => {
       process.env.FRONTEND_URL = 'https://example.com';
       process.env.STRIPE_SECRET_KEY = 'sk_live_test123';
       process.env.STRIPE_WEBHOOK_SECRET = 'whsec_test';
+      process.env.PAYMENT_MODE = 'stripe_live';
 
       expect(() => validateEnv()).toThrow(/placeholder/);
     });
@@ -97,8 +100,48 @@ describe('Environment Validation', () => {
       process.env.FRONTEND_URL = 'https://example.com';
       process.env.STRIPE_SECRET_KEY = 'sk_live_test123';
       process.env.STRIPE_WEBHOOK_SECRET = 'whsec_real123';
+      process.env.PAYMENT_MODE = 'stripe_live';
+      process.env.RESEND_API_KEY = 're_test_key_123';
 
       expect(() => validateEnv()).not.toThrow();
+    });
+
+    it('should throw in production if PAYMENT_MODE is missing', () => {
+      process.env.NODE_ENV = 'production';
+      process.env.DB_URL = 'mongodb://localhost:27017/test';
+      process.env.JWT_SECRET = 'test-secret';
+      process.env.ALLOWED_ORIGINS = 'https://example.com';
+      process.env.FRONTEND_URL = 'https://example.com';
+      process.env.STRIPE_SECRET_KEY = 'sk_live_test123';
+      process.env.STRIPE_WEBHOOK_SECRET = 'whsec_real123';
+
+      expect(() => validateEnv()).toThrow(/PAYMENT_MODE/);
+    });
+
+    it('should throw in production if PAYMENT_MODE is not stripe_live', () => {
+      process.env.NODE_ENV = 'production';
+      process.env.DB_URL = 'mongodb://localhost:27017/test';
+      process.env.JWT_SECRET = 'test-secret';
+      process.env.ALLOWED_ORIGINS = 'https://example.com';
+      process.env.FRONTEND_URL = 'https://example.com';
+      process.env.STRIPE_SECRET_KEY = 'sk_live_test123';
+      process.env.STRIPE_WEBHOOK_SECRET = 'whsec_real123';
+      process.env.PAYMENT_MODE = 'fake';
+
+      expect(() => validateEnv()).toThrow(/not allowed in production/);
+    });
+
+    it('should throw in production if PAYMENT_MODE is invalid', () => {
+      process.env.NODE_ENV = 'production';
+      process.env.DB_URL = 'mongodb://localhost:27017/test';
+      process.env.JWT_SECRET = 'test-secret';
+      process.env.ALLOWED_ORIGINS = 'https://example.com';
+      process.env.FRONTEND_URL = 'https://example.com';
+      process.env.STRIPE_SECRET_KEY = 'sk_live_test123';
+      process.env.STRIPE_WEBHOOK_SECRET = 'whsec_real123';
+      process.env.PAYMENT_MODE = 'invalid';
+
+      expect(() => validateEnv()).toThrow(/invalid/);
     });
 
     it('should throw if FRONTEND_URL is invalid', () => {
@@ -109,6 +152,7 @@ describe('Environment Validation', () => {
       process.env.FRONTEND_URL = 'not-a-url';
       process.env.STRIPE_SECRET_KEY = 'sk_live_test123';
       process.env.STRIPE_WEBHOOK_SECRET = 'whsec_real123';
+      process.env.PAYMENT_MODE = 'stripe_live';
 
       expect(() => validateEnv()).toThrow(/not a valid URL/);
     });

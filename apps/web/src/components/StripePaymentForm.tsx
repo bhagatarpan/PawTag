@@ -80,7 +80,7 @@ function PaymentFormInner({ onPaymentSuccess, onPaymentError, disabled }: Omit<S
 
       if (paymentIntent?.status === 'succeeded' || paymentIntent?.status === 'requires_capture') {
         updateProgress(50, 'Payment Processing...');
-        // Notify parent — it will call POST /orders/place and then onPaymentSuccess
+        // Notify parent — it will call POST /checkout/confirm
         onPaymentSuccess(paymentIntent.id);
       } else {
         onPaymentError(`Unexpected payment status: ${paymentIntent?.status}`);

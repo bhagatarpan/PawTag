@@ -392,8 +392,9 @@ export class CartService {
     cart.lastAccessedAt = new Date();
     await cart.save();
 
-    // Increment usage count (fire-and-forget)
-    PromoCode.updateOne({ _id: promoCode._id }, { $inc: { usageCount: 1 } }).catch(() => {});
+    // NOTE: usageCount is NOT incremented here.
+    // It is incremented at order finalization (checkout.service.ts confirmCheckout).
+    // This prevents promo slot exhaustion from cart apply/remove cycles.
 
     return cart;
   }
@@ -416,17 +417,27 @@ export class CartService {
   /**
    * Set shipping method on cart.
    *
+   * Server-authoritative: looks up the cost from the ShippingMethod collection.
+   * Never trusts client-submitted cost.
+   *
    * @param userId - User ID
-   * @param methodId - Shipping method ID
+   * @param methodId - Shipping method ID (must exist in ShippingMethod collection)
    * @param methodName - Display name
-   * @param cost - Shipping cost
    * @returns Updated cart
    */
-  async setShipping(userId: string, methodId: string, methodName: string, cost: number): Promise<ICartDocument> {
+  async setShipping(userId: string, methodId: string, methodName: string): Promise<ICartDocument> {
     const cart = await this.getOrCreate(userId);
+
+    // Server-authoritative: look up cost from ShippingMethod collection
+    const { ShippingMethod } = await import('@pawtag/db');
+    const method = await ShippingMethod.findById(methodId);
+    if (!method) {
+      throw new Error(`Shipping method not found: ${methodId}`);
+    }
+
     cart.shippingMethodId = methodId;
-    cart.shippingMethodName = methodName;
-    cart.shippingCost = cost;
+    cart.shippingMethodName = method.name || methodName;
+    cart.shippingCost = method.rate;
     cart.lastAccessedAt = new Date();
     await cart.save();
     return cart;

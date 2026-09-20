@@ -31,6 +31,7 @@
  */
 
 import Stripe from 'stripe';
+import { resolvePaymentMode, isFakePaymentIntentId } from '../../payment-mode';
 import type {
   IPaymentProvider,
   PaymentIntent,
@@ -84,8 +85,13 @@ export class StripePaymentProvider implements IPaymentProvider {
   private getClient(): Stripe {
     if (this.stripe) return this.stripe;
 
+    const mode = resolvePaymentMode();
+    if (mode === 'fake') {
+      throw new PaymentFailedError('Stripe is in fake mode — no API key configured');
+    }
+
     const apiKey = process.env.STRIPE_SECRET_KEY;
-    if (!apiKey || apiKey === 'sk_test_demo_key') {
+    if (!apiKey) {
       throw new PaymentFailedError('Stripe is not configured (no STRIPE_SECRET_KEY)');
     }
 
@@ -144,34 +150,21 @@ export class StripePaymentProvider implements IPaymentProvider {
     /** Stripe Customer ID — attaches PI to customer and enables setup_future_usage */
     stripeCustomerId?: string;
   }): Promise<PaymentIntent> {
-    // Demo mode: auto-succeed
-    const isTestMode = await getBooleanSetting('commerce.payment.testMode');
-    if (isTestMode) {
-      const demoId = `pi_demo_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-      const demoSecret = Math.random().toString(36).slice(2, 10);
+    const mode = resolvePaymentMode();
+
+    // Fake mode: deterministic auto-succeed without touching Stripe
+    if (mode === 'fake') {
+      const demoId = `pi_demo_${Date.now()}_fake`;
       return {
         id: demoId,
-        clientSecret: `${demoId}_secret_${demoSecret}`,
+        clientSecret: `${demoId}_secret_fake`,
         amount: params.amount,
         currency: params.currency.toLowerCase(),
         status: 'succeeded',
       };
     }
 
-    // Safety: If Stripe key is a test key, always use demo mode
-    const apiKey = process.env.STRIPE_SECRET_KEY;
-    if (!apiKey || apiKey.startsWith('sk_test_') || apiKey.startsWith('rk_test_')) {
-      logger.warn({ orderId: params.orderId }, 'Stripe test key detected — using demo mode');
-      const demoId = `pi_demo_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-      const demoSecret = Math.random().toString(36).slice(2, 10);
-      return {
-        id: demoId,
-        clientSecret: `${demoId}_secret_${demoSecret}`,
-        amount: params.amount,
-        currency: params.currency.toLowerCase(),
-        status: 'succeeded',
-      };
-    }
+    // stripe_test: real Stripe Test API calls (fall through to getClient)
 
     const stripe = this.getClient();
     const amountInCents = Math.round(params.amount * 100);

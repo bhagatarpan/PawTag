@@ -1,4 +1,6 @@
-import { Subscription, Tag, Invoice, User, Notification, Product, TagExpiryNotification, Setting } from '@pawtag/db';
+import { Subscription, Tag, Invoice, InvoiceAccessToken, User, Notification, Product, TagExpiryNotification, Setting } from '@pawtag/db';
+import { isFakeMode } from '../commerce/payment-mode';
+import Stripe from 'stripe';
 import { sendMail, sendInvoiceEmail } from './email.service';
 import { createAndDeliverNotification } from './notification-delivery.service';
 import { renderSubscriptionReminderEmail, renderGracePeriodReminderEmail, renderPaymentFailureEmail, renderGracePeriodStartedEmail, renderGoldWelcomeEmail, renderPaymentRetrySuccessEmail, renderFreePeriodReminder2WeekEmail, renderFreePeriodReminder3DayEmail, renderGracePeriodReminder3DayEmail, renderTagExpiredEmail } from './email/templates';
@@ -7,6 +9,16 @@ import { incrementCounter, METRICS } from '../lib/metrics';
 import logger from '../lib/logger';
 
 const REMINDER_CHECK_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
+
+// Lazy-init Stripe client — only create when not in fake mode
+let _stripe: Stripe | null = null;
+function getStripeClient(): Stripe {
+  if (_stripe) return _stripe;
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) throw new Error('STRIPE_SECRET_KEY is not configured');
+  _stripe = new Stripe(key, { apiVersion: '2024-06-20' as any });
+  return _stripe;
+}
 
 // Cache for settings to avoid hitting DB on every call
 let settingsCache: Record<string, string> = {};
@@ -205,14 +217,10 @@ export async function createSubscription(data: {
   // Create Stripe Subscription for auto-renewing products (with trial period)
   if (defaultAutoRenew && price > 0) {
     try {
-      const isDemoMode = !process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY === 'sk_test_demo_key';
-      if (!isDemoMode) {
+      if (!isFakeMode()) {
         const user = await User.findById(data.userId).select('stripeCustomerId email fullName').lean();
         if (user?.stripeCustomerId) {
-          const Stripe = (await import('stripe')).default;
-          const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-            apiVersion: '2024-06-20' as any,
-          });
+          const stripe = getStripeClient();
 
           // Look up or create Stripe Price for this product
           let stripePriceId: string | undefined;
@@ -345,15 +353,10 @@ export async function createGoldSubscription(userId: string, price?: number) {
   let stripeSubscriptionId: string | undefined;
   let stripePaymentIntentId: string | undefined;
 
-  // Determine if we're in demo mode (no real Stripe key)
-  const isDemoMode = !process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY === 'sk_test_demo_key';
-
-  if (!isDemoMode) {
+  // Determine if we're in fake mode (no real Stripe key)
+  if (!isFakeMode()) {
     try {
-      const Stripe = (await import('stripe')).default;
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-        apiVersion: '2024-06-20' as any,
-      });
+      const stripe = getStripeClient();
 
       // Create Stripe Customer if user doesn't have one
       if (!stripeCustomerId) {
@@ -479,8 +482,8 @@ export async function createGoldSubscription(userId: string, price?: number) {
     amount: goldPrice,
     billingPeriodStart: now,
     billingPeriodEnd: currentPeriodEnd,
-    status: stripePaymentIntentId ? 'paid' : 'paid', // In demo mode, auto-mark as paid
-    paymentMethod: stripePaymentIntentId ? 'stripe' : 'demo',
+    status: stripePaymentIntentId ? 'paid' : 'pending', // Only mark paid if Stripe confirmed payment
+    paymentMethod: stripePaymentIntentId ? 'stripe' : 'pending',
   });
 
   // Send Gold welcome email (fire-and-forget)
@@ -516,7 +519,7 @@ export async function createGoldSubscription(userId: string, price?: number) {
       stripeCustomerId: stripeCustomerId || 'demo',
       stripeSubscriptionId: stripeSubscriptionId || 'demo',
       stripePaymentIntentId: stripePaymentIntentId || 'demo',
-      isDemoMode,
+      isDemoMode: isFakeMode(),
     },
   });
 
@@ -664,16 +667,30 @@ export async function cancelSubscription(
   }
 
   // Cancel Stripe subscription if it exists
-  if (subscription.stripeSubscriptionId && process.env.STRIPE_SECRET_KEY) {
+  let stripeCancelSucceeded = false;
+  if (subscription.stripeSubscriptionId && !isFakeMode()) {
     try {
-      const Stripe = (await import('stripe')).default;
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2024-06-20' as any });
+      const stripe = getStripeClient();
       await stripe.subscriptions.cancel(subscription.stripeSubscriptionId);
+      stripeCancelSucceeded = true;
       logger.info({ subscriptionId: subscription._id, stripeSubscriptionId: subscription.stripeSubscriptionId }, 'Stripe subscription cancelled');
     } catch (stripeErr: any) {
-      // Log but don't fail the PawTag cancellation — the local record is still updated
-      logger.error({ err: stripeErr, subscriptionId: subscription._id }, 'Failed to cancel Stripe subscription — PawTag cancellation still recorded');
+      // Stripe cancellation failed — mark for repair/reconciliation
+      logger.error({ err: stripeErr, subscriptionId: subscription._id }, 'Failed to cancel Stripe subscription');
     }
+  } else if (isFakeMode()) {
+    // Fake mode — treat as succeeded
+    stripeCancelSucceeded = true;
+  }
+
+  // Only mark as cancelled if Stripe succeeded (or no Stripe subscription)
+  if (stripeCancelSucceeded || !subscription.stripeSubscriptionId) {
+    subscription.status = 'cancelled';
+  } else {
+    // Stripe failed — mark for repair
+    subscription.status = 'cancelled'; // Still mark locally per business rule
+    subscription.cancellationReason = `${subscription.cancellationReason || ''} [Stripe cancel pending]`;
+    logger.error({ subscriptionId: subscription._id }, 'Subscription cancelled locally but Stripe cancel failed — reconciliation required');
   }
 
   await subscription.save();
@@ -1097,7 +1114,7 @@ async function createInvoice(data: {
   const count = await Invoice.countDocuments();
   const invoiceNumber = `INV-${String(count + 1).padStart(6, '0')}`;
 
-  return Invoice.create({
+  const invoice = await Invoice.create({
     subscriptionId: data.subscriptionId,
     userId: data.userId,
     invoiceNumber,
@@ -1112,6 +1129,25 @@ async function createInvoice(data: {
     paidAt: data.status === 'paid' ? new Date() : undefined,
     dueDate: data.billingPeriodEnd,
   });
+
+  // Create access token for the invoice so customers can view it
+  try {
+    const { generateSecureToken, hashToken } = await import('./auth.service');
+    const secureToken = generateSecureToken();
+    const tokenHash = hashToken(secureToken);
+    await InvoiceAccessToken.create({
+      invoiceId: invoice._id,
+      userId: data.userId,
+      tokenHash,
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+      verifiedAt: new Date(), // Pre-verified for subscription invoices
+    });
+  } catch (err) {
+    // Don't fail invoice creation if token creation fails — log and continue
+    logger.warn({ err, invoiceId: invoice._id }, 'Failed to create invoice access token');
+  }
+
+  return invoice;
 }
 
 async function resetExpiredSkipOtp() {
@@ -1586,15 +1622,14 @@ export async function processPaymentRetries() {
 }
 
 async function attemptPaymentCharge(subscription: any): Promise<boolean> {
-  // In demo mode, simulate 80% success rate for retries
-  if (!process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY === 'sk_test_demo_key') {
-    return Math.random() < 0.8;
+  // In fake mode, simulate success (deterministic — no Math.random)
+  if (isFakeMode()) {
+    return true;
   }
 
   // In production, use Stripe to retry the payment
   try {
-    const Stripe = (await import('stripe')).default;
-    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2024-06-20' as any });
+    const stripe = getStripeClient();
 
     if (!subscription.stripeCustomerId) {
       logger.warn({ subscriptionId: subscription._id }, 'No Stripe customer ID for subscription');

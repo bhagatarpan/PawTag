@@ -9,7 +9,7 @@
  * ```typescript
  * import { shippingService } from '../commerce/services/shipping.service';
  * const rates = await shippingService.getRates(userId, address);
- * await shippingService.selectMethod(userId, 'free-standard', 'Standard NZ Shipping', 0);
+ * await shippingService.selectMethod(userId, 'free-standard', 'Standard NZ Shipping');
  * ```
  */
 
@@ -62,28 +62,35 @@ export class ShippingService {
   /**
    * Select a shipping method and update the cart.
    *
+   * Server-authoritative: looks up the cost from the ShippingMethod collection.
+   * Never trusts client-submitted cost.
+   *
    * @param userId - User ID
-   * @param methodId - Shipping method ID
+   * @param methodId - Shipping method ID (must exist in ShippingMethod collection)
    * @param methodName - Display name
-   * @param cost - Shipping cost
    */
   async selectMethod(
     userId: string,
     methodId: string,
     methodName: string,
-    cost: number,
   ): Promise<void> {
     const cart = await Cart.findOne({ userId, status: 'active' });
     if (!cart) {
       throw new ShippingError('Cart not found');
     }
 
+    // Server-authoritative: look up the cost from ShippingMethod collection
+    const method = await ShippingMethod.findById(methodId);
+    if (!method) {
+      throw new ShippingError(`Shipping method not found: ${methodId}`);
+    }
+
     cart.shippingMethodId = methodId;
-    cart.shippingMethodName = methodName;
-    cart.shippingCost = cost;
+    cart.shippingMethodName = method.name || methodName;
+    cart.shippingCost = method.rate;
     await cart.save();
 
-    logger.info({ userId, methodId, methodName, cost }, 'Shipping method selected');
+    logger.info({ userId, methodId, methodName: method.name, cost: method.rate }, 'Shipping method selected');
   }
 
   /**

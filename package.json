@@ -30,8 +30,9 @@
   },
   "//scripts": "dev:all/build run the four dev servers (and builds) in parallel via concurrently, since this shell doesn't support background jobs; name/color flags keep the log streams distinguishable. Note: deliberately NO -k flag -- with -k, the moment the fastest process exits (e.g. the finder build) concurrently kills all the others and the build fails.",
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   },
+  "packageManager": "pnpm@11.14.0",
   "devDependencies": {
     "@testing-library/jest-dom": "^7.0.0",
     "@testing-library/react": "^16.3.2",

@@ -91,7 +91,7 @@ export class CheckoutService {
    * @param userId - User ID
    * @returns Payment intent details for frontend
    */
-  async createPaymentIntent(userId: string, shippingAddress?: { line1: string; line2?: string; city: string; state: string; zip: string; country?: string }, autoRenew?: boolean | Record<string, boolean>): Promise<CheckoutPaymentIntent> {
+  async createPaymentIntent(userId: string, shippingAddress?: { line1: string; line2?: string; city: string; state: string; zip: string; country?: string }, autoRenew?: boolean | Record<string, boolean>, pawRewardsRedemption?: number): Promise<CheckoutPaymentIntent> {
     // 1. Get and validate cart
     const cart = await Cart.findOne({ userId, status: 'active' });
     logger.info({ userId, cartFound: !!cart, itemCount: cart?.items?.length || 0 }, 'Payment intent cart lookup');
@@ -132,26 +132,29 @@ export class CheckoutService {
       }
     }
 
+    // 3c. Check PawRewards reservation (if any)
+    const requestedRewards = (pawRewardsRedemption ?? 0);
+    let reservedRewards = 0;
+    if (requestedRewards > 0) {
+      const { User: UserModel } = await import('@pawtag/db');
+      const currentUser = await UserModel.findById(userId).select('pawRewardsBalance').lean();
+      const availableBalance = currentUser?.pawRewardsBalance || 0;
+      reservedRewards = Math.min(requestedRewards, availableBalance);
+      // Deduct from total
+      totals.total = Math.max(0, totals.total - reservedRewards);
+      logger.info({ userId, reservedRewards, newTotal: totals.total }, 'PawRewards applied at checkout');
+    }
+
     // 4. Get user info for Stripe
     const user = await User.findById(userId).lean();
     if (!user) throw new NotFoundError('User');
 
     // 4b. Ensure Stripe Customer exists (for saving payment method for future renewals)
     let stripeCustomerId = user.stripeCustomerId;
-    const isDemoMode = !process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY === 'sk_test_demo_key';
+    const { isFakeMode } = await import('../payment-mode');
+    const fakeMode = isFakeMode();
     
-    // Safety: If Stripe is not configured, force test mode to prevent 402 errors
-    if (isDemoMode) {
-      const { getBooleanSetting } = await import('../config');
-      const currentTestMode = await getBooleanSetting('commerce.payment.testMode');
-      if (!currentTestMode) {
-        // Force test mode if Stripe is not configured
-        logger.warn({ userId }, 'Stripe not configured — forcing test mode for checkout');
-        // We'll let the Stripe provider handle this via its own test mode check
-      }
-    }
-    
-    if (!stripeCustomerId && !isDemoMode) {
+    if (!stripeCustomerId && !fakeMode) {
       try {
         const Stripe = (await import('stripe')).default;
         const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -220,6 +223,8 @@ export class CheckoutService {
       status: 'pending',
       referralCode: cart.promoCode,
       autoRenew: typeof autoRenew === 'boolean' ? autoRenew : (autoRenew !== undefined ? true : true),
+      pawRewardsRedemption: reservedRewards,
+      pawRewardsReserved: reservedRewards > 0,
       autoRenewMap: typeof autoRenew === 'object' && autoRenew !== null ? autoRenew : undefined,
       expiresAt,
       lastAccessedAt: new Date(),
@@ -454,6 +459,39 @@ export class CheckoutService {
       const errorMsg = err?.message || String(err);
       logger.error({ err, orderId: order._id, correlationId }, 'Completion step failed: inventory confirmation');
       completionErrors.push({ step: 'inventory_confirmation', error: errorMsg, timestamp: new Date() });
+    }
+
+    // 8a. Increment promo code usage (only on successful order)
+    if (pending.promoCode) {
+      try {
+        const { PromoCode } = await import('@pawtag/db');
+        await PromoCode.updateOne(
+          { code: pending.promoCode },
+          { $inc: { usageCount: 1 } },
+        );
+        logger.info({ orderId: order._id, promoCode: pending.promoCode }, 'Promo usage incremented');
+      } catch (err: any) {
+        const errorMsg = err?.message || String(err);
+        logger.error({ err, orderId: order._id, correlationId }, 'Completion step failed: promo usage increment');
+        completionErrors.push({ step: 'promo_usage_increment', error: errorMsg, timestamp: new Date() });
+      }
+    }
+
+    // 8a2. Commit PawRewards reservation (only on successful order)
+    if (pending.pawRewardsRedemption && pending.pawRewardsRedemption > 0) {
+      try {
+        const { commitRewardsReservation } = await import('../../services/loyalty/pawrewards.service');
+        await commitRewardsReservation(
+          userId,
+          pending.pawRewardsRedemption,
+          order.orderNumber,
+        );
+        logger.info({ orderId: order._id, amount: pending.pawRewardsRedemption }, 'PawRewards reservation committed');
+      } catch (err: any) {
+        const errorMsg = err?.message || String(err);
+        logger.error({ err, orderId: order._id, correlationId }, 'Completion step failed: PawRewards commit');
+        completionErrors.push({ step: 'pawrewards_commit', error: errorMsg, timestamp: new Date() });
+      }
     }
 
     // 8b. Create Tag and Subscription for tag products

@@ -455,7 +455,7 @@ describe('Admin - Product Management', () => {
     await request(app)
       .post('/api/admin/products')
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ ...validProduct, sku: 'PT-QR-002', name: 'PawTag NFC Tag' });
+      .send({ ...validProduct, sku: 'PT-QR-002', name: 'PawTag NFC Tag', slug: 'pawtag-nfc-tag' });
 
     const res = await request(app)
       .get('/api/admin/products')

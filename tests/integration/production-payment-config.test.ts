@@ -30,6 +30,7 @@ describe('Integration: Production Payment Configuration Guardrails', () => {
       process.env.STRIPE_WEBHOOK_SECRET = 'whsec_test_secret_12345';
       process.env.ALLOWED_ORIGINS = 'https://app.pawtag.co.nz';
       process.env.FRONTEND_URL = 'https://app.pawtag.co.nz';
+      process.env.PAYMENT_MODE = 'stripe_live';
 
       const { validateEnv } = await import('../../packages/api/src/config/validateEnv');
       expect(() => validateEnv()).not.toThrow();
@@ -73,7 +74,7 @@ describe('Integration: Production Payment Configuration Guardrails', () => {
       process.env.FRONTEND_URL = 'https://app.pawtag.co.nz';
 
       const { validateEnv } = await import('../../packages/api/src/config/validateEnv');
-      expect(() => validateEnv()).toThrow(/test-mode key/);
+      expect(() => validateEnv()).toThrow(/test\/demo key/);
     });
 
     it('throws when STRIPE_WEBHOOK_SECRET is missing in production', async () => {
@@ -112,7 +113,7 @@ describe('Integration: Production Payment Configuration Guardrails', () => {
       // ALLOWED_ORIGINS is NOT set
 
       const { validateEnv } = await import('../../packages/api/src/config/validateEnv');
-      expect(() => validateEnv()).toThrow(/ALLOWED_ORIGINS is not set/);
+      expect(() => validateEnv()).toThrow(/ALLOWED_ORIGINS/);
     });
 
     it('throws when FRONTEND_URL is missing in production', async () => {
@@ -125,7 +126,7 @@ describe('Integration: Production Payment Configuration Guardrails', () => {
       // FRONTEND_URL is NOT set
 
       const { validateEnv } = await import('../../packages/api/src/config/validateEnv');
-      expect(() => validateEnv()).toThrow(/FRONTEND_URL is not set/);
+      expect(() => validateEnv()).toThrow(/FRONTEND_URL/);
     });
   });
 

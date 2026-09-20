@@ -1,10 +1,12 @@
 import { Router, Response } from 'express';
 import { AuthRequest, authenticate } from '../middleware/auth';
-import { User, Subscription } from '@pawtag/db';
+import { User, Subscription, GuardianPointsLedger, PawRewardsLedger } from '@pawtag/db';
 import { auditService, type AuditContext } from '../services/audit';
 import { createAuditContextFromRequest, type AuditRequest } from '../middleware/audit';
 import { createDbRateLimiter } from '../lib/rate-limiter';
 import { redeemRewardsSchema, paginationQuerySchema } from '../validation/loyalty';
+import { getTierBenefits, TIER_THRESHOLDS, calculateTier } from '../services/loyalty/tier.service';
+import { redeemRewards } from '../services/loyalty/pawrewards.service';
 import logger from '../lib/logger';
 
 const router = Router();
@@ -66,16 +68,12 @@ router.get('/points', async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ success: false, error: 'User not found' });
     }
 
-    // Import model dynamically to avoid circular dependencies
-    const { GuardianPointsLedger } = require('@pawtag/db');
-
     const recentHistory = await GuardianPointsLedger.find({ userId })
       .sort({ createdAt: -1 })
       .limit(50)
       .lean();
 
     // Get tier benefits and next tier info
-    const { getTierBenefits, TIER_THRESHOLDS } = require('../services/loyalty/tier.service');
     type TierName = 'CARE' | 'NURTURE' | 'PROTECTOR' | 'SAFEGUARD';
     const tier = (user.guardianTier || 'CARE') as TierName;
     const benefits = await getTierBenefits(tier);
@@ -144,9 +142,6 @@ router.get('/rewards', async (req: AuthRequest, res: Response) => {
     if (!user) {
       return res.status(404).json({ success: false, error: 'User not found' });
     }
-
-    // Import model dynamically to avoid circular dependencies
-    const { PawRewardsLedger } = require('@pawtag/db');
 
     const recentHistory = await PawRewardsLedger.find({ userId })
       .sort({ createdAt: -1 })
@@ -229,8 +224,7 @@ router.post('/rewards/redeem', redeemRateLimiter, async (req: AuthRequest, res: 
       });
     }
 
-    const { redeemRewards } = require('../services/loyalty/pawrewards.service');
-    const result = await redeemRewards(userId, parsed.data.amount, parsed.data.orderId);
+    const result = await redeemRewards(userId, parsed.data.amount, parsed.data.orderId ?? '');
 
     await auditCustomerGuardianEvent(req, {
       action: 'guardian_rewards_redeemed',
@@ -282,10 +276,6 @@ router.get('/history', async (req: AuthRequest, res: Response) => {
 
     const limitParsed = paginationQuerySchema.safeParse({ limit: req.query.limit });
     const limit = limitParsed.success ? limitParsed.data.limit : 50;
-
-    // Import models dynamically to avoid circular dependencies
-    const { GuardianPointsLedger } = require('@pawtag/db');
-    const { PawRewardsLedger } = require('@pawtag/db');
 
     // Get recent points activity
     const recentPoints = await GuardianPointsLedger.find({ userId })
@@ -363,8 +353,6 @@ router.get('/tier', async (req: AuthRequest, res: Response) => {
     }
 
     // Import tier service dynamically to avoid circular dependencies
-    const { calculateTier } = require('../services/loyalty/tier.service');
-
     const tierInfo = await calculateTier(userId);
     const benefits = tierInfo.benefits;
 
@@ -424,7 +412,6 @@ router.get('/benefits', async (req: AuthRequest, res: Response) => {
       return res.status(401).json({ success: false, error: 'Not authenticated' });
     }
 
-    const { Subscription } = require('@pawtag/db');
     
     const goldSubscription = await Subscription.findOne({
       userId,

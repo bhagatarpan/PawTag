@@ -1,10 +1,17 @@
 import Stripe from 'stripe';
+import { isFakeMode } from '../commerce/payment-mode';
 import { logIntegration } from '../lib/timing';
 import { ExternalServiceError } from '../lib/app-errors';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_demo_key', {
-  apiVersion: '2024-06-20' as any,
-});
+// Lazy-init Stripe client — only create when not in fake mode
+let _stripe: Stripe | null = null;
+function getStripeClient(): Stripe {
+  if (_stripe) return _stripe;
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) throw new ExternalServiceError('Stripe', 'STRIPE_SECRET_KEY is not configured');
+  _stripe = new Stripe(key, { apiVersion: '2024-06-20' as any });
+  return _stripe;
+}
 
 export interface PaymentIntentData {
   amount: number;        // in cents
@@ -22,19 +29,19 @@ export interface PaymentResult {
 }
 
 export async function createPaymentIntent(data: PaymentIntentData): Promise<PaymentResult> {
-  // Demo mode: if no real Stripe key, simulate success
-  if (!process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY === 'sk_test_demo_key') {
-    const demoId = `pi_demo_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  // Fake mode: if no real Stripe key, simulate success
+  if (isFakeMode()) {
+    const demoId = `pi_demo_${Date.now()}_fake`;
     return {
       success: true,
-      clientSecret: `${demoId}_secret_demo`,
+      clientSecret: `${demoId}_secret_fake`,
       paymentIntentId: demoId,
     };
   }
 
   return logIntegration('Stripe', 'createPaymentIntent', async () => {
     try {
-      const intent = await stripe.paymentIntents.create({
+      const intent = await getStripeClient().paymentIntents.create({
         amount: Math.round(data.amount * 100),
         currency: data.currency.toLowerCase(),
         automatic_payment_methods: { enabled: true },
@@ -66,7 +73,7 @@ export async function confirmPayment(paymentIntentId: string): Promise<{ status:
   }
 
   try {
-    const intent = await stripe.paymentIntents.retrieve(paymentIntentId);
+    const intent = await getStripeClient().paymentIntents.retrieve(paymentIntentId);
     return { status: intent.status };
   } catch (error: any) {
     return { status: 'failed', error: error.message };
@@ -148,7 +155,7 @@ export async function createRefund(paymentIntentId: string, amount?: number): Pr
 
   return logIntegration('Stripe', 'createRefund', async () => {
     try {
-      const refund = await stripe.refunds.create({
+      const refund = await getStripeClient().refunds.create({
         payment_intent: paymentIntentId,
         amount: amount ? Math.round(amount * 100) : undefined,
       });

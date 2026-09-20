@@ -1,142 +1,127 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import request from 'supertest';
-import express from 'express';
+import mongoose from 'mongoose';
+import { setupTestDb, teardownTestDb, clearDb } from './setup';
+import app from '../../packages/api/src/index';
+import { createCustomerWithRBAC, createPet, createTag } from './helpers';
 
-// Mock the database connection
-vi.mock('mongoose', () => ({
-  connect: vi.fn(),
-  connection: {
-    readyState: 1,
-    close: vi.fn(),
-  },
-}));
+beforeAll(async () => {
+  await setupTestDb();
+}, 30000);
 
-// Mock the models
-vi.mock('@pawtag/db', () => ({
-  User: {
-    findById: vi.fn(),
-    findByIdAndUpdate: vi.fn(),
-  },
-  Subscription: {
-    findOne: vi.fn(),
-    create: vi.fn(),
-  },
-}));
+afterAll(async () => {
+  await teardownTestDb();
+}, 10000);
 
-// Mock auth middleware
-vi.mock('../../packages/api/src/middleware/auth', () => ({
-  authenticate: vi.fn((req, res, next) => {
-    req.user = { id: 'user123', email: 'test@example.com', role: 'customer' };
-    next();
-  }),
-  requireAuth: vi.fn((req, res, next) => {
-    req.user = { id: 'user123', email: 'test@example.com', role: 'customer' };
-    next();
-  }),
-}));
+beforeEach(async () => {
+  await clearDb();
+});
 
-// Mock subscription service
-vi.mock('../../packages/api/src/services/subscription.service', () => ({
-  createSubscription: vi.fn(),
-  cancelSubscription: vi.fn(),
-  renewSubscription: vi.fn(),
-}));
+describe('Integration: Customer Subscriptions API', () => {
+  describe('GET /api/customer/subscriptions', () => {
+    it('should return empty array when no subscriptions exist', async () => {
+      const { token } = await createCustomerWithRBAC({ email: 'sub-empty@test.com' });
 
-describe('Subscription API Endpoints', () => {
-  let app: express.Application;
+      const res = await request(app)
+        .get('/api/customer/subscriptions')
+        .set('Authorization', `Bearer ${token}`);
 
-  beforeEach(() => {
-    app = express();
-    app.use(express.json());
-  });
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toEqual([]);
+    });
 
-  afterEach(() => {
-    vi.clearAllMocks();
-  });
+    it('should return user subscriptions', async () => {
+      const { userId, token } = await createCustomerWithRBAC({ email: 'sub-list@test.com' });
+      const petId = await createPet(userId, { name: 'Rex' });
+      const tagId = await createTag(userId, petId, { tagId: 'TAG-SUB-001' });
 
-  describe('POST /api/customer/subscription/create', () => {
-    it('should create a subscription', async () => {
-      // Mock subscription service
-      const mockCreateSubscription = vi.mocked(
-        require('../../packages/api/src/services/subscription.service').createSubscription
-      );
-      
-      mockCreateSubscription.mockResolvedValue({
-        subscriptionId: 'sub123',
-        status: 'active',
+      // Create a subscription record
+      await mongoose.connection.collections.subscriptions.insertOne({
+        userId: new mongoose.Types.ObjectId(userId),
+        tagId: new mongoose.Types.ObjectId(tagId),
+        planName: 'Annual Tag Protection',
         planType: 'annual',
-        price: 0.99,
+        status: 'active',
+        price: 29.99,
+        currency: 'NZD',
         startDate: new Date(),
-        nextBillingDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+        currentPeriodStart: new Date(),
+        currentPeriodEnd: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+        autoRenew: true,
+        renewalMethod: 'annual',
+        totalScans: 0,
+        reminderStates: { graceWeeklySentCount: 0 },
+        createdAt: new Date(),
+        updatedAt: new Date(),
       });
 
-      const response = await request(app)
-        .post('/api/customer/subscription/create')
-        .send({ planType: 'annual', paymentMethod: 'stripe' })
-        .expect(200);
+      const res = await request(app)
+        .get('/api/customer/subscriptions')
+        .set('Authorization', `Bearer ${token}`);
 
-      expect(response.body.success).toBe(true);
-      expect(response.body.data.subscriptionId).toBe('sub123');
-      expect(response.body.data.status).toBe('active');
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.length).toBeGreaterThanOrEqual(1);
+      expect(res.body.data[0].planName).toBe('Annual Tag Protection');
+      expect(res.body.data[0].status).toBe('active');
     });
 
-    it('should return 400 for invalid plan type', async () => {
-      const response = await request(app)
-        .post('/api/customer/subscription/create')
-        .send({ planType: 'invalid', paymentMethod: 'stripe' })
-        .expect(400);
+    it('should return 401 without authentication', async () => {
+      const res = await request(app)
+        .get('/api/customer/subscriptions');
 
-      expect(response.body.success).toBe(false);
-      expect(response.body.error).toContain('Invalid plan type');
+      expect(res.status).toBe(401);
     });
   });
 
-  describe('POST /api/customer/subscription/cancel', () => {
-    it('should cancel a subscription', async () => {
-      // Mock subscription service
-      const mockCancelSubscription = vi.mocked(
-        require('../../packages/api/src/services/subscription.service').cancelSubscription
-      );
-      
-      mockCancelSubscription.mockResolvedValue({
-        subscriptionId: 'sub123',
-        status: 'cancelled',
-        endDate: new Date(),
+  describe('GET /api/customer/subscriptions/:id', () => {
+    it('should return a specific subscription', async () => {
+      const { userId, token } = await createCustomerWithRBAC({ email: 'sub-get@test.com' });
+      const petId = await createPet(userId);
+      const tagId = await createTag(userId, petId, { tagId: 'TAG-SUB-GET' });
+
+      const subResult = await mongoose.connection.collections.subscriptions.insertOne({
+        userId: new mongoose.Types.ObjectId(userId),
+        tagId: new mongoose.Types.ObjectId(tagId),
+        planName: 'Monthly Protection',
+        planType: 'monthly',
+        status: 'active',
+        price: 2.99,
+        currency: 'NZD',
+        startDate: new Date(),
+        currentPeriodStart: new Date(),
+        currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        autoRenew: true,
+        renewalMethod: 'monthly',
+        totalScans: 5,
+        reminderStates: { graceWeeklySentCount: 0 },
+        createdAt: new Date(),
+        updatedAt: new Date(),
       });
 
-      const response = await request(app)
-        .post('/api/customer/subscription/cancel')
-        .send({ reason: 'Too expensive' })
-        .expect(200);
+      const subId = subResult.insertedId.toString();
 
-      expect(response.body.success).toBe(true);
-      expect(response.body.data.status).toBe('cancelled');
+      const res = await request(app)
+        .get(`/api/customer/subscriptions/${subId}`)
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.planName).toBe('Monthly Protection');
+      expect(res.body.data.status).toBe('active');
     });
-  });
 
-  describe('GET /api/customer/subscription/status', () => {
-    it('should return subscription status', async () => {
-      // Mock user with subscription
-      vi.mocked(require('@pawtag/db').User.findById).mockReturnValue({
-        lean: vi.fn().mockReturnValue({
-          subscription: {
-            id: 'sub123',
-            status: 'active',
-            planType: 'annual',
-            price: 0.99,
-            startDate: new Date(),
-            nextBillingDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
-          },
-        }),
-      } as any);
+    it('should return 404 for non-existent subscription', async () => {
+      const { token } = await createCustomerWithRBAC({ email: 'sub-notfound@test.com' });
+      const fakeId = new mongoose.Types.ObjectId().toString();
 
-      const response = await request(app)
-        .get('/api/customer/subscription/status')
-        .expect(200);
+      const res = await request(app)
+        .get(`/api/customer/subscriptions/${fakeId}`)
+        .set('Authorization', `Bearer ${token}`);
 
-      expect(response.body.success).toBe(true);
-      expect(response.body.data.status).toBe('active');
-      expect(response.body.data.planType).toBe('annual');
+      expect(res.status).toBe(404);
+      expect(res.body.success).toBe(false);
     });
   });
 });

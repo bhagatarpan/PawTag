@@ -220,19 +220,19 @@ router.delete('/promo', async (req: AuthRequest, res: Response) => {
 /**
  * POST /api/cart/shipping
  *
- * Set shipping method on cart.
- * Body: { methodId, methodName, cost }
+ * Server-authoritative: client sends only methodId.
+ * Server looks up the cost from ShippingMethod collection.
  */
 router.post('/shipping', async (req: AuthRequest, res: Response) => {
   try {
-    const { methodId, methodName, cost } = req.body;
+    const { methodId, methodName } = req.body;
 
     if (!methodId || !methodName) {
       res.status(400).json({ success: false, error: 'methodId and methodName are required' });
       return;
     }
 
-    const cart = await cartService.setShipping(req.user!.id, methodId, methodName, cost ?? 0);
+    const cart = await cartService.setShipping(req.user!.id, methodId, methodName);
     const totals = await cartService.calculateTotals(req.user!.id);
 
     res.json({

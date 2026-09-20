@@ -8,7 +8,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('@pawtag/db', () => ({
   Cart: { findOne: vi.fn() },
   Order: { findById: vi.fn(), updateOne: vi.fn() },
-  ShippingMethod: { find: vi.fn() },
+  ShippingMethod: { find: vi.fn(), findById: vi.fn() },
 }));
 
 vi.mock('../../../packages/api/src/commerce/providers/nz-shipping', () => ({
@@ -77,22 +77,32 @@ describe('ShippingService', () => {
   });
 
   describe('selectMethod', () => {
-    it('should update cart with shipping method', async () => {
+    it('should update cart with shipping method from server lookup', async () => {
       const mockCart = { shippingMethodId: undefined, shippingMethodName: undefined, shippingCost: 0, save: vi.fn() };
       (Cart.findOne as any).mockResolvedValue(mockCart);
+      (ShippingMethod.findById as any).mockResolvedValue({ _id: 'method_1', name: 'Standard', rate: 9.99 });
 
-      await shippingService.selectMethod('user_1', 'method_1', 'Standard', 0);
+      await shippingService.selectMethod('user_1', 'method_1', 'Standard');
 
       expect(mockCart.save).toHaveBeenCalled();
       expect(mockCart.shippingMethodId).toBe('method_1');
       expect(mockCart.shippingMethodName).toBe('Standard');
-      expect(mockCart.shippingCost).toBe(0);
+      expect(mockCart.shippingCost).toBe(9.99); // Server-authoritative cost
+    });
+
+    it('should throw if shipping method not found', async () => {
+      const mockCart = { shippingMethodId: undefined, shippingMethodName: undefined, shippingCost: 0, save: vi.fn() };
+      (Cart.findOne as any).mockResolvedValue(mockCart);
+      (ShippingMethod.findById as any).mockResolvedValue(null);
+
+      await expect(shippingService.selectMethod('user_1', 'nonexistent', 'Standard'))
+        .rejects.toThrow('Shipping method not found');
     });
 
     it('should throw if cart not found', async () => {
       (Cart.findOne as any).mockResolvedValue(null);
 
-      await expect(shippingService.selectMethod('user_1', 'method_1', 'Standard', 0))
+      await expect(shippingService.selectMethod('user_1', 'method_1', 'Standard'))
         .rejects.toThrow('Cart not found');
     });
   });

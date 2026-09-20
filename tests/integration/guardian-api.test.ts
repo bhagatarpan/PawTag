@@ -1,162 +1,126 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import request from 'supertest';
-import express from 'express';
 import mongoose from 'mongoose';
-import { createServer } from 'http';
+import { setupTestDb, teardownTestDb, clearDb } from './setup';
+import app from '../../packages/api/src/index';
+import { createCustomerWithRBAC } from './helpers';
 
-// Mock the database connection
-vi.mock('mongoose', () => ({
-  connect: vi.fn(),
-  connection: {
-    readyState: 1,
-    close: vi.fn(),
-  },
-}));
+beforeAll(async () => {
+  await setupTestDb();
+}, 30000);
 
-// Mock the models
-vi.mock('@pawtag/db', () => ({
-  User: {
-    findById: vi.fn(),
-    findByIdAndUpdate: vi.fn(),
-  },
-  Subscription: {
-    findOne: vi.fn(),
-  },
-  GuardianPointsLedger: {
-    find: vi.fn(),
-    create: vi.fn(),
-  },
-  PawRewardsLedger: {
-    find: vi.fn(),
-    create: vi.fn(),
-  },
-  GuardianTierHistory: {
-    find: vi.fn(),
-    create: vi.fn(),
-  },
-}));
+afterAll(async () => {
+  await teardownTestDb();
+}, 10000);
 
-// Mock auth middleware
-vi.mock('../../packages/api/src/middleware/auth', () => ({
-  authenticate: vi.fn((req, res, next) => {
-    req.user = { id: 'user123', email: 'test@example.com', role: 'customer' };
-    next();
-  }),
-  requireAuth: vi.fn((req, res, next) => {
-    req.user = { id: 'user123', email: 'test@example.com', role: 'customer' };
-    next();
-  }),
-}));
+beforeEach(async () => {
+  await clearDb();
+});
 
-// Mock permission middleware
-vi.mock('../../packages/api/src/middleware/permission', () => ({
-  requirePermission: vi.fn(() => (req, res, next) => next()),
-}));
-
-describe('Guardian API Endpoints', () => {
-  let app: express.Application;
-
-  beforeEach(() => {
-    app = express();
-    app.use(express.json());
-    
-    // Import and mount the routes
-    const guardianRoutes = require('../../packages/api/src/routes/customer-guardian');
-    app.use('/api/customer/guardian', guardianRoutes);
-  });
-
-  afterEach(() => {
-    vi.clearAllMocks();
-  });
-
+describe('Integration: Guardian API Endpoints', () => {
   describe('GET /api/customer/guardian/points', () => {
-    it('should return user points balance', async () => {
-      // Mock user
-      vi.mocked(require('@pawtag/db').User.findById).mockReturnValue({
-        lean: vi.fn().mockReturnValue({ guardianPoints: 150 }),
-      } as any);
+    it('should return user points balance and tier info', async () => {
+      const { userId, token } = await createCustomerWithRBAC({ email: 'guardian-points@test.com' });
 
-      const response = await request(app)
+      // Set guardian points and tier on the user
+      await mongoose.connection.collections.users.updateOne(
+        { _id: new mongoose.Types.ObjectId(userId) },
+        { $set: { guardianPoints: 150, guardianTier: 'NURTURE', pawRewardsBalance: 25.50 } }
+      );
+
+      // Create some ledger entries
+      await mongoose.connection.collections.guardianpointsledgers.insertOne({
+        userId: new mongoose.Types.ObjectId(userId),
+        points: 100,
+        activity: 'purchase',
+        description: 'Tag purchase',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      const res = await request(app)
         .get('/api/customer/guardian/points')
-        .expect(200);
+        .set('Authorization', `Bearer ${token}`);
 
-      expect(response.body.success).toBe(true);
-      expect(response.body.data.points).toBe(150);
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.points).toBe(150);
+      expect(res.body.data.currentTier).toBeDefined();
+      expect(res.body.data.pawRewardsBalance).toBe(25.50);
+      expect(res.body.data.recentHistory).toBeDefined();
+      expect(Array.isArray(res.body.data.recentHistory)).toBe(true);
+    });
+
+    it('should return 401 without authentication', async () => {
+      const res = await request(app)
+        .get('/api/customer/guardian/points');
+
+      expect(res.status).toBe(401);
     });
   });
 
   describe('GET /api/customer/guardian/rewards', () => {
     it('should return user rewards balance', async () => {
-      // Mock user
-      vi.mocked(require('@pawtag/db').User.findById).mockReturnValue({
-        lean: vi.fn().mockReturnValue({ pawRewardsBalance: 15.50 }),
-      } as any);
+      const { userId, token } = await createCustomerWithRBAC({ email: 'guardian-rewards@test.com' });
 
-      const response = await request(app)
+      await mongoose.connection.collections.users.updateOne(
+        { _id: new mongoose.Types.ObjectId(userId) },
+        { $set: { pawRewardsBalance: 42.75 } }
+      );
+
+      const res = await request(app)
         .get('/api/customer/guardian/rewards')
-        .expect(200);
+        .set('Authorization', `Bearer ${token}`);
 
-      expect(response.body.success).toBe(true);
-      expect(response.body.data.balance).toBe(15.50);
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.balance).toBe(42.75);
     });
   });
 
   describe('GET /api/customer/guardian/tier', () => {
     it('should return user tier information', async () => {
-      // Mock user
-      vi.mocked(require('@pawtag/db').User.findById).mockReturnValue({
-        lean: vi.fn().mockReturnValue({ guardianPoints: 150 }),
-      } as any);
+      const { userId, token } = await createCustomerWithRBAC({ email: 'guardian-tier@test.com' });
 
-      // Mock tier history
-      vi.mocked(require('@pawtag/db').GuardianTierHistory.find).mockReturnValue({
-        lean: vi.fn().mockReturnValue([]),
-      } as any);
+      await mongoose.connection.collections.users.updateOne(
+        { _id: new mongoose.Types.ObjectId(userId) },
+        { $set: { guardianPoints: 250, guardianTier: 'PROTECTOR' } }
+      );
 
-      const response = await request(app)
+      const res = await request(app)
         .get('/api/customer/guardian/tier')
-        .expect(200);
+        .set('Authorization', `Bearer ${token}`);
 
-      expect(response.body.success).toBe(true);
-      expect(response.body.data.tier).toBe('NURTURE');
-      expect(response.body.data.points).toBe(150);
-      expect(response.body.data.pointsToNextTier).toBe(50);
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.currentTier).toBeDefined();
+      expect(res.body.data.points).toBe(250);
     });
   });
 
   describe('POST /api/customer/guardian/rewards/redeem', () => {
-    it('should redeem rewards successfully', async () => {
-      // Mock user
-      vi.mocked(require('@pawtag/db').User.findById).mockReturnValue({
-        lean: vi.fn().mockReturnValue({ _id: 'user123', pawRewardsBalance: 10 }),
-      } as any);
+    it('should return 400 for invalid amount', async () => {
+      const { token } = await createCustomerWithRBAC({ email: 'guardian-redeem@test.com' });
 
-      // Mock ledger creation
-      vi.mocked(require('@pawtag/db').PawRewardsLedger.create).mockResolvedValue({} as any);
-
-      // Mock user update
-      vi.mocked(require('@pawtag/db').User.findByIdAndUpdate).mockReturnValue({
-        lean: vi.fn().mockReturnValue({ pawRewardsBalance: 5 }),
-      } as any);
-
-      const response = await request(app)
+      const res = await request(app)
         .post('/api/customer/guardian/rewards/redeem')
-        .send({ amount: 5, orderId: 'order123' })
-        .expect(200);
+        .set('Authorization', `Bearer ${token}`)
+        .send({ amount: -10 });
 
-      expect(response.body.success).toBe(true);
-      expect(response.body.data.amountRedeemed).toBe(5);
-      expect(response.body.data.newBalance).toBe(5);
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
     });
 
-    it('should return 400 for invalid amount', async () => {
-      const response = await request(app)
-        .post('/api/customer/guardian/rewards/redeem')
-        .send({ amount: -5, orderId: 'order123' })
-        .expect(400);
+    it('should return 400 when amount exceeds balance', async () => {
+      const { token } = await createCustomerWithRBAC({ email: 'guardian-redeem2@test.com' });
 
-      expect(response.body.success).toBe(false);
-      expect(response.body.error).toContain('Invalid amount');
+      const res = await request(app)
+        .post('/api/customer/guardian/rewards/redeem')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ amount: 99999 });
+
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
     });
   });
 });

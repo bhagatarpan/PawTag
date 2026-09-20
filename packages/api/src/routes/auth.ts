@@ -606,11 +606,20 @@ if (user.status === 'inactive') {
       sendLoginNotification(user.email, user.fullName, user.email, ip, ua, true).catch(() => {});
     }
 
+    // Set refresh token as HttpOnly cookie BEFORE sending response
+    // (res.json() flushes headers — Set-Cookie must come first)
+    const isBrowser = isBrowserRequest(req);
+    if (isBrowser) {
+      setRefreshTokenCookie(res, refreshTokens.token);
+    }
+
     res.json({
       success: true,
       data: {
         token,
-        refreshToken: refreshTokens.token,
+        // For browser clients: refresh token is in the HttpOnly cookie, not the body
+        // For mobile/native clients: refresh token is returned in the body
+        ...(isBrowser ? {} : { refreshToken: refreshTokens.token }),
         user: {
           id: user._id,
           email: user.email,
@@ -621,13 +630,6 @@ if (user.status === 'inactive') {
         },
       },
     });
-
-    // Set refresh token as HttpOnly cookie for browser clients
-    try {
-      if (isBrowserRequest(req)) {
-        setRefreshTokenCookie(res, refreshTokens.token);
-      }
-    } catch { /* non-critical */ }
   } catch (error) {
     logger.error({ err: error, email: req.body?.email }, 'Login error');
     res.status(500).json({ success: false, error: 'Login failed' });
@@ -1492,20 +1494,20 @@ router.post('/refresh', async (req, res: Response) => {
       businessOperation: 'Refreshed authentication token',
     }, { actorType: 'USER', authenticationMethod: 'refresh_token' });
 
+    // Set new refresh token as HttpOnly cookie BEFORE sending response
+    const isBrowser = isBrowserRequest(req);
+    if (isBrowser) {
+      setRefreshTokenCookie(res, newRefreshTokens.token);
+    }
+
     res.json({
       success: true,
       data: {
         token: newAccessToken,
-        refreshToken: newRefreshTokens.token,
+        // For browser clients: refresh token is in the HttpOnly cookie, not the body
+        ...(isBrowser ? {} : { refreshToken: newRefreshTokens.token }),
       },
     });
-
-    // Set new refresh token as HttpOnly cookie for browser clients
-    try {
-      if (isBrowserRequest(req)) {
-        setRefreshTokenCookie(res, newRefreshTokens.token);
-      }
-    } catch { /* non-critical */ }
   } catch {
     res.status(500).json({ success: false, error: 'Failed to refresh token' });
   }
@@ -1552,14 +1554,12 @@ router.post('/logout', async (req: AuthRequest, res: Response) => {
       businessOperation: 'Logged out',
     }, { actorType: req.user ? resolveActorType(req.user.role) : 'UNKNOWN' });
 
-    res.json({ success: true, data: { message: 'Logged out successfully' } });
+    // Clear refresh token cookie BEFORE sending response
+    if (isBrowserRequest(req)) {
+      clearRefreshTokenCookie(res);
+    }
 
-    // Clear refresh token cookie for browser clients
-    try {
-      if (isBrowserRequest(req)) {
-        clearRefreshTokenCookie(res);
-      }
-    } catch { /* non-critical */ }
+    res.json({ success: true, data: { message: 'Logged out successfully' } });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to logout' });
   }
@@ -1835,11 +1835,18 @@ router.post('/mfa/verify', mfaVerifyLimiter, async (req: AuthRequest, res: Respo
       sendLoginNotification(user.email, user.fullName, user.email, ip, ua, true).catch(() => {});
     }
 
+    // Set refresh token as HttpOnly cookie BEFORE sending response
+    const isBrowser = isBrowserRequest(req);
+    if (isBrowser) {
+      setRefreshTokenCookie(res, refreshTokens.token);
+    }
+
     res.json({
       success: true,
       data: {
         token: jwtToken,
-        refreshToken: refreshTokens.token,
+        // For browser clients: refresh token is in the HttpOnly cookie, not the body
+        ...(isBrowser ? {} : { refreshToken: refreshTokens.token }),
         user: {
           id: user._id,
           email: user.email,

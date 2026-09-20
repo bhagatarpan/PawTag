@@ -2943,7 +2943,8 @@ router.post('/orders/:id/invoice', requirePermission('order.update'), async (req
 
     logger.info({ orderId: req.params.id, orderNumber: order.orderNumber, invoiceNumber }, 'Admin backfilled invoice for order');
 
-    res.status(201).json({ success: true, data: { invoice } });
+    const invoiceUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/invoice/${secureToken}?admin=1`;
+    res.status(201).json({ success: true, data: { invoice, invoiceUrl } });
   } catch (err) {
     logger.error({ err, orderId: req.params.id }, 'Failed to backfill invoice');
     res.status(500).json({ success: false, error: 'Failed to backfill invoice' });

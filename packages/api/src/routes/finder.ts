@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { z } from 'zod';
 import { Tag, FinderScan, LocationEvent, Notification, Subscription, User, Pet, SiteContent, Setting, EscalationRecord } from '@pawtag/db';
 import { toFinderPetView } from '@pawtag/shared';
 import { sendPushToUser } from '../services/push-notification.service';
@@ -9,6 +10,29 @@ import { requireCaptcha } from '../middleware/captcha';
 import { parseUserAgent } from '../lib/user-agent';
 import { getIpGeoData } from '../lib/geo-location';
 import logger from '../lib/logger';
+
+// Zod schemas for Finder endpoints
+const finderNotifySchema = z.object({
+  finderPhone: z.string().optional(),
+  finderEmail: z.string().email('Invalid email address').optional(),
+  finderName: z.string().max(100, 'Name must be 100 characters or less').optional(),
+  latitude: z.number().min(-90).max(90).optional(),
+  longitude: z.number().min(-180).max(180).optional(),
+  accuracy: z.number().min(0).optional(),
+  consent: z.object({
+    locationConsent: z.enum(['granted', 'denied', 'skipped', 'unavailable']),
+  }).optional(),
+  captchaToken: z.string().min(1, 'CAPTCHA token is required'),
+  captchaAnswer: z.number().int('CAPTCHA answer must be an integer'),
+}).refine((data) => data.finderPhone || data.finderEmail, {
+  message: 'Please provide at least a phone number or email',
+});
+
+const shareLocationSchema = z.object({
+  latitude: z.number().min(-90).max(90, 'Latitude must be between -90 and 90'),
+  longitude: z.number().min(-180).max(180, 'Longitude must be between -180 and 180'),
+  accuracy: z.number().min(0).optional(),
+});
 
 const router = Router();
 
@@ -168,7 +192,7 @@ router.get('/:tagId', async (req: Request, res: Response) => {
   try {
     const tag = await Tag.findOne({ tagId: req.params.tagId, deletedAt: null })
       .populate({ path: 'petId', match: { deletedAt: null }, select: '-__v' })
-      .populate({ path: 'ownerId', select: 'fullName phone showOwnerNameInFinder address.line2 address.city' });
+      .populate({ path: 'ownerId', select: 'fullName phoneNumber showOwnerNameInFinder address.line2 address.city' });
 
     if (!tag) {
       res.status(404).json({ success: false, error: 'Tag not found' });
@@ -277,7 +301,7 @@ router.get('/:tagId', async (req: Request, res: Response) => {
     if (!maskOwner) {
       if (showOwnerName) {
         ownerName = owner.fullName;
-        ownerPhone = owner.phone;
+        ownerPhone = owner.phoneNumber;
         if (owner.address?.city) {
           const parts = [owner.address.line2, owner.address.city].filter(Boolean);
           ownerLocation = parts.join(', ');
@@ -370,16 +394,18 @@ router.get('/:tagId', async (req: Request, res: Response) => {
  */
 router.post('/:tagId/notify', finderNotifyLimiter, requireCaptcha, async (req: Request, res: Response) => {
   try {
-    const { finderPhone, finderEmail, finderName, latitude, longitude, accuracy, consent } = req.body;
-
-    if (!finderPhone && !finderEmail) {
-      res.status(400).json({ success: false, error: 'Please provide at least a phone number or email so the owner can contact you.' });
+    // Zod validation
+    const parsed = finderNotifySchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ success: false, error: parsed.error.errors[0]?.message || 'Invalid input' });
       return;
     }
 
+    const { finderPhone, finderEmail, finderName, latitude, longitude, accuracy, consent } = parsed.data;
+
     const tag = await Tag.findOne({ tagId: req.params.tagId, deletedAt: null })
       .populate({ path: 'petId', match: { deletedAt: null } })
-      .populate({ path: 'ownerId', select: 'fullName email phone' });
+      .populate({ path: 'ownerId', select: 'fullName email phoneNumber' });
 
     if (!tag) {
       res.status(404).json({ success: false, error: 'Tag not found' });
@@ -410,12 +436,12 @@ router.post('/:tagId/notify', finderNotifyLimiter, requireCaptcha, async (req: R
         scan.gpsLocation = { latitude, longitude, accuracy };
         scan.action = 'shared_location';
       }
-      // Store consent for audit trail
+      // Store consent for audit trail — server-authoritative timestamps and version
       if (consent) {
         scan.consent = {
           locationConsent: consent.locationConsent || 'skipped',
-          consentedAt: consent.consentedAt ? new Date(consent.consentedAt) : new Date(),
-          consentVersion: consent.consentVersion || '1.0',
+          consentedAt: new Date(), // Always server timestamp, never client-provided
+          consentVersion: '1.0', // Server canonical version
           ipAddress: req.ip || req.socket.remoteAddress || undefined,
         };
       }
@@ -482,7 +508,7 @@ router.post('/:tagId/notify', finderNotifyLimiter, requireCaptcha, async (req: R
         res.json({
           success: true,
           data: {
-            message: 'Owner has been notified successfully! Thank you for helping reunite this pet with its owner.',
+            message: 'Thank you! The owner has already been notified about this scan.',
             petFound: false,
             locationShared: locationSaved,
             duplicate: true,
@@ -567,7 +593,7 @@ router.post('/:tagId/notify', finderNotifyLimiter, requireCaptcha, async (req: R
     res.json({
       success: true,
       data: {
-        message: 'Owner has been notified successfully! Thank you for helping reunite this pet with its owner.',
+        message: 'Thank you! The owner has been notified and will be alerted shortly.',
         petFound: pet?.status === 'found',
         locationShared: locationSaved,
       },
@@ -684,11 +710,14 @@ router.get('/:tagId/found-timer', async (req: Request, res: Response) => {
  */
 router.post('/:tagId/share-location', finderLocationLimiter, requireCaptcha, async (req: Request, res: Response) => {
   try {
-    const { latitude, longitude, accuracy } = req.body;
-    if (!latitude || !longitude) {
-      res.status(400).json({ success: false, error: 'Location coordinates required' });
+    // Zod validation with numeric range checks
+    const parsed = shareLocationSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ success: false, error: parsed.error.errors[0]?.message || 'Invalid coordinates' });
       return;
     }
+
+    const { latitude, longitude, accuracy } = parsed.data;
 
     const tag = await Tag.findOne({ tagId: req.params.tagId });
     if (!tag) {

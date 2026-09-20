@@ -89,6 +89,7 @@ export function createApiClient(config: ApiClientConfig): AxiosInstance {
   const client = axios.create({
     baseURL,
     headers: { 'Content-Type': 'application/json' },
+    withCredentials: true, // Send cookies (including HttpOnly refresh token) with requests
   });
 
   let isRefreshing = false;
@@ -149,11 +150,19 @@ export function createApiClient(config: ApiClientConfig): AxiosInstance {
 
         try {
           const url = absoluteRefreshUrl || refreshEndpoint;
-          const res = await axios.post(url, { refreshToken });
+          // Send refresh token via cookie (withCredentials) for browser clients
+          // For mobile/native: send in body if no cookie
+          const res = await axios.post(url, refreshToken ? { refreshToken } : {}, { withCredentials: true });
           const { token: newAccessToken, refreshToken: newRefreshToken } = res.data.data;
 
-          // Store new tokens
-          await storage.setTokens(newAccessToken, newRefreshToken);
+          // Store new tokens (for mobile/native; browser uses cookie)
+          if (newRefreshToken) {
+            await storage.setTokens(newAccessToken, newRefreshToken);
+          } else {
+            // Browser path: only access token in storage, refresh in cookie
+            const currentRefresh = await storage.getRefreshToken();
+            await storage.setTokens(newAccessToken, currentRefresh || '');
+          }
 
           client.defaults.headers.common.Authorization = `Bearer ${newAccessToken}`;
           originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;

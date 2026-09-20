@@ -126,9 +126,30 @@ export async function sendMail(to: string, subject: string, html: string, from?:
   const fromAddress = process.env.NODE_ENV === 'production' ? (from || defaultFrom) : defaultFrom;
 
   if (isDemoMode) {
+    // In production, missing email provider is a critical failure — never report success
+    if (process.env.NODE_ENV === 'production') {
+      logger.error({ to, subject }, 'EMAIL FAILED — RESEND_API_KEY not configured in production');
+      recordEmailAudit({
+        templateSlug: auditMeta?.templateSlug || 'unknown',
+        businessFlow: auditMeta?.businessFlow || 'other',
+        recipientEmail: to,
+        senderEmail: fromAddress,
+        senderName: 'PawTag',
+        subject,
+        htmlContent: '',
+        providerMessageId: `failed_${Date.now()}`,
+        providerResponse: { error: 'RESEND_API_KEY not configured in production' },
+        relatedEntityType: auditMeta?.relatedEntityType as any,
+        relatedEntityId: auditMeta?.relatedEntityId,
+        relatedEntityDisplay: auditMeta?.relatedEntityDisplay,
+        isTest: false,
+      }).catch(() => {});
+      return { success: false, error: 'Email provider not configured (RESEND_API_KEY missing)' };
+    }
+
+    // Development/test: log and simulate success
     const urlMatch = html.match(/href="(http[^"]*verify[^"]*|http[^"]*reset[^"]*|http[^"]*token[^"]*)"/i);
-    logger.debug({ to, from: fromAddress, subject, link: urlMatch?.[1] }, 'DEMO EMAIL — No RESEND_API_KEY set');
-    // Record audit for demo mode
+    logger.debug({ to, from: fromAddress, subject, link: urlMatch?.[1] }, 'DEMO EMAIL — No RESEND_API_KEY set (development only)');
     recordEmailAudit({
       templateSlug: auditMeta?.templateSlug || 'unknown',
       businessFlow: auditMeta?.businessFlow || 'other',
@@ -141,8 +162,8 @@ export async function sendMail(to: string, subject: string, html: string, from?:
       relatedEntityType: auditMeta?.relatedEntityType as any,
       relatedEntityId: auditMeta?.relatedEntityId,
       relatedEntityDisplay: auditMeta?.relatedEntityDisplay,
-      isTest: auditMeta?.isTest || process.env.NODE_ENV !== 'production',
-    }).catch(() => {}); // fire-and-forget
+      isTest: auditMeta?.isTest || true,
+    }).catch(() => {});
     return { success: true, messageId: `demo_${Date.now()}` };
   }
 

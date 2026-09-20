@@ -251,11 +251,75 @@ export async function redeemRewards(
     throw new Error('Insufficient PawRewards balance');
   }
 
-  // Record in ledger
-  await recordPawRewardsTransaction(userId, -amount, 'redemption', `Redeemed for order ${orderId}`);
+  // Reservation-only: do NOT permanently debit yet.
+  // The balance is reserved on the PendingOrder and committed only
+  // at successful order finalization (checkout.service.ts confirmCheckout).
+  // If orderId is provided, this is a direct redemption (e.g., from account page)
+  // and we debit immediately. If no orderId, it's a checkout reservation.
+  if (orderId) {
+    // Direct redemption (non-checkout) — debit immediately
+    await recordPawRewardsTransaction(userId, -amount, 'redemption', `Redeemed for order ${orderId}`);
 
-  // Update user's balance
-  const updatedUser = await User.findByIdAndUpdate(
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { 
+        $inc: { 
+          pawRewardsBalance: -amount,
+          pawRewardsTotalRedeemed: amount,
+        } 
+      },
+      { new: true }
+    ).lean();
+
+    logger.info({
+      userId,
+      orderId,
+      redeemed: amount,
+      newBalance: updatedUser?.pawRewardsBalance,
+    }, 'PawRewards redeemed');
+
+    incrementCounter(METRICS.LOYALTY_PAWREWARDS_REDEEMED_TOTAL, { }, amount);
+
+    return {
+      redeemed: amount,
+      newBalance: updatedUser?.pawRewardsBalance || 0,
+    };
+  }
+
+  // Checkout reservation — validate and return reservation info
+  // The actual debit happens in commitRewardsReservation()
+  logger.info({ userId, amount, balance: currentBalance }, 'PawRewards reservation requested');
+
+  return {
+    redeemed: amount,
+    newBalance: currentBalance - amount, // Show projected balance after reservation
+  };
+}
+
+/**
+ * Commit a PawRewards reservation to a permanent debit.
+ * Called from checkout.service.ts confirmCheckout after payment succeeds.
+ */
+export async function commitRewardsReservation(
+  userId: string,
+  amount: number,
+  orderId: string,
+): Promise<void> {
+  if (amount <= 0) return;
+
+  const user = await User.findById(userId).lean();
+  if (!user) throw new Error('User not found');
+
+  const currentBalance = user.pawRewardsBalance || 0;
+  if (currentBalance < amount) {
+    // Insufficient balance at commit time — log but don't fail the order
+    logger.error({ userId, amount, currentBalance, orderId }, 'Insufficient balance at rewards commit');
+    return;
+  }
+
+  await recordPawRewardsTransaction(userId, -amount, 'redemption', `Committed for order ${orderId}`);
+
+  await User.findByIdAndUpdate(
     userId,
     { 
       $inc: { 
@@ -263,22 +327,26 @@ export async function redeemRewards(
         pawRewardsTotalRedeemed: amount,
       } 
     },
-    { new: true }
-  ).lean();
-
-  logger.info({
-    userId,
-    orderId,
-    redeemed: amount,
-    newBalance: updatedUser?.pawRewardsBalance,
-  }, 'PawRewards redeemed');
+  );
 
   incrementCounter(METRICS.LOYALTY_PAWREWARDS_REDEEMED_TOTAL, { }, amount);
 
-  return {
-    redeemed: amount,
-    newBalance: updatedUser?.pawRewardsBalance || 0,
-  };
+  logger.info({ userId, orderId, amount }, 'PawRewards reservation committed');
+}
+
+/**
+ * Release a PawRewards reservation (e.g., on checkout failure/cancel).
+ * No-op if amount is 0.
+ */
+export async function releaseRewardsReservation(
+  _userId: string,
+  amount: number,
+  _orderId: string,
+): Promise<void> {
+  if (amount <= 0) return;
+  // Since we don't actually debit during reservation, releasing is a no-op.
+  // The balance was never reduced.
+  logger.info({ userId: _userId, amount, orderId: _orderId }, 'PawRewards reservation released (no-op)');
 }
 
 /**

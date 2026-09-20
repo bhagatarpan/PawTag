@@ -3,6 +3,7 @@ import { AuthRequest, authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
 import { Subscription, Invoice, Tag, User, Pet } from '@pawtag/db';
 import Stripe from 'stripe';
+import { isFakeMode } from '../commerce/payment-mode';
 import { auditService, type AuditContext } from '../services/audit';
 import {
   renewSubscription,
@@ -12,9 +13,15 @@ import {
 } from '../services/subscription.service';
 import logger from '../lib/logger';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_demo_key', {
-  apiVersion: '2024-06-20' as any,
-});
+// Lazy-init Stripe client — only create when not in fake mode
+let _stripe: Stripe | null = null;
+function getStripeClient(): Stripe {
+  if (_stripe) return _stripe;
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) throw new Error('STRIPE_SECRET_KEY is not configured');
+  _stripe = new Stripe(key, { apiVersion: '2024-06-20' as any });
+  return _stripe;
+}
 
 async function auditSubscriptionEvent(
   req: AuthRequest,
@@ -402,8 +409,8 @@ router.post('/portal-link', requirePermission('customer.read'), async (req: Auth
       stripeCustomerId = subscription?.stripeCustomerId;
     }
 
-    // Demo mode: if no real Stripe key, return a demo URL
-    if (!process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY === 'sk_test_demo_key') {
+    // Fake mode: if no real Stripe key, return a demo URL
+    if (isFakeMode()) {
       const url = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/subscriptions?demo=portal`;
       await auditSubscriptionEvent(req, {
         action: 'subscription_portal_link_created',
@@ -434,7 +441,7 @@ router.post('/portal-link', requirePermission('customer.read'), async (req: Auth
         return;
       }
 
-      const customer = await stripe.customers.create({
+      const customer = await getStripeClient().customers.create({
         email: user.email,
         name: user.fullName,
         metadata: { userId: req.user!.id },
@@ -449,7 +456,7 @@ router.post('/portal-link', requirePermission('customer.read'), async (req: Auth
       );
     }
 
-    const session = await stripe.billingPortal.sessions.create({
+    const session = await getStripeClient().billingPortal.sessions.create({
       customer: stripeCustomerId,
       return_url: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/subscriptions`,
     });

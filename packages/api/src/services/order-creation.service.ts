@@ -146,9 +146,36 @@ export async function createPawTagOrder(params: CreateOrderParams): Promise<Crea
 
   if (existingOrder) {
     const existingInvoice = await Invoice.findOne({ orderId: existingOrder._id });
-    const invoiceUrl = existingInvoice
-      ? `${process.env.FRONTEND_URL || 'http://localhost:3000'}/invoice/${generateSecureToken()}`
-      : '';
+    let invoiceUrl = '';
+
+    if (existingInvoice) {
+      // Look up existing access token for this invoice
+      const existingToken = await InvoiceAccessToken.findOne({ invoiceId: existingInvoice._id });
+      if (existingToken) {
+        // Find the raw token (we only have the hash, so create a new valid one)
+        const secureToken = generateSecureToken();
+        const tokenHash = hashToken(secureToken);
+        // Update the existing token with new hash (or create new one)
+        await InvoiceAccessToken.findOneAndUpdate(
+          { invoiceId: existingInvoice._id, userId: existingOrder.userId },
+          { tokenHash, expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), verifiedAt: new Date() },
+          { upsert: true },
+        );
+        invoiceUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/invoice/${secureToken}?admin=1`;
+      } else {
+        // No existing token — create one
+        const secureToken = generateSecureToken();
+        const tokenHash = hashToken(secureToken);
+        await InvoiceAccessToken.create({
+          invoiceId: existingInvoice._id,
+          userId: existingOrder.userId,
+          tokenHash,
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+          verifiedAt: new Date(),
+        });
+        invoiceUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/invoice/${secureToken}?admin=1`;
+      }
+    }
 
     logger.info({ orderNumber: existingOrder.orderNumber, paymentIntentId }, 'Order already exists (idempotent)');
     return { order: existingOrder, invoice: existingInvoice, invoiceUrl };

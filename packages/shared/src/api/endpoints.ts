@@ -611,6 +611,8 @@ export const API = {
   checkout: {
     paymentIntent: '/checkout/payment-intent',
     confirm: '/checkout/confirm',
+    pending: '/checkout/pending',
+    status: (paymentIntentId: string) => `/checkout/status/${paymentIntentId}` as const,
   },
 
   // ---------------------------------------------------------------------------

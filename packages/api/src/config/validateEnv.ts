@@ -12,6 +12,7 @@
  */
 
 import logger from '../lib/logger';
+import { isValidPaymentMode } from '../commerce/payment-mode';
 
 // ─── Variable Categories ───────────────────────────────────────────────────
 
@@ -32,7 +33,7 @@ const ALWAYS_REQUIRED = [
  */
 const FEATURE_REQUIRED = {
   payments: ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET'] as const,
-  email: ['SMTP_HOST', 'SMTP_USER'] as const,
+  email: ['RESEND_API_KEY'] as const,
   sms: ['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_FROM_NUMBER'] as const,
   storage: ['R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET_NAME', 'R2_ENDPOINT'] as const,
   push: ['FIREBASE_PROJECT_ID', 'FIREBASE_CLIENT_EMAIL', 'FIREBASE_PRIVATE_KEY'] as const,
@@ -124,6 +125,25 @@ function validateFeatureRequired(nodeEnv: string): string[] {
 
   // Payments - always required in production
   if (nodeEnv === 'production') {
+    // Validate PAYMENT_MODE is explicitly set and valid
+    const paymentMode = process.env.PAYMENT_MODE?.trim().toLowerCase();
+    if (!paymentMode) {
+      errors.push(
+        'PAYMENT_MODE is required in production. Set it to "stripe_live". ' +
+        'Valid values: fake, stripe_test, stripe_live.'
+      );
+    } else if (!isValidPaymentMode(paymentMode)) {
+      errors.push(
+        `PAYMENT_MODE="${process.env.PAYMENT_MODE}" is invalid. ` +
+        'Valid values: fake, stripe_test, stripe_live.'
+      );
+    } else if (paymentMode !== 'stripe_live') {
+      errors.push(
+        `PAYMENT_MODE="${paymentMode}" is not allowed in production. ` +
+        'Production requires PAYMENT_MODE=stripe_live.'
+      );
+    }
+
     for (const key of FEATURE_REQUIRED.payments) {
       if (!process.env[key]) {
         errors.push(`${key} is required in production when payments are enabled.`);
@@ -149,11 +169,13 @@ function validateFeatureRequired(nodeEnv: string): string[] {
     }
   }
 
-  // Email - warn if not set
+  // Email - required in production (Resend provider)
   for (const key of FEATURE_REQUIRED.email) {
     if (!process.env[key]) {
       if (nodeEnv === 'production') {
-        logger.warn({ variable: key }, `Config: ${key} is not set — email features may not work`);
+        errors.push(`${key} is required in production. Email provider (Resend) must be configured.`);
+      } else {
+        logger.warn({ variable: key }, `Config: ${key} is not set — emails will be simulated in development`);
       }
     }
   }

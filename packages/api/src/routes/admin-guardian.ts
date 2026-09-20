@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { AuthRequest, authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
-import { User, Setting, Subscription } from '@pawtag/db';
+import { User, Setting, Subscription, GuardianPointsLedger, PawRewardsLedger } from '@pawtag/db';
 import { auditService, type AuditContext } from '../services/audit';
 import { createAuditContextFromRequest, type AuditRequest } from '../middleware/audit';
 import { guardianSettingsSchema, membersQuerySchema, activityQuerySchema } from '../validation/loyalty';
@@ -259,10 +259,6 @@ router.get('/members', requirePermission('setting.read'), async (req: AuthReques
 router.get('/activity', requirePermission('setting.read'), async (req: AuthRequest, res: Response) => {
   try {
     const limit = parseInt(req.query.limit as string) || 50;
-
-    // Import models dynamically to avoid circular dependencies
-    const { GuardianPointsLedger } = require('@pawtag/db');
-    const { PawRewardsLedger } = require('@pawtag/db');
 
     // Get recent points activity
     const recentPoints = await GuardianPointsLedger.find()

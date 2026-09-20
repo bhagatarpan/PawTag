@@ -30,6 +30,7 @@ import { Router, Request, Response } from 'express';
 import { Order, Invoice, InvoiceAccessToken, Subscription, Tag, User, Notification, WebhookEvent, PendingOrder, PaymentTransaction } from '@pawtag/db';
 import { stripePaymentProvider } from '../commerce/providers/stripe';
 import { checkoutService } from '../commerce/services/checkout.service';
+import { isFakeMode } from '../commerce/payment-mode';
 import { logPaymentEvent, logOrderEvent } from '../commerce/audit';
 import { logCommerceEvent } from '../commerce/audit';
 import logger from '../lib/logger';
@@ -49,18 +50,18 @@ const router = Router();
 router.post('/', async (req: Request, res: Response) => {
   const sig = req.headers['stripe-signature'];
 
-  // ─── Demo mode ────────────────────────────────────────────
-  // Demo mode is ONLY allowed in development/test. In production, the startup
-  // validation should have already rejected missing/demo Stripe configuration.
+  // ─── Fake mode ────────────────────────────────────────────
+  // Fake mode is ONLY allowed in development/test. In production, the startup
+  // validation should have already rejected fake payment configuration.
   // This guard is a safety net in case startup validation is bypassed.
-  if (!process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY === 'sk_test_demo_key') {
+  if (isFakeMode()) {
     if (process.env.NODE_ENV === 'production') {
-      logger.error('Stripe webhook received in production with demo configuration — this should never happen');
+      logger.error('Stripe webhook received in production with fake payment mode — this should never happen');
       res.status(500).json({ success: false, error: 'Payment system misconfigured' });
       return;
     }
     const event = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-    logger.info({ eventType: event.type }, 'Received demo Stripe webhook');
+    logger.info({ eventType: event.type }, 'Received fake mode Stripe webhook');
 
     await handleEvent(event.type, event.data?.object);
     res.json({ received: true });

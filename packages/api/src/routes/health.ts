@@ -9,6 +9,7 @@
 
 import { Router, Request, Response } from 'express';
 import mongoose from 'mongoose';
+import { resolvePaymentMode, isStripeEnabled } from '../commerce/payment-mode';
 import { collectMetrics } from '../lib/metrics';
 import logger from '../lib/logger';
 
@@ -85,7 +86,7 @@ router.get('/ready', async (_req: Request, res: Response) => {
  * Does NOT expose sensitive diagnostic information.
  */
 router.get('/dependencies', async (_req: Request, res: Response) => {
-  const checks: Record<string, { status: string; configured: boolean; error?: string }> = {};
+  const checks: Record<string, { status: string; configured: boolean; error?: string; paymentMode?: string }> = {};
 
   // Database
   checks.database = {
@@ -96,7 +97,8 @@ router.get('/dependencies', async (_req: Request, res: Response) => {
   // Stripe
   checks.stripe = {
     status: 'unknown',
-    configured: !!process.env.STRIPE_SECRET_KEY && process.env.STRIPE_SECRET_KEY !== 'sk_test_demo_key',
+    configured: isStripeEnabled(),
+    paymentMode: resolvePaymentMode(),
   };
 
   // Resend

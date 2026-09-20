@@ -9,6 +9,7 @@
  */
 
 import { Router, Response } from 'express';
+import { z } from 'zod';
 import { AuthRequest, authenticate } from '../middleware/auth';
 import { validate } from '../middleware/validation';
 import { cancelOrderSchema } from '../middleware/schemas';
@@ -20,6 +21,19 @@ import { formatActivityMessage, formatCancelledBy, formatCancelledByDescription,
 import { isValidTransition } from '../services/orderStatus.service';
 import logger from '../lib/logger';
 
+// Zod schema for return request
+const returnItemSchema = z.object({
+  orderItemId: z.string().min(1, 'orderItemId is required'),
+  quantity: z.number().int().min(1, 'quantity must be at least 1'),
+  reason: z.string().max(500).optional(),
+});
+
+const createReturnSchema = z.object({
+  orderId: z.string().min(1, 'orderId is required'),
+  reason: z.string().min(1, 'reason is required').max(1000),
+  items: z.array(returnItemSchema).min(1, 'At least one item is required'),
+});
+
 const router = Router();
 router.use(authenticate);
 
@@ -27,15 +41,10 @@ router.use(authenticate);
  * POST /api/customer/returns
  * Create a return request for an order.
  */
-router.post('/', async (req: AuthRequest, res: Response) => {
+router.post('/', validate(createReturnSchema), async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user?.id;
     const { orderId, reason, items } = req.body;
-
-    if (!orderId || !reason || !items?.length) {
-      res.status(400).json({ success: false, error: 'orderId, reason, and items are required' });
-      return;
-    }
 
     const order = await Order.findById(orderId);
     if (!order) {
@@ -84,12 +93,14 @@ router.post('/', async (req: AuthRequest, res: Response) => {
       };
     });
 
-    // Calculate refund amount
+    // Calculate refund amount (server-authoritative: uses order line-item prices)
     let refundAmount = 0;
     for (const item of returnItems) {
       const orderItem = order.items.find((oi) => String(oi.productId) === item.orderItemId);
       if (orderItem) {
-        refundAmount += orderItem.unitPrice * item.quantity;
+        // Include customization surcharges in refund calculation
+        const lineTotal = (orderItem.unitPrice + (orderItem.customizationTotal || 0)) * item.quantity;
+        refundAmount += lineTotal;
       }
     }
 

@@ -42,8 +42,8 @@ router.use(authenticate);
  */
 router.post('/payment-intent', async (req: AuthRequest, res: Response) => {
   try {
-    const { shippingAddress, autoRenew } = req.body || {};
-    const result = await checkoutService.createPaymentIntent(req.user!.id, shippingAddress, autoRenew);
+    const { shippingAddress, autoRenew, pawRewardsRedemption } = req.body || {};
+    const result = await checkoutService.createPaymentIntent(req.user!.id, shippingAddress, autoRenew, pawRewardsRedemption);
 
     res.json({
       success: true,
@@ -110,6 +110,83 @@ router.get('/pending', async (req: AuthRequest, res: Response) => {
   } catch (err) {
     const error = toAppError(err);
     logger.error({ err, userId: req.user?.id }, 'Failed to get pending order');
+    res.status(error.httpStatus).json({ success: false, error: error.userMessage });
+  }
+});
+
+/**
+ * GET /api/checkout/status/:paymentIntentId
+ *
+ * Get checkout status for a specific PaymentIntent.
+ * Provides a clean recovery contract for the frontend.
+ *
+ * Returns: { status, orderId?, orderNumber?, recoverable, customerMessage }
+ */
+router.get('/status/:paymentIntentId', async (req: AuthRequest, res: Response) => {
+  try {
+    const { paymentIntentId } = req.params;
+
+    if (!paymentIntentId) {
+      res.status(400).json({ success: false, error: 'paymentIntentId is required' });
+      return;
+    }
+
+    // Find the PendingOrder (must belong to this user)
+    const pending = await PendingOrder.findOne({
+      stripePaymentIntentId: paymentIntentId,
+      userId: req.user!.id,
+    });
+
+    if (!pending) {
+      res.json({
+        success: true,
+        data: {
+          status: 'not_found',
+          recoverable: false,
+          customerMessage: 'No checkout found for this payment.',
+        },
+      });
+      return;
+    }
+
+    // If converted, fetch order details
+    if (pending.status === 'converted' && pending.convertedOrderId) {
+      const { Order } = await import('@pawtag/db');
+      const order = await Order.findById(pending.convertedOrderId).select('orderNumber status');
+      res.json({
+        success: true,
+        data: {
+          status: 'completed',
+          orderId: pending.convertedOrderId,
+          orderNumber: order?.orderNumber || null,
+          recoverable: false,
+          customerMessage: 'Your order has been placed successfully.',
+        },
+      });
+      return;
+    }
+
+    // Pending or expired
+    const statusMap: Record<string, { recoverable: boolean; customerMessage: string }> = {
+      pending: { recoverable: true, customerMessage: 'Payment is being processed. Please wait or try again.' },
+      paid: { recoverable: true, customerMessage: 'Payment received. Finalizing your order...' },
+      expired: { recoverable: false, customerMessage: 'This checkout has expired. Please start a new order.' },
+      failed: { recoverable: false, customerMessage: 'Payment failed. Please try again.' },
+    };
+
+    const info = statusMap[pending.status] || { recoverable: false, customerMessage: 'Unknown status.' };
+
+    res.json({
+      success: true,
+      data: {
+        status: pending.status,
+        recoverable: info.recoverable,
+        customerMessage: info.customerMessage,
+      },
+    });
+  } catch (err) {
+    const error = toAppError(err);
+    logger.error({ err, userId: req.user?.id }, 'Failed to get checkout status');
     res.status(error.httpStatus).json({ success: false, error: error.userMessage });
   }
 });

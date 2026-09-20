@@ -267,6 +267,17 @@ router.post('/admin/invoices/:invoiceId/email', authenticate, requirePermission(
 
     const invoiceHtml = await generateInvoiceHtml(invoice._id.toString());
     const secureToken = generateSecureToken();
+    const tokenHash = hashToken(secureToken);
+
+    // Persist the access token so the emailed link actually works
+    await InvoiceAccessToken.create({
+      invoiceId: invoice._id,
+      userId: invoice.userId,
+      tokenHash,
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days for admin-emailed invoices
+      verifiedAt: new Date(), // Pre-verified — admin-initiated, no OTP required
+    });
+
     const invoiceUrl = `${FRONTEND_URL}/invoice/${secureToken}?admin=1`;
     await sendInvoiceEmail(recipientEmail, recipientName, invoice.invoiceNumber, invoiceHtml, invoiceUrl, invoice.amount);
 
