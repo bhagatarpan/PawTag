@@ -497,9 +497,10 @@ export default function Checkout() {
           city: form.city,
           state: form.state,
           zip: form.zip,
-          country: form.country || 'NZ',
+          country: (form.country || 'NZ').toUpperCase(),
         },
         autoRenew: autoRenewMap,
+        pawRewardsRedemption: pawRewardsRedemption || 0,
       });
       const { paymentIntentId, clientSecret, pendingOrderId } = checkoutRes.data?.data;
 

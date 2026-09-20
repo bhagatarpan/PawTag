@@ -125,13 +125,11 @@ export function createApiClient(config: ApiClientConfig): AxiosInstance {
       const originalRequest = err.config;
 
       if (err.response?.status === 401 && !originalRequest._retry) {
-        // Get refresh token
+        // Get refresh token from storage (may be null for browser clients using HttpOnly cookies)
         const refreshToken = await storage.getRefreshToken();
 
-        if (!refreshToken) {
-          onAuthFailure?.();
-          return Promise.reject(err);
-        }
+        // Don't short-circuit if token is missing — cookies may carry it via withCredentials
+        // Only call onAuthFailure if we've already attempted a refresh and it failed
 
         // Queue if already refreshing
         if (isRefreshing) {
@@ -150,18 +148,13 @@ export function createApiClient(config: ApiClientConfig): AxiosInstance {
 
         try {
           const url = absoluteRefreshUrl || refreshEndpoint;
-          // Send refresh token via cookie (withCredentials) for browser clients
-          // For mobile/native: send in body if no cookie
+          // Send refresh token in body if available; cookies sent automatically via withCredentials
           const res = await axios.post(url, refreshToken ? { refreshToken } : {}, { withCredentials: true });
           const { token: newAccessToken, refreshToken: newRefreshToken } = res.data.data;
 
-          // Store new tokens (for mobile/native; browser uses cookie)
+          // Store new tokens
           if (newRefreshToken) {
             await storage.setTokens(newAccessToken, newRefreshToken);
-          } else {
-            // Browser path: only access token in storage, refresh in cookie
-            const currentRefresh = await storage.getRefreshToken();
-            await storage.setTokens(newAccessToken, currentRefresh || '');
           }
 
           client.defaults.headers.common.Authorization = `Bearer ${newAccessToken}`;

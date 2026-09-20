@@ -617,9 +617,9 @@ if (user.status === 'inactive') {
       success: true,
       data: {
         token,
-        // For browser clients: refresh token is in the HttpOnly cookie, not the body
-        // For mobile/native clients: refresh token is returned in the body
-        ...(isBrowser ? {} : { refreshToken: refreshTokens.token }),
+        // Always return refreshToken in body for all clients
+        // HttpOnly cookie is an ADDITIONAL security layer, not a replacement
+        refreshToken: refreshTokens.token,
         user: {
           id: user._id,
           email: user.email,
@@ -1504,8 +1504,8 @@ router.post('/refresh', async (req, res: Response) => {
       success: true,
       data: {
         token: newAccessToken,
-        // For browser clients: refresh token is in the HttpOnly cookie, not the body
-        ...(isBrowser ? {} : { refreshToken: newRefreshTokens.token }),
+        // Always return refreshToken in body for all clients
+        refreshToken: newRefreshTokens.token,
       },
     });
   } catch {
@@ -1845,8 +1845,8 @@ router.post('/mfa/verify', mfaVerifyLimiter, async (req: AuthRequest, res: Respo
       success: true,
       data: {
         token: jwtToken,
-        // For browser clients: refresh token is in the HttpOnly cookie, not the body
-        ...(isBrowser ? {} : { refreshToken: refreshTokens.token }),
+        // Always return refreshToken in body for all clients
+        refreshToken: refreshTokens.token,
         user: {
           id: user._id,
           email: user.email,
