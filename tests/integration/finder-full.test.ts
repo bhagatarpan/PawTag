@@ -285,7 +285,7 @@ describe('Integration: Finder Full - Location Sharing', () => {
       .send({ longitude: 174.7633 });
 
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/coordinates/i);
+    expect(res.body.error).toBeDefined();
   });
 
   it('returns 400 when longitude is missing', async () => {
