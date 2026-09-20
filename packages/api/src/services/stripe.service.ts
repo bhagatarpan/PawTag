@@ -32,9 +32,10 @@ export async function createPaymentIntent(data: PaymentIntentData): Promise<Paym
   // Fake mode: if no real Stripe key, simulate success
   if (isFakeMode()) {
     const demoId = `pi_demo_${Date.now()}_fake`;
+    const fakeSecret = `fake${Date.now()}`.slice(0, 16);
     return {
       success: true,
-      clientSecret: `${demoId}_secret_fake`,
+      clientSecret: `${demoId}_secret_${fakeSecret}`,
       paymentIntentId: demoId,
     };
   }

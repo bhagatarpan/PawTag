@@ -169,9 +169,11 @@ export class StripePaymentProvider implements IPaymentProvider {
     // Fake mode: deterministic auto-succeed without touching Stripe
     if (mode === 'fake') {
       const demoId = `pi_demo_${Date.now()}_fake`;
+      // Generate a properly formatted secret that Stripe.js validation accepts
+      const fakeSecret = `fake${Date.now()}`.slice(0, 16);
       return {
         id: demoId,
-        clientSecret: `${demoId}_secret_fake`,
+        clientSecret: `${demoId}_secret_${fakeSecret}`,
         amount: params.amount,
         currency: params.currency.toLowerCase(),
         status: 'succeeded',

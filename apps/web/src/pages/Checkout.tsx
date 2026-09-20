@@ -9,7 +9,6 @@ import { AddressAutocomplete, InlineEditBanner } from '@pawtag/ui';
 import type { AddressComponents } from '@pawtag/ui';
 import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
-import axios from 'axios';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useSiteSettings } from '../hooks/useCms';
@@ -192,7 +191,7 @@ export default function Checkout() {
       setRecoveringPayment(true);
       try {
         // Check if order already exists for this payment intent
-        const res = await api.get('/api/checkout/pending');
+        const res = await api.get(API.checkout.pending);
         const pending = res.data?.data;
 
         if (pending && pending.status === 'converted' && pending.convertedOrderId) {
@@ -376,7 +375,7 @@ export default function Checkout() {
     // Guest: validate promo code via public endpoint (no auth required)
     if (!user) {
       try {
-        const res = await axios.post(`/api${API.public.promo.validate}`, { code: promoCode });
+        const res = await api.post(API.public.promo.validate, { code: promoCode });
         const data = res.data.data;
         if (data.valid) {
           setGuestPromoInfo(data);
@@ -561,7 +560,7 @@ export default function Checkout() {
 
         // Recovery: Check if order was actually created despite the error
         try {
-          const recoveryRes = await api.get('/api/checkout/pending');
+          const recoveryRes = await api.get(API.checkout.pending);
           const recoveryPending = recoveryRes.data?.data;
           if (recoveryPending && recoveryPending.status === 'converted' && recoveryPending.convertedOrderId) {
             // Order was created — show confirmation
