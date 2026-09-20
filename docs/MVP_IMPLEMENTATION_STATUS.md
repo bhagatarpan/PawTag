@@ -143,6 +143,12 @@ All quality gates pass:
 - [x] 11.3 Made consent server-authoritative — server stamps timestamp and canonical version, never trusts client-provided `consentedAt` or `consentVersion`
 - [x] 11.4 Fixed emergency contact lookup bug — `deletedAt: { $ne: null }` was inverted, now correctly queries active users with `deletedAt: null`
 
+### V2 Phase 12 — Premium Cart Redesign
+- [x] 12.1 Upgraded grid layout to 12-column grid (`lg:grid-cols-12`, left 8 cols, right 4 cols) with max-width 1280px
+- [x] 12.2 Redesigned CartItemCard as premium card — individual rounded cards with border, padding, shadow states; added stock warnings (low stock, out of stock, quantity exceeds), price display, customization treatment
+- [x] 12.3 Fixed guest messaging — changed "Guest checkout" to "Your cart is saved on this device. Sign in or create an account to continue to checkout and save your cart."
+- [x] 12.4 Order summary hierarchy preserved — subtotal, discount, shipping, GST, estimated total, promo, Guardian benefits, checkout CTA, trust cues
+
 ### Phase 2 — Finder and Pet Recovery Reliability
 - [x] 2.1 Public Finder DTO
 - [x] 2.2 Recovery state semantics
@@ -260,6 +266,7 @@ All quality gates pass:
 | V2 Phase 9 — Invoice Security/Delivery | ✅ Complete | 4/4 |
 | V2 Phase 10 — Auth/Session Security | ✅ Complete | 4/4 |
 | V2 Phase 11 — Finder Recovery/Privacy | ✅ Complete | 4/4 |
+| V2 Phase 12 — Premium Cart Redesign | ✅ Complete | 4/4 |
 | Phase 1 — Production Safety | ✅ Complete | 6/6 |
 | Phase 2 — Finder Reliability | ✅ Complete | 5/5 |
 | Phase 3 — Commerce/Payments | ✅ Complete | 6/6 |
@@ -283,6 +290,6 @@ All quality gates pass:
 
 ## Next Recommended Work Packet
 
-**V2 Phase 12 — Premium Cart Redesign**
+**V2 Phase 13 — Checkout UX and Customer Web Hardening**
 
-Per the V2 plan, the next priority is delivering the intended premium, high-confidence commerce cart with 70/30 desktop layout, sticky summary, and proper product card treatment.
+Per the V2 plan, the next priority is decomposing the checkout page and adding proper state/failure recovery.
