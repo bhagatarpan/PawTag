@@ -64,14 +64,16 @@ export function AddressManager({
   const fetchAddresses = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await apiClient.get('/customer/addresses');
+      // Pass userId as query param for admin callers managing another user's addresses
+      const url = userId ? `/customer/addresses?userId=${userId}` : '/customer/addresses';
+      const res = await apiClient.get(url);
       setAddresses(res.data?.data || []);
     } catch {
       setError('Failed to load addresses');
     } finally {
       setLoading(false);
     }
-  }, [apiClient]);
+  }, [apiClient, userId]);
 
   useEffect(() => {
     fetchAddresses();
@@ -95,10 +97,13 @@ export function AddressManager({
         ? `/customer/addresses/${editingId}`
         : '/customer/addresses';
 
+      // Pass userId in body for admin callers managing another user's addresses
+      const payload = userId ? { ...form, userId } : form;
+
       if (editingId) {
-        await apiClient.put(url, form);
+        await apiClient.put(url, payload);
       } else {
-        await apiClient.post(url, form);
+        await apiClient.post(url, payload);
       }
 
       setAdding(false);
@@ -113,7 +118,8 @@ export function AddressManager({
 
   const handleDelete = async (id: string) => {
     try {
-      await apiClient.delete(`/customer/addresses/${id}`);
+      const url = userId ? `/customer/addresses/${id}?userId=${userId}` : `/customer/addresses/${id}`;
+      await apiClient.delete(url);
       setDeleteConfirmId(null);
       await fetchAddresses();
       onChange?.();
@@ -124,7 +130,11 @@ export function AddressManager({
 
   const handleSetDefault = async (id: string) => {
     try {
-      await apiClient.put(`/customer/addresses/${id}/default`);
+      const url = userId
+        ? `/customer/addresses/${id}/default`
+        : `/customer/addresses/${id}/default`;
+      const payload = userId ? { userId } : {};
+      await apiClient.put(url, payload);
       await fetchAddresses();
       onChange?.();
     } catch {

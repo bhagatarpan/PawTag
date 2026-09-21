@@ -2507,10 +2507,13 @@ router.post('/escalations/:id/forward', requirePermission('pet.update'), async (
 /**
  * GET /api/customer/addresses
  * List all saved addresses for the authenticated user.
+ * Admin callers can pass ?userId=... to manage another user's addresses.
  */
 router.get('/addresses', async (req: AuthRequest, res: Response) => {
   try {
-    const user = await User.findById(req.user!.id).select('addresses').lean();
+    // Support admin callers passing userId query param
+    const targetUserId = (req.query.userId as string) || req.user!.id;
+    const user = await User.findById(targetUserId).select('addresses').lean();
     res.json({ success: true, data: user?.addresses || [] });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch addresses' });
@@ -2530,7 +2533,9 @@ router.post('/addresses', async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    const user = await User.findById(req.user!.id);
+    // Support admin callers passing userId in body
+    const targetUserId = req.body.userId || req.user!.id;
+    const user = await User.findById(targetUserId);
     if (!user) {
       res.status(404).json({ success: false, error: 'User not found' });
       return;
@@ -2597,7 +2602,9 @@ router.put('/addresses/:id', async (req: AuthRequest, res: Response) => {
   try {
     const { label, line1, line2, city, state, zip, country, isDefault } = req.body;
 
-    const user = await User.findById(req.user!.id);
+    // Support admin callers passing userId in body
+    const targetUserId = req.body.userId || req.user!.id;
+    const user = await User.findById(targetUserId);
     if (!user) {
       res.status(404).json({ success: false, error: 'User not found' });
       return;
@@ -2655,7 +2662,9 @@ router.put('/addresses/:id', async (req: AuthRequest, res: Response) => {
  */
 router.delete('/addresses/:id', async (req: AuthRequest, res: Response) => {
   try {
-    const user = await User.findById(req.user!.id);
+    // Support admin callers passing userId in query
+    const targetUserId = (req.query.userId as string) || req.user!.id;
+    const user = await User.findById(targetUserId);
     if (!user) {
       res.status(404).json({ success: false, error: 'User not found' });
       return;
@@ -2708,7 +2717,9 @@ router.delete('/addresses/:id', async (req: AuthRequest, res: Response) => {
  */
 router.put('/addresses/:id/default', async (req: AuthRequest, res: Response) => {
   try {
-    const user = await User.findById(req.user!.id);
+    // Support admin callers passing userId in body
+    const targetUserId = req.body.userId || req.user!.id;
+    const user = await User.findById(targetUserId);
     if (!user) {
       res.status(404).json({ success: false, error: 'User not found' });
       return;
