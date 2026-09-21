@@ -64,7 +64,7 @@ export function AddressManager({
   const fetchAddresses = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await apiClient.get('/api/customer/addresses');
+      const res = await apiClient.get('/customer/addresses');
       setAddresses(res.data?.data || []);
     } catch {
       setError('Failed to load addresses');
@@ -92,8 +92,8 @@ export function AddressManager({
   const handleSave = async () => {
     try {
       const url = editingId
-        ? `/api/customer/addresses/${editingId}`
-        : '/api/customer/addresses';
+        ? `/customer/addresses/${editingId}`
+        : '/customer/addresses';
 
       if (editingId) {
         await apiClient.put(url, form);
@@ -113,7 +113,7 @@ export function AddressManager({
 
   const handleDelete = async (id: string) => {
     try {
-      await apiClient.delete(`/api/customer/addresses/${id}`);
+      await apiClient.delete(`/customer/addresses/${id}`);
       setDeleteConfirmId(null);
       await fetchAddresses();
       onChange?.();
@@ -124,7 +124,7 @@ export function AddressManager({
 
   const handleSetDefault = async (id: string) => {
     try {
-      await apiClient.put(`/api/customer/addresses/${id}/default`);
+      await apiClient.put(`/customer/addresses/${id}/default`);
       await fetchAddresses();
       onChange?.();
     } catch {
