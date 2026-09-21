@@ -23,6 +23,7 @@ export function AddressAutocomplete({
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [noResults, setNoResults] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
@@ -32,16 +33,27 @@ export function AddressAutocomplete({
       setSuggestions([]);
       setIsOpen(false);
       setNoResults(false);
+      setApiError(null);
       return;
     }
 
     setIsLoading(true);
+    setApiError(null);
     try {
       const params = new URLSearchParams({
         q: query,
         limit: '5',
       });
       const res = await fetch(`/api/address/suggest?${params}`);
+      
+      if (!res.ok) {
+        setSuggestions([]);
+        setIsOpen(false);
+        setNoResults(false);
+        setApiError('Address service temporarily unavailable. You can enter your address manually.');
+        return;
+      }
+
       const data = await res.json();
       if (data.success) {
         const addresses: NormalizedAddress[] = data.addresses || [];
@@ -52,11 +64,13 @@ export function AddressAutocomplete({
         setSuggestions([]);
         setIsOpen(false);
         setNoResults(false);
+        setApiError(data.error || 'Address lookup failed. You can enter your address manually.');
       }
     } catch {
       setSuggestions([]);
       setIsOpen(false);
       setNoResults(false);
+      setApiError('Network error. Please check your connection and try again.');
     } finally {
       setIsLoading(false);
     }
@@ -150,6 +164,12 @@ export function AddressAutocomplete({
           >
             Enter address manually
           </button>
+        </p>
+      )}
+
+      {apiError && (
+        <p className="mt-1 text-xs text-amber-600">
+          {apiError}
         </p>
       )}
     </div>

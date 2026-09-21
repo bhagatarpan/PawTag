@@ -107,8 +107,10 @@ export default function Checkout() {
   const [savedTexts, setSavedTexts] = useState<Record<string, boolean>>({});
   const [expandedEngraving, setExpandedEngraving] = useState<Record<string, boolean>>({});
 
-  // Shipping address
-  const [addressMode, setAddressMode] = useState<'saved' | 'custom'>('saved');
+  // Shipping address — persisted to sessionStorage
+  const [addressMode, setAddressMode] = useState<'saved' | 'custom'>(() => {
+    return (sessionStorage.getItem('pawtag_checkout_addressMode') as 'saved' | 'custom') || 'saved';
+  });
   const [savedAddresses, setSavedAddresses] = useState<Array<{
     _id?: string;
     label: string;
@@ -120,9 +122,12 @@ export default function Checkout() {
     country: string;
     isDefault: boolean;
   }>>([]);
-  const [selectedAddressId, setSelectedAddressId] = useState<string>('');
-  const [form, setForm] = useState({
-    label: '', line1: '', line2: '', city: '', state: '', zip: '', country: 'nz',
+  const [selectedAddressId, setSelectedAddressId] = useState<string>(
+    sessionStorage.getItem('pawtag_checkout_selectedAddressId') || ''
+  );
+  const [form, setForm] = useState(() => {
+    const saved = sessionStorage.getItem('pawtag_checkout_address');
+    return saved ? JSON.parse(saved) : { label: '', line1: '', line2: '', city: '', state: '', zip: '', country: 'nz' };
   });
 
   // Fetch saved addresses on mount
@@ -165,6 +170,14 @@ export default function Checkout() {
         .catch(() => setAddressMode('custom'));
     }
   }, [user]);
+
+  // Persist address state to sessionStorage
+  useEffect(() => {
+    sessionStorage.setItem('pawtag_checkout_addressMode', addressMode);
+    sessionStorage.setItem('pawtag_checkout_selectedAddressId', selectedAddressId);
+    sessionStorage.setItem('pawtag_checkout_address', JSON.stringify(form));
+  }, [addressMode, selectedAddressId, form]);
+
   // Prepopulate from user profile on mount / login
   useEffect(() => {
     if (user?.address?.line1 && addressMode === 'saved') {
@@ -423,7 +436,7 @@ export default function Checkout() {
 
   const canProceedToCheckout = items.length > 0;
   const canProceedToReview = emailVerified && mobileVerified && form.line1 && form.city && form.zip;
-  const canProceedToPayment = canProceedToReview && paymentClientSecret;
+  const canProceedToPayment = canProceedToReview;
 
   // Step navigation
   const goToStep = (step: Step) => {
@@ -437,8 +450,9 @@ export default function Checkout() {
 
   // Promo code handlers
   const [promoError, setPromoError] = useState('');
-  const applyPromoCode = async () => {
-    if (!promoCode) return;
+  const applyPromoCode = async (code?: string) => {
+    const promoCodeToUse = code || promoCode;
+    if (!promoCodeToUse) return;
     setPromoLoading(true);
     setPromoError('');
     setGuestPromoInfo(null);
@@ -446,11 +460,12 @@ export default function Checkout() {
     // Guest: validate promo code via public endpoint (no auth required)
     if (!user) {
       try {
-        const res = await api.post(API.public.promo.validate, { code: promoCode });
+        const res = await api.post(API.public.promo.validate, { code: promoCodeToUse });
         const data = res.data.data;
         if (data.valid) {
           setGuestPromoInfo(data);
           setPromoError('');
+          setPromoCodeCtx(promoCodeToUse);
         } else {
           setPromoError(data.error || 'Invalid promo code');
           setPromoCodeCtx('');
@@ -466,7 +481,8 @@ export default function Checkout() {
 
     // Logged in: apply promo code to server-side cart
     try {
-      await api.post(API.cart.promo.apply, { code: promoCode });
+      await api.post(API.cart.promo.apply, { code: promoCodeToUse });
+      setPromoCodeCtx(promoCodeToUse);
       await refreshCart();
       setPromoAppliedCtx(true);
       setPromoDiscount(totals.discount || 0);
@@ -529,7 +545,7 @@ export default function Checkout() {
 
   // Address handler
   const handleAddressSelect = (address: AddressComponents) => {
-    setForm(prev => ({
+    setForm((prev: typeof form) => ({
       ...prev,
       line1: address.line1, line2: address.line2 || '',
       city: address.city, state: address.state,
@@ -847,7 +863,7 @@ export default function Checkout() {
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Address Line 1 *</label>
-                        <AddressAutocomplete value={form.line1} onChange={(val) => setForm(prev => ({ ...prev, line1: val }))} onAddressSelect={handleAddressSelect} placeholder="123 Main Street" />
+                        <AddressAutocomplete value={form.line1} onChange={(val: string) => setForm((prev: typeof form) => ({ ...prev, line1: val }))} onAddressSelect={handleAddressSelect} placeholder="123 Main Street" />
                       </div>
                       <div><label className="block text-sm font-medium text-gray-700 mb-1">Address Line 2</label><input type="text" value={form.line2} onChange={e => setForm({ ...form, line2: e.target.value })} className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 text-sm" placeholder="Apartment, suite, etc." /></div>
                       <div className="grid grid-cols-2 gap-4">
@@ -1166,17 +1182,17 @@ export default function Checkout() {
                       <AddressAutocomplete
                         value={form.line1}
                         onAddressSelect={handleAddressSelect}
-                        onChange={(val) => setForm(prev => ({ ...prev, line1: val }))}
+                         onChange={(val: string) => setForm((prev: typeof form) => ({ ...prev, line1: val }))}
                         placeholder="Start typing your address..."
                         className="w-full"
                       />
                     </div>
                     {form.line1 && (
                       <>
-                        <input type="text" value={form.line2 || ''} onChange={(e) => setForm(prev => ({ ...prev, line2: e.target.value }))} placeholder="Apartment, suite, etc. (optional)" className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500" />
+                         <input type="text" value={form.line2 || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setForm((prev: typeof form) => ({ ...prev, line2: e.target.value }))} placeholder="Apartment, suite, etc. (optional)" className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500" />
                         <div className="grid grid-cols-2 gap-3">
-                          <input type="text" value={form.city} onChange={(e) => setForm(prev => ({ ...prev, city: e.target.value }))} placeholder="City" className="px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500" />
-                          <input type="text" value={form.zip} onChange={(e) => setForm(prev => ({ ...prev, zip: e.target.value }))} placeholder="Postcode" className="px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500" />
+                           <input type="text" value={form.city} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setForm((prev: typeof form) => ({ ...prev, city: e.target.value }))} placeholder="City" className="px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500" />
+                           <input type="text" value={form.zip} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setForm((prev: typeof form) => ({ ...prev, zip: e.target.value }))} placeholder="Postcode" className="px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500" />
                         </div>
                       </>
                     )}
