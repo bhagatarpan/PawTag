@@ -96,7 +96,7 @@ export class StripePaymentProvider implements IPaymentProvider {
     }
 
     this.stripe = new Stripe(apiKey, {
-      apiVersion: '2024-06-20' as Stripe.LatestApiVersion,
+      apiVersion: '2026-08-26' as Stripe.LatestApiVersion,
     });
 
     return this.stripe;
@@ -211,7 +211,7 @@ export class StripePaymentProvider implements IPaymentProvider {
       }
 
       if (statementDescriptor) {
-        intentParams.statement_descriptor = statementDescriptor.slice(0, 22);
+        intentParams.statement_descriptor_suffix = statementDescriptor.slice(0, 22);
       }
 
       if (params.shipping) {
