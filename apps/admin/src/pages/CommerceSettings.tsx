@@ -29,7 +29,6 @@ interface SettingGroup {
 const SETTING_META: Record<string, { label: string; tooltip: string; type: 'toggle' | 'text' | 'number' | 'select'; options?: { value: string; label: string }[]; hint?: string }> = {
   'commerce.payment.provider': { label: 'Payment Provider', tooltip: 'Which payment gateway processes your transactions', type: 'select', options: [{ value: 'stripe', label: 'Stripe' }] },
   'commerce.payment.currency': { label: 'Currency', tooltip: 'The currency all prices are displayed and charged in', type: 'text' },
-  'commerce.payment.testMode': { label: 'Demo Mode', tooltip: 'When enabled, payments auto-succeed without contacting Stripe. Use this for testing checkout without real charges.', type: 'toggle', hint: 'Disable this before going live' },
   'commerce.shipping.enabled': { label: 'Enable Shipping', tooltip: 'Show shipping options and calculate shipping costs during checkout', type: 'toggle' },
   'commerce.shipping.provider': { label: 'Shipping Provider', tooltip: 'Which carrier integration calculates rates and creates labels', type: 'select', options: [{ value: 'nz-shipping', label: 'NZ Domestic Shipping' }] },
   'commerce.shipping.freeEnabled': { label: 'Offer Free Shipping', tooltip: 'Show a free shipping option to customers at checkout', type: 'toggle' },

@@ -1,7 +1,9 @@
+import path from 'path';
 import dotenv from 'dotenv';
 import { validateEnv } from './config/validateEnv';
 
-dotenv.config();
+// Load .env from packages/api directory (not CWD)
+dotenv.config({ path: path.join(__dirname, '../.env') });
 validateEnv();
 
 const parseAllowedOrigins = (): string[] => {

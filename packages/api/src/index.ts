@@ -1,6 +1,4 @@
-import dotenv from 'dotenv';
-dotenv.config();
-
+// dotenv.config() is called in config.ts with explicit path
 // Initialize OpenTelemetry tracing before any other imports
 import { initTracing } from './lib/tracing';
 if (process.env.NODE_ENV !== 'test') {

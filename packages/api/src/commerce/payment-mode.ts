@@ -2,8 +2,8 @@
  * @module PaymentMode
  * @description Single source of truth for payment environment mode.
  *
- * Replaces the scattered `sk_test_demo_key` sentinel checks and
- * `commerce.payment.testMode` DB setting with one explicit, resolvable enum.
+ * Replaces the scattered `sk_test_demo_key` sentinel checks with
+ * one explicit, resolvable enum.
  *
  * Resolution order:
  *   1. PAYMENT_MODE env var (explicit override)

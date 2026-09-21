@@ -144,7 +144,6 @@ async function run() {
         // Payment
         { key: 'commerce.payment.provider', value: 'stripe', displayValue: 'Payment Provider', category: 'commerce', description: 'Payment provider identifier' },
         { key: 'commerce.payment.currency', value: 'NZD', displayValue: 'Currency', category: 'commerce', description: 'Default currency code' },
-        { key: 'commerce.payment.testMode', value: 'true', displayValue: 'Test Mode', category: 'commerce', description: 'Enable demo/test payment mode' },
         // Shipping
         { key: 'commerce.shipping.enabled', value: 'true', displayValue: 'Shipping Enabled', category: 'commerce', description: 'Enable shipping calculation' },
         { key: 'commerce.shipping.provider', value: 'nz-shipping', displayValue: 'Shipping Provider', category: 'commerce', description: 'Shipping provider identifier' },

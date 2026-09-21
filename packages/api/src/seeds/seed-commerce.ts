@@ -20,7 +20,6 @@ const COMMERCE_SEED_SETTINGS = [
   // ─── Payment ──────────────────────────────────────────────
   { key: 'commerce.payment.provider', value: 'stripe', description: 'Payment provider identifier' },
   { key: 'commerce.payment.currency', value: 'NZD', description: 'Default currency code' },
-  { key: 'commerce.payment.testMode', value: 'true', description: 'Enable demo/test payment mode' },
 
   // ─── Shipping ─────────────────────────────────────────────
   { key: 'commerce.shipping.enabled', value: 'true', description: 'Enable shipping calculation' },

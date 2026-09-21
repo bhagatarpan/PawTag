@@ -39,7 +39,6 @@ export const COMMERCE_SETTINGS = {
   // ─── Payment ──────────────────────────────────────────────
   'commerce.payment.provider': { default: 'stripe', description: 'Payment provider identifier' },
   'commerce.payment.currency': { default: 'NZD', description: 'Default currency code' },
-  'commerce.payment.testMode': { default: 'true', description: 'Enable demo/test payment mode' },
 
   // ─── Shipping ─────────────────────────────────────────────
   'commerce.shipping.enabled': { default: 'true', description: 'Enable shipping calculation' },
