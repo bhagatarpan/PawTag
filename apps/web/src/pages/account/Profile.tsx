@@ -132,7 +132,7 @@ export default function Profile() {
             </p>
           </div>
           <p className="text-xs text-gray-500 mb-2">Manage up to 5 saved addresses. Set one as your preferred address for checkout.</p>
-          {user && <AddressManager userId={user.id || ''} onChange={() => refreshUser?.()} />}
+          {user && <AddressManager userId={user.id || ''} onChange={() => refreshUser?.()} apiClient={api} />}
         </div>
         <div className="bg-white rounded-lg border p-6 space-y-4">
           <h2 className="text-lg font-semibold flex items-center gap-2"><Phone size={18} /> Emergency Contact</h2>

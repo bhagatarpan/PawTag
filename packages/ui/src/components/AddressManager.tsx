@@ -26,6 +26,13 @@ interface AddressManagerProps {
   onSelect?: (address: SavedAddress) => void;
   /** Callback when addresses change */
   onChange?: () => void;
+  /** Authenticated API client - parent must provide */
+  apiClient: {
+    get: (url: string) => Promise<{ data: any }>;
+    post: (url: string, data?: any) => Promise<{ data: any }>;
+    put: (url: string, data?: any) => Promise<{ data: any }>;
+    delete: (url: string) => Promise<{ data: any }>;
+  };
 }
 
 export function AddressManager({
@@ -34,6 +41,7 @@ export function AddressManager({
   selectedAddressId,
   onSelect,
   onChange,
+  apiClient,
 }: AddressManagerProps) {
   const [addresses, setAddresses] = useState<SavedAddress[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,19 +64,14 @@ export function AddressManager({
   const fetchAddresses = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/customer/addresses', {
-        headers: { 'Content-Type': 'application/json' },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setAddresses(data.data || []);
-      }
+      const res = await apiClient.get('/api/customer/addresses');
+      setAddresses(res.data?.data || []);
     } catch {
       setError('Failed to load addresses');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [apiClient]);
 
   useEffect(() => {
     fetchAddresses();
@@ -88,21 +91,14 @@ export function AddressManager({
 
   const handleSave = async () => {
     try {
-      const method = editingId ? 'PUT' : 'POST';
       const url = editingId
         ? `/api/customer/addresses/${editingId}`
         : '/api/customer/addresses';
 
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        setError(data.error || 'Failed to save address');
-        return;
+      if (editingId) {
+        await apiClient.put(url, form);
+      } else {
+        await apiClient.post(url, form);
       }
 
       setAdding(false);
@@ -117,11 +113,7 @@ export function AddressManager({
 
   const handleDelete = async (id: string) => {
     try {
-      const res = await fetch(`/api/customer/addresses/${id}`, { method: 'DELETE' });
-      if (!res.ok) {
-        setError('Failed to delete address');
-        return;
-      }
+      await apiClient.delete(`/api/customer/addresses/${id}`);
       setDeleteConfirmId(null);
       await fetchAddresses();
       onChange?.();
@@ -132,11 +124,7 @@ export function AddressManager({
 
   const handleSetDefault = async (id: string) => {
     try {
-      const res = await fetch(`/api/customer/addresses/${id}/default`, { method: 'PUT' });
-      if (!res.ok) {
-        setError('Failed to set default');
-        return;
-      }
+      await apiClient.put(`/api/customer/addresses/${id}/default`);
       await fetchAddresses();
       onChange?.();
     } catch {

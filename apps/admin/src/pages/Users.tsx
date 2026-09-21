@@ -614,6 +614,7 @@ export function DetailDrawer({
                         }).catch(() => {});
                       }
                     }}
+                    apiClient={api}
                   />
                 )}
               </Section>
