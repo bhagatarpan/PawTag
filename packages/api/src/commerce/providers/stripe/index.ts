@@ -150,21 +150,7 @@ export class StripePaymentProvider implements IPaymentProvider {
     /** Stripe Customer ID — attaches PI to customer and enables setup_future_usage */
     stripeCustomerId?: string;
   }): Promise<PaymentIntent> {
-    let mode = resolvePaymentMode();
-
-    // Fallback: if PAYMENT_MODE env var is not set and key is not sk_test_demo_key,
-    // check DB commerce.payment.testMode setting for backward compatibility
-    if (!process.env.PAYMENT_MODE && mode !== 'fake') {
-      try {
-        const { getBooleanSetting } = await import('../../config');
-        const dbTestMode = await getBooleanSetting('commerce.payment.testMode');
-        if (dbTestMode) {
-          mode = 'fake';
-        }
-      } catch {
-        // DB check failed — continue with env-derived mode
-      }
-    }
+    const mode = resolvePaymentMode();
 
     // Fake mode: deterministic auto-succeed without touching Stripe
     if (mode === 'fake') {

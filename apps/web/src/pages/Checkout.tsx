@@ -303,6 +303,13 @@ export default function Checkout() {
     recoverPayment();
   }, [user, success, currentStep, storedPaymentIntentId]);
 
+  // Create payment intent when entering Payment step
+  useEffect(() => {
+    if (currentStep === 'payment' && !paymentClientSecret && !loading && user) {
+      handlePayment();
+    }
+  }, [currentStep]);
+
   // Fetch PawRewards balance when user is logged in
   useEffect(() => {
     if (user) {
@@ -1258,15 +1265,11 @@ export default function Checkout() {
                     </div>
 
                     <button
-                      onClick={handlePayment}
+                      onClick={() => goToStep('payment')}
                       disabled={loading || !canProceedToPayment}
                       className="w-full bg-primary-600 text-white py-3 rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-primary-700 transition-colors disabled:opacity-50"
                     >
-                      {loading ? (
-                        <><Loader2 size={16} className="animate-spin" /> Setting up payment...</>
-                      ) : (
-                        <>Continue to Payment <ChevronRight size={16} /></>
-                      )}
+                      Continue to Payment <ChevronRight size={16} />
                     </button>
 
                     <p className="text-xs text-gray-400 text-center mt-3">By continuing, you agree to our <Link to="/terms" className="underline">Terms of Service</Link> and <Link to="/privacy" className="underline">Privacy Policy</Link>.</p>
