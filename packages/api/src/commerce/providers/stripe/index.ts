@@ -458,7 +458,7 @@ export class StripePaymentProvider implements IPaymentProvider {
       return {
         id: event.id,
         type: event.type,
-        data: event.data.object as Record<string, unknown>,
+        data: event.data.object as unknown as Record<string, unknown>,
         createdAt: new Date(event.created * 1000),
       };
     } catch (err: any) {
