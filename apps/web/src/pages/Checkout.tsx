@@ -1229,27 +1229,24 @@ export default function Checkout() {
                   pointsToNextTier={pointsToNextTier}
                   nextTierName={nextTierName}
                 />
-
-                {/* Price Breakdown - Read-only (calculated) */}
-                <div className="bg-white rounded-xl border border-gray-200 p-6">
-                  <h3 className="text-sm font-semibold text-gray-900 mb-3">Order Total</h3>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm"><span className="text-gray-600">Subtotal</span><span className="text-gray-900">${itemsSubtotal.toFixed(2)}</span></div>
-                    {discountAmount > 0 && <div className="flex justify-between text-sm"><span className="text-green-600">Discount</span><span className="text-green-600">-${discountAmount.toFixed(2)}</span></div>}
-                    <div className="flex justify-between text-sm"><span className="text-gray-600">Shipping</span><span className={`font-medium ${shippingCost === 0 ? 'text-green-600' : 'text-gray-900'}`}>{shippingCost === 0 ? 'FREE' : `$${shippingCost.toFixed(2)}`}</span></div>
-                    <div className="flex justify-between text-sm"><span className="text-gray-600">Tax (Included)</span><span className="text-gray-900">${taxAmount.toFixed(2)}</span></div>
-                    <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-100"><span>Estimated Total</span><span className="text-primary-700">${orderTotal.toFixed(2)}</span></div>
-                  </div>
-                </div>
               </div>
 
-              {/* Right 33%: Continue to Payment */}
+              {/* Right 33%: Order Summary + Continue to Payment */}
               <div className="lg:col-span-4">
                 <div className="lg:sticky lg:top-24 lg:self-start">
                   <div className="bg-white rounded-xl border border-gray-200 p-6">
-                    <h2 className="text-lg font-semibold text-gray-900 mb-4">Continue to Payment</h2>
+                    <h2 className="text-lg font-semibold text-gray-900 mb-4">Order Summary</h2>
                     
-                    <div className="space-y-3 mb-6">
+                    {/* Price Breakdown */}
+                    <div className="space-y-2 mb-6">
+                      <div className="flex justify-between text-sm"><span className="text-gray-600">Subtotal</span><span className="text-gray-900">${itemsSubtotal.toFixed(2)}</span></div>
+                      {discountAmount > 0 && <div className="flex justify-between text-sm"><span className="text-green-600">Discount</span><span className="text-green-600">-${discountAmount.toFixed(2)}</span></div>}
+                      <div className="flex justify-between text-sm"><span className="text-gray-600">Shipping</span><span className={`font-medium ${shippingCost === 0 ? 'text-green-600' : 'text-gray-900'}`}>{shippingCost === 0 ? 'FREE' : `$${shippingCost.toFixed(2)}`}</span></div>
+                      <div className="flex justify-between text-sm"><span className="text-gray-600">Tax (Included)</span><span className="text-gray-900">${taxAmount.toFixed(2)}</span></div>
+                      <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-100"><span>Estimated Total</span><span className="text-primary-700">${orderTotal.toFixed(2)}</span></div>
+                    </div>
+
+                    <div className="border-t border-gray-100 pt-4 mb-4">
                       <div className="flex items-center gap-2 text-sm text-gray-600">
                         <ShieldCheck className="h-4 w-4 text-green-500" />
                         <span>All details verified</span>
