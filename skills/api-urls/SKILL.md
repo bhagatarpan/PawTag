@@ -66,6 +66,24 @@ The shared client factory is at `packages/shared/src/api/client-factory.ts`.
 - `fetch()` for public unauthenticated endpoints (invoice view, support contact form) may use `fetch(\`/api${API.public.*}\`)` when the auth interceptor would interfere
 - Direct `axios` should NEVER be used in production code — always use the configured `api` client
 
+## Address Endpoints
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| `GET` | `/customer/addresses` | List all saved addresses |
+| `POST` | `/customer/addresses` | Create new address (max 5) |
+| `PUT` | `/customer/addresses/:id` | Update address |
+| `DELETE` | `/customer/addresses/:id` | Delete address |
+| `PUT` | `/customer/addresses/:id/default` | Set as preferred address |
+| `GET` | `/address/suggest` | Address autocomplete (Photon/NZ Post) |
+
+**Rules:**
+- Address CRUD uses `API.customer.addresses.*` constants
+- Address autocomplete uses `API.address.suggest`
+- 5-address limit enforced server-side
+- Label is required for all addresses
+- One address can be marked as preferred/default
+
 ## Audit checklist
 
 Before committing any frontend change that makes API calls:

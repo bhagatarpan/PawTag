@@ -45,6 +45,8 @@ export { StatusBadge } from './components/StatusBadge';
 export { InlineEditBanner } from './components/InlineEditBanner';
 export { ConfirmDialog } from './components/ConfirmDialog';
 export { AddressAutocomplete } from './components/AddressAutocomplete';
+export { AddressManager } from './components/AddressManager';
+export type { SavedAddress } from './components/AddressManager';
 export { OrderDetailView } from './components/OrderDetailView';
 export { OrderProgressStepper, ORDER_STATUS_STEPS, STEP_LABELS } from './components/OrderProgressStepper';
 export { OrderStatusBanner } from './components/OrderStatusBanner';

@@ -2541,6 +2541,12 @@ router.post('/addresses', async (req: AuthRequest, res: Response) => {
       user.addresses = [];
     }
 
+    // Enforce 5-address limit
+    if (user.addresses.length >= 5) {
+      res.status(409).json({ success: false, error: 'Maximum of 5 addresses allowed. Please delete an existing address first.' });
+      return;
+    }
+
     // If this is the first address or isDefault is true, unset other defaults
     if (isDefault || user.addresses.length === 0) {
       user.addresses.forEach((addr: any) => { addr.isDefault = false; });

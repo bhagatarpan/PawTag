@@ -36,6 +36,9 @@ const SETTINGS_CACHE_TTL = 60_000;
 let nzpostToken: string | null = null;
 let nzpostTokenExpiry = 0;
 
+// Photon API response cache (5 min TTL)
+const photonCache = new Map<string, { addresses: NormalizedAddress[]; expiresAt: number }>();
+
 async function getSettings(): Promise<Record<string, string>> {
   const now = Date.now();
   if (settingsCacheTime && now - settingsCacheTime < SETTINGS_CACHE_TTL) {
@@ -213,42 +216,65 @@ router.get('/suggest', async (req: Request, res: Response) => {
       }
     } else {
       // Photon (OpenStreetMap) - free, no key needed
-      try {
-        const params = new URLSearchParams({
-          q: q.trim(),
-          limit: limit.toString(),
-          lang: 'en',
-          countrycode: defaultCountry,
-        });
-        const startTime = Date.now();
-        const response = await fetch(`https://photon.komoot.io/api/?${params}`, {
-          signal: AbortSignal.timeout(10_000),
-        });
-        if (!response.ok) {
-          writeLog({ level: 40, time: Date.now(), msg: 'Photon API error', provider: 'photon', operation: 'address.suggest', statusCode: response.status });
-          res.status(502).json({ success: false, error: 'Photon API temporarily unavailable' });
+      const cacheKey = `photon:${q.trim()}:${limit}:${defaultCountry}`;
+      const cached = photonCache.get(cacheKey);
+      if (cached && cached.expiresAt > Date.now()) {
+        res.json({ success: true, addresses: cached.addresses });
+        return;
+      }
+
+      const maxRetries = 2;
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+          const params = new URLSearchParams({
+            q: q.trim(),
+            limit: limit.toString(),
+            lang: 'en',
+            countrycode: defaultCountry,
+          });
+          const startTime = Date.now();
+          const response = await fetch(`https://photon.komoot.io/api/?${params}`, {
+            signal: AbortSignal.timeout(20_000),
+          });
+          if (!response.ok) {
+            if (attempt < maxRetries) {
+              writeLog({ level: 40, time: Date.now(), msg: `Photon API error (attempt ${attempt + 1}), retrying`, provider: 'photon', operation: 'address.suggest', statusCode: response.status });
+              continue;
+            }
+            writeLog({ level: 40, time: Date.now(), msg: 'Photon API error after retries', provider: 'photon', operation: 'address.suggest', statusCode: response.status });
+            res.status(502).json({ success: false, error: 'Photon API temporarily unavailable' });
+            return;
+          }
+          const data = await response.json();
+          const durationMs = Date.now() - startTime;
+          writeLog({
+            level: 30,
+            time: Date.now(),
+            msg: 'Photon Address API request',
+            provider: 'photon',
+            operation: 'address.suggest',
+            query: q.trim(),
+            statusCode: response.status,
+            addressCount: (data.features || []).length,
+            durationMs,
+            attempt: attempt + 1,
+          });
+          const addresses = (data.features || []).map(mapPhotonToAddress);
+          // Cache successful response for 5 minutes
+          photonCache.set(cacheKey, { addresses, expiresAt: Date.now() + 300_000 });
+          res.json({ success: true, addresses });
+          return;
+        } catch (err) {
+          if (attempt < maxRetries) {
+            writeLog({ level: 40, time: Date.now(), msg: `Photon API error (attempt ${attempt + 1}), retrying`, provider: 'photon', operation: 'address.suggest' });
+            continue;
+          }
+          const errMsg = err instanceof Error ? err.message : String(err);
+          const isTimeout = err instanceof Error && err.name === 'TimeoutError';
+          writeLog({ level: 50, time: Date.now(), msg: isTimeout ? 'Photon API timeout after retries' : 'Failed to call Photon API after retries', provider: 'photon', operation: 'address.suggest', err: { message: errMsg } });
+          res.status(502).json({ success: false, error: isTimeout ? 'Address service timed out — please try again' : 'Failed to reach Photon API' });
           return;
         }
-        const data = await response.json();
-        const durationMs = Date.now() - startTime;
-        writeLog({
-          level: 30,
-          time: Date.now(),
-          msg: 'Photon Address API request',
-          provider: 'photon',
-          operation: 'address.suggest',
-          query: q.trim(),
-          statusCode: response.status,
-          addressCount: (data.features || []).length,
-          durationMs,
-        });
-        const addresses = (data.features || []).map(mapPhotonToAddress);
-        res.json({ success: true, addresses });
-      } catch (err) {
-        const errMsg = err instanceof Error ? err.message : String(err);
-        const isTimeout = err instanceof Error && err.name === 'TimeoutError';
-        writeLog({ level: 50, time: Date.now(), msg: isTimeout ? 'Photon API timeout' : 'Failed to call Photon API', provider: 'photon', operation: 'address.suggest', err: { message: errMsg } });
-        res.status(502).json({ success: false, error: isTimeout ? 'Address service timed out — please try again' : 'Failed to reach Photon API' });
       }
     }
   } catch (err) {

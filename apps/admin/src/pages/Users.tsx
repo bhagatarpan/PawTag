@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { API } from '@pawtag/shared/api';
 import api, { PaginatedData } from '../lib/api';
 import { toast } from '../lib/toast';
-import { StatusBadge, AddressAutocomplete, CancellationInfoCard } from '@pawtag/ui';
+import { StatusBadge, AddressAutocomplete, AddressManager, CancellationInfoCard } from '@pawtag/ui';
 import { OrderProgressStepper, OrderStatusBanner } from '@pawtag/ui';
 import type { AddressComponents } from '@pawtag/ui';
 import { ORDER_STATUS_LABELS, getStatusBadgeVariant, getStatusBorderColor, isTerminalStatus } from '@pawtag/shared';
@@ -602,52 +602,19 @@ export function DetailDrawer({
               </Section>
 
               {/* Address */}
-              <Section title="Address" icon={<MapPin size={16} />}>
-                {editMode ? (
-                  <div className="space-y-3">
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Street Address</label>
-                      <AddressAutocomplete
-                        value={editForm.address.line1}
-                        onChange={(val) => setEditForm(prev => ({ ...prev, address: { ...prev.address, line1: val } }))}
-                        onAddressSelect={handleAddressSelect}
-                        placeholder="123 Main St"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Suburb</label>
-                      <input value={editForm.address.line2} onChange={(e) => setEditForm({ ...editForm, address: { ...editForm.address, line2: e.target.value } })} className="w-full border rounded-md px-3 py-2 text-sm" />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs text-gray-500 mb-1">City</label>
-                        <input value={editForm.address.city} onChange={(e) => setEditForm({ ...editForm, address: { ...editForm.address, city: e.target.value } })} className="w-full border rounded-md px-3 py-2 text-sm" />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-gray-500 mb-1">State / Region</label>
-                        <input value={editForm.address.state} onChange={(e) => setEditForm({ ...editForm, address: { ...editForm.address, state: e.target.value } })} className="w-full border rounded-md px-3 py-2 text-sm" />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs text-gray-500 mb-1">Postal Code</label>
-                        <input value={editForm.address.zip} onChange={(e) => setEditForm({ ...editForm, address: { ...editForm.address, zip: e.target.value } })} className="w-full border rounded-md px-3 py-2 text-sm" />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-gray-500 mb-1">Country</label>
-                        <input value={editForm.address.country} onChange={(e) => setEditForm({ ...editForm, address: { ...editForm.address, country: e.target.value } })} className="w-full border rounded-md px-3 py-2 text-sm" />
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    <DetailRow label="Street" value={user.address?.line1 || '—'} />
-                    <DetailRow label="Suburb" value={user.address?.line2 || '—'} />
-                    <DetailRow label="City" value={user.address?.city || '—'} />
-                    <DetailRow label="State" value={user.address?.state || '—'} />
-                    <DetailRow label="Postal Code" value={user.address?.zip || '—'} />
-                    <DetailRow label="Country" value={user.address?.country || '—'} />
-                  </>
+              <Section title="Addresses" icon={<MapPin size={16} />}>
+                {user && (
+                  <AddressManager
+                    userId={user._id}
+                    onChange={() => {
+                      // Refresh user data after address changes
+                      if (user?._id) {
+                        api.get(API.admin.users.get(user._id)).then(res => {
+                          onRefresh();
+                        }).catch(() => {});
+                      }
+                    }}
+                  />
                 )}
               </Section>
 
