@@ -96,7 +96,7 @@ export class StripePaymentProvider implements IPaymentProvider {
     }
 
     this.stripe = new Stripe(apiKey, {
-      apiVersion: '2026-08-26' as Stripe.LatestApiVersion,
+      apiVersion: '2026-08-26.dahlia' as Stripe.LatestApiVersion,
     });
 
     return this.stripe;
