@@ -637,14 +637,12 @@ export default function Checkout() {
     setLoading(true);
     setError(null);
     try {
-      // Payment confirmed by Stripe — go to Review step
-      // Order will be created when user clicks "Place Order" on Review step
-      setPaymentClientSecret(paymentIntentId); // Store for reference
-      setCurrentStep('review');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      // Payment confirmed — immediately create order and go to Confirmed
+      await handleConfirmOrder();
+      setCurrentStep('confirmed');
     } catch (err: any) {
-      console.error('[Checkout] Payment success handler failed:', err);
-      setError('Something went wrong during payment processing. Please try again.');
+      console.error('[Checkout] Order creation failed:', err);
+      setError('Payment succeeded but order creation failed. Please contact support.');
     } finally {
       setLoading(false);
     }

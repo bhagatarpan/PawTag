@@ -51,9 +51,9 @@ function processConditionals(html: string, vars: Record<string, string>): string
   });
 }
 
-/** Replace {{var}} placeholders with values */
+/** Replace {{var}} and {{object.property}} placeholders with values */
 function replaceVariables(html: string, vars: Record<string, string>): string {
-  return html.replace(/\{\{(\w+)\}\}/g, (match, key) => vars[key] ?? match);
+  return html.replace(/\{\{([\w.]+)\}\}/g, (match, key) => vars[key] ?? match);
 }
 
 /** Render a CMS email template to HTML, falling back to null if not found */
