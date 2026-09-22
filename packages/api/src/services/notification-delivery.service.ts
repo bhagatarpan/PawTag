@@ -53,6 +53,8 @@ export async function createAndDeliverNotification(options: NotifyOptions): Prom
     finder_reminder: 'petFound',
     order_update: 'orderUpdate',
     subscription_expiring: 'subscriptionReminder',
+    subscription_auto_renew_paused: 'subscriptionReminder',
+    subscription_poor_experience: 'subscriptionReminder',
     referral_reward: 'referral',
     tag_expiry_warning: 'subscriptionReminder',
     system: 'orderUpdate',

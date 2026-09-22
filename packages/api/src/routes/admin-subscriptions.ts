@@ -349,41 +349,72 @@ router.put('/:id/auto-renew', requirePermission('subscription.update'), async (r
 
     await subscription.save();
 
-    // Send admin notification for poor experience complaints
-    if (!autoRenew && reason === 'poor_experience' && reasonDetails) {
+    // Send notification for ALL pause reasons
+    if (!autoRenew && reason) {
       try {
         const customer = await User.findById(subscription.userId).select('fullName email').lean();
         const { createAndDeliverNotification } = await import('../services/notification-delivery.service');
+        const { renderSubscriptionPausedAdminEmail, renderSubscriptionPausedEmail } = await import('../services/email/templates');
         const { sendMail } = await import('../services/email.service');
 
+        const reasonLabels: Record<string, string> = {
+          no_longer_own_pet: 'No longer own the Pet',
+          no_longer_using: 'No longer using or need the service',
+          too_expensive: 'Too expensive',
+          found_alternative: 'Found an alternative',
+          poor_experience: 'Poor experience',
+          temporary_pause: 'Temporary Pause Requested',
+          circumstances_changed: 'Customer Circumstances Changed',
+          billing_payment_issue: 'Billing / Payment Issue',
+          other: 'Other',
+        };
+        const reasonLabel = reasonLabels[reason] || reason;
+        const isHighPriority = reason === 'poor_experience';
+
+        // Get admin recipients
         const adminEmailsSetting = await (await import('@pawtag/db')).Setting.findOne({ key: 'notifications.tagExpiryAdminEmails' }).lean();
         const adminEmails = adminEmailsSetting?.value
           ? adminEmailsSetting.value.split(',').map((e: string) => e.trim()).filter(Boolean)
           : [];
-
         const admins = adminEmails.length > 0
           ? await User.find({ email: { $in: adminEmails } }).select('_id email fullName')
           : await User.find({ role: { $in: ['admin', 'super_admin'] } }).select('_id email fullName');
 
         for (const admin of admins) {
+          // In-app notification (always)
           await createAndDeliverNotification({
             userId: (admin as any)._id.toString(),
-            type: 'subscription_poor_experience',
-            title: 'Subscription Auto-Renew Paused — Poor Experience',
-            message: `${adminUser?.fullName || 'Admin'} paused auto-renew for ${customer?.fullName || 'Customer'}'s ${subscription.planName} subscription. Reason: Poor Experience.`,
-            priority: 'high',
+            type: 'subscription_auto_renew_paused',
+            title: `Subscription Auto-Renew Paused — ${reasonLabel}`,
+            message: `${adminUser?.fullName || 'Admin'} paused auto-renew for ${customer?.fullName || 'Customer'}'s ${subscription.planName}. Reason: ${reasonLabel}`,
+            priority: isHighPriority ? 'high' : 'normal',
             channel: 'alert',
             actionUrl: `/customer-subscriptions/${subscription._id}`,
           });
 
-          await sendMail(
-            (admin as any).email,
-            `Subscription Auto-Renew Paused — Poor Experience: ${subscription.planName}`,
-            `<p><strong>${adminUser?.fullName || 'Admin'}</strong> paused auto-renew for <strong>${customer?.fullName || 'Customer'}</strong>'s <strong>${subscription.planName}</strong> subscription.</p>
-            <p><strong>Reason:</strong> Poor Experience</p>
-            <p><strong>Details:</strong> ${reasonDetails}</p>
-            <p><a href="${process.env.ADMIN_URL || 'http://localhost:3001'}/customer-subscriptions/${subscription._id}">View Subscription</a></p>`,
-          );
+          // Email notification using template
+          const html = renderSubscriptionPausedAdminEmail({
+            customerName: customer?.fullName || 'Customer',
+            customerEmail: customer?.email || '',
+            planName: subscription.planName,
+            reason: reasonLabel,
+            reasonDetails,
+            subscriptionUrl: `${process.env.ADMIN_URL || 'http://localhost:3001'}/customer-subscriptions/${subscription._id}`,
+          });
+          await sendMail((admin as any).email, `Subscription Auto-Renew Paused: ${subscription.planName}`, html);
+        }
+
+        // Send customer confirmation email
+        if (customer?.email) {
+          const customerHtml = renderSubscriptionPausedEmail({
+            name: customer?.fullName || 'Customer',
+            planName: subscription.planName,
+            reason: reasonLabel,
+            reasonDetails,
+            pausedAt: new Date().toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' }),
+            resumeUrl: `${process.env.CUSTOMER_URL || 'http://localhost:3000'}/account/subscriptions`,
+          });
+          await sendMail(customer.email, `Auto-Renew Paused: ${subscription.planName}`, customerHtml);
         }
       } catch (notifyErr) {
         // Non-critical — don't fail the request

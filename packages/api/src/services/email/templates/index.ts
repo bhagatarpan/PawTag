@@ -36,3 +36,5 @@ export { renderSubscriptionWelcomeEmail as renderSubscriptionWelcomeTemplateEmai
 export { renderInvoiceOtpEmail as renderInvoiceOtpTemplateEmail } from './invoice-otp';
 export { renderCancellationEmail } from './cancellation';
 export { renderCancelledBenefitsExpiringEmail } from './cancelled-benefits-expiring';
+export { renderSubscriptionPausedEmail } from './subscription-paused';
+export { renderSubscriptionPausedAdminEmail } from './subscription-paused-admin';
