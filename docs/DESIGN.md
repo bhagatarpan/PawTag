@@ -260,6 +260,44 @@ Use the shared `ConfirmDialog` from `@pawtag/ui` rather than creating custom mod
 
 **Reuse rule:** Do not create custom modals for confirmations. Extend `ConfirmDialog` with optional props (reasons, notes, footnote) instead. This keeps destructive actions consistent across the app.
 
+### Bottom Sheet
+
+For mobile-friendly selection/confirmation tasks that don't need a full modal overlay. Slides up from the bottom with a very light backdrop that doesn't obscure the page.
+
+**When to use:**
+- Reason selection (pause auto-renew, cancel reason)
+- Simple option pickers (change plan)
+- Quick confirmations with optional notes
+- Form modals on mobile
+
+**When NOT to use:**
+- Complex multi-tab forms (use DetailDrawer)
+- Destructive confirmations requiring focused attention (use ConfirmDialog)
+- Full-page views (use DetailDrawer or dedicated page)
+
+**Component:** `BottomSheet` from `@pawtag/ui`
+
+**Props:** `{ open, onClose, title, description?, children, footer? }`
+
+**Pattern:**
+
+| Section | Classes |
+|---------|---------|
+| Backdrop | `fixed inset-0 bg-black/10 z-50` |
+| Container | `absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-2xl z-50 max-h-[85vh] flex flex-col animate-slide-up` |
+| Drag handle | `w-10 h-1 rounded-full bg-gray-300 mx-auto mt-3 mb-2` |
+| Header | `px-6 pb-4` — title + description + close button |
+| Content | `flex-1 overflow-y-auto px-6 pb-4` |
+| Footer | `px-6 py-4 border-t border-gray-100 flex justify-end gap-3` |
+
+**Behavior:**
+- Click backdrop → close
+- Escape key → close
+- Body scroll locked when open
+- Focus trapped within sheet
+
+**Reuse rule:** Use `BottomSheet` instead of creating ad-hoc centered modals for selections and simple forms. This keeps interactions consistent and mobile-friendly.
+
 ### Order Status Colors
 
 All order status displays (badges, steppers, banners, left borders) must use these design tokens. No hardcoded colors.

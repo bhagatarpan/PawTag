@@ -44,6 +44,8 @@ export { EmptyState, ErrorState } from './components/EmptyState';
 export { StatusBadge } from './components/StatusBadge';
 export { InlineEditBanner } from './components/InlineEditBanner';
 export { ConfirmDialog } from './components/ConfirmDialog';
+export { default as BottomSheet } from './components/BottomSheet';
+export type { BottomSheetProps } from './components/BottomSheet';
 export { AddressAutocomplete } from './components/AddressAutocomplete';
 export { AddressManager } from './components/AddressManager';
 export type { SavedAddress } from './components/AddressManager';

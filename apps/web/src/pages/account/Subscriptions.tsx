@@ -1,6 +1,7 @@
 import { useState, useEffect, Component, ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { API } from '@pawtag/shared/api';
+import { BottomSheet } from '@pawtag/ui';
 import api from '../../lib/api';
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
@@ -513,118 +514,115 @@ function SubscriptionsInner() {
           )}
         </div>
 
-        {/* Change Plan Modal */}
-        {showChangePlan && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
-            <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl animate-slide-up">
-              <h3 className="text-lg font-bold text-gray-900 mb-1">Change Plan</h3>
-              <p className="text-sm text-gray-500 mb-5">Choose your new plan. Changes take effect at the next billing cycle.</p>
-              <div className="space-y-3">
-                <button
-                  onClick={() => handleChangePlan(sub._id, 'annual')}
-                  disabled={actionLoading || sub.planType === 'annual'}
-                  className={`w-full text-left p-4 rounded-xl border-2 transition-all ${sub.planType === 'annual' ? 'border-teal-500 bg-teal-50' : 'border-gray-100 hover:border-gray-200 hover:bg-gray-50'} disabled:opacity-50`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="font-semibold text-gray-900">Annual Plan</div>
-                    {sub.planType === 'annual' && <span className="text-xs font-bold text-teal-600 bg-teal-100 px-2 py-0.5 rounded-full">CURRENT</span>}
-                  </div>
-                  <div className="text-sm text-gray-500 mt-1">Billed annually</div>
-                </button>
-                <button
-                  onClick={() => handleChangePlan(sub._id, 'monthly')}
-                  disabled={actionLoading || sub.planType === 'monthly'}
-                  className={`w-full text-left p-4 rounded-xl border-2 transition-all ${sub.planType === 'monthly' ? 'border-teal-500 bg-teal-50' : 'border-gray-100 hover:border-gray-200 hover:bg-gray-50'} disabled:opacity-50`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="font-semibold text-gray-900">Monthly Plan</div>
-                    {sub.planType === 'monthly' && <span className="text-xs font-bold text-teal-600 bg-teal-100 px-2 py-0.5 rounded-full">CURRENT</span>}
-                  </div>
-                  <div className="text-sm text-gray-500 mt-1">Billed monthly</div>
-                </button>
+        {/* Change Plan Bottom Sheet */}
+        <BottomSheet
+          open={showChangePlan}
+          onClose={() => setShowChangePlan(false)}
+          title="Change Plan"
+          description="Choose your new plan. Changes take effect at the next billing cycle."
+        >
+          <div className="space-y-3">
+            <button
+              onClick={() => handleChangePlan(sub._id, 'annual')}
+              disabled={actionLoading || sub.planType === 'annual'}
+              className={`w-full text-left p-4 rounded-xl border-2 transition-all ${sub.planType === 'annual' ? 'border-teal-500 bg-teal-50' : 'border-gray-100 hover:border-gray-200 hover:bg-gray-50'} disabled:opacity-50`}
+            >
+              <div className="flex items-center justify-between">
+                <div className="font-semibold text-gray-900">Annual Plan</div>
+                {sub.planType === 'annual' && <span className="text-xs font-bold text-teal-600 bg-teal-100 px-2 py-0.5 rounded-full">CURRENT</span>}
               </div>
-              <button onClick={() => setShowChangePlan(false)} className="w-full mt-4 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">Cancel</button>
-            </div>
+              <div className="text-sm text-gray-500 mt-1">Billed annually</div>
+            </button>
+            <button
+              onClick={() => handleChangePlan(sub._id, 'monthly')}
+              disabled={actionLoading || sub.planType === 'monthly'}
+              className={`w-full text-left p-4 rounded-xl border-2 transition-all ${sub.planType === 'monthly' ? 'border-teal-500 bg-teal-50' : 'border-gray-100 hover:border-gray-200 hover:bg-gray-50'} disabled:opacity-50`}
+            >
+              <div className="flex items-center justify-between">
+                <div className="font-semibold text-gray-900">Monthly Plan</div>
+                {sub.planType === 'monthly' && <span className="text-xs font-bold text-teal-600 bg-teal-100 px-2 py-0.5 rounded-full">CURRENT</span>}
+              </div>
+              <div className="text-sm text-gray-500 mt-1">Billed monthly</div>
+            </button>
           </div>
-        )}
+        </BottomSheet>
 
-        {/* Pause Auto-Renew Modal */}
-        {showPauseModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-2xl p-6 w-full max-w-md mx-4">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Pause Auto-Renew</h3>
-              <p className="text-sm text-gray-500 mb-4">Select a reason for pausing auto-renewal.</p>
-
-              <div className="space-y-3 mb-4">
-                {[
-                  { value: 'no_longer_own_pet', label: 'No longer own the Pet' },
-                  { value: 'no_longer_using', label: 'No longer using or need the service' },
-                  { value: 'too_expensive', label: 'Too expensive' },
-                  { value: 'found_alternative', label: 'Found an alternative' },
-                  { value: 'poor_experience', label: 'Poor experience' },
-                  { value: 'temporary_pause', label: 'Temporary Pause Requested' },
-                  { value: 'circumstances_changed', label: 'Customer Circumstances Changed' },
-                  { value: 'billing_payment_issue', label: 'Billing / Payment Issue' },
-                  { value: 'other', label: 'Other' },
-                ].map((r) => (
-                  <label key={r.value} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="pauseReason"
-                      value={r.value}
-                      checked={pauseReason === r.value}
-                      onChange={() => setPauseReason(r.value)}
-                      className="w-4 h-4 text-primary-600 border-gray-300 focus:ring-primary-500"
-                    />
-                    <span className="text-sm text-gray-700">{r.label}</span>
-                  </label>
-                ))}
-              </div>
-
-              {pauseReason === 'poor_experience' && (
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Please describe your experience</label>
-                  <textarea
-                    value={pauseReasonDetails}
-                    onChange={(e) => setPauseReasonDetails(e.target.value)}
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-primary-500 focus:border-primary-500"
-                    placeholder="Tell us what went wrong..."
-                  />
-                </div>
-              )}
-
-              {pauseReason === 'other' && (
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Please specify</label>
-                  <input
-                    type="text"
-                    value={pauseReasonDetails}
-                    onChange={(e) => setPauseReasonDetails(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-primary-500 focus:border-primary-500"
-                    placeholder="Reason..."
-                  />
-                </div>
-              )}
-
-              <div className="flex justify-end gap-3">
-                <button
-                  onClick={() => setShowPauseModal(false)}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleConfirmPause}
-                  disabled={!pauseReason || actionLoading}
-                  className="px-4 py-2 text-sm font-medium text-white bg-amber-600 rounded-lg hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {actionLoading ? 'Pausing...' : 'Pause Auto-Renew'}
-                </button>
-              </div>
-            </div>
+        {/* Pause Auto-Renew Bottom Sheet */}
+        <BottomSheet
+          open={showPauseModal}
+          onClose={() => setShowPauseModal(false)}
+          title="Pause Auto-Renew"
+          description="Select a reason for pausing auto-renewal."
+          footer={
+            <>
+              <button
+                onClick={() => setShowPauseModal(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmPause}
+                disabled={!pauseReason || actionLoading}
+                className="px-4 py-2 text-sm font-medium text-white bg-amber-600 rounded-lg hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {actionLoading ? 'Pausing...' : 'Pause Auto-Renew'}
+              </button>
+            </>
+          }
+        >
+          <div className="space-y-3">
+            {[
+              { value: 'no_longer_own_pet', label: 'No longer own the Pet' },
+              { value: 'no_longer_using', label: 'No longer using or need the service' },
+              { value: 'too_expensive', label: 'Too expensive' },
+              { value: 'found_alternative', label: 'Found an alternative' },
+              { value: 'poor_experience', label: 'Poor experience' },
+              { value: 'temporary_pause', label: 'Temporary Pause Requested' },
+              { value: 'circumstances_changed', label: 'Customer Circumstances Changed' },
+              { value: 'billing_payment_issue', label: 'Billing / Payment Issue' },
+              { value: 'other', label: 'Other' },
+            ].map((r) => (
+              <label key={r.value} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer">
+                <input
+                  type="radio"
+                  name="pauseReason"
+                  value={r.value}
+                  checked={pauseReason === r.value}
+                  onChange={() => setPauseReason(r.value)}
+                  className="w-4 h-4 text-primary-600 border-gray-300 focus:ring-primary-500"
+                />
+                <span className="text-sm text-gray-700">{r.label}</span>
+              </label>
+            ))}
           </div>
-        )}
+
+          {pauseReason === 'poor_experience' && (
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Please describe your experience</label>
+              <textarea
+                value={pauseReasonDetails}
+                onChange={(e) => setPauseReasonDetails(e.target.value)}
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-primary-500 focus:border-primary-500"
+                placeholder="Tell us what went wrong..."
+              />
+            </div>
+          )}
+
+          {pauseReason === 'other' && (
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Please specify</label>
+              <input
+                type="text"
+                value={pauseReasonDetails}
+                onChange={(e) => setPauseReasonDetails(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-primary-500 focus:border-primary-500"
+                placeholder="Reason..."
+              />
+            </div>
+          )}
+        </BottomSheet>
       </div>
     );
   }
@@ -783,84 +781,6 @@ function SubscriptionsInner() {
               </div>
             );
           })}
-        </div>
-      )}
-
-      {/* Pause Auto-Renew Modal */}
-      {showPauseModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md mx-4">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Pause Auto-Renew</h3>
-            <p className="text-sm text-gray-500 mb-4">Select a reason for pausing auto-renewal.</p>
-
-            <div className="space-y-3 mb-4">
-              {[
-                { value: 'no_longer_own_pet', label: 'No longer own the Pet' },
-                { value: 'no_longer_using', label: 'No longer using or need the service' },
-                { value: 'too_expensive', label: 'Too expensive' },
-                { value: 'found_alternative', label: 'Found an alternative' },
-                { value: 'poor_experience', label: 'Poor experience' },
-                { value: 'temporary_pause', label: 'Temporary Pause Requested' },
-                { value: 'circumstances_changed', label: 'Customer Circumstances Changed' },
-                { value: 'billing_payment_issue', label: 'Billing / Payment Issue' },
-                { value: 'other', label: 'Other' },
-              ].map((r) => (
-                <label key={r.value} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="pauseReason"
-                    value={r.value}
-                    checked={pauseReason === r.value}
-                    onChange={() => setPauseReason(r.value)}
-                    className="w-4 h-4 text-primary-600 border-gray-300 focus:ring-primary-500"
-                  />
-                  <span className="text-sm text-gray-700">{r.label}</span>
-                </label>
-              ))}
-            </div>
-
-            {pauseReason === 'poor_experience' && (
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Please describe your experience</label>
-                <textarea
-                  value={pauseReasonDetails}
-                  onChange={(e) => setPauseReasonDetails(e.target.value)}
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-primary-500 focus:border-primary-500"
-                  placeholder="Tell us what went wrong..."
-                />
-              </div>
-            )}
-
-            {pauseReason === 'other' && (
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Please specify</label>
-                <input
-                  type="text"
-                  value={pauseReasonDetails}
-                  onChange={(e) => setPauseReasonDetails(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-primary-500 focus:border-primary-500"
-                  placeholder="Reason..."
-                />
-              </div>
-            )}
-
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setShowPauseModal(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleConfirmPause}
-                disabled={!pauseReason || actionLoading}
-                className="px-4 py-2 text-sm font-medium text-white bg-amber-600 rounded-lg hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {actionLoading ? 'Pausing...' : 'Pause Auto-Renew'}
-              </button>
-            </div>
-          </div>
         </div>
       )}
     </div>

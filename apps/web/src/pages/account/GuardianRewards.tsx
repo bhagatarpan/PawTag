@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { API } from '@pawtag/shared/api';
+import { BottomSheet } from '@pawtag/ui';
 import api from '../../lib/api';
 
 interface RewardsData {
@@ -217,49 +218,48 @@ export default function GuardianRewards() {
         )}
       </div>
 
-      {/* Redeem Modal */}
-      {redeemModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 mx-4">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Redeem PawRewards</h3>
-            <p className="text-gray-500 mb-4">
-              Enter the amount you want to redeem. Minimum redemption is $2.00.
-            </p>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Amount (NZD)</label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
-                <input
-                  type="number"
-                  min="2"
-                  max={data.balance}
-                  step="0.01"
-                  value={redeemAmount}
-                  onChange={(e) => setRedeemAmount(e.target.value)}
-                  className="w-full pl-8 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                  placeholder="0.00"
-                />
-              </div>
-              <p className="text-sm text-gray-500 mt-1">Available: ${data.balance.toFixed(2)}</p>
-            </div>
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => { setRedeemModalOpen(false); setRedeemAmount(''); }}
-                className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleRedeem}
-                disabled={redeeming || !redeemAmount || parseFloat(redeemAmount) < 2}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
-              >
-                {redeeming ? 'Redeeming...' : 'Redeem'}
-              </button>
-            </div>
+      {/* Redeem Bottom Sheet */}
+      <BottomSheet
+        open={redeemModalOpen}
+        onClose={() => { setRedeemModalOpen(false); setRedeemAmount(''); }}
+        title="Redeem PawRewards"
+        description="Enter the amount you want to redeem. Minimum redemption is $2.00."
+        footer={
+          <>
+            <button
+              onClick={() => { setRedeemModalOpen(false); setRedeemAmount(''); }}
+              className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleRedeem}
+              disabled={redeeming || !redeemAmount || parseFloat(redeemAmount) < 2}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+            >
+              {redeeming ? 'Redeeming...' : 'Redeem'}
+            </button>
+          </>
+        }
+      >
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Amount (NZD)</label>
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+            <input
+              type="number"
+              min="2"
+              max={data.balance}
+              step="0.01"
+              value={redeemAmount}
+              onChange={(e) => setRedeemAmount(e.target.value)}
+              className="w-full pl-8 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              placeholder="0.00"
+            />
           </div>
+          <p className="text-sm text-gray-500 mt-1">Available: ${data.balance.toFixed(2)}</p>
         </div>
-      )}
+      </BottomSheet>
     </div>
   );
 }
