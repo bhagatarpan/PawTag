@@ -373,7 +373,7 @@ router.put('/:id/auto-renew', requirePermission('customer.read'), async (req: Au
           });
 
           // Email notification using template
-          const html = renderSubscriptionPausedAdminEmail({
+          const adminHtml = renderSubscriptionPausedAdminEmail({
             customerName: user?.fullName || 'Customer',
             customerEmail: user?.email || '',
             planName: subscription.planName,
@@ -381,7 +381,14 @@ router.put('/:id/auto-renew', requirePermission('customer.read'), async (req: Au
             reasonDetails,
             subscriptionUrl: `${process.env.ADMIN_URL || 'http://localhost:3001'}/customer-subscriptions/${subscription._id}`,
           });
-          await sendMail((admin as any).email, `Subscription Auto-Renew Paused: ${subscription.planName}`, html);
+          const adminEmailResult = await sendMail((admin as any).email, `Subscription Auto-Renew Paused: ${subscription.planName}`, adminHtml, undefined, {
+            templateSlug: 'subscription-paused-admin',
+            businessFlow: 'subscription',
+            relatedEntityType: 'subscription',
+            relatedEntityId: subscription._id.toString(),
+            relatedEntityDisplay: subscription.planName,
+          });
+          logger.info({ adminEmail: (admin as any).email, result: adminEmailResult }, 'Admin pause notification email sent');
         }
 
         // Send customer confirmation email
@@ -394,10 +401,17 @@ router.put('/:id/auto-renew', requirePermission('customer.read'), async (req: Au
             pausedAt: new Date().toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' }),
             resumeUrl: `${process.env.CUSTOMER_URL || 'http://localhost:3000'}/account/subscriptions`,
           });
-          await sendMail(user.email, `Auto-Renew Paused: ${subscription.planName}`, customerHtml);
+          const customerEmailResult = await sendMail(user.email, `Auto-Renew Paused: ${subscription.planName}`, customerHtml, undefined, {
+            templateSlug: 'subscription-paused',
+            businessFlow: 'subscription',
+            relatedEntityType: 'subscription',
+            relatedEntityId: subscription._id.toString(),
+            relatedEntityDisplay: subscription.planName,
+          });
+          logger.info({ customerEmail: user.email, result: customerEmailResult }, 'Customer pause confirmation email sent');
         }
       } catch (notifyErr) {
-        // Non-critical — don't fail the request
+        logger.error({ err: notifyErr, subscriptionId: subscription._id, userId: req.user!.id }, 'Failed to send pause notifications');
       }
     }
 
