@@ -294,15 +294,81 @@ router.put('/:id/auto-renew', requirePermission('customer.read'), async (req: Au
       return;
     }
 
-    const { autoRenew } = req.body;
+    const { autoRenew, reason, reasonDetails } = req.body;
     if (typeof autoRenew !== 'boolean') {
       res.status(400).json({ success: false, error: 'autoRenew must be a boolean' });
       return;
     }
 
+    // When pausing (autoRenew=false), require a reason
+    if (!autoRenew && !reason) {
+      res.status(400).json({ success: false, error: 'Reason is required when pausing auto-renew' });
+      return;
+    }
+
     const oldAutoRenew = subscription.autoRenew;
     subscription.autoRenew = autoRenew;
+
+    if (!autoRenew) {
+      // Pausing — store pause metadata
+      subscription.autoRenewPausedAt = new Date();
+      subscription.autoRenewPausedBy = req.user!.id;
+      subscription.autoRenewPausedByType = 'Customer';
+      subscription.autoRenewPausedByPortal = 'customer-web';
+      subscription.autoRenewPauseReason = reason;
+      subscription.autoRenewPauseReasonDetails = reasonDetails || undefined;
+    } else {
+      // Resuming — clear pause metadata
+      subscription.autoRenewPausedAt = undefined;
+      subscription.autoRenewPausedBy = undefined;
+      subscription.autoRenewPausedByType = undefined;
+      subscription.autoRenewPausedByPortal = undefined;
+      subscription.autoRenewPauseReason = undefined;
+      subscription.autoRenewPauseReasonDetails = undefined;
+    }
+
     await subscription.save();
+
+    // Send admin notification for poor experience complaints
+    if (!autoRenew && reason === 'poor_experience' && reasonDetails) {
+      try {
+        const user = await User.findById(req.user!.id).select('fullName email').lean();
+        const { createAndDeliverNotification } = await import('../services/notification-delivery.service');
+        const { sendMail } = await import('../services/email.service');
+
+        const adminEmailsSetting = await (await import('@pawtag/db')).Setting.findOne({ key: 'notifications.tagExpiryAdminEmails' }).lean();
+        const adminEmails = adminEmailsSetting?.value
+          ? adminEmailsSetting.value.split(',').map((e: string) => e.trim()).filter(Boolean)
+          : [];
+
+        const admins = adminEmails.length > 0
+          ? await User.find({ email: { $in: adminEmails } }).select('_id email fullName')
+          : await User.find({ role: { $in: ['admin', 'super_admin'] } }).select('_id email fullName');
+
+        for (const admin of admins) {
+          await createAndDeliverNotification({
+            userId: (admin as any)._id.toString(),
+            type: 'subscription_poor_experience',
+            title: 'Customer Paused Auto-Renew — Poor Experience',
+            message: `${user?.fullName || 'Customer'} (${user?.email}) paused auto-renew for subscription ${subscription.planName} with reason: Poor Experience.`,
+            priority: 'high',
+            channel: 'alert',
+            actionUrl: `/customer-subscriptions/${subscription._id}`,
+          });
+
+          await sendMail(
+            (admin as any).email,
+            `Customer Paused Auto-Renew — Poor Experience: ${subscription.planName}`,
+            `<p><strong>${user?.fullName || 'Customer'}</strong> (${user?.email}) paused auto-renew for their <strong>${subscription.planName}</strong> subscription.</p>
+            <p><strong>Reason:</strong> Poor Experience</p>
+            <p><strong>Details:</strong> ${reasonDetails}</p>
+            <p><a href="${process.env.ADMIN_URL || 'http://localhost:3001'}/customer-subscriptions/${subscription._id}">View Subscription</a></p>`,
+          );
+        }
+      } catch (notifyErr) {
+        // Non-critical — don't fail the request
+      }
+    }
 
     await auditSubscriptionEvent(req, {
       action: 'subscription_auto_renew_toggled',

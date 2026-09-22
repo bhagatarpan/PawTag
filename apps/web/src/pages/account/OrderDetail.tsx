@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { Package, Loader2 } from 'lucide-react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import { Package, Loader2, Shield, Clock, RefreshCw, CheckCircle } from 'lucide-react';
 import { OrderDetailView, ConfirmDialog } from '@pawtag/ui';
 import type { OrderData, InvoiceData } from '@pawtag/ui';
 import { API } from '@pawtag/shared/api';
@@ -30,6 +30,7 @@ export default function OrderDetail() {
   const [selectedReason, setSelectedReason] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [cancelLoading, setCancelLoading] = useState(false);
+  const [subscriptions, setSubscriptions] = useState<any[]>([]);
 
   const fetchOrder = async () => {
     if (!id) return;
@@ -52,6 +53,10 @@ export default function OrderDetail() {
 
     api.get(API.customer.orders.invoice(id))
       .then((res) => setInvoice(res.data.data))
+      .catch(() => {});
+
+    api.get(API.customer.orders.subscriptions(id))
+      .then((res) => setSubscriptions(res.data.data || []))
       .catch(() => {});
 
     api.get(API.public.commerce.cancellationReasons)
@@ -166,6 +171,60 @@ export default function OrderDetail() {
         onCancelOrder={openCancelModal}
         onBackToOrders={() => navigate('/account/orders')}
       />
+
+      {subscriptions.length > 0 && (
+        <div className="mt-6 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+          <h2 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+            <Shield className="h-4 w-4" /> Subscriptions
+          </h2>
+          <div className="space-y-3">
+            {subscriptions.map((sub: any) => {
+              const isActive = sub.status === 'active';
+              const isGrace = sub.status === 'grace_period';
+              const isExpired = sub.status === 'expired';
+              const isCancelled = sub.status === 'cancelled';
+              return (
+                <Link
+                  key={sub._id}
+                  to="/account/subscriptions"
+                  className="block p-4 rounded-xl border border-gray-100 hover:border-gray-200 hover:shadow-sm transition-all"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isActive ? 'bg-emerald-50' : isGrace ? 'bg-amber-50' : 'bg-gray-50'}`}>
+                        <Shield size={18} className={isActive ? 'text-emerald-600' : isGrace ? 'text-amber-600' : 'text-gray-400'} />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-bold text-gray-900 text-sm">{sub.tagId?.tagId || sub.planName || 'Subscription'}</span>
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${isCancelled ? 'bg-gray-100 text-gray-600' : isActive ? 'bg-emerald-50 text-emerald-700' : isGrace ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700'}`}>
+                            {sub.status.replace('_', ' ')}
+                          </span>
+                        </div>
+                        {(sub.petName || sub.planId?.name) && (
+                          <p className="text-sm text-gray-500 mt-0.5">
+                            {sub.petName && <span className="font-medium text-gray-700">{sub.petName}</span>}
+                            {sub.petType && <span className="text-gray-400"> · {sub.petType}</span>}
+                            {(sub.petName || sub.petType) && sub.planId?.name && <span className="text-gray-300 mx-1">·</span>}
+                            {sub.planId?.name && <span>{sub.planId.name}</span>}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm font-semibold text-gray-900">${sub.planId?.price?.toFixed(2) || '0.00'}<span className="text-xs font-normal text-gray-400">{sub.renewalMethod === 'annual' ? '/yr' : '/mo'}</span></div>
+                      <div className="flex items-center gap-1 text-xs text-gray-400 mt-0.5">
+                        {sub.autoRenew ? <RefreshCw size={10} className="text-emerald-500" /> : <Clock size={10} />}
+                        {sub.autoRenew ? 'Auto-renew on' : 'Auto-renew off'}
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <ConfirmDialog
         open={cancelOpen}

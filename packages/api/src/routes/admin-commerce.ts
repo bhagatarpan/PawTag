@@ -34,7 +34,7 @@ import { productService } from '../commerce/services/product.service';
 import { inventoryService } from '../commerce/services/inventory.service';
 import { shippingService } from '../commerce/services/shipping.service';
 import { getAllSettings, updateSetting, type CommerceSettingKey } from '../commerce/config';
-import { Order, Invoice, Setting } from '@pawtag/db';
+import { Order, Invoice, Setting, Subscription, Tag, Pet } from '@pawtag/db';
 import { toAppError } from '../lib/app-errors';
 import { auditService } from '../services/audit';
 
@@ -350,8 +350,116 @@ router.get('/orders/:id', requirePermission('order.read'), async (req: AuthReque
   }
 });
 
+// GET /api/admin/commerce/orders/:id/subscriptions — fetch subscriptions linked to an order
+router.get('/orders/:id/subscriptions', requirePermission('order.read'), async (req: AuthRequest, res: Response) => {
+  try {
+    const order = await Order.findById(req.params.id).select('_id');
+    if (!order) { res.status(404).json({ success: false, error: 'Order not found' }); return; }
+
+    const subscriptions = await Subscription.find({ orderId: order._id, deletedAt: null })
+      .populate('tagId', 'tagId tagType status petId')
+      .populate('planId', 'name price')
+      .sort({ createdAt: -1 });
+
+    const petIds = subscriptions
+      .map((s: any) => s.tagId?.petId)
+      .filter(Boolean);
+    const pets = petIds.length > 0
+      ? await Pet.find({ _id: { $in: petIds } }).select('name petType breed')
+      : [];
+    const petMap = new Map(pets.map((p: any) => [p._id.toString(), p]));
+
+    const enriched = subscriptions.map((s: any) => {
+      const tag = s.tagId as any;
+      const pet = tag?.petId ? petMap.get(tag.petId.toString()) : null;
+      return {
+        ...s.toObject(),
+        petName: pet?.name || null,
+        petType: pet?.petType || null,
+        productName: (s.planId as any)?.name || s.planName,
+      };
+    });
+
+    res.json({ success: true, data: enriched });
+  } catch (err) {
+    const error = toAppError(err);
+    res.status(error.httpStatus).json({ success: false, error: error.userMessage });
+  }
+});
+
+// POST /api/admin/commerce/orders/:id/repair-subscriptions — retry subscription creation for failed orders
+router.post('/orders/:id/repair-subscriptions', requirePermission('order.update'), async (req: AuthRequest, res: Response) => {
+  try {
+    const order = await Order.findById(req.params.id);
+    if (!order) { res.status(404).json({ success: false, error: 'Order not found' }); return; }
+
+    const { createSubscription } = await import('../services/subscription.service');
+    const { Tag: TagModel } = await import('@pawtag/db');
+    const { generateTagId } = await import('../lib/tag-id');
+    const Product = (await import('@pawtag/db')).Product;
+
+    const created: string[] = [];
+    const skipped: string[] = [];
+    const errors: { productId: string; error: string }[] = [];
+
+    for (const item of order.items) {
+      const productId = typeof item.productId === 'string' ? item.productId : (item.productId as any)?._id?.toString() || String(item.productId);
+      if (!productId) continue;
+
+      const existingSub = await Subscription.findOne({ orderId: order._id, planId: productId, deletedAt: null });
+      if (existingSub) {
+        skipped.push(productId);
+        continue;
+      }
+
+      try {
+        const product = await Product.findById(productId).lean();
+        if (!product?.isTagProduct) {
+          skipped.push(productId);
+          continue;
+        }
+
+        const tagIdStr = await generateTagId();
+        const tag = await TagModel.create({
+          tagId: tagIdStr,
+          tagType: 'qr',
+          petId: null,
+          ownerId: order.userId,
+          status: 'inactive',
+          subscriptionStatus: 'none',
+        });
+
+        const productAutoRenew = order.autoRenewMap?.[product._id.toString()];
+        await createSubscription({
+          userId: order.userId.toString(),
+          tagId: tag._id.toString(),
+          orderId: order._id.toString(),
+          planId: product._id.toString(),
+          planType: product.subscriptionConfig?.type || 'annual',
+          autoRenew: productAutoRenew !== undefined ? productAutoRenew : (order.autoRenew !== false),
+        });
+
+        created.push(productId);
+      } catch (err: any) {
+        errors.push({ productId, error: err?.message || String(err) });
+      }
+    }
+
+    if (errors.length === 0 && created.length > 0) {
+      await Order.findByIdAndUpdate(order._id, { completionStatus: 'complete', $unset: { completionErrors: '' } });
+    }
+
+    res.json({
+      success: true,
+      data: { created, skipped, errors, orderCompletionStatus: errors.length === 0 ? 'complete' : 'repair_required' },
+    });
+  } catch (err) {
+    const error = toAppError(err);
+    res.status(error.httpStatus).json({ success: false, error: error.userMessage });
+  }
+});
+
 /**
- * POST /api/admin/commerce/orders/:id/ship
  *
  * Create a shipment for an order.
  */

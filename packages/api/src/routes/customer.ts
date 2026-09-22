@@ -964,6 +964,42 @@ router.get('/orders/:id/invoice', requirePermission('order.read'), async (req: A
   }
 });
 
+// GET /api/customer/orders/:id/subscriptions — fetch subscriptions linked to an order
+router.get('/orders/:id/subscriptions', requirePermission('order.read'), async (req: AuthRequest, res: Response) => {
+  try {
+    const order = await Order.findOne({ _id: req.params.id, userId: req.user!.id }).select('_id');
+    if (!order) { res.status(404).json({ success: false, error: 'Order not found' }); return; }
+
+    const subscriptions = await Subscription.find({ orderId: order._id, userId: req.user!.id, deletedAt: null })
+      .populate('tagId', 'tagId tagType status petId')
+      .populate('planId', 'name price')
+      .sort({ createdAt: -1 });
+
+    const petIds = subscriptions
+      .map((s: any) => s.tagId?.petId)
+      .filter(Boolean);
+    const pets = petIds.length > 0
+      ? await Pet.find({ _id: { $in: petIds }, ownerId: req.user!.id, deletedAt: null }).select('name petType breed')
+      : [];
+    const petMap = new Map(pets.map((p: any) => [p._id.toString(), p]));
+
+    const enriched = subscriptions.map((s: any) => {
+      const tag = s.tagId as any;
+      const pet = tag?.petId ? petMap.get(tag.petId.toString()) : null;
+      return {
+        ...s.toObject(),
+        petName: pet?.name || null,
+        petType: pet?.petType || null,
+        productName: (s.planId as any)?.name || s.planName,
+      };
+    });
+
+    res.json({ success: true, data: enriched });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to fetch order subscriptions' });
+  }
+});
+
 /**
  * POST /api/customer/orders/place — DEPRECATED / REMOVED
  *

@@ -40,7 +40,7 @@ export default function Payments() {
   const fetchTransactions = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await api.get(API.admin.commerce.orders, { params: { page, limit: 20, search } });
+      const res = await api.get(API.admin.commerce.orders.list, { params: { page, limit: 20, search } });
       const data = res.data?.data;
       // Map orders to payment transactions
       const txns = (data?.items || []).map((o: any) => ({

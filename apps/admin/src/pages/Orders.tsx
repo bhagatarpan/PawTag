@@ -12,7 +12,7 @@ import RefundStatusCard from '../components/RefundStatusCard';
 import {
   Search, X, ChevronDown, Download, Loader2, ShoppingCart, CreditCard,
   Truck, Package, CheckCircle, AlertCircle, Info, Clock, FileText,
-  RefreshCw, Ban, Send, Eye, Printer, Copy, ExternalLink, AlertTriangle, XCircle, RotateCcw, PlusCircle,
+  RefreshCw, Ban, Send, Eye, Printer, Copy, ExternalLink, AlertTriangle, XCircle, RotateCcw, PlusCircle, Shield,
 } from 'lucide-react';
 import {
   ORDER_STATUS_LABELS,
@@ -131,6 +131,8 @@ export interface Order {
     paidAt?: string;
     createdAt?: string;
   } | null;
+  completionStatus?: 'pending' | 'complete' | 'repair_required';
+  completionErrors?: Array<{ step: string; error: string; productId?: string; timestamp: string }>;
   createdAt: string;
   updatedAt?: string;
 }
@@ -271,6 +273,38 @@ export function OrderDetailDrawer({
   const [activeTab, setActiveTab] = useState<'info' | 'items' | 'shipping' | 'activity'>('info');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState('');
+  const [orderSubscriptions, setOrderSubscriptions] = useState<any[]>([]);
+  const [repairLoading, setRepairLoading] = useState(false);
+
+  const fetchOrderSubscriptions = useCallback(async () => {
+    if (!order) return;
+    try {
+      const res = await api.get(API.admin.commerce.orders.subscriptions(order._id));
+      setOrderSubscriptions(res.data.data || []);
+    } catch { /* non-critical */ }
+  }, [order]);
+
+  const handleRepairSubscriptions = async () => {
+    if (!order) return;
+    setRepairLoading(true);
+    try {
+      const res = await api.post(API.admin.commerce.orders.repairSubscriptions(order._id));
+      const { created, skipped, errors } = res.data.data;
+      if (errors.length === 0 && created.length > 0) {
+        toast.success(`Created ${created.length} subscription(s)`);
+      } else if (errors.length > 0) {
+        toast.error(`${errors.length} subscription(s) failed to create`);
+      } else {
+        toast.info('No new subscriptions to create');
+      }
+      fetchOrderSubscriptions();
+      onRefresh();
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to repair subscriptions');
+    } finally {
+      setRepairLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!order) return;
@@ -283,8 +317,9 @@ export function OrderDetailDrawer({
     if (order) {
       setActiveTab('info');
       setStatusFilter('');
+      fetchOrderSubscriptions();
     }
-  }, [order]);
+  }, [order, fetchOrderSubscriptions]);
 
   if (!order) return null;
 
@@ -454,6 +489,76 @@ export function OrderDetailDrawer({
               )}
               <div className="pt-2 mt-2 border-t border-gray-200">
                 <DetailRow label="Total" value={<span className="font-bold text-gray-900">{formatCurrency(order.payment.amount, order.payment.currency)}</span>} />
+              </div>
+            </Section>
+          )}
+
+          {/* Completion Errors Warning */}
+          {order.completionStatus === 'repair_required' && order.completionErrors && order.completionErrors.length > 0 && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle size={18} className="text-amber-600 mt-0.5 flex-shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-amber-800">Order completion had issues</p>
+                  <ul className="mt-1 space-y-0.5">
+                    {order.completionErrors.map((err, i) => (
+                      <li key={i} className="text-xs text-amber-700">
+                        {err.step.replace(/_/g, ' ')}: {err.error}
+                        {err.productId && <span className="text-amber-500 ml-1">(product: {err.productId})</span>}
+                      </li>
+                    ))}
+                  </ul>
+                  <button
+                    onClick={handleRepairSubscriptions}
+                    disabled={repairLoading}
+                    className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 text-white rounded-lg text-xs font-semibold hover:bg-amber-700 disabled:opacity-50 transition-all"
+                  >
+                    {repairLoading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                    {repairLoading ? 'Repairing...' : 'Retry Subscription Creation'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Subscriptions */}
+          {orderSubscriptions.length > 0 && (
+            <Section title={`Subscriptions (${orderSubscriptions.length})`} icon={<Shield size={16} />}>
+              <div className="space-y-2">
+                {orderSubscriptions.map((sub: any) => {
+                  const isActive = sub.status === 'active';
+                  const isGrace = sub.status === 'grace_period';
+                  const isCancelled = sub.status === 'cancelled';
+                  return (
+                    <div key={sub._id} className="flex items-center justify-between p-3 rounded-lg border border-gray-100 hover:border-gray-200 transition-all">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isActive ? 'bg-emerald-50' : isGrace ? 'bg-amber-50' : 'bg-gray-50'}`}>
+                          <Shield size={14} className={isActive ? 'text-emerald-600' : isGrace ? 'text-amber-600' : 'text-gray-400'} />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-bold text-gray-900 text-xs">{sub.tagId?.tagId || sub.planName || 'N/A'}</span>
+                            <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${isCancelled ? 'bg-gray-100 text-gray-600' : isActive ? 'bg-emerald-50 text-emerald-700' : isGrace ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700'}`}>
+                              {sub.status.replace('_', ' ')}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-gray-400 mt-0.5">
+                            {sub.autoRenew ? <RefreshCw size={10} className="text-emerald-500" /> : <Clock size={10} />}
+                            {sub.autoRenew ? 'Auto-renew on' : 'Auto-renew off'}
+                            {sub.planId?.name && <span>· {sub.planId.name}</span>}
+                          </div>
+                        </div>
+                      </div>
+                      <Link
+                        to={`/customer-subscriptions/${sub._id}`}
+                        onClick={onClose}
+                        className="text-xs text-primary-600 hover:text-primary-700 font-medium"
+                      >
+                        View
+                      </Link>
+                    </div>
+                  );
+                })}
               </div>
             </Section>
           )}

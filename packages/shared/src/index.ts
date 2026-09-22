@@ -315,6 +315,13 @@ export interface Subscription {
   cancellationReason?: string;
   autoRenew: boolean;
   renewalMethod: 'annual' | 'monthly';
+  // Auto-renew pause tracking
+  autoRenewPausedAt?: string;
+  autoRenewPausedBy?: string;
+  autoRenewPausedByType?: string;
+  autoRenewPausedByPortal?: 'customer-web' | 'customer-mobile' | 'admin-web';
+  autoRenewPauseReason?: string;
+  autoRenewPauseReasonDetails?: string;
   stripeSubscriptionId?: string;
   stripeCustomerId?: string;
   lastPaymentDate?: string;

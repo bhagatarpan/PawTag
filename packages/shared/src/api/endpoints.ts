@@ -165,6 +165,7 @@ export const API = {
       get: (id: string) => `/admin/subscriptions/${id}` as const,
       setStatus: (id: string) => `/admin/subscriptions/${id}/status` as const,
       extend: (id: string) => `/admin/subscriptions/${id}/extend` as const,
+      autoRenew: (id: string) => `/admin/subscriptions/${id}/auto-renew` as const,
       goldSubscribe: '/admin/subscriptions/gold/subscribe',
     },
 
@@ -179,7 +180,11 @@ export const API = {
         connectXero: '/admin/commerce/accounting/connect/xero',
         disconnectXero: '/admin/commerce/accounting/disconnect/xero',
       },
-      orders: '/admin/commerce/orders',
+      orders: {
+        list: '/admin/commerce/orders',
+        subscriptions: (id: string) => `/admin/commerce/orders/${id}/subscriptions` as const,
+        repairSubscriptions: (id: string) => `/admin/commerce/orders/${id}/repair-subscriptions` as const,
+      },
       products: '/admin/commerce/products',
       reorderProducts: '/admin/commerce/products/reorder',
       inventory: {
@@ -520,6 +525,7 @@ export const API = {
       list: '/customer/orders',
       get: (id: string) => `/customer/orders/${id}` as const,
       invoice: (id: string) => `/customer/orders/${id}/invoice` as const,
+      subscriptions: (id: string) => `/customer/orders/${id}/subscriptions` as const,
       cancel: (id: string) => `/customer/returns/orders/${id}/cancel` as const,
     },
     returns: {

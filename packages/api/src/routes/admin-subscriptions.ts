@@ -302,9 +302,105 @@ router.post('/:id/extend', requirePermission('subscription.update'), async (req:
   }
 });
 
+// PUT /api/admin/subscriptions/:id/auto-renew — Toggle auto-renew with reason tracking
+router.put('/:id/auto-renew', requirePermission('subscription.update'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { autoRenew, reason, reasonDetails } = req.body;
+    if (typeof autoRenew !== 'boolean') {
+      res.status(400).json({ success: false, error: 'autoRenew must be a boolean' });
+      return;
+    }
+
+    // When pausing (autoRenew=false), require a reason
+    if (!autoRenew && !reason) {
+      res.status(400).json({ success: false, error: 'Reason is required when pausing auto-renew' });
+      return;
+    }
+
+    const subscription = await Subscription.findById(req.params.id);
+    if (!subscription) {
+      res.status(404).json({ success: false, error: 'Subscription not found' });
+      return;
+    }
+
+    const adminUser = await User.findById(req.user!.id).select('fullName roles').lean();
+    const roleName = (adminUser?.roles as any[])?.[0] || 'Admin';
+
+    const oldAutoRenew = subscription.autoRenew;
+    subscription.autoRenew = autoRenew;
+
+    if (!autoRenew) {
+      // Pausing — store pause metadata
+      subscription.autoRenewPausedAt = new Date();
+      subscription.autoRenewPausedBy = req.user!.id;
+      subscription.autoRenewPausedByType = roleName;
+      subscription.autoRenewPausedByPortal = 'admin-web';
+      subscription.autoRenewPauseReason = reason;
+      subscription.autoRenewPauseReasonDetails = reasonDetails || undefined;
+    } else {
+      // Resuming — clear pause metadata
+      subscription.autoRenewPausedAt = undefined;
+      subscription.autoRenewPausedBy = undefined;
+      subscription.autoRenewPausedByType = undefined;
+      subscription.autoRenewPausedByPortal = undefined;
+      subscription.autoRenewPauseReason = undefined;
+      subscription.autoRenewPauseReasonDetails = undefined;
+    }
+
+    await subscription.save();
+
+    // Send admin notification for poor experience complaints
+    if (!autoRenew && reason === 'poor_experience' && reasonDetails) {
+      try {
+        const customer = await User.findById(subscription.userId).select('fullName email').lean();
+        const { createAndDeliverNotification } = await import('../services/notification-delivery.service');
+        const { sendMail } = await import('../services/email.service');
+
+        const adminEmailsSetting = await (await import('@pawtag/db')).Setting.findOne({ key: 'notifications.tagExpiryAdminEmails' }).lean();
+        const adminEmails = adminEmailsSetting?.value
+          ? adminEmailsSetting.value.split(',').map((e: string) => e.trim()).filter(Boolean)
+          : [];
+
+        const admins = adminEmails.length > 0
+          ? await User.find({ email: { $in: adminEmails } }).select('_id email fullName')
+          : await User.find({ role: { $in: ['admin', 'super_admin'] } }).select('_id email fullName');
+
+        for (const admin of admins) {
+          await createAndDeliverNotification({
+            userId: (admin as any)._id.toString(),
+            type: 'subscription_poor_experience',
+            title: 'Subscription Auto-Renew Paused — Poor Experience',
+            message: `${adminUser?.fullName || 'Admin'} paused auto-renew for ${customer?.fullName || 'Customer'}'s ${subscription.planName} subscription. Reason: Poor Experience.`,
+            priority: 'high',
+            channel: 'alert',
+            actionUrl: `/customer-subscriptions/${subscription._id}`,
+          });
+
+          await sendMail(
+            (admin as any).email,
+            `Subscription Auto-Renew Paused — Poor Experience: ${subscription.planName}`,
+            `<p><strong>${adminUser?.fullName || 'Admin'}</strong> paused auto-renew for <strong>${customer?.fullName || 'Customer'}</strong>'s <strong>${subscription.planName}</strong> subscription.</p>
+            <p><strong>Reason:</strong> Poor Experience</p>
+            <p><strong>Details:</strong> ${reasonDetails}</p>
+            <p><a href="${process.env.ADMIN_URL || 'http://localhost:3001'}/customer-subscriptions/${subscription._id}">View Subscription</a></p>`,
+          );
+        }
+      } catch (notifyErr) {
+        // Non-critical — don't fail the request
+      }
+    }
+
+    res.json({
+      success: true,
+      data: subscription,
+      message: `Auto-renew ${autoRenew ? 'enabled' : 'disabled'}`,
+    });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to update auto-renew' });
+  }
+});
+
 /**
- * @swagger
- * /api/admin/subscriptions/gold/subscribe:
  *   post:
  *     summary: Subscribe a customer to Gold membership (admin action)
  *     tags: [Admin Subscriptions]

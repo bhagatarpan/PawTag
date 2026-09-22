@@ -228,3 +228,27 @@ export function getBreedsForOrigin(petType: PetType, breedOrigin: string): reado
       return allBreeds.filter((b) => b !== 'Mixed Breed');
   }
 }
+
+// --- Subscription Auto-Renew Pause Reasons ---
+export interface PauseReasonOption {
+  value: string;
+  label: string;
+  hasComplaint?: boolean;
+  hasTextInput?: boolean;
+}
+
+export const AUTO_RENEW_PAUSE_REASONS: PauseReasonOption[] = [
+  { value: 'no_longer_own_pet', label: 'No longer own the Pet' },
+  { value: 'no_longer_using', label: 'No longer using or need the service' },
+  { value: 'too_expensive', label: 'Too expensive' },
+  { value: 'found_alternative', label: 'Found an alternative' },
+  { value: 'poor_experience', label: 'Poor experience', hasComplaint: true },
+  { value: 'temporary_pause', label: 'Temporary Pause Requested' },
+  { value: 'circumstances_changed', label: 'Customer Circumstances Changed' },
+  { value: 'billing_payment_issue', label: 'Billing / Payment Issue' },
+  { value: 'other', label: 'Other', hasTextInput: true },
+];
+
+export function getPauseReasonLabel(value: string): string {
+  return AUTO_RENEW_PAUSE_REASONS.find(r => r.value === value)?.label || value;
+}

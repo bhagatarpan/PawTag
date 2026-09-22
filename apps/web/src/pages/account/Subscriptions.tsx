@@ -41,6 +41,11 @@ interface Subscription {
   petName?: string;
   petType?: string;
   productName?: string;
+  autoRenewPausedAt?: string;
+  autoRenewPausedBy?: string;
+  autoRenewPausedByType?: string;
+  autoRenewPauseReason?: string;
+  autoRenewPauseReasonDetails?: string;
 }
 
 interface Invoice {
@@ -70,6 +75,10 @@ function SubscriptionsInner() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [showChangePlan, setShowChangePlan] = useState(false);
+  const [showPauseModal, setShowPauseModal] = useState(false);
+  const [pauseReason, setPauseReason] = useState('');
+  const [pauseReasonDetails, setPauseReasonDetails] = useState('');
+  const [pauseTargetId, setPauseTargetId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchSubscriptions();
@@ -139,11 +148,39 @@ function SubscriptionsInner() {
   }
 
   async function handleToggleAutoRenew(id: string, current: boolean) {
+    if (current) {
+      // Pausing — show reason modal
+      setPauseTargetId(id);
+      setPauseReason('');
+      setPauseReasonDetails('');
+      setShowPauseModal(true);
+      return;
+    }
+    // Resuming — no reason required
     setActionLoading(true);
     try {
-      await api.put(API.customer.subscriptions.autoRenew(id), { autoRenew: !current });
+      await api.put(API.customer.subscriptions.autoRenew(id), { autoRenew: true });
       await fetchSubscriptions();
       if (selectedId === id) await fetchDetail(id);
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Failed to update');
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function handleConfirmPause() {
+    if (!pauseTargetId || !pauseReason) return;
+    setActionLoading(true);
+    try {
+      await api.put(API.customer.subscriptions.autoRenew(pauseTargetId), {
+        autoRenew: false,
+        reason: pauseReason,
+        reasonDetails: pauseReasonDetails || undefined,
+      });
+      setShowPauseModal(false);
+      await fetchSubscriptions();
+      if (selectedId === pauseTargetId) await fetchDetail(pauseTargetId);
     } catch (err: any) {
       alert(err.response?.data?.error || 'Failed to update');
     } finally {
@@ -329,6 +366,18 @@ function SubscriptionsInner() {
                   <div className="text-xs text-gray-500">{sub.autoRenew ? `Auto-renew is on · next billing ${formatDate(sub.nextPaymentDate || sub.currentPeriodEnd)}` : 'Auto-renew is off'}</div>
                 </div>
               </div>
+              {!sub.autoRenew && sub.autoRenewPausedAt && (
+                <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <div className="text-xs font-medium text-amber-800 mb-1">Auto-Renew Paused</div>
+                  <div className="text-xs text-amber-700">
+                    Paused on {formatDate(sub.autoRenewPausedAt)}
+                    {sub.autoRenewPauseReason && <> — Reason: {sub.autoRenewPauseReason.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}</>}
+                  </div>
+                  {sub.autoRenewPauseReasonDetails && (
+                    <div className="text-xs text-amber-600 mt-1 italic">{sub.autoRenewPauseReasonDetails}</div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -498,6 +547,84 @@ function SubscriptionsInner() {
             </div>
           </div>
         )}
+
+        {/* Pause Auto-Renew Modal */}
+        {showPauseModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl p-6 w-full max-w-md mx-4">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Pause Auto-Renew</h3>
+              <p className="text-sm text-gray-500 mb-4">Select a reason for pausing auto-renewal.</p>
+
+              <div className="space-y-3 mb-4">
+                {[
+                  { value: 'no_longer_own_pet', label: 'No longer own the Pet' },
+                  { value: 'no_longer_using', label: 'No longer using or need the service' },
+                  { value: 'too_expensive', label: 'Too expensive' },
+                  { value: 'found_alternative', label: 'Found an alternative' },
+                  { value: 'poor_experience', label: 'Poor experience' },
+                  { value: 'temporary_pause', label: 'Temporary Pause Requested' },
+                  { value: 'circumstances_changed', label: 'Customer Circumstances Changed' },
+                  { value: 'billing_payment_issue', label: 'Billing / Payment Issue' },
+                  { value: 'other', label: 'Other' },
+                ].map((r) => (
+                  <label key={r.value} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="pauseReason"
+                      value={r.value}
+                      checked={pauseReason === r.value}
+                      onChange={() => setPauseReason(r.value)}
+                      className="w-4 h-4 text-primary-600 border-gray-300 focus:ring-primary-500"
+                    />
+                    <span className="text-sm text-gray-700">{r.label}</span>
+                  </label>
+                ))}
+              </div>
+
+              {pauseReason === 'poor_experience' && (
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Please describe your experience</label>
+                  <textarea
+                    value={pauseReasonDetails}
+                    onChange={(e) => setPauseReasonDetails(e.target.value)}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-primary-500 focus:border-primary-500"
+                    placeholder="Tell us what went wrong..."
+                  />
+                </div>
+              )}
+
+              {pauseReason === 'other' && (
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Please specify</label>
+                  <input
+                    type="text"
+                    value={pauseReasonDetails}
+                    onChange={(e) => setPauseReasonDetails(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-primary-500 focus:border-primary-500"
+                    placeholder="Reason..."
+                  />
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setShowPauseModal(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmPause}
+                  disabled={!pauseReason || actionLoading}
+                  className="px-4 py-2 text-sm font-medium text-white bg-amber-600 rounded-lg hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {actionLoading ? 'Pausing...' : 'Pause Auto-Renew'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -656,6 +783,84 @@ function SubscriptionsInner() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Pause Auto-Renew Modal */}
+      {showPauseModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Pause Auto-Renew</h3>
+            <p className="text-sm text-gray-500 mb-4">Select a reason for pausing auto-renewal.</p>
+
+            <div className="space-y-3 mb-4">
+              {[
+                { value: 'no_longer_own_pet', label: 'No longer own the Pet' },
+                { value: 'no_longer_using', label: 'No longer using or need the service' },
+                { value: 'too_expensive', label: 'Too expensive' },
+                { value: 'found_alternative', label: 'Found an alternative' },
+                { value: 'poor_experience', label: 'Poor experience' },
+                { value: 'temporary_pause', label: 'Temporary Pause Requested' },
+                { value: 'circumstances_changed', label: 'Customer Circumstances Changed' },
+                { value: 'billing_payment_issue', label: 'Billing / Payment Issue' },
+                { value: 'other', label: 'Other' },
+              ].map((r) => (
+                <label key={r.value} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="pauseReason"
+                    value={r.value}
+                    checked={pauseReason === r.value}
+                    onChange={() => setPauseReason(r.value)}
+                    className="w-4 h-4 text-primary-600 border-gray-300 focus:ring-primary-500"
+                  />
+                  <span className="text-sm text-gray-700">{r.label}</span>
+                </label>
+              ))}
+            </div>
+
+            {pauseReason === 'poor_experience' && (
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Please describe your experience</label>
+                <textarea
+                  value={pauseReasonDetails}
+                  onChange={(e) => setPauseReasonDetails(e.target.value)}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-primary-500 focus:border-primary-500"
+                  placeholder="Tell us what went wrong..."
+                />
+              </div>
+            )}
+
+            {pauseReason === 'other' && (
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Please specify</label>
+                <input
+                  type="text"
+                  value={pauseReasonDetails}
+                  onChange={(e) => setPauseReasonDetails(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-primary-500 focus:border-primary-500"
+                  placeholder="Reason..."
+                />
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowPauseModal(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmPause}
+                disabled={!pauseReason || actionLoading}
+                className="px-4 py-2 text-sm font-medium text-white bg-amber-600 rounded-lg hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {actionLoading ? 'Pausing...' : 'Pause Auto-Renew'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

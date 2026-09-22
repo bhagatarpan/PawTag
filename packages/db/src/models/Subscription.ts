@@ -30,6 +30,14 @@ export interface ISubscriptionDocument extends Document {
   autoRenew: boolean;
   renewalMethod: 'annual' | 'monthly';
 
+  // Auto-renew pause tracking
+  autoRenewPausedAt?: Date;
+  autoRenewPausedBy?: string;
+  autoRenewPausedByType?: string;
+  autoRenewPausedByPortal?: 'customer-web' | 'customer-mobile' | 'admin-web';
+  autoRenewPauseReason?: string;
+  autoRenewPauseReasonDetails?: string;
+
   stripeSubscriptionId?: string;
   stripeCustomerId?: string;
   lastPaymentDate?: Date;
@@ -92,6 +100,14 @@ const SubscriptionSchema = new Schema<ISubscriptionDocument>(
 
     autoRenew: { type: Boolean, default: true },
     renewalMethod: { type: String, enum: ['annual', 'monthly'], default: 'annual' },
+
+    // Auto-renew pause tracking
+    autoRenewPausedAt: { type: Date },
+    autoRenewPausedBy: { type: String },
+    autoRenewPausedByType: { type: String },
+    autoRenewPausedByPortal: { type: String, enum: ['customer-web', 'customer-mobile', 'admin-web'] },
+    autoRenewPauseReason: { type: String },
+    autoRenewPauseReasonDetails: { type: String },
 
     stripeSubscriptionId: { type: String },
     stripeCustomerId: { type: String },

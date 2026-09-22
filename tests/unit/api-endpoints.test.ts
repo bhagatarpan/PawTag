@@ -42,7 +42,7 @@ describe('API Endpoints', () => {
 
     it('has correct commerce endpoints', () => {
       expect(API.admin.commerce.settings).toBe('/admin/commerce/settings');
-      expect(API.admin.commerce.orders).toBe('/admin/commerce/orders');
+      expect(API.admin.commerce.orders.list).toBe('/admin/commerce/orders');
       expect(API.admin.commerce.products).toBe('/admin/commerce/products');
       expect(API.admin.commerce.reorderProducts).toBe('/admin/commerce/products/reorder');
     });

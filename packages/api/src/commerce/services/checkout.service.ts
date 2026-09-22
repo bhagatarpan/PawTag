@@ -448,7 +448,7 @@ export class CheckoutService {
 
     // 8-10. Post-payment completion steps with error tracking
     // Each step is tracked individually so failures are queryable and retryable.
-    const completionErrors: Array<{ step: string; error: string; timestamp: Date }> = [];
+    const completionErrors: Array<{ step: string; error: string; productId?: string; timestamp: Date }> = [];
 
     // 8. Confirm stock (deduct actual inventory)
     try {
@@ -501,15 +501,17 @@ export class CheckoutService {
       const { generateTagId } = await import('../../lib/tag-id');
       
       for (const item of pending.items) {
-        const product = await Product.findById(item.productId).lean();
-        if (product?.isTagProduct) {
+        try {
+          const product = await Product.findById(item.productId).lean();
+          if (!product?.isTagProduct) continue;
+
           // Generate tag ID
-          const tagIdStr = generateTagId();
+          const tagIdStr = await generateTagId();
           
           // Create Tag
           const tag = await TagModel.create({
             tagId: tagIdStr,
-            tagType: 'QR',
+            tagType: 'qr',
             petId: null,
             ownerId: userId,
             status: 'inactive',
@@ -527,7 +529,11 @@ export class CheckoutService {
             autoRenew: productAutoRenew !== undefined ? productAutoRenew : (pending.autoRenew !== false),
           });
 
-          logger.info({ tagId: tagIdStr, orderId: order.orderNumber, correlationId }, 'Tag and Subscription created for tag product');
+          logger.info({ tagId: tagIdStr, orderId: order.orderNumber, productId: item.productId, correlationId }, 'Tag and Subscription created for tag product');
+        } catch (itemErr: any) {
+          const errorMsg = itemErr?.message || String(itemErr);
+          logger.error({ err: itemErr, orderId: order._id, productId: item.productId, correlationId }, 'Subscription creation failed for item');
+          completionErrors.push({ step: 'tag_subscription_creation', error: errorMsg, productId: String(item.productId), timestamp: new Date() });
         }
       }
     } catch (err: any) {

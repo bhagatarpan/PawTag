@@ -25,7 +25,7 @@ export default function Reports() {
     try {
       setLoading(true);
       const [ordersRes, usersRes] = await Promise.all([
-        api.get(API.admin.commerce.orders, { params: { limit: 100 } }),
+        api.get(API.admin.commerce.orders.list, { params: { limit: 100 } }),
         api.get(API.admin.users.list, { params: { limit: 1 } }).catch(() => ({ data: { data: { total: 0 } } })),
       ]);
 

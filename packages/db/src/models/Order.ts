@@ -99,7 +99,7 @@ export interface IOrderDocument extends Document {
   /** Post-payment completion status — tracks entitlement/invoice recovery */
   completionStatus: OrderCompletionStatus;
   /** Errors from failed completion steps (for repair) */
-  completionErrors?: Array<{ step: string; error: string; timestamp: Date }>;
+  completionErrors?: Array<{ step: string; error: string; productId?: string; timestamp: Date }>;
   /** Correlation ID for tracing across checkout steps */
   completionCorrelationId?: string;
   activity: Array<{
