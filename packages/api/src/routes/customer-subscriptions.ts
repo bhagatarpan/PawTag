@@ -46,6 +46,7 @@ async function auditSubscriptionEvent(
       tenantId: ctx?.tenantId,
       actorType: 'USER',
       actorId: req.user?.id,
+      actorUsername: (ctx as any)?.actorUsername || req.user?.email,
       actorEmail: req.user?.email,
       ...overrides,
     };
