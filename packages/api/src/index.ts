@@ -330,6 +330,9 @@ async function start() {
     const workerRole = process.env.PAWTAG_WORKER_ROLE;
     const isWorker = workerRole === 'worker';
 
+    // Store scheduler stop function for graceful shutdown
+    let stopScheduler: (() => Promise<void>) | null = null;
+
     if (!isWorker) {
       // API process: start background jobs (development/staging only)
       // In production, the dedicated worker process handles jobs.
@@ -337,7 +340,8 @@ async function start() {
         logger.info('Starting background jobs via scheduler (non-production mode)');
 
         // Import job functions and register them
-        const { registerJobFunction, start: startScheduler } = await import('./services/job-scheduler.service');
+        const { registerJobFunction, start: startFn, stop: stopFn } = await import('./services/job-scheduler.service');
+        stopScheduler = stopFn;
         const { runReminderJob } = await import('./services/reminder.service');
         const { runSubscriptionJob } = await import('./services/subscription.service');
         const { runEscalationJob } = await import('./services/escalation.service');
@@ -368,7 +372,7 @@ async function start() {
         registerJobFunction('runPrivacyRetentionJob', runPrivacyRetentionJob);
         registerJobFunction('runAuditRetentionJob', runAuditRetentionJob);
 
-        await startScheduler();
+        await startFn();
       } else {
         logger.info('Production API process — background jobs handled by dedicated worker');
       }
@@ -383,6 +387,10 @@ async function start() {
 
     process.on('SIGTERM', () => {
       logger.info('SIGTERM received, shutting down gracefully...');
+      // Stop job scheduler first (drain in-flight work)
+      if (stopScheduler) {
+        stopScheduler().catch(() => {});
+      }
       server.close(async () => {
         logger.info('HTTP server closed');
         await flushSystemLogs();
@@ -398,6 +406,9 @@ async function start() {
 
     process.on('SIGINT', () => {
       logger.info('SIGINT received, shutting down...');
+      if (stopScheduler) {
+        stopScheduler().catch(() => {});
+      }
       server.close(async () => {
         await flushSystemLogs();
         await flushMonitoring();

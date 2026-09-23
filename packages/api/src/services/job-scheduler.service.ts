@@ -4,8 +4,8 @@
  * and manages job execution with locking, history, and notifications.
  */
 
-import { BackgroundJob, type IBackgroundJobDocument } from '@pawtag/db';
-import { createClaimedJob } from '../lib/job-claim';
+import { BackgroundJob } from '@pawtag/db';
+import { claimJob, releaseJob } from '../lib/job-claim';
 import { sendJobNotification } from './job-notification.service';
 import logger from '../lib/logger';
 
@@ -82,7 +82,7 @@ export async function stop(): Promise<void> {
 /**
  * Start a timer for a single job.
  */
-function startJobTimer(job: IBackgroundJobDocument): void {
+function startJobTimer(job: { name: string; functionName: string; intervalMs: number }): void {
   if (timers.has(job.name)) {
     logger.warn({ job: job.name }, 'Job timer already exists, skipping');
     return;
@@ -96,15 +96,21 @@ function startJobTimer(job: IBackgroundJobDocument): void {
 
   const timer = setInterval(async () => {
     if (isShuttingDown) return;
-    await executeJob(job.name);
+    const result = await executeJob(job.name);
+    if (result && !result.success) {
+      logger.warn({ job: job.name, error: result.error }, 'Scheduled job failed');
+    }
   }, job.intervalMs);
 
   timers.set(job.name, timer);
-  logger.debug({ job: job.name, intervalMs: job.intervalMs }, 'Job timer started');
+  logger.info({ job: job.name, intervalMs: job.intervalMs }, 'Job timer started');
 }
 
 /**
  * Execute a single job by name.
+ *
+ * Uses claimJob/releaseJob directly for full control over lock acquisition
+ * and release, with proper error handling at every stage.
  */
 export async function executeJob(jobName: string): Promise<JobResult | null> {
   // Re-read config from DB (in case it changed via admin)
@@ -117,82 +123,87 @@ export async function executeJob(jobName: string): Promise<JobResult | null> {
     return null;
   }
 
-  // Acquire lock and execute
-  let result: JobResult = { success: false, error: 'Lock not acquired' };
-  const lockAcquired = await createClaimedJob(
-    job.lockName,
-    workerId,
-    async () => {
-      // Update status to running
-      await BackgroundJob.updateOne(
-        { name: jobName },
-        { $set: { status: 'running', currentWorkerId: workerId, lastRunAt: new Date() } },
-      );
-
-      const startTime = Date.now();
-      try {
-        result = await fn();
-      } catch (err: any) {
-        result = { success: false, error: err.message || 'Unknown error' };
-      }
-      const durationMs = Date.now() - startTime;
-
-      // Build history entry
-      const historyEntry = {
-        startedAt: new Date(startTime),
-        completedAt: new Date(),
-        durationMs,
-        result: result.success ? 'success' : 'error',
-        error: result.error,
-        itemsProcessed: result.itemsProcessed,
-        workerId,
-      };
-
-      // Update job state and append history (keep last N entries)
-      const jobDoc = await BackgroundJob.findOne({ name: jobName }).lean();
-      const maxHistory = jobDoc?.maxHistorySize || 500;
-
-      await BackgroundJob.updateOne(
-        { name: jobName },
-        {
-          $set: {
-            status: result.success ? 'idle' : 'error',
-            lastRunResult: result.success ? 'success' : 'error',
-            lastRunDurationMs: durationMs,
-            lastError: result.error || null,
-            currentWorkerId: null,
-          },
-          $push: {
-            runHistory: {
-              $each: [historyEntry],
-              $slice: -maxHistory,
-            },
-          },
-        },
-      );
-
-      logger.info({
-        job: jobName,
-        result: result.success ? 'success' : 'error',
-        durationMs,
-        itemsProcessed: result.itemsProcessed,
-        error: result.error,
-      }, 'Job executed');
-
-      // Send notification (fire-and-forget)
-      sendJobNotification(
-        { _id: String(job._id), name: job.name, displayName: job.displayName, notifyOnSuccess: job.notifyOnSuccess, notifyOnFailure: job.notifyOnFailure },
-        result.success ? 'success' : 'error',
-        durationMs,
-        result.error,
-      ).catch(() => {});
-    },
-    job.lockLeaseMs || 120000,
-  );
-
+  // Acquire lock directly
+  const lockAcquired = await claimJob(job.lockName, workerId, job.lockLeaseMs || 120000);
   if (!lockAcquired) {
     logger.debug({ job: jobName }, 'Job skipped — lock held by another worker');
     return null;
+  }
+
+  let result: JobResult = { success: false, error: 'Unknown error' };
+
+  try {
+    // Update status to running
+    await BackgroundJob.updateOne(
+      { name: jobName },
+      { $set: { status: 'running', currentWorkerId: workerId, lastRunAt: new Date() } },
+    );
+
+    // Execute the job function
+    const startTime = Date.now();
+    try {
+      result = await fn();
+    } catch (err: any) {
+      result = { success: false, error: err.message || 'Unknown error' };
+    }
+    const durationMs = Date.now() - startTime;
+
+    // Build history entry
+    const historyEntry = {
+      startedAt: new Date(startTime),
+      completedAt: new Date(),
+      durationMs,
+      result: result.success ? 'success' : 'error',
+      error: result.error,
+      itemsProcessed: result.itemsProcessed,
+      workerId,
+    };
+
+    // Update job state and append history (keep last N entries)
+    const jobDoc = await BackgroundJob.findOne({ name: jobName }).lean();
+    const maxHistory = jobDoc?.maxHistorySize || 500;
+
+    await BackgroundJob.updateOne(
+      { name: jobName },
+      {
+        $set: {
+          status: result.success ? 'idle' : 'error',
+          lastRunResult: result.success ? 'success' : 'error',
+          lastRunDurationMs: durationMs,
+          lastError: result.error || null,
+          currentWorkerId: null,
+        },
+        $push: {
+          runHistory: {
+            $each: [historyEntry],
+            $slice: -maxHistory,
+          },
+        },
+      },
+    );
+
+    logger.info({
+      job: jobName,
+      result: result.success ? 'success' : 'error',
+      durationMs,
+      itemsProcessed: result.itemsProcessed,
+      error: result.error,
+    }, 'Job executed');
+
+    // Send notification (fire-and-forget)
+    sendJobNotification(
+      { _id: String(job._id), name: job.name, displayName: job.displayName, notifyOnSuccess: job.notifyOnSuccess, notifyOnFailure: job.notifyOnFailure },
+      result.success ? 'success' : 'error',
+      durationMs,
+      result.error,
+    ).catch(() => {});
+
+  } catch (err: any) {
+    logger.error({ err, job: jobName }, 'Job execution failed unexpectedly');
+    result = { success: false, error: err.message || 'Unexpected error' };
+  } finally {
+    // Always release the lock
+    await releaseJob(job.lockName, workerId);
   }
 
   return result;
