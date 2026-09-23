@@ -126,7 +126,7 @@ The current engineering stage is:
 | Admin portal | Broadly implemented | Focus on operational safety, RBAC and destructive actions |
 | CMS | Broadly implemented | Supporting feature; not core to first-customer proof |
 | Mobile app | Meaningfully implemented | Not yet recommended as a first-customer launch dependency |
-| Background jobs | Implemented in API process | Requires controlled worker/concurrency strategy |
+| Background jobs | DB-driven scheduler with admin UI, locking, notifications | Production-ready |
 | Automated API tests | Substantial | Critical browser/native E2E coverage still needed |
 | Deployment | Docker/CI foundations exist | Production environment still needs rehearsal and validation |
 | Observability | Logging/Sentry/OpenTelemetry hooks exist | Alerts/runbooks must be validated in staging/production-like conditions |
@@ -1118,44 +1118,83 @@ Avoid spending first-MVP effort making every admin table perfect on narrow mobil
 
 # Background Jobs
 
-The API currently starts multiple scheduled/background services from the main API process.
+PawTag uses a **DB-driven job scheduler** with centralized configuration, locking, execution history, and admin UI.
 
-Current job categories include behaviour for areas such as:
-
-- reminders;
-- subscription lifecycle;
-- escalation;
-- low stock;
-- pet milestones;
-- rewards;
-- orphan payment detection;
-- order auto-cancellation;
-- shipment tracking polling;
-- webhook retry;
-- payment reconciliation;
-- refund reconciliation.
-
-## Production rule
-
-Do not horizontally scale API instances while assuming process-local timers will magically become distributed jobs.
-
-For first-customer MVP, a simple architecture is acceptable:
+## Architecture
 
 ```text
 HTTP API process(es)
         ↓
       MongoDB
 
-ONE controlled worker/scheduler
+ONE dedicated worker process (or API process in dev)
         ↓
-MongoDB + external providers
+Job Scheduler (reads config from BackgroundJob collection)
+        ↓
+Individual job functions (pure, no self-managing timers)
+        ↓
+job_locks collection (concurrency safety)
 ```
 
-Alternatively, jobs that can execute from multiple instances must atomically claim/lease work and remain idempotent.
+## Job List
 
-A full enterprise queue platform is **not required for MVP** unless real workload/operational evidence justifies it.
+| Job | Category | Frequency | Purpose |
+|---|---|---|---|
+| Reminder Service | notification | 1 hour | Finder reminders, onboarding nudges |
+| Subscription Service | financial | 1 hour | Subscription lifecycle, auto-renewals, payment retries |
+| Escalation Service | notification | 1 minute | Emergency contact notifications |
+| Low Stock Check | maintenance | 24 hours | Admin alerts for low inventory |
+| Pet Milestones | notification | 24 hours | Birthday/anniversary points |
+| PawRewards | financial | 24 hours | Monthly rewards, tier re-qualification |
+| Orphan Payment Detection | financial | 60 seconds | Recovers payments without orders |
+| Order Auto-Cancel | financial | 60 seconds | Cancels stale unpaid orders |
+| Shipping Tracking Poll | maintenance | 5 minutes | Carrier API tracking updates |
+| Webhook Retry | financial | 60 seconds | Retries failed Stripe webhooks |
+| Payment Reconciliation | reconciliation | 5 minutes | Compares local vs Stripe state |
+| Refund Reconciliation | reconciliation | 24 hours | Syncs refund status from Stripe |
+| Privacy Retention | compliance | 24 hours | Anonymizes finder data per retention policy |
+| Audit Retention | compliance | 24 hours | Enforces audit event retention policies |
+
+## Admin Portal
+
+All jobs are configurable via **Admin Portal → Operations → Background Jobs**:
+
+- View job status, last run, duration
+- Enable/disable jobs
+- Configure intervals, lock lease, process target
+- Set per-job notification preferences
+- Trigger immediate execution
+- View execution history (last 500 runs)
+- Purge old history entries
+
+## Job Locking
+
+All financially-sensitive jobs use MongoDB-based locking via `job_locks` collection:
+
+- Atomic claim/release with configurable lease (default 2 minutes)
+- Prevents duplicate execution across multiple workers
+- Worker ID tracks which process holds the lock
+
+## Notifications
+
+- **Per-job**: Configure notify-on-success and notify-on-failure per job
+- **Global**: Default settings for all jobs (configurable in Admin Portal)
+- **Email**: Sent to admin email address
+- **In-app**: Created as admin notifications
+
+## Production Deployment
+
+In production, run a dedicated worker process:
+
+```bash
+PAWTAG_WORKER_ROLE=worker node packages/api/dist/worker.js
+```
+
+In development, the API process starts jobs automatically (with locking to prevent duplicates).
 
 ---
+
+
 
 # External Integrations
 

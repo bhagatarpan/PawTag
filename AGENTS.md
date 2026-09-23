@@ -653,22 +653,44 @@ For unique business constraints, test concurrent/duplicate behavior rather than 
 
 # 18. Background Jobs and Worker Rules
 
-Process-local `setInterval` jobs are not automatically safe when multiple API instances run.
+PawTag uses a **DB-driven job scheduler** with centralized configuration in the `BackgroundJob` collection.
 
-For every background/scheduled job touched, determine:
+## Job Architecture
 
-- who starts it;
-- whether more than one process can start it;
-- what unit of work it claims;
-- whether claiming is atomic;
+- All jobs are configured in MongoDB via the `BackgroundJob` model
+- Job functions are pure (no self-managing `setInterval` timers)
+- The scheduler reads config from DB and manages execution
+- All financially-sensitive jobs use MongoDB-based locking via `job_locks`
+- Job execution history is stored on the `BackgroundJob` document (last 500 runs)
+
+## For every job touched, determine:
+
+- what it does (business purpose);
+- how often it runs (interval from DB config);
+- whether it has a lock (required for financial jobs);
 - whether execution is idempotent;
-- what happens after a crash;
-- whether work can overlap;
+- what happens after a crash (DB state, lock expiry);
+- whether work can overlap (lock prevents this);
 - retry/backoff policy;
-- poison/final-failure behavior;
-- audit/alert behavior.
+- notification settings (per-job + global).
 
-For first MVP, prefer a **single controlled worker process** or simple Mongo-backed atomic leasing where sufficient.
+## Adding a new job
+
+1. Create the job function: `export async function runXxxJob(): Promise<JobResult>`
+2. Register it in `worker.ts` and `index.ts`: `registerJobFunction('runXxxJob', runXxxJob)`
+3. Seed it in `seed-background-jobs.ts` with config
+4. Add locking if financially sensitive
+5. Test: verify lock prevents duplicate execution
+
+## Production deployment
+
+Run a dedicated worker process:
+
+```bash
+PAWTAG_WORKER_ROLE=worker node packages/api/dist/worker.js
+```
+
+In development, the API process starts jobs automatically (with locking to prevent duplicates).
 
 Do not introduce a heavyweight queue platform without a demonstrated requirement.
 
