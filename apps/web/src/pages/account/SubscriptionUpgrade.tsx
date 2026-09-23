@@ -22,6 +22,7 @@ interface SubscriptionPlan {
   subscriptionConfig: {
     type: 'annual' | 'monthly';
     monthlyPrice?: number;
+    annualPrice?: number;
     features: string[];
   };
 }
@@ -49,6 +50,7 @@ export default function SubscriptionUpgrade() {
   const [loading, setLoading] = useState(true);
   const [upgrading, setUpgrading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedPlanType, setSelectedPlanType] = useState<'annual' | 'monthly'>('annual');
 
   useEffect(() => {
     fetchData();
@@ -83,11 +85,11 @@ export default function SubscriptionUpgrade() {
     try {
       if (isGold) {
         // Gold membership — call dedicated Gold subscribe endpoint
-        await api.post(API.customer.subscriptions.goldSubscribe);
+        await api.post(API.customer.subscriptions.goldSubscribe, { planType: selectedPlanType });
       } else if (subscription) {
         // Existing subscriber — change plan (annual ↔ monthly)
         await api.post(API.customer.subscriptions.changePlan(subscription._id), {
-          planType: 'monthly', // Default to monthly for plan changes
+          planType: selectedPlanType,
         });
       }
       await fetchData();
@@ -144,8 +146,41 @@ export default function SubscriptionUpgrade() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Billing Cycle Toggle */}
+          <div className="col-span-full flex justify-center mb-2">
+            <div className="inline-flex bg-gray-100 rounded-xl p-1">
+              <button
+                onClick={() => setSelectedPlanType('annual')}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  selectedPlanType === 'annual'
+                    ? 'bg-white text-primary-600 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Annual
+              </button>
+              <button
+                onClick={() => setSelectedPlanType('monthly')}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  selectedPlanType === 'monthly'
+                    ? 'bg-white text-primary-600 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Monthly
+              </button>
+            </div>
+          </div>
           {plans.map((plan) => {
-            const price = plan.subscriptionConfig?.monthlyPrice || plan.price;
+            const isGold = plan.name.toLowerCase().includes('gold') || plan.sku === 'PT-GOLD-001';
+            const price = isGold
+              ? (selectedPlanType === 'annual'
+                  ? (plan.subscriptionConfig?.annualPrice || (plan.subscriptionConfig?.monthlyPrice || 0) * 12)
+                  : (plan.subscriptionConfig?.monthlyPrice || plan.price))
+              : (selectedPlanType === 'annual'
+                  ? (plan.subscriptionConfig?.annualPrice || (plan.subscriptionConfig?.monthlyPrice || 0) * 12)
+                  : (plan.subscriptionConfig?.monthlyPrice || plan.price));
+            const priceLabel = selectedPlanType === 'annual' ? '/yr' : '/mo';
             const isCurrent = subscription?.planName === plan.name;
             const features = plan.subscriptionConfig?.features || [];
 
@@ -169,7 +204,7 @@ export default function SubscriptionUpgrade() {
 
                 <div className="mb-6">
                   <span className="text-4xl font-bold text-gray-900">${price.toFixed(2)}</span>
-                  <span className="text-gray-500">/{plan.subscriptionConfig?.type || 'monthly'}</span>
+                  <span className="text-gray-500">{priceLabel}</span>
                 </div>
 
                 <ul className="space-y-3 mb-6">

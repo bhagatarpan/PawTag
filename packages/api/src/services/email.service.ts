@@ -539,7 +539,7 @@ export async function sendGuardianWelcomeEmail(
     pawRewardsNurture: s['guardian.pawRewardsNurture'] || '3.00',
     pawRewardsProtector: s['guardian.pawRewardsProtector'] || '5.00',
     pawRewardsSafeguard: s['guardian.pawRewardsSafeguard'] || '8.00',
-    goldPrice: s['guardian.goldPrice'] || '1.99',
+    goldPrice: s['guardian.goldPrice'] || '3.99',
   };
 
   const cms = await renderCmsEmail('guardian-welcome', vars);
@@ -565,7 +565,7 @@ export async function sendGuardianWelcomeEmail(
     pawRewardsNurture: s['guardian.pawRewardsNurture'] || '3.00',
     pawRewardsProtector: s['guardian.pawRewardsProtector'] || '5.00',
     pawRewardsSafeguard: s['guardian.pawRewardsSafeguard'] || '8.00',
-    goldPrice: s['guardian.goldPrice'] || '1.99',
+    goldPrice: s['guardian.goldPrice'] || '3.99',
   });
   return sendMail(to, 'Welcome to Guardian — Your Pet Safety Journey Begins', html);
 }

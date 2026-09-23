@@ -54,7 +54,7 @@ interface GuardianData {
 export default function GuardianSection() {
   const { user } = useAuth();
   const { settings } = useSiteSettings();
-  const goldPrice = settings?.['guardian.goldPrice'] || '1.99';
+  const goldPrice = settings?.['guardian.goldPrice'] || '3.99';
   const [guardianData, setGuardianData] = useState<GuardianData | null>(null);
 
   useEffect(() => {

@@ -140,7 +140,7 @@ export default function Shop() {
   const { addItem, toggleAutoRenew: cartToggleAutoRenew, error: cartError, clearError } = useCart();
   const { page: shopPage } = useShopPage('shop');
   const { settings } = useSiteSettings();
-  const goldPrice = settings?.['guardian.goldPrice'] || '1.99';
+  const goldPrice = settings?.['guardian.goldPrice'] || '3.99';
   const { user } = useAuth();
   const companyName = settings?.['company.name'] || 'PawTag';
   const navigate = useNavigate();

@@ -418,7 +418,7 @@ export default function ProductDetail() {
                   <div>
                     <p className="text-sm font-medium text-gray-900">Auto-renew subscription</p>
                     <p className="text-xs text-gray-500 mt-0.5">
-                      ${product.subscriptionConfig.monthlyPrice.toFixed(2)}/mo after {product.subscriptionConfig.freePeriodMonths || 3} months free. Cancel anytime.
+                      ${product.subscriptionConfig.monthlyPrice.toFixed(2)}/mo{product.subscriptionConfig.annualPrice ? ` or $${product.subscriptionConfig.annualPrice.toFixed(2)}/yr` : ''} after {product.subscriptionConfig.freePeriodMonths || 3} months free. Cancel anytime.
                     </p>
                   </div>
                   <button

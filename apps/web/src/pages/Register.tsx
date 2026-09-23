@@ -11,7 +11,7 @@ import { API } from '@pawtag/shared';
 export default function Register() {
   const { login } = useAuth();
   const { settings } = useSiteSettings();
-  const goldPrice = settings?.['guardian.goldPrice'] || '1.99';
+  const goldPrice = settings?.['guardian.goldPrice'] || '3.99';
   const [form, setForm] = useState({ fullName: '', email: '', phoneNumber: '', password: '', confirmPassword: '', acceptTerms: false, addGold: false });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');

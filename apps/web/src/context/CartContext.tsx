@@ -40,6 +40,7 @@ export interface CartItem {
   autoRenew?: boolean;
   isSubscription?: boolean;
   monthlyPrice?: number;
+  annualPrice?: number;
   freePeriodMonths?: number;
   addedAt?: string;
 }

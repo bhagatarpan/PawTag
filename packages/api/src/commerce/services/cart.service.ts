@@ -232,6 +232,7 @@ export class CartService {
         autoRenew: input.autoRenew ?? true,
         isSubscription: (product as any).isSubscription ?? false,
         monthlyPrice: (product as any).subscriptionConfig?.monthlyPrice,
+        annualPrice: (product as any).subscriptionConfig?.annualPrice,
         freePeriodMonths: (product as any).subscriptionConfig?.freePeriodMonths,
         addedAt: new Date(),
       });

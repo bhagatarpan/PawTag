@@ -68,7 +68,7 @@ export const GUARDIAN_DEFAULTS: Record<string, number> = {
 
   // Gold multiplier
   goldMultiplier: 2,
-  goldPrice: 1.99,
+  goldPrice: 3.99,
 
   // Annual caps
   annualCapReviewText: 30,

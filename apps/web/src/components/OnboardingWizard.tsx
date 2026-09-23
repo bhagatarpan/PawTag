@@ -73,7 +73,7 @@ function ConfettiParticle({ color, delay, x, size }: { color: string; delay: num
 export default function OnboardingWizard() {
   const { user, refreshUser } = useAuth();
   const { settings } = useSiteSettings();
-  const goldPrice = settings?.['guardian.goldPrice'] || '1.99';
+  const goldPrice = settings?.['guardian.goldPrice'] || '3.99';
   const [steps, setSteps] = useState<OnboardingStep[]>([]);
   const [globalSettings, setGlobalSettings] = useState<GlobalSettings>({});
   const [currentIdx, setCurrentIdx] = useState(0);

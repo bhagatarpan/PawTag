@@ -86,7 +86,7 @@ const defaultSlides: SlideData[] = [
     id: 5,
     tag: 'Gold',
     headline: 'Go Gold. Get 2× the Rewards.',
-    sub: 'Earn double points on every purchase, free shipping over $50, and start at Nurture tier. Just $1.99/month — less than a coffee.',
+    sub: 'Earn double points on every purchase, free shipping over $50, and start at Nurture tier. Just $3.99/month — less than a coffee.',
     cta: { text: 'Upgrade to Gold', to: '/gold' },
     bg: 'from-amber-500 via-yellow-500 to-amber-600',
     visualType: 'stats',
@@ -353,7 +353,7 @@ export default function HeroSlider() {
   const { sections } = useHomepageSections('hero_slide');
   const { settings } = useSiteSettings();
   const companyName = settings?.['company.name'] || 'PawTag';
-  const goldPrice = settings?.['guardian.goldPrice'] || '1.99';
+  const goldPrice = settings?.['guardian.goldPrice'] || '3.99';
   const [current, setCurrent] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [touchStart, setTouchStart] = useState<number | null>(null);
@@ -424,7 +424,7 @@ export default function HeroSlider() {
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white leading-tight mb-4">
               {slide.headline}
             </h1>
-            <p className="text-lg md:text-xl text-white/80 mb-8 max-w-lg">{slide.sub.replace('$1.99', `$${goldPrice}`)}</p>
+            <p className="text-lg md:text-xl text-white/80 mb-8 max-w-lg">{slide.sub.replace(/\$\d+\.\d+\/month/, `$${goldPrice}/month`)}</p>
             <Link
               to={slide.cta.to}
               className="inline-flex items-center gap-2 bg-white text-primary-700 px-8 py-3.5 rounded-xl font-semibold hover:bg-primary-50 transition-all duration-200 shadow-lg hover:shadow-xl hover:scale-[1.02]"

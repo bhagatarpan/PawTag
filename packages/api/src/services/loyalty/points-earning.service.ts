@@ -38,7 +38,7 @@ export async function getGoldPrice(): Promise<number> {
     return _goldPriceCache.price;
   }
   const setting = await Setting.findOne({ key: 'guardian.goldPrice' }).lean();
-  const price = parseFloat(setting?.value || '1.99');
+  const price = parseFloat(setting?.value || '3.99');
   _goldPriceCache = { price, expiresAt: now + 60_000 };
   return price;
 }

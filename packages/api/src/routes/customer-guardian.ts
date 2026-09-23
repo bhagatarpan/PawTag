@@ -416,8 +416,7 @@ router.get('/benefits', async (req: AuthRequest, res: Response) => {
     const goldSubscription = await Subscription.findOne({
       userId,
       status: 'active',
-      planType: 'monthly',
-      price: 1.99,
+      planType: 'gold',
     }).lean();
 
     const isGoldMember = !!goldSubscription;
@@ -439,13 +438,17 @@ router.get('/benefits', async (req: AuthRequest, res: Response) => {
       severity: 'LOW',
     });
 
+    // Get Gold price from CMS settings
+    const goldPriceSetting = await Setting.findOne({ key: 'guardian.goldPrice' }).lean();
+    const goldMonthlyPrice = parseFloat(goldPriceSetting?.value || '3.99');
+
     res.json({
       success: true,
       data: {
         isGoldMember,
         benefits,
         nextBillingDate: goldSubscription?.currentPeriodEnd,
-        monthlyPrice: 1.99,
+        monthlyPrice: goldSubscription?.price || goldMonthlyPrice,
       },
     });
   } catch (error) {

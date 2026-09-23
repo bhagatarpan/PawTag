@@ -68,7 +68,7 @@ const faqs = [
 
 export default function GuardianLanding() {
   const { settings } = useSiteSettings();
-  const goldPrice = settings?.['guardian.goldPrice'] || '1.99';
+  const goldPrice = settings?.['guardian.goldPrice'] || '3.99';
   return (
     <div className="min-h-screen bg-gray-50">
       <SeoHead

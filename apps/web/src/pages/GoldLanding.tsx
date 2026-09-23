@@ -45,7 +45,7 @@ interface GoldContent {
 export default function GoldLanding() {
   const { user } = useAuth();
   const { settings } = useSiteSettings();
-  const goldPrice = settings?.['guardian.goldPrice'] || '1.99';
+  const goldPrice = settings?.['guardian.goldPrice'] || '3.99';
   const goldCtaTo = user ? '/account/upgrade' : '/register';
 
   const [content, setContent] = useState<GoldContent>({

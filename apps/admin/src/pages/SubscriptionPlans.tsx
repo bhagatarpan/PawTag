@@ -57,6 +57,7 @@ interface SubscriptionPlan {
     freePeriodMonths: number;
     gracePeriodWeeks: number;
     monthlyPrice?: number;
+    annualPrice?: number;
     stripePriceId?: string;
     features: string[];
   };
@@ -127,7 +128,10 @@ export default function SubscriptionPlans() {
       const totalMrr = items
         .filter((p: SubscriptionPlan) => p.isActive)
         .reduce((sum: number, p: SubscriptionPlan) => {
-          const monthlyPrice = p.subscriptionConfig?.monthlyPrice || p.price / (p.subscriptionConfig?.type === 'annual' ? 12 : 1);
+          // MRR = monthly equivalent of the subscription price
+          const monthlyPrice = p.subscriptionConfig?.type === 'annual'
+            ? ((p.subscriptionConfig?.annualPrice || (p.subscriptionConfig?.monthlyPrice || 0) * 12) / 12)
+            : (p.subscriptionConfig?.monthlyPrice || p.price);
           return sum + monthlyPrice;
         }, 0);
       setStats({ total, active, inactive, annual, monthly, totalMrr });
@@ -194,9 +198,10 @@ export default function SubscriptionPlans() {
   }
 
   function getMonthlyPrice(plan: SubscriptionPlan): number {
-    if (plan.subscriptionConfig?.monthlyPrice) return plan.subscriptionConfig.monthlyPrice;
-    if (plan.subscriptionConfig?.type === 'annual') return plan.price / 12;
-    return plan.price;
+    if (plan.subscriptionConfig?.type === 'annual') {
+      return (plan.subscriptionConfig?.annualPrice || (plan.subscriptionConfig?.monthlyPrice || 0) * 12) / 12;
+    }
+    return plan.subscriptionConfig?.monthlyPrice || plan.price;
   }
 
   return (

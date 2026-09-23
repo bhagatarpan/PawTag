@@ -238,7 +238,7 @@ export default function Checkout() {
 
   // CMS settings for trust badges
   const { settings } = useSiteSettings();
-  const goldPrice = settings?.['guardian.goldPrice'] || '1.99';
+  const goldPrice = settings?.['guardian.goldPrice'] || '3.99';
   const checkoutUpsellText = settings?.['guardian.gold.checkoutUpsellText'] || 'Earn 2× points on this order with Gold';
   const trustBadgeTitle = settings?.['checkout.trustBadges.title'] || 'All PawTag devices come with';
   const trustBadgeItems: string[] = useMemo(() => {

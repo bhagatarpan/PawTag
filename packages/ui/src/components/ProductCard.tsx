@@ -27,6 +27,8 @@ export interface ProductCardProduct {
    sku: string;
     stock: number;
     monthlyPrice?: number;
+    annualPrice?: number;
+    planType?: 'annual' | 'monthly';
     freePeriodMonths?: number;
     badge?: { label: string; color: string } | null;
     /** Product feature highlights for display in shop and product detail */
