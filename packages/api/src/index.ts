@@ -101,6 +101,7 @@ import adminPaymentRoutes from './routes/admin-payments';
 import adminPromoCodeRoutes from './routes/admin-promocodes';
 import adminRefundRoutes from './routes/admin-refunds';
 import adminStripeReportRoutes from './routes/admin-stripe-report';
+import adminBackgroundJobRoutes from './routes/admin-background-jobs';
 import stripeWebhookRoutes from './routes/stripe-webhooks';
 import resendWebhookRoutes from './routes/resend-webhooks';
 import promoPublicRoutes from './routes/promo-public';
@@ -282,6 +283,7 @@ app.use('/api/admin/audit', auditRoutes);
 app.use('/api/admin/system-logs', systemLogRoutes);
 app.use('/api/admin/site-availability', siteAvailabilityRoutes);
 app.use('/api/admin/webhooks', adminWebhookRoutes);
+app.use('/api/admin/background-jobs', adminBackgroundJobRoutes);
 app.use('/api/public/system', systemStatusRoutes);
 app.use('/api/address', addressAutocompleteRoutes);
 

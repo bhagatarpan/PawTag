@@ -429,6 +429,20 @@ export const API = {
     },
 
     // ---------------------------------------------------------------------------
+    // Admin — Background Jobs
+    // ---------------------------------------------------------------------------
+    backgroundJobs: {
+      list: '/admin/background-jobs',
+      stats: '/admin/background-jobs/stats',
+      get: (id: string) => `/admin/background-jobs/${id}` as const,
+      update: (id: string) => `/admin/background-jobs/${id}` as const,
+      run: (id: string) => `/admin/background-jobs/${id}/run` as const,
+      toggle: (id: string) => `/admin/background-jobs/${id}/toggle` as const,
+      history: (id: string) => `/admin/background-jobs/${id}/history` as const,
+      purgeHistory: (id: string) => `/admin/background-jobs/${id}/history` as const,
+    },
+
+    // ---------------------------------------------------------------------------
     // Admin — Site Availability
     // ---------------------------------------------------------------------------
     siteAvailability: {

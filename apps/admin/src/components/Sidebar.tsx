@@ -281,6 +281,7 @@ const sections: SidebarSection[] = [
     links: [
       { to: '/feature-flags', label: 'Feature Flags', icon: Flag, permission: 'feature_flag.read' },
       { to: '/webhooks', label: 'Webhooks', icon: Zap, permission: 'setting.read' },
+      { to: '/background-jobs', label: 'Background Jobs', icon: Clock, permission: 'job.read' },
       { to: '/system-logs', label: 'System Logs', icon: Terminal, permission: 'systemlogs.read' },
       { to: '/system-log-settings', label: 'Log Settings', icon: Settings, permission: 'systemlogs.admin' },
       { to: '/statistics', label: 'Statistics', icon: BarChart3, permission: 'stats.read' },

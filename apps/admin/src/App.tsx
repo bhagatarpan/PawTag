@@ -52,6 +52,7 @@ import SystemLogs from './pages/SystemLogs';
 import SystemLogSettings from './pages/SystemLogSettings';
 import SiteAvailabilitySettings from './pages/SiteAvailabilitySettings';
 import WebhookSettings from './pages/WebhookSettings';
+import BackgroundJobs from './pages/BackgroundJobs';
 import AddressAutocompleteSettings from './pages/AddressAutocompleteSettings';
 import CommerceSettings from './pages/CommerceSettings';
 import CommunicationsTemplates from './pages/communications/CommunicationsTemplates';
@@ -230,6 +231,7 @@ export default function App() {
       <Route path="/system-log-settings" element={<ProtectedRoute><SystemLogSettings /></ProtectedRoute>} />
       <Route path="/site-availability" element={<ProtectedRoute><SiteAvailabilitySettings /></ProtectedRoute>} />
       <Route path="/webhooks" element={<ProtectedRoute><WebhookSettings /></ProtectedRoute>} />
+      <Route path="/background-jobs" element={<ProtectedRoute><BackgroundJobs /></ProtectedRoute>} />
       <Route path="/address-autocomplete" element={<ProtectedRoute><AddressAutocompleteSettings /></ProtectedRoute>} />
       <Route path="/commerce-settings" element={<ProtectedRoute><CommerceSettings /></ProtectedRoute>} />
       <Route path="/communications/templates" element={<ProtectedRoute><CommunicationsTemplates /></ProtectedRoute>} />
