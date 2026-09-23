@@ -86,7 +86,11 @@ export async function claimJob(
     }
 
     return false;
-  } catch (err) {
+  } catch (err: any) {
+    // Duplicate key (11000) is expected during concurrent upsert — not a real error
+    if (err.code === 11000) {
+      return false;
+    }
     logger.error({ err, jobName }, 'Failed to claim job lock');
     return false;
   }
