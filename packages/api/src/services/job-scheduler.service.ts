@@ -6,6 +6,7 @@
 
 import { BackgroundJob, type IBackgroundJobDocument } from '@pawtag/db';
 import { createClaimedJob } from '../lib/job-claim';
+import { sendJobNotification } from './job-notification.service';
 import logger from '../lib/logger';
 
 /** Result returned by job functions */
@@ -177,6 +178,14 @@ export async function executeJob(jobName: string): Promise<JobResult | null> {
         itemsProcessed: result.itemsProcessed,
         error: result.error,
       }, 'Job executed');
+
+      // Send notification (fire-and-forget)
+      sendJobNotification(
+        { _id: String(job._id), name: job.name, displayName: job.displayName, notifyOnSuccess: job.notifyOnSuccess, notifyOnFailure: job.notifyOnFailure },
+        result.success ? 'success' : 'error',
+        durationMs,
+        result.error,
+      ).catch(() => {});
     },
     job.lockLeaseMs || 120000,
   );

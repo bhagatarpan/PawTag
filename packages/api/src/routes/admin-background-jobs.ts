@@ -334,4 +334,83 @@ router.delete('/:id/history', requirePermission('job.manage'), async (req: AuthR
   }
 });
 
+// ─── Notification Settings ───────────────────────────────────────
+
+/**
+ * GET /admin/background-jobs/notifications/settings
+ * Get global notification settings
+ */
+router.get('/notifications/settings', requirePermission('job.read'), async (_req: AuthRequest, res: Response) => {
+  try {
+    const { Setting } = await import('@pawtag/db');
+    const keys = [
+      'job-notifications.enabled',
+      'job-notifications.global.notifyOnSuccess',
+      'job-notifications.global.notifyOnFailure',
+      'job-notifications.email.recipient',
+    ];
+    const settings = await Setting.find({ key: { $in: keys } }).lean();
+    const map: Record<string, string> = {};
+    for (const s of settings) map[s.key] = s.value;
+
+    res.json({
+      success: true,
+      data: {
+        enabled: map['job-notifications.enabled'] !== 'false',
+        globalNotifyOnSuccess: map['job-notifications.global.notifyOnSuccess'] === 'true',
+        globalNotifyOnFailure: map['job-notifications.global.notifyOnFailure'] !== 'false',
+        emailRecipient: map['job-notifications.email.recipient'] || '',
+      },
+    });
+  } catch (err: any) {
+    logger.error({ err }, 'Failed to get notification settings');
+    res.status(500).json({ success: false, error: 'Failed to get notification settings' });
+  }
+});
+
+/**
+ * PUT /admin/background-jobs/notifications/settings
+ * Update global notification settings
+ */
+router.put('/notifications/settings', requirePermission('job.manage'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { Setting } = await import('@pawtag/db');
+    const { enabled, globalNotifyOnSuccess, globalNotifyOnFailure, emailRecipient } = req.body;
+
+    const updates = [
+      { key: 'job-notifications.enabled', value: String(enabled) },
+      { key: 'job-notifications.global.notifyOnSuccess', value: String(globalNotifyOnSuccess) },
+      { key: 'job-notifications.global.notifyOnFailure', value: String(globalNotifyOnFailure) },
+      { key: 'job-notifications.email.recipient', value: emailRecipient || '' },
+    ];
+
+    for (const u of updates) {
+      await Setting.findOneAndUpdate(
+        { key: u.key },
+        { key: u.key, value: u.value, category: 'job-notifications', description: `Job notification setting: ${u.key}` },
+        { upsert: true },
+      );
+    }
+
+    // Audit log
+    const auditCtx = req.auditContext as AuditContext;
+    await auditService.log(auditCtx, {
+      action: 'job_notification_settings_update',
+      eventType: 'background_job.notifications_updated',
+      eventCategory: 'CONFIG',
+      operationType: 'UPDATE',
+      resourceType: 'Setting',
+      resourceId: 'job-notifications',
+      afterState: { enabled, globalNotifyOnSuccess, globalNotifyOnFailure, emailRecipient },
+      outcome: 'SUCCESS',
+      severity: 'HIGH',
+    });
+
+    res.json({ success: true, message: 'Notification settings updated' });
+  } catch (err: any) {
+    logger.error({ err }, 'Failed to update notification settings');
+    res.status(500).json({ success: false, error: 'Failed to update notification settings' });
+  }
+});
+
 export default router;
