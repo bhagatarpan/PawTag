@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import api from '../../api/client';
 import { colors, typography, spacing, borderRadius, shadows } from '../../theme/tokens';
+import { CopyButton } from '../../components/CopyButton';
 import { hapticMedium, hapticSuccess } from '../../lib/haptics';
 
 interface Pet {
@@ -168,7 +169,10 @@ export function LostModeScreen({ navigation }: any) {
                   <Text style={styles.petDetails}>
                     {pet.petType} · {pet.breed || 'Unknown breed'}
                   </Text>
-                  <Text style={styles.petId}>ID: {pet.petId}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Text style={styles.petId}>ID: {pet.petId}</Text>
+                    <CopyButton text={pet.petId} />
+                  </View>
                 </View>
                 <View style={[styles.statusIndicator, { backgroundColor: statusConfig.bg }]}>
                   <Text style={styles.statusIcon}>{statusConfig.icon}</Text>
@@ -181,7 +185,10 @@ export function LostModeScreen({ navigation }: any) {
               {pet.linkedTag && (
                 <View style={styles.tagInfo}>
                   <Text style={styles.tagLabel}>Linked Tag</Text>
-                  <Text style={styles.tagId}>{pet.linkedTag.tagId}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Text style={styles.tagId}>{pet.linkedTag.tagId}</Text>
+                    <CopyButton text={pet.linkedTag.tagId} />
+                  </View>
                 </View>
               )}
 

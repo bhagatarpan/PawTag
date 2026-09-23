@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ShoppingBag, ChevronRight, Clock, Package, Truck, CheckCircle, Ban, RefreshCw, ExternalLink, FileText, CreditCard, MapPin, Eye } from 'lucide-react';
-import { StatusBadge, EmptyState, OrderProgressStepper, OrderStatusBanner } from '@pawtag/ui';
+import { StatusBadge, EmptyState, OrderProgressStepper, OrderStatusBanner, CopyButton } from '@pawtag/ui';
 import { ORDER_STATUS_LABELS, getStatusBadgeVariant, getStatusBorderColor, getTrackingUrl, isTerminalStatus, getPaymentStatusLabel, getPaymentStatusBadgeVariant } from '@pawtag/shared';
 import { API } from '@pawtag/shared/api';
 import api from '../../lib/api';
@@ -217,9 +217,12 @@ export default function Orders() {
                       <ShoppingBag size={18} className="text-primary-600" />
                     </div>
                     <div>
-                      <p className="font-mono text-sm font-semibold text-gray-900">
-                        {order.orderNumber || `#${order._id.slice(-8).toUpperCase()}`}
-                      </p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="font-mono text-sm font-semibold text-gray-900">
+                          {order.orderNumber || `#${order._id.slice(-8).toUpperCase()}`}
+                        </p>
+                        {order.orderNumber && <CopyButton text={order.orderNumber} size={10} />}
+                      </div>
                       <p className="text-xs text-gray-500 mt-0.5">
                         {formatDate(order.createdAt)} at {formatTime(order.createdAt)}
                       </p>

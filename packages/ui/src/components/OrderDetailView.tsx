@@ -19,6 +19,7 @@ import { StatusBadge } from './StatusBadge';
 import { OrderProgressStepper } from './OrderProgressStepper';
 import { OrderStatusBanner } from './OrderStatusBanner';
 import { CancellationInfoCard } from './CancellationInfoCard';
+import { CopyButton } from './CopyButton';
 import type {
   OrderData,
   InvoiceData,
@@ -172,8 +173,9 @@ function OrderHeader({
             <ArrowLeft className="h-4 w-4" /> Back to Orders
           </button>
         )}
-        <h1 className="text-2xl font-bold text-gray-900">
+        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
           Order {order.orderNumber || `#${order._id.slice(-8).toUpperCase()}`}
+          {order.orderNumber && <CopyButton text={order.orderNumber} size={16} />}
         </h1>
         <p className="text-sm text-gray-500 mt-1">
           Placed on {formatDateTime(order.createdAt)}
@@ -349,7 +351,10 @@ function InvoiceCard({
       <div className="space-y-2 text-sm">
         <div className="flex justify-between">
           <span className="text-gray-500">Invoice #</span>
-          <span className="font-mono font-medium text-gray-900">{invoice.invoiceNumber}</span>
+          <div className="flex items-center gap-1.5">
+            <span className="font-mono font-medium text-gray-900">{invoice.invoiceNumber}</span>
+            <CopyButton text={invoice.invoiceNumber} size={10} />
+          </div>
         </div>
         <div className="flex justify-between items-center">
           <span className="text-gray-500">Status:</span>

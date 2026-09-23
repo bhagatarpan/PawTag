@@ -158,6 +158,57 @@ A consistent 4px base unit, multiplied to create a predictable rhythm:
 
 ---
 
+## Copy Button
+
+Reusable copy-to-clipboard button for IDs, codes, and reference numbers.
+
+### Design Tokens
+
+| Element | Token/Class |
+|---------|-------------|
+| Default icon color | `text-gray-400` |
+| Hover color | `text-primary-600` |
+| Success (copied) color | `text-green-500` |
+| Transition | `transition-colors duration-150` |
+| Icon | Lucide `Copy` (default) / `Check` (after copy) |
+| Icon size | 10-16px depending on context |
+| Spacing | `ml-1.5` or `gap-1` (gap between ID text and icon) |
+
+### Component
+
+**Web:** `CopyButton` from `@pawtag/ui`
+
+```tsx
+import { CopyButton } from '@pawtag/ui';
+<CopyButton text="PT-123456" size={12} />
+```
+
+**Mobile:** `CopyButton` from `../../components/CopyButton`
+
+```tsx
+import { CopyButton } from '../../components/CopyButton';
+<CopyButton text="PT-123456" size={14} />
+```
+
+### Behavior
+
+- Click copies text to clipboard
+- Icon briefly changes to checkmark (1.5 seconds)
+- Uses `navigator.clipboard.writeText()` (web) or `expo-clipboard` (mobile)
+- Fallback to `document.execCommand('copy')` for older browsers
+
+### Usage Pattern
+
+```tsx
+{/* Inline with ID text */}
+<div className="flex items-center gap-1.5">
+  <span className="font-mono font-bold">{tagId}</span>
+  <CopyButton text={tagId} size={12} />
+</div>
+```
+
+---
+
 ## Shadows / Elevation
 
 | Level | Tailwind Classes | Usage |

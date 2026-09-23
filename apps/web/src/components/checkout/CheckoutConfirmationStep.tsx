@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { CheckCircle, Mail, Home, FileText, Package, Truck, Clock, Check, Share2, Download, Printer, ExternalLink, Crown, PawPrint, Gift, RefreshCw } from 'lucide-react';
+import { CopyButton } from '@pawtag/ui';
 import { useState, useEffect } from 'react';
 import api from '../../lib/api';
 import OrderSummaryCard from './OrderSummaryCard';
@@ -84,6 +85,7 @@ export default function CheckoutConfirmationStep({
         <div className="mt-3 bg-white border border-gray-200 rounded-xl px-5 py-3 inline-flex items-center gap-3" style={{ animation: 'fade-in-up 0.4s ease-out 0.4s both' }}>
           <span className="text-sm text-gray-500">Order</span>
           <span className="font-mono text-lg font-bold text-primary-700 tracking-wide">{orderNumber}</span>
+          <CopyButton text={orderNumber} size={14} />
           <span className="text-gray-300">|</span>
           <span className="text-sm font-medium text-gray-700">
             {new Date().toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })}
@@ -326,7 +328,10 @@ export default function CheckoutConfirmationStep({
           </h2>
           <div className="flex items-center justify-between mb-4">
             <div>
-              <p className="font-mono font-medium text-gray-900">{confirmedInvoice.invoiceNumber}</p>
+              <div className="flex items-center gap-1.5">
+                <p className="font-mono font-medium text-gray-900">{confirmedInvoice.invoiceNumber}</p>
+                <CopyButton text={confirmedInvoice.invoiceNumber} size={10} />
+              </div>
               <p className="text-sm text-gray-500">NZ${confirmedInvoice.amount.toFixed(2)} · <span className="text-green-600 font-medium">Paid</span></p>
             </div>
           </div>

@@ -6,6 +6,7 @@ import {
   Edit2, Activity, CreditCard, QrCode, MoreVertical,
   Stethoscope, Tag, Camera
 } from 'lucide-react';
+import { CopyButton } from '@pawtag/ui';
 
 interface PetPhoto { url: string; caption?: string; isMain: boolean; }
 interface PetTag {
@@ -189,7 +190,10 @@ export default function PetCard({
           <div className="min-w-0">
             <h3 className="text-xl font-bold text-gray-900 truncate">{pet.name}</h3>
             {pet.petId && (
-              <p className="text-xs text-gray-400 font-mono mt-0.5">ID: {pet.petId}</p>
+              <div className="flex items-center gap-1">
+                <p className="text-xs text-gray-400 font-mono mt-0.5">ID: {pet.petId}</p>
+                <CopyButton text={pet.petId} size={10} />
+              </div>
             )}
           </div>
           <div className="relative flex-shrink-0">
@@ -258,6 +262,7 @@ export default function PetCard({
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1.5">
                 <span className="text-sm font-bold text-gray-800 font-mono">{pet.linkedTag.tagId}</span>
+                <CopyButton text={pet.linkedTag.tagId} size={12} />
                 <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-teal-100 text-teal-700">
                   {pet.linkedTag.tagType || 'QR'}
                 </span>

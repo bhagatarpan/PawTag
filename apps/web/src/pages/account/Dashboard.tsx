@@ -4,7 +4,7 @@ import {
   PawPrint, Tag, CreditCard, ShoppingBag, Bell, AlertTriangle,
   CheckCircle, Clock, ChevronRight, Shield, QrCode, Forward, X, Gift,
 } from 'lucide-react';
-import { SummaryCards, EmptyState, StatusBadge } from '@pawtag/ui';
+import { SummaryCards, EmptyState, StatusBadge, CopyButton } from '@pawtag/ui';
 import { API } from '@pawtag/shared/api';
 import api from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
@@ -482,7 +482,10 @@ export default function AccountDashboard() {
                     <ShoppingBag size={16} className="text-blue-600" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 font-mono">{order.orderNumber}</p>
+                    <div className="flex items-center gap-1">
+                      <p className="text-sm font-medium text-gray-900 font-mono">{order.orderNumber}</p>
+                      <CopyButton text={order.orderNumber} size={10} />
+                    </div>
                     <p className="text-xs text-gray-500">{formatDate(order.createdAt)} · {order.items?.length || 0} item(s)</p>
                   </div>
                   <div className="text-right shrink-0">
@@ -524,7 +527,7 @@ export default function AccountDashboard() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-900">{sub.planName}</p>
-                    <p className="text-xs text-gray-500">Tag: {sub.tagId?.tagId || 'N/A'}</p>
+                    <p className="text-xs text-gray-500">Tag: {sub.tagId?.tagId || 'N/A'} {sub.tagId?.tagId && <CopyButton text={sub.tagId.tagId} size={10} />}</p>
                   </div>
                   <div className="text-right shrink-0">
                     <StatusBadge

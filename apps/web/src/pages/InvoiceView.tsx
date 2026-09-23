@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { Shield, RefreshCw, Printer, ArrowLeft } from 'lucide-react';
+import { CopyButton } from '@pawtag/ui';
 import { API } from '@pawtag/shared/api';
 
 export default function InvoiceView() {
@@ -152,6 +153,7 @@ export default function InvoiceView() {
           </a>
           <div className="flex items-center gap-3">
             <span className="text-sm text-gray-500">{invoice?.invoiceNumber}</span>
+            {invoice?.invoiceNumber && <CopyButton text={invoice.invoiceNumber} size={10} />}
             <button onClick={handlePrint} className="flex items-center gap-1.5 bg-teal-600 text-white px-3 py-1.5 rounded-md text-sm hover:bg-teal-700">
               <Printer size={14} /> Print / Save PDF
             </button>

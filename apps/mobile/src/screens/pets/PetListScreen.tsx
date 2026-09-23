@@ -10,6 +10,7 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import api from '../../api/client';
 import { colors, typography, spacing, borderRadius, shadows } from '../../theme/tokens';
+import { CopyButton } from '../../components/CopyButton';
 
 interface Pet {
   _id: string;
@@ -85,9 +86,12 @@ export function PetListScreen({ navigation }: PetListScreenProps) {
               {item.breed} · {item.petType}
             </Text>
             {item.linkedTag && (
-              <Text style={styles.petTag}>
-                Tag: {item.linkedTag.tagId} ({item.linkedTag.subscriptionStatus})
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={styles.petTag}>
+                  Tag: {item.linkedTag.tagId} ({item.linkedTag.subscriptionStatus})
+                </Text>
+                <CopyButton text={item.linkedTag.tagId} />
+              </View>
             )}
           </View>
           <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>

@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import api from '../../api/client';
 import { colors, typography, spacing, borderRadius, shadows } from '../../theme/tokens';
+import { CopyButton } from '../../components/CopyButton';
 import { hapticMedium, hapticSuccess, hapticError } from '../../lib/haptics';
 
 interface Pet {
@@ -181,7 +182,10 @@ export function PetDetailScreen({ navigation, route }: PetDetailScreenProps) {
           <Text style={styles.avatarText}>{pet.name.charAt(0)}</Text>
         </View>
         <Text style={styles.petName}>{pet.name}</Text>
-        <Text style={styles.petId}>ID: {pet.petId}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Text style={styles.petId}>ID: {pet.petId}</Text>
+          <CopyButton text={pet.petId} />
+        </View>
         <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
           <Text style={[styles.statusText, { color: statusStyle.text }]}>
             {pet.status.charAt(0).toUpperCase() + pet.status.slice(1)}
@@ -194,7 +198,10 @@ export function PetDetailScreen({ navigation, route }: PetDetailScreenProps) {
       {pet.linkedTag && (
         <View style={styles.infoCard}>
           <Text style={styles.infoLabel}>Linked Tag</Text>
-          <Text style={styles.infoValue}>{pet.linkedTag.tagId}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Text style={styles.infoValue}>{pet.linkedTag.tagId}</Text>
+            <CopyButton text={pet.linkedTag.tagId} />
+          </View>
           <Text style={styles.infoSubtext}>
             Subscription: {pet.linkedTag.subscriptionStatus}
           </Text>

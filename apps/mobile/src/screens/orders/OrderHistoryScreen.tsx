@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import api from '../../api/client';
 import { colors, typography, spacing, borderRadius, shadows } from '../../theme/tokens';
+import { CopyButton } from '../../components/CopyButton';
 import { EmptyState } from '../../components/states/EmptyState';
 import { ErrorState } from '../../components/states/ErrorState';
 import { hapticLight } from '../../lib/haptics';
@@ -138,9 +139,12 @@ export function OrderHistoryScreen({ navigation }: any) {
               onPress={() => toggleExpand(order._id)}
               activeOpacity={0.7}
             >
-              <View style={styles.cardHeader}>
+                <View style={styles.cardHeader}>
                 <View style={styles.cardLeft}>
-                  <Text style={styles.orderNumber}>{order.orderNumber}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Text style={styles.orderNumber}>{order.orderNumber}</Text>
+                    <CopyButton text={order.orderNumber} />
+                  </View>
                   <Text style={styles.orderDate}>{formatDate(order.createdAt)}</Text>
                 </View>
                 <View style={styles.cardRight}>
@@ -170,9 +174,12 @@ export function OrderHistoryScreen({ navigation }: any) {
                   {order.shipping?.trackingNumber && (
                     <View style={styles.trackingSection}>
                       <Text style={styles.sectionTitle}>Tracking</Text>
-                      <Text style={styles.trackingNumber}>
-                        {order.shipping.carrier}: {order.shipping.trackingNumber}
-                      </Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Text style={styles.trackingNumber}>
+                          {order.shipping.carrier}: {order.shipping.trackingNumber}
+                        </Text>
+                        <CopyButton text={`${order.shipping.carrier}: ${order.shipping.trackingNumber}`} />
+                      </View>
                     </View>
                   )}
 

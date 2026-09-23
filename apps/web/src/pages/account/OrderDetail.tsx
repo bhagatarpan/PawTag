@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Package, Loader2, Shield, Clock, RefreshCw, CheckCircle } from 'lucide-react';
-import { OrderDetailView, ConfirmDialog } from '@pawtag/ui';
+import { OrderDetailView, ConfirmDialog, CopyButton } from '@pawtag/ui';
 import type { OrderData, InvoiceData } from '@pawtag/ui';
 import { API } from '@pawtag/shared/api';
 import api from '../../lib/api';
@@ -197,6 +197,7 @@ export default function OrderDetail() {
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="font-mono font-bold text-gray-900 text-sm">{sub.tagId?.tagId || sub.planName || 'Subscription'}</span>
+                          {sub.tagId?.tagId && <CopyButton text={sub.tagId.tagId} size={10} />}
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${isCancelled ? 'bg-gray-100 text-gray-600' : isActive ? 'bg-emerald-50 text-emerald-700' : isGrace ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700'}`}>
                             {sub.status.replace('_', ' ')}
                           </span>

@@ -1,7 +1,7 @@
 import { useState, useEffect, Component, ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { API } from '@pawtag/shared/api';
-import { BottomSheet } from '@pawtag/ui';
+import { BottomSheet, CopyButton } from '@pawtag/ui';
 import api from '../../lib/api';
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
@@ -241,7 +241,10 @@ function SubscriptionsInner() {
                   <div className="w-2 h-2 rounded-full bg-white/80 animate-pulse" />
                   <span className="text-white/80 text-xs font-medium uppercase tracking-wider">{sub.planType === 'gold' ? 'Gold Membership' : 'Active Tag'}</span>
                 </div>
-                <h1 className="text-2xl font-bold text-white tracking-tight">{sub.planType === 'gold' ? 'Gold Membership' : (sub.tagId?.tagId || 'N/A')}</h1>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-2xl font-bold text-white tracking-tight">{sub.planType === 'gold' ? 'Gold Membership' : (sub.tagId?.tagId || 'N/A')}</h1>
+                  {sub.tagId?.tagId && <CopyButton text={sub.tagId.tagId} size={14} className="text-white/60 hover:text-white" />}
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 <span className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide ${sub.autoRenew ? 'bg-emerald-500/20 text-emerald-100' : 'bg-amber-500/20 text-amber-100'}`}>
@@ -485,7 +488,10 @@ function SubscriptionsInner() {
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={inv.status === 'paid' ? '#059669' : inv.status === 'pending' ? '#d97706' : '#dc2626'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="m9 15 2 2 4-4"/></svg>
                       </div>
                       <div>
-                        <div className="text-sm font-medium text-gray-900">{inv.invoiceNumber}</div>
+                        <div className="flex items-center gap-1.5">
+                          <div className="text-sm font-medium text-gray-900">{inv.invoiceNumber}</div>
+                          <CopyButton text={inv.invoiceNumber} size={10} />
+                        </div>
                         <div className="text-xs text-gray-400">
                           {start && end ? <>{formatDate(start)} — {formatDate(end)}</> : inv.paidAt ? <>Paid {formatDate(inv.paidAt)}</> : 'Date unavailable'}
                         </div>
@@ -694,6 +700,7 @@ function SubscriptionsInner() {
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="font-mono font-bold text-gray-900 text-sm">{sub.planType === 'gold' ? 'Gold Membership' : (sub.tagId?.tagId || 'N/A')}</span>
+                          {sub.tagId?.tagId && <CopyButton text={sub.tagId.tagId} size={10} />}
                           {sub.planType === 'gold' && (
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-amber-100 text-amber-700">Gold</span>
                           )}

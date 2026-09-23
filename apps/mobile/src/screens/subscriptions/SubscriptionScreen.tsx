@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import api from '../../api/client';
 import { colors, typography, spacing, borderRadius, shadows } from '../../theme/tokens';
+import { CopyButton } from '../../components/CopyButton';
 import { EmptyState } from '../../components/states/EmptyState';
 import { ErrorState } from '../../components/states/ErrorState';
 import { hapticLight } from '../../lib/haptics';
@@ -161,7 +162,10 @@ export function SubscriptionScreen({ navigation }: any) {
               </View>
 
               <View style={styles.detailsGrid}>
-                <DetailItem label="Tag" value={sub.tagId?.tagId || 'N/A'} />
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <DetailItem label="Tag" value={sub.tagId?.tagId || 'N/A'} />
+                  {sub.tagId?.tagId && <CopyButton text={sub.tagId.tagId} />}
+                </View>
                 <DetailItem label="Price" value={`$${sub.price.toFixed(2)} ${sub.renewalMethod === 'annual' ? '/yr' : '/mo'}`} />
                 <DetailItem label="Billing" value={sub.planType === 'annual' ? 'Annual' : 'Monthly'} />
                 <DetailItem
