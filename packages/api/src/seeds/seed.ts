@@ -673,6 +673,7 @@ async function seed() {
         { permissionName: 'pet.update', scopeCode: 'OWN' },
         { permissionName: 'pet.delete', scopeCode: 'OWN' },
         { permissionName: 'tag.read', scopeCode: 'OWN' },
+        { permissionName: 'tag.create', scopeCode: 'OWN' },
         { permissionName: 'medical_record.read', scopeCode: 'OWN' },
         { permissionName: 'vaccination.read', scopeCode: 'OWN' },
         { permissionName: 'medication.read', scopeCode: 'OWN' },
@@ -702,6 +703,7 @@ async function seed() {
         { permissionName: 'pet.delete', scopeCode: 'OWN' },
         // Tags (own)
         { permissionName: 'tag.read', scopeCode: 'OWN' },
+        { permissionName: 'tag.create', scopeCode: 'OWN' },
         // Health Records (own) — full CRUD
         { permissionName: 'medical_record.read', scopeCode: 'OWN' },
         { permissionName: 'medical_record.create', scopeCode: 'OWN' },

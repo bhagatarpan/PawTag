@@ -526,6 +526,87 @@ router.post('/tags/redeem', requirePermission('tag.create'), async (req: AuthReq
   }
 });
 
+// --- Link Tag to Pet ---
+/**
+ * PUT /customer/tags/:id/link-pet
+ *
+ * Link an activated tag to a pet. The tag must:
+ * - Belong to the authenticated customer
+ * - Be in 'active' status
+ * - Not already be linked to a different pet (unless changing)
+ *
+ * The pet must:
+ * - Belong to the authenticated customer
+ * - Not already have a different tag linked
+ */
+router.put('/tags/:id/link-pet', requirePermission('tag.create'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { petId } = req.body;
+    if (!petId) {
+      res.status(400).json({ success: false, error: 'Pet ID is required' });
+      return;
+    }
+
+    // Find the tag — must belong to this customer and be active
+    const tag = await Tag.findOne({ _id: req.params.id, ownerId: req.user!.id, deletedAt: null });
+    if (!tag) {
+      res.status(404).json({ success: false, error: 'Tag not found or not owned by you' });
+      return;
+    }
+
+    if (tag.status !== 'active') {
+      res.status(400).json({ success: false, error: 'Only active tags can be linked to a pet' });
+      return;
+    }
+
+    // Find the pet — must belong to this customer
+    const pet = await Pet.findOne({ _id: petId, ownerId: req.user!.id, deletedAt: null });
+    if (!pet) {
+      res.status(404).json({ success: false, error: 'Pet not found or not owned by you' });
+      return;
+    }
+
+    // One-tag-per-pet rule: check if this pet already has a different tag
+    if (tag.petId?.toString() !== petId) {
+      const existingTagOnPet = await Tag.findOne({ petId, _id: { $ne: tag._id }, deletedAt: null });
+      if (existingTagOnPet) {
+        res.status(400).json({ success: false, error: `This pet already has tag ${existingTagOnPet.tagId} linked. Unlink it first.` });
+        return;
+      }
+    }
+
+    // Link the tag to the pet
+    const oldPetId = tag.petId?.toString();
+    tag.petId = new mongoose.Types.ObjectId(petId);
+    await tag.save();
+
+    await auditCustomerEvent(req, {
+      action: 'link_pet',
+      eventType: 'customer_tag_link_pet',
+      eventCategory: 'UPDATE',
+      operationType: 'UPDATE',
+      resourceType: 'Tag',
+      resourceId: tag._id.toString(),
+      outcome: 'SUCCESS',
+      severity: 'MEDIUM',
+      businessOperation: `Linked tag '${tag.tagId}' to pet '${pet.name}'`,
+      metadata: {
+        tagId: tag.tagId,
+        petId: petId,
+        petName: pet.name,
+        previousPetId: oldPetId || null,
+      },
+    });
+
+    const updated = await Tag.findById(tag._id)
+      .populate('petId', 'name petId petType breed color');
+
+    res.json({ success: true, data: updated });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to link tag to pet' });
+  }
+});
+
 // --- Request Tag Replacement ---
 router.post('/tags/:id/request-replacement', requirePermission('tag.create'), async (req: AuthRequest, res: Response) => {
   try {

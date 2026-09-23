@@ -294,10 +294,10 @@ export default function PetCard({
             </div>
           </div>
         ) : (
-          <div className="flex items-center gap-2 p-3 rounded-xl bg-gray-50 border border-dashed border-gray-200 mb-3">
-            <Tag size={16} className="text-gray-400" />
-            <span className="text-xs text-gray-400">No tag linked</span>
-          </div>
+          <Link to="/account/redeem-tag" className="flex items-center gap-2 p-3 rounded-xl bg-gray-50 border border-dashed border-gray-200 mb-3 hover:border-primary-300 hover:bg-primary-50 transition-colors group">
+            <Tag size={16} className="text-gray-400 group-hover:text-primary-500" />
+            <span className="text-xs text-gray-400 group-hover:text-primary-600">No tag linked — tap to activate</span>
+          </Link>
         )}
 
         {/* Quick Info Row */}

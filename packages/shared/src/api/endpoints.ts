@@ -592,6 +592,7 @@ export const API = {
       list: '/customer/tags',
       unredeemedCount: '/customer/tags/unredeemed-count',
       redeem: '/customer/tags/redeem',
+      linkPet: (id: string) => `/customer/tags/${id}/link-pet` as const,
     },
     invoices: {
       access: (id: string) => `/customer/invoices/${id}/access` as const,
