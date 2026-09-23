@@ -2,6 +2,7 @@ import { Notification, User, PushToken } from '@pawtag/db';
 import { sendMail } from './email.service';
 import { renderGenericNotificationEmail } from './email/templates';
 import { sendPushToUser } from './push-notification.service';
+import logger from '../lib/logger';
 
 interface NotifyOptions {
   userId: string;
@@ -62,34 +63,46 @@ export async function createAndDeliverNotification(options: NotifyOptions): Prom
   const channelKey = channelMap[type] || 'orderUpdate';
   if (!prefs.channels[channelKey]) return;
 
-  // Create in-app notification
+  // Create in-app notification (isolated — failure must not block push or email)
   if (prefs.inApp) {
-    await Notification.create({
-      userId,
-      type,
-      title,
-      message,
-      data,
-      read: false,
-      priority,
-      actionUrl,
-      channel,
-    });
+    try {
+      await Notification.create({
+        userId,
+        type,
+        title,
+        message,
+        data,
+        read: false,
+        priority,
+        actionUrl,
+        channel,
+      });
+    } catch (err) {
+      logger.error({ err, userId, type }, 'Failed to create in-app notification');
+    }
   }
 
-  // Send push notification
+  // Send push notification (isolated — failure must not block email)
   if (sendPush && prefs.push) {
-    await sendPushToUser(userId, title, message, {
-      type,
-      actionUrl: actionUrl || '',
-      ...Object.fromEntries(Object.entries(data).map(([k, v]) => [k, String(v)])),
-    });
+    try {
+      await sendPushToUser(userId, title, message, {
+        type,
+        actionUrl: actionUrl || '',
+        ...Object.fromEntries(Object.entries(data).map(([k, v]) => [k, String(v)])),
+      });
+    } catch (err) {
+      logger.error({ err, userId, type }, 'Failed to send push notification');
+    }
   }
 
-  // Send email notification
+  // Send email notification (isolated — must not be blocked by in-app or push failure)
   if (sendEmail && prefs.email && (user as any).email) {
-    const subject = emailSubject || title;
-    const html = emailHtml || renderGenericNotificationEmail({ title, message, actionUrl });
-    await sendMail((user as any).email, subject, html).catch(() => {});
+    try {
+      const subject = emailSubject || title;
+      const html = emailHtml || renderGenericNotificationEmail({ title, message, actionUrl });
+      await sendMail((user as any).email, subject, html).catch(() => {});
+    } catch (err) {
+      logger.error({ err, userId, type }, 'Failed to send notification email');
+    }
   }
 }

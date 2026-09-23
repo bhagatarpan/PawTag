@@ -409,7 +409,7 @@ describe('Customer Subscription Routes', () => {
       const res = await request(app)
         .put(`/api/customer/subscriptions/${subRes.insertedId}/auto-renew`)
         .set('Authorization', `Bearer ${token}`)
-        .send({ autoRenew: false });
+        .send({ autoRenew: false, reason: 'temporary_pause' });
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);

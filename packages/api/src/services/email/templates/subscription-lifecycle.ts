@@ -310,3 +310,45 @@ export function renderTagExpiredEmail(data: TagExpiredData): string {
     theme: 'danger',
   });
 }
+
+// ─── Subscription Renewed ─────────────────────────────────────────
+
+interface SubscriptionRenewalData {
+  name: string;
+  tagId: string;
+  planName: string;
+  amount: number;
+  billingPeriodStart: string;
+  billingPeriodEnd: string;
+  subscriptionsUrl: string;
+}
+
+export function renderSubscriptionRenewalEmail(data: SubscriptionRenewalData): string {
+  const bodyHtml = `
+    <p style="color:#374151;font-size:16px;line-height:1.6;margin:0 0 20px;">Hi ${data.name},</p>
+    <p style="color:#374151;font-size:16px;line-height:1.6;margin:0 0 20px;">
+      Your PawTag <strong>${data.planName}</strong> subscription for tag <strong>${data.tagId}</strong> has been successfully renewed.
+    </p>
+    ${renderStatusCard('success', 'Renewal Confirmed', 'Your subscription is active and your pet remains protected.')}
+
+    ${renderDataTable([
+      { label: 'Tag ID', value: data.tagId },
+      { label: 'Plan', value: data.planName },
+      { label: 'Amount Charged', value: `$${data.amount.toFixed(2)}` },
+      { label: 'Billing Period', value: `${data.billingPeriodStart} — ${data.billingPeriodEnd}` },
+    ])}
+
+    <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+      Your next renewal will be processed on <strong>${data.billingPeriodEnd}</strong>. You can manage your subscription at any time from your account.
+    </p>
+
+    ${renderCtaButton(data.subscriptionsUrl, 'Manage Subscription')}
+  `;
+
+  return renderBase({
+    title: 'Subscription Renewed',
+    subtitle: `${data.planName} — Payment Confirmed`,
+    bodyHtml,
+    theme: 'success',
+  });
+}

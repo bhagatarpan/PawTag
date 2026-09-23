@@ -26,6 +26,7 @@ import {
   renderGuardianRenewalReminderEmail,
   renderSubscriptionWelcomeTemplateEmail,
   renderInvoiceOtpTemplateEmail,
+  renderSubscriptionRenewalEmail,
 } from './email/templates';
 
 const resendApiKey = process.env.RESEND_API_KEY;
@@ -109,12 +110,16 @@ async function renderCmsEmail(slug: string, variables: Record<string, string>): 
 
 export async function sendMail(to: string, subject: string, html: string, from?: string, auditMeta?: { templateSlug?: string; businessFlow?: string; relatedEntityType?: string; relatedEntityId?: string; relatedEntityDisplay?: string; isTest?: boolean }): Promise<EmailResult> {
   // In dev mode with test mode enabled, route ALL emails to test address
+  const originalRecipient = to;
   if (process.env.NODE_ENV !== 'production') {
     try {
       const testMode = (await Setting.findOne({ key: 'site.testMode' }).lean())?.value === 'true';
       if (testMode) {
         const testEmail = (await Setting.findOne({ key: 'site.testEmail' }).lean())?.value;
-        if (testEmail) to = testEmail;
+        if (testEmail) {
+          to = testEmail;
+          logger.info({ originalRecipient, testRedirect: testEmail, subject }, 'TEST MODE — Email redirected to test address');
+        }
       }
     } catch {
       // Settings query failed — continue with original recipient
@@ -162,7 +167,7 @@ export async function sendMail(to: string, subject: string, html: string, from?:
       relatedEntityType: auditMeta?.relatedEntityType as any,
       relatedEntityId: auditMeta?.relatedEntityId,
       relatedEntityDisplay: auditMeta?.relatedEntityDisplay,
-      isTest: auditMeta?.isTest || true,
+      isTest: auditMeta?.isTest ?? true,
     }).catch(() => {});
     return { success: true, messageId: `demo_${Date.now()}` };
   }
@@ -190,7 +195,7 @@ export async function sendMail(to: string, subject: string, html: string, from?:
         relatedEntityType: auditMeta?.relatedEntityType as any,
         relatedEntityId: auditMeta?.relatedEntityId,
         relatedEntityDisplay: auditMeta?.relatedEntityDisplay,
-        isTest: auditMeta?.isTest || false,
+        isTest: auditMeta?.isTest ?? false,
       }).catch(() => {}); // fire-and-forget
       return { success: false, error: error.message };
     }
@@ -209,7 +214,7 @@ export async function sendMail(to: string, subject: string, html: string, from?:
       relatedEntityType: auditMeta?.relatedEntityType as any,
       relatedEntityId: auditMeta?.relatedEntityId,
       relatedEntityDisplay: auditMeta?.relatedEntityDisplay,
-      isTest: auditMeta?.isTest || false,
+      isTest: auditMeta?.isTest ?? false,
     }).catch(() => {}); // fire-and-forget
     return { success: true, messageId: data?.id };
   }, { to, subject: subject.substring(0, 50) });
@@ -660,4 +665,32 @@ export async function sendGuardianRenewalReminderEmail(
   if (cms) return sendMail(to, cms.subject, cms.html, cms.from);
   const html = renderGuardianRenewalReminderEmail({ customerName, tier, renewalDate, currentBenefits, dashboardUrl });
   return sendMail(to, 'Your Guardian Membership Renewal — PawTag', html);
+}
+
+// ─── Subscription Renewal ──────────────────────────────────────
+
+export async function sendSubscriptionRenewalEmail(
+  to: string,
+  name: string,
+  tagId: string,
+  planName: string,
+  amount: number,
+  billingPeriodStart: Date,
+  billingPeriodEnd: Date,
+): Promise<EmailResult> {
+  const subscriptionsUrl = `${frontendUrl}/account/subscriptions`;
+  const fmt = (d: Date) => d.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
+  const vars: Record<string, string> = {
+    name, tagId, planName, amount: `$${amount.toFixed(2)}`,
+    billingPeriodStart: fmt(billingPeriodStart), billingPeriodEnd: fmt(billingPeriodEnd),
+    subscriptionsUrl,
+  };
+  const cms = await renderCmsEmail('subscription-renewed', vars);
+  if (cms) return sendMail(to, cms.subject, cms.html, cms.from);
+  const html = renderSubscriptionRenewalEmail({
+    name, tagId, planName, amount,
+    billingPeriodStart: fmt(billingPeriodStart), billingPeriodEnd: fmt(billingPeriodEnd),
+    subscriptionsUrl,
+  });
+  return sendMail(to, `Subscription Renewed — ${planName} | PawTag`, html);
 }

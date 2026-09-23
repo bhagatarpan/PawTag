@@ -107,6 +107,26 @@ router.post('/retry-all', requirePermission('setting.update'), async (_req: Auth
 });
 
 /**
+ * GET /api/admin/webhooks/dead-letter
+ *
+ * Get dead-letter events.
+ */
+router.get('/dead-letter', requirePermission('setting.read'), async (req: AuthRequest, res: Response) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
+    const events = await WebhookEvent.find({ status: 'dead' })
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .select('event eventId source attempts lastError createdAt');
+
+    res.json({ success: true, data: { events } });
+  } catch (err: any) {
+    logger.error({ err }, 'Failed to fetch dead-letter events');
+    res.status(500).json({ success: false, error: 'Failed to fetch dead-letter events' });
+  }
+});
+
+/**
  * DELETE /api/admin/webhooks/dead-letter
  *
  * Purge dead-letter events older than specified days.

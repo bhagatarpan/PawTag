@@ -188,6 +188,7 @@ export default function SubscriptionsPage() {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tag</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Plan</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Auto Renew</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Price</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Period End</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Scans</th>
@@ -197,11 +198,11 @@ export default function SubscriptionsPage() {
           <tbody className="divide-y divide-gray-200">
             {loading ? (
               <tr>
-                <td colSpan={8} className="px-6 py-12 text-center text-gray-500">Loading...</td>
+                <td colSpan={9} className="px-6 py-12 text-center text-gray-500">Loading...</td>
               </tr>
             ) : subscriptions.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-6 py-12 text-center text-gray-500">No subscriptions found</td>
+                <td colSpan={9} className="px-6 py-12 text-center text-gray-500">No subscriptions found</td>
               </tr>
             ) : (
               subscriptions.map((sub) => (
@@ -226,6 +227,13 @@ export default function SubscriptionsPage() {
                     <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[sub.status] || 'bg-gray-100 text-gray-700'}`}>
                       {STATUS_LABELS[sub.status] || sub.status}
                     </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    {sub.autoRenew ? (
+                      <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">On</span>
+                    ) : (
+                      <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">Off</span>
+                    )}
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-900">${sub.price.toFixed(2)}/mo</td>
                   <td className="px-6 py-4 text-sm text-gray-900">{formatDate(sub.currentPeriodEnd)}</td>

@@ -362,54 +362,67 @@ router.put('/:id/auto-renew', requirePermission('customer.read'), async (req: Au
           : await User.find({ role: { $in: ['admin', 'super_admin'] } }).select('_id email fullName');
 
         for (const admin of admins) {
-          // In-app notification (always)
-          await createAndDeliverNotification({
-            userId: (admin as any)._id.toString(),
-            type: 'subscription_auto_renew_paused',
-            title: `Subscription Auto-Renew Paused — ${reasonLabel}`,
-            message: `${user?.fullName || 'Customer'} (${user?.email}) paused auto-renew for ${subscription.planName}. Reason: ${reasonLabel}`,
-            priority: isHighPriority ? 'high' : 'normal',
-            channel: 'alert',
-            actionUrl: `/customer-subscriptions/${subscription._id}`,
-          });
+          // In-app notification (isolated — push failure must not block email)
+          try {
+            await createAndDeliverNotification({
+              userId: (admin as any)._id.toString(),
+              type: 'subscription_auto_renew_paused',
+              title: `Subscription Auto-Renew Paused — ${reasonLabel}`,
+              message: `${user?.fullName || 'Customer'} (${user?.email}) paused auto-renew for ${subscription.planName}. Reason: ${reasonLabel}`,
+              priority: isHighPriority ? 'high' : 'normal',
+              channel: 'alert',
+              actionUrl: `/customer-subscriptions/${subscription._id}`,
+            });
+          } catch (notifErr) {
+            logger.error({ err: notifErr, adminId: (admin as any)._id }, 'Failed to deliver in-app notification to admin');
+          }
 
-          // Email notification using template
-          const adminHtml = renderSubscriptionPausedAdminEmail({
-            customerName: user?.fullName || 'Customer',
-            customerEmail: user?.email || '',
-            planName: subscription.planName,
-            reason: reasonLabel,
-            reasonDetails,
-            subscriptionUrl: `${process.env.ADMIN_URL || 'http://localhost:3001'}/customer-subscriptions/${subscription._id}`,
-          });
-          const adminEmailResult = await sendMail((admin as any).email, `Subscription Auto-Renew Paused: ${subscription.planName}`, adminHtml, undefined, {
-            templateSlug: 'subscription-paused-admin',
-            businessFlow: 'subscription',
-            relatedEntityType: 'subscription',
-            relatedEntityId: subscription._id.toString(),
-            relatedEntityDisplay: subscription.planName,
-          });
-          logger.info({ adminEmail: (admin as any).email, result: adminEmailResult }, 'Admin pause notification email sent');
+          // Admin email notification (isolated — must not be blocked by in-app/push failure)
+          try {
+            const adminHtml = renderSubscriptionPausedAdminEmail({
+              customerName: user?.fullName || 'Customer',
+              customerEmail: user?.email || '',
+              planName: subscription.planName,
+              reason: reasonLabel,
+              reasonDetails,
+              subscriptionUrl: `${process.env.ADMIN_URL || 'http://localhost:3001'}/customer-subscriptions/${subscription._id}`,
+            });
+            const adminEmailResult = await sendMail((admin as any).email, `Subscription Auto-Renew Paused: ${subscription.planName}`, adminHtml, undefined, {
+              templateSlug: 'subscription-paused-admin',
+              businessFlow: 'subscription',
+              relatedEntityType: 'subscription',
+              relatedEntityId: subscription._id.toString(),
+              relatedEntityDisplay: subscription.planName,
+            });
+            logger.info({ adminEmail: (admin as any).email, result: adminEmailResult }, 'Admin pause notification email sent');
+          } catch (emailErr) {
+            logger.error({ err: emailErr, adminEmail: (admin as any).email }, 'Failed to send admin pause notification email');
+          }
         }
 
-        // Send customer confirmation email
+        // Send customer confirmation email (isolated — must not be blocked by admin notifications)
         if (user?.email) {
-          const customerHtml = renderSubscriptionPausedEmail({
-            name: user?.fullName || 'Customer',
-            planName: subscription.planName,
-            reason: reasonLabel,
-            reasonDetails,
-            pausedAt: new Date().toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' }),
-            resumeUrl: `${process.env.CUSTOMER_URL || 'http://localhost:3000'}/account/subscriptions`,
-          });
-          const customerEmailResult = await sendMail(user.email, `Auto-Renew Paused: ${subscription.planName}`, customerHtml, undefined, {
-            templateSlug: 'subscription-paused',
-            businessFlow: 'subscription',
-            relatedEntityType: 'subscription',
-            relatedEntityId: subscription._id.toString(),
-            relatedEntityDisplay: subscription.planName,
-          });
-          logger.info({ customerEmail: user.email, result: customerEmailResult }, 'Customer pause confirmation email sent');
+          try {
+            const customerHtml = renderSubscriptionPausedEmail({
+              name: user?.fullName || 'Customer',
+              planName: subscription.planName,
+              reason: reasonLabel,
+              reasonDetails,
+              pausedAt: new Date().toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' }),
+              activeUntil: subscription.currentPeriodEnd?.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' }),
+              resumeUrl: `${process.env.CUSTOMER_URL || 'http://localhost:3000'}/account/subscriptions`,
+            });
+            const customerEmailResult = await sendMail(user.email, `Auto-Renew Paused: ${subscription.planName}`, customerHtml, undefined, {
+              templateSlug: 'subscription-paused',
+              businessFlow: 'subscription',
+              relatedEntityType: 'subscription',
+              relatedEntityId: subscription._id.toString(),
+              relatedEntityDisplay: subscription.planName,
+            });
+            logger.info({ customerEmail: user.email, result: customerEmailResult }, 'Customer pause confirmation email sent');
+          } catch (emailErr) {
+            logger.error({ err: emailErr, customerEmail: user.email }, 'Failed to send customer pause confirmation email');
+          }
         }
       } catch (notifyErr) {
         logger.error({ err: notifyErr, subscriptionId: subscription._id, userId: req.user!.id }, 'Failed to send pause notifications');

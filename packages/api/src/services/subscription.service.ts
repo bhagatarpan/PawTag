@@ -1,7 +1,7 @@
 import { Subscription, Tag, Invoice, InvoiceAccessToken, User, Notification, Product, TagExpiryNotification, Setting } from '@pawtag/db';
 import { isFakeMode } from '../commerce/payment-mode';
 import Stripe from 'stripe';
-import { sendMail, sendInvoiceEmail } from './email.service';
+import { sendMail, sendInvoiceEmail, sendSubscriptionRenewalEmail } from './email.service';
 import { createAndDeliverNotification } from './notification-delivery.service';
 import { renderSubscriptionReminderEmail, renderGracePeriodReminderEmail, renderPaymentFailureEmail, renderGracePeriodStartedEmail, renderGoldWelcomeEmail, renderPaymentRetrySuccessEmail, renderFreePeriodReminder2WeekEmail, renderFreePeriodReminder3DayEmail, renderGracePeriodReminder3DayEmail, renderTagExpiredEmail } from './email/templates';
 import { auditService, type AuditContext } from './audit';
@@ -614,6 +614,25 @@ export async function renewSubscription(subscriptionId: string, paymentMethod?: 
 
   incrementCounter(METRICS.SUBSCRIPTION_RENEWED_TOTAL, { planType: subscription.planType });
 
+  // Send renewal confirmation email (fire-and-forget)
+  try {
+    const user = await User.findById(subscription.userId).select('email fullName').lean();
+    if (user?.email) {
+      await sendSubscriptionRenewalEmail(
+        user.email,
+        user.fullName || 'Customer',
+        (subscription.tagId as any)?.tagId || 'N/A',
+        subscription.planName,
+        subscription.price,
+        subscription.currentPeriodStart,
+        newPeriodEnd,
+      );
+      logger.info({ subscriptionId: subscription._id, email: user.email }, 'Renewal confirmation email sent');
+    }
+  } catch (emailErr) {
+    logger.error({ err: emailErr, subscriptionId: subscription._id }, 'Failed to send renewal confirmation email');
+  }
+
   return subscription;
 }
 
@@ -838,6 +857,25 @@ export async function processAutoRenewals() {
           planName: sub.planName,
         },
       });
+
+      // Send renewal confirmation email (fire-and-forget)
+      try {
+        const user = await User.findById(sub.userId).select('email fullName').lean();
+        if (user?.email) {
+          await sendSubscriptionRenewalEmail(
+            user.email,
+            user.fullName || 'Customer',
+            (sub.tagId as any)?.tagId || 'N/A',
+            sub.planName,
+            sub.price,
+            sub.currentPeriodStart,
+            newPeriodEnd,
+          );
+          logger.info({ subscriptionId: sub._id, email: user.email }, 'Renewal confirmation email sent');
+        }
+      } catch (emailErr) {
+        logger.error({ err: emailErr, subscriptionId: sub._id }, 'Failed to send renewal confirmation email');
+      }
     } catch (error) {
       logger.error({ err: error, subscriptionId: sub._id }, '[SubscriptionService] Failed to auto-renew');
     }

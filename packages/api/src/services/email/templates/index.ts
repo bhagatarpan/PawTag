@@ -24,7 +24,7 @@ export { renderGoldWelcomeEmail } from './gold-welcome';
 // ─── New templates (inline email extractions) ───
 export { renderNewOrderAlertEmail, renderOrderCancelledAlertEmail, renderRefundFailedAlertEmail, renderSupportRequestAlertEmail } from './admin-alert';
 export { renderOrderStatusEmail } from './order-status';
-export { renderSubscriptionWelcomeEmail, renderSubscriptionReminderEmail, renderGracePeriodReminderEmail, renderPaymentFailureEmail, renderGracePeriodStartedEmail, renderPaymentRetrySuccessEmail, renderFreePeriodReminder2WeekEmail, renderFreePeriodReminder3DayEmail, renderGracePeriodReminder3DayEmail, renderTagExpiredEmail } from './subscription-lifecycle';
+export { renderSubscriptionWelcomeEmail, renderSubscriptionReminderEmail, renderGracePeriodReminderEmail, renderPaymentFailureEmail, renderGracePeriodStartedEmail, renderPaymentRetrySuccessEmail, renderFreePeriodReminder2WeekEmail, renderFreePeriodReminder3DayEmail, renderGracePeriodReminder3DayEmail, renderTagExpiredEmail, renderSubscriptionRenewalEmail } from './subscription-lifecycle';
 export { renderReferralRewardEmail } from './referral-reward';
 export { renderTierDowngradeWarningEmail } from './tier-downgrade-warning';
 export { renderPetBirthdayEmail } from './pet-birthday';

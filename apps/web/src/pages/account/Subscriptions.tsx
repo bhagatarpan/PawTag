@@ -243,9 +243,14 @@ function SubscriptionsInner() {
                 </div>
                 <h1 className="text-2xl font-bold text-white tracking-tight">{sub.planType === 'gold' ? 'Gold Membership' : (sub.tagId?.tagId || 'N/A')}</h1>
               </div>
-              <span className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide ${isActive ? 'bg-white/20 text-white' : isGrace ? 'bg-white/20 text-white' : 'bg-white/10 text-white/70'}`}>
-                {sub.status.replace('_', ' ')}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide ${sub.autoRenew ? 'bg-emerald-500/20 text-emerald-100' : 'bg-amber-500/20 text-amber-100'}`}>
+                  Auto-renew {sub.autoRenew ? 'On' : 'Off'}
+                </span>
+                <span className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide ${isActive ? 'bg-white/20 text-white' : isGrace ? 'bg-white/20 text-white' : 'bg-white/10 text-white/70'}`}>
+                  {sub.status.replace('_', ' ')}
+                </span>
+              </div>
             </div>
             {sub.petName && (
               <div className="flex items-center gap-2 text-white/90">
@@ -374,6 +379,7 @@ function SubscriptionsInner() {
                     Paused on {formatDate(sub.autoRenewPausedAt)}
                     {sub.autoRenewPauseReason && <> — Reason: {sub.autoRenewPauseReason.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}</>}
                   </div>
+                  <div className="text-xs text-amber-600 mt-1">Active until {formatDate(sub.currentPeriodEnd)}</div>
                   {sub.autoRenewPauseReasonDetails && (
                     <div className="text-xs text-amber-600 mt-1 italic">{sub.autoRenewPauseReasonDetails}</div>
                   )}
@@ -716,7 +722,7 @@ function SubscriptionsInner() {
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
                         {formatDate(sub.startDate)}
                       </span>
-                      <span className={`flex items-center gap-1 ${sub.autoRenew ? 'text-emerald-500' : ''}`}>
+                      <span className={`flex items-center gap-1 ${sub.autoRenew ? 'text-emerald-500' : 'text-amber-500'}`}>
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
                         {sub.autoRenew ? 'Auto-renew on' : 'Auto-renew off'}
                       </span>

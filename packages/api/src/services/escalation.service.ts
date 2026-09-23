@@ -110,47 +110,55 @@ async function processEscalation(record: any): Promise<void> {
       deletedAt: null, // Find ACTIVE users only (not deleted)
     }).select('_id fullName email');
 
-    // Send in-app notification if EC is a registered user
+    // Send in-app notification if EC is a registered user (isolated — must not block email)
     if (ecUser) {
       const notifTitle = `Emergency Contact: ${ownerName}'s pet ${petName} needs attention`;
       const notifMessage = `${ownerName} has not responded to a pet found notification for ${petName} (${tag?.tagId || ''}). As their emergency contact, please help reach them.`;
 
-      await Notification.create({
-        userId: ecUser._id,
-        type: 'emergency_contact_escalation',
-        title: notifTitle,
-        message: notifMessage,
-        priority: 'high',
-        data: {
-          ownerId: owner._id,
-          ownerName,
-          petId: pet?._id,
-          petName,
-          tagId: tag?.tagId,
-          escalationRecordId: record._id,
-        },
-      });
+      try {
+        await Notification.create({
+          userId: ecUser._id,
+          type: 'emergency_contact_escalation',
+          title: notifTitle,
+          message: notifMessage,
+          priority: 'high',
+          data: {
+            ownerId: owner._id,
+            ownerName,
+            petId: pet?._id,
+            petName,
+            tagId: tag?.tagId,
+            escalationRecordId: record._id,
+          },
+        });
 
-      await sendPushToUser(ecUser._id.toString(), notifTitle, notifMessage, {
-        type: 'emergency_contact_escalation',
-        petId: pet?._id?.toString() || '',
-      }).catch(() => {});
+        await sendPushToUser(ecUser._id.toString(), notifTitle, notifMessage, {
+          type: 'emergency_contact_escalation',
+          petId: pet?._id?.toString() || '',
+        }).catch(() => {});
+      } catch (notifErr) {
+        logger.error({ err: notifErr, recordId: record._id }, '[Escalation] Failed to deliver in-app notification to emergency contact');
+      }
     }
 
-    // Send email to emergency contact
+    // Send email to emergency contact (isolated — must not be blocked by in-app/push failure)
     if (ec.email) {
-      const emailSubject = `Urgent: ${ownerName}'s pet ${petName} was found - action needed`;
-      const emailHtml = renderEmergencyEscalationEmail({
-        ownerName,
-        petName,
-        tagId: tag?.tagId || 'N/A',
-        finderName: record.finderName,
-        finderPhone: record.finderPhone,
-        finderEmail: record.finderEmail,
-        viewDetailsUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account`,
-      });
+      try {
+        const emailSubject = `Urgent: ${ownerName}'s pet ${petName} was found - action needed`;
+        const emailHtml = renderEmergencyEscalationEmail({
+          ownerName,
+          petName,
+          tagId: tag?.tagId || 'N/A',
+          finderName: record.finderName,
+          finderPhone: record.finderPhone,
+          finderEmail: record.finderEmail,
+          viewDetailsUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account`,
+        });
 
-      await sendMail(ec.email, emailSubject, emailHtml).catch(() => {});
+        await sendMail(ec.email, emailSubject, emailHtml).catch(() => {});
+      } catch (emailErr) {
+        logger.error({ err: emailErr, recordId: record._id, ecEmail: ec.email }, '[Escalation] Failed to send email to emergency contact');
+      }
     }
 
     // Update the escalation record

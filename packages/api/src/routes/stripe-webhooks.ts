@@ -33,6 +33,7 @@ import { checkoutService } from '../commerce/services/checkout.service';
 import { isFakeMode } from '../commerce/payment-mode';
 import { logPaymentEvent, logOrderEvent } from '../commerce/audit';
 import { logCommerceEvent } from '../commerce/audit';
+import { sendSubscriptionRenewalEmail } from '../services/email.service';
 import logger from '../lib/logger';
 
 const router = Router();
@@ -308,6 +309,28 @@ async function handleInvoicePaymentSucceeded(invoice: any): Promise<void> {
     },
     paidAt: new Date(),
   });
+
+  // Send renewal confirmation email (fire-and-forget)
+  try {
+    const user = await User.findById(subscription.userId).select('email fullName').lean();
+    if (user?.email) {
+      const amountPaid = (invoice.amount_paid || 0) / 100;
+      const billingStart = new Date((invoice.period_start || Date.now() / 1000) * 1000);
+      const billingEnd = new Date((invoice.period_end || Date.now() / 1000) * 1000);
+      await sendSubscriptionRenewalEmail(
+        user.email,
+        user.fullName || 'Customer',
+        (subscription.tagId as any)?.tagId || 'N/A',
+        subscription.planName,
+        amountPaid,
+        billingStart,
+        billingEnd,
+      );
+      logger.info({ subscriptionId: subscription._id, email: user.email }, 'Renewal confirmation email sent');
+    }
+  } catch (emailErr) {
+    logger.error({ err: emailErr, subscriptionId: subscription._id }, 'Failed to send renewal confirmation email');
+  }
 
   logger.info({ subscriptionId: subscription._id, stripeInvoiceId: invoice.id }, 'Subscription renewed via Stripe');
 }
