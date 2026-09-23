@@ -48,9 +48,9 @@ export function renderJobNotificationEmail(data: JobNotificationData): string {
       const icon = h.result === 'success' ? '✅' : '❌';
       return `
         <tr>
-          <td style="padding:6px 12px;font-size:13px;color:#374151;font-family:monospace;">${icon} ${formatTimeAgo(new Date(h.startedAt))}</td>
-          <td style="padding:6px 12px;font-size:13px;color:#374151;font-family:monospace;">${formatDuration(h.durationMs)}</td>
-          <td style="padding:6px 12px;font-size:13px;color:${h.result === 'error' ? '#dc2626' : '#374151'};font-family:monospace;">${h.result}${h.error ? ` — ${h.error}` : ''}</td>
+          <td style="padding:6px 12px;font-size:13px;color:#374151;font-family:'Courier New',Courier,monospace;">${icon} ${formatTimeAgo(new Date(h.startedAt))}</td>
+          <td style="padding:6px 12px;font-size:13px;color:#374151;font-family:'Courier New',Courier,monospace;">${formatDuration(h.durationMs)}</td>
+          <td style="padding:6px 12px;font-size:13px;color:${h.result === 'error' ? '#dc2626' : '#374151'};font-family:'Courier New',Courier,monospace;">${h.result}${h.error ? ` — ${h.error}` : ''}</td>
         </tr>`;
     }).join('');
 
@@ -73,7 +73,7 @@ export function renderJobNotificationEmail(data: JobNotificationData): string {
     errorHtml = `
       <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:16px;margin:16px 0;">
         <p style="color:#991b1b;font-size:14px;font-weight:600;margin:0 0 8px;">Error Details</p>
-        <pre style="color:#991b1b;font-size:13px;font-family:monospace;white-space:pre-wrap;margin:0;">${data.error}</pre>
+        <pre style="color:#991b1b;font-size:13px;font-family:'Courier New',Courier,monospace;white-space:pre-wrap;margin:0;">${data.error}</pre>
       </div>`;
   }
 
@@ -100,7 +100,7 @@ export function renderJobNotificationEmail(data: JobNotificationData): string {
     ${historyHtml}
 
     <p style="color:#9ca3af;font-size:12px;margin:24px 0 0;">
-      View job details in the <a href="http://localhost:3001/background-jobs" style="color:#0d9488;">Admin Portal — Background Jobs</a>
+      View job details in the <a href="${process.env.ADMIN_URL || 'http://localhost:3001'}/background-jobs" style="color:#0d9488;">Admin Portal — Background Jobs</a>
     </p>
   `;
 

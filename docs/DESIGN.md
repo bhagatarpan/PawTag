@@ -1532,3 +1532,65 @@ All PawTag emails must use consistent design tokens defined here. These tokens a
   .cta-button { width: 100% !important; }
 }
 ```
+
+---
+
+## Background Jobs Dashboard
+
+The Background Jobs page follows the standard admin dashboard pattern with a focus on operational monitoring.
+
+### Design Tokens
+
+| Element | Token/Class |
+|---------|-------------|
+| Page background | `bg-gray-50` |
+| Stat card | `bg-white rounded-2xl shadow-sm border border-gray-100 p-4` |
+| Stat label | `text-xs text-gray-400 font-medium uppercase tracking-wide` |
+| Stat value | `text-2xl font-bold text-gray-900` |
+| Table container | `bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden` |
+| Table header | `bg-gray-50 border-b border-gray-100` |
+| Table header text | `px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide` |
+| Table row hover | `hover:bg-gray-50` |
+| Table row divider | `divide-y divide-gray-100` |
+| Filter button (active) | `bg-primary-600 text-white rounded-lg` |
+| Filter button (inactive) | `bg-gray-100 text-gray-600 hover:bg-gray-200 rounded-lg` |
+| Icon button | `p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors duration-150` |
+| Error alert | `bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-700` |
+
+### Status Badges
+
+| Status | Badge Classes |
+|--------|--------------|
+| idle (enabled) | `bg-green-100 text-green-700` |
+| running | `bg-blue-100 text-blue-700` |
+| error | `bg-red-100 text-red-700` |
+| disabled | `bg-gray-100 text-gray-600` |
+
+### Category Badges
+
+| Category | Badge Classes |
+|----------|--------------|
+| financial | `bg-red-50 text-red-700` |
+| notification | `bg-blue-50 text-blue-700` |
+| maintenance | `bg-gray-100 text-gray-600` |
+| reconciliation | `bg-purple-50 text-purple-700` |
+| compliance | `bg-amber-50 text-amber-700` |
+
+### Edit Modal
+
+Follows the standard ConfirmDialog pattern:
+- Backdrop: `fixed inset-0 z-50 flex items-center justify-center bg-black/40`
+- Card: `relative bg-white rounded-xl shadow-2xl w-full max-w-lg p-6 mx-4 max-h-[90vh] flex flex-col`
+- Close button: Lucide `<X size={18} />` with `text-gray-400 hover:text-gray-600 transition-colors`
+- Form inputs: `w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500`
+- Footer: `flex justify-end gap-3 pt-4 mt-4 border-t border-gray-100`
+- Cancel button: `px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50`
+- Save button: `px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50`
+
+### Notification Settings
+
+Global notification settings appear at the bottom of the Background Jobs page:
+- Master toggle for all job notifications
+- Default notify-on-success (off) and notify-on-failure (on)
+- Email recipient field (falls back to ADMIN_ALERT_EMAIL env var)
+- Per-job overrides configurable in the edit modal

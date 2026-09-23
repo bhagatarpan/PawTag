@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Clock, RefreshCw, Play, Pause, ChevronRight,
+  Clock, RefreshCw, Play, Pause, ChevronRight, X,
   CheckCircle, XCircle, AlertTriangle, Settings,
 } from 'lucide-react';
+import { toast } from '../lib/toast';
 import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
 
@@ -125,7 +126,7 @@ export default function BackgroundJobs() {
       await api.post(API.admin.backgroundJobs.toggle(jobId));
       await fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to toggle job');
+      toast.error(err.response?.data?.error || 'Failed to toggle job');
     }
   };
 
@@ -135,7 +136,7 @@ export default function BackgroundJobs() {
       await api.post(API.admin.backgroundJobs.run(jobId));
       await fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to run job');
+      toast.error(err.response?.data?.error || 'Failed to run job');
     } finally {
       setRunningJob(null);
     }
@@ -161,7 +162,7 @@ export default function BackgroundJobs() {
       setEditingJob(null);
       await fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to save changes');
+      toast.error(err.response?.data?.error || 'Failed to save changes');
     } finally {
       setSaving(false);
     }
@@ -176,10 +177,10 @@ export default function BackgroundJobs() {
           <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
           <div className="grid grid-cols-5 gap-4 mb-6">
             {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="h-20 bg-gray-200 rounded-xl"></div>
+              <div key={i} className="h-20 bg-gray-200 rounded-lg"></div>
             ))}
           </div>
-          <div className="h-96 bg-gray-200 rounded-xl"></div>
+          <div className="h-96 bg-gray-200 rounded-lg"></div>
         </div>
       </div>
     );
@@ -206,30 +207,30 @@ export default function BackgroundJobs() {
 
       {/* Error */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-700">
           {error}
         </div>
       )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
+        <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
           <div className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-1">Total</div>
           <div className="text-2xl font-bold text-gray-900">{stats.total}</div>
         </div>
-        <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
+        <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
           <div className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-1">Active</div>
           <div className="text-2xl font-bold text-green-600">{stats.active}</div>
         </div>
-        <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
+        <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
           <div className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-1">Running</div>
           <div className="text-2xl font-bold text-blue-600">{stats.running}</div>
         </div>
-        <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
+        <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
           <div className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-1">Errors</div>
           <div className="text-2xl font-bold text-red-600">{stats.error}</div>
         </div>
-        <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
+        <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
           <div className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-1">Disabled</div>
           <div className="text-2xl font-bold text-gray-400">{stats.disabled}</div>
         </div>
@@ -253,7 +254,7 @@ export default function BackgroundJobs() {
       </div>
 
       {/* Job List */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-100">
             <tr>
@@ -279,12 +280,12 @@ export default function BackgroundJobs() {
                   </div>
                 </td>
                 <td className="px-6 py-4">
-                  <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${getCategoryColor(job.category)}`}>
+                  <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${getCategoryColor(job.category)}`}>
                     {job.category}
                   </span>
                 </td>
                 <td className="px-6 py-4">
-                  <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(job.status, job.enabled)}`}>
+                  <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(job.status, job.enabled)}`}>
                     {!job.enabled ? 'disabled' : job.status}
                   </span>
                 </td>
@@ -301,7 +302,7 @@ export default function BackgroundJobs() {
                   <div className="flex items-center justify-end gap-2">
                     <button
                       onClick={() => handleEdit(job)}
-                      className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
+                      className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors duration-150"
                       title="Configure"
                     >
                       <Settings size={16} />
@@ -309,7 +310,7 @@ export default function BackgroundJobs() {
                     <button
                       onClick={() => handleRunNow(job._id)}
                       disabled={runningJob === job._id || !job.enabled}
-                      className="p-1.5 text-gray-400 hover:text-primary-600 rounded-lg hover:bg-primary-50 disabled:opacity-50"
+                      className="p-1.5 text-gray-400 hover:text-primary-600 rounded-lg hover:bg-primary-50 disabled:opacity-50 transition-colors duration-150"
                       title="Run Now"
                     >
                       {runningJob === job._id ? (
@@ -331,7 +332,7 @@ export default function BackgroundJobs() {
                     </button>
                     <Link
                       to={`/background-jobs/${job._id}`}
-                      className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
+                      className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors duration-150"
                       title="View Details"
                     >
                       <ChevronRight size={16} />
@@ -350,8 +351,8 @@ export default function BackgroundJobs() {
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6 mx-4 max-h-[90vh] flex flex-col">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-semibold text-gray-900">{editingJob.displayName}</h2>
-              <button onClick={() => setEditingJob(null)} className="text-gray-400 hover:text-gray-600">
-                ✕
+              <button onClick={() => setEditingJob(null)} className="text-gray-400 hover:text-gray-600 transition-colors">
+                <X size={18} />
               </button>
             </div>
 
