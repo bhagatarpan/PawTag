@@ -150,3 +150,16 @@ export function stopOrderAutoCancelJob(): void {
     logger.info('[OrderAutoCancelJob] Stopped');
   }
 }
+
+/**
+ * Run the order auto-cancel job. Called by the job scheduler.
+ */
+export async function runOrderAutoCancelJob(): Promise<import('../services/job-scheduler.service').JobResult> {
+  try {
+    await claimedCheckAndCancelStaleOrders();
+    return { success: true };
+  } catch (error: any) {
+    logger.error({ err: error }, '[OrderAutoCancelJob] Job error');
+    return { success: false, error: error.message || 'Unknown error' };
+  }
+}

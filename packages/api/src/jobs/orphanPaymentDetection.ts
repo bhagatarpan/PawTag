@@ -127,3 +127,16 @@ export function stopOrphanPaymentJob(): void {
     logger.info('[OrphanPaymentJob] Stopped');
   }
 }
+
+/**
+ * Run the orphan payment detection job. Called by the job scheduler.
+ */
+export async function runOrphanPaymentJob(): Promise<import('../services/job-scheduler.service').JobResult> {
+  try {
+    await checkForOrphanedPayments();
+    return { success: true };
+  } catch (error: any) {
+    logger.error({ err: error }, '[OrphanPaymentJob] Job error');
+    return { success: false, error: error.message || 'Unknown error' };
+  }
+}

@@ -1,6 +1,7 @@
 import { Pet, User } from '@pawtag/db';
 import { awardPetMilestonePoints } from '../services/loyalty/points-earning.service';
 import logger from '../lib/logger';
+import type { JobResult } from '../services/job-scheduler.service';
 
 /**
  * Pet Milestones Job
@@ -147,7 +148,7 @@ async function sendMilestoneEmails(milestones: PetMilestone[]): Promise<void> {
  * Run pet milestones job
  * Should be called daily (e.g., via cron job)
  */
-export async function runPetMilestonesJob(): Promise<void> {
+async function processPetMilestones(): Promise<void> {
   logger.info('Starting pet milestones job');
 
   try {
@@ -181,14 +182,14 @@ export function startPetMilestonesJob(): void {
   if (milestonesTimer) return;
 
   // Run immediately on startup
-  runPetMilestonesJob().catch((error) => {
+  processPetMilestones().catch((error) => {
     logger.error({ err: error }, 'Pet milestones initial run failed');
   });
 
   // Then run every 24 hours
   milestonesTimer = setInterval(async () => {
     try {
-      await runPetMilestonesJob();
+      await processPetMilestones();
     } catch (error) {
       logger.error({ err: error }, '[PetMilestonesJob] Error');
     }
@@ -202,5 +203,18 @@ export function stopPetMilestonesJob(): void {
     clearInterval(milestonesTimer);
     milestonesTimer = null;
     logger.info('[PetMilestonesJob] Stopped');
+  }
+}
+
+/**
+ * Run the pet milestones job. Called by the job scheduler.
+ */
+export async function runPetMilestonesJob(): Promise<JobResult> {
+  try {
+    await processPetMilestones();
+    return { success: true };
+  } catch (error: any) {
+    logger.error({ err: error }, '[PetMilestonesJob] Job error');
+    return { success: false, error: error.message || 'Unknown error' };
   }
 }

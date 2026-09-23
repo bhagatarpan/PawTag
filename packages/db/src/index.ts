@@ -63,3 +63,5 @@ export { IntegrationConnection, type IIntegrationConnectionDocument, type Integr
 export { GuardianPointsLedger, type IGuardianPointsLedgerDocument } from './models/GuardianPointsLedger';
 export { GuardianTierHistory, type IGuardianTierHistoryDocument } from './models/GuardianTierHistory';
 export { PawRewardsLedger, type IPawRewardsLedgerDocument } from './models/PawRewardsLedger';
+export { BackgroundJob, type IBackgroundJobDocument } from './models/BackgroundJob';
+export { PendingRefundRetry, type IPendingRefundRetryDocument } from './models/PendingRefundRetry';

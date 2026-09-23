@@ -1,9 +1,9 @@
 /**
  * @module Refund Retry Service
- * @description Handles automatic retry of failed refunds.
+ * @description Handles automatic retry of failed refunds with MongoDB persistence.
  *
  * Flow:
- * 1. When a refund fails, schedule a retry using in-memory timer
+ * 1. When a refund fails, schedule a retry (persisted to MongoDB)
  * 2. First retry: 2 hours after failure
  * 3. Second retry: 24 hours after failure (via daily reconciliation job)
  * 4. After max retries, alert admin for manual intervention
@@ -13,58 +13,60 @@
  * Both customer and admin cancellations are eligible for auto-retry.
  */
 
-import { Order } from '@pawtag/db';
+import { Order, PendingRefundRetry } from '@pawtag/db';
 import { stripePaymentProvider } from '../providers/stripe';
 import { getNumberSetting } from '../config';
 import { logRefundEvent } from '../audit';
 import logger from '../../lib/logger';
 
-interface PendingRetry {
-  orderId: string;
-  refundId: string;
-  scheduledAt: Date;
-  attemptNumber: number;
-  timer: NodeJS.Timeout;
-}
-
-const pendingRetries = new Map<string, PendingRetry>();
+// In-memory timers for active retries (survives DB reads, lost on restart)
+// The DB is the source of truth; timers are just triggers
+const activeTimers = new Map<string, NodeJS.Timeout>();
 
 /**
- * Schedule a retry of a failed refund.
+ * Schedule a retry of a failed refund. Persists to MongoDB.
  *
  * @param orderId - Order ID
  * @param refundId - Previous (failed) Stripe refund ID
  * @param attemptNumber - 1 = first auto-retry, 2 = second
  * @param delayHours - Hours to wait before retrying
  */
-export function scheduleRefundRetry(
+export async function scheduleRefundRetry(
   orderId: string,
   refundId: string,
   attemptNumber: number,
   delayHours: number,
-): void {
+): Promise<void> {
   // Cancel any existing retry for this order
-  cancelRefundRetry(orderId);
+  await cancelRefundRetry(orderId);
 
   const delayMs = delayHours * 60 * 60 * 1000;
   const scheduledAt = new Date(Date.now() + delayMs);
 
+  // Persist to MongoDB
+  await PendingRefundRetry.findOneAndUpdate(
+    { orderId },
+    {
+      orderId,
+      refundId,
+      attemptNumber,
+      scheduledAt,
+      status: 'pending',
+    },
+    { upsert: true, new: true },
+  );
+
+  // Also schedule in-memory timer for immediate execution
   const timer = setTimeout(async () => {
     try {
       await executeRefundRetry(orderId, refundId, attemptNumber);
     } catch (err) {
       logger.error({ err, orderId, refundId }, 'Scheduled refund retry execution failed');
     }
-    pendingRetries.delete(orderId);
+    activeTimers.delete(orderId);
   }, delayMs);
 
-  pendingRetries.set(orderId, {
-    orderId,
-    refundId,
-    scheduledAt,
-    attemptNumber,
-    timer,
-  });
+  activeTimers.set(orderId, timer);
 
   logger.info({
     orderId,
@@ -78,13 +80,21 @@ export function scheduleRefundRetry(
 /**
  * Cancel a pending retry for an order.
  */
-export function cancelRefundRetry(orderId: string): void {
-  const existing = pendingRetries.get(orderId);
-  if (existing) {
-    clearTimeout(existing.timer);
-    pendingRetries.delete(orderId);
-    logger.info({ orderId }, 'Pending refund retry cancelled');
+export async function cancelRefundRetry(orderId: string): Promise<void> {
+  // Cancel in-memory timer
+  const existingTimer = activeTimers.get(orderId);
+  if (existingTimer) {
+    clearTimeout(existingTimer);
+    activeTimers.delete(orderId);
   }
+
+  // Update DB record
+  await PendingRefundRetry.updateOne(
+    { orderId, status: 'pending' },
+    { $set: { status: 'completed' } },
+  );
+
+  logger.info({ orderId }, 'Pending refund retry cancelled');
 }
 
 /**
@@ -130,77 +140,94 @@ export async function executeRefundRetry(
       orderNumber: order.orderNumber,
       retryAttempt: String(attemptNumber),
       previousRefundId,
-      initiatedBy: order.cancelledByType === 'System' ? 'system' :
-                   order.cancelledByType === 'Customer' ? 'customer' : 'admin',
-      environment: process.env.NODE_ENV === 'production' ? 'production' : 'development',
     },
   });
 
   if (result.success && result.refundId) {
+    // Update order with successful refund
     order.refundId = result.refundId;
     order.refundStatus = 'pending';
-    order.refundAttemptCount = attemptNumber;
     order.refundLastSyncedAt = new Date();
     await order.save();
 
+    // Mark DB record as completed
+    await PendingRefundRetry.updateOne(
+      { orderId, status: 'pending' },
+      { $set: { status: 'completed', lastAttemptAt: new Date() } },
+    );
+
     await logRefundEvent('succeeded', {
-      orderId,
+      orderId: String(order._id),
       orderNumber: order.orderNumber,
+      refundId: result.refundId,
       amount,
-      currency: order.payment.currency || 'NZD',
-      reason: `Retry attempt ${attemptNumber}`,
-      metadata: { newRefundId: result.refundId, attemptNumber },
-    } as any).catch(() => {});
+      currency: order.payment?.currency || 'NZD',
+    });
 
     logger.info({
       orderId,
       orderNumber: order.orderNumber,
-      newRefundId: result.refundId,
+      refundId: result.refundId,
       attemptNumber,
     }, 'Refund retry succeeded');
 
     return { success: true, newRefundId: result.refundId };
+  } else {
+    // Mark DB record as failed
+    await PendingRefundRetry.updateOne(
+      { orderId, status: 'pending' },
+      {
+        $set: {
+          status: 'failed',
+          lastAttemptAt: new Date(),
+          lastError: result.error || 'Unknown error',
+        },
+      },
+    );
+
+    await logRefundEvent('failed', {
+      orderId: String(order._id),
+      orderNumber: order.orderNumber,
+      amount,
+      currency: order.payment?.currency || 'NZD',
+      error: result.error,
+    });
+
+    logger.error({
+      orderId,
+      orderNumber: order.orderNumber,
+      attemptNumber,
+      error: result.error,
+    }, 'Refund retry failed');
+
+    return { success: false, error: result.error };
   }
-
-  logger.warn({
-    orderId,
-    orderNumber: order.orderNumber,
-    attemptNumber,
-    error: result.error,
-  }, 'Refund retry failed');
-
-  return { success: false, error: result.error };
 }
 
 /**
- * Called by the webhook handler when a refund fails.
- * Schedules the first auto-retry (2h by default).
+ * Called by onRefundFailed to schedule first retry.
  */
 export async function onRefundFailed(
   orderId: string,
   refundId: string,
 ): Promise<void> {
+  const maxAutoRetries = Number(await getNumberSetting('commerce.refunds.maxAutoRetries')) || 1;
+  const firstHours = Number(await getNumberSetting('commerce.refunds.retryFirstHours')) || 2;
+
   const order = await Order.findById(orderId);
   if (!order) return;
 
   const currentAttempts = order.refundAttemptCount || 0;
-  const maxAutoRetries = Number(await getNumberSetting('commerce.refunds.maxAutoRetries')) || 1;
-  const firstHours = Number(await getNumberSetting('commerce.refunds.retryFirstHours')) || 2;
 
   if (currentAttempts >= maxAutoRetries) {
-    logger.info({
-      orderId,
-      refundId,
-      currentAttempts,
-      maxAutoRetries,
-    }, 'Max auto-retries reached, waiting for manual intervention');
+    logger.info({ orderId, attempts: currentAttempts }, 'Max refund retries reached, skipping');
     return;
   }
 
   order.refundAttemptCount = currentAttempts + 1;
   await order.save();
 
-  scheduleRefundRetry(orderId, refundId, currentAttempts + 1, firstHours);
+  await scheduleRefundRetry(orderId, refundId, currentAttempts + 1, firstHours);
 }
 
 /**
@@ -262,18 +289,54 @@ export async function manualRefundRetry(
 }
 
 /**
- * Get all pending retries (for admin visibility).
+ * Get all pending retries from MongoDB (for admin visibility).
  */
-export function getPendingRetries(): Array<{
+export async function getPendingRetries(): Promise<Array<{
   orderId: string;
   refundId: string;
   scheduledAt: Date;
   attemptNumber: number;
-}> {
-  return Array.from(pendingRetries.values()).map((r) => ({
+}>> {
+  const retries = await PendingRefundRetry.find({ status: 'pending' }).lean();
+  return retries.map((r) => ({
     orderId: r.orderId,
     refundId: r.refundId,
     scheduledAt: r.scheduledAt,
     attemptNumber: r.attemptNumber,
   }));
+}
+
+/**
+ * Reload pending retries from MongoDB and reschedule timers.
+ * Called on process startup to recover from crashes.
+ */
+export async function reloadPendingRetries(): Promise<void> {
+  const pending = await PendingRefundRetry.find({ status: 'pending' }).lean();
+  
+  for (const retry of pending) {
+    const delayMs = retry.scheduledAt.getTime() - Date.now();
+    
+    if (delayMs <= 0) {
+      // Already due — execute immediately
+      try {
+        await executeRefundRetry(retry.orderId, retry.refundId, retry.attemptNumber);
+      } catch (err) {
+        logger.error({ err, orderId: retry.orderId }, 'Failed to execute recovered refund retry');
+      }
+    } else {
+      // Schedule timer
+      const timer = setTimeout(async () => {
+        try {
+          await executeRefundRetry(retry.orderId, retry.refundId, retry.attemptNumber);
+        } catch (err) {
+          logger.error({ err, orderId: retry.orderId }, 'Scheduled refund retry execution failed');
+        }
+        activeTimers.delete(retry.orderId);
+      }, delayMs);
+      
+      activeTimers.set(retry.orderId, timer);
+    }
+  }
+
+  logger.info({ count: pending.length }, 'Reloaded pending refund retries from database');
 }

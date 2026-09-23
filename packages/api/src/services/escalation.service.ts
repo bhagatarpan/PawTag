@@ -5,6 +5,7 @@ import { sendPushToUser } from './push-notification.service';
 import logger from '../lib/logger';
 import { logJob } from '../lib/timing';
 import { createClaimedJob, generateWorkerId } from '../lib/job-claim';
+import type { JobResult } from './job-scheduler.service';
 
 const POLL_INTERVAL_MS = 60_000; // Check every minute
 let pollingTimer: ReturnType<typeof setInterval> | null = null;
@@ -40,6 +41,19 @@ export function stopEscalationService(): void {
     clearInterval(pollingTimer);
     pollingTimer = null;
     logger.info('[Escalation] Stopped escalation polling service');
+  }
+}
+
+/**
+ * Run the escalation job. Called by the job scheduler.
+ */
+export async function runEscalationJob(): Promise<JobResult> {
+  try {
+    await processOverdueEscalations();
+    return { success: true };
+  } catch (error: any) {
+    logger.error({ err: error }, '[Escalation] Job error');
+    return { success: false, error: error.message || 'Unknown error' };
   }
 }
 

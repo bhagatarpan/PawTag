@@ -87,6 +87,7 @@ async function seed() {
       { name: 'SYSTEM_LOGGING', displayName: 'System Logging', description: 'View and manage system application logs', icon: 'Terminal', sortOrder: 230 },
       { name: 'SUBSCRIPTION_MANAGEMENT', displayName: 'Subscription Management', description: 'Manage customer subscriptions and plans', icon: 'RefreshCw', sortOrder: 240 },
       { name: 'SUPPORT_MANAGEMENT', displayName: 'Support Management', description: 'Manage customer support requests and escalations', icon: 'HeadphonesIcon', sortOrder: 250 },
+      { name: 'BACKGROUND_JOBS', displayName: 'Background Jobs', description: 'Manage and monitor background jobs', icon: 'Clock', sortOrder: 260 },
     ];
 
     const groupMap: Record<string, string> = {};
@@ -398,6 +399,11 @@ async function seed() {
       { name: 'admin.read', displayName: 'Read Support Requests', description: 'View customer support requests and messages', resource: 'admin', action: 'read', groupIndex: groupDefs.findIndex(g => g.name === 'SUPPORT_MANAGEMENT') },
       { name: 'admin.update', displayName: 'Update Support Requests', description: 'Update support request status, add notes, and manage resolutions', resource: 'admin', action: 'update', groupIndex: groupDefs.findIndex(g => g.name === 'SUPPORT_MANAGEMENT') },
 
+      // Background Jobs
+      { name: 'job.read', displayName: 'Read Background Jobs', description: 'View background jobs, status, and execution history', resource: 'job', action: 'read', groupIndex: groupDefs.findIndex(g => g.name === 'BACKGROUND_JOBS') },
+      { name: 'job.manage', displayName: 'Manage Background Jobs', description: 'Update job configuration, enable/disable jobs, purge history', resource: 'job', action: 'manage', groupIndex: groupDefs.findIndex(g => g.name === 'BACKGROUND_JOBS') },
+      { name: 'job.execute', displayName: 'Execute Background Jobs', description: 'Trigger immediate job execution', resource: 'job', action: 'execute', groupIndex: groupDefs.findIndex(g => g.name === 'BACKGROUND_JOBS') },
+
       // Permission Scope (referenced by Sidebar for Access Scopes page)
       { name: 'permission_scope.read', displayName: 'Read Access Scopes', description: 'View permission scopes and their configurations', resource: 'permission_scope', action: 'read', groupIndex: groupDefs.findIndex(g => g.name === 'PERMISSION_MANAGEMENT') },
     ];
@@ -624,6 +630,10 @@ async function seed() {
         // Support Requests
         { permissionName: 'admin.read' },
         { permissionName: 'admin.update' },
+        // Background Jobs
+        { permissionName: 'job.read' },
+        { permissionName: 'job.manage' },
+        { permissionName: 'job.execute' },
         // Permission Scopes
         { permissionName: 'permission_scope.read' },
       ],

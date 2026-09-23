@@ -45,10 +45,11 @@ interface Product {
    featureHighlights?: IFeatureHighlight[];
    isSubscription?: boolean;
    isTagProduct?: boolean;
-   subscriptionConfig?: {
-     type?: 'annual' | 'monthly';
-     freePeriodMonths?: number;
-     monthlyPrice?: number;
+    subscriptionConfig?: {
+      type?: 'annual' | 'monthly';
+      freePeriodMonths?: number;
+      monthlyPrice?: number;
+      annualPrice?: number;
      gracePeriodWeeks?: number;
      features?: string[];
    };
@@ -624,7 +625,7 @@ const [form, setForm] = useState({
         name: '', description: '', shortDescription: '', price: 0, category: 'PawTag',
         stock: 0, sku: '', currency: 'NZD', isActive: true, customizable: false, customizationLabel: '', customizationPrice: 0,
         featureHighlights: [...DEFAULT_FEATURE_HIGHLIGHTS], slug: '', isSubscription: true, isTagProduct: false,
-        subscriptionConfig: { type: 'annual', freePeriodMonths: 12, monthlyPrice: 0, gracePeriodWeeks: 4 },
+        subscriptionConfig: { type: 'annual', freePeriodMonths: 12, monthlyPrice: 0, annualPrice: 0, gracePeriodWeeks: 4 },
       });
       setVariants([]);
       setImages([]);
@@ -635,7 +636,7 @@ const [form, setForm] = useState({
   // Form handlers
 const openCreate = () => {
      setEditing(null);
-      setForm({ name: '', description: '', shortDescription: '', price: 0, category: 'PawTag', stock: 0, sku: '', currency: 'NZD', isActive: true, customizable: false, customizationLabel: '', customizationPrice: 0, featureHighlights: [...DEFAULT_FEATURE_HIGHLIGHTS], slug: '', isSubscription: false, isTagProduct: false, subscriptionConfig: { type: 'annual', freePeriodMonths: 12, monthlyPrice: 0, gracePeriodWeeks: 4 } });
+      setForm({ name: '', description: '', shortDescription: '', price: 0, category: 'PawTag', stock: 0, sku: '', currency: 'NZD', isActive: true, customizable: false, customizationLabel: '', customizationPrice: 0, featureHighlights: [...DEFAULT_FEATURE_HIGHLIGHTS], slug: '', isSubscription: false, isTagProduct: false, subscriptionConfig: { type: 'annual', freePeriodMonths: 12, monthlyPrice: 0, annualPrice: 0, gracePeriodWeeks: 4 } });
     setVariants([]);
     setImages([]);
     setShowForm(true);

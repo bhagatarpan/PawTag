@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import { AuthRequest, authenticate } from '../middleware/auth';
-import { User, Subscription, GuardianPointsLedger, PawRewardsLedger } from '@pawtag/db';
+import { User, Subscription, GuardianPointsLedger, PawRewardsLedger, Setting } from '@pawtag/db';
 import { auditService, type AuditContext } from '../services/audit';
 import { createAuditContextFromRequest, type AuditRequest } from '../middleware/audit';
 import { createDbRateLimiter } from '../lib/rate-limiter';

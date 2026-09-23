@@ -36,90 +36,63 @@ process.env.PAWTAG_WORKER_ROLE = 'worker';
 import { connectDatabase } from '@pawtag/db';
 import { config } from './config';
 import logger from './lib/logger';
-import { generateWorkerId } from './lib/job-claim';
 
-// Import all job starters
-import { startReminderService, stopReminderService } from './services/reminder.service';
-import { startSubscriptionService, stopSubscriptionService } from './services/subscription.service';
-import { startEscalationService, stopEscalationService } from './services/escalation.service';
-import { startLowStockService, stopLowStockService } from './jobs/lowStockCheck';
-import { startPetMilestonesJob, stopPetMilestonesJob } from './jobs/pet-milestones';
+// Import job scheduler
+import {
+  start as startScheduler,
+  stop as stopScheduler,
+  registerJobFunction,
+} from './services/job-scheduler.service';
 
-const workerId = generateWorkerId();
+// Import job functions
+import { runReminderJob } from './services/reminder.service';
+import { runSubscriptionJob } from './services/subscription.service';
+import { runEscalationJob } from './services/escalation.service';
+import { runLowStockJob } from './jobs/lowStockCheck';
+import { runPetMilestonesJob } from './jobs/pet-milestones';
+import { runPawRewardsJob } from './jobs/pawrewards';
+import { runOrphanPaymentJob } from './jobs/orphanPaymentDetection';
+import { runOrderAutoCancelJob } from './jobs/orderAutoCancel';
+import { runShippingTrackingJob } from './jobs/shippingTrackingPoll';
+import { runWebhookRetryJob } from './jobs/webhookRetry';
+import { runPaymentReconciliationJob } from './jobs/paymentReconciliation';
+import { runRefundReconciliationJob } from './jobs/refundReconciliation';
+import { runPrivacyRetentionJob } from './jobs/privacyRetention';
+import { runAuditRetentionJob } from './jobs/auditRetention';
+
 let isShuttingDown = false;
-
-// Track all stop functions for graceful shutdown
-const stopFunctions: Array<() => void> = [];
 
 async function startWorker(): Promise<void> {
   try {
-    logger.info({ workerId }, '[Worker] Starting PawTag worker process...');
+    logger.info('[Worker] Starting PawTag worker process...');
 
     // Connect to database
     await connectDatabase(config.dbUrl);
     logger.info('[Worker] Database connected');
 
-    // Start all background jobs
-    logger.info('[Worker] Starting background jobs...');
+    // Register all job functions
+    logger.info('[Worker] Registering job functions...');
+    registerJobFunction('runReminderJob', runReminderJob);
+    registerJobFunction('runSubscriptionJob', runSubscriptionJob);
+    registerJobFunction('runEscalationJob', runEscalationJob);
+    registerJobFunction('runLowStockJob', runLowStockJob);
+    registerJobFunction('runPetMilestonesJob', runPetMilestonesJob);
+    registerJobFunction('runPawRewardsJob', runPawRewardsJob);
+    registerJobFunction('runOrphanPaymentJob', runOrphanPaymentJob);
+    registerJobFunction('runOrderAutoCancelJob', runOrderAutoCancelJob);
+    registerJobFunction('runShippingTrackingJob', runShippingTrackingJob);
+    registerJobFunction('runWebhookRetryJob', runWebhookRetryJob);
+    registerJobFunction('runPaymentReconciliationJob', runPaymentReconciliationJob);
+    registerJobFunction('runRefundReconciliationJob', runRefundReconciliationJob);
+    registerJobFunction('runPrivacyRetentionJob', runPrivacyRetentionJob);
+    registerJobFunction('runAuditRetentionJob', runAuditRetentionJob);
+    logger.info('[Worker] All job functions registered');
 
-    startReminderService();
-    stopFunctions.push(stopReminderService);
-    logger.info('[Worker] Reminder service started');
+    // Start the scheduler (reads jobs from DB, starts timers)
+    await startScheduler();
+    logger.info('[Worker] Job scheduler started');
 
-    startSubscriptionService();
-    stopFunctions.push(stopSubscriptionService);
-    logger.info('[Worker] Subscription service started');
-
-    startEscalationService();
-    stopFunctions.push(stopEscalationService);
-    logger.info('[Worker] Escalation service started');
-
-    startLowStockService();
-    stopFunctions.push(stopLowStockService);
-    logger.info('[Worker] Low stock service started');
-
-    startPetMilestonesJob();
-    stopFunctions.push(stopPetMilestonesJob);
-    logger.info('[Worker] Pet milestones job started');
-
-    // Dynamic imports for jobs that use them
-    const { startPawRewardsJob, stopPawRewardsJob } = await import('./jobs/pawrewards');
-    startPawRewardsJob();
-    stopFunctions.push(stopPawRewardsJob);
-    logger.info('[Worker] PawRewards job started');
-
-    const { startOrphanPaymentJob, stopOrphanPaymentJob } = await import('./jobs/orphanPaymentDetection');
-    startOrphanPaymentJob();
-    stopFunctions.push(stopOrphanPaymentJob);
-    logger.info('[Worker] Orphan payment detection job started');
-
-    const { startOrderAutoCancelJob, stopOrderAutoCancelJob } = await import('./jobs/orderAutoCancel');
-    startOrderAutoCancelJob();
-    stopFunctions.push(stopOrderAutoCancelJob);
-    logger.info('[Worker] Order auto-cancel job started');
-
-    const { startTrackingPollJob, stopTrackingPollJob } = await import('./jobs/shippingTrackingPoll');
-    startTrackingPollJob();
-    stopFunctions.push(stopTrackingPollJob);
-    logger.info('[Worker] Shipping tracking poll job started');
-
-    const { startWebhookRetryJob, stopWebhookRetryJob } = await import('./jobs/webhookRetry');
-    startWebhookRetryJob();
-    stopFunctions.push(stopWebhookRetryJob);
-    logger.info('[Worker] Webhook retry job started');
-
-    const { startPaymentReconciliationJob, stopPaymentReconciliationJob } = await import('./jobs/paymentReconciliation');
-    startPaymentReconciliationJob();
-    stopFunctions.push(stopPaymentReconciliationJob);
-    logger.info('[Worker] Payment reconciliation job started');
-
-    const { startRefundReconciliationJob, stopRefundReconciliationJob } = await import('./jobs/refundReconciliation');
-    startRefundReconciliationJob();
-    stopFunctions.push(stopRefundReconciliationJob);
-    logger.info('[Worker] Refund reconciliation job started');
-
-    logger.info('[Worker] All background jobs started successfully');
-    logger.info({ workerId }, '[Worker] Worker process is running');
+    logger.info('[Worker] Worker process is running');
   } catch (error) {
     logger.fatal({ err: error }, '[Worker] Failed to start worker process');
     process.exit(1);
@@ -127,35 +100,16 @@ async function startWorker(): Promise<void> {
 }
 
 /**
- * Graceful shutdown: stop all jobs, wait for in-flight work, then exit.
+ * Graceful shutdown: stop scheduler, wait for in-flight work, then exit.
  */
 async function gracefulShutdown(signal: string): Promise<void> {
   if (isShuttingDown) return;
   isShuttingDown = true;
 
-  logger.info({ signal, workerId }, '[Worker] Shutdown signal received, draining jobs...');
+  logger.info({ signal }, '[Worker] Shutdown signal received, stopping scheduler...');
 
-  // Stop all job timers (prevents new iterations from starting)
-  for (const stopFn of stopFunctions) {
-    try {
-      stopFn();
-    } catch (err) {
-      logger.error({ err }, '[Worker] Error stopping job');
-    }
-  }
+  await stopScheduler();
 
-  logger.info('[Worker] All job timers stopped, waiting for in-flight work...');
-
-  // Give in-flight iterations up to 30 seconds to complete
-  const shutdownTimeout = setTimeout(() => {
-    logger.warn('[Worker] Shutdown timeout reached, forcing exit');
-    process.exit(1);
-  }, 30_000);
-
-  // Wait a moment for any async work to settle
-  await new Promise(resolve => setTimeout(resolve, 2_000));
-
-  clearTimeout(shutdownTimeout);
   logger.info('[Worker] Graceful shutdown complete');
   process.exit(0);
 }

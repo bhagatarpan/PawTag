@@ -2,6 +2,7 @@ import { Pet, Notification, User } from '@pawtag/db';
 import { sendPushToUser } from './push-notification.service';
 import { auditService, type AuditContext } from './audit';
 import logger from '../lib/logger';
+import type { JobResult } from './job-scheduler.service';
 
 const REMINDER_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const REMINDER_CHECK_INTERVAL_MS = 60 * 60 * 1000; // Check every hour
@@ -53,6 +54,20 @@ export function stopReminderService() {
     clearInterval(reminderTimer);
     reminderTimer = null;
     logger.info('[ReminderService] Stopped');
+  }
+}
+
+/**
+ * Run the reminder job. Called by the job scheduler.
+ */
+export async function runReminderJob(): Promise<JobResult> {
+  try {
+    await sendFinderReminders();
+    await sendOnboardingNudges();
+    return { success: true };
+  } catch (error: any) {
+    logger.error({ err: error }, '[ReminderService] Job error');
+    return { success: false, error: error.message || 'Unknown error' };
   }
 }
 

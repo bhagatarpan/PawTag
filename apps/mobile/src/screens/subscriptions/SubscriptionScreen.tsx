@@ -22,6 +22,7 @@ interface Subscription {
   status: string;
   price: number;
   currency: string;
+  renewalMethod: string;
   currentPeriodStart: string;
   currentPeriodEnd: string;
   autoRenew: boolean;

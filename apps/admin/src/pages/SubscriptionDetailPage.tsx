@@ -35,6 +35,7 @@ interface SubscriptionDetail {
     lastScannedAt?: string;
     lastPaymentDate?: string;
     lastPaymentAmount?: number;
+    renewalMethod?: string;
     reminderStates?: any;
   };
   invoices: Array<{

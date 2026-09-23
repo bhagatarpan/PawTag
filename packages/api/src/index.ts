@@ -111,11 +111,6 @@ import { siteAvailabilityMiddleware } from './middleware/site-availability';
 import { shutdownTracing } from './lib/tracing';
 import { flushMonitoring } from './lib/monitoring';
 import { flushSystemLogs } from './lib/logger';
-import { startReminderService } from './services/reminder.service';
-import { startSubscriptionService } from './services/subscription.service';
-import { startEscalationService } from './services/escalation.service';
-import { startLowStockService } from './jobs/lowStockCheck';
-import { startPetMilestonesJob } from './jobs/pet-milestones';
 
 const app = express();
 
@@ -337,34 +332,41 @@ async function start() {
       // API process: start background jobs (development/staging only)
       // In production, the dedicated worker process handles jobs.
       if (config.nodeEnv !== 'production') {
-        logger.info('Starting background jobs (non-production mode)');
+        logger.info('Starting background jobs via scheduler (non-production mode)');
 
-        startReminderService();
-        startSubscriptionService();
-        startEscalationService();
-        startLowStockService();
-        startPetMilestonesJob();
+        // Import job functions and register them
+        const { registerJobFunction, start: startScheduler } = await import('./services/job-scheduler.service');
+        const { runReminderJob } = await import('./services/reminder.service');
+        const { runSubscriptionJob } = await import('./services/subscription.service');
+        const { runEscalationJob } = await import('./services/escalation.service');
+        const { runLowStockJob } = await import('./jobs/lowStockCheck');
+        const { runPetMilestonesJob } = await import('./jobs/pet-milestones');
+        const { runPawRewardsJob } = await import('./jobs/pawrewards');
+        const { runOrphanPaymentJob } = await import('./jobs/orphanPaymentDetection');
+        const { runOrderAutoCancelJob } = await import('./jobs/orderAutoCancel');
+        const { runShippingTrackingJob } = await import('./jobs/shippingTrackingPoll');
+        const { runWebhookRetryJob } = await import('./jobs/webhookRetry');
+        const { runPaymentReconciliationJob } = await import('./jobs/paymentReconciliation');
+        const { runRefundReconciliationJob } = await import('./jobs/refundReconciliation');
+        const { runPrivacyRetentionJob } = await import('./jobs/privacyRetention');
+        const { runAuditRetentionJob } = await import('./jobs/auditRetention');
 
-        const { startPawRewardsJob } = await import('./jobs/pawrewards');
-        startPawRewardsJob();
+        registerJobFunction('runReminderJob', runReminderJob);
+        registerJobFunction('runSubscriptionJob', runSubscriptionJob);
+        registerJobFunction('runEscalationJob', runEscalationJob);
+        registerJobFunction('runLowStockJob', runLowStockJob);
+        registerJobFunction('runPetMilestonesJob', runPetMilestonesJob);
+        registerJobFunction('runPawRewardsJob', runPawRewardsJob);
+        registerJobFunction('runOrphanPaymentJob', runOrphanPaymentJob);
+        registerJobFunction('runOrderAutoCancelJob', runOrderAutoCancelJob);
+        registerJobFunction('runShippingTrackingJob', runShippingTrackingJob);
+        registerJobFunction('runWebhookRetryJob', runWebhookRetryJob);
+        registerJobFunction('runPaymentReconciliationJob', runPaymentReconciliationJob);
+        registerJobFunction('runRefundReconciliationJob', runRefundReconciliationJob);
+        registerJobFunction('runPrivacyRetentionJob', runPrivacyRetentionJob);
+        registerJobFunction('runAuditRetentionJob', runAuditRetentionJob);
 
-        const { startOrphanPaymentJob } = await import('./jobs/orphanPaymentDetection');
-        startOrphanPaymentJob();
-
-        const { startOrderAutoCancelJob } = await import('./jobs/orderAutoCancel');
-        startOrderAutoCancelJob();
-
-        const { startTrackingPollJob } = await import('./jobs/shippingTrackingPoll');
-        startTrackingPollJob();
-
-        const { startWebhookRetryJob } = await import('./jobs/webhookRetry');
-        startWebhookRetryJob();
-
-        const { startPaymentReconciliationJob } = await import('./jobs/paymentReconciliation');
-        startPaymentReconciliationJob();
-
-        const { startRefundReconciliationJob } = await import('./jobs/refundReconciliation');
-        startRefundReconciliationJob();
+        await startScheduler();
       } else {
         logger.info('Production API process — background jobs handled by dedicated worker');
       }

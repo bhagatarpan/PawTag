@@ -3,6 +3,7 @@ import { sendMail } from '../services/email.service';
 import { renderLowStockAlertEmail } from '../services/email/templates';
 import { auditService, type AuditContext } from '../services/audit';
 import logger from '../lib/logger';
+import type { JobResult } from '../services/job-scheduler.service';
 
 async function auditJobEvent(
   input: Parameters<typeof auditService.log>[1],
@@ -140,5 +141,18 @@ export function stopLowStockService(): void {
     clearInterval(lowStockTimer);
     lowStockTimer = null;
     logger.info('[LowStockCheck] Stopped low stock check service');
+  }
+}
+
+/**
+ * Run the low stock check job. Called by the job scheduler.
+ */
+export async function runLowStockJob(): Promise<JobResult> {
+  try {
+    const result = await checkLowStock();
+    return { success: true, itemsProcessed: result.count };
+  } catch (error: any) {
+    logger.error({ err: error }, '[LowStockCheck] Job error');
+    return { success: false, error: error.message || 'Unknown error' };
   }
 }

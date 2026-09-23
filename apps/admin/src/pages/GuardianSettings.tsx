@@ -41,6 +41,7 @@ interface GuardianSettings {
   // Gold multiplier
   goldMultiplier: number;
   goldPrice: number;
+  goldAnnualPrice: number;
   
   // Annual caps
   annualCapReviewText: number;

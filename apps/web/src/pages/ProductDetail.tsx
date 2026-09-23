@@ -69,10 +69,11 @@ const getIconByName = (iconName: string) => {
    customizable?: boolean;
    customizationLabel?: string;
    customizationPrice?: number;
-subscriptionConfig?: {
+ subscriptionConfig?: {
       type: 'annual' | 'monthly';
       freePeriodMonths: number;
       monthlyPrice?: number;
+      annualPrice?: number;
       features: string[];
     };
     warrantyMonths: number;

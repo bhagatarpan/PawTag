@@ -230,3 +230,16 @@ export function stopRefundReconciliationJob(): void {
     logger.info('Refund reconciliation job stopped');
   }
 }
+
+/**
+ * Run the refund reconciliation job. Called by the job scheduler.
+ */
+export async function runRefundReconciliationJob(): Promise<import('../services/job-scheduler.service').JobResult> {
+  try {
+    await claimedRunRefundReconciliation();
+    return { success: true };
+  } catch (error: any) {
+    logger.error({ err: error }, '[RefundReconciliationJob] Job error');
+    return { success: false, error: error.message || 'Unknown error' };
+  }
+}

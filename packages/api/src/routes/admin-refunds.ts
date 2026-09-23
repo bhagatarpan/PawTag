@@ -179,7 +179,7 @@ router.get('/refunds/:orderId', requirePermission('order.read'), async (req: Aut
         order: mapOrderToRefundListItem(order),
         customer: order.userId,
         transactions,
-        pendingRetries: getPendingRetries().filter((r) => r.orderId === req.params.orderId),
+        pendingRetries: (await getPendingRetries()).filter((r: any) => r.orderId === req.params.orderId),
       },
     });
   } catch (err) {

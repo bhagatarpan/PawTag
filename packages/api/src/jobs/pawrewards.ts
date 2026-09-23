@@ -124,3 +124,16 @@ export function stopPawRewardsJob(): void {
     logger.info('[PawRewardsJob] Stopped');
   }
 }
+
+/**
+ * Run the PawRewards job. Called by the job scheduler.
+ */
+export async function runPawRewardsJob(): Promise<import('../services/job-scheduler.service').JobResult> {
+  try {
+    await runPawRewardsJobs();
+    return { success: true };
+  } catch (error: any) {
+    logger.error({ err: error }, '[PawRewardsJob] Job error');
+    return { success: false, error: error.message || 'Unknown error' };
+  }
+}

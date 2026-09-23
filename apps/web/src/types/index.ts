@@ -21,6 +21,7 @@ export interface Product {
     freePeriodMonths: number;
     gracePeriodWeeks: number;
     monthlyPrice?: number;
+    annualPrice?: number;
     features: string[];
   };
   createdAt: string;

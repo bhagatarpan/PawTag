@@ -132,3 +132,16 @@ export function stopWebhookRetryJob(): void {
     logger.info('Webhook retry job stopped');
   }
 }
+
+/**
+ * Run the webhook retry job. Called by the job scheduler.
+ */
+export async function runWebhookRetryJob(): Promise<import('../services/job-scheduler.service').JobResult> {
+  try {
+    await claimedRetryFailedEvents();
+    return { success: true };
+  } catch (error: any) {
+    logger.error({ err: error }, '[WebhookRetryJob] Job error');
+    return { success: false, error: error.message || 'Unknown error' };
+  }
+}

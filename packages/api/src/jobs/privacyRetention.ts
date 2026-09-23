@@ -253,3 +253,19 @@ export async function runPrivacyRetentionCleanup(): Promise<{
 
   return results;
 }
+
+/**
+ * Run the privacy retention job. Called by the job scheduler.
+ */
+export async function runPrivacyRetentionJob(): Promise<import('../services/job-scheduler.service').JobResult> {
+  try {
+    const results = await runPrivacyRetentionCleanup();
+    const total = results.finderContactsAnonymized + results.gpsLocationsAnonymized +
+      results.ipLocationsAnonymized + results.deviceInfoAnonymized +
+      results.escalationRecordsAnonymized + results.locationEventsAnonymized;
+    return { success: true, itemsProcessed: total };
+  } catch (error: any) {
+    logger.error({ err: error }, '[PrivacyRetentionJob] Job error');
+    return { success: false, error: error.message || 'Unknown error' };
+  }
+}

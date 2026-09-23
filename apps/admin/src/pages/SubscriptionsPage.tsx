@@ -11,6 +11,7 @@ interface Subscription {
   planType: string;
   status: string;
   price: number;
+  renewalMethod: string;
   startDate: string;
   currentPeriodEnd: string;
   freePeriodEndsAt?: string;

@@ -76,3 +76,16 @@ export function stopTrackingPollJob(): void {
     logger.info('Shipping tracking poll job stopped');
   }
 }
+
+/**
+ * Run the shipping tracking poll job. Called by the job scheduler.
+ */
+export async function runShippingTrackingJob(): Promise<import('../services/job-scheduler.service').JobResult> {
+  try {
+    await claimedPollTrackingUpdates();
+    return { success: true };
+  } catch (error: any) {
+    logger.error({ err: error }, '[ShippingTrackingJob] Job error');
+    return { success: false, error: error.message || 'Unknown error' };
+  }
+}

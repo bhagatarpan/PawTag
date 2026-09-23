@@ -141,6 +141,20 @@ export function stopSubscriptionService() {
   }
 }
 
+/**
+ * Run the subscription service job. Called by the job scheduler.
+ */
+export async function runSubscriptionJob(): Promise<import('./job-scheduler.service').JobResult> {
+  try {
+    await runSubscriptionChecks();
+    await processPaymentRetries();
+    return { success: true };
+  } catch (error: any) {
+    logger.error({ err: error }, '[SubscriptionService] Job error');
+    return { success: false, error: error.message || 'Unknown error' };
+  }
+}
+
 export async function createSubscription(data: {
   userId: string;
   tagId?: string;
