@@ -412,6 +412,33 @@ Subscription status displays (badges, cards, steppers) must use these design tok
 | `cancelled` | neutral | `bg-gray-100 text-gray-600` | `from-gray-500 to-gray-700` | `border-l-gray-400` |
 | `pending_payment` | warning | `bg-amber-100 text-amber-700` | `from-amber-500 to-orange-600` | `border-l-amber-400` |
 
+### Tag Status Colors
+
+Tag status displays (badges, dots, indicators) must use these design tokens. No hardcoded colors.
+
+| Status | Badge Classes | Text Color | Dot Color | Icon | Meaning |
+|---|---|---|---|---|---|
+| `active` | `bg-green-100 text-green-700` | `text-green-700` | `bg-green-500` | CheckCircle | Tag is operational |
+| `inactive` | `bg-gray-100 text-gray-600` | `text-gray-600` | `bg-gray-400` | Info | Not yet activated |
+| `lost` | `bg-red-100 text-red-700` | `text-red-700` | `bg-red-500 animate-pulse` | AlertCircle | Pet is lost |
+| `expired` | `bg-amber-100 text-amber-700` | `text-amber-700` | `bg-amber-500` | Clock | Subscription expired |
+| `terminated` | `bg-gray-100 text-gray-500` | `text-gray-500` | `bg-gray-400` | XCircle | Pet terminal (deceased/sold) |
+| `replaced` | `bg-blue-100 text-blue-700` | `text-blue-700` | `bg-blue-400` | RefreshCw | Superseded by new tag |
+| `deleted` | `bg-gray-100 text-gray-400` | `text-gray-400` | `bg-gray-300` | Trash | Admin removed |
+
+### Tag Status Transitions
+
+| From | To | Trigger |
+|---|---|---|
+| (new) | `inactive` | Tag created at checkout |
+| `inactive` | `active` | Customer redeems/activates tag |
+| `active` | `lost` | Pet marked lost |
+| `lost` | `active` | Pet marked found |
+| `active` | `expired` | Grace period ends |
+| `active` | `terminated` | Pet marked terminal |
+| `active` | `replaced` | Replacement tag activated |
+| any | `deleted` | Admin soft-deletes tag |
+
 ### Subscription Tier Colors
 
 Guardian/Gold membership tier displays (badges, cards, progress indicators) must use these design tokens.

@@ -1077,6 +1077,7 @@ export async function checkGracePeriodExpiry() {
 
     await Tag.findByIdAndUpdate(sub.tagId, {
       subscriptionStatus: 'expired',
+      status: 'expired',
     });
 
     // Send tag expired email

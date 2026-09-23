@@ -430,19 +430,35 @@ router.get('/tags', requirePermission('tag.read'), async (req: AuthRequest, res:
 router.post('/tags/redeem', requirePermission('tag.create'), async (req: AuthRequest, res: Response) => {
   try {
     const { tagId } = req.body;
+
+    // Check 1: tagId is provided
     if (!tagId) {
       res.status(400).json({ success: false, error: 'Tag ID is required' });
       return;
     }
 
+    // Find the tag
     const tag = await Tag.findOne({ tagId, deletedAt: null });
     if (!tag) {
       res.status(404).json({ success: false, error: 'Tag ID not recognized — check the code on your tag' });
       return;
     }
 
-    if (tag.ownerId) {
+    // Check 2: ownerId must match current user (tag belongs to this customer)
+    if (!tag.ownerId || tag.ownerId.toString() !== req.user!.id) {
+      res.status(403).json({ success: false, error: 'This tag does not belong to you' });
+      return;
+    }
+
+    // Check 3: tag.status must be 'inactive' (not yet activated)
+    if (tag.status !== 'inactive') {
       res.status(409).json({ success: false, error: 'This tag has already been activated' });
+      return;
+    }
+
+    // Check 4: subscription must be active
+    if (tag.subscriptionStatus !== 'active') {
+      res.status(400).json({ success: false, error: 'This tag\'s subscription is not active. Please renew or purchase a new tag.' });
       return;
     }
 
@@ -463,8 +479,7 @@ router.post('/tags/redeem', requirePermission('tag.create'), async (req: AuthReq
       }
     }
 
-    // Redeem the tag
-    tag.ownerId = new mongoose.Types.ObjectId(req.user!.id);
+    // All checks passed — activate the tag
     tag.status = 'active';
     tag.activatedAt = new Date();
 
@@ -476,8 +491,8 @@ router.post('/tags/redeem', requirePermission('tag.create'), async (req: AuthReq
         if (oldTag.petId) {
           tag.petId = oldTag.petId;
         }
-        // Deactivate old tag
-        oldTag.status = 'inactive';
+        // Mark old tag as replaced
+        oldTag.status = 'replaced';
         oldTag.replacedByTagId = tag._id;
         await oldTag.save();
       }
@@ -1282,7 +1297,7 @@ router.post('/pets/:id/mark-terminal', requirePermission('pet.update'), async (r
       { read: true },
     );
 
-    await Tag.updateMany({ petId: pet._id, deletedAt: null }, { status: 'inactive' });
+    await Tag.updateMany({ petId: pet._id, deletedAt: null }, { status: 'terminated' });
 
     await auditCustomerEvent(req, {
       action: 'pet_mark_terminal',

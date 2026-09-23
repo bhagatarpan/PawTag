@@ -161,7 +161,7 @@ export interface Tag {
   _id: string;
   tagId: string;
   tagType: 'qr' | 'nfc';
-  status: 'active' | 'inactive' | 'lost' | 'unredeemed';
+  status: 'active' | 'inactive' | 'lost' | 'expired' | 'terminated' | 'replaced' | 'deleted';
   petId?: { _id: string; name: string; petType: string };
   subscription?: { status: string; planName: string; currentPeriodEnd: string };
   lastScannedAt?: string;

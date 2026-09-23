@@ -15,6 +15,8 @@ export default function TagInfoHeader({ tagId, tagStatus }: TagInfoHeaderProps) 
           <span className={`ml-2 inline-block px-2 py-0.5 text-xs font-bold rounded-full ${
             tagStatus === 'active' ? 'bg-green-100 text-green-700' :
             tagStatus === 'lost' ? 'bg-red-200 text-red-800' :
+            tagStatus === 'expired' ? 'bg-amber-100 text-amber-700' :
+            tagStatus === 'replaced' ? 'bg-blue-100 text-blue-700' :
             'bg-gray-200 text-gray-700'
           }`}>{tagStatus.toUpperCase()}</span>
         )}

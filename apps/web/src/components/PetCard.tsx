@@ -268,7 +268,10 @@ export default function PetCard({
                 </span>
                 <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
                   pet.linkedTag.status === 'active' ? 'bg-green-500' :
-                  pet.linkedTag.status === 'lost' ? 'bg-red-500 animate-pulse' : 'bg-gray-400'
+                  pet.linkedTag.status === 'lost' ? 'bg-red-500 animate-pulse' :
+                  pet.linkedTag.status === 'expired' ? 'bg-amber-500' :
+                  pet.linkedTag.status === 'replaced' ? 'bg-blue-400' :
+                  'bg-gray-400'
                 }`} />
               </div>
               {pet.linkedTag.subscription ? (

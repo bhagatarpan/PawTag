@@ -1792,6 +1792,7 @@ router.delete('/tags/:id', requirePermission('tag.delete'), async (req: AuthRequ
     if (!tag) { res.status(404).json({ success: false, error: 'Tag not found' }); return; }
 
     tag.deletedAt = new Date();
+    tag.status = 'deleted';
     await tag.save();
 
     await auditAdminEvent(req, {

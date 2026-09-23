@@ -202,11 +202,13 @@ router.get('/:tagId', async (req: Request, res: Response) => {
     const pet = tag.petId as any;
     const owner = tag.ownerId as any;
 
-    // Check subscription status
-    const isActiveForFinder = !tag.subscriptionStatus ||
+    // Check subscription status AND tag status
+    const isActiveForFinder = tag.status === 'active' && (
+      !tag.subscriptionStatus ||
       tag.subscriptionStatus === 'active' ||
       tag.subscriptionStatus === 'grace_period' ||
-      tag.subscriptionStatus === 'none';
+      tag.subscriptionStatus === 'none'
+    );
 
     if (!isActiveForFinder) {
       // Tag subscription expired — still log the scan but return limited info

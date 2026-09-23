@@ -8,6 +8,7 @@ import {
   Copy, Loader2, AlertTriangle, Shield, Lock, Unlock, RotateCcw,
   Database, FileText, User, Settings, Activity, CheckCircle,
   AlertCircle, Info, Clock, ExternalLink, Eye, Scan, Monitor, Smartphone, Tablet,
+  XCircle, RefreshCw,
 } from 'lucide-react';
 import { DetailDrawer as PetDetailDrawer, type PetRecord } from './Pets';
 import { DetailDrawer as UserDetailDrawer, type UserRecord } from './Users';
@@ -22,7 +23,7 @@ export interface TagItem {
   tagType?: string;
   petId: { _id: string; name: string; petId: string; petType: string; breed: string; color: string; status: string } | null;
   ownerId: { _id: string; fullName: string; email: string; phoneNumber?: string } | null;
-  status: 'active' | 'inactive' | 'lost';
+  status: 'active' | 'inactive' | 'lost' | 'expired' | 'terminated' | 'replaced' | 'deleted';
   lastScannedAt?: string;
   createdAt: string;
 }
@@ -60,9 +61,13 @@ function copyToClipboard(text: string) {
 
 function getStatusBadge(status: string): { className: string; icon: React.ReactNode } {
   switch (status) {
-    case 'active': return { className: 'bg-emerald-100 text-emerald-700 border border-emerald-200', icon: <CheckCircle size={13} /> };
-    case 'lost': return { className: 'bg-red-100 text-red-700 border border-red-200', icon: <AlertCircle size={13} /> };
+    case 'active': return { className: 'bg-green-100 text-green-700 border border-green-200', icon: <CheckCircle size={13} /> };
     case 'inactive': return { className: 'bg-gray-100 text-gray-600 border border-gray-200', icon: <Info size={13} /> };
+    case 'lost': return { className: 'bg-red-100 text-red-700 border border-red-200', icon: <AlertCircle size={13} /> };
+    case 'expired': return { className: 'bg-amber-100 text-amber-700 border border-amber-200', icon: <AlertTriangle size={13} /> };
+    case 'terminated': return { className: 'bg-gray-100 text-gray-500 border border-gray-200', icon: <XCircle size={13} /> };
+    case 'replaced': return { className: 'bg-blue-100 text-blue-700 border border-blue-200', icon: <RefreshCw size={13} /> };
+    case 'deleted': return { className: 'bg-gray-100 text-gray-400 border border-gray-200', icon: <Trash2 size={13} /> };
     default: return { className: 'bg-gray-100 text-gray-600 border border-gray-200', icon: <Info size={13} /> };
   }
 }
@@ -970,6 +975,10 @@ export default function Tags() {
                   <option value="active">Active</option>
                   <option value="inactive">Inactive</option>
                   <option value="lost">Lost</option>
+                  <option value="expired">Expired</option>
+                  <option value="terminated">Terminated</option>
+                  <option value="replaced">Replaced</option>
+                  <option value="deleted">Deleted</option>
                 </select>
               </div>
               <div>

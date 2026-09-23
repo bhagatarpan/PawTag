@@ -55,6 +55,10 @@ export enum TagStatus {
   ACTIVE = 'active',
   INACTIVE = 'inactive',
   LOST = 'lost',
+  EXPIRED = 'expired',
+  TERMINATED = 'terminated',
+  REPLACED = 'replaced',
+  DELETED = 'deleted',
 }
 
 export enum NotificationType {
