@@ -93,6 +93,7 @@ export enum SubscriptionPlanType {
   ANNUAL = 'annual',
   MONTHLY = 'monthly',
   FREE = 'free',
+  GOLD = 'gold',
 }
 
 export enum InvoiceStatus {
@@ -434,6 +435,7 @@ export interface SubscriptionConfig {
   freePeriodMonths: number;
   gracePeriodWeeks: number;
   monthlyPrice?: number;
+  annualPrice?: number;
   stripePriceId?: string;
   features: string[];
 }

@@ -17,6 +17,7 @@ interface PetTag {
     productName: string;
     status: string;
     price: number;
+    renewalMethod: string;
     autoRenew: boolean;
   };
 }
@@ -285,7 +286,7 @@ export default function PetCard({
                       Renew
                     </Link>
                   )}
-                  <span className="text-[11px] text-teal-500">${pet.linkedTag.subscription.price}/mo</span>
+                  <span className="text-[11px] text-teal-500">${pet.linkedTag.subscription.price}/{pet.linkedTag.subscription.renewalMethod === 'annual' ? 'yr' : 'mo'}</span>
                 </div>
               ) : (
                 <p className="text-[11px] text-teal-500 mt-0.5 italic">No subscription</p>

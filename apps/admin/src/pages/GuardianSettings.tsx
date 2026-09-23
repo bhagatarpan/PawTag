@@ -95,7 +95,8 @@ const DEFAULT_SETTINGS: GuardianSettings = {
   tagActivationPoints: 10,
   socialSharePoints: 3,
   goldMultiplier: 2,
-  goldPrice: 1.99,
+  goldPrice: 3.99,
+  goldAnnualPrice: 39.99,
   annualCapReviewText: 30,
   annualCapReviewPhoto: 50,
   annualCapReviewVideo: 75,
@@ -386,6 +387,19 @@ export default function GuardianSettings() {
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
             />
             <p className="text-xs text-gray-500 mt-1">Monthly subscription price for Gold members</p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Gold Annual Price (NZD)
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              value={settings.goldAnnualPrice}
+              onChange={(e) => setSettings({ ...settings, goldAnnualPrice: Number(e.target.value) })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            />
+            <p className="text-xs text-gray-500 mt-1">Incentivized annual price (save vs monthly × 12)</p>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">

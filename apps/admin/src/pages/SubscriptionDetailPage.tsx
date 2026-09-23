@@ -245,7 +245,7 @@ export default function SubscriptionDetailPage() {
                   )}
                 </div>
               </InfoRow>
-              <InfoRow label="Price" value={sub.planType === 'gold' ? 'Gold Membership' : `$${sub.price.toFixed(2)}/mo`} />
+              <InfoRow label="Price" value={sub.planType === 'gold' ? 'Gold Membership' : `$${sub.price.toFixed(2)}/${sub.renewalMethod === 'annual' ? 'yr' : 'mo'}`} />
               <InfoRow label="Auto-renew" value={sub.autoRenew ? 'Yes' : 'No'} />
               {!sub.autoRenew && sub.autoRenewPausedAt && (
                 <>

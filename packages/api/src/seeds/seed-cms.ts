@@ -216,7 +216,8 @@ async function run() {
         // Guardian Loyalty Program — Points Earning
         { key: 'guardian.purchaseRateGuardian', value: '1', displayValue: 'Purchase Rate (Guardian)', category: 'guardian', description: 'Points earned per $1 spent (Guardian members)' },
         { key: 'guardian.purchaseRateGold', value: '2', displayValue: 'Purchase Rate (Gold)', category: 'guardian', description: 'Points earned per $1 spent (Gold members)' },
-        { key: 'guardian.goldPrice', value: '1.99', displayValue: 'Gold Membership Price', category: 'guardian', description: 'Monthly price for Gold membership (NZD)' },
+        { key: 'guardian.goldPrice', value: '3.99', displayValue: 'Gold Membership Monthly Price', category: 'guardian', description: 'Monthly price for Gold membership (NZD)' },
+        { key: 'guardian.goldAnnualPrice', value: '39.99', displayValue: 'Gold Membership Annual Price', category: 'guardian', description: 'Annual price for Gold membership (NZD) — incentivized annual rate' },
         { key: 'guardian.repeatPurchaseBonusGuardian', value: '10', displayValue: 'Repeat Purchase Bonus (Guardian)', category: 'guardian', description: 'Bonus points on 3rd+ order (Guardian members)' },
         { key: 'guardian.repeatPurchaseBonusGold', value: '20', displayValue: 'Repeat Purchase Bonus (Gold)', category: 'guardian', description: 'Bonus points on 3rd+ order (Gold members)' },
         // Guardian Loyalty Program — Review Points
@@ -2123,7 +2124,7 @@ async function run() {
           ctaUrl: '{{dashboardUrl}}',
           senderEmail: 'no-reply@pawtag.co.nz',
           senderName: 'PawTag',
-          variables: ['customerName', 'tier', 'points', 'dashboardUrl', 'goldLandingUrl', 'pointsPerDollar', 'pointsPerDollarPlural', 'reviewTextPoints', 'reviewPhotoPoints', 'reviewVideoPoints', 'referralSignupPoints', 'referralPurchasePoints', 'petProfilePoints', 'tagActivationPoints', 'tierThresholdNurture', 'tierThresholdProtector', 'tierThresholdSafeguard', 'pawRewardsCare', 'pawRewardsNurture', 'pawRewardsProtector', 'pawRewardsSafeguard', 'goldPrice'],
+          variables: ['customerName', 'tier', 'points', 'dashboardUrl', 'goldLandingUrl', 'pointsPerDollar', 'pointsPerDollarPlural', 'reviewTextPoints', 'reviewPhotoPoints', 'reviewVideoPoints', 'referralSignupPoints', 'referralPurchasePoints', 'petProfilePoints', 'tagActivationPoints', 'tierThresholdNurture', 'tierThresholdProtector', 'tierThresholdSafeguard', 'pawRewardsCare', 'pawRewardsNurture', 'pawRewardsProtector', 'pawRewardsSafeguard', 'goldPrice', 'goldAnnualPrice'],
           status: 'active' as const,
           businessFlow: 'guardian_loyalty' as const,
           purpose: 'Premium welcome email for new Guardian members — explains points system, tier progression, PawRewards, and includes Gold upgrade section.',

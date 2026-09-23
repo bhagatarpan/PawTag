@@ -513,7 +513,7 @@ const [form, setForm] = useState({
       slug: '',
       isSubscription: false,
       isTagProduct: false,
-      subscriptionConfig: { type: 'annual' as 'annual' | 'monthly', freePeriodMonths: 12, monthlyPrice: 0, gracePeriodWeeks: 4 },
+      subscriptionConfig: { type: 'annual' as 'annual' | 'monthly', freePeriodMonths: 12, monthlyPrice: 0, annualPrice: 0, gracePeriodWeeks: 4 },
     });
   const [variants, setVariants] = useState<ProductVariant[]>([]);
   const [images, setImages] = useState<string[]>([]);
@@ -651,12 +651,13 @@ const openEdit = (p: Product) => {
        slug: p.slug || '',
        isSubscription: p.isSubscription || false,
        isTagProduct: p.isTagProduct || false,
-       subscriptionConfig: {
-         type: p.subscriptionConfig?.type || 'annual',
-         freePeriodMonths: p.subscriptionConfig?.freePeriodMonths || 0,
-         monthlyPrice: p.subscriptionConfig?.monthlyPrice || 0,
-         gracePeriodWeeks: p.subscriptionConfig?.gracePeriodWeeks || 4,
-       },
+      subscriptionConfig: {
+          type: p.subscriptionConfig?.type || 'annual',
+          freePeriodMonths: p.subscriptionConfig?.freePeriodMonths || 0,
+          monthlyPrice: p.subscriptionConfig?.monthlyPrice || 0,
+          annualPrice: p.subscriptionConfig?.annualPrice || 0,
+          gracePeriodWeeks: p.subscriptionConfig?.gracePeriodWeeks || 4,
+        },
      });
      setVariants(p.variants?.map((v) => ({ ...v, attributes: { ...v.attributes } })) || []);
      setImages(p.images || []);
@@ -1009,7 +1010,12 @@ const openEdit = (p: Product) => {
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Monthly Price (NZD)</label>
                         <input type="number" step="0.01" min={0} value={form.subscriptionConfig.monthlyPrice} onChange={(e) => setForm({ ...form, subscriptionConfig: { ...form.subscriptionConfig, monthlyPrice: parseFloat(e.target.value) || 0 } })} className="w-full border rounded-md px-3 py-2 text-sm" />
-                        <p className="text-xs text-gray-400 mt-1">Price shown after free period expires</p>
+                        <p className="text-xs text-gray-400 mt-1">Monthly recurring price</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Annual Price (NZD)</label>
+                        <input type="number" step="0.01" min={0} value={form.subscriptionConfig.annualPrice} onChange={(e) => setForm({ ...form, subscriptionConfig: { ...form.subscriptionConfig, annualPrice: parseFloat(e.target.value) || 0 } })} className="w-full border rounded-md px-3 py-2 text-sm" />
+                        <p className="text-xs text-gray-400 mt-1">Incentivized annual price (save vs monthly × 12)</p>
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Grace Period (weeks)</label>

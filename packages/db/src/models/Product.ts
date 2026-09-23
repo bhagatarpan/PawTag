@@ -178,6 +178,7 @@ export interface IProductVariant {
      freePeriodMonths: number;
      gracePeriodWeeks: number;
      monthlyPrice?: number;
+     annualPrice?: number;
      stripePriceId?: string;
      features: string[];
    };
@@ -272,8 +273,9 @@ const ProductSchema = new Schema<IProductDocument>(
        type: { type: String, enum: ['annual', 'monthly'] },
        freePeriodMonths: { type: Number, default: 12 },
        gracePeriodWeeks: { type: Number, default: 4 },
-       monthlyPrice: { type: Number },
-       stripePriceId: { type: String },
+     monthlyPrice: { type: Number },
+        annualPrice: { type: Number },
+        stripePriceId: { type: String },
        features: [{ type: String }],
      },
 

@@ -168,7 +168,13 @@ export async function createSubscription(data: {
   if (data.planId) {
     const product = await Product.findById(data.planId).lean();
     if (product) {
-      price = data.price ?? product.subscriptionConfig?.monthlyPrice ?? product.price ?? 0;
+      // Use annualPrice for annual plans, monthlyPrice for monthly plans
+      if (planType === 'annual') {
+        price = data.price ?? product.subscriptionConfig?.annualPrice
+          ?? (product.subscriptionConfig?.monthlyPrice ?? 0) * 12;
+      } else {
+        price = data.price ?? product.subscriptionConfig?.monthlyPrice ?? product.price ?? 0;
+      }
       freePeriodMonths = product.subscriptionConfig?.freePeriodMonths ?? 3;
       productName = product.name || productName;
     }
@@ -334,16 +340,27 @@ export async function createSubscription(data: {
  * @param price - The price charged (default: from CMS setting `guardian.goldPrice`)
  * @returns The created subscription document
  */
-export async function createGoldSubscription(userId: string, price?: number) {
+export async function createGoldSubscription(userId: string, price?: number, planType?: 'monthly' | 'annual') {
   const now = new Date();
 
   // Load Gold price from CMS settings
   const goldPriceSetting = await Setting.findOne({ key: 'guardian.goldPrice' }).lean();
-  const goldPrice = price ?? parseFloat(goldPriceSetting?.value || '1.99');
+  const goldAnnualPriceSetting = await Setting.findOne({ key: 'guardian.goldAnnualPrice' }).lean();
+  const goldMonthlyPrice = parseFloat(goldPriceSetting?.value || '3.99');
+  const goldAnnualPrice = parseFloat(goldAnnualPriceSetting?.value || '39.99');
 
-  // Gold billing is monthly
+  // Determine billing interval and price
+  const isAnnual = planType === 'annual';
+  const goldPrice = price ?? (isAnnual ? goldAnnualPrice : goldMonthlyPrice);
+  const billingInterval = isAnnual ? 'year' : 'month';
+
+  // Set period end based on billing interval
   const currentPeriodEnd = new Date(now);
-  currentPeriodEnd.setMonth(currentPeriodEnd.getMonth() + 1);
+  if (isAnnual) {
+    currentPeriodEnd.setFullYear(currentPeriodEnd.getFullYear() + 1);
+  } else {
+    currentPeriodEnd.setMonth(currentPeriodEnd.getMonth() + 1);
+  }
 
   // Get user info for Stripe customer creation
   const user = await User.findById(userId).select('fullName email stripeCustomerId').lean();
@@ -408,7 +425,7 @@ export async function createGoldSubscription(userId: string, price?: number) {
           product: goldStripeProductId,
           unit_amount: Math.round(goldPrice * 100),
           currency: 'nzd',
-          recurring: { interval: 'month' },
+          recurring: { interval: billingInterval },
           metadata: { plan: 'gold' },
         });
         goldStripePriceId = priceObj.id;
@@ -463,7 +480,7 @@ export async function createGoldSubscription(userId: string, price?: number) {
     currentPeriodStart: now,
     currentPeriodEnd,
     autoRenew: true,
-    renewalMethod: 'monthly',
+    renewalMethod: isAnnual ? 'annual' : 'monthly',
     stripeCustomerId: stripeCustomerId || undefined,
     stripeSubscriptionId: stripeSubscriptionId || undefined,
     totalScans: 0,
@@ -489,7 +506,7 @@ export async function createGoldSubscription(userId: string, price?: number) {
   // Send Gold welcome email (fire-and-forget)
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
   const dashboardUrl = `${frontendUrl}/account/guardian`;
-  sendGoldWelcomeEmail(user.email, user.fullName || 'there', goldPrice, dashboardUrl).catch((err) => {
+  sendGoldWelcomeEmail(user.email, user.fullName || 'there', goldPrice, dashboardUrl, planType).catch((err) => {
     logger.error({ err, userId }, '[Gold] Failed to send welcome email');
   });
 
@@ -911,16 +928,20 @@ export async function checkExpiringSubscriptions() {
 
     const reminderStates = sub.reminderStates || { graceWeeklySentCount: 0 };
     const isFreePeriod = sub.freePeriodEndsAt && sub.currentPeriodEnd.getTime() === sub.freePeriodEndsAt.getTime();
-    const monthlyPrice = product?.subscriptionConfig?.monthlyPrice || sub.price || 1.99;
+    // Use annualPrice for annual plans, monthlyPrice for monthly
+    const isAnnualPlan = sub.planType === 'annual' || sub.renewalMethod === 'annual';
+    const monthlyPrice = isAnnualPlan
+      ? (product?.subscriptionConfig?.annualPrice ?? (product?.subscriptionConfig?.monthlyPrice ?? sub.price ?? 3.99) * 12)
+      : (product?.subscriptionConfig?.monthlyPrice || sub.price || 3.99);
     const productName = product?.name || sub.planName || 'PawTag';
 
     // Free period reminders (2-week and 3-day)
     if (isFreePeriod) {
       if (daysUntilExpiry <= 3 && !reminderStates.reminder1dSent) {
-        await sendFreePeriodReminder3DayEmail(user.email, user.fullName, tag?.tagId || 'Unknown', productName, sub.currentPeriodEnd, monthlyPrice, sub.autoRenew);
+        await sendFreePeriodReminder3DayEmail(user.email, user.fullName, tag?.tagId || 'Unknown', productName, sub.currentPeriodEnd, monthlyPrice, sub.autoRenew, sub.planType);
         reminderStates.reminder1dSent = true;
       } else if (daysUntilExpiry <= 14 && !reminderStates.reminder7dSent) {
-        await sendFreePeriodReminder2WeekEmail(user.email, user.fullName, tag?.tagId || 'Unknown', productName, sub.currentPeriodEnd, monthlyPrice, sub.autoRenew);
+        await sendFreePeriodReminder2WeekEmail(user.email, user.fullName, tag?.tagId || 'Unknown', productName, sub.currentPeriodEnd, monthlyPrice, sub.autoRenew, sub.planType);
         reminderStates.reminder7dSent = true;
       }
     } else {
@@ -1351,7 +1372,7 @@ async function sendGraceReminderEmail(to: string, name: string, tagId: string, d
   await sendMail(to, `Grace period: ${daysLeft} days left to renew — PawTag`, html);
 }
 
-async function sendFreePeriodReminder2WeekEmail(to: string, name: string, tagId: string, productName: string, freePeriodEndsAt: Date, monthlyPrice: number, autoRenew: boolean) {
+async function sendFreePeriodReminder2WeekEmail(to: string, name: string, tagId: string, productName: string, freePeriodEndsAt: Date, monthlyPrice: number, autoRenew: boolean, planType?: string) {
   const subscriptionsUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/subscriptions`;
   const html = renderFreePeriodReminder2WeekEmail({
     name,
@@ -1359,6 +1380,7 @@ async function sendFreePeriodReminder2WeekEmail(to: string, name: string, tagId:
     productName,
     freePeriodEndsAt: freePeriodEndsAt.toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' }),
     monthlyPrice,
+    planType,
     autoRenew,
     subscriptionsUrl,
   });
@@ -1366,7 +1388,7 @@ async function sendFreePeriodReminder2WeekEmail(to: string, name: string, tagId:
   await sendMail(to, `Your free ${productName} subscription ends in 2 weeks`, html);
 }
 
-async function sendFreePeriodReminder3DayEmail(to: string, name: string, tagId: string, productName: string, freePeriodEndsAt: Date, monthlyPrice: number, autoRenew: boolean) {
+async function sendFreePeriodReminder3DayEmail(to: string, name: string, tagId: string, productName: string, freePeriodEndsAt: Date, monthlyPrice: number, autoRenew: boolean, planType?: string) {
   const subscriptionsUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/subscriptions`;
   const html = renderFreePeriodReminder3DayEmail({
     name,
@@ -1374,6 +1396,7 @@ async function sendFreePeriodReminder3DayEmail(to: string, name: string, tagId: 
     productName,
     freePeriodEndsAt: freePeriodEndsAt.toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' }),
     monthlyPrice,
+    planType,
     autoRenew,
     subscriptionsUrl,
   });
@@ -1409,8 +1432,13 @@ export async function changeSubscriptionPlan(subscriptionId: string, newPlanType
   let newPrice = subscription.price; // default to current price
   if (subscription.planId) {
     const product = await Product.findById(subscription.planId).lean();
-    if (product?.subscriptionConfig?.monthlyPrice) {
-      newPrice = product.subscriptionConfig.monthlyPrice;
+    if (product?.subscriptionConfig) {
+      if (newPlanType === 'annual') {
+        newPrice = product.subscriptionConfig.annualPrice
+          ?? (product.subscriptionConfig.monthlyPrice ?? 0) * 12;
+      } else {
+        newPrice = product.subscriptionConfig.monthlyPrice ?? subscription.price;
+      }
     }
   }
 
@@ -1698,8 +1726,8 @@ async function attemptPaymentCharge(subscription: any): Promise<boolean> {
   }
 }
 
-async function sendGoldWelcomeEmail(to: string, name: string, price: number, dashboardUrl: string) {
-  const html = renderGoldWelcomeEmail({ customerName: name, price, dashboardUrl });
+async function sendGoldWelcomeEmail(to: string, name: string, price: number, dashboardUrl: string, planType?: string) {
+  const html = renderGoldWelcomeEmail({ customerName: name, price, planType, dashboardUrl });
   await sendMail(to, 'Welcome to PawTag Gold Membership', html);
 }
 

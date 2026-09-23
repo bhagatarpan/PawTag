@@ -20,10 +20,23 @@ export default function GuardianAnalytics() {
   const [analytics, setAnalytics] = useState<GuardianAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [goldPrice, setGoldPrice] = useState(3.99);
 
   useEffect(() => {
     fetchAnalytics();
+    fetchGoldPrice();
   }, []);
+
+  async function fetchGoldPrice() {
+    try {
+      const res = await api.get('/admin/settings');
+      const settings = res.data?.data || [];
+      const goldPriceSetting = settings.find((s: any) => s.key === 'guardian.goldPrice');
+      if (goldPriceSetting) setGoldPrice(parseFloat(goldPriceSetting.value));
+    } catch {
+      // Use default
+    }
+  }
 
   async function fetchAnalytics() {
     try {
@@ -224,7 +237,7 @@ export default function GuardianAnalytics() {
             <div className="flex justify-between items-center">
               <span className="text-gray-600">Estimated Monthly MRR</span>
               <span className="font-semibold text-blue-600">
-                ${(analytics.goldMembers * 1.99).toFixed(2)}
+                ${(analytics.goldMembers * goldPrice).toFixed(2)}
               </span>
             </div>
           </div>

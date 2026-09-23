@@ -618,7 +618,7 @@ router.post('/portal-link', requirePermission('customer.read'), async (req: Auth
  * Subscribe to Gold membership. Creates a Gold subscription for the user.
  * No physical Tag required — Gold is a standalone digital membership.
  *
- * Body: { price?: number } (optional, defaults to $1.99)
+ * Body: { price?: number, planType?: 'monthly' | 'annual' } (optional, defaults to monthly at $3.99)
  */
 router.post('/gold/subscribe', async (req: AuthRequest, res: Response) => {
   try {
@@ -637,8 +637,8 @@ router.post('/gold/subscribe', async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    const { price } = req.body || {};
-    const subscription = await createGoldSubscription(userId, price);
+    const { price, planType } = req.body || {};
+    const subscription = await createGoldSubscription(userId, price, planType);
 
     res.json({
       success: true,

@@ -15,6 +15,7 @@ export default function GoldUpgrade() {
   const [loading, setLoading] = useState(true);
   const [subscribing, setSubscribing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
 
   useEffect(() => {
     fetchData();
@@ -46,7 +47,7 @@ export default function GoldUpgrade() {
     setSubscribing(true);
     setError(null);
     try {
-      await api.post(API.customer.subscriptions.goldSubscribe);
+      await api.post(API.customer.subscriptions.goldSubscribe, { planType: billingCycle });
       await fetchData();
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to subscribe to Gold');
@@ -55,7 +56,9 @@ export default function GoldUpgrade() {
     }
   }
 
-  const goldPrice = parseFloat(settings['guardian.goldPrice'] || '2.99');
+  const goldMonthlyPrice = parseFloat(settings['guardian.goldPrice'] || '3.99');
+  const goldAnnualPrice = parseFloat(settings['guardian.goldAnnualPrice'] || '39.99');
+  const goldPrice = billingCycle === 'annual' ? goldAnnualPrice : goldMonthlyPrice;
   const goldMultiplier = parseInt(settings['guardian.goldMultiplier'] || '2');
   const goldBenefits: GoldBenefits[] = (() => {
     try {
@@ -126,10 +129,46 @@ export default function GoldUpgrade() {
             </div>
           </div>
 
+          {/* Billing Cycle Toggle */}
+          {!isGoldMember && (
+            <div className="mb-6">
+              <div className="inline-flex bg-white/10 rounded-xl p-1">
+                <button
+                  onClick={() => setBillingCycle('monthly')}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                    billingCycle === 'monthly'
+                      ? 'bg-white text-amber-600'
+                      : 'text-white/70 hover:text-white'
+                  }`}
+                >
+                  Monthly
+                </button>
+                <button
+                  onClick={() => setBillingCycle('annual')}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all relative ${
+                    billingCycle === 'annual'
+                      ? 'bg-white text-amber-600'
+                      : 'text-white/70 hover:text-white'
+                  }`}
+                >
+                  Annual
+                  <span className="absolute -top-2 -right-2 px-1.5 py-0.5 bg-green-500 text-white text-[10px] font-bold rounded-full">
+                    Save ${(goldMonthlyPrice * 12 - goldAnnualPrice).toFixed(0)}
+                  </span>
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Price */}
           <div className="mb-6">
             <span className="text-5xl font-bold">${goldPrice.toFixed(2)}</span>
-            <span className="text-white/70 text-lg">/month</span>
+            <span className="text-white/70 text-lg">/{billingCycle === 'annual' ? 'year' : 'month'}</span>
+            {billingCycle === 'annual' && (
+              <div className="text-white/60 text-sm mt-1">
+                That's ${(goldAnnualPrice / 12).toFixed(2)}/month — save ${(goldMonthlyPrice * 12 - goldAnnualPrice).toFixed(2)}/year
+              </div>
+            )}
           </div>
 
           {/* Benefits */}
@@ -161,7 +200,7 @@ export default function GoldUpgrade() {
               disabled={subscribing}
               className="w-full sm:w-auto px-8 py-4 bg-white text-amber-600 rounded-xl font-bold text-lg hover:bg-white/90 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              {subscribing ? 'Subscribing...' : 'Subscribe to Gold'}
+              {subscribing ? 'Subscribing...' : `Subscribe to Gold — $${goldPrice.toFixed(2)}/${billingCycle === 'annual' ? 'yr' : 'mo'}`}
               {!subscribing && <ArrowRight size={20} />}
             </button>
           )}

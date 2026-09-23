@@ -184,6 +184,7 @@ export const createProductSchema = z.object({
     freePeriodMonths: z.number(),
     gracePeriodWeeks: z.number(),
     monthlyPrice: z.number().optional(),
+    annualPrice: z.number().optional(),
     stripePriceId: z.string().optional(),
     features: z.array(z.string()).optional(),
   }).optional(),

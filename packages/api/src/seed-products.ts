@@ -29,12 +29,13 @@ const products = [
     isTagProduct: true,
     isSubscription: true,
     subscriptionConfig: {
-      type: 'annual',
-      freePeriodMonths: 3,
-      gracePeriodWeeks: 4,
-      monthlyPrice: 0.99,
-      features: ['qr_scan', 'lost_pet_alerts', 'finder_notifications'],
-     },
+       type: 'annual',
+       freePeriodMonths: 3,
+       gracePeriodWeeks: 4,
+       monthlyPrice: 0.99,
+       annualPrice: 9.99,
+       features: ['qr_scan', 'lost_pet_alerts', 'finder_notifications'],
+      },
      featureHighlights: [
        { icon: 'Shield', description: '12 month warranty' },
        { icon: 'Truck', description: 'Free NZ-wide shipping' },
@@ -67,6 +68,7 @@ const products = [
         freePeriodMonths: 3,
         gracePeriodWeeks: 4,
         monthlyPrice: 1.99,
+        annualPrice: 19.99,
         features: ['nfc_scan', 'qr_scan', 'lost_pet_alerts', 'finder_notifications'],
      },
       featureHighlights: [
@@ -100,6 +102,7 @@ const products = [
         freePeriodMonths: 3,
         gracePeriodWeeks: 4,
         monthlyPrice: 2.99,
+        annualPrice: 29.99,
         features: ['nfc_scan', 'qr_scan', 'lost_pet_alerts', 'finder_notifications'],
      },
       featureHighlights: [
@@ -114,7 +117,7 @@ const products = [
       slug: 'gold-membership',
       description: 'Upgrade to Gold and earn 2× Guardian Points on every purchase. Priority support, early access to new products, and free shipping on orders over $50.',
       shortDescription: 'Earn 2× Guardian Points on every purchase',
-      price: 1.99,
+      price: 3.99,
       currency: 'NZD',
       images: [],
       category: 'Guardian',
@@ -139,7 +142,8 @@ const products = [
         type: 'monthly',
         freePeriodMonths: 0,
         gracePeriodWeeks: 1,
-        monthlyPrice: 1.99,
+        monthlyPrice: 3.99,
+        annualPrice: 39.99,
         features: [
           '2× Guardian Points on all purchases',
           'Free shipping on orders over $50',
@@ -179,6 +183,14 @@ async function seedProducts() {
       if (existing.customizationPrice !== productData.customizationPrice) updates.customizationPrice = productData.customizationPrice;
       if (existing.isActive !== productData.isActive) updates.isActive = productData.isActive;
       if (existing.isSubscription !== productData.isSubscription) updates.isSubscription = productData.isSubscription;
+      // Update subscriptionConfig if prices changed
+      if (productData.subscriptionConfig) {
+        const existingConfig = existing.subscriptionConfig as any || {};
+        const newConfig = productData.subscriptionConfig as any;
+        if (existingConfig.monthlyPrice !== newConfig.monthlyPrice || existingConfig.annualPrice !== newConfig.annualPrice) {
+          updates.subscriptionConfig = { ...existingConfig, ...newConfig };
+        }
+      }
       if (Object.keys(updates).length > 0) {
           await Product.updateOne({ _id: existing._id }, { $set: updates });
           updated++;

@@ -161,7 +161,7 @@ export function SubscriptionScreen({ navigation }: any) {
 
               <View style={styles.detailsGrid}>
                 <DetailItem label="Tag" value={sub.tagId?.tagId || 'N/A'} />
-                <DetailItem label="Price" value={`$${sub.price.toFixed(2)} ${sub.currency}`} />
+                <DetailItem label="Price" value={`$${sub.price.toFixed(2)} ${sub.renewalMethod === 'annual' ? '/yr' : '/mo'}`} />
                 <DetailItem label="Billing" value={sub.planType === 'annual' ? 'Annual' : 'Monthly'} />
                 <DetailItem
                   label="Next billing"

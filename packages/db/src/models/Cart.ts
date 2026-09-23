@@ -76,6 +76,9 @@ export interface ICartItem {
   /** Monthly recurring price (from Product.subscriptionConfig) */
   monthlyPrice?: number;
 
+  /** Annual recurring price (from Product.subscriptionConfig) */
+  annualPrice?: number;
+
   /** Free period in months (from Product.subscriptionConfig) */
   freePeriodMonths?: number;
 
@@ -138,6 +141,7 @@ const CartItemSchema = new Schema<ICartItem>({
   autoRenew: { type: Boolean, default: true },
   isSubscription: { type: Boolean, default: false },
   monthlyPrice: { type: Number },
+  annualPrice: { type: Number },
   freePeriodMonths: { type: Number },
   addedAt: { type: Date, default: Date.now },
 }, { _id: true });

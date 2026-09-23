@@ -3,11 +3,17 @@ import { renderBase, renderCtaButton, renderInfoBox } from './base';
 interface GoldWelcomeEmailData {
   customerName: string;
   price: number;
+  planType?: string;
   dashboardUrl: string;
 }
 
 export function renderGoldWelcomeEmail(data: GoldWelcomeEmailData): string {
-  const { customerName, price, dashboardUrl } = data;
+  const { customerName, price, planType, dashboardUrl } = data;
+  const isAnnual = planType === 'annual';
+  const priceLabel = isAnnual ? '/year' : '/month';
+  const renewalText = isAnnual
+    ? 'Your membership will automatically renew each year.'
+    : 'Your membership will automatically renew each month.';
 
   const benefitsList = `
     <ul style="color:#374151;font-size:14px;line-height:1.8;margin:0;padding-left:20px;">
@@ -23,7 +29,7 @@ export function renderGoldWelcomeEmail(data: GoldWelcomeEmailData): string {
       Hi ${customerName},
     </p>
     <p style="color:#374151;font-size:15px;line-height:1.7;">
-      Welcome to <strong>PawTag Gold Membership</strong>! You're now a Gold member at <strong>$${price.toFixed(2)}/month</strong>.
+      Welcome to <strong>PawTag Gold Membership</strong>! You're now a Gold member at <strong>$${price.toFixed(2)}${priceLabel}</strong>.
     </p>
     ${renderInfoBox(`
       <p style="color:#92400e;font-size:13px;font-weight:600;margin:0 0 8px;">Your Gold Benefits</p>
@@ -31,7 +37,7 @@ export function renderGoldWelcomeEmail(data: GoldWelcomeEmailData): string {
     `)}
     ${renderCtaButton(dashboardUrl, 'View Your Dashboard')}
     <p style="color:#9ca3af;font-size:12px;margin-top:24px;">
-      Your membership will automatically renew each month. You can manage or cancel anytime from your dashboard.
+      ${renewalText} You can manage or cancel anytime from your dashboard.
     </p>
   `;
 

@@ -235,7 +235,7 @@ export default function SubscriptionsPage() {
                       <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">Off</span>
                     )}
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-900">${sub.price.toFixed(2)}/mo</td>
+                  <td className="px-6 py-4 text-sm text-gray-900">${sub.price.toFixed(2)}/{sub.renewalMethod === 'annual' ? 'yr' : 'mo'}</td>
                   <td className="px-6 py-4 text-sm text-gray-900">{formatDate(sub.currentPeriodEnd)}</td>
                   <td className="px-6 py-4 text-sm text-gray-900">{sub.totalScans}</td>
                   <td className="px-6 py-4">

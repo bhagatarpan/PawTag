@@ -106,9 +106,14 @@ router.get('/stats', requirePermission('subscription.read'), async (_req: AuthRe
         .limit(10),
     ]);
 
-    // Monthly recurring revenue (annual plans: $0.99/mo, monthly: $1.99/mo)
+    // Monthly recurring revenue (normalize annual to monthly)
     const activeSubs = await Subscription.find({ status: 'active', deletedAt: null });
-    const mrr = activeSubs.reduce((sum, sub) => sum + (sub.price || 0), 0);
+    const mrr = activeSubs.reduce((sum, sub) => {
+      const monthlyAmount = sub.renewalMethod === 'annual'
+        ? (sub.price || 0) / 12
+        : (sub.price || 0);
+      return sum + monthlyAmount;
+    }, 0);
 
     res.json({
       success: true,
@@ -468,7 +473,7 @@ router.put('/:id/auto-renew', requirePermission('subscription.update'), async (r
  */
 router.post('/gold/subscribe', requirePermission('subscription.update'), async (req: AuthRequest, res: Response) => {
   try {
-    const { userId, price } = req.body;
+    const { userId, price, planType } = req.body;
     if (!userId) {
       res.status(400).json({ success: false, error: 'userId is required' });
       return;
@@ -492,7 +497,7 @@ router.post('/gold/subscribe', requirePermission('subscription.update'), async (
       return;
     }
 
-    const subscription = await createGoldSubscription(userId, price);
+    const subscription = await createGoldSubscription(userId, price, planType);
 
     res.json({
       success: true,

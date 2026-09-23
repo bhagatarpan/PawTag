@@ -181,11 +181,14 @@ interface FreePeriodReminder2WeekData {
   productName: string;
   freePeriodEndsAt: string;
   monthlyPrice: number;
+  planType?: string;
   autoRenew: boolean;
   subscriptionsUrl: string;
 }
 
 export function renderFreePeriodReminder2WeekEmail(data: FreePeriodReminder2WeekData): string {
+  const isAnnual = data.planType === 'annual';
+  const priceLabel = isAnnual ? '/year' : '/month';
   const bodyHtml = `
     <p style="color:#374151;font-size:16px;line-height:1.6;margin:0 0 20px;">Hi ${data.name},</p>
     <p style="color:#374151;font-size:16px;line-height:1.6;margin:0 0 20px;">
@@ -194,11 +197,11 @@ export function renderFreePeriodReminder2WeekEmail(data: FreePeriodReminder2Week
     ${renderDataTable([
       { label: 'Tag ID', value: data.tagId },
       { label: 'Free Period Ends', value: data.freePeriodEndsAt },
-      { label: 'Monthly Price After', value: `$${data.monthlyPrice.toFixed(2)}/month` },
+      { label: 'Price After', value: `$${data.monthlyPrice.toFixed(2)}${priceLabel}` },
       { label: 'Auto-Renew', value: data.autoRenew ? 'ON' : 'OFF' },
     ])}
     ${data.autoRenew
-      ? renderStatusCard('info', 'Auto-Renew is ON', 'Your subscription will automatically continue at $' + data.monthlyPrice.toFixed(2) + '/month after the free period ends. No action needed.')
+      ? renderStatusCard('info', 'Auto-Renew is ON', 'Your subscription will automatically continue at $' + data.monthlyPrice.toFixed(2) + priceLabel + ' after the free period ends. No action needed.')
       : renderStatusCard('warning', 'Auto-Renew is OFF', 'Your subscription will NOT automatically renew. Renew before ' + data.freePeriodEndsAt + ' to keep your pet protected.')
     }
     ${renderCtaButton(data.subscriptionsUrl, 'Manage Subscription')}
@@ -220,11 +223,14 @@ interface FreePeriodReminder3DayData {
   productName: string;
   freePeriodEndsAt: string;
   monthlyPrice: number;
+  planType?: string;
   autoRenew: boolean;
   subscriptionsUrl: string;
 }
 
 export function renderFreePeriodReminder3DayEmail(data: FreePeriodReminder3DayData): string {
+  const isAnnual = data.planType === 'annual';
+  const priceLabel = isAnnual ? '/year' : '/month';
   const bodyHtml = `
     <p style="color:#374151;font-size:16px;line-height:1.6;margin:0 0 20px;">Hi ${data.name},</p>
     <p style="color:#374151;font-size:16px;line-height:1.6;margin:0 0 20px;">
@@ -233,11 +239,11 @@ export function renderFreePeriodReminder3DayEmail(data: FreePeriodReminder3DayDa
     ${renderDataTable([
       { label: 'Tag ID', value: data.tagId },
       { label: 'Free Period Ends', value: data.freePeriodEndsAt },
-      { label: 'Monthly Price After', value: `$${data.monthlyPrice.toFixed(2)}/month` },
+      { label: 'Price After', value: `$${data.monthlyPrice.toFixed(2)}${priceLabel}` },
       { label: 'Auto-Renew', value: data.autoRenew ? 'ON' : 'OFF' },
     ])}
     ${data.autoRenew
-      ? renderStatusCard('success', 'Auto-Renew is ON', 'Your subscription will automatically continue. Your card will be charged $' + data.monthlyPrice.toFixed(2) + '/month after the free period.')
+      ? renderStatusCard('success', 'Auto-Renew is ON', 'Your subscription will automatically continue. Your card will be charged $' + data.monthlyPrice.toFixed(2) + priceLabel + ' after the free period.')
       : renderStatusCard('danger', 'Action Required', 'Auto-renew is OFF. Renew now to keep your pet protected without interruption.')
     }
     ${renderCtaButton(data.subscriptionsUrl, 'Manage Subscription')}
