@@ -1,4 +1,5 @@
 import { Router, Response } from 'express';
+import mongoose from 'mongoose';
 import QRCode from 'qrcode';
 import { AuthRequest, authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
@@ -1808,6 +1809,86 @@ router.delete('/tags/:id', requirePermission('tag.delete'), async (req: AuthRequ
     });
     res.json({ success: true, data: { message: 'Tag deleted' } });
   } catch { res.status(500).json({ success: false, error: 'Failed to delete tag' }); }
+});
+
+// --- Unlink Tag from Pet (Admin) ---
+/**
+ * PUT /admin/tags/:id/unlink-pet
+ *
+ * Admin can unlink any tag from its pet with a reason.
+ */
+router.put('/tags/:id/unlink-pet', requirePermission('tag.update'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { reason } = req.body;
+    const validReasons = ['customer_mistake', 'wrong_pet', 'technical_issue'];
+    if (!reason || !validReasons.includes(reason)) {
+      res.status(400).json({ success: false, error: 'Please provide a valid reason' });
+      return;
+    }
+
+    const tag = await Tag.findOne({ _id: req.params.id, deletedAt: null });
+    if (!tag) {
+      res.status(404).json({ success: false, error: 'Tag not found' });
+      return;
+    }
+
+    if (tag.status !== 'active') {
+      res.status(400).json({ success: false, error: 'Only active tags can be unlinked' });
+      return;
+    }
+
+    if (!tag.petId) {
+      res.status(400).json({ success: false, error: 'Tag is not linked to any pet' });
+      return;
+    }
+
+    // Get pet name for audit
+    const pet = await Pet.findById(tag.petId);
+    const previousPetId = tag.petId.toString();
+    const previousPetName = pet?.name || 'Unknown';
+
+    // Get admin display name
+    const admin = await User.findById(req.user!.id).select('fullName').lean();
+    const unlinkedByName = admin?.fullName || 'Admin';
+
+    // Unlink the tag
+    tag.petId = undefined as any;
+    tag.unlinkedAt = new Date();
+    tag.unlinkReason = reason;
+    tag.unlinkedBy = new mongoose.Types.ObjectId(req.user!.id);
+    tag.unlinkedByName = unlinkedByName;
+    await tag.save();
+
+    // Audit
+    await auditAdminEvent(req, {
+      action: 'unlink_pet',
+      eventType: 'admin_tag_unlink_pet',
+      eventCategory: 'ADMIN',
+      operationType: 'UPDATE',
+      resourceType: 'Tag',
+      resourceId: tag._id.toString(),
+      outcome: 'SUCCESS',
+      severity: 'MEDIUM',
+      reason,
+      businessOperation: `Unlinked tag '${tag.tagId}' from pet '${previousPetName}'`,
+      metadata: {
+        tagId: tag.tagId,
+        previousPetId,
+        previousPetName,
+        unlinkedBy: req.user!.id,
+        unlinkedByName,
+        reason,
+      },
+    });
+
+    const updated = await Tag.findById(tag._id)
+      .populate('petId', 'name petId petType breed color')
+      .populate('ownerId', 'fullName email');
+
+    res.json({ success: true, data: updated });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to unlink tag' });
+  }
 });
 
 // --- QR Code Generation ---

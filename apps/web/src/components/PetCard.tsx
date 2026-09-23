@@ -7,6 +7,9 @@ import {
   Stethoscope, Tag, Camera
 } from 'lucide-react';
 import { CopyButton } from '@pawtag/ui';
+import { ConfirmDialog } from '@pawtag/ui';
+import { API } from '@pawtag/shared/api';
+import api from '../lib/api';
 
 interface PetPhoto { url: string; caption?: string; isMain: boolean; }
 interface PetTag {
@@ -87,6 +90,9 @@ export default function PetCard({
 }: PetCardProps) {
   const [imgError, setImgError] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [showUnlinkConfirm, setShowUnlinkConfirm] = useState(false);
+  const [unlinkReason, setUnlinkReason] = useState('');
+  const [unlinking, setUnlinking] = useState(false);
   const mainPhoto = getMainPhoto(pet);
   const status = STATUS_CONFIG[pet.status] || STATUS_CONFIG.safe;
   const StatusIcon = status.icon;
@@ -98,7 +104,24 @@ export default function PetCard({
     return () => document.removeEventListener('click', handler);
   }, [showMenu]);
 
+  const handleUnlink = async () => {
+    if (!unlinkReason || !pet.linkedTag) return;
+    setUnlinking(true);
+    try {
+      await api.delete(API.customer.tags.unlinkPet(pet.linkedTag._id), { data: { reason: unlinkReason } });
+      setShowUnlinkConfirm(false);
+      setUnlinkReason('');
+      // Refresh the page to show updated state
+      window.location.reload();
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Failed to unlink tag');
+    } finally {
+      setUnlinking(false);
+    }
+  };
+
   return (
+    <>
     <div
       className={`pet-card bg-white rounded-2xl overflow-hidden border border-gray-100 animate-stagger-in relative group ${
         pet.status === 'lost' ? `ring-2 ${status.ring} border-red-200` :
@@ -266,6 +289,13 @@ export default function PetCard({
                 <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-teal-100 text-teal-700">
                   {pet.linkedTag.tagType || 'QR'}
                 </span>
+                <button
+                  onClick={() => setShowUnlinkConfirm(true)}
+                  className="text-[10px] text-gray-400 hover:text-red-500 transition-colors ml-1"
+                  title="Unlink tag from this pet"
+                >
+                  unlink
+                </button>
                 <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
                   pet.linkedTag.status === 'active' ? 'bg-green-500' :
                   pet.linkedTag.status === 'lost' ? 'bg-red-500 animate-pulse' :
@@ -348,6 +378,24 @@ export default function PetCard({
         </div>
       </div>
     </div>
+
+    {/* Unlink Tag Confirmation Dialog */}
+    {showUnlinkConfirm && (
+      <ConfirmDialog
+        open={showUnlinkConfirm}
+        onClose={() => { setShowUnlinkConfirm(false); setUnlinkReason(''); }}
+        onConfirm={handleUnlink}
+        title="Unlink Tag from Pet"
+        message={`This will remove tag ${pet.linkedTag?.tagId || ''} from ${pet.name}. The tag can be linked to a different pet later.`}
+        confirmLabel={unlinking ? 'Unlinking...' : 'Unlink Tag'}
+        variant="warning"
+        reasons={['customer_mistake', 'wrong_pet', 'technical_issue']}
+        selectedReason={unlinkReason}
+        onReasonChange={setUnlinkReason}
+        showNotes={false}
+      />
+    )}
+  </>
   );
 }
 

@@ -22,6 +22,10 @@ export interface ITagDocument extends Document {
   subscriptionStatus: 'active' | 'inactive' | 'grace_period' | 'expired' | 'none';
   subscriptionId?: mongoose.Types.ObjectId;
   activatedAt?: Date;
+  unlinkedAt?: Date;
+  unlinkReason?: string;
+  unlinkedBy?: mongoose.Types.ObjectId;
+  unlinkedByName?: string;
   deletedAt?: Date;
 }
 
@@ -52,6 +56,10 @@ const TagSchema = new Schema<ITagDocument>(
     },
     subscriptionId: { type: Schema.Types.ObjectId, ref: 'Subscription' },
     activatedAt: { type: Date },
+    unlinkedAt: { type: Date },
+    unlinkReason: { type: String },
+    unlinkedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+    unlinkedByName: { type: String },
     deletedAt: { type: Date, default: null },
   },
   { timestamps: true },

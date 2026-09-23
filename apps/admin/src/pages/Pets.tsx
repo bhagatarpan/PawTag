@@ -9,7 +9,7 @@ import {
   Loader2, AlertTriangle, Users as UsersIcon, Dog, Cat,
   Activity, CheckCircle, AlertCircle, Clock, Copy, Settings,
   Database, FileText, User, Shield, Lock, Unlock, RotateCcw,
-  ExternalLink, Scan, Monitor, Smartphone, Tablet,
+  ExternalLink, Scan, Monitor, Smartphone, Tablet, Unlink,
 } from 'lucide-react';
 import { BREED_ORIGINS, getBreedsForOrigin, PET_BREEDS } from '@pawtag/shared';
 import type { PetType } from '@pawtag/shared';
@@ -259,6 +259,9 @@ export function DetailDrawer({
   const [editSaving, setEditSaving] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showUnlinkConfirm, setShowUnlinkConfirm] = useState(false);
+  const [unlinkReason, setUnlinkReason] = useState('');
+  const [unlinking, setUnlinking] = useState(false);
   const drawerRef = useRef<HTMLDivElement>(null);
   const [selectedOwner, setSelectedOwner] = useState<UserRecord | null>(null);
   const [selectedTag, setSelectedTag] = useState<TagItem | null>(null);
@@ -385,6 +388,22 @@ export function DetailDrawer({
     } finally {
       setActionLoading(null);
       setShowDeleteConfirm(false);
+    }
+  };
+
+  const handleUnlinkTag = async () => {
+    if (!unlinkReason || !pet.linkedTag) return;
+    setUnlinking(true);
+    try {
+      await api.put(`/admin/tags/${pet.linkedTag._id}/unlink-pet`, { reason: unlinkReason });
+      toast.success('Tag unlinked from pet');
+      setShowUnlinkConfirm(false);
+      setUnlinkReason('');
+      onRefresh();
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to unlink tag');
+    } finally {
+      setUnlinking(false);
     }
   };
 
@@ -641,6 +660,14 @@ export function DetailDrawer({
                       <button onClick={() => setEditMode(true)} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary-600 bg-primary-50 hover:bg-primary-100 rounded-lg transition-colors">
                         <Edit2 size={13} /> Edit
                       </button>
+                      {pet.linkedTag && (
+                        <button
+                          onClick={() => setShowUnlinkConfirm(true)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-lg transition-colors"
+                        >
+                          <Unlink size={13} /> Unlink Tag
+                        </button>
+                      )}
                       {PET_STATUSES.filter((s) => s !== pet.status).map((s) => (
                         <button
                           key={s}
@@ -705,6 +732,21 @@ export function DetailDrawer({
                 confirmLabel="Delete Pet"
                 variant="danger"
                 loading={actionLoading === 'delete'}
+              />
+
+              {/* Unlink Tag Confirmation Dialog */}
+              <ConfirmDialog
+                open={showUnlinkConfirm}
+                onClose={() => { setShowUnlinkConfirm(false); setUnlinkReason(''); }}
+                onConfirm={handleUnlinkTag}
+                title="Unlink Tag from Pet"
+                message={`This will remove tag ${pet.linkedTag?.tagId || ''} from ${pet.name}. The tag can be linked to a different pet later.`}
+                confirmLabel={unlinking ? 'Unlinking...' : 'Unlink Tag'}
+                variant="warning"
+                reasons={['customer_mistake', 'wrong_pet', 'technical_issue']}
+                selectedReason={unlinkReason}
+                onReasonChange={setUnlinkReason}
+                showNotes={false}
               />
             </div>
           )}

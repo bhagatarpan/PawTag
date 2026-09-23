@@ -27,7 +27,7 @@ interface Pet {
   medicalAlerts?: string;
   notes?: string;
   isNeutered: boolean;
-  linkedTag?: { tagId: string; status: string; subscriptionStatus: string };
+  linkedTag?: { _id: string; tagId: string; status: string; subscriptionStatus: string };
   vaccinations: any[];
   microchips: any[];
   medications: any[];
@@ -157,6 +157,20 @@ export function PetDetailScreen({ navigation, route }: PetDetailScreenProps) {
     }
   };
 
+  const handleUnlinkTag = async (reason: string) => {
+    if (!pet?.linkedTag) return;
+    try {
+      hapticMedium();
+      await api.delete(`/customer/tags/${pet.linkedTag._id}/unlink-pet`, { data: { reason } });
+      hapticSuccess();
+      Alert.alert('Tag Unlinked', `Tag ${pet.linkedTag.tagId} has been unlinked from ${pet.name}.`);
+      await fetchPet();
+    } catch (err: any) {
+      hapticError();
+      Alert.alert('Error', err.response?.data?.error || 'Failed to unlink tag');
+    }
+  };
+
   if (loading) {
     return (
       <View style={styles.centered}>
@@ -205,6 +219,37 @@ export function PetDetailScreen({ navigation, route }: PetDetailScreenProps) {
           <Text style={styles.infoSubtext}>
             Subscription: {pet.linkedTag.subscriptionStatus}
           </Text>
+          <TouchableOpacity
+            style={{ marginTop: 8, paddingVertical: 6, paddingHorizontal: 12, backgroundColor: '#fef3c7', borderRadius: 8, borderWidth: 1, borderColor: '#fcd34d', alignSelf: 'flex-start' }}
+            onPress={() => {
+              Alert.alert(
+                'Unlink Tag',
+                `Remove tag ${pet.linkedTag?.tagId} from ${pet.name}? The tag can be linked to a different pet later.`,
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Unlink',
+                    style: 'destructive',
+                    onPress: async () => {
+                      try {
+                        const reasons = ['customer_mistake', 'wrong_pet', 'technical_issue'];
+                        Alert.alert('Reason', 'Why are you unlinking this tag?', [
+                          { text: 'Cancel', style: 'cancel' },
+                          { text: 'Customer mistake', onPress: () => handleUnlinkTag(reasons[0]) },
+                          { text: 'Wrong pet', onPress: () => handleUnlinkTag(reasons[1]) },
+                          { text: 'Technical issue', onPress: () => handleUnlinkTag(reasons[2]) },
+                        ]);
+                      } catch (err: any) {
+                        Alert.alert('Error', err.message || 'Failed to unlink tag');
+                      }
+                    },
+                  },
+                ]
+              );
+            }}
+          >
+            <Text style={{ color: '#92400e', fontSize: 13, fontWeight: '500' }}>Unlink Tag</Text>
+          </TouchableOpacity>
         </View>
       )}
 

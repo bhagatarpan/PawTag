@@ -622,6 +622,89 @@ router.put('/tags/:id/link-pet', requirePermission('tag.create'), async (req: Au
   }
 });
 
+// --- Unlink Tag from Pet ---
+/**
+ * DELETE /customer/tags/:id/unlink-pet
+ *
+ * Unlink a tag from its current pet. The tag remains active and can be
+ * relinked to any other pet owned by the same customer.
+ */
+router.delete('/tags/:id/unlink-pet', requirePermission('tag.create'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { reason } = req.body;
+    const validReasons = ['customer_mistake', 'wrong_pet', 'technical_issue'];
+    if (!reason || !validReasons.includes(reason)) {
+      res.status(400).json({ success: false, error: 'Please provide a valid reason' });
+      return;
+    }
+
+    // Find tag — must belong to customer
+    const tag = await Tag.findOne({ _id: req.params.id, ownerId: req.user!.id, deletedAt: null });
+    if (!tag) {
+      res.status(404).json({ success: false, error: 'Tag not found or not owned by you' });
+      return;
+    }
+
+    // Must be active
+    if (tag.status !== 'active') {
+      res.status(400).json({ success: false, error: 'Only active tags can be unlinked' });
+      return;
+    }
+
+    // Must have a pet linked
+    if (!tag.petId) {
+      res.status(400).json({ success: false, error: 'Tag is not linked to any pet' });
+      return;
+    }
+
+    // Get pet name for audit before unlinking
+    const pet = await Pet.findById(tag.petId);
+    const previousPetId = tag.petId.toString();
+    const previousPetName = pet?.name || 'Unknown';
+
+    // Get user display name
+    const user = await User.findById(req.user!.id).select('fullName').lean();
+    const unlinkedByName = user?.fullName || 'Customer';
+
+    // Unlink the tag
+    tag.petId = undefined as any;
+    tag.unlinkedAt = new Date();
+    tag.unlinkReason = reason;
+    tag.unlinkedBy = new mongoose.Types.ObjectId(req.user!.id);
+    tag.unlinkedByName = unlinkedByName;
+    await tag.save();
+
+    // Audit
+    await auditCustomerEvent(req, {
+      action: 'unlink_pet',
+      eventType: 'customer_tag_unlink_pet',
+      eventCategory: 'UPDATE',
+      operationType: 'UPDATE',
+      resourceType: 'Tag',
+      resourceId: tag._id.toString(),
+      outcome: 'SUCCESS',
+      severity: 'MEDIUM',
+      reason,
+      businessOperation: `Unlinked tag '${tag.tagId}' from pet '${previousPetName}'`,
+      metadata: {
+        tagId: tag.tagId,
+        previousPetId,
+        previousPetName,
+        unlinkedBy: req.user!.id,
+        unlinkedByName,
+        reason,
+      },
+    });
+
+    const updated = await Tag.findById(tag._id)
+      .populate('petId', 'name petId petType breed color');
+
+    res.json({ success: true, data: updated });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to unlink tag from pet' });
+  }
+});
+
 // --- Request Tag Replacement ---
 router.post('/tags/:id/request-replacement', requirePermission('tag.create'), async (req: AuthRequest, res: Response) => {
   try {
