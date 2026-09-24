@@ -65,3 +65,5 @@ export { GuardianTierHistory, type IGuardianTierHistoryDocument } from './models
 export { PawRewardsLedger, type IPawRewardsLedgerDocument } from './models/PawRewardsLedger';
 export { BackgroundJob, type IBackgroundJobDocument } from './models/BackgroundJob';
 export { PendingRefundRetry, type IPendingRefundRetryDocument } from './models/PendingRefundRetry';
+export { MembershipTier, type IMembershipTierDocument, type IMembershipTierBenefits } from './models/MembershipTier';
+export { UserMembership, type IUserMembershipDocument } from './models/UserMembership';
