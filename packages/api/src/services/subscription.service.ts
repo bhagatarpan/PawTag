@@ -1503,6 +1503,176 @@ export async function changeSubscriptionPlan(subscriptionId: string, newPlanType
   return subscription;
 }
 
+/**
+ * Change a Gold subscription between monthly and annual billing.
+ *
+ * Business rules:
+ * - Only allowed on active Gold subscriptions
+ * - Reads new price from CMS settings (guardian.goldPrice / guardian.goldAnnualPrice)
+ * - If Stripe subscription exists: cancels old, creates new with correct price/interval
+ * - Creates invoice record for the plan change
+ * - Sends plan-change confirmation email
+ * - Full audit logging with before/after state
+ */
+export async function changeGoldPlan(
+  subscriptionId: string,
+  userId: string,
+  newPlanType: 'monthly' | 'annual',
+) {
+  const subscription = await Subscription.findById(subscriptionId);
+  if (!subscription) throw new Error('Subscription not found');
+  if (subscription.userId.toString() !== userId) throw new Error('Subscription not found');
+  if (subscription.planType !== 'gold') throw new Error('This is not a Gold subscription');
+  if (subscription.status !== 'active') throw new Error('Can only change plan for active subscriptions');
+
+  // Load Gold prices from CMS settings
+  const goldPriceSetting = await Setting.findOne({ key: 'guardian.goldPrice' }).lean();
+  const goldAnnualPriceSetting = await Setting.findOne({ key: 'guardian.goldAnnualPrice' }).lean();
+  const goldMonthlyPrice = parseFloat(goldPriceSetting?.value || '3.99');
+  const goldAnnualPrice = parseFloat(goldAnnualPriceSetting?.value || '39.99');
+
+  const newPrice = newPlanType === 'annual' ? goldAnnualPrice : goldMonthlyPrice;
+  const oldPlanType = subscription.renewalMethod;
+  const oldPrice = subscription.price;
+
+  // Nothing to change if already on the requested plan
+  if (subscription.renewalMethod === newPlanType) {
+    throw new Error(`Already on the ${newPlanType} billing plan`);
+  }
+
+  // Update Stripe subscription if it exists
+  let stripeUpdateSucceeded = false;
+  if (subscription.stripeSubscriptionId && !isFakeMode()) {
+    try {
+      const stripe = getStripeClient();
+
+      // Look up or create a new Stripe Price for Gold
+      const billingInterval = newPlanType === 'annual' ? 'year' : 'month';
+      const goldStripeProductId = (await Setting.findOne({ key: 'gold.stripeProductId' }).lean())?.value;
+
+      if (goldStripeProductId) {
+        // Create a new price for the new interval
+        const newPriceObj = await stripe.prices.create({
+          product: goldStripeProductId,
+          unit_amount: Math.round(newPrice * 100),
+          currency: 'nzd',
+          recurring: { interval: billingInterval },
+          metadata: { plan: 'gold' },
+        });
+
+        // Cancel the old Stripe subscription and create a new one
+        await stripe.subscriptions.cancel(subscription.stripeSubscriptionId);
+
+        const user = await User.findById(userId).select('stripeCustomerId').lean();
+        if (user?.stripeCustomerId) {
+          const newStripeSub = await stripe.subscriptions.create({
+            customer: user.stripeCustomerId,
+            items: [{ price: newPriceObj.id }],
+            payment_behavior: 'default_incomplete',
+            payment_settings: { save_default_payment_method: 'on_subscription' },
+            metadata: { userId: userId.toString(), plan: 'gold' },
+            expand: ['latest_invoice.payment_intent'],
+          });
+
+          subscription.stripeSubscriptionId = newStripeSub.id;
+          stripeUpdateSucceeded = true;
+
+          logger.info({
+            subscriptionId: subscription._id,
+            oldStripeSubscriptionId: subscription.stripeSubscriptionId,
+            newStripeSubscriptionId: newStripeSub.id,
+            newPlanType,
+            newPrice,
+          }, '[Gold] Stripe subscription updated for plan change');
+        }
+      }
+    } catch (stripeErr) {
+      logger.error({ err: stripeErr, subscriptionId: subscription._id }, '[Gold] Failed to update Stripe subscription for plan change');
+      // Continue with local update — Stripe mismatch will be caught by reconciliation
+    }
+  } else if (isFakeMode()) {
+    stripeUpdateSucceeded = true;
+  }
+
+  // Update PawTag subscription
+  subscription.renewalMethod = newPlanType;
+  subscription.price = newPrice;
+  subscription.planName = 'Gold Membership';
+
+  await subscription.save();
+
+  // Create invoice record for the plan change
+  const now = new Date();
+  await createInvoice({
+    subscriptionId: subscription._id.toString(),
+    userId: userId,
+    amount: newPrice,
+    billingPeriodStart: now,
+    billingPeriodEnd: subscription.currentPeriodEnd,
+    status: stripeUpdateSucceeded ? 'paid' : 'pending',
+    paymentMethod: stripeUpdateSucceeded ? 'stripe' : 'pending',
+  });
+
+  // Send plan change confirmation email (fire-and-forget)
+  try {
+    const user = await User.findById(userId).select('fullName email').lean();
+    if (user?.email) {
+      const { sendMail } = await import('./email.service');
+      const { renderSubscriptionPlanChangedEmail } = await import('./email/templates/subscription-plan-changed');
+      const dashboardUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/subscriptions`;
+      const html = renderSubscriptionPlanChangedEmail({
+        customerName: user.fullName || 'there',
+        planName: 'Gold Membership',
+        oldPlanType: oldPlanType as 'monthly' | 'annual',
+        newPlanType,
+        oldPrice,
+        newPrice,
+        nextBillingDate: subscription.currentPeriodEnd?.toLocaleDateString('en-NZ', { dateStyle: 'full' }) || 'N/A',
+        dashboardUrl,
+      });
+      await sendMail(user.email, `Gold Membership — Plan Changed to ${newPlanType}`, html, undefined, {
+        templateSlug: 'subscription-plan-changed',
+        businessFlow: 'subscription',
+        relatedEntityType: 'subscription',
+        relatedEntityId: subscription._id.toString(),
+        relatedEntityDisplay: 'Gold Membership',
+      });
+    }
+  } catch (emailErr) {
+    logger.error({ err: emailErr, subscriptionId: subscription._id }, '[Gold] Failed to send plan change email');
+  }
+
+  // Audit log
+  await auditJobEvent({
+    action: 'gold_plan_changed',
+    eventType: 'subscription.plan_changed',
+    eventCategory: 'UPDATE',
+    operationType: 'UPDATE',
+    resourceType: 'Subscription',
+    resourceId: subscription._id.toString(),
+    outcome: 'SUCCESS',
+    severity: 'HIGH',
+    beforeState: {
+      renewalMethod: oldPlanType,
+      price: oldPrice,
+      status: subscription.status,
+    },
+    afterState: {
+      renewalMethod: newPlanType,
+      price: newPrice,
+      status: subscription.status,
+    },
+    metadata: {
+      userId,
+      planType: 'gold',
+      planName: 'Gold Membership',
+      stripeUpdateSucceeded,
+    },
+  }, { actorType: 'SERVICE' });
+
+  return subscription;
+}
+
 // Dunning/Retry Logic for Failed Payments
 export async function handlePaymentFailure(subscriptionId: string, paymentMethod?: string) {
   const subscription = await Subscription.findById(subscriptionId);

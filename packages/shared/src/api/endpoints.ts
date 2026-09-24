@@ -554,6 +554,7 @@ export const API = {
       autoRenew: (id: string) => `/customer/subscriptions/${id}/auto-renew` as const,
       changePlan: (id: string) => `/customer/subscriptions/${id}/change-plan` as const,
       goldSubscribe: '/customer/subscriptions/gold/subscribe',
+      goldChangePlan: '/customer/subscriptions/gold/change-plan',
     },
     guardian: {
       points: '/customer/guardian/points',

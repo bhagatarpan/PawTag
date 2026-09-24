@@ -39,3 +39,4 @@ export { renderCancelledBenefitsExpiringEmail } from './cancelled-benefits-expir
 export { renderSubscriptionPausedEmail } from './subscription-paused';
 export { renderSubscriptionPausedAdminEmail } from './subscription-paused-admin';
 export { renderJobNotificationEmail } from './job-notification';
+export { renderSubscriptionPlanChangedEmail } from './subscription-plan-changed';
