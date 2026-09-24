@@ -170,6 +170,18 @@ export const API = {
     },
 
     // ---------------------------------------------------------------------------
+    // Admin — Membership
+    // ---------------------------------------------------------------------------
+    membership: {
+      tiers: '/admin/membership/tiers',
+      tier: (id: string) => `/admin/membership/tiers/${id}` as const,
+      subscribers: '/admin/membership/subscribers',
+      subscriber: (id: string) => `/admin/membership/subscribers/${id}` as const,
+      extend: '/admin/membership/extend',
+      stats: '/admin/membership/stats',
+    },
+
+    // ---------------------------------------------------------------------------
     // Admin — Commerce
     // ---------------------------------------------------------------------------
     commerce: {
@@ -567,6 +579,15 @@ export const API = {
       benefits: '/customer/guardian/benefits',
       activity: '/customer/guardian/activity',
     },
+    membership: {
+      tiers: '/membership/tiers',
+      status: '/membership/status',
+      subscribe: '/membership/subscribe',
+      activate: '/membership/activate',
+      cancel: '/membership/cancel',
+      changeTier: '/membership/change-tier',
+      tags: '/membership/tags',
+    },
     escalations: {
       list: '/customer/escalations',
       resolve: (id: string) => `/customer/escalations/${id}/resolve` as const,
@@ -686,6 +707,10 @@ export const API = {
       estimate: '/public/points/estimate',
       rates: '/public/points/rates',
       goldContent: '/public/points/gold-content',
+    },
+    membership: {
+      tiers: '/public/membership/tiers',
+      tier: (id: string) => `/public/membership/tiers/${id}` as const,
     },
     promo: {
       validate: '/public/promo/validate',

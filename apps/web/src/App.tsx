@@ -49,6 +49,7 @@ import GoldBenefits from './pages/account/GoldBenefits';
 import FloatingLoyaltyBadge from './components/FloatingLoyaltyBadge';
 import GuardianLanding from './pages/GuardianLanding';
 import GoldLanding from './pages/GoldLanding';
+import Membership from './pages/Membership';
 import AnnouncementBar from './components/AnnouncementBar';
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
@@ -121,6 +122,7 @@ export default function App() {
         <Route path="/refer" element={<PublicLayout showEmergency={false}><Refer /></PublicLayout>} />
         <Route path="/guardian" element={<PublicLayout><GuardianLanding /></PublicLayout>} />
         <Route path="/gold" element={<PublicLayout><GoldLanding /></PublicLayout>} />
+        <Route path="/membership" element={<PublicLayout><Membership /></PublicLayout>} />
 
         {/* Account routes */}
         <Route path="/account" element={<ProtectedRoute><AccountLayout><AccountDashboard /></AccountLayout></ProtectedRoute>} />

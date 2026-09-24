@@ -104,6 +104,7 @@ export default function Navbar() {
   const fallbackLinks = [
     { to: '/', label: 'Home' },
     { to: '/shop', label: 'Shop' },
+    { to: '/membership', label: 'Membership' },
     { to: '/about', label: 'About' },
   ];
 

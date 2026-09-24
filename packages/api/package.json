@@ -14,7 +14,10 @@
     "seed": "tsx src/seeds/seed.ts",
     "seed:cms": "tsx src/seeds/seed-cms.ts",
     "seed:products": "tsx src/seed-products.ts",
-    "seed:demo": "tsx src/seeds/seed-demo-data.ts"
+    "seed:demo": "tsx src/seeds/seed-demo-data.ts",
+    "seed:memberships": "tsx src/seeds/seed-memberships.ts",
+    "cleanup": "tsx src/scripts/cleanup-test-data.ts",
+    "grant-permissions": "tsx src/scripts/grant-all-permissions.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1101.0",
