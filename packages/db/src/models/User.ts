@@ -157,7 +157,7 @@ const UserSchema = new Schema<IUserDocument>(
     stripeCustomerId: { type: String },
     membershipTier: { 
       type: String, 
-      enum: ['gold', 'platinum', 'black'], 
+      enum: ['gold', 'platinum', 'black', null], 
       default: null 
     },
     membershipId: { type: Schema.Types.ObjectId, ref: 'UserMembership', default: null },
