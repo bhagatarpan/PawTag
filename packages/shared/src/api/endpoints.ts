@@ -699,6 +699,7 @@ export const API = {
       shopPage: (slug: string) => `/public/cms/shop/${slug}` as const,
       authPage: (pageType: string) => `/public/cms/auth/${pageType}` as const,
       onboarding: '/public/cms/onboarding',
+      announcements: '/public/cms/announcements',
     },
     commerce: {
       cancellationReasons: '/public/commerce/cancellation-reasons',
