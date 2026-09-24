@@ -475,8 +475,12 @@ export async function createGoldSubscription(userId: string, price?: number, pla
         stripePaymentIntentId,
       }, '[Gold] Created Stripe subscription');
     } catch (err) {
-      logger.error({ err, userId }, '[Gold] Stripe subscription creation failed — falling back to demo mode');
-      // Fall back to demo mode on Stripe failure
+      logger.error({ err, userId }, '[Gold] Stripe subscription creation failed');
+      // In production, fail explicitly — do not create a free Gold subscription
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error('Payment processing failed. Please try again or contact support.');
+      }
+      // In development/test mode, allow fallback for demo purposes
       stripeCustomerId = undefined;
       stripeSubscriptionId = undefined;
     }

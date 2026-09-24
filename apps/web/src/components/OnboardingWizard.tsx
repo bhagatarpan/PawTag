@@ -119,7 +119,10 @@ export default function OnboardingWizard() {
           setGoldJoined(true);
           setAddGold(true);
         })
-        .catch(() => {});
+        .catch((err) => {
+          // Gold is optional — log but don't block onboarding
+          console.warn('Gold subscription creation failed during onboarding:', err?.response?.data?.error || err.message);
+        });
     }
 
     // Then check if user already has an active Gold subscription
