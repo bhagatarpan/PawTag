@@ -106,11 +106,14 @@ export class InventoryService {
     }
 
     // Atomic reserve: only succeed if enough stock is available
+    // Products with stockPolicy 'allow' bypass stock check (digital/unlimited)
     const result = await Product.findOneAndUpdate(
       {
         _id: productId,
-        stockPolicy: { $ne: 'allow' }, // Skip check for backorder products
-        $expr: { $gte: [{ $subtract: ['$stock', '$reserved'] }, quantity] },
+        $or: [
+          { stockPolicy: 'allow' },
+          { $expr: { $gte: [{ $subtract: ['$stock', '$reserved'] }, quantity] } },
+        ],
       },
       {
         $inc: { reserved: quantity },

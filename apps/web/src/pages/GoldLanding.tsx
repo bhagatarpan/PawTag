@@ -45,8 +45,10 @@ interface GoldContent {
 export default function GoldLanding() {
   const { user } = useAuth();
   const { settings } = useSiteSettings();
-  const goldPrice = settings?.['guardian.goldPrice'] || '3.99';
+  const goldMonthlyPrice = parseFloat(settings?.['guardian.goldPrice'] || '3.99');
+  const goldAnnualPrice = parseFloat(settings?.['guardian.goldAnnualPrice'] || '39.99');
   const goldCtaTo = user ? '/account/upgrade' : '/register';
+  const annualSavings = (goldMonthlyPrice * 12) - goldAnnualPrice;
 
   const [content, setContent] = useState<GoldContent>({
     heroHeadline: 'Go Gold. Get 2× the Rewards.',
@@ -86,8 +88,23 @@ export default function GoldLanding() {
           <h1 className="text-4xl md:text-5xl font-bold mb-4">{content.heroHeadline}</h1>
           <p className="text-amber-100 text-xl mb-8">
             {content.heroSubtext}
-            {' '}Just ${goldPrice}/month — less than a coffee.
           </p>
+          
+          {/* Pricing Cards */}
+          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
+            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 text-left">
+              <div className="text-amber-200 text-sm font-medium mb-1">Monthly</div>
+              <div className="text-3xl font-bold text-white">${goldMonthlyPrice.toFixed(2)}<span className="text-lg font-normal text-amber-200">/mo</span></div>
+              <div className="text-amber-200 text-sm mt-1">${(goldMonthlyPrice * 12).toFixed(2)}/year</div>
+            </div>
+            <div className="bg-white rounded-xl p-6 text-left relative">
+              <div className="absolute -top-3 right-4 bg-green-500 text-white text-xs font-bold px-3 py-1 rounded-full">SAVE ${annualSavings.toFixed(2)}</div>
+              <div className="text-amber-600 text-sm font-medium mb-1">Annual</div>
+              <div className="text-3xl font-bold text-gray-900">${goldAnnualPrice.toFixed(2)}<span className="text-lg font-normal text-gray-500">/yr</span></div>
+              <div className="text-gray-500 text-sm mt-1">${(goldAnnualPrice / 12).toFixed(2)}/month</div>
+            </div>
+          </div>
+
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
               to={goldCtaTo}
@@ -192,7 +209,7 @@ export default function GoldLanding() {
             ))}
           </div>
           <p className="text-center text-sm text-gray-400 mt-6">
-            Gold costs ${goldPrice}/month. Spend $50+/month and Gold pays for itself.
+            Gold costs ${goldMonthlyPrice.toFixed(2)}/month or ${goldAnnualPrice.toFixed(2)}/year (save ${annualSavings.toFixed(2)}).
           </p>
         </div>
       </section>
@@ -202,7 +219,7 @@ export default function GoldLanding() {
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl font-bold text-white mb-4">Less Than a Coffee a Month</h2>
           <p className="text-amber-100 text-xl mb-6">
-            Gold is just <strong>${goldPrice}/month</strong> — that's ${(parseFloat(goldPrice) * 12).toFixed(2)}/year.
+            Gold is just <strong>${goldMonthlyPrice.toFixed(2)}/month</strong> — or save with annual at <strong>${goldAnnualPrice.toFixed(2)}/year</strong>.
             Spend $50/month and you'll earn $36 in PawRewards annually.
           </p>
           <p className="text-amber-100 text-lg mb-8">

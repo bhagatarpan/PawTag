@@ -10,6 +10,7 @@ import {
   cancelSubscription,
   changeSubscriptionPlan,
   createGoldSubscription,
+  changeGoldPlan,
 } from '../services/subscription.service';
 import logger from '../lib/logger';
 
@@ -329,6 +330,34 @@ router.put('/:id/auto-renew', requirePermission('customer.read'), async (req: Au
     }
 
     await subscription.save();
+
+    // Send resume confirmation email when auto-renew is reactivated
+    if (autoRenew) {
+      try {
+        const user = await User.findById(req.user!.id).select('fullName email').lean();
+        if (user?.email) {
+          const { sendMail } = await import('../services/email.service');
+          const { renderSubscriptionResumedEmail } = await import('../services/email/templates/subscription-resumed');
+          const dashboardUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/subscriptions`;
+          const html = renderSubscriptionResumedEmail({
+            customerName: user.fullName || 'there',
+            planName: subscription.planName || 'Subscription',
+            resumedAt: new Date().toLocaleDateString('en-NZ', { dateStyle: 'full' }),
+            nextBillingDate: subscription.currentPeriodEnd?.toLocaleDateString('en-NZ', { dateStyle: 'full' }) || 'N/A',
+            dashboardUrl,
+          });
+          await sendMail(user.email, `Auto-Renewal Reactivated — ${subscription.planName || 'Subscription'}`, html, undefined, {
+            templateSlug: 'subscription-resumed',
+            businessFlow: 'subscription',
+            relatedEntityType: 'subscription',
+            relatedEntityId: subscription._id.toString(),
+            relatedEntityDisplay: subscription.planName || 'Subscription',
+          }).catch(() => {});
+        }
+      } catch (emailErr) {
+        logger.error({ err: emailErr, subscriptionId: subscription._id }, 'Failed to send resume email');
+      }
+    }
 
     // Send admin notification for ALL pause reasons
     if (!autoRenew && reason) {
@@ -650,6 +679,52 @@ router.post('/gold/subscribe', async (req: AuthRequest, res: Response) => {
   } catch (error: any) {
     logger.error({ err: error, userId: req.user?.id }, '[Subscriptions] Gold subscribe error');
     res.status(500).json({ success: false, error: error.message || 'Failed to create Gold subscription' });
+  }
+});
+
+/**
+ * POST /gold/change-plan
+ *
+ * Change Gold membership billing cycle between monthly and annual.
+ *
+ * Body: { planType: 'monthly' | 'annual' }
+ */
+router.post('/gold/change-plan', async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const { planType } = req.body || {};
+
+    if (!planType || !['monthly', 'annual'].includes(planType)) {
+      res.status(400).json({ success: false, error: 'planType must be "monthly" or "annual"' });
+      return;
+    }
+
+    // Find the user's active Gold subscription
+    const existingGold = await Subscription.findOne({
+      userId,
+      planName: 'Gold Membership',
+      planType: 'gold',
+      status: 'active',
+      deletedAt: null,
+    });
+
+    if (!existingGold) {
+      res.status(404).json({ success: false, error: 'No active Gold membership found' });
+      return;
+    }
+
+    const updated = await changeGoldPlan(existingGold._id.toString(), userId, planType);
+
+    res.json({
+      success: true,
+      data: {
+        subscription: updated,
+        message: `Gold membership changed to ${planType} billing. New price: $${updated.price.toFixed(2)}/${planType === 'annual' ? 'yr' : 'mo'}`,
+      },
+    });
+  } catch (error: any) {
+    logger.error({ err: error, userId: req.user?.id }, '[Subscriptions] Gold change plan error');
+    res.status(500).json({ success: false, error: error.message || 'Failed to change Gold plan' });
   }
 });
 

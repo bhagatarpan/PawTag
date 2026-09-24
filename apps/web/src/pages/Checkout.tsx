@@ -197,11 +197,13 @@ export default function Checkout() {
   const [shippingOptions, setShippingOptions] = useState<any[]>([]);
   const [selectedShippingOption, setSelectedShippingOption] = useState<string>('');
   const [shippingLoading, setShippingLoading] = useState(false);
+  const [shippingError, setShippingError] = useState<string | null>(null);
 
   // Fetch shipping options when address is entered
   useEffect(() => {
     if (!form.line1) return;
     setShippingLoading(true);
+    setShippingError(null);
     api.get(API.shipping.rates, {
       params: { line1: form.line1, city: form.city, state: form.state, zip: form.zip, country: form.country },
     })
@@ -213,7 +215,16 @@ export default function Checkout() {
           setSelectedShippingOption(rates[0].id);
         }
       })
-      .catch(() => setShippingOptions([]))
+      .catch((err) => {
+        console.error('[Checkout] Shipping rates failed:', err?.response?.data || err.message);
+        const status = err?.response?.status;
+        if (status === 401) {
+          setShippingError('Your session expired. Please log in again to continue.');
+        } else {
+          setShippingError('Unable to load shipping options. Please try again.');
+        }
+        setShippingOptions([]);
+      })
       .finally(() => setShippingLoading(false));
   }, [form.line1, form.city, form.state, form.zip, form.country]);
 
@@ -622,9 +633,17 @@ export default function Checkout() {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err: any) {
       console.error('[Checkout] Payment intent creation failed:', err?.response?.data || err);
-      const msg = err?.response?.status === 401
-        ? 'Your session expired. Please log in again to continue.'
-        : 'Payment setup failed. Please try again.';
+      const status = err?.response?.status;
+      const serverMsg = err?.response?.data?.error;
+      let msg: string;
+      if (status === 401) {
+        msg = 'Your session expired. Please log in again to continue.';
+      } else if (status === 400 && serverMsg) {
+        // Show actual server error message (e.g., "Your cart is empty", "product no longer available")
+        msg = serverMsg;
+      } else {
+        msg = 'Payment setup failed. Please try again.';
+      }
       setError(msg);
     } finally {
       setLoading(false);
@@ -915,6 +934,10 @@ export default function Checkout() {
                       {shippingLoading ? (
                         <div className="flex items-center gap-2 text-sm text-gray-500">
                           <Loader2 className="h-4 w-4 animate-spin" /> Loading shipping options...
+                        </div>
+                      ) : shippingError ? (
+                        <div className="bg-red-50 border border-red-200 rounded-xl p-3">
+                          <p className="text-sm text-red-700">{shippingError}</p>
                         </div>
                       ) : shippingOptions.length > 0 ? (
                         <div className="space-y-2">

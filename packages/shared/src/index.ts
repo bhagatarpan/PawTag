@@ -69,8 +69,14 @@ export enum NotificationType {
   SYSTEM = 'system',
   FINDER_REMINDER = 'finder_reminder',
   SUBSCRIPTION_EXPIRING = 'subscription_expiring',
+  SUBSCRIPTION_AUTO_RENEW_PAUSED = 'subscription_auto_renew_paused',
   REFERRAL_REWARD = 'referral_reward',
   TAG_EXPIRY_WARNING = 'tag_expiry_warning',
+  NEW_ORDER = 'new_order',
+  ONBOARDING_REMINDER = 'onboarding_reminder',
+  REFUND_FAILED = 'refund_failed',
+  EMERGENCY_CONTACT_ESCALATION = 'emergency_contact_escalation',
+  ORDER = 'order',
 }
 
 export enum FinderAction {

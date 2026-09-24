@@ -172,7 +172,7 @@ export default function SubscriptionUpgrade() {
             </div>
           </div>
           {plans.map((plan) => {
-            const isGold = plan.name.toLowerCase().includes('gold') || plan.sku === 'PT-GOLD-001';
+            const isGold = plan.name.toLowerCase().includes('gold');
             const price = isGold
               ? (selectedPlanType === 'annual'
                   ? (plan.subscriptionConfig?.annualPrice || (plan.subscriptionConfig?.monthlyPrice || 0) * 12)
@@ -227,7 +227,7 @@ export default function SubscriptionUpgrade() {
                   </button>
                 ) : (
                   <button
-                    onClick={() => handleUpgrade(plan._id, plan.name.toLowerCase().includes('gold') || plan.sku === 'PT-GOLD-001')}
+                    onClick={() => handleUpgrade(plan._id, plan.name.toLowerCase().includes('gold'))}
                     disabled={upgrading}
                     className="w-full py-3 px-4 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                   >

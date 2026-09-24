@@ -13,6 +13,7 @@ interface GuardianAnalytics {
   goldMembers: number;
   averagePointsPerMember: number;
   averageRewardsPerMember: number;
+  estimatedMRR: number;
   recentActivity: any[];
 }
 
@@ -21,6 +22,7 @@ export default function GuardianAnalytics() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [goldPrice, setGoldPrice] = useState(3.99);
+  const [goldAnnualPrice, setGoldAnnualPrice] = useState(39.99);
 
   useEffect(() => {
     fetchAnalytics();
@@ -33,6 +35,8 @@ export default function GuardianAnalytics() {
       const settings = res.data?.data || [];
       const goldPriceSetting = settings.find((s: any) => s.key === 'guardian.goldPrice');
       if (goldPriceSetting) setGoldPrice(parseFloat(goldPriceSetting.value));
+      const goldAnnualPriceSetting = settings.find((s: any) => s.key === 'guardian.goldAnnualPrice');
+      if (goldAnnualPriceSetting) setGoldAnnualPrice(parseFloat(goldAnnualPriceSetting.value));
     } catch {
       // Use default
     }
@@ -42,6 +46,19 @@ export default function GuardianAnalytics() {
     try {
       const res = await api.get(API.admin.guardian.stats);
       const stats = res.data.data;
+      
+      // Fetch Gold subscriptions to calculate accurate MRR
+      let estimatedMRR = 0;
+      try {
+        const subsRes = await api.get(API.admin.subscriptions.list, { params: { planType: 'gold', status: 'active', limit: 1000 } });
+        const goldSubs = subsRes.data?.data?.subscriptions || subsRes.data?.data || [];
+        const monthlyCount = goldSubs.filter((s: any) => s.renewalMethod === 'monthly').length;
+        const annualCount = goldSubs.filter((s: any) => s.renewalMethod === 'annual').length;
+        estimatedMRR = (monthlyCount * goldPrice) + (annualCount * goldAnnualPrice / 12);
+      } catch {
+        // Fallback to simple calculation
+        estimatedMRR = stats.goldMembers * goldPrice;
+      }
       
       // Calculate additional metrics
       const averagePointsPerMember = stats.totalMembers > 0 
@@ -55,6 +72,7 @@ export default function GuardianAnalytics() {
         ...stats,
         averagePointsPerMember,
         averageRewardsPerMember,
+        estimatedMRR,
         recentActivity: [],
       });
     } catch (err: any) {
@@ -237,7 +255,7 @@ export default function GuardianAnalytics() {
             <div className="flex justify-between items-center">
               <span className="text-gray-600">Estimated Monthly MRR</span>
               <span className="font-semibold text-blue-600">
-                ${(analytics.goldMembers * goldPrice).toFixed(2)}
+                ${(analytics.estimatedMRR || analytics.goldMembers * goldPrice).toFixed(2)}
               </span>
             </div>
           </div>

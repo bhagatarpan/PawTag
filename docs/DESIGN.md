@@ -1611,6 +1611,22 @@ All PawTag emails must use consistent design tokens defined here. These tokens a
 }
 ```
 
+### New Email Templates (Gold/Subscription)
+
+The following email templates were added for Gold membership and subscription management:
+
+| Template | Theme | Purpose |
+|----------|-------|---------|
+| `subscription-plan-changed.ts` | `default` (teal) | Plan change confirmation (annual ↔ monthly) |
+| `gold-cancellation.ts` | `warning` (amber) | Gold-specific cancellation with benefits list |
+| `subscription-resumed.ts` | `success` (green) | Auto-renew resume confirmation |
+
+**Design patterns:**
+- All templates use `renderBase()` with appropriate theme
+- Plan change: Shows old → new plan with pricing table
+- Gold cancellation: Lists lost benefits, includes resubscribe CTA
+- Resume: Shows resumed date and next billing date
+
 ---
 
 ## Background Jobs Dashboard
