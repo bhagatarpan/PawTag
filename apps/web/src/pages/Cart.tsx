@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
@@ -17,6 +17,19 @@ export default function CartPage() {
 
   const [promoLoading, setPromoLoading] = useState(false);
   const [promoError, setPromoError] = useState('');
+  const [isGoldMember, setIsGoldMember] = useState(false);
+
+  // Fetch Gold membership status from tier API (single source of truth)
+  useEffect(() => {
+    if (!user) return;
+    api.get(API.customer.guardian.tier)
+      .then((res) => {
+        setIsGoldMember(res.data.data?.isGoldMember || false);
+      })
+      .catch(() => {
+        // Default to non-Gold on error
+      });
+  }, [user]);
 
   const applyPromoCode = useCallback(async (code: string) => {
     if (!code || !user) return;
@@ -54,11 +67,10 @@ export default function CartPage() {
   const isEmpty = items.length === 0 && !loading;
   const isGuest = !user;
 
-  // Guardian/Gold points calculation
-  const guardianTier = user?.rbacRoles?.find((r) => r.name === 'GOLD') ? 'GOLD' : null;
+  // Guardian/Gold points calculation — uses tier API (single source of truth)
   const pointsEarning = totals && totals.total > 0 ? {
-    points: Math.floor(totals.total * (guardianTier === 'GOLD' ? 2 : 1)),
-    isGoldMember: guardianTier === 'GOLD',
+    points: Math.floor(totals.total * (isGoldMember ? 2 : 1)),
+    isGoldMember,
   } : null;
 
   return (
@@ -132,7 +144,7 @@ export default function CartPage() {
                   loading={loading}
                   isGuest={isGuest}
                   pointsEarning={pointsEarning}
-                  guardianTier={guardianTier}
+                  guardianTier={isGoldMember ? 'GOLD' : null}
                   promoCode={promoCode || undefined}
                   promoApplied={promoApplied}
                   promoError={promoError}
