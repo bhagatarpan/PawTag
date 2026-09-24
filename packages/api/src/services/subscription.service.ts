@@ -1463,12 +1463,111 @@ export async function changeSubscriptionPlan(subscriptionId: string, newPlanType
   const oldPlanName = subscription.planName;
   const oldPrice = subscription.price;
 
+  // Update Stripe subscription price if it exists
+  let stripeUpdateSucceeded = false;
+  if (subscription.stripeSubscriptionId && !isFakeMode()) {
+    try {
+      const stripe = getStripeClient();
+      const billingInterval = newPlanType === 'annual' ? 'year' : 'month';
+
+      // Look up the product's Stripe price ID or create a new one
+      const product = subscription.planId ? await Product.findById(subscription.planId).lean() : null;
+      const stripeProductId = product?.subscriptionConfig?.stripePriceId;
+
+      // Create a new Stripe Price for the new interval
+      if (subscription.planId) {
+        const settingKey = `${subscription.planId}.stripePriceId`;
+        const existingPriceId = (await Setting.findOne({ key: settingKey }).lean())?.value;
+
+        let newStripePriceId: string | null = null;
+
+        // Verify existing price is still valid
+        if (existingPriceId) {
+          try {
+            const existingPrice = await stripe.prices.retrieve(existingPriceId) as any;
+            if (existingPrice.status === 'active' && existingPrice.unit_amount === Math.round(newPrice * 100)) {
+              newStripePriceId = existingPriceId;
+            }
+          } catch {
+            // Price doesn't exist or is invalid
+          }
+        }
+
+        // Create new price if needed
+        if (!newStripePriceId && product?.subscriptionConfig?.stripePriceId) {
+          const newPriceObj = await stripe.prices.create({
+            product: product.subscriptionConfig.stripePriceId as any,
+            unit_amount: Math.round(newPrice * 100),
+            currency: 'nzd',
+            recurring: { interval: billingInterval },
+            metadata: { plan: subscription.planName },
+          });
+          newStripePriceId = newPriceObj.id;
+          // Cache the new price ID
+          await Setting.findOneAndUpdate(
+            { key: settingKey },
+            { key: settingKey, value: newPriceObj.id },
+            { upsert: true },
+          );
+        }
+
+        // Update Stripe subscription with new price
+        if (newStripePriceId) {
+          await stripe.subscriptions.update(subscription.stripeSubscriptionId, {
+            items: [{ price: newStripePriceId }],
+          });
+          stripeUpdateSucceeded = true;
+          logger.info({
+            subscriptionId: subscription._id,
+            stripeSubscriptionId: subscription.stripeSubscriptionId,
+            newPlanType,
+            newPrice,
+          }, 'Stripe subscription price updated for plan change');
+        }
+      }
+    } catch (stripeErr) {
+      logger.error({ err: stripeErr, subscriptionId: subscription._id }, 'Failed to update Stripe subscription price for plan change');
+      // Continue with local update — Stripe mismatch will be caught by reconciliation
+    }
+  } else if (isFakeMode()) {
+    stripeUpdateSucceeded = true;
+  }
+
   subscription.planType = newPlanType;
   subscription.planName = planNames[newPlanType];
   subscription.price = newPrice;
   subscription.renewalMethod = newPlanType;
 
   await subscription.save();
+
+  // Send plan change confirmation email (fire-and-forget)
+  try {
+    const user = await User.findById(subscription.userId).select('fullName email').lean();
+    if (user?.email) {
+      const { sendMail } = await import('./email.service');
+      const { renderSubscriptionPlanChangedEmail } = await import('./email/templates/subscription-plan-changed');
+      const dashboardUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/subscriptions`;
+      const html = renderSubscriptionPlanChangedEmail({
+        customerName: user.fullName || 'there',
+        planName: planNames[newPlanType],
+        oldPlanType: oldPlanType as 'monthly' | 'annual',
+        newPlanType,
+        oldPrice,
+        newPrice,
+        nextBillingDate: subscription.currentPeriodEnd?.toLocaleDateString('en-NZ', { dateStyle: 'full' }) || 'N/A',
+        dashboardUrl,
+      });
+      await sendMail(user.email, `Plan Changed — ${planNames[newPlanType]}`, html, undefined, {
+        templateSlug: 'subscription-plan-changed',
+        businessFlow: 'subscription',
+        relatedEntityType: 'subscription',
+        relatedEntityId: subscription._id.toString(),
+        relatedEntityDisplay: planNames[newPlanType],
+      });
+    }
+  } catch (emailErr) {
+    logger.error({ err: emailErr, subscriptionId: subscription._id }, 'Failed to send plan change email');
+  }
 
   await auditJobEvent({
     action: 'subscription_plan_changed',
@@ -1497,6 +1596,7 @@ export async function changeSubscriptionPlan(subscriptionId: string, newPlanType
       userId: subscription.userId?.toString?.(),
       tagId: subscription.tagId?.toString?.(),
       actorSource: 'customer-api',
+      stripeUpdateSucceeded,
     },
   }, { actorType: 'SERVICE' });
 

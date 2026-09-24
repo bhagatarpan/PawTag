@@ -12,7 +12,7 @@
 |--------|-------------|--------|-----------|
 | 1 | Gold Plan Change Backend | ✅ Complete | 2026-09-24 |
 | 1B | Plan Change Email Template | ✅ Complete | 2026-09-24 |
-| 2 | Fix Stripe Price Update on Plan Change | ⬜ Pending | — |
+| 2 | Fix Stripe Price Update on Plan Change | ✅ Complete | 2026-09-24 |
 | 3 | Gold Creation Failure Handling | ⬜ Pending | — |
 | 4 | Consistent Gold Detection | ⬜ Pending | — |
 | 5 | Gold Landing Page + Checkout Upsell | ⬜ Pending | — |
