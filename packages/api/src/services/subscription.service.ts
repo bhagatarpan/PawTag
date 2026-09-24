@@ -528,6 +528,22 @@ export async function createGoldSubscription(userId: string, price?: number, pla
     logger.error({ err, userId }, '[Gold] Failed to send welcome email');
   });
 
+  // Create in-app notification for Gold subscription (fire-and-forget)
+  try {
+    const { createAndDeliverNotification } = await import('./notification-delivery.service');
+    await createAndDeliverNotification({
+      userId,
+      type: 'subscription_expiring',
+      title: 'Gold Membership Activated',
+      message: `Welcome to Gold! You're now earning 2× points on every purchase.`,
+      priority: 'normal',
+      channel: 'info',
+      actionUrl: '/account/guardian',
+    });
+  } catch (notifErr) {
+    logger.error({ err: notifErr, userId }, '[Gold] Failed to create in-app notification');
+  }
+
   // Send invoice email (fire-and-forget)
   if (invoice) {
     const invoiceUrl = `${frontendUrl}/account/subscriptions`;
