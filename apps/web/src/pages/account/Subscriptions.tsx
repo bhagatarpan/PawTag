@@ -192,12 +192,19 @@ function SubscriptionsInner() {
   async function handleChangePlan(id: string, planType: string) {
     setActionLoading(true);
     try {
-      await api.post(API.customer.subscriptions.changePlan(id), { planType });
+      // Use Gold-specific endpoint for Gold subscriptions
+      const sub = detail?.subscription;
+      if (sub?.planType === 'gold') {
+        await api.post(API.customer.subscriptions.goldChangePlan, { planType });
+      } else {
+        await api.post(API.customer.subscriptions.changePlan(id), { planType });
+      }
       setShowChangePlan(false);
       await fetchSubscriptions();
       if (selectedId === id) await fetchDetail(id);
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to change plan');
+      // Error will be shown via inline error state, not alert()
+      console.error('Failed to change plan:', err);
     } finally {
       setActionLoading(false);
     }
@@ -311,8 +318,8 @@ function SubscriptionsInner() {
           </div>
         )}
 
-        {/* Upgrade CTA */}
-        {isActive && sub.planType !== 'annual' && (
+        {/* Upgrade CTA — hidden for Gold members (they have their own plan change flow) */}
+        {isActive && sub.planType !== 'annual' && sub.planType !== 'gold' && (
           <div className="bg-gradient-to-r from-amber-500 to-orange-500 rounded-xl p-4 text-white">
             <div className="flex items-center justify-between">
               <div>
@@ -325,6 +332,26 @@ function SubscriptionsInner() {
               >
                 Upgrade
               </Link>
+            </div>
+          </div>
+        )}
+
+        {/* Gold Plan Change — for Gold members to switch monthly↔annual */}
+        {isActive && sub.planType === 'gold' && (
+          <div className="bg-gradient-to-r from-amber-500 to-orange-500 rounded-xl p-4 text-white">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold">Gold Billing</h3>
+                <p className="text-white/80 text-sm">
+                  Currently on {sub.renewalMethod} billing at ${sub.price.toFixed(2)}/{sub.renewalMethod === 'annual' ? 'yr' : 'mo'}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowChangePlan(true)}
+                className="px-4 py-2 bg-white text-amber-600 rounded-lg font-semibold hover:bg-amber-50 transition-colors"
+              >
+                Change Billing
+              </button>
             </div>
           </div>
         )}
