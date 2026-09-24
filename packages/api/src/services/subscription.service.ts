@@ -754,14 +754,43 @@ export async function cancelSubscription(
     const user = await User.findById(userId).select('fullName email').lean();
     if (user?.email) {
       const { sendMail } = await import('./email.service');
-      const { renderCancellationEmail } = await import('./email/templates/cancellation');
-      const html = renderCancellationEmail({
-        name: user.fullName || 'there',
-        planName: subscription.planName || 'PawTag Subscription',
-        cancelledAt: subscription.cancelledAt!.toLocaleDateString('en-NZ', { dateStyle: 'full' }),
-        currentPeriodEnd: subscription.currentPeriodEnd?.toLocaleDateString('en-NZ', { dateStyle: 'full' }) || 'current billing period',
-      });
-      await sendMail(user.email, `Your ${subscription.planName || 'PawTag'} subscription has been cancelled`, html).catch(() => {});
+      const cancelledAt = subscription.cancelledAt!.toLocaleDateString('en-NZ', { dateStyle: 'full' });
+      const benefitsUntil = subscription.currentPeriodEnd?.toLocaleDateString('en-NZ', { dateStyle: 'full' }) || 'current billing period';
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+
+      let html: string;
+      let subject: string;
+
+      if (subscription.planType === 'gold') {
+        // Gold-specific cancellation email with benefits list
+        const { renderGoldCancellationEmail } = await import('./email/templates/gold-cancellation');
+        html = renderGoldCancellationEmail({
+          customerName: user.fullName || 'there',
+          cancelledAt,
+          currentPeriodEnd: benefitsUntil,
+          dashboardUrl: `${frontendUrl}/account/subscriptions`,
+          resubscribeUrl: `${frontendUrl}/account/gold`,
+        });
+        subject = 'Gold Membership Cancelled — Confirmation';
+      } else {
+        // Standard cancellation email
+        const { renderCancellationEmail } = await import('./email/templates/cancellation');
+        html = renderCancellationEmail({
+          name: user.fullName || 'there',
+          planName: subscription.planName || 'PawTag Subscription',
+          cancelledAt,
+          currentPeriodEnd: benefitsUntil,
+        });
+        subject = `Your ${subscription.planName || 'PawTag'} subscription has been cancelled`;
+      }
+
+      await sendMail(user.email, subject, html, undefined, {
+        templateSlug: subscription.planType === 'gold' ? 'gold-cancellation' : 'cancellation',
+        businessFlow: 'subscription',
+        relatedEntityType: 'subscription',
+        relatedEntityId: subscription._id.toString(),
+        relatedEntityDisplay: subscription.planName || 'Subscription',
+      }).catch(() => {});
     }
   } catch (emailErr) {
     logger.error({ err: emailErr, subscriptionId: subscription._id }, 'Failed to send cancellation email');

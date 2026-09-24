@@ -17,7 +17,7 @@
 | 4 | Consistent Gold Detection | ✅ Complete | 2026-09-24 |
 | 5 | Gold Landing Page + Checkout Upsell | ✅ Complete | 2026-09-24 |
 | 6 | Subscription Detail UX Fixes | ✅ Complete | 2026-09-24 |
-| 6B | Gold Cancellation Email Template | ⬜ Pending | — |
+| 6B | Gold Cancellation Email Template | ✅ Complete | 2026-09-24 |
 | 7 | Admin MRR + Gold SKU Cleanup | ⬜ Pending | — |
 | 8 | Auto-Renew Resume Email | ⬜ Pending | — |
 | 9 | Shared Enum Sync + In-App Notifications | ⬜ Pending | — |
