@@ -103,6 +103,9 @@ export interface IProductVariant {
   /** Product category for filtering and display */
   category: string;
 
+  /** Product type: physical (shippable), digital (no shipping), membership (annual subscription) */
+  productType: 'physical' | 'digital' | 'membership';
+
   /** Tags for search and filtering */
   tags: string[];
 
@@ -229,6 +232,7 @@ const ProductSchema = new Schema<IProductDocument>(
 
     // ─── Organisation ────────────────────────────────────
     category: { type: String, required: true, index: true },
+    productType: { type: String, enum: ['physical', 'digital', 'membership'], default: 'physical', index: true },
     tags: [{ type: String }],
 
     // ─── Status ──────────────────────────────────────────

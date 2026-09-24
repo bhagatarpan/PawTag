@@ -71,6 +71,8 @@ export interface IUserDocument extends Document {
   pawRewardsTotalRedeemed: number;
   pawRewardsTotalExpired: number;
   stripeCustomerId?: string;
+  membershipTier?: 'gold' | 'platinum' | 'black';
+  membershipId?: mongoose.Types.ObjectId;
   deletedAt?: Date;
 }
 
@@ -153,6 +155,12 @@ const UserSchema = new Schema<IUserDocument>(
     pawRewardsTotalRedeemed: { type: Number, default: 0, min: 0 },
     pawRewardsTotalExpired: { type: Number, default: 0, min: 0 },
     stripeCustomerId: { type: String },
+    membershipTier: { 
+      type: String, 
+      enum: ['gold', 'platinum', 'black'], 
+      default: null 
+    },
+    membershipId: { type: Schema.Types.ObjectId, ref: 'UserMembership', default: null },
     deletedAt: { type: Date, default: null },
   },
   { timestamps: true },
