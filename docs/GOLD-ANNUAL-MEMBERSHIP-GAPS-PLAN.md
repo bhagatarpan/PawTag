@@ -15,7 +15,7 @@
 | 2 | Fix Stripe Price Update on Plan Change | ✅ Complete | 2026-09-24 |
 | 3 | Gold Creation Failure Handling | ✅ Complete | 2026-09-24 |
 | 4 | Consistent Gold Detection | ✅ Complete | 2026-09-24 |
-| 5 | Gold Landing Page + Checkout Upsell | ⬜ Pending | — |
+| 5 | Gold Landing Page + Checkout Upsell | ✅ Complete | 2026-09-24 |
 | 6 | Subscription Detail UX Fixes | ⬜ Pending | — |
 | 6B | Gold Cancellation Email Template | ⬜ Pending | — |
 | 7 | Admin MRR + Gold SKU Cleanup | ⬜ Pending | — |

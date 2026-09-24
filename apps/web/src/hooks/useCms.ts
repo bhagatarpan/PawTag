@@ -104,6 +104,7 @@ export interface SiteSettings {
   'checkout.otp.requireEmail'?: string;
   'checkout.otp.requireSms'?: string;
   'guardian.goldPrice'?: string;
+  'guardian.goldAnnualPrice'?: string;
   'guardian.gold.heroHeadline'?: string;
   'guardian.gold.heroSubtext'?: string;
   'guardian.gold.benefits'?: string;
