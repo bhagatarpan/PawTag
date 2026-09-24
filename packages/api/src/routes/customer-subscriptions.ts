@@ -331,6 +331,34 @@ router.put('/:id/auto-renew', requirePermission('customer.read'), async (req: Au
 
     await subscription.save();
 
+    // Send resume confirmation email when auto-renew is reactivated
+    if (autoRenew) {
+      try {
+        const user = await User.findById(req.user!.id).select('fullName email').lean();
+        if (user?.email) {
+          const { sendMail } = await import('../services/email.service');
+          const { renderSubscriptionResumedEmail } = await import('../services/email/templates/subscription-resumed');
+          const dashboardUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/subscriptions`;
+          const html = renderSubscriptionResumedEmail({
+            customerName: user.fullName || 'there',
+            planName: subscription.planName || 'Subscription',
+            resumedAt: new Date().toLocaleDateString('en-NZ', { dateStyle: 'full' }),
+            nextBillingDate: subscription.currentPeriodEnd?.toLocaleDateString('en-NZ', { dateStyle: 'full' }) || 'N/A',
+            dashboardUrl,
+          });
+          await sendMail(user.email, `Auto-Renewal Reactivated — ${subscription.planName || 'Subscription'}`, html, undefined, {
+            templateSlug: 'subscription-resumed',
+            businessFlow: 'subscription',
+            relatedEntityType: 'subscription',
+            relatedEntityId: subscription._id.toString(),
+            relatedEntityDisplay: subscription.planName || 'Subscription',
+          }).catch(() => {});
+        }
+      } catch (emailErr) {
+        logger.error({ err: emailErr, subscriptionId: subscription._id }, 'Failed to send resume email');
+      }
+    }
+
     // Send admin notification for ALL pause reasons
     if (!autoRenew && reason) {
       try {

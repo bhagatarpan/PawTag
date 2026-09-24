@@ -19,7 +19,7 @@
 | 6 | Subscription Detail UX Fixes | ✅ Complete | 2026-09-24 |
 | 6B | Gold Cancellation Email Template | ✅ Complete | 2026-09-24 |
 | 7 | Admin MRR + Gold SKU Cleanup | ✅ Complete | 2026-09-24 |
-| 8 | Auto-Renew Resume Email | ⬜ Pending | — |
+| 8 | Auto-Renew Resume Email | ✅ Complete | 2026-09-24 |
 | 9 | Shared Enum Sync + In-App Notifications | ⬜ Pending | — |
 | — | Update AGENTS.md, README.md, Design.md | ⬜ Pending | — |
 | — | Extract Reusable Skills | ⬜ Pending | — |
