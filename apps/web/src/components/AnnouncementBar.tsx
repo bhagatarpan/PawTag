@@ -3,10 +3,9 @@ import { Link } from 'react-router-dom';
 import { X, Sparkles } from 'lucide-react';
 
 const announcements = [
-  { text: 'Join Guardian — Earn points on every purchase', link: '/guardian' },
-  { text: 'Gold members earn 2× Points on all purchases', link: '/gold' },
-  { text: 'Free shipping for Gold members over $50', link: '/gold' },
-  { text: 'New: Guardian loyalty program — Join free today', link: '/guardian' },
+  { text: 'Protect your pet — Join Gold from $89/year', link: '/membership' },
+  { text: 'Platinum members get 2× Points + Emergency Contacts', link: '/membership' },
+  { text: 'New: 3-tier membership system — Find your perfect plan', link: '/membership' },
 ];
 
 const STORAGE_KEY = 'pawtag_announcement_dismissed';

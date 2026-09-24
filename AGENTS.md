@@ -1991,6 +1991,50 @@ Features that do not materially strengthen these loops should not displace safet
 
 ---
 
+# 57A. Membership System
+
+PawTag offers a **3-tier annual membership system** as a premium service for pet owners.
+
+## Membership Tiers
+
+| Tier | Price | Key Benefits |
+|------|-------|--------------|
+| **Gold** | $89/year | Medical alert, health records, 1× points, free shipping $100+ |
+| **Platinum** | $99/year | All Gold + emergency contacts, 2× points, free shipping $80+, 5% off accessories |
+| **Black** | $199/year | All Platinum + lifetime free shipping, 3× points, pet recovery service, 10% off |
+
+## Key Rules
+
+- **Annual-only billing** — no monthly subscriptions for memberships
+- **Multi-pet coverage** — one membership covers all tags for a customer
+- **Tag warranty** — tags work for 12 months (configurable per product), then require membership
+- **Emergency escalation** — Gold (1-hop), Platinum (2-hop), Black (3-hop with PawTag admin)
+- **Pet Recovery via PawTag** — Black-only premium service with 30-minute escalation
+- **Immediate effect** — no grace period when membership expires; tag stops working immediately
+- **Reactivation** — tag reactivates when membership is paid/activated
+
+## Membership vs Products
+
+Products and memberships are **never mixed** in the same cart:
+
+| Type | Purchase Model | Shipping | Cart |
+|------|---------------|----------|------|
+| **PRODUCT** | One-time | Yes | Product cart |
+| **MEMBERSHIP** | Annual renewal | No | Dedicated subscribe flow |
+| **DIGITAL** | One-time | No | Dedicated flow |
+
+## Membership API
+
+- `GET /api/public/membership/tiers` — Public tier listing
+- `GET /api/membership/status` — User membership status
+- `POST /api/membership/subscribe` — Subscribe to a tier
+- `POST /api/membership/cancel` — Cancel membership
+- `POST /api/membership/change-tier` — Change tier
+- `GET /api/admin/membership/tiers` — Admin tier management
+- `GET /api/admin/membership/subscribers` — Admin subscriber list
+
+---
+
 # 58. Scope Guidance for MVP
 
 ## Core

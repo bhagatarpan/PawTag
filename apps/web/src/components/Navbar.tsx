@@ -7,6 +7,7 @@ import { useNavigation } from '../hooks/useCms';
 import { CartDrawer } from '@pawtag/ui';
 import { useCartInteraction } from '../context/CartInteractionContext';
 import CartToast from './CartToast';
+import MembershipDropdown from './MembershipDropdown';
 import api from '../lib/api';
 
 interface GuardianData {
@@ -158,16 +159,8 @@ export default function Navbar() {
                   </span>
                 )}
               </Link>
-              {/* Gold upsell — visible to logged-in Guardian non-Gold members */}
-              {user && guardianData?.tier && !(guardianData as any).isGoldMember && (
-                <Link
-                  to="/account/gold"
-                  className="px-3 py-2 rounded-lg text-sm font-medium text-amber-600 hover:bg-amber-50 transition-all flex items-center gap-1"
-                >
-                  <Crown className="h-4 w-4" />
-                  Go Gold
-                </Link>
-              )}
+              {/* Membership Dropdown */}
+              <MembershipDropdown />
             </div>
 
             {/* Right Side */}

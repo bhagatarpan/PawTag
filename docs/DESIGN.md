@@ -80,6 +80,76 @@ Standard Tailwind gray scale for text, borders, backgrounds, and disabled states
 | `from-amber-500 to-orange-600` | Grace period subscription cards |
 | `from-gray-700 to-gray-900` | Expired subscription cards |
 
+### Membership Tier Colors
+
+| Tier | Gradient | Badge | Card Header |
+|------|----------|-------|-------------|
+| **Gold** | `from-yellow-400 to-amber-500` | `bg-yellow-100 text-yellow-700` | `bg-gradient-to-br from-yellow-400 to-amber-500` |
+| **Platinum** | `from-gray-300 to-gray-500` | `bg-gray-100 text-gray-700` | `bg-gradient-to-br from-gray-300 to-gray-500` |
+| **Black** | `from-gray-800 to-black` | `bg-gray-800 text-white` | `bg-gradient-to-br from-gray-800 to-black` |
+
+### Membership Navbar Badge
+
+| Element | Token/Class |
+|---------|-------------|
+| Badge Background | `bg-gradient-to-r from-yellow-500 via-gray-400 to-gray-800` |
+| Badge Text | `text-white font-bold text-sm` |
+| Badge Icon | Crown `text-white` |
+| Badge Padding | `px-3 py-1.5` |
+| Badge Border Radius | `rounded-full` |
+| Badge Shadow | `shadow-lg hover:shadow-xl` |
+| Badge Hover | `hover:scale-105 transition-all` |
+
+### Membership Carousel Dropdown
+
+| Element | Token/Class |
+|---------|-------------|
+| Trigger Button | `bg-gradient-to-r from-yellow-500 via-amber-500 to-orange-500 text-white rounded-xl shadow-md` |
+| Dropdown Container | `bg-white rounded-2xl shadow-xl border border-gray-100 p-4 w-96` |
+| Tier Card | `rounded-xl overflow-hidden shadow-md` |
+| Gold Card Header | `bg-gradient-to-br from-yellow-400 to-amber-500` |
+| Platinum Card Header | `bg-gradient-to-br from-gray-300 to-gray-500` |
+| Black Card Header | `bg-gradient-to-br from-gray-800 to-black` |
+| Card Body | `bg-white p-3` |
+| Card Price | `text-lg font-bold text-gray-900 text-center` |
+| Card CTA | `text-primary-600 font-medium text-sm hover:text-primary-700` |
+| "View All" Button | `w-full py-2 bg-primary-600 text-white rounded-lg font-semibold text-sm` |
+
+### Membership Floating Badge
+
+| Element | Token/Class |
+|---------|-------------|
+| Badge Background | `bg-gradient-to-r from-yellow-500 via-gray-400 to-gray-800` |
+| Badge Text | `text-white font-bold text-sm` |
+| Badge Icon | Crown `text-white` |
+| Badge Padding | `px-4 py-3` |
+| Badge Border Radius | `rounded-2xl` |
+| Badge Shadow | `shadow-lg hover:shadow-xl` |
+| Badge Animation | Subtle pulse on first load, scale on hover |
+
+### Membership Status Colors
+
+| Status | Badge Classes | Usage |
+|--------|---------------|-------|
+| `active` | `bg-green-100 text-green-700` | Active membership |
+| `cancelled` | `bg-amber-100 text-amber-700` | Cancelled (benefits until period end) |
+| `expired` | `bg-red-100 text-red-700` | Expired membership |
+| `pending_payment` | `bg-blue-100 text-blue-700` | Awaiting payment |
+
+### Membership Landing Page
+
+| Element | Token/Class |
+|---------|-------------|
+| Hero Background | `bg-gradient-to-r from-teal-600 to-teal-700` |
+| Hero Headline | `text-4xl md:text-5xl font-bold text-white` |
+| Hero Subtitle | `text-teal-100 text-xl` |
+| Tier Card (Gold) | `bg-gradient-to-br from-yellow-400 to-amber-500 text-white rounded-2xl shadow-xl p-8` |
+| Tier Card (Platinum) | `bg-gradient-to-br from-gray-300 to-gray-500 text-white rounded-2xl shadow-xl p-8` |
+| Tier Card (Black) | `bg-gradient-to-br from-gray-800 to-black text-white rounded-2xl shadow-xl p-8` |
+| Recommended Badge | `bg-white text-gray-900 px-3 py-1 rounded-full text-xs font-bold` |
+| CTA Button | `bg-primary-600 text-white rounded-xl font-semibold px-6 py-3 hover:bg-primary-700` |
+| Trust Section | `bg-white py-12` |
+
 ---
 
 ## Typography

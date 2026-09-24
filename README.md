@@ -938,41 +938,47 @@ Stripe webhook handling must preserve the raw request body required for signatur
 
 Webhook event IDs should remain idempotently tracked to prevent replay/duplicate side effects.
 
-## Gold Membership
+## Membership System
 
-PawTag offers a **Gold Membership** as a paid add-on that provides enhanced benefits:
+PawTag offers a **3-tier annual membership system** as a premium service for pet owners.
 
-### Pricing
+### Membership Tiers
 
-| Plan | Price | Billing |
-|------|-------|---------|
-| Monthly | $3.99/month | Recurring monthly |
-| Annual | $39.99/year | Recurring yearly (save $7.89/year) |
+| Tier | Price | Key Benefits |
+|------|-------|--------------|
+| **Gold** | $89/year | Medical alert, health records, 1× points, free shipping $100+ |
+| **Platinum** | $99/year | All Gold + emergency contacts, 2× points, free shipping $80+, 5% off accessories |
+| **Black** | $199/year | All Platinum + lifetime free shipping, 3× points, pet recovery service, 10% off |
 
-### Benefits
+### Key Rules
 
-- **2× points** on all purchases
-- **Free shipping** on orders over $50
-- **Priority customer support**
-- **Early access** to new products
-- **$3/month PawRewards** (Nurture tier allocation)
-- **Enhanced PawRewards earning rate** ($1 per $25 spent vs $50)
-- **Higher PawRewards max balance** ($40 vs $20)
-- Starts at **Nurture tier** (100 bonus points)
+- **Annual-only billing** — no monthly subscriptions for memberships
+- **Multi-pet coverage** — one membership covers all tags for a customer
+- **Tag warranty** — tags work for 12 months (configurable per product), then require membership
+- **Emergency escalation** — Gold (1-hop), Platinum (2-hop), Black (3-hop with PawTag admin)
+- **Pet Recovery via PawTag** — Black-only premium service with 30-minute escalation
+- **Immediate effect** — no grace period when membership expires; tag stops working immediately
+- **Reactivation** — tag reactivates when membership is paid/activated
 
-### Key Features
+### Membership vs Products
 
-- **Plan changes:** Gold members can switch between monthly and annual billing via the customer portal
-- **Cancellation:** Gold members receive a specific email detailing lost benefits
-- **Detection:** Gold status is determined by active Gold subscription (single source of truth)
-- **Email notifications:** Plan changes, cancellations, and auto-renew resume send confirmation emails
+Products and memberships are **never mixed** in the same cart:
 
-### Technical Details
+| Type | Purchase Model | Shipping | Cart |
+|------|---------------|----------|------|
+| **PRODUCT** | One-time | Yes | Product cart |
+| **MEMBERSHIP** | Annual renewal | No | Dedicated subscribe flow |
+| **DIGITAL** | One-time | No | Dedicated flow |
 
-- **Endpoint:** `POST /api/customer/subscriptions/gold/subscribe` — Create Gold subscription
-- **Endpoint:** `POST /api/customer/subscriptions/gold/change-plan` — Switch billing cycle
-- **Detection:** Use `/api/customer/guardian/tier` endpoint (returns `isGoldMember`)
-- **Configuration:** Gold pricing stored in CMS settings (`guardian.goldPrice`, `guardian.goldAnnualPrice`)
+### Membership API
+
+- `GET /api/public/membership/tiers` — Public tier listing
+- `GET /api/membership/status` — User membership status
+- `POST /api/membership/subscribe` — Subscribe to a tier
+- `POST /api/membership/cancel` — Cancel membership
+- `POST /api/membership/change-tier` — Change tier
+- `GET /api/admin/membership/tiers` — Admin tier management
+- `GET /api/admin/membership/subscribers` — Admin subscriber list
 
 ---
 
