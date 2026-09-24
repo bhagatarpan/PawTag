@@ -938,6 +938,42 @@ Stripe webhook handling must preserve the raw request body required for signatur
 
 Webhook event IDs should remain idempotently tracked to prevent replay/duplicate side effects.
 
+## Gold Membership
+
+PawTag offers a **Gold Membership** as a paid add-on that provides enhanced benefits:
+
+### Pricing
+
+| Plan | Price | Billing |
+|------|-------|---------|
+| Monthly | $3.99/month | Recurring monthly |
+| Annual | $39.99/year | Recurring yearly (save $7.89/year) |
+
+### Benefits
+
+- **2× points** on all purchases
+- **Free shipping** on orders over $50
+- **Priority customer support**
+- **Early access** to new products
+- **$3/month PawRewards** (Nurture tier allocation)
+- **Enhanced PawRewards earning rate** ($1 per $25 spent vs $50)
+- **Higher PawRewards max balance** ($40 vs $20)
+- Starts at **Nurture tier** (100 bonus points)
+
+### Key Features
+
+- **Plan changes:** Gold members can switch between monthly and annual billing via the customer portal
+- **Cancellation:** Gold members receive a specific email detailing lost benefits
+- **Detection:** Gold status is determined by active Gold subscription (single source of truth)
+- **Email notifications:** Plan changes, cancellations, and auto-renew resume send confirmation emails
+
+### Technical Details
+
+- **Endpoint:** `POST /api/customer/subscriptions/gold/subscribe` — Create Gold subscription
+- **Endpoint:** `POST /api/customer/subscriptions/gold/change-plan` — Switch billing cycle
+- **Detection:** Use `/api/customer/guardian/tier` endpoint (returns `isGoldMember`)
+- **Configuration:** Gold pricing stored in CMS settings (`guardian.goldPrice`, `guardian.goldAnnualPrice`)
+
 ---
 
 # Cart UX Direction
