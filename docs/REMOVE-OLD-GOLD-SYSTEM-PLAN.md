@@ -17,7 +17,7 @@
 | 5 | Update shared endpoints + enums | ✅ Complete | 4 endpoints removed, 1 enum updated, 3 frontend files updated |
 | 6 | Update isGoldMember in API | ✅ Complete | isGoldSubscription() updated, 6 call sites updated |
 | 7 | Update isGoldMember in frontend | ⬜ Partial | Checkout.tsx updated, 18 components remaining |
-| 8 | Update admin portal | ⬜ Pending | 6 components |
+| 8 | Update admin portal | ✅ Partial | GuardianSettings Gold section removed |
 | 9 | Build admin membership pages | ⬜ Pending | 3 new pages + routes + sidebar |
 
 ---
