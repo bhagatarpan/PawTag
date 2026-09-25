@@ -215,6 +215,37 @@ const jobs = [
     notifyOnSuccess: false,
     notifyOnFailure: true,
   },
+  // ─── Membership Jobs ──────────────────────────────────────────
+  {
+    name: 'membership-expiry-check',
+    displayName: 'Membership Expiry Check',
+    description: 'Checks for expired memberships and deactivates them. Sends expiry notifications to customers.',
+    category: 'financial',
+    intervalMs: 24 * 60 * 60 * 1000, // 24 hours
+    lockName: 'membership-expiry',
+    lockLeaseMs: 120000,
+    processTarget: 'worker',
+    filePath: 'services/membership.service.ts',
+    functionName: 'checkExpiredMemberships',
+    enabled: true,
+    notifyOnSuccess: false,
+    notifyOnFailure: true,
+  },
+  {
+    name: 'membership-renewal-reminders',
+    displayName: 'Membership Renewal Reminders',
+    description: 'Sends renewal reminders to members before their membership expires (30 and 7 days before).',
+    category: 'notification',
+    intervalMs: 24 * 60 * 60 * 1000, // 24 hours
+    lockName: 'membership-renewal',
+    lockLeaseMs: 120000,
+    processTarget: 'worker',
+    filePath: 'services/membership.service.ts',
+    functionName: 'sendRenewalReminders',
+    enabled: true,
+    notifyOnSuccess: false,
+    notifyOnFailure: true,
+  },
 ];
 
 async function seedBackgroundJobs() {

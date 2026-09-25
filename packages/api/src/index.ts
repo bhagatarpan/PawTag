@@ -362,6 +362,18 @@ async function start() {
         const { runRefundReconciliationJob } = await import('./jobs/refundReconciliation');
         const { runPrivacyRetentionJob } = await import('./jobs/privacyRetention');
         const { runAuditRetentionJob } = await import('./jobs/auditRetention');
+        const { checkExpiredMemberships, sendRenewalReminders } = await import('./services/membership.service');
+
+        // Wrapper functions to adapt membership functions to JobResult type
+        async function runMembershipExpiryCheck(): Promise<import('./services/job-scheduler.service').JobResult> {
+          const result = await checkExpiredMemberships();
+          return { success: true, itemsProcessed: result };
+        }
+
+        async function runMembershipRenewalReminders(): Promise<import('./services/job-scheduler.service').JobResult> {
+          await sendRenewalReminders();
+          return { success: true };
+        }
 
         registerJobFunction('runReminderJob', runReminderJob);
         registerJobFunction('runSubscriptionJob', runSubscriptionJob);
@@ -377,6 +389,8 @@ async function start() {
         registerJobFunction('runRefundReconciliationJob', runRefundReconciliationJob);
         registerJobFunction('runPrivacyRetentionJob', runPrivacyRetentionJob);
         registerJobFunction('runAuditRetentionJob', runAuditRetentionJob);
+        registerJobFunction('checkExpiredMemberships', runMembershipExpiryCheck);
+        registerJobFunction('sendRenewalReminders', runMembershipRenewalReminders);
 
         await startFn();
       } else {
