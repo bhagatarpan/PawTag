@@ -1,54 +1,45 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Shield, Star, Zap, Crown, ArrowRight, TrendingUp } from 'lucide-react';
+import { Shield, Crown, ArrowRight, TrendingUp, Diamond } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSiteSettings } from '../hooks/useCms';
 import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
 
-const tiers = [
+const membershipTiers = [
   {
-    name: 'Care',
-    icon: Shield,
-    points: '1×',
-    rewards: '$2/mo',
-    shipping: 'Over $100',
-    color: 'bg-emerald-100 text-emerald-700',
-    minPoints: 0,
-  },
-  {
-    name: 'Nurture',
-    icon: Star,
-    points: '1×',
-    rewards: '$3/mo',
-    shipping: 'Over $75',
-    color: 'bg-teal-100 text-teal-700',
-    minPoints: 100,
-  },
-  {
-    name: 'Protector',
-    icon: Zap,
-    points: '1×',
-    rewards: '$5/mo',
-    shipping: 'Over $50',
-    color: 'bg-purple-100 text-purple-700',
-    minPoints: 200,
-  },
-  {
-    name: 'Safeguard',
+    tier: 'gold',
+    name: 'Gold',
+    price: 89,
     icon: Crown,
-    points: '2×',
-    rewards: '$8/mo',
-    shipping: 'Free',
-    color: 'bg-amber-100 text-amber-700',
-    minPoints: 300,
+    gradient: 'from-yellow-400 to-amber-500',
+    badge: 'Most Popular',
+    benefits: ['1× Points', 'Free shipping $100+'],
+  },
+  {
+    tier: 'platinum',
+    name: 'Platinum',
+    price: 99,
+    icon: Diamond,
+    gradient: 'from-gray-300 to-gray-500',
+    badge: 'Best Value',
+    benefits: ['2× Points', 'Emergency Contacts'],
+  },
+  {
+    tier: 'black',
+    name: 'Black',
+    price: 199,
+    icon: Shield,
+    gradient: 'from-gray-800 to-black',
+    badge: 'Elite',
+    benefits: ['3× Points', 'Pet Recovery'],
+    comingSoon: true,
   },
 ];
 
 interface GuardianData {
   tier: string;
   points: number;
-  isGoldMember: boolean;
 }
 
 export default function GuardianSection() {
@@ -63,11 +54,6 @@ export default function GuardianSection() {
         .catch(() => {});
     }
   }, [user]);
-
-  const currentTierIndex = guardianData ? tiers.findIndex(t => t.name === guardianData.tier) : -1;
-  const nextTier = currentTierIndex >= 0 && currentTierIndex < tiers.length - 1 ? tiers[currentTierIndex + 1] : null;
-  const progressToNext = nextTier && guardianData ? 
-    Math.min(100, ((guardianData.points - tiers[currentTierIndex].minPoints) / (nextTier.minPoints - tiers[currentTierIndex].minPoints)) * 100) : 0;
 
   return (
     <section className="py-20 bg-white">
@@ -84,62 +70,42 @@ export default function GuardianSection() {
           </p>
         </div>
 
-        {/* Tier Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-          {tiers.map((tier) => {
-            const Icon = tier.icon;
-            return (
-              <div
-                key={tier.name}
-                className="bg-white rounded-2xl border border-gray-100 p-6 hover:shadow-lg hover:border-primary-200 transition-all"
-              >
-                <div className={`w-12 h-12 ${tier.color} rounded-xl flex items-center justify-center mb-4`}>
-                  <Icon size={24} />
-                </div>
-                <h3 className="text-lg font-bold text-gray-900 mb-2">{tier.name}</h3>
-                <ul className="space-y-2 text-sm text-gray-600">
-                  <li className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 bg-primary-500 rounded-full" />
-                    {tier.points} points on all purchases
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 bg-primary-500 rounded-full" />
-                    {tier.rewards} PawRewards
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 bg-primary-500 rounded-full" />
-                    Free shipping {tier.shipping === 'Free' ? '' : `over ${tier.shipping}`}
-                  </li>
-                </ul>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* How It Works */}
+        {/* Membership Tiers */}
         <div className="bg-gradient-to-r from-teal-50 to-cyan-50 rounded-2xl p-8 md:p-12">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="text-center">
-              <div className="w-12 h-12 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-xl font-bold">1</span>
-              </div>
-              <h3 className="font-semibold text-gray-900 mb-2">Make a Purchase</h3>
-              <p className="text-sm text-gray-600">Earn Guardian Points on every order you place</p>
-            </div>
-            <div className="text-center">
-              <div className="w-12 h-12 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-xl font-bold">2</span>
-              </div>
-              <h3 className="font-semibold text-gray-900 mb-2">Earn & Redeem</h3>
-              <p className="text-sm text-gray-600">Convert points to PawRewards and spend on products</p>
-            </div>
-            <div className="text-center">
-              <div className="w-12 h-12 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-xl font-bold">3</span>
-              </div>
-              <h3 className="font-semibold text-gray-900 mb-2">Level Up</h3>
-              <p className="text-sm text-gray-600">Unlock higher tiers with better benefits</p>
-            </div>
+          <div className="text-center mb-8">
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Protect Your Pet. Join the Pack.</h2>
+            <p className="text-gray-600">Get peace of mind with PawTag membership. Emergency contacts, health records, and premium benefits.</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {membershipTiers.map((tier) => {
+              const Icon = tier.icon;
+              return (
+                <div key={tier.tier} className="bg-white rounded-xl shadow-md overflow-hidden">
+                  <div className={`bg-gradient-to-br ${tier.gradient} p-4 text-white`}>
+                    <div className="flex items-center justify-between">
+                      <Icon className="h-6 w-6" />
+                      <span className="text-xs font-bold bg-white/20 px-2 py-0.5 rounded-full">{tier.badge}</span>
+                    </div>
+                    <h3 className="text-xl font-bold mt-2">{tier.name}</h3>
+                    <div className="text-2xl font-bold mt-1">${tier.price}<span className="text-sm font-normal">/yr</span></div>
+                  </div>
+                  <div className="p-4">
+                    {tier.benefits.map((benefit, i) => (
+                      <div key={i} className="flex items-center gap-2 text-sm text-gray-600 mb-1">
+                        <span className="text-green-500">✓</span> {benefit}
+                      </div>
+                    ))}
+                    {tier.comingSoon ? (
+                      <div className="mt-3 text-xs text-gray-400 text-center font-medium">COMING SOON</div>
+                    ) : (
+                      <Link to="/membership" className="block mt-3 text-center text-sm font-semibold text-primary-600 hover:text-primary-700">
+                        Learn More →
+                      </Link>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 
@@ -155,28 +121,6 @@ export default function GuardianSection() {
                 <p className="text-sm text-gray-500">{guardianData.points} points · {guardianData.tier} Tier</p>
               </div>
             </div>
-            
-            {nextTier ? (
-              <div>
-                <div className="flex justify-between text-sm mb-2">
-                  <span className="text-gray-600">{guardianData.tier}</span>
-                  <span className="text-primary-600 font-medium">{nextTier.name}</span>
-                </div>
-                <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-gradient-to-r from-primary-500 to-primary-600 rounded-full transition-all duration-500"
-                    style={{ width: `${progressToNext}%` }}
-                  />
-                </div>
-                <p className="text-sm text-gray-500 mt-2">
-                  {nextTier.minPoints - guardianData.points} points to {nextTier.name}
-                </p>
-              </div>
-            ) : (
-              <p className="text-sm text-primary-600 font-medium">
-                You've reached the highest tier! Enjoy all premium benefits.
-              </p>
-            )}
           </div>
         )}
 
@@ -198,12 +142,6 @@ export default function GuardianSection() {
                 className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 transition-colors"
               >
                 Join Guardian — It's Free <ArrowRight size={18} />
-              </Link>
-              <Link
-                to="/gold"
-                className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-amber-500 text-white rounded-xl font-semibold hover:bg-amber-600 transition-colors"
-              >
-                <Crown size={18} /> View Membership Plans
               </Link>
             </div>
           )}
