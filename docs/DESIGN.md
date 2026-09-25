@@ -76,9 +76,9 @@ Standard Tailwind gray scale for text, borders, backgrounds, and disabled states
 | `from-teal-500 to-teal-600` | Footer logo icon |
 | `from-teal-700 to-teal-600` | Hero banners, shop banners |
 | `from-teal-50 to-teal-100` | Image placeholders, upload areas |
-| `from-emerald-600 to-teal-700` | Active subscription cards |
-| `from-amber-500 to-orange-600` | Grace period subscription cards |
-| `from-gray-700 to-gray-900` | Expired subscription cards |
+| `from-yellow-400 to-amber-500` | Gold membership cards |
+| `from-gray-300 to-gray-500` | Platinum membership cards |
+| `from-gray-800 to-black` | Black membership cards |
 
 ---
 
@@ -439,14 +439,15 @@ Tag status displays (badges, dots, indicators) must use these design tokens. No 
 | `active` | `replaced` | Replacement tag activated |
 | any | `deleted` | Admin soft-deletes tag |
 
-### Subscription Tier Colors
+### Membership Tier Colors
 
-Guardian/Gold membership tier displays (badges, cards, progress indicators) must use these design tokens.
+Membership tier displays (badges, cards, progress indicators) must use these design tokens.
 
 | Tier | Badge Classes | Card Background | Icon Color |
 |---|---|---|---|
-| **Guardian** | `bg-teal-100 text-teal-700` | `bg-teal-50` | `text-teal-600` |
 | **Gold** | `bg-yellow-100 text-yellow-700` | `bg-yellow-50` | `text-yellow-600` |
+| **Platinum** | `bg-gray-100 text-gray-700` | `bg-gray-50` | `text-gray-600` |
+| **Black** | `bg-gray-800 text-white` | `bg-gray-900` | `text-white` |
 
 ### Guardian Points Display
 
