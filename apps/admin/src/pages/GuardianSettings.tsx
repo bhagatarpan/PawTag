@@ -372,88 +372,9 @@ export default function GuardianSettings() {
         </div>
       </div>
 
-      {/* Gold Settings */}
+      {/* Tier Rules */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Gold Membership</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Gold Monthly Price (NZD)
-            </label>
-            <input
-              type="number"
-              step="0.01"
-              value={settings.goldPrice}
-              onChange={(e) => setSettings({ ...settings, goldPrice: Number(e.target.value) })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-            />
-            <p className="text-xs text-gray-500 mt-1">Monthly subscription price for Gold members</p>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Gold Annual Price (NZD)
-            </label>
-            <input
-              type="number"
-              step="0.01"
-              value={settings.goldAnnualPrice}
-              onChange={(e) => setSettings({ ...settings, goldAnnualPrice: Number(e.target.value) })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-            />
-            <p className="text-xs text-gray-500 mt-1">Incentivized annual price (save vs monthly × 12)</p>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Gold Points Multiplier
-            </label>
-            <input
-              type="number"
-              value={settings.goldMultiplier}
-              onChange={(e) => setSettings({ ...settings, goldMultiplier: Number(e.target.value) })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-            />
-            <p className="text-xs text-gray-500 mt-1">Points multiplier for Gold members</p>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Gold Free Shipping Threshold (NZD)
-            </label>
-            <input
-              type="number"
-              value={settings.goldFreeShippingThreshold}
-              onChange={(e) => setSettings({ ...settings, goldFreeShippingThreshold: Number(e.target.value) })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-            />
-            <p className="text-xs text-gray-500 mt-1">Minimum order total for Gold free shipping</p>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Tier Downgrade Grace Period (days)
-            </label>
-            <input
-              type="number"
-              value={settings.tierDowngradeGraceDays}
-              onChange={(e) => setSettings({ ...settings, tierDowngradeGraceDays: Number(e.target.value) })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-            />
-            <p className="text-xs text-gray-500 mt-1">Days before tier downgrade is applied</p>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Lifetime Safeguard Years
-            </label>
-            <input
-              type="number"
-              value={settings.lifetimeSafeguardYears}
-              onChange={(e) => setSettings({ ...settings, lifetimeSafeguardYears: Number(e.target.value) })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-            />
-            <p className="text-xs text-gray-500 mt-1">Consecutive years at Safeguard for lifetime status</p>
-          </div>
-        </div>
-      </div>
-
-      {/* PawRewards Settings */}
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Tier Rules</h2>
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">PawRewards</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
