@@ -5,7 +5,7 @@ vi.mock('@pawtag/db', () => ({
     findById: vi.fn(),
     findByIdAndUpdate: vi.fn(),
   },
-  Subscription: {
+  UserMembership: {
     findOne: vi.fn(),
   },
   Order: {
@@ -41,10 +41,10 @@ import {
   awardMembershipMilestonePoints,
 } from '../../../packages/api/src/services/loyalty/points-earning.service';
 import { clearGuardianCache } from '../../../packages/api/src/services/loyalty/guardian-config';
-import { User, Subscription, Order, GuardianPointsLedger } from '@pawtag/db';
+import { User, UserMembership, Order, GuardianPointsLedger } from '@pawtag/db';
 
 const mockUser = vi.mocked(User);
-const mockSubscription = vi.mocked(Subscription);
+const mockUserMembership = vi.mocked(UserMembership);
 const mockOrder = vi.mocked(Order);
 const mockLedger = vi.mocked(GuardianPointsLedger);
 
@@ -53,9 +53,9 @@ function setupMocks(points: number, isGold = false, orderCount = 0) {
     lean: vi.fn().mockReturnValue({ _id: 'u1', guardianPoints: points }),
   } as any);
 
-  mockSubscription.findOne.mockReturnValue({
+  mockUserMembership.findOne.mockReturnValue({
     lean: vi.fn().mockReturnValue(
-      isGold ? { planType: 'gold', price: 1.99 } : { planType: 'annual', price: 0.99 }
+      isGold ? { tierId: { tier: 'gold' } } : null
     ),
   } as any);
 
@@ -607,8 +607,8 @@ describe('Subscription type detection', () => {
     mockUser.findById.mockReturnValue({
       lean: vi.fn().mockReturnValue({ _id: 'u1', guardianPoints: 50 }),
     } as any);
-    mockSubscription.findOne.mockReturnValue({
-      lean: vi.fn().mockReturnValue({ planType: 'monthly', price: 1.99 }),
+    mockUserMembership.findOne.mockReturnValue({
+      lean: vi.fn().mockReturnValue({ tierId: { tier: 'monthly' } }),
     } as any);
     mockOrder.countDocuments.mockResolvedValue(0);
     mockLedger.countDocuments.mockResolvedValue(0);
@@ -626,7 +626,7 @@ describe('Subscription type detection', () => {
     mockUser.findById.mockReturnValue({
       lean: vi.fn().mockReturnValue({ _id: 'u1', guardianPoints: 50 }),
     } as any);
-    mockSubscription.findOne.mockReturnValue({
+    mockUserMembership.findOne.mockReturnValue({
       lean: vi.fn().mockReturnValue(null),
     } as any);
     mockOrder.countDocuments.mockResolvedValue(0);
