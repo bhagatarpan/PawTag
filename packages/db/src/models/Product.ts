@@ -6,6 +6,7 @@
  * Products are managed via the PawTag admin portal.
  *
  * Key fields:
+ * - productType: 'physical' | 'membership' | 'digital' — primary product type discriminator
  * - price: Base price in NZD (major units, not cents)
  * - compareAtPrice: Original price before sale (for display)
  * - salePrice: Current sale price (takes precedence over price)
@@ -165,12 +166,16 @@ export interface IProductVariant {
   /** Warranty period in months */
   warrantyMonths: number;
 
-  // ─── Subscription ────────────────────────────────────────
-  /** Whether this product includes a subscription */
-  isSubscription: boolean;
+   // ─── Product Type ───────────────────────────────────────
+   /** Product type discriminator: 'physical' = one-time product purchase, 'membership' = annual membership, 'digital' = one-time digital purchase */
+   productType: 'physical' | 'membership' | 'digital';
 
-  /** Whether this product is a physical tag */
-  isTagProduct: boolean;
+   // ─── Subscription (deprecated — use productType instead) ──
+   /** @deprecated Use productType instead. Whether this product includes a subscription */
+   isSubscription: boolean;
+
+   /** @deprecated Use productType instead. Whether this product is a physical tag */
+   isTagProduct: boolean;
 
 /** Subscription configuration (if isSubscription is true) */
    subscriptionConfig?: {
@@ -266,7 +271,10 @@ const ProductSchema = new Schema<IProductDocument>(
      // ─── Warranty ────────────────────────────────────────
     warrantyMonths: { type: Number, default: 12, min: 0 },
 
-// ─── Subscription ────────────────────────────────────
+// ─── Product Type ───────────────────────────────────
+     productType: { type: String, enum: ['physical', 'membership', 'digital'], default: 'physical', index: true },
+
+// ─── Subscription (deprecated — use productType instead) ──
      isSubscription: { type: Boolean, default: false, index: true },
      isTagProduct: { type: Boolean, default: false, index: true },
      subscriptionConfig: {
@@ -304,5 +312,6 @@ ProductSchema.index({ name: 'text', description: 'text' });
 ProductSchema.index({ slug: 1 }, { unique: true });
 ProductSchema.index({ isTagProduct: 1 });
 ProductSchema.index({ isSubscription: 1 });
+ProductSchema.index({ productType: 1 });
 
 export const Product = mongoose.model<IProductDocument>('Product', ProductSchema);

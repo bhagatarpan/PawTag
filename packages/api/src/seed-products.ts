@@ -26,6 +26,7 @@ const products = [
       customizationPrice: 0,
     shippingCost: 0,
     warrantyMonths: 12,
+    productType: 'physical',
     isTagProduct: true,
     isSubscription: true,
     subscriptionConfig: {
@@ -61,6 +62,7 @@ const products = [
       customizationPrice: 5.00,
       shippingCost: 0,
       warrantyMonths: 12,
+      productType: 'physical',
       isTagProduct: true,
       isSubscription: true,
       subscriptionConfig: {
@@ -95,6 +97,7 @@ const products = [
       customizationPrice: 0,
       shippingCost: 0,
       warrantyMonths: 12,
+      productType: 'physical',
       isTagProduct: true,
       isSubscription: true,
       subscriptionConfig: {
@@ -136,6 +139,7 @@ const products = [
       shippingCost: 0,
       shippingDescription: 'Digital membership — no shipping required',
       warrantyMonths: 0,
+      productType: 'membership',
       isSubscription: true,
       isTagProduct: false,
       subscriptionConfig: {
@@ -182,6 +186,7 @@ async function seedProducts() {
       if (existing.customizationLabel !== productData.customizationLabel) updates.customizationLabel = productData.customizationLabel;
       if (existing.customizationPrice !== productData.customizationPrice) updates.customizationPrice = productData.customizationPrice;
       if (existing.isActive !== productData.isActive) updates.isActive = productData.isActive;
+      if (existing.productType !== productData.productType) updates.productType = productData.productType;
       if (existing.isSubscription !== productData.isSubscription) updates.isSubscription = productData.isSubscription;
       // Update subscriptionConfig if prices changed
       if (productData.subscriptionConfig) {

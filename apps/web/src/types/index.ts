@@ -15,7 +15,11 @@ export interface Product {
   dimensions?: { length: number; width: number; height: number; unit: 'cm' | 'in' };
   shippingCost?: number;
   warrantyMonths?: number;
+  /** Product type: 'physical' = one-time product purchase, 'membership' = annual membership, 'digital' = one-time digital purchase */
+  productType?: 'physical' | 'membership' | 'digital';
+  /** @deprecated Use productType instead */
   isSubscription?: boolean;
+  /** @deprecated Use productType instead */
   subscriptionConfig?: {
     type: 'annual' | 'monthly';
     freePeriodMonths: number;

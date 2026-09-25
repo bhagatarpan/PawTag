@@ -36,10 +36,13 @@ export interface ProductFilter {
   /** Filter by published status */
   isPublished?: boolean;
 
-  /** Filter by tag product status */
+  /** Filter by product type: 'physical', 'membership', 'digital' */
+  productType?: 'physical' | 'membership' | 'digital';
+
+  /** @deprecated Use productType instead. Filter by tag product status */
   isTagProduct?: boolean;
 
-  /** Filter by subscription status */
+  /** @deprecated Use productType instead. Filter by subscription status */
   isSubscription?: boolean;
 
   /** Filter by stock status: 'in', 'low', 'out' */
@@ -142,6 +145,7 @@ export class ProductService {
     if (filter.category) query.category = filter.category;
     if (filter.isActive !== undefined) query.isActive = filter.isActive;
     if (filter.isPublished !== undefined) query.isPublished = filter.isPublished;
+    if (filter.productType) query.productType = filter.productType;
     if (filter.isTagProduct !== undefined) query.isTagProduct = filter.isTagProduct;
     if (filter.isSubscription !== undefined) query.isSubscription = filter.isSubscription;
 
@@ -227,6 +231,7 @@ weight: data.weight,
        customizationPrice: data.customizationPrice || 0,
        shippingCost: data.shippingCost || 0,
        warrantyMonths: data.warrantyMonths ?? 12,
+       productType: data.productType || 'physical',
        isSubscription: data.isSubscription ?? false,
        isTagProduct: data.isTagProduct ?? false,
        subscriptionConfig: data.subscriptionConfig,

@@ -414,8 +414,13 @@ export interface Product {
     customizationPrice?: number;
    shippingCost?: number;
    warrantyMonths?: number;
+   /** Product type: 'physical' = one-time product purchase, 'membership' = annual membership, 'digital' = one-time digital purchase */
+   productType?: 'physical' | 'membership' | 'digital';
+   /** @deprecated Use productType instead */
    isSubscription?: boolean;
+   /** @deprecated Use productType instead */
    isTagProduct?: boolean;
+   /** @deprecated Use productType instead */
    subscriptionConfig?: SubscriptionConfig;
    /** Product feature highlights for display in shop and product detail */
    featureHighlights?: IFeatureHighlight[];

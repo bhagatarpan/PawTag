@@ -178,7 +178,11 @@ export const createProductSchema = z.object({
     image: z.string().optional(),
     attributes: z.record(z.string()).optional(),
   })).optional(),
+  /** Product type: 'physical' = one-time product purchase, 'membership' = annual membership, 'digital' = one-time digital purchase */
+  productType: z.enum(['physical', 'membership', 'digital']).optional(),
+  /** @deprecated Use productType instead */
   isSubscription: z.boolean().optional(),
+  /** @deprecated Use productType instead */
   subscriptionConfig: z.object({
     type: z.string(),
     freePeriodMonths: z.number(),

@@ -2150,7 +2150,7 @@ router.post('/tags/qr-bulk', requirePermission('tag.generate_qr'), async (req: A
  */
 router.get('/products', requirePermission('product.read'), async (req, res: Response) => {
   try {
-    const { page = 1, limit = 20, search, category, isActive, stockStatus, isSubscription, subscriptionType, sortBy = 'createdAt', sortDir = 'desc' } = req.query;
+    const { page = 1, limit = 20, search, category, isActive, stockStatus, productType, isSubscription, subscriptionType, sortBy = 'createdAt', sortDir = 'desc' } = req.query;
     const query: any = {};
     if (search) {
       query.$or = [
@@ -2169,8 +2169,9 @@ router.get('/products', requirePermission('product.read'), async (req, res: Resp
     } else if (stockStatus === 'in') {
       query.stock = { $gt: 10 };
     }
-    /** Filter by subscription plans — used by SubscriptionPlans page to show only
-     *  products with isSubscription=true, optionally filtered by type (annual/monthly) */
+    /** Filter by product type: 'physical', 'membership', 'digital' */
+    if (productType) query.productType = productType;
+    /** @deprecated Use productType instead. Filter by subscription plans */
     if (isSubscription !== undefined) query.isSubscription = isSubscription === 'true';
     if (subscriptionType) query['subscriptionConfig.type'] = subscriptionType;
 
