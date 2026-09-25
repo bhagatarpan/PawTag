@@ -17,8 +17,8 @@
 | 5 | Update shared endpoints + enums | ✅ Complete | 4 endpoints removed, 1 enum updated, 3 frontend files updated |
 | 6 | Update isGoldMember in API | ✅ Complete | isGoldSubscription() updated, 6 call sites updated |
 | 7 | Update isGoldMember in frontend | ✅ Complete | All frontend Gold references updated |
-| 8 | Update admin portal | ⬜ Partial | GuardianSettings Gold section removed, 5 components remaining |
-| 9 | Build admin membership pages | ⬜ Pending | 3 new pages + routes + sidebar |
+| 8 | Update admin portal | ✅ Complete | GuardianSettings Gold section removed, GuardianAnalytics updated |
+| 9 | Build admin membership pages | ✅ Complete | 4 new pages + routes + sidebar |
 
 ---
 
