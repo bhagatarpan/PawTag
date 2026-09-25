@@ -96,6 +96,9 @@ export interface ICartDocument extends Document {
   /** Cart items */
   items: mongoose.Types.DocumentArray<ICartItem>;
 
+  /** Product type this cart contains: 'physical' | 'membership' | 'digital'. Set on first item add, prevents mixing types. */
+  productType?: 'physical' | 'membership' | 'digital';
+
   /** Promo code applied to cart */
   promoCode?: string;
 
@@ -150,6 +153,7 @@ const CartSchema = new Schema<ICartDocument>(
   {
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, unique: true, index: true },
     items: [CartItemSchema],
+    productType: { type: String, enum: ['physical', 'membership', 'digital'] },
     promoCode: { type: String },
     promoDiscount: { type: Number, min: 0 },
     shippingMethodId: { type: String },

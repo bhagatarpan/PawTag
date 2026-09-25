@@ -172,6 +172,21 @@ export class CartService {
       throw new ProductUnavailableError(`${product.name} is no longer available`);
     }
 
+    // ─── Cart Type Isolation ─────────────────────────────────────
+    // Enforce that all items in a cart must be the same product type.
+    // PRODUCT, MEMBERSHIP, and DIGITAL must never be mixed in the same cart.
+    const productType = (product as any).productType || 'physical';
+    if (cart.productType && cart.productType !== productType) {
+      throw new InvalidCartError(
+        `Cannot add ${productType} product to a cart containing ${cart.productType} products. ` +
+        `Your cart contains ${cart.productType} items. Please clear your cart or complete your current purchase first.`
+      );
+    }
+    // Set cart product type on first item add
+    if (!cart.productType) {
+      cart.productType = productType;
+    }
+
     // Normalise customisation for consistent comparison
     const inputCust = input.customisation === true;
     const inputTexts = (input.customisationTexts || []).map(t => t.trim()).filter(Boolean);
@@ -344,6 +359,7 @@ export class CartService {
   async clearCart(userId: string): Promise<ICartDocument> {
     const cart = await this.getOrCreate(userId);
     cart.items = [] as any;
+    cart.productType = undefined;
     cart.promoCode = undefined;
     cart.promoDiscount = undefined;
     cart.shippingMethodId = undefined;

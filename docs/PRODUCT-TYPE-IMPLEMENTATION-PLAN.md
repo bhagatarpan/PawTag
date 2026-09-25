@@ -23,8 +23,8 @@
 | Phase | Name | Status | Started | Completed |
 |-------|------|--------|---------|-----------|
 | 1 | Product Type System (Foundation) | ✅ Complete | 2026-09-26 | 2026-09-26 |
-| 2 | Cart Isolation | 🔄 In Progress | 2026-09-26 | |
-| 3 | Remove Subscription from Products | ⬜ Pending | | |
+| 2 | Cart Isolation | ✅ Complete | 2026-09-26 | 2026-09-26 |
+| 3 | Remove Subscription from Products | 🔄 In Progress | 2026-09-26 | |
 | 4 | Stripe Payment Fixes | ⬜ Pending | | |
 | 5 | Customer Portal Updates | ⬜ Pending | | |
 | 6 | Admin Portal Updates | ⬜ Pending | | |
