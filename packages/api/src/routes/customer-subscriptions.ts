@@ -9,8 +9,6 @@ import {
   renewSubscription,
   cancelSubscription,
   changeSubscriptionPlan,
-  createGoldSubscription,
-  changeGoldPlan,
 } from '../services/subscription.service';
 import logger from '../lib/logger';
 
@@ -638,93 +636,6 @@ router.post('/portal-link', requirePermission('customer.read'), async (req: Auth
   } catch (error: any) {
     logger.error({ err: error, userId: req.user?.id }, '[Subscriptions] Portal link error');
     res.status(500).json({ success: false, error: error.message || 'Failed to create portal session' });
-  }
-});
-
-/**
- * POST /gold/subscribe
- *
- * Subscribe to Gold membership. Creates a Gold subscription for the user.
- * No physical Tag required — Gold is a standalone digital membership.
- *
- * Body: { price?: number, planType?: 'monthly' | 'annual' } (optional, defaults to monthly at $3.99)
- */
-router.post('/gold/subscribe', async (req: AuthRequest, res: Response) => {
-  try {
-    const userId = req.user!.id;
-
-    // Check if user already has an active Gold subscription
-    const existingGold = await Subscription.findOne({
-      userId,
-      planName: 'Gold Membership',
-      status: { $in: ['active', 'grace_period'] },
-      deletedAt: null,
-    });
-
-    if (existingGold) {
-      res.status(409).json({ success: false, error: 'You already have an active Gold membership' });
-      return;
-    }
-
-    const { price, planType } = req.body || {};
-    const subscription = await createGoldSubscription(userId, price, planType);
-
-    res.json({
-      success: true,
-      data: {
-        subscription,
-        message: 'Gold membership activated! You are now earning 2× points on every purchase.',
-      },
-    });
-  } catch (error: any) {
-    logger.error({ err: error, userId: req.user?.id }, '[Subscriptions] Gold subscribe error');
-    res.status(500).json({ success: false, error: error.message || 'Failed to create Gold subscription' });
-  }
-});
-
-/**
- * POST /gold/change-plan
- *
- * Change Gold membership billing cycle between monthly and annual.
- *
- * Body: { planType: 'monthly' | 'annual' }
- */
-router.post('/gold/change-plan', async (req: AuthRequest, res: Response) => {
-  try {
-    const userId = req.user!.id;
-    const { planType } = req.body || {};
-
-    if (!planType || !['monthly', 'annual'].includes(planType)) {
-      res.status(400).json({ success: false, error: 'planType must be "monthly" or "annual"' });
-      return;
-    }
-
-    // Find the user's active Gold subscription
-    const existingGold = await Subscription.findOne({
-      userId,
-      planName: 'Gold Membership',
-      planType: 'gold',
-      status: 'active',
-      deletedAt: null,
-    });
-
-    if (!existingGold) {
-      res.status(404).json({ success: false, error: 'No active Gold membership found' });
-      return;
-    }
-
-    const updated = await changeGoldPlan(existingGold._id.toString(), userId, planType);
-
-    res.json({
-      success: true,
-      data: {
-        subscription: updated,
-        message: `Gold membership changed to ${planType} billing. New price: $${updated.price.toFixed(2)}/${planType === 'annual' ? 'yr' : 'mo'}`,
-      },
-    });
-  } catch (error: any) {
-    logger.error({ err: error, userId: req.user?.id }, '[Subscriptions] Gold change plan error');
-    res.status(500).json({ success: false, error: error.message || 'Failed to change Gold plan' });
   }
 });
 

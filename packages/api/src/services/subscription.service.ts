@@ -3,7 +3,7 @@ import { isFakeMode } from '../commerce/payment-mode';
 import Stripe from 'stripe';
 import { sendMail, sendInvoiceEmail, sendSubscriptionRenewalEmail } from './email.service';
 import { createAndDeliverNotification } from './notification-delivery.service';
-import { renderSubscriptionReminderEmail, renderGracePeriodReminderEmail, renderPaymentFailureEmail, renderGracePeriodStartedEmail, renderGoldWelcomeEmail, renderPaymentRetrySuccessEmail, renderFreePeriodReminder2WeekEmail, renderFreePeriodReminder3DayEmail, renderGracePeriodReminder3DayEmail, renderTagExpiredEmail } from './email/templates';
+import { renderSubscriptionReminderEmail, renderGracePeriodReminderEmail, renderPaymentFailureEmail, renderGracePeriodStartedEmail, renderPaymentRetrySuccessEmail, renderFreePeriodReminder2WeekEmail, renderFreePeriodReminder3DayEmail, renderGracePeriodReminder3DayEmail, renderTagExpiredEmail } from './email/templates';
 import { auditService, type AuditContext } from './audit';
 import { incrementCounter, METRICS } from '../lib/metrics';
 import logger from '../lib/logger';
@@ -524,9 +524,20 @@ export async function createGoldSubscription(userId: string, price?: number, pla
   // Send Gold welcome email (fire-and-forget)
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
   const dashboardUrl = `${frontendUrl}/account/guardian`;
-  sendGoldWelcomeEmail(user.email, user.fullName || 'there', goldPrice, dashboardUrl, planType).catch((err) => {
+  try {
+    const { sendMail } = await import('./email.service');
+    const { renderMembershipWelcomeEmail } = await import('./email/templates/membership-welcome');
+    const html = renderMembershipWelcomeEmail({
+      customerName: user.fullName || 'there',
+      tierName: 'Gold',
+      price: goldPrice,
+      renewalDate: subscription.currentPeriodEnd?.toLocaleDateString('en-NZ', { dateStyle: 'full' }) || 'N/A',
+      dashboardUrl,
+    });
+    await sendMail(user.email, 'Welcome to PawTag Gold Membership', html);
+  } catch (err) {
     logger.error({ err, userId }, '[Gold] Failed to send welcome email');
-  });
+  }
 
   // Create in-app notification for Gold subscription (fire-and-forget)
   try {
@@ -774,34 +785,18 @@ export async function cancelSubscription(
       const benefitsUntil = subscription.currentPeriodEnd?.toLocaleDateString('en-NZ', { dateStyle: 'full' }) || 'current billing period';
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
 
-      let html: string;
-      let subject: string;
-
-      if (subscription.planType === 'gold') {
-        // Gold-specific cancellation email with benefits list
-        const { renderGoldCancellationEmail } = await import('./email/templates/gold-cancellation');
-        html = renderGoldCancellationEmail({
-          customerName: user.fullName || 'there',
-          cancelledAt,
-          currentPeriodEnd: benefitsUntil,
-          dashboardUrl: `${frontendUrl}/account/subscriptions`,
-          resubscribeUrl: `${frontendUrl}/account/gold`,
-        });
-        subject = 'Gold Membership Cancelled — Confirmation';
-      } else {
-        // Standard cancellation email
-        const { renderCancellationEmail } = await import('./email/templates/cancellation');
-        html = renderCancellationEmail({
-          name: user.fullName || 'there',
-          planName: subscription.planName || 'PawTag Subscription',
-          cancelledAt,
-          currentPeriodEnd: benefitsUntil,
-        });
-        subject = `Your ${subscription.planName || 'PawTag'} subscription has been cancelled`;
-      }
+      // Standard cancellation email
+      const { renderCancellationEmail } = await import('./email/templates/cancellation');
+      const html = renderCancellationEmail({
+        name: user.fullName || 'there',
+        planName: subscription.planName || 'PawTag Subscription',
+        cancelledAt,
+        currentPeriodEnd: benefitsUntil,
+      });
+      const subject = `Your ${subscription.planName || 'PawTag'} subscription has been cancelled`;
 
       await sendMail(user.email, subject, html, undefined, {
-        templateSlug: subscription.planType === 'gold' ? 'gold-cancellation' : 'cancellation',
+        templateSlug: 'cancellation',
         businessFlow: 'subscription',
         relatedEntityType: 'subscription',
         relatedEntityId: subscription._id.toString(),
@@ -2058,11 +2053,6 @@ async function attemptPaymentCharge(subscription: any): Promise<boolean> {
     logger.error({ err, subscriptionId: subscription._id }, 'Stripe payment retry failed');
     return false;
   }
-}
-
-async function sendGoldWelcomeEmail(to: string, name: string, price: number, dashboardUrl: string, planType?: string) {
-  const html = renderGoldWelcomeEmail({ customerName: name, price, planType, dashboardUrl });
-  await sendMail(to, 'Welcome to PawTag Gold Membership', html);
 }
 
 async function sendPaymentRetrySuccessEmail(to: string, name: string, tagId: string) {

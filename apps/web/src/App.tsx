@@ -44,11 +44,10 @@ import GuardianDashboard from './pages/account/GuardianDashboard';
 import GuardianPoints from './pages/account/GuardianPoints';
 import GuardianRewards from './pages/account/GuardianRewards';
 import SubscriptionUpgrade from './pages/account/SubscriptionUpgrade';
-import GoldUpgrade from './pages/account/GoldUpgrade';
-import GoldBenefits from './pages/account/GoldBenefits';
+// OLD Gold imports removed — using new membership system
 import FloatingLoyaltyBadge from './components/FloatingLoyaltyBadge';
 import GuardianLanding from './pages/GuardianLanding';
-import GoldLanding from './pages/GoldLanding';
+// OLD GoldLanding removed — using new Membership page
 import AnnouncementBar from './components/AnnouncementBar';
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
@@ -120,7 +119,6 @@ export default function App() {
         <Route path="/contact" element={<PublicLayout><Contact /></PublicLayout>} />
         <Route path="/refer" element={<PublicLayout showEmergency={false}><Refer /></PublicLayout>} />
         <Route path="/guardian" element={<PublicLayout><GuardianLanding /></PublicLayout>} />
-        <Route path="/gold" element={<PublicLayout><GoldLanding /></PublicLayout>} />
 
         {/* Account routes */}
         <Route path="/account" element={<ProtectedRoute><AccountLayout><AccountDashboard /></AccountLayout></ProtectedRoute>} />
@@ -133,9 +131,7 @@ export default function App() {
         <Route path="/account/guardian" element={<ProtectedRoute><AccountLayout><GuardianDashboard /></AccountLayout></ProtectedRoute>} />
         <Route path="/account/guardian/points" element={<ProtectedRoute><AccountLayout><GuardianPoints /></AccountLayout></ProtectedRoute>} />
         <Route path="/account/guardian/rewards" element={<ProtectedRoute><AccountLayout><GuardianRewards /></AccountLayout></ProtectedRoute>} />
-        <Route path="/account/guardian/benefits" element={<ProtectedRoute><AccountLayout><GoldBenefits /></AccountLayout></ProtectedRoute>} />
         <Route path="/account/upgrade" element={<ProtectedRoute><AccountLayout><SubscriptionUpgrade /></AccountLayout></ProtectedRoute>} />
-        <Route path="/account/gold" element={<ProtectedRoute><AccountLayout><GoldUpgrade /></AccountLayout></ProtectedRoute>} />
         <Route path="/account/notifications" element={<ProtectedRoute><AccountLayout><Notifications /></AccountLayout></ProtectedRoute>} />
         <Route path="/account/notification-preferences" element={<ProtectedRoute><AccountLayout><NotificationPreferences /></AccountLayout></ProtectedRoute>} />
         <Route path="/account/redeem-tag" element={<ProtectedRoute><AccountLayout><RedeemTag /></AccountLayout></ProtectedRoute>} />

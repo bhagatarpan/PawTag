@@ -20,7 +20,7 @@ export { renderGuardianBirthdayEmail } from './guardian-birthday';
 export { renderGuardianAnniversaryEmail } from './guardian-anniversary';
 export { renderGuardianRenewalReminderEmail } from './guardian-renewal-reminder';
 export { renderPurchasePointsEmail } from './guardian-purchase-points';
-export { renderGoldWelcomeEmail } from './gold-welcome';
+// OLD: Gold welcome email removed — using membership-welcome instead
 // ─── New templates (inline email extractions) ───
 export { renderNewOrderAlertEmail, renderOrderCancelledAlertEmail, renderRefundFailedAlertEmail, renderSupportRequestAlertEmail } from './admin-alert';
 export { renderOrderStatusEmail } from './order-status';
@@ -40,5 +40,4 @@ export { renderSubscriptionPausedEmail } from './subscription-paused';
 export { renderSubscriptionPausedAdminEmail } from './subscription-paused-admin';
 export { renderJobNotificationEmail } from './job-notification';
 export { renderSubscriptionPlanChangedEmail } from './subscription-plan-changed';
-export { renderGoldCancellationEmail } from './gold-cancellation';
 export { renderSubscriptionResumedEmail } from './subscription-resumed';
