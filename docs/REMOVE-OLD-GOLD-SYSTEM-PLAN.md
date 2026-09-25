@@ -10,9 +10,9 @@
 
 | Phase | Description | Status | Notes |
 |-------|-------------|--------|-------|
-| 1 | Delete old Gold files | ⬜ Pending | 6 files |
-| 2 | Remove old Gold API routes | ⬜ Pending | 5 routes |
-| 3 | Remove old Gold service functions | ⬜ Pending | 9 functions |
+| 1 | Delete old Gold files | ✅ Complete | 6 files deleted |
+| 2 | Remove old Gold API routes | ✅ Complete | 3 routes removed, 1 updated |
+| 3 | Remove old Gold service functions | ✅ Complete | 2 functions removed, 1 updated |
 | 4 | Remove old Gold CMS settings + seeds | ⬜ Pending | 17 settings + 2 seeds |
 | 5 | Update shared endpoints + enums | ⬜ Pending | 5 items |
 | 6 | Update isGoldMember in API | ⬜ Pending | 10 files |
