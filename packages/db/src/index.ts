@@ -67,3 +67,5 @@ export { BackgroundJob, type IBackgroundJobDocument } from './models/BackgroundJ
 export { PendingRefundRetry, type IPendingRefundRetryDocument } from './models/PendingRefundRetry';
 export { MembershipTier, type IMembershipTierDocument, type IMembershipTierBenefits } from './models/MembershipTier';
 export { UserMembership, type IUserMembershipDocument } from './models/UserMembership';
+export { DigitalProduct, type IDigitalProductDocument } from './models/DigitalProduct';
+export { DigitalEntitlement, type IDigitalEntitlementDocument } from './models/DigitalEntitlement';
