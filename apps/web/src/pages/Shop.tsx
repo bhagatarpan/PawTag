@@ -58,6 +58,8 @@ import analytics from '../lib/analytics';
    reserved: number;
    sku: string;
 weight?: number;
+    /** Product type: 'physical' = one-time purchase, 'membership' = annual renewal, 'digital' = one-time purchase */
+    productType?: 'physical' | 'membership' | 'digital';
     isSubscription: boolean;
     isTagProduct: boolean;
     subscriptionConfig?: {
@@ -106,26 +108,27 @@ function toCardProduct(
    // Show Gold upsell for Guardian members who are not Gold
    const showGoldUpsell = !!guardianTier && !isGoldMember;
 
-   return {
-      id: p._id,
-      slug: p.slug,
-      name: p.name,
-      shortDescription: p.shortDescription || undefined,
-      price: effectivePrice,
-      currency: p.currency || 'NZD',
-      image: p.images?.[0] || undefined,
-      sku: p.sku,
-      stock: available,
-      monthlyPrice: p.subscriptionConfig?.monthlyPrice,
-      freePeriodMonths: p.subscriptionConfig?.freePeriodMonths,
-      badge: badge ? { label: badge.label, color: badge.color } : null,
-      featureHighlights: p.featureHighlights && p.featureHighlights.length > 0
-        ? p.featureHighlights.map(h => ({ icon: h.icon, description: h.description }))
-        : undefined,
-      pointsEarning,
-      showGoldUpsell,
-      customizable: p.customizable,
-      customizationLabel: p.customizationLabel,
+    return {
+       id: p._id,
+       slug: p.slug,
+       name: p.name,
+       shortDescription: p.shortDescription || undefined,
+       price: effectivePrice,
+       currency: p.currency || 'NZD',
+       image: p.images?.[0] || undefined,
+       sku: p.sku,
+       stock: available,
+       productType: (p.productType as 'physical' | 'membership' | 'digital') || 'physical',
+       monthlyPrice: p.subscriptionConfig?.monthlyPrice,
+       freePeriodMonths: p.subscriptionConfig?.freePeriodMonths,
+       badge: badge ? { label: badge.label, color: badge.color } : null,
+       featureHighlights: p.featureHighlights && p.featureHighlights.length > 0
+         ? p.featureHighlights.map(h => ({ icon: h.icon, description: h.description }))
+         : undefined,
+       pointsEarning,
+       showGoldUpsell,
+       customizable: p.customizable,
+       customizationLabel: p.customizationLabel,
     };
  }
 
