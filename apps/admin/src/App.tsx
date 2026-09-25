@@ -43,6 +43,10 @@ import GuardianDashboard from './pages/GuardianDashboard';
 import GuardianMembers from './pages/GuardianMembers';
 import GuardianSettings from './pages/GuardianSettings';
 import GuardianAnalytics from './pages/GuardianAnalytics';
+import MembershipDashboard from './pages/MembershipDashboard';
+import MembershipTiers from './pages/MembershipTiers';
+import MembershipSubscribers from './pages/MembershipSubscribers';
+import MembershipSubscriberDetail from './pages/MembershipSubscriberDetail';
 import Referrals from './pages/Referrals';
 import TagExpiryNotifications from './pages/TagExpiryNotifications';
 import Notifications from './pages/Notifications';
@@ -223,6 +227,10 @@ export default function App() {
       <Route path="/guardian/members" element={<ProtectedRoute><GuardianMembers /></ProtectedRoute>} />
       <Route path="/guardian/settings" element={<ProtectedRoute><GuardianSettings /></ProtectedRoute>} />
       <Route path="/guardian/analytics" element={<ProtectedRoute><GuardianAnalytics /></ProtectedRoute>} />
+      <Route path="/membership" element={<ProtectedRoute><MembershipDashboard /></ProtectedRoute>} />
+      <Route path="/membership/tiers" element={<ProtectedRoute><MembershipTiers /></ProtectedRoute>} />
+      <Route path="/membership/subscribers" element={<ProtectedRoute><MembershipSubscribers /></ProtectedRoute>} />
+      <Route path="/membership/subscribers/:id" element={<ProtectedRoute><MembershipSubscriberDetail /></ProtectedRoute>} />
       <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
       <Route path="/referrals" element={<ProtectedRoute><Referrals /></ProtectedRoute>} />
       <Route path="/tag-expiry-notifications" element={<ProtectedRoute><TagExpiryNotifications /></ProtectedRoute>} />

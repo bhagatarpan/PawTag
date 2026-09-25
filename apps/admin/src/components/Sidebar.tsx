@@ -52,6 +52,7 @@ import {
   Menu,
   X,
   Sun,
+  Crown,
   Moon,
   ChevronsLeft,
   ChevronsRight,
@@ -173,6 +174,18 @@ const sections: SidebarSection[] = [
       { to: '/guardian/members', label: 'Members', icon: Users, permission: 'subscription.read' },
       { to: '/guardian/analytics', label: 'Analytics', icon: BarChart3, permission: 'subscription.read' },
       { to: '/guardian/settings', label: 'Guardian Settings', icon: Settings, permission: 'subscription.read' },
+    ],
+  },
+  // ─── Membership ──────────────────────────────────────────
+  {
+    id: 'membership',
+    label: 'Membership',
+    icon: Crown,
+    color: 'text-amber-400',
+    links: [
+      { to: '/membership', label: 'Dashboard', icon: Crown, permission: 'subscription.read' },
+      { to: '/membership/tiers', label: 'Tier Configuration', icon: Settings, permission: 'setting.read' },
+      { to: '/membership/subscribers', label: 'Subscribers', icon: Users, permission: 'subscription.read' },
     ],
   },
   // ─── Discounts & Promotions ───────────────────────────────

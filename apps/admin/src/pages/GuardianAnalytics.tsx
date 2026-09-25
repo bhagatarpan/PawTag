@@ -11,6 +11,8 @@ interface GuardianAnalytics {
   totalRewardsAllocated: number;
   totalRewardsRedeemed: number;
   goldMembers: number;
+  platinumMembers: number;
+  blackMembers: number;
   averagePointsPerMember: number;
   averageRewardsPerMember: number;
   estimatedMRR: number;
@@ -21,43 +23,38 @@ export default function GuardianAnalytics() {
   const [analytics, setAnalytics] = useState<GuardianAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [goldPrice, setGoldPrice] = useState(3.99);
-  const [goldAnnualPrice, setGoldAnnualPrice] = useState(39.99);
 
   useEffect(() => {
     fetchAnalytics();
-    fetchGoldPrice();
   }, []);
-
-  async function fetchGoldPrice() {
-    try {
-      const res = await api.get('/admin/settings');
-      const settings = res.data?.data || [];
-      const goldPriceSetting = settings.find((s: any) => s.key === 'guardian.goldPrice');
-      if (goldPriceSetting) setGoldPrice(parseFloat(goldPriceSetting.value));
-      const goldAnnualPriceSetting = settings.find((s: any) => s.key === 'guardian.goldAnnualPrice');
-      if (goldAnnualPriceSetting) setGoldAnnualPrice(parseFloat(goldAnnualPriceSetting.value));
-    } catch {
-      // Use default
-    }
-  }
 
   async function fetchAnalytics() {
     try {
       const res = await api.get(API.admin.guardian.stats);
       const stats = res.data.data;
       
-      // Fetch Gold subscriptions to calculate accurate MRR
+      // Fetch membership data from new membership system
+      let goldMembers = 0;
+      let platinumMembers = 0;
+      let blackMembers = 0;
       let estimatedMRR = 0;
       try {
-        const subsRes = await api.get(API.admin.subscriptions.list, { params: { planType: 'gold', status: 'active', limit: 1000 } });
-        const goldSubs = subsRes.data?.data?.subscriptions || subsRes.data?.data || [];
-        const monthlyCount = goldSubs.filter((s: any) => s.renewalMethod === 'monthly').length;
-        const annualCount = goldSubs.filter((s: any) => s.renewalMethod === 'annual').length;
-        estimatedMRR = (monthlyCount * goldPrice) + (annualCount * goldAnnualPrice / 12);
+        const membersRes = await api.get(API.admin.membership.subscribers, { params: { status: 'active', limit: 1000 } });
+        const members = membersRes.data?.data?.memberships || [];
+        goldMembers = members.filter((m: any) => m.tierId?.tier === 'gold').length;
+        platinumMembers = members.filter((m: any) => m.tierId?.tier === 'platinum').length;
+        blackMembers = members.filter((m: any) => m.tierId?.tier === 'black').length;
+        
+        // Calculate MRR from membership prices
+        for (const m of members) {
+          const tier = m.tierId as any;
+          if (tier?.price) {
+            estimatedMRR += tier.price / 12; // Convert annual to monthly
+          }
+        }
       } catch {
         // Fallback to simple calculation
-        estimatedMRR = stats.goldMembers * goldPrice;
+        estimatedMRR = stats.goldMembers * 89 / 12; // Gold $89/year
       }
       
       // Calculate additional metrics
@@ -70,6 +67,9 @@ export default function GuardianAnalytics() {
 
       setAnalytics({
         ...stats,
+        goldMembers,
+        platinumMembers,
+        blackMembers,
         averagePointsPerMember,
         averageRewardsPerMember,
         estimatedMRR,
@@ -255,7 +255,7 @@ export default function GuardianAnalytics() {
             <div className="flex justify-between items-center">
               <span className="text-gray-600">Estimated Monthly MRR</span>
               <span className="font-semibold text-blue-600">
-                ${(analytics.estimatedMRR || analytics.goldMembers * goldPrice).toFixed(2)}
+                ${(analytics.estimatedMRR || 0).toFixed(2)}
               </span>
             </div>
           </div>

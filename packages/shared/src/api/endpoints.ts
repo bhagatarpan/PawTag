@@ -169,6 +169,18 @@ export const API = {
     },
 
     // ---------------------------------------------------------------------------
+    // Admin — Membership
+    // ---------------------------------------------------------------------------
+    membership: {
+      tiers: '/admin/membership/tiers',
+      tier: (id: string) => `/admin/membership/tiers/${id}` as const,
+      subscribers: '/admin/membership/subscribers',
+      subscriber: (id: string) => `/admin/membership/subscribers/${id}` as const,
+      extend: '/admin/membership/extend',
+      stats: '/admin/membership/stats',
+    },
+
+    // ---------------------------------------------------------------------------
     // Admin — Commerce
     // ---------------------------------------------------------------------------
     commerce: {
