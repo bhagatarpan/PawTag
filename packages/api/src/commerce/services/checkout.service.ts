@@ -542,6 +542,51 @@ export class CheckoutService {
       completionErrors.push({ step: 'tag_subscription_creation', error: errorMsg, timestamp: new Date() });
     }
 
+    // 8c. Create Digital Product Entitlements
+    try {
+      const { DigitalProduct: DigitalProductModel, DigitalEntitlement } = await import('@pawtag/db');
+      
+      for (const item of pending.items) {
+        try {
+          const product = await Product.findById(item.productId).lean();
+          if (!product || product.productType !== 'digital') continue;
+
+          // Find the digital product configuration
+          const digitalProduct = await DigitalProductModel.findOne({ productId: item.productId });
+          if (!digitalProduct) continue;
+
+          // Calculate access expiry
+          let accessExpiresAt: Date | undefined;
+          if (digitalProduct.accessType === 'time_limited' && digitalProduct.accessDurationDays) {
+            accessExpiresAt = new Date();
+            accessExpiresAt.setDate(accessExpiresAt.getDate() + digitalProduct.accessDurationDays);
+          }
+
+          // Create entitlement
+          await DigitalEntitlement.create({
+            userId,
+            digitalProductId: digitalProduct._id,
+            orderId: order._id,
+            grantedAt: new Date(),
+            accessExpiresAt,
+            downloadCount: 0,
+            downloadLimit: digitalProduct.downloadLimit || 0,
+            isActive: true,
+          });
+
+          logger.info({ digitalProductId: digitalProduct._id, orderId: order.orderNumber, productId: item.productId, correlationId }, 'Digital product entitlement created');
+        } catch (itemErr: any) {
+          const errorMsg = itemErr?.message || String(itemErr);
+          logger.error({ err: itemErr, orderId: order._id, productId: item.productId, correlationId }, 'Digital entitlement creation failed for item');
+          completionErrors.push({ step: 'digital_entitlement_creation', error: errorMsg, productId: String(item.productId), timestamp: new Date() });
+        }
+      }
+    } catch (err: any) {
+      const errorMsg = err?.message || String(err);
+      logger.error({ err, orderId: order._id, correlationId }, 'Completion step failed: digital entitlement creation');
+      completionErrors.push({ step: 'digital_entitlement_creation', error: errorMsg, timestamp: new Date() });
+    }
+
     // 9. Create Invoice
     let invoice: any;
     try {
