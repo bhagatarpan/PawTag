@@ -43,6 +43,8 @@ interface Product {
    slug?: string;
    sortOrder?: number;
    featureHighlights?: IFeatureHighlight[];
+   /** Product type: 'physical' = one-time purchase, 'membership' = annual renewal, 'digital' = one-time purchase */
+   productType?: 'physical' | 'membership' | 'digital';
    isSubscription?: boolean;
    isTagProduct?: boolean;
     subscriptionConfig?: {
@@ -512,6 +514,7 @@ const [form, setForm] = useState({
       stock: 0, sku: '', currency: 'NZD', isActive: true, customizable: false, customizationLabel: '', customizationPrice: 0,
       featureHighlights: DEFAULT_FEATURE_HIGHLIGHTS as IFeatureHighlight[],
       slug: '',
+      productType: 'physical' as 'physical' | 'membership' | 'digital',
       isSubscription: false,
       isTagProduct: false,
       subscriptionConfig: { type: 'annual' as 'annual' | 'monthly', freePeriodMonths: 12, monthlyPrice: 0, annualPrice: 0, gracePeriodWeeks: 4 },
@@ -624,7 +627,7 @@ const [form, setForm] = useState({
       setForm({
         name: '', description: '', shortDescription: '', price: 0, category: 'PawTag',
         stock: 0, sku: '', currency: 'NZD', isActive: true, customizable: false, customizationLabel: '', customizationPrice: 0,
-        featureHighlights: [...DEFAULT_FEATURE_HIGHLIGHTS], slug: '', isSubscription: true, isTagProduct: false,
+        featureHighlights: [...DEFAULT_FEATURE_HIGHLIGHTS], slug: '', productType: 'membership', isSubscription: true, isTagProduct: false,
         subscriptionConfig: { type: 'annual', freePeriodMonths: 12, monthlyPrice: 0, annualPrice: 0, gracePeriodWeeks: 4 },
       });
       setVariants([]);
@@ -636,7 +639,7 @@ const [form, setForm] = useState({
   // Form handlers
 const openCreate = () => {
      setEditing(null);
-      setForm({ name: '', description: '', shortDescription: '', price: 0, category: 'PawTag', stock: 0, sku: '', currency: 'NZD', isActive: true, customizable: false, customizationLabel: '', customizationPrice: 0, featureHighlights: [...DEFAULT_FEATURE_HIGHLIGHTS], slug: '', isSubscription: false, isTagProduct: false, subscriptionConfig: { type: 'annual', freePeriodMonths: 12, monthlyPrice: 0, annualPrice: 0, gracePeriodWeeks: 4 } });
+      setForm({ name: '', description: '', shortDescription: '', price: 0, category: 'PawTag', stock: 0, sku: '', currency: 'NZD', isActive: true, customizable: false, customizationLabel: '', customizationPrice: 0, featureHighlights: [...DEFAULT_FEATURE_HIGHLIGHTS], slug: '', productType: 'physical', isSubscription: false, isTagProduct: false, subscriptionConfig: { type: 'annual', freePeriodMonths: 12, monthlyPrice: 0, annualPrice: 0, gracePeriodWeeks: 4 } });
     setVariants([]);
     setImages([]);
     setShowForm(true);
@@ -650,6 +653,7 @@ const openEdit = (p: Product) => {
        isActive: p.isActive, customizable: p.customizable || false, customizationLabel: p.customizationLabel || '', customizationPrice: p.customizationPrice || 0,
        featureHighlights: p.featureHighlights && p.featureHighlights.length > 0 ? [...p.featureHighlights] : [...DEFAULT_FEATURE_HIGHLIGHTS],
        slug: p.slug || '',
+       productType: (p.productType as 'physical' | 'membership' | 'digital') || 'physical',
        isSubscription: p.isSubscription || false,
        isTagProduct: p.isTagProduct || false,
       subscriptionConfig: {
@@ -985,7 +989,21 @@ const openEdit = (p: Product) => {
                 </div>
               </div>
               <div className="border-t pt-4">
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">Subscription</h3>
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">Product Type</h3>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Type *</label>
+                    <select value={form.productType || 'physical'} onChange={(e) => setForm({ ...form, productType: e.target.value as 'physical' | 'membership' | 'digital' })} className="w-full border rounded-md px-3 py-2 text-sm">
+                      <option value="physical">Physical Product (one-time purchase, requires shipping)</option>
+                      <option value="membership">Membership (annual renewal, no shipping)</option>
+                      <option value="digital">Digital Product (one-time purchase, no shipping)</option>
+                    </select>
+                    <p className="text-xs text-gray-400 mt-1">Determines cart behavior, shipping requirements, and checkout flow</p>
+                  </div>
+                </div>
+              </div>
+              <div className="border-t pt-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">Subscription (Legacy)</h3>
                 <div className="space-y-3">
                   <div className="flex items-center gap-6">
                     <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.isSubscription} onChange={(e) => setForm({ ...form, isSubscription: e.target.checked })} className="rounded" /> This product includes a subscription</label>
