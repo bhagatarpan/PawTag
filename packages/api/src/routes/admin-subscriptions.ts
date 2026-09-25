@@ -5,7 +5,6 @@ import { Subscription, Invoice, Tag, User } from '@pawtag/db';
 import {
   renewSubscription,
   cancelSubscription,
-  createGoldSubscription,
 } from '../services/subscription.service';
 import logger from '../lib/logger';
 
@@ -471,42 +470,7 @@ router.put('/:id/auto-renew', requirePermission('subscription.update'), async (r
  *     security:
  *       - bearerAuth: []
  */
-router.post('/gold/subscribe', requirePermission('subscription.update'), async (req: AuthRequest, res: Response) => {
-  try {
-    const { userId, price, planType } = req.body;
-    if (!userId) {
-      res.status(400).json({ success: false, error: 'userId is required' });
-      return;
-    }
 
-    const user = await User.findById(userId).select('fullName email').lean();
-    if (!user) {
-      res.status(404).json({ success: false, error: 'User not found' });
-      return;
-    }
-
-    // Check for existing active Gold subscription
-    const existing = await Subscription.findOne({
-      userId,
-      planName: 'Gold Membership',
-      status: { $in: ['active', 'grace_period'] },
-      deletedAt: null,
-    });
-    if (existing) {
-      res.status(409).json({ success: false, error: 'User already has an active Gold membership' });
-      return;
-    }
-
-    const subscription = await createGoldSubscription(userId, price, planType);
-
-    res.json({
-      success: true,
-      data: subscription,
-      message: `Gold membership activated for ${user.fullName || user.email}`,
-    });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message || 'Failed to create Gold subscription' });
-  }
-});
+// OLD: Gold subscription route removed — use membership system instead
 
 export default router;

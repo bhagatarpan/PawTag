@@ -9,7 +9,6 @@
 
 import { Router, Response } from 'express';
 import { AuthRequest, authenticate } from '../middleware/auth';
-import { checkGoldBenefits, getsFreeShipping } from '../middleware/gold-benefits';
 import { shippingService } from '../commerce/services/shipping.service';
 import { Cart } from '@pawtag/db';
 import { toAppError } from '../lib/app-errors';
@@ -17,7 +16,6 @@ import logger from '../lib/logger';
 
 const router = Router();
 router.use(authenticate);
-router.use(checkGoldBenefits);
 
 /**
  * GET /api/shipping/rates
@@ -47,18 +45,6 @@ router.get('/rates', async (req: AuthRequest, res: Response) => {
       zip: (zip as string) || '',
       country: (country as string) || 'NZ',
     });
-
-    // Apply Gold member free shipping benefit using server-derived cart total
-    const isGoldMember = (req as any).isGoldMember === true;
-    if (isGoldMember && await getsFreeShipping(true, cartSubtotal)) {
-      const freeRates = rates.map((rate) => ({
-        ...rate,
-        cost: 0,
-        description: rate.description ? `${rate.description} (Gold Free Shipping)` : 'Free (Gold Member)',
-      }));
-      res.json({ success: true, data: freeRates });
-      return;
-    }
 
     res.json({ success: true, data: rates });
   } catch (err) {
