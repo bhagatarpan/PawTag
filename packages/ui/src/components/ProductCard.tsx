@@ -26,6 +26,8 @@ export interface ProductCardProduct {
    image?: string;
    sku: string;
     stock: number;
+    /** Product type: 'physical' = one-time purchase, 'membership' = annual renewal, 'digital' = one-time purchase */
+    productType?: 'physical' | 'membership' | 'digital';
     monthlyPrice?: number;
     annualPrice?: number;
     planType?: 'annual' | 'monthly';
@@ -98,12 +100,14 @@ export const ProductCard = React.memo(function ProductCard({
             <span className="text-3xl font-bold text-primary-700">${product.price.toFixed(2)}</span>
             <span className="text-sm text-gray-500">{product.currency || 'NZD'}</span>
           </div>
-          {product.monthlyPrice != null && product.monthlyPrice > 0 && (
+          {/* Show subscription pricing only for membership products, not physical/digital */}
+          {product.productType === 'membership' && product.monthlyPrice != null && product.monthlyPrice > 0 && (
             <p className="text-xs text-gray-400 mt-1">
               + ${product.monthlyPrice.toFixed(2)}/mo{product.freePeriodMonths ? ` after ${product.freePeriodMonths} months free` : ''}
             </p>
           )}
-          {product.monthlyPrice != null && product.monthlyPrice > 0 && onToggleAutoRenew && (
+          {/* Show auto-renew toggle only for membership products */}
+          {product.productType === 'membership' && product.monthlyPrice != null && product.monthlyPrice > 0 && onToggleAutoRenew && (
             <div className="flex items-center gap-2 mt-2">
               <span className="text-xs text-gray-500">Auto-renew</span>
               <button
