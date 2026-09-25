@@ -17,7 +17,6 @@ interface CheckoutConfirmationProps {
   estimatedPoints: number;
   pointsToNextTier: number | null;
   nextTierName: string;
-  goldPrice: string;
 }
 
 export default function CheckoutConfirmationStep({
@@ -32,7 +31,6 @@ export default function CheckoutConfirmationStep({
   estimatedPoints,
   pointsToNextTier,
   nextTierName,
-  goldPrice,
 }: CheckoutConfirmationProps) {
   const [referralCode, setReferralCode] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -265,10 +263,10 @@ export default function CheckoutConfirmationStep({
                 With Gold, you'd have earned <strong>{estimatedPoints * 2} Points</strong> on this order!
               </p>
               <p className="text-xs text-amber-600 mt-1">
-                Gold members earn 2x points on every purchase — just ${goldPrice}/month.
+                Join Gold membership and earn 2x points on every purchase.
               </p>
-              <Link to="/gold" className="text-xs font-medium text-amber-700 underline mt-1 inline-block">
-                Upgrade to Gold &rarr;
+              <Link to="/membership" className="text-xs font-medium text-amber-700 underline mt-1 inline-block">
+                View Membership Plans &rarr;
               </Link>
             </div>
           </div>

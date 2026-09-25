@@ -1085,20 +1085,20 @@ export default function Checkout() {
                     </div>
                   </div>
                 ) : guardianTier ? (
-                  /* Guardian member — upsell Gold */
+                  /* Guardian member — upsell Membership */
                   <div className="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-xl p-4">
                     <div className="flex items-center gap-3">
                       <Crown className="h-5 w-5 text-amber-600 flex-shrink-0" />
                       <div className="flex-1">
                         <p className="text-sm font-medium text-amber-800">
-                          <strong>{checkoutUpsellText}.</strong>
+                          <strong>Upgrade your membership for 2× Points!</strong>
                         </p>
                         <p className="text-xs text-amber-600 mt-0.5">
-                          Just ${goldPrice}/month — less than a coffee. Upgrade anytime.
+                          Join Gold from $89/year and earn double points on every purchase.
                         </p>
                       </div>
-                      <Link to="/gold" className="px-3 py-1.5 bg-amber-600 text-white rounded-lg text-xs font-medium hover:bg-amber-700 transition-colors whitespace-nowrap">
-                        Go Gold
+                      <Link to="/membership" className="px-3 py-1.5 bg-amber-600 text-white rounded-lg text-xs font-medium hover:bg-amber-700 transition-colors whitespace-nowrap">
+                        View Plans
                       </Link>
                     </div>
                   </div>
@@ -1313,7 +1313,6 @@ export default function Checkout() {
             estimatedPoints={estimatedPoints}
             pointsToNextTier={pointsToNextTier}
             nextTierName={nextTierName}
-            goldPrice={goldPrice}
           />
         )}
       </div>

@@ -1,5 +1,4 @@
 export interface MembershipCheckboxesProps {
-  goldPrice: string;
   addGold: boolean;
   onGoldChange: (checked: boolean) => void;
   goldJoined?: boolean;
@@ -8,7 +7,6 @@ export interface MembershipCheckboxesProps {
 }
 
 export function MembershipCheckboxes({
-  goldPrice,
   addGold,
   onGoldChange,
   goldJoined = false,
@@ -54,7 +52,7 @@ export function MembershipCheckboxes({
             </>
           ) : (
             <>
-              <span className="font-medium text-amber-800">Add Gold Membership — ${goldPrice}/mo</span>
+              <span className="font-medium text-amber-800">Add Gold Membership</span>
               <span className="text-amber-600 block text-xs mt-0.5">
                 Earn 2× points on every purchase, free shipping over $50, and more.
               </span>

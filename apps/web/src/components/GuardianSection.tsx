@@ -54,7 +54,6 @@ interface GuardianData {
 export default function GuardianSection() {
   const { user } = useAuth();
   const { settings } = useSiteSettings();
-  const goldPrice = settings?.['guardian.goldPrice'] || '3.99';
   const [guardianData, setGuardianData] = useState<GuardianData | null>(null);
 
   useEffect(() => {
@@ -191,14 +190,6 @@ export default function GuardianSection() {
               >
                 View Your Guardian Dashboard <ArrowRight size={18} />
               </Link>
-              {!guardianData?.isGoldMember && (
-                <Link
-                  to="/gold"
-                  className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-amber-500 text-white rounded-xl font-semibold hover:bg-amber-600 transition-colors"
-                >
-                  <Crown size={18} /> Upgrade to Gold
-                </Link>
-              )}
             </div>
           ) : (
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -212,29 +203,11 @@ export default function GuardianSection() {
                 to="/gold"
                 className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-amber-500 text-white rounded-xl font-semibold hover:bg-amber-600 transition-colors"
               >
-                <Crown size={18} /> Learn About Gold
+                <Crown size={18} /> View Membership Plans
               </Link>
             </div>
           )}
         </div>
-
-        {/* Gold Callout */}
-        {!guardianData?.isGoldMember && (
-          <div className="mt-8 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-6 text-center">
-            <Crown className="h-8 w-8 text-amber-500 mx-auto mb-3" />
-            <h3 className="font-semibold text-amber-900 mb-2">Want to Earn Even More?</h3>
-            <p className="text-sm text-amber-700 mb-4">
-              Gold members earn <strong>2× Points</strong> on every purchase and start at Nurture tier.
-              Just ${goldPrice}/month — less than a coffee.
-            </p>
-            <Link
-              to="/gold"
-              className="inline-flex items-center gap-2 text-amber-600 font-medium hover:text-amber-700"
-            >
-              Learn About Gold <ArrowRight size={16} />
-            </Link>
-          </div>
-        )}
       </div>
     </section>
   );

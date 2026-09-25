@@ -375,6 +375,35 @@ export default function GuardianSettings() {
       {/* Tier Rules */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Tier Rules</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Tier Downgrade Grace Period (days)
+            </label>
+            <input
+              type="number"
+              value={settings.tierDowngradeGraceDays}
+              onChange={(e) => setSettings({ ...settings, tierDowngradeGraceDays: Number(e.target.value) })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            />
+            <p className="text-xs text-gray-500 mt-1">Days before tier downgrade is applied</p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Lifetime Safeguard Years
+            </label>
+            <input
+              type="number"
+              value={settings.lifetimeSafeguardYears}
+              onChange={(e) => setSettings({ ...settings, lifetimeSafeguardYears: Number(e.target.value) })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            />
+            <p className="text-xs text-gray-500 mt-1">Consecutive years at Safeguard for lifetime status</p>
+          </div>
+        </div>
+      </div>
+
+      {/* PawRewards Settings */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">PawRewards</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
