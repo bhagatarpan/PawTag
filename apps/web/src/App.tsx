@@ -46,8 +46,9 @@ import GuardianRewards from './pages/account/GuardianRewards';
 import SubscriptionUpgrade from './pages/account/SubscriptionUpgrade';
 // OLD Gold imports removed — using new membership system
 import FloatingLoyaltyBadge from './components/FloatingLoyaltyBadge';
+import FloatingMembershipBadge from './components/FloatingMembershipBadge';
 import GuardianLanding from './pages/GuardianLanding';
-// OLD GoldLanding removed — using new Membership page
+import Membership from './pages/Membership';
 import AnnouncementBar from './components/AnnouncementBar';
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
@@ -65,6 +66,7 @@ function PublicLayout({ children, showEmergency = true }: { children: ReactNode;
       <Footer />
       {showEmergency && <EmergencyLostPet />}
       <FloatingLoyaltyBadge />
+      <FloatingMembershipBadge />
     </div>
   );
 }
@@ -119,6 +121,7 @@ export default function App() {
         <Route path="/contact" element={<PublicLayout><Contact /></PublicLayout>} />
         <Route path="/refer" element={<PublicLayout showEmergency={false}><Refer /></PublicLayout>} />
         <Route path="/guardian" element={<PublicLayout><GuardianLanding /></PublicLayout>} />
+        <Route path="/membership" element={<PublicLayout><Membership /></PublicLayout>} />
 
         {/* Account routes */}
         <Route path="/account" element={<ProtectedRoute><AccountLayout><AccountDashboard /></AccountLayout></ProtectedRoute>} />

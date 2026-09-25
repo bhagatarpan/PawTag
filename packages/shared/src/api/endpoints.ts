@@ -576,6 +576,15 @@ export const API = {
       benefits: '/customer/guardian/benefits',
       activity: '/customer/guardian/activity',
     },
+    membership: {
+      tiers: '/membership/tiers',
+      status: '/membership/status',
+      subscribe: '/membership/subscribe',
+      activate: '/membership/activate',
+      cancel: '/membership/cancel',
+      changeTier: '/membership/change-tier',
+      tags: '/membership/tags',
+    },
     escalations: {
       list: '/customer/escalations',
       resolve: (id: string) => `/customer/escalations/${id}/resolve` as const,
@@ -690,6 +699,10 @@ export const API = {
     },
     commerce: {
       cancellationReasons: '/public/commerce/cancellation-reasons',
+    },
+    membership: {
+      tiers: '/public/membership/tiers',
+      tier: (id: string) => `/public/membership/tiers/${id}` as const,
     },
     points: {
       estimate: '/public/points/estimate',
