@@ -53,8 +53,6 @@ export interface FinderTagView {
   tagId: string;
   /** Tag status (active, inactive, expired) */
   tagStatus: string;
-  /** Subscription status affecting finder access */
-  subscriptionStatus: string;
 }
 
 /**

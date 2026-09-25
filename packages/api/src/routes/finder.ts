@@ -202,16 +202,11 @@ router.get('/:tagId', async (req: Request, res: Response) => {
     const pet = tag.petId as any;
     const owner = tag.ownerId as any;
 
-    // Check subscription status AND tag status
-    const isActiveForFinder = tag.status === 'active' && (
-      !tag.subscriptionStatus ||
-      tag.subscriptionStatus === 'active' ||
-      tag.subscriptionStatus === 'grace_period' ||
-      tag.subscriptionStatus === 'none'
-    );
+    // Check tag status only — pet recovery should not be blocked by subscription status
+    const isActiveForFinder = tag.status === 'active';
 
     if (!isActiveForFinder) {
-      // Tag subscription expired — still log the scan but return limited info
+      // Tag is inactive — still log the scan but return limited info
       const userAgent = (req.headers['user-agent'] as string) || 'unknown';
       const { browser, device } = parseUserAgent(userAgent);
       const ipGeo = await getIpGeoData(req.ip || req.headers['x-forwarded-for']?.toString().split(',')[0]?.trim() || '');
@@ -238,8 +233,7 @@ router.get('/:tagId', async (req: Request, res: Response) => {
         severity: 'MEDIUM',
         metadata: {
           tagId: tag.tagId,
-          subscriptionStatus: tag.subscriptionStatus,
-          message: 'This PawTag is no longer active. The owner needs to renew their subscription.',
+          message: 'This PawTag is no longer active.',
           petInfo: null,
         },
       });
@@ -248,8 +242,7 @@ router.get('/:tagId', async (req: Request, res: Response) => {
         success: true,
         data: {
           tagActive: false,
-          subscriptionStatus: tag.subscriptionStatus,
-          message: 'This PawTag is no longer active. The owner needs to renew their subscription.',
+          message: 'This PawTag is no longer active.',
           petInfo: null,
         },
       });
@@ -275,14 +268,6 @@ router.get('/:tagId', async (req: Request, res: Response) => {
     // Update tag scan info
     tag.lastScannedAt = new Date();
     await tag.save();
-
-    // Update subscription scan count if linked
-    if (tag.subscriptionId) {
-      await Subscription.findByIdAndUpdate(tag.subscriptionId, {
-        lastScannedAt: new Date(),
-        $inc: { totalScans: 1 },
-      });
-    }
 
     // Check admin CMS setting for finder name visibility
     const adminSetting = await Setting.findOne({ key: 'finder.showOwnerName' });
@@ -320,7 +305,6 @@ router.get('/:tagId', async (req: Request, res: Response) => {
         pet: toFinderPetView(pet),
         tagId: tag.tagId,
         tagStatus: tag.status,
-        subscriptionStatus: tag.subscriptionStatus || 'none',
         ownerName,
         ownerLocation,
         ownerPhone,
@@ -342,12 +326,10 @@ router.get('/:tagId', async (req: Request, res: Response) => {
         petId: pet._id.toString(),
         petName: pet.name,
         petStatus: pet.status,
-        subscriptionStatus: tag.subscriptionStatus,
         ownerId: owner?._id?.toString(),
         ownerName: ownerName || '(hidden)',
         showOwnerName,
         fieldsAccessed: ['pet.name', 'pet.petId', 'pet.species', 'pet.breed', 'pet.medicalAlerts', 'pet.status', 'ownerName', 'ownerPhone'],
-        subscriptionActive: isActiveForFinder,
         deviceBrowser: browser,
         deviceOS: device,
         deviceType: detectDeviceType(userAgent),
