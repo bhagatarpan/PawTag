@@ -353,6 +353,7 @@ export async function createSubscription(data: {
  * @param userId - The user purchasing Gold
  * @param price - The price charged (default: from CMS setting `guardian.goldPrice`)
  * @returns The created subscription document
+ * @deprecated Use membership.service.ts subscribeToTier() instead. This function is kept for backwards compatibility only.
  */
 export async function createGoldSubscription(userId: string, price?: number, planType?: 'monthly' | 'annual') {
   const now = new Date();
