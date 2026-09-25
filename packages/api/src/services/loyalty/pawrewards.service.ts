@@ -103,7 +103,7 @@ export async function allocateMonthlyRewards(userId: string): Promise<{
   }
 
   // Check maximum balance (read from CMS settings)
-  const isGoldMember = await isGoldSubscription(subscription);
+  const isGoldMember = await isGoldSubscription(userId);
   const maxBalance = isGoldMember
     ? await getGuardianNumber('pawRewardsMaxBalanceGold')
     : await getGuardianNumber('pawRewardsMaxBalanceGuardian');
@@ -171,7 +171,7 @@ export async function earnRewardsFromPurchase(
   }
 
   // Determine earning rate (read from CMS settings)
-  const isGoldMember = await isGoldSubscription(subscription);
+  const isGoldMember = await isGoldSubscription(userId);
   const earningRate = isGoldMember
     ? await getGuardianNumber('pawRewardsEarningRateGold')
     : await getGuardianNumber('pawRewardsEarningRateGuardian');

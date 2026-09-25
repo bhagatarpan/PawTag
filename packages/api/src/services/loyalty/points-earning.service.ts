@@ -44,11 +44,21 @@ export async function getGoldPrice(): Promise<number> {
 }
 
 /**
- * Check if a subscription represents Gold membership.
+ * Check if a user has an active Gold membership via the new UserMembership model.
  */
-export async function isGoldSubscription(subscription: { planType?: string; price?: number } | null): Promise<boolean> {
-  if (!subscription) return false;
-  return subscription.planType === 'gold';
+export async function isGoldSubscription(userId: string): Promise<boolean> {
+  if (!userId) return false;
+  try {
+    const { UserMembership } = await import('@pawtag/db');
+    const membership = await UserMembership.findOne({
+      userId,
+      status: 'active',
+    }).populate('tierId').lean();
+    const tier = membership?.tierId as any;
+    return tier?.tier === 'gold';
+  } catch {
+    return false;
+  }
 }
 
 // Points earning activities with base rates
@@ -112,8 +122,7 @@ export async function awardPurchasePoints(
   const user = await User.findById(userId).lean();
   if (!user) throw new Error('User not found');
 
-  const subscription = await Subscription.findOne({ userId, status: 'active' }).lean();
-  const isGoldMember = await isGoldSubscription(subscription);
+  const isGoldMember = await isGoldSubscription(userId);
 
   // Calculate base points (read from CMS settings)
   // Formula: points = (orderTotal ÷ spentAmount) × purchaseRate
@@ -163,8 +172,7 @@ export async function awardReviewPoints(
   const user = await User.findById(userId).lean();
   if (!user) throw new Error('User not found');
 
-  const subscription = await Subscription.findOne({ userId, status: 'active' }).lean();
-  const isGoldMember = await isGoldSubscription(subscription);
+  const isGoldMember = await isGoldSubscription(userId);
 
   // Get base points for review type (read from CMS settings)
   const reviewKey = `review${reviewType.charAt(0).toUpperCase() + reviewType.slice(1)}Points` as GuardianSettingKey;
@@ -220,8 +228,7 @@ export async function awardReferralPoints(
   const user = await User.findById(userId).lean();
   if (!user) throw new Error('User not found');
 
-  const subscription = await Subscription.findOne({ userId, status: 'active' }).lean();
-  const isGoldMember = await isGoldSubscription(subscription);
+  const isGoldMember = await isGoldSubscription(userId);
 
   // Get base points for referral type (read from CMS settings)
   const referralKey = `referral${referralType.charAt(0).toUpperCase() + referralType.slice(1)}Points` as GuardianSettingKey;
@@ -276,8 +283,7 @@ export async function awardPetMilestonePoints(
   const user = await User.findById(userId).lean();
   if (!user) throw new Error('User not found');
 
-  const subscription = await Subscription.findOne({ userId, status: 'active' }).lean();
-  const isGoldMember = await isGoldSubscription(subscription);
+  const isGoldMember = await isGoldSubscription(userId);
 
   // Get base points for milestone type (read from CMS settings)
   const MILESTONE_KEYS: Record<string, GuardianSettingKey> = {
@@ -318,8 +324,7 @@ export async function awardTagActivationPoints(
   const user = await User.findById(userId).lean();
   if (!user) throw new Error('User not found');
 
-  const subscription = await Subscription.findOne({ userId, status: 'active' }).lean();
-  const isGoldMember = await isGoldSubscription(subscription);
+  const isGoldMember = await isGoldSubscription(userId);
 
   const basePoints = await getGuardianNumber('tagActivationPoints');
   const goldMultiplier = await getGuardianNumber('goldMultiplier');
@@ -351,8 +356,7 @@ export async function awardSocialSharePoints(
   const user = await User.findById(userId).lean();
   if (!user) throw new Error('User not found');
 
-  const subscription = await Subscription.findOne({ userId, status: 'active' }).lean();
-  const isGoldMember = await isGoldSubscription(subscription);
+  const isGoldMember = await isGoldSubscription(userId);
 
   const basePoints = await getGuardianNumber('socialSharePoints');
   const goldMultiplier = await getGuardianNumber('goldMultiplier');
@@ -386,8 +390,7 @@ export async function awardMembershipMilestonePoints(
   const user = await User.findById(userId).lean();
   if (!user) throw new Error('User not found');
 
-  const subscription = await Subscription.findOne({ userId, status: 'active' }).lean();
-  const isGoldMember = await isGoldSubscription(subscription);
+  const isGoldMember = await isGoldSubscription(userId);
 
   const basePoints = await getGuardianNumber(`${milestoneType}AnniversaryPoints` as GuardianSettingKey);
   const goldMultiplier = await getGuardianNumber('goldMultiplier');
