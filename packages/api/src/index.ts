@@ -72,6 +72,7 @@ import customerGuardianRoutes from './routes/customer-guardian';
 import membershipRoutes from './routes/membership';
 import membershipPublicRoutes from './routes/membership-public';
 import adminMembershipRoutes from './routes/admin-membership';
+import adminDigitalProductRoutes from './routes/admin-digital-products';
 
 import invoiceAccessRoutes from './routes/invoice-access';
 import referralRoutes from './routes/referrals';
@@ -274,6 +275,7 @@ app.use('/api/customer/guardian', customerGuardianRoutes);
 app.use('/api/membership', membershipRoutes);
 app.use('/api/public/membership', membershipPublicRoutes);
 app.use('/api/admin/membership', adminMembershipRoutes);
+app.use('/api/admin/digital-products', adminDigitalProductRoutes);
 app.use('/api', invoiceAccessRoutes);
 app.use('/api/finder', finderRoutes);
 app.use('/api/upload', uploadRoutes);
