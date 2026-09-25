@@ -195,7 +195,7 @@ function SubscriptionsInner() {
       // Use Gold-specific endpoint for Gold subscriptions
       const sub = detail?.subscription;
       if (sub?.planType === 'gold') {
-        await api.post(API.customer.subscriptions.goldChangePlan, { planType });
+        await api.post('/membership/change-tier', { tierId: sub._id, planType });
       } else {
         await api.post(API.customer.subscriptions.changePlan(id), { planType });
       }

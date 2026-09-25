@@ -103,7 +103,6 @@ export enum SubscriptionPlanType {
   ANNUAL = 'annual',
   MONTHLY = 'monthly',
   FREE = 'free',
-  GOLD = 'gold',
 }
 
 export enum InvoiceStatus {

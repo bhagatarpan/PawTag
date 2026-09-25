@@ -84,8 +84,8 @@ export default function SubscriptionUpgrade() {
     setUpgrading(true);
     try {
       if (isGold) {
-        // Gold membership — call dedicated Gold subscribe endpoint
-        await api.post(API.customer.subscriptions.goldSubscribe, { planType: selectedPlanType });
+        // Gold membership — call dedicated membership subscribe endpoint
+        await api.post('/membership/subscribe', { tierId: planId, planType: selectedPlanType });
       } else if (subscription) {
         // Existing subscriber — change plan (annual ↔ monthly)
         await api.post(API.customer.subscriptions.changePlan(subscription._id), {

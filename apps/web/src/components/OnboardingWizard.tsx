@@ -114,7 +114,7 @@ export default function OnboardingWizard() {
     const goldPreference = localStorage.getItem('pawtag_subscribe_gold');
     if (goldPreference) {
       localStorage.removeItem('pawtag_subscribe_gold');
-      api.post(API.customer.subscriptions.goldSubscribe)
+      api.post('/membership/subscribe', { planType: 'monthly' })
         .then(() => {
           setGoldJoined(true);
           setAddGold(true);
@@ -149,7 +149,7 @@ export default function OnboardingWizard() {
     // Subscribe to Gold if opted in on guardian step
     if (step?.stepId === 'guardian' && addGold && !goldJoined) {
       try {
-        await api.post(API.customer.subscriptions.goldSubscribe);
+        await api.post('/membership/subscribe', { planType: 'monthly' });
         setGoldJoined(true);
       } catch (err: any) {
         setGoldError(err.response?.data?.error || 'Failed to join Gold');

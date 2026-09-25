@@ -166,7 +166,6 @@ export const API = {
       setStatus: (id: string) => `/admin/subscriptions/${id}/status` as const,
       extend: (id: string) => `/admin/subscriptions/${id}/extend` as const,
       autoRenew: (id: string) => `/admin/subscriptions/${id}/auto-renew` as const,
-      goldSubscribe: '/admin/subscriptions/gold/subscribe',
     },
 
     // ---------------------------------------------------------------------------
@@ -553,8 +552,6 @@ export const API = {
       cancel: (id: string) => `/customer/subscriptions/${id}/cancel` as const,
       autoRenew: (id: string) => `/customer/subscriptions/${id}/auto-renew` as const,
       changePlan: (id: string) => `/customer/subscriptions/${id}/change-plan` as const,
-      goldSubscribe: '/customer/subscriptions/gold/subscribe',
-      goldChangePlan: '/customer/subscriptions/gold/change-plan',
     },
     guardian: {
       points: '/customer/guardian/points',
@@ -685,7 +682,6 @@ export const API = {
     points: {
       estimate: '/public/points/estimate',
       rates: '/public/points/rates',
-      goldContent: '/public/points/gold-content',
     },
     promo: {
       validate: '/public/promo/validate',

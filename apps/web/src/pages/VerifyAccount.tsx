@@ -195,7 +195,7 @@ export default function VerifyAccount() {
     if (goldPreference) {
       localStorage.removeItem('pawtag_subscribe_gold');
       try {
-        await api.post(API.customer.subscriptions.goldSubscribe);
+        await api.post('/membership/subscribe', { planType: 'monthly' });
       } catch (err: any) {
         // Non-critical — log for monitoring, user can upgrade later from the dashboard
         console.warn('Gold subscription creation failed during verification:', err?.response?.data?.error || err.message);
