@@ -80,7 +80,7 @@ const membershipTiers = [
       petRecovery: true,
       blackFridayDeal: true,
     },
-    isActive: false, // Disabled by default - not yet available
+    isActive: true, // Active but CTA shows "Coming Soon" on frontend
     displayOrder: 3,
     icon: 'Shield',
     color: '#1F2937',

@@ -163,7 +163,28 @@ export default function CmsAnnouncements() {
               <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.visible} onChange={(e) => setForm({ ...form, visible: e.target.checked })} /> Visible</label>
             </div>
             <div className="flex gap-2">
-              <button type="submit" className="bg-primary-600 text-white px-4 py-2 rounded-md text-sm hover:bg-primary-700">Save</button>
+              <button type="submit" className="bg-primary-600 text-white px-4 py-2 rounded-md text-sm hover:bg-primary-700">Save as Draft</button>
+              <button type="button" onClick={async () => {
+                setForm(prev => ({ ...prev, status: 'published' }));
+                // Submit with published status
+                try {
+                  const payload = {
+                    ...form,
+                    status: 'published',
+                    startsAt: form.startsAt || undefined,
+                    endsAt: form.endsAt || undefined,
+                  };
+                  if (editing) {
+                    await api.put(`/admin/cms/announcements/${editing._id}`, payload);
+                  } else {
+                    await api.post(API.admin.cms.announcements.list, payload);
+                  }
+                  setShowForm(false);
+                  fetchData();
+                } catch (err: any) {
+                  alert(err.response?.data?.error || 'Failed to publish');
+                }
+              }} className="bg-green-600 text-white px-4 py-2 rounded-md text-sm hover:bg-green-700">Publish</button>
               <button type="button" onClick={() => setShowForm(false)} className="border border-gray-300 px-4 py-2 rounded-md text-sm">Cancel</button>
             </div>
           </form>
@@ -200,6 +221,18 @@ export default function CmsAnnouncements() {
                   <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${a.status === 'published' ? 'bg-green-100 text-green-700' : a.status === 'draft' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'}`}>{a.status}</span>
                 </td>
                 <td className="px-5 py-3 flex gap-2">
+                  {a.status === 'draft' && (
+                    <button onClick={async () => {
+                      await api.put(`/admin/cms/announcements/${a._id}`, { ...a, status: 'published' });
+                      fetchData();
+                    }} className="text-green-600 hover:text-green-800 text-xs font-medium">Publish</button>
+                  )}
+                  {a.status === 'published' && (
+                    <button onClick={async () => {
+                      await api.put(`/admin/cms/announcements/${a._id}`, { ...a, status: 'archived' });
+                      fetchData();
+                    }} className="text-gray-500 hover:text-gray-700 text-xs">Archive</button>
+                  )}
                   <button onClick={() => openEdit(a)} className="text-primary-600 hover:text-primary-800 text-xs">Edit</button>
                   <button onClick={() => handleDelete(a._id)} className="text-red-500 hover:text-red-700 text-xs">Delete</button>
                 </td>

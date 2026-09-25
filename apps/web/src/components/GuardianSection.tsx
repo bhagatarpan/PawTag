@@ -1,10 +1,41 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Shield, Star, Zap, Crown, ArrowRight, TrendingUp } from 'lucide-react';
+import { Shield, Star, Zap, Crown, ArrowRight, TrendingUp, Diamond } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSiteSettings } from '../hooks/useCms';
 import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
+
+const membershipTiers = [
+  {
+    tier: 'gold',
+    name: 'Gold',
+    price: 89,
+    icon: Crown,
+    gradient: 'from-yellow-400 to-amber-500',
+    badge: 'Most Popular',
+    benefits: ['1× Points', 'Free shipping $100+'],
+  },
+  {
+    tier: 'platinum',
+    name: 'Platinum',
+    price: 99,
+    icon: Diamond,
+    gradient: 'from-gray-300 to-gray-500',
+    badge: 'Best Value',
+    benefits: ['2× Points', 'Emergency Contacts'],
+  },
+  {
+    tier: 'black',
+    name: 'Black',
+    price: 199,
+    icon: Shield,
+    gradient: 'from-gray-800 to-black',
+    badge: 'Elite',
+    benefits: ['3× Points', 'Pet Recovery'],
+    comingSoon: true,
+  },
+];
 
 const tiers = [
   {
@@ -119,28 +150,40 @@ export default function GuardianSection() {
 
         {/* How It Works */}
         <div className="bg-gradient-to-r from-teal-50 to-cyan-50 rounded-2xl p-8 md:p-12">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="text-center">
-              <div className="w-12 h-12 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-xl font-bold">1</span>
-              </div>
-              <h3 className="font-semibold text-gray-900 mb-2">Make a Purchase</h3>
-              <p className="text-sm text-gray-600">Earn Guardian Points on every order you place</p>
-            </div>
-            <div className="text-center">
-              <div className="w-12 h-12 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-xl font-bold">2</span>
-              </div>
-              <h3 className="font-semibold text-gray-900 mb-2">Earn & Redeem</h3>
-              <p className="text-sm text-gray-600">Convert points to PawRewards and spend on products</p>
-            </div>
-            <div className="text-center">
-              <div className="w-12 h-12 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-xl font-bold">3</span>
-              </div>
-              <h3 className="font-semibold text-gray-900 mb-2">Level Up</h3>
-              <p className="text-sm text-gray-600">Unlock higher tiers with better benefits</p>
-            </div>
+          <div className="text-center mb-8">
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Protect Your Pet. Join the Pack.</h2>
+            <p className="text-gray-600">Get peace of mind with PawTag membership. Emergency contacts, health records, and premium benefits.</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {membershipTiers.map((tier) => {
+              const Icon = tier.icon;
+              return (
+                <div key={tier.tier} className="bg-white rounded-xl shadow-md overflow-hidden">
+                  <div className={`bg-gradient-to-br ${tier.gradient} p-4 text-white`}>
+                    <div className="flex items-center justify-between">
+                      <Icon className="h-6 w-6" />
+                      <span className="text-xs font-bold bg-white/20 px-2 py-0.5 rounded-full">{tier.badge}</span>
+                    </div>
+                    <h3 className="text-xl font-bold mt-2">{tier.name}</h3>
+                    <div className="text-2xl font-bold mt-1">${tier.price}<span className="text-sm font-normal">/yr</span></div>
+                  </div>
+                  <div className="p-4">
+                    {tier.benefits.map((benefit, i) => (
+                      <div key={i} className="flex items-center gap-2 text-sm text-gray-600 mb-1">
+                        <span className="text-green-500">✓</span> {benefit}
+                      </div>
+                    ))}
+                    {tier.comingSoon ? (
+                      <div className="mt-3 text-xs text-gray-400 text-center font-medium">COMING SOON</div>
+                    ) : (
+                      <Link to="/membership" className="block mt-3 text-center text-sm font-semibold text-primary-600 hover:text-primary-700">
+                        Learn More →
+                      </Link>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 
@@ -183,58 +226,14 @@ export default function GuardianSection() {
 
         {/* CTA */}
         <div className="text-center mt-12">
-          {user ? (
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link
-                to="/account/guardian"
-                className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 transition-colors"
-              >
-                View Your Guardian Dashboard <ArrowRight size={18} />
-              </Link>
-              {!guardianData?.isGoldMember && (
-                <Link
-                  to="/gold"
-                  className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-amber-500 text-white rounded-xl font-semibold hover:bg-amber-600 transition-colors"
-                >
-                  <Crown size={18} /> Upgrade to Gold
-                </Link>
-              )}
-            </div>
-          ) : (
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link
-                to="/guardian"
-                className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 transition-colors"
-              >
-                Join Guardian — It's Free <ArrowRight size={18} />
-              </Link>
-              <Link
-                to="/gold"
-                className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-amber-500 text-white rounded-xl font-semibold hover:bg-amber-600 transition-colors"
-              >
-                <Crown size={18} /> Learn About Gold
-              </Link>
-            </div>
-          )}
+          <Link
+            to="/membership"
+            className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-gradient-to-r from-yellow-500 via-amber-500 to-orange-500 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl hover:scale-105 transition-all"
+          >
+            <Crown size={20} /> View All Membership Plans <ArrowRight size={20} />
+          </Link>
+          <p className="text-sm text-gray-500 mt-4">Gold from $89/yr · Platinum from $99/yr · Black from $199/yr</p>
         </div>
-
-        {/* Gold Callout */}
-        {!guardianData?.isGoldMember && (
-          <div className="mt-8 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-6 text-center">
-            <Crown className="h-8 w-8 text-amber-500 mx-auto mb-3" />
-            <h3 className="font-semibold text-amber-900 mb-2">Want to Earn Even More?</h3>
-            <p className="text-sm text-amber-700 mb-4">
-              Gold members earn <strong>2× Points</strong> on every purchase and start at Nurture tier.
-              Just ${goldPrice}/month — less than a coffee.
-            </p>
-            <Link
-              to="/gold"
-              className="inline-flex items-center gap-2 text-amber-600 font-medium hover:text-amber-700"
-            >
-              Learn About Gold <ArrowRight size={16} />
-            </Link>
-          </div>
-        )}
       </div>
     </section>
   );
