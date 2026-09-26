@@ -1311,6 +1311,7 @@ router.post('/reset-password', validate(resetPasswordSchema), async (req, res: R
       businessOperation: 'Reset password',
     }, { actorType: 'USER', authenticationMethod: 'password_reset_token' });
 
+    const location = clientInfo.ipAddress ? await getLocationFromIp(clientInfo.ipAddress).catch(() => undefined) : undefined;
     sendPasswordChangedEmail(user.email, user.fullName, 'self', clientInfo.ipAddress, clientInfo.userAgent).catch((err) => {
       logger.error({ err, email: user.email }, 'Failed to send password changed email');
     });
@@ -1456,7 +1457,8 @@ router.post('/change-password', authenticate, validate(changePasswordSchema), as
       businessOperation: 'Changed password',
     }, { authenticationMethod: 'current_password' });
 
-    sendPasswordChangedEmail(user.email, user.fullName, 'self', getClientInfo(req).ipAddress, getClientInfo(req).userAgent).catch((err) => {
+    const clientInfo = getClientInfo(req);
+    sendPasswordChangedEmail(user.email, user.fullName, 'self', clientInfo.ipAddress, clientInfo.userAgent).catch((err) => {
       logger.error({ err, email: user.email }, 'Failed to send password changed email');
     });
 

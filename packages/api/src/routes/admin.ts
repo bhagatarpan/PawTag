@@ -21,6 +21,7 @@ import {
 } from '../middleware/schemas';
 import { sendPasswordChangedEmail } from '../services/email.service';
 import { revokeAllUserRefreshTokens } from '../services/auth.service';
+import { getLocationFromIp } from '../lib/geo-location';
 import { isValidTransition } from '../services/orderStatus.service';
 import { notifyCustomerOfStatusChange } from '../services/orderNotification.service';
 import { resolveActor, formatActivityMessage, formatCancelledBy, formatCancelledByDescription, formatRefundedBy, formatRefundedByDescription } from '../lib/actor';
@@ -601,6 +602,7 @@ router.post('/users/:id/reset-password', requirePermission('user.reset_password'
       // Fallback to default
     }
     
+    const location = clientInfo.ipAddress ? await getLocationFromIp(clientInfo.ipAddress).catch(() => undefined) : undefined;
     sendPasswordChangedEmail(user.email, user.fullName, req.user!.id, clientInfo.ipAddress, clientInfo.userAgent, adminRoleName).catch((err) => {
       logger.error({ err, targetUserId: req.params.id, targetEmail: user.email }, 'Failed to send password changed email');
     });
