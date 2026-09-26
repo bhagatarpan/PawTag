@@ -2556,6 +2556,26 @@ async function run() {
           content: {
             heroTitle: 'Shop PawTag Products',
             heroDescription: 'Browse our range of QR-coded pet recovery tags. Each tag links to your pet\'s online profile, helping them get home faster.',
+            // Guardian Banner (left column)
+            guardianBanner: {
+              enabled: true,
+              icon: 'Shield',
+              title: 'Every purchase can earn rewards.',
+              description: 'Guardian members earn Points with every eligible purchase.',
+              subtitle: 'Join free and start earning PawRewards today.',
+              ctaText: 'Learn More',
+              ctaLink: '/guardian',
+            },
+            // Membership Banner (right column)
+            membershipBanner: {
+              enabled: true,
+              icon: 'Crown',
+              title: 'Upgrade to Gold, Platinum, or Black',
+              description: '2× points, free shipping, and priority support.',
+              subtitle: 'Starting from $89/year.',
+              ctaText: 'View Membership',
+              ctaLink: '/membership',
+            },
           },
           metaTitle: 'Shop - PawTag QR Pet Recovery Tags',
           metaDescription: 'Browse our range of QR-coded pet recovery tags. Each tag links to your pet\'s online profile, helping them get home faster.',

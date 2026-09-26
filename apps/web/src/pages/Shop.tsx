@@ -279,75 +279,54 @@ export default function Shop() {
           <h1 className="text-3xl font-bold text-gray-900 mb-2">{shopTitle}</h1>
           <p className="text-gray-600 mb-4">{shopDesc}</p>
 
-          {/* Guardian Loyalty Banner */}
-          {!user && (
-            <div className="mb-6 p-4 bg-gradient-to-r from-primary-50 to-amber-50 border border-primary-100 rounded-xl">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Shield className="h-5 w-5 text-primary-600 flex-shrink-0" />
-                  <div>
-                    <p className="text-sm font-medium text-primary-800">
-                      <strong>Every purchase can earn rewards.</strong>{' '}
-                      <span className="text-primary-600">Guardian members earn Points with every eligible purchase.</span>
-                    </p>
-                    <p className="text-xs text-primary-600 mt-1">
-                      Join free and start earning PawRewards today.
-                    </p>
+          {/* Two-Column CMS-Editable Banners */}
+          {shopPage?.content && (
+            <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Guardian Banner (Left Column) */}
+              {(shopPage.content as any).guardianBanner?.enabled && (
+                <div className="p-4 bg-gradient-to-r from-primary-50 to-amber-50 border border-primary-100 rounded-xl">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Shield className="h-5 w-5 text-primary-600 flex-shrink-0" />
+                      <div>
+                        <p className="text-sm font-medium text-primary-800">
+                          <strong>{(shopPage.content as any).guardianBanner.title}</strong>{' '}
+                          <span className="text-primary-600">{(shopPage.content as any).guardianBanner.description}</span>
+                        </p>
+                        <p className="text-xs text-primary-600 mt-1">
+                          {(shopPage.content as any).guardianBanner.subtitle}
+                        </p>
+                      </div>
+                    </div>
+                    <Link to={(shopPage.content as any).guardianBanner.ctaLink} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition-colors whitespace-nowrap">
+                      {(shopPage.content as any).guardianBanner.ctaText}
+                    </Link>
                   </div>
                 </div>
-                <Link to="/guardian" className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition-colors whitespace-nowrap">
-                  Learn More
-                </Link>
-              </div>
-            </div>
-          )}
+              )}
 
-          {/* What You're Missing - for logged-in non-Guardian users */}
-          {user && !guardianTier && (
-            <div className="mb-6 p-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
-                    <Shield className="h-5 w-5 text-amber-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-amber-900">
-                      <strong>You're not earning rewards yet.</strong>
-                    </p>
-                    <p className="text-xs text-amber-700 mt-0.5">
-                      Guardian members earn points on every purchase and unlock exclusive benefits.
-                    </p>
-                  </div>
-                </div>
-                <Link to="/account/guardian" className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 transition-colors whitespace-nowrap">
-                  Join Free
-                </Link>
-              </div>
-            </div>
-          )}
-
-          {/* Gold Callout - for logged-in non-Gold users */}
-          {user && !isGoldMember && (
-            <div className="mb-6 p-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
-                    <Crown className="h-5 w-5 text-amber-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-amber-900">
-                      <strong>Earn 2× Points with Gold.</strong>
-                    </p>
-                    <p className="text-xs text-amber-700 mt-0.5">
-                      Gold members earn double points on every purchase and start at Nurture tier.
-                      Just ${goldPrice}/month.
-                    </p>
+              {/* Membership Banner (Right Column) */}
+              {(shopPage.content as any).membershipBanner?.enabled && (
+                <div className="p-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Crown className="h-5 w-5 text-amber-600 flex-shrink-0" />
+                      <div>
+                        <p className="text-sm font-medium text-amber-900">
+                          <strong>{(shopPage.content as any).membershipBanner.title}</strong>
+                        </p>
+                        <p className="text-xs text-amber-700 mt-0.5">
+                          {(shopPage.content as any).membershipBanner.description}{' '}
+                          {(shopPage.content as any).membershipBanner.subtitle}
+                        </p>
+                      </div>
+                    </div>
+                    <Link to={(shopPage.content as any).membershipBanner.ctaLink} className="px-4 py-2 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600 transition-colors whitespace-nowrap">
+                      {(shopPage.content as any).membershipBanner.ctaText}
+                    </Link>
                   </div>
                 </div>
-                <Link to="/membership" className="px-4 py-2 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600 transition-colors whitespace-nowrap">
-                  View Membership
-                </Link>
-              </div>
+              )}
             </div>
           )}
 
