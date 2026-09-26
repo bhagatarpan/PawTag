@@ -656,10 +656,8 @@ const openEdit = (p: Product) => {
       const payload = { ...form, category: 'PawTag', variants, images };
       if (editing) {
         await api.put(API.admin.products.update(editing._id), payload);
-        toast.success('Product updated');
       } else {
         await api.post(API.admin.products.create, payload);
-        toast.success('Product created');
       }
       setShowForm(false);
       fetchProducts();
