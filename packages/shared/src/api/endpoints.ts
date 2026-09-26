@@ -63,6 +63,7 @@ export const API = {
       orders: (id: string) => `/admin/users/${id}/orders` as const,
       subscriptions: (id: string) => `/admin/users/${id}/subscriptions` as const,
       referrals: (id: string) => `/admin/users/${id}/referrals` as const,
+      registerOwner: '/admin/owners/register' as const,
     },
 
     // ---------------------------------------------------------------------------

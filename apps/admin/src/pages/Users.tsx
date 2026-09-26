@@ -1410,6 +1410,16 @@ export default function Users({ defaultRoleFilter }: UsersProps) {
   const [selectedUser, setSelectedUser] = useState<UserRecord | null>(null);
   const [exportLoading, setExportLoading] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [showCreateStaff, setShowCreateStaff] = useState(false);
+  const [createStaffForm, setCreateStaffForm] = useState({
+    email: '',
+    password: '',
+    fullName: '',
+    phoneNumber: '',
+    roleId: '',
+  });
+  const [createStaffLoading, setCreateStaffLoading] = useState(false);
+  const [createStaffError, setCreateStaffError] = useState('');
 
   const searchDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -1558,6 +1568,33 @@ export default function Users({ defaultRoleFilter }: UsersProps) {
     }
   };
 
+  const handleCreateStaff = async () => {
+    if (!createStaffForm.email || !createStaffForm.password || !createStaffForm.fullName || !createStaffForm.phoneNumber) {
+      setCreateStaffError('All fields are required');
+      return;
+    }
+    setCreateStaffLoading(true);
+    setCreateStaffError('');
+    try {
+      await api.post(API.admin.users.registerOwner, {
+        email: createStaffForm.email,
+        password: createStaffForm.password,
+        fullName: createStaffForm.fullName,
+        phoneNumber: createStaffForm.phoneNumber,
+        roleId: createStaffForm.roleId || undefined,
+      });
+      toast.success('Staff account created');
+      setShowCreateStaff(false);
+      setCreateStaffForm({ email: '', password: '', fullName: '', phoneNumber: '', roleId: '' });
+      fetchUsers();
+      fetchSummary();
+    } catch (err: any) {
+      setCreateStaffError(err.response?.data?.error || 'Failed to create staff account');
+    } finally {
+      setCreateStaffLoading(false);
+    }
+  };
+
   // Filter helpers
   const activeFilters: Array<{ key: string; label: string; clear: () => void }> = [];
   if (debouncedSearch) activeFilters.push({ key: 'search', label: `Search: "${debouncedSearch}"`, clear: () => { setSearch(''); setDebouncedSearch(''); } });
@@ -1593,6 +1630,13 @@ export default function Users({ defaultRoleFilter }: UsersProps) {
               <p className="mt-1 text-sm text-gray-500">Manage user accounts, roles, and security settings.</p>
             </div>
             <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowCreateStaff(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors"
+              >
+                <UserPlus size={15} />
+                Create Staff Account
+              </button>
               <div className="relative">
                 <button
                   onClick={() => setShowExportMenu(!showExportMenu)}
@@ -1844,6 +1888,118 @@ export default function Users({ defaultRoleFilter }: UsersProps) {
           onRefresh={() => { fetchUsers(); fetchSummary(); }}
           rbacRoles={rbacRoles}
         />
+
+        {/* Create Staff Account Modal */}
+        {showCreateStaff && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] flex flex-col">
+              <div className="flex items-center justify-between p-6 border-b">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center">
+                    <UserPlus size={20} className="text-primary-600" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-900">Create Staff Account</h2>
+                    <p className="text-sm text-gray-500">Create a new admin or CSR account</p>
+                  </div>
+                </div>
+                <button onClick={() => setShowCreateStaff(false)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors">
+                  <X size={18} />
+                </button>
+              </div>
+              
+              <div className="p-6 overflow-y-auto flex-1">
+                {createStaffError && (
+                  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                    {createStaffError}
+                  </div>
+                )}
+                
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
+                    <input
+                      type="text"
+                      value={createStaffForm.fullName}
+                      onChange={(e) => setCreateStaffForm({ ...createStaffForm, fullName: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                      placeholder="Cory Jane"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+                    <input
+                      type="email"
+                      value={createStaffForm.email}
+                      onChange={(e) => setCreateStaffForm({ ...createStaffForm, email: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                      placeholder="cory.jane@pawtag.co.nz"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number *</label>
+                    <input
+                      type="tel"
+                      value={createStaffForm.phoneNumber}
+                      onChange={(e) => setCreateStaffForm({ ...createStaffForm, phoneNumber: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                      placeholder="+64 21 123 4567"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Password *</label>
+                    <input
+                      type="password"
+                      value={createStaffForm.password}
+                      onChange={(e) => setCreateStaffForm({ ...createStaffForm, password: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                      placeholder="Minimum 8 characters"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Role *</label>
+                    <select
+                      value={createStaffForm.roleId}
+                      onChange={(e) => setCreateStaffForm({ ...createStaffForm, roleId: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    >
+                      <option value="">Select a role...</option>
+                      {rbacRoles.filter((r: any) => ['SUPER_ADMIN', 'ADMIN', 'CUSTOMER_SERVICE', 'WEBSITE_EDITOR'].includes(r.name)).map((role: any) => (
+                        <option key={role._id} value={role._id}>
+                          {role.displayName} - {role.description || role.name}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="mt-1 text-xs text-gray-500">
+                      Select the appropriate role for this staff member
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex justify-end gap-3 p-6 border-t bg-gray-50 rounded-b-xl">
+                <button
+                  onClick={() => setShowCreateStaff(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCreateStaff}
+                  disabled={createStaffLoading}
+                  className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50 transition-colors flex items-center gap-2"
+                >
+                  {createStaffLoading && <Loader2 size={14} className="animate-spin" />}
+                  Create Account
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
