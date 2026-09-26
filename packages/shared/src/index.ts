@@ -133,6 +133,15 @@ export interface User {
   profilePicture?: string;
   address?: Address;
   emergencyContact?: EmergencyContact;
+  // Login tracking
+  lastLoginAt?: string;
+  lastLoginIp?: string;
+  lastLoginUserAgent?: string;
+  lastLoginMethod?: string;
+  loginCount?: number;
+  // Password tracking
+  passwordChangedAt?: string;
+  passwordResetAt?: string;
   createdAt: string;
   updatedAt: string;
 }

@@ -328,6 +328,7 @@ router.post('/login', loginLimiter, validate(loginSchema), async (req, res: Resp
   try {
     const { email: rawEmail, password, captchaToken, captchaAnswer } = req.body;
     const email = normalizeEmail(rawEmail);
+    const clientInfo = getClientInfo(req);
 
     const user = await User.findOne({ email, deletedAt: null });
 
@@ -438,9 +439,16 @@ router.post('/login', loginLimiter, validate(loginSchema), async (req, res: Resp
       return;
     }
 
-    // Successful login — reset failed attempts and update lastLogin
+    // Successful login — reset failed attempts and update login tracking
     // Use findOneAndUpdate to skip validation (some users may lack phoneNumber)
-    const updateFields: Record<string, unknown> = { lastLogin: new Date() };
+    const updateFields: Record<string, unknown> = { 
+      lastLogin: new Date(),
+      lastLoginAt: new Date(),
+      lastLoginIp: clientInfo.ipAddress,
+      lastLoginUserAgent: clientInfo.userAgent,
+      lastLoginMethod: 'password',
+      $inc: { loginCount: 1 },
+    };
     if (user.failedLoginAttempts > 0) {
       updateFields.failedLoginAttempts = 0;
       updateFields.lockedUntil = undefined;
@@ -1276,6 +1284,8 @@ router.post('/reset-password', validate(resetPasswordSchema), async (req, res: R
     }
 
     user.passwordHash = await hashPassword(newPassword);
+    user.passwordChangedAt = new Date();
+    user.passwordResetAt = new Date();
     await user.save();
 
     // Invalidate all existing sessions — password reset implies possible compromise
@@ -1424,6 +1434,7 @@ router.post('/change-password', authenticate, validate(changePasswordSchema), as
     if (!valid) { res.status(401).json({ success: false, error: 'Current password is incorrect' }); return; }
 
     user.passwordHash = await hashPassword(newPassword);
+    user.passwordChangedAt = new Date();
     await user.save();
 
     // Invalidate all other sessions — the user must re-authenticate on other devices
@@ -1829,6 +1840,17 @@ router.post('/mfa/verify', mfaVerifyLimiter, async (req: AuthRequest, res: Respo
       metadata: { mfaType: 'email_otp', isAdmin, rememberMe: !!req.body.rememberMe, rbacRoles: rbacRoles.map((r: any) => r.name) },
       businessOperation: 'Verified two-factor code',
     }, { actorType: resolveActorType(user.role), authenticationMethod: 'mfa_email_otp' });
+
+    // Update login tracking for MFA login
+    await User.findByIdAndUpdate(user._id, { 
+      $set: { 
+        lastLoginAt: new Date(),
+        lastLoginIp: ip,
+        lastLoginUserAgent: ua,
+        lastLoginMethod: 'mfa',
+      },
+      $inc: { loginCount: 1 },
+    });
 
     // Send login notification for admin accounts
     if (isAdmin) {

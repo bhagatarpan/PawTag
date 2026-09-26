@@ -68,6 +68,16 @@ export interface UserRecord {
   skipInvoiceOtp?: boolean;
   skipInvoiceOtpExpiresAt?: string;
   lockedUntil?: string;
+  // Login tracking
+  lastLoginAt?: string;
+  lastLoginIp?: string;
+  lastLoginUserAgent?: string;
+  lastLoginMethod?: string;
+  loginCount?: number;
+  // Password tracking
+  passwordChangedAt?: string;
+  passwordResetAt?: string;
+  failedLoginAttempts?: number;
   createdAt: string;
   address?: { line1?: string; line2?: string; city?: string; state?: string; zip?: string; country?: string };
   emergencyContact?: { name?: string; phone?: string; email?: string; relationship?: string };
@@ -599,6 +609,22 @@ export function DetailDrawer({
                     <DetailRow label="Joined" value={formatDate(user.createdAt)} />
                   </>
                 )}
+              </Section>
+
+              {/* Login & Security */}
+              <Section title="Login & Security" icon={<Shield size={16} />}>
+                <DetailRow label="Last Login" value={
+                  user.lastLoginAt ? (
+                    <span>{formatDate(user.lastLoginAt)} from {user.lastLoginIp || 'unknown'}</span>
+                  ) : '—'
+                } />
+                <DetailRow label="Login Method" value={user.lastLoginMethod || '—'} />
+                <DetailRow label="Login Count" value={String(user.loginCount || 0)} />
+                <DetailRow label="Password Changed" value={user.passwordChangedAt ? formatDate(user.passwordChangedAt) : '—'} />
+                <DetailRow label="Password Reset" value={user.passwordResetAt ? formatDate(user.passwordResetAt) : '—'} />
+                <DetailRow label="MFA Enabled" value={user.mfaEnabled ? 'Yes' : 'No'} />
+                <DetailRow label="Failed Login Attempts" value={String(user.failedLoginAttempts || 0)} />
+                <DetailRow label="Account Locked" value={user.lockedUntil && new Date(user.lockedUntil) > new Date() ? 'Yes' : 'No'} />
               </Section>
 
               {/* Address */}

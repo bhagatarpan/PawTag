@@ -43,6 +43,15 @@ export interface IUserDocument extends Document {
   mfaEnabled: boolean;
   failedLoginAttempts: number;
   lockedUntil?: Date;
+  // Login tracking
+  lastLoginAt?: Date;
+  lastLoginIp?: string;
+  lastLoginUserAgent?: string;
+  lastLoginMethod?: string;
+  loginCount: number;
+  // Password tracking
+  passwordChangedAt?: Date;
+  passwordResetAt?: Date;
   skipInvoiceOtp: boolean;
   skipInvoiceOtpExpiresAt?: Date;
   checkoutOtpVerified: boolean;
@@ -121,6 +130,15 @@ const UserSchema = new Schema<IUserDocument>(
     mfaEnabled: { type: Boolean, default: true },
     failedLoginAttempts: { type: Number, default: 0, min: 0 },
     lockedUntil: { type: Date, default: null },
+    // Login tracking
+    lastLoginAt: { type: Date },
+    lastLoginIp: { type: String },
+    lastLoginUserAgent: { type: String },
+    lastLoginMethod: { type: String },
+    loginCount: { type: Number, default: 0, min: 0 },
+    // Password tracking
+    passwordChangedAt: { type: Date },
+    passwordResetAt: { type: Date },
     skipInvoiceOtp: { type: Boolean, default: false },
     skipInvoiceOtpExpiresAt: { type: Date, default: null },
     checkoutOtpVerified: { type: Boolean, default: false },

@@ -20,6 +20,7 @@ import {
   updateTagSchema,
 } from '../middleware/schemas';
 import { sendPasswordChangedEmail } from '../services/email.service';
+import { revokeAllUserRefreshTokens } from '../services/auth.service';
 import { isValidTransition } from '../services/orderStatus.service';
 import { notifyCustomerOfStatusChange } from '../services/orderNotification.service';
 import { resolveActor, formatActivityMessage, formatCancelledBy, formatCancelledByDescription, formatRefundedBy, formatRefundedByDescription } from '../lib/actor';
@@ -567,7 +568,11 @@ router.post('/users/:id/reset-password', requirePermission('user.reset_password'
     if (!user) { res.status(404).json({ success: false, error: 'User not found' }); return; }
 
     user.passwordHash = await hashPassword(req.body.newPassword);
+    user.passwordChangedAt = new Date();
     await user.save();
+
+    // Invalidate all sessions — admin reset implies possible compromise
+    await revokeAllUserRefreshTokens(user._id.toString());
 
     await auditAdminEvent(req, {
       action: 'reset_password',
