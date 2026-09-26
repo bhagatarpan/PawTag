@@ -639,28 +639,43 @@ async function seed() {
       ],
 
       CUSTOMER_SERVICE: [
+        // Customer Management
         { permissionName: 'customer.read' },
         { permissionName: 'customer.update' },
         { permissionName: 'customer.view_activity' },
+        // Pet Management
         { permissionName: 'pet.read' },
+        { permissionName: 'pet.create' },
         { permissionName: 'pet.update' },
+        // Tag Management
         { permissionName: 'tag.read' },
+        { permissionName: 'tag.update' },
+        // Health Records
         { permissionName: 'medical_record.read' },
         { permissionName: 'vaccination.read' },
         { permissionName: 'microchip.read' },
         { permissionName: 'health_document.read' },
         { permissionName: 'health_document.download' },
+        // User Management
         { permissionName: 'user.read' },
+        // Order Management
         { permissionName: 'order.read' },
+        { permissionName: 'order.update' },
         { permissionName: 'order.refund' },
+        // Inventory
         { permissionName: 'inventory.read' },
+        // Finder
         { permissionName: 'finder_scan.read' },
+        // Notifications
+        { permissionName: 'notification.read' },
+        { permissionName: 'notification.update' },
+        // System & Audit
         { permissionName: 'systemlogs.read' },
         { permissionName: 'audit.read' },
-        // Subscriptions (needed for subscription management)
+        // Subscriptions
         { permissionName: 'subscription.read' },
         { permissionName: 'subscription.update' },
-        // Support Requests (needed for support request management)
+        // Support
         { permissionName: 'admin.read' },
         { permissionName: 'admin.update' },
       ],
