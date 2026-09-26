@@ -244,11 +244,6 @@ export class CartService {
         customizable: product.customizable ?? false,
         customizationLabel: product.customizationLabel || '',
         customizationPrice: product.customizationPrice || 0,
-        autoRenew: input.autoRenew ?? true,
-        isSubscription: (product as any).isSubscription ?? false,
-        monthlyPrice: (product as any).subscriptionConfig?.monthlyPrice,
-        annualPrice: (product as any).subscriptionConfig?.annualPrice,
-        freePeriodMonths: (product as any).subscriptionConfig?.freePeriodMonths,
         addedAt: new Date(),
       });
     }
