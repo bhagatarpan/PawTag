@@ -290,17 +290,6 @@ function DetailDrawer({
                 {product.customizable && <DetailRow label="Extra Cost" value={`$${(product.customizationPrice || 0).toFixed(2)} NZD`} />}
               </Section>
 
-              {product.isSubscription && (
-                <Section title="Subscription" icon={<Activity size={16} />}>
-                  <DetailRow label="Subscription" value="Yes" />
-                  <DetailRow label="Tag Product" value={product.isTagProduct ? 'Yes' : 'No'} />
-                  <DetailRow label="Billing Cycle" value={product.subscriptionConfig?.type === 'monthly' ? 'Monthly' : 'Annual'} />
-                  <DetailRow label="Free Period" value={`${product.subscriptionConfig?.freePeriodMonths ?? 0} months`} />
-                  <DetailRow label="Monthly Price" value={`$${(product.subscriptionConfig?.monthlyPrice ?? 0).toFixed(2)} NZD`} />
-                  <DetailRow label="Grace Period" value={`${product.subscriptionConfig?.gracePeriodWeeks ?? 0} weeks`} />
-                </Section>
-              )}
-
               <Section title="Quick Actions" icon={<Activity size={16} />}>
                 <div className="flex flex-wrap gap-2">
                   <button onClick={() => onEdit(product)} className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-primary-700 bg-primary-100 hover:bg-primary-200 rounded-lg">
@@ -450,15 +439,6 @@ function SortableProductRow({
       </td>
       <td className="px-4 py-3 hidden md:table-cell font-mono text-gray-600 text-xs" onClick={() => onSelect(product)}>{product.sku}</td>
       <td className="px-4 py-3 font-medium" onClick={() => onSelect(product)}>${product.price.toFixed(2)}</td>
-      <td className="px-4 py-3 hidden lg:table-cell text-sm text-gray-600" onClick={() => onSelect(product)}>
-        {product.subscriptionConfig?.freePeriodMonths != null ? `${product.subscriptionConfig.freePeriodMonths} mo` : '—'}
-      </td>
-      <td className="px-4 py-3 hidden lg:table-cell text-sm text-gray-600" onClick={() => onSelect(product)}>
-        {product.subscriptionConfig?.gracePeriodWeeks != null ? `${product.subscriptionConfig.gracePeriodWeeks} wk` : '—'}
-      </td>
-      <td className="px-4 py-3 hidden lg:table-cell text-sm text-gray-600" onClick={() => onSelect(product)}>
-        {product.subscriptionConfig?.monthlyPrice != null ? `$${product.subscriptionConfig.monthlyPrice.toFixed(2)}` : '—'}
-      </td>
       <td className="px-4 py-3 hidden lg:table-cell" onClick={() => onSelect(product)}>
         <span className={`text-xs px-2 py-0.5 rounded-full ${totalStock === 0 ? 'bg-red-100 text-red-700' : totalStock <= 10 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
           {totalStock}
@@ -1090,9 +1070,6 @@ const openEdit = (p: Product) => {
                   <th className="text-left px-4 py-3 font-medium text-gray-500">Name</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-500 hidden md:table-cell">SKU</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-500">Price</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-500 hidden lg:table-cell">Free Period</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-500 hidden lg:table-cell">Grace Period</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-500 hidden lg:table-cell">Monthly Price</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-500 hidden lg:table-cell">Stock</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-500">Status</th>
                   <th className="text-right px-4 py-3 font-medium text-gray-500"></th>
