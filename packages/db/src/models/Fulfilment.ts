@@ -34,6 +34,16 @@ export interface IFulfilmentDocument extends Document {
   items: IFulfilmentItem[];
   notes?: string;
   assignedTo?: mongoose.Types.ObjectId;
+  tagAssignment?: {
+    tagId: string;
+    productId: mongoose.Types.ObjectId;
+    orderItemId: mongoose.Types.ObjectId;
+    nfcWritten: boolean;
+    assignedAt: Date;
+    assignedBy: mongoose.Types.ObjectId;
+    confirmedAt?: Date;
+    confirmedBy?: mongoose.Types.ObjectId;
+  };
   fulfilledAt?: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -55,6 +65,16 @@ const FulfilmentSchema = new Schema<IFulfilmentDocument>(
     items: [FulfilmentItemSchema],
     notes: { type: String },
     assignedTo: { type: Schema.Types.ObjectId, ref: 'User' },
+    tagAssignment: {
+      tagId: { type: String },
+      productId: { type: Schema.Types.ObjectId, ref: 'Product' },
+      orderItemId: { type: Schema.Types.ObjectId },
+      nfcWritten: { type: Boolean, default: false },
+      assignedAt: { type: Date },
+      assignedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+      confirmedAt: { type: Date },
+      confirmedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+    },
     fulfilledAt: { type: Date },
   },
   { timestamps: true },

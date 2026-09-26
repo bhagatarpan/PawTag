@@ -4,13 +4,15 @@
  */
 
 import { Router, Response } from 'express';
+import mongoose from 'mongoose';
 import { AuthRequest, authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
-import { Fulfilment, Order } from '@pawtag/db';
+import { Fulfilment, Order, Tag, Product } from '@pawtag/db';
 import { toAppError } from '../lib/app-errors';
 import logger from '../lib/logger';
 import { auditService, type AuditContext } from '../services/audit';
 import { createAuditContextFromRequest, type AuditRequest } from '../middleware/audit';
+import { generateTagId } from '../lib/tag-id';
 
 const router = Router();
 router.use(authenticate);
@@ -123,9 +125,227 @@ router.put('/:id', requirePermission('order.update'), async (req: AuthRequest, r
       metadata: { orderNumber: item.orderNumber },
     });
 
-logger.info({ fulfilmentId: req.params.id, updatedFields: Object.keys(updateData), updatedBy: req.user!.id }, 'Fulfilment updated');
+    logger.info({ fulfilmentId: req.params.id, updatedFields: Object.keys(updateData), updatedBy: req.user!.id }, 'Fulfilment updated');
     res.json({ success: true, data: item });
   } catch (err) { res.status(500).json({ success: false, error: toAppError(err).userMessage }); }
+});
+
+/**
+ * POST /api/admin/fulfilments/:id/assign-tag
+ *
+ * Assign a Tag ID to a fulfilment item during warehouse packing.
+ * This creates the Tag record with Active Period and Warranty Period dates.
+ *
+ * HYBRID 2 Model: Tag IDs are created at fulfillment time, not order time.
+ * This ensures the Active Period starts when the customer receives the tag.
+ */
+router.post('/:id/assign-tag', requirePermission('order.update'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { orderItemId, productId } = req.body;
+    
+    if (!orderItemId || !productId) {
+      res.status(400).json({ success: false, error: 'orderItemId and productId are required' });
+      return;
+    }
+
+    // Find the fulfilment
+    const fulfilment = await Fulfilment.findById(req.params.id);
+    if (!fulfilment) {
+      res.status(404).json({ success: false, error: 'Fulfilment not found' });
+      return;
+    }
+
+    // Find the order
+    const order = await Order.findById(fulfilment.orderId);
+    if (!order) {
+      res.status(404).json({ success: false, error: 'Order not found' });
+      return;
+    }
+
+    // Find the product to get period configuration
+    const product = await Product.findById(productId).lean();
+    if (!product) {
+      res.status(404).json({ success: false, error: 'Product not found' });
+      return;
+    }
+
+    // Check if product is a tag product
+    if (!product.isTagProduct && product.productType !== 'physical') {
+      res.status(400).json({ success: false, error: 'Product is not a tag product' });
+      return;
+    }
+
+    // Check if this order item already has a tag assigned
+    const existingTag = await Tag.findOne({
+      orderId: order._id,
+      'orderItemId': orderItemId,
+    });
+    if (existingTag) {
+      res.status(409).json({ success: false, error: 'Tag already assigned to this order item', tagId: existingTag.tagId });
+      return;
+    }
+
+    // Generate Tag ID
+    const tagIdStr = await generateTagId();
+
+    // Calculate Active Period and Warranty Period dates
+    const now = new Date();
+    const activePeriodEndsAt = new Date(now);
+    activePeriodEndsAt.setMonth(activePeriodEndsAt.getMonth() + (product.activePeriodMonths || 3));
+
+    const warrantyEndsAt = new Date(now);
+    warrantyEndsAt.setMonth(warrantyEndsAt.getMonth() + (product.warrantyMonths || 12));
+
+    // Create Tag record
+    const tag = await Tag.create({
+      tagId: tagIdStr,
+      tagType: 'qr',
+      petId: null,
+      ownerId: order.userId,
+      orderId: order._id,
+      status: 'inactive',
+      subscriptionStatus: 'none',
+      activatedAt: null,
+      activePeriodEndsAt,
+      warrantyEndsAt,
+    });
+
+    // Update fulfilment with tag assignment
+    fulfilment.tagAssignment = {
+      tagId: tagIdStr,
+      productId: new mongoose.Types.ObjectId(productId),
+      orderItemId: new mongoose.Types.ObjectId(orderItemId),
+      nfcWritten: false,
+      assignedAt: now,
+      assignedBy: new mongoose.Types.ObjectId(req.user!.id),
+    };
+    await fulfilment.save();
+
+    // Audit log
+    await auditFulfilmentEvent(req, {
+      action: 'tag_assigned',
+      eventType: 'fulfilment.tag_assigned',
+      eventCategory: 'UPDATE',
+      operationType: 'UPDATE',
+      resourceType: 'Tag',
+      resourceId: tag._id.toString(),
+      afterState: {
+        tagId: tagIdStr,
+        orderId: order._id.toString(),
+        activePeriodEndsAt: activePeriodEndsAt.toISOString(),
+        warrantyEndsAt: warrantyEndsAt.toISOString(),
+      },
+      outcome: 'SUCCESS',
+      severity: 'MEDIUM',
+      metadata: {
+        orderNumber: order.orderNumber,
+        fulfilmentId: fulfilment._id.toString(),
+        productId: productId,
+      },
+    });
+
+    logger.info({
+      tagId: tagIdStr,
+      orderId: order.orderNumber,
+      fulfilmentId: fulfilment._id,
+      activePeriodMonths: product.activePeriodMonths || 3,
+      warrantyMonths: product.warrantyMonths || 12,
+      assignedBy: req.user!.id,
+    }, 'Tag assigned during fulfillment');
+
+    res.status(201).json({
+      success: true,
+      data: {
+        tagId: tagIdStr,
+        activePeriodEndsAt,
+        warrantyEndsAt,
+        message: 'Tag assigned. Staff can now write this Tag ID to the NFC chip.',
+      },
+    });
+  } catch (err) {
+    logger.error({ err, fulfilmentId: req.params.id }, 'Failed to assign tag');
+    res.status(500).json({ success: false, error: toAppError(err).userMessage });
+  }
+});
+
+/**
+ * PUT /api/admin/fulfilments/:id/confirm-nfc
+ *
+ * Confirm that NFC has been written for an assigned tag.
+ */
+router.put('/:id/confirm-nfc', requirePermission('order.update'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { tagId } = req.body;
+    
+    if (!tagId) {
+      res.status(400).json({ success: false, error: 'tagId is required' });
+      return;
+    }
+
+    const fulfilment = await Fulfilment.findById(req.params.id);
+    if (!fulfilment) {
+      res.status(404).json({ success: false, error: 'Fulfilment not found' });
+      return;
+    }
+
+    if (fulfilment.tagAssignment?.tagId !== tagId) {
+      res.status(400).json({ success: false, error: 'Tag ID does not match fulfilment assignment' });
+      return;
+    }
+
+    // Update fulfilment
+    if (fulfilment.tagAssignment) {
+      fulfilment.tagAssignment.nfcWritten = true;
+      fulfilment.tagAssignment.confirmedAt = new Date();
+      fulfilment.tagAssignment.confirmedBy = new mongoose.Types.ObjectId(req.user!.id);
+    }
+    await fulfilment.save();
+
+    // Update tag NFC status
+    const tag = await Tag.findOne({ tagId });
+    if (tag) {
+      tag.nfcEnabled = true;
+      await tag.save();
+    }
+
+    // Audit log
+    await auditFulfilmentEvent(req, {
+      action: 'nfc_confirmed',
+      eventType: 'fulfilment.nfc_confirmed',
+      eventCategory: 'UPDATE',
+      operationType: 'UPDATE',
+      resourceType: 'Fulfilment',
+      resourceId: fulfilment._id.toString(),
+      afterState: {
+        tagId,
+        nfcWritten: true,
+      },
+      outcome: 'SUCCESS',
+      severity: 'LOW',
+      metadata: {
+        orderNumber: fulfilment.orderNumber,
+        confirmedBy: req.user!.id,
+      },
+    });
+
+    logger.info({
+      fulfilmentId: fulfilment._id,
+      tagId,
+      confirmedBy: req.user!.id,
+    }, 'NFC write confirmed');
+
+    res.json({
+      success: true,
+      data: {
+        tagId,
+        nfcWritten: true,
+        message: 'NFC write confirmed. Tag is ready for shipping.',
+      },
+    });
+  } catch (err) {
+    logger.error({ err, fulfilmentId: req.params.id }, 'Failed to confirm NFC write');
+    res.status(500).json({ success: false, error: toAppError(err).userMessage });
+  }
 });
 
 export default router;

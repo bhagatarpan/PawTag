@@ -940,7 +940,33 @@ Webhook event IDs should remain idempotently tracked to prevent replay/duplicate
 
 ## Membership Tiers
 
-PawTag offers a **three-tier membership system** as paid add-ons that provide enhanced benefits:
+PawTag offers a **three-tier membership system** as paid add-ons that provide enhanced benefits and extend tag functionality:
+
+### HYBRID 2 Model
+
+Tags work out of box for the **Active Period** (configurable per product, default 3 months). After the Active Period, finder notifications stop unless the customer purchases a **Guardian Membership**.
+
+| Phase | Duration | Finder Status | Notification Status |
+|-------|----------|---------------|---------------------|
+| Active Period | 3 months (configurable) | Full access | Enabled |
+| After Active Period (no membership) | Until warranty expires | Limited (no notify) | Disabled |
+| After Active Period (with membership) | 12 months from membership | Full access | Enabled |
+| After Warranty Period | N/A | Expired | Disabled |
+
+### Tag Limits by Membership Tier
+
+| Tier | Tag Limit | Price |
+|------|-----------|-------|
+| Gold | 3 tags | $89/year |
+| Platinum | 10 tags | $99/year |
+| Black | Unlimited | $199/year |
+
+### Tag Lifecycle Rules
+
+- **Damaged/Lost Tag Replacement:** Remaining Active Period transfers to replacement
+- **Expired Tag Replacement:** Fresh Active Period (customer must buy new tag)
+- **Multiple Tags per Order:** Each tag assigned separately during fulfillment
+- **Grace Period:** Immediate (no grace period after Active Period expires)
 
 ### Pricing
 
@@ -962,6 +988,8 @@ PawTag offers a **three-tier membership system** as paid add-ons that provide en
 | Accessory discount | 0% | 5% | 10% |
 | Pet recovery assistance | ✓ | ✓ | ✓ |
 | Black Friday deals | - | - | ✓ |
+| Tag limit | 3 tags | 10 tags | Unlimited |
+| Tag extension | 12 months | 12 months | 12 months |
 
 ### Key Features
 
@@ -969,6 +997,7 @@ PawTag offers a **three-tier membership system** as paid add-ons that provide en
 - **Cancellation:** Members receive email detailing lost benefits, benefits continue until period end
 - **Tier management:** Members can upgrade/downgrade tiers via customer portal
 - **Email notifications:** Renewal reminders (30/7 days), cancellations, tier changes send confirmation emails
+- **Tag extension:** Membership extends all tags within tier limit for 12 months
 
 ### Technical Details
 
@@ -976,6 +1005,8 @@ PawTag offers a **three-tier membership system** as paid add-ons that provide en
 - **Endpoint:** `POST /api/membership/activate` — Activate after payment
 - **Detection:** Use `/api/customer/guardian/tier` endpoint (returns tier info)
 - **Configuration:** Membership tiers managed via Admin → Membership → Tier Configuration
+- **Tag Status:** Use `calculateTagStatus()` service to check tag status (active/limited/expired)
+- **Active Period Check:** Background job runs daily to send warnings and update tag status
 
 ---
 

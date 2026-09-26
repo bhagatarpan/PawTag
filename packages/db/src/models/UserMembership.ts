@@ -20,6 +20,7 @@ export interface IUserMembershipDocument extends Document {
   cardExpMonth?: number;
   cardExpYear?: number;
   autoRenew: boolean;
+  extendedTagIds: mongoose.Types.ObjectId[];
   adminExtensionGraceUsed: boolean;
   lastAdminExtensionAt?: Date;
   adminExtensionCount: number;
@@ -53,6 +54,7 @@ const UserMembershipSchema = new Schema<IUserMembershipDocument>(
     cardExpMonth: { type: Number },
     cardExpYear: { type: Number },
     autoRenew: { type: Boolean, default: true },
+    extendedTagIds: [{ type: Schema.Types.ObjectId, ref: 'Tag' }],
     adminExtensionGraceUsed: { type: Boolean, default: false },
     lastAdminExtensionAt: { type: Date },
     adminExtensionCount: { type: Number, default: 0 },

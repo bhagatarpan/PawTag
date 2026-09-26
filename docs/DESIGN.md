@@ -420,24 +420,51 @@ Tag status displays (badges, dots, indicators) must use these design tokens. No 
 |---|---|---|---|---|---|
 | `active` | `bg-green-100 text-green-700` | `text-green-700` | `bg-green-500` | CheckCircle | Tag is operational |
 | `inactive` | `bg-gray-100 text-gray-600` | `text-gray-600` | `bg-gray-400` | Info | Not yet activated |
+| `limited` | `bg-amber-100 text-amber-700` | `text-amber-700` | `bg-amber-500` | AlertTriangle | Active period expired, no membership |
 | `lost` | `bg-red-100 text-red-700` | `text-red-700` | `bg-red-500 animate-pulse` | AlertCircle | Pet is lost |
-| `expired` | `bg-amber-100 text-amber-700` | `text-amber-700` | `bg-amber-500` | Clock | Subscription expired |
+| `expired` | `bg-red-100 text-red-700` | `text-red-700` | `bg-red-500` | Clock | Warranty expired |
 | `terminated` | `bg-gray-100 text-gray-500` | `text-gray-500` | `bg-gray-400` | XCircle | Pet terminal (deceased/sold) |
 | `replaced` | `bg-blue-100 text-blue-700` | `text-blue-700` | `bg-blue-400` | RefreshCw | Superseded by new tag |
 | `deleted` | `bg-gray-100 text-gray-400` | `text-gray-400` | `bg-gray-300` | Trash | Admin removed |
 
-### Tag Status Transitions
+### Tag Status Transitions (HYBRID 2 Model)
 
 | From | To | Trigger |
 |---|---|---|
-| (new) | `inactive` | Tag created at checkout |
+| (new) | `inactive` | Tag created at fulfillment |
 | `inactive` | `active` | Customer redeems/activates tag |
+| `active` | `limited` | Active Period expires (no membership) |
+| `limited` | `active` | Customer purchases membership |
 | `active` | `lost` | Pet marked lost |
 | `lost` | `active` | Pet marked found |
-| `active` | `expired` | Grace period ends |
+| `active` | `expired` | Warranty period expires |
+| `limited` | `expired` | Warranty period expires |
 | `active` | `terminated` | Pet marked terminal |
 | `active` | `replaced` | Replacement tag activated |
 | any | `deleted` | Admin soft-deletes tag |
+
+### Tag Period Status (HYBRID 2)
+
+When displaying tag status, also show the Active Period and Warranty Period status:
+
+| Period | Status | Display |
+|---|---|---|
+| Active Period | Active | Green badge: "Active until [date]" |
+| Active Period | Expiring soon (<30 days) | Amber badge: "Expires in [X] days" |
+| Active Period | Expired | Red badge: "Expired [date]" |
+| Warranty Period | Active | Green badge: "Warranty until [date]" |
+| Warranty Period | Expiring soon (<30 days) | Amber badge: "Warranty expires in [X] days" |
+| Warranty Period | Expired | Red badge: "Warranty expired [date]" |
+
+### Finder Mode Status (HYBRID 2)
+
+When a finder scans a tag, the response includes:
+
+| Mode | Response | Finder Behavior |
+|---|---|---|
+| Active | `tagActive: true, tagLimited: false` | Full functionality, can notify owner |
+| Limited | `tagActive: true, tagLimited: true` | Show pet info, cannot notify owner |
+| Expired | `tagActive: false, tagLimited: false` | "Tag Expired" screen |
 
 ### Membership Tier Colors
 

@@ -456,11 +456,7 @@ router.post('/tags/redeem', requirePermission('tag.create'), async (req: AuthReq
       return;
     }
 
-    // Check 4: subscription must be active
-    if (tag.subscriptionStatus !== 'active') {
-      res.status(400).json({ success: false, error: 'This tag\'s subscription is not active. Please renew or purchase a new tag.' });
-      return;
-    }
+    // HYBRID 2: No subscription check required — tags work out of box for Active Period
 
     // If tag has an orderId, verify it belongs to this customer and is shipped/delivered
     if (tag.orderId) {
@@ -500,19 +496,7 @@ router.post('/tags/redeem', requirePermission('tag.create'), async (req: AuthReq
 
     await tag.save();
 
-    // Create subscription for the activated tag
-    try {
-      await createSubscription({
-        userId: req.user!.id,
-        tagId: tag._id.toString(),
-        orderId: tag.orderId?.toString(),
-        planType: 'annual', // Default to annual plan
-      });
-      logger.info({ tagId: tag.tagId, userId: req.user!.id }, 'Subscription created for activated tag');
-    } catch (error) {
-      logger.error({ err: error, tagId: tag.tagId }, 'Failed to create subscription for activated tag');
-      // Don't fail the tag redemption if subscription creation fails
-    }
+    // HYBRID 2: No subscription creation — tags use Active Period + Membership model
 
     await auditCustomerEvent(req, {
       action: 'redeem',

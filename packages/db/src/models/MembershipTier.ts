@@ -23,6 +23,7 @@ export interface IMembershipTierDocument extends Document {
   price: number;
   currency: string;
   benefits: IMembershipTierBenefits;
+  tagLimit: number;
   stripeProductId?: string;
   stripePriceId?: string;
   isActive: boolean;
@@ -61,6 +62,7 @@ const MembershipTierSchema = new Schema<IMembershipTierDocument>(
       petRecovery: { type: Boolean, default: false },
       blackFridayDeal: { type: Boolean, default: false },
     },
+    tagLimit: { type: Number, required: true, min: 1 },
     stripeProductId: { type: String },
     stripePriceId: { type: String },
     isActive: { type: Boolean, default: true },

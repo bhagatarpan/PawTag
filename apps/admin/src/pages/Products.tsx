@@ -55,6 +55,8 @@ interface Product {
      gracePeriodWeeks?: number;
      features?: string[];
    };
+   warrantyMonths?: number;
+   activePeriodMonths?: number;
  }
 
  interface IFeatureHighlight {
@@ -498,6 +500,8 @@ const [form, setForm] = useState({
       isSubscription: false,
       isTagProduct: false,
       subscriptionConfig: { type: 'annual' as 'annual' | 'monthly', freePeriodMonths: 12, monthlyPrice: 0, annualPrice: 0, gracePeriodWeeks: 4 },
+      warrantyMonths: 12,
+      activePeriodMonths: 3,
     });
   const [variants, setVariants] = useState<ProductVariant[]>([]);
   const [images, setImages] = useState<string[]>([]);
@@ -609,6 +613,7 @@ const [form, setForm] = useState({
         stock: 0, sku: '', currency: 'NZD', isActive: true, customizable: false, customizationLabel: '', customizationPrice: 0,
         featureHighlights: [...DEFAULT_FEATURE_HIGHLIGHTS], slug: '', productType: 'membership', isSubscription: true, isTagProduct: false,
         subscriptionConfig: { type: 'annual', freePeriodMonths: 12, monthlyPrice: 0, annualPrice: 0, gracePeriodWeeks: 4 },
+        warrantyMonths: 12, activePeriodMonths: 3,
       });
       setVariants([]);
       setImages([]);
@@ -619,7 +624,7 @@ const [form, setForm] = useState({
   // Form handlers
 const openCreate = () => {
      setEditing(null);
-      setForm({ name: '', description: '', shortDescription: '', price: 0, category: 'PawTag', stock: 0, sku: '', currency: 'NZD', isActive: true, customizable: false, customizationLabel: '', customizationPrice: 0, featureHighlights: [...DEFAULT_FEATURE_HIGHLIGHTS], slug: '', productType: 'physical', isSubscription: false, isTagProduct: false, subscriptionConfig: { type: 'annual', freePeriodMonths: 12, monthlyPrice: 0, annualPrice: 0, gracePeriodWeeks: 4 } });
+      setForm({ name: '', description: '', shortDescription: '', price: 0, category: 'PawTag', stock: 0, sku: '', currency: 'NZD', isActive: true, customizable: false, customizationLabel: '', customizationPrice: 0, featureHighlights: [...DEFAULT_FEATURE_HIGHLIGHTS], slug: '', productType: 'physical', isSubscription: false, isTagProduct: false, subscriptionConfig: { type: 'annual', freePeriodMonths: 12, monthlyPrice: 0, annualPrice: 0, gracePeriodWeeks: 4 }, warrantyMonths: 12, activePeriodMonths: 3 });
     setVariants([]);
     setImages([]);
     setShowForm(true);
@@ -643,6 +648,8 @@ const openEdit = (p: Product) => {
           annualPrice: p.subscriptionConfig?.annualPrice || 0,
           gracePeriodWeeks: p.subscriptionConfig?.gracePeriodWeeks || 4,
         },
+      warrantyMonths: p.warrantyMonths || 12,
+      activePeriodMonths: p.activePeriodMonths || 3,
      });
      setVariants(p.variants?.map((v) => ({ ...v, attributes: { ...v.attributes } })) || []);
      setImages(p.images || []);
@@ -1021,6 +1028,27 @@ const openEdit = (p: Product) => {
                       </div>
                     </div>
                   )}
+                </div>
+              </div>
+              <div className="border-t pt-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">Tag Periods (HYBRID 2)</h3>
+                <p className="text-xs text-gray-500 mb-3">Configure how long tags remain active and under warranty. These settings apply to tag products only.</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Active Period (months)</label>
+                    <input type="number" min={0} value={form.activePeriodMonths} onChange={(e) => setForm({ ...form, activePeriodMonths: parseInt(e.target.value) || 0 })} className="w-full border rounded-md px-3 py-2 text-sm" />
+                    <p className="text-xs text-gray-400 mt-1">Full finder functionality during this period (default: 3 months)</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Warranty Period (months)</label>
+                    <input type="number" min={0} value={form.warrantyMonths} onChange={(e) => setForm({ ...form, warrantyMonths: parseInt(e.target.value) || 0 })} className="w-full border rounded-md px-3 py-2 text-sm" />
+                    <p className="text-xs text-gray-400 mt-1">Tag expires after this period (default: 12 months)</p>
+                  </div>
+                </div>
+                <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-xs text-blue-700">
+                    <strong>HYBRID 2 Model:</strong> Tags work out of box for the Active Period. After Active Period, finder notifications stop unless customer purchases a Guardian Membership (Gold/Platinum/Black). Tags expire after the Warranty Period.
+                  </p>
                 </div>
               </div>
               <div className="border-t pt-4">

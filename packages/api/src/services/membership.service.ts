@@ -356,6 +356,14 @@ export async function activateMembership(membershipId: string) {
     logger.error({ err, membershipId }, '[Membership] Failed to create in-app notification');
   }
 
+  // HYBRID 2: Extend tags based on membership tier limit
+  try {
+    await extendTagsForMembership(membership.userId.toString(), membership._id.toString());
+  } catch (err) {
+    logger.error({ err, membershipId }, '[Membership] Failed to extend tags');
+    // Don't fail membership activation if tag extension fails
+  }
+
   return membership;
 }
 
@@ -427,6 +435,14 @@ export async function cancelMembership(userId: string, reason?: string) {
       reason: reason || 'Customer request',
     },
   });
+
+  // HYBRID 2: Remove membership extension from tags
+  try {
+    await removeMembershipFromTags(userId, membership._id.toString());
+  } catch (err) {
+    logger.error({ err, membershipId: membership._id }, '[Membership] Failed to remove membership from tags');
+    // Don't fail membership cancellation if tag removal fails
+  }
 
   return membership;
 }
@@ -726,4 +742,150 @@ export async function sendRenewalReminders() {
       }
     }
   }
+}
+
+// ─── Extend Tags for Membership (HYBRID 2) ──────────────────
+
+/**
+ * Extend tags based on membership tier limit.
+ * When a customer purchases membership, their tags get extended.
+ *
+ * Tier limits:
+ * - Gold: 3 tags
+ * - Platinum: 10 tags
+ * - Black: unlimited (999)
+ *
+ * Tags are extended oldest-first based on the tier limit.
+ * Tags beyond the limit remain in 'limited' status if their active period has expired.
+ *
+ * @param userId - The user ID
+ * @param membershipId - The membership ID
+ */
+export async function extendTagsForMembership(userId: string, membershipId: string): Promise<void> {
+  const now = new Date();
+
+  // Get the user's membership
+  const membership = await UserMembership.findById(membershipId).lean();
+  if (!membership) {
+    logger.error({ membershipId }, '[Membership] Membership not found for tag extension');
+    return;
+  }
+
+  // Get the tier to check tag limit
+  const tier = await MembershipTier.findById(membership.tierId).lean();
+  if (!tier) {
+    logger.error({ tierId: membership.tierId }, '[Membership] Tier not found for tag extension');
+    return;
+  }
+
+  // Get all user's tags (active or limited, not deleted)
+  const tags = await Tag.find({
+    ownerId: userId,
+    status: { $in: ['active', 'limited'] },
+    deletedAt: null,
+  }).sort({ createdAt: 1 }); // Oldest first
+
+  // Apply tier limit
+  const tagsToExtend = tags.slice(0, tier.tagLimit);
+  const tagsNotExtended = tags.slice(tier.tagLimit);
+
+  // Extend tags within limit
+  for (const tag of tagsToExtend) {
+    // Set membership start date if not already set
+    if (!tag.membershipStartsAt) {
+      tag.membershipStartsAt = now;
+    }
+    
+    // Restore to active if it was limited
+    if (tag.status === 'limited') {
+      tag.status = 'active';
+    }
+    
+    await tag.save();
+    
+    logger.info({
+      tagId: tag.tagId,
+      userId,
+      membershipId,
+      tier: tier.tier,
+    }, '[Membership] Tag extended by membership');
+  }
+
+  // Update membership with extended tag IDs
+  await UserMembership.findByIdAndUpdate(membershipId, {
+    extendedTagIds: tagsToExtend.map(t => t._id),
+  });
+
+  // For tags beyond limit, ensure they're limited if active period expired
+  for (const tag of tagsNotExtended) {
+    if (tag.activePeriodEndsAt && now > tag.activePeriodEndsAt && tag.status === 'active') {
+      tag.status = 'limited';
+      await tag.save();
+      
+      logger.info({
+        tagId: tag.tagId,
+        userId,
+        tier: tier.tier,
+        tagLimit: tier.tagLimit,
+      }, '[Membership] Tag remains limited (exceeds tier limit)');
+    }
+  }
+
+  logger.info({
+    userId,
+    membershipId,
+    tier: tier.tier,
+    tagLimit: tier.tagLimit,
+    totalTags: tags.length,
+    tagsExtended: tagsToExtend.length,
+    tagsLimited: tagsNotExtended.length,
+  }, '[Membership] Tag extension completed');
+}
+
+/**
+ * Remove membership extension from tags when membership is cancelled/expired.
+ *
+ * @param userId - The user ID
+ * @param membershipId - The membership ID
+ */
+export async function removeMembershipFromTags(userId: string, membershipId: string): Promise<void> {
+  const now = new Date();
+
+  // Get all user's tags with membership set
+  const tags = await Tag.find({
+    ownerId: userId,
+    membershipStartsAt: { $exists: true, $ne: null },
+    deletedAt: null,
+  });
+
+  for (const tag of tags) {
+    // Check if tag's active period has expired
+    if (tag.activePeriodEndsAt && now > tag.activePeriodEndsAt) {
+      // Active period expired - set to limited
+      tag.status = 'limited';
+      tag.membershipStartsAt = undefined;
+      await tag.save();
+      
+      logger.info({
+        tagId: tag.tagId,
+        userId,
+        membershipId,
+      }, '[Membership] Tag set to limited after membership removal');
+    } else {
+      // Active period still valid - just remove membership reference
+      tag.membershipStartsAt = undefined;
+      await tag.save();
+    }
+  }
+
+  // Update membership to clear extended tag IDs
+  await UserMembership.findByIdAndUpdate(membershipId, {
+    extendedTagIds: [],
+  });
+
+  logger.info({
+    userId,
+    membershipId,
+    tagsProcessed: tags.length,
+  }, '[Membership] Membership removed from tags');
 }

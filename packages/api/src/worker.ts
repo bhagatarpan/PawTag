@@ -60,6 +60,7 @@ import { runRefundReconciliationJob } from './jobs/refundReconciliation';
 import { runPrivacyRetentionJob } from './jobs/privacyRetention';
 import { runAuditRetentionJob } from './jobs/auditRetention';
 import { checkExpiredMemberships, sendRenewalReminders } from './services/membership.service';
+import { checkActivePeriodExpirations } from './services/active-period-check.service';
 import type { JobResult } from './services/job-scheduler.service';
 
 // Wrapper functions to adapt membership functions to JobResult type
@@ -71,6 +72,11 @@ async function runMembershipExpiryCheck(): Promise<JobResult> {
 async function runMembershipRenewalReminders(): Promise<JobResult> {
   await sendRenewalReminders();
   return { success: true };
+}
+
+async function runActivePeriodCheck(): Promise<JobResult> {
+  const result = await checkActivePeriodExpirations();
+  return result;
 }
 
 let isShuttingDown = false;
@@ -101,6 +107,7 @@ async function startWorker(): Promise<void> {
     registerJobFunction('runAuditRetentionJob', runAuditRetentionJob);
     registerJobFunction('checkExpiredMemberships', runMembershipExpiryCheck);
     registerJobFunction('sendRenewalReminders', runMembershipRenewalReminders);
+    registerJobFunction('checkActivePeriodExpirations', runActivePeriodCheck);
     logger.info('[Worker] All job functions registered');
 
     // Start the scheduler (reads jobs from DB, starts timers)

@@ -9,7 +9,7 @@ export interface ITagDocument extends Document {
   nfcEnabled: boolean;
   replacesTagId?: mongoose.Types.ObjectId;
   replacedByTagId?: mongoose.Types.ObjectId;
-  status: 'active' | 'inactive' | 'lost' | 'expired' | 'terminated' | 'replaced' | 'deleted';
+  status: 'active' | 'inactive' | 'lost' | 'limited' | 'expired' | 'terminated' | 'replaced' | 'deleted';
   qrCodeUrl?: string;
   nfcUrl?: string;
   lastScannedAt?: Date;
@@ -22,6 +22,14 @@ export interface ITagDocument extends Document {
   subscriptionStatus: 'active' | 'inactive' | 'grace_period' | 'expired' | 'none';
   subscriptionId?: mongoose.Types.ObjectId;
   activatedAt?: Date;
+  activePeriodEndsAt?: Date;
+  warrantyEndsAt?: Date;
+  membershipStartsAt?: Date;
+  reminderStates?: {
+    activePeriod30DaySent?: boolean;
+    activePeriod7DaySent?: boolean;
+    activePeriodLastDaySent?: boolean;
+  };
   unlinkedAt?: Date;
   unlinkReason?: string;
   unlinkedBy?: mongoose.Types.ObjectId;
@@ -39,7 +47,7 @@ const TagSchema = new Schema<ITagDocument>(
     nfcEnabled: { type: Boolean, default: false },
     replacesTagId: { type: Schema.Types.ObjectId, ref: 'Tag' },
     replacedByTagId: { type: Schema.Types.ObjectId, ref: 'Tag' },
-    status: { type: String, enum: ['active', 'inactive', 'lost', 'expired', 'terminated', 'replaced', 'deleted'], default: 'inactive' },
+    status: { type: String, enum: ['active', 'inactive', 'lost', 'limited', 'expired', 'terminated', 'replaced', 'deleted'], default: 'inactive' },
     qrCodeUrl: { type: String },
     nfcUrl: { type: String },
     lastScannedAt: { type: Date },
@@ -56,6 +64,14 @@ const TagSchema = new Schema<ITagDocument>(
     },
     subscriptionId: { type: Schema.Types.ObjectId, ref: 'Subscription' },
     activatedAt: { type: Date },
+    activePeriodEndsAt: { type: Date },
+    warrantyEndsAt: { type: Date },
+    membershipStartsAt: { type: Date },
+    reminderStates: {
+      activePeriod30DaySent: { type: Boolean, default: false },
+      activePeriod7DaySent: { type: Boolean, default: false },
+      activePeriodLastDaySent: { type: Boolean, default: false },
+    },
     unlinkedAt: { type: Date },
     unlinkReason: { type: String },
     unlinkedBy: { type: Schema.Types.ObjectId, ref: 'User' },

@@ -163,8 +163,12 @@ export interface IProductVariant {
    shippingDescription: string;
 
    // ─── Warranty ────────────────────────────────────────────
-  /** Warranty period in months */
+  /** Warranty period in months — tag expires after this period */
   warrantyMonths: number;
+
+  // ─── Active Period ────────────────────────────────────────
+  /** Active period in months — full finder functionality during this period */
+  activePeriodMonths: number;
 
    // ─── Product Type ───────────────────────────────────────
    /** Product type discriminator: 'physical' = one-time product purchase, 'membership' = annual membership, 'digital' = one-time digital purchase */
@@ -270,6 +274,9 @@ const ProductSchema = new Schema<IProductDocument>(
 
      // ─── Warranty ────────────────────────────────────────
     warrantyMonths: { type: Number, default: 12, min: 0 },
+
+    // ─── Active Period ──────────────────────────────────────
+    activePeriodMonths: { type: Number, default: 3, min: 0 },
 
 // ─── Product Type ───────────────────────────────────
      productType: { type: String, enum: ['physical', 'membership', 'digital'], default: 'physical', index: true },

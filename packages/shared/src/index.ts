@@ -424,6 +424,7 @@ export interface Product {
     customizationPrice?: number;
    shippingCost?: number;
    warrantyMonths?: number;
+   activePeriodMonths?: number;
    /** Product type: 'physical' = one-time product purchase, 'membership' = annual membership, 'digital' = one-time digital purchase */
    productType?: 'physical' | 'membership' | 'digital';
    /** @deprecated Use productType instead */
