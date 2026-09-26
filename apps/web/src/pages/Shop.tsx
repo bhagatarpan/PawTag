@@ -60,15 +60,7 @@ import analytics from '../lib/analytics';
 weight?: number;
     /** Product type: 'physical' = one-time purchase, 'membership' = annual renewal, 'digital' = one-time purchase */
     productType?: 'physical' | 'membership' | 'digital';
-    isSubscription: boolean;
     isTagProduct: boolean;
-    subscriptionConfig?: {
-      type: 'annual' | 'monthly';
-      freePeriodMonths: number;
-      gracePeriodWeeks: number;
-      monthlyPrice?: number;
-      features: string[];
-    };
     badge?: string;
     sortOrder: number;
     warrantyMonths: number;
@@ -119,9 +111,7 @@ function toCardProduct(
        sku: p.sku,
        stock: available,
        productType: (p.productType as 'physical' | 'membership' | 'digital') || 'physical',
-       monthlyPrice: p.subscriptionConfig?.monthlyPrice,
-       freePeriodMonths: p.subscriptionConfig?.freePeriodMonths,
-       badge: badge ? { label: badge.label, color: badge.color } : null,
+        badge: badge ? { label: badge.label, color: badge.color } : null,
        featureHighlights: p.featureHighlights && p.featureHighlights.length > 0
          ? p.featureHighlights.map(h => ({ icon: h.icon, description: h.description }))
          : undefined,
