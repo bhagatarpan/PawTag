@@ -11,7 +11,7 @@
  * WARNING: This is a DESTRUCTIVE migration. Run in controlled environment with backups.
  *
  * Usage:
- *   npx ts-node scripts/migrate-hybrid2.ts
+ *   pnpm --filter @pawtag/api exec tsx ../../scripts/migrate-hybrid2.ts
  *
  * Environment variables:
  *   - DB_URL: MongoDB connection string
@@ -21,6 +21,7 @@
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import path from 'path';
+import { Subscription, Tag, Invoice, Product, MembershipTier, UserMembership } from '@pawtag/db';
 
 dotenv.config({ path: path.resolve(__dirname, '../packages/api/.env') });
 
@@ -60,7 +61,6 @@ function logDryRun(message: string) {
 async function deleteTagSubscriptions(): Promise<number> {
   log('Step 1: Deleting existing tag subscriptions...');
   
-  const Subscription = mongoose.model('Subscription');
   const count = await Subscription.countDocuments({ planType: { $in: ['annual', 'monthly'] } });
   
   if (DRY_RUN) {
@@ -79,7 +79,6 @@ async function deleteTagSubscriptions(): Promise<number> {
 async function deleteTags(): Promise<number> {
   log('Step 2: Deleting existing tags...');
   
-  const Tag = mongoose.model('Tag');
   const count = await Tag.countDocuments({});
   
   if (DRY_RUN) {
@@ -98,7 +97,6 @@ async function deleteTags(): Promise<number> {
 async function deleteTagInvoices(): Promise<number> {
   log('Step 3: Deleting existing invoices for tag products...');
   
-  const Invoice = mongoose.model('Invoice');
   const count = await Invoice.countDocuments({});
   
   if (DRY_RUN) {
@@ -116,8 +114,6 @@ async function deleteTagInvoices(): Promise<number> {
  */
 async function updateProducts(): Promise<number> {
   log('Step 4: Updating Product model with new fields...');
-  
-  const Product = mongoose.model('Product');
   
   if (DRY_RUN) {
     const count = await Product.countDocuments({ isTagProduct: true });
@@ -138,8 +134,6 @@ async function updateProducts(): Promise<number> {
  */
 async function updateMembershipTiers(): Promise<number> {
   log('Step 5: Updating MembershipTier with tag limits...');
-  
-  const MembershipTier = mongoose.model('MembershipTier');
   
   if (DRY_RUN) {
     logDryRun('Would update MembershipTier with tag limits: Gold=3, Platinum=10, Black=999');
@@ -171,8 +165,6 @@ async function updateMembershipTiers(): Promise<number> {
  */
 async function cleanUserMemberships(): Promise<number> {
   log('Step 6: Cleaning UserMembership extendedTagIds...');
-  
-  const UserMembership = mongoose.model('UserMembership');
   
   if (DRY_RUN) {
     const count = await UserMembership.countDocuments({});
