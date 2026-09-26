@@ -2,6 +2,8 @@ import { useState, FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff, Loader2, LogIn } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import api from '../lib/api';
+import { API } from '@pawtag/shared';
 
 interface CheckoutAuthProps {
   onLoginSuccess?: () => void;
@@ -14,14 +16,33 @@ export default function CheckoutAuth({ onLoginSuccess }: CheckoutAuthProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  
+  // CAPTCHA state
+  const [captchaRequired, setCaptchaRequired] = useState(false);
+  const [captchaQuestion, setCaptchaQuestion] = useState('');
+  const [captchaToken, setCaptchaToken] = useState('');
+  const [captchaAnswer, setCaptchaAnswer] = useState('');
+
+  const fetchCaptcha = async () => {
+    try {
+      const res = await api.get(API.auth.captcha);
+      setCaptchaQuestion(res.data.data.question);
+      setCaptchaToken(res.data.data.token);
+      setCaptchaAnswer('');
+    } catch {
+      setError('Failed to load verification challenge');
+    }
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!email || !password) return;
+    if (captchaRequired && !captchaAnswer) return;
+    
     setLoading(true);
     setError('');
     try {
-      await login(email, password);
+      await login(email, password, captchaRequired ? captchaToken : undefined, captchaRequired ? captchaAnswer : undefined);
       onLoginSuccess?.();
     } catch (err: any) {
       if (err?.code === 'REQUIRES_VERIFICATION') {
@@ -37,7 +58,17 @@ export default function CheckoutAuth({ onLoginSuccess }: CheckoutAuthProps) {
         window.location.href = '/login';
         return;
       }
+      if (err?.code === 'CAPTCHA_REQUIRED') {
+        setCaptchaRequired(true);
+        await fetchCaptcha();
+        setError('Please complete the verification challenge below');
+        setLoading(false);
+        return;
+      }
       setError(err?.message || 'Invalid email or password');
+      if (captchaRequired) {
+        await fetchCaptcha();
+      }
     } finally {
       setLoading(false);
     }
@@ -95,6 +126,23 @@ export default function CheckoutAuth({ onLoginSuccess }: CheckoutAuthProps) {
           </div>
         </div>
 
+        {/* CAPTCHA Challenge */}
+        {captchaRequired && (
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Verification Challenge
+            </label>
+            <p className="text-lg font-semibold text-gray-900 mb-3">{captchaQuestion}</p>
+            <input
+              type="number"
+              value={captchaAnswer}
+              onChange={(e) => setCaptchaAnswer(e.target.value)}
+              placeholder="Your answer"
+              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm"
+            />
+          </div>
+        )}
+
         <div className="flex items-center justify-between text-sm">
           <label className="flex items-center gap-2 text-gray-600">
             <input type="checkbox" className="rounded border-gray-300 text-primary-600" />
@@ -107,7 +155,7 @@ export default function CheckoutAuth({ onLoginSuccess }: CheckoutAuthProps) {
 
         <button
           type="submit"
-          disabled={loading || !email || !password}
+          disabled={loading || !email || !password || (captchaRequired && !captchaAnswer)}
           className="w-full py-3 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
         >
           {loading ? (
