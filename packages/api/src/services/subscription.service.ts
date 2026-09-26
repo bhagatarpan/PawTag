@@ -350,6 +350,10 @@ export async function createSubscription(data: {
  * Create a Gold membership subscription with Stripe billing.
  * Gold is a standalone digital membership — no physical Tag required.
  *
+ * @deprecated This function is deprecated. Use membership.service.ts subscribeToTier() instead.
+ * Gold membership is now managed through the MembershipTier + UserMembership models.
+ * This function is kept for backwards compatibility only and should not be called from new code.
+ *
  * @param userId - The user purchasing Gold
  * @param price - The price charged (default: from CMS setting `guardian.goldPrice`)
  * @returns The created subscription document
@@ -1650,6 +1654,10 @@ export async function changeSubscriptionPlan(subscriptionId: string, newPlanType
 
 /**
  * Change a Gold subscription between monthly and annual billing.
+ *
+ * @deprecated This function is deprecated. Gold membership plan changes should be handled
+ * through the new membership system (membership.service.ts). This function is kept for
+ * backwards compatibility only and should not be called from new code.
  *
  * Business rules:
  * - Only allowed on active Gold subscriptions
