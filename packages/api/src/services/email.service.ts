@@ -264,10 +264,26 @@ export async function sendPasswordChangedEmail(
 ): Promise<EmailResult> {
   const { browser, device } = userAgent ? parseUserAgent(userAgent) : { browser: undefined, device: undefined };
   const location = ipAddress ? await getLocationFromIp(ipAddress).catch(() => undefined) : undefined;
-  const vars = { name, changedBy, ipAddress: ipAddress || '', browser: browser || '', device: device || '', location: location || '' };
+  
+  // Resolve changedBy to a meaningful name
+  let changedByName = changedBy;
+  if (changedBy !== 'self' && changedBy) {
+    try {
+      const { User } = await import('@pawtag/db');
+      const changer = await User.findById(changedBy).select('fullName email').lean();
+      changedByName = changer?.fullName || changer?.email || 'an administrator';
+    } catch {
+      changedByName = 'an administrator';
+    }
+  } else if (changedBy === 'self') {
+    changedByName = 'You';
+  }
+  
+  const timestamp = new Date().toLocaleString('en-NZ', { dateStyle: 'full', timeStyle: 'short' });
+  const vars = { name, changedBy: changedByName, ipAddress: ipAddress || '', browser: browser || '', device: device || '', location: location || '', timestamp };
   const cms = await renderCmsEmail('password-changed', vars);
   if (cms) return sendMail(to, cms.subject, cms.html, cms.from);
-  const html = renderPasswordChangedEmail({ name, changedBy, ipAddress, browser, device, location });
+  const html = renderPasswordChangedEmail({ name, changedBy: changedByName, ipAddress, browser, device, location });
   return sendMail(to, 'Your password has been changed — PawTag', html);
 }
 
