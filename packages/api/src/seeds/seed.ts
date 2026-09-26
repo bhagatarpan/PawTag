@@ -658,6 +658,8 @@ async function seed() {
         { permissionName: 'health_document.download' },
         // User Management
         { permissionName: 'user.read' },
+        { permissionName: 'user.update' },
+        { permissionName: 'user.reset_password' },
         // Order Management
         { permissionName: 'order.read' },
         { permissionName: 'order.update' },
