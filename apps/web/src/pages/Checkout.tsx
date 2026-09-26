@@ -1225,11 +1225,11 @@ export default function Checkout() {
                   </div>
                 </div>
 
-                {/* Auto-Renew - Editable Toggle */}
-                {items.some((item: any) => item.isSubscription || item.autoRenew) && (
+                {/* Auto-Renew - Editable Toggle (only for membership products) */}
+                {items.some((item: any) => item.isSubscription && (item.productType === 'membership' || !item.productType)) && (
                   <div className="bg-white rounded-xl border border-gray-200 p-6">
                     <h3 className="text-sm font-semibold text-gray-900 mb-3">Subscription Auto-Renew</h3>
-                    {items.filter((item: any) => item.isSubscription || item.autoRenew).map((item: any) => {
+                    {items.filter((item: any) => item.isSubscription && (item.productType === 'membership' || !item.productType)).map((item: any) => {
                       const key = item._id || item.productId;
                       const isOn = editableAutoRenewMap[key] !== false;
                       return (
