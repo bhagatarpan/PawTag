@@ -1,6 +1,6 @@
 ---
 name: cart-checkout-experience
-description: Design, implement, or review PawTag cart and checkout UX. Use for CartDrawer, the full /cart page, checkout presentation, quantity controls, product/customization display, discounts, Guardian/Gold benefits, shipping, GST, totals, inventory/price-change messaging, responsive behavior, accessibility, and commerce motion. Enforces the PawTag mini-cart plus premium 70/30 desktop cart architecture.
+description: Design, implement, or review PawTag cart and checkout UX. Use for CartDrawer, the full /cart page, checkout presentation, quantity controls, product/customization display, discounts, membership benefits, shipping, GST, totals, inventory/price-change messaging, responsive behavior, accessibility, and commerce motion. Enforces the PawTag mini-cart plus premium 70/30 desktop cart architecture.
 ---
 
 # Cart and Checkout Experience
@@ -28,7 +28,7 @@ It must behave as an accessible dialog/drawer with focus management, Escape beha
 Desktop target: approximately 70/30 composition.
 
 - Left ~70%: product management, images, variants, engraving/customization, quantity, per-unit/line pricing, stock/price messages, contextual benefits/delivery information.
-- Right ~30%: sticky order summary with subtotal, discounts, Guardian/Gold benefit, shipping status/estimate, GST/tax statement, total/estimated total, checkout CTA, trust/support context.
+- Right ~30%: sticky order summary with subtotal, discounts, membership benefits, shipping status/estimate, GST/tax statement, total/estimated total, checkout CTA, trust/support context.
 
 The summary should remain sticky only where viewport/layout makes it usable.
 

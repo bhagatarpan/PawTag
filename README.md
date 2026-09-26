@@ -1047,7 +1047,7 @@ Desktop/tablet target:
 - visible personalization/engraving;
 - explicit price/inventory changes;
 - transparent savings and totals;
-- Gold/Guardian benefits shown once, clearly;
+- membership benefits shown once, clearly;
 - useful reassurance near checkout without clutter;
 - accessible buttons and quantity controls;
 - no decorative motion that competes with checkout.
@@ -1644,12 +1644,12 @@ Prioritize:
 
 Keep only where required by launch/business model:
 
-- Guardian/Gold membership;
+- Membership tiers (Gold, Platinum, Black);
 - rewards;
 - basic CMS;
 - shipping integration;
 - notification preferences;
-- subscriptions.
+- digital products.
 
 ## Strong candidates to defer/simplify
 

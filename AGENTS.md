@@ -943,7 +943,7 @@ The summary should explain, where applicable:
 
 - subtotal;
 - discount/promo;
-- Guardian/Gold benefit;
+- membership benefits;
 - shipping or how shipping will be calculated;
 - GST/tax statement;
 - savings;
@@ -2011,7 +2011,7 @@ Treat these as first-customer critical when enabled:
 
 May be simplified if necessary:
 
-- Guardian/Gold;
+- Membership tiers (Gold, Platinum, Black);
 - loyalty/rewards;
 - shipping automation;
 - CMS sophistication;
