@@ -284,7 +284,7 @@ export default function ProductDetail() {
               )}
               {guardianTier && !isGoldMember && (
                 <p className="text-xs text-amber-600 mt-1 ml-6">
-                  Gold members earn 2× Points on this item — <Link to="/gold" className="underline">learn about Gold</Link>
+                  Gold members earn 2× Points on this item — <Link to="/membership" className="underline">view membership</Link>
                 </p>
               )}
             </div>

@@ -84,10 +84,10 @@ const defaultSlides: SlideData[] = [
   },
   {
     id: 5,
-    tag: 'Gold',
+    tag: 'Membership',
     headline: 'Go Gold. Get 2× the Rewards.',
-    sub: 'Earn double points on every purchase, free shipping over $50, and start at Nurture tier. Just $3.99/month — less than a coffee.',
-    cta: { text: 'Upgrade to Gold', to: '/gold' },
+    sub: 'Earn double points on every purchase, free shipping over $50, and start at Nurture tier. Just $89/year.',
+    cta: { text: 'View Membership', to: '/membership' },
     bg: 'from-amber-500 via-yellow-500 to-amber-600',
     visualType: 'stats',
     stats: [

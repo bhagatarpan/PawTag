@@ -344,8 +344,8 @@ export default function Shop() {
                     </p>
                   </div>
                 </div>
-                <Link to="/gold" className="px-4 py-2 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600 transition-colors whitespace-nowrap">
-                  Learn About Gold
+                <Link to="/membership" className="px-4 py-2 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600 transition-colors whitespace-nowrap">
+                  View Membership
                 </Link>
               </div>
             </div>
