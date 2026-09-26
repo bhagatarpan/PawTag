@@ -261,6 +261,7 @@ export async function sendPasswordChangedEmail(
   changedBy: 'self' | string,
   ipAddress?: string,
   userAgent?: string,
+  changedByRole?: string,
 ): Promise<EmailResult> {
   const { browser, device } = userAgent ? parseUserAgent(userAgent) : { browser: undefined, device: undefined };
   const location = ipAddress ? await getLocationFromIp(ipAddress).catch(() => undefined) : undefined;
@@ -280,10 +281,10 @@ export async function sendPasswordChangedEmail(
   }
   
   const timestamp = new Date().toLocaleString('en-NZ', { dateStyle: 'full', timeStyle: 'short' });
-  const vars = { name, changedBy: changedByName, ipAddress: ipAddress || '', browser: browser || '', device: device || '', location: location || '', timestamp };
+  const vars = { name, changedBy: changedByName, changedByRole: changedByRole || '', ipAddress: ipAddress || '', browser: browser || '', device: device || '', location: location || '', timestamp };
   const cms = await renderCmsEmail('password-changed', vars);
   if (cms) return sendMail(to, cms.subject, cms.html, cms.from);
-  const html = renderPasswordChangedEmail({ name, changedBy: changedByName, ipAddress, browser, device, location });
+  const html = renderPasswordChangedEmail({ name, changedBy: changedByName, changedByRole, ipAddress, browser, device, location });
   return sendMail(to, 'Your password has been changed — PawTag', html);
 }
 

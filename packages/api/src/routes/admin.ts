@@ -587,7 +587,21 @@ router.post('/users/:id/reset-password', requirePermission('user.reset_password'
     });
 
     const clientInfo = { ipAddress: req.ip || req.connection?.remoteAddress, userAgent: req.headers['user-agent'] };
-    sendPasswordChangedEmail(user.email, user.fullName, req.user!.id, clientInfo.ipAddress, clientInfo.userAgent).catch((err) => {
+    
+    // Get admin user's role name for email
+    let adminRoleName = 'Admin';
+    try {
+      const adminUser = await User.findById(req.user!.id).select('fullName').lean();
+      const { UserRole: UserRoleModel, Role } = await import('@pawtag/db');
+      const adminRole = await UserRoleModel.findOne({ userId: req.user!.id, isActive: true }).populate('roleId', 'displayName').lean();
+      if (adminRole?.roleId) {
+        adminRoleName = (adminRole.roleId as any)?.displayName || 'Admin';
+      }
+    } catch {
+      // Fallback to default
+    }
+    
+    sendPasswordChangedEmail(user.email, user.fullName, req.user!.id, clientInfo.ipAddress, clientInfo.userAgent, adminRoleName).catch((err) => {
       logger.error({ err, targetUserId: req.params.id, targetEmail: user.email }, 'Failed to send password changed email');
     });
 

@@ -3,27 +3,34 @@ import { renderBase, renderInfoBox } from './base';
 export function renderPasswordChangedEmail(data: {
   name: string;
   changedBy: string;
+  changedByRole?: string;
   ipAddress?: string;
   browser?: string;
   device?: string;
   location?: string;
 }): string {
+  const isSelf = data.changedBy === 'self';
+  const changedByText = isSelf 
+    ? `${data.name} (You)` 
+    : data.changedByRole 
+      ? `${data.changedBy} (PawTag - ${data.changedByRole})`
+      : `${data.changedBy} (PawTag)`;
+
   const bodyHtml = `
     <p style="margin:0 0 20px;color:#374151;font-size:16px;">Hi <strong>${data.name}</strong>,</p>
     <p style="margin:0 0 20px;color:#374151;font-size:16px;line-height:1.6;">
-      Your PawTag password has been successfully changed${data.changedBy === 'self' ? '' : ' by an administrator'}.
+      Your PawTag password has been changed.
+    </p>
+    <p style="margin:0 0 20px;color:#374151;font-size:16px;line-height:1.6;">
+      By: <strong>${changedByText}</strong>
     </p>
 
     ${renderInfoBox(`
       <p style="margin:0 0 8px;color:#374151;font-size:13px;"><strong>Details:</strong></p>
       <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;font-size:13px;">
-        <tr>
-          <td style="padding:4px 0;color:#6b7280;width:120px;">Changed by</td>
-          <td style="padding:4px 0;color:#374151;font-weight:500;">${data.changedBy === 'self' ? 'You' : data.changedBy}</td>
-        </tr>
         ${data.browser ? `
         <tr>
-          <td style="padding:4px 0;color:#6b7280;">Browser</td>
+          <td style="padding:4px 0;color:#6b7280;width:120px;">Browser</td>
           <td style="padding:4px 0;color:#374151;font-weight:500;">${data.browser}</td>
         </tr>
         ` : ''}
