@@ -660,6 +660,8 @@ async function seed() {
         { permissionName: 'user.read' },
         { permissionName: 'user.update' },
         { permissionName: 'user.reset_password' },
+        { permissionName: 'user.activate' },
+        { permissionName: 'user.deactivate' },
         // Role Management (read-only for viewing role assignments)
         { permissionName: 'role.read' },
         // Order Management
