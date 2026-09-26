@@ -138,6 +138,7 @@ export interface User {
   lastLoginIp?: string;
   lastLoginUserAgent?: string;
   lastLoginMethod?: string;
+  lastLoginLocation?: string;
   loginCount?: number;
   // Password tracking
   passwordChangedAt?: string;

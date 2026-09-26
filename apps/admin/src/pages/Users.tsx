@@ -73,6 +73,7 @@ export interface UserRecord {
   lastLoginIp?: string;
   lastLoginUserAgent?: string;
   lastLoginMethod?: string;
+  lastLoginLocation?: string;
   loginCount?: number;
   // Password tracking
   passwordChangedAt?: string;
@@ -116,6 +117,33 @@ function timeAgo(iso: string): string {
   if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
   if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
   return `${Math.floor(diff / 86400000)}d ago`;
+}
+
+function parseUserAgent(ua: string): string {
+  if (!ua) return 'Unknown';
+  
+  // Mobile app detection
+  if (ua.includes('PawTag/')) {
+    const version = ua.match(/PawTag\/([\d.]+)/)?.[1] || '';
+    if (ua.includes('(ios)')) return `PawTag iOS App${version ? ` v${version}` : ''}`;
+    if (ua.includes('(android)')) return `PawTag Android App${version ? ` v${version}` : ''}`;
+    return `PawTag App${version ? ` v${version}` : ''}`;
+  }
+  
+  // Browser detection
+  if (ua.includes('Chrome/') && !ua.includes('Edg/')) return 'Chrome';
+  if (ua.includes('Edg/')) return 'Edge';
+  if (ua.includes('Firefox/')) return 'Firefox';
+  if (ua.includes('Safari/') && !ua.includes('Chrome/')) return 'Safari';
+  
+  // OS detection
+  if (ua.includes('Windows')) return 'Windows Browser';
+  if (ua.includes('Mac OS')) return 'Mac Browser';
+  if (ua.includes('Linux')) return 'Linux Browser';
+  if (ua.includes('iPhone') || ua.includes('iPad')) return 'iOS Browser';
+  if (ua.includes('Android')) return 'Android Browser';
+  
+  return 'Unknown Browser';
 }
 
 function copyToClipboard(text: string) {
@@ -615,9 +643,18 @@ export function DetailDrawer({
               <Section title="Login & Security" icon={<Shield size={16} />}>
                 <DetailRow label="Last Login" value={
                   user.lastLoginAt ? (
-                    <span>{formatDate(user.lastLoginAt)} from {user.lastLoginIp || 'unknown'}</span>
+                    <span>{formatDate(user.lastLoginAt)}</span>
                   ) : '—'
                 } />
+                <DetailRow label="From" value={
+                  user.lastLoginUserAgent ? (
+                    <span className="text-sm">
+                      {parseUserAgent(user.lastLoginUserAgent)}
+                      {user.lastLoginLocation && <span className="text-gray-500"> ({user.lastLoginLocation})</span>}
+                    </span>
+                  ) : '—'
+                } />
+                <DetailRow label="IP Address" value={user.lastLoginIp || '—'} />
                 <DetailRow label="Login Method" value={user.lastLoginMethod || '—'} />
                 <DetailRow label="Login Count" value={String(user.loginCount || 0)} />
                 <DetailRow label="Password Changed" value={user.passwordChangedAt ? formatDate(user.passwordChangedAt) : '—'} />

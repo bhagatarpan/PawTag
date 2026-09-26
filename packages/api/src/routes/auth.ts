@@ -37,6 +37,7 @@ import { isRegistrationOtpDisabled } from '../services/otp-settings.service';
 import { getMaxLoginAttempts, getLockoutMinutes, getCaptchaRequiredAfterAttempts, getCaptchaTokenExpiryMinutes } from '../services/auth-settings.service';
 import { User, Role, UserRole, VerificationToken, Setting, AuditEvent } from '@pawtag/db';
 import { auditService, resolveActorType, type AuditContext } from '../services/audit';
+import { getLocationFromIp } from '../lib/geo-location';
 import { createAuditContextFromRequest, setAuditActor, type AuditRequest } from '../middleware/audit';
 import { config } from '../config';
 import logger from '../lib/logger';
@@ -441,12 +442,14 @@ router.post('/login', loginLimiter, validate(loginSchema), async (req, res: Resp
 
     // Successful login — reset failed attempts and update login tracking
     // Use findOneAndUpdate to skip validation (some users may lack phoneNumber)
+    const location = clientInfo.ipAddress ? await getLocationFromIp(clientInfo.ipAddress).catch(() => undefined) : undefined;
     const updateFields: Record<string, unknown> = { 
       lastLogin: new Date(),
       lastLoginAt: new Date(),
       lastLoginIp: clientInfo.ipAddress,
       lastLoginUserAgent: clientInfo.userAgent,
       lastLoginMethod: 'password',
+      lastLoginLocation: location,
       $inc: { loginCount: 1 },
     };
     if (user.failedLoginAttempts > 0) {
@@ -1842,12 +1845,14 @@ router.post('/mfa/verify', mfaVerifyLimiter, async (req: AuthRequest, res: Respo
     }, { actorType: resolveActorType(user.role), authenticationMethod: 'mfa_email_otp' });
 
     // Update login tracking for MFA login
+    const mfaLocation = ip ? await getLocationFromIp(ip).catch(() => undefined) : undefined;
     await User.findByIdAndUpdate(user._id, { 
       $set: { 
         lastLoginAt: new Date(),
         lastLoginIp: ip,
         lastLoginUserAgent: ua,
         lastLoginMethod: 'mfa',
+        lastLoginLocation: mfaLocation,
       },
       $inc: { loginCount: 1 },
     });

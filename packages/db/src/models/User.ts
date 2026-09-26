@@ -48,6 +48,7 @@ export interface IUserDocument extends Document {
   lastLoginIp?: string;
   lastLoginUserAgent?: string;
   lastLoginMethod?: string;
+  lastLoginLocation?: string;
   loginCount: number;
   // Password tracking
   passwordChangedAt?: Date;
@@ -135,6 +136,7 @@ const UserSchema = new Schema<IUserDocument>(
     lastLoginIp: { type: String },
     lastLoginUserAgent: { type: String },
     lastLoginMethod: { type: String },
+    lastLoginLocation: { type: String },
     loginCount: { type: Number, default: 0, min: 0 },
     // Password tracking
     passwordChangedAt: { type: Date },
