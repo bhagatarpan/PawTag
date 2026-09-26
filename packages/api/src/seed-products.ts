@@ -10,13 +10,13 @@ const products = [
    {
      name: 'PawTag Scan',
      slug: 'pawtag-scan',
-     description: 'Our essential QR code pet tag. Simply scan with any smartphone camera to view your pet\'s profile, medical info, and owner contact details. Made from durable plastic with a printed QR code. Includes 3 months free subscription — after that just $0.99/month.',
+     description: 'Our essential QR code pet tag. Simply scan with any smartphone camera to view your pet\'s profile, medical info, and owner contact details. Made from durable plastic with a printed QR code. 12 month warranty included.',
      shortDescription: 'QR code tag — scan with phone camera',
     price: 10.99,
     currency: 'NZD',
     images: [`${API_URL}/api/uploads/products/pawtag-scan.svg`],
     category: 'PawTag',
-    tags: ['qr', 'plastic', 'essential', 'subscription'],
+    tags: ['qr', 'plastic', 'essential'],
     isActive: true,
     stock: 500,
     sku: 'PT-SCAN-001',
@@ -28,31 +28,23 @@ const products = [
     warrantyMonths: 12,
     productType: 'physical',
     isTagProduct: true,
-    isSubscription: true,
-    subscriptionConfig: {
-       type: 'annual',
-       freePeriodMonths: 3,
-       gracePeriodWeeks: 4,
-       monthlyPrice: 0.99,
-       annualPrice: 9.99,
-       features: ['qr_scan', 'lost_pet_alerts', 'finder_notifications'],
-      },
-     featureHighlights: [
+    isSubscription: false,
+      featureHighlights: [
        { icon: 'Shield', description: '12 month warranty' },
        { icon: 'Truck', description: 'Free NZ-wide shipping' },
-       { icon: 'Check', description: '3 months free subscription included' }
+       { icon: 'Check', description: '12 month warranty included' }
      ],
    },
 {
      name: 'PawTag Classic',
      slug: 'pawtag-classic',
-     description: 'Our most popular NFC pet tag. Simply tap with any NFC-enabled smartphone to instantly view your pet\'s profile, medical info, and owner contact details. Made from durable plastic with a built-in NFC chip. Includes 3 months free subscription — after that just $1.99/month.',
+     description: 'Our most popular NFC pet tag. Simply tap with any NFC-enabled smartphone to instantly view your pet\'s profile, medical info, and owner contact details. Made from durable plastic with a built-in NFC chip. 12 month warranty included.',
      shortDescription: 'NFC tag — tap with phone (Most Ordered)',
     price: 20.99,
     currency: 'NZD',
     images: [`${API_URL}/api/uploads/products/pawtag-classic.svg`],
     category: 'PawTag',
-    tags: ['nfc', 'plastic', 'popular', 'subscription'],
+    tags: ['nfc', 'plastic', 'popular'],
     isActive: true,
     stock: 500,
       sku: 'PT-CLASSIC-001',
@@ -64,31 +56,23 @@ const products = [
       warrantyMonths: 12,
       productType: 'physical',
       isTagProduct: true,
-      isSubscription: true,
-      subscriptionConfig: {
-        type: 'annual',
-        freePeriodMonths: 3,
-        gracePeriodWeeks: 4,
-        monthlyPrice: 1.99,
-        annualPrice: 19.99,
-        features: ['nfc_scan', 'qr_scan', 'lost_pet_alerts', 'finder_notifications'],
-     },
+      isSubscription: false,
       featureHighlights: [
        { icon: 'Shield', description: '12 month warranty' },
        { icon: 'Truck', description: 'Free NZ-wide shipping' },
-       { icon: 'Check', description: '3 months free subscription included' }
+       { icon: 'Check', description: '12 month warranty included' }
      ],
    },
  {
       name: 'PawTag Plus',
      slug: 'pawtag-plus',
-     description: 'Our premium NFC pet tag with metal edges and epoxy resin coating for ultimate durability. Simply tap with any NFC-enabled smartphone to instantly view your pet\'s profile, medical info, and owner contact details. Built to withstand the most active pets. Includes 3 months free subscription — after that just $2.99/month.',
+     description: 'Our premium NFC pet tag with metal edges and epoxy resin coating for ultimate durability. Simply tap with any NFC-enabled smartphone to instantly view your pet\'s profile, medical info, and owner contact details. Built to withstand the most active pets. 12 month warranty included.',
      shortDescription: 'NFC tag — metal edges + epoxy resin',
     price: 40.99,
     currency: 'NZD',
     images: [`${API_URL}/api/uploads/products/pawtag-plus.svg`],
     category: 'PawTag',
-    tags: ['nfc', 'metal', 'premium', 'epoxy', 'subscription'],
+    tags: ['nfc', 'metal', 'premium', 'epoxy'],
     isActive: true,
     stock: 300,
       sku: 'PT-PLUS-001',
@@ -99,19 +83,11 @@ const products = [
       warrantyMonths: 12,
       productType: 'physical',
       isTagProduct: true,
-      isSubscription: true,
-      subscriptionConfig: {
-        type: 'annual',
-        freePeriodMonths: 3,
-        gracePeriodWeeks: 4,
-        monthlyPrice: 2.99,
-        annualPrice: 29.99,
-        features: ['nfc_scan', 'qr_scan', 'lost_pet_alerts', 'finder_notifications'],
-     },
+      isSubscription: false,
       featureHighlights: [
         { icon: 'Shield', description: '12 month warranty' },
         { icon: 'Truck', description: 'Free NZ-wide shipping' },
-        { icon: 'Check', description: '3 months free subscription included' }
+        { icon: 'Check', description: '12 month warranty included' }
       ],
     },
 ];
@@ -140,14 +116,6 @@ async function seedProducts() {
       if (existing.isActive !== productData.isActive) updates.isActive = productData.isActive;
       if (existing.productType !== productData.productType) updates.productType = productData.productType;
       if (existing.isSubscription !== productData.isSubscription) updates.isSubscription = productData.isSubscription;
-      // Update subscriptionConfig if prices changed
-      if (productData.subscriptionConfig) {
-        const existingConfig = existing.subscriptionConfig as any || {};
-        const newConfig = productData.subscriptionConfig as any;
-        if (existingConfig.monthlyPrice !== newConfig.monthlyPrice || existingConfig.annualPrice !== newConfig.annualPrice) {
-          updates.subscriptionConfig = { ...existingConfig, ...newConfig };
-        }
-      }
       if (Object.keys(updates).length > 0) {
           await Product.updateOne({ _id: existing._id }, { $set: updates });
           updated++;
