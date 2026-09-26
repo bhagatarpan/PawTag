@@ -21,7 +21,7 @@
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import path from 'path';
-import { Subscription, Tag, Invoice, Product, MembershipTier, UserMembership } from '@pawtag/db';
+import { Subscription, Tag, Invoice, Product, MembershipTier, UserMembership, Order, PendingOrder, Fulfilment, Shipment, FinderScan, EscalationRecord } from '@pawtag/db';
 
 dotenv.config({ path: path.resolve(__dirname, '../packages/api/.env') });
 
@@ -92,10 +92,10 @@ async function deleteTags(): Promise<number> {
 }
 
 /**
- * Step 3: Delete existing invoices for tag products
+ * Step 3: Delete existing invoices
  */
 async function deleteTagInvoices(): Promise<number> {
-  log('Step 3: Deleting existing invoices for tag products...');
+  log('Step 3: Deleting existing invoices...');
   
   const count = await Invoice.countDocuments({});
   
@@ -107,6 +107,82 @@ async function deleteTagInvoices(): Promise<number> {
   const result = await Invoice.deleteMany({});
   log(`Deleted ${result.deletedCount} invoices`);
   return result.deletedCount;
+}
+
+/**
+ * Step 3b: Delete existing orders
+ */
+async function deleteOrders(): Promise<number> {
+  log('Step 3b: Deleting existing orders...');
+  
+  const count = await Order.countDocuments({});
+  
+  if (DRY_RUN) {
+    logDryRun(`Would delete ${count} orders`);
+    return count;
+  }
+  
+  const result = await Order.deleteMany({});
+  log(`Deleted ${result.deletedCount} orders`);
+  return result.deletedCount;
+}
+
+/**
+ * Step 3c: Delete pending orders
+ */
+async function deletePendingOrders(): Promise<number> {
+  log('Step 3c: Deleting pending orders...');
+  
+  const count = await PendingOrder.countDocuments({});
+  
+  if (DRY_RUN) {
+    logDryRun(`Would delete ${count} pending orders`);
+    return count;
+  }
+  
+  const result = await PendingOrder.deleteMany({});
+  log(`Deleted ${result.deletedCount} pending orders`);
+  return result.deletedCount;
+}
+
+/**
+ * Step 3d: Delete fulfilments and shipments
+ */
+async function deleteFulfilmentsAndShipments(): Promise<number> {
+  log('Step 3d: Deleting fulfilments and shipments...');
+  
+  const fulfilmentCount = await Fulfilment.countDocuments({});
+  const shipmentCount = await Shipment.countDocuments({});
+  
+  if (DRY_RUN) {
+    logDryRun(`Would delete ${fulfilmentCount} fulfilments and ${shipmentCount} shipments`);
+    return fulfilmentCount + shipmentCount;
+  }
+  
+  const fulfilmentResult = await Fulfilment.deleteMany({});
+  const shipmentResult = await Shipment.deleteMany({});
+  log(`Deleted ${fulfilmentResult.deletedCount} fulfilments and ${shipmentResult.deletedCount} shipments`);
+  return fulfilmentResult.deletedCount + shipmentResult.deletedCount;
+}
+
+/**
+ * Step 3e: Delete finder scans and escalation records
+ */
+async function deleteFinderData(): Promise<number> {
+  log('Step 3e: Deleting finder scans and escalation records...');
+  
+  const scanCount = await FinderScan.countDocuments({});
+  const escalationCount = await EscalationRecord.countDocuments({});
+  
+  if (DRY_RUN) {
+    logDryRun(`Would delete ${scanCount} finder scans and ${escalationCount} escalation records`);
+    return scanCount + escalationCount;
+  }
+  
+  const scanResult = await FinderScan.deleteMany({});
+  const escalationResult = await EscalationRecord.deleteMany({});
+  log(`Deleted ${scanResult.deletedCount} finder scans and ${escalationResult.deletedCount} escalation records`);
+  return scanResult.deletedCount + escalationResult.deletedCount;
 }
 
 /**
@@ -193,10 +269,16 @@ async function migrate() {
   try {
     await connect();
     
-    // Execute migration steps
+    // Execute migration steps - delete all existing commerce data
     const deletedSubscriptions = await deleteTagSubscriptions();
     const deletedTags = await deleteTags();
     const deletedInvoices = await deleteTagInvoices();
+    const deletedOrders = await deleteOrders();
+    const deletedPendingOrders = await deletePendingOrders();
+    const deletedFulfilments = await deleteFulfilmentsAndShipments();
+    const deletedFinderData = await deleteFinderData();
+    
+    // Update models with new fields
     const updatedProducts = await updateProducts();
     const updatedTiers = await updateMembershipTiers();
     const cleanedMemberships = await cleanUserMemberships();
@@ -208,6 +290,10 @@ async function migrate() {
     log(`  - Deleted ${deletedSubscriptions} subscriptions`);
     log(`  - Deleted ${deletedTags} tags`);
     log(`  - Deleted ${deletedInvoices} invoices`);
+    log(`  - Deleted ${deletedOrders} orders`);
+    log(`  - Deleted ${deletedPendingOrders} pending orders`);
+    log(`  - Deleted ${deletedFulfilments} fulfilments/shipments`);
+    log(`  - Deleted ${deletedFinderData} finder scans/escalations`);
     log(`  - Updated ${updatedProducts} products`);
     log(`  - Updated ${updatedTiers} membership tiers`);
     log(`  - Cleaned ${cleanedMemberships} user memberships`);
