@@ -114,59 +114,11 @@ const products = [
         { icon: 'Check', description: '3 months free subscription included' }
       ],
     },
-    // ─── Guardian Loyalty: Gold Membership ──────────────────────
-    {
-      name: 'Gold Membership',
-      slug: 'gold-membership',
-      description: 'Upgrade to Gold and earn 2× Guardian Points on every purchase. Priority support, early access to new products, and free shipping on orders over $50.',
-      shortDescription: 'Earn 2× Guardian Points on every purchase',
-      price: 3.99,
-      currency: 'NZD',
-      images: [],
-      category: 'Guardian',
-      tags: ['gold', 'membership', 'loyalty', 'guardian'],
-      isActive: true,
-      isPublished: true,
-      stock: 99999,
-      reserved: 0,
-      lowStockThreshold: 0,
-      stockPolicy: 'allow',
-      weight: 0,
-      sku: 'PT-GOLD-001',
-      variants: [],
-      customizable: false,
-      customizationPrice: 0,
-      shippingCost: 0,
-      shippingDescription: 'Digital membership — no shipping required',
-      warrantyMonths: 0,
-      productType: 'membership',
-      isSubscription: true,
-      isTagProduct: false,
-      subscriptionConfig: {
-        type: 'monthly',
-        freePeriodMonths: 0,
-        gracePeriodWeeks: 1,
-        monthlyPrice: 3.99,
-        annualPrice: 39.99,
-        features: [
-          '2× Guardian Points on all purchases',
-          'Free shipping on orders over $50',
-          'Early access to new products',
-          'Priority support',
-          '$3/month PawRewards',
-        ],
-      },
-      featureHighlights: [
-        { icon: 'Sparkles', description: '2× Points on every purchase' },
-        { icon: 'Truck', description: 'Free shipping on orders over $50' },
-        { icon: 'Clock', description: 'Early access to new products' },
-        { icon: 'Headphones', description: 'Priority support' },
-        { icon: 'Gift', description: '$3/month PawRewards' },
-      ],
-      sortOrder: 100,
-      badge: 'Gold',
-    },
 ];
+
+// NOTE: Gold Membership is now managed through the MembershipTier model (seed-memberships.ts)
+// The old Gold Membership product (PT-GOLD-001) has been removed.
+// Membership tiers: Gold ($89/yr), Platinum ($99/yr), Black ($199/yr)
 
 async function seedProducts() {
   try {
