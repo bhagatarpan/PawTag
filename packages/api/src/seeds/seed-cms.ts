@@ -2583,7 +2583,36 @@ async function run() {
         }], { session });
         console.log('  Created shop page');
       } else {
-        console.log('  Shop page already exists');
+        // Update existing shop page with banner fields if missing
+        const content = existingShop.content as any || {};
+        if (!content.guardianBanner || !content.membershipBanner) {
+          content.guardianBanner = content.guardianBanner || {
+            enabled: true,
+            icon: 'Shield',
+            title: 'Every purchase can earn rewards.',
+            description: 'Guardian members earn Points with every eligible purchase.',
+            subtitle: 'Join free and start earning PawRewards today.',
+            ctaText: 'Learn More',
+            ctaLink: '/guardian',
+          };
+          content.membershipBanner = content.membershipBanner || {
+            enabled: true,
+            icon: 'Crown',
+            title: 'Upgrade to Gold, Platinum, or Black',
+            description: '2× points, free shipping, and priority support.',
+            subtitle: 'Starting from $89/year.',
+            ctaText: 'View Membership',
+            ctaLink: '/membership',
+          };
+          await CmsShopPage.updateOne(
+            { _id: existingShop._id },
+            { $set: { content } },
+            { session }
+          );
+          console.log('  Updated shop page with banner fields');
+        } else {
+          console.log('  Shop page already has banner fields');
+        }
       }
       console.log('');
 
