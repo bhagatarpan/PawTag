@@ -82,6 +82,23 @@ router.put('/:id/status', requirePermission('order.update'), async (req: AuthReq
     if (status === 'fulfilled') update.fulfilledAt = new Date();
     const item = await Fulfilment.findByIdAndUpdate(req.params.id, update, { new: true });
     if (!item) { res.status(404).json({ success: false, error: 'Fulfilment not found' }); return; }
+
+    // Sync order status based on fulfilment status
+    const fulfilmentToOrderStatus: Record<string, string> = {
+      packing: 'packing',
+      fulfilled: 'shipped',
+    };
+    const orderStatus = fulfilmentToOrderStatus[status];
+    if (orderStatus) {
+      try {
+        await Order.findByIdAndUpdate(item.orderId, { status: orderStatus });
+        logger.info({ fulfilmentId: req.params.id, orderId: item.orderId, orderStatus }, 'Order status synced from fulfilment');
+      } catch (syncErr) {
+        logger.error({ err: syncErr, fulfilmentId: req.params.id }, 'Failed to sync order status');
+        // Non-critical — don't fail the fulfilment update
+      }
+    }
+
     logger.info({ fulfilmentId: req.params.id, status }, 'Fulfilment status updated');
     res.json({ success: true, data: item });
   } catch (err) { res.status(500).json({ success: false, error: toAppError(err).userMessage }); }
