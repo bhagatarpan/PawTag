@@ -15,6 +15,13 @@ vi.mock('../../packages/api/src/services/push-notification.service', () => ({
   sendPushToUser: vi.fn().mockResolvedValue({}),
 }));
 
+vi.mock('../../packages/api/src/services/membership-entitlement.service', () => ({
+  membershipEntitlementService: {
+    hasAccess: vi.fn().mockResolvedValue(true),
+    getValue: vi.fn().mockResolvedValue(true),
+  },
+}));
+
 import { createAndDeliverNotification } from '../../packages/api/src/services/notification-delivery.service';
 import { Notification, User } from '@pawtag/db';
 import { sendPushToUser } from '../../packages/api/src/services/push-notification.service';

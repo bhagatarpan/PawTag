@@ -8,6 +8,12 @@ vi.mock('@pawtag/db', () => ({
   UserMembership: {
     findOne: vi.fn(),
   },
+  MembershipBenefit: {
+    find: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue([]) }),
+  },
+  MembershipTierBenefit: {
+    find: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue([]) }),
+  },
   Order: {
     countDocuments: vi.fn(),
   },
@@ -28,6 +34,28 @@ vi.mock('../../../packages/api/src/lib/logger', () => ({
 vi.mock('../../../packages/api/src/lib/metrics', () => ({
   incrementCounter: vi.fn(),
   METRICS: { LOYALTY_POINTS_EARNED_TOTAL: 'loyalty_points_earned_total' },
+}));
+
+// Mock entitlement service to return multiplier based on Gold membership
+const mockGetMultiplier = vi.fn().mockResolvedValue(1);
+vi.mock('../../../packages/api/src/services/membership-entitlement.service', () => ({
+  membershipEntitlementService: {
+    getValue: vi.fn().mockImplementation(async (userId: string, key: string) => {
+      if (key === 'points_multiplier') return mockGetMultiplier();
+      return null;
+    }),
+    hasAccess: vi.fn().mockResolvedValue(true),
+    getUserTierString: vi.fn().mockResolvedValue(null),
+    getTierValue: vi.fn().mockResolvedValue(null),
+    getUserEntitlements: vi.fn().mockResolvedValue({}),
+    getTierEntitlements: vi.fn().mockResolvedValue({}),
+    getBenefitsMatrix: vi.fn().mockResolvedValue({ benefits: [], tiers: [], values: {} }),
+    upsertBenefit: vi.fn().mockResolvedValue({}),
+    deleteBenefit: vi.fn().mockResolvedValue(undefined),
+    setTierBenefit: vi.fn().mockResolvedValue({}),
+    setTierBenefits: vi.fn().mockResolvedValue(undefined),
+    invalidateCache: vi.fn(),
+  },
 }));
 
 import {
@@ -59,6 +87,9 @@ function setupMocks(points: number, isGold = false, orderCount = 0) {
     ),
   } as any);
 
+  // Set multiplier based on Gold status
+  mockGetMultiplier.mockResolvedValue(isGold ? 2 : 1);
+
   mockOrder.countDocuments.mockResolvedValue(orderCount);
   mockLedger.countDocuments.mockResolvedValue(0);
   mockLedger.create.mockResolvedValue({} as any);
@@ -77,12 +108,6 @@ beforeEach(() => {
 // POINTS_CONFIG constants
 // ---------------------------------------------------------------------------
 describe('POINTS_CONFIG', () => {
-  it('has correct purchase rates', () => {
-    expect(POINTS_CONFIG.PURCHASE_RATE).toBe(1);
-    expect(POINTS_CONFIG.PURCHASE_RATE_GOLD).toBe(2);
-    expect(POINTS_CONFIG.GOLD_MULTIPLIER).toBe(2);
-  });
-
   it('has correct review points', () => {
     expect(POINTS_CONFIG.REVIEW_TEXT).toBe(5);
     expect(POINTS_CONFIG.REVIEW_PHOTO).toBe(15);
@@ -102,11 +127,6 @@ describe('POINTS_CONFIG', () => {
 
   it('has correct social share points', () => {
     expect(POINTS_CONFIG.SOCIAL_SHARE).toBe(3);
-  });
-
-  it('has correct repeat purchase bonuses', () => {
-    expect(POINTS_CONFIG.REPEAT_PURCHASE_BONUS).toBe(10);
-    expect(POINTS_CONFIG.REPEAT_PURCHASE_BONUS_GOLD).toBe(20);
   });
 
   it('has correct annual caps', () => {
