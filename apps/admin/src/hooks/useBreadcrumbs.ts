@@ -28,6 +28,7 @@ const ROUTE_MAP: Record<string, { section: string; page: string }> = {
   '/orders': { section: 'Orders & Fulfilment', page: 'All Orders' },
   '/orders/pending': { section: 'Orders & Fulfilment', page: 'Pending' },
   '/orders/processing': { section: 'Orders & Fulfilment', page: 'Processing' },
+  '/fulfilment': { section: 'Orders & Fulfilment', page: 'Fulfilment' },
   '/invoices': { section: 'Orders & Fulfilment', page: 'Invoices' },
   '/shipping/shipments': { section: 'Orders & Fulfilment', page: 'Shipments' },
   '/returns': { section: 'Orders & Fulfilment', page: 'Returns' },
