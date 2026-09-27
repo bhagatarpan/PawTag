@@ -185,6 +185,7 @@ const sections: SidebarSection[] = [
     links: [
       { to: '/membership', label: 'Dashboard', icon: Crown, permission: 'subscription.read' },
       { to: '/membership/tiers', label: 'Tier Configuration', icon: Settings, permission: 'setting.read' },
+      { to: '/membership/entitlements', label: 'Entitlements', icon: Settings, permission: 'setting.read' },
       { to: '/membership/subscribers', label: 'Subscribers', icon: Users, permission: 'subscription.read' },
     ],
   },

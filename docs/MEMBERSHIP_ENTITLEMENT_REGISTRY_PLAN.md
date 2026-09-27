@@ -10,8 +10,8 @@
 
 | Phase | Description | Status | Date |
 |-------|-------------|--------|------|
-| 0 | Data Layer + Entitlement Service | 🔄 IN PROGRESS | 2026-09-27 |
-| 1 | Admin API + UI (Entitlements Table) | ⬜ PENDING | |
+| 0 | Data Layer + Entitlement Service | ✅ COMPLETE | 2026-09-27 |
+| 1 | Admin API + UI (Entitlements Table) | ✅ COMPLETE | 2026-09-27 |
 | 2 | Checkout (Free Shipping for ALL tiers) | ⬜ PENDING | |
 | 3 | Points (Multiplier for ALL tiers) | ⬜ PENDING | |
 | 4 | Notifications (Channel Gating) | ⬜ PENDING | |
