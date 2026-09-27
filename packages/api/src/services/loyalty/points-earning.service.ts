@@ -26,6 +26,7 @@ import { User, Subscription, Order, Setting, GuardianPointsLedger } from '@pawta
 import { incrementCounter, METRICS } from '../../lib/metrics';
 import logger from '../../lib/logger';
 import { getGuardianNumber, type GuardianSettingKey } from './guardian-config';
+import { membershipEntitlementService } from '../membership-entitlement.service';
 
 /**
  * Get the Gold membership price from CMS settings.
@@ -44,57 +45,58 @@ export async function getGoldPrice(): Promise<number> {
 }
 
 /**
- * Check if a user has an active Gold membership via the new UserMembership model.
+ * @deprecated Use membershipEntitlementService.getValue(userId, 'points_multiplier') instead.
+ * Kept for backward compatibility during migration.
  */
 export async function isGoldSubscription(userId: string): Promise<boolean> {
-  if (!userId) return false;
-  try {
-    const { UserMembership } = await import('@pawtag/db');
-    const membership = await UserMembership.findOne({
-      userId,
-      status: 'active',
-    }).populate('tierId').lean();
-    const tier = membership?.tierId as any;
-    return tier?.tier === 'gold';
-  } catch {
-    return false;
-  }
+  const multiplier = await membershipEntitlementService.getValue<number>(userId, 'points_multiplier');
+  return (multiplier ?? 1) > 1;
 }
 
-// Points earning activities with base rates
+/**
+ * Get the points multiplier for a user from the entitlement registry.
+ * Gold=1, Platinum=2, Black=3 (configurable via admin).
+ */
+async function getPointsMultiplier(userId: string): Promise<number> {
+  const multiplier = await membershipEntitlementService.getValue<number>(userId, 'points_multiplier');
+  return multiplier ?? 1;
+}
+
+/**
+ * Get the purchase rate and spent amount for a user.
+ * Uses entitlement-based multiplier applied to base Guardian rates.
+ */
+async function getPurchaseConfig(userId: string): Promise<{ rate: number; spentAmount: number; repeatBonus: number }> {
+  const multiplier = await getPointsMultiplier(userId);
+  const baseRate = await getGuardianNumber('purchaseRateGuardian');
+  const baseSpentAmount = await getGuardianNumber('purchaseSpentAmount');
+  const baseRepeatBonus = await getGuardianNumber('repeatPurchaseBonusGuardian');
+  return {
+    rate: Math.floor(baseRate * multiplier),
+    spentAmount: baseSpentAmount,
+    repeatBonus: Math.floor(baseRepeatBonus * multiplier),
+  };
+}
+
+// Points earning activities — base rates from CMS settings
+// All multiplier logic is now in the entitlement registry.
 export const POINTS_CONFIG = {
-  // Purchase points
-  PURCHASE_RATE: 1, // 1 pt per $1 spent (Guardian)
-  PURCHASE_RATE_GOLD: 2, // 2 pts per $1 (Gold)
-  
-  // Repeat purchase bonus
-  REPEAT_PURCHASE_BONUS: 10, // +10 pts on 3rd+ order
-  REPEAT_PURCHASE_BONUS_GOLD: 20, // +20 for Gold
-  
-  // Review points
-  REVIEW_TEXT: 5, // 5 pts for text review
-  REVIEW_PHOTO: 15, // 15 pts for photo review
-  REVIEW_VIDEO: 25, // 25 pts for video review
-  
+  // Review points (base, before multiplier)
+  REVIEW_TEXT: 5,
+  REVIEW_PHOTO: 15,
+  REVIEW_VIDEO: 25,
   // Referral points
-  REFERRAL_SIGNUP: 20, // 20 pts for referral signup
-  REFERRAL_PURCHASE: 50, // 50 pts for referral purchase
-  
+  REFERRAL_SIGNUP: 20,
+  REFERRAL_PURCHASE: 50,
   // Pet milestone points
-  PET_PROFILE_COMPLETE: 15, // 15 pts for completing pet profile
-  PET_BIRTHDAY: 10, // 10 pts on pet birthday
-  PET_ADOPTION_ANNIVERSARY: 10, // 10 pts on adoption anniversary
-  
+  PET_PROFILE_COMPLETE: 15,
+  PET_BIRTHDAY: 10,
+  PET_ADOPTION_ANNIVERSARY: 10,
   // Membership milestone points
-  MONTHLY_ANNIVERSARY: 5, // 5 pts per month of membership
-  ANNUAL_ANNIVERSARY: 25, // 25 pts per year of membership
-  
+  MONTHLY_ANNIVERSARY: 5,
+  ANNUAL_ANNIVERSARY: 25,
   // Social share points
-  SOCIAL_SHARE: 3, // 3 pts for sharing on social media
-  
-  // Gold multiplier
-  GOLD_MULTIPLIER: 2, // Gold members earn 2× points
-  
+  SOCIAL_SHARE: 3,
   // Annual caps (per activity type)
   ANNUAL_CAPS: {
     REVIEW_TEXT: 30,
@@ -122,25 +124,18 @@ export async function awardPurchasePoints(
   const user = await User.findById(userId).lean();
   if (!user) throw new Error('User not found');
 
-  const isGoldMember = await isGoldSubscription(userId);
+  const multiplier = await getPointsMultiplier(userId);
 
-  // Calculate base points (read from CMS settings)
-  // Formula: points = (orderTotal ÷ spentAmount) × purchaseRate
-  const rate = isGoldMember
-    ? await getGuardianNumber('purchaseRateGold')
-    : await getGuardianNumber('purchaseRateGuardian');
-  const spentAmount = isGoldMember
-    ? await getGuardianNumber('purchaseSpentAmountGold')
-    : await getGuardianNumber('purchaseSpentAmount');
-  let points = Math.floor((orderTotal / spentAmount) * rate);
+  // Calculate base points from CMS settings, apply membership multiplier
+  const baseRate = await getGuardianNumber('purchaseRateGuardian');
+  const spentAmount = await getGuardianNumber('purchaseSpentAmount');
+  let points = Math.floor((orderTotal / spentAmount) * baseRate * multiplier);
 
   // Check for repeat purchase bonus (3rd+ order)
   const orderCount = await Order.countDocuments({ userId, status: { $in: ['paid', 'delivered'] } });
   if (orderCount >= 3) {
-    const bonus = isGoldMember
-      ? await getGuardianNumber('repeatPurchaseBonusGold')
-      : await getGuardianNumber('repeatPurchaseBonusGuardian');
-    points += bonus;
+    const baseRepeatBonus = await getGuardianNumber('repeatPurchaseBonusGuardian');
+    points += Math.floor(baseRepeatBonus * multiplier);
   }
 
   // Record in ledger
@@ -157,7 +152,7 @@ export async function awardPurchasePoints(
     pointsAwarded: points,
     totalPoints: updatedUser?.guardianPoints || 0,
     activity: 'purchase',
-    isGoldMember,
+    isGoldMember: multiplier > 1,
   };
 }
 
@@ -172,13 +167,12 @@ export async function awardReviewPoints(
   const user = await User.findById(userId).lean();
   if (!user) throw new Error('User not found');
 
-  const isGoldMember = await isGoldSubscription(userId);
+  const multiplier = await getPointsMultiplier(userId);
 
-  // Get base points for review type (read from CMS settings)
+  // Get base points for review type from CMS settings, apply membership multiplier
   const reviewKey = `review${reviewType.charAt(0).toUpperCase() + reviewType.slice(1)}Points` as GuardianSettingKey;
   const basePoints = await getGuardianNumber(reviewKey);
-  const goldMultiplier = await getGuardianNumber('goldMultiplier');
-  const points = isGoldMember ? basePoints * goldMultiplier : basePoints;
+  const points = basePoints * multiplier;
 
   // Check annual cap
   const capKey = `annualCapReview${reviewType.charAt(0).toUpperCase() + reviewType.slice(1)}` as GuardianSettingKey;
@@ -194,7 +188,7 @@ export async function awardReviewPoints(
         pointsAwarded: 0,
         totalPoints: user.guardianPoints || 0,
         activity: 'review',
-        isGoldMember,
+        isGoldMember: multiplier > 1,
       };
     }
   }
@@ -213,7 +207,7 @@ export async function awardReviewPoints(
     pointsAwarded: points,
     totalPoints: updatedUser?.guardianPoints || 0,
     activity: `review_${reviewType}`,
-    isGoldMember,
+    isGoldMember: multiplier > 1,
   };
 }
 
@@ -228,13 +222,12 @@ export async function awardReferralPoints(
   const user = await User.findById(userId).lean();
   if (!user) throw new Error('User not found');
 
-  const isGoldMember = await isGoldSubscription(userId);
+  const multiplier = await getPointsMultiplier(userId);
 
-  // Get base points for referral type (read from CMS settings)
+  // Get base points for referral type from CMS settings, apply membership multiplier
   const referralKey = `referral${referralType.charAt(0).toUpperCase() + referralType.slice(1)}Points` as GuardianSettingKey;
   const basePoints = await getGuardianNumber(referralKey);
-  const goldMultiplier = await getGuardianNumber('goldMultiplier');
-  const points = isGoldMember ? basePoints * goldMultiplier : basePoints;
+  const points = basePoints * multiplier;
 
   // Check annual cap for signup referrals
   if (referralType === 'signup') {
@@ -249,7 +242,7 @@ export async function awardReferralPoints(
         pointsAwarded: 0,
         totalPoints: user.guardianPoints || 0,
         activity: 'referral',
-        isGoldMember,
+        isGoldMember: multiplier > 1,
       };
     }
   }
@@ -268,7 +261,7 @@ export async function awardReferralPoints(
     pointsAwarded: points,
     totalPoints: updatedUser?.guardianPoints || 0,
     activity: `referral_${referralType}`,
-    isGoldMember,
+    isGoldMember: multiplier > 1,
   };
 }
 
@@ -283,9 +276,9 @@ export async function awardPetMilestonePoints(
   const user = await User.findById(userId).lean();
   if (!user) throw new Error('User not found');
 
-  const isGoldMember = await isGoldSubscription(userId);
+  const multiplier = await getPointsMultiplier(userId);
 
-  // Get base points for milestone type (read from CMS settings)
+  // Get base points for milestone type from CMS settings, apply membership multiplier
   const MILESTONE_KEYS: Record<string, GuardianSettingKey> = {
     profile_complete: 'petProfilePoints',
     birthday: 'petBirthdayPoints',
@@ -293,8 +286,7 @@ export async function awardPetMilestonePoints(
   };
   const milestoneKey = MILESTONE_KEYS[milestoneType];
   const basePoints = await getGuardianNumber(milestoneKey);
-  const goldMultiplier = await getGuardianNumber('goldMultiplier');
-  const points = isGoldMember ? basePoints * goldMultiplier : basePoints;
+  const points = basePoints * multiplier;
 
   // Record in ledger
   await recordPointsEarned(userId, points, `pet_${milestoneType}`, petId, { milestoneType });
@@ -310,7 +302,7 @@ export async function awardPetMilestonePoints(
     pointsAwarded: points,
     totalPoints: updatedUser?.guardianPoints || 0,
     activity: `pet_${milestoneType}`,
-    isGoldMember,
+    isGoldMember: multiplier > 1,
   };
 }
 
@@ -324,11 +316,9 @@ export async function awardTagActivationPoints(
   const user = await User.findById(userId).lean();
   if (!user) throw new Error('User not found');
 
-  const isGoldMember = await isGoldSubscription(userId);
-
+  const multiplier = await getPointsMultiplier(userId);
   const basePoints = await getGuardianNumber('tagActivationPoints');
-  const goldMultiplier = await getGuardianNumber('goldMultiplier');
-  const points = isGoldMember ? basePoints * goldMultiplier : basePoints;
+  const points = basePoints * multiplier;
 
   await recordPointsEarned(userId, points, 'tag_activation', tagId, {});
 
@@ -342,7 +332,7 @@ export async function awardTagActivationPoints(
     pointsAwarded: points,
     totalPoints: updatedUser?.guardianPoints || 0,
     activity: 'tag_activation',
-    isGoldMember,
+    isGoldMember: multiplier > 1,
   };
 }
 
@@ -356,11 +346,9 @@ export async function awardSocialSharePoints(
   const user = await User.findById(userId).lean();
   if (!user) throw new Error('User not found');
 
-  const isGoldMember = await isGoldSubscription(userId);
-
+  const multiplier = await getPointsMultiplier(userId);
   const basePoints = await getGuardianNumber('socialSharePoints');
-  const goldMultiplier = await getGuardianNumber('goldMultiplier');
-  const points = isGoldMember ? basePoints * goldMultiplier : basePoints;
+  const points = basePoints * multiplier;
 
   // Record in ledger
   await recordPointsEarned(userId, points, 'social_share', platform, { platform });
@@ -376,7 +364,7 @@ export async function awardSocialSharePoints(
     pointsAwarded: points,
     totalPoints: updatedUser?.guardianPoints || 0,
     activity: 'social_share',
-    isGoldMember,
+    isGoldMember: multiplier > 1,
   };
 }
 
@@ -390,11 +378,9 @@ export async function awardMembershipMilestonePoints(
   const user = await User.findById(userId).lean();
   if (!user) throw new Error('User not found');
 
-  const isGoldMember = await isGoldSubscription(userId);
-
+  const multiplier = await getPointsMultiplier(userId);
   const basePoints = await getGuardianNumber(`${milestoneType}AnniversaryPoints` as GuardianSettingKey);
-  const goldMultiplier = await getGuardianNumber('goldMultiplier');
-  const points = isGoldMember ? basePoints * goldMultiplier : basePoints;
+  const points = basePoints * multiplier;
 
   // Record in ledger
   await recordPointsEarned(userId, points, `membership_${milestoneType}`, userId, { milestoneType });
@@ -410,7 +396,7 @@ export async function awardMembershipMilestonePoints(
     pointsAwarded: points,
     totalPoints: updatedUser?.guardianPoints || 0,
     activity: `membership_${milestoneType}`,
-    isGoldMember,
+    isGoldMember: multiplier > 1,
   };
 }
 
