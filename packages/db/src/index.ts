@@ -69,3 +69,5 @@ export { MembershipTier, type IMembershipTierDocument, type IMembershipTierBenef
 export { UserMembership, type IUserMembershipDocument } from './models/UserMembership';
 export { DigitalProduct, type IDigitalProductDocument } from './models/DigitalProduct';
 export { DigitalEntitlement, type IDigitalEntitlementDocument } from './models/DigitalEntitlement';
+export { MembershipBenefit, type IMembershipBenefitDocument } from './models/MembershipBenefit';
+export { MembershipTierBenefit, type IMembershipTierBenefitDocument } from './models/MembershipTierBenefit';
