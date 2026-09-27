@@ -14,7 +14,7 @@
 | 1 | Admin API + UI (Entitlements Table) | ✅ COMPLETE | 2026-09-27 |
 | 2 | Checkout (Free Shipping for ALL tiers) | ✅ COMPLETE | 2026-09-27 |
 | 3 | Points (Multiplier for ALL tiers) | ✅ COMPLETE | 2026-09-27 |
-| 4 | Notifications (Channel Gating) | ⬜ PENDING | |
+| 4 | Notifications (Channel Gating) | ✅ COMPLETE | 2026-09-27 |
 | 5 | Remaining Services (Tag limits, PawRewards, etc.) | ⬜ PENDING | |
 | 6 | Frontend Cleanup (Remove hardcoded tier text) | ⬜ PENDING | |
 | 7 | Dead Code Removal + Documentation | ⬜ PENDING | |
