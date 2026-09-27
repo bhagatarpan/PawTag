@@ -778,6 +778,10 @@ export async function extendTagsForMembership(userId: string, membershipId: stri
     return;
   }
 
+  // Get tag limit from entitlement registry (admin-configurable)
+  const { membershipEntitlementService } = await import('./membership-entitlement.service');
+  const tagLimit = await membershipEntitlementService.getValue<number>(userId, 'tag_limit') ?? tier.tagLimit;
+
   // Get all user's tags (active or limited, not deleted)
   const tags = await Tag.find({
     ownerId: userId,
@@ -786,8 +790,8 @@ export async function extendTagsForMembership(userId: string, membershipId: stri
   }).sort({ createdAt: 1 }); // Oldest first
 
   // Apply tier limit
-  const tagsToExtend = tags.slice(0, tier.tagLimit);
-  const tagsNotExtended = tags.slice(tier.tagLimit);
+  const tagsToExtend = tags.slice(0, tagLimit);
+  const tagsNotExtended = tags.slice(tagLimit);
 
   // Extend tags within limit
   for (const tag of tagsToExtend) {
@@ -835,7 +839,7 @@ export async function extendTagsForMembership(userId: string, membershipId: stri
     userId,
     membershipId,
     tier: tier.tier,
-    tagLimit: tier.tagLimit,
+    tagLimit,
     totalTags: tags.length,
     tagsExtended: tagsToExtend.length,
     tagsLimited: tagsNotExtended.length,
