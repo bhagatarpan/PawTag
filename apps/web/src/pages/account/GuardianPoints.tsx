@@ -71,19 +71,21 @@ export default function GuardianPoints() {
         api.get(`${API.customer.guardian.history}?limit=20&offset=${(page - 1) * 20}`),
       ]);
 
+      const historyData = historyRes.data.data?.history || historyRes.data.data || [];
+
       if (page === 1) {
         setData({
           ...pointsRes.data.data,
-          history: historyRes.data.data,
+          history: historyData,
         });
       } else {
         setData((prev) => prev ? {
           ...prev,
-          history: [...prev.history, ...historyRes.data.data],
+          history: [...prev.history, ...historyData],
         } : null);
       }
 
-      setHasMore(historyRes.data.data.length === 20);
+      setHasMore(historyData.length === 20);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to load points data');
     } finally {
