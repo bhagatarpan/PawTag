@@ -296,7 +296,8 @@ export async function notifyRefundUpdate(
       const creditNote = await Invoice.findOne({ orderId: order._id, type: 'credit_note' }).sort({ createdAt: -1 }).lean();
       if (creditNote) {
         creditNoteNumber = creditNote.invoiceNumber;
-        creditNoteUrl = `${baseUrl}/account/invoices/${creditNote._id}`;
+        // Use the order detail page which shows invoices and credit notes
+        creditNoteUrl = `${baseUrl}/account/orders/${order._id}`;
       }
     } catch { /* non-critical */ }
 

@@ -831,17 +831,26 @@ router.get('/users/:id/orders', requirePermission('user.read'), requirePermissio
     const orderIds = orders.map((o: any) => o._id);
     const invoices = await Invoice.find({ orderId: { $in: orderIds } })
       .sort({ createdAt: -1 })
-      .select('orderId invoiceNumber amount currency status paidAt createdAt');
+      .select('orderId invoiceNumber amount currency status paidAt createdAt type relatedInvoiceId');
 
     const invoiceMap = new Map<string, any>();
+    const creditNoteMap = new Map<string, any>();
     for (const inv of invoices) {
       const oid = (inv as any).orderId?.toString();
-      if (oid && !invoiceMap.has(oid)) invoiceMap.set(oid, inv);
+      if (!oid) continue;
+      if ((inv as any).type === 'credit_note') {
+        // Store credit note (most recent per order)
+        if (!creditNoteMap.has(oid)) creditNoteMap.set(oid, inv);
+      } else {
+        // Store original invoice (most recent per order)
+        if (!invoiceMap.has(oid)) invoiceMap.set(oid, inv);
+      }
     }
 
     const ordersWithInvoices = orders.map((o: any) => ({
       ...o.toObject(),
       latestInvoice: invoiceMap.get(o._id?.toString()) || null,
+      creditNote: creditNoteMap.get(o._id?.toString()) || null,
     }));
 
     res.json({

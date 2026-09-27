@@ -31,6 +31,7 @@ import { toast } from '../lib/toast';
 
 interface Invoice {
   _id: string;
+  type: 'invoice' | 'credit_note';
   invoiceNumber: string;
   userId: { _id: string; fullName: string; email: string } | string;
   orderId: { _id: string; orderNumber: string; status: string } | string;
@@ -167,6 +168,7 @@ export default function Invoices() {
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Invoice</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Type</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Customer</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Order</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Amount</th>
@@ -180,6 +182,17 @@ export default function Invoices() {
                 <tr key={inv._id} className="hover:bg-gray-50">
                   <td className="px-4 py-3">
                     <span className="font-mono text-sm font-medium text-gray-900">{inv.invoiceNumber}</span>
+                  </td>
+                  <td className="px-4 py-3">
+                    {inv.type === 'credit_note' ? (
+                      <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-700">
+                        Credit Note
+                      </span>
+                    ) : (
+                      <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-700">
+                        Invoice
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600">{getUserName(inv)}</td>
                   <td className="px-4 py-3 text-sm text-gray-600 font-mono">{getOrderNumber(inv)}</td>

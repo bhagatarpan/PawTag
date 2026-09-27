@@ -1033,11 +1033,11 @@ router.get('/orders', requirePermission('order.read'), async (req: AuthRequest, 
   try {
     const orders = await Order.find({ userId: req.user!.id }).sort({ createdAt: -1 });
 
-    // Enrich with latest invoice per order
+    // Enrich with latest invoice per order (exclude credit notes)
     const orderIds = orders.map((o: any) => o._id);
-    const invoices = await Invoice.find({ orderId: { $in: orderIds } })
+    const invoices = await Invoice.find({ orderId: { $in: orderIds }, type: { $ne: 'credit_note' } })
       .sort({ createdAt: -1 })
-      .select('orderId invoiceNumber amount status paidAt');
+      .select('orderId invoiceNumber amount status paidAt type');
     const invoiceMap = new Map<string, any>();
     for (const inv of invoices) {
       const oid = (inv as any).orderId?.toString();

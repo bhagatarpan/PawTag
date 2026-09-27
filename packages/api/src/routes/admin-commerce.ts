@@ -482,10 +482,11 @@ router.post('/orders/:id/ship', requirePermission('order.update'), async (req: A
  */
 router.get('/invoices', requirePermission('order.read'), async (req: AuthRequest, res: Response) => {
   try {
-    const { page = 1, limit = 20, status, search, sortBy = 'createdAt', sortDir = 'desc' } = req.query;
+    const { page = 1, limit = 20, status, type, search, sortBy = 'createdAt', sortDir = 'desc' } = req.query;
 
     const query: Record<string, any> = {};
     if (status) query.status = status;
+    if (type) query.type = type;
     if (search) {
       query.$or = [
         { invoiceNumber: { $regex: search, $options: 'i' } },

@@ -748,6 +748,17 @@ export function OrderDetailDrawer({
                   })}
                 />
               )}
+              {(order as any).creditNote && (
+                <DetailRow
+                  label="Credit Note"
+                  value={
+                    <span className="flex items-center gap-2">
+                      <span className="font-mono text-sm font-medium text-red-600">{(order as any).creditNote.invoiceNumber}</span>
+                      <span className="inline-flex px-2 py-0.5 text-xs font-medium rounded-full bg-red-100 text-red-700">CN</span>
+                    </span>
+                  }
+                />
+              )}
             </Section>
           )}
 

@@ -293,6 +293,11 @@ export async function generateInvoiceHtml(invoiceId: string): Promise<string> {
   const invoice = await Invoice.findById(invoiceId).lean();
   if (!invoice) throw new Error('Invoice not found');
 
+  // Delegate credit notes to the dedicated credit note renderer
+  if (invoice.type === 'credit_note') {
+    return generateCreditNoteHtml(invoiceId);
+  }
+
   // Subscription lookup is conditional — only for subscription invoices
   let subscription: any = null;
   if (invoice.subscriptionId) {
