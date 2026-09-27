@@ -178,7 +178,7 @@ function FinderPage() {
           <div className="mx-auto w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mb-6">
             <AlertTriangle size={40} className="text-red-600" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-3">Tag Expired</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-3">Tag In-Active or Expired</h1>
           <p className="text-lg text-gray-600 mb-6">
             This PawTag is no longer active. No pet information is available for this tag.
           </p>
