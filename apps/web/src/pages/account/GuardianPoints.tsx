@@ -68,7 +68,7 @@ export default function GuardianPoints() {
     try {
       const [pointsRes, historyRes] = await Promise.all([
         api.get(API.customer.guardian.points),
-        api.get(`${API.customer.guardian.activity}?limit=20&offset=${(page - 1) * 20}`),
+        api.get(`${API.customer.guardian.history}?limit=20&offset=${(page - 1) * 20}`),
       ]);
 
       if (page === 1) {
