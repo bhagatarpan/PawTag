@@ -12,7 +12,7 @@
  * ```
  */
 
-import { Order, PaymentTransaction, type IOrderDocument } from '@pawtag/db';
+import { Order, PaymentTransaction, Invoice, User, type IOrderDocument } from '@pawtag/db';
 import mongoose from 'mongoose';
 import { NotFoundError } from '../../lib/app-errors';
 import { RefundError } from '../errors';
@@ -198,6 +198,34 @@ export class RefundService {
       initiatedBy: 'admin',
       notes: params.reason,
     });
+
+    // 12. Generate credit note (refund invoice)
+    let creditNote: any = null;
+    try {
+      const { generateCreditNoteNumber } = await import('../../lib/invoice-number');
+      const creditNoteNumber = await generateCreditNoteNumber();
+
+      // Find original invoice for this order
+      const originalInvoice = await Invoice.findOne({ orderId: order._id, type: 'invoice' }).sort({ createdAt: -1 }).lean();
+
+      creditNote = await Invoice.create({
+        type: 'credit_note',
+        relatedInvoiceId: originalInvoice?._id || null,
+        orderId: order._id,
+        userId: order.userId,
+        invoiceNumber: creditNoteNumber,
+        amount: refundAmount,
+        currency: order.payment.currency || 'NZD',
+        status: 'paid',
+        paymentMethod: order.payment.method,
+        paidAt: new Date(),
+      });
+
+      logger.info({ creditNoteId: creditNote._id, creditNoteNumber, orderId: order._id, amount: refundAmount }, 'Credit note generated');
+    } catch (err: any) {
+      logger.error({ err, orderId: order._id }, 'Failed to generate credit note');
+      // Non-critical — don't fail the refund
+    }
 
     logger.info({
       orderId,

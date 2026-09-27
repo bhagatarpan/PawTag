@@ -1,6 +1,8 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IInvoiceDocument extends Document {
+  type: 'invoice' | 'credit_note';
+  relatedInvoiceId?: mongoose.Types.ObjectId;
   subscriptionId?: mongoose.Types.ObjectId;
   orderId?: mongoose.Types.ObjectId;
   userId: mongoose.Types.ObjectId;
@@ -33,6 +35,8 @@ export interface IInvoiceDocument extends Document {
 
 const InvoiceSchema = new Schema<IInvoiceDocument>(
   {
+    type: { type: String, enum: ['invoice', 'credit_note'], default: 'invoice', index: true },
+    relatedInvoiceId: { type: Schema.Types.ObjectId, ref: 'Invoice' },
     subscriptionId: { type: Schema.Types.ObjectId, ref: 'Subscription', index: true },
     orderId: { type: Schema.Types.ObjectId, ref: 'Order', index: true },
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
@@ -72,6 +76,7 @@ InvoiceSchema.index({ invoiceNumber: 1 }, { unique: true });
 InvoiceSchema.index({ orderId: 1, createdAt: -1 });
 InvoiceSchema.index({ subscriptionId: 1, createdAt: -1 });
 InvoiceSchema.index({ userId: 1, subscriptionId: 1, createdAt: -1 });
+InvoiceSchema.index({ relatedInvoiceId: 1 });
 
 // Idempotency: prevent duplicate invoices for the same Stripe Invoice ID
 InvoiceSchema.index(

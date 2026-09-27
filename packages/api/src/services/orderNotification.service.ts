@@ -287,6 +287,19 @@ export async function notifyRefundUpdate(
     });
   } else if (newStatus === 'succeeded') {
     subject = `Refund Settled — Order ${order.orderNumber}`;
+
+    // Look up credit note if it exists
+    let creditNoteNumber: string | undefined;
+    let creditNoteUrl: string | undefined;
+    try {
+      const { Invoice } = await import('@pawtag/db');
+      const creditNote = await Invoice.findOne({ orderId: order._id, type: 'credit_note' }).sort({ createdAt: -1 }).lean();
+      if (creditNote) {
+        creditNoteNumber = creditNote.invoiceNumber;
+        creditNoteUrl = `${baseUrl}/account/invoices/${creditNote._id}`;
+      }
+    } catch { /* non-critical */ }
+
     html = renderRefundSettledEmail({
       name: user.fullName || 'Customer',
       orderNumber: order.orderNumber,
@@ -296,6 +309,8 @@ export async function notifyRefundUpdate(
       currency,
       settledAt,
       viewOrderUrl,
+      creditNoteNumber,
+      creditNoteUrl,
     });
   } else if (newStatus === 'failed') {
     subject = `Refund Update — Order ${order.orderNumber}`;

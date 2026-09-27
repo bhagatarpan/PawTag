@@ -380,6 +380,205 @@ export async function generateInvoiceHtml(invoiceId: string): Promise<string> {
   return buildDefaultInvoiceHtml(data, company, order);
 }
 
+export async function generateCreditNoteHtml(creditNoteId: string): Promise<string> {
+  const creditNote = await Invoice.findById(creditNoteId).lean();
+  if (!creditNote) throw new Error('Credit note not found');
+  if (creditNote.type !== 'credit_note') throw new Error('Invoice is not a credit note');
+
+  // Load the original invoice
+  let originalInvoice: any = null;
+  if (creditNote.relatedInvoiceId) {
+    originalInvoice = await Invoice.findById(creditNote.relatedInvoiceId).lean();
+  }
+
+  // Load order for line items
+  let order: any = null;
+  if (creditNote.orderId) {
+    order = await Order.findById(creditNote.orderId).lean();
+  }
+
+  const user = await User.findById(creditNote.userId)
+    .select('fullName email phoneNumber address')
+    .lean();
+
+  const company = await getCompanySettings();
+  const companyName = company['company.name'] || 'PawTag Ltd';
+  const companyAddress = company['company.address'] || '';
+  const companyPhone = company['company.phone'] || '';
+  const companyEmail = company['company.email'] || '';
+  const companyGst = company['company.gst'] || '';
+  const companyWebsite = company['company.website'] || '';
+  const companyLogo = company['company.logo'] || '';
+  const currentYear = new Date().getFullYear();
+
+  // Build line items from original order (refunded items)
+  let lineItemRows = '';
+  if (order?.items?.length > 0) {
+    lineItemRows = order.items.map((item: any) => `
+          <tr>
+            <td>
+              <strong>${escapeHtml(item.productName)}</strong>
+              ${item.variantName ? `<br><span style="color:#6b7280;font-size:12px;">${escapeHtml(item.variantName)}</span>` : ''}
+              ${item.tagId ? `<br><span style="color:#0d9488;font-size:12px;">Tag: ${escapeHtml(item.tagId)}</span>` : ''}
+            </td>
+            <td>${item.quantity}</td>
+            <td class="amount-col" style="color:#dc2626;">-$${(item.unitPrice * item.quantity).toFixed(2)}</td>
+          </tr>`).join('');
+  } else {
+    lineItemRows = `
+          <tr>
+            <td><strong>Refund — ${escapeHtml(originalInvoice?.invoiceNumber || creditNote.invoiceNumber)}</strong></td>
+            <td>—</td>
+            <td class="amount-col" style="color:#dc2626;">-$${creditNote.amount.toFixed(2)}</td>
+          </tr>`;
+  }
+
+  // Totals breakdown
+  const orderSubtotal = order?.subtotal;
+  const orderShipping = order?.shippingCost;
+  const orderTax = order?.tax;
+  const orderDiscount = order?.discount?.amount || 0;
+
+  let totalsRows = '';
+  if (orderSubtotal != null) {
+    totalsRows += `
+        <tr>
+          <td colspan="2" style="border:none;padding:8px 16px;font-size:13px;color:#6b7280;">Original Subtotal</td>
+          <td class="amount-col" style="border:none;padding:8px 16px;font-size:13px;color:#6b7280;font-weight:400;">$${orderSubtotal.toFixed(2)}</td>
+        </tr>`;
+  }
+  if (orderDiscount > 0) {
+    totalsRows += `
+        <tr>
+          <td colspan="2" style="border:none;padding:8px 16px;font-size:13px;color:#6b7280;">Discount${order?.discount?.reason ? ` (${escapeHtml(order.discount.reason)})` : ''}</td>
+          <td class="amount-col" style="border:none;padding:8px 16px;font-size:13px;color:#16a34a;font-weight:400;">-$${orderDiscount.toFixed(2)}</td>
+        </tr>`;
+  }
+  if (orderShipping != null && orderShipping > 0) {
+    totalsRows += `
+        <tr>
+          <td colspan="2" style="border:none;padding:8px 16px;font-size:13px;color:#6b7280;">Shipping Refund</td>
+          <td class="amount-col" style="border:none;padding:8px 16px;font-size:13px;color:#dc2626;font-weight:400;">-$${orderShipping.toFixed(2)}</td>
+        </tr>`;
+  }
+  if (orderTax != null && orderTax > 0) {
+    totalsRows += `
+        <tr>
+          <td colspan="2" style="border:none;padding:8px 16px;font-size:13px;color:#6b7280;">GST Refund (15%)</td>
+          <td class="amount-col" style="border:none;padding:8px 16px;font-size:13px;color:#dc2626;font-weight:400;">-$${orderTax.toFixed(2)}</td>
+        </tr>`;
+  }
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Credit Note ${escapeHtml(creditNote.invoiceNumber)} | ${escapeHtml(companyName)}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f3f4f6; color: #1f2937; }
+    .invoice-container { max-width: 800px; margin: 0 auto; background: #fff; }
+    .invoice-header { background: linear-gradient(135deg, #dc2626, #b91c1c); padding: 40px; color: #fff; display: flex; justify-content: space-between; align-items: flex-start; }
+    .company-info h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; }
+    .company-info p { font-size: 13px; opacity: 0.85; line-height: 1.6; }
+    .invoice-title { text-align: right; }
+    .invoice-title h2 { font-size: 36px; font-weight: 800; letter-spacing: 2px; }
+    .invoice-title .inv-number { font-size: 16px; opacity: 0.9; margin-top: 4px; }
+    .invoice-body { padding: 40px; }
+    .invoice-meta { display: flex; justify-content: space-between; margin-bottom: 32px; }
+    .meta-block h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #9ca3af; margin-bottom: 8px; }
+    .meta-block p { font-size: 14px; line-height: 1.6; color: #374151; }
+    .meta-block .label { color: #6b7280; font-size: 12px; }
+    .status-badge { display: inline-block; padding: 4px 14px; border-radius: 20px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #fff; background: #16a34a; }
+    table { width: 100%; border-collapse: collapse; margin: 24px 0; }
+    thead th { background: #f9fafb; padding: 12px 16px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #6b7280; border-bottom: 2px solid #e5e7eb; }
+    tbody td { padding: 14px 16px; border-bottom: 1px solid #f3f4f6; font-size: 14px; }
+    tbody tr:last-child td { border-bottom: none; }
+    .amount-col { text-align: right; font-weight: 600; }
+    .total-row { background: #fef2f2; }
+    .total-row td { padding: 16px; font-weight: 700; font-size: 16px; border-top: 2px solid #dc2626; }
+    .footer { background: #f9fafb; padding: 32px 40px; border-top: 1px solid #e5e7eb; text-align: center; }
+    .footer p { font-size: 12px; color: #9ca3af; line-height: 1.6; }
+    .footer a { color: #dc2626; text-decoration: none; }
+    @media print { body { background: #fff; } .invoice-container { box-shadow: none; margin: 0; } }
+    @media only screen and (max-width: 600px) {
+      .invoice-header { flex-direction: column; gap: 16px; padding: 24px; }
+      .invoice-title { text-align: left; }
+      .invoice-body { padding: 24px; }
+      .invoice-meta { flex-direction: column; gap: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="invoice-container">
+    <div class="invoice-header">
+      <div class="company-info">
+        ${companyLogo ? `<img src="${escapeHtml(companyLogo)}" alt="${escapeHtml(companyName)}" style="height:40px;margin-bottom:12px;" />` : ''}
+        <h1>${escapeHtml(companyName)}</h1>
+        ${companyAddress ? `<p>${escapeHtml(companyAddress).replace(/\n/g, '<br>')}</p>` : ''}
+        ${companyPhone ? `<p>${escapeHtml(companyPhone)}</p>` : ''}
+        ${companyEmail ? `<p>${escapeHtml(companyEmail)}</p>` : ''}
+        ${companyGst ? `<p>GST: ${escapeHtml(companyGst)}</p>` : ''}
+      </div>
+      <div class="invoice-title">
+        <h2>CREDIT NOTE</h2>
+        <div class="inv-number">${escapeHtml(creditNote.invoiceNumber)}</div>
+        <div style="margin-top:8px;"><span class="status-badge">REFUNDED</span></div>
+      </div>
+    </div>
+
+    <div class="invoice-body">
+      <div class="invoice-meta">
+        <div class="meta-block">
+          <h3>Issued To</h3>
+          <p><strong>${escapeHtml(user?.fullName || 'Customer')}</strong></p>
+          ${user?.email ? `<p>${escapeHtml(user.email)}</p>` : ''}
+          ${user?.phoneNumber ? `<p>${escapeHtml(user.phoneNumber)}</p>` : ''}
+        </div>
+        <div class="meta-block" style="text-align:right;">
+          <h3>Credit Note Details</h3>
+          <p><span class="label">Date:</span> ${formatDate(creditNote.createdAt)}</p>
+          ${originalInvoice ? `<p><span class="label">Original Invoice:</span> ${escapeHtml(originalInvoice.invoiceNumber)}</p>` : ''}
+          ${order ? `<p><span class="label">Order:</span> ${escapeHtml(order.orderNumber)}</p>` : ''}
+          <p><span class="label">Payment Ref:</span> ${escapeHtml(order?.payment?.stripePaymentIntentId || 'N/A')}</p>
+        </div>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Description</th>
+            <th>Qty</th>
+            <th class="amount-col">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${lineItemRows}
+          ${totalsRows}
+          <tr class="total-row">
+            <td colspan="2"><strong>Total Refund</strong></td>
+            <td class="amount-col" style="color:#dc2626;"><strong>-${creditNote.currency || 'NZD'} $${creditNote.amount.toFixed(2)}</strong></td>
+          </tr>
+        </tbody>
+      </table>
+
+      ${order?.refundArn ? `<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:16px;margin-top:24px;"><p style="font-size:13px;color:#166534;"><strong>Refund Reference:</strong> ${escapeHtml(order.refundArn)}</p></div>` : ''}
+
+      <div style="background:#f9fafb;border-radius:8px;padding:16px;margin-top:24px;">
+        <p style="font-size:13px;color:#6b7280;">This credit note confirms that the above amount has been refunded to your original payment method. Please allow 5-10 business days for the refund to appear on your statement.</p>
+      </div>
+    </div>
+
+    <div class="footer">
+      <p>${escapeHtml(companyName)}${companyWebsite ? ` | <a href="https://${escapeHtml(companyWebsite)}">${escapeHtml(companyWebsite)}</a>` : ''}</p>
+      <p style="margin-top:8px;">&copy; ${currentYear} ${escapeHtml(companyName)}. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
 export async function generateInvoiceEmailHtml(invoiceId: string): Promise<{ html: string; subject: string }> {
   const invoice = await Invoice.findById(invoiceId).lean();
   if (!invoice) throw new Error('Invoice not found');

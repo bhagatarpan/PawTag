@@ -15,13 +15,29 @@ export function renderRefundSettledEmail(data: {
   currency: string;
   settledAt: string;
   viewOrderUrl: string;
+  creditNoteNumber?: string;
+  creditNoteUrl?: string;
 }): string {
+  const creditNoteSection = data.creditNoteNumber ? `
+    <div style="background-color:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:16px;margin:20px 0;">
+      <p style="margin:0 0 8px;font-weight:600;color:#1e40af;font-size:14px;">
+        Credit Note: ${data.creditNoteNumber}
+      </p>
+      <p style="margin:0;color:#1e3a5f;font-size:13px;line-height:1.5;">
+        A credit note has been generated for this refund. You can view or download it for your records.
+      </p>
+      ${data.creditNoteUrl ? `<p style="margin:12px 0 0;"><a href="${data.creditNoteUrl}" style="color:#2563eb;text-decoration:none;font-weight:600;">View Credit Note →</a></p>` : ''}
+    </div>
+  ` : '';
+
   const bodyHtml = `
     <p style="margin:0 0 20px;color:#374151;font-size:16px;">Hi <strong>${data.name}</strong>,</p>
 
     <p style="margin:0 0 20px;color:#374151;font-size:16px;line-height:1.6;">
       Your refund for order <strong>${data.orderNumber}</strong> has been successfully processed.
     </p>
+
+    ${creditNoteSection}
 
     <div style="background-color:#dcfce7;border:1px solid #86efac;border-radius:8px;padding:16px;margin:20px 0;">
       <p style="margin:0 0 8px;font-weight:600;color:#166534;font-size:14px;">
