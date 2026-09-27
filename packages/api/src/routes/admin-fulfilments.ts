@@ -13,6 +13,7 @@ import logger from '../lib/logger';
 import { auditService, type AuditContext } from '../services/audit';
 import { createAuditContextFromRequest, type AuditRequest } from '../middleware/audit';
 import { generateTagId } from '../lib/tag-id';
+import { FULFILMENT_TO_ORDER_STATUS } from '../services/fulfilment-sync';
 
 const router = Router();
 router.use(authenticate);
@@ -84,11 +85,7 @@ router.put('/:id/status', requirePermission('order.update'), async (req: AuthReq
     if (!item) { res.status(404).json({ success: false, error: 'Fulfilment not found' }); return; }
 
     // Sync order status based on fulfilment status
-    const fulfilmentToOrderStatus: Record<string, string> = {
-      packing: 'packing',
-      fulfilled: 'shipped',
-    };
-    const orderStatus = fulfilmentToOrderStatus[status];
+    const orderStatus = FULFILMENT_TO_ORDER_STATUS[status as keyof typeof FULFILMENT_TO_ORDER_STATUS];
     if (orderStatus) {
       try {
         await Order.findByIdAndUpdate(item.orderId, { status: orderStatus });

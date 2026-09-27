@@ -55,7 +55,7 @@ export { Category, type ICategoryDocument } from './models/Category';
 export { Collection, type ICollectionDocument } from './models/Collection';
 export { Brand, type IBrandDocument } from './models/Brand';
 export { ShippingMethod, type IShippingMethodDocument } from './models/ShippingMethod';
-export { Fulfilment, type IFulfilmentDocument } from './models/Fulfilment';
+export { Fulfilment, type IFulfilmentDocument, type FulfilmentStatus } from './models/Fulfilment';
 export { Return, type IReturnDocument } from './models/Return';
 export { Shipment, type IShipmentDocument, type ShipmentStatus, type IShipmentItem, type ITrackingEvent } from './models/Shipment';
 export { PaymentTransaction, type IPaymentTransactionDocument, type TransactionType, type TransactionStatus } from './models/PaymentTransaction';

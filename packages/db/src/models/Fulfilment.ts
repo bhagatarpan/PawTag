@@ -20,6 +20,8 @@
 
 import mongoose, { Schema, Document } from 'mongoose';
 
+export type FulfilmentStatus = 'pending' | 'picking' | 'packing' | 'fulfilled';
+
 export interface IFulfilmentItem {
   orderItemId: mongoose.Types.ObjectId;
   productName: string;
@@ -42,7 +44,7 @@ export interface ITagAssignment {
 export interface IFulfilmentDocument extends Document {
   orderId: mongoose.Types.ObjectId;
   orderNumber: string;
-  status: 'pending' | 'picking' | 'packing' | 'fulfilled';
+  status: FulfilmentStatus;
   items: IFulfilmentItem[];
   notes?: string;
   assignedTo?: mongoose.Types.ObjectId;
