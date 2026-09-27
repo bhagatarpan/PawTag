@@ -444,6 +444,10 @@ export interface Product {
    icon: string;
    /** Description text */
    description: string;
+   /** Whether this feature is visually highlighted */
+   highlighted?: boolean;
+   /** Highlight color key — defaults to 'teal' */
+   highlightColor?: string;
  }
 
 export interface ProductVariant {

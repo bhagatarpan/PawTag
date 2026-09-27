@@ -2,7 +2,8 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { API } from '@pawtag/shared/api';
 import { useSearchParams } from 'react-router-dom';
 import { ImagePlus, X, Upload, Loader2, Search, SlidersHorizontal, ChevronDown, ChevronLeft, ChevronRight, Download, Trash2, Edit2, Save, Settings, AlertTriangle, RotateCcw, Database, FileText, Package, Activity, CheckCircle, AlertCircle, Info, Copy, Eye, Plus, GripVertical } from 'lucide-react';
-import { IconPicker, ICON_MAP, type IconPickerProps } from '@pawtag/ui';
+import { IconPicker, ICON_MAP, type IconPickerProps, type IFeatureHighlight } from '@pawtag/ui';
+import { FeatureHighlightsEditor, HIGHLIGHT_COLORS } from '../components/FeatureHighlightsEditor';
 import { Check } from 'lucide-react';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
@@ -57,11 +58,6 @@ interface Product {
    };
    warrantyMonths?: number;
    activePeriodMonths?: number;
- }
-
- interface IFeatureHighlight {
-   icon: string;
-   description: string;
  }
 
  const DEFAULT_FEATURE_HIGHLIGHTS: IFeatureHighlight[] = [
@@ -251,21 +247,30 @@ function DetailDrawer({
                  } />
                  <DetailRow label="Slug" value={product.slug} />
                  <DetailRow label="Price" value={`$${product.price.toFixed(2)} NZD`} />
-                 {product.featureHighlights && product.featureHighlights.length > 0 && (
-                   <DetailRow label="Features" value={
-                     <div className="space-y-1">
-                       {product.featureHighlights.map((fh, i) => {
-                         const IconComp = ICON_MAP[fh.icon] || Check;
-                         return (
-                           <div key={i} className="flex items-center gap-2 text-sm">
-                             <IconComp size={14} className="text-primary-600 shrink-0" />
-                             <span>{fh.description}</span>
-                           </div>
-                         );
-                       })}
-                     </div>
-                   } />
-                 )}
+                  {product.featureHighlights && product.featureHighlights.length > 0 && (
+                    <DetailRow label="Features" value={
+                      <div className="space-y-1">
+                        {product.featureHighlights.map((fh, i) => {
+                          const IconComp = ICON_MAP[fh.icon] || Check;
+                          if (fh.highlighted) {
+                            const colors = HIGHLIGHT_COLORS[fh.highlightColor || 'teal'] || HIGHLIGHT_COLORS.teal;
+                            return (
+                              <div key={i} className={`flex items-center gap-2 text-sm font-semibold ${colors.text} ${colors.bg} border ${colors.border} rounded-lg px-2 py-1`}>
+                                <IconComp size={14} className="shrink-0" />
+                                <span>{fh.description}</span>
+                              </div>
+                            );
+                          }
+                          return (
+                            <div key={i} className="flex items-center gap-2 text-sm">
+                              <IconComp size={14} className="text-primary-600 shrink-0" />
+                              <span>{fh.description}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    } />
+                  )}
                  <DetailRow label="Category" value={product.category} />
                 <DetailRow label="Total Stock" value={
                   <span className={`text-sm font-medium px-2 py-0.5 rounded-full ${
@@ -720,17 +725,7 @@ const openEdit = (p: Product) => {
     setVariants(next);
   };
 
-  const addFeatureHighlight = () => {
-    setForm({ ...form, featureHighlights: [...form.featureHighlights, { icon: 'check', description: '' }] });
-  };
-  const removeFeatureHighlight = (i: number) => {
-    setForm({ ...form, featureHighlights: form.featureHighlights.filter((_, idx) => idx !== i) });
-  };
-  const updateFeatureHighlight = (i: number, field: 'icon' | 'description', value: string) => {
-    const next = [...form.featureHighlights];
-    next[i] = { ...next[i], [field]: value };
-    setForm({ ...form, featureHighlights: next });
-  };
+  // Feature highlights handled by FeatureHighlightsEditor component
 
   // Export
   const handleExport = async (format: 'csv' | 'json') => {
@@ -911,30 +906,11 @@ const openEdit = (p: Product) => {
         <div className="col-span-2"><label className="block text-sm font-medium text-gray-700 mb-1">Short Description</label><input value={form.shortDescription} onChange={(e) => setForm({ ...form, shortDescription: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm" /></div>
         <div className="col-span-2">
           <label className="block text-sm font-medium text-gray-700 mb-1">Feature Highlights</label>
-          <p className="text-xs text-gray-400 mb-2">Displayed on shop and product detail pages. Add as many as you like.</p>
-          <div className="space-y-2">
-            {form.featureHighlights.map((fh, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <IconPicker
-                  value={fh.icon}
-                  onChange={(icon) => updateFeatureHighlight(i, 'icon', icon)}
-                  className="w-40"
-                />
-                <input
-                  value={fh.description}
-                  onChange={(e) => updateFeatureHighlight(i, 'description', e.target.value)}
-                  className="flex-1 border rounded-md px-3 py-2 text-sm"
-                  placeholder="e.g. Eligible for Free Shipping NZ Wide"
-                />
-                <button type="button" onClick={() => removeFeatureHighlight(i)} className="text-red-500 hover:text-red-700 p-1">
-                  <X size={16} />
-                </button>
-              </div>
-            ))}
-          </div>
-          <button type="button" onClick={addFeatureHighlight} className="mt-2 inline-flex items-center gap-1 text-sm text-primary-600 hover:text-primary-800 font-medium">
-            <Plus size={14} /> Add Feature
-          </button>
+          <p className="text-xs text-gray-400 mb-2">Displayed on shop and product detail pages. Drag to reorder. Click the star to highlight a feature.</p>
+          <FeatureHighlightsEditor
+            value={form.featureHighlights}
+            onChange={(items) => setForm({ ...form, featureHighlights: items })}
+          />
         </div>
         <div className="col-span-2"><label className="block text-sm font-medium text-gray-700 mb-1">Description *</label><RichTextEditor value={form.description} onChange={(val) => setForm({ ...form, description: val })} placeholder="Describe your product..." minHeight="120px" /></div>
               </div>

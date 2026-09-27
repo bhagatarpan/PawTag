@@ -197,6 +197,8 @@ export const createProductSchema = z.object({
   featureHighlights: z.array(z.object({
     icon: z.string(),
     description: z.string(),
+    highlighted: z.boolean().optional(),
+    highlightColor: z.string().optional(),
   })).optional(),
 });
 
@@ -272,7 +274,7 @@ export const updateUserSchema = z.object({
 
 // --- Tag Schemas ---
 export const createTagSchema = z.object({
-  petId: z.string().min(1, 'Pet ID is required'),
+  petId: z.string().optional(),
   ownerId: z.string().min(1, 'Owner ID is required'),
   tagId: z.string().regex(/^PT-([A-Z2-9]{8}|\d{6})$/i, 'Tag ID must be in format PT-XXXXXXXX or PT-NNNNNN').optional(),
   tagType: z.enum(['qr', 'nfc']).optional(),

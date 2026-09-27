@@ -23,11 +23,25 @@ import {
   Check,
   Star,
 } from 'lucide-react';
-import { ICON_MAP } from '@pawtag/ui';
+import { ICON_MAP, type IFeatureHighlight } from '@pawtag/ui';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
+
+// Color palette for highlighted features
+const HIGHLIGHT_COLORS: Record<string, { bg: string; text: string; border: string; icon: string }> = {
+  teal:   { bg: 'bg-teal-50',   text: 'text-teal-800',   border: 'border-teal-200',   icon: 'text-teal-600' },
+  green:  { bg: 'bg-green-50',  text: 'text-green-800',  border: 'border-green-200',  icon: 'text-green-600' },
+  amber:  { bg: 'bg-amber-50',  text: 'text-amber-800',  border: 'border-amber-200',  icon: 'text-amber-600' },
+  blue:   { bg: 'bg-blue-50',   text: 'text-blue-800',   border: 'border-blue-200',   icon: 'text-blue-600' },
+  purple: { bg: 'bg-purple-50', text: 'text-purple-800', border: 'border-purple-200', icon: 'text-purple-600' },
+  red:    { bg: 'bg-red-50',    text: 'text-red-800',    border: 'border-red-200',    icon: 'text-red-600' },
+};
+
+function getHighlightClasses(colorKey?: string) {
+  return HIGHLIGHT_COLORS[colorKey || 'teal'] || HIGHLIGHT_COLORS.teal;
+}
 import { getProductBadge } from '../utils/productHelpers';
 import analytics from '../lib/analytics';
 
@@ -37,16 +51,9 @@ const getIconByName = (iconName: string) => {
   return ICON_MAP[iconName] || ICON_MAP[iconName.toLowerCase()] || Check;
 };
 
-/* ------------------------------------------------------------------ */
+ /* ------------------------------------------------------------------ */
  /*  Types                                                              */
  /* ------------------------------------------------------------------ */
-
- export interface IFeatureHighlight {
-    /** Icon name from Lucide icon set */
-    icon: string;
-    /** Description text */
-    description: string;
- }
 
  interface PawTagProduct {
    _id: string;
@@ -381,9 +388,18 @@ export default function ProductDetail() {
 
 {/* Features */}
               {product.featureHighlights && product.featureHighlights.length > 0 ? (
-                <div className="mt-6 space-y-3 text-sm text-gray-600">
+                <div className="mt-6 space-y-2 text-sm text-gray-600">
                   {product.featureHighlights.map((highlight, index) => {
                     const HighlightIcon = getIconByName(highlight.icon);
+                    if (highlight.highlighted) {
+                      const colors = getHighlightClasses(highlight.highlightColor);
+                      return (
+                        <div key={index} className={`flex items-center gap-2 font-semibold ${colors.text} ${colors.bg} border ${colors.border} rounded-lg px-3 py-1.5`}>
+                          <HighlightIcon size={16} className={`${colors.icon} shrink-0`} />
+                          <span>{highlight.description}</span>
+                        </div>
+                      );
+                    }
                     return (
                       <div key={index} className="flex items-center gap-2">
                         <HighlightIcon size={16} className="text-teal-600 shrink-0" />

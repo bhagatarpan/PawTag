@@ -1612,17 +1612,20 @@ router.post('/tags', requirePermission('tag.create'), validate(createTagSchema),
   try {
     const { petId, ownerId, tagId: customTagId, tagType = 'qr', status } = req.body;
 
-    const pet = await Pet.findOne({ _id: petId, deletedAt: null });
-    if (!pet) { res.status(400).json({ success: false, error: 'Pet not found' }); return; }
+    let pet = null;
+    if (petId) {
+      pet = await Pet.findOne({ _id: petId, deletedAt: null });
+      if (!pet) { res.status(400).json({ success: false, error: 'Pet not found' }); return; }
+
+      const existingTag = await Tag.findOne({ petId, deletedAt: null });
+      if (existingTag) {
+        res.status(400).json({ success: false, error: `This pet already has a tag (${existingTag.tagId}). Each pet can only have one tag.` });
+        return;
+      }
+    }
 
     const owner = await User.findOne({ _id: ownerId, deletedAt: null });
     if (!owner) { res.status(400).json({ success: false, error: 'Owner not found' }); return; }
-
-    const existingTag = await Tag.findOne({ petId, deletedAt: null });
-    if (existingTag) {
-      res.status(400).json({ success: false, error: `This pet already has a tag (${existingTag.tagId}). Each pet can only have one tag.` });
-      return;
-    }
 
     let tagId = customTagId;
     if (!tagId) {
@@ -1637,7 +1640,8 @@ router.post('/tags', requirePermission('tag.create'), validate(createTagSchema),
     }
 
     const finderUrl = `${req.protocol}://${req.get('host')}/finder/${tagId}`;
-    const tagData: any = { tagId, tagType, petId, ownerId, status: status || 'active' };
+    const tagData: any = { tagId, tagType, ownerId, status: status || 'inactive' };
+    if (petId) tagData.petId = petId;
     if (tagType === 'nfc') tagData.nfcUrl = finderUrl;
 
     const tag = await Tag.create(tagData);
@@ -1654,7 +1658,7 @@ router.post('/tags', requirePermission('tag.create'), validate(createTagSchema),
       resourceId: tag._id.toString(),
       outcome: 'SUCCESS',
       severity: 'MEDIUM',
-      metadata: { tagId, tagType, petId, ownerId, petName: pet.name, ownerEmail: owner.email },
+      metadata: { tagId, tagType, petId: petId || null, ownerId, petName: pet?.name || null, ownerEmail: owner.email },
     });
     res.status(201).json({ success: true, data: populated });
   } catch { res.status(500).json({ success: false, error: 'Failed to create tag' }); }

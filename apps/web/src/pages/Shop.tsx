@@ -18,7 +18,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useCartInteraction } from '../context/CartInteractionContext';
 import { useAuth } from '../context/AuthContext';
-import { ProductCard, type ProductCardProduct } from '@pawtag/ui';
+import { ProductCard, type ProductCardProduct, type IFeatureHighlight } from '@pawtag/ui';
 import SeoHead from '../components/SeoHead';
 import { useShopPage, useSiteSettings } from '../hooks/useCms';
 import { getProductBadge } from '../utils/productHelpers';
@@ -30,13 +30,6 @@ import analytics from '../lib/analytics';
 /* ------------------------------------------------------------------ */
  /*  Types                                                              */
  /* ------------------------------------------------------------------ */
-
- export interface IFeatureHighlight {
-    /** Icon name from Lucide icon set */
-    icon: string;
-    /** Description text */
-    description: string;
- }
 
  /** PawTag product from the API */
  interface PawTagProduct {
@@ -113,8 +106,8 @@ function toCardProduct(
        productType: (p.productType as 'physical' | 'membership' | 'digital') || 'physical',
         badge: badge ? { label: badge.label, color: badge.color } : null,
        featureHighlights: p.featureHighlights && p.featureHighlights.length > 0
-         ? p.featureHighlights.map(h => ({ icon: h.icon, description: h.description }))
-         : undefined,
+          ? p.featureHighlights.map(h => ({ icon: h.icon, description: h.description, highlighted: h.highlighted, highlightColor: h.highlightColor }))
+          : undefined,
        pointsEarning,
        showGoldUpsell,
        customizable: p.customizable,

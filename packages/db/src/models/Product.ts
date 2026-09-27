@@ -58,12 +58,16 @@ export interface IProductVariant {
   attributes: Record<string, string>;
 }
   
-/** Product feature highlight for display in shop and product detail */
+ /** Product feature highlight for display in shop and product detail */
  export interface IFeatureHighlight {
     /** Icon name from Lucide icon set */
     icon: string;
     /** Description text */
     description: string;
+    /** Whether this feature is visually highlighted */
+    highlighted?: boolean;
+    /** Highlight color key — defaults to 'teal' */
+    highlightColor?: string;
  }
 
  /**
@@ -301,6 +305,10 @@ const ProductSchema = new Schema<IProductDocument>(
        icon: { type: String, required: true },
        /** Description text */
        description: { type: String, required: true },
+       /** Whether this feature is visually highlighted */
+       highlighted: { type: Boolean, default: false },
+       /** Highlight color key — defaults to 'teal' */
+       highlightColor: { type: String, default: 'teal' },
      }],
 
      // ─── Display ─────────────────────────────────────────

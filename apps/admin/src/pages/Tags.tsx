@@ -724,7 +724,7 @@ export default function Tags() {
   const [selectedTag, setSelectedTag] = useState<TagItem | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingTag, setEditingTag] = useState<TagItem | null>(null);
-  const [form, setForm] = useState({ petId: '', ownerId: '', tagId: '', tagType: 'qr', status: 'active' });
+  const [form, setForm] = useState({ petId: '', ownerId: '', tagId: '', tagType: 'qr', status: 'inactive' });
   const [pets, setPets] = useState<any[]>([]);
   const [owners, setOwners] = useState<any[]>([]);
   const [formError, setFormError] = useState('');
@@ -791,7 +791,7 @@ export default function Tags() {
   useEffect(() => { fetchSummary(); }, [fetchSummary]);
 
   // Form handlers
-  const startAdd = () => { setEditingTag(null); setForm({ petId: '', ownerId: '', tagId: '', tagType: 'qr', status: 'active' }); setFormError(''); setShowForm(true); };
+  const startAdd = () => { setEditingTag(null); setForm({ petId: '', ownerId: '', tagId: '', tagType: 'qr', status: 'inactive' }); setFormError(''); setShowForm(true); };
   const startEdit = (tag: TagItem) => {
     setEditingTag(tag);
     setForm({
@@ -801,7 +801,7 @@ export default function Tags() {
     setFormError('');
     setShowForm(true);
   };
-  const cancelForm = () => { setShowForm(false); setEditingTag(null); setForm({ petId: '', ownerId: '', tagId: '', tagType: 'qr', status: 'active' }); setFormError(''); };
+  const cancelForm = () => { setShowForm(false); setEditingTag(null); setForm({ petId: '', ownerId: '', tagId: '', tagType: 'qr', status: 'inactive' }); setFormError(''); };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -812,7 +812,7 @@ export default function Tags() {
         await api.put(API.admin.tags.update(editingTag._id), { petId: form.petId || undefined, ownerId: form.ownerId || undefined, tagType: form.tagType, status: form.status });
         toast.success('Tag updated');
       } else {
-        await api.post(API.admin.tags.create, { petId: form.petId, ownerId: form.ownerId, tagId: form.tagId || undefined, tagType: form.tagType, status: form.status });
+        await api.post(API.admin.tags.create, { petId: form.petId || undefined, ownerId: form.ownerId, tagId: form.tagId || undefined, tagType: form.tagType, status: form.status });
         toast.success('Tag created');
       }
       cancelForm();
@@ -980,10 +980,11 @@ export default function Tags() {
                   <option value="replaced">Replaced</option>
                   <option value="deleted">Deleted</option>
                 </select>
+                {!editingTag && form.status === 'inactive' && <p className="text-xs text-gray-400 mt-1">Tag created as inactive — customer activates upon receipt</p>}
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Link to Pet *</label>
-                <select value={form.petId} onChange={(e) => setForm({ ...form, petId: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm" required>
+                <label className="block text-xs text-gray-500 mb-1">Link to Pet</label>
+                <select value={form.petId} onChange={(e) => setForm({ ...form, petId: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm">
                   <option value="">Select pet...</option>
                   {pets.map((p: any) => <option key={p._id} value={p._id}>{p.name} ({p.petId || 'no ID'}) — {p.ownerId?.fullName || 'unknown'}</option>)}
                 </select>
