@@ -79,6 +79,8 @@ const SETTING_META: Record<string, { label: string; tooltip: string; type: 'togg
   'commerce.promotions.maxUsesPerCode': { label: 'Max Uses Per Discount Code', tooltip: 'Maximum number of times a single discount code can be used across all customers', type: 'number' },
   'commerce.promotions.bundle2Items': { label: 'Bundle Discount — 2 Items (%)', tooltip: 'Automatic percentage discount when a customer buys exactly 2 items', type: 'number' },
   'commerce.promotions.bundle3PlusItems': { label: 'Bundle Discount — 3+ Items (%)', tooltip: 'Automatic percentage discount when a customer buys 3 or more items', type: 'number' },
+  'commerce.fulfilment.autoCreateFulfilment': { label: 'Auto-Create Fulfilment', tooltip: 'Automatically create a fulfilment record when an order is confirmed (paid)', type: 'toggle', hint: 'Recommended — warehouse staff see new orders immediately' },
+  'commerce.fulfilment.autoCreateTag': { label: 'Auto-Create Tag IDs', tooltip: 'Automatically generate Tag IDs during fulfilment (full automation mode). Requires Auto-Create Fulfilment to be enabled.', type: 'toggle', hint: 'When enabled, Tag IDs are pre-generated and ready for NFC writing' },
 };
 
 function getSettingMeta(key: string) {
@@ -98,6 +100,7 @@ function parseSettings(all: CommerceSetting[]): SettingGroup[] {
     { name: 'Cart', icon: <ShoppingCart size={20} />, description: 'Shopping cart behaviour, expiry, and limits', category: 'cart' },
     { name: 'Checkout', icon: <ShoppingCart size={20} />, description: 'What happens during the checkout process', category: 'checkout' },
     { name: 'Orders', icon: <RotateCcw size={20} />, description: 'How orders are numbered and managed', category: 'orders' },
+    { name: 'Fulfilment', icon: <Package size={20} />, description: 'Automatic fulfilment and tag creation when orders are confirmed', category: 'fulfilment' },
     { name: 'Subscriptions', icon: <Clock size={20} />, description: 'Subscription billing, auto-renew, and payment retry settings (pricing managed per product)', category: 'subscriptions' },
     { name: 'Refunds', icon: <RotateCcw size={20} />, description: 'Refund rules and policies', category: 'refunds' },
     { name: 'Notifications', icon: <Bell size={20} />, description: 'Email notifications sent to customers and admins', category: 'notifications' },

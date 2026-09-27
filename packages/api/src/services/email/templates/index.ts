@@ -41,3 +41,4 @@ export { renderSubscriptionPausedAdminEmail } from './subscription-paused-admin'
 export { renderJobNotificationEmail } from './job-notification';
 export { renderSubscriptionPlanChangedEmail } from './subscription-plan-changed';
 export { renderSubscriptionResumedEmail } from './subscription-resumed';
+export { renderFulfilmentAlertEmail } from './fulfilment-alert';

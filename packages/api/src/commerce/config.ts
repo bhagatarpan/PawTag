@@ -88,6 +88,10 @@ export const COMMERCE_SETTINGS = {
     description: 'Predefined reasons selectable when cancelling an order',
   },
 
+  // ─── Fulfilment ────────────────────────────────────────────
+  'commerce.fulfilment.autoCreateFulfilment': { default: 'true', description: 'Auto-create fulfilment when order is confirmed' },
+  'commerce.fulfilment.autoCreateTag': { default: 'false', description: 'Auto-create Tag ID during fulfilment (full automation mode). Requires autoCreateFulfilment=true.' },
+
   // ─── Subscriptions ────────────────────────────────────────
   // Pricing and free/grace period are now read from Product.subscriptionConfig
   // Only operational settings remain here

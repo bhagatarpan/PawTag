@@ -34,7 +34,7 @@ import { stripePaymentProvider } from '../providers/stripe';
 import { inventoryService } from './inventory.service';
 import { pricingService } from './pricing.service';
 import { cartService } from './cart.service';
-import { getSetting, getNumberSetting } from '../config';
+import { getSetting, getNumberSetting, getBooleanSetting } from '../config';
 import { getGuardianNumber } from '../../services/loyalty/guardian-config';
 import { membershipEntitlementService } from '../../services/membership-entitlement.service';
 import { logPaymentEvent, logOrderEvent } from '../audit';
@@ -533,6 +533,111 @@ export class CheckoutService {
       const errorMsg = err?.message || String(err);
       logger.error({ err, orderId: order._id, correlationId }, 'Completion step failed: digital entitlement creation');
       completionErrors.push({ step: 'digital_entitlement_creation', error: errorMsg, timestamp: new Date() });
+    }
+
+    // 8d. Auto-create Fulfilment (and optionally Tag) if enabled
+    try {
+      const autoCreateFulfilment = await getBooleanSetting('commerce.fulfilment.autoCreateFulfilment');
+      const autoCreateTag = await getBooleanSetting('commerce.fulfilment.autoCreateTag');
+
+      if (autoCreateFulfilment) {
+        const { Fulfilment } = await import('@pawtag/db');
+
+        // Map order items to fulfilment items
+        const fulfilmentItems = order.items.map((item: any) => ({
+          orderItemId: item.productId,
+          productName: item.productName,
+          quantity: item.quantity,
+          pickedQuantity: 0,
+          packedQuantity: 0,
+        }));
+
+        const fulfilment = await Fulfilment.create({
+          orderId: order._id,
+          orderNumber: order.orderNumber,
+          status: 'pending',
+          items: fulfilmentItems,
+          notes: autoCreateTag ? 'Auto-created — Tag ID will be auto-generated' : 'Auto-created — Tag to be assigned manually',
+        });
+
+        logger.info({ fulfilmentId: fulfilment._id, orderId: order._id, orderNumber: order.orderNumber, correlationId }, 'Auto-created fulfilment');
+
+        // Auto-create Tag if full automation mode is enabled
+        if (autoCreateTag) {
+          const { Tag } = await import('@pawtag/db');
+          const { generateTagId } = await import('../../lib/tag-id');
+
+          // Create a tag for each physical/tag product in the order
+          for (const item of order.items) {
+            const product = await Product.findById(item.productId).lean();
+            if (!product || product.productType !== 'physical') continue;
+
+            // Calculate active period and warranty from product config
+            const activePeriodMonths = product.activePeriodMonths || 3;
+            const warrantyMonths = product.warrantyMonths || 12;
+            const activePeriodEndsAt = new Date();
+            activePeriodEndsAt.setMonth(activePeriodEndsAt.getMonth() + activePeriodMonths);
+            const warrantyEndsAt = new Date();
+            warrantyEndsAt.setMonth(warrantyEndsAt.getMonth() + warrantyMonths);
+
+            // Create one tag per quantity ordered
+            for (let i = 0; i < item.quantity; i++) {
+              const tagIdStr = await generateTagId();
+              await Tag.create({
+                tagId: tagIdStr,
+                tagType: 'qr',
+                petId: null,
+                ownerId: order.userId,
+                orderId: order._id,
+                status: 'inactive',
+                subscriptionStatus: 'none',
+                activatedAt: null,
+                activePeriodEndsAt,
+                warrantyEndsAt,
+              });
+
+              logger.info({ tagId: tagIdStr, orderId: order._id, orderNumber: order.orderNumber, productName: product.name, correlationId }, 'Auto-created tag');
+            }
+          }
+        }
+
+        // Send admin/warehouse notification email
+        try {
+          const adminEmail = process.env.ADMIN_ALERT_EMAIL;
+          if (adminEmail) {
+            const { sendMail } = await import('../../services/email.service');
+            const { renderFulfilmentAlertEmail } = await import('../../services/email/templates/fulfilment-alert');
+
+            const itemList = order.items
+              .map((item: any) => `${item.productName} × ${item.quantity}`)
+              .join(', ');
+
+            const customerUser = await User.findById(userId).select('fullName email').lean();
+            const customerName = (customerUser as any)?.fullName || 'Unknown';
+            const customerEmail = (customerUser as any)?.email || 'Unknown';
+
+            await sendMail(
+              adminEmail,
+              `New fulfilment ready: ${order.orderNumber}`,
+              renderFulfilmentAlertEmail({
+                orderNumber: order.orderNumber,
+                customerName,
+                customerEmail,
+                items: itemList,
+                total: order.payment.amount,
+                fulfilmentId: String(fulfilment._id),
+                autoTagCreated: autoCreateTag,
+              }),
+            ).catch(() => {});
+          }
+        } catch (emailErr) {
+          logger.error({ err: emailErr, orderId: order._id }, 'Failed to send fulfilment alert email');
+        }
+      }
+    } catch (err: any) {
+      const errorMsg = err?.message || String(err);
+      logger.error({ err, orderId: order._id, correlationId }, 'Completion step failed: fulfilment creation');
+      completionErrors.push({ step: 'fulfilment_creation', error: errorMsg, timestamp: new Date() });
     }
 
     // 9. Create Invoice
