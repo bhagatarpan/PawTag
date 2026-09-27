@@ -81,7 +81,7 @@ function FinderPage() {
       if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
         setData(cached.data);
         setLoading(false);
-        if (cached.data.pet.status === 'found') {
+        if (cached.data.pet?.status === 'found') {
           loadFoundTimer(id);
         }
         return;
@@ -93,7 +93,7 @@ function FinderPage() {
       setData(res);
       // Cache the result
       finderCache.set(id, { data: res, timestamp: Date.now() });
-      if (res.pet.status === 'found') {
+      if (res.pet?.status === 'found') {
         loadFoundTimer(id);
       }
       setError('');
