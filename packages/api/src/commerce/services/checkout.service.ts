@@ -485,6 +485,17 @@ export class CheckoutService {
       }
     }
 
+    // 8a3. Award Guardian Points for purchase
+    try {
+      const { awardPurchasePoints } = await import('../../services/loyalty/points-earning.service');
+      const pointsResult = await awardPurchasePoints(userId, pending.total, order._id.toString());
+      logger.info({ orderId: order._id, pointsAwarded: pointsResult.pointsAwarded, totalPoints: pointsResult.totalPoints }, 'Guardian Points awarded for purchase');
+    } catch (err: any) {
+      const errorMsg = err?.message || String(err);
+      logger.error({ err, orderId: order._id, correlationId }, 'Completion step failed: Guardian Points award');
+      completionErrors.push({ step: 'guardian_points_award', error: errorMsg, timestamp: new Date() });
+    }
+
     // 8b. Tag creation DEFERRED to fulfillment time (HYBRID 2 model)
     // Tags are now created when warehouse staff assigns Tag ID during fulfillment
     // This ensures Active Period starts when customer receives the tag, not at order time
