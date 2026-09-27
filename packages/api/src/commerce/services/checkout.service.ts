@@ -494,53 +494,10 @@ export class CheckoutService {
       }
     }
 
-    // 8b. Create Tag and Subscription for tag products
-    try {
-      const { Tag: TagModel } = await import('@pawtag/db');
-      const { createSubscription } = await import('../../services/subscription.service');
-      const { generateTagId } = await import('../../lib/tag-id');
-      
-      for (const item of pending.items) {
-        try {
-          const product = await Product.findById(item.productId).lean();
-          if (!product?.isTagProduct) continue;
-
-          // Generate tag ID
-          const tagIdStr = await generateTagId();
-          
-          // Create Tag
-          const tag = await TagModel.create({
-            tagId: tagIdStr,
-            tagType: 'qr',
-            petId: null,
-            ownerId: userId,
-            status: 'inactive',
-            subscriptionStatus: 'none',
-          });
-
-          // Create Subscription
-          const productAutoRenew = pending.autoRenewMap?.[product._id.toString()];
-          await createSubscription({
-            userId,
-            tagId: tag._id.toString(),
-            orderId: order._id.toString(),
-            planId: product._id.toString(),
-            planType: product.subscriptionConfig?.type || 'annual',
-            autoRenew: productAutoRenew !== undefined ? productAutoRenew : (pending.autoRenew !== false),
-          });
-
-          logger.info({ tagId: tagIdStr, orderId: order.orderNumber, productId: item.productId, correlationId }, 'Tag and Subscription created for tag product');
-        } catch (itemErr: any) {
-          const errorMsg = itemErr?.message || String(itemErr);
-          logger.error({ err: itemErr, orderId: order._id, productId: item.productId, correlationId }, 'Subscription creation failed for item');
-          completionErrors.push({ step: 'tag_subscription_creation', error: errorMsg, productId: String(item.productId), timestamp: new Date() });
-        }
-      }
-    } catch (err: any) {
-      const errorMsg = err?.message || String(err);
-      logger.error({ err, orderId: order._id, correlationId }, 'Completion step failed: tag/subscription creation');
-      completionErrors.push({ step: 'tag_subscription_creation', error: errorMsg, timestamp: new Date() });
-    }
+    // 8b. Tag creation DEFERRED to fulfillment time (HYBRID 2 model)
+    // Tags are now created when warehouse staff assigns Tag ID during fulfillment
+    // This ensures Active Period starts when customer receives the tag, not at order time
+    // See: admin-fulfilments.ts assign-tag endpoint
 
     // 8c. Create Digital Product Entitlements
     try {

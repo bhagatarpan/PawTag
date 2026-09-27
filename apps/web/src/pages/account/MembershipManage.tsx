@@ -26,11 +26,15 @@ interface Tag {
   _id: string;
   tagId: string;
   status: string;
+  activePeriodEndsAt?: string;
+  warrantyEndsAt?: string;
+  membershipStartsAt?: string;
   access: {
     hasAccess: boolean;
     reason: string;
     warrantyEndsAt?: string;
     membershipEndsAt?: string;
+    finderEnabled?: boolean;
   };
 }
 
@@ -257,17 +261,77 @@ export default function MembershipManage() {
         ) : (
           <div className="space-y-3">
             {tags.map((tag) => (
-              <div key={tag._id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                <div className="flex items-center gap-3">
-                  <span className="text-lg">🏷️</span>
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">{tag.tagId}</p>
-                    <p className="text-xs text-gray-500">{tag.access.reason}</p>
+              <div key={tag._id} className="p-4 bg-gray-50 rounded-xl">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-3">
+                    <span className="text-lg">🏷️</span>
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">{tag.tagId}</p>
+                      <p className="text-xs text-gray-500">{tag.access.reason}</p>
+                    </div>
+                  </div>
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                    tag.access.finderEnabled ? 'bg-green-100 text-green-700' : 
+                    tag.access.hasAccess ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
+                  }`}>
+                    {tag.access.finderEnabled ? 'Active' : 
+                     tag.access.hasAccess ? 'Limited' : 'Inactive'}
+                  </span>
+                </div>
+                
+                {/* HYBRID 2: Show Active Period and Warranty Period */}
+                <div className="mt-3 grid grid-cols-2 gap-3 text-xs">
+                  <div className="p-2 bg-white rounded-lg border border-gray-200">
+                    <p className="text-gray-500 mb-1">Active Period</p>
+                    {tag.activePeriodEndsAt ? (
+                      <p className={`font-medium ${
+                        new Date(tag.activePeriodEndsAt) > new Date() ? 'text-green-600' : 'text-red-600'
+                      }`}>
+                        {new Date(tag.activePeriodEndsAt) > new Date() 
+                          ? `Expires ${formatDate(tag.activePeriodEndsAt)}`
+                          : `Expired ${formatDate(tag.activePeriodEndsAt)}`
+                        }
+                      </p>
+                    ) : (
+                      <p className="text-gray-400">Not configured</p>
+                    )}
+                  </div>
+                  <div className="p-2 bg-white rounded-lg border border-gray-200">
+                    <p className="text-gray-500 mb-1">Warranty Period</p>
+                    {tag.warrantyEndsAt ? (
+                      <p className={`font-medium ${
+                        new Date(tag.warrantyEndsAt) > new Date() ? 'text-green-600' : 'text-red-600'
+                      }`}>
+                        {new Date(tag.warrantyEndsAt) > new Date() 
+                          ? `Expires ${formatDate(tag.warrantyEndsAt)}`
+                          : `Expired ${formatDate(tag.warrantyEndsAt)}`
+                        }
+                      </p>
+                    ) : (
+                      <p className="text-gray-400">Not configured</p>
+                    )}
                   </div>
                 </div>
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${tag.access.hasAccess ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                  {tag.access.hasAccess ? 'Active' : 'Inactive'}
-                </span>
+
+                {/* Show warning if Active Period is expiring soon */}
+                {tag.activePeriodEndsAt && 
+                 new Date(tag.activePeriodEndsAt) > new Date() && 
+                 new Date(tag.activePeriodEndsAt) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) && (
+                  <div className="mt-3 p-2 bg-amber-50 border border-amber-200 rounded-lg">
+                    <p className="text-xs text-amber-700">
+                      ⚠️ Active Period expiring soon. <Link to="/membership" className="font-medium underline">Purchase membership</Link> to maintain full finder functionality.
+                    </p>
+                  </div>
+                )}
+
+                {/* Show message if in limited mode */}
+                {tag.access.hasAccess && !tag.access.finderEnabled && (
+                  <div className="mt-3 p-2 bg-amber-50 border border-amber-200 rounded-lg">
+                    <p className="text-xs text-amber-700">
+                      ⚠️ Finder notifications are disabled. <Link to="/membership" className="font-medium underline">Purchase membership</Link> to restore full functionality.
+                    </p>
+                  </div>
+                )}
               </div>
             ))}
           </div>

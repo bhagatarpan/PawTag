@@ -198,6 +198,81 @@ function FinderPage() {
     );
   }
 
+  // HYBRID 2: Handle limited tag (active period expired, no membership)
+  if (data.tagLimited) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        {/* Limited Mode Banner */}
+        <div className="bg-amber-50 border-b border-amber-200 px-4 py-3">
+          <div className="max-w-lg mx-auto flex items-center gap-3">
+            <AlertTriangle size={20} className="text-amber-600 flex-shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-amber-800">
+                This tag's active period has expired
+              </p>
+              <p className="text-xs text-amber-600">
+                The owner hasn't renewed their membership yet. You can see pet information, but cannot notify the owner.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Pet Information (limited - no owner contact) */}
+        <div className="max-w-lg mx-auto px-4 py-6 space-y-4">
+          {/* Status Banner */}
+          <StatusBanner 
+            status={data.pet.status} 
+            tagId={data.tagId}
+            tagStatus={data.tagStatus || 'limited'} 
+          />
+
+          {/* Pet Photo */}
+          <PetPhotoCarousel photos={data.pet.photos || []} petName={data.pet.name} />
+
+          {/* Medical Alerts */}
+          {data.pet.medicalAlerts && (
+            <MedicalAlertBanner message={data.pet.medicalAlerts} />
+          )}
+
+          {/* Pet Details */}
+          <PetDetailsCard data={data} />
+
+          {/* Limited Mode Notice */}
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle size={20} className="text-amber-500 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-gray-900 mb-1">
+                  Owner notifications are disabled
+                </p>
+                <p className="text-sm text-gray-600">
+                  The owner of this pet hasn't renewed their PawTag membership. 
+                  You can see the pet's information, but we cannot notify the owner that you found their pet.
+                </p>
+                <p className="text-sm text-gray-600 mt-2">
+                  If this is your pet, please contact PawTag directly at{' '}
+                  <a href="mailto:support@pawtag.co.nz" className="text-primary-600 font-medium">
+                    support@pawtag.co.nz
+                  </a>
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Found Timer (if pet is found) */}
+          {data.pet.status === 'found' && foundTimer && (
+            <FoundTimer timer={foundTimer} />
+          )}
+
+          {/* Footer */}
+          <div className="text-center pt-4 pb-8">
+            <p className="text-xs text-gray-400">PawTag — Reuniting lost pets with their families</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const isMaintenance = siteStatus === SiteAvailabilityStatus.MAINTENANCE;
   const bgColor = data.pet.status === 'lost' ? 'bg-red-50' : data.pet.status === 'found' ? 'bg-amber-50' : 'bg-gray-50';
 

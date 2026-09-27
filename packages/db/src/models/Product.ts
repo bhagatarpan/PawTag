@@ -58,12 +58,16 @@ export interface IProductVariant {
   attributes: Record<string, string>;
 }
   
-/** Product feature highlight for display in shop and product detail */
+ /** Product feature highlight for display in shop and product detail */
  export interface IFeatureHighlight {
     /** Icon name from Lucide icon set */
     icon: string;
     /** Description text */
     description: string;
+    /** Whether this feature is visually highlighted */
+    highlighted?: boolean;
+    /** Highlight color key — defaults to 'teal' */
+    highlightColor?: string;
  }
 
  /**
@@ -163,8 +167,12 @@ export interface IProductVariant {
    shippingDescription: string;
 
    // ─── Warranty ────────────────────────────────────────────
-  /** Warranty period in months */
+  /** Warranty period in months — tag expires after this period */
   warrantyMonths: number;
+
+  // ─── Active Period ────────────────────────────────────────
+  /** Active period in months — full finder functionality during this period */
+  activePeriodMonths: number;
 
    // ─── Product Type ───────────────────────────────────────
    /** Product type discriminator: 'physical' = one-time product purchase, 'membership' = annual membership, 'digital' = one-time digital purchase */
@@ -271,6 +279,9 @@ const ProductSchema = new Schema<IProductDocument>(
      // ─── Warranty ────────────────────────────────────────
     warrantyMonths: { type: Number, default: 12, min: 0 },
 
+    // ─── Active Period ──────────────────────────────────────
+    activePeriodMonths: { type: Number, default: 3, min: 0 },
+
 // ─── Product Type ───────────────────────────────────
      productType: { type: String, enum: ['physical', 'membership', 'digital'], default: 'physical', index: true },
 
@@ -294,6 +305,10 @@ const ProductSchema = new Schema<IProductDocument>(
        icon: { type: String, required: true },
        /** Description text */
        description: { type: String, required: true },
+       /** Whether this feature is visually highlighted */
+       highlighted: { type: Boolean, default: false },
+       /** Highlight color key — defaults to 'teal' */
+       highlightColor: { type: String, default: 'teal' },
      }],
 
      // ─── Display ─────────────────────────────────────────

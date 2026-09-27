@@ -202,11 +202,15 @@ router.get('/:tagId', async (req: Request, res: Response) => {
     const pet = tag.petId as any;
     const owner = tag.ownerId as any;
 
-    // Check tag status only — pet recovery should not be blocked by subscription status
-    const isActiveForFinder = tag.status === 'active';
+    // HYBRID 2: Check tag status using centralized service
+    const { calculateTagStatus } = await import('../services/tag-status.service');
+    const tagStatus = await calculateTagStatus(tag);
+    const isActiveForFinder = tagStatus.finderEnabled;
+    const isLimited = tagStatus.status === 'limited';
+    const isExpired = tagStatus.status === 'expired';
 
-    if (!isActiveForFinder) {
-      // Tag is inactive — still log the scan but return limited info
+    if (isExpired) {
+      // Tag is expired — log the scan but return expired info
       const userAgent = (req.headers['user-agent'] as string) || 'unknown';
       const { browser, device } = parseUserAgent(userAgent);
       const ipGeo = await getIpGeoData(req.ip || req.headers['x-forwarded-for']?.toString().split(',')[0]?.trim() || '');
@@ -242,8 +246,73 @@ router.get('/:tagId', async (req: Request, res: Response) => {
         success: true,
         data: {
           tagActive: false,
+          tagLimited: false,
           message: 'This PawTag is no longer active.',
           petInfo: null,
+        },
+      });
+      return;
+    }
+
+    if (isLimited) {
+      // HYBRID 2: Limited mode — show pet info but no notify button
+      const userAgent = (req.headers['user-agent'] as string) || 'unknown';
+      const { browser, device } = parseUserAgent(userAgent);
+      const ipGeo = await getIpGeoData(req.ip || req.headers['x-forwarded-for']?.toString().split(',')[0]?.trim() || '');
+
+      await FinderScan.create({
+        tagId: tag._id,
+        petId: pet?._id || tag._id,
+        deviceInfo: userAgent,
+        deviceBrowser: browser,
+        deviceOS: device,
+        deviceType: detectDeviceType(userAgent),
+        ipLocation: ipGeo || undefined,
+        action: 'viewed',
+      });
+
+      // Update tag scan info
+      tag.lastScannedAt = new Date();
+      await tag.save();
+
+      // Build limited pet info (no owner contact)
+      const safePetInfo = pet ? {
+        name: pet.name,
+        breed: pet.breed,
+        color: pet.color,
+        age: pet.age,
+        gender: pet.gender,
+        photo: pet.photos?.[0] || null,
+        medicalAlerts: pet.medicalAlerts || [],
+        description: pet.description,
+        status: pet.status,
+      } : null;
+
+      await auditFinderEvent(req, {
+        action: 'view_limited_tag',
+        eventType: 'finder_view_limited',
+        eventCategory: 'READ',
+        operationType: 'READ',
+        resourceType: 'Tag',
+        resourceId: tag._id.toString(),
+        outcome: 'SUCCESS',
+        severity: 'MEDIUM',
+        metadata: {
+          tagId: tag.tagId,
+          message: 'Tag active period expired. Finder notifications disabled.',
+          petInfo: safePetInfo,
+        },
+      });
+
+      res.json({
+        success: true,
+        data: {
+          tagActive: true,
+          tagLimited: true,
+          message: "This tag's active period has expired. The owner hasn't renewed their membership yet.",
+          petInfo: safePetInfo,
+          ownerContact: null,
+          notifyEnabled: false,
         },
       });
       return;

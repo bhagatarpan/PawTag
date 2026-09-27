@@ -26,6 +26,7 @@ export interface Microchip {
 
 export interface FinderData {
   tagActive?: boolean;
+  tagLimited?: boolean;
   message?: string;
   petInfo?: null;
   pet: {
@@ -46,6 +47,7 @@ export interface FinderData {
   ownerLocation: string | null;
   ownerPhone?: string;
   safePetMasking?: boolean;
+  notifyEnabled?: boolean;
 }
 
 export interface FoundTimerData {

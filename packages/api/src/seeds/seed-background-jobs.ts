@@ -246,6 +246,22 @@ const jobs = [
     notifyOnSuccess: false,
     notifyOnFailure: true,
   },
+  // ─── HYBRID 2 Active Period Jobs ──────────────────────────────
+  {
+    name: 'active-period-check',
+    displayName: 'Active Period Check',
+    description: 'Monitors tag Active Periods, sends 30/7/1-day warnings, updates tag status to limited when expired.',
+    category: 'notification',
+    intervalMs: 24 * 60 * 60 * 1000, // 24 hours
+    lockName: 'active-period-check',
+    lockLeaseMs: 120000,
+    processTarget: 'worker',
+    filePath: 'services/active-period-check.service.ts',
+    functionName: 'checkActivePeriodExpirations',
+    enabled: true,
+    notifyOnSuccess: false,
+    notifyOnFailure: true,
+  },
 ];
 
 async function seedBackgroundJobs() {

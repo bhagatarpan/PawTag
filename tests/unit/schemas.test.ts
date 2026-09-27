@@ -187,6 +187,27 @@ describe('createProductSchema', () => {
     const data = { ...validProduct(), price: 0 };
     expect(createProductSchema.safeParse(data).success).toBe(false);
   });
+
+  it('accepts featureHighlights with highlighted fields', () => {
+    const data = {
+      ...validProduct(),
+      featureHighlights: [
+        { icon: 'Truck', description: 'Free Shipping', highlighted: true, highlightColor: 'teal' },
+        { icon: 'Shield', description: '12 Month Warranty' },
+      ],
+    };
+    expect(createProductSchema.safeParse(data).success).toBe(true);
+  });
+
+  it('accepts featureHighlights without highlighted fields', () => {
+    const data = {
+      ...validProduct(),
+      featureHighlights: [
+        { icon: 'Truck', description: 'Free Shipping' },
+      ],
+    };
+    expect(createProductSchema.safeParse(data).success).toBe(true);
+  });
 });
 
 describe('updateProductSchema', () => {
@@ -267,9 +288,9 @@ describe('createTagSchema', () => {
     expect(createTagSchema.safeParse(data).success).toBe(false);
   });
 
-  it('fails with missing petId', () => {
+  it('passes without petId (optional)', () => {
     const data = { ownerId: 'user1' };
-    expect(createTagSchema.safeParse(data).success).toBe(false);
+    expect(createTagSchema.safeParse(data).success).toBe(true);
   });
 
   it('fails with missing ownerId', () => {

@@ -1,0 +1,191 @@
+1. There is no Gold subscripbers at the moment, If there is any, remove their memberhsihp. We want to start clean.
+2. Let's do three  memberhsihps for now.. GOLD, PLATINUM, BLACK 
+ (Memberhsips are only One time purchase, Renew every year,  no monthly subscription here)
+GOLD IS MOST POULAR, PLATINUM IS RECOMMANDED, BLACK IS ELETE MEMBERHSIP (KEEP BLACK DISABLED TO PURCHASE, I HAVE NOT THOUGHT ABOUT BLACK more YET)
+3. Yes, we need landing page with ENTERPIRISE LEVEL PROFESSIONAL comparision with awesome ui/ux and purchase CTA  from there 
+4. I am not sure about this, let's decide later.
+5. yes, full featured admin portal management
+6. yes, remove everything related to gold purchasing, just read below and get the context right.
+
+SO IN SHORT..
+
+This is what we have talked about earlier, just remember below things, do not action anyting.
+PRODUCT = ONE TIME PRODUCT PURCHASE COST OF PRODUCT (NO SUBSCRIPTION NEEDED NOW, SIMPLE ONE TIME PURCHASE ONLY , CART, SHIPPING, STRIPE  AND FULLFILMENT WORKFLOW END TO END
+MEMBERSHIP = ONE TIME MEMBERSHIP PURCHASE, RENEW EVERY YEAR (SEPARATE CART, STRPE, NO SHIPPING)
+DIGITAL = ONE TIME PURCHASE ONLY ((SEPARATE CART, STRPE, NO SHIPPING)
+(none of the 3 type can be mixed in one cart) 
+
+
+PRODUCT = ONE TIME PRODUCT PURCHASE COST OF PRODUCT (NO SUBSCRIPTION NEEDED NOW, SIMPLE ONE TIME PURCHASE ONLY , CART, SHIPPING, STRIPE  AND FULLFILMENT WORKFLOW END TO END
+MEMBERSHIP = ONE TIME MEMBERSHIP PURCHASE, RENEW EVERY YEAR (SEPARATE CART, STRPE, NO SHIPPING)
+DIGITAL = ONE TIME PURCHASE ONLY ((SEPARATE CART, STRPE, NO SHIPPING)
+(none of the 3 type can be mixed in one cart)
+
+this will significanly change our code, will generate lot of dead code, but soon it will make everyting more simpler..
+
+
+## My Proposal for Hybrid -
+Tag + Optional Membership	
+Tag works out of the box for 12 months (configured through admin)  basic finder functionality for 12 months . 
+After 12 months, Membership is mandatory, if no membership, tag stop working. (finder stop working immediately)
+If membership is purchased within 12 months then below are benifits for each membership type 
+
+## My Proposal - HYBRID 2
+Do you want to proceed with Model C (Hybrid)?
+- Tags have warranty period (12 months)
+- Tags will remain active for 12 months
+
+Introduce an Active Period
+- Tag Active period (3 months) 
+- Tag will remain Active even after Active period of 3 months (Tag works since still 9 months left in warranty)
+- After Active period ends, membership required to keep tag working
+
+What should happen when Active Period expires but No Membership ?
+- Tag works for another 9 months but finder notifications stop (Tag remains active but Finder scans / taps won't work)
+- This will make customer to start buying Membership 
+
+What should happen when Active Period expires and customer buy Membership ?
+- Tag works for another 12 months from the membership start date
+- If customer buy membership after 1 month of activity, membership will still start after 3 months, so tag will be active after 3 months + 12 month
+- Finder will keep working for all 15 months
+
+
+In admin there is no configuration for Tag Active period setting (we need this per product item)
+In admin there is no configuration for Tag Warranty period setting (we need this per product item)
+
+
+ HYBRID 2 Model - Understood
+Timeline Scenarios
+Scenario 1: Customer buys membership BEFORE Active Period expires (e.g., at Month 1)
+Month 0:     Buy PawTag Classic ($19.99)
+Month 0-3:   ✅ Tag ACTIVE - everything works (finder, notifications, scans)
+Month 1:     Customer buys Membership ($99/year)
+Month 3:     ✅ Tag still ACTIVE - membership kicks in
+Month 3-15:  ✅ Tag ACTIVE with finder (12 months from membership start)
+             Total active period: 15 months (3 months + 12 months membership)
+Scenario 2: Customer buys membership AFTER Active Period expires (e.g., at Month 10)
+Month 0:     Buy PawTag Classic ($19.99)
+Month 0-3:   ✅ Tag ACTIVE - everything works (finder, notifications, scans)
+Month 3:     ⚠️ Active Period ends
+Month 3-10:  ⚠️ Tag works but FINDER NOTIFICATIONS STOPPED
+Month 10:    Customer buys Membership ($99/year)
+Month 10-22: ✅ Tag works with finder (12 months from membership start)
+             Total: 22 months (10 months + 12 months membership)
+
+Scenario 3: Customer NEVER buys membership
+Month 0:     Buy PawTag Classic ($19.99)
+Month 0-3:   ✅ Tag ACTIVE - everything works (finder, notifications, scans)
+Month 3:     ⚠️ Active Period ends
+Month 3-12:  ⚠️ Tag works but FINDER NOTIFICATIONS STOPPED
+Month 12:    Tag still works for NFC/QR scanning (till 12 month, after 12 month Tag Expires, need to buy new tag)
+             But owner can't be notified when pet is found 
+
+1. Yes, show a message
+2. Yes, both email and inapp notifications for approaching end of activie period + InApp notification on last of of Active period + Last day warning banner when Phone app / Web app opens (like big warning banner - closable )
+3. Subscirption is no longer required - remove it for tag products
+4. Proceed, but make a comprehensive plan 
+it will also affect db, api, stripe payment, inapp notifications, UI/UX, API, DB, email templates and any other area that I forgot about
+
+Key Design Decisions
+Question	Your Answer
+What is "Active Period"?	3 months from purchase
+What happens after Active Period?	Tag works but finder notifications stop
+When does membership kick in?	12 months from membership start date
+Can customer buy membership early?	Yes, but membership starts from purchase date
+What if customer buys membership at Month 1?	Tag active for 3 + 12 = 15 months total
+What if customer buys membership at Month 10?	Tag works for 10 months, then finder stops, then membership kicks in
+Implementation Requirements
+New Fields Needed
+Field	Location	Purpose
+activePeriodMonths	Product model	Default 3 months
+warrantyMonths	Product model	Already exists (default 12)
+activePeriodEndsAt	Tag model	When active period expires
+membershipStartsAt	Tag model	When membership kicks in (if purchased)
+Tag Status Logic
+IF tag.age <= activePeriodMonths:
+    Status: ACTIVE (full functionality)
+    
+IF tag.age > activePeriodMonths AND membership active:
+    Status: ACTIVE (full functionality - membership extends)
+    
+IF tag.age > activePeriodMonths AND NO membership:
+    Status: LIMITED (tag works but finder notifications stopped)
+Finder Behavior
+IF tag is ACTIVE:
+    Finder works (notify owner, share location, etc.)
+    
+IF tag is LIMITED:
+    Finder shows pet info but CAN'T notify owner
+    (Incentivizes customer to buy membership)
+Questions Before Implementation
+Should the "Limited" state show a message to the finder?
+- Example: "This tag is past its active period. The owner hasn't renewed their membership yet."
+- Or just silently block notifications?
+Should the customer see a warning when their tag is approaching the end of Active Period?
+- Example: Email at Day 60 (30 days before Active Period ends)
+- Example: In-app notification at Day 80 (10 days before)
+What happens to the Subscription system?
+- Keep it for membership management only?
+- Remove it entirely for tag products?
+- Rename it to something else?
+Should we proceed with this model?
+- This is a significant architectural change
+- It affects: Product model, Tag model, Checkout flow, Finder behavior, Email notifications, Admin portal
+Question: Should I proceed with implementing this HYBRID 2 model? This will require changes across multiple systems.
+
+
+============
+
+so the way currently TagID creation work is as below..
+1) PawTag will have stock of Products in the warehouse (eg: PawTag Classic with stock of 500) - goods is imported from China from Manufracture..
+2) Customer has ordered 1 PawTag Classic with NFC chip.
+3) After order is paid, PawTag Staff in a warehouse will pickup one of the PawTag Classic and use NFC Tag Writer to write a TAG ID generated from System to the NFC tag and lock the NFC tag so further writing is not possible.
+4) Staff will then complete the shipping fulfilment
+5) Customer receives the Tag
+6) Customer will Activate the Tag and Pair that tag with their PET, in the iPhone/android app or via webapp (This is forced action required by app when Tag is activated, this action can't be skipped because tag is for PET identification and tracking )
+7) Tag is ready to use
+(this tag is a actual physical item which is be shipped to customer after Tagid generated from system and same id is written inside the TAG  electronically by NFC writing software) 
+8) Customer will attach this tag to pet - and PET is now SAFE
+
+
+
+=============
+
+GOLD
+89$ YEAR
+Medical Alert to Finder 
+Pet Health Records
+Email Notifications 
+Free Shipping over $100
+Guardian Rewards 1x time
+
+PLATINUM
+99$ YEAR
+Medical Alert to Finder 
+Pet Health Records
+Email Notifications 
+Free Shipping over $80
+Guardian Rewards 2x time
+In App Notifications
+Critical Emergency Contact 
+Emergency Person Notification Email
+5% OFF ALL ACCESSORIES
+
+BLACK
+199$ YEAR
+Medical Alert to Finder 
+Pet Health Records
+Email Notifications 
+LIFETIME FREE SHIPPING (must stay on BLACK)
+Guardian Rewards 3x time
+In App Notifications
+Critical Emergency Contact 
+Emergency Person Notification Email
+Emergency Person Notification In App
+10% OFF ALL ACCESSORIES
+PET RECOVERY VIA PAWTAG
+EXLUSIVE BLACK FRIDAY DEAL
+
+
+
+

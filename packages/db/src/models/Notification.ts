@@ -3,7 +3,7 @@ import mongoose, { Schema, Document } from 'mongoose';
 export interface INotificationDocument extends Document {
   userId: mongoose.Types.ObjectId;
   audience: 'customer' | 'admin';
-  type: 'pet_lost' | 'pet_found' | 'finder_scan' | 'order_update' | 'system' | 'finder_reminder' | 'subscription_expiring' | 'subscription_auto_renew_paused' | 'referral_reward' | 'tag_expiry_warning' | 'new_order' | 'onboarding_reminder' | 'refund_failed' | 'emergency_contact_escalation' | 'order';
+  type: 'pet_lost' | 'pet_found' | 'finder_scan' | 'order_update' | 'system' | 'finder_reminder' | 'subscription_expiring' | 'subscription_auto_renew_paused' | 'referral_reward' | 'tag_expiry_warning' | 'new_order' | 'onboarding_reminder' | 'refund_failed' | 'emergency_contact_escalation' | 'order' | 'active_period_expiring_30d' | 'active_period_expiring_7d' | 'active_period_expired' | 'membership_required';
   title: string;
   message: string;
   data?: Record<string, unknown>;
@@ -20,7 +20,7 @@ const NotificationSchema = new Schema<INotificationDocument>(
     audience: { type: String, enum: ['customer', 'admin'], default: 'customer', index: true },
     type: {
       type: String,
-      enum: ['pet_lost', 'pet_found', 'finder_scan', 'order_update', 'system', 'finder_reminder', 'subscription_expiring', 'subscription_auto_renew_paused', 'referral_reward', 'tag_expiry_warning', 'new_order', 'onboarding_reminder', 'refund_failed', 'emergency_contact_escalation', 'order'],
+      enum: ['pet_lost', 'pet_found', 'finder_scan', 'order_update', 'system', 'finder_reminder', 'subscription_expiring', 'subscription_auto_renew_paused', 'referral_reward', 'tag_expiry_warning', 'new_order', 'onboarding_reminder', 'refund_failed', 'emergency_contact_escalation', 'order', 'active_period_expiring_30d', 'active_period_expiring_7d', 'active_period_expired', 'membership_required'],
       required: true,
     },
     title: { type: String, required: true },

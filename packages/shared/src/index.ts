@@ -424,6 +424,7 @@ export interface Product {
     customizationPrice?: number;
    shippingCost?: number;
    warrantyMonths?: number;
+   activePeriodMonths?: number;
    /** Product type: 'physical' = one-time product purchase, 'membership' = annual membership, 'digital' = one-time digital purchase */
    productType?: 'physical' | 'membership' | 'digital';
    /** @deprecated Use productType instead */
@@ -443,6 +444,10 @@ export interface Product {
    icon: string;
    /** Description text */
    description: string;
+   /** Whether this feature is visually highlighted */
+   highlighted?: boolean;
+   /** Highlight color key — defaults to 'teal' */
+   highlightColor?: string;
  }
 
 export interface ProductVariant {

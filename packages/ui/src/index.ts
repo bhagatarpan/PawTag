@@ -24,7 +24,7 @@ export type {
   OrderDetailViewProps,
 } from './types';
 
-export type { ProductCardProduct, ProductCardProps } from './components/ProductCard';
+export type { ProductCardProduct, ProductCardProps, IFeatureHighlight } from './components/ProductCard';
 export type { PriceDisplayProps } from './components/PriceDisplay';
 export type { ProductBadgeProps } from './components/ProductBadge';
 export type { CartItem, CartDrawerProps } from './components/CartDrawer';
