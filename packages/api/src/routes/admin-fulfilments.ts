@@ -67,6 +67,17 @@ router.post('/', requirePermission('order.update'), async (req: AuthRequest, res
 router.put('/:id/status', requirePermission('order.update'), async (req: AuthRequest, res: Response) => {
   try {
     const { status } = req.body;
+
+    // Validate: cannot mark fulfilled without at least one tag assignment
+    if (status === 'fulfilled') {
+      const fulfilment = await Fulfilment.findById(req.params.id);
+      if (!fulfilment) { res.status(404).json({ success: false, error: 'Fulfilment not found' }); return; }
+      if (!fulfilment.tagAssignments || fulfilment.tagAssignments.length === 0) {
+        res.status(400).json({ success: false, error: 'Cannot fulfil without assigning at least one tag. Please assign a tag first.' });
+        return;
+      }
+    }
+
     const update: Record<string, any> = { status };
     if (status === 'fulfilled') update.fulfilledAt = new Date();
     const item = await Fulfilment.findByIdAndUpdate(req.params.id, update, { new: true });
@@ -175,13 +186,12 @@ router.post('/:id/assign-tag', requirePermission('order.update'), async (req: Au
       return;
     }
 
-    // Check if this order item already has a tag assigned
-    const existingTag = await Tag.findOne({
-      orderId: order._id,
-      'orderItemId': orderItemId,
-    });
-    if (existingTag) {
-      res.status(409).json({ success: false, error: 'Tag already assigned to this order item', tagId: existingTag.tagId });
+    // Check if this order item already has a tag assigned (in this fulfilment)
+    const alreadyAssigned = fulfilment.tagAssignments.some(
+      (ta) => ta.orderItemId.toString() === orderItemId
+    );
+    if (alreadyAssigned) {
+      res.status(409).json({ success: false, error: 'Tag already assigned to this order item in this fulfilment' });
       return;
     }
 
@@ -210,15 +220,15 @@ router.post('/:id/assign-tag', requirePermission('order.update'), async (req: Au
       warrantyEndsAt,
     });
 
-    // Update fulfilment with tag assignment
-    fulfilment.tagAssignment = {
+    // Update fulfilment with tag assignment (push to array)
+    fulfilment.tagAssignments.push({
       tagId: tagIdStr,
       productId: new mongoose.Types.ObjectId(productId),
       orderItemId: new mongoose.Types.ObjectId(orderItemId),
       nfcWritten: false,
       assignedAt: now,
       assignedBy: new mongoose.Types.ObjectId(req.user!.id),
-    };
+    });
     await fulfilment.save();
 
     // Audit log
@@ -288,17 +298,17 @@ router.put('/:id/confirm-nfc', requirePermission('order.update'), async (req: Au
       return;
     }
 
-    if (fulfilment.tagAssignment?.tagId !== tagId) {
-      res.status(400).json({ success: false, error: 'Tag ID does not match fulfilment assignment' });
+    // Find the tag assignment in the array
+    const tagAssignment = fulfilment.tagAssignments.find((ta) => ta.tagId === tagId);
+    if (!tagAssignment) {
+      res.status(400).json({ success: false, error: 'Tag ID not found in this fulfilment' });
       return;
     }
 
-    // Update fulfilment
-    if (fulfilment.tagAssignment) {
-      fulfilment.tagAssignment.nfcWritten = true;
-      fulfilment.tagAssignment.confirmedAt = new Date();
-      fulfilment.tagAssignment.confirmedBy = new mongoose.Types.ObjectId(req.user!.id);
-    }
+    // Update the specific tag assignment
+    tagAssignment.nfcWritten = true;
+    tagAssignment.confirmedAt = new Date();
+    tagAssignment.confirmedBy = new mongoose.Types.ObjectId(req.user!.id);
     await fulfilment.save();
 
     // Update tag NFC status

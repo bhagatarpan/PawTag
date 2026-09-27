@@ -248,7 +248,10 @@ export const API = {
       },
       fulfilments: {
         list: '/admin/commerce/fulfilments',
+        get: (id: string) => `/admin/commerce/fulfilments/${id}` as const,
         setStatus: (id: string) => `/admin/commerce/fulfilments/${id}/status` as const,
+        assignTag: (id: string) => `/admin/commerce/fulfilments/${id}/assign-tag` as const,
+        confirmNfc: (id: string) => `/admin/commerce/fulfilments/${id}/confirm-nfc` as const,
       },
       shipments: {
         list: '/admin/commerce/shipments',

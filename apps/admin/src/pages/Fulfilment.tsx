@@ -4,20 +4,49 @@
  *
  * Shows fulfilment status across all stages:
  * pending → picking → packing → fulfilled
+ *
+ * Staff can:
+ * 1. View fulfilment details
+ * 2. Assign Tag IDs to order items
+ * 3. Confirm NFC writes
+ * 4. Progress through fulfilment stages
  */
 
 import { useEffect, useState, useCallback } from 'react';
 import { API } from '@pawtag/shared/api';
-import { Search, Loader2, ClipboardCheck, Clock, Package, CheckCircle, Filter } from 'lucide-react';
+import {
+  Search, Loader2, ClipboardCheck, Clock, Package, CheckCircle, Filter,
+  Eye, X, Copy, ExternalLink, Tag, Nfc, AlertTriangle, Check,
+} from 'lucide-react';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
 
+interface TagAssignment {
+  tagId: string;
+  productId: string;
+  orderItemId: string;
+  nfcWritten: boolean;
+  assignedAt: string;
+  assignedBy: string;
+  confirmedAt?: string;
+  confirmedBy?: string;
+}
+
+interface FulfilmentItem {
+  orderItemId: string;
+  productName: string;
+  quantity: number;
+  pickedQuantity: number;
+  packedQuantity: number;
+}
+
 interface Fulfilment {
   _id: string;
-  orderId: { _id: string; orderNumber: string; status: string } | string;
+  orderId: { _id: string; orderNumber: string; status: string; userId: { _id: string; fullName: string; email: string } } | string;
   orderNumber: string;
   status: 'pending' | 'picking' | 'packing' | 'fulfilled';
-  items: Array<{ productName: string; quantity: number; pickedQuantity: number; packedQuantity: number }>;
+  items: FulfilmentItem[];
+  tagAssignments: TagAssignment[];
   notes?: string;
   createdAt: string;
   fulfilledAt?: string;
@@ -32,6 +61,276 @@ const STATUS_CONFIG = {
 
 const STATUS_OPTIONS = ['all', 'pending', 'picking', 'packing', 'fulfilled'];
 
+function copyToClipboard(text: string) {
+  navigator.clipboard.writeText(text).then(
+    () => toast.success('Copied to clipboard'),
+    () => toast.error('Failed to copy'),
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Detail Drawer                                                      */
+/* ------------------------------------------------------------------ */
+
+function FulfilmentDetailDrawer({
+  fulfilment,
+  onClose,
+  onRefresh,
+}: {
+  fulfilment: Fulfilment | null;
+  onClose: () => void;
+  onRefresh: () => void;
+}) {
+  const [assigning, setAssigning] = useState<string | null>(null);
+  const [confirmingNfc, setConfirmingNfc] = useState<string | null>(null);
+  const [statusLoading, setStatusLoading] = useState(false);
+
+  useEffect(() => {
+    if (!fulfilment) return;
+    const handleEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', handleEsc);
+    return () => document.removeEventListener('keydown', handleEsc);
+  }, [fulfilment, onClose]);
+
+  if (!fulfilment) return null;
+
+  const handleAssignTag = async (orderItemId: string, productId: string) => {
+    setAssigning(orderItemId);
+    try {
+      const res = await api.post(`/admin/commerce/fulfilments/${fulfilment._id}/assign-tag`, {
+        orderItemId,
+        productId,
+      });
+      toast.success(`Tag assigned: ${res.data.data.tagId}`);
+      onRefresh();
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to assign tag');
+    } finally {
+      setAssigning(null);
+    }
+  };
+
+  const handleConfirmNfc = async (tagId: string) => {
+    setConfirmingNfc(tagId);
+    try {
+      await api.put(`/admin/commerce/fulfilments/${fulfilment._id}/confirm-nfc`, { tagId });
+      toast.success('NFC write confirmed');
+      onRefresh();
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to confirm NFC');
+    } finally {
+      setConfirmingNfc(null);
+    }
+  };
+
+  const handleStatusChange = async (status: string) => {
+    setStatusLoading(true);
+    try {
+      await api.put(`/admin/commerce/fulfilments/${fulfilment._id}/status`, { status });
+      toast.success(`Fulfilment marked as ${status}`);
+      onRefresh();
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to update status');
+    } finally {
+      setStatusLoading(false);
+    }
+  };
+
+  const owner = typeof fulfilment.orderId === 'object' ? fulfilment.orderId.userId : null;
+  const allAssigned = fulfilment.items.every((item) =>
+    fulfilment.tagAssignments.some((ta) => ta.orderItemId === item.orderItemId)
+  );
+  const allNfcWritten = fulfilment.tagAssignments.length > 0 &&
+    fulfilment.tagAssignments.every((ta) => ta.nfcWritten);
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end">
+      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
+      <div className="relative w-full max-w-lg bg-white shadow-2xl overflow-y-auto">
+        {/* Header */}
+        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">{fulfilment.orderNumber}</h2>
+            <p className="text-sm text-gray-500">Fulfilment Details</p>
+          </div>
+          <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 rounded-lg">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="px-6 py-5 space-y-6">
+          {/* Status */}
+          <div>
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Status</h3>
+            <div className="flex items-center gap-2">
+              {(['pending', 'picking', 'packing', 'fulfilled'] as const).map((s) => {
+                const cfg = STATUS_CONFIG[s];
+                const Icon = cfg.icon;
+                const isActive = fulfilment.status === s;
+                const isPast = ['pending', 'picking', 'packing', 'fulfilled'].indexOf(fulfilment.status) > ['pending', 'picking', 'packing', 'fulfilled'].indexOf(s);
+                return (
+                  <div key={s} className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                    isActive ? cfg.color : isPast ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'
+                  }`}>
+                    {isPast ? <Check size={12} /> : <Icon size={12} />}
+                    {cfg.label}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Owner */}
+          {owner && (
+            <div>
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Customer</h3>
+              <p className="text-sm font-medium text-gray-900">{owner.fullName}</p>
+              <p className="text-xs text-gray-500">{owner.email}</p>
+            </div>
+          )}
+
+          {/* Items + Tag Assignment */}
+          <div>
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Items & Tag Assignment</h3>
+            <div className="space-y-3">
+              {fulfilment.items.map((item, idx) => {
+                const assignment = fulfilment.tagAssignments.find(
+                  (ta) => ta.orderItemId === item.orderItemId
+                );
+                return (
+                  <div key={idx} className="border border-gray-200 rounded-lg p-3">
+                    <div className="flex items-start justify-between mb-2">
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">{item.productName}</p>
+                        <p className="text-xs text-gray-500">Qty: {item.quantity}</p>
+                      </div>
+                      {assignment ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-700">
+                          <Check size={12} /> Tag Assigned
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-yellow-100 text-yellow-700">
+                          <AlertTriangle size={12} /> No Tag
+                        </span>
+                      )}
+                    </div>
+
+                    {assignment ? (
+                      <div className="bg-gray-50 rounded-lg p-2 space-y-1">
+                        <div className="flex items-center gap-2">
+                          <Tag size={12} className="text-gray-400" />
+                          <span className="font-mono text-sm font-medium text-gray-900">{assignment.tagId}</span>
+                          <button onClick={() => copyToClipboard(assignment.tagId)} className="text-gray-400 hover:text-gray-600">
+                            <Copy size={12} />
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-gray-500">
+                          {assignment.nfcWritten ? (
+                            <span className="inline-flex items-center gap-1 text-green-600">
+                              <Check size={12} /> NFC Written
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => handleConfirmNfc(assignment.tagId)}
+                              disabled={confirmingNfc === assignment.tagId}
+                              className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 disabled:opacity-50"
+                            >
+                              {confirmingNfc === assignment.tagId ? (
+                                <Loader2 size={12} className="animate-spin" />
+                              ) : (
+                                <Nfc size={12} />
+                              )}
+                              Confirm NFC Written
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => handleAssignTag(item.orderItemId, item.orderItemId)}
+                        disabled={assigning === item.orderItemId || fulfilment.status === 'fulfilled'}
+                        className="mt-1 inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-teal-600 hover:bg-teal-700 rounded-lg disabled:opacity-50"
+                      >
+                        {assigning === item.orderItemId ? (
+                          <Loader2 size={12} className="animate-spin" />
+                        ) : (
+                          <Tag size={12} />
+                        )}
+                        Assign Tag ID
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Notes */}
+          {fulfilment.notes && (
+            <div>
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Notes</h3>
+              <p className="text-sm text-gray-600">{fulfilment.notes}</p>
+            </div>
+          )}
+
+          {/* Status Actions */}
+          <div className="border-t border-gray-200 pt-4">
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Actions</h3>
+            <div className="flex flex-wrap gap-2">
+              {fulfilment.status === 'pending' && (
+                <button
+                  onClick={() => handleStatusChange('picking')}
+                  disabled={statusLoading}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg disabled:opacity-50"
+                >
+                  {statusLoading && <Loader2 size={12} className="animate-spin" />}
+                  Start Picking
+                </button>
+              )}
+              {fulfilment.status === 'picking' && (
+                <button
+                  onClick={() => handleStatusChange('packing')}
+                  disabled={statusLoading}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-lg disabled:opacity-50"
+                >
+                  {statusLoading && <Loader2 size={12} className="animate-spin" />}
+                  Start Packing
+                </button>
+              )}
+              {fulfilment.status === 'packing' && (
+                <button
+                  onClick={() => handleStatusChange('fulfilled')}
+                  disabled={statusLoading || !allAssigned}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-lg disabled:opacity-50"
+                  title={!allAssigned ? 'Assign tags to all items before fulfilling' : ''}
+                >
+                  {statusLoading && <Loader2 size={12} className="animate-spin" />}
+                  Mark Fulfilled
+                </button>
+              )}
+              {fulfilment.status === 'fulfilled' && (
+                <span className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-green-700 bg-green-50 rounded-lg">
+                  <CheckCircle size={12} /> Fulfilled
+                </span>
+              )}
+            </div>
+            {!allAssigned && fulfilment.status === 'packing' && (
+              <p className="mt-2 text-xs text-amber-600 flex items-center gap-1">
+                <AlertTriangle size={12} />
+                Assign tags to all items before marking as fulfilled.
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Main Page                                                          */
+/* ------------------------------------------------------------------ */
+
 export default function Fulfilment() {
   const [fulfilments, setFulfilments] = useState<Fulfilment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,6 +338,7 @@ export default function Fulfilment() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [selectedFulfilment, setSelectedFulfilment] = useState<Fulfilment | null>(null);
 
   const fetchFulfilments = useCallback(async () => {
     try {
@@ -56,19 +356,11 @@ export default function Fulfilment() {
 
   useEffect(() => { fetchFulfilments(); }, [fetchFulfilments]);
 
-  const updateStatus = async (id: string, status: string) => {
-    try {
-      await api.put(`/admin/commerce/fulfilments/${id}/status`, { status });
-      toast.success(`Fulfilment marked as ${status}`);
-      fetchFulfilments();
-    } catch { toast.error('Failed to update status'); }
-  };
-
   return (
     <div className="max-w-7xl mx-auto p-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Fulfilment</h1>
-        <p className="text-sm text-gray-500 mt-1">Manage order fulfilment workflow</p>
+        <p className="text-sm text-gray-500 mt-1">Manage order fulfilment workflow — assign tags, confirm NFC, and ship</p>
       </div>
 
       <div className="flex flex-wrap gap-3 mb-6">
@@ -102,6 +394,7 @@ export default function Fulfilment() {
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Order</th>
                 <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Status</th>
                 <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Items</th>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Tags</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Created</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Actions</th>
               </tr>
@@ -110,26 +403,29 @@ export default function Fulfilment() {
               {fulfilments.map((f) => {
                 const cfg = STATUS_CONFIG[f.status];
                 const Icon = cfg.icon;
+                const tagsAssigned = f.tagAssignments?.length || 0;
+                const totalItems = f.items.reduce((sum, i) => sum + i.quantity, 0);
                 return (
-                  <tr key={f._id} className="hover:bg-gray-50">
+                  <tr key={f._id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setSelectedFulfilment(f)}>
                     <td className="px-4 py-3 font-mono text-sm font-medium text-gray-900">{f.orderNumber}</td>
                     <td className="px-4 py-3 text-center">
                       <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full ${cfg.color}`}>
                         <Icon size={12} /> {cfg.label}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-center text-sm text-gray-600">
-                      {f.items.reduce((sum, i) => sum + i.quantity, 0)} items
+                    <td className="px-4 py-3 text-center text-sm text-gray-600">{totalItems} item{totalItems !== 1 ? 's' : ''}</td>
+                    <td className="px-4 py-3 text-center text-sm">
+                      {tagsAssigned > 0 ? (
+                        <span className="text-green-600 font-medium">{tagsAssigned}/{totalItems}</span>
+                      ) : (
+                        <span className="text-gray-400">—</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-500">{new Date(f.createdAt).toLocaleDateString()}</td>
                     <td className="px-4 py-3 text-right">
-                      {f.status !== 'fulfilled' && (
-                        <div className="flex gap-1 justify-end">
-                          {f.status === 'pending' && <button onClick={() => updateStatus(f._id, 'picking')} className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200">Start Picking</button>}
-                          {f.status === 'picking' && <button onClick={() => updateStatus(f._id, 'packing')} className="px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded hover:bg-purple-200">Start Packing</button>}
-                          {f.status === 'packing' && <button onClick={() => updateStatus(f._id, 'fulfilled')} className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200">Mark Fulfilled</button>}
-                        </div>
-                      )}
+                      <button className="p-1.5 text-gray-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors">
+                        <Eye size={16} />
+                      </button>
                     </td>
                   </tr>
                 );
@@ -150,6 +446,20 @@ export default function Fulfilment() {
           </div>
         </div>
       )}
+
+      {/* Detail Drawer */}
+      <FulfilmentDetailDrawer
+        fulfilment={selectedFulfilment}
+        onClose={() => setSelectedFulfilment(null)}
+        onRefresh={() => {
+          fetchFulfilments();
+          if (selectedFulfilment) {
+            api.get(`/admin/commerce/fulfilments/${selectedFulfilment._id}`).then((r) => {
+              setSelectedFulfilment(r.data.data);
+            }).catch(() => {});
+          }
+        }}
+      />
     </div>
   );
 }

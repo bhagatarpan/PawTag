@@ -5,7 +5,8 @@
  * Tracks the fulfilment workflow for orders:
  * pending → picking → packing → fulfilled
  *
- * Each fulfilment can contain multiple items from an order.
+ * Each fulfilment can contain multiple items from an order,
+ * and each item can have its own tag assignment.
  *
  * @example
  * ```typescript
@@ -27,6 +28,17 @@ export interface IFulfilmentItem {
   packedQuantity: number;
 }
 
+export interface ITagAssignment {
+  tagId: string;
+  productId: mongoose.Types.ObjectId;
+  orderItemId: mongoose.Types.ObjectId;
+  nfcWritten: boolean;
+  assignedAt: Date;
+  assignedBy: mongoose.Types.ObjectId;
+  confirmedAt?: Date;
+  confirmedBy?: mongoose.Types.ObjectId;
+}
+
 export interface IFulfilmentDocument extends Document {
   orderId: mongoose.Types.ObjectId;
   orderNumber: string;
@@ -34,20 +46,22 @@ export interface IFulfilmentDocument extends Document {
   items: IFulfilmentItem[];
   notes?: string;
   assignedTo?: mongoose.Types.ObjectId;
-  tagAssignment?: {
-    tagId: string;
-    productId: mongoose.Types.ObjectId;
-    orderItemId: mongoose.Types.ObjectId;
-    nfcWritten: boolean;
-    assignedAt: Date;
-    assignedBy: mongoose.Types.ObjectId;
-    confirmedAt?: Date;
-    confirmedBy?: mongoose.Types.ObjectId;
-  };
+  tagAssignments: ITagAssignment[];
   fulfilledAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
+
+const TagAssignmentSchema = new Schema<ITagAssignment>({
+  tagId: { type: String, required: true },
+  productId: { type: Schema.Types.ObjectId, ref: 'Product', required: true },
+  orderItemId: { type: Schema.Types.ObjectId, required: true },
+  nfcWritten: { type: Boolean, default: false },
+  assignedAt: { type: Date, required: true },
+  assignedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  confirmedAt: { type: Date },
+  confirmedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+}, { _id: false });
 
 const FulfilmentItemSchema = new Schema<IFulfilmentItem>({
   orderItemId: { type: Schema.Types.ObjectId, required: true },
@@ -65,16 +79,7 @@ const FulfilmentSchema = new Schema<IFulfilmentDocument>(
     items: [FulfilmentItemSchema],
     notes: { type: String },
     assignedTo: { type: Schema.Types.ObjectId, ref: 'User' },
-    tagAssignment: {
-      tagId: { type: String },
-      productId: { type: Schema.Types.ObjectId, ref: 'Product' },
-      orderItemId: { type: Schema.Types.ObjectId },
-      nfcWritten: { type: Boolean, default: false },
-      assignedAt: { type: Date },
-      assignedBy: { type: Schema.Types.ObjectId, ref: 'User' },
-      confirmedAt: { type: Date },
-      confirmedBy: { type: Schema.Types.ObjectId, ref: 'User' },
-    },
+    tagAssignments: [TagAssignmentSchema],
     fulfilledAt: { type: Date },
   },
   { timestamps: true },
