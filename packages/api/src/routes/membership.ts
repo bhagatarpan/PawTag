@@ -159,4 +159,20 @@ router.get('/tags', async (req: AuthRequest, res: Response) => {
   }
 });
 
+/**
+ * GET /api/membership/entitlements
+ * Get current user's full entitlements from the registry.
+ */
+router.get('/entitlements', async (req: AuthRequest, res: Response) => {
+  try {
+    const { membershipEntitlementService } = await import('../services/membership-entitlement.service');
+    const entitlements = await membershipEntitlementService.getUserEntitlements(req.user!.id);
+    const tier = await membershipEntitlementService.getUserTierString(req.user!.id);
+    res.json({ success: true, data: { tier, entitlements } });
+  } catch (error: any) {
+    logger.error({ err: error, userId: req.user?.id }, '[Membership] Failed to fetch entitlements');
+    res.status(500).json({ success: false, error: 'Failed to fetch entitlements' });
+  }
+});
+
 export default router;

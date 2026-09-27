@@ -573,38 +573,45 @@ router.post('/:tagId/notify', finderNotifyLimiter, requireCaptcha, async (req: R
       const notifTitle = `Your pet ${pet?.name || 'Unknown'} has been found!`;
       const notifMessage = `A kind person found your pet ${pet?.name || ''} (${pet?.petId || ''}). They left their contact details so you can reach them. ${contactInfo}${locationContext ? '\n\n' + locationContext : ''}`;
 
-      // In-app notification + push (isolated — must not block email to owner)
-      try {
-        await Notification.create({
-          userId: owner._id,
-          type: 'pet_found',
-          title: notifTitle,
-          message: notifMessage,
-          priority: 'high',
-          data: {
-            petId: pet?._id,
-            petName: pet?.name,
-            petPetId: pet?.petId,
-            tagId: tag.tagId,
-            finderPhone: finderPhone || null,
-            finderEmail: finderEmail || null,
-            finderName: finderName || null,
-            foundAt: new Date().toISOString(),
-            location: locationSaved ? { latitude, longitude, accuracy } : null,
-          },
-        });
+      // Check owner's notification entitlements
+      const { membershipEntitlementService } = await import('../services/membership-entitlement.service');
+      const ownerInAppEntitled = await membershipEntitlementService.hasAccess(owner._id.toString(), 'in_app_notifications');
+      const ownerEmailEntitled = await membershipEntitlementService.hasAccess(owner._id.toString(), 'email_notifications');
 
-        await sendPushToUser(owner._id.toString(), notifTitle, notifMessage, {
-          type: 'pet_found',
-          petId: pet?._id?.toString() || '',
-          tagId: tag.tagId,
-        }).catch(() => {});
-      } catch (notifErr) {
-        logger.error({ err: notifErr, petId: pet?._id, ownerId: owner._id }, '[Finder] Failed to deliver in-app/push notification to owner');
+      // In-app notification + push (isolated — must not block email to owner)
+      if (ownerInAppEntitled) {
+        try {
+          await Notification.create({
+            userId: owner._id,
+            type: 'pet_found',
+            title: notifTitle,
+            message: notifMessage,
+            priority: 'high',
+            data: {
+              petId: pet?._id,
+              petName: pet?.name,
+              petPetId: pet?.petId,
+              tagId: tag.tagId,
+              finderPhone: finderPhone || null,
+              finderEmail: finderEmail || null,
+              finderName: finderName || null,
+              foundAt: new Date().toISOString(),
+              location: locationSaved ? { latitude, longitude, accuracy } : null,
+            },
+          });
+
+          await sendPushToUser(owner._id.toString(), notifTitle, notifMessage, {
+            type: 'pet_found',
+            petId: pet?._id?.toString() || '',
+            tagId: tag.tagId,
+          }).catch(() => {});
+        } catch (notifErr) {
+          logger.error({ err: notifErr, petId: pet?._id, ownerId: owner._id }, '[Finder] Failed to deliver in-app/push notification to owner');
+        }
       }
 
       // Send email notification to owner (isolated — must not be blocked by in-app/push failure)
-      if (owner.email) {
+      if (ownerEmailEntitled && owner.email) {
         try {
           const scanLocation = locationSaved
             ? `${latitude}, ${longitude}${accuracy ? ` (±${Math.round(accuracy)}m)` : ''}`

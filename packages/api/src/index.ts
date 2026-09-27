@@ -112,6 +112,7 @@ import resendWebhookRoutes from './routes/resend-webhooks';
 import promoPublicRoutes from './routes/promo-public';
 import commercePublicRoutes from './routes/commerce-public';
 import pointsEstimateRoutes from './routes/points-estimate';
+import adminEntitlementRoutes from './routes/admin-entitlements';
 
 import { siteAvailabilityMiddleware } from './middleware/site-availability';
 import { shutdownTracing } from './lib/tracing';
@@ -276,6 +277,7 @@ app.use('/api/customer/guardian', customerGuardianRoutes);
 app.use('/api/membership', membershipRoutes);
 app.use('/api/public/membership', membershipPublicRoutes);
 app.use('/api/admin/membership', adminMembershipRoutes);
+app.use('/api/admin/entitlements', adminEntitlementRoutes);
 app.use('/api/admin/digital-products', adminDigitalProductRoutes);
 app.use('/api/customer/digital-products', customerDigitalRoutes);
 app.use('/api', invoiceAccessRoutes);

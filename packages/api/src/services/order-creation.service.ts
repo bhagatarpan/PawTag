@@ -402,10 +402,10 @@ export async function createPawTagOrder(params: CreateOrderParams): Promise<Crea
         if (!user || !user.guardianTier) return;
 
         const { calculateTier } = await import('./loyalty/tier.service');
-        const { isGoldSubscription } = await import('./loyalty/points-earning.service');
+        const { membershipEntitlementService } = await import('./membership-entitlement.service');
         const tierInfo = await calculateTier(userId);
-        const isGoldMember = await isGoldSubscription(userId);
-        const pointsEarned = Math.floor(total * (isGoldMember ? 2 : 1));
+        const multiplier = await membershipEntitlementService.getValue<number>(userId, 'points_multiplier');
+        const pointsEarned = Math.floor(total * (multiplier ?? 1));
 
         await sendMail(
           user.email,
@@ -418,7 +418,7 @@ export async function createPawTagOrder(params: CreateOrderParams): Promise<Crea
             tier: tierInfo.tier,
             pointsToNextTier: tierInfo.pointsToNextTier,
             nextTier: tierInfo.nextTier,
-            isGoldMember,
+            isGoldMember: (multiplier ?? 1) > 1,
             dashboardUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/guardian`,
           }),
         );

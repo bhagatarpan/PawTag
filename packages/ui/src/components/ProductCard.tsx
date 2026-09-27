@@ -155,7 +155,7 @@ export const ProductCard = React.memo(function ProductCard({
           )}
           {product.showGoldUpsell && (
             <a href="/membership" className="text-xs text-amber-600 font-medium mt-1 hover:underline">
-              Gold members earn 2× Points on this item →
+              Members earn extra points on this item →
             </a>
           )}
           {product.customizable && (

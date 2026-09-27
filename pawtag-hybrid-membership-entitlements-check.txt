@@ -1,0 +1,1631 @@
+Yes — **this is a much bigger issue than simply checking whether the membership page is displaying the correct benefits.**
+
+What you are describing is the difference between:
+
+> **"The website says Platinum gets Free Shipping over $80"**
+
+and:
+
+> **"The PawTag system actually knows that this customer is Platinum and automatically applies Free Shipping when their eligible order is $80+."**
+
+The same applies to `isInAppNotifications`, Guardian points multipliers, emergency-contact capabilities, discounts, medical features, etc.
+
+I would have your AI perform a **Membership Benefits Reality Audit** first, before changing anything.
+
+The important architectural goal should eventually be:
+
+```text
+                    MEMBERSHIP BENEFIT CONFIGURATION
+                              │
+                              ▼
+                 ┌────────────────────────┐
+                 │ Membership Benefit      │
+                 │ Registry / Rules Engine  │
+                 └───────────┬────────────┘
+                             │
+          ┌──────────────────┼──────────────────┐
+          ▼                  ▼                  ▼
+      Checkout          Notifications       Guardian
+      Shipping           In-App/Push          Points
+          │                  │                  │
+          ▼                  ▼                  ▼
+       Enforced            Enforced           Enforced
+```
+
+Rather than having random code throughout PawTag saying:
+
+```text
+if Gold...
+if Platinum...
+if Black...
+```
+
+Here's the prompt I'd give your coding agent.
+
+---
+
+# PAWTAG — MEMBERSHIP BENEFITS REALITY AUDIT, ENTITLEMENT ENGINE & ADMIN CONFIGURATION
+
+```text
+# PAWTAG — MEMBERSHIP BENEFITS REALITY AUDIT
+# BUSINESS RULES → CODE ENFORCEMENT → ADMIN CONFIGURATION
+# COMPLETE DISCOVERY, GAP ANALYSIS & IMPLEMENTATION PLAN
+
+You are acting as:
+
+- Lead Software Architect
+- Senior Full-Stack Engineer
+- Database Architect
+- Business Rules Architect
+- Product Engineer
+- UX/UI Engineer
+- QA/Test Lead
+- Security Engineer
+
+Repository:
+
+bhagatarpan/PawTag
+
+I am the Product Owner and Business Decision Maker.
+
+I am NOT asking you to simply inspect whether the Membership page looks correct.
+
+I want you to determine whether PawTag's advertised membership benefits are ACTUALLY implemented and enforced throughout the system.
+
+============================================================
+1. CORE PROBLEM
+============================================================
+
+PawTag currently has Membership tiers such as:
+
+- Gold
+- Platinum
+- Black
+
+The website displays benefits for each tier.
+
+However, we currently do NOT have a proper central Membership Benefit Configuration / Entitlement Registry that defines:
+
+- What each membership tier receives
+- What limits apply
+- What thresholds apply
+- What multipliers apply
+- What features are enabled
+- What features are disabled
+- What discounts apply
+- What shipping rules apply
+- What notification channels are allowed
+- What emergency/recovery capabilities are available
+
+This creates a major risk:
+
+The website may SAY that a member receives a benefit while the actual application may not enforce that benefit.
+
+Example:
+
+PLATINUM says:
+
+"Free Shipping over $80"
+
+GOLD says:
+
+"Free Shipping over $100"
+
+Question:
+
+If a Platinum customer places a $85 eligible order, does the actual checkout/shipping engine return FREE shipping?
+
+If a Gold customer places a $85 eligible order, does the actual checkout correctly charge shipping?
+
+We need to determine this from the codebase.
+
+Do NOT assume that because the Membership page displays a benefit, the benefit is actually implemented.
+
+============================================================
+2. SECOND EXAMPLE — NOTIFICATION BENEFITS
+============================================================
+
+Example:
+
+Gold:
+
+- Email Notifications
+- NO In-App Notifications
+
+Platinum:
+
+- Email Notifications
+- In-App Notifications
+
+Black:
+
+- Email Notifications
+- In-App Notifications
+- Emergency Person In-App
+
+We need to determine:
+
+If a Gold customer's membership configuration says:
+
+isInAppNotifications = false
+
+does the actual notification service prevent in-app notifications from being created/delivered to that customer?
+
+Or does the system simply allow all customers to receive in-app notifications regardless of membership?
+
+Do not assume.
+
+Trace the complete implementation.
+
+============================================================
+3. THIRD EXAMPLE — GUARDIAN POINTS
+============================================================
+
+Membership benefits currently advertise different Guardian/PawRewards point multipliers.
+
+For example:
+
+Gold:
+2× points
+
+Platinum:
+2× points
+
+Black:
+3× points
+
+Determine whether these are actually enforced when points are awarded.
+
+Trace:
+
+Purchase
+↓
+Order
+↓
+Payment
+↓
+Points calculation
+↓
+Membership tier
+↓
+Multiplier
+↓
+Ledger entry
+↓
+Customer balance
+
+Determine whether:
+
+- membership tier is actually consulted
+- multiplier is actually applied
+- points are calculated centrally
+- points can be manipulated from frontend
+- different earning events use the same rules
+- some earning events ignore membership
+- refunds/reversals correctly reverse the correct points
+
+============================================================
+4. MEMBERSHIP PAGE IS NOT THE SOURCE OF TRUTH
+============================================================
+
+IMPORTANT:
+
+Do NOT treat the current Membership page as proof that a benefit exists.
+
+The Membership page is marketing/presentation.
+
+We need to establish:
+
+BUSINESS RULE
+↓
+CONFIGURATION
+↓
+BACKEND ENFORCEMENT
+↓
+API
+↓
+FRONTEND EXPERIENCE
+↓
+ACTUAL CUSTOMER OUTCOME
+
+A benefit is considered REAL only when the actual application enforces it where relevant.
+
+============================================================
+5. FIRST TASK — FULL AUDIT
+============================================================
+
+DO NOT START CODING.
+
+First perform a complete audit.
+
+Search the entire repository.
+
+Inspect:
+
+apps/web
+apps/admin
+apps/finder
+apps/mobile
+packages/api
+packages/shared
+packages/ui
+
+Also inspect:
+
+DESIGN.md
+README.md
+AGENTS.md
+existing documentation
+database models
+services
+controllers
+routes
+middleware
+hooks
+contexts
+utilities
+background jobs
+Stripe integration
+checkout
+cart
+shipping
+notifications
+email
+points
+Guardian
+membership
+customer portal
+admin portal
+
+============================================================
+6. SEARCH FOR MEMBERSHIP IMPLEMENTATION
+============================================================
+
+Search for ALL references to:
+
+Gold
+Platinum
+Black
+membership
+membershipTier
+membershipType
+membershipLevel
+tier
+guardian
+Guardian
+points
+multiplier
+shipping
+free shipping
+shipping threshold
+discount
+notification
+inAppNotifications
+pushNotifications
+emailNotifications
+emergency contact
+medical alert
+health records
+recovery
+support
+access
+benefit
+entitlement
+feature flag
+capability
+perk
+reward
+
+Also search for hardcoded values such as:
+
+80
+100
+2x
+3x
+5%
+10%
+etc.
+
+Do not assume every occurrence is relevant.
+
+Trace each relevant occurrence to its business purpose.
+
+============================================================
+7. BUILD A MEMBERSHIP BENEFIT INVENTORY
+============================================================
+
+Create a complete table of every membership benefit advertised by PawTag.
+
+Use the existing Membership page/content as one source.
+
+For each benefit identify:
+
+- Membership tier
+- Benefit name
+- Description
+- Current advertised value
+- Expected business behaviour
+- Relevant system area
+- Current implementation
+- Backend enforcement?
+- Frontend enforcement?
+- Database configuration?
+- Admin configuration?
+- Hardcoded?
+- Tested?
+- Actual status
+- Gap
+- Recommended implementation
+
+Example:
+
+| Benefit | Gold | Platinum | Black | Actual Enforcement |
+|---------|------|----------|-------|--------------------|
+| Free shipping threshold | $100 | $80 | Lifetime/free | UNKNOWN |
+| Guardian points | 2× | 2× | 3× | UNKNOWN |
+| Email notifications | Yes | Yes | Yes | UNKNOWN |
+| In-app notifications | No/limited | Yes | Yes | UNKNOWN |
+| Emergency contact | ... | ... | ... | UNKNOWN |
+| Medical alert | ... | ... | ... | UNKNOWN |
+| Pet health records | ... | ... | ... | UNKNOWN |
+| Accessory discount | ... | 5% | 10% | UNKNOWN |
+
+Do not invent values.
+
+Only use values actually found in the codebase/business documentation.
+
+============================================================
+8. CLASSIFY EVERY BENEFIT
+============================================================
+
+For every benefit classify it as one of:
+
+TYPE A — Marketing only
+
+TYPE B — Already implemented and enforced
+
+TYPE C — Partially implemented
+
+TYPE D — Displayed but NOT enforced
+
+TYPE E — Implemented but inconsistent with advertised benefit
+
+TYPE F — Hardcoded in application logic
+
+TYPE G — Configurable but no admin UI
+
+TYPE H — No implementation found
+
+TYPE I — Ambiguous / business decision required
+
+This classification is extremely important.
+
+============================================================
+9. SHIPPING BENEFITS — DEEP AUDIT
+============================================================
+
+Perform a complete trace of shipping.
+
+Start at:
+
+Membership tier
+
+and trace through:
+
+Customer
+↓
+Cart
+↓
+Checkout
+↓
+Shipping calculation
+↓
+Shipping options
+↓
+Order
+↓
+Payment
+↓
+Fulfilment
+
+Determine:
+
+How is shipping price calculated?
+
+Where are shipping methods stored?
+
+Where is the shipping threshold calculated?
+
+Does the system know the customer's membership tier?
+
+Does shipping logic receive membership information?
+
+Does Gold use $100?
+
+Does Platinum use $80?
+
+Does Black receive free shipping regardless of amount?
+
+Are thresholds hardcoded?
+
+Are they stored in DB?
+
+Are they stored in configuration?
+
+Are they calculated client-side?
+
+Are they validated server-side?
+
+Can a customer manipulate the frontend and receive free shipping incorrectly?
+
+Does the final order contain the correct shipping price?
+
+Does Stripe receive the correct final amount?
+
+Test examples:
+
+Gold + $79.99
+Gold + $80
+Gold + $99.99
+Gold + $100
+Gold + $150
+
+Platinum + $79.99
+Platinum + $80
+Platinum + $99.99
+
+Black + $1
+Black + $50
+Black + $200
+
+Also determine whether the threshold applies to:
+
+- product subtotal
+- subtotal after discounts
+- subtotal before discounts
+- tax
+- shipping
+- subscription
+- gift cards
+- excluded products
+
+Do NOT invent these rules.
+
+Identify them as business-rule decisions if they are not currently defined.
+
+============================================================
+10. NOTIFICATION BENEFITS — DEEP AUDIT
+============================================================
+
+Trace the complete notification architecture.
+
+Determine how PawTag handles:
+
+- In-app notifications
+- Push notifications
+- Email
+- SMS
+- Emergency notifications
+
+Trace:
+
+Event
+↓
+Notification service
+↓
+Customer preferences
+↓
+Membership entitlement
+↓
+Channel selection
+↓
+Notification creation
+↓
+Delivery
+
+Determine whether membership benefits actually control notification delivery.
+
+For example:
+
+Gold:
+
+isInAppNotifications = false
+
+Does this actually prevent:
+
+Notification document creation?
+
+In-app display?
+
+Push notification?
+
+API response?
+
+Unread notification count?
+
+Mobile notification?
+
+Determine whether:
+
+customer notification preferences
+
+and
+
+membership entitlement
+
+are being incorrectly mixed together.
+
+We need to distinguish:
+
+"Customer has disabled notifications"
+
+from:
+
+"Customer's membership does not include this notification capability."
+
+These are different business concepts.
+
+============================================================
+11. GUARDIAN POINTS — DEEP AUDIT
+============================================================
+
+Audit every points earning path.
+
+Find all ways customers can earn points.
+
+Examples may include:
+
+- Purchases
+- Reviews
+- Photo reviews
+- Video reviews
+- Referrals
+- Pet profile completion
+- Tag activation
+- Other engagement events
+
+For every event determine:
+
+Base points
++
+Membership multiplier
+=
+Actual awarded points
+
+Determine whether the multiplier is:
+
+- centralized
+- duplicated
+- hardcoded
+- configurable
+- database-driven
+
+Check refunds and reversals.
+
+Check whether points can be awarded twice.
+
+Check whether changing membership tier affects future points correctly.
+
+============================================================
+12. DISCOUNT BENEFITS
+============================================================
+
+Audit benefits such as:
+
+- Accessory discounts
+- Product discounts
+- Percentage discounts
+- Exclusive offers
+- Gold/Platinum/Black promotions
+
+Determine whether the discount is actually applied to checkout.
+
+Trace:
+
+Membership
+↓
+Eligible products
+↓
+Discount calculation
+↓
+Cart
+↓
+Checkout
+↓
+Order
+↓
+Stripe
+
+Verify server-side enforcement.
+
+A frontend showing:
+
+"5% OFF"
+
+is NOT sufficient.
+
+============================================================
+13. EMERGENCY CONTACT BENEFITS
+============================================================
+
+Audit emergency-contact benefits.
+
+Determine:
+
+Which tiers can configure emergency contacts?
+
+Which tiers can receive emergency notifications?
+
+Which tiers receive:
+
+- SMS
+- Email
+- Push
+- In-app
+- emergency escalation
+
+Trace the actual recovery/escalation workflow.
+
+Determine whether membership controls the advertised capabilities.
+
+Do not break the safety-critical PawTag recovery functionality.
+
+If membership restrictions would affect a safety-critical workflow, clearly identify that as a business/product decision requiring explicit confirmation.
+
+============================================================
+14. MEDICAL / HEALTH BENEFITS
+============================================================
+
+Audit benefits such as:
+
+- Medical Alert to Finder
+- Pet Health Records
+- Medical records
+- Vaccinations
+- Medication
+- Allergies
+- Conditions
+- Surgery history
+- Weight tracking
+
+Determine which are:
+
+- available to everyone
+- tier restricted
+- partially restricted
+- merely advertised
+
+Trace frontend + API + database authorization.
+
+IMPORTANT:
+
+Do not assume hiding a menu item is sufficient.
+
+If a feature is membership restricted:
+
+Backend authorization must enforce it.
+
+============================================================
+15. PET RECOVERY BENEFITS
+============================================================
+
+Audit:
+
+- Lost Mode
+- Finder scans
+- Recovery alerts
+- Location events
+- Emergency escalation
+- Pet recovery via PawTag
+- Finder contact mechanisms
+- Medical alerts
+
+Determine whether membership affects any of these.
+
+Again:
+
+Do not infer.
+
+Trace actual implementation.
+
+============================================================
+16. MEMBERSHIP BENEFIT CONFIGURATION
+============================================================
+
+Currently PawTag does NOT appear to have a central admin configuration registry defining all benefits for each membership type.
+
+Investigate this thoroughly.
+
+Determine whether we should introduce a central:
+
+MEMBERSHIP BENEFIT REGISTRY
+
+or
+
+MEMBERSHIP ENTITLEMENT CONFIGURATION
+
+The objective is to avoid business rules being scattered across the codebase.
+
+Conceptually:
+
+Membership Tier
+        ↓
+Benefit Configuration
+        ↓
+Entitlement Evaluation
+        ↓
+Application Service
+        ↓
+Actual Enforcement
+
+============================================================
+17. PROPOSE A CENTRAL DATA MODEL
+============================================================
+
+Do NOT immediately implement.
+
+First propose the data model.
+
+It may conceptually contain:
+
+MembershipPlan
+
+MembershipBenefit
+
+MembershipEntitlement
+
+MembershipTier
+
+MembershipBenefitRule
+
+But use PawTag's existing models if appropriate.
+
+The configuration should potentially support values such as:
+
+feature:
+"in_app_notifications"
+
+enabled:
+true/false
+
+OR:
+
+benefit:
+"free_shipping"
+
+threshold:
+80
+
+OR:
+
+benefit:
+"guardian_points_multiplier"
+
+multiplier:
+2
+
+OR:
+
+benefit:
+"accessory_discount"
+
+percentage:
+5
+
+OR:
+
+benefit:
+"emergency_contact"
+
+allowed:
+true
+
+The exact model should be determined after auditing the existing database.
+
+Do not create an overly generic JSON blob that becomes impossible to validate or maintain.
+
+Prefer strongly structured configuration for important business rules.
+
+============================================================
+18. BENEFIT TYPES
+============================================================
+
+Determine which benefit types PawTag actually needs.
+
+Potential categories:
+
+BOOLEAN
+
+Example:
+In-App Notifications = enabled/disabled
+
+THRESHOLD
+
+Example:
+Free Shipping over $80
+
+PERCENTAGE
+
+Example:
+5% accessory discount
+
+MULTIPLIER
+
+Example:
+2× Guardian Points
+
+QUANTITY/LIMIT
+
+Example:
+number of emergency contacts
+
+ACCESS
+
+Example:
+medical records available
+
+CHANNEL
+
+Example:
+Emergency notification via SMS
+
+PLAN/LEVEL
+
+Example:
+Priority Support
+
+Do not implement unnecessary types until actual requirements justify them.
+
+============================================================
+19. ADMIN CONFIGURATION
+============================================================
+
+The final architecture should provide an Admin area where authorized administrators can see and manage membership benefits.
+
+Potential UI:
+
+ADMIN
+→ Membership
+→ Plans
+→ Benefits
+
+Example:
+
+GOLD
+
+Free Shipping
+Threshold: $100
+
+Guardian Points
+Multiplier: 2×
+
+Email Notifications
+Enabled
+
+In-App Notifications
+Disabled
+
+Accessory Discount
+0%
+
+...
+
+PLATINUM
+
+Free Shipping
+Threshold: $80
+
+Guardian Points
+Multiplier: 2×
+
+In-App Notifications
+Enabled
+
+Accessory Discount
+5%
+
+...
+
+BLACK
+
+Free Shipping
+No minimum
+
+Guardian Points
+Multiplier: 3×
+
+In-App Notifications
+Enabled
+
+Accessory Discount
+10%
+
+...
+
+The actual fields must be based on the audited business requirements.
+
+============================================================
+20. DO NOT CREATE ADMIN CONFIGURATION THAT DOES NOTHING
+============================================================
+
+This is CRITICAL.
+
+If Admin changes:
+
+Platinum free shipping threshold
+from:
+
+$80
+
+to:
+
+$75
+
+then checkout must actually use $75.
+
+If Admin changes:
+
+Gold points multiplier
+from:
+
+2×
+
+to:
+
+1.5×
+
+then the points calculation service must actually use 1.5×.
+
+If Admin disables:
+
+Gold in-app notifications
+
+then the notification service must actually enforce it.
+
+An admin configuration screen that only changes what is displayed is NOT acceptable.
+
+The configuration must become the authoritative business-rule source.
+
+============================================================
+21. CENTRAL ENTITLEMENT SERVICE
+============================================================
+
+Investigate whether PawTag needs a centralized service such as:
+
+MembershipEntitlementService
+
+or equivalent.
+
+Conceptually it could expose functions such as:
+
+can(customer, "in_app_notifications")
+
+can(customer, "medical_records")
+
+getLimit(customer, "emergency_contacts")
+
+getThreshold(customer, "free_shipping")
+
+getMultiplier(customer, "guardian_points")
+
+getDiscount(customer, "accessories")
+
+But DO NOT blindly implement these exact method names.
+
+Design the service based on existing PawTag architecture.
+
+The key objective is:
+
+ONE CENTRAL PLACE
+for membership entitlement evaluation.
+
+Avoid this throughout the codebase:
+
+if (membership === "gold") ...
+
+if (membership === "platinum") ...
+
+if (membership === "black") ...
+
+unless there is a legitimate presentation-only reason.
+
+============================================================
+22. FRONTEND VS BACKEND
+============================================================
+
+Clearly distinguish:
+
+Frontend entitlement awareness
+
+from:
+
+Backend entitlement enforcement.
+
+Frontend may use entitlement information to:
+
+- hide unavailable features
+- show locked features
+- explain benefits
+- display upgrade prompts
+- display shipping savings
+
+But backend MUST enforce actual business rules.
+
+Examples:
+
+Frontend:
+"Free shipping unlocked"
+
+Backend:
+Actually returns $0 shipping.
+
+Frontend:
+"In-App Notifications unavailable on Gold"
+
+Backend:
+Notification system actually respects the entitlement.
+
+Frontend:
+"5% accessory discount"
+
+Backend:
+Actual order calculation applies 5%.
+
+============================================================
+23. API
+============================================================
+
+Determine whether PawTag needs a central endpoint/API response exposing customer entitlements.
+
+Potential conceptual response:
+
+{
+  "membership": "PLATINUM",
+  "entitlements": {
+    "freeShipping": {
+      "enabled": true,
+      "threshold": 80
+    },
+    "guardianPoints": {
+      "multiplier": 2
+    },
+    "inAppNotifications": true,
+    "accessoryDiscount": {
+      "percentage": 5
+    }
+  }
+}
+
+Do not blindly use this exact structure.
+
+Design the correct response based on PawTag's existing API conventions.
+
+============================================================
+24. CACHING
+============================================================
+
+Determine whether membership entitlement configuration should be cached.
+
+If yes:
+
+Ensure changes made by Admin propagate safely.
+
+A customer must not continue receiving an old benefit configuration indefinitely because of stale caching.
+
+Document cache invalidation.
+
+============================================================
+25. MEMBERSHIP CHANGES
+============================================================
+
+Audit what happens when:
+
+Gold → Platinum
+
+Platinum → Gold
+
+Platinum → Black
+
+Black → Platinum
+
+Membership expires.
+
+Membership payment fails.
+
+Membership is cancelled.
+
+Membership is upgraded mid-period.
+
+Determine when the new entitlements take effect.
+
+Do NOT invent policy if it is not currently defined.
+
+Document business-rule gaps.
+
+============================================================
+26. SOURCE OF TRUTH
+============================================================
+
+Clearly establish:
+
+Membership Plan
+↓
+Membership Benefit Configuration
+↓
+Customer Membership
+↓
+Entitlement Evaluation
+↓
+Business Service
+↓
+Actual Customer Outcome
+
+The Membership marketing page should consume the same benefit configuration where possible.
+
+This is extremely important.
+
+We should ideally avoid:
+
+Marketing page says:
+Platinum = $80 shipping
+
+while checkout independently contains:
+
+Platinum = $75
+
+The same underlying configuration should drive both presentation and enforcement where practical.
+
+============================================================
+27. HARD-CODED BUSINESS RULE AUDIT
+============================================================
+
+Search for hardcoded membership-specific rules.
+
+Examples:
+
+if (tier === "gold")
+if (plan === "platinum")
+if (membership === "black")
+
+and:
+
+shipping >= 80
+shipping >= 100
+
+points * 2
+points * 3
+
+discount * 0.05
+discount * 0.10
+
+inAppNotifications === false
+
+Identify every occurrence.
+
+For each occurrence:
+
+- file
+- line
+- purpose
+- whether legitimate
+- whether business logic
+- whether should be replaced by central entitlement configuration
+
+Do NOT blindly replace all occurrences.
+
+Some UI presentation logic may legitimately need tier-specific styling.
+
+============================================================
+28. MEMBERSHIP PAGE
+============================================================
+
+Audit the existing Membership page shown in the current PawTag UI.
+
+Determine where its benefits come from.
+
+Are they:
+
+- hardcoded?
+- CMS?
+- database?
+- API?
+- membership plan model?
+- static configuration?
+
+The long-term objective should be:
+
+ONE BUSINESS DEFINITION
+
+→ Admin configuration
+
+→ Backend entitlement enforcement
+
+→ Customer dashboard
+
+→ Membership page
+
+→ Checkout
+
+→ Notifications
+
+→ Points
+
+etc.
+
+Avoid maintaining the same benefit in multiple unrelated places.
+
+============================================================
+29. TEST MATRIX
+============================================================
+
+Create a membership entitlement test matrix.
+
+Example:
+
+SHIPPING
+
+Gold $79.99 → Paid
+Gold $100 → Free
+
+Platinum $79.99 → Paid
+Platinum $80 → Free
+
+Black $1 → ?
+
+POINTS
+
+Gold purchase → 2×
+Platinum purchase → 2×
+Black purchase → 3×
+
+NOTIFICATIONS
+
+Gold → In-App?
+Platinum → In-App?
+Black → In-App?
+
+DISCOUNTS
+
+Gold → ?
+Platinum → 5%
+Black → 10%
+
+etc.
+
+Do not fill unknown values with assumptions.
+
+Mark unknowns as:
+
+BUSINESS RULE REQUIRED
+
+============================================================
+30. IMPORTANT — SAFETY / RECOVERY
+============================================================
+
+PawTag is a pet recovery/safety product.
+
+Do not implement membership restrictions in a way that accidentally exposes private information or breaks safety-critical functionality.
+
+Any change involving:
+
+- finder
+- lost pet
+- emergency contacts
+- emergency escalation
+- location
+- medical information
+
+must receive additional security and regression analysis.
+
+============================================================
+31. REQUIRED AUDIT DOCUMENT
+============================================================
+
+Create:
+
+docs/audits/MEMBERSHIP_BENEFITS_REALITY_AUDIT.md
+
+It must contain:
+
+1. Executive summary
+2. Current membership tiers
+3. Advertised benefits
+4. Actual implementation status
+5. Benefit-by-benefit audit
+6. Shipping audit
+7. Notification audit
+8. Guardian points audit
+9. Discount audit
+10. Emergency contact audit
+11. Medical/health audit
+12. Recovery audit
+13. Hardcoded rule inventory
+14. Existing database models
+15. Existing APIs
+16. Existing services
+17. Existing admin configuration
+18. Missing configuration
+19. Security gaps
+20. Test gaps
+21. Recommended architecture
+22. Proposed data model
+23. Proposed Admin UI
+24. Proposed entitlement service
+25. Migration strategy
+26. Phased implementation plan
+27. Business decisions required
+
+============================================================
+32. DO NOT START IMPLEMENTATION YET
+============================================================
+
+This is an AUDIT + DISCOVERY phase first.
+
+Do not immediately change code.
+
+Do not immediately create database migrations.
+
+Do not immediately build the Admin UI.
+
+First produce the complete audit.
+
+After the audit, provide a proposed implementation plan.
+
+Separate:
+
+A. What already works
+
+B. What partially works
+
+C. What is only marketing/display
+
+D. What is missing
+
+E. What is hardcoded
+
+F. What should become configurable
+
+G. What requires Product Owner business decisions
+
+============================================================
+33. PHASED IMPLEMENTATION PLAN
+============================================================
+
+After completing the audit, propose implementation phases.
+
+Potential structure:
+
+PHASE 0
+Membership Benefits Reality Audit
+
+PHASE 1
+Business Rules + Benefit Registry Data Model
+
+PHASE 2
+Membership Entitlement Service
+
+PHASE 3
+Admin Membership Benefit Configuration
+
+PHASE 4
+Shipping Enforcement
+
+PHASE 5
+Guardian Points Enforcement
+
+PHASE 6
+Notification Entitlement Enforcement
+
+PHASE 7
+Discount Enforcement
+
+PHASE 8
+Emergency / Medical / Recovery Entitlements
+
+PHASE 9
+Membership Page + Customer Dashboard driven by configuration
+
+PHASE 10
+API + Frontend entitlement integration
+
+PHASE 11
+Testing / Security / Regression
+
+PHASE 12
+Migration / Cleanup of hardcoded rules
+
+PHASE 13
+Final Membership Benefits Reality Audit
+
+The actual phases may differ after the repository audit.
+
+============================================================
+34. TESTING REQUIREMENTS
+============================================================
+
+Every implemented benefit must have automated tests.
+
+Tests must verify actual outcomes.
+
+Not merely:
+
+"membership page contains 'Free Shipping'."
+
+Instead:
+
+Given:
+Platinum customer
+
+And:
+eligible cart subtotal = $80
+
+When:
+shipping options are calculated
+
+Then:
+eligible free shipping option is returned/applied.
+
+Similarly:
+
+Given:
+Gold customer
+
+When:
+in-app notification is attempted
+
+Then:
+system respects the Gold entitlement configuration.
+
+And:
+
+Given:
+Black customer
+
+When:
+points are awarded
+
+Then:
+correct configured multiplier is applied.
+
+============================================================
+35. FINAL DEFINITION OF DONE
+============================================================
+
+The project should eventually reach this architecture:
+
+                    ┌──────────────────────────────┐
+                    │ PAWTAG MEMBERSHIP BENEFITS   │
+                    │ CENTRAL CONFIGURATION        │
+                    └───────────────┬──────────────┘
+                                    │
+                                    ▼
+                    ┌──────────────────────────────┐
+                    │ MEMBERSHIP ENTITLEMENT       │
+                    │ SERVICE / RULE ENGINE        │
+                    └───────────────┬──────────────┘
+                                    │
+             ┌──────────────────────┼──────────────────────┐
+             ▼                      ▼                      ▼
+        CHECKOUT                NOTIFICATIONS           POINTS
+        SHIPPING                EMAIL/PUSH/INAPP        REWARDS
+             │                      │                      │
+             ▼                      ▼                      ▼
+        DISCOUNTS              RECOVERY                 HEALTH
+        PRODUCTS               EMERGENCY                FEATURES
+             │                      │                      │
+             └──────────────────────┼──────────────────────┘
+                                    ▼
+                           ACTUAL CUSTOMER
+                              ENTITLEMENT
+
+
+The final system should make it possible for an authorized Admin to change a membership benefit in one controlled place and have the corresponding business logic use that configuration.
+
+However:
+
+DO NOT build this architecture blindly.
+
+First audit the existing PawTag implementation.
+
+Reuse existing models/services where appropriate.
+
+Avoid duplicate systems.
+
+Avoid unnecessary rewrites.
+
+Do not break existing Stripe, checkout, subscription, notification, Guardian, finder, recovery or customer functionality.
+
+============================================================
+36. FINAL OUTPUT REQUIRED FROM YOU
+============================================================
+
+Before writing implementation code, provide:
+
+1. Complete Membership Benefits Reality Audit
+
+2. Current membership architecture
+
+3. Complete advertised-benefit inventory
+
+4. Benefit-by-benefit implementation status
+
+5. Shipping enforcement findings
+
+6. Notification enforcement findings
+
+7. Guardian Points findings
+
+8. Discount findings
+
+9. Emergency/medical/recovery findings
+
+10. Hardcoded membership rules
+
+11. Existing database models
+
+12. Existing APIs/services
+
+13. Existing Admin capabilities
+
+14. Missing central configuration
+
+15. Security concerns
+
+16. Testing gaps
+
+17. Recommended architecture
+
+18. Proposed membership benefit data model
+
+19. Proposed entitlement service
+
+20. Proposed Admin UI
+
+21. Proposed migration strategy
+
+22. Complete phased implementation plan
+
+23. List of Product Owner decisions required
+
+24. Files likely to change
+
+25. Risks and backward compatibility considerations
+
+DO NOT start Phase 1 implementation until the audit and architecture proposal are complete.
+```
+
+### One important thing I deliberately added
+
+I would **not** let the AI immediately create a generic table like:
+
+```text
+membershipBenefits = {
+   gold: {...},
+   platinum: {...},
+   black: {...}
+}
+```
+
+and then call the job finished.
+
+The real objective is to move PawTag from:
+
+> **Membership benefits as marketing content**
+
+to:
+
+> **Membership benefits as actual system entitlements.**
+
+For example, eventually your Admin should be able to configure:
+
+| Benefit                    |       Gold |   Platinum |        Black |
+| -------------------------- | ---------: | ---------: | -----------: |
+| Free shipping threshold    |       $100 |        $80 | configurable |
+| Guardian points multiplier |         2× |         2× |           3× |
+| In-app notifications       |          ❌ |          ✅ |            ✅ |
+| Accessory discount         |         0% |         5% |          10% |
+| Emergency features         | configured | configured |   configured |
+
+And the **same configuration should drive both what the website says and what the backend actually allows**.
+
+That is the architectural gap I would have your AI investigate first.

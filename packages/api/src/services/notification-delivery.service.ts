@@ -2,6 +2,7 @@ import { Notification, User, PushToken } from '@pawtag/db';
 import { sendMail } from './email.service';
 import { renderGenericNotificationEmail } from './email/templates';
 import { sendPushToUser } from './push-notification.service';
+import { membershipEntitlementService } from './membership-entitlement.service';
 import logger from '../lib/logger';
 
 interface NotifyOptions {
@@ -63,8 +64,12 @@ export async function createAndDeliverNotification(options: NotifyOptions): Prom
   const channelKey = channelMap[type] || 'orderUpdate';
   if (!prefs.channels[channelKey]) return;
 
+  // Check membership entitlements for notification channels
+  const inAppEntitled = await membershipEntitlementService.hasAccess(userId, 'in_app_notifications');
+  const emailEntitled = await membershipEntitlementService.hasAccess(userId, 'email_notifications');
+
   // Create in-app notification (isolated — failure must not block push or email)
-  if (prefs.inApp) {
+  if (inAppEntitled && prefs.inApp) {
     try {
       await Notification.create({
         userId,
@@ -82,8 +87,8 @@ export async function createAndDeliverNotification(options: NotifyOptions): Prom
     }
   }
 
-  // Send push notification (isolated — failure must not block email)
-  if (sendPush && prefs.push) {
+  // Send push notification (follows in-app entitlement)
+  if (inAppEntitled && sendPush && prefs.push) {
     try {
       await sendPushToUser(userId, title, message, {
         type,
@@ -96,7 +101,7 @@ export async function createAndDeliverNotification(options: NotifyOptions): Prom
   }
 
   // Send email notification (isolated — must not be blocked by in-app or push failure)
-  if (sendEmail && prefs.email && (user as any).email) {
+  if (emailEntitled && sendEmail && prefs.email && (user as any).email) {
     try {
       const subject = emailSubject || title;
       const html = emailHtml || renderGenericNotificationEmail({ title, message, actionUrl });

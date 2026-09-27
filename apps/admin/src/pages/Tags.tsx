@@ -188,13 +188,20 @@ export function DetailDrawer({
   tag,
   onClose,
   onRefresh,
+  pets,
+  owners,
 }: {
   tag: TagItem | null;
   onClose: () => void;
   onRefresh: () => void;
+  pets?: any[];
+  owners?: any[];
 }) {
   const [activeTab, setActiveTab] = useState<'info' | 'qr' | 'scans'>('info');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [editMode, setEditMode] = useState(false);
+  const [editForm, setEditForm] = useState({ status: '', tagType: '', petId: '', ownerId: '' });
+  const [editSaving, setEditSaving] = useState(false);
   const drawerRef = useRef<HTMLDivElement>(null);
   const [selectedPet, setSelectedPet] = useState<PetRecord | null>(null);
   const [selectedOwner, setSelectedOwner] = useState<UserRecord | null>(null);
@@ -273,6 +280,54 @@ export function DetailDrawer({
       onRefresh();
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Failed to update');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const startEdit = () => {
+    setEditForm({
+      status: tag.status,
+      tagType: tag.tagType || 'qr',
+      petId: tag.petId?._id || '',
+      ownerId: tag.ownerId?._id || '',
+    });
+    setEditMode(true);
+  };
+
+  const cancelEdit = () => {
+    setEditMode(false);
+    setEditForm({ status: '', tagType: '', petId: '', ownerId: '' });
+  };
+
+  const handleSaveEdit = async () => {
+    setEditSaving(true);
+    try {
+      await api.put(API.admin.tags.update(tag._id), {
+        status: editForm.status,
+        tagType: editForm.tagType,
+        petId: editForm.petId || undefined,
+        ownerId: editForm.ownerId || undefined,
+      });
+      toast.success('Tag updated');
+      setEditMode(false);
+      onRefresh();
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to update tag');
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const handleUnlinkPet = async () => {
+    if (!window.confirm('Unlink this pet from the tag? The tag will no longer be associated with this pet.')) return;
+    setActionLoading('unlink');
+    try {
+      await api.put(`${API.admin.tags.update(tag._id)}/unlink-pet`, { reason: 'technical_issue' });
+      toast.success('Pet unlinked from tag');
+      onRefresh();
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to unlink pet');
     } finally {
       setActionLoading(null);
     }
@@ -380,126 +435,229 @@ export function DetailDrawer({
                     <button onClick={() => copyToClipboard(tag.tagId)} className="text-gray-400 hover:text-gray-600"><Copy size={12} /></button>
                   </span>
                 } />
-                <DetailRow label="Type" value={
-                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${getTypeBadge(tag.tagType || 'qr').className}`}>
-                    {tag.tagType === 'nfc' ? <Nfc size={13} /> : <QrCode size={13} />}
-                    {getTypeBadge(tag.tagType || 'qr').label}
-                  </span>
-                } />
-                <DetailRow label="Status" value={
-                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${getStatusBadge(tag.status).className}`}>
-                    {getStatusBadge(tag.status).icon} {tag.status}
-                  </span>
-                } />
+                {editMode ? (
+                  <>
+                    <DetailRow label="Type" value={
+                      <select
+                        value={editForm.tagType}
+                        onChange={(e) => setEditForm({ ...editForm, tagType: e.target.value })}
+                        className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-primary-500"
+                      >
+                        <option value="qr">QR</option>
+                        <option value="nfc">NFC</option>
+                      </select>
+                    } />
+                    <DetailRow label="Status" value={
+                      <select
+                        value={editForm.status}
+                        onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                        className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-primary-500"
+                      >
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                        <option value="lost">Lost</option>
+                        <option value="expired">Expired</option>
+                        <option value="terminated">Terminated</option>
+                        <option value="replaced">Replaced</option>
+                      </select>
+                    } />
+                  </>
+                ) : (
+                  <>
+                    <DetailRow label="Type" value={
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${getTypeBadge(tag.tagType || 'qr').className}`}>
+                        {tag.tagType === 'nfc' ? <Nfc size={13} /> : <QrCode size={13} />}
+                        {getTypeBadge(tag.tagType || 'qr').label}
+                      </span>
+                    } />
+                    <DetailRow label="Status" value={
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${getStatusBadge(tag.status).className}`}>
+                        {getStatusBadge(tag.status).icon} {tag.status}
+                      </span>
+                    } />
+                  </>
+                )}
                 <DetailRow label="Created" value={formatDate(tag.createdAt)} />
                 <DetailRow label="Last Scanned" value={tag.lastScannedAt ? timeAgo(tag.lastScannedAt) : 'Never'} />
               </Section>
 
-              {tag.petId && (
-                <Section title="Linked Pet" icon={<span className="text-base">🐾</span>}>
-                  <DetailRow label="Name" value={
-                    <button
-                      type="button"
-                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); handlePetClick(tag.petId!._id); }}
-                      className="text-primary-600 hover:underline font-medium inline-flex items-center gap-1"
-                    >
-                      {tag.petId.name}
-                      <ExternalLink size={11} className="opacity-50" />
-                    </button>
-                  } />
-                  <DetailRow label="Pet ID" value={
-                    <span className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); handlePetClick(tag.petId!._id); }}
-                        className="font-mono text-xs text-primary-600 hover:underline"
+              {editMode ? (
+                <>
+                  <Section title="Linked Pet" icon={<span className="text-base">🐾</span>}>
+                    <div className="px-4 pb-4">
+                      <label className="block text-xs text-gray-500 mb-1">Link to Pet</label>
+                      <select
+                        value={editForm.petId}
+                        onChange={(e) => setEditForm({ ...editForm, petId: e.target.value })}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500"
                       >
-                        {tag.petId.petId}
-                      </button>
-                      <button onClick={() => copyToClipboard(tag.petId!.petId)} className="text-gray-400 hover:text-gray-600"><Copy size={12} /></button>
-                    </span>
-                  } />
-                  <DetailRow label="Type" value={tag.petId.petType} />
-                  <DetailRow label="Breed" value={tag.petId.breed} />
-                  <DetailRow label="Color" value={tag.petId.color} />
-                  <DetailRow label="Status" value={
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
-                      tag.petId!.status === 'safe' ? 'bg-emerald-100 text-emerald-700' :
-                      tag.petId!.status === 'lost' ? 'bg-red-100 text-red-700' :
-                      'bg-gray-100 text-gray-600'
-                    }`}>
-                      {tag.petId!.status}
-                    </span>
-                  } />
-                </Section>
-              )}
+                        <option value="">No pet linked</option>
+                        {(pets || []).map((p: any) => (
+                          <option key={p._id} value={p._id}>{p.name} ({p.petId || 'no ID'}) — {p.ownerId?.fullName || 'unknown'}</option>
+                        ))}
+                      </select>
+                      {tag.petId && (
+                        <button
+                          onClick={handleUnlinkPet}
+                          disabled={actionLoading === 'unlink'}
+                          className="mt-2 inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg disabled:opacity-50"
+                        >
+                          {actionLoading === 'unlink' && <Loader2 size={12} className="animate-spin" />}
+                          Unlink Current Pet
+                        </button>
+                      )}
+                    </div>
+                  </Section>
 
-              {tag.ownerId && (
-                <Section title="Owner" icon={<User size={16} />}>
-                  <DetailRow label="Name" value={
-                    <button
-                      type="button"
-                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleOwnerClick(tag.ownerId!._id); }}
-                      className="text-primary-600 hover:underline font-medium inline-flex items-center gap-1"
-                    >
-                      {tag.ownerId.fullName}
-                      <ExternalLink size={11} className="opacity-50" />
-                    </button>
-                  } />
-                  <DetailRow label="Email" value={
-                    <span className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleOwnerClick(tag.ownerId!._id); }}
-                        className="text-primary-600 hover:underline text-left"
-                      >
-                        {tag.ownerId.email}
-                      </button>
-                      <button onClick={() => copyToClipboard(tag.ownerId!.email)} className="text-gray-400 hover:text-gray-600"><Copy size={12} /></button>
-                    </span>
-                  } />
-                  {tag.ownerId.phoneNumber && <DetailRow label="Phone" value={tag.ownerId.phoneNumber} />}
-                </Section>
+                  <Section title="Owner" icon={<User size={16} />}>
+                    <div className="px-4 pb-4">
+                      <label className="block text-xs text-gray-500 mb-1">Owner *</label>
+                      <OwnerSearch
+                        owners={owners || []}
+                        value={editForm.ownerId}
+                        onSelect={(id) => setEditForm({ ...editForm, ownerId: id })}
+                        required
+                      />
+                    </div>
+                  </Section>
+                </>
+              ) : (
+                <>
+                  {tag.petId && (
+                    <Section title="Linked Pet" icon={<span className="text-base">🐾</span>}>
+                      <DetailRow label="Name" value={
+                        <button
+                          type="button"
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); handlePetClick(tag.petId!._id); }}
+                          className="text-primary-600 hover:underline font-medium inline-flex items-center gap-1"
+                        >
+                          {tag.petId.name}
+                          <ExternalLink size={11} className="opacity-50" />
+                        </button>
+                      } />
+                      <DetailRow label="Pet ID" value={
+                        <span className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); handlePetClick(tag.petId!._id); }}
+                            className="font-mono text-xs text-primary-600 hover:underline"
+                          >
+                            {tag.petId.petId}
+                          </button>
+                          <button onClick={() => copyToClipboard(tag.petId!.petId)} className="text-gray-400 hover:text-gray-600"><Copy size={12} /></button>
+                        </span>
+                      } />
+                      <DetailRow label="Type" value={tag.petId.petType} />
+                      <DetailRow label="Breed" value={tag.petId.breed} />
+                      <DetailRow label="Color" value={tag.petId.color} />
+                      <DetailRow label="Status" value={
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                          tag.petId!.status === 'safe' ? 'bg-emerald-100 text-emerald-700' :
+                          tag.petId!.status === 'lost' ? 'bg-red-100 text-red-700' :
+                          'bg-gray-100 text-gray-600'
+                        }`}>
+                          {tag.petId!.status}
+                        </span>
+                      } />
+                    </Section>
+                  )}
+
+                  {tag.ownerId && (
+                    <Section title="Owner" icon={<User size={16} />}>
+                      <DetailRow label="Name" value={
+                        <button
+                          type="button"
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleOwnerClick(tag.ownerId!._id); }}
+                          className="text-primary-600 hover:underline font-medium inline-flex items-center gap-1"
+                        >
+                          {tag.ownerId.fullName}
+                          <ExternalLink size={11} className="opacity-50" />
+                        </button>
+                      } />
+                      <DetailRow label="Email" value={
+                        <span className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleOwnerClick(tag.ownerId!._id); }}
+                            className="text-primary-600 hover:underline text-left"
+                          >
+                            {tag.ownerId.email}
+                          </button>
+                          <button onClick={() => copyToClipboard(tag.ownerId!.email)} className="text-gray-400 hover:text-gray-600"><Copy size={12} /></button>
+                        </span>
+                      } />
+                      {tag.ownerId.phoneNumber && <DetailRow label="Phone" value={tag.ownerId.phoneNumber} />}
+                    </Section>
+                  )}
+                </>
               )}
 
               <Section title="Quick Actions" icon={<Settings size={16} />}>
                 <div className="flex flex-wrap gap-2">
-                  {tag.status !== 'active' && (
-                    <button
-                      onClick={() => handleStatusChange('active')}
-                      disabled={actionLoading === 'status'}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg disabled:opacity-50"
-                    >
-                      {actionLoading === 'status' && <Loader2 size={12} className="animate-spin" />}
-                      Activate
-                    </button>
+                  {editMode ? (
+                    <>
+                      <button
+                        onClick={handleSaveEdit}
+                        disabled={editSaving || !editForm.ownerId}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg disabled:opacity-50"
+                      >
+                        {editSaving && <Loader2 size={12} className="animate-spin" />}
+                        <Save size={13} /> Save Changes
+                      </button>
+                      <button
+                        onClick={cancelEdit}
+                        disabled={editSaving}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-50 hover:bg-gray-100 rounded-lg disabled:opacity-50"
+                      >
+                        Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        onClick={startEdit}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-primary-700 bg-primary-50 hover:bg-primary-100 rounded-lg"
+                      >
+                        <Edit2 size={13} /> Edit Tag
+                      </button>
+                      {tag.status !== 'active' && (
+                        <button
+                          onClick={() => handleStatusChange('active')}
+                          disabled={actionLoading === 'status'}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg disabled:opacity-50"
+                        >
+                          {actionLoading === 'status' && <Loader2 size={12} className="animate-spin" />}
+                          Activate
+                        </button>
+                      )}
+                      {tag.status !== 'inactive' && (
+                        <button
+                          onClick={() => handleStatusChange('inactive')}
+                          disabled={actionLoading === 'status'}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-50 hover:bg-gray-100 rounded-lg disabled:opacity-50"
+                        >
+                          {actionLoading === 'status' && <Loader2 size={12} className="animate-spin" />}
+                          Deactivate
+                        </button>
+                      )}
+                      {tag.status !== 'lost' && (
+                        <button
+                          onClick={() => handleStatusChange('lost')}
+                          disabled={actionLoading === 'status'}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded-lg disabled:opacity-50"
+                        >
+                          {actionLoading === 'status' && <Loader2 size={12} className="animate-spin" />}
+                          Mark Lost
+                        </button>
+                      )}
+                      <button
+                        onClick={() => window.open(`${apiBase}/tags/${tag.tagId}/sticker`, '_blank')}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-lg"
+                      >
+                        <Printer size={13} /> Sticker
+                      </button>
+                    </>
                   )}
-                  {tag.status !== 'inactive' && (
-                    <button
-                      onClick={() => handleStatusChange('inactive')}
-                      disabled={actionLoading === 'status'}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-50 hover:bg-gray-100 rounded-lg disabled:opacity-50"
-                    >
-                      {actionLoading === 'status' && <Loader2 size={12} className="animate-spin" />}
-                      Deactivate
-                    </button>
-                  )}
-                  {tag.status !== 'lost' && (
-                    <button
-                      onClick={() => handleStatusChange('lost')}
-                      disabled={actionLoading === 'status'}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded-lg disabled:opacity-50"
-                    >
-                      {actionLoading === 'status' && <Loader2 size={12} className="animate-spin" />}
-                      Mark Lost
-                    </button>
-                  )}
-                  <button
-                    onClick={() => window.open(`${apiBase}/tags/${tag.tagId}/sticker`, '_blank')}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-lg"
-                  >
-                    <Printer size={13} /> Sticker
-                  </button>
                 </div>
               </Section>
             </div>
@@ -1153,7 +1311,7 @@ export default function Tags() {
         )}
 
         {/* Detail Drawer */}
-        <DetailDrawer tag={selectedTag} onClose={() => setSelectedTag(null)} onRefresh={() => { fetchTags(); fetchSummary(); }} />
+        <DetailDrawer tag={selectedTag} onClose={() => setSelectedTag(null)} onRefresh={() => { fetchTags(); fetchSummary(); }} pets={pets} owners={owners} />
       </div>
     </div>
   );

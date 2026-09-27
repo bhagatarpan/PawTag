@@ -356,13 +356,10 @@ router.get('/tier', async (req: AuthRequest, res: Response) => {
     const tierInfo = await calculateTier(userId);
     const benefits = tierInfo.benefits;
 
-    // Check Gold membership
-    const goldSubscription = await Subscription.findOne({
-      userId,
-      status: 'active',
-      planType: 'gold',
-    }).lean();
-    const isGoldMember = !!goldSubscription;
+    // Check paid membership via entitlement registry
+    const { membershipEntitlementService } = await import('../services/membership-entitlement.service');
+    const paidMultiplier = await membershipEntitlementService.getValue<number>(userId, 'points_multiplier');
+    const isGoldMember = (paidMultiplier ?? 1) > 1;
 
     await auditCustomerGuardianEvent(req, {
       action: 'guardian_tier_viewed',
@@ -412,21 +409,18 @@ router.get('/benefits', async (req: AuthRequest, res: Response) => {
       return res.status(401).json({ success: false, error: 'Not authenticated' });
     }
 
-    
-    const goldSubscription = await Subscription.findOne({
-      userId,
-      status: 'active',
-      planType: 'gold',
-    }).lean();
-
-    const isGoldMember = !!goldSubscription;
+    // Get entitlements from registry
+    const { membershipEntitlementService } = await import('../services/membership-entitlement.service');
+    const entitlements = await membershipEntitlementService.getUserEntitlements(userId);
+    const paidMultiplier = await membershipEntitlementService.getValue<number>(userId, 'points_multiplier');
+    const freeShippingThreshold = await membershipEntitlementService.getValue<number>(userId, 'free_shipping_threshold');
+    const isGoldMember = (paidMultiplier ?? 1) > 1;
     
     const benefits = [
-      'Free shipping on orders over $50',
+      freeShippingThreshold !== null ? `Free shipping on orders over $${freeShippingThreshold}` : 'Free shipping on all orders',
       'Priority customer support',
       'Early access to new products',
-      'Double points on all purchases',
-      'Nurture tier starting point (100 bonus points)',
+      `${paidMultiplier ?? 1}× points on all purchases`,
     ];
 
     await auditCustomerGuardianEvent(req, {
@@ -438,17 +432,12 @@ router.get('/benefits', async (req: AuthRequest, res: Response) => {
       severity: 'LOW',
     });
 
-    // Get Gold price from CMS settings
-    const goldPriceSetting = await Setting.findOne({ key: 'guardian.goldPrice' }).lean();
-    const goldMonthlyPrice = parseFloat(goldPriceSetting?.value || '3.99');
-
     res.json({
       success: true,
       data: {
         isGoldMember,
         benefits,
-        nextBillingDate: goldSubscription?.currentPeriodEnd,
-        monthlyPrice: goldSubscription?.price || goldMonthlyPrice,
+        entitlements,
       },
     });
   } catch (error) {

@@ -607,6 +607,51 @@ Do not rely on reading a quantity and then writing it later without concurrency 
 
 ---
 
+# 16a. Membership Entitlement Registry
+
+All membership benefits (Gold, Platinum, Black) are driven from a **single source of truth**: the Membership Entitlement Registry.
+
+## Architecture
+
+```
+MembershipBenefit (definitions) → MembershipTierBenefit (values per tier) → EntitlementService (evaluation)
+```
+
+**Never hardcode tier-specific business logic.** Instead:
+
+```typescript
+// CORRECT: Query the entitlement registry
+const threshold = await membershipEntitlementService.getValue<number>(userId, 'free_shipping_threshold');
+const multiplier = await membershipEntitlementService.getValue<number>(userId, 'points_multiplier');
+const hasAccess = await membershipEntitlementService.hasAccess(userId, 'in_app_notifications');
+
+// WRONG: Do not do this
+if (tier === 'gold') { ... }
+if (isGoldMember) { multiplier = 2; }
+```
+
+## Admin Configuration
+
+Admins configure benefits via `/membership/entitlements` in the admin portal. Adding a new benefit = adding a row. Changing a threshold = editing a cell. Zero code changes needed.
+
+## Service Files
+
+- `packages/api/src/services/membership-entitlement.service.ts` — central entitlement service
+- `packages/api/src/routes/admin-entitlements.ts` — admin CRUD API
+- `apps/admin/src/pages/MembershipEntitlements.tsx` — admin table UI
+
+## When Adding New Benefits
+
+1. Add a row in the admin entitlements table
+2. In your feature code, call `entitlementService.hasAccess(userId, 'your_benefit_key')`
+3. No other code changes needed
+
+## Safety-Critical Notifications
+
+Finder pet-found and emergency escalation notifications respect the entitlement registry. If a tier has `in_app_notifications` disabled, notifications will not be delivered for that tier.
+
+---
+
 # 17. HYBRID 2 Tag Lifecycle Rules
 
 PawTag uses the HYBRID 2 model for tag lifecycle management.

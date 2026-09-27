@@ -978,18 +978,35 @@ Tags work out of box for the **Active Period** (configurable per product, defaul
 
 ### Benefits by Tier
 
-| Benefit | Gold | Platinum | Black |
-|---------|------|----------|-------|
-| Points multiplier | 1× | 2× | 3× |
-| Free shipping threshold | $100 | $80 | Lifetime free |
-| Medical alerts | ✓ | ✓ | ✓ |
-| Pet health records | ✓ | ✓ | ✓ |
-| Emergency contacts | Basic | ✓ | ✓ |
-| Accessory discount | 0% | 5% | 10% |
-| Pet recovery assistance | ✓ | ✓ | ✓ |
-| Black Friday deals | - | - | ✓ |
-| Tag limit | 3 tags | 10 tags | Unlimited |
-| Tag extension | 12 months | 12 months | 12 months |
+Benefits are fully configurable via the **Membership Entitlement Registry** — an admin-editable table that drives both presentation and enforcement.
+
+| Benefit | Gold | Platinum | Black | Configurable? |
+|---------|------|----------|-------|---------------|
+| Points multiplier | 1× | 2× | 3× | ✅ Admin |
+| Free shipping threshold | $100 | $80 | Lifetime free | ✅ Admin |
+| In-app notifications | ❌ | ✅ | ✅ | ✅ Admin |
+| Email notifications | ✅ | ✅ | ✅ | ✅ Admin |
+| Medical alerts | ✓ | ✓ | ✓ | ✅ Admin |
+| Pet health records | ✓ | ✓ | ✓ | ✅ Admin |
+| Emergency contacts | Basic | ✓ | ✓ | ✅ Admin |
+| Accessory discount | 0% | 5% | 10% | ✅ Admin |
+| Pet recovery assistance | ✓ | ✓ | ✓ | ✅ Admin |
+| Black Friday deals | - | - | ✓ | ✅ Admin |
+| Tag limit | 3 tags | 10 tags | Unlimited | ✅ Admin |
+
+### Entitlement Registry
+
+All membership benefits are driven from a single source of truth: the **Membership Entitlement Registry** (`MembershipBenefit` + `MembershipTierBenefit` collections).
+
+**How it works:**
+1. Admin configures benefits in a table at `/membership/entitlements`
+2. Services query the entitlement service — no hardcoded tier checks
+3. Adding a new benefit = adding a row to the table (zero code changes)
+4. Changing a threshold = editing a cell (takes effect immediately)
+
+**Admin UI:** `apps/admin/src/pages/MembershipEntitlements.tsx`
+**Service:** `packages/api/src/services/membership-entitlement.service.ts`
+**API:** `GET/PUT /api/admin/entitlements/*`
 
 ### Key Features
 
@@ -1001,10 +1018,11 @@ Tags work out of box for the **Active Period** (configurable per product, defaul
 
 ### Technical Details
 
+- **Entitlement Service:** `packages/api/src/services/membership-entitlement.service.ts` — single source of truth for all benefits
+- **Admin UI:** `GET /api/admin/entitlements/matrix` — full benefits matrix
+- **Customer API:** `GET /api/membership/entitlements` — user's current entitlements
 - **Endpoint:** `POST /api/membership/subscribe` — Create membership subscription
 - **Endpoint:** `POST /api/membership/activate` — Activate after payment
-- **Detection:** Use `/api/customer/guardian/tier` endpoint (returns tier info)
-- **Configuration:** Membership tiers managed via Admin → Membership → Tier Configuration
 - **Tag Status:** Use `calculateTagStatus()` service to check tag status (active/limited/expired)
 - **Active Period Check:** Background job runs daily to send warnings and update tag status
 

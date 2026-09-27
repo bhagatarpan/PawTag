@@ -182,6 +182,18 @@ export const API = {
     },
 
     // ---------------------------------------------------------------------------
+    // Admin — Entitlements
+    // ---------------------------------------------------------------------------
+    entitlements: {
+      matrix: '/admin/entitlements/matrix',
+      benefits: '/admin/entitlements/benefits',
+      benefit: (key: string) => `/admin/entitlements/benefits/${key}` as const,
+      tierBenefit: (tier: string, key: string) => `/admin/entitlements/tiers/${tier}/${key}` as const,
+      tier: (tier: string) => `/admin/entitlements/tiers/${tier}` as const,
+      invalidateCache: '/admin/entitlements/cache/invalidate',
+    },
+
+    // ---------------------------------------------------------------------------
     // Admin — Commerce
     // ---------------------------------------------------------------------------
     commerce: {
@@ -585,6 +597,7 @@ export const API = {
       cancel: '/membership/cancel',
       changeTier: '/membership/change-tier',
       tags: '/membership/tags',
+      entitlements: '/membership/entitlements',
     },
     escalations: {
       list: '/customer/escalations',
