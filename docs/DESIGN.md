@@ -738,6 +738,39 @@ The admin portal should feel comparable to a high-quality modern enterprise SaaS
    - Avoid rainbow-colored navigation.
    - Icon color should reinforce category recognition while text remains neutral/white.
 
+### Membership Entitlements Table
+
+The Membership Entitlements page (`/membership/entitlements`) uses a spreadsheet-like grid pattern:
+
+**Layout:**
+- Full-width table with category grouping rows
+- Benefit name + description in left column
+- Tier value cells (Gold, Platinum, Black) in center columns
+- Type badge and actions in right columns
+
+**Cell interactions:**
+- Boolean cells: toggle button with `bg-green-100 text-green-600` (enabled) / `bg-gray-100 text-gray-400` (disabled)
+- Number cells: inline edit on click, input with `focus:ring-2 focus:ring-primary-500`
+- Saving state: `Loader2` spinner with `text-primary-600 animate-spin`
+
+**Category grouping:**
+- Category header row: `bg-gray-100 text-xs font-bold text-gray-500 uppercase tracking-wider`
+- Categories: Shipping, Loyalty, Notifications, Exclusive, Recovery, Health, General
+
+**Design tokens:**
+| Element | Classes |
+|---------|---------|
+| Table header | `bg-gray-50 border-b border-gray-200` |
+| Row hover | `hover:bg-gray-50/50` |
+| Category row | `bg-gray-100 px-4 py-2` |
+| Benefit name | `font-medium text-gray-900` |
+| Benefit description | `text-xs text-gray-400 mt-0.5` |
+| Toggle (on) | `bg-green-100 text-green-600 hover:bg-green-200 rounded-lg` |
+| Toggle (off) | `bg-gray-100 text-gray-400 hover:bg-gray-200 rounded-lg` |
+| Number edit button | `bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-lg min-w-[60px]` |
+| Type badge | `text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-500` |
+| Delete button | `text-red-400 hover:text-red-600` |
+
 4. **Information hierarchy must be obvious.**
    - Brand → navigation → breadcrumb → page title → actions → content.
    - Avoid visually competing elements.
