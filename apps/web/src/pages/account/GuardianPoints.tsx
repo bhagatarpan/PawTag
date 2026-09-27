@@ -13,6 +13,8 @@ interface PointsData {
     points: number;
     activity: string;
     description: string;
+    referenceId?: string;
+    metadata?: Record<string, any>;
     createdAt: string;
   }>;
 }
@@ -190,11 +192,25 @@ export default function GuardianPoints() {
                   <div>
                     <p className="font-medium text-gray-900">
                       {ACTIVITY_LABELS[item.activity] || item.activity}
+                      {item.metadata?.orderNumber && (
+                        <span className="text-gray-500 font-normal"> — Order {item.metadata.orderNumber}</span>
+                      )}
                     </p>
                     <p className="text-sm text-gray-500">
                       {new Date(item.createdAt).toLocaleDateString()} at{' '}
                       {new Date(item.createdAt).toLocaleTimeString()}
+                      {item.metadata?.orderTotal && (
+                        <span> · NZD ${item.metadata.orderTotal.toFixed(2)}</span>
+                      )}
                     </p>
+                    {item.metadata?.orderNumber && item.referenceId && (
+                      <Link
+                        to={`/account/orders/${item.referenceId}`}
+                        className="text-xs text-primary-600 hover:underline mt-1 inline-block"
+                      >
+                        View Order →
+                      </Link>
+                    )}
                   </div>
                 </div>
                 <span className="text-green-600 font-semibold">+{item.points}</span>
