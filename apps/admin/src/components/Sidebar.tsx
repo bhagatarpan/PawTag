@@ -132,6 +132,7 @@ const sections: SidebarSection[] = [
       { to: '/orders', label: 'All Orders', icon: FileText, permission: 'order.read' },
       { to: '/orders/pending', label: 'Pending', icon: Clock, permission: 'order.read' },
       { to: '/orders/processing', label: 'Processing', icon: Activity, permission: 'order.read' },
+      { to: '/fulfilment', label: 'Fulfilment', icon: ClipboardCheck, permission: 'order.read' },
       { to: '/invoices', label: 'Invoices', icon: FileText, permission: 'order.read' },
       { to: '/shipping/shipments', label: 'Shipments', icon: Truck, permission: 'order.read' },
       { to: '/returns', label: 'Returns', icon: RotateCcw, permission: 'order.read' },
