@@ -459,6 +459,51 @@ async function getPointsEarnedForActivity(
 }
 
 /**
+ * Deduct points from a user (e.g., on refund).
+ * Creates a negative ledger entry and decrements user balance.
+ */
+export async function deductPoints(
+  userId: string,
+  points: number,
+  activity: string,
+  referenceId: string,
+  reason: string,
+): Promise<{ pointsDeducted: number; newBalance: number }> {
+  if (points <= 0) throw new Error('Points to deduct must be positive');
+
+  // Check current balance — don't go negative
+  const user = await User.findById(userId).select('guardianPoints').lean();
+  const currentBalance = user?.guardianPoints || 0;
+  const pointsToDeduct = Math.min(points, currentBalance);
+
+  if (pointsToDeduct <= 0) {
+    return { pointsDeducted: 0, newBalance: 0 };
+  }
+
+  // Create negative ledger entry (audit trail)
+  await GuardianPointsLedger.create({
+    userId: new (await import('mongoose')).default.Types.ObjectId(userId),
+    points: -pointsToDeduct,
+    activity,
+    referenceId,
+    metadata: { reason, originalPoints: points },
+  });
+
+  // Decrement user balance (atomic, minimum 0)
+  const updatedUser = await User.findByIdAndUpdate(
+    userId,
+    { $inc: { guardianPoints: -pointsToDeduct } },
+    { new: true },
+  ).lean();
+
+  const newBalance = Math.max(0, updatedUser?.guardianPoints || 0);
+
+  logger.info({ userId, pointsDeducted: pointsToDeduct, originalPoints: points, newBalance, reason }, 'Guardian Points deducted');
+
+  return { pointsDeducted: pointsToDeduct, newBalance };
+}
+
+/**
  * Get user's points balance
  */
 export async function getPointsBalance(userId: string): Promise<number> {

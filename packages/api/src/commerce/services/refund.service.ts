@@ -227,6 +227,30 @@ export class RefundService {
       // Non-critical — don't fail the refund
     }
 
+    // 13. Deduct Guardian Points for refunded purchase
+    try {
+      const { deductPoints } = await import('../../services/loyalty/points-earning.service');
+      const pointsEarnedForOrder = Math.floor(refundAmount); // 1 point per $1
+      if (pointsEarnedForOrder > 0) {
+        const deductionResult = await deductPoints(
+          String(order.userId),
+          pointsEarnedForOrder,
+          'refund',
+          order._id.toString(),
+          `Refund for order ${order.orderNumber} (${stripeResult.refundId})`,
+        );
+        logger.info({
+          orderId,
+          userId: order.userId,
+          pointsDeducted: deductionResult.pointsDeducted,
+          newBalance: deductionResult.newBalance,
+        }, 'Guardian Points deducted for refund');
+      }
+    } catch (err: any) {
+      logger.error({ err, orderId: order._id }, 'Failed to deduct Guardian Points');
+      // Non-critical — don't fail the refund
+    }
+
     logger.info({
       orderId,
       orderNumber: order.orderNumber,
