@@ -12,7 +12,7 @@
 |-------|-------------|--------|------|
 | 0 | Data Layer + Entitlement Service | ✅ COMPLETE | 2026-09-27 |
 | 1 | Admin API + UI (Entitlements Table) | ✅ COMPLETE | 2026-09-27 |
-| 2 | Checkout (Free Shipping for ALL tiers) | ⬜ PENDING | |
+| 2 | Checkout (Free Shipping for ALL tiers) | ✅ COMPLETE | 2026-09-27 |
 | 3 | Points (Multiplier for ALL tiers) | ⬜ PENDING | |
 | 4 | Notifications (Channel Gating) | ⬜ PENDING | |
 | 5 | Remaining Services (Tag limits, PawRewards, etc.) | ⬜ PENDING | |

@@ -36,6 +36,7 @@ import { pricingService } from './pricing.service';
 import { cartService } from './cart.service';
 import { getSetting, getNumberSetting } from '../config';
 import { getGuardianNumber } from '../../services/loyalty/guardian-config';
+import { membershipEntitlementService } from '../../services/membership-entitlement.service';
 import { logPaymentEvent, logOrderEvent } from '../audit';
 import { generateSecureToken, hashToken } from '../../services/auth.service';
 import { sendOrderConfirmation, sendInvoiceEmail, sendMail } from '../../services/email.service';
@@ -113,23 +114,13 @@ export class CheckoutService {
     // 3. Calculate totals (server-side)
     const totals = await cartService.calculateTotals(userId);
 
-    // 3b. Apply Gold member free shipping if eligible
-    // Read threshold from database (not hardcoded)
-    const goldFreeShippingThreshold = await getGuardianNumber('goldFreeShippingThreshold');
-    if (goldFreeShippingThreshold > 0 && totals.subtotal >= goldFreeShippingThreshold) {
-      // Check if user has active Gold subscription
-      const { Subscription } = await import('@pawtag/db');
-      const goldSub = await Subscription.findOne({
-        userId,
-        status: 'active',
-        planType: 'gold',
-      });
-      if (goldSub) {
-        // Override shipping cost to 0 for Gold members meeting threshold
-        totals.shipping = 0;
-        totals.total = totals.subtotal - totals.discount + totals.tax;
-        logger.info({ userId, goldFreeShippingThreshold, subtotal: totals.subtotal }, 'Gold free shipping applied at checkout');
-      }
+    // 3b. Apply membership-based free shipping if eligible
+    // Uses the entitlement registry — works for ALL tiers (Gold, Platinum, Black)
+    const freeShippingThreshold = await membershipEntitlementService.getValue<number>(userId, 'free_shipping_threshold');
+    if (freeShippingThreshold !== null && freeShippingThreshold >= 0 && totals.subtotal >= freeShippingThreshold) {
+      totals.shipping = 0;
+      totals.total = totals.subtotal - totals.discount + totals.tax;
+      logger.info({ userId, freeShippingThreshold, subtotal: totals.subtotal }, 'Membership free shipping applied at checkout');
     }
 
     // 3c. Check PawRewards reservation (if any)
