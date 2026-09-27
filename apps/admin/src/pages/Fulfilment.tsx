@@ -288,30 +288,60 @@ function FulfilmentDetailDrawer({
                 </button>
               )}
               {fulfilment.status === 'picking' && (
-                <button
-                  onClick={() => handleStatusChange('packing')}
-                  disabled={statusLoading}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-lg disabled:opacity-50"
-                >
-                  {statusLoading && <Loader2 size={12} className="animate-spin" />}
-                  Start Packing
-                </button>
+                <>
+                  <button
+                    onClick={() => handleStatusChange('pending')}
+                    disabled={statusLoading}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-50 hover:bg-gray-100 rounded-lg disabled:opacity-50"
+                  >
+                    {statusLoading && <Loader2 size={12} className="animate-spin" />}
+                    Move Back to Pending
+                  </button>
+                  <button
+                    onClick={() => handleStatusChange('packing')}
+                    disabled={statusLoading}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-lg disabled:opacity-50"
+                  >
+                    {statusLoading && <Loader2 size={12} className="animate-spin" />}
+                    Start Packing
+                  </button>
+                </>
               )}
               {fulfilment.status === 'packing' && (
-                <button
-                  onClick={() => handleStatusChange('fulfilled')}
-                  disabled={statusLoading || !allAssigned}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-lg disabled:opacity-50"
-                  title={!allAssigned ? 'Assign tags to all items before fulfilling' : ''}
-                >
-                  {statusLoading && <Loader2 size={12} className="animate-spin" />}
-                  Mark Fulfilled
-                </button>
+                <>
+                  <button
+                    onClick={() => handleStatusChange('picking')}
+                    disabled={statusLoading}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-50 hover:bg-gray-100 rounded-lg disabled:opacity-50"
+                  >
+                    {statusLoading && <Loader2 size={12} className="animate-spin" />}
+                    Move Back to Picking
+                  </button>
+                  <button
+                    onClick={() => handleStatusChange('fulfilled')}
+                    disabled={statusLoading || !allAssigned}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-lg disabled:opacity-50"
+                    title={!allAssigned ? 'Assign tags to all items before fulfilling' : ''}
+                  >
+                    {statusLoading && <Loader2 size={12} className="animate-spin" />}
+                    Mark Fulfilled
+                  </button>
+                </>
               )}
               {fulfilment.status === 'fulfilled' && (
-                <span className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-green-700 bg-green-50 rounded-lg">
-                  <CheckCircle size={12} /> Fulfilled
-                </span>
+                <>
+                  <button
+                    onClick={() => handleStatusChange('packing')}
+                    disabled={statusLoading}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-50 hover:bg-gray-100 rounded-lg disabled:opacity-50"
+                  >
+                    {statusLoading && <Loader2 size={12} className="animate-spin" />}
+                    Move Back to Packing
+                  </button>
+                  <span className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-green-700 bg-green-50 rounded-lg">
+                    <CheckCircle size={12} /> Fulfilled
+                  </span>
+                </>
               )}
             </div>
             {!allAssigned && fulfilment.status === 'packing' && (
