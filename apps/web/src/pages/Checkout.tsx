@@ -1076,10 +1076,10 @@ export default function Checkout() {
                       <Crown className="h-5 w-5 text-amber-600 flex-shrink-0" />
                       <div className="flex-1">
                         <p className="text-sm font-medium text-amber-800">
-                          <strong>You're earning 2× Gold Points on this order!</strong>
+                          <strong>You're earning bonus points on this order!</strong>
                         </p>
                         <p className="text-xs text-amber-600 mt-0.5">
-                          Thank you for being a Gold member.
+                          Thank you for being a valued member.
                         </p>
                       </div>
                     </div>
@@ -1091,10 +1091,10 @@ export default function Checkout() {
                       <Crown className="h-5 w-5 text-amber-600 flex-shrink-0" />
                       <div className="flex-1">
                         <p className="text-sm font-medium text-amber-800">
-                          <strong>Upgrade your membership for 2× Points!</strong>
+                          <strong>Upgrade your membership for extra points!</strong>
                         </p>
                         <p className="text-xs text-amber-600 mt-0.5">
-                          Join Gold from $89/year and earn double points on every purchase.
+                          Join a membership tier to earn more points on every purchase.
                         </p>
                       </div>
                       <Link to="/membership" className="px-3 py-1.5 bg-amber-600 text-white rounded-lg text-xs font-medium hover:bg-amber-700 transition-colors whitespace-nowrap">

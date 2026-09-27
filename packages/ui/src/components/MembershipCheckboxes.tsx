@@ -54,7 +54,7 @@ export function MembershipCheckboxes({
             <>
               <span className="font-medium text-amber-800">Add Gold Membership</span>
               <span className="text-amber-600 block text-xs mt-0.5">
-                Earn 2× points on every purchase, free shipping over $50, and more.
+                Earn extra points on every purchase, free shipping, and more.
               </span>
             </>
           )}
