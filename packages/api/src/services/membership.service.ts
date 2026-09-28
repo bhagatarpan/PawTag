@@ -1,4 +1,5 @@
 import { MembershipTier, UserMembership, User, Tag, Invoice } from '@pawtag/db';
+import mongoose from 'mongoose';
 import { isFakeMode } from '../commerce/payment-mode';
 import Stripe from 'stripe';
 import { sendMail } from './email.service';
@@ -262,11 +263,14 @@ export async function subscribeToTier(
   const currentPeriodEnd = new Date(now);
   currentPeriodEnd.setFullYear(currentPeriodEnd.getFullYear() + 1);
 
+  // In demo/fake mode, activate immediately; otherwise pending until payment
+  const initialStatus = isFakeMode() ? 'active' : 'pending_payment';
+
   // Create UserMembership
   const membership = await UserMembership.create({
     userId,
     tierId,
-    status: 'pending_payment',
+    status: initialStatus,
     billingCycle: 'annual',
     price: tier.price,
     currency: 'NZD',
@@ -280,6 +284,20 @@ export async function subscribeToTier(
     adminExtensionGraceUsed: false,
     adminExtensionCount: 0,
   });
+
+  // In demo mode, complete activation immediately (update user, extend tags)
+  if (isFakeMode()) {
+    await User.findByIdAndUpdate(userId, {
+      membershipTier: tier.tier,
+      membershipId: membership._id,
+    });
+
+    try {
+      await extendTagsForMembership(userId, membership._id.toString());
+    } catch (err) {
+      logger.error({ err, membershipId: membership._id }, '[Membership] Failed to extend tags in demo mode');
+    }
+  }
 
   // Audit log
   await auditMembershipEvent({
@@ -314,6 +332,39 @@ export async function activateMembership(membershipId: string) {
   membership.status = 'active';
   await membership.save();
 
+  // Create invoice for membership purchase (INVM- prefix)
+  let invoiceId: mongoose.Types.ObjectId | undefined;
+  try {
+    const invCounter = await UserMembership.db!.collection('counters').findOneAndUpdate(
+      { _id: 'membershipInvoiceNumber' as any },
+      { $inc: { seq: 1 } },
+      { upsert: true, returnDocument: 'after' },
+    );
+    const invoiceNumber = `INVM-${String(invCounter?.value?.seq || 1).padStart(6, '0')}`;
+
+    const invoice = await Invoice.create({
+      userId: membership.userId,
+      invoiceNumber,
+      amount: membership.price,
+      currency: membership.currency || 'NZD',
+      status: 'paid',
+      stripeSubscriptionId: membership.stripeSubscriptionId,
+      billingPeriod: {
+        start: membership.currentPeriodStart,
+        end: membership.currentPeriodEnd,
+      },
+      paidAt: new Date(),
+    });
+
+    invoiceId = invoice._id;
+    membership.invoiceId = invoice._id;
+    await membership.save();
+
+    logger.info({ membershipId, invoiceId: invoice._id, invoiceNumber }, '[Membership] Invoice created');
+  } catch (err) {
+    logger.error({ err, membershipId }, '[Membership] Failed to create invoice');
+  }
+
   // Update user's membershipTier
   const tier = await MembershipTier.findById(membership.tierId).lean();
   if (tier) {
@@ -345,7 +396,7 @@ export async function activateMembership(membershipId: string) {
   try {
     await createAndDeliverNotification({
       userId: membership.userId.toString(),
-      type: 'subscription_expiring',
+      type: 'membership_activated',
       title: `${tier?.displayName || 'Gold'} Membership Activated`,
       message: `Welcome to ${tier?.displayName || 'Gold'}! Your membership is now active.`,
       priority: 'normal',
@@ -400,6 +451,15 @@ export async function cancelMembership(userId: string, reason?: string) {
     membershipId: null,
   });
 
+  // Generate retention offer for next purchase
+  let retentionOffer = null;
+  try {
+    const { generateRetentionOffer } = await import('./membership-retention.service');
+    retentionOffer = await generateRetentionOffer(userId, membership.tierId.toString(), 'cancel');
+  } catch (err) {
+    logger.error({ err, membershipId: membership._id }, '[Membership] Failed to generate retention offer');
+  }
+
   // Send cancellation email
   try {
     const user = await User.findById(userId).select('email fullName').lean();
@@ -412,11 +472,28 @@ export async function cancelMembership(userId: string, reason?: string) {
         cancelledAt: membership.cancelledAt?.toLocaleDateString('en-NZ', { dateStyle: 'full' }) || 'N/A',
         benefitsUntil: membership.currentPeriodEnd?.toLocaleDateString('en-NZ', { dateStyle: 'full' }) || 'N/A',
         resubscribeUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/membership`,
+        retentionOffer: retentionOffer || undefined,
       });
       await sendMail(user.email, `${tier.name} Membership Cancelled`, html).catch(() => {});
     }
   } catch (err) {
     logger.error({ err, membershipId: membership._id }, 'Failed to send cancellation email');
+  }
+
+  // In-app notification
+  try {
+    const cancelTier = await MembershipTier.findById(membership.tierId).lean();
+    await createAndDeliverNotification({
+      userId: membership.userId.toString(),
+      type: 'membership_cancelled',
+      title: `${cancelTier?.displayName || 'Membership'} Cancelled`,
+      message: `Your ${cancelTier?.displayName || 'membership'} has been cancelled. Benefits remain active until ${membership.currentPeriodEnd?.toLocaleDateString('en-NZ', { dateStyle: 'full' }) || 'the end of your billing period'}.`,
+      priority: 'normal',
+      channel: 'info',
+      actionUrl: '/account/membership',
+    });
+  } catch (err) {
+    logger.error({ err, membershipId: membership._id }, '[Membership] Failed to send cancellation notification');
   }
 
   // Audit log
@@ -449,7 +526,11 @@ export async function cancelMembership(userId: string, reason?: string) {
 
 // ─── Change Tier ─────────────────────────────────────────────
 
-export async function changeTier(userId: string, newTierId: string) {
+export async function changeTier(
+  userId: string,
+  newTierId: string,
+  prorationBehavior: 'now' | 'next_billing_cycle' = 'now',
+) {
   const membership = await UserMembership.findOne({
     userId,
     status: 'active',
@@ -486,16 +567,17 @@ export async function changeTier(userId: string, newTierId: string) {
         await MembershipTier.findByIdAndUpdate(newTierId, { stripePriceId: priceObj.id });
       }
 
-      // Update subscription
+      // Update subscription with proration behavior
       const subscription = await stripe.subscriptions.retrieve(membership.stripeSubscriptionId);
       await stripe.subscriptions.update(membership.stripeSubscriptionId, {
         items: [{
           id: subscription.items.data[0].id,
           price: newPriceId,
         }],
+        proration_behavior: prorationBehavior === 'now' ? 'create_prorations' : 'none',
       });
 
-      logger.info({ membershipId: membership._id, oldTier: oldTier?.tier, newTier: newTier.tier }, 'Stripe subscription updated');
+      logger.info({ membershipId: membership._id, oldTier: oldTier?.tier, newTier: newTier.tier, prorationBehavior }, 'Stripe subscription updated');
     } catch (err) {
       logger.error({ err, membershipId: membership._id }, 'Failed to update Stripe subscription');
     }
@@ -508,6 +590,14 @@ export async function changeTier(userId: string, newTierId: string) {
 
   // Update user
   await User.findByIdAndUpdate(userId, { membershipTier: newTier.tier });
+
+  // Re-evaluate tag coverage for new tier limit
+  try {
+    await removeMembershipFromTags(userId, membership._id.toString());
+    await extendTagsForMembership(userId, membership._id.toString());
+  } catch (err) {
+    logger.error({ err, membershipId: membership._id }, '[Membership] Failed to re-evaluate tags after tier change');
+  }
 
   // Send tier change email
   try {
@@ -526,6 +616,24 @@ export async function changeTier(userId: string, newTierId: string) {
     }
   } catch (err) {
     logger.error({ err, membershipId: membership._id }, 'Failed to send tier change email');
+  }
+
+  // In-app notification
+  try {
+    const isUpgrade = newTier.price > (oldTier?.price || 0);
+    await createAndDeliverNotification({
+      userId: membership.userId.toString(),
+      type: isUpgrade ? 'membership_upgraded' : 'membership_downgraded',
+      title: isUpgrade ? `Welcome to ${newTier.displayName}!` : `Membership Changed to ${newTier.displayName}`,
+      message: isUpgrade
+        ? `Congratulations! You've upgraded to ${newTier.displayName}. Enjoy your new benefits!`
+        : `Your membership has changed to ${newTier.displayName}. Your new benefits are now active.`,
+      priority: 'normal',
+      channel: 'info',
+      actionUrl: '/account/membership',
+    });
+  } catch (err) {
+    logger.error({ err, membershipId: membership._id }, '[Membership] Failed to send tier change notification');
   }
 
   // Audit log
@@ -612,6 +720,22 @@ export async function extendMembership(
     logger.error({ err, membershipId: membership._id }, 'Failed to send extension email');
   }
 
+  // In-app notification
+  try {
+    const extendTier = await MembershipTier.findById(membership.tierId).lean();
+    await createAndDeliverNotification({
+      userId: membership.userId.toString(),
+      type: 'membership_extended',
+      title: `${extendTier?.displayName || 'Membership'} Extended`,
+      message: `Your ${extendTier?.displayName || 'membership'} has been extended by ${extensionDays} days. New period ends ${newPeriodEnd.toLocaleDateString('en-NZ', { dateStyle: 'full' })}.`,
+      priority: 'normal',
+      channel: 'info',
+      actionUrl: '/account/membership',
+    });
+  } catch (err) {
+    logger.error({ err, membershipId: membership._id }, '[Membership] Failed to send extension notification');
+  }
+
   // Audit log
   await auditMembershipEvent({
     action: 'membership_extended',
@@ -670,6 +794,22 @@ export async function checkExpiredMemberships() {
       }
     } catch (err) {
       logger.error({ err, membershipId: membership._id }, 'Failed to send expiry email');
+    }
+
+    // In-app notification
+    try {
+      const expireTier = await MembershipTier.findById(membership.tierId).lean();
+      await createAndDeliverNotification({
+        userId: membership.userId.toString(),
+        type: 'membership_expired',
+        title: `${expireTier?.displayName || 'Membership'} Expired`,
+        message: `Your ${expireTier?.displayName || 'membership'} has expired. Renew now to maintain your benefits and tag coverage.`,
+        priority: 'high',
+        channel: 'alert',
+        actionUrl: '/membership',
+      });
+    } catch (err) {
+      logger.error({ err, membershipId: membership._id }, '[Membership] Failed to send expiry notification');
     }
 
     // Deactivate tags that depend on this membership
@@ -736,6 +876,21 @@ export async function sendRenewalReminders() {
             dashboardUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/membership`,
           });
           await sendMail(user.email, `Your ${tier.name} Renews in ${days} Days`, html).catch(() => {});
+        }
+
+        // In-app notification
+        try {
+          await createAndDeliverNotification({
+            userId: membership.userId.toString(),
+            type: 'membership_renewal_reminder',
+            title: `${tier?.displayName || 'Membership'} Renews in ${days} Days`,
+            message: `Your ${tier?.displayName || 'membership'} will automatically renew on ${membership.currentPeriodEnd?.toLocaleDateString('en-NZ', { dateStyle: 'full' }) || 'N/A'} for $${membership.price}/year.`,
+            priority: days <= 7 ? 'normal' : 'low',
+            channel: 'reminder',
+            actionUrl: '/account/membership',
+          });
+        } catch (err) {
+          logger.error({ err, membershipId: membership._id }, '[Membership] Failed to send renewal reminder notification');
         }
       } catch (err) {
         logger.error({ err, membershipId: membership._id }, 'Failed to send renewal reminder');

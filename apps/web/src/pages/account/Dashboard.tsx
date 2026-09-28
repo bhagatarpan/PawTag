@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   PawPrint, Tag, CreditCard, ShoppingBag, Bell, AlertTriangle,
-  CheckCircle, Clock, ChevronRight, Shield, QrCode, Forward, X, Gift,
+  CheckCircle, Clock, ChevronRight, Shield, QrCode, Forward, X, Gift, Crown,
 } from 'lucide-react';
 import { SummaryCards, EmptyState, StatusBadge, CopyButton } from '@pawtag/ui';
 import { API } from '@pawtag/shared/api';
@@ -28,6 +28,7 @@ interface DashboardData {
   notifications: Notification[];
   escalations: EscalationRecord[];
   guardian: GuardianData | null;
+  membership: { hasMembership: boolean; membership: any; tier: any } | null;
 }
 
 interface EscalationRecord {
@@ -126,7 +127,7 @@ export default function AccountDashboard() {
   useEffect(() => {
     async function fetchDashboard() {
       try {
-        const [petsRes, tagsRes, subsRes, ordersRes, notifsRes, escRes, guardianRes] = await Promise.all([
+        const [petsRes, tagsRes, subsRes, ordersRes, notifsRes, escRes, guardianRes, membershipRes] = await Promise.all([
           api.get(API.customer.pets.list).catch(() => ({ data: { data: [] } })),
           api.get(API.customer.tags.list).catch(() => ({ data: { data: [] } })),
           api.get(API.customer.subscriptions.list).catch(() => ({ data: { data: [] } })),
@@ -134,6 +135,7 @@ export default function AccountDashboard() {
           api.get(API.customer.notifications.list).catch(() => ({ data: { data: [] } })),
           api.get(`${API.customer.escalations.list}?status=pending`).catch(() => ({ data: { data: [] } })),
           api.get(API.customer.guardian.points).catch(() => ({ data: { data: null } })),
+          api.get(API.customer.membership.status).catch(() => ({ data: { data: null } })),
         ]);
         setData({
           pets: petsRes.data.data || [],
@@ -143,6 +145,7 @@ export default function AccountDashboard() {
           notifications: notifsRes.data.data || [],
           escalations: escRes.data.data || [],
           guardian: guardianRes.data.data || null,
+          membership: membershipRes.data.data || null,
         });
       } catch (err: any) {
         setError(err.message || 'Failed to load dashboard');
@@ -342,6 +345,64 @@ export default function AccountDashboard() {
           </div>
         </div>
       )}
+
+      {/* Membership Status Card */}
+      {data?.membership?.hasMembership && data.membership.tier ? (
+        <div className={`bg-gradient-to-r rounded-lg border p-5 ${
+          data.membership.tier.tier === 'platinum' ? 'from-gray-100 to-gray-200 border-gray-300' :
+          data.membership.tier.tier === 'black' ? 'from-gray-800 to-black border-gray-700' :
+          'from-amber-50 to-yellow-50 border-amber-200'
+        }`}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                data.membership.tier.tier === 'platinum' ? 'bg-gray-500' :
+                data.membership.tier.tier === 'black' ? 'bg-gray-900' :
+                'bg-amber-500'
+              }`}>
+                <Crown size={24} className="text-white" />
+              </div>
+              <div>
+                <h3 className={`font-semibold ${
+                  data.membership.tier.tier === 'black' ? 'text-white' : 'text-gray-900'
+                }`}>
+                  {data.membership.tier.displayName} Member
+                </h3>
+                <p className={`text-sm ${
+                  data.membership.tier.tier === 'black' ? 'text-gray-300' : 'text-gray-600'
+                }`}>
+                  {data.membership.tier.benefits?.pointsMultiplier || 1}× points · Renews {new Date(data.membership.membership.currentPeriodEnd).toLocaleDateString('en-NZ', { dateStyle: 'medium' })}
+                </p>
+              </div>
+            </div>
+            <Link to="/account/membership" className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              data.membership.tier.tier === 'black' ? 'bg-white text-gray-900 hover:bg-gray-100' :
+              'bg-primary-600 text-white hover:bg-primary-700'
+            }`}>
+              Manage
+            </Link>
+          </div>
+        </div>
+      ) : data?.membership && !data.membership.hasMembership ? (
+        <div className="bg-gradient-to-r from-primary-50 to-teal-50 rounded-lg border border-primary-200 p-5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-primary-600 rounded-xl flex items-center justify-center">
+                <Crown size={24} className="text-white" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-primary-900">Upgrade to Gold — $89/year</h3>
+                <p className="text-sm text-primary-700">
+                  Get 3× tag coverage, 2× points, and exclusive benefits
+                </p>
+              </div>
+            </div>
+            <Link to="/membership" className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition-colors">
+              View Plans
+            </Link>
+          </div>
+        </div>
+      ) : null}
 
       {/* Pending Escalations */}
       {data?.escalations && data.escalations.length > 0 && (

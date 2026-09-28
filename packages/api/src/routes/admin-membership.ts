@@ -2,7 +2,8 @@ import { Router, Response } from 'express';
 import { AuthRequest, authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
 import { UserMembership, MembershipTier, User, Tag } from '@pawtag/db';
-import { extendMembership } from '../services/membership.service';
+import { extendMembership, changeTier, cancelMembership } from '../services/membership.service';
+import { auditService } from '../services/audit';
 import logger from '../lib/logger';
 
 const router = Router();
@@ -185,6 +186,163 @@ router.get('/stats', requirePermission('stats.read'), async (_req: AuthRequest, 
   } catch (error: any) {
     logger.error({ err: error }, '[Admin Membership] Failed to fetch stats');
     res.status(500).json({ success: false, error: 'Failed to fetch stats' });
+  }
+});
+
+/**
+ * POST /api/admin/membership/change-tier
+ * Admin-initiated tier change with required evidence
+ */
+router.post('/change-tier', requirePermission('subscription.update'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { membershipId, newTierId, evidence } = req.body;
+
+    if (!membershipId || !newTierId || !evidence) {
+      res.status(400).json({ success: false, error: 'membershipId, newTierId, and evidence are required' });
+      return;
+    }
+
+    // Validate required evidence fields
+    const { customerEmailDate, customerEmailContent, actionRequired, reason, csrFullName } = evidence;
+    if (!customerEmailDate || !customerEmailContent || !actionRequired || !reason || !csrFullName) {
+      res.status(400).json({
+        success: false,
+        error: 'Evidence must include: customerEmailDate, customerEmailContent, actionRequired, reason, csrFullName',
+      });
+      return;
+    }
+
+    // Verify membership exists
+    const membership = await UserMembership.findById(membershipId);
+    if (!membership) {
+      res.status(404).json({ success: false, error: 'Membership not found' });
+      return;
+    }
+
+    // Perform tier change
+    const updated = await changeTier(membership.userId.toString(), newTierId);
+
+    // Log admin-initiated audit event with full evidence
+    await auditService.log({
+      requestId: req.auditContext?.requestId || 'admin-membership',
+      correlationId: req.auditContext?.correlationId || 'admin-membership',
+      traceId: req.auditContext?.traceId || 'admin-membership',
+      transactionId: req.auditContext?.transactionId || 'admin-membership',
+      sourceIp: req.ip || 'unknown',
+      userAgent: req.get('user-agent') || 'unknown',
+      applicationName: 'pawtag-api',
+      applicationVersion: '1.0.0',
+      apiVersion: 'v1',
+      environment: process.env.NODE_ENV || 'development',
+      actorType: 'CSR',
+      actorId: req.user!.id,
+      actorUsername: req.user!.email,
+    }, {
+      action: 'membership_tier_changed_by_admin',
+      eventType: 'membership.tier_changed',
+      eventCategory: 'FINANCIAL',
+      operationType: 'UPDATE',
+      resourceType: 'UserMembership',
+      resourceId: membershipId,
+      outcome: 'SUCCESS',
+      severity: 'HIGH',
+      metadata: {
+        userId: membership.userId.toString(),
+        membershipId,
+        newTierId,
+        evidence: {
+          customerEmailDate,
+          customerEmailContent,
+          actionRequired,
+          reason,
+          csrFullName,
+          csrNotes: evidence.csrNotes || '',
+        },
+      },
+    });
+
+    res.json({ success: true, data: updated });
+  } catch (error: any) {
+    logger.error({ err: error, userId: req.user?.id }, '[Admin Membership] Change tier error');
+    res.status(400).json({ success: false, error: error.message || 'Failed to change tier' });
+  }
+});
+
+/**
+ * POST /api/admin/membership/cancel
+ * Admin-initiated cancellation with required evidence
+ */
+router.post('/cancel', requirePermission('subscription.update'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { membershipId, evidence } = req.body;
+
+    if (!membershipId || !evidence) {
+      res.status(400).json({ success: false, error: 'membershipId and evidence are required' });
+      return;
+    }
+
+    // Validate required evidence fields
+    const { customerEmailDate, customerEmailContent, actionRequired, reason, csrFullName } = evidence;
+    if (!customerEmailDate || !customerEmailContent || !actionRequired || !reason || !csrFullName) {
+      res.status(400).json({
+        success: false,
+        error: 'Evidence must include: customerEmailDate, customerEmailContent, actionRequired, reason, csrFullName',
+      });
+      return;
+    }
+
+    // Verify membership exists
+    const membership = await UserMembership.findById(membershipId);
+    if (!membership) {
+      res.status(404).json({ success: false, error: 'Membership not found' });
+      return;
+    }
+
+    // Perform cancellation
+    const cancelled = await cancelMembership(membership.userId.toString(), reason);
+
+    // Log admin-initiated audit event with full evidence
+    await auditService.log({
+      requestId: req.auditContext?.requestId || 'admin-membership',
+      correlationId: req.auditContext?.correlationId || 'admin-membership',
+      traceId: req.auditContext?.traceId || 'admin-membership',
+      transactionId: req.auditContext?.transactionId || 'admin-membership',
+      sourceIp: req.ip || 'unknown',
+      userAgent: req.get('user-agent') || 'unknown',
+      applicationName: 'pawtag-api',
+      applicationVersion: '1.0.0',
+      apiVersion: 'v1',
+      environment: process.env.NODE_ENV || 'development',
+      actorType: 'CSR',
+      actorId: req.user!.id,
+      actorUsername: req.user!.email,
+    }, {
+      action: 'membership_cancelled_by_admin',
+      eventType: 'membership.cancelled',
+      eventCategory: 'FINANCIAL',
+      operationType: 'UPDATE',
+      resourceType: 'UserMembership',
+      resourceId: membershipId,
+      outcome: 'SUCCESS',
+      severity: 'HIGH',
+      metadata: {
+        userId: membership.userId.toString(),
+        membershipId,
+        evidence: {
+          customerEmailDate,
+          customerEmailContent,
+          actionRequired,
+          reason,
+          csrFullName,
+          csrNotes: evidence.csrNotes || '',
+        },
+      },
+    });
+
+    res.json({ success: true, data: cancelled });
+  } catch (error: any) {
+    logger.error({ err: error, userId: req.user?.id }, '[Admin Membership] Cancel error');
+    res.status(400).json({ success: false, error: error.message || 'Failed to cancel membership' });
   }
 });
 

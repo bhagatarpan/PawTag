@@ -27,12 +27,13 @@
  */
 
 import { Router, Request, Response } from 'express';
-import { Order, Invoice, InvoiceAccessToken, Subscription, Tag, User, Notification, WebhookEvent, PendingOrder, PaymentTransaction } from '@pawtag/db';
+import { Order, Invoice, InvoiceAccessToken, Subscription, Tag, User, Notification, WebhookEvent, PendingOrder, PaymentTransaction, UserMembership } from '@pawtag/db';
 import { stripePaymentProvider } from '../commerce/providers/stripe';
 import { checkoutService } from '../commerce/services/checkout.service';
 import { isFakeMode } from '../commerce/payment-mode';
 import { logPaymentEvent, logOrderEvent } from '../commerce/audit';
 import { logCommerceEvent } from '../commerce/audit';
+import { activateMembership } from '../services/membership.service';
 import { sendSubscriptionRenewalEmail } from '../services/email.service';
 import logger from '../lib/logger';
 
@@ -265,8 +266,23 @@ async function handlePaymentIntentFailed(paymentIntent: any): Promise<void> {
 async function handleInvoicePaymentSucceeded(invoice: any): Promise<void> {
   if (!invoice?.subscription) return;
 
+  // Try tag-based Subscription first (existing behavior)
   const subscription = await Subscription.findOne({ stripeSubscriptionId: invoice.subscription });
-  if (!subscription) return;
+
+  if (!subscription) {
+    // Try membership-tier subscription (UserMembership model)
+    // This handles Gold/Platinum/Black membership subscriptions
+    try {
+      const membership = await UserMembership.findOne({ stripeSubscriptionId: invoice.subscription });
+      if (membership && membership.status === 'pending_payment') {
+        await activateMembership(membership._id.toString());
+        logger.info({ membershipId: membership._id, stripeSubscriptionId: invoice.subscription }, 'Membership activated via webhook (invoice.payment_succeeded)');
+      }
+    } catch (err) {
+      logger.error({ err, stripeSubscriptionId: invoice.subscription }, 'Failed to activate membership from webhook');
+    }
+    return;
+  }
 
   // Idempotency: skip if we already created an invoice for this Stripe invoice
   if (invoice.id) {

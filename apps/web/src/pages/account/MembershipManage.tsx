@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Crown, Check, Shield, CreditCard, AlertTriangle } from 'lucide-react';
 import { API } from '@pawtag/shared/api';
 import api from '../../lib/api';
@@ -9,9 +9,10 @@ interface MembershipStatus {
   hasMembership: boolean;
   membership: {
     _id: string;
-    tierId: { tier: string; displayName: string; price: number; benefits: any };
+    tierId: { tier: string; displayName: string; price: number; benefits: any; tagLimit?: number };
     status: string;
     price: number;
+    currentPeriodStart: string;
     currentPeriodEnd: string;
     autoRenew: boolean;
     cardBrand?: string;
@@ -63,8 +64,10 @@ const BENEFIT_LABELS: Record<string, string> = {
 };
 
 export default function MembershipManage() {
+  const navigate = useNavigate();
   const [status, setStatus] = useState<MembershipStatus | null>(null);
   const [tags, setTags] = useState<Tag[]>([]);
+  const [invoices, setInvoices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
@@ -76,12 +79,14 @@ export default function MembershipManage() {
 
   async function fetchData() {
     try {
-      const [statusRes, tagsRes] = await Promise.all([
+      const [statusRes, tagsRes, invoicesRes] = await Promise.all([
         api.get(API.customer.membership.status),
         api.get(API.customer.membership.tags),
+        api.get(API.customer.membership.invoices),
       ]);
       setStatus(statusRes.data.data);
       setTags(tagsRes.data.data || []);
+      setInvoices(invoicesRes.data.data || []);
     } catch (err) {
       console.error('Failed to fetch membership data:', err);
     } finally {
@@ -161,7 +166,7 @@ export default function MembershipManage() {
             </span>
           </div>
           <div className="flex items-center gap-4 text-white/80 text-sm">
-            <span>Active since {formatDate(membership.currentPeriodEnd)}</span>
+            <span>Active since {formatDate(membership.currentPeriodStart || membership.currentPeriodEnd)}</span>
             <span>·</span>
             <span>Renews {formatDate(membership.currentPeriodEnd)} (${membership.price}/yr)</span>
           </div>
@@ -252,6 +257,35 @@ export default function MembershipManage() {
           <p className="text-sm text-gray-500">No payment method on file</p>
         )}
       </div>
+
+      {/* Billing History */}
+      {invoices.length > 0 && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+          <h2 className="text-sm font-semibold text-gray-900 mb-4">Billing History</h2>
+          <div className="space-y-3">
+            {invoices.map((invoice: any) => (
+              <div key={invoice._id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                <div>
+                  <p className="text-sm font-medium text-gray-900">{invoice.invoiceNumber}</p>
+                  <p className="text-xs text-gray-500">
+                    {new Date(invoice.createdAt).toLocaleDateString('en-NZ', { dateStyle: 'medium' })}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-semibold text-gray-900">${invoice.amount.toFixed(2)}</p>
+                  <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
+                    invoice.status === 'paid' ? 'bg-green-100 text-green-700' :
+                    invoice.status === 'pending' ? 'bg-amber-100 text-amber-700' :
+                    'bg-red-100 text-red-700'
+                  }`}>
+                    {invoice.status}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Tags */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
@@ -347,6 +381,49 @@ export default function MembershipManage() {
               Your benefits will remain active until {formatDate(membership.currentPeriodEnd)}.
             </p>
           </div>
+
+          {/* Benefits being lost */}
+          <div className="bg-gray-50 rounded-xl p-4">
+            <p className="text-sm font-medium text-gray-900 mb-2">You'll lose these benefits:</p>
+            <ul className="space-y-1.5">
+              {tier.benefits.inAppNotifications && (
+                <li className="flex items-center gap-2 text-sm text-gray-600">
+                  <span className="text-red-400">✕</span> In-App Notifications
+                </li>
+              )}
+              {tier.benefits.pointsMultiplier > 1 && (
+                <li className="flex items-center gap-2 text-sm text-gray-600">
+                  <span className="text-red-400">✕</span> {tier.benefits.pointsMultiplier}× Guardian Points
+                </li>
+              )}
+              {tier.benefits.accessoryDiscount > 0 && (
+                <li className="flex items-center gap-2 text-sm text-gray-600">
+                  <span className="text-red-400">✕</span> {tier.benefits.accessoryDiscount}% off accessories
+                </li>
+              )}
+              <li className="flex items-center gap-2 text-sm text-gray-600">
+                <span className="text-red-400">✕</span> Cover up to {tier.tagLimit} tags
+              </li>
+            </ul>
+          </div>
+
+          {/* Downgrade alternative */}
+          <div className="bg-primary-50 border border-primary-200 rounded-xl p-4">
+            <p className="text-sm font-medium text-primary-900 mb-1">Want to keep some benefits?</p>
+            <p className="text-xs text-primary-700 mb-2">
+              Downgrade to Gold for $89/year and keep core benefits including 3 tag coverage.
+            </p>
+            <button
+              onClick={() => {
+                setShowCancelModal(false);
+                navigate('/account/membership/change-tier');
+              }}
+              className="text-sm font-medium text-primary-600 hover:text-primary-700 underline"
+            >
+              Downgrade instead
+            </button>
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Reason for cancellation *</label>
             <select
@@ -362,6 +439,13 @@ export default function MembershipManage() {
               <option value="other">Other</option>
             </select>
           </div>
+
+          <div className="bg-green-50 border border-green-200 rounded-xl p-3">
+            <p className="text-xs text-green-700">
+              As a thank you, you'll receive a one-time 15% discount code + free shipping for your next purchase.
+            </p>
+          </div>
+
           <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
             <button
               onClick={() => setShowCancelModal(false)}

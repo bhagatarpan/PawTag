@@ -24,6 +24,7 @@ export interface IUserMembershipDocument extends Document {
   adminExtensionGraceUsed: boolean;
   lastAdminExtensionAt?: Date;
   adminExtensionCount: number;
+  invoiceId?: mongoose.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -58,6 +59,7 @@ const UserMembershipSchema = new Schema<IUserMembershipDocument>(
     adminExtensionGraceUsed: { type: Boolean, default: false },
     lastAdminExtensionAt: { type: Date },
     adminExtensionCount: { type: Number, default: 0 },
+    invoiceId: { type: Schema.Types.ObjectId, ref: 'Invoice' },
   },
   { timestamps: true }
 );

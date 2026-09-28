@@ -156,7 +156,7 @@ export default function MembershipSubscriberDetail() {
       {/* Admin Actions */}
       <div className="bg-white rounded-xl border border-gray-100 p-6">
         <h2 className="text-sm font-semibold text-gray-900 mb-4">Admin Actions</h2>
-        <div className="flex gap-3">
+        <div className="flex gap-3 flex-wrap">
           <button
             onClick={() => handleExtend('charge')}
             disabled={extendLoading}
@@ -171,7 +171,22 @@ export default function MembershipSubscriberDetail() {
           >
             Extend 30 Days (Complimentary)
           </button>
+          <button
+            onClick={() => {/* TODO: Open tier change modal */}}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
+          >
+            Change Tier
+          </button>
+          <button
+            onClick={() => {/* TODO: Open cancel modal */}}
+            className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700"
+          >
+            Cancel Membership
+          </button>
         </div>
+        <p className="text-xs text-gray-500 mt-3">
+          Tier changes and cancellations require customer email evidence. Changes are logged with full audit trail.
+        </p>
       </div>
     </div>
   );
