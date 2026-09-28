@@ -32,6 +32,11 @@
 | P6 | Admin Portal | ✅ Complete | admin-membership.ts, MembershipSubscriberDetail.tsx, endpoints.ts | ✅ |
 | P7 | Black Tier Readiness | ✅ Verified | No changes needed | ✅ |
 | P8 | Documentation & Skills | ✅ Complete | SKILL.md, MEMBERSHIP-LIFECYCLE-PLAN.md | ✅ |
+| P9 | Benefit Enforcement - Accessory Discount | ✅ Complete | Product.ts, cart.service.ts, CartContext.tsx, OrderSummary.tsx, Cart.tsx | ✅ |
+| P10 | Benefit Enforcement - Health Records Gating | ✅ Complete | customer.ts, finder.ts, PetCard.tsx | ✅ |
+| P11 | Benefit Enforcement - Emergency Contact Gating | ✅ Complete | escalation.service.ts | ✅ |
+| P12 | Pet Recovery via PawTag (3-stage) | ✅ Complete | EscalationRecord.ts, escalation.service.ts, admin-escalations.ts | ✅ |
+| P13 | Data Sync - petRecovery alignment | ✅ Complete | seed-entitlements.ts | ✅ |
 
 ---
 

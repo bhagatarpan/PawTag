@@ -68,33 +68,51 @@ async function processOverdueEscalations(): Promise<void> {
     const enabledSetting = await Setting.findOne({ key: 'escalation.notifyEmergencyContact' });
     if (enabledSetting?.value === 'false') return;
 
-    // Find overdue records that haven't been escalated yet
-    const overdueRecords = await EscalationRecord.find({
+    // Stage 2: Find overdue records pending emergency contact notification
+    const stage2Records = await EscalationRecord.find({
       status: 'pending',
+      stage: 'owner_notified',
       escalationDeadline: { $lte: now },
       escalatedAt: { $exists: false },
     }).populate('ownerId', 'fullName email emergencyContact')
       .populate('petId', 'name petId')
       .populate('tagId', 'tagId');
 
-    if (overdueRecords.length === 0) return;
+    // Stage 3: Find records where emergency contact was notified but PawTag team not yet notified
+    const stage3Records = await EscalationRecord.find({
+      status: 'escalated',
+      stage: 'emergency_contact_notified',
+      emergencyContactEscalatedAt: { $lte: new Date(now.getTime() - 30 * 60 * 1000) }, // 30 mins after EC notified
+      pawtagTeamNotifiedAt: { $exists: false },
+    }).populate('ownerId', 'fullName email emergencyContact phoneNumber address')
+      .populate('petId', 'name petId species breed color photos medicalAlerts')
+      .populate('tagId', 'tagId');
+
+    const totalRecords = stage2Records.length + stage3Records.length;
+    if (totalRecords === 0) return;
 
     await logJob('escalation-check', async () => {
-      logger.info({ count: overdueRecords.length }, 'Processing overdue escalations');
+      logger.info({ stage2Count: stage2Records.length, stage3Count: stage3Records.length }, 'Processing escalation records');
 
-      for (const record of overdueRecords) {
-        await processEscalation(record);
+      // Process Stage 2 records (Owner → Emergency Contact)
+      for (const record of stage2Records) {
+        await processStage2Escalation(record);
       }
-    }, { overdueCount: overdueRecords.length });
+
+      // Process Stage 3 records (Emergency Contact → PawTag Team)
+      for (const record of stage3Records) {
+        await processStage3Escalation(record);
+      }
+    }, { overdueCount: totalRecords });
   } catch (err) {
     logger.error({ err }, '[Escalation] Error processing overdue escalations');
   }
 }
 
 /**
- * Process a single escalation record.
+ * Process a single escalation record - Stage 2 (Owner → Emergency Contact).
  */
-async function processEscalation(record: any): Promise<void> {
+async function processStage2Escalation(record: any): Promise<void> {
   try {
     const owner = record.ownerId as any;
     const pet = record.petId as any;
@@ -109,6 +127,41 @@ async function processEscalation(record: any): Promise<void> {
         notes: 'No emergency contact configured',
       });
       return;
+    }
+
+    // Check owner's membership tier - Gold members don't get emergency contact escalation
+    try {
+      const { UserMembership } = await import('@pawtag/db');
+      const ownerMembership = await UserMembership.findOne({ userId: owner._id, status: 'active' }).populate('tierId');
+      const ownerTier = (ownerMembership?.tierId as any)?.tier;
+
+      if (ownerTier === 'gold' || !ownerTier) {
+        logger.info({ ownerId: owner._id, tier: ownerTier }, '[Escalation] Gold/non-member - emergency contact not notified');
+        await EscalationRecord.findByIdAndUpdate(record._id, {
+          status: 'escalated',
+          escalatedAt: new Date(),
+          notes: `Owner has ${ownerTier || 'no'} membership - emergency contact not notified per tier rules`,
+        });
+
+        // Notify owner that escalation requires upgrade
+        try {
+          await Notification.create({
+            userId: owner._id,
+            type: 'escalation_requires_upgrade',
+            title: 'Emergency Contact Escalation',
+            message: 'Your pet was found but your emergency contact could not be notified. Upgrade to Platinum or Black to enable emergency contact escalation.',
+            priority: 'high',
+            actionUrl: '/membership',
+          });
+        } catch (notifErr) {
+          logger.error({ err: notifErr }, '[Escalation] Failed to send upgrade notification');
+        }
+
+        return;
+      }
+    } catch (tierErr) {
+      // If tier check fails, proceed with escalation (fail open for safety)
+      logger.error({ err: tierErr }, '[Escalation] Failed to check owner tier, proceeding with escalation');
     }
 
     const ec = owner.emergencyContact;
@@ -178,14 +231,132 @@ async function processEscalation(record: any): Promise<void> {
     // Update the escalation record
     await EscalationRecord.findByIdAndUpdate(record._id, {
       status: 'escalated',
+      stage: 'emergency_contact_notified',
       escalatedAt: new Date(),
       emergencyContactNotifiedAt: new Date(),
+      emergencyContactEscalatedAt: new Date(),
       emergencyContactNotificationType: ecUser ? 'in_app' : 'email',
     });
 
-    logger.info({ petName, ownerName }, '[Escalation] Escalated pet for owner');
+    logger.info({ petName, ownerName }, '[Escalation] Stage 2: Emergency contact notified');
   } catch (err) {
-    logger.error({ err, recordId: record._id }, '[Escalation] Error processing escalation');
+    logger.error({ err, recordId: record._id }, '[Escalation] Error processing Stage 2 escalation');
+  }
+}
+
+/**
+ * Process a single escalation record - Stage 3 (Emergency Contact → PawTag Team).
+ * Only for Black members. Triggers 30 minutes after Stage 2.
+ */
+async function processStage3Escalation(record: any): Promise<void> {
+  try {
+    const owner = record.ownerId as any;
+    const pet = record.petId as any;
+    const tag = record.tagId as any;
+
+    // Check owner's membership tier - only Black members get Stage 3
+    try {
+      const { UserMembership } = await import('@pawtag/db');
+      const ownerMembership = await UserMembership.findOne({ userId: owner._id, status: 'active' }).populate('tierId');
+      const ownerTier = (ownerMembership?.tierId as any)?.tier;
+
+      if (ownerTier !== 'black') {
+        logger.info({ ownerId: owner._id, tier: ownerTier }, '[Escalation] Stage 3: Not Black member, skipping PawTag team notification');
+        await EscalationRecord.findByIdAndUpdate(record._id, {
+          stage: 'pawtag_team_notified',
+          pawtagTeamNotifiedAt: new Date(),
+          notes: `Stage 3 skipped: Owner has ${ownerTier || 'no'} membership (Black required)`,
+        });
+        return;
+      }
+    } catch (tierErr) {
+      logger.error({ err: tierErr }, '[Escalation] Stage 3: Failed to check owner tier');
+      return;
+    }
+
+    const petName = pet?.name || 'Unknown pet';
+    const ownerName = owner.fullName || 'Unknown owner';
+    const ownerEmail = owner.email || 'Unknown';
+    const ownerPhone = owner.phoneNumber || owner.phone || 'Unknown';
+    const ecName = owner.emergencyContact?.name || 'Unknown';
+    const ecPhone = owner.emergencyContact?.phone || 'Unknown';
+    const ecEmail = owner.emergencyContact?.email || 'Unknown';
+
+    // Format finder location
+    let finderLocation = 'Unknown';
+    if (record.scanLocation?.latitude && record.scanLocation?.longitude) {
+      finderLocation = `${record.scanLocation.latitude.toFixed(6)}, ${record.scanLocation.longitude.toFixed(6)}`;
+      if (record.scanLocation.accuracy) {
+        finderLocation += ` (±${record.scanLocation.accuracy}m)`;
+      }
+    }
+
+    // Send admin escalation email (using existing template!)
+    try {
+      const { renderEmergencyAdminEscalationEmail } = await import('./email/templates/emergency-admin-escalation');
+      const emailHtml = renderEmergencyAdminEscalationEmail({
+        petName,
+        ownerName,
+        ownerEmail,
+        contactName: ecName,
+        contactPhone: ecPhone,
+        finderLocation,
+      });
+
+      const adminEmail = process.env.ADMIN_ALERT_EMAIL || process.env.ADMIN_EMAIL || 'admin@pawtag.co.nz';
+      await sendMail(adminEmail, `URGENT: Pet Recovery Required - ${petName}`, emailHtml).catch(() => {});
+    } catch (emailErr) {
+      logger.error({ err: emailErr, recordId: record._id }, '[Escalation] Stage 3: Failed to send admin email');
+    }
+
+    // Create admin in-app notification
+    try {
+      // Find all admin users
+      const admins = await User.find({ role: { $in: ['admin', 'super_admin'] }, deletedAt: null }).select('_id');
+      for (const admin of admins) {
+        await Notification.create({
+          userId: admin._id,
+          audience: 'admin',
+          type: 'pet_recovery_escalation',
+          title: `URGENT: ${petName} needs recovery`,
+          message: `Owner (${ownerName}) and emergency contact (${ecName}) unreachable. Finder: ${record.finderName || 'Unknown'}. Location: ${finderLocation}`,
+          priority: 'critical',
+          channel: 'alert',
+          data: {
+            escalationRecordId: record._id,
+            petId: pet?._id,
+            ownerId: owner._id,
+            petName,
+            ownerName,
+            ownerPhone,
+            ownerEmail,
+            emergencyContactName: ecName,
+            emergencyContactPhone: ecPhone,
+            emergencyContactEmail: ecEmail,
+            finderName: record.finderName,
+            finderPhone: record.finderPhone,
+            finderEmail: record.finderEmail,
+            finderLocation,
+            scanLocation: record.scanLocation,
+            tagId: tag?.tagId,
+          },
+          actionUrl: `/admin/escalations/${record._id}`,
+        });
+      }
+    } catch (notifErr) {
+      logger.error({ err: notifErr, recordId: record._id }, '[Escalation] Stage 3: Failed to create admin notification');
+    }
+
+    // Update the escalation record
+    await EscalationRecord.findByIdAndUpdate(record._id, {
+      stage: 'pawtag_team_notified',
+      pawtagTeamNotifiedAt: new Date(),
+      pawtagTeamNotificationType: 'email',
+    });
+
+    logger.info({ petName, ownerName, recordId: record._id }, '[Escalation] Stage 3: PawTag team notified');
+  } catch (err) {
+    logger.error({ err, recordId: record._id }, '[Escalation] Error processing Stage 3 escalation');
   }
 }
 
@@ -218,7 +389,7 @@ export async function forwardToEmergencyContact(recordId: string): Promise<{ suc
   }
 
   // Process the escalation immediately
-  await processEscalation(record);
+  await processStage2Escalation(record);
 
   return { success: true, message: 'Emergency contact has been notified' };
 }

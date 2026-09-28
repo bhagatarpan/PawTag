@@ -172,14 +172,14 @@ const BENEFITS: SeedBenefit[] = [
   {
     key: 'pet_recovery',
     name: 'Pet Recovery Assistance',
-    description: 'Access to full pet recovery and finder-assisted reunion features.',
+    description: 'Access to full pet recovery and finder-assisted reunion features. Includes PawTag team intervention when owner and emergency contact are unreachable.',
     type: 'boolean',
     category: 'recovery',
-    defaultValue: true,
+    defaultValue: false,
     displayOrder: 11,
     tierValues: {
-      gold: { enabled: true, value: true },
-      platinum: { enabled: true, value: true },
+      gold: { enabled: false, value: false },
+      platinum: { enabled: false, value: false },
       black: { enabled: true, value: true },
     },
   },

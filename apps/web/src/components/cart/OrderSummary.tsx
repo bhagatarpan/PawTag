@@ -7,6 +7,7 @@ export { type PromoCodeControlProps } from './PromoCodeControl';
 interface OrderSummaryProps {
   subtotal: number;
   discount: number;
+  accessoryDiscount?: number;
   shipping: number;
   tax: number;
   total: number;
@@ -31,6 +32,7 @@ interface OrderSummaryProps {
 export default function OrderSummary({
   subtotal,
   discount,
+  accessoryDiscount = 0,
   shipping,
   tax,
   total,
@@ -67,6 +69,17 @@ export default function OrderSummary({
           <div className="flex justify-between text-green-600">
             <span>Discount{promoCode ? ` (${promoCode})` : ''}</span>
             <span className="font-medium">-${discount.toFixed(2)}</span>
+          </div>
+        )}
+
+        {/* 3b. Membership accessory discount */}
+        {accessoryDiscount > 0 && (
+          <div className="flex justify-between text-teal-600">
+            <span className="flex items-center gap-1">
+              <Tag size={12} />
+              Membership Accessory Discount
+            </span>
+            <span className="font-medium">-${accessoryDiscount.toFixed(2)}</span>
           </div>
         )}
 

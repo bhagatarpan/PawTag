@@ -134,6 +134,7 @@ export default function CartPage() {
                 <OrderSummary
                   subtotal={totals?.subtotal || 0}
                   discount={totals?.discount || 0}
+                  accessoryDiscount={totals?.accessoryDiscount || 0}
                   shipping={totals?.shipping || 0}
                   tax={totals?.tax || 0}
                   total={totals?.total || 0}

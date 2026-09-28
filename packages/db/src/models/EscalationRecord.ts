@@ -6,6 +6,7 @@ export interface IEscalationRecord extends Document {
   tagId: mongoose.Types.ObjectId;
   finderScanId: mongoose.Types.ObjectId;
   status: 'pending' | 'owner_responded' | 'escalated' | 'forwarded' | 'resolved';
+  stage: 'owner_notified' | 'emergency_contact_notified' | 'pawtag_team_notified';
   foundAt: Date;
   ownerNotifiedAt: Date;
   escalationDeadline: Date;
@@ -24,6 +25,9 @@ export interface IEscalationRecord extends Document {
   };
   emergencyContactNotifiedAt?: Date;
   emergencyContactNotificationType?: 'email' | 'sms' | 'in_app';
+  emergencyContactEscalatedAt?: Date;
+  pawtagTeamNotifiedAt?: Date;
+  pawtagTeamNotificationType?: 'email' | 'in_app';
   notes?: string;
 }
 
@@ -34,6 +38,7 @@ const EscalationRecordSchema = new Schema<IEscalationRecord>(
     tagId: { type: Schema.Types.ObjectId, ref: 'Tag', required: true },
     finderScanId: { type: Schema.Types.ObjectId, ref: 'FinderScan', required: true },
     status: { type: String, enum: ['pending', 'owner_responded', 'escalated', 'forwarded', 'resolved'], default: 'pending' },
+    stage: { type: String, enum: ['owner_notified', 'emergency_contact_notified', 'pawtag_team_notified'], default: 'owner_notified' },
     foundAt: { type: Date, required: true },
     ownerNotifiedAt: { type: Date, required: true },
     escalationDeadline: { type: Date, required: true },
@@ -52,6 +57,9 @@ const EscalationRecordSchema = new Schema<IEscalationRecord>(
     },
     emergencyContactNotifiedAt: { type: Date },
     emergencyContactNotificationType: { type: String, enum: ['email', 'sms', 'in_app'] },
+    emergencyContactEscalatedAt: { type: Date },
+    pawtagTeamNotifiedAt: { type: Date },
+    pawtagTeamNotificationType: { type: String, enum: ['email', 'in_app'] },
     notes: { type: String },
   },
   { timestamps: true }

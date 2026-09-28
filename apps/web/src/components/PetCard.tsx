@@ -92,6 +92,17 @@ export default function PetCard({
   const [showMenu, setShowMenu] = useState(false);
   const [showUnlinkConfirm, setShowUnlinkConfirm] = useState(false);
   const [unlinkReason, setUnlinkReason] = useState('');
+  const [canAccessHealthRecords, setCanAccessHealthRecords] = useState(false);
+
+  // Check health records entitlement on mount
+  useEffect(() => {
+    api.get(API.customer.membership.entitlements)
+      .then(res => {
+        const entitlements = res.data?.data?.entitlements;
+        setCanAccessHealthRecords(entitlements?.pet_health_records === true);
+      })
+      .catch(() => setCanAccessHealthRecords(false));
+  }, []);
   const [unlinking, setUnlinking] = useState(false);
   const mainPhoto = getMainPhoto(pet);
   const status = STATUS_CONFIG[pet.status] || STATUS_CONFIG.safe;
@@ -231,9 +242,15 @@ export default function PetCard({
                 <button onClick={() => { onEdit(pet); setShowMenu(false); }} className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2.5">
                   <Edit2 size={14} className="text-gray-400" /> Edit Pet
                 </button>
-                <button onClick={() => { onHealth(pet); setShowMenu(false); }} className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2.5">
-                  <Stethoscope size={14} className="text-gray-400" /> Health Records
-                </button>
+                {canAccessHealthRecords ? (
+                  <button onClick={() => { onHealth(pet); setShowMenu(false); }} className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2.5">
+                    <Stethoscope size={14} className="text-gray-400" /> Health Records
+                  </button>
+                ) : (
+                  <button onClick={() => { window.location.href = '/membership'; setShowMenu(false); }} className="w-full px-4 py-2.5 text-left text-sm text-primary-600 hover:bg-primary-50 flex items-center gap-2.5">
+                    <Stethoscope size={14} /> Health Records ✦
+                  </button>
+                )}
                 <div className="border-t border-gray-100 my-1" />
                 <button onClick={() => { onDelete(pet._id); setShowMenu(false); }} className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2.5">
                   Delete Pet

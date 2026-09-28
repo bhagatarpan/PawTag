@@ -1501,8 +1501,31 @@ async function getOwnedPet(petId: string, userId: string) {
   return Pet.findOne({ _id: petId, ownerId: userId, deletedAt: null });
 }
 
+// Helper: check health records entitlement (Platinum/Black only)
+async function checkHealthRecordsAccess(userId: string): Promise<boolean> {
+  try {
+    const { membershipEntitlementService } = await import('../services/membership-entitlement.service');
+    return await membershipEntitlementService.hasAccess(userId, 'pet_health_records');
+  } catch {
+    return false;
+  }
+}
+
+// Middleware: require Platinum or Black membership for health records
+function requireHealthRecordsAccess(req: AuthRequest, res: Response, next: Function) {
+  checkHealthRecordsAccess(req.user!.id).then(hasAccess => {
+    if (!hasAccess) {
+      res.status(403).json({ success: false, error: 'Pet health records require Platinum or Black membership', upgradeUrl: '/membership' });
+      return;
+    }
+    next();
+  }).catch(() => {
+    res.status(500).json({ success: false, error: 'Failed to verify membership' });
+  });
+}
+
 // --- Vaccinations ---
-router.get('/pets/:id/vaccinations', requirePermission('vaccination.read'), async (req: AuthRequest, res: Response) => {
+router.get('/pets/:id/vaccinations', requireHealthRecordsAccess, requirePermission('vaccination.read'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -1512,7 +1535,7 @@ router.get('/pets/:id/vaccinations', requirePermission('vaccination.read'), asyn
   }
 });
 
-router.post('/pets/:id/vaccinations', requirePermission('vaccination.create'), async (req: AuthRequest, res: Response) => {
+router.post('/pets/:id/vaccinations', requireHealthRecordsAccess, requirePermission('vaccination.create'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -1540,7 +1563,7 @@ router.post('/pets/:id/vaccinations', requirePermission('vaccination.create'), a
   }
 });
 
-router.put('/pets/:id/vaccinations/:vaxId', requirePermission('vaccination.update'), async (req: AuthRequest, res: Response) => {
+router.put('/pets/:id/vaccinations/:vaxId', requireHealthRecordsAccess, requirePermission('vaccination.update'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -1577,7 +1600,7 @@ router.put('/pets/:id/vaccinations/:vaxId', requirePermission('vaccination.updat
   }
 });
 
-router.delete('/pets/:id/vaccinations/:vaxId', requirePermission('vaccination.delete'), async (req: AuthRequest, res: Response) => {
+router.delete('/pets/:id/vaccinations/:vaxId', requireHealthRecordsAccess, requirePermission('vaccination.delete'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -1608,7 +1631,7 @@ router.delete('/pets/:id/vaccinations/:vaxId', requirePermission('vaccination.de
 });
 
 // --- Microchips ---
-router.get('/pets/:id/microchips', requirePermission('microchip.read'), async (req: AuthRequest, res: Response) => {
+router.get('/pets/:id/microchips', requireHealthRecordsAccess, requirePermission('microchip.read'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -1618,7 +1641,7 @@ router.get('/pets/:id/microchips', requirePermission('microchip.read'), async (r
   }
 });
 
-router.post('/pets/:id/microchips', requirePermission('microchip.create'), async (req: AuthRequest, res: Response) => {
+router.post('/pets/:id/microchips', requireHealthRecordsAccess, requirePermission('microchip.create'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -1646,7 +1669,7 @@ router.post('/pets/:id/microchips', requirePermission('microchip.create'), async
   }
 });
 
-router.put('/pets/:id/microchips/:chipId', requirePermission('microchip.update'), async (req: AuthRequest, res: Response) => {
+router.put('/pets/:id/microchips/:chipId', requireHealthRecordsAccess, requirePermission('microchip.update'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -1683,7 +1706,7 @@ router.put('/pets/:id/microchips/:chipId', requirePermission('microchip.update')
   }
 });
 
-router.delete('/pets/:id/microchips/:chipId', requirePermission('microchip.delete'), async (req: AuthRequest, res: Response) => {
+router.delete('/pets/:id/microchips/:chipId', requireHealthRecordsAccess, requirePermission('microchip.delete'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -1714,7 +1737,7 @@ router.delete('/pets/:id/microchips/:chipId', requirePermission('microchip.delet
 });
 
 // --- Medications ---
-router.get('/pets/:id/medications', requirePermission('medication.read'), async (req: AuthRequest, res: Response) => {
+router.get('/pets/:id/medications', requireHealthRecordsAccess, requirePermission('medication.read'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -1724,7 +1747,7 @@ router.get('/pets/:id/medications', requirePermission('medication.read'), async 
   }
 });
 
-router.post('/pets/:id/medications', requirePermission('medication.create'), async (req: AuthRequest, res: Response) => {
+router.post('/pets/:id/medications', requireHealthRecordsAccess, requirePermission('medication.create'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -1752,7 +1775,7 @@ router.post('/pets/:id/medications', requirePermission('medication.create'), asy
   }
 });
 
-router.put('/pets/:id/medications/:medId', requirePermission('medication.update'), async (req: AuthRequest, res: Response) => {
+router.put('/pets/:id/medications/:medId', requireHealthRecordsAccess, requirePermission('medication.update'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -1789,7 +1812,7 @@ router.put('/pets/:id/medications/:medId', requirePermission('medication.update'
   }
 });
 
-router.delete('/pets/:id/medications/:medId', requirePermission('medication.delete'), async (req: AuthRequest, res: Response) => {
+router.delete('/pets/:id/medications/:medId', requireHealthRecordsAccess, requirePermission('medication.delete'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -1820,7 +1843,7 @@ router.delete('/pets/:id/medications/:medId', requirePermission('medication.dele
 });
 
 // --- Allergies ---
-router.get('/pets/:id/allergies', requirePermission('allergy.read'), async (req: AuthRequest, res: Response) => {
+router.get('/pets/:id/allergies', requireHealthRecordsAccess, requirePermission('allergy.read'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -1830,7 +1853,7 @@ router.get('/pets/:id/allergies', requirePermission('allergy.read'), async (req:
   }
 });
 
-router.post('/pets/:id/allergies', requirePermission('allergy.create'), async (req: AuthRequest, res: Response) => {
+router.post('/pets/:id/allergies', requireHealthRecordsAccess, requirePermission('allergy.create'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -1858,7 +1881,7 @@ router.post('/pets/:id/allergies', requirePermission('allergy.create'), async (r
   }
 });
 
-router.put('/pets/:id/allergies/:allergyId', requirePermission('allergy.update'), async (req: AuthRequest, res: Response) => {
+router.put('/pets/:id/allergies/:allergyId', requireHealthRecordsAccess, requirePermission('allergy.update'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -1895,7 +1918,7 @@ router.put('/pets/:id/allergies/:allergyId', requirePermission('allergy.update')
   }
 });
 
-router.delete('/pets/:id/allergies/:allergyId', requirePermission('allergy.delete'), async (req: AuthRequest, res: Response) => {
+router.delete('/pets/:id/allergies/:allergyId', requireHealthRecordsAccess, requirePermission('allergy.delete'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -1926,7 +1949,7 @@ router.delete('/pets/:id/allergies/:allergyId', requirePermission('allergy.delet
 });
 
 // --- Vet Details ---
-router.get('/pets/:id/vet-details', requirePermission('vet_visit.read'), async (req: AuthRequest, res: Response) => {
+router.get('/pets/:id/vet-details', requireHealthRecordsAccess, requirePermission('vet_visit.read'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -1936,7 +1959,7 @@ router.get('/pets/:id/vet-details', requirePermission('vet_visit.read'), async (
   }
 });
 
-router.post('/pets/:id/vet-details', requirePermission('vet_visit.create'), async (req: AuthRequest, res: Response) => {
+router.post('/pets/:id/vet-details', requireHealthRecordsAccess, requirePermission('vet_visit.create'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -1951,7 +1974,7 @@ router.post('/pets/:id/vet-details', requirePermission('vet_visit.create'), asyn
   }
 });
 
-router.put('/pets/:id/vet-details/:vetId', requirePermission('vet_visit.update'), async (req: AuthRequest, res: Response) => {
+router.put('/pets/:id/vet-details/:vetId', requireHealthRecordsAccess, requirePermission('vet_visit.update'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -1991,7 +2014,7 @@ router.put('/pets/:id/vet-details/:vetId', requirePermission('vet_visit.update')
   }
 });
 
-router.delete('/pets/:id/vet-details/:vetId', requirePermission('vet_visit.delete'), async (req: AuthRequest, res: Response) => {
+router.delete('/pets/:id/vet-details/:vetId', requireHealthRecordsAccess, requirePermission('vet_visit.delete'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -2006,7 +2029,7 @@ router.delete('/pets/:id/vet-details/:vetId', requirePermission('vet_visit.delet
 });
 
 // --- Surgeries ---
-router.get('/pets/:id/surgeries', requirePermission('surgery.read'), async (req: AuthRequest, res: Response) => {
+router.get('/pets/:id/surgeries', requireHealthRecordsAccess, requirePermission('surgery.read'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -2016,7 +2039,7 @@ router.get('/pets/:id/surgeries', requirePermission('surgery.read'), async (req:
   }
 });
 
-router.post('/pets/:id/surgeries', requirePermission('surgery.create'), async (req: AuthRequest, res: Response) => {
+router.post('/pets/:id/surgeries', requireHealthRecordsAccess, requirePermission('surgery.create'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -2044,7 +2067,7 @@ router.post('/pets/:id/surgeries', requirePermission('surgery.create'), async (r
   }
 });
 
-router.put('/pets/:id/surgeries/:surgId', requirePermission('surgery.update'), async (req: AuthRequest, res: Response) => {
+router.put('/pets/:id/surgeries/:surgId', requireHealthRecordsAccess, requirePermission('surgery.update'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -2081,7 +2104,7 @@ router.put('/pets/:id/surgeries/:surgId', requirePermission('surgery.update'), a
   }
 });
 
-router.delete('/pets/:id/surgeries/:surgId', requirePermission('surgery.delete'), async (req: AuthRequest, res: Response) => {
+router.delete('/pets/:id/surgeries/:surgId', requireHealthRecordsAccess, requirePermission('surgery.delete'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -2112,7 +2135,7 @@ router.delete('/pets/:id/surgeries/:surgId', requirePermission('surgery.delete')
 });
 
 // --- Weight History ---
-router.get('/pets/:id/weight-history', requirePermission('weight.read'), async (req: AuthRequest, res: Response) => {
+router.get('/pets/:id/weight-history', requireHealthRecordsAccess, requirePermission('weight.read'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -2122,7 +2145,7 @@ router.get('/pets/:id/weight-history', requirePermission('weight.read'), async (
   }
 });
 
-router.post('/pets/:id/weight-history', requirePermission('weight.create'), async (req: AuthRequest, res: Response) => {
+router.post('/pets/:id/weight-history', requireHealthRecordsAccess, requirePermission('weight.create'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -2151,7 +2174,7 @@ router.post('/pets/:id/weight-history', requirePermission('weight.create'), asyn
   }
 });
 
-router.delete('/pets/:id/weight-history/:wid', requirePermission('weight.delete'), async (req: AuthRequest, res: Response) => {
+router.delete('/pets/:id/weight-history/:wid', requireHealthRecordsAccess, requirePermission('weight.delete'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -2182,7 +2205,7 @@ router.delete('/pets/:id/weight-history/:wid', requirePermission('weight.delete'
 });
 
 // --- Health Conditions ---
-router.get('/pets/:id/health-conditions', requirePermission('medical_record.read'), async (req: AuthRequest, res: Response) => {
+router.get('/pets/:id/health-conditions', requireHealthRecordsAccess, requirePermission('medical_record.read'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -2192,7 +2215,7 @@ router.get('/pets/:id/health-conditions', requirePermission('medical_record.read
   }
 });
 
-router.post('/pets/:id/health-conditions', requirePermission('medical_record.create'), async (req: AuthRequest, res: Response) => {
+router.post('/pets/:id/health-conditions', requireHealthRecordsAccess, requirePermission('medical_record.create'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -2220,7 +2243,7 @@ router.post('/pets/:id/health-conditions', requirePermission('medical_record.cre
   }
 });
 
-router.put('/pets/:id/health-conditions/:condId', requirePermission('medical_record.update'), async (req: AuthRequest, res: Response) => {
+router.put('/pets/:id/health-conditions/:condId', requireHealthRecordsAccess, requirePermission('medical_record.update'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -2257,7 +2280,7 @@ router.put('/pets/:id/health-conditions/:condId', requirePermission('medical_rec
   }
 });
 
-router.delete('/pets/:id/health-conditions/:condId', requirePermission('medical_record.delete'), async (req: AuthRequest, res: Response) => {
+router.delete('/pets/:id/health-conditions/:condId', requireHealthRecordsAccess, requirePermission('medical_record.delete'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -2288,7 +2311,7 @@ router.delete('/pets/:id/health-conditions/:condId', requirePermission('medical_
 });
 
 // --- Desexing ---
-router.get('/pets/:id/desexing', requirePermission('desexing.read'), async (req: AuthRequest, res: Response) => {
+router.get('/pets/:id/desexing', requireHealthRecordsAccess, requirePermission('desexing.read'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
@@ -2298,7 +2321,7 @@ router.get('/pets/:id/desexing', requirePermission('desexing.read'), async (req:
   }
 });
 
-router.put('/pets/:id/desexing', requirePermission('desexing.update'), async (req: AuthRequest, res: Response) => {
+router.put('/pets/:id/desexing', requireHealthRecordsAccess, requirePermission('desexing.update'), async (req: AuthRequest, res: Response) => {
   try {
     const pet = await getOwnedPet(req.params.id, req.user!.id);
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }

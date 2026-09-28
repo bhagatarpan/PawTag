@@ -39,6 +39,7 @@ export interface CartItem {
   customizationPrice?: number;
   autoRenew?: boolean;
   isSubscription?: boolean;
+  isAccessory?: boolean;
   monthlyPrice?: number;
   annualPrice?: number;
   freePeriodMonths?: number;
@@ -62,9 +63,11 @@ export interface CartTotals {
     unitPrice: number;
     customisationTotal: number;
     lineTotal: number;
+    isAccessory?: boolean;
   }>;
   subtotal: number;
   discount: number;
+  accessoryDiscount: number;
   shipping: number;
   tax: number;
   total: number;
@@ -112,6 +115,7 @@ const EMPTY_TOTALS: CartTotals = {
   items: [],
   subtotal: 0,
   discount: 0,
+  accessoryDiscount: 0,
   shipping: 0,
   tax: 0,
   total: 0,
@@ -150,9 +154,11 @@ function calculateTotals(items: CartItem[]): CartTotals {
       unitPrice: item.unitPrice || item.price || 0,
       customisationTotal: item.customizationTotal || 0,
       lineTotal: ((item.unitPrice || item.price || 0) + (item.customizationTotal || 0)) * item.quantity,
+      isAccessory: item.isAccessory ?? false,
     })),
     subtotal,
     discount: 0,
+    accessoryDiscount: 0,
     shipping: 0,
     tax: 0,
     total: subtotal,

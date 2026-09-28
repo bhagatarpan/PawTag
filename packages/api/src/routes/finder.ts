@@ -368,10 +368,27 @@ router.get('/:tagId', async (req: Request, res: Response) => {
       }
     }
 
+    // Build pet view and gate medical alerts by owner's membership tier
+    const petView = toFinderPetView(pet);
+    if (owner?._id) {
+      try {
+        const { UserMembership } = await import('@pawtag/db');
+        const ownerMembership = await UserMembership.findOne({ userId: owner._id, status: 'active' }).populate('tierId');
+        const ownerTier = (ownerMembership?.tierId as any)?.tier;
+        // Only Platinum and Black members can share medical alerts with finders
+        if (ownerTier !== 'platinum' && ownerTier !== 'black') {
+          petView.medicalAlerts = undefined;
+        }
+      } catch {
+        // If membership check fails, hide medical alerts for safety
+        petView.medicalAlerts = undefined;
+      }
+    }
+
     res.json({
       success: true,
       data: {
-        pet: toFinderPetView(pet),
+        pet: petView,
         tagId: tag.tagId,
         tagStatus: tag.status,
         ownerName,

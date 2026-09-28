@@ -178,6 +178,10 @@ export interface IProductVariant {
    /** Product type discriminator: 'physical' = one-time product purchase, 'membership' = annual membership, 'digital' = one-time digital purchase */
    productType: 'physical' | 'membership' | 'digital';
 
+   // ─── Membership Benefits ────────────────────────────────
+   /** Whether this product is an accessory (eligible for membership accessory discount) */
+   isAccessory: boolean;
+
    // ─── Subscription (deprecated — use productType instead) ──
    /** @deprecated Use productType instead. Whether this product includes a subscription */
    isSubscription: boolean;
@@ -284,6 +288,9 @@ const ProductSchema = new Schema<IProductDocument>(
 
 // ─── Product Type ───────────────────────────────────
      productType: { type: String, enum: ['physical', 'membership', 'digital'], default: 'physical', index: true },
+
+// ─── Membership Benefits ────────────────────────────
+     isAccessory: { type: Boolean, default: false, index: true },
 
 // ─── Subscription (deprecated — use productType instead) ──
      isSubscription: { type: Boolean, default: false, index: true },

@@ -68,9 +68,11 @@ export interface CartTotals {
     unitPrice: number;
     customisationTotal: number;
     lineTotal: number;
+    isAccessory?: boolean;
   }>;
   subtotal: number;
   discount: number;
+  accessoryDiscount: number;
   shipping: number;
   tax: number;
   total: number;
@@ -472,6 +474,7 @@ export class CartService {
         items: [],
         subtotal: 0,
         discount: 0,
+        accessoryDiscount: 0,
         shipping: 0,
         tax: 0,
         total: 0,
@@ -502,6 +505,7 @@ export class CartService {
         unitPrice: item.unitPrice,
         customisationTotal: item.customizationTotal,
         lineTotal: (item.unitPrice + item.customizationTotal) * item.quantity,
+        isAccessory: product?.isAccessory ?? false,
       };
     });
 
@@ -510,6 +514,22 @@ export class CartService {
 
     const subtotal = items.reduce((sum, item) => sum + item.lineTotal, 0);
     const discount = cart.promoDiscount ?? 0;
+
+    // Calculate membership accessory discount
+    let accessoryDiscount = 0;
+    try {
+      const { membershipEntitlementService } = await import('../../services/membership-entitlement.service');
+      const accessoryDiscountPercent = await membershipEntitlementService.getValue<number>(userId, 'accessory_discount');
+      if (accessoryDiscountPercent && accessoryDiscountPercent > 0) {
+        const accessorySubtotal = items
+          .filter(item => item.isAccessory)
+          .reduce((sum, item) => sum + item.lineTotal, 0);
+        accessoryDiscount = Math.round(accessorySubtotal * (accessoryDiscountPercent / 100) * 100) / 100;
+      }
+    } catch (err) {
+      // Membership lookup failed — continue without accessory discount
+    }
+
     const shipping = cart.shippingCost ?? 0;
 
     // Use tax provider for accurate tax calculation
@@ -521,17 +541,18 @@ export class CartService {
     let tax: number;
     if (taxInclusive) {
       // Tax is included in the price — extract the tax component
-      tax = (subtotal - discount + shipping) * (taxRate / (1 + taxRate));
+      tax = (subtotal - discount - accessoryDiscount + shipping) * (taxRate / (1 + taxRate));
     } else {
       // Tax is added on top of the price
-      tax = (subtotal - discount + shipping) * taxRate;
+      tax = (subtotal - discount - accessoryDiscount + shipping) * taxRate;
     }
-    const total = subtotal - discount + shipping + (taxInclusive ? 0 : tax);
+    const total = subtotal - discount - accessoryDiscount + shipping + (taxInclusive ? 0 : tax);
 
     return {
       items,
       subtotal,
       discount,
+      accessoryDiscount,
       shipping,
       tax,
       total,

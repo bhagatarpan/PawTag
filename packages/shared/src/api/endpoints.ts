@@ -184,6 +184,16 @@ export const API = {
     },
 
     // ---------------------------------------------------------------------------
+    // Admin — Escalations
+    // ---------------------------------------------------------------------------
+    escalations: {
+      list: '/admin/escalations',
+      urgent: '/admin/escalations/urgent',
+      detail: (id: string) => `/admin/escalations/${id}` as const,
+      resolve: (id: string) => `/admin/escalations/${id}/resolve` as const,
+    },
+
+    // ---------------------------------------------------------------------------
     // Admin — Entitlements
     // ---------------------------------------------------------------------------
     entitlements: {
