@@ -12,20 +12,7 @@ interface MembershipTier {
   displayName: string;
   description: string;
   price: number;
-  benefits: {
-    medicalAlert: boolean;
-    petHealthRecords: boolean;
-    emailNotifications: boolean;
-    freeShippingThreshold: number;
-    pointsMultiplier: number;
-    inAppNotifications: boolean;
-    criticalEmergencyContact: boolean;
-    emergencyPersonEmail: boolean;
-    emergencyPersonInApp: boolean;
-    accessoryDiscount: number;
-    petRecovery: boolean;
-    blackFridayDeal: boolean;
-  };
+  entitlements: Record<string, { enabled: boolean; value: any; name?: string; description?: string }>;
   tagLimit: number;
   icon: string;
   color: string;
@@ -36,18 +23,6 @@ const TIER_CONFIG: Record<string, { icon: typeof Crown; gradient: string; popula
   gold: { icon: Crown, gradient: 'from-yellow-400 to-amber-500', popular: true },
   platinum: { icon: Diamond, gradient: 'from-gray-300 to-gray-500', recommended: true },
   black: { icon: Shield, gradient: 'from-gray-800 to-black', comingSoon: true },
-};
-
-const BENEFIT_LABELS: Record<string, string> = {
-  medicalAlert: 'Medical Alert to Finder',
-  petHealthRecords: 'Pet Health Records',
-  emailNotifications: 'Email Notifications',
-  inAppNotifications: 'In-App Notifications',
-  criticalEmergencyContact: 'Critical Emergency Contact',
-  emergencyPersonEmail: 'Emergency Person Email',
-  emergencyPersonInApp: 'Emergency Person In-App',
-  petRecovery: 'Pet Recovery via PawTag',
-  blackFridayDeal: 'Exclusive Black Friday Deal',
 };
 
 export default function MembershipSubscribe() {
@@ -241,22 +216,33 @@ export default function MembershipSubscribe() {
                 </div>
 
                 <ul className="space-y-2 mb-6">
-                  {tier.benefits.pointsMultiplier > 1 && (
-                    <li className="flex items-center gap-2 text-sm text-gray-700">
-                      <Check size={16} className="text-green-500 shrink-0" />
-                      {tier.benefits.pointsMultiplier}× Guardian Points
-                    </li>
-                  )}
-                  <li className="flex items-center gap-2 text-sm text-gray-700">
-                    <Check size={16} className="text-green-500 shrink-0" />
-                    Free shipping {tier.benefits.freeShippingThreshold === 0 ? 'always' : `over $${tier.benefits.freeShippingThreshold}`}
-                  </li>
-                  {tier.benefits.accessoryDiscount > 0 && (
-                    <li className="flex items-center gap-2 text-sm text-gray-700">
-                      <Check size={16} className="text-green-500 shrink-0" />
-                      {tier.benefits.accessoryDiscount}% off accessories
-                    </li>
-                  )}
+                  {Object.entries(tier.entitlements).map(([key, entitlement]) => {
+                    if (key === 'points_multiplier' && typeof entitlement.value === 'number' && entitlement.value > 1) {
+                      return (
+                        <li key={key} className="flex items-center gap-2 text-sm text-gray-700">
+                          <Check size={16} className="text-green-500 shrink-0" />
+                          {entitlement.value}× Guardian Points
+                        </li>
+                      );
+                    }
+                    if (key === 'free_shipping_threshold' && typeof entitlement.value === 'number') {
+                      return (
+                        <li key={key} className="flex items-center gap-2 text-sm text-gray-700">
+                          <Check size={16} className="text-green-500 shrink-0" />
+                          Free shipping {entitlement.value === 0 ? 'always' : `over $${entitlement.value}`}
+                        </li>
+                      );
+                    }
+                    if (key === 'accessory_discount' && typeof entitlement.value === 'number' && entitlement.value > 0) {
+                      return (
+                        <li key={key} className="flex items-center gap-2 text-sm text-gray-700">
+                          <Check size={16} className="text-green-500 shrink-0" />
+                          {entitlement.value}% off accessories
+                        </li>
+                      );
+                    }
+                    return null;
+                  })}
                   <li className="flex items-center gap-2 text-sm text-gray-700">
                     <Check size={16} className="text-green-500 shrink-0" />
                     Cover up to {tier.tagLimit} tags

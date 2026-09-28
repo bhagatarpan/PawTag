@@ -12,20 +12,7 @@ const membershipTiers = [
     description: 'Essential pet protection with core benefits for your furry family members.',
     price: 89,
     currency: 'NZD',
-    benefits: {
-      medicalAlert: true,
-      petHealthRecords: true,
-      emailNotifications: true,
-      freeShippingThreshold: 100,
-      pointsMultiplier: 1,
-      inAppNotifications: false,
-      criticalEmergencyContact: false,
-      emergencyPersonEmail: false,
-      emergencyPersonInApp: false,
-      accessoryDiscount: 0,
-      petRecovery: false,
-      blackFridayDeal: false,
-    },
+    tagLimit: 3,
     isActive: true,
     displayOrder: 1,
     icon: 'Crown',
@@ -39,20 +26,7 @@ const membershipTiers = [
     description: 'Premium pet protection with emergency features and enhanced rewards.',
     price: 99,
     currency: 'NZD',
-    benefits: {
-      medicalAlert: true,
-      petHealthRecords: true,
-      emailNotifications: true,
-      freeShippingThreshold: 80,
-      pointsMultiplier: 2,
-      inAppNotifications: true,
-      criticalEmergencyContact: true,
-      emergencyPersonEmail: true,
-      emergencyPersonInApp: false,
-      accessoryDiscount: 5,
-      petRecovery: false,
-      blackFridayDeal: false,
-    },
+    tagLimit: 10,
     isActive: true,
     displayOrder: 2,
     icon: 'Diamond',
@@ -66,20 +40,7 @@ const membershipTiers = [
     description: 'Elite pet protection with lifetime benefits and premium recovery service.',
     price: 199,
     currency: 'NZD',
-    benefits: {
-      medicalAlert: true,
-      petHealthRecords: true,
-      emailNotifications: true,
-      freeShippingThreshold: 0, // Lifetime free shipping
-      pointsMultiplier: 3,
-      inAppNotifications: true,
-      criticalEmergencyContact: true,
-      emergencyPersonEmail: true,
-      emergencyPersonInApp: true,
-      accessoryDiscount: 10,
-      petRecovery: true,
-      blackFridayDeal: true,
-    },
+    tagLimit: 999,
     isActive: true, // Active but CTA shows "Coming Soon" on frontend
     displayOrder: 3,
     icon: 'Shield',
@@ -95,10 +56,10 @@ async function seedMembershipTiers() {
     const existing = await MembershipTier.findOne({ tier: tierData.tier });
     
     if (existing) {
-      // Update existing tier
+      // Update existing tier (remove benefits field if it exists)
       await MembershipTier.findOneAndUpdate(
         { tier: tierData.tier },
-        { $set: tierData },
+        { $set: tierData, $unset: { benefits: '' } },
         { new: true }
       );
       console.log(`  Updated tier: ${tierData.displayName} ($${tierData.price}/yr)`);

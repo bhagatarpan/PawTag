@@ -2,7 +2,7 @@ import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IMembershipTierBenefitDocument extends Document {
   benefitKey: string;
-  tier: 'gold' | 'platinum' | 'black';
+  tier: string;
   enabled: boolean;
   value: boolean | number | string | null;
   createdAt: Date;
@@ -12,7 +12,7 @@ export interface IMembershipTierBenefitDocument extends Document {
 const MembershipTierBenefitSchema = new Schema<IMembershipTierBenefitDocument>(
   {
     benefitKey: { type: String, required: true, trim: true },
-    tier: { type: String, enum: ['gold', 'platinum', 'black'], required: true },
+    tier: { type: String, required: true, lowercase: true },
     enabled: { type: Boolean, default: true },
     value: { type: Schema.Types.Mixed, default: null },
   },

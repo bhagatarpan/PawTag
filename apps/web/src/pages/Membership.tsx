@@ -13,20 +13,7 @@ interface MembershipTier {
   displayName: string;
   description: string;
   price: number;
-  benefits: {
-    medicalAlert: boolean;
-    petHealthRecords: boolean;
-    emailNotifications: boolean;
-    freeShippingThreshold: number;
-    pointsMultiplier: number;
-    inAppNotifications: boolean;
-    criticalEmergencyContact: boolean;
-    emergencyPersonEmail: boolean;
-    emergencyPersonInApp: boolean;
-    accessoryDiscount: number;
-    petRecovery: boolean;
-    blackFridayDeal: boolean;
-  };
+  entitlements: Record<string, { enabled: boolean; value: any; name?: string; description?: string }>;
   icon: string;
   color: string;
   gradient: string;
@@ -36,18 +23,6 @@ const TIER_CONFIG: Record<string, { icon: typeof Crown; gradient: string; popula
   gold: { icon: Crown, gradient: 'from-yellow-400 to-amber-500', popular: true },
   platinum: { icon: Diamond, gradient: 'from-gray-300 to-gray-500', recommended: true },
   black: { icon: Shield, gradient: 'from-gray-800 to-black', comingSoon: true },
-};
-
-const BENEFIT_LABELS: Record<string, string> = {
-  medicalAlert: 'Medical Alert to Finder',
-  petHealthRecords: 'Pet Health Records',
-  emailNotifications: 'Email Notifications',
-  inAppNotifications: 'In-App Notifications',
-  criticalEmergencyContact: 'Critical Emergency Contact',
-  emergencyPersonEmail: 'Emergency Person Email',
-  emergencyPersonInApp: 'Emergency Person In-App',
-  petRecovery: 'Pet Recovery via PawTag',
-  blackFridayDeal: 'Exclusive Black Friday Deal',
 };
 
 export default function MembershipLanding() {
@@ -159,47 +134,57 @@ export default function MembershipLanding() {
                     {/* Card Body */}
                     <div className="bg-white p-8">
                       <ul className="space-y-3 mb-8">
-                        {Object.entries(tier.benefits).map(([key, value]) => {
-                          if (key === 'freeShippingThreshold' || key === 'pointsMultiplier' || key === 'accessoryDiscount') {
-                            return null;
-                          }
-                          if (typeof value === 'boolean' && value) {
+                        {Object.entries(tier.entitlements).map(([key, entitlement]) => {
+                          if (typeof entitlement.value === 'boolean') {
                             return (
                               <li key={key} className="flex items-center gap-3">
-                                <Check className="h-5 w-5 text-green-500 shrink-0" />
-                                <span className="text-sm text-gray-700">{BENEFIT_LABELS[key] || key}</span>
+                                {entitlement.enabled && entitlement.value ? (
+                                  <Check className="h-5 w-5 text-green-500 shrink-0" />
+                                ) : (
+                                  <Check className="h-5 w-5 text-gray-300 shrink-0" />
+                                )}
+                                <span className={`text-sm ${entitlement.enabled && entitlement.value ? 'text-gray-700' : 'text-gray-400'}`}>
+                                  {entitlement.name || key}
+                                </span>
                               </li>
                             );
                           }
+                          if (typeof entitlement.value === 'number') {
+                            if (key === 'free_shipping_threshold') {
+                              if (entitlement.value === 0) {
+                                return (
+                                  <li key={key} className="flex items-center gap-3">
+                                    <Check className="h-5 w-5 text-green-500 shrink-0" />
+                                    <span className="text-sm text-gray-700">LIFETIME Free Shipping</span>
+                                  </li>
+                                );
+                              }
+                              return (
+                                <li key={key} className="flex items-center gap-3">
+                                  <Check className="h-5 w-5 text-green-500 shrink-0" />
+                                  <span className="text-sm text-gray-700">Free Shipping over ${entitlement.value}</span>
+                                </li>
+                              );
+                            }
+                            if (key === 'points_multiplier') {
+                              return (
+                                <li key={key} className="flex items-center gap-3">
+                                  <Check className="h-5 w-5 text-green-500 shrink-0" />
+                                  <span className="text-sm text-gray-700">{entitlement.value}× Guardian Points</span>
+                                </li>
+                              );
+                            }
+                            if (key === 'accessory_discount' && entitlement.value > 0) {
+                              return (
+                                <li key={key} className="flex items-center gap-3">
+                                  <Check className="h-5 w-5 text-green-500 shrink-0" />
+                                  <span className="text-sm text-gray-700">{entitlement.value}% OFF All Accessories</span>
+                                </li>
+                              );
+                            }
+                          }
                           return null;
                         })}
-
-                        {/* Points Multiplier */}
-                        <li className="flex items-center gap-3">
-                          <Check className="h-5 w-5 text-green-500 shrink-0" />
-                          <span className="text-sm text-gray-700">{tier.benefits.pointsMultiplier}x Guardian Points</span>
-                        </li>
-
-                        {/* Free Shipping */}
-                        {tier.benefits.freeShippingThreshold === 0 ? (
-                          <li className="flex items-center gap-3">
-                            <Check className="h-5 w-5 text-green-500 shrink-0" />
-                            <span className="text-sm text-gray-700">LIFETIME Free Shipping</span>
-                          </li>
-                        ) : tier.benefits.freeShippingThreshold > 0 ? (
-                          <li className="flex items-center gap-3">
-                            <Check className="h-5 w-5 text-green-500 shrink-0" />
-                            <span className="text-sm text-gray-700">Free Shipping over ${tier.benefits.freeShippingThreshold}</span>
-                          </li>
-                        ) : null}
-
-                        {/* Accessory Discount */}
-                        {tier.benefits.accessoryDiscount > 0 && (
-                          <li className="flex items-center gap-3">
-                            <Check className="h-5 w-5 text-green-500 shrink-0" />
-                            <span className="text-sm text-gray-700">{tier.benefits.accessoryDiscount}% OFF All Accessories</span>
-                          </li>
-                        )}
                       </ul>
 
                       {config.comingSoon ? (

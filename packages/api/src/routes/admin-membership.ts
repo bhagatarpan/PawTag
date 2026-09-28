@@ -24,6 +24,59 @@ router.get('/tiers', requirePermission('setting.read'), async (_req: AuthRequest
 });
 
 /**
+ * POST /api/admin/membership/tiers
+ * Create a new membership tier
+ */
+router.post('/tiers', requirePermission('setting.update'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { tier, name, displayName, description, price, tagLimit, icon, color, gradient, displayOrder } = req.body;
+
+    // Validate required fields
+    if (!tier || !name || !displayName || !description || price === undefined || tagLimit === undefined) {
+      res.status(400).json({ success: false, error: 'tier, name, displayName, description, price, and tagLimit are required' });
+      return;
+    }
+
+    // Check if tier identifier already exists
+    const existing = await MembershipTier.findOne({ tier: tier.toLowerCase() });
+    if (existing) {
+      res.status(409).json({ success: false, error: 'A tier with this identifier already exists' });
+      return;
+    }
+
+    // Create the tier
+    const newTier = await MembershipTier.create({
+      tier: tier.toLowerCase(),
+      name,
+      displayName,
+      description,
+      price,
+      tagLimit,
+      icon: icon || 'Crown',
+      color: color || '#F59E0B',
+      gradient: gradient || 'from-yellow-400 to-amber-500',
+      displayOrder: displayOrder || 0,
+      isActive: true,
+    });
+
+    // Auto-create entitlement entries for the new tier
+    try {
+      const { membershipEntitlementService } = await import('../services/membership-entitlement.service');
+      // Invalidate cache so the new tier appears in the matrix
+      membershipEntitlementService.invalidateCache();
+    } catch (err) {
+      logger.error({ err }, '[Admin Membership] Failed to invalidate entitlement cache after tier creation');
+    }
+
+    logger.info({ tierId: newTier._id, tier: newTier.tier }, '[Admin Membership] Tier created');
+    res.status(201).json({ success: true, data: newTier });
+  } catch (error: any) {
+    logger.error({ err: error }, '[Admin Membership] Failed to create tier');
+    res.status(500).json({ success: false, error: error.message || 'Failed to create tier' });
+  }
+});
+
+/**
  * PUT /api/admin/membership/tiers/:tierId
  * Update membership tier configuration
  */

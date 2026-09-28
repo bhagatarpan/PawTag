@@ -9,7 +9,7 @@ interface MembershipStatus {
   hasMembership: boolean;
   membership: {
     _id: string;
-    tierId: { tier: string; displayName: string; price: number; benefits: any; tagLimit?: number };
+    tierId: { tier: string; displayName: string; price: number; entitlements?: Record<string, { enabled: boolean; value: any; name?: string; description?: string }>; tagLimit?: number };
     status: string;
     price: number;
     currentPeriodStart: string;
@@ -21,6 +21,7 @@ interface MembershipStatus {
     cardExpYear?: number;
   } | null;
   tier: any;
+  entitlements?: Record<string, { enabled: boolean; value: any; name?: string; description?: string }>;
 }
 
 interface Tag {
@@ -49,18 +50,6 @@ const TIER_ICONS: Record<string, typeof Crown> = {
   gold: Crown,
   platinum: Crown,
   black: Shield,
-};
-
-const BENEFIT_LABELS: Record<string, string> = {
-  medicalAlert: 'Medical Alert to Finder',
-  petHealthRecords: 'Pet Health Records',
-  emailNotifications: 'Email Notifications',
-  inAppNotifications: 'In-App Notifications',
-  criticalEmergencyContact: 'Critical Emergency Contact',
-  emergencyPersonEmail: 'Emergency Person Email',
-  emergencyPersonInApp: 'Emergency Person In-App',
-  petRecovery: 'Pet Recovery via PawTag',
-  blackFridayDeal: 'Exclusive Black Friday Deal',
 };
 
 export default function MembershipManage() {
@@ -193,43 +182,53 @@ export default function MembershipManage() {
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
         <h2 className="text-sm font-semibold text-gray-900 mb-4">Your Benefits</h2>
         <ul className="space-y-3">
-          {Object.entries(tier.benefits).map(([key, value]) => {
-            if (key === 'freeShippingThreshold' || key === 'pointsMultiplier' || key === 'accessoryDiscount') {
-              return null;
-            }
-            if (typeof value === 'boolean') {
+          {Object.entries(status.entitlements || tier.entitlements || {}).map(([key, entitlement]) => {
+            if (typeof entitlement.value === 'boolean') {
               return (
                 <li key={key} className="flex items-center gap-3">
-                  <Check className={`h-5 w-5 ${value ? 'text-green-500' : 'text-gray-300'}`} />
-                  <span className={`text-sm ${value ? 'text-gray-700' : 'text-gray-400'}`}>
-                    {BENEFIT_LABELS[key] || key}
+                  <Check className={`h-5 w-5 ${entitlement.enabled && entitlement.value ? 'text-green-500' : 'text-gray-300'}`} />
+                  <span className={`text-sm ${entitlement.enabled && entitlement.value ? 'text-gray-700' : 'text-gray-400'}`}>
+                    {entitlement.name || key}
                   </span>
                 </li>
               );
             }
+            if (typeof entitlement.value === 'number') {
+              if (key === 'free_shipping_threshold') {
+                if (entitlement.value === 0) {
+                  return (
+                    <li key={key} className="flex items-center gap-3">
+                      <Check className="h-5 w-5 text-green-500" />
+                      <span className="text-sm text-gray-700">LIFETIME Free Shipping</span>
+                    </li>
+                  );
+                }
+                return (
+                  <li key={key} className="flex items-center gap-3">
+                    <Check className="h-5 w-5 text-green-500" />
+                    <span className="text-sm text-gray-700">Free Shipping over ${entitlement.value}</span>
+                  </li>
+                );
+              }
+              if (key === 'points_multiplier') {
+                return (
+                  <li key={key} className="flex items-center gap-3">
+                    <Check className="h-5 w-5 text-green-500" />
+                    <span className="text-sm text-gray-700">{entitlement.value}× Guardian Points</span>
+                  </li>
+                );
+              }
+              if (key === 'accessory_discount' && entitlement.value > 0) {
+                return (
+                  <li key={key} className="flex items-center gap-3">
+                    <Check className="h-5 w-5 text-green-500" />
+                    <span className="text-sm text-gray-700">{entitlement.value}% OFF All Accessories</span>
+                  </li>
+                );
+              }
+            }
             return null;
           })}
-          <li className="flex items-center gap-3">
-            <Check className="h-5 w-5 text-green-500" />
-            <span className="text-sm text-gray-700">{tier.benefits.pointsMultiplier}x Guardian Points</span>
-          </li>
-          {tier.benefits.freeShippingThreshold === 0 ? (
-            <li className="flex items-center gap-3">
-              <Check className="h-5 w-5 text-green-500" />
-              <span className="text-sm text-gray-700">LIFETIME Free Shipping</span>
-            </li>
-          ) : tier.benefits.freeShippingThreshold > 0 ? (
-            <li className="flex items-center gap-3">
-              <Check className="h-5 w-5 text-green-500" />
-              <span className="text-sm text-gray-700">Free Shipping over ${tier.benefits.freeShippingThreshold}</span>
-            </li>
-          ) : null}
-          {tier.benefits.accessoryDiscount > 0 && (
-            <li className="flex items-center gap-3">
-              <Check className="h-5 w-5 text-green-500" />
-              <span className="text-sm text-gray-700">{tier.benefits.accessoryDiscount}% OFF All Accessories</span>
-            </li>
-          )}
         </ul>
       </div>
 
@@ -386,21 +385,30 @@ export default function MembershipManage() {
           <div className="bg-gray-50 rounded-xl p-4">
             <p className="text-sm font-medium text-gray-900 mb-2">You'll lose these benefits:</p>
             <ul className="space-y-1.5">
-              {tier.benefits.inAppNotifications && (
-                <li className="flex items-center gap-2 text-sm text-gray-600">
-                  <span className="text-red-400">✕</span> In-App Notifications
-                </li>
-              )}
-              {tier.benefits.pointsMultiplier > 1 && (
-                <li className="flex items-center gap-2 text-sm text-gray-600">
-                  <span className="text-red-400">✕</span> {tier.benefits.pointsMultiplier}× Guardian Points
-                </li>
-              )}
-              {tier.benefits.accessoryDiscount > 0 && (
-                <li className="flex items-center gap-2 text-sm text-gray-600">
-                  <span className="text-red-400">✕</span> {tier.benefits.accessoryDiscount}% off accessories
-                </li>
-              )}
+              {Object.entries(status.entitlements || tier.entitlements || {}).map(([key, entitlement]) => {
+                if (typeof entitlement.value === 'boolean' && entitlement.enabled && entitlement.value) {
+                  return (
+                    <li key={key} className="flex items-center gap-2 text-sm text-gray-600">
+                      <span className="text-red-400">✕</span> {entitlement.name || key}
+                    </li>
+                  );
+                }
+                if (key === 'points_multiplier' && typeof entitlement.value === 'number' && entitlement.value > 1) {
+                  return (
+                    <li key={key} className="flex items-center gap-2 text-sm text-gray-600">
+                      <span className="text-red-400">✕</span> {entitlement.value}× Guardian Points
+                    </li>
+                  );
+                }
+                if (key === 'accessory_discount' && typeof entitlement.value === 'number' && entitlement.value > 0) {
+                  return (
+                    <li key={key} className="flex items-center gap-2 text-sm text-gray-600">
+                      <span className="text-red-400">✕</span> {entitlement.value}% off accessories
+                    </li>
+                  );
+                }
+                return null;
+              })}
               <li className="flex items-center gap-2 text-sm text-gray-600">
                 <span className="text-red-400">✕</span> Cover up to {tier.tagLimit} tags
               </li>

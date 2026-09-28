@@ -129,18 +129,17 @@ async function processStage2Escalation(record: any): Promise<void> {
       return;
     }
 
-    // Check owner's membership tier - Gold members don't get emergency contact escalation
+    // Check owner's emergency contact entitlement from registry
     try {
-      const { UserMembership } = await import('@pawtag/db');
-      const ownerMembership = await UserMembership.findOne({ userId: owner._id, status: 'active' }).populate('tierId');
-      const ownerTier = (ownerMembership?.tierId as any)?.tier;
+      const { membershipEntitlementService } = await import('./membership-entitlement.service');
+      const hasEmergencyContact = await membershipEntitlementService.hasAccess(owner._id, 'emergency_contact');
 
-      if (ownerTier === 'gold' || !ownerTier) {
-        logger.info({ ownerId: owner._id, tier: ownerTier }, '[Escalation] Gold/non-member - emergency contact not notified');
+      if (!hasEmergencyContact) {
+        logger.info({ ownerId: owner._id }, '[Escalation] Owner lacks emergency_contact entitlement - emergency contact not notified');
         await EscalationRecord.findByIdAndUpdate(record._id, {
           status: 'escalated',
           escalatedAt: new Date(),
-          notes: `Owner has ${ownerTier || 'no'} membership - emergency contact not notified per tier rules`,
+          notes: 'Owner lacks emergency_contact entitlement - emergency contact not notified per entitlement rules',
         });
 
         // Notify owner that escalation requires upgrade
@@ -149,7 +148,7 @@ async function processStage2Escalation(record: any): Promise<void> {
             userId: owner._id,
             type: 'escalation_requires_upgrade',
             title: 'Emergency Contact Escalation',
-            message: 'Your pet was found but your emergency contact could not be notified. Upgrade to Platinum or Black to enable emergency contact escalation.',
+            message: 'Your pet was found but your emergency contact could not be notified. Upgrade your membership to enable emergency contact escalation.',
             priority: 'high',
             actionUrl: '/membership',
           });
@@ -256,21 +255,21 @@ async function processStage3Escalation(record: any): Promise<void> {
 
     // Check owner's membership tier - only Black members get Stage 3
     try {
-      const { UserMembership } = await import('@pawtag/db');
-      const ownerMembership = await UserMembership.findOne({ userId: owner._id, status: 'active' }).populate('tierId');
-      const ownerTier = (ownerMembership?.tierId as any)?.tier;
+      // Check owner's pet_recovery entitlement from registry
+      const { membershipEntitlementService } = await import('./membership-entitlement.service');
+      const hasPetRecovery = await membershipEntitlementService.hasAccess(owner._id, 'pet_recovery');
 
-      if (ownerTier !== 'black') {
-        logger.info({ ownerId: owner._id, tier: ownerTier }, '[Escalation] Stage 3: Not Black member, skipping PawTag team notification');
+      if (!hasPetRecovery) {
+        logger.info({ ownerId: owner._id }, '[Escalation] Stage 3: Owner lacks pet_recovery entitlement, skipping PawTag team notification');
         await EscalationRecord.findByIdAndUpdate(record._id, {
           stage: 'pawtag_team_notified',
           pawtagTeamNotifiedAt: new Date(),
-          notes: `Stage 3 skipped: Owner has ${ownerTier || 'no'} membership (Black required)`,
+          notes: 'Stage 3 skipped: Owner lacks pet_recovery entitlement',
         });
         return;
       }
     } catch (tierErr) {
-      logger.error({ err: tierErr }, '[Escalation] Stage 3: Failed to check owner tier');
+      logger.error({ err: tierErr }, '[Escalation] Stage 3: Failed to check owner entitlement');
       return;
     }
 
