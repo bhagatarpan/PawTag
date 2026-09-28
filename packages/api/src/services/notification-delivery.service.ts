@@ -60,6 +60,14 @@ export async function createAndDeliverNotification(options: NotifyOptions): Prom
     referral_reward: 'referral',
     tag_expiry_warning: 'subscriptionReminder',
     system: 'orderUpdate',
+    // Membership lifecycle notifications
+    membership_activated: 'subscriptionReminder',
+    membership_cancelled: 'subscriptionReminder',
+    membership_upgraded: 'subscriptionReminder',
+    membership_downgraded: 'subscriptionReminder',
+    membership_extended: 'subscriptionReminder',
+    membership_expired: 'subscriptionReminder',
+    membership_renewal_reminder: 'subscriptionReminder',
   };
   const channelKey = channelMap[type] || 'orderUpdate';
   if (!prefs.channels[channelKey]) return;

@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { AuthRequest, authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
-import { UserMembership, MembershipTier, User, Tag } from '@pawtag/db';
+import { UserMembership, MembershipTier, User, Tag, Invoice } from '@pawtag/db';
 import {
   getMembershipTiers,
   getUserMembershipStatus,
@@ -122,13 +122,13 @@ router.post('/cancel', async (req: AuthRequest, res: Response) => {
  */
 router.post('/change-tier', async (req: AuthRequest, res: Response) => {
   try {
-    const { tierId } = req.body;
+    const { tierId, prorationBehavior } = req.body;
     if (!tierId) {
       res.status(400).json({ success: false, error: 'tierId is required' });
       return;
     }
 
-    const updated = await changeTier(req.user!.id, tierId);
+    const updated = await changeTier(req.user!.id, tierId, prorationBehavior);
     res.json({ success: true, data: updated });
   } catch (error: any) {
     logger.error({ err: error, userId: req.user?.id }, '[Membership] Change tier error');
@@ -172,6 +172,26 @@ router.get('/entitlements', async (req: AuthRequest, res: Response) => {
   } catch (error: any) {
     logger.error({ err: error, userId: req.user?.id }, '[Membership] Failed to fetch entitlements');
     res.status(500).json({ success: false, error: 'Failed to fetch entitlements' });
+  }
+});
+
+/**
+ * GET /api/membership/invoices
+ * Get current user's membership invoices
+ */
+router.get('/invoices', async (req: AuthRequest, res: Response) => {
+  try {
+    const invoices = await Invoice.find({
+      userId: req.user!.id,
+      invoiceNumber: { $regex: /^INVM-/ },
+    })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    res.json({ success: true, data: invoices });
+  } catch (error: any) {
+    logger.error({ err: error, userId: req.user?.id }, '[Membership] Failed to fetch invoices');
+    res.status(500).json({ success: false, error: 'Failed to fetch invoices' });
   }
 });
 

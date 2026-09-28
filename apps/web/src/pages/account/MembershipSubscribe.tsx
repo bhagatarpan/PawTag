@@ -57,6 +57,7 @@ export default function MembershipSubscribe() {
   const [selectedTier, setSelectedTier] = useState<MembershipTier | null>(null);
   const [processing, setProcessing] = useState(false);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [membershipId, setMembershipId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
@@ -90,11 +91,14 @@ export default function MembershipSubscribe() {
 
       const { clientSecret: secret, membership } = res.data.data;
 
+      // Store membership ID for activation after payment
+      setMembershipId(membership._id);
+
       if (secret) {
         // Real Stripe payment needed
         setClientSecret(secret);
       } else {
-        // Demo/fake mode — membership already activated
+        // Demo/fake mode — membership already activated by server
         setSuccess(true);
         setTimeout(() => navigate('/account/membership'), 2000);
       }
@@ -104,10 +108,22 @@ export default function MembershipSubscribe() {
     }
   }
 
-  function handlePaymentSuccess(paymentIntentId: string) {
-    setSuccess(true);
-    setProcessing(false);
-    setTimeout(() => navigate('/account/membership'), 2000);
+  async function handlePaymentSuccess(paymentIntentId: string) {
+    try {
+      // Activate membership on server after successful payment
+      if (membershipId) {
+        await api.post(API.customer.membership.activate, { membershipId });
+      }
+    } catch (err: any) {
+      // Activation failed after payment — log but don't block the user
+      // The webhook will handle activation as a safety net
+      console.error('Membership activation failed after payment:', err);
+    } finally {
+      // Always show success since payment went through
+      setSuccess(true);
+      setProcessing(false);
+      setTimeout(() => navigate('/account/membership'), 2000);
+    }
   }
 
   function handlePaymentError(error: string) {

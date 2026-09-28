@@ -178,6 +178,8 @@ export const API = {
       subscribers: '/admin/membership/subscribers',
       subscriber: (id: string) => `/admin/membership/subscribers/${id}` as const,
       extend: '/admin/membership/extend',
+      changeTier: '/admin/membership/change-tier',
+      cancel: '/admin/membership/cancel',
       stats: '/admin/membership/stats',
     },
 
@@ -601,6 +603,7 @@ export const API = {
       changeTier: '/membership/change-tier',
       tags: '/membership/tags',
       entitlements: '/membership/entitlements',
+      invoices: '/membership/invoices',
     },
     escalations: {
       list: '/customer/escalations',
