@@ -372,15 +372,14 @@ router.get('/:tagId', async (req: Request, res: Response) => {
     const petView = toFinderPetView(pet);
     if (owner?._id) {
       try {
-        const { UserMembership } = await import('@pawtag/db');
-        const ownerMembership = await UserMembership.findOne({ userId: owner._id, status: 'active' }).populate('tierId');
-        const ownerTier = (ownerMembership?.tierId as any)?.tier;
-        // Only Platinum and Black members can share medical alerts with finders
-        if (ownerTier !== 'platinum' && ownerTier !== 'black') {
+        // Check owner's medical_alerts entitlement from registry
+        const { membershipEntitlementService } = await import('../services/membership-entitlement.service');
+        const hasMedicalAlerts = await membershipEntitlementService.hasAccess(owner._id, 'medical_alerts');
+        if (!hasMedicalAlerts) {
           petView.medicalAlerts = undefined;
         }
       } catch {
-        // If membership check fails, hide medical alerts for safety
+        // If entitlement check fails, hide medical alerts for safety
         petView.medicalAlerts = undefined;
       }
     }

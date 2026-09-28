@@ -11,6 +11,7 @@ import {
   changeTier,
   checkTagAccess,
 } from '../services/membership.service';
+import { membershipEntitlementService } from '../services/membership-entitlement.service';
 import logger from '../lib/logger';
 
 const router = Router();
@@ -18,12 +19,17 @@ router.use(authenticate);
 
 /**
  * GET /api/membership/tiers
- * List available membership tiers
+ * List available membership tiers with entitlements
  */
 router.get('/tiers', async (_req: AuthRequest, res: Response) => {
   try {
     const tiers = await getMembershipTiers();
-    res.json({ success: true, data: tiers });
+    // Enrich each tier with entitlements from the registry
+    const enrichedTiers = await Promise.all(tiers.map(async (tier) => {
+      const entitlements = await membershipEntitlementService.getTierEntitlements(tier.tier);
+      return { ...tier, entitlements };
+    }));
+    res.json({ success: true, data: enrichedTiers });
   } catch (error: any) {
     logger.error({ err: error }, '[Membership] Failed to fetch tiers');
     res.status(500).json({ success: false, error: 'Failed to fetch membership tiers' });
@@ -32,12 +38,14 @@ router.get('/tiers', async (_req: AuthRequest, res: Response) => {
 
 /**
  * GET /api/membership/status
- * Get current user's membership status
+ * Get current user's membership status with entitlements
  */
 router.get('/status', async (req: AuthRequest, res: Response) => {
   try {
     const status = await getUserMembershipStatus(req.user!.id);
-    res.json({ success: true, data: status });
+    // Add entitlements from the registry
+    const entitlements = await membershipEntitlementService.getUserEntitlements(req.user!.id);
+    res.json({ success: true, data: { ...status, entitlements } });
   } catch (error: any) {
     logger.error({ err: error }, '[Membership] Failed to fetch status');
     res.status(500).json({ success: false, error: 'Failed to fetch membership status' });

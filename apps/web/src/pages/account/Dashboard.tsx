@@ -28,7 +28,7 @@ interface DashboardData {
   notifications: Notification[];
   escalations: EscalationRecord[];
   guardian: GuardianData | null;
-  membership: { hasMembership: boolean; membership: any; tier: any } | null;
+  membership: { hasMembership: boolean; membership: any; tier: any; entitlements?: Record<string, { enabled: boolean; value: any; name?: string; description?: string }> } | null;
 }
 
 interface EscalationRecord {
@@ -371,7 +371,7 @@ export default function AccountDashboard() {
                 <p className={`text-sm ${
                   data.membership.tier.tier === 'black' ? 'text-gray-300' : 'text-gray-600'
                 }`}>
-                  {data.membership.tier.benefits?.pointsMultiplier || 1}× points · Renews {new Date(data.membership.membership.currentPeriodEnd).toLocaleDateString('en-NZ', { dateStyle: 'medium' })}
+                  {data.membership.entitlements?.points_multiplier?.value || data.membership.tier.entitlements?.points_multiplier?.value || 1}× points · Renews {new Date(data.membership.membership.currentPeriodEnd).toLocaleDateString('en-NZ', { dateStyle: 'medium' })}
                 </p>
               </div>
             </div>

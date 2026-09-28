@@ -1,12 +1,18 @@
 import { Router, Response } from 'express';
 import { AuthRequest, authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
-import { MembershipBenefit, AuditEvent } from '@pawtag/db';
+import { MembershipBenefit, MembershipTier, AuditEvent } from '@pawtag/db';
 import { membershipEntitlementService } from '../services/membership-entitlement.service';
 import logger from '../lib/logger';
 
 const router = Router();
 router.use(authenticate);
+
+// Helper: validate tier exists in MembershipTier collection
+async function isValidTier(tier: string): Promise<boolean> {
+  const tierDoc = await MembershipTier.findOne({ tier }).lean();
+  return !!tierDoc;
+}
 
 /**
  * GET /api/admin/entitlements/matrix
@@ -177,7 +183,7 @@ router.put('/tiers/:tier/:benefitKey', requirePermission('setting.update'), asyn
     const { tier, benefitKey } = req.params;
     const { enabled, value } = req.body;
 
-    if (!['gold', 'platinum', 'black'].includes(tier)) {
+    if (!await isValidTier(tier)) {
       res.status(400).json({ success: false, error: 'Invalid tier' });
       return;
     }
@@ -219,7 +225,7 @@ router.put('/tiers/:tier', requirePermission('setting.update'), async (req: Auth
     const { tier } = req.params;
     const { benefits } = req.body;
 
-    if (!['gold', 'platinum', 'black'].includes(tier)) {
+    if (!await isValidTier(tier)) {
       res.status(400).json({ success: false, error: 'Invalid tier' });
       return;
     }
@@ -260,7 +266,7 @@ router.get('/tiers/:tier', requirePermission('setting.read'), async (req: AuthRe
   try {
     const { tier } = req.params;
 
-    if (!['gold', 'platinum', 'black'].includes(tier)) {
+    if (!await isValidTier(tier)) {
       res.status(400).json({ success: false, error: 'Invalid tier' });
       return;
     }

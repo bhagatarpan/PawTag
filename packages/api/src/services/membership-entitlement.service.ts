@@ -130,7 +130,7 @@ async function getTierValue(
  */
 async function getUserEntitlements(
   userId: string
-): Promise<Record<string, { enabled: boolean; value: any }>> {
+): Promise<Record<string, { enabled: boolean; value: any; name?: string; description?: string }>> {
   const tier = await getUserTierString(userId);
   if (!tier) return {};
 
@@ -142,16 +142,18 @@ async function getUserEntitlements(
  */
 async function getTierEntitlements(
   tier: string
-): Promise<Record<string, { enabled: boolean; value: any }>> {
+): Promise<Record<string, { enabled: boolean; value: any; name?: string; description?: string }>> {
   await loadAllBenefits();
 
-  const result: Record<string, { enabled: boolean; value: any }> = {};
+  const result: Record<string, { enabled: boolean; value: any; name?: string; description?: string }> = {};
 
   for (const [key, benefit] of cache.benefits) {
     const tierValue = cache.tierValues.get(`${tier}:${key}`);
     result[key] = {
       enabled: tierValue?.enabled ?? false,
       value: tierValue?.value ?? benefit.defaultValue ?? null,
+      name: benefit.name,
+      description: benefit.description,
     };
   }
 
@@ -168,7 +170,9 @@ async function getBenefitsMatrix(): Promise<{
 }> {
   const benefits = await MembershipBenefit.find({}).sort({ category: 1, displayOrder: 1 }).lean();
   const tierBenefits = await MembershipTierBenefit.find({}).lean();
-  const tiers = ['gold', 'platinum', 'black'];
+  // Dynamic tier list from MembershipTier collection (no hardcoded values)
+  const tierDocs = await MembershipTier.find({}).select('tier').sort({ displayOrder: 1 }).lean();
+  const tiers = tierDocs.map(t => t.tier);
 
   const valueMap = new Map<string, { enabled: boolean; value: any }>();
   for (const tb of tierBenefits) {
@@ -222,8 +226,9 @@ async function upsertBenefit(data: {
     { upsert: true, new: true }
   ).lean();
 
-  // Ensure tier entries exist for all tiers
-  const tiers = ['gold', 'platinum', 'black'] as const;
+  // Ensure tier entries exist for all tiers (dynamic from MembershipTier collection)
+  const tierDocs = await MembershipTier.find({}).select('tier').lean();
+  const tiers = tierDocs.map(t => t.tier);
   for (const tier of tiers) {
     await MembershipTierBenefit.findOneAndUpdate(
       { benefitKey: data.key, tier },

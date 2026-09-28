@@ -243,7 +243,7 @@ export default function MembershipEntitlements() {
                               <div className="text-xs text-gray-400 mt-0.5">{benefit.description}</div>
                             )}
                           </td>
-                          {(['gold', 'platinum', 'black'] as const).map((tier) => {
+                          {matrix.tiers.map((tier) => {
                             const tv = vals[tier] || { enabled: false, value: null };
                             const cellId = `${tier}:${benefit.key}`;
                             const isSaving = saving === cellId;
