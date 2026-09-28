@@ -262,6 +262,22 @@ const jobs = [
     notifyOnSuccess: false,
     notifyOnFailure: true,
   },
+  // ─── Membership Activation Reconciliation ──────────────────────
+  {
+    name: 'membership-activation-reconciliation',
+    displayName: 'Membership Activation Reconciliation',
+    description: 'Detects and activates memberships stuck in pending_payment for more than 10 minutes.',
+    category: 'financial',
+    intervalMs: 5 * 60 * 1000, // 5 minutes
+    lockName: 'membership-activation-reconciliation',
+    lockLeaseMs: 120000,
+    processTarget: 'worker',
+    filePath: 'jobs/membershipActivationReconciliation.ts',
+    functionName: 'runMembershipActivationReconciliation',
+    enabled: true,
+    notifyOnSuccess: false,
+    notifyOnFailure: true,
+  },
 ];
 
 async function seedBackgroundJobs() {

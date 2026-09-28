@@ -61,6 +61,7 @@ import { runPrivacyRetentionJob } from './jobs/privacyRetention';
 import { runAuditRetentionJob } from './jobs/auditRetention';
 import { checkExpiredMemberships, sendRenewalReminders } from './services/membership.service';
 import { checkActivePeriodExpirations } from './services/active-period-check.service';
+import { runMembershipActivationReconciliation } from './jobs/membershipActivationReconciliation';
 import type { JobResult } from './services/job-scheduler.service';
 
 // Wrapper functions to adapt membership functions to JobResult type
@@ -108,6 +109,7 @@ async function startWorker(): Promise<void> {
     registerJobFunction('checkExpiredMemberships', runMembershipExpiryCheck);
     registerJobFunction('sendRenewalReminders', runMembershipRenewalReminders);
     registerJobFunction('checkActivePeriodExpirations', runActivePeriodCheck);
+    registerJobFunction('membershipActivationReconciliation', runMembershipActivationReconciliation);
     logger.info('[Worker] All job functions registered');
 
     // Start the scheduler (reads jobs from DB, starts timers)

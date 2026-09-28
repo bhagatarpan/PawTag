@@ -12,6 +12,7 @@ interface MembershipTier {
   description: string;
   price: number;
   isActive: boolean;
+  comingSoon: boolean;
   displayOrder: number;
   tagLimit: number;
   icon?: string;
@@ -31,7 +32,7 @@ export default function MembershipTiers() {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<MembershipTier | null>(null);
   const [adding, setAdding] = useState(false);
-  const [newTier, setNewTier] = useState({ tier: '', name: '', displayName: '', description: '', price: 0, tagLimit: 3 });
+  const [newTier, setNewTier] = useState({ tier: '', name: '', displayName: '', description: '', price: 0, tagLimit: 3, comingSoon: false });
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -84,7 +85,7 @@ export default function MembershipTiers() {
     try {
       await api.post(API.admin.membership.tiers, newTier);
       setAdding(false);
-      setNewTier({ tier: '', name: '', displayName: '', description: '', price: 0, tagLimit: 3 });
+      setNewTier({ tier: '', name: '', displayName: '', description: '', price: 0, tagLimit: 3, comingSoon: false });
       await fetchTiers();
     } catch (err: any) {
       alert(err.response?.data?.error || 'Failed to create tier');
@@ -224,6 +225,15 @@ export default function MembershipTiers() {
                 />
                 <label className="text-sm text-gray-700">Active (available for purchase)</label>
               </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={editing.comingSoon}
+                  onChange={(e) => setEditing({ ...editing, comingSoon: e.target.checked })}
+                  className="h-4 w-4 text-primary-600 rounded"
+                />
+                <label className="text-sm text-gray-700">Coming Soon (show "Coming Soon" instead of "Join")</label>
+              </div>
               <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
                 <button
                   onClick={() => setEditing(null)}
@@ -314,6 +324,15 @@ export default function MembershipTiers() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={newTier.comingSoon}
+                  onChange={(e) => setNewTier({ ...newTier, comingSoon: e.target.checked })}
+                  className="h-4 w-4 text-primary-600 rounded"
+                />
+                <label className="text-sm text-gray-700">Coming Soon (show "Coming Soon" instead of "Join")</label>
               </div>
               <div className="bg-primary-50 border border-primary-200 rounded-lg p-3">
                 <p className="text-sm text-primary-700">

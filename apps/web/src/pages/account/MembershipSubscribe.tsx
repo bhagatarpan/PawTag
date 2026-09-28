@@ -13,16 +13,17 @@ interface MembershipTier {
   description: string;
   price: number;
   entitlements: Record<string, { enabled: boolean; value: any; name?: string; description?: string }>;
+  comingSoon: boolean;
   tagLimit: number;
   icon: string;
   color: string;
   gradient: string;
 }
 
-const TIER_CONFIG: Record<string, { icon: typeof Crown; gradient: string; popular?: boolean; recommended?: boolean; comingSoon?: boolean }> = {
+const TIER_CONFIG: Record<string, { icon: typeof Crown; gradient: string; popular?: boolean; recommended?: boolean }> = {
   gold: { icon: Crown, gradient: 'from-yellow-400 to-amber-500', popular: true },
   platinum: { icon: Diamond, gradient: 'from-gray-300 to-gray-500', recommended: true },
-  black: { icon: Shield, gradient: 'from-gray-800 to-black', comingSoon: true },
+  black: { icon: Shield, gradient: 'from-gray-800 to-black' },
 };
 
 export default function MembershipSubscribe() {
@@ -52,8 +53,7 @@ export default function MembershipSubscribe() {
   }
 
   async function handleSubscribe(tier: MembershipTier) {
-    const config = TIER_CONFIG[tier.tier] || TIER_CONFIG.gold;
-    if (config.comingSoon) return;
+    if (tier.comingSoon) return;
 
     setSelectedTier(tier);
     setProcessing(true);
@@ -84,20 +84,28 @@ export default function MembershipSubscribe() {
   }
 
   async function handlePaymentSuccess(paymentIntentId: string) {
-    try {
-      // Activate membership on server after successful payment
-      if (membershipId) {
-        await api.post(API.customer.membership.activate, { membershipId });
+    // Retry activation up to 3 times with exponential backoff
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        if (membershipId) {
+          await api.post(API.customer.membership.activate, { membershipId });
+        }
+        // Success — show success and navigate
+        setSuccess(true);
+        setProcessing(false);
+        setTimeout(() => navigate('/account/membership'), 2000);
+        return;
+      } catch (err: any) {
+        if (attempt < 3) {
+          // Wait before retrying (exponential backoff: 1s, 2s)
+          await new Promise(r => setTimeout(r, 1000 * attempt));
+        } else {
+          // Final attempt failed — show error to user
+          console.error('Membership activation failed after 3 attempts:', err);
+          setError('Payment succeeded but activation failed. Please contact support or try refreshing the page.');
+          setProcessing(false);
+        }
       }
-    } catch (err: any) {
-      // Activation failed after payment — log but don't block the user
-      // The webhook will handle activation as a safety net
-      console.error('Membership activation failed after payment:', err);
-    } finally {
-      // Always show success since payment went through
-      setSuccess(true);
-      setProcessing(false);
-      setTimeout(() => navigate('/account/membership'), 2000);
     }
   }
 
@@ -185,7 +193,7 @@ export default function MembershipSubscribe() {
                   isSelected
                     ? 'border-primary-500 shadow-lg'
                     : 'border-gray-200 hover:border-gray-300 hover:shadow-md'
-                } ${config.comingSoon ? 'opacity-60' : ''}`}
+                } ${tier.comingSoon ? 'opacity-60' : ''}`}
               >
                 {config.popular && (
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-amber-500 text-white text-xs font-bold rounded-full">
@@ -197,7 +205,7 @@ export default function MembershipSubscribe() {
                     RECOMMENDED
                   </div>
                 )}
-                {config.comingSoon && (
+                {tier.comingSoon && (
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-gray-500 text-white text-xs font-bold rounded-full">
                     COMING SOON
                   </div>
@@ -249,7 +257,7 @@ export default function MembershipSubscribe() {
                   </li>
                 </ul>
 
-                {config.comingSoon ? (
+                {tier.comingSoon ? (
                   <button
                     disabled
                     className="w-full py-3 px-4 bg-gray-200 text-gray-500 rounded-xl font-semibold cursor-not-allowed"

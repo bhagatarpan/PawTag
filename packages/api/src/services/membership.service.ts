@@ -86,7 +86,7 @@ export async function getMembershipTierByTier(tier: 'gold' | 'platinum' | 'black
 export async function getUserMembershipStatus(userId: string) {
   const membership = await UserMembership.findOne({
     userId,
-    status: { $in: ['active', 'cancelled', 'expired'] },
+    status: { $in: ['active', 'cancelled', 'expired', 'pending_payment'] },
   })
     .populate('tierId')
     .sort({ createdAt: -1 })
@@ -332,35 +332,46 @@ export async function activateMembership(membershipId: string) {
   membership.status = 'active';
   await membership.save();
 
-  // Create invoice for membership purchase (INVM- prefix)
+  // Create invoice for membership purchase (INVM- prefix) — with idempotency check
   let invoiceId: mongoose.Types.ObjectId | undefined;
   try {
-    const invCounter = await UserMembership.db!.collection('counters').findOneAndUpdate(
-      { _id: 'membershipInvoiceNumber' as any },
-      { $inc: { seq: 1 } },
-      { upsert: true, returnDocument: 'after' },
-    );
-    const invoiceNumber = `INVM-${String(invCounter?.value?.seq || 1).padStart(6, '0')}`;
-
-    const invoice = await Invoice.create({
+    // Check if invoice already exists (idempotency: prevent duplicate if frontend + webhook both call activate)
+    const existingInvoice = await Invoice.findOne({
       userId: membership.userId,
-      invoiceNumber,
-      amount: membership.price,
-      currency: membership.currency || 'NZD',
-      status: 'paid',
       stripeSubscriptionId: membership.stripeSubscriptionId,
-      billingPeriod: {
-        start: membership.currentPeriodStart,
-        end: membership.currentPeriodEnd,
-      },
-      paidAt: new Date(),
     });
 
-    invoiceId = invoice._id;
-    membership.invoiceId = invoice._id;
-    await membership.save();
+    if (existingInvoice) {
+      invoiceId = existingInvoice._id;
+      logger.info({ membershipId, invoiceId: existingInvoice._id }, '[Membership] Invoice already exists, skipping creation');
+    } else {
+      const invCounter = await UserMembership.db!.collection('counters').findOneAndUpdate(
+        { _id: 'membershipInvoiceNumber' as any },
+        { $inc: { seq: 1 } },
+        { upsert: true, returnDocument: 'after' },
+      );
+      const invoiceNumber = `INVM-${String(invCounter?.value?.seq || 1).padStart(6, '0')}`;
 
-    logger.info({ membershipId, invoiceId: invoice._id, invoiceNumber }, '[Membership] Invoice created');
+      const invoice = await Invoice.create({
+        userId: membership.userId,
+        invoiceNumber,
+        amount: membership.price,
+        currency: membership.currency || 'NZD',
+        status: 'paid',
+        stripeSubscriptionId: membership.stripeSubscriptionId,
+        billingPeriod: {
+          start: membership.currentPeriodStart,
+          end: membership.currentPeriodEnd,
+        },
+        paidAt: new Date(),
+      });
+
+      invoiceId = invoice._id;
+      logger.info({ membershipId, invoiceId: invoice._id, invoiceNumber }, '[Membership] Invoice created');
+    }
+
+    membership.invoiceId = invoiceId;
+    await membership.save();
   } catch (err) {
     logger.error({ err, membershipId }, '[Membership] Failed to create invoice');
   }

@@ -11,6 +11,7 @@ export interface IMembershipTierDocument extends Document {
   stripeProductId?: string;
   stripePriceId?: string;
   isActive: boolean;
+  comingSoon: boolean;
   displayOrder: number;
   icon: string;
   color: string;
@@ -37,6 +38,7 @@ const MembershipTierSchema = new Schema<IMembershipTierDocument>(
     stripeProductId: { type: String },
     stripePriceId: { type: String },
     isActive: { type: Boolean, default: true },
+    comingSoon: { type: Boolean, default: false },
     displayOrder: { type: Number, default: 0 },
     icon: { type: String, default: 'Crown' },
     color: { type: String, default: '#F59E0B' },

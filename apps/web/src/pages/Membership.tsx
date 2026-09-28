@@ -14,15 +14,16 @@ interface MembershipTier {
   description: string;
   price: number;
   entitlements: Record<string, { enabled: boolean; value: any; name?: string; description?: string }>;
+  comingSoon: boolean;
   icon: string;
   color: string;
   gradient: string;
 }
 
-const TIER_CONFIG: Record<string, { icon: typeof Crown; gradient: string; popular?: boolean; recommended?: boolean; comingSoon?: boolean }> = {
+const TIER_CONFIG: Record<string, { icon: typeof Crown; gradient: string; popular?: boolean; recommended?: boolean }> = {
   gold: { icon: Crown, gradient: 'from-yellow-400 to-amber-500', popular: true },
   platinum: { icon: Diamond, gradient: 'from-gray-300 to-gray-500', recommended: true },
-  black: { icon: Shield, gradient: 'from-gray-800 to-black', comingSoon: true },
+  black: { icon: Shield, gradient: 'from-gray-800 to-black' },
 };
 
 export default function MembershipLanding() {
@@ -103,7 +104,7 @@ export default function MembershipLanding() {
                 return (
                   <div
                     key={tier._id}
-                    className={`relative rounded-2xl shadow-xl overflow-hidden ${config.comingSoon ? 'opacity-75' : ''}`}
+                    className={`relative rounded-2xl shadow-xl overflow-hidden ${tier.comingSoon ? 'opacity-75' : ''}`}
                   >
                     {/* Card Header */}
                     <div className={`bg-gradient-to-br ${config.gradient} p-8 text-white`}>
@@ -117,7 +118,7 @@ export default function MembershipLanding() {
                           MOST POPULAR
                         </div>
                       )}
-                      {config.comingSoon && (
+                      {tier.comingSoon && (
                         <div className="absolute top-4 right-4 bg-gray-700 text-white px-3 py-1 rounded-full text-xs font-bold">
                           COMING SOON
                         </div>
@@ -187,7 +188,7 @@ export default function MembershipLanding() {
                         })}
                       </ul>
 
-                      {config.comingSoon ? (
+                      {tier.comingSoon ? (
                         <button
                           disabled
                           className="w-full py-3 px-4 bg-gray-300 text-gray-500 rounded-xl font-semibold cursor-not-allowed"

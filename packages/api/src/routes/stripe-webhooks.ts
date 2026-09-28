@@ -418,8 +418,23 @@ async function handleInvoicePaymentFailed(invoice: any): Promise<void> {
 async function handleSubscriptionUpdated(stripeSubscription: any): Promise<void> {
   if (!stripeSubscription?.id) return;
 
+  // Try tag-based Subscription first (existing behavior)
   const sub = await Subscription.findOne({ stripeSubscriptionId: stripeSubscription.id });
-  if (!sub) return;
+
+  if (!sub) {
+    // Try membership-tier subscription (UserMembership model)
+    try {
+      const membership = await UserMembership.findOne({ stripeSubscriptionId: stripeSubscription.id });
+      if (membership && membership.status === 'pending_payment') {
+        // Stripe subscription is now active — activate the membership
+        await activateMembership(membership._id.toString());
+        logger.info({ membershipId: membership._id, stripeStatus: stripeSubscription.status }, 'Membership activated via customer.subscription.updated webhook');
+      }
+    } catch (err) {
+      logger.error({ err, stripeSubscriptionId: stripeSubscription.id }, 'Failed to activate membership from customer.subscription.updated webhook');
+    }
+    return;
+  }
 
   const oldStatus = sub.status;
 
