@@ -348,21 +348,56 @@ export async function subscribeToTier(
 
       stripeSubscriptionId = stripeSubscription.id;
 
-      // Extract client secret for frontend
+      logger.info({
+        userId,
+        stripeSubscriptionId,
+        hasLatestInvoice: !!stripeSubscription.latest_invoice,
+        latestInvoiceType: typeof stripeSubscription.latest_invoice,
+        latestInvoiceId: (stripeSubscription.latest_invoice as any)?.id,
+      }, '[Membership] Stripe subscription created, extracting client secret');
+
+      // Extract client secret for frontend — primary attempt from expanded response
       const latestInvoice = stripeSubscription.latest_invoice as any;
-      if (latestInvoice?.payment_intent) {
+      if (latestInvoice?.payment_intent?.client_secret) {
         clientSecret = latestInvoice.payment_intent.client_secret;
       }
 
-      // If clientSecret is still null, try retrieving the subscription separately
-      if (!clientSecret) {
-        logger.warn({ userId, stripeSubscriptionId }, '[Membership] clientSecret null after creation, attempting retrieval');
-        const retrievedSubscription = await stripe.subscriptions.retrieve(stripeSubscriptionId, {
-          expand: ['latest_invoice.payment_intent'],
-        });
-        const retrievedInvoice = retrievedSubscription.latest_invoice as any;
-        if (retrievedInvoice?.payment_intent?.client_secret) {
-          clientSecret = retrievedInvoice.payment_intent.client_secret;
+      // If clientSecret is still null, try retrieving subscription with expansion
+      if (!clientSecret && stripeSubscriptionId) {
+        logger.warn({ userId, stripeSubscriptionId }, '[Membership] clientSecret null after creation, attempting subscription retrieval');
+        try {
+          const retrievedSubscription = await stripe.subscriptions.retrieve(stripeSubscriptionId, {
+            expand: ['latest_invoice.payment_intent'],
+          });
+          const retrievedInvoice = retrievedSubscription.latest_invoice as any;
+          logger.info({
+            userId,
+            stripeSubscriptionId,
+            hasRetrievedInvoice: !!retrievedInvoice,
+            retrievedInvoiceId: retrievedInvoice?.id,
+            hasPaymentIntent: !!retrievedInvoice?.payment_intent,
+          }, '[Membership] Subscription retrieval result');
+          if (retrievedInvoice?.payment_intent?.client_secret) {
+            clientSecret = retrievedInvoice.payment_intent.client_secret;
+          }
+        } catch (retrieveErr) {
+          logger.error({ err: retrieveErr, userId, stripeSubscriptionId }, '[Membership] Failed to retrieve subscription');
+        }
+      }
+
+      // Final attempt: retrieve the invoice directly by ID
+      if (!clientSecret && (latestInvoice?.id || (stripeSubscription as any).latest_invoice)) {
+        const invoiceId = latestInvoice?.id || (stripeSubscription as any).latest_invoice;
+        logger.warn({ userId, invoiceId }, '[Membership] clientSecret still null, attempting direct invoice retrieval');
+        try {
+          const retrievedInvoice = await stripe.invoices.retrieve(invoiceId, {
+            expand: ['payment_intent'],
+          });
+          if ((retrievedInvoice as any).payment_intent?.client_secret) {
+            clientSecret = (retrievedInvoice as any).payment_intent.client_secret;
+          }
+        } catch (invoiceErr) {
+          logger.error({ err: invoiceErr, userId, invoiceId }, '[Membership] Failed to retrieve invoice directly');
         }
       }
 
@@ -371,7 +406,7 @@ export async function subscribeToTier(
         stripeCustomerId,
         stripeSubscriptionId,
         clientSecretObtained: !!clientSecret,
-      }, '[Membership] Created Stripe subscription');
+      }, '[Membership] Stripe subscription setup complete');
     } catch (err) {
       logger.error({ err, userId }, '[Membership] Stripe subscription creation failed');
       throw new Error('Payment processing failed. Please try again.');
