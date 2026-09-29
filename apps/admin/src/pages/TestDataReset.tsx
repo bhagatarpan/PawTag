@@ -82,6 +82,7 @@ export default function TestDataReset() {
   const [expandedDelete, setExpandedDelete] = useState(true);
   const [expandedPreserve, setExpandedPreserve] = useState(false);
   const [showFinalConfirm, setShowFinalConfirm] = useState(false);
+  const [selectedReason, setSelectedReason] = useState('');
 
   const isConfirmEnabled = checkboxChecked && confirmText === 'RESET';
 
@@ -92,6 +93,7 @@ export default function TestDataReset() {
 
   async function executeReset() {
     setShowFinalConfirm(false);
+    setSelectedReason('');
     setLoading(true);
     setStep('confirm');
 
@@ -171,6 +173,7 @@ export default function TestDataReset() {
             setStep('initial');
             setCheckboxChecked(false);
             setConfirmText('');
+            setSelectedReason('');
             setResult(null);
           }}
           className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
@@ -324,7 +327,10 @@ export default function TestDataReset() {
       {/* Final Confirmation Dialog */}
       <ConfirmDialog
         open={showFinalConfirm}
-        onClose={() => setShowFinalConfirm(false)}
+        onClose={() => {
+          setShowFinalConfirm(false);
+          setSelectedReason('');
+        }}
         onConfirm={executeReset}
         title="Permanently Delete All Test Data?"
         message="This action cannot be undone. All customer data will be permanently deleted."
@@ -337,6 +343,8 @@ export default function TestDataReset() {
           'Preparing for demo/presentation',
           'Other',
         ]}
+        selectedReason={selectedReason}
+        onReasonChange={setSelectedReason}
         footnote={
           <div className="text-sm text-gray-500">
             Admin accounts, products, CMS content, and system settings will NOT be affected.
