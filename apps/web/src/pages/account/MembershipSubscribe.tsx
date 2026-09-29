@@ -72,6 +72,7 @@ export default function MembershipSubscribe() {
       if (secret) {
         // Real Stripe payment needed
         setClientSecret(secret);
+        setProcessing(false);
       } else if (isDemoMode) {
         // Demo/fake mode — membership already activated by server
         setSuccess(true);
