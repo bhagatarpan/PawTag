@@ -1,4 +1,4 @@
-import { Setting, CmsEmailTemplate, Invoice, Subscription, User, Order } from '@pawtag/db';
+import { Setting, CmsEmailTemplate, Invoice, Subscription, User, Order, UserMembership, MembershipTier } from '@pawtag/db';
 
 interface InvoiceData {
   invoice: any;
@@ -94,6 +94,15 @@ function buildDefaultInvoiceHtml(data: InvoiceData, company: Record<string, stri
             <td>${item.quantity}</td>
             <td class="amount-col">$${(item.unitPrice * item.quantity).toFixed(2)}</td>
           </tr>`).join('');
+  } else if (membership && membershipTier) {
+    lineItemRows = `
+          <tr>
+            <td>
+              <strong>${escapeHtml(membershipTier.displayName || membershipTier.name)} Membership — Annual</strong>
+            </td>
+            <td>${formatDate(membership.currentPeriodStart)} — ${formatDate(membership.currentPeriodEnd)}</td>
+            <td class="amount-col">${invoice.currency || 'NZD'} $${invoice.amount.toFixed(2)}</td>
+          </tr>`;
   } else if (hasSubscription) {
     lineItemRows = `
           <tr>
@@ -119,6 +128,8 @@ function buildDefaultInvoiceHtml(data: InvoiceData, company: Record<string, stri
   let qtyCol: string;
   if (hasOrderItems) {
     qtyCol = '';
+  } else if (membership && membership.currentPeriodStart && membership.currentPeriodEnd) {
+    qtyCol = `${formatDate(membership.currentPeriodStart)} — ${formatDate(membership.currentPeriodEnd)}`;
   } else if (hasSubscription && invoice.billingPeriod) {
     qtyCol = `${formatDate(getBillingPeriod(invoice).start)} — ${formatDate(getBillingPeriod(invoice).end)}`;
   } else {
@@ -296,6 +307,16 @@ export async function generateInvoiceHtml(invoiceId: string): Promise<string> {
   // Delegate credit notes to the dedicated credit note renderer
   if (invoice.type === 'credit_note') {
     return generateCreditNoteHtml(invoiceId);
+  }
+
+  // Membership lookup — for membership invoices
+  let membership: any = null;
+  let membershipTier: any = null;
+  if ((invoice as any).userMembershipId) {
+    membership = await UserMembership.findById((invoice as any).userMembershipId).lean();
+    if (membership?.tierId) {
+      membershipTier = await MembershipTier.findById(membership.tierId).lean();
+    }
   }
 
   // Subscription lookup is conditional — only for subscription invoices
