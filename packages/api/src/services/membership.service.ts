@@ -376,6 +376,22 @@ export async function subscribeToTier(
       logger.error({ err, userId }, '[Membership] Stripe subscription creation failed');
       throw new Error('Payment processing failed. Please try again.');
     }
+
+    // If clientSecret is still undefined after both extraction attempts, clean up and fail
+    if (!clientSecret && stripeSubscriptionId) {
+      logger.error({ userId, stripeSubscriptionId }, '[Membership] clientSecret unavailable after subscription creation, cleaning up');
+      try {
+        const stripe = getStripeClient();
+        await stripe.subscriptions.cancel(stripeSubscriptionId);
+      } catch {
+        // Best-effort cleanup — log but don't mask the original error
+      }
+      throw new Error('Unable to initialize payment. Please try again.');
+    }
+
+    if (!clientSecret) {
+      throw new Error('Unable to initialize payment. Please try again.');
+    }
   }
 
   // Calculate period end (1 year from now)
