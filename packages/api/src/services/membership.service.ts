@@ -252,10 +252,10 @@ export async function subscribeToTier(
       }, '[Membership] Created Stripe subscription');
     } catch (err) {
       logger.error({ err, userId }, '[Membership] Stripe subscription creation failed');
-      if (process.env.NODE_ENV === 'production') {
-        throw new Error('Payment processing failed. Please try again.');
-      }
-      // In dev/test, continue without Stripe
+      // When Stripe is enabled (test or live), always throw — never silently
+      // continue without payment. The silent fallback created phantom memberships
+      // that appeared active in the UI but had no real Stripe backing.
+      throw new Error('Payment processing failed. Please try again.');
     }
   }
 

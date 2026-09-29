@@ -12,6 +12,7 @@ import {
   checkTagAccess,
 } from '../services/membership.service';
 import { membershipEntitlementService } from '../services/membership-entitlement.service';
+import { isFakeMode } from '../commerce/payment-mode';
 import logger from '../lib/logger';
 
 const router = Router();
@@ -70,6 +71,7 @@ router.post('/subscribe', async (req: AuthRequest, res: Response) => {
       data: {
         membership: result.membership,
         clientSecret: result.clientSecret,
+        isDemoMode: isFakeMode(),
         message: 'Membership subscription created. Complete payment to activate.',
       },
     });
@@ -98,6 +100,17 @@ router.post('/activate', async (req: AuthRequest, res: Response) => {
     });
     if (!membership) {
       res.status(404).json({ success: false, error: 'Membership not found' });
+      return;
+    }
+
+    // In real Stripe mode, require that a Stripe subscription was actually created.
+    // Prevents activating phantom memberships that were created due to Stripe errors
+    // or misconfigurations — only the webhook should activate these.
+    if (!isFakeMode() && !membership.stripeSubscriptionId) {
+      res.status(400).json({
+        success: false,
+        error: 'This membership has no associated payment. Please subscribe again.',
+      });
       return;
     }
 

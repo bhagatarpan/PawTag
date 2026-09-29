@@ -548,6 +548,13 @@ export const API = {
       report: (userId: string) => `/admin/stripe/report/${userId}` as const,
       search: '/admin/stripe/search',
     },
+
+    // ---------------------------------------------------------------------------
+    // Admin — Test Data Reset
+    // ---------------------------------------------------------------------------
+    testData: {
+      reset: '/admin/test-data/reset' as const,
+    },
   },
 
   // ---------------------------------------------------------------------------

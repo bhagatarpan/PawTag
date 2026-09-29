@@ -114,6 +114,7 @@ import promoPublicRoutes from './routes/promo-public';
 import commercePublicRoutes from './routes/commerce-public';
 import pointsEstimateRoutes from './routes/points-estimate';
 import adminEntitlementRoutes from './routes/admin-entitlements';
+import adminTestDataResetRoutes from './routes/admin-test-data-reset';
 
 import { siteAvailabilityMiddleware } from './middleware/site-availability';
 import { shutdownTracing } from './lib/tracing';
@@ -296,6 +297,7 @@ app.use('/api/public/cms', cmsPublicV2Routes);
 app.use('/api/admin/audit', auditRoutes);
 app.use('/api/admin/system-logs', systemLogRoutes);
 app.use('/api/admin/site-availability', siteAvailabilityRoutes);
+app.use('/api/admin/test-data', adminTestDataResetRoutes);
 app.use('/api/admin/webhooks', adminWebhookRoutes);
 app.use('/api/admin/background-jobs', adminBackgroundJobRoutes);
 app.use('/api/public/system', systemStatusRoutes);

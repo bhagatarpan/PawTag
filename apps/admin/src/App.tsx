@@ -56,6 +56,7 @@ import SupportRequests from './pages/SupportRequests';
 import SystemLogs from './pages/SystemLogs';
 import SystemLogSettings from './pages/SystemLogSettings';
 import SiteAvailabilitySettings from './pages/SiteAvailabilitySettings';
+import TestDataReset from './pages/TestDataReset';
 import WebhookSettings from './pages/WebhookSettings';
 import BackgroundJobs from './pages/BackgroundJobs';
 import BackgroundJobDetail from './pages/BackgroundJobDetail';
@@ -241,6 +242,7 @@ export default function App() {
       <Route path="/system-logs" element={<ProtectedRoute><SystemLogs /></ProtectedRoute>} />
       <Route path="/system-log-settings" element={<ProtectedRoute><SystemLogSettings /></ProtectedRoute>} />
       <Route path="/site-availability" element={<ProtectedRoute><SiteAvailabilitySettings /></ProtectedRoute>} />
+      <Route path="/test-data-reset" element={<ProtectedRoute><TestDataReset /></ProtectedRoute>} />
       <Route path="/webhooks" element={<ProtectedRoute><WebhookSettings /></ProtectedRoute>} />
       <Route path="/background-jobs" element={<ProtectedRoute><BackgroundJobs /></ProtectedRoute>} />
       <Route path="/background-jobs/:id" element={<ProtectedRoute><BackgroundJobDetail /></ProtectedRoute>} />

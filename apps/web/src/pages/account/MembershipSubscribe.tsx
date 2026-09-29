@@ -64,7 +64,7 @@ export default function MembershipSubscribe() {
         tierId: tier._id,
       });
 
-      const { clientSecret: secret, membership } = res.data.data;
+      const { clientSecret: secret, membership, isDemoMode } = res.data.data;
 
       // Store membership ID for activation after payment
       setMembershipId(membership._id);
@@ -72,10 +72,14 @@ export default function MembershipSubscribe() {
       if (secret) {
         // Real Stripe payment needed
         setClientSecret(secret);
-      } else {
+      } else if (isDemoMode) {
         // Demo/fake mode — membership already activated by server
         setSuccess(true);
         setTimeout(() => navigate('/account/membership'), 2000);
+      } else {
+        // Stripe is enabled but no client secret returned — payment setup failed
+        setError('Unable to start payment. Please try again or contact support.');
+        setProcessing(false);
       }
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to start subscription');
