@@ -348,56 +348,46 @@ export async function subscribeToTier(
 
       stripeSubscriptionId = stripeSubscription.id;
 
-      logger.info({
-        userId,
-        stripeSubscriptionId,
-        hasLatestInvoice: !!stripeSubscription.latest_invoice,
-        latestInvoiceType: typeof stripeSubscription.latest_invoice,
-        latestInvoiceId: (stripeSubscription.latest_invoice as any)?.id,
-      }, '[Membership] Stripe subscription created, extracting client secret');
-
       // Extract client secret for frontend — primary attempt from expanded response
       const latestInvoice = stripeSubscription.latest_invoice as any;
       if (latestInvoice?.payment_intent?.client_secret) {
         clientSecret = latestInvoice.payment_intent.client_secret;
       }
 
-      // If clientSecret is still null, try retrieving subscription with expansion
+      // If clientSecret is still null, the payment_intent was not auto-created on the invoice.
+      // This happens with some Stripe API versions/accounts. Create a PaymentIntent manually
+      // for the invoice amount so the frontend can collect payment.
       if (!clientSecret && stripeSubscriptionId) {
-        logger.warn({ userId, stripeSubscriptionId }, '[Membership] clientSecret null after creation, attempting subscription retrieval');
-        try {
-          const retrievedSubscription = await stripe.subscriptions.retrieve(stripeSubscriptionId, {
-            expand: ['latest_invoice.payment_intent'],
-          });
-          const retrievedInvoice = retrievedSubscription.latest_invoice as any;
-          logger.info({
-            userId,
-            stripeSubscriptionId,
-            hasRetrievedInvoice: !!retrievedInvoice,
-            retrievedInvoiceId: retrievedInvoice?.id,
-            hasPaymentIntent: !!retrievedInvoice?.payment_intent,
-          }, '[Membership] Subscription retrieval result');
-          if (retrievedInvoice?.payment_intent?.client_secret) {
-            clientSecret = retrievedInvoice.payment_intent.client_secret;
-          }
-        } catch (retrieveErr) {
-          logger.error({ err: retrieveErr, userId, stripeSubscriptionId }, '[Membership] Failed to retrieve subscription');
-        }
-      }
+        logger.warn({ userId, stripeSubscriptionId }, '[Membership] payment_intent not on invoice, creating PaymentIntent manually');
 
-      // Final attempt: retrieve the invoice directly by ID
-      if (!clientSecret && (latestInvoice?.id || (stripeSubscription as any).latest_invoice)) {
-        const invoiceId = latestInvoice?.id || (stripeSubscription as any).latest_invoice;
-        logger.warn({ userId, invoiceId }, '[Membership] clientSecret still null, attempting direct invoice retrieval');
-        try {
-          const retrievedInvoice = await stripe.invoices.retrieve(invoiceId, {
-            expand: ['payment_intent'],
-          });
-          if ((retrievedInvoice as any).payment_intent?.client_secret) {
-            clientSecret = (retrievedInvoice as any).payment_intent.client_secret;
+        // Retrieve the subscription to get the latest invoice amount
+        const sub = await stripe.subscriptions.retrieve(stripeSubscriptionId);
+        const invoiceId = typeof sub.latest_invoice === 'string' ? sub.latest_invoice : (sub.latest_invoice as any)?.id;
+
+        if (invoiceId) {
+          const invoice = await stripe.invoices.retrieve(invoiceId);
+          const amount = invoice.amount_due || invoice.total;
+
+          if (amount > 0) {
+            const paymentIntent = await stripe.paymentIntents.create({
+              amount,
+              currency: invoice.currency || 'nzd',
+              customer: stripeCustomerId,
+              metadata: {
+                userId: userId.toString(),
+                subscriptionId: stripeSubscriptionId,
+                invoiceId,
+                tier: tier.tier,
+              },
+              automatic_payment_methods: { enabled: true },
+            });
+            clientSecret = paymentIntent.client_secret || undefined;
+            logger.info({ userId, paymentIntentId: paymentIntent.id, hasClientSecret: !!clientSecret }, '[Membership] Created PaymentIntent manually');
+          } else {
+            logger.warn({ userId, invoiceId, amount }, '[Membership] Invoice has zero amount, cannot create PaymentIntent');
           }
-        } catch (invoiceErr) {
-          logger.error({ err: invoiceErr, userId, invoiceId }, '[Membership] Failed to retrieve invoice directly');
+        } else {
+          logger.error({ userId, stripeSubscriptionId }, '[Membership] No invoice found on subscription');
         }
       }
 
