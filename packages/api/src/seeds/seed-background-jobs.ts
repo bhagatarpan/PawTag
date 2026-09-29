@@ -246,6 +246,21 @@ const jobs = [
     notifyOnSuccess: false,
     notifyOnFailure: true,
   },
+  {
+    name: 'pending-membership-cleanup',
+    displayName: 'Pending Membership Cleanup',
+    description: 'Cleans up orphaned pending_payment memberships older than 30 minutes, cancels their Stripe subscriptions.',
+    category: 'financial',
+    intervalMs: 30 * 60 * 1000, // 30 minutes
+    lockName: 'pending-membership-cleanup',
+    lockLeaseMs: 120000,
+    processTarget: 'worker',
+    filePath: 'services/membership.service.ts',
+    functionName: 'cleanupOrphanedPendingMemberships',
+    enabled: true,
+    notifyOnSuccess: false,
+    notifyOnFailure: true,
+  },
   // ─── HYBRID 2 Active Period Jobs ──────────────────────────────
   {
     name: 'active-period-check',

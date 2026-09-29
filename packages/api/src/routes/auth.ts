@@ -638,6 +638,8 @@ if (user.status === 'inactive') {
           role: user.role,
           status: user.status,
           rbacRoles,
+          onboardingCompleted: user.onboardingCompleted,
+          onboardingSkipped: user.onboardingSkipped,
         },
       },
     });

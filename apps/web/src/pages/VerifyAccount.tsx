@@ -16,7 +16,7 @@ type VerificationStatus = {
 } | null;
 
 export default function VerifyAccount() {
-  const { user: authUser } = useAuth();
+  const { user: authUser, refreshUser } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const [status, setStatus] = useState<VerificationStatus>(null);
@@ -201,6 +201,9 @@ export default function VerifyAccount() {
         console.warn('Gold subscription creation failed during verification:', err?.response?.data?.error || err.message);
       }
     }
+
+    // Refresh user data to ensure onboarding status is current before navigating
+    await refreshUser();
 
     // Check if there's a return URL (e.g., from checkout)
     const returnUrl = localStorage.getItem('pawtag_return_url');

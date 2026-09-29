@@ -78,7 +78,9 @@ export default function MembershipSubscribe() {
         setTimeout(() => navigate('/account/membership'), 2000);
       } else {
         // Stripe is enabled but no client secret returned — payment setup failed
-        setError('Unable to start payment. Please try again or contact support.');
+        // Show the server error message if available, otherwise show generic message
+        const serverMessage = res.data.data?.message;
+        setError(serverMessage || 'Unable to start payment. Please try again or contact support.');
         setProcessing(false);
       }
     } catch (err: any) {

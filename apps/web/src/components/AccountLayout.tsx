@@ -85,7 +85,8 @@ export default function AccountLayout({ children }: { children: ReactNode }) {
   const companyName = settings?.['company.name'] || 'PawTag';
 
   // Show onboarding wizard for users who haven't completed or dismissed it.
-  const shouldShowWizard = user?.onboardingCompleted === false && user?.onboardingSkipped !== true;
+  // Use !== true instead of === false to handle undefined (e.g. before /me completes).
+  const shouldShowWizard = user?.onboardingCompleted !== true && user?.onboardingSkipped !== true;
   if (shouldShowWizard) {
     return <OnboardingWizard />;
   }

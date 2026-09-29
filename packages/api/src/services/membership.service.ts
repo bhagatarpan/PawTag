@@ -163,6 +163,67 @@ export async function checkTagAccess(tagId: string): Promise<{
   };
 }
 
+// ─── Cleanup Helpers ──────────────────────────────────────
+
+async function cleanupPendingMembership(
+  membership: { _id: any; stripeSubscriptionId?: string },
+  stripe: Stripe,
+): Promise<void> {
+  if (membership.stripeSubscriptionId) {
+    try {
+      await stripe.subscriptions.cancel(membership.stripeSubscriptionId);
+      logger.info({ membershipId: membership._id, stripeSubscriptionId: membership.stripeSubscriptionId }, '[Membership] Cancelled orphaned Stripe subscription');
+    } catch (err: any) {
+      // Subscription may already be cancelled or not found — log but don't fail
+      logger.warn({ err, membershipId: membership._id }, '[Membership] Failed to cancel Stripe subscription (may already be cancelled)');
+    }
+  }
+  await UserMembership.findByIdAndDelete(membership._id);
+  logger.info({ membershipId: membership._id }, '[Membership] Deleted orphaned pending membership');
+}
+
+export async function cleanupOrphanedPendingMemberships(): Promise<{ cleaned: number; errors: number }> {
+  const cutoffTime = new Date(Date.now() - 30 * 60 * 1000); // 30 minutes ago
+  let cleaned = 0;
+  let errors = 0;
+
+  try {
+    const orphanedMemberships = await UserMembership.find({
+      status: 'pending_payment',
+      createdAt: { $lt: cutoffTime },
+    }).lean();
+
+    if (orphanedMemberships.length === 0) {
+      return { cleaned: 0, errors: 0 };
+    }
+
+    logger.info({ count: orphanedMemberships.length }, '[Membership Cleanup] Found orphaned pending memberships');
+
+    const stripe = isFakeMode() ? null : getStripeClient();
+
+    for (const membership of orphanedMemberships) {
+      try {
+        if (stripe && membership.stripeSubscriptionId) {
+          await cleanupPendingMembership(membership, stripe);
+        } else {
+          await UserMembership.findByIdAndDelete(membership._id);
+        }
+        cleaned++;
+      } catch (err) {
+        logger.error({ err, membershipId: membership._id }, '[Membership Cleanup] Failed to clean up membership');
+        errors++;
+      }
+    }
+
+    logger.info({ cleaned, errors }, '[Membership Cleanup] Completed');
+  } catch (err) {
+    logger.error({ err }, '[Membership Cleanup] Failed to query orphaned memberships');
+    errors++;
+  }
+
+  return { cleaned, errors };
+}
+
 // ─── Subscribe to Tier ───────────────────────────────────────
 
 export async function subscribeToTier(
@@ -178,12 +239,60 @@ export async function subscribeToTier(
   if (!tier.isActive) throw new Error('This membership tier is not currently available');
 
   // Check for existing active membership
-  const existingMembership = await UserMembership.findOne({
+  const existingActiveMembership = await UserMembership.findOne({
     userId,
     status: 'active',
   });
-  if (existingMembership) {
+  if (existingActiveMembership) {
     throw new Error('You already have an active membership');
+  }
+
+  // Check for existing pending_payment membership (idempotent retry)
+  const existingPendingMembership = await UserMembership.findOne({
+    userId,
+    status: 'pending_payment',
+  }).lean();
+
+  if (existingPendingMembership && existingPendingMembership.stripeSubscriptionId && !isFakeMode()) {
+    // Try to retrieve the existing Stripe subscription's client secret
+    try {
+      const stripe = getStripeClient();
+      const stripeSubscription = await stripe.subscriptions.retrieve(
+        existingPendingMembership.stripeSubscriptionId,
+        { expand: ['latest_invoice.payment_intent'] },
+      );
+
+      const latestInvoice = stripeSubscription.latest_invoice as any;
+      if (latestInvoice?.payment_intent?.client_secret) {
+        logger.info({
+          userId,
+          membershipId: existingPendingMembership._id,
+          stripeSubscriptionId: stripeSubscription.id,
+        }, '[Membership] Returning existing pending membership with client secret');
+        return { membership: existingPendingMembership, clientSecret: latestInvoice.payment_intent.client_secret };
+      }
+
+      // Stripe subscription exists but no client secret — clean up and retry
+      logger.warn({
+        userId,
+        membershipId: existingPendingMembership._id,
+        stripeSubscriptionId: stripeSubscription.id,
+      }, '[Membership] Existing pending membership has no client secret, cleaning up');
+      await cleanupPendingMembership(existingPendingMembership, stripe);
+    } catch (err) {
+      // Stripe subscription retrieval failed — clean up and retry
+      logger.error({ err, userId, membershipId: existingPendingMembership._id }, '[Membership] Failed to retrieve existing Stripe subscription, cleaning up');
+      try {
+        const stripe = getStripeClient();
+        await cleanupPendingMembership(existingPendingMembership, stripe);
+      } catch {
+        // If cleanup fails, still try to delete the membership record
+        await UserMembership.findByIdAndDelete(existingPendingMembership._id);
+      }
+    }
+  } else if (existingPendingMembership) {
+    // Demo mode or no Stripe subscription — delete stale pending membership
+    await UserMembership.findByIdAndDelete(existingPendingMembership._id);
   }
 
   // Get user
@@ -245,16 +354,26 @@ export async function subscribeToTier(
         clientSecret = latestInvoice.payment_intent.client_secret;
       }
 
+      // If clientSecret is still null, try retrieving the subscription separately
+      if (!clientSecret) {
+        logger.warn({ userId, stripeSubscriptionId }, '[Membership] clientSecret null after creation, attempting retrieval');
+        const retrievedSubscription = await stripe.subscriptions.retrieve(stripeSubscriptionId, {
+          expand: ['latest_invoice.payment_intent'],
+        });
+        const retrievedInvoice = retrievedSubscription.latest_invoice as any;
+        if (retrievedInvoice?.payment_intent?.client_secret) {
+          clientSecret = retrievedInvoice.payment_intent.client_secret;
+        }
+      }
+
       logger.info({
         userId,
         stripeCustomerId,
         stripeSubscriptionId,
+        clientSecretObtained: !!clientSecret,
       }, '[Membership] Created Stripe subscription');
     } catch (err) {
       logger.error({ err, userId }, '[Membership] Stripe subscription creation failed');
-      // When Stripe is enabled (test or live), always throw — never silently
-      // continue without payment. The silent fallback created phantom memberships
-      // that appeared active in the UI but had no real Stripe backing.
       throw new Error('Payment processing failed. Please try again.');
     }
   }
