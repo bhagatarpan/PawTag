@@ -1,4 +1,4 @@
-import { MembershipTier, UserMembership, User, Tag, Invoice } from '@pawtag/db';
+import { MembershipTier, UserMembership, User, Tag, Invoice, InvoiceAccessToken } from '@pawtag/db';
 import mongoose from 'mongoose';
 import { isFakeMode } from '../commerce/payment-mode';
 import Stripe from 'stripe';
@@ -514,6 +514,7 @@ export async function activateMembership(membershipId: string) {
 
       const invoice = await Invoice.create({
         userId: membership.userId,
+        userMembershipId: membership._id,
         invoiceNumber,
         amount: membership.price,
         currency: membership.currency || 'NZD',
@@ -561,6 +562,35 @@ export async function activateMembership(membershipId: string) {
     }
   } catch (err) {
     logger.error({ err, membershipId }, '[Membership] Failed to send welcome email');
+  }
+
+  // Send invoice email with secure viewable URL
+  try {
+    if (invoiceId) {
+      const user = await User.findById(membership.userId).select('email fullName').lean();
+      const invoice = await Invoice.findById(invoiceId).lean();
+      if (user?.email && invoice) {
+        // Generate secure invoice access URL
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const token = require('crypto').randomBytes(32).toString('hex');
+        const expiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000); // 1 year for membership invoices
+        await InvoiceAccessToken.create({
+          invoiceId: invoice._id,
+          userId: membership.userId,
+          token,
+          expiresAt,
+        });
+        const invoiceUrl = `${frontendUrl}/account/invoices/${invoice.invoiceNumber}?token=${token}`;
+
+        const { generateInvoiceHtml } = await import('./invoice-html.service');
+        const { sendInvoiceEmail } = await import('./email.service');
+        const invoiceHtml = await generateInvoiceHtml(invoice._id.toString());
+        await sendInvoiceEmail(user.email, user.fullName, invoice.invoiceNumber, invoiceHtml, invoiceUrl, invoice.amount).catch(() => {});
+        logger.info({ membershipId, invoiceId: invoice._id, invoiceNumber: invoice.invoiceNumber }, '[Membership] Invoice email sent');
+      }
+    }
+  } catch (err) {
+    logger.error({ err, membershipId }, '[Membership] Failed to send invoice email');
   }
 
   // In-app notification

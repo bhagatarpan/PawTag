@@ -270,15 +270,31 @@ export default function MembershipManage() {
                     {new Date(invoice.createdAt).toLocaleDateString('en-NZ', { dateStyle: 'medium' })}
                   </p>
                 </div>
-                <div className="text-right">
-                  <p className="text-sm font-semibold text-gray-900">${invoice.amount.toFixed(2)}</p>
-                  <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
-                    invoice.status === 'paid' ? 'bg-green-100 text-green-700' :
-                    invoice.status === 'pending' ? 'bg-amber-100 text-amber-700' :
-                    'bg-red-100 text-red-700'
-                  }`}>
-                    {invoice.status}
-                  </span>
+                <div className="flex items-center gap-3">
+                  <div className="text-right">
+                    <p className="text-sm font-semibold text-gray-900">${invoice.amount.toFixed(2)}</p>
+                    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
+                      invoice.status === 'paid' ? 'bg-green-100 text-green-700' :
+                      invoice.status === 'pending' ? 'bg-amber-100 text-amber-700' :
+                      'bg-red-100 text-red-700'
+                    }`}>
+                      {invoice.status}
+                    </span>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      try {
+                        const res = await api.post(API.customer.invoices.access(invoice._id));
+                        const { secureUrl } = res.data.data;
+                        if (secureUrl) window.open(secureUrl, '_blank');
+                      } catch {
+                        // silently fail — invoice may not have access token yet
+                      }
+                    }}
+                    className="text-sm text-primary-600 hover:text-primary-700 font-medium whitespace-nowrap"
+                  >
+                    View
+                  </button>
                 </div>
               </div>
             ))}

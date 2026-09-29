@@ -47,6 +47,8 @@ import {
   Referral,
   PaymentTransaction,
   InvoiceAccessToken,
+  UserMembership,
+  MembershipTier,
 } from '@pawtag/db';
 import { stripePaymentProvider } from '../commerce/providers/stripe';
 import { getNumberSetting } from '../commerce/config';
@@ -872,6 +874,7 @@ router.get('/users/:id/subscriptions', requirePermission('user.read'), async (re
     const query: any = { userId: req.params.id };
     if (status) query.status = status;
 
+    // Fetch tag-linked subscriptions
     const total = await Subscription.countDocuments(query);
     const subscriptions = await Subscription.find(query)
       .populate('tagId', 'tagId tagType status petId')
@@ -880,7 +883,14 @@ router.get('/users/:id/subscriptions', requirePermission('user.read'), async (re
       .skip((Number(page) - 1) * Number(limit))
       .limit(Number(limit));
 
-    // Enrich with pet info from tags
+    // Fetch membership-tier subscriptions (Gold, Platinum, Black)
+    const membershipQuery: any = { userId: req.params.id };
+    if (status) membershipQuery.status = status;
+    const memberships = await UserMembership.find(membershipQuery)
+      .populate('tierId', 'name displayName tier price')
+      .sort({ createdAt: -1 });
+
+    // Enrich tag subscriptions with pet info from tags
     const petIds = subscriptions
       .map((s: any) => s.tagId?.petId)
       .filter(Boolean);
@@ -890,18 +900,43 @@ router.get('/users/:id/subscriptions', requirePermission('user.read'), async (re
     const petMap = new Map<string, any>();
     for (const pet of pets) { petMap.set((pet as any)._id.toString(), pet); }
 
-    const enriched = subscriptions.map((s: any) => {
+    const enrichedSubscriptions = subscriptions.map((s: any) => {
       const pet = s.tagId?.petId ? petMap.get(s.tagId.petId.toString()) : null;
       return {
         ...s.toObject(),
+        source: 'subscription',
         petName: pet?.name || null,
         petType: pet?.petType || null,
       };
     });
 
+    const enrichedMemberships = memberships.map((m: any) => ({
+      _id: m._id,
+      userId: m.userId,
+      status: m.status,
+      planName: m.tierId?.displayName || m.tierId?.name || m.tierId?.tier || 'Membership',
+      planType: m.tierId?.tier || 'membership',
+      price: m.price,
+      currency: m.currency,
+      billingCycle: m.billingCycle,
+      currentPeriodStart: m.currentPeriodStart,
+      currentPeriodEnd: m.currentPeriodEnd,
+      startDate: m.startDate,
+      autoRenew: m.autoRenew,
+      stripeSubscriptionId: m.stripeSubscriptionId,
+      createdAt: m.createdAt,
+      source: 'membership',
+    }));
+
+    // Combine and sort by date
+    const allItems = [...enrichedSubscriptions, ...enrichedMemberships]
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice((Number(page) - 1) * Number(limit), Number(page) * Number(limit));
+    const combinedTotal = total + memberships.length;
+
     res.json({
       success: true,
-      data: { items: enriched, total, page: Number(page), limit: Number(limit), totalPages: Math.ceil(total / Number(limit)) },
+      data: { items: allItems, total: combinedTotal, page: Number(page), limit: Number(limit), totalPages: Math.ceil(combinedTotal / Number(limit)) },
     });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch user subscriptions' });

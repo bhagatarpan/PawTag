@@ -5,6 +5,7 @@ export interface IInvoiceDocument extends Document {
   relatedInvoiceId?: mongoose.Types.ObjectId;
   subscriptionId?: mongoose.Types.ObjectId;
   orderId?: mongoose.Types.ObjectId;
+  userMembershipId?: mongoose.Types.ObjectId;
   userId: mongoose.Types.ObjectId;
   invoiceNumber: string;
 
@@ -15,6 +16,7 @@ export interface IInvoiceDocument extends Document {
 
   stripeInvoiceId?: string;
   stripePaymentIntentId?: string;
+  stripeSubscriptionId?: string;
   paymentMethod?: string;
 
   billingPeriod?: {
@@ -39,6 +41,7 @@ const InvoiceSchema = new Schema<IInvoiceDocument>(
     relatedInvoiceId: { type: Schema.Types.ObjectId, ref: 'Invoice' },
     subscriptionId: { type: Schema.Types.ObjectId, ref: 'Subscription', index: true },
     orderId: { type: Schema.Types.ObjectId, ref: 'Order', index: true },
+    userMembershipId: { type: Schema.Types.ObjectId, ref: 'UserMembership', index: true },
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     invoiceNumber: { type: String, required: true, unique: true },
 
@@ -54,6 +57,7 @@ const InvoiceSchema = new Schema<IInvoiceDocument>(
 
     stripeInvoiceId: { type: String },
     stripePaymentIntentId: { type: String },
+    stripeSubscriptionId: { type: String, index: true },
     paymentMethod: { type: String },
 
     billingPeriod: {
@@ -76,6 +80,8 @@ InvoiceSchema.index({ invoiceNumber: 1 }, { unique: true });
 InvoiceSchema.index({ orderId: 1, createdAt: -1 });
 InvoiceSchema.index({ subscriptionId: 1, createdAt: -1 });
 InvoiceSchema.index({ userId: 1, subscriptionId: 1, createdAt: -1 });
+InvoiceSchema.index({ userMembershipId: 1, createdAt: -1 });
+InvoiceSchema.index({ userId: 1, stripeSubscriptionId: 1, createdAt: -1 });
 InvoiceSchema.index({ relatedInvoiceId: 1 });
 
 // Idempotency: prevent duplicate invoices for the same Stripe Invoice ID
