@@ -270,7 +270,7 @@ const sections: SidebarSection[] = [
       { to: '/settings', label: 'General Settings', icon: Settings, permission: 'setting.read' },
       { to: '/site-availability', label: 'Site Availability', icon: Wifi, permission: 'setting.read' },
       { to: '/address-autocomplete', label: 'Address Autocomplete', icon: MapPin, permission: 'setting.read' },
-      { to: '/test-data-reset', label: 'Reset Test Data', icon: Database, permission: 'setting.update' },
+      { to: '/test-data-reset', label: 'Reset Test Data', icon: Database, permission: 'system.reset_test_data' },
     ],
   },
   // ─── Security & Access ────────────────────────────────────

@@ -144,6 +144,9 @@ async function seed() {
       { name: 'feature_flag.update', displayName: 'Update Feature Flags', description: 'Update feature flags', resource: 'feature_flag', action: 'update', groupIndex: groupDefs.findIndex(g => g.name === 'SYSTEM_CONFIGURATION') },
       { name: 'feature_flag.delete', displayName: 'Delete Feature Flags', description: 'Delete feature flags', resource: 'feature_flag', action: 'delete', groupIndex: groupDefs.findIndex(g => g.name === 'SYSTEM_CONFIGURATION') },
 
+      // System Operations
+      { name: 'system.reset_test_data', displayName: 'Reset Test Data', description: 'Permanently delete all test data including customer accounts, orders, and transactions', resource: 'system', action: 'reset_data', groupIndex: groupDefs.findIndex(g => g.name === 'SYSTEM_CONFIGURATION') },
+
       // Finder Scans
       { name: 'finder_scan.read', displayName: 'Read Finder Scans', description: 'View finder scan events', resource: 'finder_scan', action: 'read', groupIndex: groupDefs.findIndex(g => g.name === 'AUDIT_SECURITY') },
 
@@ -545,6 +548,8 @@ async function seed() {
         { permissionName: 'setting.read' },
         { permissionName: 'setting.create' },
         { permissionName: 'setting.update' },
+        // System Operations
+        { permissionName: 'system.reset_test_data' },
         // Feature Flags
         { permissionName: 'feature_flag.read' },
         { permissionName: 'feature_flag.create' },

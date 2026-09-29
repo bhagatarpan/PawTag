@@ -63,7 +63,7 @@ const RESETTABLE_MODELS = [
 ];
 
 // ─── POST /api/admin/test-data/reset ─────────────────────────────
-router.post('/reset', requirePermission('setting.update'), async (req: AuthRequest, res: Response) => {
+router.post('/reset', requirePermission('system.reset_test_data'), async (req: AuthRequest, res: Response) => {
   try {
     const { confirmText } = req.body;
 

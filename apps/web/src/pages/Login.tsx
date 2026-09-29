@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { PawPrint, Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -35,6 +35,14 @@ export default function Login() {
 
   const adminRoles = ['SUPER_ADMIN', 'ADMIN', 'CUSTOMER_SERVICE', 'WEBSITE_EDITOR'];
   const RETURN_URL_KEY = 'pawtag_return_url';
+
+  // Check for session expired flag (set by onAuthFailure when refresh token is invalid)
+  useEffect(() => {
+    if (localStorage.getItem('pawtag_session_expired')) {
+      localStorage.removeItem('pawtag_session_expired');
+      setError('Your session has expired. Please sign in again.');
+    }
+  }, []);
 
   const fetchCaptcha = async () => {
     try {
