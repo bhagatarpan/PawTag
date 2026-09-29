@@ -6,6 +6,7 @@ import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
 import Users from './pages/Users';
+import UserDetailPage from './pages/UserDetailPage';
 import Pets from './pages/Pets';
 import Tags from './pages/Tags';
 import Products from './pages/Products';
@@ -107,6 +108,14 @@ export default function App() {
         element={
           <ProtectedRoute>
             <Dashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/users/customers/:id"
+        element={
+          <ProtectedRoute>
+            <UserDetailPage />
           </ProtectedRoute>
         }
       />

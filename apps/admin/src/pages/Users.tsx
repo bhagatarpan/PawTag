@@ -1895,7 +1895,7 @@ export default function Users({ defaultRoleFilter }: UsersProps) {
                 </tr>
               ) : (
                 data?.items.map((user) => (
-                  <tr key={user._id} className="hover:bg-gray-50 cursor-pointer transition-colors" onClick={() => setSelectedUser(user)}>
+                   <tr key={user._id} className="hover:bg-gray-50 cursor-pointer transition-colors" onClick={() => navigate(`/users/customers/${user._id}`)}>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center shrink-0">
@@ -1942,7 +1942,7 @@ export default function Users({ defaultRoleFilter }: UsersProps) {
                     </td>
                     <td className="px-4 py-3 text-gray-500 hidden xl:table-cell">{formatDate(user.createdAt)}</td>
                     <td className="px-4 py-3 text-right">
-                      <button onClick={(e) => { e.stopPropagation(); setSelectedUser(user); }} className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600">
+                      <button onClick={(e) => { e.stopPropagation(); navigate(`/users/customers/${user._id}`); }} className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600">
                         <ChevronRight size={16} />
                       </button>
                     </td>
