@@ -246,6 +246,9 @@ export function DetailDrawer({
   const [userSubscriptions, setUserSubscriptions] = useState<any[]>([]);
   const [userSubscriptionsTotal, setUserSubscriptionsTotal] = useState(0);
   const [userSubscriptionsLoading, setUserSubscriptionsLoading] = useState(false);
+  const [userInvoices, setUserInvoices] = useState<any[]>([]);
+  const [userInvoicesTotal, setUserInvoicesTotal] = useState(0);
+  const [userInvoicesLoading, setUserInvoicesLoading] = useState(false);
   const [selectedAdminOrder, setSelectedAdminOrder] = useState<Order | null>(null);
   const [userReferrals, setUserReferrals] = useState<any>(null);
   const [userReferralsLoading, setUserReferralsLoading] = useState(false);
@@ -326,6 +329,16 @@ export function DetailDrawer({
     } catch { /* non-critical */ } finally { setUserSubscriptionsLoading(false); }
   }, [user]);
 
+  const fetchUserInvoices = useCallback(async () => {
+    if (!user) return;
+    setUserInvoicesLoading(true);
+    try {
+      const res = await api.get(`/admin/users/${user._id}/invoices`, { params: { limit: 50 } });
+      setUserInvoices(res.data.data?.items || []);
+      setUserInvoicesTotal(res.data.data?.total || 0);
+    } catch { /* non-critical */ } finally { setUserInvoicesLoading(false); }
+  }, [user]);
+
   const fetchUserReferrals = useCallback(async () => {
     if (!user) return;
     setUserReferralsLoading(true);
@@ -369,8 +382,9 @@ export function DetailDrawer({
   useEffect(() => {
     if (activeTab === 'orders') fetchUserOrders();
     if (activeTab === 'subscriptions') fetchUserSubscriptions();
+    if (activeTab === 'invoices') fetchUserInvoices();
     if (activeTab === 'referrals') fetchUserReferrals();
-  }, [activeTab, fetchUserOrders, fetchUserSubscriptions, fetchUserReferrals]);
+  }, [activeTab, fetchUserOrders, fetchUserSubscriptions, fetchUserInvoices, fetchUserReferrals]);
 
   if (!user) return null;
 
@@ -519,6 +533,7 @@ export function DetailDrawer({
     { key: 'rbac' as const, label: `Roles (${user.rbacRoles?.length || 0})` },
     { key: 'orders' as const, label: `Orders (${userOrdersTotal})` },
     { key: 'subscriptions' as const, label: `Subscriptions (${userSubscriptionsTotal})` },
+    { key: 'invoices' as const, label: `Invoices (${userInvoicesTotal})` },
     { key: 'referrals' as const, label: 'Referrals' },
     { key: 'settings' as const, label: 'Settings' },
   ];
@@ -1058,6 +1073,65 @@ export function DetailDrawer({
                     </div>
                   );
                 })
+              )}
+            </div>
+          )}
+
+          {activeTab === 'invoices' && (
+            <div className="space-y-3">
+              {userInvoicesLoading ? (
+                <div className="flex items-center gap-3 text-gray-400 py-12 justify-center">
+                  <Loader2 size={18} className="animate-spin" />
+                  <span className="text-sm">Loading invoices...</span>
+                </div>
+              ) : userInvoices.length === 0 ? (
+                <div className="text-center py-12 bg-white rounded-xl border border-gray-100">
+                  <FileText size={32} className="mx-auto mb-2 text-gray-300" />
+                  <p className="text-gray-500 font-medium">No invoices yet</p>
+                  <p className="text-sm text-gray-400 mt-1">Invoices appear after membership or order purchases.</p>
+                </div>
+              ) : (
+                userInvoices.map((inv: any) => (
+                  <div key={inv._id} className="bg-white rounded-xl border border-gray-100 p-4 hover:border-gray-200 hover:shadow-sm transition-all duration-200">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-primary-50 flex items-center justify-center">
+                          <FileText size={16} className="text-primary-600" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-bold text-gray-900 text-sm">{inv.invoiceNumber}</span>
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${
+                              inv.status === 'paid' ? 'bg-green-50 text-green-700' :
+                              inv.status === 'pending' ? 'bg-amber-50 text-amber-700' :
+                              'bg-red-50 text-red-700'
+                            }`}>
+                              {inv.status}
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-400 mt-0.5">{formatDate(inv.createdAt)}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <span className="text-sm font-semibold text-gray-900">${inv.amount?.toFixed(2)}</span>
+                        <button
+                          onClick={async () => {
+                            try {
+                              const res = await api.get(`/admin/invoices/${inv._id}/view`);
+                              const { secureUrl } = res.data.data;
+                              if (secureUrl) window.open(secureUrl, '_blank');
+                            } catch {
+                              toast.error('Failed to open invoice');
+                            }
+                          }}
+                          className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                        >
+                          View
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))
               )}
             </div>
           )}

@@ -943,6 +943,31 @@ router.get('/users/:id/subscriptions', requirePermission('user.read'), async (re
   }
 });
 
+// GET /api/admin/users/:id/invoices — fetch invoices for a specific user
+router.get('/users/:id/invoices', requirePermission('user.read'), async (req, res: Response) => {
+  try {
+    const user = await User.findOne({ _id: req.params.id, deletedAt: null }).select('_id');
+    if (!user) { res.status(404).json({ success: false, error: 'User not found' }); return; }
+
+    const { page = 1, limit = 20, status } = req.query;
+    const query: any = { userId: req.params.id };
+    if (status) query.status = status;
+
+    const total = await Invoice.countDocuments(query);
+    const invoices = await Invoice.find(query)
+      .sort({ createdAt: -1 })
+      .skip((Number(page) - 1) * Number(limit))
+      .limit(Number(limit));
+
+    res.json({
+      success: true,
+      data: { items: invoices, total, page: Number(page), limit: Number(limit), totalPages: Math.ceil(total / Number(limit)) },
+    });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to fetch user invoices' });
+  }
+});
+
 // GET /api/admin/users/:id/referrals — fetch referral info for a specific user
 router.get('/users/:id/referrals', requirePermission('user.read'), async (req: AuthRequest, res: Response) => {
   try {

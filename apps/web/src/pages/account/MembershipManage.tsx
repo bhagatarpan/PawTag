@@ -261,26 +261,23 @@ export default function MembershipManage() {
       {invoices.length > 0 && (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
           <h2 className="text-sm font-semibold text-gray-900 mb-4">Billing History</h2>
-          <div className="space-y-3">
+          <div className="divide-y divide-gray-100">
             {invoices.map((invoice: any) => (
-              <div key={invoice._id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                <div>
-                  <p className="text-sm font-medium text-gray-900">{invoice.invoiceNumber}</p>
-                  <p className="text-xs text-gray-500">
-                    {new Date(invoice.createdAt).toLocaleDateString('en-NZ', { dateStyle: 'medium' })}
-                  </p>
-                </div>
+              <div key={invoice._id} className="flex items-center justify-between py-4 first:pt-0 last:pb-0">
                 <div className="flex items-center gap-3">
-                  <div className="text-right">
-                    <p className="text-sm font-semibold text-gray-900">${invoice.amount.toFixed(2)}</p>
-                    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
-                      invoice.status === 'paid' ? 'bg-green-100 text-green-700' :
-                      invoice.status === 'pending' ? 'bg-amber-100 text-amber-700' :
-                      'bg-red-100 text-red-700'
-                    }`}>
-                      {invoice.status}
-                    </span>
+                  <div className="w-10 h-10 rounded-xl bg-primary-50 flex items-center justify-center shrink-0">
+                    <CreditCard size={18} className="text-primary-600" />
                   </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">{invoice.invoiceNumber}</p>
+                    <p className="text-xs text-gray-500">
+                      {new Date(invoice.createdAt).toLocaleDateString('en-NZ', { dateStyle: 'medium' })} &middot;{' '}
+                      <span className="text-green-600 font-medium">{invoice.status}</span>
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4">
+                  <p className="text-sm font-semibold text-gray-900">${invoice.amount.toFixed(2)}</p>
                   <button
                     onClick={async () => {
                       try {
@@ -291,7 +288,7 @@ export default function MembershipManage() {
                         // silently fail — invoice may not have access token yet
                       }
                     }}
-                    className="text-sm text-primary-600 hover:text-primary-700 font-medium whitespace-nowrap"
+                    className="text-sm text-primary-600 hover:text-primary-700 font-medium"
                   >
                     View
                   </button>
