@@ -1499,6 +1499,7 @@ interface UsersProps {
 }
 
 export default function Users({ defaultRoleFilter }: UsersProps) {
+  const navigate = useNavigate();
   // Data state
   const [data, setData] = useState<PaginatedData<UserRecord> | null>(null);
   const [loading, setLoading] = useState(true);
