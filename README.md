@@ -1214,6 +1214,27 @@ Sensitive operations should provide appropriate confirmation and audit context, 
 
 Avoid spending first-MVP effort making every admin table perfect on narrow mobile screens unless staff genuinely need that workflow in the field.
 
+## User Detail View
+
+Admin users have two ways to view and manage customer details:
+
+- **Quick View (Drawer):** Click a table row to open a slide-in drawer with all edit capabilities. Best for quick edits without leaving the list.
+- **Full-Page View:** Click the external link icon (↗) to navigate to `/users/customers/:id` — a full-width detail page with all edit capabilities. Best for comprehensive user management.
+
+Both views share the same `UserDetailContent` component, ensuring identical functionality:
+
+| Tab | Capabilities |
+|-----|-------------|
+| Profile | Edit name, email, phone, score, emergency contact, addresses |
+| RBAC | Assign/remove roles |
+| Orders | View order history |
+| Subscriptions | View and renew subscriptions |
+| Invoices | View and open invoices |
+| Referrals | View referral code and stats |
+| Settings | MFA, OTP skip, status, finder privacy, notifications, password reset, lock/unlock, soft-delete |
+
+All admin actions are audit-logged via the existing `auditService`.
+
 ---
 
 # Background Jobs

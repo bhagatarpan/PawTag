@@ -47,6 +47,7 @@ import {
   Phone,
   Bell,
   Eye,
+  ExternalLink,
   XCircle,
   EyeOff,
   Package,
@@ -218,16 +219,18 @@ function SkeletonRow() {
 /*  Detail Drawer                                                      */
 /* ------------------------------------------------------------------ */
 
-export function DetailDrawer({
+export function UserDetailContent({
   user,
   onClose,
   onRefresh,
   rbacRoles,
+  fullWidth = false,
 }: {
   user: UserRecord | null;
-  onClose: () => void;
+  onClose?: () => void;
   onRefresh: () => void;
   rbacRoles: any[];
+  fullWidth?: boolean;
 }) {
   const [activeTab, setActiveTab] = useState<'profile' | 'rbac' | 'orders' | 'subscriptions' | 'referrals' | 'settings'>('profile');
   const [editMode, setEditMode] = useState(false);
@@ -260,12 +263,18 @@ export function DetailDrawer({
 
   useEffect(() => {
     if (!user) return;
-    const handleEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    document.addEventListener('keydown', handleEsc);
-    api.get(API.public.cms.onboarding).then((r) => {
-      setRelationshipOptions(r.data.data?.globalSettings?.relationshipOptions || ['Spouse', 'Partner', 'Parent', 'Sibling', 'Child', 'Uncle', 'Aunt', 'Cousin', 'Friend', 'Neighbour', 'Work Colleague', 'Other']);
-    }).catch(() => {});
-    return () => document.removeEventListener('keydown', handleEsc);
+    if (onClose) {
+      const handleEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+      document.addEventListener('keydown', handleEsc);
+      api.get(API.public.cms.onboarding).then((r) => {
+        setRelationshipOptions(r.data.data?.globalSettings?.relationshipOptions || ['Spouse', 'Partner', 'Parent', 'Sibling', 'Child', 'Uncle', 'Aunt', 'Cousin', 'Friend', 'Neighbour', 'Work Colleague', 'Other']);
+      }).catch(() => {});
+      return () => document.removeEventListener('keydown', handleEsc);
+    } else {
+      api.get(API.public.cms.onboarding).then((r) => {
+        setRelationshipOptions(r.data.data?.globalSettings?.relationshipOptions || ['Spouse', 'Partner', 'Parent', 'Sibling', 'Child', 'Uncle', 'Aunt', 'Cousin', 'Friend', 'Neighbour', 'Work Colleague', 'Other']);
+      }).catch(() => {});
+    }
   }, [user, onClose]);
 
   useEffect(() => {
@@ -466,7 +475,7 @@ export function DetailDrawer({
     try {
       await api.delete(API.admin.users.delete(user._id));
       toast.success('User soft-deleted');
-      onClose();
+      onClose?.();
       onRefresh();
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Failed to delete');
@@ -538,35 +547,37 @@ export function DetailDrawer({
     { key: 'settings' as const, label: 'Settings' },
   ];
 
-  return (
-    <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true" aria-label={`User details: ${user.fullName}`}>
-      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
-      <div ref={drawerRef} className="relative w-full max-w-2xl bg-white shadow-2xl overflow-hidden flex flex-col animate-in slide-in-from-right duration-200">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center shrink-0">
-              <User size={20} className="text-primary-600" />
-            </div>
-            <div className="min-w-0">
-              <h2 className="text-lg font-semibold text-gray-900 truncate">{user.fullName}</h2>
-              <p className="text-sm text-gray-500 truncate">{user.email}</p>
-            </div>
-            {(() => {
-              const badge = getStatusBadge(user.status);
-              return (
-                <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${badge.className}`}>
-                  {badge.icon} {formatStatusLabel(user.status)}
-                </span>
-              );
-            })()}
-            {user.lockedUntil && new Date(user.lockedUntil) > new Date() && (
-              <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-red-100 text-red-700">
-                <Lock size={12} /> Locked
-              </span>
-            )}
+  const content = (
+    <div className="flex flex-col h-full">
+      {/* Header */}
+      <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center shrink-0">
+            <User size={20} className="text-primary-600" />
           </div>
+          <div className="min-w-0">
+            <h2 className="text-lg font-semibold text-gray-900 truncate">{user.fullName}</h2>
+            <p className="text-sm text-gray-500 truncate">{user.email}</p>
+          </div>
+          {(() => {
+            const badge = getStatusBadge(user.status);
+            return (
+              <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${badge.className}`}>
+                {badge.icon} {formatStatusLabel(user.status)}
+              </span>
+            );
+          })()}
+          {user.lockedUntil && new Date(user.lockedUntil) > new Date() && (
+            <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-red-100 text-red-700">
+              <Lock size={12} /> Locked
+            </span>
+          )}
+        </div>
+        {onClose && (
           <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-lg transition-colors" aria-label="Close">
+            <X size={18} />
+          </button>
+        )}
             <X size={18} />
           </button>
         </div>
@@ -1463,6 +1474,33 @@ export function DetailDrawer({
       <OrderDetailDrawer order={selectedAdminOrder} onClose={() => setSelectedAdminOrder(null)} onRefresh={() => { fetchUserOrders(); onRefresh(); }} onCancel={() => {}} onRefund={() => {}} cancellationReasons={[]} />
     </div>
   );
+
+  if (fullWidth) {
+    return content;
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true" aria-label={`User details: ${user.fullName}`}>
+      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
+      <div ref={drawerRef} className="relative w-full max-w-2xl bg-white shadow-2xl overflow-hidden flex flex-col animate-in slide-in-from-right duration-200">
+        {content}
+      </div>
+    </div>
+  );
+}
+
+export function DetailDrawer({
+  user,
+  onClose,
+  onRefresh,
+  rbacRoles,
+}: {
+  user: UserRecord | null;
+  onClose: () => void;
+  onRefresh: () => void;
+  rbacRoles: any[];
+}) {
+  return <UserDetailContent user={user} onClose={onClose} onRefresh={onRefresh} rbacRoles={rbacRoles} />;
 }
 
 /* ------------------------------------------------------------------ */
@@ -1896,7 +1934,7 @@ export default function Users({ defaultRoleFilter }: UsersProps) {
                 </tr>
               ) : (
                 data?.items.map((user) => (
-                   <tr key={user._id} className="hover:bg-gray-50 cursor-pointer transition-colors" onClick={() => navigate(`/users/customers/${user._id}`)}>
+                   <tr key={user._id} className="hover:bg-gray-50 cursor-pointer transition-colors" onClick={() => setSelectedUser(user)}>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center shrink-0">
@@ -1943,9 +1981,14 @@ export default function Users({ defaultRoleFilter }: UsersProps) {
                     </td>
                     <td className="px-4 py-3 text-gray-500 hidden xl:table-cell">{formatDate(user.createdAt)}</td>
                     <td className="px-4 py-3 text-right">
-                      <button onClick={(e) => { e.stopPropagation(); navigate(`/users/customers/${user._id}`); }} className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600">
-                        <ChevronRight size={16} />
-                      </button>
+                      <div className="flex items-center justify-end gap-1">
+                        <button onClick={(e) => { e.stopPropagation(); navigate(`/users/customers/${user._id}`); }} className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-primary-600" title="Open full page">
+                          <ExternalLink size={15} />
+                        </button>
+                        <button onClick={(e) => { e.stopPropagation(); setSelectedUser(user); }} className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600" title="Quick view">
+                          <ChevronRight size={16} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
