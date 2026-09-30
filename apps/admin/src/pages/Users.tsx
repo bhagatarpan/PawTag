@@ -1468,9 +1468,8 @@ export function UserDetailContent({
             </div>
           )}
         </div>
+        <OrderDetailDrawer order={selectedAdminOrder} onClose={() => setSelectedAdminOrder(null)} onRefresh={() => { fetchUserOrders(); onRefresh(); }} onCancel={() => {}} onRefund={() => {}} cancellationReasons={[]} />
       </div>
-      <OrderDetailDrawer order={selectedAdminOrder} onClose={() => setSelectedAdminOrder(null)} onRefresh={() => { fetchUserOrders(); onRefresh(); }} onCancel={() => {}} onRefund={() => {}} cancellationReasons={[]} />
-    </div>
   );
 
   if (fullWidth) {
