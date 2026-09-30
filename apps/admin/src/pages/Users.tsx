@@ -578,9 +578,7 @@ export function UserDetailContent({
             <X size={18} />
           </button>
         )}
-            <X size={18} />
-          </button>
-        </div>
+      </div>
 
         {/* Tabs */}
         <div className="flex border-b border-gray-200 bg-gray-50">
