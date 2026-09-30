@@ -61,7 +61,7 @@ function cardBrandIcon(brand: string): string {
   return `<svg viewBox="0 0 48 32" width="28" height="18" style="display:inline-block;vertical-align:middle;margin:0 4px 0 0;"><rect width="48" height="32" rx="4" fill="#6B7280"/><rect x="4" y="8" width="40" height="4" rx="1" fill="#fff" opacity="0.5"/><rect x="4" y="18" width="16" height="3" rx="1" fill="#fff" opacity="0.4"/></svg>`;
 }
 
-function buildDefaultInvoiceHtml(data: InvoiceData, company: Record<string, string>, order?: any): string {
+function buildDefaultInvoiceHtml(data: InvoiceData, company: Record<string, string>, order?: any, membership?: any, membershipTier?: any): string {
   const { invoice, subscription, user } = data;
   const companyName = company['company.name'] || 'PawTag Ltd';
   const companyAddress = company['company.address'] || '';
@@ -403,7 +403,7 @@ export async function generateInvoiceHtml(invoiceId: string): Promise<string> {
     return body;
   }
 
-  return buildDefaultInvoiceHtml(data, company, order);
+  return buildDefaultInvoiceHtml(data, company, order, membership, membershipTier);
 }
 
 export async function generateCreditNoteHtml(creditNoteId: string): Promise<string> {
