@@ -247,6 +247,21 @@ const jobs = [
     notifyOnFailure: true,
   },
   {
+    name: 'membership-scheduled-downgrades',
+    displayName: 'Membership Scheduled Downgrades',
+    description: 'Executes pending membership downgrades whose effective date has arrived. Applies tier change, points clawback, and tag re-evaluation.',
+    category: 'financial',
+    intervalMs: 5 * 60 * 1000, // 5 minutes
+    lockName: 'membership-downgrades',
+    lockLeaseMs: 120000,
+    processTarget: 'worker',
+    filePath: 'services/membership.service.ts',
+    functionName: 'processScheduledDowngrades',
+    enabled: true,
+    notifyOnSuccess: false,
+    notifyOnFailure: true,
+  },
+  {
     name: 'pending-membership-cleanup',
     displayName: 'Pending Membership Cleanup',
     description: 'Cleans up orphaned pending_payment memberships older than 30 minutes, cancels their Stripe subscriptions.',

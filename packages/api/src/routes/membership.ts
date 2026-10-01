@@ -10,6 +10,8 @@ import {
   cancelMembership,
   changeTier,
   estimateTierChange,
+  requestDowngrade,
+  cancelPendingDowngrade,
   checkTagAccess,
 } from '../services/membership.service';
 import { membershipEntitlementService } from '../services/membership-entitlement.service';
@@ -182,6 +184,58 @@ router.post('/change-tier', async (req: AuthRequest, res: Response) => {
   } catch (error: any) {
     logger.error({ err: error, userId: req.user?.id }, '[Membership] Change tier error');
     res.status(400).json({ success: false, error: error.message || 'Failed to change tier' });
+  }
+});
+
+/**
+ * POST /api/membership/downgrade
+ * Request a deferred downgrade (effective at end of current subscription cycle)
+ */
+router.post('/downgrade', async (req: AuthRequest, res: Response) => {
+  try {
+    const { tierId, reason, termsAccepted, termsVersion } = req.body;
+
+    if (!tierId) {
+      res.status(400).json({ success: false, error: 'tierId is required' });
+      return;
+    }
+    if (!termsAccepted) {
+      res.status(400).json({ success: false, error: 'You must accept the downgrade terms to proceed' });
+      return;
+    }
+
+    const membership = await requestDowngrade(req.user!.id, {
+      tierId,
+      reason,
+      termsAccepted: Boolean(termsAccepted),
+      termsVersion: termsVersion || 'v1',
+    });
+
+    res.json({
+      success: true,
+      data: {
+        membership,
+        pendingTierEffectiveAt: membership.pendingTierEffectiveAt,
+        message: `Downgrade scheduled for ${membership.pendingTierEffectiveAt?.toLocaleDateString('en-NZ', { dateStyle: 'medium' }) || 'renewal'}`,
+      },
+    });
+  } catch (error: any) {
+    logger.error({ err: error, userId: req.user?.id }, '[Membership] Downgrade request error');
+    res.status(400).json({ success: false, error: error.message || 'Failed to request downgrade' });
+  }
+});
+
+/**
+ * POST /api/membership/downgrade/cancel
+ * Cancel a pending downgrade
+ */
+router.post('/downgrade/cancel', async (req: AuthRequest, res: Response) => {
+  try {
+    const membership = await cancelPendingDowngrade(req.user!.id);
+    res.json({ success: true, data: { membership } });
+  } catch (error: any) {
+    logger.error({ err: error, userId: req.user?.id }, '[Membership] Cancel downgrade error');
+    res.status(400).json({ success: false, error: error.message || 'Failed to cancel downgrade' });
   }
 });
 

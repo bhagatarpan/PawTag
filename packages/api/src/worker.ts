@@ -59,7 +59,7 @@ import { runPaymentReconciliationJob } from './jobs/paymentReconciliation';
 import { runRefundReconciliationJob } from './jobs/refundReconciliation';
 import { runPrivacyRetentionJob } from './jobs/privacyRetention';
 import { runAuditRetentionJob } from './jobs/auditRetention';
-import { checkExpiredMemberships, sendRenewalReminders } from './services/membership.service';
+import { checkExpiredMemberships, sendRenewalReminders, processScheduledDowngrades } from './services/membership.service';
 import { checkActivePeriodExpirations } from './services/active-period-check.service';
 import { runMembershipActivationReconciliation } from './jobs/membershipActivationReconciliation';
 import type { JobResult } from './services/job-scheduler.service';
@@ -73,6 +73,11 @@ async function runMembershipExpiryCheck(): Promise<JobResult> {
 async function runMembershipRenewalReminders(): Promise<JobResult> {
   await sendRenewalReminders();
   return { success: true };
+}
+
+async function runMembershipScheduledDowngrades(): Promise<JobResult> {
+  const result = await processScheduledDowngrades();
+  return { success: true, itemsProcessed: result.processed };
 }
 
 async function runActivePeriodCheck(): Promise<JobResult> {
@@ -108,6 +113,7 @@ async function startWorker(): Promise<void> {
     registerJobFunction('runAuditRetentionJob', runAuditRetentionJob);
     registerJobFunction('checkExpiredMemberships', runMembershipExpiryCheck);
     registerJobFunction('sendRenewalReminders', runMembershipRenewalReminders);
+    registerJobFunction('processScheduledDowngrades', runMembershipScheduledDowngrades);
     registerJobFunction('checkActivePeriodExpirations', runActivePeriodCheck);
     registerJobFunction('membershipActivationReconciliation', runMembershipActivationReconciliation);
     logger.info('[Worker] All job functions registered');

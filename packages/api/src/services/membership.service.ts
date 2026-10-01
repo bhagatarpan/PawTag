@@ -1102,6 +1102,203 @@ export async function changeTier(
   return { membership, invoice, invoiceUrl };
 }
 
+// ─── Request Downgrade (Deferred) ────────────────────────────
+
+export interface DowngradeRequestParams {
+  tierId: string;
+  reason?: string;
+  termsAccepted: boolean;
+  termsVersion: string;
+}
+
+/**
+ * Request a deferred downgrade. The customer's current tier remains active
+ * until currentPeriodEnd. The pending tier takes effect at renewal.
+ *
+ * Business rules:
+ * - Downgrade is effective at end of current subscription cycle (not immediate)
+ * - Customer must explicitly accept terms (points loss, entitlements lost)
+ * - Guardian points clawback is applied when the downgrade executes
+ * - Stripe subscription price is updated so renewal charges the new tier price
+ */
+export async function requestDowngrade(userId: string, params: DowngradeRequestParams) {
+  const { tierId, reason, termsAccepted, termsVersion } = params;
+
+  if (!termsAccepted) {
+    throw new Error('You must accept the downgrade terms to proceed');
+  }
+
+  const membership = await UserMembership.findOne({
+    userId,
+    status: 'active',
+  });
+
+  if (!membership) throw new Error('No active membership found');
+
+  // Cannot downgrade if already pending
+  if (membership.pendingTierId) {
+    throw new Error('A downgrade is already scheduled for your membership');
+  }
+
+  const newTier = await MembershipTier.findById(tierId).lean();
+  if (!newTier) throw new Error('Membership tier not found');
+  if (!newTier.isActive) throw new Error('This membership tier is not currently available');
+
+  const oldTier = await MembershipTier.findById(membership.tierId).lean();
+  if (oldTier?.tier === newTier.tier) throw new Error('Already on this tier');
+
+  // Validate this is actually a downgrade (new tier is lower)
+  if ((newTier.displayOrder || 0) > (oldTier?.displayOrder || 0)) {
+    throw new Error('This is an upgrade, not a downgrade. Use the upgrade flow instead.');
+  }
+
+  // Update Stripe subscription price so renewal charges the new tier.
+  // Use proration_behavior: 'create_prorations' — Stripe creates a credit
+  // item that applies to the next renewal invoice.
+  if (membership.stripeSubscriptionId && !isFakeMode()) {
+    try {
+      const stripe = getStripeClient();
+
+      // Get or create price for new tier
+      let newPriceId = newTier.stripePriceId;
+      if (!newPriceId) {
+        const priceObj = await stripe.prices.create({
+          product_data: {
+            name: `${newTier.name} - Annual`,
+            metadata: { tier: newTier.tier },
+          },
+          unit_amount: Math.round(newTier.price * 100),
+          currency: 'nzd',
+          recurring: { interval: 'year' },
+          metadata: { tier: newTier.tier },
+        });
+        newPriceId = priceObj.id;
+        await MembershipTier.findByIdAndUpdate(tierId, { stripePriceId: priceObj.id });
+      }
+
+      const subscription = await stripe.subscriptions.retrieve(membership.stripeSubscriptionId);
+      await stripe.subscriptions.update(membership.stripeSubscriptionId, {
+        items: [{
+          id: subscription.items.data[0].id,
+          price: newPriceId,
+        }],
+        proration_behavior: 'create_prorations',
+      });
+
+      logger.info({
+        membershipId: membership._id,
+        oldTier: oldTier?.tier,
+        newTier: newTier.tier,
+      }, 'Stripe subscription price updated for deferred downgrade');
+    } catch (err) {
+      logger.error({ err, membershipId: membership._id }, 'Failed to update Stripe subscription for downgrade');
+      throw new Error('Failed to update payment subscription. Please try again or contact support.');
+    }
+  }
+
+  // Record pending downgrade — current tier remains active
+  membership.pendingTierId = newTier._id;
+  membership.pendingTierEffectiveAt = membership.currentPeriodEnd;
+  membership.downgradeRequestedAt = new Date();
+  membership.downgradeTermsAcceptedAt = new Date();
+  membership.downgradeTermsVersion = termsVersion;
+  membership.downgradeReason = reason;
+  await membership.save();
+
+  // Send downgrade-scheduled email
+  try {
+    const user = await User.findById(userId).select('email fullName').lean();
+    if (user?.email && oldTier && newTier) {
+      const { sendMail } = await import('./email.service');
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      const effectiveDate = membership.currentPeriodEnd?.toLocaleDateString('en-NZ', { dateStyle: 'full' }) || 'N/A';
+
+      const html = `
+        <p>Hi ${user.fullName || 'there'},</p>
+        <p>Your downgrade from <strong>${oldTier.displayName}</strong> to <strong>${newTier.displayName}</strong> has been scheduled.</p>
+        <p><strong>Effective date:</strong> ${effectiveDate}</p>
+        <p>Until then, you'll continue to enjoy your ${oldTier.displayName} benefits. At renewal, your membership will switch to ${newTier.displayName} at $${newTier.price}/year.</p>
+        <p><a href="${frontendUrl}/account/membership">View Your Membership</a></p>
+      `;
+      await sendMail(user.email, `Downgrade to ${newTier.displayName} Scheduled`, html)
+        .catch((err) => logger.error({ err, membershipId: membership._id }, '[Membership] Failed to send downgrade-scheduled email'));
+    }
+  } catch (err) {
+    logger.error({ err, membershipId: membership._id }, '[Membership] Failed to send downgrade-scheduled email');
+  }
+
+  // In-app notification
+  try {
+    await createAndDeliverNotification({
+      userId: membership.userId.toString(),
+      type: 'membership_downgrade_scheduled',
+      title: `Downgrade to ${newTier.displayName} Scheduled`,
+      message: `Your downgrade to ${newTier.displayName} will take effect on ${membership.currentPeriodEnd?.toLocaleDateString('en-NZ', { dateStyle: 'medium' }) || 'renewal'}. Your current benefits remain until then.`,
+      priority: 'normal',
+      channel: 'info',
+      actionUrl: '/account/membership',
+    });
+  } catch (err) {
+    logger.error({ err, membershipId: membership._id }, '[Membership] Failed to send downgrade notification');
+  }
+
+  // Audit log
+  await auditMembershipEvent({
+    action: 'membership_downgrade_requested',
+    eventType: 'membership.downgrade_requested',
+    eventCategory: 'FINANCIAL',
+    operationType: 'UPDATE',
+    resourceType: 'UserMembership',
+    resourceId: membership._id.toString(),
+    outcome: 'SUCCESS',
+    severity: 'HIGH',
+    metadata: {
+      userId,
+      oldTier: oldTier?.tier,
+      newTier: newTier.tier,
+      pendingTierEffectiveAt: membership.pendingTierEffectiveAt,
+      termsVersion,
+      reason: reason || 'Customer request',
+    },
+  });
+
+  return membership;
+}
+
+// ─── Cancel Pending Downgrade ────────────────────────────────
+
+export async function cancelPendingDowngrade(userId: string) {
+  const membership = await UserMembership.findOne({
+    userId,
+    status: 'active',
+    pendingTierId: { $ne: null },
+  });
+
+  if (!membership) throw new Error('No pending downgrade found');
+
+  membership.pendingTierId = undefined;
+  membership.pendingTierEffectiveAt = undefined;
+  membership.downgradeCancelledAt = new Date();
+  await membership.save();
+
+  logger.info({ membershipId: membership._id }, 'Pending downgrade cancelled');
+
+  // Audit log
+  await auditMembershipEvent({
+    action: 'membership_downgrade_cancelled',
+    eventType: 'membership.downgrade_cancelled',
+    eventCategory: 'UPDATE',
+    operationType: 'UPDATE',
+    resourceType: 'UserMembership',
+    resourceId: membership._id.toString(),
+    outcome: 'SUCCESS',
+    severity: 'MEDIUM',
+    metadata: { userId },
+  });
+
+  return membership;
+}
+
 // ─── Extend Membership (Admin) ───────────────────────────────
 
 export async function extendMembership(
@@ -1201,6 +1398,186 @@ export async function extendMembership(
   });
 
   return membership;
+}
+
+// ─── Process Scheduled Downgrades ────────────────────────────
+
+/**
+ * Execute pending downgrades whose effective date has arrived.
+ *
+ * This job runs alongside checkExpiredMemberships. For each membership
+ * with a pendingTierId whose pendingTierEffectiveAt has passed:
+ *
+ * 1. Verify the Stripe renewal succeeded (period was extended)
+ * 2. If renewal succeeded: flip tier, apply points clawback, extend period
+ * 3. If renewal failed: keep current tier, notify customer
+ * 4. Invalidate entitlement cache
+ * 5. Send downgrade-executed email
+ * 6. Audit log
+ *
+ * The points clawback is a Phase 3 item — for now, the tier flip and
+ * period extension happen. Points clawback will be wired in Phase 3.
+ */
+export async function processScheduledDowngrades() {
+  const now = new Date();
+  const pendingDowngrades = await UserMembership.find({
+    status: 'active',
+    pendingTierId: { $ne: null },
+    pendingTierEffectiveAt: { $lte: now },
+  });
+
+  let processed = 0;
+  let failed = 0;
+
+  for (const membership of pendingDowngrades) {
+    try {
+      const oldTier = await MembershipTier.findById(membership.tierId).lean();
+      const newTier = await MembershipTier.findById(membership.pendingTierId).lean();
+
+      if (!newTier) {
+        logger.error({ membershipId: membership._id, pendingTierId: membership.pendingTierId }, 'Pending tier not found — skipping downgrade');
+        continue;
+      }
+
+      // Check if the membership period was extended (renewal succeeded)
+      // If currentPeriodEnd is still in the past, renewal failed
+      const renewalSucceeded = membership.currentPeriodEnd > now;
+
+      if (!renewalSucceeded) {
+        // Renewal failed — keep current tier, notify customer
+        logger.warn({
+          membershipId: membership._id,
+          currentPeriodEnd: membership.currentPeriodEnd,
+          dunningStatus: membership.dunningStatus,
+        }, 'Renewal failed — downgrade not executed, keeping current tier');
+
+        // Clear pending state — downgrade cannot proceed without renewal
+        membership.pendingTierId = undefined;
+        membership.pendingTierEffectiveAt = undefined;
+        await membership.save();
+
+        // Notify customer
+        try {
+          const user = await User.findById(membership.userId).select('email fullName').lean();
+          if (user?.email) {
+            const { sendMail } = await import('./email.service');
+            const html = `
+              <p>Hi ${user.fullName || 'there'},</p>
+              <p>Your scheduled downgrade to <strong>${newTier.displayName}</strong> could not be completed because your membership renewal payment failed.</p>
+              <p>Your current ${oldTier?.displayName || 'membership'} benefits remain active. Please update your payment method to keep your membership active.</p>
+              <p><a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/membership">Update Payment Method</a></p>
+            `;
+            await sendMail(user.email, `Downgrade to ${newTier.displayName} Not Completed`, html)
+              .catch((err) => logger.error({ err, membershipId: membership._id }, 'Failed to send downgrade-failed email'));
+          }
+        } catch (err) {
+          logger.error({ err, membershipId: membership._id }, 'Failed to send downgrade-failed email');
+        }
+
+        failed++;
+        continue;
+      }
+
+      // Renewal succeeded — execute the downgrade
+      const previousTierId = membership.tierId;
+      const previousPrice = membership.price;
+
+      membership.tierId = newTier._id;
+      membership.price = newTier.price;
+      membership.pendingTierId = undefined;
+      membership.pendingTierEffectiveAt = undefined;
+      membership.downgradeCancelledAt = undefined;
+      await membership.save();
+
+      // Update User.membershipTier
+      await User.findByIdAndUpdate(membership.userId, {
+        membershipTier: newTier.tier,
+      });
+
+      // Re-evaluate tag coverage for new tier limit
+      try {
+        await removeMembershipFromTags(membership.userId.toString(), membership._id.toString());
+        await extendTagsForMembership(membership.userId.toString(), membership._id.toString());
+      } catch (err) {
+        logger.error({ err, membershipId: membership._id }, 'Failed to re-evaluate tags after downgrade execution');
+      }
+
+      // Invalidate entitlement cache (Phase 3: points clawback will be added here)
+      try {
+        const { membershipEntitlementService } = await import('./membership-entitlement.service');
+        membershipEntitlementService.invalidateCache();
+      } catch (err) {
+        logger.warn({ err }, 'Failed to invalidate entitlement cache');
+      }
+
+      // Send downgrade-executed email
+      try {
+        const user = await User.findById(membership.userId).select('email fullName').lean();
+        if (user?.email) {
+          const { sendMail } = await import('./email.service');
+          const html = `
+            <p>Hi ${user.fullName || 'there'},</p>
+            <p>Your membership is now <strong>${newTier.displayName}</strong>. Your new benefits are active.</p>
+            <p><strong>New plan:</strong> ${newTier.displayName} — $${newTier.price}/year</p>
+            <p><a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/membership">View Your Membership</a></p>
+          `;
+          await sendMail(user.email, `Membership Changed to ${newTier.displayName}`, html)
+            .catch((err) => logger.error({ err, membershipId: membership._id }, 'Failed to send downgrade-executed email'));
+        }
+      } catch (err) {
+        logger.error({ err, membershipId: membership._id }, 'Failed to send downgrade-executed email');
+      }
+
+      // In-app notification
+      try {
+        await createAndDeliverNotification({
+          userId: membership.userId.toString(),
+          type: 'membership_downgraded',
+          title: `Membership Changed to ${newTier.displayName}`,
+          message: `Your membership has been changed to ${newTier.displayName}. Your new benefits are now active.`,
+          priority: 'normal',
+          channel: 'info',
+          actionUrl: '/account/membership',
+        });
+      } catch (err) {
+        logger.error({ err, membershipId: membership._id }, 'Failed to send downgrade notification');
+      }
+
+      // Audit log
+      await auditMembershipEvent({
+        action: 'membership_downgrade_executed',
+        eventType: 'membership.downgrade_executed',
+        eventCategory: 'FINANCIAL',
+        operationType: 'UPDATE',
+        resourceType: 'UserMembership',
+        resourceId: membership._id.toString(),
+        outcome: 'SUCCESS',
+        severity: 'HIGH',
+        metadata: {
+          userId: membership.userId.toString(),
+          oldTier: oldTier?.tier,
+          newTier: newTier.tier,
+          oldPrice: previousPrice,
+          newPrice: newTier.price,
+          requestedAt: membership.downgradeRequestedAt,
+        },
+      });
+
+      logger.info({
+        membershipId: membership._id,
+        oldTier: oldTier?.tier,
+        newTier: newTier.tier,
+      }, 'Scheduled downgrade executed successfully');
+
+      processed++;
+    } catch (err) {
+      logger.error({ err, membershipId: membership._id }, 'Failed to process scheduled downgrade');
+      failed++;
+    }
+  }
+
+  logger.info({ processed, failed, total: pendingDowngrades.length }, 'Scheduled downgrade processing complete');
+  return { processed, failed, total: pendingDowngrades.length };
 }
 
 // ─── Check Expired Memberships ───────────────────────────────

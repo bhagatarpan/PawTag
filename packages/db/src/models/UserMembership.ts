@@ -25,6 +25,18 @@ export interface IUserMembershipDocument extends Document {
   lastAdminExtensionAt?: Date;
   adminExtensionCount: number;
   invoiceId?: mongoose.Types.ObjectId;
+  // Deferred downgrade fields
+  pendingTierId?: mongoose.Types.ObjectId;
+  pendingTierEffectiveAt?: Date;
+  downgradeRequestedAt?: Date;
+  downgradeTermsAcceptedAt?: Date;
+  downgradeTermsVersion?: string;
+  downgradeReason?: string;
+  downgradeCancelledAt?: Date;
+  // Dunning state
+  dunningStatus?: 'active' | 'past_due' | 'expired';
+  dunningRetryCount?: number;
+  dunningLastAttemptAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -60,6 +72,22 @@ const UserMembershipSchema = new Schema<IUserMembershipDocument>(
     lastAdminExtensionAt: { type: Date },
     adminExtensionCount: { type: Number, default: 0 },
     invoiceId: { type: Schema.Types.ObjectId, ref: 'Invoice' },
+    // Deferred downgrade
+    pendingTierId: { type: Schema.Types.ObjectId, ref: 'MembershipTier', default: null },
+    pendingTierEffectiveAt: { type: Date, default: null },
+    downgradeRequestedAt: { type: Date, default: null },
+    downgradeTermsAcceptedAt: { type: Date, default: null },
+    downgradeTermsVersion: { type: String, default: null },
+    downgradeReason: { type: String, default: null },
+    downgradeCancelledAt: { type: Date, default: null },
+    // Dunning
+    dunningStatus: {
+      type: String,
+      enum: ['active', 'past_due', 'expired'],
+      default: 'active',
+    },
+    dunningRetryCount: { type: Number, default: 0 },
+    dunningLastAttemptAt: { type: Date },
   },
   { timestamps: true }
 );
@@ -67,6 +95,7 @@ const UserMembershipSchema = new Schema<IUserMembershipDocument>(
 UserMembershipSchema.index({ userId: 1, status: 1 });
 UserMembershipSchema.index({ status: 1, currentPeriodEnd: 1 });
 UserMembershipSchema.index({ stripeSubscriptionId: 1 });
+UserMembershipSchema.index({ pendingTierEffectiveAt: 1, status: 1 });
 
 export const UserMembership = mongoose.model<IUserMembershipDocument>(
   'UserMembership',
