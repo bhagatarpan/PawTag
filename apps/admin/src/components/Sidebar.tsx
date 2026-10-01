@@ -185,9 +185,19 @@ const sections: SidebarSection[] = [
     color: 'text-amber-400',
     links: [
       { to: '/membership', label: 'Dashboard', icon: Crown, permission: 'subscription.read' },
+      { to: '/membership/subscribers', label: 'Subscribers', icon: Users, permission: 'subscription.read' },
+    ],
+  },
+  // ─── Membership Settings ─────────────────────────────────
+  {
+    id: 'membership-settings',
+    label: 'Membership Settings',
+    icon: Settings,
+    color: 'text-amber-300',
+    links: [
       { to: '/membership/tiers', label: 'Tier Configuration', icon: Settings, permission: 'setting.read' },
       { to: '/membership/entitlements', label: 'Entitlements', icon: Settings, permission: 'setting.read' },
-      { to: '/membership/subscribers', label: 'Subscribers', icon: Users, permission: 'subscription.read' },
+      { to: '/membership/settings/retention', label: 'Retention Settings', icon: Settings, permission: 'setting.read' },
     ],
   },
   // ─── Discounts & Promotions ───────────────────────────────

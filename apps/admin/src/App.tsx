@@ -49,6 +49,7 @@ import MembershipTiers from './pages/MembershipTiers';
 import MembershipSubscribers from './pages/MembershipSubscribers';
 import MembershipSubscriberDetail from './pages/MembershipSubscriberDetail';
 import MembershipEntitlements from './pages/MembershipEntitlements';
+import MembershipRetentionSettings from './pages/MembershipRetentionSettings';
 import Referrals from './pages/Referrals';
 import TagExpiryNotifications from './pages/TagExpiryNotifications';
 import Notifications from './pages/Notifications';
@@ -243,6 +244,7 @@ export default function App() {
       <Route path="/membership/subscribers" element={<ProtectedRoute><MembershipSubscribers /></ProtectedRoute>} />
       <Route path="/membership/subscribers/:id" element={<ProtectedRoute><MembershipSubscriberDetail /></ProtectedRoute>} />
       <Route path="/membership/entitlements" element={<ProtectedRoute><MembershipEntitlements /></ProtectedRoute>} />
+      <Route path="/membership/settings/retention" element={<ProtectedRoute><MembershipRetentionSettings /></ProtectedRoute>} />
       <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
       <Route path="/referrals" element={<ProtectedRoute><Referrals /></ProtectedRoute>} />
       <Route path="/tag-expiry-notifications" element={<ProtectedRoute><TagExpiryNotifications /></ProtectedRoute>} />

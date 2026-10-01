@@ -382,7 +382,7 @@ export default function MembershipManage() {
         loading={actionLoading}
         footnote={
           <p className="text-xs text-green-700">
-            As a thank you, you'll receive a one-time 15% discount code for your next purchase.
+            As a thank you, you'll receive a one-time discount code for your next purchase. Details will be emailed to you.
           </p>
         }
       >

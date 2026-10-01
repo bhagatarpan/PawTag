@@ -182,6 +182,7 @@ export const API = {
       changeTier: '/admin/membership/change-tier',
       cancel: '/admin/membership/cancel',
       stats: '/admin/membership/stats',
+      retentionSettings: '/admin/membership/retention-settings',
     },
 
     // ---------------------------------------------------------------------------

@@ -4,6 +4,12 @@ import { requirePermission } from '../middleware/permission';
 import { UserMembership, MembershipTier, User, Tag } from '@pawtag/db';
 import { extendMembership, changeTier, cancelMembership } from '../services/membership.service';
 import { auditService } from '../services/audit';
+import { Setting } from '@pawtag/db';
+import {
+  getAllMembershipRetentionSettings,
+  clearMembershipConfigCache,
+  MEMBERSHIP_RETENTION_DEFAULTS,
+} from '../services/membership-config';
 import logger from '../lib/logger';
 
 const router = Router();
@@ -396,6 +402,91 @@ router.post('/cancel', requirePermission('subscription.update'), async (req: Aut
   } catch (error: any) {
     logger.error({ err: error, userId: req.user?.id }, '[Admin Membership] Cancel error');
     res.status(400).json({ success: false, error: error.message || 'Failed to cancel membership' });
+  }
+});
+
+/**
+ * GET /api/admin/membership/retention-settings
+ * Get membership retention offer settings
+ */
+router.get('/retention-settings', requirePermission('setting.read'), async (_req: AuthRequest, res: Response) => {
+  try {
+    const settings = await getAllMembershipRetentionSettings();
+    res.json({ success: true, data: settings });
+  } catch (error: any) {
+    logger.error({ err: error }, '[AdminMembership] Failed to fetch retention settings');
+    res.status(500).json({ success: false, error: 'Failed to fetch retention settings' });
+  }
+});
+
+/**
+ * PUT /api/admin/membership/retention-settings
+ * Update membership retention offer settings
+ */
+router.put('/retention-settings', requirePermission('setting.update'), async (req: AuthRequest, res: Response) => {
+  try {
+    const updates = req.body;
+
+    // Validate: must be an object with at least one known key
+    if (!updates || typeof updates !== 'object' || Object.keys(updates).length === 0) {
+      res.status(400).json({ success: false, error: 'No settings provided' });
+      return;
+    }
+
+    const validKeys = Object.keys(MEMBERSHIP_RETENTION_DEFAULTS);
+    const invalidKeys = Object.keys(updates).filter((k) => !validKeys.includes(k));
+    if (invalidKeys.length > 0) {
+      res.status(400).json({ success: false, error: `Invalid setting keys: ${invalidKeys.join(', ')}` });
+      return;
+    }
+
+    // Validate values are valid numbers
+    for (const [key, value] of Object.entries(updates)) {
+      const num = Number(value);
+      if (isNaN(num) || num < 0) {
+        res.status(400).json({ success: false, error: `Invalid value for ${key}: ${value}` });
+        return;
+      }
+    }
+
+    // Upsert each setting
+    for (const [key, value] of Object.entries(updates)) {
+      await Setting.findOneAndUpdate(
+        { key: `membership.retention.${key}` },
+        { value: String(value), updatedAt: new Date() },
+        { upsert: true },
+      );
+    }
+
+    // Clear cache so services pick up new values
+    clearMembershipConfigCache();
+
+    // Audit
+    await auditService.log({
+      actorType: 'ADMIN',
+      actorId: req.user!.id,
+      actorUsername: req.user!.email,
+      sourceIp: req.ip || 'unknown',
+      userAgent: req.get('user-agent') || 'unknown',
+      applicationName: 'pawtag-api',
+      applicationVersion: '1.0.0',
+      apiVersion: 'v1',
+      environment: process.env.NODE_ENV || 'development',
+    }, {
+      action: 'membership_retention_settings_updated',
+      eventType: 'ADMIN_ACTION',
+      eventCategory: 'UPDATE',
+      operationType: 'UPDATE',
+      resourceType: 'MembershipRetentionSettings',
+      outcome: 'SUCCESS',
+      severity: 'MEDIUM',
+      metadata: { updatedKeys: Object.keys(updates), values: updates },
+    });
+
+    res.json({ success: true, message: 'Retention settings updated successfully' });
+  } catch (error: any) {
+    logger.error({ err: error }, '[AdminMembership] Failed to update retention settings');
+    res.status(500).json({ success: false, error: 'Failed to update retention settings' });
   }
 });
 
