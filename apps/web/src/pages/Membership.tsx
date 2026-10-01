@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Crown, Check, ArrowRight } from 'lucide-react';
+import { Crown, Check, ArrowRight, Shield } from 'lucide-react';
 import { API } from '@pawtag/shared/api';
 import { formatCurrency } from '@pawtag/shared';
 import { resolveTierIcon, resolveTierGradient, getTierMarketingFlags, EntitlementList } from '@pawtag/ui';
