@@ -26,6 +26,7 @@ interface MembershipStatus {
     currentPeriodStart: string;
     currentPeriodEnd: string;
     autoRenew: boolean;
+    cancelledAt?: string;
     cardBrand?: string;
     cardLast4?: string;
     cardExpMonth?: number;
@@ -151,18 +152,30 @@ export default function MembershipManage() {
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <TierIcon className="h-6 w-6 text-white" />
-                <span className="text-white/80 text-xs font-medium uppercase tracking-wider">Active Membership</span>
+                <span className="text-white/80 text-xs font-medium uppercase tracking-wider">
+                  {membership.cancelledAt ? 'Cancelling' : 'Active Membership'}
+                </span>
               </div>
               <h1 className="text-2xl font-bold text-white tracking-tight">{tier.displayName} Membership</h1>
             </div>
-            <span className="px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide bg-white/20 text-white">
-              {membership.status}
+            <span className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide ${
+              membership.cancelledAt
+                ? 'bg-amber-400/30 text-amber-100'
+                : 'bg-white/20 text-white'
+            }`}>
+              {membership.cancelledAt ? 'Cancelling' : membership.status}
             </span>
           </div>
           <div className="flex items-center gap-4 text-white/80 text-sm">
             <span>Active since {formatDate(membership.currentPeriodStart || membership.currentPeriodEnd, 'long')}</span>
             <span>·</span>
-            <span>Renews {formatDate(membership.currentPeriodEnd, 'long')} ({formatCurrency(membership.price, tierCurrency, { decimals: false })}/yr)</span>
+            <span>
+              {membership.cancelledAt ? (
+                <>Benefits until {formatDate(membership.currentPeriodEnd, 'long')}</>
+              ) : (
+                <>Renews {formatDate(membership.currentPeriodEnd, 'long')} ({formatCurrency(membership.price, tierCurrency, { decimals: false })}/yr)</>
+              )}
+            </span>
           </div>
         </div>
       </div>
@@ -353,7 +366,28 @@ export default function MembershipManage() {
       </div>
 
       {/* Cancel Modal */}
-      <BottomSheet open={showCancelModal} onClose={() => setShowCancelModal(false)} title="Cancel Membership">
+      <BottomSheet
+        open={showCancelModal}
+        onClose={() => setShowCancelModal(false)}
+        title="Cancel Membership"
+        footer={
+          <>
+            <button
+              onClick={() => setShowCancelModal(false)}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+            >
+              Keep Membership
+            </button>
+            <button
+              onClick={handleCancel}
+              disabled={!cancelReason || actionLoading}
+              className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50"
+            >
+              {actionLoading ? 'Cancelling...' : 'Cancel Membership'}
+            </button>
+          </>
+        }
+      >
         <div className="space-y-4">
           <div className="flex items-center gap-3 p-3 bg-amber-50 rounded-xl">
             <AlertTriangle className="h-5 w-5 text-amber-600" />
@@ -371,10 +405,6 @@ export default function MembershipManage() {
               tagLimit={tier.tagLimit}
             />
           </div>
-
-          {/* Note: Gold is the lowest tier — there is no downgrade below Gold.
-              The only exit from Gold is cancellation. Downgrade from higher tiers
-              is available on the membership subscribe page. */}
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Reason for cancellation *</label>
@@ -394,24 +424,8 @@ export default function MembershipManage() {
 
           <div className="bg-green-50 border border-green-200 rounded-xl p-3">
             <p className="text-xs text-green-700">
-              As a thank you, you'll receive a one-time 15% discount code + free shipping for your next purchase.
+              As a thank you, you'll receive a one-time 15% discount code for your next purchase.
             </p>
-          </div>
-
-          <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
-            <button
-              onClick={() => setShowCancelModal(false)}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-            >
-              Keep Membership
-            </button>
-            <button
-              onClick={handleCancel}
-              disabled={!cancelReason || actionLoading}
-              className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50"
-            >
-              {actionLoading ? 'Cancelling...' : 'Cancel Membership'}
-            </button>
           </div>
         </div>
       </BottomSheet>

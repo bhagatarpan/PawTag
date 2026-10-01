@@ -660,8 +660,15 @@ export async function cancelMembership(userId: string, reason?: string) {
 
   if (!membership) throw new Error('No active membership found');
 
+  // Guard: prevent double-cancel (membership already has cancelledAt set)
+  if (membership.cancelledAt) {
+    throw new Error('Your membership is already scheduled for cancellation');
+  }
+
   // Cancel Stripe subscription at period end (not immediately).
   // This ensures the customer keeps benefits until currentPeriodEnd.
+  // CRITICAL: If Stripe fails, we must NOT proceed — customer would be
+  // charged after cancelling. Throw to prevent local state change.
   if (membership.stripeSubscriptionId && !isFakeMode()) {
     try {
       const stripe = getStripeClient();
@@ -671,6 +678,7 @@ export async function cancelMembership(userId: string, reason?: string) {
       logger.info({ membershipId: membership._id }, 'Stripe subscription set to cancel at period end');
     } catch (err) {
       logger.error({ err, membershipId: membership._id }, 'Failed to set Stripe subscription cancel_at_period_end');
+      throw new Error('Failed to cancel membership with payment provider. Please try again or contact support.');
     }
   }
 

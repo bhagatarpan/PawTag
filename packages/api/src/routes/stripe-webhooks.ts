@@ -754,10 +754,70 @@ async function handleSubscriptionUpdated(stripeSubscription: any): Promise<void>
 
 /**
  * Handle customer.subscription.deleted.
+ *
+ * Handles BOTH tag-based Subscriptions AND membership (UserMembership) records.
+ * This is critical: when a customer cancels via Stripe Billing Portal, or when
+ * a cancel_at_period_end subscription reaches its end, Stripe fires this event.
+ * PawTag must sync its local state accordingly.
  */
 async function handleSubscriptionDeleted(subscription: any): Promise<void> {
+  // Try tag-based Subscription first (existing behavior)
   const sub = await Subscription.findOne({ stripeSubscriptionId: subscription.id });
-  if (!sub) return;
+
+  if (!sub) {
+    // Try membership-tier subscription (UserMembership model)
+    try {
+      const membership = await UserMembership.findOne({ stripeSubscriptionId: subscription.id });
+      if (membership && (membership.status === 'active' || membership.status === 'cancelled')) {
+        // Only update if not already expired
+        if (membership.status === 'active') {
+          membership.status = 'cancelled';
+          membership.cancelledAt = membership.cancelledAt || new Date();
+          membership.cancellationReason = membership.cancellationReason || 'Cancelled via Stripe';
+          membership.autoRenew = false;
+          await membership.save();
+
+          logger.info({ membershipId: membership._id }, 'Membership cancelled via Stripe (customer.subscription.deleted)');
+
+          // Audit
+          try {
+            const { auditService } = await import('../services/audit');
+            await auditService.log({
+              actorType: 'SYSTEM',
+              actorId: 'stripe-webhook',
+              actorUsername: 'stripe-webhook',
+              sourceIp: 'stripe',
+              userAgent: 'stripe-webhook',
+              applicationName: 'pawtag-api',
+              applicationVersion: '1.0.0',
+              apiVersion: 'v1',
+              environment: process.env.NODE_ENV || 'development',
+            }, {
+              action: 'membership_cancelled_via_stripe',
+              eventType: 'membership.cancelled',
+              eventCategory: 'FINANCIAL',
+              operationType: 'UPDATE',
+              resourceType: 'UserMembership',
+              resourceId: membership._id.toString(),
+              subjectUserId: membership.userId?.toString(),
+              outcome: 'SUCCESS',
+              severity: 'HIGH',
+              metadata: {
+                userId: membership.userId?.toString(),
+                cancellationReason: 'Cancelled via Stripe',
+                cancelledAt: membership.cancelledAt,
+              },
+            });
+          } catch (err) {
+            logger.error({ err, membershipId: membership._id }, 'Failed to audit membership cancellation from webhook');
+          }
+        }
+      }
+    } catch (err) {
+      logger.error({ err, stripeSubscriptionId: subscription.id }, 'Failed to process membership deletion from webhook');
+    }
+    return;
+  }
 
   sub.status = 'cancelled';
   sub.autoRenew = false;

@@ -33,7 +33,7 @@ export async function generateRetentionOffer(
     // Create the promo code
     await PromoCode.create({
       code,
-      description: `Thank you for being a ${tier.displayName} member! Enjoy 15% off your next purchase plus free shipping.`,
+      description: `Thank you for being a ${tier.displayName} member! Enjoy 15% off your next purchase.`,
       discountType: 'percentage',
       discountValue: 15,
       maxDiscountAmount: 50,
@@ -55,7 +55,9 @@ export async function generateRetentionOffer(
       code,
       discountType: 'percentage',
       discountValue: 15,
-      freeShipping: true,
+      // freeShipping is false: the PromoCode model does not support a freeShipping
+      // benefit. The discount engine only applies the percentage discount.
+      freeShipping: false,
       expiresAt,
     };
   } catch (err) {

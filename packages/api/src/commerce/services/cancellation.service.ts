@@ -23,7 +23,8 @@
 import { Order, PaymentTransaction } from '@pawtag/db';
 import { stripePaymentProvider } from '../providers/stripe';
 import { inventoryService } from './inventory.service';
-import { logPaymentEvent } from '../audit';
+import { logPaymentEvent, logOrderEvent } from '../audit';
+import { auditService } from '../../services/audit';
 import logger from '../../lib/logger';
 
 /** Valid order statuses that can be cancelled */
@@ -117,38 +118,58 @@ export async function cancelOrder(params: {
           },
         });
 
-        if (refundResult.refundId) {
+        // Check if refund actually succeeded — createRefund returns { success: false }
+        // on Stripe errors instead of throwing. We must not proceed with cancellation
+        // if requireRefundSuccess is true and the refund failed.
+        if (!refundResult.success) {
+          logger.error({
+            orderId: String(order._id),
+            paymentIntentId,
+            error: refundResult.error,
+          }, 'Stripe refund returned failure during cancellation');
+
+          if (requireRefundSuccess) {
+            return {
+              success: false,
+              order,
+              refundCreated: false,
+              error: refundResult.error || 'Failed to process refund. Please contact support.',
+            };
+          }
+          // Otherwise continue without refund — but do NOT record PaymentTransaction
+          // with the PaymentIntent ID as if it were a refund ID
+        } else if (refundResult.refundId) {
           order.refundId = refundResult.refundId;
           order.refundStatus = (refundResult.status as any) || 'pending';
           order.refundLastSyncedAt = new Date();
           refundCreated = true;
           refundId = refundResult.refundId;
+
+          // Record payment transaction only when refund actually succeeded
+          await PaymentTransaction.create({
+            orderId: order._id,
+            orderNumber: order.orderNumber,
+            type: 'refund',
+            status: refundResult.status === 'succeeded' ? 'succeeded' : 'pending',
+            amount: order.payment.amount,
+            currency: order.payment.currency || 'NZD',
+            provider: 'stripe',
+            providerTransactionId: refundResult.refundId,
+            providerStatus: refundResult.status,
+            arn: refundResult.arn,
+            expectedArrival: refundResult.expectedArrival,
+            initiatedBy: actor.type,
+            attemptCount: 0,
+            notes: notes ? `${reason} — ${notes}` : reason,
+          });
+
+          await logPaymentEvent('refunded', {
+            paymentIntentId,
+            orderId: String(order._id),
+            orderNumber: order.orderNumber,
+            amount: order.payment.amount,
+          });
         }
-
-        // Record payment transaction
-        await PaymentTransaction.create({
-          orderId: order._id,
-          orderNumber: order.orderNumber,
-          type: 'refund',
-          status: refundResult.status === 'succeeded' ? 'succeeded' : 'pending',
-          amount: order.payment.amount,
-          currency: order.payment.currency || 'NZD',
-          provider: 'stripe',
-          providerTransactionId: refundResult.refundId || paymentIntentId,
-          providerStatus: refundResult.status,
-          arn: refundResult.arn,
-          expectedArrival: refundResult.expectedArrival,
-          initiatedBy: actor.type,
-          attemptCount: 0,
-          notes: notes ? `${reason} — ${notes}` : reason,
-        });
-
-        await logPaymentEvent('refunded', {
-          paymentIntentId,
-          orderId: String(order._id),
-          orderNumber: order.orderNumber,
-          amount: order.payment.amount,
-        });
       } catch (err: any) {
         logger.error({ err, orderId: String(order._id), actor: actor.type }, 'Failed to process refund during cancellation');
 
@@ -227,6 +248,45 @@ export async function cancelOrder(params: {
     cancelledByType: actor.type,
     refundCreated,
   }, 'Order cancelled');
+
+  // Durable audit event for financial traceability
+  try {
+    await auditService.log({
+      actorType: actor.type === 'customer' ? 'USER' : actor.type === 'admin' ? 'ADMIN' : 'SYSTEM',
+      actorId: actor.name,
+      actorUsername: actor.name,
+      sourceIp: 'unknown',
+      userAgent: actor.portal,
+      applicationName: 'pawtag-api',
+      applicationVersion: '1.0.0',
+      apiVersion: 'v1',
+      environment: process.env.NODE_ENV || 'development',
+    }, {
+      action: 'order_cancelled',
+      eventType: 'order.cancelled',
+      eventCategory: 'FINANCIAL',
+      operationType: 'UPDATE',
+      resourceType: 'Order',
+      resourceId: String(order._id),
+      outcome: 'SUCCESS',
+      severity: 'HIGH',
+      metadata: {
+        orderId: String(order._id),
+        orderNumber: order.orderNumber,
+        previousStatus,
+        reason,
+        notes: notes || '',
+        cancelledBy: actor.name,
+        cancelledByType: actor.type,
+        cancelledByPortal: actor.portal,
+        refundCreated,
+        refundId: order.refundId || null,
+        refundAmount: refundCreated ? order.payment?.amount || 0 : 0,
+      },
+    });
+  } catch (err) {
+    logger.error({ err, orderId: String(order._id) }, 'Failed to create audit event for order cancellation');
+  }
 
   return {
     success: true,

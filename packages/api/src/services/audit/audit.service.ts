@@ -40,6 +40,8 @@ export interface AuditEventInput {
   operationType: string;
   resourceType: string;
   resourceId?: string;
+  /** Customer/user affected by this event (distinct from actorId who performed it) */
+  subjectUserId?: string;
   resourceVersionBefore?: number;
   resourceVersionAfter?: number;
   businessOperation?: string;

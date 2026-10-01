@@ -47,15 +47,15 @@ export default function BottomSheet({ open, onClose, title, description, childre
       {/* Sheet container */}
       <div
         ref={sheetRef}
-        className="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-2xl max-h-[85vh] flex flex-col animate-slide-up"
+        className="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-2xl max-h-[90vh] flex flex-col animate-slide-up"
       >
         {/* Drag handle */}
-        <div className="flex justify-center pt-3 pb-2">
+        <div className="flex justify-center pt-3 pb-2 shrink-0">
           <div className="w-10 h-1 rounded-full bg-gray-300" />
         </div>
 
-        {/* Header */}
-        <div className="px-6 pb-4 flex items-start justify-between">
+        {/* Header — always visible */}
+        <div className="px-6 pb-4 flex items-start justify-between shrink-0">
           <div>
             <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
             {description && (
@@ -71,14 +71,14 @@ export default function BottomSheet({ open, onClose, title, description, childre
           </button>
         </div>
 
-        {/* Content — scrollable */}
-        <div className="flex-1 overflow-y-auto px-6 pb-4">
+        {/* Content — scrollable between header and footer */}
+        <div className="flex-1 overflow-y-auto overscroll-contain px-6 pb-4 min-h-0">
           {children}
         </div>
 
-        {/* Footer — sticky */}
+        {/* Footer — sticky at bottom, always visible */}
         {footer && (
-          <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
+          <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 shrink-0 bg-white rounded-b-none">
             {footer}
           </div>
         )}

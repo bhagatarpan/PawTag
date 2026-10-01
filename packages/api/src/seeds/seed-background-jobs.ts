@@ -221,7 +221,7 @@ const jobs = [
     displayName: 'Membership Expiry Check',
     description: 'Checks for expired memberships and deactivates them. Sends expiry notifications to customers.',
     category: 'financial',
-    intervalMs: 24 * 60 * 60 * 1000, // 24 hours
+    intervalMs: 60 * 60 * 1000, // 1 hour (was 24h — reduced for faster benefit cutoff after cancellation/expiry)
     lockName: 'membership-expiry',
     lockLeaseMs: 120000,
     processTarget: 'worker',
