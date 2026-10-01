@@ -279,6 +279,76 @@ router.get('/entitlements', async (req: AuthRequest, res: Response) => {
 });
 
 /**
+ * GET /api/membership/payment-methods
+ * List saved payment methods from Stripe Customer
+ */
+router.get('/payment-methods', async (req: AuthRequest, res: Response) => {
+  try {
+    const user = await User.findById(req.user!.id).select('stripeCustomerId').lean();
+    if (!user?.stripeCustomerId) {
+      res.json({ success: true, data: [] });
+      return;
+    }
+
+    if (isFakeMode()) {
+      res.json({ success: true, data: [] });
+      return;
+    }
+
+    const { getStripeClient } = await import('../services/membership.service');
+    const stripe = getStripeClient();
+    const paymentMethods = await stripe.customers.listPaymentMethods(user.stripeCustomerId, { type: 'card' });
+
+    const formatted = paymentMethods.data.map((pm) => ({
+      id: pm.id,
+      brand: pm.card?.brand,
+      last4: pm.card?.last4,
+      expMonth: pm.card?.exp_month,
+      expYear: pm.card?.exp_year,
+      isDefault: false, // Stripe doesn't expose this directly; frontend can compare with membership.cardBrand/last4
+    }));
+
+    res.json({ success: true, data: formatted });
+  } catch (error: any) {
+    logger.error({ err: error, userId: req.user?.id }, '[Membership] Failed to list payment methods');
+    res.status(500).json({ success: false, error: 'Failed to list payment methods' });
+  }
+});
+
+/**
+ * POST /api/membership/payment-methods/portal
+ * Create Stripe Billing Portal session for payment method management
+ */
+router.post('/payment-methods/portal', async (req: AuthRequest, res: Response) => {
+  try {
+    const user = await User.findById(req.user!.id).select('stripeCustomerId email fullName').lean();
+    if (!user?.stripeCustomerId) {
+      res.status(400).json({ success: false, error: 'No payment profile found. Please make a payment first.' });
+      return;
+    }
+
+    if (isFakeMode()) {
+      res.json({ success: true, data: { url: null, isDemoMode: true } });
+      return;
+    }
+
+    const { getStripeClient } = await import('../services/membership.service');
+    const stripe = getStripeClient();
+
+    const session = await stripe.billingPortal.sessions.create({
+      customer: user.stripeCustomerId,
+      return_url: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/membership`,
+    });
+
+    logger.info({ userId: req.user!.id, sessionId: session.id }, '[Membership] Billing Portal session created');
+    res.json({ success: true, data: { url: session.url } });
+  } catch (error: any) {
+    logger.error({ err: error, userId: req.user?.id }, '[Membership] Failed to create Billing Portal session');
+    res.status(500).json({ success: false, error: 'Failed to open payment settings' });
+  }
+});
+
+/**
  * GET /api/membership/invoices
  * Get current user's membership invoices
  */

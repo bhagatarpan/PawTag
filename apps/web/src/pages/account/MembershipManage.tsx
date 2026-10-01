@@ -95,6 +95,20 @@ export default function MembershipManage() {
     }
   }
 
+  async function handleOpenBillingPortal() {
+    try {
+      const res = await api.post(API.customer.membership.paymentMethodsPortal);
+      const { url } = res.data.data || {};
+      if (url) {
+        window.open(url, '_blank');
+      } else {
+        alert('Payment settings are not available in demo mode.');
+      }
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Failed to open payment settings');
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex justify-center py-12">
@@ -184,7 +198,10 @@ export default function MembershipManage() {
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-sm font-semibold text-gray-900">Payment Method</h2>
-          <button className="text-sm text-primary-600 hover:text-primary-700 font-medium">
+          <button
+            onClick={handleOpenBillingPortal}
+            className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+          >
             Update
           </button>
         </div>
@@ -203,6 +220,9 @@ export default function MembershipManage() {
         ) : (
           <p className="text-sm text-gray-500">No payment method on file</p>
         )}
+        <p className="text-xs text-gray-400 mt-2">
+          Default payment method for auto-renewal. Click "Update" to change via Stripe secure portal.
+        </p>
       </div>
 
       {/* Billing History */}

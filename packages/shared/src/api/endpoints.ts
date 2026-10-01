@@ -621,6 +621,8 @@ export const API = {
       changeTierEstimate: (tierId: string) => `/membership/change-tier/estimate?tierId=${tierId}` as const,
       downgrade: '/membership/downgrade',
       downgradeCancel: '/membership/downgrade/cancel',
+      paymentMethods: '/membership/payment-methods',
+      paymentMethodsPortal: '/membership/payment-methods/portal',
       tags: '/membership/tags',
       entitlements: '/membership/entitlements',
       invoices: '/membership/invoices',
