@@ -2,11 +2,12 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   ArrowLeft, CreditCard, Calendar, Tag, Shield, AlertTriangle,
-  FileText, History, Settings, Loader2, Check, X,
+  FileText, History, Settings, Loader2, Check, X, Lock,
 } from 'lucide-react';
 import { API } from '@pawtag/shared/api';
 import { formatDate, formatCurrency } from '@pawtag/shared';
 import { TIER_ICONS, resolveTierGradient } from '@pawtag/ui';
+import { useAuth } from '../lib/auth';
 import api from '../lib/api';
 
 interface MemberDetail {
@@ -62,6 +63,7 @@ interface EvidenceForm {
   actionRequired: string;
   reason: string;
   csrFullName: string;
+  csrEmail: string;
   csrNotes: string;
 }
 
@@ -71,11 +73,13 @@ const EMPTY_EVIDENCE: EvidenceForm = {
   actionRequired: '',
   reason: '',
   csrFullName: '',
+  csrEmail: '',
   csrNotes: '',
 };
 
 export default function MembershipSubscriberDetail() {
   const { id } = useParams<{ id: string }>();
+  const { user } = useAuth();
   const [data, setData] = useState<MemberDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [extendLoading, setExtendLoading] = useState(false);
@@ -162,7 +166,7 @@ export default function MembershipSubscriberDetail() {
 
   async function handleChangeTier() {
     if (!targetTierId) { alert('Please select a target tier'); return; }
-    if (!evidence.customerEmailDate || !evidence.customerEmailContent || !evidence.actionRequired || !evidence.reason || !evidence.csrFullName) {
+    if (!evidence.customerEmailDate || !evidence.customerEmailContent || !evidence.actionRequired || !evidence.reason || !evidence.csrFullName || !evidence.csrEmail) {
       alert('Please fill in all required evidence fields');
       return;
     }
@@ -187,7 +191,7 @@ export default function MembershipSubscriberDetail() {
   }
 
   async function handleCancelMembership() {
-    if (!evidence.customerEmailDate || !evidence.customerEmailContent || !evidence.actionRequired || !evidence.reason || !evidence.csrFullName) {
+    if (!evidence.customerEmailDate || !evidence.customerEmailContent || !evidence.actionRequired || !evidence.reason || !evidence.csrFullName || !evidence.csrEmail) {
       alert('Please fill in all required evidence fields');
       return;
     }
@@ -349,13 +353,20 @@ export default function MembershipSubscriberDetail() {
             Extend 30 Days (Complimentary)
           </button>
           <button
-            onClick={() => { fetchTiers(); setShowChangeTierModal(true); }}
+            onClick={() => {
+              fetchTiers();
+              setEvidence({ ...EMPTY_EVIDENCE, csrFullName: user?.fullName || '', csrEmail: user?.email || '' });
+              setShowChangeTierModal(true);
+            }}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
           >
             Change Tier
           </button>
           <button
-            onClick={() => setShowCancelModal(true)}
+            onClick={() => {
+              setEvidence({ ...EMPTY_EVIDENCE, csrFullName: user?.fullName || '', csrEmail: user?.email || '' });
+              setShowCancelModal(true);
+            }}
             className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700"
           >
             Cancel Membership
@@ -538,13 +549,28 @@ export default function MembershipSubscriberDetail() {
 
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">CSR Full Name *</label>
-                  <input
-                    type="text"
-                    value={evidence.csrFullName}
-                    onChange={(e) => setEvidence({ ...evidence, csrFullName: e.target.value })}
-                    placeholder="Your full name"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                  />
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={evidence.csrFullName}
+                      readOnly
+                      className="w-full px-3 py-2 pr-8 border border-gray-200 rounded-lg text-sm bg-gray-50 text-gray-600 cursor-not-allowed"
+                    />
+                    <Lock size={14} className="absolute right-3 top-2.5 text-gray-400" />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">CSR Email *</label>
+                  <div className="relative">
+                    <input
+                      type="email"
+                      value={evidence.csrEmail}
+                      readOnly
+                      className="w-full px-3 py-2 pr-8 border border-gray-200 rounded-lg text-sm bg-gray-50 text-gray-600 cursor-not-allowed"
+                    />
+                    <Lock size={14} className="absolute right-3 top-2.5 text-gray-400" />
+                  </div>
                 </div>
 
                 <div>
@@ -652,13 +678,28 @@ export default function MembershipSubscriberDetail() {
 
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">CSR Full Name *</label>
-                  <input
-                    type="text"
-                    value={evidence.csrFullName}
-                    onChange={(e) => setEvidence({ ...evidence, csrFullName: e.target.value })}
-                    placeholder="Your full name"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                  />
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={evidence.csrFullName}
+                      readOnly
+                      className="w-full px-3 py-2 pr-8 border border-gray-200 rounded-lg text-sm bg-gray-50 text-gray-600 cursor-not-allowed"
+                    />
+                    <Lock size={14} className="absolute right-3 top-2.5 text-gray-400" />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">CSR Email *</label>
+                  <div className="relative">
+                    <input
+                      type="email"
+                      value={evidence.csrEmail}
+                      readOnly
+                      className="w-full px-3 py-2 pr-8 border border-gray-200 rounded-lg text-sm bg-gray-50 text-gray-600 cursor-not-allowed"
+                    />
+                    <Lock size={14} className="absolute right-3 top-2.5 text-gray-400" />
+                  </div>
                 </div>
 
                 <div>

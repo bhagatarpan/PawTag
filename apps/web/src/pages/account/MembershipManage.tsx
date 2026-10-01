@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Crown, CreditCard, AlertTriangle } from 'lucide-react';
+import { Crown, CreditCard } from 'lucide-react';
 import { API } from '@pawtag/shared/api';
 import { formatCurrency, formatDate } from '@pawtag/shared';
 import api from '../../lib/api';
-import { BottomSheet, resolveTierIcon, resolveTierGradient, EntitlementList } from '@pawtag/ui';
+import { ConfirmDialog, resolveTierIcon, resolveTierGradient, EntitlementList } from '@pawtag/ui';
 
 interface MembershipStatus {
   hasMembership: boolean;
@@ -366,69 +366,36 @@ export default function MembershipManage() {
       </div>
 
       {/* Cancel Modal */}
-      <BottomSheet
+      <ConfirmDialog
         open={showCancelModal}
         onClose={() => setShowCancelModal(false)}
+        onConfirm={handleCancel}
         title="Cancel Membership"
-        footer={
-          <>
-            <button
-              onClick={() => setShowCancelModal(false)}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-            >
-              Keep Membership
-            </button>
-            <button
-              onClick={handleCancel}
-              disabled={!cancelReason || actionLoading}
-              className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50"
-            >
-              {actionLoading ? 'Cancelling...' : 'Cancel Membership'}
-            </button>
-          </>
+        message={`Your benefits will remain active until ${formatDate(membership.currentPeriodEnd, 'long')}. You'll lose the following benefits at that time:`}
+        confirmLabel="Cancel Membership"
+        cancelLabel="Keep Membership"
+        variant="danger"
+        reasons={['Too expensive', 'Not using the benefits', 'Found an alternative', 'Poor experience', 'Other']}
+        selectedReason={cancelReason}
+        onReasonChange={setCancelReason}
+        reasonPlaceholder="Select a reason"
+        loading={actionLoading}
+        footnote={
+          <p className="text-xs text-green-700">
+            As a thank you, you'll receive a one-time 15% discount code for your next purchase.
+          </p>
         }
       >
-        <div className="space-y-4">
-          <div className="flex items-center gap-3 p-3 bg-amber-50 rounded-xl">
-            <AlertTriangle className="h-5 w-5 text-amber-600" />
-            <p className="text-sm text-amber-700">
-              Your benefits will remain active until {formatDate(membership.currentPeriodEnd, 'long')}.
-            </p>
-          </div>
-
-          {/* Benefits being lost */}
-          <div className="bg-gray-50 rounded-xl p-4">
-            <p className="text-sm font-medium text-gray-900 mb-2">You'll lose these benefits:</p>
-            <EntitlementList
-              entitlements={status.entitlements || tier.entitlements || {}}
-              variant="cross"
-              tagLimit={tier.tagLimit}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Reason for cancellation *</label>
-            <select
-              value={cancelReason}
-              onChange={(e) => setCancelReason(e.target.value)}
-              className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-            >
-              <option value="">Select a reason</option>
-              <option value="too_expensive">Too expensive</option>
-              <option value="not_using">Not using the benefits</option>
-              <option value="found_alternative">Found an alternative</option>
-              <option value="poor_experience">Poor experience</option>
-              <option value="other">Other</option>
-            </select>
-          </div>
-
-          <div className="bg-green-50 border border-green-200 rounded-xl p-3">
-            <p className="text-xs text-green-700">
-              As a thank you, you'll receive a one-time 15% discount code for your next purchase.
-            </p>
-          </div>
+        {/* Benefits being lost — custom children content */}
+        <div className="bg-gray-50 rounded-xl p-4">
+          <p className="text-sm font-medium text-gray-900 mb-2">You'll lose these benefits:</p>
+          <EntitlementList
+            entitlements={status.entitlements || tier.entitlements || {}}
+            variant="cross"
+            tagLimit={tier.tagLimit}
+          />
         </div>
-      </BottomSheet>
+      </ConfirmDialog>
     </div>
   );
 }
