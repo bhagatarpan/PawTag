@@ -101,11 +101,13 @@ export default function MembershipSubscribe() {
 
     setEstimateLoading(true);
     setEstimate(null);
+    setSelectedTier(tier);
     try {
       const res = await api.get(API.customer.membership.changeTierEstimate(tier._id));
       setEstimate(res.data.data);
     } catch {
       setEstimate(null);
+      setSelectedTier(null);
     } finally {
       setEstimateLoading(false);
     }
