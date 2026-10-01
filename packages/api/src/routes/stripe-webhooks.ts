@@ -261,7 +261,7 @@ async function handlePaymentIntentFailed(paymentIntent: any): Promise<void> {
 }
 
 /**
- * Handle invoice.payment_succeeded (subscription renewal).
+ * Handle invoice.payment_succeeded (subscription renewal + membership proration).
  */
 async function handleInvoicePaymentSucceeded(invoice: any): Promise<void> {
   if (!invoice?.subscription) return;
@@ -271,15 +271,22 @@ async function handleInvoicePaymentSucceeded(invoice: any): Promise<void> {
 
   if (!subscription) {
     // Try membership-tier subscription (UserMembership model)
-    // This handles Gold/Platinum/Black membership subscriptions
     try {
       const membership = await UserMembership.findOne({ stripeSubscriptionId: invoice.subscription });
+
       if (membership && membership.status === 'pending_payment') {
+        // Initial membership activation
         await activateMembership(membership._id.toString());
         logger.info({ membershipId: membership._id, stripeSubscriptionId: invoice.subscription }, 'Membership activated via webhook (invoice.payment_succeeded)');
+      } else if (membership && membership.status === 'active') {
+        // Proration invoice on an already-active membership (tier upgrade/downgrade).
+        // changeTier may have already created the invoice synchronously — this is
+        // the recovery path if that process crashed after Stripe charged but before
+        // the local invoice was written.
+        await handleMembershipProrationInvoice(membership, invoice);
       }
     } catch (err) {
-      logger.error({ err, stripeSubscriptionId: invoice.subscription }, 'Failed to activate membership from webhook');
+      logger.error({ err, stripeSubscriptionId: invoice.subscription }, 'Failed to process membership invoice from webhook');
     }
     return;
   }
@@ -349,6 +356,91 @@ async function handleInvoicePaymentSucceeded(invoice: any): Promise<void> {
   }
 
   logger.info({ subscriptionId: subscription._id, stripeInvoiceId: invoice.id }, 'Subscription renewed via Stripe');
+}
+
+/**
+ * Handle a proration invoice on an already-active membership (tier upgrade/downgrade).
+ *
+ * This is the webhook recovery path: if changeTier() crashed after Stripe charged
+ * the proration but before the local invoice was created, this handler creates the
+ * invoice and sends the email. If changeTier already created the invoice, the
+ * stripeInvoiceId idempotency check makes this a no-op.
+ */
+async function handleMembershipProrationInvoice(membership: any, stripeInvoice: any): Promise<void> {
+  if (!stripeInvoice?.id) return;
+
+  // Idempotency: skip if invoice already exists for this Stripe invoice
+  const existingInvoice = await Invoice.findOne({ stripeInvoiceId: stripeInvoice.id });
+  if (existingInvoice) {
+    logger.info({ membershipId: membership._id, stripeInvoiceId: stripeInvoice.id }, 'Membership proration invoice already recorded — skipping');
+    return;
+  }
+
+  const amountPaid = (stripeInvoice.amount_paid || 0) / 100;
+  if (amountPaid <= 0) return;
+
+  const currency = (stripeInvoice.currency || 'nzd').toUpperCase();
+
+  // Generate invoice number using the same atomic counter as activateMembership
+  const counter = await UserMembership.db!.collection('counters').findOneAndUpdate(
+    { _id: 'membershipInvoiceNumber' as any },
+    { $inc: { seq: 1 } },
+    { upsert: true, returnDocument: 'after' },
+  );
+  const invoiceNumber = `INVM-${String((counter as any)?.value?.seq || 1).padStart(6, '0')}`;
+
+  const pawtagInvoice = await Invoice.create({
+    userId: membership.userId,
+    userMembershipId: membership._id,
+    invoiceNumber,
+    amount: amountPaid,
+    currency,
+    status: 'paid',
+    stripeInvoiceId: stripeInvoice.id,
+    stripeSubscriptionId: membership.stripeSubscriptionId,
+    billingPeriod: {
+      start: membership.currentPeriodStart || new Date(),
+      end: membership.currentPeriodEnd || new Date(),
+    },
+    paidAt: new Date(),
+  });
+
+  logger.info({
+    membershipId: membership._id,
+    invoiceId: pawtagInvoice._id,
+    invoiceNumber,
+    amountPaid,
+    stripeInvoiceId: stripeInvoice.id,
+  }, 'Membership proration invoice created via webhook');
+
+  // Send invoice email (fire-and-forget with logged errors)
+  try {
+    const { generateInvoiceHtml } = await import('../services/invoice-html.service');
+    const { sendInvoiceEmail } = await import('../services/email.service');
+    const { generateSecureToken, hashToken } = await import('../services/auth.service');
+    const { InvoiceAccessToken } = await import('@pawtag/db');
+
+    const user = await User.findById(membership.userId).select('email fullName').lean();
+    if (user?.email) {
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      const secureToken = generateSecureToken();
+      const tokenHash = hashToken(secureToken);
+      await InvoiceAccessToken.create({
+        invoiceId: pawtagInvoice._id,
+        userId: membership.userId,
+        tokenHash,
+        expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+        verifiedAt: new Date(),
+      });
+      const invoiceUrl = `${frontendUrl}/account/invoices/${invoiceNumber}?token=${secureToken}`;
+
+      const invoiceHtml = await generateInvoiceHtml(pawtagInvoice._id.toString());
+      await sendInvoiceEmail(user.email, user.fullName, invoiceNumber, invoiceHtml, invoiceUrl, amountPaid)
+        .catch((err: any) => logger.error({ err, invoiceId: pawtagInvoice._id }, 'Failed to send membership proration invoice email'));
+    }
+  } catch (err) {
+    logger.error({ err, membershipId: membership._id }, 'Failed to send membership proration invoice email');
+  }
 }
 
 /**

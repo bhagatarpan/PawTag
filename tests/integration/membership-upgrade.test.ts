@@ -262,6 +262,14 @@ describe('Membership Upgrade Flow', () => {
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
 
+      // Response should include membership + invoice fields
+      expect(res.body.data.membership).toBeDefined();
+      expect(res.body.data.invoice).toBeDefined();
+
+      // In fake mode (no Stripe), invoice is null — no proration charge occurred
+      // In Stripe mode, invoice would contain the proration record
+      expect(res.body.data.invoice).toBeNull();
+
       // Verify the membership document was updated
       const updated = await mongoose.connection.collections.usermemberships
         .findOne({ _id: new mongoose.Types.ObjectId(membershipId) });
@@ -323,6 +331,36 @@ describe('Membership Upgrade Flow', () => {
       expect(res.body.data.hasMembership).toBe(true);
       expect(res.body.data.tier.tier).toBe('platinum');
       expect(res.body.data.tier.price).toBe(99);
+    });
+  });
+
+  describe('GET /api/membership/invoices after upgrade', () => {
+    it('returns invoice list (empty in fake mode — no proration charge)', async () => {
+      await createActiveGoldMembership();
+
+      await request(app)
+        .post('/api/membership/change-tier')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ tierId: platinumTierId });
+
+      const res = await request(app)
+        .get('/api/membership/invoices')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(Array.isArray(res.body.data)).toBe(true);
+
+      // In fake mode, no Stripe proration invoice is created, so the list is empty.
+      // In Stripe mode, the upgrade proration invoice would appear here.
+      // The endpoint itself works and returns the correct shape.
+    });
+
+    it('returns 401 without auth token', async () => {
+      const res = await request(app)
+        .get('/api/membership/invoices');
+
+      expect(res.status).toBe(401);
     });
   });
 });

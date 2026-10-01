@@ -3,6 +3,9 @@ import mongoose from 'mongoose';
 import { isFakeMode } from '../commerce/payment-mode';
 import Stripe from 'stripe';
 import { sendMail } from './email.service';
+import { sendInvoiceEmail } from './email.service';
+import { generateInvoiceHtml } from './invoice-html.service';
+import { generateSecureToken, hashToken } from './auth.service';
 import { createAndDeliverNotification } from './notification-delivery.service';
 import { auditService, type AuditContext } from './audit';
 import logger from '../lib/logger';
@@ -804,11 +807,93 @@ export async function estimateTierChange(
 
 // ─── Change Tier ─────────────────────────────────────────────
 
+/**
+ * Generate the next membership invoice number (INVM-NNNNNN).
+ * Uses the atomic counters collection — same pattern as activateMembership.
+ */
+async function nextMembershipInvoiceNumber(): Promise<string> {
+  const counter = await UserMembership.db!.collection('counters').findOneAndUpdate(
+    { _id: 'membershipInvoiceNumber' as any },
+    { $inc: { seq: 1 } },
+    { upsert: true, returnDocument: 'after' },
+  );
+  return `INVM-${String((counter as any)?.value?.seq || 1).padStart(6, '0')}`;
+}
+
+/**
+ * Create a membership invoice document with idempotency.
+ * Returns the invoice document, or an existing one if already created.
+ */
+async function createMembershipInvoice(params: {
+  userId: mongoose.Types.ObjectId;
+  membershipId: mongoose.Types.ObjectId;
+  stripeSubscriptionId?: string;
+  stripeInvoiceId?: string;
+  amount: number;
+  currency: string;
+  billingPeriod: { start: Date; end: Date };
+}): Promise<any> {
+  // Idempotency: check by stripeInvoiceId (strongest key) or membership + subscription
+  const existing = params.stripeInvoiceId
+    ? await Invoice.findOne({ stripeInvoiceId: params.stripeInvoiceId })
+    : await Invoice.findOne({
+        userId: params.userId,
+        userMembershipId: params.membershipId,
+        stripeSubscriptionId: params.stripeSubscriptionId,
+      });
+
+  if (existing) {
+    logger.info({ invoiceId: existing._id, stripeInvoiceId: params.stripeInvoiceId }, '[Membership] Invoice already exists, skipping creation');
+    return existing;
+  }
+
+  const invoiceNumber = await nextMembershipInvoiceNumber();
+  return Invoice.create({
+    userId: params.userId,
+    userMembershipId: params.membershipId,
+    invoiceNumber,
+    amount: params.amount,
+    currency: params.currency,
+    status: 'paid',
+    stripeInvoiceId: params.stripeInvoiceId,
+    stripeSubscriptionId: params.stripeSubscriptionId,
+    billingPeriod: params.billingPeriod,
+    paidAt: new Date(),
+  });
+}
+
+/**
+ * Send invoice email with secure access link.
+ * Follows the checkout pattern: static imports, tokenHash, logged errors.
+ */
+async function sendMembershipInvoiceEmail(invoice: any, userId: mongoose.Types.ObjectId): Promise<string | undefined> {
+  const user = await User.findById(userId).select('email fullName').lean();
+  if (!user?.email) return undefined;
+
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+  const secureToken = generateSecureToken();
+  const tokenHash = hashToken(secureToken);
+  await InvoiceAccessToken.create({
+    invoiceId: invoice._id,
+    userId,
+    tokenHash,
+    expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+    verifiedAt: new Date(),
+  });
+  const invoiceUrl = `${frontendUrl}/account/invoices/${invoice.invoiceNumber}?token=${secureToken}`;
+
+  const invoiceHtml = await generateInvoiceHtml(invoice._id.toString());
+  await sendInvoiceEmail(user.email, user.fullName, invoice.invoiceNumber, invoiceHtml, invoiceUrl, invoice.amount)
+    .catch((err) => logger.error({ err, invoiceId: invoice._id }, '[Membership] Failed to send invoice email'));
+
+  return invoiceUrl;
+}
+
 export async function changeTier(
   userId: string,
   newTierId: string,
   prorationBehavior: 'now' | 'next_billing_cycle' = 'now',
-) {
+): Promise<{ membership: any; invoice: any; invoiceUrl?: string }> {
   const membership = await UserMembership.findOne({
     userId,
     status: 'active',
@@ -822,6 +907,10 @@ export async function changeTier(
 
   const oldTier = await MembershipTier.findById(membership.tierId).lean();
   if (oldTier?.tier === newTier.tier) throw new Error('Already on this tier');
+
+  let prorationInvoiceId: string | undefined;
+  let prorationAmount: number | undefined;
+  let prorationCurrency: string | undefined;
 
   // Update Stripe subscription if needed
   if (membership.stripeSubscriptionId && !isFakeMode()) {
@@ -846,18 +935,42 @@ export async function changeTier(
       }
 
       // Update subscription with proration behavior
+      // Expand latest_invoice to capture the proration invoice Stripe creates
       const subscription = await stripe.subscriptions.retrieve(membership.stripeSubscriptionId);
-      await stripe.subscriptions.update(membership.stripeSubscriptionId, {
+      const updatedSubscription = await stripe.subscriptions.update(membership.stripeSubscriptionId, {
         items: [{
           id: subscription.items.data[0].id,
           price: newPriceId,
         }],
         proration_behavior: prorationBehavior === 'now' ? 'create_prorations' : 'none',
+        expand: ['latest_invoice'],
       });
 
-      logger.info({ membershipId: membership._id, oldTier: oldTier?.tier, newTier: newTier.tier, prorationBehavior }, 'Stripe subscription updated');
-    } catch (err) {
+      // Capture proration invoice data from Stripe response
+      const latestInvoice = updatedSubscription.latest_invoice as any;
+      if (latestInvoice && typeof latestInvoice === 'object') {
+        prorationInvoiceId = latestInvoice.id;
+        // amount_due is in cents; only record if non-zero (proration created)
+        prorationAmount = (latestInvoice.amount_due || 0) / 100;
+        prorationCurrency = (latestInvoice.currency || 'nzd').toUpperCase();
+      }
+
+      logger.info({
+        membershipId: membership._id,
+        oldTier: oldTier?.tier,
+        newTier: newTier.tier,
+        prorationBehavior,
+        prorationInvoiceId,
+        prorationAmount,
+      }, 'Stripe subscription updated');
+    } catch (err: any) {
       logger.error({ err, membershipId: membership._id }, 'Failed to update Stripe subscription');
+      // When proration is expected (immediate charge), a Stripe failure must
+      // not silently change the local tier — the customer would get new
+      // benefits without paying.
+      if (prorationBehavior === 'now') {
+        throw new Error('Payment processing failed. Please try again or contact support.');
+      }
     }
   }
 
@@ -877,7 +990,32 @@ export async function changeTier(
     logger.error({ err, membershipId: membership._id }, '[Membership] Failed to re-evaluate tags after tier change');
   }
 
-  // Send tier change email
+  // Create invoice document for the proration charge (if Stripe created one)
+  let invoice: any = null;
+  let invoiceUrl: string | undefined;
+  if (prorationInvoiceId && prorationAmount && prorationAmount > 0) {
+    try {
+      invoice = await createMembershipInvoice({
+        userId: membership.userId,
+        membershipId: membership._id,
+        stripeSubscriptionId: membership.stripeSubscriptionId,
+        stripeInvoiceId: prorationInvoiceId,
+        amount: prorationAmount,
+        currency: prorationCurrency || membership.currency || 'NZD',
+        billingPeriod: {
+          start: membership.currentPeriodStart || new Date(),
+          end: membership.currentPeriodEnd || new Date(),
+        },
+      });
+
+      // Send invoice email (fire-and-forget with logged errors)
+      invoiceUrl = await sendMembershipInvoiceEmail(invoice, membership.userId);
+    } catch (err) {
+      logger.error({ err, membershipId: membership._id, stripeInvoiceId: prorationInvoiceId }, '[Membership] Failed to create/send upgrade invoice');
+    }
+  }
+
+  // Send tier change email (fire-and-forget with logged errors)
   try {
     const user = await User.findById(userId).select('email fullName').lean();
     if (user?.email) {
@@ -890,7 +1028,8 @@ export async function changeTier(
         renewalDate: membership.currentPeriodEnd?.toLocaleDateString('en-NZ', { dateStyle: 'full' }) || 'N/A',
         dashboardUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/membership`,
       });
-      await sendMail(user.email, `Membership Changed to ${newTier.displayName}`, html).catch(() => {});
+      await sendMail(user.email, `Membership Changed to ${newTier.displayName}`, html)
+        .catch((err) => logger.error({ err, membershipId: membership._id }, '[Membership] Failed to send tier change email'));
     }
   } catch (err) {
     logger.error({ err, membershipId: membership._id }, 'Failed to send tier change email');
@@ -930,10 +1069,12 @@ export async function changeTier(
       newTier: newTier.tier,
       oldPrice: oldTier?.price,
       newPrice: newTier.price,
+      prorationAmount: prorationAmount || 0,
+      stripeInvoiceId: prorationInvoiceId || null,
     },
   });
 
-  return membership;
+  return { membership, invoice, invoiceUrl };
 }
 
 // ─── Extend Membership (Admin) ───────────────────────────────

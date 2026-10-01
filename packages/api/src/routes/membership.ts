@@ -170,8 +170,15 @@ router.post('/change-tier', async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    const updated = await changeTier(req.user!.id, tierId, prorationBehavior);
-    res.json({ success: true, data: updated });
+    const result = await changeTier(req.user!.id, tierId, prorationBehavior);
+    res.json({
+      success: true,
+      data: {
+        membership: result.membership,
+        invoice: result.invoice,
+        invoiceUrl: result.invoiceUrl,
+      },
+    });
   } catch (error: any) {
     logger.error({ err: error, userId: req.user?.id }, '[Membership] Change tier error');
     res.status(400).json({ success: false, error: error.message || 'Failed to change tier' });

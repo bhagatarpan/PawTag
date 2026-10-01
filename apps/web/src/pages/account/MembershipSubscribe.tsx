@@ -62,6 +62,7 @@ export default function MembershipSubscribe() {
   const [estimate, setEstimate] = useState<TierChangeEstimate | null>(null);
   const [estimateLoading, setEstimateLoading] = useState(false);
   const [confirmingUpgrade, setConfirmingUpgrade] = useState(false);
+  const [upgradeResult, setUpgradeResult] = useState<{ invoiceNumber?: string; prorationAmount?: number; currency?: string } | null>(null);
 
   const hasActiveMembership = currentMembership?.hasMembership && currentMembership.membership?.status === 'active';
   const currentTier = currentMembership?.tier || currentMembership?.membership?.tierId || null;
@@ -186,16 +187,24 @@ export default function MembershipSubscribe() {
 
   async function handleChangeTier(tier: MembershipTier) {
     try {
-      await api.post(API.customer.membership.changeTier, {
+      const res = await api.post(API.customer.membership.changeTier, {
         tierId: tier._id,
         prorationBehavior: 'now',
       });
 
-      // changeTier updates the existing membership synchronously.
-      // In fake/demo mode there is no Stripe payment step.
-      // In Stripe mode, proration is handled by Stripe on the subscription update.
+      // changeTier returns { membership, invoice, invoiceUrl }
+      // The invoice contains the proration charge record (if Stripe created one)
+      const { invoice } = res.data.data || {};
+      if (invoice) {
+        setUpgradeResult({
+          invoiceNumber: invoice.invoiceNumber,
+          prorationAmount: invoice.amount,
+          currency: invoice.currency,
+        });
+      }
+
       setSuccess(true);
-      setTimeout(() => navigate('/account/membership'), 2500);
+      setTimeout(() => navigate('/account/membership'), 4000);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to change membership tier');
       setProcessing(false);
@@ -263,9 +272,24 @@ export default function MembershipSubscribe() {
         <h1 className="text-2xl font-bold text-gray-900 mb-2">Welcome to {selectedTier?.displayName}!</h1>
         <p className="text-gray-500">
           {hasActiveMembership
-            ? 'Your membership has been updated. Redirecting...'
-            : 'Your membership is being activated. Redirecting...'}
+            ? 'Your membership has been updated.'
+            : 'Your membership is being activated.'}
         </p>
+        {upgradeResult?.invoiceNumber && (
+          <div className="mt-6 p-4 bg-primary-50 border border-primary-200 rounded-xl text-left">
+            <p className="text-sm font-semibold text-primary-900 mb-1">Upgrade invoice</p>
+            <p className="text-sm text-primary-700">
+              {upgradeResult.invoiceNumber}
+              {upgradeResult.prorationAmount !== undefined && upgradeResult.prorationAmount > 0 && (
+                <> — {formatCurrency(upgradeResult.prorationAmount, upgradeResult.currency || 'NZD')} prorated charge</>
+              )}
+            </p>
+            <p className="text-xs text-primary-600 mt-2">
+              A copy has been emailed to you. You can also view it in Billing History.
+            </p>
+          </div>
+        )}
+        <p className="text-sm text-gray-400 mt-4">Redirecting...</p>
       </div>
     );
   }
