@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Settings, Plus, Trash2, Check, X, Loader2, RefreshCw } from 'lucide-react';
 import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
@@ -227,8 +227,8 @@ export default function MembershipEntitlements() {
                 const benefits = grouped[cat];
                 if (!benefits || benefits.length === 0) return null;
                 return (
-                  <>
-                    <tr key={`cat-${cat}`}>
+                  <React.Fragment key={`cat-${cat}`}>
+                    <tr>
                       <td colSpan={6} className="px-4 py-2 bg-gray-100 text-xs font-bold text-gray-500 uppercase tracking-wider">
                         {CATEGORY_LABELS[cat] || cat}
                       </td>
@@ -299,7 +299,7 @@ export default function MembershipEntitlements() {
                         </tr>
                       );
                     })}
-                  </>
+                  </React.Fragment>
                 );
               })}
             </tbody>
