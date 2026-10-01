@@ -1567,12 +1567,30 @@ export async function processScheduledDowngrades() {
         logger.error({ err, membershipId: membership._id }, 'Failed to re-evaluate tags after downgrade execution');
       }
 
-      // Invalidate entitlement cache (Phase 3: points clawback will be added here)
+      // Apply Guardian Points clawback (Phase 3)
       try {
+        const { applyDowngradePointsClawback } = await import('./loyalty/points-earning.service');
         const { membershipEntitlementService } = await import('./membership-entitlement.service');
+        const oldMultiplier = Number(await membershipEntitlementService.getTierValue(oldTier?.tier || 'gold', 'points_multiplier') ?? 1) || 1;
+        const newMultiplier = Number(await membershipEntitlementService.getTierValue(newTier.tier, 'points_multiplier') ?? 1) || 1;
+
+        if (oldMultiplier > newMultiplier) {
+          const clawbackResult = await applyDowngradePointsClawback(
+            membership.userId.toString(),
+            oldMultiplier,
+            newMultiplier,
+            membership._id.toString(),
+          );
+          logger.info({
+            membershipId: membership._id,
+            ...clawbackResult,
+          }, 'Points clawback applied during downgrade execution');
+        }
+
+        // Invalidate entitlement cache
         membershipEntitlementService.invalidateCache();
       } catch (err) {
-        logger.warn({ err }, 'Failed to invalidate entitlement cache');
+        logger.error({ err, membershipId: membership._id }, 'Failed to apply points clawback during downgrade execution');
       }
 
       // Send downgrade-executed email

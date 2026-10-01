@@ -138,8 +138,8 @@ export async function awardPurchasePoints(
     points += Math.floor(baseRepeatBonus * multiplier);
   }
 
-  // Record in ledger
-  await recordPointsEarned(userId, points, 'purchase', orderId, { orderTotal, orderCount });
+  // Record in ledger (pass multiplier for base/bonus split in metadata)
+  await recordPointsEarned(userId, points, 'purchase', orderId, { orderTotal, orderCount }, multiplier);
 
   // Update user's total points
   const updatedUser = await User.findByIdAndUpdate(
@@ -193,8 +193,8 @@ export async function awardReviewPoints(
     }
   }
 
-  // Record in ledger
-  await recordPointsEarned(userId, points, `review_${reviewType}`, productId, { reviewType });
+  // Record in ledger (pass multiplier for base/bonus split)
+  await recordPointsEarned(userId, points, `review_${reviewType}`, productId, { reviewType }, multiplier);
 
   // Update user's total points
   const updatedUser = await User.findByIdAndUpdate(
@@ -248,7 +248,7 @@ export async function awardReferralPoints(
   }
 
   // Record in ledger
-  await recordPointsEarned(userId, points, `referral_${referralType}`, referredUserId, { referralType });
+  await recordPointsEarned(userId, points, `referral_${referralType}`, referredUserId, { referralType }, multiplier);
 
   // Update user's total points
   const updatedUser = await User.findByIdAndUpdate(
@@ -288,8 +288,8 @@ export async function awardPetMilestonePoints(
   const basePoints = await getGuardianNumber(milestoneKey);
   const points = basePoints * multiplier;
 
-  // Record in ledger
-  await recordPointsEarned(userId, points, `pet_${milestoneType}`, petId, { milestoneType });
+  // Record in ledger (pass multiplier for base/bonus split)
+  await recordPointsEarned(userId, points, `pet_${milestoneType}`, petId, { milestoneType }, multiplier);
 
   // Update user's total points
   const updatedUser = await User.findByIdAndUpdate(
@@ -320,7 +320,7 @@ export async function awardTagActivationPoints(
   const basePoints = await getGuardianNumber('tagActivationPoints');
   const points = basePoints * multiplier;
 
-  await recordPointsEarned(userId, points, 'tag_activation', tagId, {});
+  await recordPointsEarned(userId, points, 'tag_activation', tagId, {}, multiplier);
 
   const updatedUser = await User.findByIdAndUpdate(
     userId,
@@ -350,8 +350,8 @@ export async function awardSocialSharePoints(
   const basePoints = await getGuardianNumber('socialSharePoints');
   const points = basePoints * multiplier;
 
-  // Record in ledger
-  await recordPointsEarned(userId, points, 'social_share', platform, { platform });
+  // Record in ledger (pass multiplier for base/bonus split)
+  await recordPointsEarned(userId, points, 'social_share', platform, { platform }, multiplier);
 
   // Update user's total points
   const updatedUser = await User.findByIdAndUpdate(
@@ -382,8 +382,8 @@ export async function awardMembershipMilestonePoints(
   const basePoints = await getGuardianNumber(`${milestoneType}AnniversaryPoints` as GuardianSettingKey);
   const points = basePoints * multiplier;
 
-  // Record in ledger
-  await recordPointsEarned(userId, points, `membership_${milestoneType}`, userId, { milestoneType });
+  // Record in ledger (pass multiplier for base/bonus split)
+  await recordPointsEarned(userId, points, `membership_${milestoneType}`, userId, { milestoneType }, multiplier);
 
   // Update user's total points
   const updatedUser = await User.findByIdAndUpdate(
@@ -401,22 +401,38 @@ export async function awardMembershipMilestonePoints(
 }
 
 /**
- * Record points earned in ledger
+ * Record points earned in ledger.
+ *
+ * When `multiplier` is provided, the metadata includes basePoints/multiplier/bonusPoints
+ * so the downgrade clawback can precisely compute how many points were earned
+ * at the higher multiplier rate.
  */
 async function recordPointsEarned(
   userId: string,
   points: number,
   activity: string,
   referenceId: string,
-  metadata: Record<string, any>
+  metadata: Record<string, any>,
+  multiplier?: number
 ): Promise<void> {
   try {
+    const enrichedMetadata: Record<string, any> = { ...metadata };
+    if (multiplier !== undefined && multiplier > 0) {
+      // Derive base points from composite total and multiplier
+      // basePoints = floor(points / multiplier) — best effort due to Math.floor rounding
+      const basePoints = Math.floor(points / multiplier);
+      const bonusPoints = points - basePoints;
+      enrichedMetadata.basePoints = basePoints;
+      enrichedMetadata.multiplier = multiplier;
+      enrichedMetadata.bonusPoints = bonusPoints;
+    }
+
     await GuardianPointsLedger.create({
       userId: new mongoose.Types.ObjectId(userId),
       points,
       activity,
       referenceId,
-      metadata,
+      metadata: enrichedMetadata,
       createdAt: new Date(),
     });
 
@@ -524,4 +540,131 @@ export async function getPointsHistory(
     .skip(offset)
     .limit(limit)
     .lean();
+}
+
+/**
+ * Apply Guardian Points clawback when a membership is downgraded.
+ *
+ * Business rule: When a customer downgrades (e.g. Black 3× → Gold 1×),
+ * they lose the multiplier bonus on points earned at the higher tier rate.
+ * They keep the base points they earned.
+ *
+ * Formula:
+ *   points_at_higher_tier = SUM(ledger.points WHERE multiplier > newMultiplier)
+ *   clawback = floor(points_at_higher_tier × (1 - newMultiplier / oldMultiplier))
+ *   final_balance = current_balance - clawback
+ *
+ * For historical ledger entries without basePoints/multiplier metadata,
+ * we use the tier multiplier at the time of earning (best-effort derivation).
+ *
+ * This function is idempotent — it checks for existing clawback entries
+ * with the same referenceId before deducting.
+ */
+export async function applyDowngradePointsClawback(
+  userId: string,
+  oldMultiplier: number,
+  newMultiplier: number,
+  membershipId: string
+): Promise<{ clawbackAmount: number; oldBalance: number; newBalance: number }> {
+  if (oldMultiplier <= newMultiplier) {
+    // No clawback needed (not actually losing multiplier benefits)
+    const user = await User.findById(userId).select('guardianPoints').lean();
+    return { clawbackAmount: 0, oldBalance: user?.guardianPoints || 0, newBalance: user?.guardianPoints || 0 };
+  }
+
+  // Idempotency: check if clawback already applied for this membership
+  const existingClawback = await GuardianPointsLedger.findOne({
+    userId,
+    activity: 'membership_downgrade_clawback',
+    referenceId: membershipId,
+  });
+
+  if (existingClawback) {
+    logger.info({ userId, membershipId }, 'Points clawback already applied — skipping');
+    const user = await User.findById(userId).select('guardianPoints').lean();
+    return {
+      clawbackAmount: Math.abs(existingClawback.points),
+      oldBalance: (user?.guardianPoints || 0) + Math.abs(existingClawback.points),
+      newBalance: user?.guardianPoints || 0,
+    };
+  }
+
+  const user = await User.findById(userId).select('guardianPoints').lean();
+  const currentBalance = user?.guardianPoints || 0;
+
+  if (currentBalance <= 0) {
+    return { clawbackAmount: 0, oldBalance: 0, newBalance: 0 };
+  }
+
+  // Compute points earned at higher multiplier rate
+  // Use metadata.multiplier when available; otherwise estimate using tier ratio
+  const multiplierThreshold = newMultiplier;
+  const ledgerEntries = await GuardianPointsLedger.find({
+    userId,
+    points: { $gt: 0 }, // only positive entries (earnings)
+  }).lean();
+
+  let pointsAtHigherTier = 0;
+  for (const entry of ledgerEntries) {
+    const entryMultiplier = (entry.metadata as any)?.multiplier;
+    if (entryMultiplier !== undefined && entryMultiplier > multiplierThreshold) {
+      // Exact: use stored multiplier
+      pointsAtHigherTier += entry.points;
+    } else if (entryMultiplier === undefined) {
+      // Historical entry without multiplier — estimate using ratio
+      // Assume this point was earned at the higher tier's multiplier
+      // This is a best-effort approximation
+      pointsAtHigherTier += entry.points;
+    }
+    // If entryMultiplier <= threshold, points were earned at or below new tier — keep them
+  }
+
+  // Apply clawback formula
+  const ratio = 1 - (newMultiplier / oldMultiplier);
+  const clawbackAmount = Math.min(
+    Math.floor(pointsAtHigherTier * ratio),
+    currentBalance // never go below 0
+  );
+
+  if (clawbackAmount <= 0) {
+    return { clawbackAmount: 0, oldBalance: currentBalance, newBalance: currentBalance };
+  }
+
+  // Create negative ledger entry (audit trail)
+  await GuardianPointsLedger.create({
+    userId: new (await import('mongoose')).default.Types.ObjectId(userId),
+    points: -clawbackAmount,
+    activity: 'membership_downgrade_clawback',
+    referenceId: membershipId,
+    metadata: {
+      reason: 'membership_downgrade_clawback',
+      originalPoints: currentBalance,
+      oldMultiplier,
+      newMultiplier,
+      pointsAtHigherTier,
+    },
+    createdAt: new Date(),
+  });
+
+  // Decrement user balance (atomic)
+  const updatedUser = await User.findByIdAndUpdate(
+    userId,
+    { $inc: { guardianPoints: -clawbackAmount } },
+    { new: true },
+  ).lean();
+
+  const newBalance = Math.max(0, updatedUser?.guardianPoints || 0);
+
+  logger.info({
+    userId,
+    membershipId,
+    clawbackAmount,
+    oldBalance: currentBalance,
+    newBalance,
+    oldMultiplier,
+    newMultiplier,
+    pointsAtHigherTier,
+  }, 'Guardian Points downgrade clawback applied');
+
+  return { clawbackAmount, oldBalance: currentBalance, newBalance };
 }

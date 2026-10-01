@@ -1,11 +1,36 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
+/**
+ * Guardian Points Ledger metadata shape.
+ *
+ * For points earned going forward, metadata includes:
+ * - basePoints: points before multiplier was applied
+ * - multiplier: the tier multiplier at earn time (e.g. 1, 2, 3)
+ * - bonusPoints: points earned from the multiplier (basePoints × (multiplier - 1))
+ *
+ * For clawback entries, metadata includes:
+ * - reason: 'membership_downgrade_clawback'
+ * - originalPoints: balance before clawback
+ * - oldMultiplier: multiplier before downgrade
+ * - newMultiplier: multiplier after downgrade
+ */
+export interface IGuardianPointsLedgerMetadata {
+  basePoints?: number;
+  multiplier?: number;
+  bonusPoints?: number;
+  reason?: string;
+  originalPoints?: number;
+  oldMultiplier?: number;
+  newMultiplier?: number;
+  [key: string]: any;
+}
+
 export interface IGuardianPointsLedgerDocument extends Document {
   userId: mongoose.Types.ObjectId;
   points: number;
   activity: string;
   referenceId: string;
-  metadata: Record<string, any>;
+  metadata: IGuardianPointsLedgerMetadata;
   createdAt: Date;
 }
 
