@@ -12,7 +12,7 @@ const router = Router();
 router.get('/tiers', async (_req: Request, res: Response) => {
   try {
     const tiers = await MembershipTier.find({ isActive: true })
-      .select('tier name displayName description price currency icon color gradient displayOrder tagLimit')
+      .select('tier name displayName description price currency icon color gradient displayOrder tagLimit comingSoon')
       .sort({ displayOrder: 1 })
       .lean();
 
@@ -36,7 +36,7 @@ router.get('/tiers', async (_req: Request, res: Response) => {
 router.get('/tiers/:tierId', async (req: Request, res: Response) => {
   try {
     const tier = await MembershipTier.findById(req.params.tierId)
-      .select('tier name displayName description price currency icon color gradient tagLimit')
+      .select('tier name displayName description price currency icon color gradient tagLimit comingSoon')
       .lean();
     
     if (!tier) {

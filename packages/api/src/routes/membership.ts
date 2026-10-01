@@ -9,6 +9,7 @@ import {
   activateMembership,
   cancelMembership,
   changeTier,
+  estimateTierChange,
   checkTagAccess,
 } from '../services/membership.service';
 import { membershipEntitlementService } from '../services/membership-entitlement.service';
@@ -134,6 +135,26 @@ router.post('/cancel', async (req: AuthRequest, res: Response) => {
   } catch (error: any) {
     logger.error({ err: error, userId: req.user?.id }, '[Membership] Cancel error');
     res.status(400).json({ success: false, error: error.message || 'Failed to cancel membership' });
+  }
+});
+
+/**
+ * GET /api/membership/change-tier/estimate?tierId=xxx
+ * Estimate the prorated charge for a tier change (preview before confirm)
+ */
+router.get('/change-tier/estimate', async (req: AuthRequest, res: Response) => {
+  try {
+    const tierId = req.query.tierId as string;
+    if (!tierId) {
+      res.status(400).json({ success: false, error: 'tierId is required' });
+      return;
+    }
+
+    const estimate = await estimateTierChange(req.user!.id, tierId);
+    res.json({ success: true, data: estimate });
+  } catch (error: any) {
+    logger.error({ err: error, userId: req.user?.id }, '[Membership] Change tier estimate error');
+    res.status(400).json({ success: false, error: error.message || 'Failed to estimate tier change' });
   }
 });
 

@@ -75,3 +75,15 @@ export { IconPicker, ICON_MAP } from './components/IconPicker';
 
 // Membership components
 export { MembershipCheckboxes } from './components/MembershipCheckboxes';
+export { EntitlementList } from './components/EntitlementList';
+export type { EntitlementListProps, EntitlementEntry } from './components/EntitlementList';
+
+// Tier visual configuration
+export {
+  TIER_ICONS,
+  TIER_GRADIENTS,
+  resolveTierIcon,
+  resolveTierGradient,
+  getTierMarketingFlags,
+} from './tier-visuals';
+export type { TierMarketingFlags } from './tier-visuals';

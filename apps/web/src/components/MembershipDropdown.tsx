@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Crown, Shield, Diamond, ArrowRight, ChevronDown } from 'lucide-react';
+import { Crown, ArrowRight, ChevronDown } from 'lucide-react';
 import { API } from '@pawtag/shared/api';
+import { formatCurrency } from '@pawtag/shared';
+import { resolveTierIcon, resolveTierGradient } from '@pawtag/ui';
 import api from '../lib/api';
 
 interface MembershipTier {
@@ -11,37 +13,12 @@ interface MembershipTier {
   displayName: string;
   description: string;
   price: number;
-  benefits: {
-    pointsMultiplier: number;
-    freeShippingThreshold: number;
-    inAppNotifications: boolean;
-    criticalEmergencyContact: boolean;
-    petRecovery: boolean;
-  };
-  icon: string;
-  gradient: string;
+  currency?: string;
+  tagLimit?: number;
+  comingSoon?: boolean;
+  icon?: string;
+  gradient?: string;
 }
-
-const TIER_CONFIG: Record<string, { icon: typeof Crown; gradient: string; bgGradient: string; benefits: string[] }> = {
-  gold: {
-    icon: Crown,
-    gradient: 'from-yellow-400 to-amber-500',
-    bgGradient: 'bg-gradient-to-br from-yellow-400 to-amber-500',
-    benefits: ['1× Points', 'Free shipping $100+'],
-  },
-  platinum: {
-    icon: Diamond,
-    gradient: 'from-gray-300 to-gray-500',
-    bgGradient: 'bg-gradient-to-br from-gray-300 to-gray-500',
-    benefits: ['2× Points', 'Emergency Contacts'],
-  },
-  black: {
-    icon: Shield,
-    gradient: 'from-gray-800 to-black',
-    bgGradient: 'bg-gradient-to-br from-gray-800 to-black',
-    benefits: ['3× Points', 'Pet Recovery'],
-  },
-};
 
 export default function MembershipDropdown() {
   const [isOpen, setIsOpen] = useState(false);
@@ -120,8 +97,10 @@ export default function MembershipDropdown() {
           ) : (
             <div className="grid grid-cols-3 gap-3 mb-4">
               {tiers.map((tier) => {
-                const config = TIER_CONFIG[tier.tier] || TIER_CONFIG.gold;
-                const Icon = config.icon;
+                const TierIcon = resolveTierIcon(tier.icon, tier.tier);
+                const gradient = resolveTierGradient(tier.tier, tier.gradient);
+                const bgGradient = `bg-gradient-to-br ${gradient}`;
+                const currency = tier.currency || 'NZD';
 
                 return (
                   <Link
@@ -132,25 +111,23 @@ export default function MembershipDropdown() {
                   >
                     <div className={`rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-all hover:scale-105`}>
                       {/* Card Header */}
-                      <div className={`${config.bgGradient} p-3 text-center`}>
-                        <Icon className="h-6 w-6 text-white mx-auto mb-1" />
+                      <div className={`${bgGradient} p-3 text-center`}>
+                        <TierIcon className="h-6 w-6 text-white mx-auto mb-1" />
                         <div className="text-white font-bold text-xs">{tier.displayName}</div>
                       </div>
 
                       {/* Card Body */}
                       <div className="bg-white p-3">
                         <div className="text-lg font-bold text-gray-900 text-center">
-                          ${tier.price}
+                          {formatCurrency(tier.price, currency, { decimals: false })}
                           <span className="text-xs text-gray-400 font-normal">/yr</span>
                         </div>
-                        <div className="mt-2 space-y-1">
-                          {config.benefits.map((benefit, i) => (
-                            <div key={i} className="text-[10px] text-gray-500 text-center">
-                              {benefit}
-                            </div>
-                          ))}
-                        </div>
-                        {tier.tier === 'black' && (
+                        {typeof tier.tagLimit === 'number' && (
+                          <div className="mt-2 text-[10px] text-gray-500 text-center">
+                            Cover up to {tier.tagLimit} tags
+                          </div>
+                        )}
+                        {tier.comingSoon && (
                           <div className="mt-2 text-[10px] text-gray-400 text-center font-medium">
                             COMING SOON
                           </div>

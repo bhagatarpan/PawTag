@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Users, Search, Filter, Crown, Shield, Diamond } from 'lucide-react';
+import { Users, Search, Filter } from 'lucide-react';
 import { API } from '@pawtag/shared/api';
+import { formatDate } from '@pawtag/shared';
+import { TIER_ICONS } from '@pawtag/ui';
 import api from '../lib/api';
 
 interface Member {
@@ -13,12 +15,6 @@ interface Member {
   currentPeriodEnd: string;
   createdAt: string;
 }
-
-const TIER_ICONS: Record<string, typeof Crown> = {
-  gold: Crown,
-  platinum: Diamond,
-  black: Shield,
-};
 
 export default function MembershipSubscribers() {
   const [members, setMembers] = useState<Member[]>([]);
@@ -50,10 +46,6 @@ export default function MembershipSubscribers() {
     } finally {
       setLoading(false);
     }
-  }
-
-  function formatDate(dateStr: string) {
-    return new Date(dateStr).toLocaleDateString('en-NZ', { year: 'numeric', month: 'short', day: 'numeric' });
   }
 
   return (
@@ -123,7 +115,7 @@ export default function MembershipSubscribers() {
               <tr><td colSpan={6} className="px-6 py-8 text-center text-gray-500">No members found</td></tr>
             ) : members.map((m) => {
               const tier = m.tierId;
-              const Icon = TIER_ICONS[tier?.tier] || Crown;
+              const Icon = TIER_ICONS[tier?.tier] || TIER_ICONS.gold;
               return (
                 <tr key={m._id} className="hover:bg-gray-50">
                   <td className="px-6 py-4">

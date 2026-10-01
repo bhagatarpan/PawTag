@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Crown, Shield, Diamond, ArrowRight, X } from 'lucide-react';
+import { Crown, ArrowRight, X } from 'lucide-react';
 import { API } from '@pawtag/shared/api';
+import { formatCurrency } from '@pawtag/shared';
+import { resolveTierIcon, resolveTierGradient } from '@pawtag/ui';
 import api from '../lib/api';
 
 interface MembershipTier {
@@ -10,14 +12,11 @@ interface MembershipTier {
   name: string;
   displayName: string;
   price: number;
-  gradient: string;
+  currency?: string;
+  comingSoon?: boolean;
+  icon?: string;
+  gradient?: string;
 }
-
-const TIER_CONFIG: Record<string, { icon: typeof Crown; gradient: string; bgGradient: string }> = {
-  gold: { icon: Crown, gradient: 'from-yellow-400 to-amber-500', bgGradient: 'bg-gradient-to-br from-yellow-400 to-amber-500' },
-  platinum: { icon: Diamond, gradient: 'from-gray-300 to-gray-500', bgGradient: 'bg-gradient-to-br from-gray-300 to-gray-500' },
-  black: { icon: Shield, gradient: 'from-gray-800 to-black', bgGradient: 'bg-gradient-to-br from-gray-800 to-black' },
-};
 
 const STORAGE_KEY = 'pawtag_membership_badge_dismissed';
 
@@ -126,8 +125,10 @@ export default function FloatingMembershipBadge() {
           ) : (
             <div className="p-4 space-y-3">
               {tiers.map((tier) => {
-                const config = TIER_CONFIG[tier.tier] || TIER_CONFIG.gold;
-                const Icon = config.icon;
+                const TierIcon = resolveTierIcon(tier.icon, tier.tier);
+                const gradient = resolveTierGradient(tier.tier, tier.gradient);
+                const bgGradient = `bg-gradient-to-br ${gradient}`;
+                const currency = tier.currency || 'NZD';
 
                 return (
                   <Link
@@ -136,15 +137,15 @@ export default function FloatingMembershipBadge() {
                     onClick={() => setIsOpen(false)}
                     className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors group"
                   >
-                    <div className={`${config.bgGradient} w-10 h-10 rounded-xl flex items-center justify-center shrink-0`}>
-                      <Icon className="h-5 w-5 text-white" />
+                    <div className={`${bgGradient} w-10 h-10 rounded-xl flex items-center justify-center shrink-0`}>
+                      <TierIcon className="h-5 w-5 text-white" />
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center justify-between">
                         <span className="font-semibold text-gray-900">{tier.displayName}</span>
-                        <span className="font-bold text-gray-900">${tier.price}<span className="text-xs text-gray-400">/yr</span></span>
+                        <span className="font-bold text-gray-900">{formatCurrency(tier.price, currency, { decimals: false })}<span className="text-xs text-gray-400">/yr</span></span>
                       </div>
-                      {tier.tier === 'black' && (
+                      {tier.comingSoon && (
                         <span className="text-[10px] text-gray-400 font-medium">COMING SOON</span>
                       )}
                     </div>

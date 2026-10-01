@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Crown, Shield, Diamond, CreditCard, Calendar, Tag } from 'lucide-react';
+import { ArrowLeft, CreditCard, Calendar, Tag } from 'lucide-react';
 import { API } from '@pawtag/shared/api';
+import { formatDate } from '@pawtag/shared';
+import { TIER_ICONS, resolveTierGradient } from '@pawtag/ui';
 import api from '../lib/api';
 
 interface MemberDetail {
@@ -18,12 +20,6 @@ interface MemberDetail {
   };
   tags: Array<{ _id: string; tagId: string; status: string }>;
 }
-
-const TIER_ICONS: Record<string, typeof Crown> = {
-  gold: Crown,
-  platinum: Diamond,
-  black: Shield,
-};
 
 export default function MembershipSubscriberDetail() {
   const { id } = useParams<{ id: string }>();
@@ -63,10 +59,6 @@ export default function MembershipSubscriberDetail() {
     }
   }
 
-  function formatDate(dateStr: string) {
-    return new Date(dateStr).toLocaleDateString('en-NZ', { year: 'numeric', month: 'long', day: 'numeric' });
-  }
-
   if (loading) {
     return (
       <div className="flex justify-center py-12">
@@ -85,7 +77,7 @@ export default function MembershipSubscriberDetail() {
 
   const { membership, tags } = data;
   const tier = membership.tierId;
-  const Icon = TIER_ICONS[tier?.tier] || Crown;
+  const Icon = TIER_ICONS[tier?.tier] || TIER_ICONS.gold;
 
   return (
     <div className="max-w-3xl mx-auto py-8 px-4 space-y-6">
@@ -95,7 +87,7 @@ export default function MembershipSubscriberDetail() {
       </Link>
 
       {/* Member Header */}
-      <div className={`rounded-2xl p-6 bg-gradient-to-br ${tier?.tier === 'gold' ? 'from-yellow-400 to-amber-500' : tier?.tier === 'platinum' ? 'from-gray-300 to-gray-500' : 'from-gray-800 to-black'}`}>
+      <div className={`rounded-2xl p-6 bg-gradient-to-br ${resolveTierGradient(tier?.tier || '', tier?.gradient)}`}>
         <div className="flex items-center gap-4">
           <Icon className="h-10 w-10 text-white" />
           <div className="flex-1">

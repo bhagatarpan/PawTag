@@ -1,15 +1,26 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Crown, Check, Shield, CreditCard, AlertTriangle } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Crown, CreditCard, AlertTriangle } from 'lucide-react';
 import { API } from '@pawtag/shared/api';
+import { formatCurrency, formatDate } from '@pawtag/shared';
 import api from '../../lib/api';
-import { BottomSheet } from '@pawtag/ui';
+import { BottomSheet, resolveTierIcon, resolveTierGradient, EntitlementList } from '@pawtag/ui';
 
 interface MembershipStatus {
   hasMembership: boolean;
   membership: {
     _id: string;
-    tierId: { tier: string; displayName: string; price: number; entitlements?: Record<string, { enabled: boolean; value: any; name?: string; description?: string }>; tagLimit?: number };
+    tierId: {
+      _id: string;
+      tier: string;
+      displayName: string;
+      price: number;
+      currency?: string;
+      icon?: string;
+      gradient?: string;
+      entitlements?: Record<string, { enabled: boolean; value: any; name?: string; description?: string }>;
+      tagLimit?: number;
+    };
     status: string;
     price: number;
     currentPeriodStart: string;
@@ -40,20 +51,7 @@ interface Tag {
   };
 }
 
-const TIER_COLORS: Record<string, string> = {
-  gold: 'from-yellow-400 to-amber-500',
-  platinum: 'from-gray-300 to-gray-500',
-  black: 'from-gray-800 to-black',
-};
-
-const TIER_ICONS: Record<string, typeof Crown> = {
-  gold: Crown,
-  platinum: Crown,
-  black: Shield,
-};
-
 export default function MembershipManage() {
-  const navigate = useNavigate();
   const [status, setStatus] = useState<MembershipStatus | null>(null);
   const [tags, setTags] = useState<Tag[]>([]);
   const [invoices, setInvoices] = useState<any[]>([]);
@@ -97,14 +95,6 @@ export default function MembershipManage() {
     }
   }
 
-  function formatDate(dateStr: string) {
-    return new Date(dateStr).toLocaleDateString('en-NZ', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
-  }
-
   if (loading) {
     return (
       <div className="flex justify-center py-12">
@@ -133,8 +123,9 @@ export default function MembershipManage() {
 
   const membership = status.membership!;
   const tier = membership.tierId;
-  const tierGradient = TIER_COLORS[tier.tier] || TIER_COLORS.gold;
-  const TierIcon = TIER_ICONS[tier.tier] || Crown;
+  const tierGradient = resolveTierGradient(tier.tier, tier.gradient);
+  const TierIcon = resolveTierIcon(tier.icon, tier.tier);
+  const tierCurrency = tier.currency || 'NZD';
 
   return (
     <div className="max-w-3xl mx-auto py-8 px-4 space-y-6">
@@ -155,9 +146,9 @@ export default function MembershipManage() {
             </span>
           </div>
           <div className="flex items-center gap-4 text-white/80 text-sm">
-            <span>Active since {formatDate(membership.currentPeriodStart || membership.currentPeriodEnd)}</span>
+            <span>Active since {formatDate(membership.currentPeriodStart || membership.currentPeriodEnd, 'long')}</span>
             <span>·</span>
-            <span>Renews {formatDate(membership.currentPeriodEnd)} (${membership.price}/yr)</span>
+            <span>Renews {formatDate(membership.currentPeriodEnd, 'long')} ({formatCurrency(membership.price, tierCurrency, { decimals: false })}/yr)</span>
           </div>
         </div>
       </div>
@@ -181,55 +172,12 @@ export default function MembershipManage() {
       {/* Benefits */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
         <h2 className="text-sm font-semibold text-gray-900 mb-4">Your Benefits</h2>
-        <ul className="space-y-3">
-          {Object.entries(status.entitlements || tier.entitlements || {}).map(([key, entitlement]) => {
-            if (typeof entitlement.value === 'boolean') {
-              return (
-                <li key={key} className="flex items-center gap-3">
-                  <Check className={`h-5 w-5 ${entitlement.enabled && entitlement.value ? 'text-green-500' : 'text-gray-300'}`} />
-                  <span className={`text-sm ${entitlement.enabled && entitlement.value ? 'text-gray-700' : 'text-gray-400'}`}>
-                    {entitlement.name || key}
-                  </span>
-                </li>
-              );
-            }
-            if (typeof entitlement.value === 'number') {
-              if (key === 'free_shipping_threshold') {
-                if (entitlement.value === 0) {
-                  return (
-                    <li key={key} className="flex items-center gap-3">
-                      <Check className="h-5 w-5 text-green-500" />
-                      <span className="text-sm text-gray-700">LIFETIME Free Shipping</span>
-                    </li>
-                  );
-                }
-                return (
-                  <li key={key} className="flex items-center gap-3">
-                    <Check className="h-5 w-5 text-green-500" />
-                    <span className="text-sm text-gray-700">Free Shipping over ${entitlement.value}</span>
-                  </li>
-                );
-              }
-              if (key === 'points_multiplier') {
-                return (
-                  <li key={key} className="flex items-center gap-3">
-                    <Check className="h-5 w-5 text-green-500" />
-                    <span className="text-sm text-gray-700">{entitlement.value}× Guardian Points</span>
-                  </li>
-                );
-              }
-              if (key === 'accessory_discount' && entitlement.value > 0) {
-                return (
-                  <li key={key} className="flex items-center gap-3">
-                    <Check className="h-5 w-5 text-green-500" />
-                    <span className="text-sm text-gray-700">{entitlement.value}% OFF All Accessories</span>
-                  </li>
-                );
-              }
-            }
-            return null;
-          })}
-        </ul>
+        <EntitlementList
+          entitlements={status.entitlements || tier.entitlements || {}}
+          variant="check"
+          showDisabled={true}
+          tagLimit={tier.tagLimit}
+        />
       </div>
 
       {/* Payment Method */}
@@ -271,13 +219,13 @@ export default function MembershipManage() {
                   <div>
                     <p className="text-sm font-medium text-gray-900">{invoice.invoiceNumber}</p>
                     <p className="text-xs text-gray-500">
-                      {new Date(invoice.createdAt).toLocaleDateString('en-NZ', { dateStyle: 'medium' })} &middot;{' '}
+                      {formatDate(invoice.createdAt, 'medium')} &middot;{' '}
                       <span className="text-green-600 font-medium">{invoice.status}</span>
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
-                  <p className="text-sm font-semibold text-gray-900">${invoice.amount.toFixed(2)}</p>
+                  <p className="text-sm font-semibold text-gray-900">{formatCurrency(invoice.amount, invoice.currency || 'NZD')}</p>
                   <button
                     onClick={async () => {
                       try {
@@ -390,60 +338,23 @@ export default function MembershipManage() {
           <div className="flex items-center gap-3 p-3 bg-amber-50 rounded-xl">
             <AlertTriangle className="h-5 w-5 text-amber-600" />
             <p className="text-sm text-amber-700">
-              Your benefits will remain active until {formatDate(membership.currentPeriodEnd)}.
+              Your benefits will remain active until {formatDate(membership.currentPeriodEnd, 'long')}.
             </p>
           </div>
 
           {/* Benefits being lost */}
           <div className="bg-gray-50 rounded-xl p-4">
             <p className="text-sm font-medium text-gray-900 mb-2">You'll lose these benefits:</p>
-            <ul className="space-y-1.5">
-              {Object.entries(status.entitlements || tier.entitlements || {}).map(([key, entitlement]) => {
-                if (typeof entitlement.value === 'boolean' && entitlement.enabled && entitlement.value) {
-                  return (
-                    <li key={key} className="flex items-center gap-2 text-sm text-gray-600">
-                      <span className="text-red-400">✕</span> {entitlement.name || key}
-                    </li>
-                  );
-                }
-                if (key === 'points_multiplier' && typeof entitlement.value === 'number' && entitlement.value > 1) {
-                  return (
-                    <li key={key} className="flex items-center gap-2 text-sm text-gray-600">
-                      <span className="text-red-400">✕</span> {entitlement.value}× Guardian Points
-                    </li>
-                  );
-                }
-                if (key === 'accessory_discount' && typeof entitlement.value === 'number' && entitlement.value > 0) {
-                  return (
-                    <li key={key} className="flex items-center gap-2 text-sm text-gray-600">
-                      <span className="text-red-400">✕</span> {entitlement.value}% off accessories
-                    </li>
-                  );
-                }
-                return null;
-              })}
-              <li className="flex items-center gap-2 text-sm text-gray-600">
-                <span className="text-red-400">✕</span> Cover up to {tier.tagLimit} tags
-              </li>
-            </ul>
+            <EntitlementList
+              entitlements={status.entitlements || tier.entitlements || {}}
+              variant="cross"
+              tagLimit={tier.tagLimit}
+            />
           </div>
 
-          {/* Downgrade alternative */}
-          <div className="bg-primary-50 border border-primary-200 rounded-xl p-4">
-            <p className="text-sm font-medium text-primary-900 mb-1">Want to keep some benefits?</p>
-            <p className="text-xs text-primary-700 mb-2">
-              Downgrade to Gold for $89/year and keep core benefits including 3 tag coverage.
-            </p>
-            <button
-              onClick={() => {
-                setShowCancelModal(false);
-                navigate('/account/membership/change-tier');
-              }}
-              className="text-sm font-medium text-primary-600 hover:text-primary-700 underline"
-            >
-              Downgrade instead
-            </button>
-          </div>
+          {/* Note: Gold is the lowest tier — there is no downgrade below Gold.
+              The only exit from Gold is cancellation. Downgrade from higher tiers
+              is available on the membership subscribe page. */}
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Reason for cancellation *</label>

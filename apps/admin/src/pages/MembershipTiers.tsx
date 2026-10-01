@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Crown, Shield, Diamond, Edit, Save, X, ExternalLink } from 'lucide-react';
+import { Edit, Save, X, ExternalLink } from 'lucide-react';
 import { API } from '@pawtag/shared/api';
+import { formatCurrency } from '@pawtag/shared';
+import { TIER_ICONS, resolveTierGradient } from '@pawtag/ui';
 import api from '../lib/api';
 
 interface MembershipTier {
@@ -11,6 +13,7 @@ interface MembershipTier {
   displayName: string;
   description: string;
   price: number;
+  currency?: string;
   isActive: boolean;
   comingSoon: boolean;
   displayOrder: number;
@@ -20,12 +23,6 @@ interface MembershipTier {
   gradient?: string;
   entitlements?: Record<string, { enabled: boolean; value: any; name?: string }>;
 }
-
-const TIER_ICONS: Record<string, typeof Crown> = {
-  gold: Crown,
-  platinum: Diamond,
-  black: Shield,
-};
 
 export default function MembershipTiers() {
   const [tiers, setTiers] = useState<MembershipTier[]>([]);
@@ -120,10 +117,11 @@ export default function MembershipTiers() {
       {/* Tier Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         {tiers.map((tier) => {
-          const Icon = TIER_ICONS[tier.tier] || Crown;
+          const Icon = TIER_ICONS[tier.tier] || TIER_ICONS.gold;
+          const gradient = resolveTierGradient(tier.tier, tier.gradient);
           return (
             <div key={tier._id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className={`bg-gradient-to-br ${tier.tier === 'gold' ? 'from-yellow-400 to-amber-500' : tier.tier === 'platinum' ? 'from-gray-300 to-gray-500' : 'from-gray-800 to-black'} p-6 text-white`}>
+              <div className={`bg-gradient-to-br ${gradient} p-6 text-white`}>
                 <div className="flex items-center justify-between">
                   <Icon className="h-8 w-8" />
                   <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${tier.isActive ? 'bg-green-500/20 text-green-100' : 'bg-red-500/20 text-red-100'}`}>
@@ -131,7 +129,7 @@ export default function MembershipTiers() {
                   </span>
                 </div>
                 <h3 className="text-xl font-bold mt-3">{tier.displayName}</h3>
-                <div className="text-3xl font-bold mt-1">${tier.price}<span className="text-sm font-normal">/yr</span></div>
+                <div className="text-3xl font-bold mt-1">{formatCurrency(tier.price, tier.currency || 'NZD', { decimals: false })}<span className="text-sm font-normal">/yr</span></div>
               </div>
               <div className="p-6">
                 <p className="text-sm text-gray-600 mb-4">{tier.description}</p>

@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Crown, Check, ArrowRight, Shield, Diamond } from 'lucide-react';
+import { Crown, Check, ArrowRight } from 'lucide-react';
 import { API } from '@pawtag/shared/api';
+import { formatCurrency } from '@pawtag/shared';
+import { resolveTierIcon, resolveTierGradient, getTierMarketingFlags, EntitlementList } from '@pawtag/ui';
 import api from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import SeoHead from '../components/SeoHead';
@@ -13,18 +15,15 @@ interface MembershipTier {
   displayName: string;
   description: string;
   price: number;
+  currency?: string;
+  displayOrder?: number;
   entitlements: Record<string, { enabled: boolean; value: any; name?: string; description?: string }>;
-  comingSoon: boolean;
-  icon: string;
-  color: string;
-  gradient: string;
+  comingSoon?: boolean;
+  tagLimit?: number;
+  icon?: string;
+  color?: string;
+  gradient?: string;
 }
-
-const TIER_CONFIG: Record<string, { icon: typeof Crown; gradient: string; popular?: boolean; recommended?: boolean }> = {
-  gold: { icon: Crown, gradient: 'from-yellow-400 to-amber-500', popular: true },
-  platinum: { icon: Diamond, gradient: 'from-gray-300 to-gray-500', recommended: true },
-  black: { icon: Shield, gradient: 'from-gray-800 to-black' },
-};
 
 export default function MembershipLanding() {
   const { user } = useAuth();
@@ -98,8 +97,10 @@ export default function MembershipLanding() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               {tiers.map((tier) => {
-                const config = TIER_CONFIG[tier.tier] || TIER_CONFIG.gold;
-                const Icon = config.icon;
+                const TierIcon = resolveTierIcon(tier.icon, tier.tier);
+                const gradient = resolveTierGradient(tier.tier, tier.gradient);
+                const marketing = getTierMarketingFlags(tier.tier);
+                const currency = tier.currency || 'NZD';
 
                 return (
                   <div
@@ -107,13 +108,13 @@ export default function MembershipLanding() {
                     className={`relative rounded-2xl shadow-xl overflow-hidden ${tier.comingSoon ? 'opacity-75' : ''}`}
                   >
                     {/* Card Header */}
-                    <div className={`bg-gradient-to-br ${config.gradient} p-8 text-white`}>
-                      {config.recommended && (
+                    <div className={`bg-gradient-to-br ${gradient} p-8 text-white`}>
+                      {marketing.recommended && (
                         <div className="absolute top-4 right-4 bg-white text-gray-900 px-3 py-1 rounded-full text-xs font-bold">
                           RECOMMENDED
                         </div>
                       )}
-                      {config.popular && (
+                      {marketing.popular && (
                         <div className="absolute top-4 right-4 bg-white/20 text-white px-3 py-1 rounded-full text-xs font-bold">
                           MOST POPULAR
                         </div>
@@ -123,70 +124,24 @@ export default function MembershipLanding() {
                           COMING SOON
                         </div>
                       )}
-                      <Icon className="h-12 w-12 mb-4" />
+                      <TierIcon className="h-12 w-12 mb-4" />
                       <h3 className="text-2xl font-bold mb-2">{tier.displayName}</h3>
                       <p className="text-white/80 text-sm mb-4">{tier.description}</p>
                       <div className="flex items-baseline gap-1">
-                        <span className="text-4xl font-bold">${tier.price}</span>
+                        <span className="text-4xl font-bold">{formatCurrency(tier.price, currency, { decimals: false })}</span>
                         <span className="text-white/80">/year</span>
                       </div>
                     </div>
 
                     {/* Card Body */}
                     <div className="bg-white p-8">
-                      <ul className="space-y-3 mb-8">
-                        {Object.entries(tier.entitlements).map(([key, entitlement]) => {
-                          if (typeof entitlement.value === 'boolean') {
-                            return (
-                              <li key={key} className="flex items-center gap-3">
-                                {entitlement.enabled && entitlement.value ? (
-                                  <Check className="h-5 w-5 text-green-500 shrink-0" />
-                                ) : (
-                                  <Check className="h-5 w-5 text-gray-300 shrink-0" />
-                                )}
-                                <span className={`text-sm ${entitlement.enabled && entitlement.value ? 'text-gray-700' : 'text-gray-400'}`}>
-                                  {entitlement.name || key}
-                                </span>
-                              </li>
-                            );
-                          }
-                          if (typeof entitlement.value === 'number') {
-                            if (key === 'free_shipping_threshold') {
-                              if (entitlement.value === 0) {
-                                return (
-                                  <li key={key} className="flex items-center gap-3">
-                                    <Check className="h-5 w-5 text-green-500 shrink-0" />
-                                    <span className="text-sm text-gray-700">LIFETIME Free Shipping</span>
-                                  </li>
-                                );
-                              }
-                              return (
-                                <li key={key} className="flex items-center gap-3">
-                                  <Check className="h-5 w-5 text-green-500 shrink-0" />
-                                  <span className="text-sm text-gray-700">Free Shipping over ${entitlement.value}</span>
-                                </li>
-                              );
-                            }
-                            if (key === 'points_multiplier') {
-                              return (
-                                <li key={key} className="flex items-center gap-3">
-                                  <Check className="h-5 w-5 text-green-500 shrink-0" />
-                                  <span className="text-sm text-gray-700">{entitlement.value}× Guardian Points</span>
-                                </li>
-                              );
-                            }
-                            if (key === 'accessory_discount' && entitlement.value > 0) {
-                              return (
-                                <li key={key} className="flex items-center gap-3">
-                                  <Check className="h-5 w-5 text-green-500 shrink-0" />
-                                  <span className="text-sm text-gray-700">{entitlement.value}% OFF All Accessories</span>
-                                </li>
-                              );
-                            }
-                          }
-                          return null;
-                        })}
-                      </ul>
+                      <EntitlementList
+                        entitlements={tier.entitlements}
+                        variant="check"
+                        showDisabled={true}
+                        tagLimit={tier.tagLimit}
+                        className="mb-8"
+                      />
 
                       {tier.comingSoon ? (
                         <button

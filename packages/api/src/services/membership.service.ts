@@ -725,6 +725,83 @@ export async function cancelMembership(userId: string, reason?: string) {
   return membership;
 }
 
+// ─── Estimate Tier Change (Proration Preview) ──────────────
+
+export interface TierChangeEstimate {
+  currentTier: { tier: string; displayName: string; price: number };
+  newTier: { tier: string; displayName: string; price: number };
+  remainingDays: number;
+  totalDays: number;
+  proratedAmount: number;
+  currency: string;
+  isUpgrade: boolean;
+  /** ISO date string — frontend formats for display */
+  renewalDate: string;
+}
+
+/**
+ * Calculate a proration estimate for a tier change.
+ *
+ * Returns raw data only — no pre-formatted strings. The frontend is
+ * responsible for currency/date formatting and user-facing copy.
+ */
+export async function estimateTierChange(
+  userId: string,
+  newTierId: string,
+): Promise<TierChangeEstimate> {
+  const membership = await UserMembership.findOne({
+    userId,
+    status: 'active',
+  });
+
+  if (!membership) throw new Error('No active membership found');
+
+  const newTier = await MembershipTier.findById(newTierId).lean();
+  if (!newTier) throw new Error('Membership tier not found');
+  if (!newTier.isActive) throw new Error('This membership tier is not currently available');
+
+  const oldTier = await MembershipTier.findById(membership.tierId).lean();
+  if (oldTier?.tier === newTier.tier) throw new Error('Already on this tier');
+
+  const now = new Date();
+  const periodStart = membership.currentPeriodStart || membership.startDate || now;
+  const periodEnd = membership.currentPeriodEnd;
+
+  const totalDays = Math.max(
+    1,
+    Math.ceil((periodEnd.getTime() - periodStart.getTime()) / (24 * 60 * 60 * 1000)),
+  );
+  const remainingDays = Math.max(
+    0,
+    Math.ceil((periodEnd.getTime() - now.getTime()) / (24 * 60 * 60 * 1000)),
+  );
+
+  const priceDiff = newTier.price - (oldTier?.price || 0);
+  const proratedAmount = Math.round(((priceDiff / totalDays) * remainingDays) * 100) / 100;
+
+  // Prefer tier currency, fall back to membership currency, then NZD
+  const currency = newTier.currency || membership.currency || 'NZD';
+
+  return {
+    currentTier: {
+      tier: oldTier?.tier || 'unknown',
+      displayName: oldTier?.displayName || 'Unknown',
+      price: oldTier?.price || 0,
+    },
+    newTier: {
+      tier: newTier.tier,
+      displayName: newTier.displayName,
+      price: newTier.price,
+    },
+    remainingDays,
+    totalDays,
+    proratedAmount,
+    currency,
+    isUpgrade: priceDiff > 0,
+    renewalDate: periodEnd.toISOString(),
+  };
+}
+
 // ─── Change Tier ─────────────────────────────────────────────
 
 export async function changeTier(
