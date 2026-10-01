@@ -765,6 +765,14 @@ export interface TierChangeEstimate {
   isUpgrade: boolean;
   /** ISO date string — frontend formats for display */
   renewalDate: string;
+  /** For downgrades: estimated Guardian points that will be clawed back */
+  pointsAtRisk: number;
+  /** For downgrades: current Guardian points balance */
+  currentPointsBalance: number;
+  /** For downgrades: list of entitlements that will change (name, currentValue, newValue) */
+  entitlementsLost: Array<{ key: string; name: string; currentValue: any; newValue: any }>;
+  /** For downgrades: ISO date when the downgrade takes effect */
+  downgradeEffectiveDate: string;
 }
 
 /**
@@ -772,6 +780,9 @@ export interface TierChangeEstimate {
  *
  * Returns raw data only — no pre-formatted strings. The frontend is
  * responsible for currency/date formatting and user-facing copy.
+ *
+ * For downgrades, additionally computes points-at-risk and entitlements-lost
+ * so the customer can see exact consequences before accepting.
  */
 export async function estimateTierChange(
   userId: string,
@@ -806,9 +817,59 @@ export async function estimateTierChange(
 
   const priceDiff = newTier.price - (oldTier?.price || 0);
   const proratedAmount = Math.round(((priceDiff / totalDays) * remainingDays) * 100) / 100;
+  const isUpgrade = priceDiff > 0;
 
   // Prefer tier currency, fall back to membership currency, then NZD
   const currency = newTier.currency || membership.currency || 'NZD';
+
+  // For downgrades: compute points-at-risk and entitlements-lost
+  let pointsAtRisk = 0;
+  let currentPointsBalance = 0;
+  let entitlementsLost: Array<{ key: string; name: string; currentValue: any; newValue: any }> = [];
+
+  if (!isUpgrade) {
+    try {
+      // Get Guardian points balance
+      const user = await User.findById(userId).select('guardianPoints').lean();
+      currentPointsBalance = user?.guardianPoints || 0;
+
+      // Get points multipliers from entitlement registry
+      const { membershipEntitlementService } = await import('./membership-entitlement.service');
+      const oldMultiplier = Number(await membershipEntitlementService.getTierValue(oldTier?.tier || 'gold', 'points_multiplier') ?? 1) || 1;
+      const newMultiplier = Number(await membershipEntitlementService.getTierValue(newTier.tier, 'points_multiplier') ?? 1) || 1;
+
+      // Estimate points earned at higher multiplier rate
+      // Formula: points_at_risk = floor(balance × (1 - newMultiplier/oldMultiplier))
+      // This is an approximation — exact calculation requires ledger data (Phase 3)
+      if (oldMultiplier > newMultiplier && currentPointsBalance > 0) {
+        pointsAtRisk = Math.floor(currentPointsBalance * (1 - newMultiplier / oldMultiplier));
+      }
+
+      // Compare entitlements between tiers
+      const oldEntitlements = await membershipEntitlementService.getTierEntitlements(oldTier?.tier || 'gold');
+      const newEntitlements = await membershipEntitlementService.getTierEntitlements(newTier.tier);
+
+      const allKeys = new Set([...Object.keys(oldEntitlements), ...Object.keys(newEntitlements)]);
+      for (const key of allKeys) {
+        const oldVal = oldEntitlements[key];
+        const newVal = newEntitlements[key];
+        const oldValue = oldVal?.value;
+        const newValue = newVal?.value;
+
+        // Only include if the value actually changes
+        if (JSON.stringify(oldValue) !== JSON.stringify(newValue)) {
+          entitlementsLost.push({
+            key,
+            name: oldVal?.name || newVal?.name || key,
+            currentValue: oldValue,
+            newValue,
+          });
+        }
+      }
+    } catch (err) {
+      logger.warn({ err, userId, newTierId }, 'Failed to compute downgrade consequences — estimate will be partial');
+    }
+  }
 
   return {
     currentTier: {
@@ -825,8 +886,12 @@ export async function estimateTierChange(
     totalDays,
     proratedAmount,
     currency,
-    isUpgrade: priceDiff > 0,
+    isUpgrade,
     renewalDate: periodEnd.toISOString(),
+    pointsAtRisk,
+    currentPointsBalance,
+    entitlementsLost,
+    downgradeEffectiveDate: isUpgrade ? '' : periodEnd.toISOString(),
   };
 }
 

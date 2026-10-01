@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Check, Loader2, ArrowLeft, CreditCard, Info, TrendingUp } from 'lucide-react';
+import { Check, Loader2, ArrowLeft, CreditCard, Info, TrendingUp, AlertTriangle, Clock } from 'lucide-react';
 import { API } from '@pawtag/shared/api';
 import { formatCurrency, formatDate } from '@pawtag/shared';
 import { resolveTierIcon, resolveTierGradient, getTierMarketingFlags, EntitlementList } from '@pawtag/ui';
@@ -44,6 +44,10 @@ interface TierChangeEstimate {
   currency: string;
   isUpgrade: boolean;
   renewalDate: string;
+  pointsAtRisk: number;
+  currentPointsBalance: number;
+  entitlementsLost: Array<{ key: string; name: string; currentValue: any; newValue: any }>;
+  downgradeEffectiveDate: string;
 }
 
 export default function MembershipSubscribe() {
@@ -62,7 +66,11 @@ export default function MembershipSubscribe() {
   const [estimate, setEstimate] = useState<TierChangeEstimate | null>(null);
   const [estimateLoading, setEstimateLoading] = useState(false);
   const [confirmingUpgrade, setConfirmingUpgrade] = useState(false);
-  const [upgradeResult, setUpgradeResult] = useState<{ invoiceNumber?: string; prorationAmount?: number; currency?: string } | null>(null);
+  const [upgradeResult, setUpgradeResult] = useState<{ invoiceNumber?: string; prorationAmount?: number; currency?: string; isDowngrade?: boolean; effectiveDate?: string } | null>(null);
+
+  // Downgrade consent state
+  const [downgradeTermsAccepted, setDowngradeTermsAccepted] = useState(false);
+  const [downgradeReason, setDowngradeReason] = useState('');
 
   const hasActiveMembership = currentMembership?.hasMembership && currentMembership.membership?.status === 'active';
   const currentTier = currentMembership?.tier || currentMembership?.membership?.tierId || null;
@@ -214,10 +222,49 @@ export default function MembershipSubscribe() {
 
   /**
    * Second confirmation step: user has seen the proration estimate and clicks confirm.
+   * For upgrades: calls changeTier endpoint (immediate).
+   * For downgrades: calls downgrade endpoint (deferred) — requires terms acceptance.
    */
   async function handleConfirmUpgrade(tier: MembershipTier) {
+    // For downgrades, require terms acceptance
+    if (estimate && !estimate.isUpgrade && !downgradeTermsAccepted) {
+      setError('You must accept the downgrade terms to proceed');
+      return;
+    }
+
     setConfirmingUpgrade(true);
-    await handleChangeTier(tier);
+    setError('');
+
+    if (estimate && !estimate.isUpgrade) {
+      // Downgrade flow — deferred to renewal
+      await handleDowngrade(tier);
+    } else {
+      // Upgrade flow — immediate
+      await handleChangeTier(tier);
+    }
+  }
+
+  async function handleDowngrade(tier: MembershipTier) {
+    try {
+      await api.post(API.customer.membership.downgrade, {
+        tierId: tier._id,
+        reason: downgradeReason || undefined,
+        termsAccepted: true,
+        termsVersion: 'v1',
+      });
+
+      setUpgradeResult({
+        isDowngrade: true,
+        effectiveDate: estimate?.downgradeEffectiveDate,
+      });
+
+      setSuccess(true);
+      setTimeout(() => navigate('/account/membership'), 5000);
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to schedule downgrade');
+      setProcessing(false);
+      setConfirmingUpgrade(false);
+    }
   }
 
   async function handlePaymentSuccess(paymentIntentId: string) {
@@ -269,25 +316,48 @@ export default function MembershipSubscribe() {
         <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
           <Check size={32} className="text-green-600" />
         </div>
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Welcome to {selectedTier?.displayName}!</h1>
-        <p className="text-gray-500">
-          {hasActiveMembership
-            ? 'Your membership has been updated.'
-            : 'Your membership is being activated.'}
-        </p>
-        {upgradeResult?.invoiceNumber && (
-          <div className="mt-6 p-4 bg-primary-50 border border-primary-200 rounded-xl text-left">
-            <p className="text-sm font-semibold text-primary-900 mb-1">Upgrade invoice</p>
-            <p className="text-sm text-primary-700">
-              {upgradeResult.invoiceNumber}
-              {upgradeResult.prorationAmount !== undefined && upgradeResult.prorationAmount > 0 && (
-                <> — {formatCurrency(upgradeResult.prorationAmount, upgradeResult.currency || 'NZD')} prorated charge</>
-              )}
+        {upgradeResult?.isDowngrade ? (
+          <>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">Downgrade Scheduled</h1>
+            <p className="text-gray-500">
+              Your downgrade to {selectedTier?.displayName} has been scheduled for{' '}
+              {upgradeResult.effectiveDate ? formatDate(upgradeResult.effectiveDate, 'medium') : 'renewal'}.
             </p>
-            <p className="text-xs text-primary-600 mt-2">
-              A copy has been emailed to you. You can also view it in Billing History.
+            <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-xl text-left">
+              <p className="text-sm font-semibold text-amber-900 mb-2">What happens next:</p>
+              <ul className="text-sm text-amber-700 space-y-1">
+                <li>✓ Your {currentTier?.displayName || 'current'} benefits remain active until renewal</li>
+                <li>✓ At renewal, your membership switches to {selectedTier?.displayName}</li>
+                {estimate && estimate.pointsAtRisk > 0 && (
+                  <li>⚠ You will lose {estimate.pointsAtRisk} Guardian points</li>
+                )}
+              </ul>
+            </div>
+            <p className="text-sm text-gray-400 mt-4">A confirmation email has been sent.</p>
+          </>
+        ) : (
+          <>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">Welcome to {selectedTier?.displayName}!</h1>
+            <p className="text-gray-500">
+              {hasActiveMembership
+                ? 'Your membership has been updated.'
+                : 'Your membership is being activated.'}
             </p>
-          </div>
+            {upgradeResult?.invoiceNumber && (
+              <div className="mt-6 p-4 bg-primary-50 border border-primary-200 rounded-xl text-left">
+                <p className="text-sm font-semibold text-primary-900 mb-1">Upgrade invoice</p>
+                <p className="text-sm text-primary-700">
+                  {upgradeResult.invoiceNumber}
+                  {upgradeResult.prorationAmount !== undefined && upgradeResult.prorationAmount > 0 && (
+                    <> — {formatCurrency(upgradeResult.prorationAmount, upgradeResult.currency || 'NZD')} prorated charge</>
+                  )}
+                </p>
+                <p className="text-xs text-primary-600 mt-2">
+                  A copy has been emailed to you. You can also view it in Billing History.
+                </p>
+              </div>
+            )}
+          </>
         )}
         <p className="text-sm text-gray-400 mt-4">Redirecting...</p>
       </div>
@@ -401,17 +471,102 @@ export default function MembershipSubscribe() {
             </p>
           </div>
 
+          {/* Downgrade consequences — shown only for downgrades */}
+          {!estimate.isUpgrade && (
+            <div className="mb-4 space-y-3">
+              {/* Points at risk */}
+              {estimate.pointsAtRisk > 0 && (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-1">
+                    <AlertTriangle size={16} className="text-red-600" />
+                    <span className="text-sm font-semibold text-red-800">Points at Risk</span>
+                  </div>
+                  <p className="text-sm text-red-700">
+                    You will lose <strong>{estimate.pointsAtRisk} Guardian points</strong> when this downgrade takes effect.
+                    Your balance will change from {estimate.currentPointsBalance} to {estimate.currentPointsBalance - estimate.pointsAtRisk} points.
+                  </p>
+                </div>
+              )}
+
+              {/* Entitlements lost */}
+              {estimate.entitlementsLost.length > 0 && (
+                <div className="bg-white rounded-xl border border-gray-200 p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Info size={16} className="text-amber-600" />
+                    <span className="text-sm font-semibold text-gray-800">Benefits That Will Change</span>
+                  </div>
+                  <ul className="space-y-1.5">
+                    {estimate.entitlementsLost.map((item) => (
+                      <li key={item.key} className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600">{item.name}</span>
+                        <span className="text-red-600 font-medium">
+                          {String(item.currentValue)} → {String(item.newValue)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Effective date */}
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <Clock size={16} className="text-amber-600" />
+                  <span className="text-sm font-semibold text-amber-800">Effective Date</span>
+                </div>
+                <p className="text-sm text-amber-700">
+                  {estimate.newTier.displayName} benefits will be active from {formatDate(estimate.downgradeEffectiveDate, 'medium')}.
+                  Your current {estimate.currentTier.displayName} benefits remain until then.
+                </p>
+              </div>
+
+              {/* Terms acceptance checkbox */}
+              <div className="bg-white rounded-xl border border-gray-200 p-4">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={downgradeTermsAccepted}
+                    onChange={(e) => setDowngradeTermsAccepted(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                  />
+                  <span className="text-sm text-gray-700">
+                    I understand that my {estimate.currentTier.displayName} benefits will change to {estimate.newTier.displayName} benefits at renewal, and I will lose {estimate.pointsAtRisk > 0 ? `${estimate.pointsAtRisk} Guardian points` : 'any accumulated points bonus'}.
+                  </span>
+                </label>
+              </div>
+
+              {/* Optional reason */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Reason (optional)</label>
+                <select
+                  value={downgradeReason}
+                  onChange={(e) => setDowngradeReason(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm"
+                >
+                  <option value="">Select a reason</option>
+                  <option value="too_expensive">Too expensive</option>
+                  <option value="not_using">Not using the benefits</option>
+                  <option value="found_alternative">Found an alternative</option>
+                  <option value="poor_experience">Poor experience</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+            </div>
+          )}
+
           {/* Confirm / Cancel */}
           <div className="flex gap-3">
             <button
               onClick={() => handleConfirmUpgrade(selectedTier)}
-              disabled={confirmingUpgrade || estimateLoading}
+              disabled={confirmingUpgrade || estimateLoading || (!estimate.isUpgrade && !downgradeTermsAccepted)}
               className={`flex-1 py-3 px-4 rounded-xl font-semibold transition-colors ${
                 confirmingUpgrade
                   ? 'bg-primary-400 text-white cursor-wait'
-                  : estimate.isUpgrade
-                    ? 'bg-primary-600 text-white hover:bg-primary-700'
-                    : 'bg-amber-600 text-white hover:bg-amber-700'
+                  : (!estimate.isUpgrade && !downgradeTermsAccepted)
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : estimate.isUpgrade
+                      ? 'bg-primary-600 text-white hover:bg-primary-700'
+                      : 'bg-amber-600 text-white hover:bg-amber-700'
               }`}
             >
               {confirmingUpgrade ? (
@@ -421,11 +576,11 @@ export default function MembershipSubscribe() {
               ) : (
                 estimate.isUpgrade
                   ? `Confirm Upgrade — ${formatCurrency(estimate.proratedAmount, estimate.currency)}`
-                  : 'Confirm Change'
+                  : 'Schedule Downgrade'
               )}
             </button>
             <button
-              onClick={() => { setEstimate(null); setSelectedTier(null); setConfirmingUpgrade(false); }}
+              onClick={() => { setEstimate(null); setSelectedTier(null); setConfirmingUpgrade(false); setDowngradeTermsAccepted(false); setDowngradeReason(''); }}
               disabled={confirmingUpgrade}
               className="py-3 px-6 rounded-xl font-medium text-gray-600 bg-white border border-gray-300 hover:bg-gray-50 transition-colors"
             >
