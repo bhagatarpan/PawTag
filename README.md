@@ -123,6 +123,7 @@ The current engineering stage is:
 | Stripe payments | Implemented | Requires webhook/configuration/failure-path validation |
 | Orders/refunds | Implemented | Requires reconciliation and idempotency validation |
 | Guardian/subscriptions | Implemented in code | Validate billing lifecycle before depending on it commercially |
+| Membership lifecycle | Upgrade/downgrade/renewal/cancellation implemented | Deferred downgrade with points clawback; dunning state; payment method management |
 | Admin portal | Broadly implemented | Focus on operational safety, RBAC and destructive actions |
 | CMS | Broadly implemented | Supporting feature; not core to first-customer proof |
 | Mobile app | Meaningfully implemented | Not yet recommended as a first-customer launch dependency |
@@ -1010,10 +1011,14 @@ All membership benefits are driven from a single source of truth: the **Membersh
 
 ### Key Features
 
-- **Annual renewal:** Memberships renew yearly automatically
-- **Cancellation:** Members receive email detailing lost benefits, benefits continue until period end
-- **Tier management:** Members can upgrade/downgrade tiers via customer portal
-- **Email notifications:** Renewal reminders (30/7 days), cancellations, tier changes send confirmation emails
+- **Annual renewal:** Memberships renew yearly automatically via Stripe
+- **Upgrades:** Effective immediately with prorated charge; new benefits activate now
+- **Downgrades:** Effective at end of current subscription cycle; customer sees points-at-risk and entitlements-lost before accepting
+- **Points clawback:** On downgrade, customer loses multiplier bonus on points earned at higher tier rate
+- **Cancellation:** `cancel_at_period_end` — benefits continue until period end
+- **Payment failure handling:** Dunning state, customer notification, CSR alert; Stripe retries automatically
+- **Payment method management:** Customers manage cards via Stripe Billing Portal
+- **Email notifications:** Renewal reminders (30/7 days), cancellations, tier changes, payment failures
 - **Tag extension:** Membership extends all tags within tier limit for 12 months
 
 ### Technical Details
@@ -1023,8 +1028,14 @@ All membership benefits are driven from a single source of truth: the **Membersh
 - **Customer API:** `GET /api/membership/entitlements` — user's current entitlements
 - **Endpoint:** `POST /api/membership/subscribe` — Create membership subscription
 - **Endpoint:** `POST /api/membership/activate` — Activate after payment
+- **Endpoint:** `POST /api/membership/change-tier` — Immediate upgrade
+- **Endpoint:** `POST /api/membership/downgrade` — Deferred downgrade (requires terms acceptance)
+- **Endpoint:** `GET /api/membership/payment-methods` — List saved cards
+- **Endpoint:** `POST /api/membership/payment-methods/portal` — Stripe Billing Portal
 - **Tag Status:** Use `calculateTagStatus()` service to check tag status (active/limited/expired)
 - **Active Period Check:** Background job runs daily to send warnings and update tag status
+- **Scheduled Downgrades:** Background job runs every 5 minutes to execute pending downgrades
+- **Full lifecycle documentation:** `docs/MEMBERSHIP-LIFECYCLE-SYSTEM.md`
 
 ---
 

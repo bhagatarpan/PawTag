@@ -1749,3 +1749,63 @@ Global notification settings appear at the bottom of the Background Jobs page:
 - Default notify-on-success (off) and notify-on-failure (on)
 - Email recipient field (falls back to ADMIN_ALERT_EMAIL env var)
 - Per-job overrides configurable in the edit modal
+
+---
+
+## Membership Downgrade Consent Pattern
+
+When a customer requests a downgrade (e.g. Platinum → Gold), the UI must show exact consequences and require explicit consent before proceeding.
+
+### Estimate Panel (Amber variant)
+
+Used on `/account/membership/subscribe` when an existing member selects a lower tier.
+
+| Element | Classes / Behavior |
+|---------|-------------------|
+| **Container** | `mb-6 rounded-2xl border-2 p-6 bg-amber-50 border-amber-300` |
+| **Header icon** | Lucide `Info` `size={20} className="text-amber-600 shrink-0 mt-0.5"` |
+| **Title** | `font-semibold text-gray-900 mb-1` — "Downgrade to {tier}" |
+| **Cost breakdown** | `bg-white rounded-xl border border-gray-200 p-4 mb-4 space-y-2` |
+| **Points at risk box** | `bg-red-50 border border-red-200 rounded-xl p-4` |
+| **Points risk icon** | Lucide `AlertTriangle` `size={16} className="text-red-600"` |
+| **Points risk label** | `text-sm font-semibold text-red-800` — "Points at Risk" |
+| **Points risk body** | `text-sm text-red-700` — "You will lose {N} Guardian points..." |
+| **Entitlements list** | `bg-white rounded-xl border border-gray-200 p-4` |
+| **Entitlement row** | `flex items-center justify-between text-sm` — name left, value change right |
+| **Entitlement value** | `text-red-600 font-medium` — "oldValue → newValue" |
+| **Effective date box** | `bg-amber-50 border border-amber-200 rounded-xl p-4` |
+| **Effective date icon** | Lucide `Clock` `size={16} className="text-amber-600"` |
+| **Terms checkbox** | Required — `bg-white rounded-xl border border-gray-200 p-4` |
+| **Checkbox label** | `text-sm text-gray-700` — "I understand and accept these changes..." |
+| **Reason select** | Optional — standard form select |
+| **Confirm button** | `bg-amber-600 text-white hover:bg-amber-700` — "Schedule Downgrade" |
+| **Confirm disabled** | `bg-gray-300 text-gray-500 cursor-not-allowed` — until checkbox checked |
+| **Cancel button** | `text-gray-600 bg-white border border-gray-300 hover:bg-gray-50` |
+
+### Downgrade Success Screen
+
+| Element | Classes / Behavior |
+|---------|-------------------|
+| **Container** | `max-w-md mx-auto px-4 py-20 text-center` |
+| **Checkmark** | `w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6` |
+| **Title** | `text-2xl font-bold text-gray-900 mb-2` — "Downgrade Scheduled" |
+| **Message** | `text-gray-500` — "Your downgrade to {tier} has been scheduled for {date}." |
+| **Summary box** | `mt-6 p-4 bg-amber-50 border border-amber-200 rounded-xl text-left` |
+| **Summary title** | `text-sm font-semibold text-amber-900 mb-2` — "What happens next:" |
+| **Summary items** | `text-sm text-amber-700 space-y-1` — checkmarks + what stays/changes |
+
+### CSR Admin — Evidence Modal
+
+Used in admin `MembershipSubscriberDetail` for Change Tier and Cancel actions.
+
+| Element | Classes / Behavior |
+|---------|-------------------|
+| **Backdrop** | `fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4` |
+| **Card** | `bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto` |
+| **Evidence section** | `space-y-3 border-t border-gray-100 pt-4` |
+| **Field label** | `block text-xs font-medium text-gray-500 mb-1` — required fields marked with `*` |
+| **Input** | `w-full px-3 py-2 border border-gray-300 rounded-lg text-sm` |
+| **Textarea** | Same as input + `resize-none` |
+| **Required indicator** | Red asterisk `*` after label text |
+| **Submit button** | `bg-blue-600 text-white hover:bg-blue-700` (Change Tier) / `bg-red-600` (Cancel) |
+| **Loading state** | Lucide `Loader2` `className="h-4 w-4 animate-spin inline mr-1"` |

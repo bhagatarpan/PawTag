@@ -91,18 +91,74 @@ if (ownerTier !== 'black') { ... }
 
 ## Tier Changes (Upgrade/Downgrade)
 
-- Backend: `changeTier(userId, newTierId, prorationBehavior)`
-- Proration options: `'now'` (immediate prorated charge) or `'next_billing_cycle'` (takes effect at renewal)
-- Tag re-evaluation: `removeMembershipFromTags()` + `extendTagsForMembership()` called automatically
-- Retention offer: Generated for downgrades, included in email
+### Upgrades (immediate)
+- Backend: `changeTier(userId, newTierId, prorationBehavior: 'now')`
+- Stripe subscription price updated with `proration_behavior: 'create_prorations'`
+- Proration invoice created immediately (INVM- prefix)
+- New benefits activate immediately
+- Invoice email + tier-change email sent
+- Tag re-evaluation: `removeMembershipFromTags()` + `extendTagsForMembership()`
 
-## Cancellation
+### Downgrades (deferred to renewal)
+- Backend: `requestDowngrade(userId, { tierId, reason, termsAccepted, termsVersion })`
+- **Requires explicit terms acceptance** — customer must see points-at-risk and entitlements-lost
+- Records `pendingTierId`, `pendingTierEffectiveAt`, `downgradeTermsAcceptedAt` on membership
+- Stripe subscription price updated for next renewal (no immediate charge)
+- Current tier benefits REMAIN ACTIVE until `currentPeriodEnd`
+- Background job `processScheduledDowngrades()` executes at period end:
+  - Checks Stripe renewal succeeded before executing
+  - Flips `tierId` to `pendingTierId`
+  - Applies Guardian Points clawback
+  - Re-evaluates tags
+  - Invalidates entitlement cache
+  - Sends downgrade-executed email
+- If renewal failed: keeps current tier, notifies customer
+
+### Guardian Points Clawback (on downgrade)
+- Formula: `floor(points_at_higher_tier × (1 - newMultiplier / oldMultiplier))`
+- Example: Black (3×) → Gold (1×): lose 2/3 of points earned at Black rate
+- Applied by `applyDowngradePointsClawback()` in `points-earning.service.ts`
+- Idempotent — checks for existing clawback by `referenceId`
+- Ledger entry with `activity: 'membership_downgrade_clawback'`
+- Points ledger metadata includes `basePoints`, `multiplier`, `bonusPoints` (forward-only)
+
+## Cancellation (deferred to period end)
 
 - Backend: `cancelMembership(userId, reason)`
+- Uses Stripe `cancel_at_period_end: true` — NOT immediate cancel
+- `User.membershipTier` remains active until `currentPeriodEnd`
+- Tags remain active until `currentPeriodEnd`
+- `autoRenew` set to false immediately
+- Benefits continue until period end (matches email copy)
+- `checkExpiredMemberships` job transitions to 'expired' at period end
 - Generates retention offer (15% off + free shipping)
-- Includes offer in cancellation email
-- Removes membership from tags
-- Audit logged with full metadata
+- Audit logged with `cancelAtPeriodEnd: true` metadata
+
+## Payment Failure Handling
+
+- Webhook `invoice.payment_failed` handles `UserMembership` (not just tag Subscriptions)
+- Records failed invoice (INVM- prefix, status: 'failed')
+- Updates `dunningStatus: 'past_due'`, increments `dunningRetryCount`
+- Notifies customer via email + in-app notification
+- Alerts CSR via admin alert email
+- Stripe retries automatically (~4 times over ~2 weeks)
+- Membership NOT expired on first failure — grace period applies
+
+## Renewal Handling
+
+- Webhook `invoice.payment_succeeded` with `billing_reason: 'subscription_cycle'`
+- Advances `currentPeriodStart/End` by 1 year (from Stripe invoice period)
+- Resets `dunningStatus: 'active'`, `dunningRetryCount: 0`
+- Creates INVM- invoice + sends renewal confirmation email
+- Idempotent by `stripeInvoiceId`
+
+## Payment Method Management
+
+- Card display data populated from Stripe subscription after activation
+- `GET /membership/payment-methods` — lists cards from Stripe Customer
+- `POST /membership/payment-methods/portal` — Stripe Billing Portal session
+- Customer can add/change/delete cards via Stripe-hosted portal
+- "Update" button in MembershipManage opens portal
 
 ## Notifications
 
@@ -110,10 +166,12 @@ All lifecycle events create in-app notifications via `createAndDeliverNotificati
 - `membership_activated` — Welcome
 - `membership_cancelled` — Cancellation confirmation
 - `membership_upgraded` — Upgrade confirmation
-- `membership_downgraded` — Downgrade confirmation
+- `membership_downgrade_scheduled` — Downgrade scheduled
+- `membership_downgraded` — Downgrade executed
 - `membership_extended` — Admin extension
 - `membership_expired` — Expiry warning
 - `membership_renewal_reminder` — 30/7 day renewal reminder
+- `membership_payment_failed` — Payment failure alert
 
 ## Pet Recovery (Black-Only)
 

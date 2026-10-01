@@ -652,6 +652,72 @@ Finder pet-found and emergency escalation notifications respect the entitlement 
 
 ---
 
+# 16b. Membership Lifecycle Rules
+
+## Upgrade vs Downgrade
+
+| Action | Timing | Stripe | Local State |
+|---|---|---|---|
+| **Upgrade** | Immediate | `proration_behavior: 'create_prorations'`, charges now | `tierId` changes immediately |
+| **Downgrade** | Deferred to renewal | Price updated for next renewal, no immediate charge | `pendingTierId` set, current tier active until `currentPeriodEnd` |
+
+## Downgrade Business Rules
+
+1. **Customer must accept terms** — see points-at-risk and entitlements-lost before confirming
+2. **Guardian Points clawback** — customer loses multiplier bonus on points earned at higher tier rate
+3. **Entitlements revert at renewal** — free shipping threshold, accessory discount, tag limit, etc.
+4. **Current benefits remain active** until `currentPeriodEnd`
+5. **Background job executes** at period end: flips tier, applies clawback, re-evaluates tags
+
+## Points Clawback Formula
+
+```
+clawback = floor(points_at_higher_tier × (1 - newMultiplier / oldMultiplier))
+```
+
+Example: Black (3×) → Gold (1×): customer loses 2/3 of points earned at Black rate.
+
+## Cancellation Rules
+
+- Use `cancel_at_period_end: true` in Stripe (NOT immediate cancel)
+- Benefits remain active until `currentPeriodEnd`
+- `User.membershipTier` NOT nulled until expiry
+- Tags remain active until expiry
+- Email copy must match actual behavior
+
+## Payment Failure Rules
+
+- Webhook `invoice.payment_failed` handles `UserMembership` (not just tag Subscriptions)
+- Records failed invoice, updates `dunningStatus: 'past_due'`
+- Notifies customer + alerts CSR
+- Stripe retries automatically; membership NOT expired on first failure
+- Expiry only after grace period or all retries exhausted
+
+## Renewal Rules
+
+- Webhook `invoice.payment_succeeded` with `billing_reason: 'subscription_cycle'`
+- Advances `currentPeriodStart/End` by 1 year
+- Resets dunning state
+- Creates INVM- invoice + sends renewal email
+- Idempotent by `stripeInvoiceId`
+
+## Payment Method Management
+
+- Card display data populated from Stripe subscription after activation
+- Customer manages cards via Stripe Billing Portal
+- `GET /membership/payment-methods` — list from Stripe Customer
+- `POST /membership/payment-methods/portal` — Billing Portal session
+
+## Audit Requirements
+
+Every membership lifecycle action must generate audit events with:
+- `subjectUserId` (customer affected, distinct from actorId)
+- Real request context (IP, user-agent) where available
+- Business metadata (tier IDs, amounts, reasons)
+- Downgrade acceptance metadata (termsVersion, termsAcceptedAt)
+
+---
+
 # 17. HYBRID 2 Tag Lifecycle Rules
 
 PawTag uses the HYBRID 2 model for tag lifecycle management.
