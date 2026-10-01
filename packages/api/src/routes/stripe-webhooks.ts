@@ -27,7 +27,7 @@
  */
 
 import { Router, Request, Response } from 'express';
-import { Order, Invoice, InvoiceAccessToken, Subscription, Tag, User, Notification, WebhookEvent, PendingOrder, PaymentTransaction, UserMembership } from '@pawtag/db';
+import { Order, Invoice, InvoiceAccessToken, Subscription, Tag, User, Notification, WebhookEvent, PendingOrder, PaymentTransaction, UserMembership, MembershipTier } from '@pawtag/db';
 import { stripePaymentProvider } from '../commerce/providers/stripe';
 import { checkoutService } from '../commerce/services/checkout.service';
 import { isFakeMode } from '../commerce/payment-mode';
@@ -261,7 +261,7 @@ async function handlePaymentIntentFailed(paymentIntent: any): Promise<void> {
 }
 
 /**
- * Handle invoice.payment_succeeded (subscription renewal + membership proration).
+ * Handle invoice.payment_succeeded for memberships (renewal + proration).
  */
 async function handleInvoicePaymentSucceeded(invoice: any): Promise<void> {
   if (!invoice?.subscription) return;
@@ -279,11 +279,9 @@ async function handleInvoicePaymentSucceeded(invoice: any): Promise<void> {
         await activateMembership(membership._id.toString());
         logger.info({ membershipId: membership._id, stripeSubscriptionId: invoice.subscription }, 'Membership activated via webhook (invoice.payment_succeeded)');
       } else if (membership && membership.status === 'active') {
-        // Proration invoice on an already-active membership (tier upgrade/downgrade).
-        // changeTier may have already created the invoice synchronously — this is
-        // the recovery path if that process crashed after Stripe charged but before
-        // the local invoice was written.
-        await handleMembershipProrationInvoice(membership, invoice);
+        // Invoice on an already-active membership.
+        // This handles BOTH proration invoices (tier change) AND renewal invoices.
+        await handleMembershipInvoice(membership, invoice);
       }
     } catch (err) {
       logger.error({ err, stripeSubscriptionId: invoice.subscription }, 'Failed to process membership invoice from webhook');
@@ -359,27 +357,41 @@ async function handleInvoicePaymentSucceeded(invoice: any): Promise<void> {
 }
 
 /**
- * Handle a proration invoice on an already-active membership (tier upgrade/downgrade).
+ * Handle a membership invoice — both proration (tier change) and renewal.
  *
- * This is the webhook recovery path: if changeTier() crashed after Stripe charged
- * the proration but before the local invoice was created, this handler creates the
- * invoice and sends the email. If changeTier already created the invoice, the
- * stripeInvoiceId idempotency check makes this a no-op.
+ * For proration invoices (billing_reason: 'subscription_update'):
+ *   Creates the INVM- invoice and sends email.
+ *   changeTier may have already done this — stripeInvoiceId idempotency prevents duplicates.
+ *
+ * For renewal invoices (billing_reason: 'subscription_cycle'):
+ *   Creates the INVM- invoice, extends currentPeriodStart/End by 1 year,
+ *   resets dunning state, and sends renewal confirmation.
+ *   This is critical: without period advancement, checkExpiredMemberships
+ *   would expire the membership even though Stripe charged successfully.
  */
-async function handleMembershipProrationInvoice(membership: any, stripeInvoice: any): Promise<void> {
+async function handleMembershipInvoice(membership: any, stripeInvoice: any): Promise<void> {
   if (!stripeInvoice?.id) return;
 
   // Idempotency: skip if invoice already exists for this Stripe invoice
   const existingInvoice = await Invoice.findOne({ stripeInvoiceId: stripeInvoice.id });
   if (existingInvoice) {
-    logger.info({ membershipId: membership._id, stripeInvoiceId: stripeInvoice.id }, 'Membership proration invoice already recorded — skipping');
+    logger.info({ membershipId: membership._id, stripeInvoiceId: stripeInvoice.id }, 'Membership invoice already recorded — skipping');
     return;
   }
 
   const amountPaid = (stripeInvoice.amount_paid || 0) / 100;
-  if (amountPaid <= 0) return;
+  const billingReason = stripeInvoice.billing_reason || 'subscription_update';
+  const isRenewal = billingReason === 'subscription_cycle';
+
+  // For renewal invoices, we must advance the period even if amountPaid is 0
+  // (e.g. full credit applied). For proration, only create invoice if positive.
+  if (!isRenewal && amountPaid <= 0) return;
 
   const currency = (stripeInvoice.currency || 'nzd').toUpperCase();
+
+  // Determine billing period from Stripe invoice
+  const stripePeriodStart = stripeInvoice.period_start ? new Date(stripeInvoice.period_start * 1000) : membership.currentPeriodStart || new Date();
+  const stripePeriodEnd = stripeInvoice.period_end ? new Date(stripeInvoice.period_end * 1000) : undefined;
 
   // Generate invoice number using the same atomic counter as activateMembership
   const counter = await UserMembership.db!.collection('counters').findOneAndUpdate(
@@ -399,8 +411,8 @@ async function handleMembershipProrationInvoice(membership: any, stripeInvoice: 
     stripeInvoiceId: stripeInvoice.id,
     stripeSubscriptionId: membership.stripeSubscriptionId,
     billingPeriod: {
-      start: membership.currentPeriodStart || new Date(),
-      end: membership.currentPeriodEnd || new Date(),
+      start: isRenewal ? stripePeriodStart : (membership.currentPeriodStart || stripePeriodStart),
+      end: isRenewal ? (stripePeriodEnd || membership.currentPeriodEnd) : (membership.currentPeriodEnd || stripePeriodEnd),
     },
     paidAt: new Date(),
   });
@@ -410,36 +422,79 @@ async function handleMembershipProrationInvoice(membership: any, stripeInvoice: 
     invoiceId: pawtagInvoice._id,
     invoiceNumber,
     amountPaid,
+    billingReason,
+    isRenewal,
     stripeInvoiceId: stripeInvoice.id,
-  }, 'Membership proration invoice created via webhook');
+  }, `Membership ${isRenewal ? 'renewal' : 'proration'} invoice created via webhook`);
 
-  // Send invoice email (fire-and-forget with logged errors)
-  try {
-    const { generateInvoiceHtml } = await import('../services/invoice-html.service');
-    const { sendInvoiceEmail } = await import('../services/email.service');
-    const { generateSecureToken, hashToken } = await import('../services/auth.service');
-    const { InvoiceAccessToken } = await import('@pawtag/db');
+  // For renewal invoices: advance the membership period and reset dunning state
+  if (isRenewal && stripePeriodEnd) {
+    const previousPeriodEnd = membership.currentPeriodEnd;
+    membership.currentPeriodStart = stripePeriodStart;
+    membership.currentPeriodEnd = stripePeriodEnd;
+    membership.dunningStatus = 'active';
+    membership.dunningRetryCount = 0;
+    membership.dunningLastAttemptAt = undefined;
+    await membership.save();
 
-    const user = await User.findById(membership.userId).select('email fullName').lean();
-    if (user?.email) {
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-      const secureToken = generateSecureToken();
-      const tokenHash = hashToken(secureToken);
-      await InvoiceAccessToken.create({
-        invoiceId: pawtagInvoice._id,
-        userId: membership.userId,
-        tokenHash,
-        expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
-        verifiedAt: new Date(),
-      });
-      const invoiceUrl = `${frontendUrl}/account/invoices/${invoiceNumber}?token=${secureToken}`;
+    logger.info({
+      membershipId: membership._id,
+      previousPeriodEnd,
+      newPeriodEnd: stripePeriodEnd,
+    }, 'Membership renewal period advanced via webhook');
 
-      const invoiceHtml = await generateInvoiceHtml(pawtagInvoice._id.toString());
-      await sendInvoiceEmail(user.email, user.fullName, invoiceNumber, invoiceHtml, invoiceUrl, amountPaid)
-        .catch((err: any) => logger.error({ err, invoiceId: pawtagInvoice._id }, 'Failed to send membership proration invoice email'));
+    // Send renewal confirmation email (distinct from proration invoice email)
+    try {
+      const { User } = await import('@pawtag/db');
+      const user = await User.findById(membership.userId).select('email fullName').lean();
+      if (user?.email) {
+        const { renderMembershipRenewalReminderEmail } = await import('../services/email/templates/membership-renewal-reminder');
+        const tier = await MembershipTier.findById(membership.tierId).lean();
+        const html = renderMembershipRenewalReminderEmail({
+          customerName: user.fullName || 'there',
+          tierName: tier?.displayName || 'Membership',
+          renewalDate: stripePeriodEnd.toLocaleDateString('en-NZ', { dateStyle: 'full' }),
+          price: membership.price,
+          dashboardUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/membership`,
+        });
+        const { sendMail } = await import('../services/email.service');
+        await sendMail(user.email, `Your ${tier?.name || 'Membership'} Has Been Renewed`, html)
+          .catch((err: any) => logger.error({ err, membershipId: membership._id }, 'Failed to send renewal confirmation email'));
+      }
+    } catch (err) {
+      logger.error({ err, membershipId: membership._id }, 'Failed to send renewal confirmation email');
     }
-  } catch (err) {
-    logger.error({ err, membershipId: membership._id }, 'Failed to send membership proration invoice email');
+  }
+
+  // Send invoice email for all membership invoices (fire-and-forget with logged errors)
+  if (amountPaid > 0) {
+    try {
+      const { generateInvoiceHtml } = await import('../services/invoice-html.service');
+      const { sendInvoiceEmail } = await import('../services/email.service');
+      const { generateSecureToken, hashToken } = await import('../services/auth.service');
+      const { InvoiceAccessToken, User } = await import('@pawtag/db');
+
+      const user = await User.findById(membership.userId).select('email fullName').lean();
+      if (user?.email) {
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const secureToken = generateSecureToken();
+        const tokenHash = hashToken(secureToken);
+        await InvoiceAccessToken.create({
+          invoiceId: pawtagInvoice._id,
+          userId: membership.userId,
+          tokenHash,
+          expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+          verifiedAt: new Date(),
+        });
+        const invoiceUrl = `${frontendUrl}/account/invoices/${invoiceNumber}?token=${secureToken}`;
+
+        const invoiceHtml = await generateInvoiceHtml(pawtagInvoice._id.toString());
+        await sendInvoiceEmail(user.email, user.fullName, invoiceNumber, invoiceHtml, invoiceUrl, amountPaid)
+          .catch((err: any) => logger.error({ err, invoiceId: pawtagInvoice._id }, 'Failed to send membership invoice email'));
+      }
+    } catch (err) {
+      logger.error({ err, membershipId: membership._id }, 'Failed to send membership invoice email');
+    }
   }
 }
 
@@ -449,8 +504,21 @@ async function handleMembershipProrationInvoice(membership: any, stripeInvoice: 
 async function handleInvoicePaymentFailed(invoice: any): Promise<void> {
   if (!invoice?.subscription) return;
 
+  // Try tag-based Subscription first (existing behavior)
   const subscription = await Subscription.findOne({ stripeSubscriptionId: invoice.subscription });
-  if (!subscription) return;
+
+  if (!subscription) {
+    // Try membership-tier subscription (UserMembership model)
+    try {
+      const membership = await UserMembership.findOne({ stripeSubscriptionId: invoice.subscription });
+      if (membership && membership.status === 'active') {
+        await handleMembershipPaymentFailure(membership, invoice);
+      }
+    } catch (err) {
+      logger.error({ err, stripeSubscriptionId: invoice.subscription }, 'Failed to process membership payment failure from webhook');
+    }
+    return;
+  }
 
   // Idempotency: skip if we already created a failed invoice for this Stripe invoice
   if (invoice.id) {
@@ -501,6 +569,126 @@ async function handleInvoicePaymentFailed(invoice: any): Promise<void> {
   }
 
   logger.info({ subscriptionId: subscription._id, stripeInvoiceId: invoice.id }, 'Subscription payment failed — dunning initiated');
+}
+
+/**
+ * Handle membership payment failure (renewal charge failed).
+ *
+ * Records the failure, updates dunning state, notifies the customer,
+ * and alerts the CSR. The membership is NOT expired here — Stripe will
+ * retry automatically. Expiry happens only after the grace period ends.
+ */
+async function handleMembershipPaymentFailure(membership: any, stripeInvoice: any): Promise<void> {
+  if (!stripeInvoice?.id) return;
+
+  // Idempotency: skip if we already recorded this failure
+  if (stripeInvoice.id) {
+    const existingInvoice = await Invoice.findOne({ stripeInvoiceId: stripeInvoice.id });
+    if (existingInvoice) {
+      logger.info({ membershipId: membership._id, stripeInvoiceId: stripeInvoice.id }, 'Membership payment failure already recorded — skipping');
+      return;
+    }
+  }
+
+  const amountDue = (stripeInvoice.amount_due || 0) / 100;
+  const currency = (stripeInvoice.currency || 'nzd').toUpperCase();
+
+  // Record failed invoice
+  const counter = await UserMembership.db!.collection('counters').findOneAndUpdate(
+    { _id: 'membershipInvoiceNumber' as any },
+    { $inc: { seq: 1 } },
+    { upsert: true, returnDocument: 'after' },
+  );
+  const invoiceNumber = `INVM-${String((counter as any)?.value?.seq || 1).padStart(6, '0')}`;
+
+  await Invoice.create({
+    userId: membership.userId,
+    userMembershipId: membership._id,
+    invoiceNumber,
+    amount: amountDue,
+    currency,
+    status: 'failed',
+    stripeInvoiceId: stripeInvoice.id,
+    stripeSubscriptionId: membership.stripeSubscriptionId,
+    billingPeriod: {
+      start: membership.currentPeriodStart || new Date(),
+      end: membership.currentPeriodEnd || new Date(),
+    },
+  });
+
+  // Update dunning state
+  membership.dunningStatus = 'past_due';
+  membership.dunningRetryCount = (membership.dunningRetryCount || 0) + 1;
+  membership.dunningLastAttemptAt = new Date();
+  await membership.save();
+
+  logger.warn({
+    membershipId: membership._id,
+    stripeInvoiceId: stripeInvoice.id,
+    amountDue,
+    retryCount: membership.dunningRetryCount,
+  }, 'Membership renewal payment failed');
+
+  // Notify customer
+  try {
+    const user = await User.findById(membership.userId).select('email fullName').lean();
+    if (user?.email) {
+      const tier = await MembershipTier.findById(membership.tierId).lean();
+      const { sendMail } = await import('../services/email.service');
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+
+      const html = `
+        <p>Hi ${user.fullName || 'there'},</p>
+        <p>We couldn't renew your <strong>${tier?.displayName || 'Membership'}</strong> membership.
+        The payment of $${amountDue.toFixed(2)} failed.</p>
+        <p>Please update your payment method to keep your membership active.
+        Your benefits will remain active until ${membership.currentPeriodEnd?.toLocaleDateString('en-NZ', { dateStyle: 'full' }) || 'the end of your billing period'}.</p>
+        <p><a href="${frontendUrl}/account/membership">Update Payment Method</a></p>
+      `;
+      await sendMail(user.email, `Action Required: Update Your ${tier?.name || 'Membership'} Payment Method`, html)
+        .catch((err: any) => logger.error({ err, membershipId: membership._id }, 'Failed to send payment failure email'));
+    }
+  } catch (err) {
+    logger.error({ err, membershipId: membership._id }, 'Failed to send membership payment failure notification');
+  }
+
+  // In-app notification for customer
+  try {
+    await Notification.create({
+      userId: membership.userId,
+      audience: 'customer',
+      type: 'membership_payment_failed',
+      title: 'Payment Failed — Action Required',
+      message: `We couldn't renew your membership. Please update your payment method. Benefits remain active until ${membership.currentPeriodEnd?.toLocaleDateString('en-NZ', { dateStyle: 'medium' }) || 'period end'}.`,
+      data: { membershipId: membership._id.toString() },
+      priority: 'high',
+      channel: 'alert',
+    });
+  } catch (err) {
+    logger.error({ err, membershipId: membership._id }, 'Failed to create membership payment failure notification');
+  }
+
+  // Alert CSR/admin
+  try {
+    const adminAlertEmail = process.env.ADMIN_ALERT_EMAIL;
+    if (adminAlertEmail) {
+      const { sendMail } = await import('../services/email.service');
+      const user = await User.findById(membership.userId).select('email fullName').lean();
+      const tier = await MembershipTier.findById(membership.tierId).lean();
+      const html = `
+        <p><strong>Membership Payment Failure Alert</strong></p>
+        <p>Customer: ${user?.fullName || 'Unknown'} (${user?.email || 'Unknown'})</p>
+        <p>Tier: ${tier?.displayName || 'Unknown'}</p>
+        <p>Amount: $${amountDue.toFixed(2)} ${currency}</p>
+        <p>Retry count: ${membership.dunningRetryCount}</p>
+        <p>Benefits until: ${membership.currentPeriodEnd?.toLocaleDateString('en-NZ', { dateStyle: 'full' }) || 'N/A'}</p>
+      `;
+      await sendMail(adminAlertEmail, `Membership Payment Failure: ${user?.email || membership.userId}`, html)
+        .catch((err: any) => logger.error({ err, membershipId: membership._id }, 'Failed to send CSR alert email'));
+    }
+  } catch (err) {
+    logger.error({ err, membershipId: membership._id }, 'Failed to send CSR alert for membership payment failure');
+  }
 }
 
 /**

@@ -495,6 +495,34 @@ export async function activateMembership(membershipId: string) {
   membership.status = 'active';
   await membership.save();
 
+  // Populate card display data from Stripe subscription's default payment method.
+  // The subscription uses save_default_payment_method: 'on_subscription',
+  // so after initial payment Stripe stores the PM on the subscription.
+  if (membership.stripeSubscriptionId && !isFakeMode()) {
+    try {
+      const stripe = getStripeClient();
+      const sub = await stripe.subscriptions.retrieve(membership.stripeSubscriptionId);
+      const defaultPmId = typeof sub.default_payment_method === 'string'
+        ? sub.default_payment_method
+        : (sub.default_payment_method as any)?.id;
+
+      if (defaultPmId) {
+        const pm = await stripe.paymentMethods.retrieve(defaultPmId);
+        if (pm.card) {
+          membership.cardBrand = pm.card.brand;
+          membership.cardLast4 = pm.card.last4;
+          membership.cardExpMonth = pm.card.exp_month;
+          membership.cardExpYear = pm.card.exp_year;
+          membership.paymentMethodId = pm.id;
+          await membership.save();
+          logger.info({ membershipId, cardBrand: pm.card.brand, cardLast4: pm.card.last4 }, '[Membership] Card display data populated from Stripe');
+        }
+      }
+    } catch (err) {
+      logger.warn({ err, membershipId }, '[Membership] Failed to populate card display data from Stripe');
+    }
+  }
+
   // Create invoice for membership purchase (INVM- prefix) — with idempotency check
   let invoiceId: mongoose.Types.ObjectId | undefined;
   try {
@@ -632,28 +660,30 @@ export async function cancelMembership(userId: string, reason?: string) {
 
   if (!membership) throw new Error('No active membership found');
 
-  // Cancel Stripe subscription if it exists
+  // Cancel Stripe subscription at period end (not immediately).
+  // This ensures the customer keeps benefits until currentPeriodEnd.
   if (membership.stripeSubscriptionId && !isFakeMode()) {
     try {
       const stripe = getStripeClient();
-      await stripe.subscriptions.cancel(membership.stripeSubscriptionId);
-      logger.info({ membershipId: membership._id }, 'Stripe subscription cancelled');
+      await stripe.subscriptions.update(membership.stripeSubscriptionId, {
+        cancel_at_period_end: true,
+      });
+      logger.info({ membershipId: membership._id }, 'Stripe subscription set to cancel at period end');
     } catch (err) {
-      logger.error({ err, membershipId: membership._id }, 'Failed to cancel Stripe subscription');
+      logger.error({ err, membershipId: membership._id }, 'Failed to set Stripe subscription cancel_at_period_end');
     }
   }
 
-  membership.status = 'cancelled';
+  // Record cancellation intent but keep membership ACTIVE until period end.
+  // The checkExpiredMemberships job will transition to 'expired' at currentPeriodEnd.
+  membership.autoRenew = false;
   membership.cancelledAt = new Date();
   membership.cancellationReason = reason;
-  membership.autoRenew = false;
   await membership.save();
 
-  // Update user
-  await User.findByIdAndUpdate(userId, {
-    membershipTier: null,
-    membershipId: null,
-  });
+  // NOTE: User.membershipTier is NOT nulled here — benefits remain until period end.
+  // Tags are NOT removed here — they remain active until period end.
+  // The expiry job handles both transitions.
 
   // Generate retention offer for next purchase
   let retentionOffer = null;
@@ -678,7 +708,8 @@ export async function cancelMembership(userId: string, reason?: string) {
         resubscribeUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/membership`,
         retentionOffer: retentionOffer || undefined,
       });
-      await sendMail(user.email, `${tier.name} Membership Cancelled`, html).catch(() => {});
+      await sendMail(user.email, `${tier.name} Membership Cancelled`, html)
+        .catch((err) => logger.error({ err, membershipId: membership._id }, '[Membership] Failed to send cancellation email'));
     }
   } catch (err) {
     logger.error({ err, membershipId: membership._id }, 'Failed to send cancellation email');
@@ -714,16 +745,10 @@ export async function cancelMembership(userId: string, reason?: string) {
       userId,
       tierId: membership.tierId.toString(),
       reason: reason || 'Customer request',
+      cancelAtPeriodEnd: true,
+      benefitsUntil: membership.currentPeriodEnd,
     },
   });
-
-  // HYBRID 2: Remove membership extension from tags
-  try {
-    await removeMembershipFromTags(userId, membership._id.toString());
-  } catch (err) {
-    logger.error({ err, membershipId: membership._id }, '[Membership] Failed to remove membership from tags');
-    // Don't fail membership cancellation if tag removal fails
-  }
 
   return membership;
 }
