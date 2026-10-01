@@ -968,6 +968,47 @@ router.get('/users/:id/invoices', requirePermission('user.read'), async (req, re
   }
 });
 
+// GET /api/admin/users/:id/membership-audit — fetch membership-related audit events for a specific customer
+router.get('/users/:id/membership-audit', requirePermission('user.read'), async (req: AuthRequest, res: Response) => {
+  try {
+    const user = await User.findOne({ _id: req.params.id, deletedAt: null }).select('_id');
+    if (!user) { res.status(404).json({ success: false, error: 'User not found' }); return; }
+
+    const { AuditEvent } = await import('@pawtag/db');
+    const { page = 1, limit = 50 } = req.query;
+
+    // Query by subjectUserId (new field) OR metadata.userId (legacy)
+    const query = {
+      $or: [
+        { subjectUserId: req.params.id },
+        { 'metadata.userId': req.params.id },
+      ],
+      eventCategory: { $in: ['FINANCIAL', 'UPDATE', 'ADMIN'] },
+    };
+
+    const total = await AuditEvent.countDocuments(query);
+    const events = await AuditEvent.find(query)
+      .sort({ occurredAt: -1 })
+      .skip((Number(page) - 1) * Number(limit))
+      .limit(Number(limit))
+      .lean();
+
+    res.json({
+      success: true,
+      data: {
+        items: events,
+        total,
+        page: Number(page),
+        limit: Number(limit),
+        totalPages: Math.ceil(total / Number(limit)),
+      },
+    });
+  } catch (err: any) {
+    logger.error({ err, userId: req.params.id }, 'Failed to fetch membership audit events');
+    res.status(500).json({ success: false, error: 'Failed to fetch membership audit events' });
+  }
+});
+
 // GET /api/admin/users/:id/referrals — fetch referral info for a specific user
 router.get('/users/:id/referrals', requirePermission('user.read'), async (req: AuthRequest, res: Response) => {
   try {

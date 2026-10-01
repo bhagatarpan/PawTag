@@ -59,6 +59,8 @@ export interface IAuditEventDocument extends Document {
 
   actorType: ActorType;
   actorId?: string;
+  /** Customer/user affected by this event (distinct from actorId who performed it) */
+  subjectUserId?: string;
   actorUsername?: string;
   actorEmail?: string;
   impersonatorId?: string;
@@ -154,6 +156,7 @@ const AuditEventSchema = new Schema<IAuditEventDocument>(
       index: true,
     },
     actorId: { type: String, index: true },
+    subjectUserId: { type: String, index: true },
     actorUsername: { type: String },
     actorEmail: { type: String },
     impersonatorId: { type: String, index: true },
@@ -235,6 +238,7 @@ const AuditEventSchema = new Schema<IAuditEventDocument>(
 );
 
 AuditEventSchema.index({ actorType: 1, actorId: 1, occurredAt: -1 });
+AuditEventSchema.index({ subjectUserId: 1, occurredAt: -1 });
 AuditEventSchema.index({ resourceType: 1, resourceId: 1, occurredAt: -1 });
 AuditEventSchema.index({ eventCategory: 1, severity: 1, occurredAt: -1 });
 AuditEventSchema.index({ transactionId: 1, eventSequenceNumber: 1 });
