@@ -395,6 +395,7 @@ export const auditService = {
       actorId: context.actorId,
       actorUsername: context.actorUsername,
       actorEmail: context.actorEmail,
+      subjectUserId: input.subjectUserId,
       impersonatorId: context.impersonatorId,
       delegatedById: context.delegatedById,
       sessionId: context.sessionId,

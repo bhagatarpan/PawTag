@@ -391,6 +391,27 @@ export class StripePaymentProvider implements IPaymentProvider {
   }
 
   /**
+   * List refunds already attached to a payment intent.
+   * Used by cancellation to reconcile an already-refunded charge without
+   * attempting a duplicate Stripe refund.
+   */
+  async listRefundsByPaymentIntent(paymentIntentId: string): Promise<RefundResult[]> {
+    if (paymentIntentId.startsWith('pi_demo_')) return [];
+
+    const stripe = this.getClient();
+    try {
+      const refunds = await stripe.refunds.list({
+        payment_intent: paymentIntentId,
+        limit: 10,
+      });
+      return refunds.data.map((r) => this.mapRefund(r));
+    } catch (err: any) {
+      logger.error({ err, paymentIntentId }, 'Failed to list Stripe refunds for payment intent');
+      return [];
+    }
+  }
+
+  /**
    * List refunds for reconciliation.
    *
    * @param params - Date range and pagination options
@@ -423,16 +444,22 @@ export class StripePaymentProvider implements IPaymentProvider {
 
   /**
    * Map a Stripe refund object to our RefundResult format.
+   * Extracts ARN and expected arrival when Stripe provides them.
    * @internal
    */
   private mapRefund(refund: Stripe.Refund): RefundResult {
+    const raw = refund as Stripe.Refund & { arn?: string | null; arrival_date?: number | null };
+    const arrivalDate = raw.arrival_date
+      ? new Date(raw.arrival_date * 1000)
+      : undefined;
+
     return {
       success: refund.status === 'succeeded' || refund.status === 'pending',
       refundId: refund.id,
       amount: (refund.amount || 0) / 100,
       status: refund.status ?? undefined,
-      arn: undefined,
-      expectedArrival: undefined,
+      arn: raw.arn || undefined,
+      expectedArrival: arrivalDate,
     };
   }
 

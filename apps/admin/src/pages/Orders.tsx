@@ -718,13 +718,21 @@ export function OrderDetailDrawer({
           )}
 
           {/* Refund Details - shown for refunded orders or cancelled with refund */}
-          {(order.status === 'refunded' || (order.status === 'cancelled' && order.refundedByDescription)) && (
+          {(order.status === 'refunded' || (order.status === 'cancelled' && (order.refundedByDescription || order.refundStatus))) && (
             <Section title="Refund Details" icon={<RotateCcw size={16} />}>
               {order.refundedByDescription && (
                 <div className="mb-3 text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-lg p-3">
                   {order.refundedByDescription}
                 </div>
               )}
+              {order.payment?.cardBrand && (
+                <DetailRow
+                  label="Refund destination"
+                  value={`${order.payment.cardBrand.charAt(0).toUpperCase() + order.payment.cardBrand.slice(1).toLowerCase()}${order.payment.cardLast4 ? ` ••••${order.payment.cardLast4}` : ''} (original payment method)`}
+                />
+              )}
+              {order.refundId && <DetailRow label="Refund ID" value={<span className="font-mono text-xs">{order.refundId}</span>} />}
+              {order.refundArn && <DetailRow label="ARN" value={<span className="font-mono text-xs">{order.refundArn}</span>} />}
               {order.refundedBy && <DetailRow label="Refunded by" value={order.refundedBy} />}
               {order.refundedByType && <DetailRow label="Role" value={order.refundedByType} />}
               {order.refundedByPortal && (
@@ -744,6 +752,14 @@ export function OrderDetailDrawer({
                 <DetailRow
                   label="Refunded at"
                   value={new Date(order.refundedAt).toLocaleString('en-NZ', {
+                    day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+                  })}
+                />
+              )}
+              {order.refundExpectedArrival && (
+                <DetailRow
+                  label="Expected arrival"
+                  value={new Date(order.refundExpectedArrival).toLocaleString('en-NZ', {
                     day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
                   })}
                 />
@@ -778,6 +794,9 @@ export function OrderDetailDrawer({
                   refundLastSyncedAt: order.refundLastSyncedAt,
                   refundFailureReason: order.refundFailureReason,
                   refundAttemptCount: order.refundAttemptCount,
+                  refundAmount: order.payment?.amount,
+                  paymentCardBrand: order.payment?.cardBrand,
+                  paymentCardLast4: order.payment?.cardLast4,
                 }}
                 onSynced={() => {
                   // Trigger parent refresh — best-effort via toast

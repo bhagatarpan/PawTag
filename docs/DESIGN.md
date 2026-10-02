@@ -1,7 +1,25 @@
 # PawTag Design System
 
-**Last updated:** 2026-08-30
+**Last updated:** 2026-10-02
 **Status:** Active — authoritative reference for all PawTag UI (web, customer, admin, finder, mobile)
+
+---
+
+## Refund destination display
+
+Refunds always return to the **original payment method**. UI must state that clearly and never invent a card.
+
+| Surface | Pattern | Tokens |
+|---|---|---|
+| Customer cancel modal footnote | `formatRefundDestinationSentence` copy + list | `text-primary-800` on footnote; body-sm |
+| Customer order detail refund card | Destination + amount + refund ID + timing | Status card uses semantic bg (`blue-50` pending, `green-50` succeeded, `red-50` failed) with matching border/text |
+| Customer orders list | Short label `Refund to Visa ••••1234` | `text-xs text-gray-600` |
+| Admin refunds / order refund card | Destination + amount + ARN + dates | Same status semantic colors; admin desktop density |
+| Failed refund copy | Support will arrange alternate method | Red semantic (`red-50` / `red-700`) |
+
+Shared formatters live in `@pawtag/shared` (`formatRefundDestination*`) and are re-exported from `@pawtag/ui`.
+
+Do not introduce a new visual language for refunds. Use existing status-card patterns and teal/gray tokens for secondary labels.
 
 ---
 

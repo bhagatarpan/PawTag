@@ -13,12 +13,18 @@ export function renderRefundFailedEmail(data: {
   amount: number;
   currency: string;
   failureReason?: string;
+  /** e.g. "Visa ••••1234" when known */
+  destination?: string;
   willRetry: boolean;
   viewOrderUrl: string;
 }): string {
   const retryMessage = data.willRetry
     ? `<strong>What happens next:</strong> We will automatically retry this refund in 2 hours. If the second attempt also fails, our support team will be notified and reach out to you.`
     : `<strong>What happens next:</strong> Our support team has been notified and will reach out to you to arrange an alternative refund method (e.g. bank transfer).`;
+
+  const destinationNote = data.destination
+    ? `<p style="margin:0 0 12px;color:#7f1d1d;font-size:14px;line-height:1.5;">We tried to return the funds to your original payment method (${data.destination}).</p>`
+    : `<p style="margin:0 0 12px;color:#7f1d1d;font-size:14px;line-height:1.5;">We tried to return the funds to your original payment method.</p>`;
 
   const bodyHtml = `
     <p style="margin:0 0 20px;color:#374151;font-size:16px;">Hi <strong>${data.name}</strong>,</p>
@@ -31,6 +37,7 @@ export function renderRefundFailedEmail(data: {
       <p style="margin:0 0 8px;font-weight:600;color:#991b1b;font-size:14px;">
         Refund Status: Failed
       </p>
+      ${destinationNote}
       <p style="margin:0;color:#7f1d1d;font-size:14px;line-height:1.5;">
         ${data.failureReason || 'The card issuer or bank declined the refund. This can happen if the card has expired, been cancelled, or has restrictions.'}
       </p>
@@ -47,7 +54,7 @@ export function renderRefundFailedEmail(data: {
       </tr>
       <tr>
         <td style="padding:12px 16px;background-color:#f9fafb;font-weight:600;color:#374151;font-size:13px;border-bottom:1px solid #e5e7eb;">Refund Amount</td>
-        <td style="padding:12px 16px;color:#374151;font-size:16px;font-weight:700;border-bottom:1px solid #e5e7eb;">$${data.amount.toFixed(2)} ${data.currency}</td>
+        <td style="padding:12px 16px;color:#6b7280;font-size:16px;font-weight:700;border-bottom:1px solid #e5e7eb;">$${data.amount.toFixed(2)} ${data.currency}</td>
       </tr>
       <tr>
         <td style="padding:12px 16px;background-color:#f9fafb;font-weight:600;color:#374151;font-size:13px;">Failure Reason</td>

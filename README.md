@@ -891,6 +891,21 @@ PawTag Commerce includes code for:
 - subscriptions/Guardian-related billing;
 - reconciliation jobs and operational admin tools.
 
+## Refund destination (current behaviour)
+
+Stripe refunds always go back to the **original payment method** used for the charge.
+
+PawTag does **not** currently offer refund-to-a-new-card selection on customer cancel.
+
+Customers and admins should see:
+
+- destination label when card data exists, e.g. `Visa ••••1234 (original payment method)`;
+- refund amount, refund ID, requested/settled timing when available;
+- ARN when Stripe provides it;
+- clear failed-refund guidance (support will arrange an alternate method if Stripe cannot return funds).
+
+Implementation guidance lives in `skills/refund-visibility/`.
+
 ## Commerce correctness principles
 
 ### Never trust client pricing

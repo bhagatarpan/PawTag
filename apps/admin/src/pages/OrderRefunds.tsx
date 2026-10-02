@@ -20,8 +20,14 @@ interface RefundListItem {
   cancellationReason: string;
   refundSettledAt?: string;
   refundCreatedAt: string;
+  refundExpectedArrival?: string;
+  refundFailureReason?: string;
   paymentIntentId: string;
   attemptCount: number;
+  paymentCardBrand?: string;
+  paymentCardLast4?: string;
+  refundDestination?: string;
+  refundAmount?: number;
 }
 
 interface RefundsResponse {
@@ -413,8 +419,20 @@ export default function OrderRefunds() {
                                   <dd className="text-gray-900 font-mono text-xs">{r.refundId || '—'}</dd>
                                 </div>
                                 <div className="flex justify-between gap-4">
+                                  <dt className="text-gray-500">Destination</dt>
+                                  <dd className="text-gray-900 text-right">{r.refundDestination || 'Original payment method'}</dd>
+                                </div>
+                                <div className="flex justify-between gap-4">
+                                  <dt className="text-gray-500">Requested</dt>
+                                  <dd className="text-gray-900">{formatDate(r.refundCreatedAt)}</dd>
+                                </div>
+                                <div className="flex justify-between gap-4">
                                   <dt className="text-gray-500">ARN</dt>
                                   <dd className="text-gray-900 font-mono text-xs">{r.arn || '—'}</dd>
+                                </div>
+                                <div className="flex justify-between gap-4">
+                                  <dt className="text-gray-500">Expected arrival</dt>
+                                  <dd className="text-gray-900">{formatDate(r.refundExpectedArrival)}</dd>
                                 </div>
                                 <div className="flex justify-between gap-4">
                                   <dt className="text-gray-500">Initiated by</dt>
@@ -428,6 +446,12 @@ export default function OrderRefunds() {
                                   <dt className="text-gray-500">Settled at</dt>
                                   <dd className="text-gray-900">{formatDate(r.refundSettledAt)}</dd>
                                 </div>
+                                {r.refundFailureReason && (
+                                  <div className="flex justify-between gap-4">
+                                    <dt className="text-gray-500">Failure reason</dt>
+                                    <dd className="text-red-700 text-right">{r.refundFailureReason}</dd>
+                                  </div>
+                                )}
                                 <div className="flex justify-between gap-4">
                                   <dt className="text-gray-500">Retry attempts</dt>
                                   <dd className="text-gray-900">{r.attemptCount}</dd>
@@ -443,10 +467,16 @@ export default function OrderRefunds() {
                                   refundArn: r.arn,
                                   refundStatus: (r.status as any) || null,
                                   refundSettledAt: r.refundSettledAt,
+                                  refundExpectedArrival: r.refundExpectedArrival,
                                   refundLastSyncedAt: r.refundCreatedAt,
                                   refundAttemptCount: r.attemptCount,
+                                  refundDestination: r.refundDestination,
+                                  refundAmount: r.refundAmount ?? r.amount,
+                                  paymentCardBrand: r.paymentCardBrand,
+                                  paymentCardLast4: r.paymentCardLast4,
                                   cancelledBy: r.cancelledBy,
                                   cancellationReason: r.cancellationReason,
+                                  refundFailureReason: r.refundFailureReason,
                                 }}
                                 onSynced={fetchRefunds}
                                 compact

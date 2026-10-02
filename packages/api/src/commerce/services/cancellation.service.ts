@@ -18,17 +18,40 @@
  * - Authorization (ownership vs RBAC)
  * - Whether to fail or continue if refund fails
  * - Audit event details
+ *
+ * Financial safety:
+ * - PaymentTransaction.initiatedBy must use the lowercase enum
+ *   (`customer` | `admin` | `system` | `webhook`).
+ * - After a Stripe refund succeeds, local cancellation bookkeeping must not
+ *   leave the order marked paid. Bookkeeping failures are repaired, not used
+ *   to abandon a refund that already happened at Stripe.
  */
 
 import { Order, PaymentTransaction } from '@pawtag/db';
 import { stripePaymentProvider } from '../providers/stripe';
 import { inventoryService } from './inventory.service';
-import { logPaymentEvent, logOrderEvent } from '../audit';
+import { logPaymentEvent } from '../audit';
 import { auditService } from '../../services/audit';
+import {
+  formatActivityMessage,
+  formatCancelledBy,
+  formatCancelledByDescription,
+} from '../../lib/actor';
+import { formatRefundDestination } from '@pawtag/shared';
 import logger from '../../lib/logger';
+import type { RefundResult } from '../interfaces/payment-provider';
 
 /** Valid order statuses that can be cancelled */
 const CANCELLABLE_STATUSES = ['pending', 'pending_payment', 'paid', 'packing'] as const;
+
+/** Normalized actor types used for durable bookkeeping enums */
+type NormalizedActorType = 'customer' | 'admin' | 'system';
+
+export type CancellationErrorCode =
+  | 'ORDER_NOT_FOUND'
+  | 'ORDER_NOT_CANCELLABLE'
+  | 'REFUND_FAILED'
+  | 'UNKNOWN';
 
 /** Result of a cancellation attempt */
 export interface CancellationResult {
@@ -37,13 +60,22 @@ export interface CancellationResult {
   refundCreated: boolean;
   refundId?: string;
   error?: string;
+  errorCode?: CancellationErrorCode;
+  /**
+   * True when Stripe refund succeeded but local payment-transaction write failed.
+   * Order is still cancelled; ops should backfill PaymentTransaction.
+   */
+  bookkeepingFailed?: boolean;
 }
 
 /** Actor information for cancellation */
 export interface CancellationActor {
   /** Display name of the actor */
   name: string;
-  /** Actor type: 'customer', 'admin', 'system' */
+  /**
+   * Actor type. Lowercase preferred (`customer`/`admin`/`system`).
+   * Display values like `Customer` are also accepted and normalized.
+   */
   type: string;
   /** Portal: 'customer-web', 'customer-mobile', 'admin-web', 'system' */
   portal: string;
@@ -54,6 +86,97 @@ export interface CancellationActor {
  */
 export function isValidCancellationStatus(status: string): boolean {
   return (CANCELLABLE_STATUSES as readonly string[]).includes(status);
+}
+
+/** Normalize actor type for enums/comparisons. */
+export function normalizeActorType(type: string): NormalizedActorType {
+  const value = (type || '').toLowerCase();
+  if (value === 'customer' || value === 'admin' || value === 'system') {
+    return value;
+  }
+  if (value.includes('customer')) return 'customer';
+  if (value.includes('admin')) return 'admin';
+  return 'system';
+}
+
+function displayActorType(normalized: NormalizedActorType): string {
+  if (normalized === 'customer') return 'Customer';
+  if (normalized === 'admin') return 'Admin';
+  return 'System';
+}
+
+function activityActor(normalized: NormalizedActorType): 'customer' | 'admin' | 'system' {
+  return normalized;
+}
+
+function auditActorType(normalized: NormalizedActorType): 'USER' | 'ADMIN' | 'SYSTEM' {
+  if (normalized === 'customer') return 'USER';
+  if (normalized === 'admin') return 'ADMIN';
+  return 'SYSTEM';
+}
+
+function isAlreadyRefundedProviderError(message?: string): boolean {
+  if (!message) return false;
+  return /already refunded|has been refunded|refund.*already|charge.*refund/i.test(message);
+}
+
+function isDuplicateKeyError(err: unknown): boolean {
+  return Boolean(err && typeof err === 'object' && (err as any).code === 11000);
+}
+
+async function findExistingStripeRefund(paymentIntentId: string): Promise<RefundResult | null> {
+  if (paymentIntentId.startsWith('pi_demo_')) return null;
+
+  // Prefer a refund already stored on the order (handled by caller via order.refundId)
+  try {
+    const lister = (stripePaymentProvider as any).listRefundsByPaymentIntent;
+    if (typeof lister !== 'function') return null;
+    const refunds: RefundResult[] = await lister.call(stripePaymentProvider, paymentIntentId);
+    const usable = refunds.find(
+      (r) => r.success && r.refundId && (r.status === 'succeeded' || r.status === 'pending'),
+    );
+    return usable || null;
+  } catch (err) {
+    logger.error({ err, paymentIntentId }, 'Failed to look up existing Stripe refund during cancellation');
+    return null;
+  }
+}
+
+async function recordRefundPaymentTransaction(params: {
+  order: any;
+  refundResult: RefundResult;
+  initiatedBy: NormalizedActorType;
+  reason: string;
+  notes?: string;
+  reconciledFromExisting?: boolean;
+}): Promise<void> {
+  const { order, refundResult, initiatedBy, reason, notes, reconciledFromExisting } = params;
+  const cardBrand = order.payment?.cardBrand;
+  const cardLast4 = order.payment?.cardLast4;
+
+  await PaymentTransaction.create({
+    orderId: order._id,
+    orderNumber: order.orderNumber,
+    type: 'refund',
+    status: refundResult.status === 'succeeded' ? 'succeeded' : 'pending',
+    amount: refundResult.amount ?? order.payment?.amount ?? 0,
+    currency: order.payment?.currency || 'NZD',
+    provider: 'stripe',
+    providerTransactionId: refundResult.refundId,
+    providerStatus: refundResult.status,
+    arn: refundResult.arn,
+    expectedArrival: refundResult.expectedArrival,
+    initiatedBy,
+    attemptCount: 0,
+    cardBrand,
+    cardLast4,
+    refundDestination: formatRefundDestination(cardBrand, cardLast4),
+    notes: reconciledFromExisting
+      ? `${reason} — reconciled from existing Stripe refund${notes ? ` — ${notes}` : ''}`
+      : notes
+        ? `${reason} — ${notes}`
+        : reason,
+  });
 }
 
 /**
@@ -71,11 +194,21 @@ export async function cancelOrder(params: {
   requireRefundSuccess?: boolean;
 }): Promise<CancellationResult> {
   const { orderId, reason, notes, actor, requireRefundSuccess = false } = params;
+  const normalizedActorType = normalizeActorType(actor.type);
+  const displayType = displayActorType(normalizedActorType);
+  const cancelledBy = formatCancelledBy(actor.name, displayType);
+  const cancelledByDescription = formatCancelledByDescription(actor.portal, actor.name, displayType);
 
   // 1. Find order
   const order = await Order.findById(orderId);
   if (!order) {
-    return { success: false, order: null, refundCreated: false, error: 'Order not found' };
+    return {
+      success: false,
+      order: null,
+      refundCreated: false,
+      error: 'Order not found',
+      errorCode: 'ORDER_NOT_FOUND',
+    };
   }
 
   // 2. Validate status
@@ -85,6 +218,7 @@ export async function cancelOrder(params: {
       order,
       refundCreated: false,
       error: `Order in status '${order.status}' cannot be cancelled`,
+      errorCode: 'ORDER_NOT_CANCELLABLE',
     };
   }
 
@@ -94,6 +228,8 @@ export async function cancelOrder(params: {
   // 3. Process refund for paid orders
   let refundCreated = false;
   let refundId: string | undefined;
+  let bookkeepingFailed = false;
+  let reconciledFromExisting = false;
 
   if (order.payment?.status === 'completed' && order.payment?.stripePaymentIntentId) {
     const paymentIntentId = order.payment.stripePaymentIntentId;
@@ -101,26 +237,56 @@ export async function cancelOrder(params: {
     // Skip demo/test payment intents
     if (!paymentIntentId.startsWith('pi_demo_')) {
       try {
-        const refundResult = await stripePaymentProvider.createRefund({
-          paymentIntentId,
-          amount: order.payment.amount,
-          reason: 'requested_by_customer',
-          metadata: {
-            orderId: String(order._id),
-            orderNumber: order.orderNumber,
-            cancelledBy: actor.name,
-            cancelledByType: actor.type,
-            cancelledByPortal: actor.portal,
-            cancellationReason: reason,
-            cancellationNotes: notes || '',
-            initiatedBy: actor.type,
-            environment: process.env.NODE_ENV === 'production' ? 'production' : 'development',
-          },
-        });
+        let refundResult: RefundResult | null = null;
 
-        // Check if refund actually succeeded — createRefund returns { success: false }
-        // on Stripe errors instead of throwing. We must not proceed with cancellation
-        // if requireRefundSuccess is true and the refund failed.
+        // 3a. Reuse a refund already stored on the order
+        if (order.refundId) {
+          const existingOnOrder = await stripePaymentProvider.retrieveRefund(order.refundId);
+          if (existingOnOrder.success && existingOnOrder.refundId) {
+            refundResult = existingOnOrder;
+            reconciledFromExisting = true;
+          }
+        }
+
+        // 3b. Reuse a provider-side refund if Stripe already refunded this charge
+        if (!refundResult) {
+          refundResult = await findExistingStripeRefund(paymentIntentId);
+          if (refundResult?.refundId) {
+            reconciledFromExisting = true;
+          }
+        }
+
+        // 3c. Create a new Stripe refund when none exists
+        if (!refundResult) {
+          refundResult = await stripePaymentProvider.createRefund({
+            paymentIntentId,
+            amount: order.payment.amount,
+            reason: 'requested_by_customer',
+            metadata: {
+              orderId: String(order._id),
+              orderNumber: order.orderNumber,
+              cancelledBy,
+              cancelledByType: displayType,
+              cancelledByPortal: actor.portal,
+              cancellationReason: reason,
+              cancellationNotes: notes || '',
+              initiatedBy: normalizedActorType,
+              environment: process.env.NODE_ENV === 'production' ? 'production' : 'development',
+            },
+          });
+        }
+
+        // 3d. Handle refund failure / already-refunded race
+        if (!refundResult.success) {
+          if (isAlreadyRefundedProviderError(refundResult.error)) {
+            const existing = await findExistingStripeRefund(paymentIntentId);
+            if (existing?.refundId) {
+              refundResult = existing;
+              reconciledFromExisting = true;
+            }
+          }
+        }
+
         if (!refundResult.success) {
           logger.error({
             orderId: String(order._id),
@@ -134,6 +300,7 @@ export async function cancelOrder(params: {
               order,
               refundCreated: false,
               error: refundResult.error || 'Failed to process refund. Please contact support.',
+              errorCode: 'REFUND_FAILED',
             };
           }
           // Otherwise continue without refund — but do NOT record PaymentTransaction
@@ -142,36 +309,60 @@ export async function cancelOrder(params: {
           order.refundId = refundResult.refundId;
           order.refundStatus = (refundResult.status as any) || 'pending';
           order.refundLastSyncedAt = new Date();
+          if (refundResult.arn) {
+            order.refundArn = refundResult.arn;
+          }
+          if (refundResult.expectedArrival) {
+            order.refundExpectedArrival = refundResult.expectedArrival;
+          }
           refundCreated = true;
           refundId = refundResult.refundId;
 
-          // Record payment transaction only when refund actually succeeded
-          await PaymentTransaction.create({
-            orderId: order._id,
-            orderNumber: order.orderNumber,
-            type: 'refund',
-            status: refundResult.status === 'succeeded' ? 'succeeded' : 'pending',
-            amount: order.payment.amount,
-            currency: order.payment.currency || 'NZD',
-            provider: 'stripe',
-            providerTransactionId: refundResult.refundId,
-            providerStatus: refundResult.status,
-            arn: refundResult.arn,
-            expectedArrival: refundResult.expectedArrival,
-            initiatedBy: actor.type,
-            attemptCount: 0,
-            notes: notes ? `${reason} — ${notes}` : reason,
-          });
+          // Record payment transaction only when refund actually succeeded.
+          // initiatedBy MUST be the lowercase enum value.
+          try {
+            await recordRefundPaymentTransaction({
+              order,
+              refundResult,
+              initiatedBy: normalizedActorType,
+              reason,
+              notes,
+              reconciledFromExisting,
+            });
+          } catch (bookkeepingErr: any) {
+            if (isDuplicateKeyError(bookkeepingErr)) {
+              logger.warn({
+                orderId: String(order._id),
+                refundId: refundResult.refundId,
+              }, 'PaymentTransaction already exists for refund — treating bookkeeping as complete');
+            } else {
+              // Stripe refund already succeeded. Do not fail the customer cancel
+              // and leave the order paid. Complete cancellation and flag repair.
+              bookkeepingFailed = true;
+              logger.error({
+                err: bookkeepingErr,
+                orderId: String(order._id),
+                refundId: refundResult.refundId,
+                initiatedBy: normalizedActorType,
+              }, 'PaymentTransaction write failed after successful Stripe refund — order will still be cancelled');
+            }
+          }
 
           await logPaymentEvent('refunded', {
             paymentIntentId,
             orderId: String(order._id),
             orderNumber: order.orderNumber,
-            amount: order.payment.amount,
+            amount: refundResult.amount ?? order.payment.amount,
+          }).catch((err) => {
+            logger.error({ err, orderId: String(order._id) }, 'Failed to log payment event after refund');
           });
         }
       } catch (err: any) {
-        logger.error({ err, orderId: String(order._id), actor: actor.type }, 'Failed to process refund during cancellation');
+        logger.error({
+          err,
+          orderId: String(order._id),
+          actor: normalizedActorType,
+        }, 'Failed to process refund during cancellation');
 
         if (requireRefundSuccess) {
           return {
@@ -179,6 +370,7 @@ export async function cancelOrder(params: {
             order,
             refundCreated: false,
             error: 'Failed to process refund. Please contact support.',
+            errorCode: 'REFUND_FAILED',
           };
         }
         // Otherwise continue with cancellation without refund
@@ -190,14 +382,24 @@ export async function cancelOrder(params: {
   order.status = 'cancelled';
   order.cancellationReason = reason;
   order.cancellationNotes = notes;
-  order.cancelledBy = `${actor.name} (${actor.type})`;
-  order.cancelledByType = actor.type;
+  order.cancelledBy = cancelledBy;
+  order.cancelledByType = displayType;
   order.cancelledByPortal = actor.portal as any;
-  order.cancelledByDescription = `${actor.name} via ${actor.portal}`;
+  order.cancelledByDescription = cancelledByDescription;
   order.cancelledAt = cancelledAt;
 
   if (refundCreated && order.payment) {
     order.payment.status = 'refunded';
+  }
+
+  if (bookkeepingFailed) {
+    const repairError = {
+      step: 'payment_transaction_after_refund',
+      error: 'Stripe refund succeeded but PaymentTransaction write failed',
+      timestamp: new Date(),
+    };
+    order.completionStatus = 'repair_required';
+    order.completionErrors = [...(order.completionErrors || []), repairError];
   }
 
   await order.save();
@@ -214,7 +416,7 @@ export async function cancelOrder(params: {
   }
 
   // 6. Log activity
-  const activityMessage = `Cancelled by ${actor.name}: ${reason}`;
+  const activityMessage = formatActivityMessage(cancelledBy, reason, cancelledAt);
   await Order.updateOne(
     { _id: order._id },
     {
@@ -223,16 +425,18 @@ export async function cancelOrder(params: {
           type: 'cancelled',
           message: activityMessage,
           timestamp: cancelledAt,
-          actor: actor.type === 'customer' ? 'customer' : actor.type === 'admin' ? 'admin' : 'system',
+          actor: activityActor(normalizedActorType),
           metadata: {
             reason,
             notes,
-            cancelledBy: actor.name,
-            cancelledByType: actor.type,
+            cancelledBy,
+            cancelledByType: displayType,
             cancelledByPortal: actor.portal,
             cancelledAt: cancelledAt.toISOString(),
             refundCreated,
             refundId: order.refundId,
+            reconciledFromExisting,
+            bookkeepingFailed,
           },
         },
       },
@@ -244,15 +448,18 @@ export async function cancelOrder(params: {
     orderNumber: order.orderNumber,
     previousStatus,
     reason,
-    cancelledBy: actor.name,
-    cancelledByType: actor.type,
+    cancelledBy,
+    cancelledByType: displayType,
     refundCreated,
+    refundId,
+    reconciledFromExisting,
+    bookkeepingFailed,
   }, 'Order cancelled');
 
   // Durable audit event for financial traceability
   try {
     await auditService.log({
-      actorType: actor.type === 'customer' ? 'USER' : actor.type === 'admin' ? 'ADMIN' : 'SYSTEM',
+      actorType: auditActorType(normalizedActorType),
       actorId: actor.name,
       actorUsername: actor.name,
       sourceIp: 'unknown',
@@ -268,20 +475,31 @@ export async function cancelOrder(params: {
       operationType: 'UPDATE',
       resourceType: 'Order',
       resourceId: String(order._id),
-      outcome: 'SUCCESS',
+      subjectUserId: String(order.userId),
+      outcome: bookkeepingFailed ? 'PARTIAL' : 'SUCCESS',
       severity: 'HIGH',
+      reason,
       metadata: {
         orderId: String(order._id),
         orderNumber: order.orderNumber,
         previousStatus,
         reason,
         notes: notes || '',
-        cancelledBy: actor.name,
-        cancelledByType: actor.type,
+        cancelledBy,
+        cancelledByType: displayType,
         cancelledByPortal: actor.portal,
         refundCreated,
         refundId: order.refundId || null,
+        refundArn: order.refundArn || null,
+        refundExpectedArrival: order.refundExpectedArrival || null,
         refundAmount: refundCreated ? order.payment?.amount || 0 : 0,
+        refundDestination: refundCreated
+          ? formatRefundDestination(order.payment?.cardBrand, order.payment?.cardLast4)
+          : null,
+        initiatedBy: normalizedActorType,
+        reconciledFromExisting,
+        bookkeepingFailed,
+        subjectUserId: String(order.userId),
       },
     });
   } catch (err) {
@@ -293,5 +511,6 @@ export async function cancelOrder(params: {
     order,
     refundCreated,
     refundId,
+    bookkeepingFailed,
   };
 }

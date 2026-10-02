@@ -49,6 +49,8 @@ At every external or persistent step ask:
 - Authorize refund capability separately.
 - Make retries safe.
 - Persist external refund IDs and reconcile PawTag state against Stripe.
+- Refund destination is the original payment method; display that truthfully (`skills/refund-visibility/`).
+- Persist Stripe ARN/arrival when provided; snapshot destination on refund transactions.
 
 ## Verification
 

@@ -257,6 +257,12 @@ export async function notifyRefundUpdate(
   const amount = (refund.amount || 0) / 100;
   const currency = (refund.currency || 'nzd').toUpperCase();
   const failureReason = refund.failure_reason as string | undefined;
+  const arn = (refund.arn as string | undefined) || order.refundArn || undefined;
+  const cardBrand = order.payment?.cardBrand;
+  const cardLast4 = order.payment?.cardLast4;
+  const destination = cardBrand
+    ? `${cardBrand.charAt(0).toUpperCase() + cardBrand.slice(1).toLowerCase()}${cardLast4 ? ` ••••${cardLast4}` : ''}`
+    : undefined;
   const settledAt = new Date().toLocaleString('en-NZ', {
     day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
   });
@@ -264,7 +270,11 @@ export async function notifyRefundUpdate(
     ? new Date(refund.arrival_date * 1000).toLocaleDateString('en-NZ', {
         day: 'numeric', month: 'long', year: 'numeric',
       })
-    : undefined;
+    : order.refundExpectedArrival
+      ? new Date(order.refundExpectedArrival).toLocaleDateString('en-NZ', {
+          day: 'numeric', month: 'long', year: 'numeric',
+        })
+      : undefined;
 
   // Build order view URL (assumes public-facing domain)
   const baseUrl = process.env.PUBLIC_WEB_URL || 'http://localhost:3000';
@@ -283,6 +293,7 @@ export async function notifyRefundUpdate(
       amount,
       currency,
       expectedArrival,
+      destination,
       viewOrderUrl,
     });
   } else if (newStatus === 'succeeded') {
@@ -305,10 +316,11 @@ export async function notifyRefundUpdate(
       name: user.fullName || 'Customer',
       orderNumber: order.orderNumber,
       refundId,
-      arn: undefined,
+      arn,
       amount,
       currency,
       settledAt,
+      destination,
       viewOrderUrl,
       creditNoteNumber,
       creditNoteUrl,
@@ -323,6 +335,7 @@ export async function notifyRefundUpdate(
       amount,
       currency,
       failureReason,
+      destination,
       willRetry,
       viewOrderUrl,
     });

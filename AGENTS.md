@@ -543,6 +543,17 @@ Never trust the browser for authoritative values such as:
 
 The server must calculate/validate authoritative financial values.
 
+### Refund destination (current product rule)
+
+Stripe refunds always return to the **original payment method** used for the charge.
+
+- Do **not** add a customer-facing “refund to a different card” picker in the normal cancel/refund flow.
+- Always surface destination truthfully as `Brand ••••last4 (original payment method)` when card data exists; otherwise say “Original payment method”.
+- If the original card expired/was lost/replaced, bank/issuer usually still credits the customer. Do not claim the money is lost.
+- Persist Stripe `arn` / `arrival_date` when provided.
+- Snapshot destination (`cardBrand`, `cardLast4`, `refundDestination`) on refund PaymentTransactions.
+- Failed refunds need a clear customer/CSR recovery path (auto-retry + support arranging alternate method). See `skills/refund-visibility/`.
+
 ## Idempotency
 
 Financial operations must tolerate retries where retries are possible.
@@ -1987,6 +1998,7 @@ skills/work-packet-executor/          One-work-packet execution discipline
 skills/production-readiness-review/  Implemented vs genuinely production-ready
 skills/security-boundary-review/     Auth, ownership, RBAC, privacy, sensitive resources
 skills/commerce-safety/               Stripe, checkout, orders, inventory, refunds, subscriptions
+skills/refund-visibility/             Refund destination truthfulness, ARN/arrival data, customer/CSR refund display
 skills/finder-recovery/               Lost-pet Finder flow, privacy, abuse controls, recovery UX
 skills/cart-checkout-experience/      Mini-cart + premium full cart/checkout experience
 skills/pawtag-ui-ux/                  PawTag design system, accessibility, responsive UX
@@ -2019,6 +2031,16 @@ commerce-safety
 security-boundary-review      # when ownership/auth boundaries are touched
 testing-regression
 production-readiness-review   # before claiming completion/readiness
+```
+
+### Refund destination / refund visibility
+
+```text
+work-packet-executor
+commerce-safety
+refund-visibility
+pawtag-ui-ux                  # when customer/admin refund UI changes
+testing-regression
 ```
 
 ### Finder change

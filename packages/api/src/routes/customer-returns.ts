@@ -13,12 +13,10 @@ import { z } from 'zod';
 import { AuthRequest, authenticate } from '../middleware/auth';
 import { validate } from '../middleware/validation';
 import { cancelOrderSchema } from '../middleware/schemas';
-import { Order, Return, PaymentTransaction, User } from '@pawtag/db';
-import { cancelOrder } from '../commerce/services/cancellation.service';
+import { Order, Return, User } from '@pawtag/db';
+import { cancelOrder, type CancellationResult } from '../commerce/services/cancellation.service';
 import { toAppError } from '../lib/app-errors';
 import { notifyCustomerOfStatusChange } from '../services/orderNotification.service';
-import { formatActivityMessage, formatCancelledBy, formatCancelledByDescription, formatCancellationPortalLabel } from '../lib/actor';
-import { isValidTransition } from '../services/orderStatus.service';
 import logger from '../lib/logger';
 
 // Zod schema for return request
@@ -187,6 +185,20 @@ router.get('/', async (req: AuthRequest, res: Response) => {
  * POST /api/customer/orders/:id/cancel
  * Cancel an order (only if not yet shipped).
  */
+function cancellationHttpStatus(result: CancellationResult): number {
+  switch (result.errorCode) {
+    case 'ORDER_NOT_FOUND':
+      return 404;
+    case 'ORDER_NOT_CANCELLABLE':
+      return 400;
+    case 'REFUND_FAILED':
+      // Customer expects a refund on cancel; surface provider failure as bad gateway.
+      return 502;
+    default:
+      return 500;
+  }
+}
+
 router.post('/orders/:id/cancel', validate(cancelOrderSchema), async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user?.id;
@@ -209,30 +221,54 @@ router.post('/orders/:id/cancel', validate(cancelOrderSchema), async (req: AuthR
     const user = await User.findById(userId).select('fullName').lean();
     const customerFullName = user?.fullName || 'Customer';
 
-    // Use central cancellation service (requireRefundSuccess=true for customer)
+    // Use central cancellation service (requireRefundSuccess=true for customer).
+    // actor.type is lowercase so PaymentTransaction.initiatedBy matches model enum.
     const result = await cancelOrder({
       orderId: req.params.id,
       reason,
       notes,
       actor: {
         name: customerFullName,
-        type: 'Customer',
+        type: 'customer',
         portal: resolvedPortal,
       },
       requireRefundSuccess: true,
     });
 
     if (!result.success) {
-      const statusCode = result.error?.includes('cannot be cancelled') ? 400 : 500;
+      const statusCode = cancellationHttpStatus(result);
+      logger.warn({
+        orderId: req.params.id,
+        userId,
+        errorCode: result.errorCode,
+        statusCode,
+      }, 'Customer order cancel failed');
       res.status(statusCode).json({ success: false, error: result.error });
       return;
     }
 
     notifyCustomerOfStatusChange(result.order, 'cancelled', { reason }).catch(() => {});
 
-    res.json({ success: true, data: { status: 'cancelled', refundAmount: result.order.payment?.amount || 0 } });
+    if (result.bookkeepingFailed) {
+      logger.error({
+        orderId: req.params.id,
+        userId,
+        refundId: result.refundId,
+      }, 'Customer cancel completed with PaymentTransaction bookkeeping failure — repair required');
+    }
+
+    res.json({
+      success: true,
+      data: {
+        status: 'cancelled',
+        refundAmount: result.order.payment?.amount || 0,
+        refundId: result.refundId || null,
+        bookkeepingFailed: Boolean(result.bookkeepingFailed),
+      },
+    });
   } catch (err) {
-    res.status(500).json({ success: false, error: toAppError(err).userMessage });
+    const appErr = toAppError(err);
+    res.status(appErr.httpStatus || 500).json({ success: false, error: appErr.userMessage });
   }
 });
 

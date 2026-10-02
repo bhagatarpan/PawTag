@@ -910,6 +910,12 @@ async function handleRefundCreated(refund: any): Promise<void> {
   order.refundId = refund.id;
   order.refundStatus = 'pending';
   order.refundLastSyncedAt = new Date();
+  if (refund.arn) {
+    order.refundArn = refund.arn;
+  }
+  if (refund.arrival_date) {
+    order.refundExpectedArrival = new Date(refund.arrival_date * 1000);
+  }
   await order.save();
 
   // Update PaymentTransaction
@@ -918,6 +924,8 @@ async function handleRefundCreated(refund: any): Promise<void> {
     {
       providerStatus: refund.status || 'pending',
       lastSyncedAt: new Date(),
+      ...(refund.arn ? { arn: refund.arn } : {}),
+      ...(refund.arrival_date ? { expectedArrival: new Date(refund.arrival_date * 1000) } : {}),
     },
   );
 
@@ -956,11 +964,21 @@ async function handleRefundUpdated(refund: any): Promise<void> {
 
   const newStatus = refund.status as 'pending' | 'succeeded' | 'failed' | 'canceled';
   const previousStatus = order.refundStatus;
+  const refundArn = refund.arn as string | undefined;
+  const expectedArrival = refund.arrival_date
+    ? new Date(refund.arrival_date * 1000)
+    : undefined;
 
   // Update order
   order.refundId = refund.id;
   order.refundStatus = newStatus;
   order.refundLastSyncedAt = new Date();
+  if (refundArn) {
+    order.refundArn = refundArn;
+  }
+  if (expectedArrival) {
+    order.refundExpectedArrival = expectedArrival;
+  }
   if (newStatus === 'succeeded') {
     order.refundSettledAt = new Date();
   }
@@ -977,8 +995,13 @@ async function handleRefundUpdated(refund: any): Promise<void> {
       lastSyncedAt: new Date(),
       refundedAt: newStatus === 'succeeded' ? new Date() : undefined,
       failureReason: newStatus === 'failed' ? refund.failure_reason : undefined,
+      ...(refundArn ? { arn: refundArn } : {}),
+      ...(expectedArrival ? { expectedArrival } : {}),
     },
   );
+
+  const arnLabel = refundArn ? ` ARN: ${refundArn}` : newStatus === 'succeeded' ? ' (ARN pending)' : '';
+  const failureLabel = newStatus === 'failed' ? ` (${refund.failure_reason || 'unknown failure'})` : '';
 
   // Record activity log
   await Order.updateOne(
@@ -987,7 +1010,7 @@ async function handleRefundUpdated(refund: any): Promise<void> {
       $push: {
         activity: {
           type: `refund_${newStatus}`,
-          message: `Refund ${newStatus}: ${refund.id}${newStatus === 'succeeded' ? ` (ARN pending)` : newStatus === 'failed' ? ` (${refund.failure_reason || 'unknown failure'})` : ''}`,
+          message: `Refund ${newStatus}: ${refund.id}${arnLabel}${failureLabel}`,
           timestamp: new Date(),
           actor: 'webhook',
           metadata: {
@@ -996,6 +1019,8 @@ async function handleRefundUpdated(refund: any): Promise<void> {
             newStatus,
             amount: (refund.amount || 0) / 100,
             failureReason: refund.failure_reason,
+            arn: refundArn,
+            expectedArrival: expectedArrival?.toISOString(),
           },
         },
       },

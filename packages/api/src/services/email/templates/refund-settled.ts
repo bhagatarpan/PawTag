@@ -14,6 +14,8 @@ export function renderRefundSettledEmail(data: {
   amount: number;
   currency: string;
   settledAt: string;
+  /** e.g. "Visa ••••1234" when known */
+  destination?: string;
   viewOrderUrl: string;
   creditNoteNumber?: string;
   creditNoteUrl?: string;
@@ -30,6 +32,12 @@ export function renderRefundSettledEmail(data: {
     </div>
   ` : '';
 
+  const destinationRow = data.destination ? `
+      <tr>
+        <td style="padding:12px 16px;background-color:#f9fafb;font-weight:600;color:#374151;font-size:13px;border-bottom:1px solid #e5e7eb;">Refund destination</td>
+        <td style="padding:12px 16px;color:#6b7280;font-size:13px;border-bottom:1px solid #e5e7eb;">${data.destination} (original payment method)</td>
+      </tr>` : '';
+
   const bodyHtml = `
     <p style="margin:0 0 20px;color:#374151;font-size:16px;">Hi <strong>${data.name}</strong>,</p>
 
@@ -44,7 +52,7 @@ export function renderRefundSettledEmail(data: {
         Refund Status: Settled
       </p>
       <p style="margin:0;color:#14532d;font-size:14px;line-height:1.5;">
-        The refund of <strong>$${data.amount.toFixed(2)} ${data.currency}</strong> has been processed by your bank. Depending on your bank's processing time, the funds may take 1–3 additional business days to appear on your statement.
+        The refund of <strong>$${data.amount.toFixed(2)} ${data.currency}</strong> has been sent to the original payment method${data.destination ? ` (${data.destination})` : ''} and processed by your bank. Depending on your bank's processing time, the funds may take 1–3 additional business days to appear on your statement. If that card was replaced or expired, your bank usually posts the refund to your new card or bank account.
       </p>
     </div>
 
@@ -53,6 +61,7 @@ export function renderRefundSettledEmail(data: {
         <td style="padding:12px 16px;background-color:#f9fafb;font-weight:600;color:#374151;font-size:13px;border-bottom:1px solid #e5e7eb;width:40%;">Refund ID</td>
         <td style="padding:12px 16px;color:#6b7280;font-size:13px;font-family:monospace;border-bottom:1px solid #e5e7eb;">${data.refundId}</td>
       </tr>
+      ${destinationRow}
       ${data.arn ? `
       <tr>
         <td style="padding:12px 16px;background-color:#f9fafb;font-weight:600;color:#374151;font-size:13px;border-bottom:1px solid #e5e7eb;">ARN (Bank Reference)</td>

@@ -21,6 +21,10 @@ export interface RefundDetails {
   cancellationNotes?: string;
   cancelledAt?: string;
   cancelledByDescription?: string;
+  refundDestination?: string;
+  refundAmount?: number;
+  paymentCardBrand?: string;
+  paymentCardLast4?: string;
 }
 
 interface RefundStatusCardProps {
@@ -127,34 +131,51 @@ export default function RefundStatusCard({
     });
   };
 
+  const destinationLabel = details.refundDestination
+    || (details.paymentCardBrand
+      ? `${details.paymentCardBrand.charAt(0).toUpperCase() + details.paymentCardBrand.slice(1).toLowerCase()}${details.paymentCardLast4 ? ` ••••${details.paymentCardLast4}` : ''} (original payment method)`
+      : 'Original payment method');
+
   return (
     <div className={`${config.bg} ${config.border} border rounded-2xl p-5`}>
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-start justify-between gap-3 mb-3">
         <h3 className={`text-sm font-semibold ${config.color} flex items-center gap-2`}>
           <Icon size={16} />
           {config.label}
         </h3>
-        {showActions && (
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleSync}
-              disabled={syncing}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50"
-            >
-              {syncing ? <RefreshCw size={12} className="animate-spin" /> : <RefreshCw size={12} />}
-              Sync with Stripe
-            </button>
-            {details.refundStatus === 'failed' && (
+        <div className="flex items-center gap-2">
+          {showActions && (
+            <>
               <button
-                onClick={handleRetry}
-                disabled={retrying}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50"
+                onClick={handleSync}
+                disabled={syncing}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50"
               >
-                {retrying ? <RefreshCw size={12} className="animate-spin" /> : <RefreshCw size={12} />}
-                Retry
+                {syncing ? <RefreshCw size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                Sync with Stripe
               </button>
-            )}
-          </div>
+              {details.refundStatus === 'failed' && (
+                <button
+                  onClick={handleRetry}
+                  disabled={retrying}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50"
+                >
+                  {retrying ? <RefreshCw size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                  Retry
+                </button>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div className="text-xs text-gray-600">
+          <div className="font-medium text-gray-700">Refund destination</div>
+          <div className="text-gray-900">{destinationLabel}</div>
+        </div>
+        {typeof details.refundAmount === 'number' && details.refundAmount > 0 && (
+          <div className="text-sm font-semibold text-gray-900">${details.refundAmount.toFixed(2)}</div>
         )}
       </div>
 
@@ -172,6 +193,10 @@ export default function RefundStatusCard({
               </button>
             </div>
           )}
+          <div className="flex justify-between gap-4">
+            <span className="text-gray-600">Refund destination</span>
+            <span className="text-gray-900 text-right">{destinationLabel}</span>
+          </div>
           {details.refundArn && (
             <div className="flex justify-between gap-4">
               <span className="text-gray-600">ARN (Bank Ref)</span>
@@ -209,6 +234,10 @@ export default function RefundStatusCard({
             </div>
           )}
         </div>
+      )}
+
+      {compact && details.refundId && (
+        <div className="text-xs text-gray-600 font-mono truncate">Refund ID: {details.refundId}</div>
       )}
     </div>
   );

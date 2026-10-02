@@ -19,6 +19,7 @@ import { RefundError } from '../errors';
 import { stripePaymentProvider } from '../providers/stripe';
 import { logRefundEvent } from '../audit';
 import { getBooleanSetting, getNumberSetting } from '../config';
+import { formatRefundDestination } from '@pawtag/shared';
 import logger from '../../lib/logger';
 
 /**
@@ -196,6 +197,11 @@ export class RefundService {
       provider: 'stripe',
       providerTransactionId: stripeResult.refundId,
       initiatedBy: 'admin',
+      arn: stripeResult.arn,
+      expectedArrival: stripeResult.expectedArrival,
+      cardBrand: order.payment.cardBrand,
+      cardLast4: order.payment.cardLast4,
+      refundDestination: formatRefundDestination(order.payment.cardBrand, order.payment.cardLast4),
       notes: params.reason,
     });
 

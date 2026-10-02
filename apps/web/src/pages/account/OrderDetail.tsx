@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Package, Loader2, Shield, Clock, RefreshCw, CheckCircle } from 'lucide-react';
-import { OrderDetailView, ConfirmDialog, CopyButton } from '@pawtag/ui';
+import { OrderDetailView, ConfirmDialog, CopyButton, formatRefundDestination, formatRefundDestinationSentence } from '@pawtag/ui';
 import type { OrderData, InvoiceData } from '@pawtag/ui';
 import { API } from '@pawtag/shared/api';
 import api from '../../lib/api';
@@ -146,12 +146,21 @@ export default function OrderDetail() {
     if (selectedReason === 'Other' && !notes.trim()) return;
     setCancelLoading(true);
     try {
-      await api.post(API.customer.orders.cancel(order._id), {
+      const res = await api.post(API.customer.orders.cancel(order._id), {
         reason: selectedReason,
         notes: selectedReason === 'Other' ? notes : undefined,
         portal: 'customer-web',
       });
-      alert('Order cancelled. A refund will be processed within 5–10 business days.');
+      const refundAmount = res.data?.data?.refundAmount ?? order.payment?.amount ?? 0;
+      const refundId = res.data?.data?.refundId;
+      const destination = formatRefundDestination(order.payment?.cardBrand, order.payment?.cardLast4);
+      const amountLabel = typeof refundAmount === 'number' ? `$${refundAmount.toFixed(2)}` : 'your payment';
+      alert(
+        `Order cancelled.\n\n` +
+        `Refund of ${amountLabel} to ${destination} is being processed (usually 5–10 business days).\n` +
+        (refundId ? `Refund ID: ${refundId}\n` : '') +
+        `\nIf that card was replaced or expired, your bank usually posts the refund to your new card or bank account.`
+      );
       setCancelOpen(false);
       fetchOrder();
     } catch (err: any) {
@@ -249,8 +258,10 @@ export default function OrderDetail() {
           <div>
             <p className="font-medium mb-1">What happens next?</p>
             <ul className="list-disc pl-5 space-y-0.5 text-primary-800">
-              <li>A full refund will be processed automatically</li>
+              <li>{formatRefundDestinationSentence(order.payment?.cardBrand, order.payment?.cardLast4)}</li>
+              <li>A full refund will be processed automatically to the original payment method</li>
               <li>Refunds typically take 5–10 business days to appear on your statement</li>
+              <li>If we cannot complete the refund, our team will contact you to arrange another method</li>
               <li>Your order status will update to "Cancelled"</li>
             </ul>
           </div>

@@ -20,6 +20,7 @@ import { OrderProgressStepper } from './OrderProgressStepper';
 import { OrderStatusBanner } from './OrderStatusBanner';
 import { CancellationInfoCard } from './CancellationInfoCard';
 import { CopyButton } from './CopyButton';
+import { formatRefundDestination } from '../lib/refundDestination';
 import type {
   OrderData,
   InvoiceData,
@@ -479,6 +480,9 @@ function RefundStatusCard({ order }: { order: OrderData }) {
 
   const config = statusConfig[order.refundStatus] || statusConfig.pending;
   const Icon = config.icon;
+  const destination = formatRefundDestination(order.payment?.cardBrand, order.payment?.cardLast4);
+  const refundAmount = order.payment?.amount;
+  const cancelledAt = order.cancelledAt || (order.activity || []).find((a) => a.type === 'cancelled')?.timestamp;
 
   return (
     <div className={`${config.bg} ${config.border} border rounded-2xl p-5`}>
@@ -487,16 +491,26 @@ function RefundStatusCard({ order }: { order: OrderData }) {
         {config.label}
       </h3>
       <div className="space-y-2 text-sm">
+        {typeof refundAmount === 'number' && refundAmount > 0 && (
+          <div className="flex justify-between gap-4">
+            <span className="text-gray-600">Refund amount</span>
+            <span className="text-gray-900 font-semibold">NZ${refundAmount.toFixed(2)}</span>
+          </div>
+        )}
+        <div className="flex justify-between gap-4">
+          <span className="text-gray-600">Refund to</span>
+          <span className="text-gray-900 text-right">{destination}</span>
+        </div>
         {order.refundId && (
           <div className="flex justify-between gap-4">
             <span className="text-gray-600">Refund ID</span>
             <span className="text-gray-900 font-mono text-xs">{order.refundId}</span>
           </div>
         )}
-        {order.refundArn && (
+        {cancelledAt && (
           <div className="flex justify-between gap-4">
-            <span className="text-gray-600">ARN (Bank Ref)</span>
-            <span className="text-gray-900 font-mono text-xs">{order.refundArn}</span>
+            <span className="text-gray-600">Requested</span>
+            <span className="text-gray-900">{formatDateTime(cancelledAt)}</span>
           </div>
         )}
         {order.refundExpectedArrival && (
@@ -511,11 +525,22 @@ function RefundStatusCard({ order }: { order: OrderData }) {
             <span className="text-gray-900">{formatDateTime(order.refundSettledAt)}</span>
           </div>
         )}
+        {order.refundArn && (
+          <div className="flex justify-between gap-4">
+            <span className="text-gray-600">ARN (Bank Ref)</span>
+            <span className="text-gray-900 font-mono text-xs">{order.refundArn}</span>
+          </div>
+        )}
         {order.refundFailureReason && (
           <div className="flex justify-between gap-4">
             <span className="text-gray-600">Failure reason</span>
             <span className="text-red-700 text-right">{order.refundFailureReason}</span>
           </div>
+        )}
+        {order.refundStatus === 'failed' && (
+          <p className="text-xs text-red-700 pt-1">
+            We could not return the funds to the original payment method. Our team will contact you to arrange an alternative refund if needed.
+          </p>
         )}
       </div>
     </div>

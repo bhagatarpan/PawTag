@@ -53,6 +53,13 @@ export { OrderDetailView } from './components/OrderDetailView';
 export { CopyButton } from './components/CopyButton';
 export { OrderProgressStepper, ORDER_STATUS_STEPS, STEP_LABELS } from './components/OrderProgressStepper';
 export { OrderStatusBanner } from './components/OrderStatusBanner';
+export {
+  formatCardBrand,
+  formatCardDisplay,
+  formatRefundDestination,
+  formatRefundDestinationShort,
+  formatRefundDestinationSentence,
+} from './lib/refundDestination';
 
 // Commerce components
 export { ProductCard } from './components/ProductCard';

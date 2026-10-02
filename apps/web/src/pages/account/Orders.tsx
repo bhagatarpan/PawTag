@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ShoppingBag, ChevronRight, Clock, Package, Truck, CheckCircle, Ban, RefreshCw, ExternalLink, FileText, CreditCard, MapPin, Eye } from 'lucide-react';
-import { StatusBadge, EmptyState, OrderProgressStepper, OrderStatusBanner, CopyButton } from '@pawtag/ui';
+import { StatusBadge, EmptyState, OrderProgressStepper, OrderStatusBanner, CopyButton, formatRefundDestinationShort } from '@pawtag/ui';
 import { ORDER_STATUS_LABELS, getStatusBadgeVariant, getStatusBorderColor, getTrackingUrl, isTerminalStatus, getPaymentStatusLabel, getPaymentStatusBadgeVariant } from '@pawtag/shared';
 import { API } from '@pawtag/shared/api';
 import api from '../../lib/api';
@@ -252,6 +252,14 @@ export default function Orders() {
                     <OrderStatusBanner status={order.status} amount={order.payment?.amount} />
                   ) : (
                     <OrderProgressStepper status={order.status} variant="compact" />
+                  )}
+                  {(order.status === 'cancelled' || order.status === 'refunded') && order.refundStatus && (
+                    <p className="mt-1.5 text-xs text-gray-600">
+                      {order.refundStatus === 'failed'
+                        ? 'Refund failed — support will arrange an alternative method'
+                        : formatRefundDestinationShort(order.payment?.cardBrand, order.payment?.cardLast4)
+                          || 'Refund to original payment method'}
+                    </p>
                   )}
                 </div>
 

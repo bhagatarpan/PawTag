@@ -156,6 +156,12 @@ export interface IPaymentProvider {
   retrieveRefund(refundId: string): Promise<RefundResult>;
 
   /**
+   * List refunds for a specific payment intent.
+   * Used to reconcile cancellation when a refund already exists at the provider.
+   */
+  listRefundsByPaymentIntent?(paymentIntentId: string): Promise<RefundResult[]>;
+
+  /**
    * List refunds for reconciliation.
    *
    * @param params - Date range and pagination options

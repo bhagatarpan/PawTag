@@ -53,14 +53,26 @@ interface RefundListItem {
   cancellationReason: string;
   refundSettledAt?: string;
   refundCreatedAt: string;
+  refundExpectedArrival?: string;
+  refundFailureReason?: string;
   paymentIntentId: string;
   attemptCount: number;
+  paymentCardBrand?: string;
+  paymentCardLast4?: string;
+  refundDestination?: string;
+  refundAmount?: number;
 }
 
 /**
  * Map an order with refund data to a list item.
  */
 function mapOrderToRefundListItem(order: any): RefundListItem {
+  const paymentBrand = order.payment?.cardBrand as string | undefined;
+  const paymentLast4 = order.payment?.cardLast4 as string | undefined;
+  const cardDisplay = paymentBrand
+    ? `${paymentBrand.charAt(0).toUpperCase() + paymentBrand.slice(1).toLowerCase()}${paymentLast4 ? ` ••••${paymentLast4}` : ''}`
+    : undefined;
+
   return {
     orderId: String(order._id),
     orderNumber: order.orderNumber,
@@ -76,8 +88,14 @@ function mapOrderToRefundListItem(order: any): RefundListItem {
     cancellationReason: order.cancellationReason || '',
     refundSettledAt: order.refundSettledAt?.toISOString(),
     refundCreatedAt: order.cancelledAt?.toISOString() || order.updatedAt?.toISOString(),
+    refundExpectedArrival: order.refundExpectedArrival?.toISOString?.() || (order.refundExpectedArrival ? new Date(order.refundExpectedArrival).toISOString() : undefined),
+    refundFailureReason: order.refundFailureReason,
     paymentIntentId: order.payment?.stripePaymentIntentId || order.payment?.transactionId || '',
     attemptCount: order.refundAttemptCount || 0,
+    paymentCardBrand: paymentBrand,
+    paymentCardLast4: paymentLast4,
+    refundDestination: cardDisplay ? `${cardDisplay} (original payment method)` : 'Original payment method',
+    refundAmount: order.payment?.amount || 0,
   };
 }
 

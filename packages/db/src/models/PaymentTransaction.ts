@@ -87,6 +87,18 @@ export interface IPaymentTransactionDocument extends Document {
   /** Number of retry attempts (0 = first attempt, max 1 auto-retry) */
   attemptCount?: number;
 
+  /** Snapshot of original payment method brand (e.g. visa) for refund destination display */
+  cardBrand?: string;
+
+  /** Snapshot of original payment method last4 for refund destination display */
+  cardLast4?: string;
+
+  /**
+   * Human-readable refund destination, e.g. "Visa ••••1234 (original payment method)".
+   * Stripe refunds always return to the original payment method; this field is a display snapshot.
+   */
+  refundDestination?: string;
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -136,6 +148,9 @@ const PaymentTransactionSchema = new Schema<IPaymentTransactionDocument>(
     lastSyncedAt: { type: Date },
     failureReason: { type: String },
     attemptCount: { type: Number, default: 0 },
+    cardBrand: { type: String },
+    cardLast4: { type: String },
+    refundDestination: { type: String },
   },
   { timestamps: true },
 );
