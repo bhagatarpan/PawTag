@@ -20,7 +20,7 @@ import { OrderProgressStepper } from './OrderProgressStepper';
 import { OrderStatusBanner } from './OrderStatusBanner';
 import { CancellationInfoCard } from './CancellationInfoCard';
 import { CopyButton } from './CopyButton';
-import { formatRefundDestination } from '../lib/refundDestination';
+import { formatRefundDestination, formatDateTime } from '../lib/refundDestination';
 import type {
   OrderData,
   InvoiceData,
@@ -52,16 +52,6 @@ function formatDate(iso: string): string {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
-  });
-}
-
-function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-NZ', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
   });
 }
 
