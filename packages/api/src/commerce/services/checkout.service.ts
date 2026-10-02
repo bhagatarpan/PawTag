@@ -382,7 +382,9 @@ export class CheckoutService {
           referredByCode: pending.referralCode,
           autoRenew: pending.autoRenew !== false,
           autoRenewMap: pending.autoRenewMap,
-          notes: `Stripe PaymentIntent: ${paymentIntentId}`,
+          notes: payment.cardBrand
+            ? `Paid with ${payment.cardBrand.charAt(0).toUpperCase() + payment.cardBrand.slice(1).toLowerCase()}${payment.cardLast4 ? ` ••••${payment.cardLast4}` : ''} — Stripe PaymentIntent: ${paymentIntentId}`
+            : `Stripe PaymentIntent: ${paymentIntentId}`,
           createdBy,
           createdByType: 'Customer',
           createdByPortal: portal,
@@ -435,6 +437,8 @@ export class CheckoutService {
       provider: 'stripe',
       providerTransactionId: paymentIntentId,
       initiatedBy: 'customer',
+      cardBrand: order.payment?.cardBrand,
+      cardLast4: order.payment?.cardLast4,
     });
 
     // 8-10. Post-payment completion steps with error tracking

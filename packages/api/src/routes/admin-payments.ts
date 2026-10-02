@@ -100,6 +100,8 @@ router.get('/reconciliation', requirePermission('order.read'), async (_req: Auth
       amount: number;
       stripeAmount: number | null;
       stripePaymentIntentId: string;
+      paymentCardBrand?: string;
+      paymentCardLast4?: string;
       issue: string;
     }> = [];
 
@@ -138,6 +140,8 @@ router.get('/reconciliation', requirePermission('order.read'), async (_req: Auth
         const amountMatch = Math.abs((order.payment?.amount || 0) - stripeIntent.amount) < 0.01;
 
         if (expectedStatus !== order.payment?.status || !amountMatch) {
+          const paymentCardBrand = order.payment?.cardBrand || (stripeIntent as any).cardBrand;
+          const paymentCardLast4 = order.payment?.cardLast4 || (stripeIntent as any).cardLast4;
           discrepancies.push({
             orderNumber: order.orderNumber,
             orderPaymentStatus: order.payment?.status || 'unknown',
@@ -145,6 +149,8 @@ router.get('/reconciliation', requirePermission('order.read'), async (_req: Auth
             amount: order.payment?.amount || 0,
             stripeAmount: stripeIntent.amount,
             stripePaymentIntentId: piId,
+            paymentCardBrand,
+            paymentCardLast4,
             issue: expectedStatus !== order.payment?.status
               ? `Status mismatch: PawTag="${order.payment?.status}" vs Stripe="${stripeIntent.status}"`
               : `Amount mismatch: PawTag=$${order.payment?.amount} vs Stripe=$${stripeIntent.amount}`,

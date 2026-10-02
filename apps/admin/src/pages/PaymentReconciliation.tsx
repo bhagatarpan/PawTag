@@ -8,7 +8,8 @@
 
 import { useEffect, useState } from 'react';
 import { API } from '@pawtag/shared/api';
-import { Loader2, AlertTriangle, CheckCircle, RefreshCw, CreditCard, ExternalLink } from 'lucide-react';
+import { formatCardDisplay } from '@pawtag/shared';
+import { Loader2, AlertTriangle, CheckCircle, RefreshCw, ExternalLink } from 'lucide-react';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
 
@@ -19,6 +20,8 @@ interface Discrepancy {
   amount: number;
   stripeAmount: number | null;
   stripePaymentIntentId: string;
+  paymentCardBrand?: string;
+  paymentCardLast4?: string;
   issue: string;
 }
 
@@ -164,6 +167,9 @@ export default function PaymentReconciliation() {
                       </td>
                       <td className="px-4 py-3 text-sm text-red-600">{d.issue}</td>
                       <td className="px-4 py-3">
+                        <div className="text-xs font-medium text-gray-900">
+                          {formatCardDisplay(d.paymentCardBrand, d.paymentCardLast4) || 'Card'}
+                        </div>
                         <div className="flex items-center gap-1">
                           <span className="text-xs font-mono text-gray-500 truncate max-w-[120px]">
                             {d.stripePaymentIntentId}

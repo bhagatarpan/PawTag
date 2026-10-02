@@ -227,7 +227,9 @@ export async function createPawTagOrder(params: CreateOrderParams): Promise<Crea
     },
     shippingAddress: shippingAddress || { line1: '', city: '', state: '', zip: '', country: 'NZ' },
     referredByCode: referralCode,
-    notes: `Stripe PaymentIntent: ${paymentIntentId}`,
+    notes: cardBrand
+      ? `Paid with ${cardBrand.charAt(0).toUpperCase() + cardBrand.slice(1).toLowerCase()}${cardLast4 ? ` ••••${cardLast4}` : ''} — Stripe PaymentIntent: ${paymentIntentId}`
+      : `Stripe PaymentIntent: ${paymentIntentId}`,
     createdBy,
     createdByType: 'Customer',
     createdByPortal: portal,

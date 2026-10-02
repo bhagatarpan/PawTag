@@ -266,7 +266,8 @@ function buildDefaultInvoiceHtml(data: InvoiceData, company: Record<string, stri
           ${invoice.dueDate ? `<p><span class="label">Due:</span> ${formatDate(invoice.dueDate)}</p>` : ''}
           ${invoice.paidAt ? `<p><span class="label">Paid:</span> ${formatDate(invoice.paidAt)}</p>` : ''}
           ${invoice.paymentMethod ? `<p><span class="label">Method:</span> ${escapeHtml(invoice.paymentMethod)}</p>` : ''}
-          ${order?.payment?.cardBrand ? `<p style="white-space:nowrap;"><span class="label">Card:</span> ${cardBrandIcon(order.payment.cardBrand)}&nbsp;&bull;&bull;&bull;&bull;&nbsp;${escapeHtml(order.payment.cardLast4 || '****')}</p>` : ''}
+          ${membership?.cardBrand ? `<p style="white-space:nowrap;"><span class="label">Card:</span> ${cardBrandIcon(membership.cardBrand)}&nbsp;&bull;&bull;&bull;&bull;&nbsp;${escapeHtml(membership.cardLast4 || '****')}</p>` : ''}
+          ${!membership?.cardBrand && order?.payment?.cardBrand ? `<p style="white-space:nowrap;"><span class="label">Card:</span> ${cardBrandIcon(order.payment.cardBrand)}&nbsp;&bull;&bull;&bull;&bull;&nbsp;${escapeHtml(order.payment.cardLast4 || '****')}</p>` : ''}
           ${order?.payment?.stripePaymentIntentId ? `<p><span class="label">Payment ID:</span> <span style="font-size:11px;color:#9ca3af;">${escapeHtml(order.payment.stripePaymentIntentId)}</span></p>` : ''}
         </div>
       </div>
@@ -388,8 +389,8 @@ export async function generateInvoiceHtml(invoiceId: string): Promise<string> {
       'invoice.tax': (order as any)?.tax != null ? `$${(order as any).tax.toFixed(2)}` : '',
       'invoice.discount': (order as any)?.discount?.amount ? `$${(order as any).discount.amount.toFixed(2)}` : '',
       'invoice.paymentRef': (order as any)?.payment?.stripePaymentIntentId || '',
-      'invoice.cardBrand': (order as any)?.payment?.cardBrand || '',
-      'invoice.cardLast4': (order as any)?.payment?.cardLast4 || '',
+      'invoice.cardBrand': (order as any)?.payment?.cardBrand || membership?.cardBrand || '',
+      'invoice.cardLast4': (order as any)?.payment?.cardLast4 || membership?.cardLast4 || '',
       'customer.name': customerName,
       'customer.email': customerEmail,
       'subscription.planName': subscription?.planName || '',
@@ -567,6 +568,7 @@ export async function generateCreditNoteHtml(creditNoteId: string): Promise<stri
           <p><span class="label">Date:</span> ${formatDate(creditNote.createdAt)}</p>
           ${originalInvoice ? `<p><span class="label">Original Invoice:</span> ${escapeHtml(originalInvoice.invoiceNumber)}</p>` : ''}
           ${order ? `<p><span class="label">Order:</span> ${escapeHtml(order.orderNumber)}</p>` : ''}
+          ${order?.payment?.cardBrand ? `<p style="white-space:nowrap;"><span class="label">Card:</span> ${cardBrandIcon(order.payment.cardBrand)}&nbsp;&bull;&bull;&bull;&bull;&nbsp;${escapeHtml(order.payment.cardLast4 || '****')}</p>` : ''}
           <p><span class="label">Payment Ref:</span> ${escapeHtml(order?.payment?.stripePaymentIntentId || 'N/A')}</p>
         </div>
       </div>
