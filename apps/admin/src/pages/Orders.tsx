@@ -399,13 +399,38 @@ export function OrderDetailDrawer({
   const trackingMissing = isShipmentTrackingMissing(order.status, order.trackingNumber);
   const showCreateShipment = canCreateShipmentForOrder(order.status, order.trackingNumber);
 
-  const renderProgress = () => (
-    isTerminalStatus(order.status) ? (
-      <OrderStatusBanner status={order.status} amount={order.payment?.amount} />
-    ) : (
-      <OrderProgressStepper status={order.status} variant="full" />
-    )
-  );
+  const renderProgress = () => {
+    const refundDisplay = getOrderRefundDisplay(order as any);
+    const hasRefund = refundDisplay !== 'none';
+    if (isTerminalStatus(order.status) || (hasRefund && refundDisplay !== 'partial')) {
+      return (
+        <OrderStatusBanner
+          status={order.status}
+          amount={order.payment?.amount}
+          refundStatus={order.refundStatus}
+          refundAmount={(order as any).refundAmount}
+        />
+      );
+    }
+    return (
+      <>
+        <OrderProgressStepper
+          status={order.status}
+          variant="full"
+          refundStatus={order.refundStatus}
+          refundAmount={(order as any).refundAmount}
+        />
+        {hasRefund && (
+          <div className="mt-2">
+            <StatusBadge
+              label={getRefundDisplayLabel(refundDisplay, order.refundStatus)}
+              variant={getRefundDisplayBadgeVariant(refundDisplay)}
+            />
+          </div>
+        )}
+      </>
+    );
+  };
 
   const renderActions = () => (
     (availableTransitions.length > 0 || showCreateShipment) && (
@@ -764,8 +789,8 @@ export function OrderDetailDrawer({
             </Section>
           )}
 
-          {/* Refund Details - shown for refunded orders or cancelled with refund */}
-          {(order.status === 'refunded' || (order.status === 'cancelled' && (order.refundedByDescription || order.refundStatus))) && (
+          {/* Refund Details — full or partial (not only cancelled) */}
+          {(order.status === 'refunded' || order.refundStatus || order.refundedByDescription || order.refundId) && (
             <Section title="Refund Details" icon={<RotateCcw size={16} />}>
               {order.refundedByDescription && (
                 <div className="mb-3 text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-lg p-3">
@@ -1326,6 +1351,12 @@ export default function Orders() {
         { label: 'Paid', value: summary?.paid, icon: <CreditCard size={20} />, color: 'primary', clickable: !!summary?.paid, onClick: () => { setStatusFilter('paid'); setPage(1); } },
         { label: 'Shipped', value: summary?.shipped, icon: <Truck size={20} />, color: 'primary', clickable: !!summary?.shipped, onClick: () => { setStatusFilter('shipped'); setPage(1); } },
         { label: 'Delivered', value: summary?.delivered, icon: <CheckCircle size={20} />, color: 'success', clickable: !!summary?.delivered, onClick: () => { setStatusFilter('delivered'); setPage(1); } },
+        {
+          label: 'Partially refunded',
+          value: data?.items?.filter((o) => getOrderRefundDisplay(o as any) === 'partial').length ?? 0,
+          icon: <RefreshCw size={20} />,
+          color: 'warning',
+        },
       ]} />
 
       {/* Toolbar */}

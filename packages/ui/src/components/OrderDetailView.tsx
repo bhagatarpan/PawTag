@@ -18,9 +18,11 @@ import {
 import { StatusBadge } from './StatusBadge';
 import { OrderProgressStepper } from './OrderProgressStepper';
 import { OrderStatusBanner } from './OrderStatusBanner';
+import { OrderRefundSummaryCard } from './OrderRefundSummaryCard';
 import { CancellationInfoCard } from './CancellationInfoCard';
 import { CopyButton } from './CopyButton';
 import { formatRefundDestination, formatDateTime } from '../lib/refundDestination';
+import { getOrderRefundDisplay } from '@pawtag/shared';
 import type {
   OrderData,
   InvoiceData,
@@ -595,11 +597,35 @@ export function OrderDetailView({
       <OrderHeader order={order} onBackToOrders={onBackToOrders} />
 
       {/* Progress Stepper or Status Banner */}
-      {['cancelled', 'refunded'].includes(order.status) ? (
-        <OrderStatusBanner status={order.status} amount={order.payment?.amount} />
+      {['cancelled', 'refunded'].includes(order.status) || order.refundStatus ? (
+        <OrderStatusBanner
+          status={order.status}
+          amount={order.payment?.amount}
+          refundStatus={order.refundStatus}
+          refundAmount={(order as any).refundAmount}
+          destinationLabel={formatRefundDestination(order.payment?.cardBrand, order.payment?.cardLast4) || undefined}
+        />
       ) : (
         <OrderProgressStepper status={order.status} variant="full" />
       )}
+
+      {/* Refund summary — full or partial (shared component) */}
+      {['cancelled', 'refunded'].includes(order.status) || order.refundStatus ? (
+        <OrderRefundSummaryCard
+          status={order.status}
+          refundStatus={order.refundStatus}
+          refundAmount={(order as any).refundAmount ?? (order.status === 'refunded' || order.payment?.status === 'refunded' ? order.payment?.amount : undefined)}
+          originalAmount={order.payment?.amount}
+          cardBrand={order.payment?.cardBrand}
+          cardLast4={order.payment?.cardLast4}
+          refundId={order.refundId}
+          refundArn={order.refundArn}
+          expectedArrival={(order as any).refundExpectedArrival}
+          settledAt={(order as any).refundSettledAt}
+          failureReason={(order as any).refundFailureReason}
+          refundedAt={(order as any).refundedAt}
+        />
+      ) : null}
 
       {/* Shipped without tracking — clarify pending state for customers */}
       {order.status === 'shipped' && !order.trackingNumber && (

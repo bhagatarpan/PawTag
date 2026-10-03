@@ -7,6 +7,11 @@ import {
   Clock,
   CreditCard,
 } from 'lucide-react';
+import {
+  getOrderRefundDisplay,
+  getRefundDisplayLabel,
+  type OrderRefundDisplay,
+} from '@pawtag/shared';
 
 /* ------------------------------------------------------------------ */
 /*  Constants                                                          */
@@ -39,6 +44,9 @@ const STEP_ICON: Record<string, React.FC<{ className?: string }>> = {
 export interface OrderProgressStepperProps {
   status: string;
   variant: 'compact' | 'full';
+  refundDisplay?: OrderRefundDisplay;
+  refundStatus?: string | null;
+  refundAmount?: number | null;
   className?: string;
 }
 
@@ -46,19 +54,52 @@ export interface OrderProgressStepperProps {
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
 
-export function OrderProgressStepper({ status, variant, className }: OrderProgressStepperProps) {
+export function OrderProgressStepper({
+  status,
+  variant,
+  refundDisplay,
+  refundStatus,
+  refundAmount,
+  className,
+}: OrderProgressStepperProps) {
   const currentStep = ORDER_STATUS_STEPS.indexOf(status);
-  const isCancelled = status === 'cancelled' || status === 'refunded';
+  const isTerminal = status === 'cancelled' || status === 'refunded';
+  const display: OrderRefundDisplay =
+    refundDisplay || getOrderRefundDisplay({ status, refundStatus });
 
-  if (isCancelled) {
+  // Full refund / cancelled: use banner via parent — keep null for stepper
+  if (isTerminal || display === 'full_succeeded' || display === 'full_failed' || display === 'full_canceled') {
     return null;
   }
 
-  if (variant === 'compact') {
-    return <CompactStepper status={status} currentStep={currentStep} className={className} />;
+  const showPartialStrip =
+    display === 'partial' ||
+    display === 'full_pending' ||
+    (refundStatus === 'succeeded' || refundStatus === 'pending') && status !== 'refunded';
+
+  const stepper =
+    variant === 'compact' ? (
+      <CompactStepper status={status} currentStep={currentStep} className={className} />
+    ) : (
+      <FullStepper status={status} currentStep={currentStep} className={className} />
+    );
+
+  if (!showPartialStrip) {
+    return stepper;
   }
 
-  return <FullStepper status={status} currentStep={currentStep} className={className} />;
+  return (
+    <div className={className}>
+      {stepper}
+      <div className="mt-1.5 flex items-center gap-1.5 text-xs text-amber-700">
+        <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500" />
+        <span>
+          {getRefundDisplayLabel(display, refundStatus)}
+          {refundAmount != null ? ` · $${refundAmount.toFixed(2)}` : ''}
+        </span>
+      </div>
+    </div>
+  );
 }
 
 /* ------------------------------------------------------------------ */

@@ -152,11 +152,20 @@ export class RefundService {
       };
     }
 
-    // 8. Update order
+    // 8. Update order — persist refund fields for UI display
     const isFullRefund = refundAmount >= capturedAmount;
-    order.status = isFullRefund ? 'refunded' : order.status;
-    order.payment.status = isFullRefund ? 'refunded' : order.payment.status;
+    if (isFullRefund) {
+      order.status = 'refunded';
+      order.payment.status = 'refunded';
+    }
     order.refundReason = params.reason;
+    order.refundId = stripeResult.refundId;
+    order.refundStatus = (stripeResult.status as any) || 'succeeded';
+    if (stripeResult.arn) order.refundArn = stripeResult.arn;
+    if (stripeResult.expectedArrival) {
+      order.refundExpectedArrival = new Date(stripeResult.expectedArrival);
+    }
+    order.refundLastSyncedAt = new Date();
 
     await order.save();
 
