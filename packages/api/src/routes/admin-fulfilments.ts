@@ -13,7 +13,7 @@ import logger from '../lib/logger';
 import { auditService, type AuditContext } from '../services/audit';
 import { createAuditContextFromRequest, type AuditRequest } from '../middleware/audit';
 import { generateTagId } from '../lib/tag-id';
-import { FULFILMENT_TO_ORDER_STATUS, FULFILMENT_BACKWARD_ORDER_STATUS } from '../services/fulfilment-sync';
+import { resolveOrderStatusFromFulfilment } from '../services/fulfilment-sync';
 
 const router = Router();
 router.use(authenticate);
@@ -84,25 +84,38 @@ router.put('/:id/status', requirePermission('order.update'), async (req: AuthReq
     const item = await Fulfilment.findByIdAndUpdate(req.params.id, update, { new: true });
     if (!item) { res.status(404).json({ success: false, error: 'Fulfilment not found' }); return; }
 
-    // Sync order status based on fulfilment status direction
-    const ORDER_STATUS_SEQUENCE = ['pending', 'paid', 'packing', 'shipped', 'delivered'] as const;
-    const currentOrderStatus = (await Order.findById(item.orderId).select('status'))?.status as string | undefined;
-    const newFulfilmentStatusIdx = ORDER_STATUS_SEQUENCE.indexOf(status as any);
-    const currentOrderStatusIdx = currentOrderStatus ? ORDER_STATUS_SEQUENCE.indexOf(currentOrderStatus as any) : -1;
+    // Sync order status using explicit fulfilment→order mapping.
+    // Do not indexOf() fulfilment names against the order status sequence.
+    const currentOrder = await Order.findById(item.orderId).select('status orderNumber');
+    const orderStatus = resolveOrderStatusFromFulfilment(
+      status as any,
+      currentOrder?.status,
+    );
 
-    let orderStatus: string | undefined;
-    if (newFulfilmentStatusIdx > currentOrderStatusIdx) {
-      // Forward transition
-      orderStatus = FULFILMENT_TO_ORDER_STATUS[status as keyof typeof FULFILMENT_TO_ORDER_STATUS];
-    } else if (newFulfilmentStatusIdx < currentOrderStatusIdx) {
-      // Backward transition
-      orderStatus = FULFILMENT_BACKWARD_ORDER_STATUS[status as keyof typeof FULFILMENT_BACKWARD_ORDER_STATUS];
-    }
-
-    if (orderStatus) {
+    if (orderStatus && currentOrder && currentOrder.status !== orderStatus) {
       try {
-        await Order.findByIdAndUpdate(item.orderId, { status: orderStatus });
-        logger.info({ fulfilmentId: req.params.id, orderId: item.orderId, orderStatus }, 'Order status synced from fulfilment');
+        await Order.findByIdAndUpdate(item.orderId, {
+          status: orderStatus,
+          $push: {
+            activity: {
+              type: 'status_synced',
+              message: `Order status synced from fulfilment (${status} → ${orderStatus})`,
+              timestamp: new Date(),
+              actor: 'system' as const,
+            },
+          },
+        });
+        logger.info(
+          {
+            fulfilmentId: req.params.id,
+            orderId: item.orderId,
+            orderNumber: currentOrder.orderNumber,
+            fulfilmentStatus: status,
+            previousOrderStatus: currentOrder.status,
+            orderStatus,
+          },
+          'Order status synced from fulfilment',
+        );
       } catch (syncErr) {
         logger.error({ err: syncErr, fulfilmentId: req.params.id }, 'Failed to sync order status');
         // Non-critical — don't fail the fulfilment update

@@ -52,6 +52,17 @@ At every external or persistent step ask:
 - Refund destination is the original payment method; display that truthfully (`skills/refund-visibility/`).
 - Persist Stripe ARN/arrival when provided; snapshot destination on refund transactions.
 
+### Order ↔ Fulfilment status sync
+- Fulfilment and Order use **different enums**:
+  - Fulfilment: `pending | picking | packing | fulfilled`
+  - Order: `pending | pending_payment | paid | packing | shipped | delivered | ...`
+- Resolve order status only via **explicit mapping** in `packages/api/src/services/fulfilment-sync.ts` (`resolveOrderStatusFromFulfilment`).
+- **Never** `indexOf()` a fulfilment status name against the order status sequence. `'fulfilled'` is not an order status (`indexOf` → `-1`) and previously made fulfilled look like a backward transition, leaving orders stuck at `packing` while warehouse fulfilment was already `fulfilled`.
+- Forward map today: `packing → packing`, `fulfilled → shipped`.
+- Do not overwrite terminal order statuses (`cancelled`, `refunded`) from fulfilment sync.
+- Data repairs that align order status with fulfilled fulfilment are status corrections only — do not invent tracking, shipment, payment, or refund state.
+- Regression test: `tests/unit/fulfilment-order-sync.test.ts`.
+
 ## Verification
 
 Add tests for duplicate requests, replayed webhooks, ownership violations, concurrent inventory, partial failures, and production configuration where the touched change creates those risks.
