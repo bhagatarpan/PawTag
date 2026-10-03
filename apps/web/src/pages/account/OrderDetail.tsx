@@ -29,8 +29,15 @@ function ReturnStatusCard({
   const status = String(returnRequest.status || '');
   const isRejected = status === 'rejected';
   const isPending = status === 'pending';
-  const canShip = status === 'approved' || status === 'received';
+  const isApproved = status === 'approved';
+  const canShip = isApproved || status === 'received';
+  // Customer can edit tracking until warehouse marks return received
+  const canEditTracking = isApproved && Boolean(returnRequest.returnTrackingNumber);
   const csrNote = String(returnRequest.notes || '').trim();
+  const [editingTracking, setEditingTracking] = useState(false);
+  const [editProvider, setEditProvider] = useState(String(returnRequest.returnShipProvider || ''));
+  const [editTrackingNumber, setEditTrackingNumber] = useState(String(returnRequest.returnTrackingNumber || ''));
+  const [savingTracking, setSavingTracking] = useState(false);
 
   return (
     <div className="mt-6 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
@@ -71,19 +78,90 @@ function ReturnStatusCard({
           </div>
         )}
         {returnRequest.returnTrackingNumber && (
-          <div className="flex justify-between gap-2">
-            <span className="text-gray-500">Your return tracking</span>
-            <span className="font-mono text-xs text-right">
-              {returnRequest.returnShipProvider} {returnRequest.returnTrackingNumber}
-              {returnRequest.returnTrackingUrl && (
-                <>
-                  {' · '}
-                  <a href={returnRequest.returnTrackingUrl} target="_blank" rel="noopener noreferrer" className="text-primary-600 underline">
-                    Track
-                  </a>
-                </>
-              )}
-            </span>
+          <div className="space-y-1">
+            <div className="flex justify-between gap-2">
+              <span className="text-gray-500">Your return tracking</span>
+              <span className="font-mono text-xs text-right">
+                {returnRequest.returnShipProvider} {returnRequest.returnTrackingNumber}
+                {returnRequest.returnTrackingUrl && (
+                  <>
+                    {' · '}
+                    <a href={returnRequest.returnTrackingUrl} target="_blank" rel="noopener noreferrer" className="text-primary-600 underline">
+                      Track
+                    </a>
+                  </>
+                )}
+              </span>
+            </div>
+            {canEditTracking && (
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingTracking((v) => !v);
+                    setEditProvider(String(returnRequest.returnShipProvider || ''));
+                    setEditTrackingNumber(String(returnRequest.returnTrackingNumber || ''));
+                  }}
+                  className="text-xs text-primary-600 hover:text-primary-700 font-medium underline"
+                >
+                  Edit tracking
+                </button>
+              </div>
+            )}
+            {canEditTracking && editingTracking && (
+              <div className="pt-2 border-t border-gray-100 space-y-2">
+                <p className="text-xs text-gray-500">
+                  You can correct your return tracking until the warehouse marks this return as received.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <input
+                    id="return-provider-edit"
+                    name="return-provider-edit"
+                    value={editProvider}
+                    onChange={(e) => setEditProvider(e.target.value)}
+                    className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                    placeholder="Shipping provider (e.g. NZ Post)"
+                  />
+                  <input
+                    id="return-tracking-edit"
+                    name="return-tracking-edit"
+                    value={editTrackingNumber}
+                    onChange={(e) => setEditTrackingNumber(e.target.value)}
+                    className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                    placeholder="Tracking number"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    disabled={savingTracking}
+                    onClick={async () => {
+                      if (!editProvider.trim() || !editTrackingNumber.trim()) {
+                        alert('Please enter provider and tracking number');
+                        return;
+                      }
+                      setSavingTracking(true);
+                      try {
+                        await onTrackingSubmit(editProvider.trim(), editTrackingNumber.trim());
+                        setEditingTracking(false);
+                      } finally {
+                        setSavingTracking(false);
+                      }
+                    }}
+                    className="inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 disabled:opacity-50"
+                  >
+                    {savingTracking ? 'Saving…' : 'Save tracking'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingTracking(false)}
+                    className="inline-flex items-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
         {returnRequest.refundStatus === 'succeeded' && (
