@@ -925,6 +925,7 @@ Rules:
 - Remaining refundable balance is enforced server-side (partial refunds supported when enabled).
 - Never mark a return refunded unless Stripe accepted the refund.
 - Admin order partial refunds do **not** flip the whole order to fully refunded unless the capture is exhausted.
+- **New return requests notify admin** by email (`commerce.returns.notificationEmail` + optional `ADMIN_ALERT_EMAIL`) and admin in-app notifications; admin sidebar shows a pending-returns count; Dashboard has a calm “Pending Returns” tile (no blinking).
 - Process, decision tree, mockups, and progress: `docs/RETURNS-REFUNDS-WORKFLOW.md`.
 - Skill: `skills/returns-refunds/`.
 

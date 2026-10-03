@@ -14,7 +14,7 @@ import { z } from 'zod';
 import { AuthRequest, authenticate } from '../middleware/auth';
 import { validate } from '../middleware/validation';
 import { cancelOrderSchema } from '../middleware/schemas';
-import { Order, Return, User } from '@pawtag/db';
+import { Order, Return, User, Notification } from '@pawtag/db';
 import { cancelOrder, type CancellationResult } from '../commerce/services/cancellation.service';
 import { toAppError } from '../lib/app-errors';
 import { notifyCustomerOfStatusChange } from '../services/orderNotification.service';
@@ -187,6 +187,71 @@ router.post('/', validate(createReturnSchema), async (req: AuthRequest, res: Res
       }
     } catch (err) {
       logger.error({ err, orderId }, 'Failed to send return request email');
+    }
+
+    // Admin notification — email + in-app (audience: admin). Fire-and-forget.
+    try {
+      const returnNotificationEmail =
+        (await getSetting('commerce.returns.notificationEmail')) || 'return@pawtag.co.nz';
+      const adminAlertEmail = process.env.ADMIN_ALERT_EMAIL;
+      const recipients = Array.from(
+        new Set(
+          [returnNotificationEmail, adminAlertEmail]
+            .map((e) => (e || '').trim())
+            .filter(Boolean),
+        ),
+      );
+      const itemLines = returnItems
+        .map((i: { productName: string; quantity: number }) => `${i.productName} × ${i.quantity}`)
+        .join(', ');
+      const adminHtml = `
+        <p><strong>New return request</strong></p>
+        <p>Order: ${order.orderNumber}</p>
+        <p>Customer: ${requester?.fullName || 'Unknown'} (${requester?.email || userId})${requester?.phoneNumber ? ` · ${requester.phoneNumber}` : ''}</p>
+        <p>Items: ${itemLines}</p>
+        <p>Reason: ${reason}</p>
+        <p>Estimated refund: $${refundAmount.toFixed(2)} ${order.payment?.currency || 'NZD'}</p>
+        <p>Return ID: ${returnRequest._id}</p>
+        <p><a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/admin/returns">Open Returns in Admin</a></p>
+      `;
+      const { sendMail } = await import('../services/email.service');
+      await Promise.all(
+        recipients.map((email) =>
+          sendMail(email, `New return request — ${order.orderNumber}`, adminHtml).catch((e) =>
+            logger.error({ err: e, orderId }, 'Failed to send admin return request email'),
+          ),
+        ),
+      );
+
+      Notification.create({
+        userId,
+        audience: 'admin',
+        type: 'return_requested',
+        title: 'New return request',
+        message: `${order.orderNumber} — ${reason} ($${refundAmount.toFixed(2)} estimated)`,
+        data: {
+          returnId: String(returnRequest._id),
+          orderId: String(order._id),
+          orderNumber: order.orderNumber,
+          refundAmount,
+          reason,
+        },
+        priority: 'high',
+        channel: 'alert',
+        actionUrl: '/admin/returns',
+      }).catch((err) => logger.error({ err, orderId }, 'Failed to create admin return notification'));
+
+      logger.info(
+        {
+          orderId,
+          orderNumber: order.orderNumber,
+          returnId: String(returnRequest._id),
+          adminEmailRecipients: recipients,
+        },
+        'Admin notified of new return request',
+      );
+    } catch (err) {
+      logger.error({ err, orderId }, 'Failed to notify admin of return request');
     }
 
     logger.info({
@@ -365,6 +430,28 @@ router.post('/:id/tracking', validate(trackingSchema), async (req: AuthRequest, 
       },
       'Return tracking submitted by customer',
     );
+
+    // Admin in-app notification for tracking (email already sent above)
+    try {
+      await Notification.create({
+        userId,
+        audience: 'admin',
+        type: 'return_tracking_submitted',
+        title: 'Return tracking submitted',
+        message: `${ret.orderNumber} — ${cleanProvider} ${cleanTracking}`,
+        data: {
+          returnId: String(ret._id),
+          orderNumber: ret.orderNumber,
+          provider: cleanProvider,
+          trackingNumber: cleanTracking,
+        },
+        priority: 'normal',
+        channel: 'info',
+        actionUrl: '/admin/returns',
+      }).catch(() => {});
+    } catch {
+      // non-critical
+    }
 
     res.json({ success: true, data: ret });
   } catch (err) {

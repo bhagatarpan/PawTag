@@ -553,7 +553,7 @@ Stripe refunds always return to the **original payment method** used for the cha
 - Persist Stripe `arn` / `arrival_date` when provided.
 - Snapshot destination (`cardBrand`, `cardLast4`, `refundDestination`) on refund PaymentTransactions.
 - Failed refunds need a clear customer/CSR recovery path (auto-retry + support arranging alternate method). See `skills/refund-visibility/`.
-- **Customer returns → money:** process via `return-refund.service` / `POST /api/admin/commerce/returns/:id/refund` with permission `order.refund`. Returns status updates alone must **not** move money. Default requires warehouse receipt; refund-without-return is an explicit exception. Remaining refundable balance is server-enforced. Customer tracking submit ≠ warehouse receipt. See `skills/returns-refunds/` and `docs/RETURNS-REFUNDS-WORKFLOW.md`.
+- **Customer returns → money:** process via `return-refund.service` / `POST /api/admin/commerce/returns/:id/refund` with permission `order.refund`. Returns status updates alone must **not** move money. Default requires warehouse receipt; refund-without-return is an explicit exception. Remaining refundable balance is server-enforced. Customer tracking submit ≠ warehouse receipt. **Admin is notified** on new return requests via email (`commerce.returns.notificationEmail` + `ADMIN_ALERT_EMAIL`) and admin in-app notification (`return_requested`); sidebar shows pending-return count. See `skills/returns-refunds/` and `docs/RETURNS-REFUNDS-WORKFLOW.md`.
 
 ## Idempotency
 

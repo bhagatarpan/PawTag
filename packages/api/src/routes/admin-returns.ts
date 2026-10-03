@@ -47,6 +47,33 @@ const refundWithoutReturnSchema = z.object({
 const router = Router();
 router.use(authenticate);
 
+/**
+ * GET /api/admin/commerce/returns/summary
+ * Lightweight counts for sidebar badges and dashboard tiles.
+ */
+router.get('/summary', requirePermission('order.read'), async (_req: AuthRequest, res: Response) => {
+  try {
+    const [pending, approved, received, refundFailed] = await Promise.all([
+      Return.countDocuments({ status: 'pending' }),
+      Return.countDocuments({ status: 'approved' }),
+      Return.countDocuments({ status: 'received' }),
+      Return.countDocuments({ status: 'refund_failed' }),
+    ]);
+    res.json({
+      success: true,
+      data: {
+        pending,
+        approved,
+        received,
+        refundFailed,
+        needsAttention: pending + refundFailed,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: toAppError(err).userMessage });
+  }
+});
+
 router.get('/', requirePermission('order.read'), async (req: AuthRequest, res: Response) => {
   try {
     const { page = 1, limit = 20, status } = req.query;

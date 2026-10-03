@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
-import { Users, PawPrint, QrCode, ShoppingBag, AlertTriangle, Activity, TrendingUp, Package, Repeat, LayoutDashboard } from 'lucide-react';
+import { Users, PawPrint, QrCode, ShoppingBag, AlertTriangle, Activity, TrendingUp, Package, Repeat, LayoutDashboard, RotateCcw } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 
 interface AnalyticsData {
@@ -14,8 +15,8 @@ interface AnalyticsData {
   dailyOrders: Array<{ _id: string; count: number; revenue: number }>;
 }
 
-function StatCard({ label, value, icon: Icon, color, subtext }: { label: string; value: string | number; icon: any; color: string; subtext?: string }) {
-  return (
+function StatCard({ label, value, icon: Icon, color, subtext, onClick }: { label: string; value: string | number; icon: any; color: string; subtext?: string; onClick?: () => void }) {
+  const content = (
     <div className="bg-white rounded-lg border border-gray-200 p-5">
       <div className="flex items-center gap-4">
         <div className={`p-3 rounded-lg ${color}`}>
@@ -29,10 +30,18 @@ function StatCard({ label, value, icon: Icon, color, subtext }: { label: string;
       </div>
     </div>
   );
+  if (!onClick) return content;
+  return (
+    <button type="button" onClick={onClick} className="text-left w-full hover:shadow-sm transition-shadow focus:outline-none focus:ring-2 focus:ring-primary-500 rounded-lg">
+      {content}
+    </button>
+  );
 }
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
+  const [pendingReturns, setPendingReturns] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -41,6 +50,10 @@ export default function Dashboard() {
       .then((res) => setAnalytics(res.data.data))
       .catch((e) => setError(e.response?.data?.error || 'Failed to load analytics'))
       .finally(() => setLoading(false));
+
+    api.get(API.admin.commerce.returns.summary)
+      .then((res) => setPendingReturns(res.data.data?.pending ?? 0))
+      .catch(() => setPendingReturns(0));
   }, []);
 
   if (loading) return <div className="text-center py-12 text-gray-500">Loading dashboard...</div>;
@@ -80,9 +93,6 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* Integration Status */}
-      {/* Commerce Status */}
-
       {/* Operations Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <StatCard
@@ -110,6 +120,18 @@ export default function Dashboard() {
           icon={AlertTriangle}
           color="bg-amber-500"
           subtext={`${analytics.tags.expired} expired`}
+        />
+      </div>
+
+      {/* Returns ops card — static count, no blinking (DESIGN.md) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <StatCard
+          label="Pending Returns"
+          value={pendingReturns ?? '—'}
+          icon={RotateCcw}
+          color={pendingReturns && pendingReturns > 0 ? 'bg-amber-500' : 'bg-gray-400'}
+          subtext={pendingReturns && pendingReturns > 0 ? 'Needs CSR review' : 'No pending return requests'}
+          onClick={() => navigate('/returns?status=pending')}
         />
       </div>
 

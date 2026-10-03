@@ -4,6 +4,7 @@
  */
 
 import { useEffect, useState, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { API } from '@pawtag/shared/api';
 import { Search, Loader2, RotateCcw, Eye, AlertTriangle } from 'lucide-react';
 import api from '../lib/api';
@@ -46,9 +47,11 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
 };
 
 export default function Returns() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialStatus = searchParams.get('status') || 'all';
   const [returns, setReturns] = useState<ReturnRequest[]>([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState(initialStatus);
   const [selected, setSelected] = useState<ReturnRequest | null>(null);
   const [refundAmount, setRefundAmount] = useState('');
   const [refundReason, setRefundReason] = useState('');
@@ -67,6 +70,12 @@ export default function Returns() {
   }, [statusFilter]);
 
   useEffect(() => { fetchReturns(); }, [fetchReturns]);
+
+  const handleStatusFilterChange = (s: string) => {
+    setStatusFilter(s);
+    if (s === 'all') setSearchParams({});
+    else setSearchParams({ status: s });
+  };
 
   const updateStatus = async (id: string, status: string) => {
     try {
@@ -127,7 +136,7 @@ export default function Returns() {
       </div>
       <div className="flex flex-wrap gap-3 mb-6">
         {['all', 'pending', 'approved', 'rejected', 'received', 'refunded', 'refund_failed'].map((s) => (
-          <button key={s} onClick={() => setStatusFilter(s)}
+          <button key={s} onClick={() => handleStatusFilterChange(s)}
             className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${statusFilter === s ? 'bg-teal-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
             {s.charAt(0).toUpperCase() + s.slice(1)}
           </button>
