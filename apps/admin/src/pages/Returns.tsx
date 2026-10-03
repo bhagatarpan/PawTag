@@ -6,9 +6,10 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { API } from '@pawtag/shared/api';
-import { Search, Loader2, RotateCcw, Eye, AlertTriangle, X } from 'lucide-react';
+import { Search, Loader2, RotateCcw, Eye, AlertTriangle, X, ExternalLink } from 'lucide-react';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
+import { OrderDetailDrawer, type Order } from './Orders';
 
 interface ReturnRequest {
   _id: string;
@@ -52,25 +53,65 @@ export default function Returns() {
   const [returns, setReturns] = useState<ReturnRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState(initialStatus);
+  const [searchQuery, setSearchQuery] = useState('');
   const [selected, setSelected] = useState<ReturnRequest | null>(null);
   const [refundAmount, setRefundAmount] = useState('');
   const [refundReason, setRefundReason] = useState('');
   const [exceptionReason, setExceptionReason] = useState('');
   const [processing, setProcessing] = useState(false);
   const [confirmAction, setConfirmAction] = useState<{ id: string; status: 'approved' | 'rejected' } | null>(null);
+  const [orderDrawerOrder, setOrderDrawerOrder] = useState<Order | null>(null);
+  const [orderDrawerLoading, setOrderDrawerLoading] = useState(false);
 
   const fetchReturns = useCallback(async () => {
     try {
       setLoading(true);
       const params: Record<string, any> = { limit: 50 };
       if (statusFilter !== 'all') params.status = statusFilter;
+      if (searchQuery.trim()) params.search = searchQuery.trim();
       const res = await api.get(API.admin.commerce.returns.list, { params });
       setReturns(res.data?.data?.items || []);
     } catch { toast.error('Failed to load returns'); }
     finally { setLoading(false); }
-  }, [statusFilter]);
+  }, [statusFilter, searchQuery]);
 
-  useEffect(() => { fetchReturns(); }, [fetchReturns]);
+  useEffect(() => {
+    const t = setTimeout(() => { fetchReturns(); }, searchQuery ? 300 : 0);
+    return () => clearTimeout(t);
+  }, [fetchReturns, searchQuery]);
+
+  const openOrderDrawer = async (orderId?: string, orderNumber?: string) => {
+    if (!orderId && !orderNumber) {
+      toast.error('Order ID not available on this return');
+      return;
+    }
+    setOrderDrawerLoading(true);
+    try {
+      const res = orderId
+        ? await api.get(API.admin.commerce.orders.list, { params: { search: orderNumber || '', limit: 1 } })
+        : await api.get(API.admin.commerce.orders.list, { params: { search: orderNumber, limit: 1 } });
+      // Prefer direct lookup via commerce orders list search by order number
+      let order: Order | null = null;
+      const data = res.data?.data;
+      const list = data?.items || (Array.isArray(data) ? data : []);
+      order = list.find((o: Order) => String(o._id) === String(orderId)) || list[0] || null;
+      if (!order && orderId) {
+        // Fallback: fetch via admin users orders is not needed — try list without filter then match
+        const res2 = await api.get(API.admin.commerce.orders.list, { params: { search: orderNumber || '', limit: 20 } });
+        const list2 = res2.data?.data?.items || [];
+        order = list2.find((o: Order) => String(o._id) === String(orderId)) || list2[0] || null;
+      }
+      if (!order) {
+        toast.error('Order not found');
+        return;
+      }
+      setOrderDrawerOrder(order);
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to load order');
+    } finally {
+      setOrderDrawerLoading(false);
+    }
+  };
 
   const handleStatusFilterChange = (s: string) => {
     setStatusFilter(s);
@@ -163,7 +204,18 @@ export default function Returns() {
         <h1 className="text-2xl font-bold text-gray-900">Returns</h1>
         <p className="text-sm text-gray-500 mt-1">Manage return requests. Money refunds use Stripe via Process Refund — status alone does not move funds.</p>
       </div>
-      <div className="flex flex-wrap gap-3 mb-6">
+      <div className="flex flex-wrap gap-3 mb-6 items-center">
+        <div className="relative">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="search"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search order # or customer…"
+            className="pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm w-64 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            aria-label="Search returns by order number or customer"
+          />
+        </div>
         {['all', 'pending', 'approved', 'rejected', 'received', 'refunded', 'refund_failed'].map((s) => (
           <button key={s} onClick={() => handleStatusFilterChange(s)}
             className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${statusFilter === s ? 'bg-teal-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
@@ -190,7 +242,17 @@ export default function Returns() {
             <tbody className="divide-y divide-gray-100">
               {returns.map((r) => (
                 <tr key={r._id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 font-mono text-sm font-medium text-gray-900">{r.orderNumber}</td>
+                  <td className="px-4 py-3 font-mono text-sm font-medium text-gray-900">
+                    <button
+                      type="button"
+                      onClick={() => openOrderDrawer(r.orderId?._id, r.orderNumber)}
+                      className="text-primary-600 hover:text-primary-700 hover:underline inline-flex items-center gap-1"
+                      title="Open order"
+                    >
+                      {r.orderNumber}
+                      <ExternalLink size={12} />
+                    </button>
+                  </td>
                   <td className="px-4 py-3 text-sm text-gray-600">{getUserName(r)}</td>
                   <td className="px-4 py-3 text-sm text-gray-500 truncate max-w-[200px]">{r.reason}</td>
                   <td className="px-4 py-3 text-center"><span className={`px-2 py-1 text-xs font-medium rounded-full ${STATUS_CONFIG[r.status]?.color || 'bg-gray-100'}`}>{STATUS_CONFIG[r.status]?.label || r.status}</span></td>
@@ -223,7 +285,18 @@ export default function Returns() {
               </button>
             </div>
             <div className="space-y-3 text-sm">
-              <div className="flex justify-between"><span className="text-gray-500">Order</span><span className="font-mono">{selected.orderNumber}</span></div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Order</span>
+                <button
+                  type="button"
+                  onClick={() => openOrderDrawer(selected.orderId?._id, selected.orderNumber)}
+                  className="font-mono text-primary-600 hover:text-primary-700 hover:underline inline-flex items-center gap-1"
+                  title="Open order"
+                >
+                  {selected.orderNumber}
+                  <ExternalLink size={12} />
+                </button>
+              </div>
               <div className="flex justify-between"><span className="text-gray-500">Customer</span><span>{getUserName(selected)}</span></div>
               {getUserPhone(selected) && (
                 <div className="flex justify-between"><span className="text-gray-500">Phone</span><span>{getUserPhone(selected)}</span></div>
@@ -408,6 +481,23 @@ export default function Returns() {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Order drawer — opened from order number links */}
+      {orderDrawerOrder && (
+        <OrderDetailDrawer
+          order={orderDrawerOrder}
+          onClose={() => setOrderDrawerOrder(null)}
+          onRefresh={() => { fetchReturns(); }}
+          onCancel={() => {}}
+          onRefund={() => {}}
+          cancellationReasons={[]}
+        />
+      )}
+      {orderDrawerLoading && (
+        <div className="fixed inset-0 z-40 bg-black/10 flex items-center justify-center pointer-events-none">
+          <Loader2 className="animate-spin text-teal-600" size={24} />
         </div>
       )}
     </div>

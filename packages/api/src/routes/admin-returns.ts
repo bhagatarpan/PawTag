@@ -78,9 +78,26 @@ router.get('/summary', requirePermission('order.read'), async (_req: AuthRequest
 
 router.get('/', requirePermission('order.read'), async (req: AuthRequest, res: Response) => {
   try {
-    const { page = 1, limit = 20, status } = req.query;
+    const { page = 1, limit = 20, status, search } = req.query;
     const query: Record<string, any> = {};
     if (status) query.status = status;
+
+    const searchStr = String(search || '').trim();
+    if (searchStr) {
+      // Match orderNumber OR customer name/email (populate userId)
+      const userMatches = await User.find({
+        $or: [
+          { fullName: { $regex: searchStr, $options: 'i' } },
+          { email: { $regex: searchStr, $options: 'i' } },
+        ],
+      }).select('_id').limit(200);
+      const userIds = userMatches.map((u) => u._id);
+      query.$or = [
+        { orderNumber: { $regex: searchStr, $options: 'i' } },
+        ...(userIds.length ? [{ userId: { $in: userIds } }] : []),
+      ];
+    }
+
     const total = await Return.countDocuments(query);
     const items = await Return.find(query)
       .sort({ createdAt: -1 })
