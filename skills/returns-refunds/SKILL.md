@@ -35,15 +35,21 @@ description: Implement or review PawTag customer returns and refunds end-to-end.
 | Stripe provider refund | `packages/api/src/commerce/providers/stripe/index.ts` |
 | Workflow + mockups | `docs/RETURNS-REFUNDS-WORKFLOW.md` |
 
-## Return lifecycle (Phase 1+)
+## Return lifecycle (current)
 
 ```text
 pending → approved → received → refunded
-pending → rejected (terminal)
-Exception: approved → refund_without_return approved → refund
-Failure: refund attempted → refund_failed (order remains financially truthful)
-Tracking: approved/received → customer POST tracking (does not mean warehouse received)
+pending → rejected
+rejected → approved          (CSR can reverse until money refunded)
+approved → rejected          (CSR can reverse until money refunded)
+received → rejected          (change mind before Process Refund)
+refunded → (terminal — no approve/reject)
 ```
+
+- **Approve ≠ money.** Warehouse receipt + Process Refund remain separate.
+- **CSR can Approve/Reject until payment is refunded** (business rule).
+- Modal: Close (X) button + Escape; Approve/Reject shown on all statuses except `refunded`.
+- Re-decides send customer emails again (`return-approved` / `return-rejected`).
 
 Do **not** treat bare `PUT status → refunded` as money movement.
 

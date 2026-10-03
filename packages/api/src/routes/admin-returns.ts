@@ -19,13 +19,14 @@ import { getSetting } from '../commerce/config';
 import logger from '../lib/logger';
 
 // Valid return status transitions (logistics only — not money)
+// CSR can still Approve/Reject until payment is refunded (business rule).
 const RETURN_STATUS_TRANSITIONS: Record<string, string[]> = {
   pending: ['approved', 'rejected'],
   approved: ['received', 'rejected'],
-  rejected: [],
-  received: ['refunded'],
+  rejected: ['approved'],
+  received: ['rejected'],
   refunded: [],
-  refund_failed: ['received'],
+  refund_failed: ['received', 'approved', 'rejected'],
 };
 
 const updateReturnStatusSchema = z.object({
