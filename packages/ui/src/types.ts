@@ -275,6 +275,7 @@ export interface OrderData {
   };
   trackingNumber?: string;
   carrier?: string;
+  shippingLabelUrl?: string;
   notes?: string;
   cancellationReason?: string;
   cancellationNotes?: string;

@@ -86,7 +86,8 @@ router.put('/:id/status', requirePermission('order.update'), async (req: AuthReq
 
     // Sync order status using explicit fulfilment→order mapping.
     // Do not indexOf() fulfilment names against the order status sequence.
-    const currentOrder = await Order.findById(item.orderId).select('status orderNumber');
+    const currentOrder = await Order.findById(item.orderId)
+      .select('status orderNumber trackingNumber');
     const orderStatus = resolveOrderStatusFromFulfilment(
       status as any,
       currentOrder?.status,
@@ -122,8 +123,24 @@ router.put('/:id/status', requirePermission('order.update'), async (req: AuthReq
       }
     }
 
+    // Surface shipment/tracking gap so CSR can Create Shipment next.
+    const { isShipmentTrackingMissing } = await import('@pawtag/shared');
+    const effectiveOrderStatus = orderStatus || currentOrder?.status;
+    const trackingMissing = isShipmentTrackingMissing(
+      effectiveOrderStatus,
+      currentOrder?.trackingNumber,
+    );
+
     logger.info({ fulfilmentId: req.params.id, status }, 'Fulfilment status updated');
-    res.json({ success: true, data: item });
+    res.json({
+      success: true,
+      data: item,
+      orderSync: {
+        status: effectiveOrderStatus,
+        orderNumber: currentOrder?.orderNumber,
+        trackingMissing,
+      },
+    });
   } catch (err) { res.status(500).json({ success: false, error: toAppError(err).userMessage }); }
 });
 

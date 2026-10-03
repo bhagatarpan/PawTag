@@ -457,6 +457,41 @@ function OrderActions({
   );
 }
 
+function ShipmentTrackingCard({ order }: { order: OrderData }) {
+  if (!order.trackingNumber) return null;
+  if (order.status !== 'shipped' && order.status !== 'delivered') return null;
+
+  const trackUrl = getTrackingUrl(order.carrier || '', order.trackingNumber);
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 space-y-2">
+      <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+        <Truck size={16} /> Shipment
+      </h2>
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl bg-primary-50 flex items-center justify-center shrink-0">
+          <Truck size={18} className="text-primary-600" />
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-gray-900 font-mono truncate">{order.trackingNumber}</p>
+          {order.carrier && <p className="text-xs text-gray-500">{order.carrier}</p>}
+        </div>
+      </div>
+      {trackUrl && (
+        <a
+          href={trackUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 px-3 py-2 bg-primary-50 border border-primary-200 text-primary-700 rounded-lg text-sm font-medium hover:bg-primary-100 transition-all"
+        >
+          Track with {order.carrier || 'carrier'}
+          <ExternalLink size={12} />
+        </a>
+      )}
+    </div>
+  );
+}
+
 function RefundStatusCard({ order }: { order: OrderData }) {
   if (order.status !== 'cancelled' && order.status !== 'refunded') return null;
   if (!order.refundStatus) return null;
@@ -564,6 +599,21 @@ export function OrderDetailView({
         <OrderProgressStepper status={order.status} variant="full" />
       )}
 
+      {/* Shipped without tracking — clarify pending state for customers */}
+      {order.status === 'shipped' && !order.trackingNumber && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+          <div className="flex items-center gap-3">
+            <Truck size={20} className="text-amber-600" />
+            <div>
+              <p className="text-sm font-medium text-amber-800">Shipped — tracking pending</p>
+              <p className="text-xs text-amber-600 mt-0.5">
+                We’ll update this page when your tracking number is available.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Refund pending card — shown when order is cancelled but payment hasn't been refunded yet */}
       {order.status === 'cancelled' && order.payment?.status === 'completed' && (
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
@@ -590,6 +640,7 @@ export function OrderDetailView({
         {/* Right column: Payment, Invoice, Address, Actions */}
         <div className="lg:col-span-2 space-y-6">
           <PaymentInformationCard order={order} />
+          <ShipmentTrackingCard order={order} />
           {invoice && (
             <InvoiceCard invoice={invoice} onViewInvoice={onViewInvoice} />
           )}

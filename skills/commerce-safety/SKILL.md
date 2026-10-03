@@ -63,6 +63,17 @@ At every external or persistent step ask:
 - Data repairs that align order status with fulfilled fulfilment are status corrections only — do not invent tracking, shipment, payment, or refund state.
 - Regression test: `tests/unit/fulfilment-order-sync.test.ts`.
 
+### Shipment tracking after packing/fulfilled
+- Shared helpers: `isShipmentTrackingMissing`, `canCreateShipmentForOrder` in `@pawtag/shared`.
+- Create Shipment is allowed for:
+  - `packing` without tracking (normal ship → status `shipped` + tracking + customer notify)
+  - `shipped` without tracking (repair fill of tracking/carrier/label; status stays `shipped`; still notify with tracking)
+- Reject if tracking already exists or order is `cancelled`/`refunded`.
+- Admin CSR warning when packing/shipped has no tracking; Actions sit under Order Progress on Order Info and Activity tabs.
+- Customer OrderDetailView shows **“Shipped — tracking pending”** when shipped without tracking; tracking card appears once `trackingNumber` exists.
+- Fulfilment mark-fulfilled returns `orderSync.trackingMissing` so admin can prompt Create Shipment.
+- Regression tests: `tests/unit/shipment-tracking-helpers.test.ts`.
+
 ## Verification
 
 Add tests for duplicate requests, replayed webhooks, ownership violations, concurrent inventory, partial failures, and production configuration where the touched change creates those risks.

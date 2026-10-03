@@ -487,6 +487,8 @@ export interface Order {
   shippingAddress: Address;
   billingAddress?: Address;
   trackingNumber?: string;
+  carrier?: string;
+  shippingLabelUrl?: string;
   notes?: string;
   discount?: {
     percent: number;
@@ -768,6 +770,34 @@ export function getOrderStatusLabel(status: string): string {
 
 export function isTerminalStatus(status: string): boolean {
   return ['cancelled', 'refunded'].includes(status);
+}
+
+/**
+ * True when order is packing/shipped but no tracking number exists yet.
+ * Used by admin CSR warnings and create-shipment repair eligibility.
+ */
+export function isShipmentTrackingMissing(
+  status?: string | null,
+  trackingNumber?: string | null,
+): boolean {
+  if (!status || trackingNumber) return false;
+  if (status !== 'packing' && status !== 'shipped') return false;
+  return true;
+}
+
+/**
+ * Whether admin Create Shipment is allowed for this order state.
+ * - packing: normal ship path (status → shipped + tracking)
+ * - shipped without tracking: repair path (fill tracking only)
+ */
+export function canCreateShipmentForOrder(
+  status?: string | null,
+  trackingNumber?: string | null,
+): boolean {
+  if (!status || trackingNumber) return false;
+  if (status === 'packing') return true;
+  if (status === 'shipped') return true;
+  return false;
 }
 
 export function getStatusBadgeVariant(status: string): 'success' | 'danger' | 'warning' | 'info' | 'neutral' | 'primary' {

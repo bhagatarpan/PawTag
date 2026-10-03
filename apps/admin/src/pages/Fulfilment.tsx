@@ -126,8 +126,13 @@ function FulfilmentDetailDrawer({
   const handleStatusChange = async (status: string) => {
     setStatusLoading(true);
     try {
-      await api.put(`/admin/commerce/fulfilments/${fulfilment._id}/status`, { status });
-      toast.success(`Fulfilment marked as ${status}`);
+      const res = await api.put(`/admin/commerce/fulfilments/${fulfilment._id}/status`, { status });
+      const trackingMissing = Boolean(res.data?.orderSync?.trackingMissing);
+      if (status === 'fulfilled' && trackingMissing) {
+        toast.success(`Fulfilment marked as ${status} — Create Shipment to generate tracking`);
+      } else {
+        toast.success(`Fulfilment marked as ${status}`);
+      }
       onRefresh();
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Failed to update status');
@@ -348,6 +353,12 @@ function FulfilmentDetailDrawer({
               <p className="mt-2 text-xs text-amber-600 flex items-center gap-1">
                 <AlertTriangle size={12} />
                 Assign tags to all items before marking as fulfilled.
+              </p>
+            )}
+            {fulfilment.status === 'fulfilled' && (
+              <p className="mt-2 text-xs text-amber-600 flex items-center gap-1">
+                <AlertTriangle size={12} />
+                Warehouse complete — if the order has no tracking yet, open Orders and use Create Shipment.
               </p>
             )}
           </div>

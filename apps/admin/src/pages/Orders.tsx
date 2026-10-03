@@ -20,6 +20,8 @@ import {
   getStatusBorderColor,
   getTrackingUrl,
   isTerminalStatus,
+  isShipmentTrackingMissing,
+  canCreateShipmentForOrder,
   getPaymentStatusLabel,
   getPaymentStatusBadgeVariant,
 } from '@pawtag/shared';
@@ -394,6 +396,105 @@ export function OrderDetailDrawer({
     { key: 'activity' as const, label: `Activity (${order.activity?.length || 0})` },
   ];
 
+  const trackingMissing = isShipmentTrackingMissing(order.status, order.trackingNumber);
+  const showCreateShipment = canCreateShipmentForOrder(order.status, order.trackingNumber);
+
+  const renderProgress = () => (
+    isTerminalStatus(order.status) ? (
+      <OrderStatusBanner status={order.status} amount={order.payment?.amount} />
+    ) : (
+      <OrderProgressStepper status={order.status} variant="full" />
+    )
+  );
+
+  const renderActions = () => (
+    (availableTransitions.length > 0 || showCreateShipment) && (
+      <Section title="Actions" icon={<RefreshCw size={16} />}>
+        <div className="flex flex-wrap gap-2">
+          {availableTransitions.includes('packing') && (
+            <button
+              onClick={() => handleStatusChange('packing')}
+              disabled={!!actionLoading}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 disabled:opacity-50"
+            >
+              <Package size={12} /> Start Packing
+            </button>
+          )}
+          {showCreateShipment && (
+            <button
+              onClick={handleCreateShipment}
+              disabled={!!actionLoading}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 disabled:opacity-50"
+            >
+              {actionLoading === 'shipment' ? <Loader2 size={12} className="animate-spin" /> : <Truck size={12} />}
+              Create Shipment
+            </button>
+          )}
+          {availableTransitions.includes('delivered') && (
+            <button
+              onClick={handleMarkDelivered}
+              disabled={!!actionLoading}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 disabled:opacity-50"
+            >
+              {actionLoading === 'deliver' ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle size={12} />}
+              Mark Delivered
+            </button>
+          )}
+          {availableTransitions.includes('cancelled') && (
+            <button
+              onClick={() => order && onCancel(order._id)}
+              disabled={!!actionLoading}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 disabled:opacity-50"
+            >
+              <Ban size={12} /> Cancel Order
+            </button>
+          )}
+          {availableTransitions.includes('refunded') && (
+            <button
+              onClick={() => order && onRefund(order._id)}
+              disabled={!!actionLoading}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-orange-700 bg-orange-50 border border-orange-200 rounded-lg hover:bg-orange-100 disabled:opacity-50"
+            >
+              <RefreshCw size={12} /> Refund Order
+            </button>
+          )}
+        </div>
+      </Section>
+    )
+  );
+
+  const renderTrackingMissingWarning = () => (
+    trackingMissing && (
+      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+        <div className="flex items-start gap-3">
+          <AlertTriangle size={18} className="text-amber-600 mt-0.5 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-amber-800">
+              {order.status === 'shipped'
+                ? 'Shipped — shipment/tracking not created'
+                : 'Packing — shipment/tracking not created'}
+            </p>
+            <p className="text-xs text-amber-700 mt-1">
+              {order.status === 'shipped'
+                ? 'This order is marked Shipped, but no tracking number exists yet. Create a shipment to generate tracking and notify the customer.'
+                : 'This order is Packing but has no tracking number yet. Create a shipment to generate tracking when you dispatch.'}
+            </p>
+            {showCreateShipment && (
+              <button
+                onClick={handleCreateShipment}
+                disabled={!!actionLoading}
+                className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 text-white rounded-lg text-xs font-semibold hover:bg-amber-700 disabled:opacity-50 transition-all"
+              >
+                {actionLoading === 'shipment' ? <Loader2 size={12} className="animate-spin" /> : <Truck size={12} />}
+                Create Shipment
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  );
+
   return (
     <DetailDrawer
       open={!!order}
@@ -422,11 +523,11 @@ export function OrderDetailDrawer({
       {activeTab === 'info' && (
         <div className="space-y-6">
           {/* Order Progress or Status Banner */}
-          {isTerminalStatus(order.status) ? (
-            <OrderStatusBanner status={order.status} amount={order.payment?.amount} />
-          ) : (
-            <OrderProgressStepper status={order.status} variant="full" />
-          )}
+          {renderProgress()}
+
+          {/* Actions immediately under progress for CSR reachability */}
+          {renderActions()}
+          {renderTrackingMissingWarning()}
 
           <Section title="Order Details" icon={<ShoppingCart size={16} />}>
             <DetailRow label="Order Number" value={<span className="font-mono font-medium">{order.orderNumber}</span>} />
@@ -635,60 +736,6 @@ export function OrderDetailDrawer({
                   })}
                 />
               )}
-            </Section>
-          )}
-
-          {availableTransitions.length > 0 && (
-            <Section title="Actions" icon={<RefreshCw size={16} />}>
-              <div className="flex flex-wrap gap-2">
-                {availableTransitions.includes('packing') && (
-                  <button
-                    onClick={() => handleStatusChange('packing')}
-                    disabled={!!actionLoading}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 disabled:opacity-50"
-                  >
-                    <Package size={12} /> Start Packing
-                  </button>
-                )}
-                {availableTransitions.includes('shipped') && (
-                  <button
-                    onClick={handleCreateShipment}
-                    disabled={!!actionLoading}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 disabled:opacity-50"
-                  >
-                    {actionLoading === 'shipment' ? <Loader2 size={12} className="animate-spin" /> : <Truck size={12} />}
-                    Create Shipment
-                  </button>
-                )}
-                {availableTransitions.includes('delivered') && (
-                  <button
-                    onClick={handleMarkDelivered}
-                    disabled={!!actionLoading}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 disabled:opacity-50"
-                  >
-                    {actionLoading === 'deliver' ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle size={12} />}
-                    Mark Delivered
-                  </button>
-                )}
-                {availableTransitions.includes('cancelled') && (
-                  <button
-                    onClick={() => order && onCancel(order._id)}
-                    disabled={!!actionLoading}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 disabled:opacity-50"
-                  >
-                    <Ban size={12} /> Cancel Order
-                  </button>
-                )}
-                {availableTransitions.includes('refunded') && (
-                  <button
-                    onClick={() => order && onRefund(order._id)}
-                    disabled={!!actionLoading}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-orange-700 bg-orange-50 border border-orange-200 rounded-lg hover:bg-orange-100 disabled:opacity-50"
-                  >
-                    <RefreshCw size={12} /> Refund Order
-                  </button>
-                )}
-              </div>
             </Section>
           )}
 
@@ -1018,15 +1065,12 @@ export function OrderDetailDrawer({
 
       {activeTab === 'activity' && (
         <div className="space-y-4">
+          {/* Progress + Actions available even when no activity yet */}
+          {renderProgress()}
+          {renderActions()}
+          {renderTrackingMissingWarning()}
           {order.activity && order.activity.length > 0 ? (
             <>
-              {/* Progress Stepper or Status Banner */}
-              {isTerminalStatus(order.status) ? (
-                <OrderStatusBanner status={order.status} amount={order.payment?.amount} />
-              ) : (
-                <OrderProgressStepper status={order.status} variant="full" />
-              )}
-
               {/* Activity Feed */}
               <div className="relative">
                 <div className="absolute left-[15px] top-2 bottom-2 w-0.5 bg-gray-200" />

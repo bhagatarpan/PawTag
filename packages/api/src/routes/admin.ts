@@ -3175,7 +3175,24 @@ router.post('/orders/:id/create-shipment', requirePermission('order.update'), as
     const order = await Order.findById(req.params.id);
     if (!order) { res.status(404).json({ success: false, error: 'Order not found' }); return; }
 
-    if (!isValidTransition(order.status, 'shipped')) {
+    // Reject terminal orders
+    if (order.status === 'cancelled' || order.status === 'refunded') {
+      res.status(400).json({ success: false, error: `Cannot create shipment for order in "${order.status}" status` });
+      return;
+    }
+
+    // Tracking already exists — do not overwrite silently
+    if (order.trackingNumber) {
+      res.status(400).json({ success: false, error: 'Tracking number already exists for this order' });
+      return;
+    }
+
+    const canTransitionShip = isValidTransition(order.status, 'shipped');
+    // Repair path: warehouse/status already marked packing or shipped without tracking
+    const repairShipment =
+      (order.status === 'packing' || order.status === 'shipped') && !order.trackingNumber;
+
+    if (!canTransitionShip && !repairShipment) {
       res.status(400).json({ success: false, error: `Cannot ship order in "${order.status}" status` });
       return;
     }
@@ -3196,7 +3213,11 @@ router.post('/orders/:id/create-shipment', requirePermission('order.update'), as
     }
 
     const previousStatus = order.status;
-    order.status = 'shipped';
+    const statusAlreadyShipped = order.status === 'shipped';
+    // packing → shipped is a status change; already-shipped repair only fills tracking
+    if (!statusAlreadyShipped) {
+      order.status = 'shipped';
+    }
     order.trackingNumber = result.trackingNumber;
     order.carrier = result.carrier;
     order.shippingLabelUrl = result.labelUrl;
@@ -3212,14 +3233,24 @@ router.post('/orders/:id/create-shipment', requirePermission('order.update'), as
       outcome: 'SUCCESS',
       severity: 'HIGH',
       changedFields: [
-        { field: 'status', before: previousStatus, after: 'shipped', sensitive: false },
+        ...(statusAlreadyShipped
+          ? []
+          : [{ field: 'status', before: previousStatus, after: 'shipped', sensitive: false }]),
         { field: 'trackingNumber', before: null, after: result.trackingNumber, sensitive: false },
         { field: 'carrier', before: null, after: result.carrier, sensitive: false },
       ],
-      metadata: { orderNumber: order.orderNumber, previousStatus, trackingNumber: result.trackingNumber, carrier: result.carrier, labelUrl: result.labelUrl, amount: order.payment.amount },
+      metadata: {
+        orderNumber: order.orderNumber,
+        previousStatus,
+        statusAlreadyShipped,
+        trackingNumber: result.trackingNumber,
+        carrier: result.carrier,
+        labelUrl: result.labelUrl,
+        amount: order.payment.amount,
+      },
     });
 
-    // Notify customer
+    // Notify customer with tracking (normal ship + repair fill)
     try {
       await notifyCustomerOfStatusChange(order, 'shipped', { trackingNumber: result.trackingNumber, carrier: result.carrier });
     } catch (notifError) {
@@ -3233,6 +3264,7 @@ router.post('/orders/:id/create-shipment', requirePermission('order.update'), as
         carrier: result.carrier,
         labelUrl: result.labelUrl,
         status: order.status,
+        statusAlreadyShipped,
       },
     });
   } catch {
