@@ -619,6 +619,7 @@ export const API = {
       subscribe: '/membership/subscribe',
       activate: '/membership/activate',
       cancel: '/membership/cancel',
+      resume: '/membership/resume',
       changeTier: '/membership/change-tier',
       changeTierEstimate: (tierId: string) => `/membership/change-tier/estimate?tierId=${tierId}` as const,
       downgrade: '/membership/downgrade',

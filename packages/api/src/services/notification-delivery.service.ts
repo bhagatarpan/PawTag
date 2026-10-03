@@ -63,6 +63,7 @@ export async function createAndDeliverNotification(options: NotifyOptions): Prom
     // Membership lifecycle notifications
     membership_activated: 'subscriptionReminder',
     membership_cancelled: 'subscriptionReminder',
+    membership_resumed: 'subscriptionReminder',
     membership_upgraded: 'subscriptionReminder',
     membership_downgraded: 'subscriptionReminder',
     membership_extended: 'subscriptionReminder',

@@ -761,6 +761,131 @@ export async function cancelMembership(userId: string, reason?: string) {
   return membership;
 }
 
+// ─── Resume Membership ──────────────────────────────────────
+
+/**
+ * Resume a membership that was cancelled for period end (cancel_at_period_end).
+ *
+ * Only valid while status is still 'active' and cancelledAt is set — i.e. the
+ * customer is in the cancelling window before currentPeriodEnd.
+ *
+ * Stripe is authoritative: cancel_at_period_end is cleared first. If Stripe
+ * fails, local cancellation state is left intact.
+ */
+export async function resumeMembership(userId: string) {
+  const membership = await UserMembership.findOne({
+    userId,
+    status: 'active',
+    cancelledAt: { $ne: null },
+  });
+
+  if (!membership) {
+    throw new Error('Your membership is not scheduled for cancellation');
+  }
+
+  if (membership.currentPeriodEnd && membership.currentPeriodEnd.getTime() < Date.now()) {
+    throw new Error('Your membership benefits have already ended. Please subscribe again to rejoin.');
+  }
+
+  const previousCancelledAt = membership.cancelledAt;
+
+  // Stripe first — fail closed. Do not clear local cancellation if provider fails.
+  if (membership.stripeSubscriptionId && !isFakeMode()) {
+    try {
+      const stripe = getStripeClient();
+      const subscription = await stripe.subscriptions.retrieve(membership.stripeSubscriptionId);
+
+      if (subscription.status === 'canceled' || subscription.status === 'incomplete_expired') {
+        throw new Error('This membership subscription has already ended with the payment provider. Please subscribe again.');
+      }
+
+      await stripe.subscriptions.update(membership.stripeSubscriptionId, {
+        cancel_at_period_end: false,
+      });
+      logger.info({ membershipId: membership._id }, 'Stripe subscription cancel_at_period_end cleared');
+    } catch (err: any) {
+      if (err?.message && /already ended|subscribe again/.test(err.message)) {
+        throw err;
+      }
+      logger.error({ err, membershipId: membership._id }, 'Failed to resume Stripe subscription');
+      throw new Error('Failed to resume membership with payment provider. Please try again or contact support.');
+    }
+  }
+
+  membership.cancelledAt = undefined;
+  membership.cancellationReason = undefined;
+  membership.autoRenew = true;
+  await membership.save();
+
+  // Entitlements remain keyed on status==='active'; invalidate so any cached
+  // tier lookups stay consistent after billing-state changes.
+  try {
+    const { membershipEntitlementService } = await import('./membership-entitlement.service');
+    membershipEntitlementService.invalidateCache();
+  } catch (err) {
+    logger.warn({ err, membershipId: membership._id }, '[Membership] Failed to invalidate entitlement cache after resume');
+  }
+
+  // Email confirmation
+  try {
+    const user = await User.findById(userId).select('email fullName').lean();
+    const tier = await MembershipTier.findById(membership.tierId).lean();
+    if (user?.email && tier) {
+      const { renderMembershipResumedEmail } = await import('./email/templates/membership-resumed');
+      const html = renderMembershipResumedEmail({
+        customerName: user.fullName || 'there',
+        tierName: tier.displayName,
+        resumedAt: new Date().toLocaleDateString('en-NZ', { dateStyle: 'full' }),
+        benefitsUntil: membership.currentPeriodEnd?.toLocaleDateString('en-NZ', { dateStyle: 'full' }) || 'N/A',
+        dashboardUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/membership`,
+      });
+      await sendMail(user.email, `${tier.displayName} Membership Resumed`, html)
+        .catch((err) => logger.error({ err, membershipId: membership._id }, '[Membership] Failed to send resume email'));
+    }
+  } catch (err) {
+    logger.error({ err, membershipId: membership._id }, '[Membership] Failed to send resume email');
+  }
+
+  // In-app notification
+  try {
+    const resumeTier = await MembershipTier.findById(membership.tierId).lean();
+    await createAndDeliverNotification({
+      userId: membership.userId.toString(),
+      type: 'membership_resumed',
+      title: `${resumeTier?.displayName || 'Membership'} Resumed`,
+      message: `Your ${resumeTier?.displayName || 'membership'} has been resumed. Auto-renewal is active and benefits remain until ${membership.currentPeriodEnd?.toLocaleDateString('en-NZ', { dateStyle: 'full' }) || 'the end of your billing period'}.`,
+      priority: 'normal',
+      channel: 'info',
+      actionUrl: '/account/membership',
+    });
+  } catch (err) {
+    logger.error({ err, membershipId: membership._id }, '[Membership] Failed to send resume notification');
+  }
+
+  // Audit log
+  await auditMembershipEvent({
+    action: 'membership_resumed',
+    eventType: 'membership.resumed',
+    eventCategory: 'FINANCIAL',
+    operationType: 'UPDATE',
+    resourceType: 'UserMembership',
+    resourceId: membership._id.toString(),
+    outcome: 'SUCCESS',
+    severity: 'HIGH',
+    metadata: {
+      userId,
+      tierId: membership.tierId.toString(),
+      previousCancelledAt,
+      cancelAtPeriodEnd: false,
+      autoRenew: true,
+      benefitsUntil: membership.currentPeriodEnd,
+      stripeSubscriptionId: membership.stripeSubscriptionId,
+    },
+  });
+
+  return membership;
+}
+
 // ─── Estimate Tier Change (Proration Preview) ──────────────
 
 export interface TierChangeEstimate {

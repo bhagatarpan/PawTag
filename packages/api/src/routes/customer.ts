@@ -10,6 +10,7 @@ import { createAuditContextFromRequest, type AuditRequest } from '../middleware/
 import { sendOrderConfirmation } from '../services/email.service';
 import { formatCreatedBy, formatCreatedByDescription } from '../lib/actor';
 import { createSubscription } from '../services/subscription.service';
+import { isFakePaymentIntentId } from '../commerce/payment-mode';
 import logger from '../lib/logger';
 
 const router = Router();
@@ -1100,6 +1101,31 @@ router.get('/orders/:id', requirePermission('order.read'), async (req: AuthReque
   try {
     const order = await Order.findOne({ _id: req.params.id, userId: req.user!.id });
     if (!order) { res.status(404).json({ success: false, error: 'Order not found' }); return; }
+
+    // Backfill missing card display details from Stripe when available.
+    // Covers orders confirmed before cardBrand was persisted on Order.payment.
+    if (
+      order.payment?.stripePaymentIntentId &&
+      !order.payment.cardBrand &&
+      !isFakePaymentIntentId(order.payment.stripePaymentIntentId)
+    ) {
+      try {
+        const { resolvePaymentMode } = await import('../commerce/payment-mode');
+        if (resolvePaymentMode() !== 'fake') {
+          const { stripePaymentProvider } = await import('../commerce/providers/stripe');
+          const payment = await stripePaymentProvider.retrievePaymentIntent(order.payment.stripePaymentIntentId);
+          if (payment.cardBrand || payment.cardLast4) {
+            order.payment.cardBrand = payment.cardBrand;
+            order.payment.cardLast4 = payment.cardLast4;
+            await order.save();
+            logger.info({ orderId: order._id, orderNumber: order.orderNumber }, 'Backfilled order card display details from Stripe');
+          }
+        }
+      } catch (backfillErr) {
+        logger.warn({ err: backfillErr, orderId: order._id }, 'Failed to backfill order card details from Stripe');
+      }
+    }
+
     auditCustomerEvent(req, {
       action: 'view',
       eventType: 'navigation',

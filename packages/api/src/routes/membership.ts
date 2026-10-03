@@ -8,6 +8,7 @@ import {
   subscribeToTier,
   activateMembership,
   cancelMembership,
+  resumeMembership,
   changeTier,
   estimateTierChange,
   requestDowngrade,
@@ -137,6 +138,20 @@ router.post('/cancel', async (req: AuthRequest, res: Response) => {
   } catch (error: any) {
     logger.error({ err: error, userId: req.user?.id }, '[Membership] Cancel error');
     res.status(400).json({ success: false, error: error.message || 'Failed to cancel membership' });
+  }
+});
+
+/**
+ * POST /api/membership/resume
+ * Resume a membership that was cancelled for period end (undo cancellation).
+ */
+router.post('/resume', async (req: AuthRequest, res: Response) => {
+  try {
+    const resumed = await resumeMembership(req.user!.id);
+    res.json({ success: true, data: resumed });
+  } catch (error: any) {
+    logger.error({ err: error, userId: req.user?.id }, '[Membership] Resume error');
+    res.status(400).json({ success: false, error: error.message || 'Failed to resume membership' });
   }
 });
 

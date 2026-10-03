@@ -67,6 +67,43 @@ function detectEnvironment(): string {
 }
 
 /**
+ * Extract card brand/last4 from a retrieved Stripe PaymentIntent payload.
+ * Charges expansion is preferred; falls back to latest_charge object.
+ */
+export function extractCardDetailsFromStripeIntent(intent: {
+  charges?: { data?: any[] };
+  latest_charge?: any;
+  payment_method?: any;
+}): { cardBrand?: string; cardLast4?: string } {
+  let cardBrand: string | undefined;
+  let cardLast4: string | undefined;
+
+  const extractFromCharge = (charge: any): boolean => {
+    const card = charge?.payment_method_details?.card;
+    if (card?.brand && card?.last4) {
+      cardBrand = card.brand;
+      cardLast4 = card.last4;
+      return true;
+    }
+    return false;
+  };
+
+  const charges = intent.charges?.data;
+  if (Array.isArray(charges) && charges.length > 0) {
+    extractFromCharge(charges[0]);
+  }
+
+  if (!cardBrand || !cardLast4) {
+    const latestCharge = intent.latest_charge;
+    if (latestCharge && typeof latestCharge === 'object') {
+      extractFromCharge(latestCharge);
+    }
+  }
+
+  return { cardBrand, cardLast4 };
+}
+
+/**
  * Stripe payment provider for PawTag Commerce.
  *
  * Uses the Stripe Node SDK directly.
@@ -263,17 +300,39 @@ export class StripePaymentProvider implements IPaymentProvider {
 
     try {
       const intent = await stripe.paymentIntents.retrieve(paymentIntentId, {
-        expand: ['charges', 'charges.data.payment_method_details', 'latest_charge'],
+        expand: [
+          'charges',
+          'charges.data.payment_method_details',
+          'latest_charge',
+          'latest_charge.payment_method_details',
+        ],
       });
 
       let cardBrand: string | undefined;
       let cardLast4: string | undefined;
-      const charges = (intent as any).charges?.data;
-      if (charges?.length > 0) {
-        const card = charges[0].payment_method_details?.card;
-        if (card) {
-          cardBrand = card.brand;
-          cardLast4 = card.last4;
+
+      ({ cardBrand, cardLast4 } = extractCardDetailsFromStripeIntent(intent as any));
+
+      // Fallback: charges may not expand payment_method_details in all API
+      // versions. Retrieve the PaymentMethod when Stripe exposes an ID.
+      if (!cardBrand || !cardLast4) {
+        const pmId =
+          typeof intent.payment_method === 'string'
+            ? intent.payment_method
+            : (intent.payment_method as any)?.id;
+        if (pmId) {
+          try {
+            const pm = await stripe.paymentMethods.retrieve(pmId);
+            if (pm.type === 'card' && pm.card?.brand && pm.card?.last4) {
+              cardBrand = pm.card.brand;
+              cardLast4 = pm.card.last4;
+            }
+          } catch (pmErr) {
+            logger.warn(
+              { err: pmErr, paymentIntentId, paymentMethodId: pmId },
+              'Failed to retrieve payment method for card display details',
+            );
+          }
         }
       }
 

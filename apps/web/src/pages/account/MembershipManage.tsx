@@ -60,6 +60,8 @@ export default function MembershipManage() {
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
+  const [showResumeModal, setShowResumeModal] = useState(false);
+  const [resumeError, setResumeError] = useState('');
 
   useEffect(() => {
     fetchData();
@@ -91,6 +93,20 @@ export default function MembershipManage() {
       await fetchData();
     } catch (err: any) {
       alert(err.response?.data?.error || 'Failed to cancel membership');
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function handleResume() {
+    setActionLoading(true);
+    setResumeError('');
+    try {
+      await api.post(API.customer.membership.resume);
+      setShowResumeModal(false);
+      await fetchData();
+    } catch (err: any) {
+      setResumeError(err.response?.data?.error || 'Failed to resume membership');
     } finally {
       setActionLoading(false);
     }
@@ -141,6 +157,7 @@ export default function MembershipManage() {
   const tierGradient = resolveTierGradient(tier.tier, tier.gradient);
   const TierIcon = resolveTierIcon(tier.icon, tier.tier);
   const tierCurrency = tier.currency || 'NZD';
+  const isCancelling = Boolean(membership.cancelledAt);
 
   return (
     <div className="max-w-3xl mx-auto py-8 px-4 space-y-6">
@@ -153,48 +170,109 @@ export default function MembershipManage() {
               <div className="flex items-center gap-2 mb-1">
                 <TierIcon className="h-6 w-6 text-white" />
                 <span className="text-white/80 text-xs font-medium uppercase tracking-wider">
-                  {membership.cancelledAt ? 'Cancelling' : 'Active Membership'}
+                  {isCancelling ? 'Cancelling' : 'Active Membership'}
                 </span>
               </div>
               <h1 className="text-2xl font-bold text-white tracking-tight">{tier.displayName} Membership</h1>
             </div>
             <span className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide ${
-              membership.cancelledAt
+              isCancelling
                 ? 'bg-amber-400/30 text-amber-100'
                 : 'bg-white/20 text-white'
             }`}>
-              {membership.cancelledAt ? 'Cancelling' : membership.status}
+              {isCancelling ? 'Cancelling' : membership.status}
             </span>
           </div>
-          <div className="flex items-center gap-4 text-white/80 text-sm">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-white/80 text-sm">
             <span>Active since {formatDate(membership.currentPeriodStart || membership.currentPeriodEnd, 'long')}</span>
             <span>·</span>
             <span>
-              {membership.cancelledAt ? (
+              {isCancelling ? (
                 <>Benefits until {formatDate(membership.currentPeriodEnd, 'long')}</>
               ) : (
                 <>Renews {formatDate(membership.currentPeriodEnd, 'long')} ({formatCurrency(membership.price, tierCurrency, { decimals: false })}/yr)</>
               )}
             </span>
+            {isCancelling && (
+              <>
+                <span>·</span>
+                <span className="font-medium text-amber-100">Auto-renew: Off — no further charges</span>
+              </>
+            )}
           </div>
         </div>
       </div>
 
       {/* Actions */}
-      <div className="flex gap-3">
-        <Link
-          to="/membership"
-          className="inline-flex items-center gap-2 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-all"
-        >
-          Change Plan
-        </Link>
-        <button
-          onClick={() => setShowCancelModal(true)}
-          className="inline-flex items-center gap-2 px-4 py-2.5 border border-red-200 rounded-xl text-sm font-medium text-red-600 hover:bg-red-50 transition-all"
-        >
-          Cancel Membership
-        </button>
-      </div>
+      {isCancelling ? (
+        <div className="space-y-4">
+          <div className="bg-white rounded-2xl shadow-sm border border-amber-200 p-5">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <h2 className="text-sm font-semibold text-gray-900">Your membership is scheduled to cancel</h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  Benefits stay active until {formatDate(membership.currentPeriodEnd, 'long')}. After that date,
+                  membership perks and covered tag finder features end.
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setResumeError('');
+                  setShowResumeModal(true);
+                }}
+                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-primary-600 hover:bg-primary-700 transition-colors shrink-0"
+              >
+                Keep my membership
+              </button>
+            </div>
+            {resumeError && (
+              <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-xl">
+                <p className="text-sm text-red-700">{resumeError}</p>
+              </div>
+            )}
+          </div>
+
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+            <h2 className="text-sm font-semibold text-gray-900 mb-3">What ends on {formatDate(membership.currentPeriodEnd, 'long')}</h2>
+            <ul className="space-y-2 text-sm text-gray-600">
+              <li className="flex items-start gap-2">
+                <span className="text-gray-400 mt-0.5">•</span>
+                Free shipping over $100
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-gray-400 mt-0.5">•</span>
+                2× Guardian Points on purchases
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-gray-400 mt-0.5">•</span>
+                Finder notifications on membership-covered tags
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-gray-400 mt-0.5">•</span>
+                Membership tag extension beyond warranty
+              </li>
+            </ul>
+            <p className="text-xs text-gray-400 mt-4">
+              We emailed a thank-you discount for your next purchase when you cancelled.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div className="flex gap-3">
+          <Link
+            to="/membership"
+            className="inline-flex items-center gap-2 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-all"
+          >
+            Change Plan
+          </Link>
+          <button
+            onClick={() => setShowCancelModal(true)}
+            className="inline-flex items-center gap-2 px-4 py-2.5 border border-red-200 rounded-xl text-sm font-medium text-red-600 hover:bg-red-50 transition-all"
+          >
+            Cancel Membership
+          </button>
+        </div>
+      )}
 
       {/* Benefits */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
@@ -234,7 +312,9 @@ export default function MembershipManage() {
           <p className="text-sm text-gray-500">No payment method on file</p>
         )}
         <p className="text-xs text-gray-400 mt-2">
-          Default payment method for auto-renewal. Click "Update" to change via Stripe secure portal.
+          {membership.autoRenew
+            ? 'Default payment method for auto-renewal. Click "Update" to change via Stripe secure portal.'
+            : 'No further membership charges are scheduled. You can still update your saved card here.'}
         </p>
       </div>
 
@@ -364,6 +444,32 @@ export default function MembershipManage() {
           </div>
         )}
       </div>
+
+      {/* Resume Modal */}
+      <ConfirmDialog
+        open={showResumeModal}
+        onClose={() => {
+          if (actionLoading) return;
+          setShowResumeModal(false);
+          setResumeError('');
+        }}
+        onConfirm={handleResume}
+        title="Keep my membership"
+        message={`Resume auto-renewal for your ${tier.displayName} membership? Benefits will continue until ${formatDate(membership.currentPeriodEnd, 'long')}, and your plan will renew on that date.`}
+        confirmLabel="Yes, keep my membership"
+        cancelLabel="Keep cancelling"
+        variant="primary"
+        loading={actionLoading}
+        footnote={
+          resumeError ? (
+            <p className="text-sm text-red-600">{resumeError}</p>
+          ) : (
+            <p className="text-xs text-gray-500">
+              No extra charge today. Your current plan continues at the same annual price.
+            </p>
+          )
+        }
+      />
 
       {/* Cancel Modal */}
       <ConfirmDialog
