@@ -768,6 +768,101 @@ export function getOrderStatusLabel(status: string): string {
   return ORDER_STATUS_LABELS[status] || status;
 }
 
+/** Order-level refund display state for UI (customer + admin). */
+export type OrderRefundDisplay =
+  | 'none'
+  | 'partial'
+  | 'full_pending'
+  | 'full_succeeded'
+  | 'full_failed'
+  | 'full_canceled';
+
+export interface OrderRefundDisplayInput {
+  status?: string | null;
+  refundStatus?: string | null;
+  payment?: { status?: string | null } | null;
+  items?: Array<{ refundStatus?: string | null; refundedQuantity?: number | null }>;
+}
+
+/**
+ * Derive refund display from order refund fields.
+ * Partial refunds leave order.status as delivered/shipped/paid — use refundStatus + item state.
+ */
+export function getOrderRefundDisplay(order: OrderRefundDisplayInput): OrderRefundDisplay {
+  if (!order) return 'none';
+
+  const status = order.status || '';
+  const refundStatus = (order.refundStatus || '').toLowerCase();
+  const paymentStatus = (order.payment?.status || '').toLowerCase();
+  const items = order.items || [];
+  const hasPartialItem = items.some((i) => i?.refundStatus === 'partial');
+  const hasAnyItemRefund = items.some(
+    (i) => i?.refundStatus === 'partial' || i?.refundStatus === 'refunded' || Number(i?.refundedQuantity || 0) > 0,
+  );
+
+  // Full refund terminal
+  if (status === 'refunded' || paymentStatus === 'refunded') {
+    if (refundStatus === 'pending') return 'full_pending';
+    if (refundStatus === 'failed') return 'full_failed';
+    if (refundStatus === 'canceled' || refundStatus === 'cancelled') return 'full_canceled';
+    return 'full_succeeded';
+  }
+
+  // Cancelled with refund in progress
+  if (status === 'cancelled' && (refundStatus === 'pending' || refundStatus === 'succeeded' || refundStatus === 'failed')) {
+    if (refundStatus === 'failed') return 'full_failed';
+    if (refundStatus === 'pending') return 'full_pending';
+    return 'full_succeeded';
+  }
+
+  // Partial: refundStatus set on non-terminal order, or item-level partial
+  if (hasPartialItem) return 'partial';
+  if (refundStatus === 'succeeded' || refundStatus === 'pending' || refundStatus === 'failed') {
+    if (status && status !== 'refunded' && status !== 'cancelled') {
+      return refundStatus === 'failed' ? 'partial' : 'partial';
+    }
+    if (hasAnyItemRefund) return 'partial';
+  }
+  if (hasAnyItemRefund && status && status !== 'refunded' && status !== 'cancelled') return 'partial';
+
+  return 'none';
+}
+
+export function getRefundDisplayLabel(display: OrderRefundDisplay, refundStatus?: string | null): string {
+  switch (display) {
+    case 'partial':
+      return 'Partially refunded';
+    case 'full_pending':
+      return 'Refund processing';
+    case 'full_succeeded':
+      return 'Refunded';
+    case 'full_failed':
+      return 'Refund failed';
+    case 'full_canceled':
+      return 'Refund canceled';
+    default:
+      return refundStatus ? `Refund ${refundStatus}` : 'Refunded';
+  }
+}
+
+export function getRefundDisplayBadgeVariant(
+  display: OrderRefundDisplay,
+): 'success' | 'danger' | 'warning' | 'info' | 'neutral' {
+  switch (display) {
+    case 'full_succeeded':
+      return 'success';
+    case 'full_failed':
+      return 'danger';
+    case 'full_pending':
+    case 'partial':
+      return 'warning';
+    case 'full_canceled':
+      return 'neutral';
+    default:
+      return 'neutral';
+  }
+}
+
 export function isTerminalStatus(status: string): boolean {
   return ['cancelled', 'refunded'].includes(status);
 }
