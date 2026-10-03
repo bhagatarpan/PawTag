@@ -60,6 +60,9 @@ const COMMERCE_SEED_SETTINGS = [
 
   // ─── Refunds ──────────────────────────────────────────────
   { key: 'commerce.refunds.enabled', value: 'true', description: 'Allow refunds' },
+  { key: 'commerce.returns.warehouseAddress', value: '', description: 'Warehouse return address shown to customers (configure before launch)' },
+  { key: 'commerce.returns.warehouseContact', value: '', description: 'Optional warehouse contact for returns' },
+  { key: 'commerce.returns.notificationEmail', value: 'return@pawtag.co.nz', description: 'Admin email notified when customers submit return tracking' },
   { key: 'commerce.refunds.maxDaysAfterPurchase', value: '60', description: 'Maximum days after purchase for refund' },
   { key: 'commerce.refunds.partialEnabled', value: 'true', description: 'Allow partial refunds' },
 

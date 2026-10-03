@@ -906,6 +906,25 @@ Customers and admins should see:
 
 Implementation guidance lives in `skills/refund-visibility/`.
 
+## Returns & refunds (current behaviour)
+
+Customer **Request Return** is available for eligible orders (including delivered). That creates a `Return` request — it does **not** move money by itself.
+
+| Path | Money movement |
+|---|---|
+| Customer cancel (pre-shipment) | Automatic Stripe refund via cancellation service |
+| Admin Orders → Refund Order | Stripe refund (order-level) |
+| Admin Returns → Process Refund | Stripe refund via return-refund service (**`order.refund`**), after warehouse receipt or explicit refund-without-return exception |
+
+Rules:
+
+- Refund reason is mandatory (server-side).
+- PawTag does **not** provide return shipping; customers arrange shipment and can submit tracking.
+- Default money path requires warehouse receipt before Process Refund.
+- Never mark a return refunded unless Stripe accepted the refund.
+- Process, decision tree, mockups, and progress: `docs/RETURNS-REFUNDS-WORKFLOW.md`.
+- Skill: `skills/returns-refunds/`.
+
 ## Commerce correctness principles
 
 ### Never trust client pricing

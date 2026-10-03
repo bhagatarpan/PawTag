@@ -276,6 +276,8 @@ export const API = {
       returns: {
         list: '/admin/commerce/returns',
         setStatus: (id: string) => `/admin/commerce/returns/${id}/status` as const,
+        refund: (id: string) => `/admin/commerce/returns/${id}/refund` as const,
+        refundWithoutReturn: (id: string) => `/admin/commerce/returns/${id}/refund-without-return` as const,
       },
       payments: {
         reconciliation: '/admin/commerce/payments/reconciliation',
@@ -592,6 +594,8 @@ export const API = {
     },
     returns: {
       create: '/customer/returns',
+      list: '/customer/returns',
+      tracking: (id: string) => `/customer/returns/${id}/tracking` as const,
     },
     subscriptions: {
       list: '/customer/subscriptions',

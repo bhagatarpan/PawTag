@@ -74,33 +74,33 @@ router.post('/', validate(createReturnSchema), async (req: AuthRequest, res: Res
       return;
     }
 
-    // Validate items exist in the order
+    // Validate items exist in the order + calculate server-authoritative refund
+    let refundAmount = 0;
     const returnItems = items.map((item: { orderItemId: string; quantity: number; reason?: string }) => {
-      const orderItem = order.items.find((oi) => String(oi.productId) === item.orderItemId);
+      const orderItem = order.items.find(
+        (oi: any) => String(oi._id) === item.orderItemId || String(oi.productId) === item.orderItemId,
+      );
       if (!orderItem) {
         throw new Error(`Item ${item.orderItemId} not found in order`);
       }
       if (item.quantity > orderItem.quantity) {
         throw new Error(`Cannot return ${item.quantity} — only ${orderItem.quantity} were ordered`);
       }
+      const unitPrice = Number(orderItem.unitPrice || 0);
+      const customizationTotal = Number(orderItem.customizationTotal || 0);
+      refundAmount += (unitPrice + customizationTotal) * item.quantity;
       return {
-        orderItemId: item.orderItemId,
+        orderItemId: (orderItem as any)._id || orderItem.productId,
         productName: orderItem.productName,
         quantity: item.quantity,
         reason: item.reason,
+        unitPrice,
+        customizationTotal,
+        refundedQuantity: 0,
       };
     });
 
-    // Calculate refund amount (server-authoritative: uses order line-item prices)
-    let refundAmount = 0;
-    for (const item of returnItems) {
-      const orderItem = order.items.find((oi) => String(oi.productId) === item.orderItemId);
-      if (orderItem) {
-        // Include customization surcharges in refund calculation
-        const lineTotal = (orderItem.unitPrice + (orderItem.customizationTotal || 0)) * item.quantity;
-        refundAmount += lineTotal;
-      }
-    }
+    const requester = await User.findById(userId).select('fullName email phoneNumber').lean();
 
     const returnRequest = await Return.create({
       orderId: order._id,
@@ -110,6 +110,20 @@ router.post('/', validate(createReturnSchema), async (req: AuthRequest, res: Res
       reason,
       items: returnItems,
       refundAmount,
+      requestedByType: 'customer',
+      requestedByEmail: requester?.email,
+      requestedByName: requester?.fullName,
+      requestedByPhone: requester?.phoneNumber,
+      activity: [
+        {
+          type: 'return_requested',
+          message: `Return requested: ${reason}`,
+          timestamp: new Date(),
+          actor: requester?.email || userId,
+          actorType: 'customer',
+          metadata: { refundAmount, itemCount: returnItems.length },
+        },
+      ],
     });
 
     // Record activity
@@ -128,6 +142,28 @@ router.post('/', validate(createReturnSchema), async (req: AuthRequest, res: Res
       },
     );
 
+    // Customer confirmation email
+    try {
+      if (requester?.email) {
+        const { sendMail } = await import('../services/email.service');
+        const itemLines = returnItems
+          .map((i: { productName: string; quantity: number }) => `• ${i.productName} × ${i.quantity}`)
+          .join('<br>');
+        const html = `
+          <p>Hi ${requester.fullName || 'there'},</p>
+          <p>We've received your return request for order <strong>${order.orderNumber}</strong>.</p>
+          <p><strong>Items:</strong><br>${itemLines}</p>
+          <p><strong>Estimated refund:</strong> $${refundAmount.toFixed(2)} ${order.payment?.currency || 'NZD'}</p>
+          <p><strong>Reason:</strong> ${reason}</p>
+          <p>Our team will review it within 1–2 business days.</p>
+          <p>PawTag does not provide return shipping. If approved, please send the product to our warehouse with a printed copy of your invoice, in reasonable condition, with original packaging if available. You'll be able to add return tracking on your order after you ship.</p>
+        `;
+        await sendMail(requester.email, `Return request received — ${order.orderNumber}`, html).catch(() => {});
+      }
+    } catch (err) {
+      logger.error({ err, orderId }, 'Failed to send return request email');
+    }
+
     logger.info({
       orderId,
       orderNumber: order.orderNumber,
@@ -138,43 +174,35 @@ router.post('/', validate(createReturnSchema), async (req: AuthRequest, res: Res
 
     res.status(201).json({
       success: true,
-      data: {
-        _id: returnRequest._id,
-        status: returnRequest.status,
-        refundAmount,
-        items: returnItems,
-      },
+      data: returnRequest,
     });
-  } catch (err) {
-    const appErr = toAppError(err);
-    res.status(appErr.httpStatus || 500).json({ success: false, error: appErr.userMessage });
+  } catch (err: any) {
+    logger.error({ err, userId: req.user?.id }, 'Failed to create return request');
+    res.status(400).json({ success: false, error: err.message || 'Failed to create return request' });
   }
 });
 
 /**
  * GET /api/customer/returns
- * List return requests for the current user.
+ * List the authenticated customer's return requests.
  */
 router.get('/', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user?.id;
-    const { page = 1, limit = 20 } = req.query;
-
-    const total = await Return.countDocuments({ userId });
-    const returns = await Return.find({ userId })
+    const { orderId, page = 1, limit = 20 } = req.query;
+    const query: Record<string, any> = { userId };
+    if (orderId) query.orderId = orderId;
+    const total = await Return.countDocuments(query);
+    const items = await Return.find(query)
       .sort({ createdAt: -1 })
       .skip((Number(page) - 1) * Number(limit))
-      .limit(Number(limit));
-
+      .limit(Number(limit))
+      .populate('orderId', 'orderNumber status payment.amount payment.currency payment.cardBrand payment.cardLast4');
     res.json({
       success: true,
-      data: {
-        items: returns,
-        total,
-        page: Number(page),
-        limit: Number(limit),
-        totalPages: Math.ceil(total / Number(limit)),
-      },
+      data: orderId
+        ? items
+        : { items, total, page: Number(page), limit: Number(limit), totalPages: Math.ceil(total / Number(limit)) },
     });
   } catch (err) {
     res.status(500).json({ success: false, error: toAppError(err).userMessage });

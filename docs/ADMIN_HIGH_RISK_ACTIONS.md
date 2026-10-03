@@ -10,7 +10,9 @@
 
 | Action | Endpoint | Permission | Confirmation | Audit | Reversible |
 |--------|----------|------------|-------------|-------|------------|
-| Refund order | `POST /api/admin/orders/:id/refund` | `order.update` | No (reason required) | CRITICAL | Yes (via Stripe) |
+| Refund order | `POST /api/admin/orders/:id/refund` | `order.refund` | Yes (reason required) | CRITICAL | Yes (via Stripe) |
+| Process return refund | `POST /api/admin/commerce/returns/:id/refund` | `order.refund` | Yes (reason required) | CRITICAL | Yes (via Stripe) |
+| Refund without return | `POST /api/admin/commerce/returns/:id/refund-without-return` | `order.refund` | Yes (reason + exception) | CRITICAL | Yes (via Stripe) |
 | Cancel order (with refund) | `POST /api/admin/orders/:id/cancel` | `order.update` | No (reason required) | HIGH | Partial |
 | Retry refund | `POST /api/admin/commerce/refunds/:orderId/retry` | `order.update` | No | **NO** | Yes |
 | Sync refund | `POST /api/admin/commerce/refunds/:orderId/sync` | `order.update` | No | **NO** | Yes |
