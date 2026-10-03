@@ -70,6 +70,7 @@ await sendCmsEmailOrFallback({
 | Gold welcome | CMS `gold-welcome` |
 | Membership welcome/cancelled/resumed/tier-changed/expired/renewal-reminder | **CMS Phase 2** |
 | Returns request/admin/tracking/CSR refund | **CMS Phase 2** |
+| Return approved / rejected (customer) | **CMS Phase 2b** — sent from admin-returns status PUT |
 | Active period expired/today/7d/30d | **CMS Phase 2** |
 | Subscription cancellation | **CMS Phase 2** |
 | Remaining Category B (reminders, grace, milestones, low stock, support, referral, generic) | **Wired CMS Phase 2b** (subscription reminders/grace/payment-failure/retry-success, referral, tier-downgrade, support, low-stock, emergency-escalation, generic-notification, invoice-otp) |

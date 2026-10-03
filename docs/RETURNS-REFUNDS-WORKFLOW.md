@@ -323,11 +323,12 @@ Avoid overloading status PUT for money.
 | Event | Audience | Channel |
 |---|---|---|
 | Return requested | Customer + **admin** | Customer email + admin email + admin in-app `return_requested` |
-| Return approved | Customer | Email (follow-up packet if missing) |
-| Return rejected | Customer | Email (follow-up packet if missing) |
+| **Return approved** | Customer | Email CMS `return-approved` (ship instructions) |
+| **Return rejected** | Customer | Email CMS `return-rejected` |
 | Tracking submitted | Admin return mailbox + admin in-app | Email + `return_tracking_submitted` notification |
-| Warehouse received | Customer (optional) | Email (follow-up) |
+| Warehouse received | Customer (optional) | Email (follow-up if product wants it) |
 | Refund processing / settled / failed | Customer | Existing refund templates + webhooks |
+| **CSR Process Refund** | Customer | Email CMS `refund-processed-csr` + Stripe webhook emails |
 | Admin refund failure | Admin | Existing admin alert |
 
 **UI surfaces for new returns (no blinking):**
@@ -335,7 +336,7 @@ Avoid overloading status PUT for money.
 - Sidebar Returns amber badge = pending count (`GET /admin/commerce/returns/summary`)
 - Dashboard tile “Pending Returns” → `/returns?status=pending`
 
-Reuse `sendMail` + existing template architecture.
+Reuse `sendMail` / `sendCmsEmailOrFallback` + CMS templates.
 
 ---
 
