@@ -45,6 +45,12 @@ At every external or persistent step ask:
 - External calls cannot participate in Mongo transactions; persist explicit intermediate/repairable states.
 - Never silently log a financially important failure and still present the overall operation as complete without a repair workflow.
 
+### External providers
+- External systems are **adapters**. Map provider-specific values (e.g. Stripe refund `reason` enum) at the provider boundary.
+- PawTag free-text business reasons must not be sent raw to providers that only accept enums.
+- Preserve original business text in PawTag records + provider metadata where useful.
+- Provider terminology is not automatically PawTag domain terminology.
+
 ### Refunds
 - Authorize refund capability separately.
 - Make retries safe.

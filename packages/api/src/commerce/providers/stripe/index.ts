@@ -104,6 +104,27 @@ export function extractCardDetailsFromStripeIntent(intent: {
 }
 
 /**
+ * Stripe only accepts these refund reasons.
+ * PawTag free-text reasons (CSR/customer) are preserved in metadata as `pawtagReason`.
+ * Provider mapping lives at the adapter boundary — not as a new PawTag business rule.
+ */
+export const STRIPE_REFUND_REASONS = ['duplicate', 'fraudulent', 'requested_by_customer'] as const;
+
+export type StripeRefundReason = (typeof STRIPE_REFUND_REASONS)[number];
+
+/**
+ * Map a PawTag free-text refund reason to a Stripe refund reason enum value.
+ * Unknown/free-text reasons default to `requested_by_customer`.
+ */
+export function mapStripeRefundReason(reason?: string | null): StripeRefundReason {
+  const raw = (reason || '').trim().toLowerCase();
+  if ((STRIPE_REFUND_REASONS as readonly string[]).includes(raw)) {
+    return raw as StripeRefundReason;
+  }
+  return 'requested_by_customer';
+}
+
+/**
  * Stripe payment provider for PawTag Commerce.
  *
  * Uses the Stripe Node SDK directly.
@@ -401,8 +422,15 @@ export class StripePaymentProvider implements IPaymentProvider {
         refundParams.amount = Math.round(params.amount * 100);
       }
 
-      if (params.reason) {
-        refundParams.reason = params.reason as Stripe.RefundCreateParams.Reason;
+      // Map free-text PawTag reason to Stripe enum at the provider boundary.
+      // Full CSR/customer reason is preserved in metadata.
+      const rawReason = (params.reason || '').trim();
+      if (rawReason) {
+        refundParams.reason = mapStripeRefundReason(rawReason);
+        refundParams.metadata = {
+          ...refundParams.metadata,
+          pawtagReason: rawReason.slice(0, 490),
+        };
       }
 
       const refund = await stripe.refunds.create(refundParams);

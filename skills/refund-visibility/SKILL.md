@@ -18,6 +18,7 @@ Refund destination is **always the original payment method** used for the charge
 5. **Snapshot destination on refund records.** Write `cardBrand`, `cardLast4`, and `refundDestination` on refund PaymentTransactions at refund time.
 6. **Do not hardcode `arn: undefined` in emails.** Pass real ARN when present.
 7. **Failed refunds need a recovery path.** Customer copy must say support will arrange an alternate method (e.g. bank transfer). Automated alternate payouts are out of scope unless explicitly built.
+8. **Refund reason:** PawTag stores free-text CSR/customer reason on Order/Return. Stripe `reason` is mapped at the provider adapter (default `requested_by_customer`); original text is kept in Stripe metadata `pawtagReason` and PawTag records — do not require CSR to use only Stripe enum values in the UI.
 
 ## Where the data lives
 
