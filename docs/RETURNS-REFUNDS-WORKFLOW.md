@@ -355,7 +355,7 @@ Never log card numbers, CVV, or Stripe secrets.
 | **1** | Money path: return → Stripe refund (admin process refund) | ✅ Complete | 2026-10-03 |
 | **1b** | Skill extraction + docs (AGENTS/README/DESIGN) | ✅ Complete | 2026-10-03 |
 | **2** | Tracking, warehouse receipt gate, return emails, customer status UI | ✅ Complete (receipt gate + emails + status card + tracking submit) | 2026-10-03 |
-| **2b** | Settings: warehouse address + return notification email | ✅ Complete (typed in COMMERCE_SETTINGS + admin Commerce Settings UI; **configure real warehouse address in production**) | 2026-10-03 |
+| **2b** | Settings: warehouse address + return notification email | ✅ Complete (seeded contact + notification email; warehouse **street** address still empty until set in Admin) | 2026-10-03 |
 | **3** | Item-level refund state, multi-refund balance hardening, full E2E tests | ✅ Complete (code + unit tests; Playwright skipped by decision) | 2026-10-03 |
 | **4** | Merge to main after verification | 🔄 Branch `feature/returns-refunds-phase3` pending merge after tests | |
 

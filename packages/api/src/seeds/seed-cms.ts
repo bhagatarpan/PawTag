@@ -187,6 +187,10 @@ async function run() {
         { key: 'commerce.refunds.retryFirstHours', value: '2', displayValue: 'First Retry (hours)', category: 'commerce', description: 'Hours to wait before first auto-retry of failed refund' },
         { key: 'commerce.refunds.retrySecondHours', value: '24', displayValue: 'Second Retry (hours)', category: 'commerce', description: 'Hours to wait before second auto-retry of failed refund' },
         { key: 'commerce.refunds.maxAutoRetries', value: '1', displayValue: 'Max Auto-Retries', category: 'commerce', description: 'Maximum number of automatic refund retries' },
+        // Returns (customer return logistics + CSR refund mailbox)
+        { key: 'commerce.returns.warehouseAddress', value: '', displayValue: 'Return Warehouse Address', category: 'commerce', description: 'Warehouse return address in instruction emails. Leave empty to tell customers to email support.' },
+        { key: 'commerce.returns.warehouseContact', value: 'PawTag Returns Team\nsupport@pawtag.co.nz\nNew Zealand', displayValue: 'Return Warehouse Contact', category: 'commerce', description: 'Optional return contact shown in emails' },
+        { key: 'commerce.returns.notificationEmail', value: 'return@pawtag.co.nz', displayValue: 'Return Tracking Email', category: 'commerce', description: 'Admin mailbox for return tracking submissions' },
         // Promotions
         { key: 'commerce.promotions.enabled', value: 'true', displayValue: 'Promotions Enabled', category: 'commerce', description: 'Enable discount codes' },
         { key: 'commerce.promotions.maxUsesPerCode', value: '1000', displayValue: 'Max Uses Per Code', category: 'commerce', description: 'Maximum uses per discount code' },

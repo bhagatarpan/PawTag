@@ -13,6 +13,7 @@
     "lint": "eslint src --ext .ts",
     "seed": "tsx src/seeds/seed.ts",
     "seed:cms": "tsx src/seeds/seed-cms.ts",
+    "seed:commerce": "tsx src/seeds/seed-commerce.ts",
     "seed:products": "tsx src/seed-products.ts",
     "seed:demo": "tsx src/seeds/seed-demo-data.ts"
   },

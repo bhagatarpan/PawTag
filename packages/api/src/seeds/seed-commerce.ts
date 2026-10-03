@@ -60,11 +60,21 @@ const COMMERCE_SEED_SETTINGS = [
 
   // ─── Refunds ──────────────────────────────────────────────
   { key: 'commerce.refunds.enabled', value: 'true', description: 'Allow refunds' },
-  { key: 'commerce.returns.warehouseAddress', value: '', description: 'Warehouse return address shown to customers (configure before launch)' },
-  { key: 'commerce.returns.warehouseContact', value: '', description: 'Optional warehouse contact for returns' },
-  { key: 'commerce.returns.notificationEmail', value: 'return@pawtag.co.nz', description: 'Admin email notified when customers submit return tracking' },
   { key: 'commerce.refunds.maxDaysAfterPurchase', value: '60', description: 'Maximum days after purchase for refund' },
   { key: 'commerce.refunds.partialEnabled', value: 'true', description: 'Allow partial refunds' },
+  { key: 'commerce.refunds.reconciliationEnabled', value: 'true', description: 'Run daily refund reconciliation against Stripe' },
+  { key: 'commerce.refunds.reconciliationHour', value: '2', description: 'Hour of day (NZ time) to run reconciliation job' },
+  { key: 'commerce.refunds.retryFirstHours', value: '2', description: 'Hours to wait before first auto-retry of failed refund' },
+  { key: 'commerce.refunds.retrySecondHours', value: '24', description: 'Hours to wait before second auto-retry of failed refund' },
+  { key: 'commerce.refunds.maxAutoRetries', value: '1', description: 'Maximum number of automatic refund retries' },
+
+  // ─── Returns ──────────────────────────────────────────────
+  // Warehouse street address intentionally empty until founder sets the real
+  // address in Admin → Commerce Settings. Instruction emails then say to email
+  // support@pawtag.co.nz for the return address.
+  { key: 'commerce.returns.warehouseAddress', value: '', description: 'Warehouse return address for instruction emails (set real address in Admin before launch)' },
+  { key: 'commerce.returns.warehouseContact', value: 'PawTag Returns Team\nsupport@pawtag.co.nz\nNew Zealand', description: 'Optional warehouse/return contact shown in return emails' },
+  { key: 'commerce.returns.notificationEmail', value: 'return@pawtag.co.nz', description: 'Admin email notified when customers submit return tracking' },
 
   // ─── Promotions ───────────────────────────────────────────
   { key: 'commerce.promotions.enabled', value: 'true', description: 'Enable discount codes' },
@@ -117,6 +127,9 @@ export async function seedCommerceSettings(): Promise<void> {
 
 // Run directly
 if (require.main === module) {
+  // Load env when invoked as a script (matches seed.ts pattern)
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  require('dotenv').config({ path: require('path').resolve(__dirname, '../../.env') });
   import('@pawtag/db').then(async ({ connectDatabase }) => {
     const dbUrl = process.env.DB_URL || process.env.MONGODB_URI;
     if (!dbUrl) {
