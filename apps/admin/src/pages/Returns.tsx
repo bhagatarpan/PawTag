@@ -6,7 +6,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { API } from '@pawtag/shared/api';
-import { Search, Loader2, RotateCcw, Eye, AlertTriangle } from 'lucide-react';
+import { Search, Loader2, RotateCcw, Eye, AlertTriangle, X } from 'lucide-react';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
 
@@ -57,6 +57,7 @@ export default function Returns() {
   const [refundReason, setRefundReason] = useState('');
   const [exceptionReason, setExceptionReason] = useState('');
   const [processing, setProcessing] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<{ id: string; status: 'approved' | 'rejected' } | null>(null);
 
   const fetchReturns = useCallback(async () => {
     try {
@@ -76,6 +77,34 @@ export default function Returns() {
     if (s === 'all') setSearchParams({});
     else setSearchParams({ status: s });
   };
+
+  const closeModal = () => {
+    if (processing) return;
+    setSelected(null);
+    setConfirmAction(null);
+  };
+
+  const requestStatusChange = (id: string, status: 'approved' | 'rejected') => {
+    // Business can revert approve/reject until payment is refunded
+    setConfirmAction({ id, status });
+  };
+
+  const confirmStatusChange = async () => {
+    if (!confirmAction) return;
+    await updateStatus(confirmAction.id, confirmAction.status);
+    setConfirmAction(null);
+  };
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && selected && !processing) {
+        setSelected(null);
+        setConfirmAction(null);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selected, processing]);
 
   const updateStatus = async (id: string, status: string) => {
     try {
@@ -173,9 +202,26 @@ export default function Returns() {
         )}
       </div>
       {selected && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setSelected(null)}>
-          <div className="bg-white rounded-xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-bold text-gray-900 mb-4">Return Request</h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={closeModal}>
+          <div
+            className="bg-white rounded-xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto relative"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="return-modal-title"
+          >
+            <div className="flex items-start justify-between mb-4">
+              <h2 id="return-modal-title" className="text-lg font-bold text-gray-900">Return Request</h2>
+              <button
+                type="button"
+                onClick={closeModal}
+                disabled={processing}
+                aria-label="Close return details"
+                className="p-2 -mt-2 -mr-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg disabled:opacity-50"
+              >
+                <X size={20} />
+              </button>
+            </div>
             <div className="space-y-3 text-sm">
               <div className="flex justify-between"><span className="text-gray-500">Order</span><span className="font-mono">{selected.orderNumber}</span></div>
               <div className="flex justify-between"><span className="text-gray-500">Customer</span><span>{getUserName(selected)}</span></div>
@@ -246,14 +292,30 @@ export default function Returns() {
               )}
             </div>
 
-            {selected.status === 'pending' && (
+            {/* Approve / Reject — available until payment is refunded (business can revert) */}
+            {selected.status !== 'refunded' && (
               <div className="flex gap-2 mt-4">
-                <button onClick={() => updateStatus(selected._id, 'approved')} className="flex-1 px-4 py-2 text-sm text-white bg-green-600 rounded-lg hover:bg-green-700">Approve</button>
-                <button onClick={() => updateStatus(selected._id, 'rejected')} className="flex-1 px-4 py-2 text-sm text-white bg-red-600 rounded-lg hover:bg-red-700">Reject</button>
+                <button
+                  type="button"
+                  onClick={() => requestStatusChange(selected._id, 'approved')}
+                  disabled={processing}
+                  className="flex-1 px-4 py-2 text-sm text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50"
+                >
+                  Approve
+                </button>
+                <button
+                  type="button"
+                  onClick={() => requestStatusChange(selected._id, 'rejected')}
+                  disabled={processing}
+                  className="flex-1 px-4 py-2 text-sm text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50"
+                >
+                  Reject
+                </button>
               </div>
             )}
+
             {selected.status === 'approved' && (
-              <button onClick={() => updateStatus(selected._id, 'received')} className="w-full mt-4 px-4 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700">Mark as Received</button>
+              <button onClick={() => updateStatus(selected._id, 'received')} className="w-full mt-3 px-4 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700">Mark as Received</button>
             )}
 
             {(selected.status === 'received' || selected.status === 'refund_failed' || selected.status === 'approved') && (
@@ -311,6 +373,37 @@ export default function Returns() {
                   >
                     Approve Refund Without Return + Process
                   </button>
+                </div>
+              </div>
+            )}
+
+            {confirmAction && (
+              <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40" onClick={() => setConfirmAction(null)}>
+                <div className="bg-white rounded-xl max-w-sm w-full p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+                  <h3 className="text-sm font-semibold text-gray-900 mb-2">
+                    {confirmAction.status === 'approved' ? 'Approve return?' : 'Reject return?'}
+                  </h3>
+                  <p className="text-xs text-gray-600 mb-4">
+                    {confirmAction.status === 'approved'
+                      ? 'This marks the return approved. Customer will receive approval email. Money is only moved when Process Refund runs after warehouse receipt (or approved exception).'
+                      : 'This rejects the return. Customer will receive a rejection email. You can still reverse this until payment is refunded.'}
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setConfirmAction(null)}
+                      className="flex-1 px-3 py-2 text-sm text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={confirmStatusChange}
+                      className={`flex-1 px-3 py-2 text-sm text-white rounded-lg ${confirmAction.status === 'approved' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}
+                    >
+                      {confirmAction.status === 'approved' ? 'Approve' : 'Reject'}
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
