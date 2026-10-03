@@ -553,6 +553,7 @@ Stripe refunds always return to the **original payment method** used for the cha
 - Persist Stripe `arn` / `arrival_date` when provided.
 - Snapshot destination (`cardBrand`, `cardLast4`, `refundDestination`) on refund PaymentTransactions.
 - Failed refunds need a clear customer/CSR recovery path (auto-retry + support arranging alternate method). See `skills/refund-visibility/`.
+- **Customer returns → money:** process via `return-refund.service` / `POST /api/admin/commerce/returns/:id/refund` with permission `order.refund`. Returns status updates alone must **not** move money. Default requires warehouse receipt; refund-without-return is an explicit exception. See `skills/returns-refunds/` and `docs/RETURNS-REFUNDS-WORKFLOW.md`.
 
 ## Idempotency
 
@@ -1999,7 +2000,7 @@ skills/production-readiness-review/  Implemented vs genuinely production-ready
 skills/security-boundary-review/     Auth, ownership, RBAC, privacy, sensitive resources
 skills/commerce-safety/               Stripe, checkout, orders, inventory, refunds, subscriptions
 skills/refund-visibility/             Refund destination truthfulness, ARN/arrival data, customer/CSR refund display
-skills/finder-recovery/               Lost-pet Finder flow, privacy, abuse controls, recovery UX
+skills/returns-refunds/               Customer returns, CSR Stripe refunds, warehouse receipt, refund-without-return
 skills/cart-checkout-experience/      Mini-cart + premium full cart/checkout experience
 skills/pawtag-ui-ux/                  PawTag design system, accessibility, responsive UX
 skills/mobile-native/                 Expo/RN, SecureStore, QR, NFC, push, native validation

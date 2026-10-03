@@ -31,6 +31,7 @@ export default function OrderDetail() {
   const [notes, setNotes] = useState<string>('');
   const [cancelLoading, setCancelLoading] = useState(false);
   const [subscriptions, setSubscriptions] = useState<any[]>([]);
+  const [returnRequest, setReturnRequest] = useState<any | null>(null);
 
   const fetchOrder = async () => {
     if (!id) return;
@@ -57,6 +58,14 @@ export default function OrderDetail() {
 
     api.get(API.customer.orders.subscriptions(id))
       .then((res) => setSubscriptions(res.data.data || []))
+      .catch(() => {});
+
+    api.get(`${API.customer.returns.create}?orderId=${id}`)
+      .then((res) => {
+        const data = res.data?.data;
+        const list = Array.isArray(data) ? data : data?.items || [];
+        setReturnRequest(list[0] || null);
+      })
       .catch(() => {});
 
     api.get(API.public.commerce.cancellationReasons)
@@ -180,6 +189,52 @@ export default function OrderDetail() {
         onCancelOrder={openCancelModal}
         onBackToOrders={() => navigate('/account/orders')}
       />
+
+      {returnRequest && (
+        <div className="mt-6 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+          <h2 className="text-sm font-semibold text-gray-700 mb-3">Return status</h2>
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-gray-500">Status</span>
+              <span className="font-medium capitalize">{String(returnRequest.status || '').replace(/_/g, ' ')}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500">Reason</span>
+              <span>{returnRequest.reason}</span>
+            </div>
+            {returnRequest.refundAmount != null && (
+              <div className="flex justify-between">
+                <span className="text-gray-500">Requested refund</span>
+                <span className="font-medium">${Number(returnRequest.refundAmount).toFixed(2)}</span>
+              </div>
+            )}
+            {returnRequest.returnTrackingNumber && (
+              <div className="flex justify-between">
+                <span className="text-gray-500">Your return tracking</span>
+                <span className="font-mono text-xs">{returnRequest.returnShipProvider} {returnRequest.returnTrackingNumber}</span>
+              </div>
+            )}
+            {returnRequest.refundStatus === 'succeeded' && (
+              <div className="flex justify-between">
+                <span className="text-gray-500">Refund</span>
+                <span className="text-green-700 font-medium">
+                  ${Number(returnRequest.refundAmount || 0).toFixed(2)} to original payment method
+                </span>
+              </div>
+            )}
+            {returnRequest.refundStatus === 'failed' && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
+                {returnRequest.refundFailureReason || 'Refund could not be completed. Contact support.'}
+              </div>
+            )}
+            {!returnRequest.returnTrackingNumber && ['pending', 'approved'].includes(returnRequest.status) && (
+              <p className="text-xs text-gray-500">
+                PawTag does not provide return shipping. If approved, ship the item yourself with a printed invoice and add tracking when available.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       {subscriptions.length > 0 && (
         <div className="mt-6 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
