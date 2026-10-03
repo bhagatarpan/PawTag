@@ -347,6 +347,7 @@ export default function Sidebar({ mobile, onClose }: SidebarContentProps & { mob
   } = useSidebarCollapse();
   const location = useLocation();
   const [unreadCount, setUnreadCount] = useState(0);
+  const [pendingReturns, setPendingReturns] = useState(0);
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
@@ -356,6 +357,9 @@ export default function Sidebar({ mobile, onClose }: SidebarContentProps & { mob
     const fetchCount = () => {
       api.get(API.admin.notifications.unreadCount)
         .then((res) => setUnreadCount(res.data.data?.count || 0))
+        .catch(() => {});
+      api.get(API.admin.commerce.returns.summary)
+        .then((res) => setPendingReturns(res.data.data?.pending || 0))
         .catch(() => {});
     };
     fetchCount();
@@ -546,6 +550,11 @@ export default function Sidebar({ mobile, onClose }: SidebarContentProps & { mob
                                 {unreadCount > 99 ? '99+' : unreadCount}
                               </span>
                             )}
+                            {link.to === '/returns' && pendingReturns > 0 && (
+                              <span className="bg-amber-500 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5 min-w-[18px] text-center">
+                                {pendingReturns > 99 ? '99+' : pendingReturns}
+                              </span>
+                            )}
                           </NavLink>
                           ))}
                         </div>
@@ -613,6 +622,11 @@ export default function Sidebar({ mobile, onClose }: SidebarContentProps & { mob
                             {link.to === '/notifications' && unreadCount > 0 && (
                               <span className="bg-red-500 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5 min-w-[18px] text-center">
                                 {unreadCount > 99 ? '99+' : unreadCount}
+                              </span>
+                            )}
+                            {link.to === '/returns' && pendingReturns > 0 && (
+                              <span className="bg-amber-500 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5 min-w-[18px] text-center">
+                                {pendingReturns > 99 ? '99+' : pendingReturns}
                               </span>
                             )}
                           </NavLink>

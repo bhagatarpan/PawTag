@@ -322,13 +322,18 @@ Avoid overloading status PUT for money.
 
 | Event | Audience | Channel |
 |---|---|---|
-| Return requested | Customer + optional admin | Email + in-app |
-| Return approved | Customer | Email |
-| Return rejected | Customer | Email |
-| Tracking submitted | Admin return mailbox | Email (configurable) |
-| Warehouse received | Customer (optional) | Email |
+| Return requested | Customer + **admin** | Customer email + admin email + admin in-app `return_requested` |
+| Return approved | Customer | Email (follow-up packet if missing) |
+| Return rejected | Customer | Email (follow-up packet if missing) |
+| Tracking submitted | Admin return mailbox + admin in-app | Email + `return_tracking_submitted` notification |
+| Warehouse received | Customer (optional) | Email (follow-up) |
 | Refund processing / settled / failed | Customer | Existing refund templates + webhooks |
 | Admin refund failure | Admin | Existing admin alert |
+
+**UI surfaces for new returns (no blinking):**
+- Admin bell unread count includes `return_requested`
+- Sidebar Returns amber badge = pending count (`GET /admin/commerce/returns/summary`)
+- Dashboard tile “Pending Returns” → `/returns?status=pending`
 
 Reuse `sendMail` + existing template architecture.
 

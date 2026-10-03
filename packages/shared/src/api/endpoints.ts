@@ -275,6 +275,7 @@ export const API = {
       },
       returns: {
         list: '/admin/commerce/returns',
+        summary: '/admin/commerce/returns/summary',
         setStatus: (id: string) => `/admin/commerce/returns/${id}/status` as const,
         refund: (id: string) => `/admin/commerce/returns/${id}/refund` as const,
         refundWithoutReturn: (id: string) => `/admin/commerce/returns/${id}/refund-without-return` as const,

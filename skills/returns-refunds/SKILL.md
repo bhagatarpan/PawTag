@@ -83,6 +83,19 @@ Every refund operation must write:
 
 Webhook refund updates remain the settlement source of truth.
 
+## Admin notification when customer requests a return
+
+On successful `POST /api/customer/returns`:
+
+1. **Customer email** — request received + return instructions (warehouse address in email if configured, else email support for address).
+2. **Admin email** — to `commerce.returns.notificationEmail` (default `return@pawtag.co.nz`) and `ADMIN_ALERT_EMAIL` if set. Includes order, customer, items, reason, estimated refund, link to `/admin/returns`.
+3. **Admin in-app notification** — `Notification.audience: 'admin'`, `type: 'return_requested'`, `priority: 'high'`, `actionUrl: '/admin/returns'`. Surfaces in admin bell unread count.
+4. **Tracking submit** — also creates admin email (existing) + in-app `return_tracking_submitted`.
+5. **Sidebar badge** — amber count of `status: 'pending'` on Returns nav (`GET /admin/commerce/returns/summary`).
+6. **Dashboard tile** — “Pending Returns” StatCard; click → `/returns?status=pending`. **No blinking/flashing** (DESIGN.md calm/premium).
+
+Monitored via: `logger.info` on create/tracking, Notification collection, email send logs.
+
 ## Tests expected
 
 - Customer request: ownership, reason required, items, server amount

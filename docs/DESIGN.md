@@ -10,16 +10,19 @@
 | Surface | Pattern | Tokens |
 |---|---|---|
 | Customer return status on order detail | Card with status, reason, requested amount, tracking, refund result | White card `bg-white rounded-2xl shadow-sm border border-gray-100`; body-sm |
-| Customer return instructions | Calm amber or gray note: no PawTag return shipping; invoice/condition/packing/tracking | `text-xs text-gray-500` or amber semantic when blocked |
+| Customer return instructions | Calm note: no PawTag return shipping; warehouse address in email when configured | `text-xs text-gray-500` |
 | Admin Returns list/status | Table + status pills | Existing admin table; status colors in Returns.tsx |
-| Admin Process Refund | Explicit amount + reason + warehouse received / exception | Money action uses purple/primary confirm; exception uses amber |
+| Admin Process Refund | Explicit amount + reason + warehouse received / exception | Money action uses purple confirm; exception uses amber |
+| **Pending returns badge (sidebar)** | Amber count pill when pending > 0 | `bg-amber-500 text-white text-[10px] rounded-full` — **not** blinking |
+| **Dashboard Pending Returns tile** | Static StatCard; amber icon bg when count > 0; click → `/returns?status=pending` | Same StatCard pattern as other ops cards |
 | Failed refund | Support path; no fake success | `red-50` / `red-700` |
 | Refund destination | Always original payment method | Shared `formatRefundDestination*` |
 
 Full process, decision tree, and mockups: `docs/RETURNS-REFUNDS-WORKFLOW.md`.  
 Specialist skill: `skills/returns-refunds/`.
 
-Do not invent a new visual language for returns. Use existing status-card and form patterns.
+Do not invent a new visual language for returns. Use existing status-card and form patterns.  
+**Do not use blinking/flashing alerts** for admin ops — counts and badges are sufficient.
 
 ---
 
