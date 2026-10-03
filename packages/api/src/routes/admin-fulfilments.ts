@@ -243,12 +243,19 @@ router.post('/:id/assign-tag', requirePermission('order.update'), async (req: Au
       return;
     }
 
-    // Check if this order item already has a tag assigned (in this fulfilment)
-    const alreadyAssigned = fulfilment.tagAssignments.some(
+    // Check how many tags are already assigned for this order item
+    const assignedForItem = fulfilment.tagAssignments.filter(
       (ta) => ta.orderItemId.toString() === orderItemId
     );
-    if (alreadyAssigned) {
-      res.status(409).json({ success: false, error: 'Tag already assigned to this order item in this fulfilment' });
+    const fulfilmentItem = fulfilment.items.find(
+      (fi) => fi.orderItemId.toString() === orderItemId
+    );
+    const maxTags = Number(fulfilmentItem?.quantity || 1);
+    if (assignedForItem.length >= maxTags) {
+      res.status(409).json({
+        success: false,
+        error: `All ${maxTags} tag(s) already assigned for this order item`,
+      });
       return;
     }
 

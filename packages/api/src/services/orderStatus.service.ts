@@ -7,7 +7,8 @@ const ALLOWED_TRANSITIONS: StatusTransitionMap = {
   pending_payment: ['paid', 'cancelled'],
   paid: ['packing', 'cancelled', 'refunded'],
   packing: ['shipped', 'cancelled'],
-  shipped: ['delivered'],
+  // CSR can refund a shipped order (same Stripe path as delivered)
+  shipped: ['delivered', 'refunded'],
   delivered: ['refunded'],
   cancelled: ['refunded'],
   refunded: [],

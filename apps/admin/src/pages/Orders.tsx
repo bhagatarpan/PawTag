@@ -161,7 +161,7 @@ const ORDER_STATUS_TRANSITIONS: Record<string, string[]> = {
   pending_payment: ['paid', 'cancelled'],
   paid: ['packing', 'cancelled', 'refunded'],
   packing: ['shipped', 'cancelled'],
-  shipped: ['delivered'],
+  shipped: ['delivered', 'refunded'],
   delivered: ['refunded'],
   cancelled: ['refunded'],
   refunded: [],

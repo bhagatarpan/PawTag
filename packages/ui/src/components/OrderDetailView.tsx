@@ -428,7 +428,9 @@ function OrderActions({
   const isCancelled = order.status === 'cancelled' || order.status === 'refunded';
   if (isCancelled) return null;
 
-  const showReturn = order.status === 'delivered' || order.status === 'paid' || order.status === 'packing';
+  // Request Return for paid/packing/shipped/delivered (refund follows CSR review)
+  const showReturn = order.status === 'delivered' || order.status === 'paid' || order.status === 'packing' || order.status === 'shipped';
+  // Cancel Order is pre-shipment only — after shipped use Request Return
   const showCancel = order.status === 'paid' || order.status === 'packing';
 
   if (!showReturn && !showCancel) return null;
