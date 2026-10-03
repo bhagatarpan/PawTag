@@ -1,83 +1,81 @@
 # PawTag Email Communications Centre — Implementation Tracker
 
-**Branch:** `feature/email-communications-centre`
-**Started:** 2026-09-12
-**Status:** In Progress
+**Branch:** `feature/email-cms-phase1`  
+**Last updated:** 2026-10-03  
+**Status:** Phase 1 CMS wiring in progress (see below)
 
 ---
 
-## Audit Summary
+## Audit Summary (code inventory 2026-10-03)
 
 | Metric | Count |
 |--------|-------|
-| Total distinct email types | 36 |
-| Structured template files | 23 |
-| Inline HTML emails | 13 |
-| CMS-overridable templates | 8 seeded, 16 supported |
-| Dead/unused email functions | 4 |
-| Email provider | Resend (v6.18.1) |
-| Email audit/delivery tracking | None (to be created) |
-| Email queue/retry | None (to be created) |
-| Business flows discovered | 8 |
+| CMS email templates seeded | **38** (+ `subscription-renewed` added in Phase 1) |
+| CMS used at send time (Category A) | **~12 before Phase 1**; order-status, refunds, login-notification, gold-welcome, pet birthday/anniversary wired in Phase 1 |
+| CMS seeded but not used at send (Category B) | Being wired Phase 1–2 |
+| Product emails hardcoded (Category C) | Membership lifecycle, most subscription dunning, active period, returns — Phase 2 |
+
+**Mechanism:** Admin edits on `/communications/templates` only affect live email if send code calls `renderCmsEmail(slug)` or `sendCmsEmailOrFallback`.  
+See `skills/email-cms-templates/SKILL.md`.
 
 ---
 
-## Business Flow Categories
+## Phase 1 (this packet) — Wire existing CMS templates
 
-| # | Flow | Emails |
-|---|------|--------|
-| 1 | Account & Security | Verification, Welcome, Password Reset, Password Changed, Login Notification, MFA OTP, Account Status |
-| 2 | Pet & Tag | Pet Found, Tag Expiry Reminders |
-| 3 | Lost & Found | Pet Found, Emergency Escalation |
-| 4 | Orders & Commerce | Order Confirmation, Invoice, Invoice OTP, Shipping, Order Status (6), Admin Alerts, Refunds (3), Low Stock |
-| 5 | Subscriptions | Welcome, Expiry Reminders (3), Grace Period, Payment Failure, Payment Retry, Gold Welcome |
-| 6 | Guardian & Loyalty | Welcome, Tier Upgrade, Tier Downgrade, Monthly Summary, PawRewards, Birthday, Anniversary, Renewal, Purchase Points |
-| 7 | Referrals | Referral Reward |
-| 8 | Admin / System | Support Request, Low Stock, Refund Alert, Cancellation Alert |
+- [x] Export `sendCmsEmailOrFallback` + CMS-first pattern in `email.service.ts`
+- [x] Wire order-status customer emails
+- [x] Wire refund-processing / refund-settled / refund-failed (Stripe webhook path)
+- [x] Wire admin order cancel/refund alerts
+- [x] Wire admin refund-failed alert
+- [x] Wire login-notification (customer subject fixed — no “admin account”)
+- [x] Fix guardian-birthday → pet-birthday, guardian-anniversary → pet-anniversary
+- [x] Seed + wire `subscription-renewed`
+- [x] Wire gold-welcome CMS path
+- [ ] Remaining Category B (subscription reminders, grace period, pet milestones, low stock, support, referral, generic, invoice-otp, etc.)
 
 ---
 
-## Implementation Phases
+## Phase 2 — Seed missing product emails (not started)
+
+Membership lifecycle, returns, active period HYBRID 2, subscription cancel/pause/free-period — seed CMS + wire send paths.
+
+---
+
+## Phase 3 — Operator truth + docs
+
+- [ ] UI “wired to send path” indicator
+- [ ] Deduplicate admin new-order alert paths
+- [ ] Update skills/docs after Phase 2
+
+---
+
+## Implementation Phases (historical tracker below — partially stale)
 
 ### Phase 1: Foundation & Data Model (Backend)
-- [ ] Create `EmailTemplate` model (enhanced CmsEmailTemplate with versioning, business flow, purpose, trigger, variables)
-- [ ] Create `EmailTemplateVersion` model (immutable version snapshots)
-- [ ] Create `EmailAudit` model (actual email send records)
-- [ ] Add Resend webhook endpoint for delivery tracking
-- [ ] Add email audit middleware (wrap sendMail)
-- [ ] Register all 36 templates with metadata
-- [ ] Seed template metadata
-- [ ] Add RBAC permissions
+- [x] EmailTemplate model fields (versioning, business flow, variables)
+- [x] EmailTemplateVersion model
+- [x] EmailAudit model
+- [x] Email audit middleware (sendMail auditMeta)
+- [x] Seed template metadata
+- [x] RBAC permissions
+- [ ] CMS-first wiring for all send paths (Phase 1–2 of this tracker)
 
 ### Phase 2: Admin Email Template Centre (Frontend)
-- [ ] Restructure admin sidebar navigation
-- [ ] Email Templates list page
-- [ ] Email Template detail/edit page
-- [ ] Variable schema panel
-- [ ] Variable picker
-- [ ] Variable validation
-- [ ] Preview (desktop + mobile)
-- [ ] Send test email
-- [ ] Version history
+- [x] Email Templates list page
+- [x] Email Template detail/edit page
+- [x] Variable schema panel
+- [x] Send test email
+- [x] Version history
 
-### Phase 3: Email Audit Library (Frontend + Backend)
-- [ ] Email Audit list page
-- [ ] Email Audit detail page
-- [ ] Actual rendered email preview
-- [ ] Variable snapshot display
-- [ ] Delivery timeline
-- [ ] Technical details panel
-- [ ] Related business records
-- [ ] Email Audit dashboard metrics
+### Phase 3: Email Audit Library
+- [x] Email Audit list/detail pages
+- [ ] Delivery timeline enhancements
 
 ### Phase 4: Migration & Cleanup
-- [ ] Migrate inline HTML emails to template system
-- [ ] Remove 4 dead email functions
+- [ ] Migrate remaining inline HTML emails to CMS (Phase 2)
+- [ ] Remove dead email functions
 - [ ] Fix duplicate checkout email paths
-- [ ] Wire up pet-milestones to template system
-- [ ] Update AGENTS.md
-- [ ] Update DESIGN.md
-- [ ] Update README.md
+- [ ] Update AGENTS.md / DESIGN.md / README.md after full CMS coverage
 
 ---
 

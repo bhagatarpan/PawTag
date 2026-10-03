@@ -108,6 +108,36 @@ async function renderCmsEmail(slug: string, variables: Record<string, string>): 
   }
 }
 
+/**
+ * Send an email using the CMS template when active; otherwise hardcoded fallback.
+ * Always records templateSlug in email audit for Communications Centre filtering.
+ */
+export async function sendCmsEmailOrFallback(params: {
+  slug: string;
+  to: string;
+  vars: Record<string, string>;
+  fallbackSubject: string;
+  fallbackHtml: string;
+  fallbackFrom?: string;
+  businessFlow?: string;
+  relatedEntityType?: string;
+  relatedEntityId?: string;
+  relatedEntityDisplay?: string;
+}): Promise<EmailResult> {
+  const auditMeta = {
+    templateSlug: params.slug,
+    businessFlow: params.businessFlow || 'other',
+    relatedEntityType: params.relatedEntityType,
+    relatedEntityId: params.relatedEntityId,
+    relatedEntityDisplay: params.relatedEntityDisplay,
+  };
+  const cms = await renderCmsEmail(params.slug, params.vars);
+  if (cms) {
+    return sendMail(params.to, cms.subject, cms.html, cms.from, auditMeta);
+  }
+  return sendMail(params.to, params.fallbackSubject, params.fallbackHtml, params.fallbackFrom, auditMeta);
+}
+
 export async function sendMail(to: string, subject: string, html: string, from?: string, auditMeta?: { templateSlug?: string; businessFlow?: string; relatedEntityType?: string; relatedEntityId?: string; relatedEntityDisplay?: string; isTest?: boolean }): Promise<EmailResult> {
   // In dev mode with test mode enabled, route ALL emails to test address
   const originalRecipient = to;
@@ -329,10 +359,28 @@ export async function sendLoginNotification(
   const { browser, device } = parseUserAgent(userAgent);
   const location = await getLocationFromIp(ipAddress).catch(() => 'Unknown');
   const html = renderLoginNotificationEmail({ name, email, ipAddress, userAgent, timestamp, success, browser, device, location });
+  // Customer-facing wording — do not say "admin account" for normal customer logins
   const subject = success
-    ? 'New login to your PawTag admin account'
-    : 'Failed login attempt on your PawTag admin account';
-  return sendMail(to, subject, html);
+    ? 'New login to your PawTag account'
+    : 'Failed login attempt on your PawTag account';
+  return sendCmsEmailOrFallback({
+    slug: 'login-notification',
+    to,
+    vars: {
+      name,
+      email,
+      ipAddress,
+      userAgent,
+      timestamp,
+      success: success ? 'true' : 'false',
+      browser,
+      device,
+      location,
+    },
+    fallbackSubject: subject,
+    fallbackHtml: html,
+    businessFlow: 'account_security',
+  });
 }
 
 export interface OrderEmailData {
@@ -611,10 +659,10 @@ export async function sendGuardianBirthdayEmail(
 ): Promise<EmailResult> {
   const dashboardUrl = `${frontendUrl}/account/guardian`;
   const vars = { customerName, petName, pointsEarned: String(pointsEarned), dashboardUrl };
-  const cms = await renderCmsEmail('guardian-birthday', vars);
-  if (cms) return sendMail(to, cms.subject, cms.html, cms.from);
+  const cms = await renderCmsEmail('pet-birthday', vars);
+  if (cms) return sendMail(to, cms.subject, cms.html, cms.from, { templateSlug: 'pet-birthday', businessFlow: 'guardian_loyalty' });
   const html = renderGuardianBirthdayEmail({ customerName, petName, pointsEarned, dashboardUrl });
-  return sendMail(to, `Happy Birthday ${petName}! — PawTag`, html);
+  return sendMail(to, `Happy Birthday ${petName}! — PawTag`, html, undefined, { templateSlug: 'pet-birthday', businessFlow: 'guardian_loyalty' });
 }
 
 export async function sendMonthlySummaryEmail(
@@ -663,10 +711,10 @@ export async function sendGuardianAnniversaryEmail(
 ): Promise<EmailResult> {
   const dashboardUrl = `${frontendUrl}/account/guardian`;
   const vars = { customerName, petName, yearsOwned: String(yearsOwned), pointsEarned: String(pointsEarned), dashboardUrl };
-  const cms = await renderCmsEmail('guardian-anniversary', vars);
-  if (cms) return sendMail(to, cms.subject, cms.html, cms.from);
+  const cms = await renderCmsEmail('pet-anniversary', vars);
+  if (cms) return sendMail(to, cms.subject, cms.html, cms.from, { templateSlug: 'pet-anniversary', businessFlow: 'guardian_loyalty' });
   const html = renderGuardianAnniversaryEmail({ customerName, petName, yearsOwned, pointsEarned, dashboardUrl });
-  return sendMail(to, `${petName}'s Adoption Anniversary — PawTag`, html);
+  return sendMail(to, `${petName}'s Adoption Anniversary — PawTag`, html, undefined, { templateSlug: 'pet-anniversary', businessFlow: 'guardian_loyalty' });
 }
 
 export async function sendGuardianRenewalReminderEmail(
@@ -703,7 +751,7 @@ export async function sendSubscriptionRenewalEmail(
     subscriptionsUrl,
   };
   const cms = await renderCmsEmail('subscription-renewed', vars);
-  if (cms) return sendMail(to, cms.subject, cms.html, cms.from);
+  if (cms) return sendMail(to, cms.subject, cms.html, cms.from, { templateSlug: 'subscription-renewed', businessFlow: 'subscriptions' });
   const html = renderSubscriptionRenewalEmail({
     name, tagId, planName, amount,
     billingPeriodStart: fmt(billingPeriodStart), billingPeriodEnd: fmt(billingPeriodEnd),

@@ -926,6 +926,7 @@ Rules:
 - Never mark a return refunded unless Stripe accepted the refund.
 - Admin order partial refunds do **not** flip the whole order to fully refunded unless the capture is exhausted.
 - **New return requests notify admin** by email (`commerce.returns.notificationEmail` + optional `ADMIN_ALERT_EMAIL`) and admin in-app notifications; admin sidebar shows a pending-returns count; Dashboard has a calm “Pending Returns” tile (no blinking).
+- **Email CMS:** admin edits on `/communications/templates` only affect live email when send paths use `renderCmsEmail` / `sendCmsEmailOrFallback`. Order-status, refund lifecycle, login notification, gold-welcome, pet birthday/anniversary, and subscription-renewed are CMS-first (hardcoded fallback). Membership/returns/active-period emails remain hardcoded until Phase 2. See `skills/email-cms-templates/` and `docs/email-communications-centre.md`.
 - Process, decision tree, mockups, and progress: `docs/RETURNS-REFUNDS-WORKFLOW.md`.
 - Skill: `skills/returns-refunds/`.
 
