@@ -35,6 +35,20 @@ description: Implement or review PawTag customer returns and refunds end-to-end.
 | Stripe provider refund | `packages/api/src/commerce/providers/stripe/index.ts` |
 | Workflow + mockups | `docs/RETURNS-REFUNDS-WORKFLOW.md` |
 
+## Customer portal return status
+
+When showing return status on order detail:
+
+| Status | Customer copy |
+|---|---|
+| pending | Under review; instructions if approved; tracking form hidden |
+| approved / received | Ship yourself + add tracking; no PawTag-paid shipping |
+| **rejected** | **“Return rejected”** + no refund will be processed; show **PawTag note** (`Return.notes` if set); label amount **“Requested (not refunded)”**; contact `support@pawtag.co.nz`; **hide tracking form** |
+| refunded | Show refund to original payment method |
+| refund_failed | Failure reason + support path |
+
+Do **not** show soft “under review” language after reject. Do **not** show Process Refund UI on customer portal.
+
 ## Return lifecycle (current)
 
 ```text
