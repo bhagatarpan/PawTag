@@ -4,7 +4,7 @@ import type { LucideIcon } from 'lucide-react';
 import {
   getOrderRefundDisplay,
   type OrderRefundDisplay,
-} from '@pawtag/shared';
+} from '../lib/orderRefundDisplay';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */

@@ -22,7 +22,7 @@ import { OrderRefundSummaryCard } from './OrderRefundSummaryCard';
 import { CancellationInfoCard } from './CancellationInfoCard';
 import { CopyButton } from './CopyButton';
 import { formatRefundDestination, formatDateTime } from '../lib/refundDestination';
-import { getOrderRefundDisplay } from '@pawtag/shared';
+import { getOrderRefundDisplay } from '../lib/orderRefundDisplay';
 import type {
   OrderData,
   InvoiceData,

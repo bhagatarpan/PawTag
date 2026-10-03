@@ -1,11 +1,11 @@
 import React from 'react';
-import { RefreshCw, CheckCircle, AlertTriangle, XCircle, CreditCard } from 'lucide-react';
+import { RefreshCw, CheckCircle, AlertTriangle, XCircle } from 'lucide-react';
 import {
   getOrderRefundDisplay,
   getRefundDisplayLabel,
-  formatRefundDestination,
+  formatRefundDestinationLocal,
   type OrderRefundDisplay,
-} from '@pawtag/shared';
+} from '../lib/orderRefundDisplay';
 import { StatusBadge } from './StatusBadge';
 
 export interface OrderRefundSummaryCardProps {
@@ -53,7 +53,7 @@ export function OrderRefundSummaryCard({
 
   const destination =
     destinationLabel ||
-    formatRefundDestination(cardBrand || undefined, cardLast4 || undefined) ||
+    formatRefundDestinationLocal(cardBrand || undefined, cardLast4 || undefined) ||
     'Original payment method';
 
   const tone =

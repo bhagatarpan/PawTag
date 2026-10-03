@@ -11,7 +11,7 @@ import {
   getOrderRefundDisplay,
   getRefundDisplayLabel,
   type OrderRefundDisplay,
-} from '@pawtag/shared';
+} from '../lib/orderRefundDisplay';
 
 /* ------------------------------------------------------------------ */
 /*  Constants                                                          */
