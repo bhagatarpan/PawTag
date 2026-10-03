@@ -927,6 +927,7 @@ Rules:
 - Admin order partial refunds do **not** flip the whole order to fully refunded unless the capture is exhausted.
 - **New return requests notify admin** by email (`commerce.returns.notificationEmail` + optional `ADMIN_ALERT_EMAIL`) and admin in-app notifications; admin sidebar shows a pending-returns count; Dashboard has a calm “Pending Returns” tile (no blinking).
 - **Email CMS:** admin edits on `/communications/templates` only affect live email when send paths use `renderCmsEmail` / `sendCmsEmailOrFallback`. Order-status, refund lifecycle, login notification, gold-welcome, pet birthday/anniversary, subscription-renewed, membership lifecycle, returns, active-period warnings, subscription cancellation, **subscription reminders/grace/payment dunning, referral, tier-downgrade, support, low-stock, emergency-escalation, generic notification, and invoice OTP** are CMS-first (hardcoded fallback). A few niche subscription edge emails may still be hardcoded. See `skills/email-cms-templates/` and `docs/email-communications-centre.md`.
+- Customer order detail shows return status; **rejected** returns clearly state no refund will be processed, show PawTag note when provided, and label amount as requested (not refunded).
 - Process, decision tree, mockups, and progress: `docs/RETURNS-REFUNDS-WORKFLOW.md`.
 - Skill: `skills/returns-refunds/`.
 
