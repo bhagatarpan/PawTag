@@ -93,12 +93,17 @@ Webhook refund updates remain the settlement source of truth.
 
 On successful `POST /api/customer/returns`:
 
-1. **Customer email** — request received + return instructions (warehouse address in email if configured, else email support for address).
-2. **Admin email** — to `commerce.returns.notificationEmail` (default `return@pawtag.co.nz`) and `ADMIN_ALERT_EMAIL` if set. Includes order, customer, items, reason, estimated refund, link to `/admin/returns`.
-3. **Admin in-app notification** — `Notification.audience: 'admin'`, `type: 'return_requested'`, `priority: 'high'`, `actionUrl: '/admin/returns'`. Surfaces in admin bell unread count.
-4. **Tracking submit** — also creates admin email (existing) + in-app `return_tracking_submitted`.
-5. **Sidebar badge** — amber count of `status: 'pending'` on Returns nav (`GET /admin/commerce/returns/summary`).
-6. **Dashboard tile** — “Pending Returns” StatCard; click → `/returns?status=pending`. **No blinking/flashing** (DESIGN.md calm/premium).
+1. **Customer email** — request received + return instructions (warehouse address in email if configured, else email support for address). CMS slug: `return-request-received`.
+2. **Admin email** — to `commerce.returns.notificationEmail` (default `return@pawtag.co.nz`) and `ADMIN_ALERT_EMAIL` if set. CMS slug: `return-request-admin`.
+3. **Admin in-app notification** — `Notification.audience: 'admin'`, `type: 'return_requested'`.
+4. **CSR approve** — customer email CMS `return-approved` (ship instructions + warehouse address/contact).
+5. **CSR reject** — customer email CMS `return-rejected`.
+6. **Tracking submit** — admin email `return-tracking-admin` + customer `return-tracking-received`.
+7. **Process Refund** — customer email `refund-processed-csr` + Stripe webhook refund emails.
+8. **Sidebar badge** — amber pending count.
+9. **Dashboard tile** — “Pending Returns” (no blinking).
+
+Approve ≠ money. Warehouse receipt + Process Refund remain separate.
 
 Monitored via: `logger.info` on create/tracking, Notification collection, email send logs.
 

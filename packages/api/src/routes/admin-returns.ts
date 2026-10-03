@@ -15,6 +15,7 @@ import { Order, Return, User } from '@pawtag/db';
 import { toAppError } from '../lib/app-errors';
 import { logCommerceEvent } from '../commerce/audit';
 import { returnRefundService } from '../commerce/services/return-refund.service';
+import { getSetting } from '../commerce/config';
 import logger from '../lib/logger';
 
 // Valid return status transitions (logistics only — not money)
@@ -181,6 +182,81 @@ router.put('/:id/status', requirePermission('order.update'), validate(updateRetu
         refundAmount,
       },
     }, req as any);
+
+    // Customer emails for approved / rejected (fire-and-forget)
+    if (status === 'approved' || status === 'rejected') {
+      try {
+        const customer = await User.findById(item.userId).select('fullName email').lean();
+        if (customer?.email) {
+          const { sendCmsEmailOrFallback } = await import('../services/email.service');
+          const warehouseAddress = (await getSetting('commerce.returns.warehouseAddress')) || '';
+          const returnContact = (await getSetting('commerce.returns.warehouseContact')) || 'support@pawtag.co.nz';
+          const items = (item.items || [])
+            .map((i: { productName: string; quantity: number }) => `${i.productName} × ${i.quantity}`)
+            .join(', ');
+          const viewOrderUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/orders/${item.orderId}`;
+
+          if (status === 'approved') {
+            await sendCmsEmailOrFallback({
+              slug: 'return-approved',
+              to: customer.email,
+              vars: {
+                customerName: customer.fullName || 'there',
+                orderNumber: item.orderNumber,
+                items,
+                refundAmount: Number(item.refundAmount || 0).toFixed(2),
+                warehouseAddress,
+                returnContact,
+                viewOrderUrl,
+              },
+              fallbackSubject: `Return approved — ${item.orderNumber}`,
+              fallbackHtml: `
+                <p>Hi ${customer.fullName || 'there'},</p>
+                <p>Your return request for order <strong>${item.orderNumber}</strong> has been <strong>approved</strong>.</p>
+                <p>Items: ${items}</p>
+                <p>Estimated refund: $${Number(item.refundAmount || 0).toFixed(2)}</p>
+                <p>PawTag does not provide return shipping. Please ship the product with a printed invoice. Add tracking on your order after you ship.</p>
+                ${warehouseAddress.trim() ? `<p>Return address:<br>${warehouseAddress.replace(/\n/g, '<br>')}</p>` : `<p>Please email ${returnContact} for the warehouse return address.</p>`}
+              `,
+              businessFlow: 'orders_commerce',
+              relatedEntityType: 'return',
+              relatedEntityId: String(item._id),
+              relatedEntityDisplay: item.orderNumber,
+            }).catch((err) =>
+              logger.error({ err, returnId: item._id }, 'Failed to send return approved email'),
+            );
+          } else {
+            await sendCmsEmailOrFallback({
+              slug: 'return-rejected',
+              to: customer.email,
+              vars: {
+                customerName: customer.fullName || 'there',
+                orderNumber: item.orderNumber,
+                returnReason: item.reason || 'Return request',
+                csrNote: notes || '',
+                returnContact,
+                viewOrderUrl,
+              },
+              fallbackSubject: `Return request update — ${item.orderNumber}`,
+              fallbackHtml: `
+                <p>Hi ${customer.fullName || 'there'},</p>
+                <p>We reviewed your return request for order <strong>${item.orderNumber}</strong> and are unable to approve it at this time.</p>
+                ${notes ? `<p>PawTag note: ${notes}</p>` : ''}
+                <p>If you believe this is incorrect, please contact ${returnContact}.</p>
+              `,
+              businessFlow: 'orders_commerce',
+              relatedEntityType: 'return',
+              relatedEntityId: String(item._id),
+              relatedEntityDisplay: item.orderNumber,
+            }).catch((err) =>
+              logger.error({ err, returnId: item._id }, 'Failed to send return rejected email'),
+            );
+          }
+        }
+      } catch (err) {
+        logger.error({ err, returnId: item._id, status }, 'Failed to send return status customer email');
+      }
+    }
 
     logger.info({ returnId: req.params.id, status, reviewedBy: req.user!.id }, 'Return status updated');
     res.json({ success: true, data: item });
