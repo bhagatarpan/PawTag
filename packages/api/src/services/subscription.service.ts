@@ -1444,15 +1444,37 @@ async function sendReminderEmail(to: string, name: string, tagId: string, daysLe
 
   const subject = subjects[type] || `PawTag subscription expiring soon`;
   const html = renderSubscriptionReminderEmail({ name, tagId, daysLeft, type, renewUrl });
+  const { sendCmsEmailOrFallback } = await import('./email.service');
 
-  await sendMail(to, subject, html);
+  await sendCmsEmailOrFallback({
+    slug: 'subscription-reminder',
+    to,
+    vars: {
+      name,
+      tagId,
+      daysLeft: String(daysLeft),
+      type,
+      renewUrl,
+    },
+    fallbackSubject: subject,
+    fallbackHtml: html,
+    businessFlow: 'subscriptions',
+  });
 }
 
 async function sendGraceReminderEmail(to: string, name: string, tagId: string, daysLeft: number) {
   const renewUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/subscriptions`;
   const html = renderGracePeriodReminderEmail({ name, tagId, daysLeft, renewUrl });
+  const { sendCmsEmailOrFallback } = await import('./email.service');
 
-  await sendMail(to, `Grace period: ${daysLeft} days left to renew — PawTag`, html);
+  await sendCmsEmailOrFallback({
+    slug: 'grace-period-reminder',
+    to,
+    vars: { name, tagId, daysLeft: String(daysLeft), renewUrl },
+    fallbackSubject: `Grace period: ${daysLeft} days left to renew — PawTag`,
+    fallbackHtml: html,
+    businessFlow: 'subscriptions',
+  });
 }
 
 async function sendFreePeriodReminder2WeekEmail(to: string, name: string, tagId: string, productName: string, freePeriodEndsAt: Date, monthlyPrice: number, autoRenew: boolean, planType?: string) {
@@ -1963,15 +1985,42 @@ async function moveSubscriptionToGracePeriod(subscriptionId: string) {
 async function sendPaymentFailureEmail(to: string, name: string, tagId: string, retryCount: number, retriesLeft: number) {
   const updatePaymentUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/subscriptions`;
   const html = renderPaymentFailureEmail({ name, tagId, retryCount, retriesLeft, updatePaymentUrl });
+  const { sendCmsEmailOrFallback } = await import('./email.service');
 
-  await sendMail(to, `Payment failed for your PawTag subscription — Retry ${retryCount}`, html);
+  await sendCmsEmailOrFallback({
+    slug: 'payment-failure',
+    to,
+    vars: {
+      name,
+      tagId,
+      retryCount: String(retryCount),
+      retriesLeft: String(retriesLeft),
+      updatePaymentUrl,
+    },
+    fallbackSubject: `Payment failed for your PawTag subscription — Retry ${retryCount}`,
+    fallbackHtml: html,
+    businessFlow: 'subscriptions',
+  });
 }
 
 async function sendGracePeriodEmail(to: string, name: string, tagId: string, gracePeriodWeeks: number) {
   const renewUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/subscriptions`;
   const html = renderGracePeriodStartedEmail({ name, tagId, gracePeriodWeeks, renewUrl });
+  const { sendCmsEmailOrFallback } = await import('./email.service');
 
-  await sendMail(to, `Grace period started for your PawTag subscription`, html);
+  await sendCmsEmailOrFallback({
+    slug: 'grace-period-started',
+    to,
+    vars: {
+      name,
+      tagId,
+      gracePeriodWeeks: String(gracePeriodWeeks),
+      renewUrl,
+    },
+    fallbackSubject: 'Grace period started for your PawTag subscription',
+    fallbackHtml: html,
+    businessFlow: 'subscriptions',
+  });
 }
 
 export async function processPaymentRetries() {
@@ -2085,5 +2134,13 @@ async function attemptPaymentCharge(subscription: any): Promise<boolean> {
 
 async function sendPaymentRetrySuccessEmail(to: string, name: string, tagId: string) {
   const html = renderPaymentRetrySuccessEmail({ name, tagId });
-  await sendMail(to, `Payment successful for your PawTag subscription`, html);
+  const { sendCmsEmailOrFallback } = await import('./email.service');
+  await sendCmsEmailOrFallback({
+    slug: 'payment-retry-success',
+    to,
+    vars: { name, tagId },
+    fallbackSubject: 'Payment successful for your PawTag subscription',
+    fallbackHtml: html,
+    businessFlow: 'subscriptions',
+  });
 }

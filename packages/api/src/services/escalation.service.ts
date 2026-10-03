@@ -220,8 +220,24 @@ async function processStage2Escalation(record: any): Promise<void> {
           finderEmail: record.finderEmail,
           viewDetailsUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account`,
         });
+        const { sendCmsEmailOrFallback } = await import('./email.service');
 
-        await sendMail(ec.email, emailSubject, emailHtml).catch(() => {});
+        await sendCmsEmailOrFallback({
+          slug: 'emergency-escalation',
+          to: ec.email,
+          vars: {
+            ownerName,
+            petName,
+            tagId: tag?.tagId || 'N/A',
+            finderName: record.finderName || '',
+            finderPhone: record.finderPhone || '',
+            finderEmail: record.finderEmail || '',
+            viewDetailsUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account`,
+          },
+          fallbackSubject: emailSubject,
+          fallbackHtml: emailHtml,
+          businessFlow: 'lost_found',
+        }).catch(() => {});
       } catch (emailErr) {
         logger.error({ err: emailErr, recordId: record._id, ecEmail: ec.email }, '[Escalation] Failed to send email to emergency contact');
       }

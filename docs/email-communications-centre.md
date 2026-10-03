@@ -45,7 +45,8 @@ See `skills/email-cms-templates/SKILL.md`.
 - [x] Wire customer-returns + return-refund.service
 - [x] Wire active-period-check.service
 - [x] Wire subscription.service cancellation
-- [ ] Remaining Category B (subscription reminders, grace period, pet milestones, low stock, support, referral, generic, invoice-otp)
+- [x] Wire Category B: subscription-reminder, grace-period-reminder, payment-failure, grace-period-started, payment-retry-success, referral-reward, tier-downgrade-warning, support-request-alert, low-stock-alert, emergency-escalation, generic-notification, invoice-otp
+- [ ] Remaining edge cases: free-period 2-week/3-day, grace 3-day, tag-expired, plan-changed, subscription-paused/resumed admin+customer, gold plan-changed, membership payment-method/admin dunning emails
 
 ---
 

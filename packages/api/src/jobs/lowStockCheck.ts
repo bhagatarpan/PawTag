@@ -66,8 +66,20 @@ export async function checkLowStock(): Promise<{ alerted: boolean; count: number
     logger.info('[LowStockCheck] No ADMIN_ALERT_EMAIL configured, skipping email alert');
   } else {
     const html = renderLowStockAlertEmail({ threshold, products: lowStockProducts });
+    const { sendCmsEmailOrFallback } = await import('../services/email.service');
 
-    await sendMail(adminEmail, `[PawTag] Low Stock Alert — ${lowStockProducts.length} product(s)`, html);
+    await sendCmsEmailOrFallback({
+      slug: 'low-stock-alert',
+      to: adminEmail,
+      vars: {
+        threshold: String(threshold),
+        productCount: String(lowStockProducts.length),
+        products: lowStockProducts.map((p) => p.name).join(', '),
+      },
+      fallbackSubject: `[PawTag] Low Stock Alert — ${lowStockProducts.length} product(s)`,
+      fallbackHtml: html,
+      businessFlow: 'admin_system',
+    });
   }
 
   const adminUser = await User.findOne({ role: 'admin' }).select('_id').lean();

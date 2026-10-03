@@ -91,7 +91,26 @@ router.post('/customer/invoices/:invoiceId/access', authenticate, async (req: Au
     const name = (user as any)?.fullName || (user as any)?.name || 'Customer';
     const email = (user as any)?.email;
     if (email) {
-      await sendInvoiceOtpEmail(email, name, invoice.invoiceNumber, otp);
+      const { sendCmsEmailOrFallback } = await import('../services/email.service');
+      const { renderInvoiceOtpTemplateEmail } = await import('../services/email/templates');
+      const html = renderInvoiceOtpTemplateEmail({
+        name,
+        invoiceNumber: invoice.invoiceNumber,
+        otp,
+      });
+      await sendCmsEmailOrFallback({
+        slug: 'invoice-otp',
+        to: email,
+        vars: {
+          name,
+          invoiceNumber: invoice.invoiceNumber,
+          otp,
+          expiresInMinutes: '10',
+        },
+        fallbackSubject: `Your PawTag invoice access code — ${invoice.invoiceNumber}`,
+        fallbackHtml: html,
+        businessFlow: 'orders_commerce',
+      });
     }
 
     res.json({ success: true, data: { secureUrl: `${FRONTEND_URL}/invoice/${secureToken}` } });

@@ -173,11 +173,22 @@ export async function completeReferralRewards(orderId: string): Promise<void> {
     },
   });
 
-  // Notify referrer
+  // Notify referrer — CMS-first
   const referrer = await User.findById(referral.referrerId).select('fullName email');
   if (referrer) {
     const html = renderReferralRewardEmail({ referrerName: (referrer as any).fullName, rewardMonths });
-    await sendMail((referrer as any).email, 'You earned a referral reward!', html);
+    const { sendCmsEmailOrFallback } = await import('./email.service');
+    await sendCmsEmailOrFallback({
+      slug: 'referral-reward',
+      to: (referrer as any).email,
+      vars: {
+        referrerName: (referrer as any).fullName || 'there',
+        rewardMonths: String(rewardMonths),
+      },
+      fallbackSubject: 'You earned a referral reward!',
+      fallbackHtml: html,
+      businessFlow: 'referrals',
+    });
   }
 
 // Award Guardian Points for referral (non-blocking)

@@ -56,7 +56,20 @@ publicRouter.post('/contact', contactLimiter as any, async (req: Request, res: R
     const adminEmail = process.env.ADMIN_ALERT_EMAIL;
     if (adminEmail) {
       const html = renderSupportRequestAlertEmail(name, email, message, supportRequest._id.toString());
-      await sendMail(adminEmail, `[PawTag Support] New message from ${name}`, html);
+      const { sendCmsEmailOrFallback } = await import('../services/email.service');
+      await sendCmsEmailOrFallback({
+        slug: 'support-request-alert',
+        to: adminEmail,
+        vars: {
+          name,
+          email,
+          message,
+          requestId: supportRequest._id.toString(),
+        },
+        fallbackSubject: `[PawTag Support] New message from ${name}`,
+        fallbackHtml: html,
+        businessFlow: 'admin_system',
+      });
     }
 
     res.status(201).json({ success: true, data: { id: supportRequest._id } });

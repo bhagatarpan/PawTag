@@ -327,7 +327,7 @@ async function sendTierDowngradeWarningEmail(
   const user = await User.findById(userId).select('email fullName').lean();
   if (!user?.email) return;
 
-  const { sendMail } = await import('../email.service');
+  const { sendCmsEmailOrFallback } = await import('../email.service');
   const { renderTierDowngradeWarningEmail } = await import('../email/templates');
 
   // Read tier thresholds from CMS settings
@@ -347,7 +347,22 @@ async function sendTierDowngradeWarningEmail(
     dashboardUrl: `${process.env.FRONTEND_URL || 'https://pawtag.co.nz'}/account/guardian`,
   });
 
-  await sendMail(user.email, `Keep your ${currentTier} Guardian status — ${daysRemaining} days left`, html);
+  await sendCmsEmailOrFallback({
+    slug: 'tier-downgrade-warning',
+    to: user.email,
+    vars: {
+      customerName: user.fullName || 'Guardian',
+      currentTier,
+      newTier,
+      points: String(points),
+      pointsNeeded: String(pointsNeeded),
+      daysRemaining: String(daysRemaining),
+      dashboardUrl: `${process.env.FRONTEND_URL || 'https://pawtag.co.nz'}/account/guardian`,
+    },
+    fallbackSubject: `Keep your ${currentTier} Guardian status — ${daysRemaining} days left`,
+    fallbackHtml: html,
+    businessFlow: 'guardian_loyalty',
+  });
 }
 
 /**

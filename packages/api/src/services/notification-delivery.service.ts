@@ -114,7 +114,19 @@ export async function createAndDeliverNotification(options: NotifyOptions): Prom
     try {
       const subject = emailSubject || title;
       const html = emailHtml || renderGenericNotificationEmail({ title, message, actionUrl });
-      await sendMail((user as any).email, subject, html).catch(() => {});
+      const { sendCmsEmailOrFallback } = await import('./email.service');
+      await sendCmsEmailOrFallback({
+        slug: 'generic-notification',
+        to: (user as any).email,
+        vars: {
+          title,
+          message,
+          actionUrl: actionUrl || '',
+        },
+        fallbackSubject: subject,
+        fallbackHtml: html,
+        businessFlow: 'other',
+      }).catch(() => {});
     } catch (err) {
       logger.error({ err, userId, type }, 'Failed to send notification email');
     }
