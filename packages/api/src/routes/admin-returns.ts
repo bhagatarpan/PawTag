@@ -234,16 +234,30 @@ async function runReturnRefund(
       return;
     }
 
-    const fresh = await Return.findById(returnId).populate('userId', 'fullName email phoneNumber').populate('orderId', 'orderNumber status payment');
+    const item = await Return.findById(returnId).populate('userId', 'fullName email phoneNumber').populate('orderId', 'orderNumber status payment');
+    const orderIdForBalance = String(item?.orderId && typeof item.orderId === 'object' && (item.orderId as any)._id
+      ? (item.orderId as any)._id
+      : item?.orderId || '');
+    let balance = { capturedAmount: 0, alreadyRefunded: 0, remainingRefundable: 0 };
+    try {
+      if (orderIdForBalance) {
+        balance = await returnRefundService.getBalance(orderIdForBalance);
+      }
+    } catch {
+      // balance is informational on response; refund already succeeded
+    }
     res.json({
       success: true,
       data: {
-        return: fresh,
+        return: item,
         refundId: result.refundId,
         amount: result.amount,
         refundStatus: result.refundStatus,
         arn: result.arn,
         expectedArrival: result.expectedArrival,
+        remainingRefundable: result.remainingRefundable ?? balance.remainingRefundable,
+        alreadyRefunded: result.alreadyRefunded ?? balance.alreadyRefunded,
+        capturedAmount: result.capturedAmount ?? balance.capturedAmount,
         message: result.refundStatus === 'succeeded'
           ? 'Refund accepted by Stripe'
           : 'Refund submitted — awaiting Stripe confirmation',

@@ -352,35 +352,30 @@ Never log card numbers, CVV, or Stripe secrets.
 | Phase | Scope | Status | Completed |
 |---|---|---|---|
 | **0** | Discovery + this document | ✅ Complete | 2026-10-03 |
-| **1** | Money path: return → Stripe refund (admin process refund) | ✅ Complete (code) | 2026-10-03 |
+| **1** | Money path: return → Stripe refund (admin process refund) | ✅ Complete | 2026-10-03 |
 | **1b** | Skill extraction + docs (AGENTS/README/DESIGN) | ✅ Complete | 2026-10-03 |
-| **2** | Tracking, warehouse receipt gate, return emails, customer status UI | 🔄 Partial (receipt gate + requested email + customer status card) | 2026-10-03 |
-| **2b** | Settings: warehouse address + return notification email | 🔄 Seeds added; warehouse address still empty (configure before launch) | 2026-10-03 |
-| **3** | Item-level refund state, multi-refund balance hardening, full E2E tests | ⬜ Not started | |
-| **4** | Merge to main after verification | 🔄 Branch pushed; merge pending founder confirmation of tests | |
+| **2** | Tracking, warehouse receipt gate, return emails, customer status UI | ✅ Complete (receipt gate + emails + status card + tracking submit) | 2026-10-03 |
+| **2b** | Settings: warehouse address + return notification email | ✅ Complete (typed in COMMERCE_SETTINGS + admin Commerce Settings UI; **configure real warehouse address in production**) | 2026-10-03 |
+| **3** | Item-level refund state, multi-refund balance hardening, full E2E tests | ✅ Complete (code + unit tests; Playwright skipped by decision) | 2026-10-03 |
+| **4** | Merge to main after verification | 🔄 Branch `feature/returns-refunds-phase3` pending merge after tests | |
 
-### Phase 1 acceptance criteria
+### Phase 3 acceptance criteria
 
-- [x] Customer can request return for delivered order (existing + unit price snapshot)
-- [x] Reason required server-side
-- [x] Admin can process refund on received return via **dedicated** endpoint
-- [x] Permission `order.refund` enforced
-- [x] Amount server-validated; default from return lines; CSR can adjust within remaining balance
-- [x] Stripe refund used (not status-only) — status-only refunded blocked
-- [x] Fail closed: Stripe failure does **not** mark refunded
-- [x] Return.refundId + Order refund fields + PaymentTransaction persisted
-- [x] Audit + activity written (`logCommerceEvent` + return.activity + order.activity)
-- [ ] Customer cancel + Admin Orders refund still work — regression suite not fully re-run this packet
-- [x] Unit tests for reason required, receipt gate, success, fail-closed, exception
+- [x] Customer can submit return tracking after approval; admin sees it + gets email
+- [x] Instruction email includes warehouse address when configured; else “email PawTag for address”
+- [x] Remaining balance enforced in cents; over-refund rejected
+- [x] Item-level refunded state updated on refund success; blocks double-return of same lines
+- [x] Admin order partial refund does not mark whole order fully refunded incorrectly
+- [x] Unit tests for balance helpers + over-amount + existing Phase 1 guards
+- [ ] Full integration suite for return→refund API — not run this packet (unit coverage only)
+- [ ] Configure `commerce.returns.warehouseAddress` in production settings
 
 ### Remaining work (not hidden)
 
-- Customer tracking submission UI/API (`POST /customer/returns/:id/tracking`)
-- Admin email on tracking submit (settings key seeded; send path not wired)
-- Item-level OrderItem refund state (Phase 3)
-- Full browser E2E for return → refund
-- Configure `commerce.returns.warehouseAddress` before production returns
-- Consolidate cancel/admin-order Stripe refund call sites into the same service as return refunds (hardening)
+- Integration tests for create-return / process-refund routes (optional follow-up)
+- Browser E2E skipped per founder decision
+- Consolidate cancel/admin-order Stripe call sites into one service (hardening later)
+- Live Stripe verification on a real test order
 
 ---
 

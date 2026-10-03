@@ -276,6 +276,14 @@ export interface OrderData {
   trackingNumber?: string;
   carrier?: string;
   shippingLabelUrl?: string;
+  items?: Array<{
+    productId?: string;
+    productName: string;
+    quantity: number;
+    unitPrice?: number;
+    refundedQuantity?: number;
+    refundStatus?: 'none' | 'partial' | 'refunded';
+  }>;
   notes?: string;
   cancellationReason?: string;
   cancellationNotes?: string;

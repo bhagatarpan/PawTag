@@ -209,9 +209,19 @@ export default function OrderDetail() {
               </div>
             )}
             {returnRequest.returnTrackingNumber && (
-              <div className="flex justify-between">
+              <div className="flex justify-between gap-2">
                 <span className="text-gray-500">Your return tracking</span>
-                <span className="font-mono text-xs">{returnRequest.returnShipProvider} {returnRequest.returnTrackingNumber}</span>
+                <span className="font-mono text-xs text-right">
+                  {returnRequest.returnShipProvider} {returnRequest.returnTrackingNumber}
+                  {returnRequest.returnTrackingUrl && (
+                    <>
+                      {' · '}
+                      <a href={returnRequest.returnTrackingUrl} target="_blank" rel="noopener noreferrer" className="text-primary-600 underline">
+                        Track
+                      </a>
+                    </>
+                  )}
+                </span>
               </div>
             )}
             {returnRequest.refundStatus === 'succeeded' && (
@@ -227,10 +237,55 @@ export default function OrderDetail() {
                 {returnRequest.refundFailureReason || 'Refund could not be completed. Contact support.'}
               </div>
             )}
-            {!returnRequest.returnTrackingNumber && ['pending', 'approved'].includes(returnRequest.status) && (
+            {!returnRequest.returnTrackingNumber && returnRequest.status === 'pending' && (
               <p className="text-xs text-gray-500">
-                PawTag does not provide return shipping. If approved, ship the item yourself with a printed invoice and add tracking when available.
+                PawTag does not provide return shipping. Our team will review your request. If approved, you'll receive instructions by email (including the return address, or a note to email us for it). You can add tracking after approval.
               </p>
+            )}
+            {['approved', 'received'].includes(returnRequest.status) && !returnRequest.returnTrackingNumber && (
+              <div className="pt-2 border-t border-gray-100 space-y-2">
+                <p className="text-xs text-gray-500">
+                  Ship the item yourself with a printed invoice. PawTag does not provide return shipping. Check your email for the warehouse address, or contact support if you need it. Add tracking below after you ship.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <input
+                    id="return-provider"
+                    name="return-provider"
+                    className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                    placeholder="Shipping provider (e.g. NZ Post)"
+                  />
+                  <input
+                    id="return-tracking"
+                    name="return-tracking"
+                    className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                    placeholder="Tracking number"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const provider = (document.getElementById('return-provider') as HTMLInputElement)?.value?.trim();
+                    const trackingNumber = (document.getElementById('return-tracking') as HTMLInputElement)?.value?.trim();
+                    if (!provider || !trackingNumber) {
+                      alert('Please enter provider and tracking number');
+                      return;
+                    }
+                    try {
+                      await api.post(API.customer.returns.tracking(returnRequest._id), { provider, trackingNumber });
+                      await fetchOrder();
+                      const listRes = await api.get(`${API.customer.returns.create}?orderId=${id}`);
+                      const data = listRes.data?.data;
+                      const list = Array.isArray(data) ? data : data?.items || [];
+                      setReturnRequest(list[0] || null);
+                    } catch (err: any) {
+                      alert(err.response?.data?.error || 'Failed to submit tracking');
+                    }
+                  }}
+                  className="inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700"
+                >
+                  Submit return tracking
+                </button>
+              </div>
             )}
           </div>
         </div>

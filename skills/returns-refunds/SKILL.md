@@ -42,9 +42,21 @@ pending → approved → received → refunded
 pending → rejected (terminal)
 Exception: approved → refund_without_return approved → refund
 Failure: refund attempted → refund_failed (order remains financially truthful)
+Tracking: approved/received → customer POST tracking (does not mean warehouse received)
 ```
 
 Do **not** treat bare `PUT status → refunded` as money movement.
+
+## Phase 3 rules (current)
+
+1. Customer tracking: `POST /api/customer/returns/:id/tracking` only when status is `approved` or `received`. Tracking ≠ warehouse receipt.
+2. Warehouse address appears in **return instruction email** when `commerce.returns.warehouseAddress` is set; otherwise customers email support for the address. Do not require a large warehouse address block on the order page.
+3. Remaining refundable balance is computed in **cents** from PaymentTransaction (`succeeded` + `pending`); over-amount refunds are rejected server-side.
+4. Admin order partial refunds must **not** set the whole order to `refunded` unless the capture is fully refunded.
+5. Item-level state (`Order.items[].refundedQuantity` / `refundStatus`) is **display/enforcement** only — money truth is PaymentTransaction + Return.
+6. Block create-return for lines already fully refunded.
+7. Playwright E2E is out of scope for Phase 3; use integration/unit tests.
+8. Admin email on tracking submit uses `commerce.returns.notificationEmail` (default `return@pawtag.co.nz`).
 
 ## Permissions
 
