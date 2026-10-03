@@ -68,10 +68,16 @@ Do **not** treat bare `PUT status → refunded` as money movement.
 
 ## Configurable settings (do not hardcode)
 
-- `commerce.returns.warehouseAddress`
-- `commerce.returns.warehouseContact`
+- `commerce.returns.warehouseAddress` — street address for instruction emails; **empty until set in Admin**
+- `commerce.returns.warehouseContact` — **email only** (`support@pawtag.co.nz`); no phone
 - `commerce.returns.notificationEmail` (default `return@pawtag.co.nz`)
 - Existing `commerce.refunds.enabled`, `maxDaysAfterPurchase`, `partialEnabled`
+
+## Founder smoke test (Stripe test mode only)
+
+Before launch, founder verifies: Request Return → Approve → tracking → Mark Received → Process Refund.  
+Checklist: `docs/RETURNS-REFUNDS-WORKFLOW.md` § Progress tracker.  
+Do not process live refunds as part of automated AI verification unless explicitly authorized.
 
 ## Observability
 

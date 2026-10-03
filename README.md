@@ -921,7 +921,7 @@ Rules:
 - Refund reason is mandatory (server-side).
 - PawTag does **not** provide return shipping; customers arrange shipment and can submit tracking after approval.
 - Default money path requires warehouse receipt before Process Refund.
-- Warehouse return address is included in **instruction emails** when configured; otherwise customers email support for the address.
+- Warehouse return address is included in **instruction emails** when configured; otherwise customers email the return contact (`support@pawtag.co.nz` by default — email only).
 - Remaining refundable balance is enforced server-side (partial refunds supported when enabled).
 - Never mark a return refunded unless Stripe accepted the refund.
 - Admin order partial refunds do **not** flip the whole order to fully refunded unless the capture is exhausted.

@@ -166,12 +166,13 @@ router.post('/', validate(createReturnSchema), async (req: AuthRequest, res: Res
       if (requester?.email) {
         const { sendMail } = await import('../services/email.service');
         const warehouseAddress = (await getSetting('commerce.returns.warehouseAddress')) || '';
+        const returnContact = (await getSetting('commerce.returns.warehouseContact')) || 'support@pawtag.co.nz';
         const itemLines = returnItems
           .map((i: { productName: string; quantity: number }) => `• ${i.productName} × ${i.quantity}`)
           .join('<br>');
         const addressBlock = warehouseAddress.trim()
           ? `<p><strong>Return address:</strong><br>${warehouseAddress.replace(/\n/g, '<br>')}</p>`
-          : `<p>PawTag does not provide return shipping. Please email <strong>support@pawtag.co.nz</strong> for the current warehouse return address before you ship.</p>`;
+          : `<p>PawTag does not provide return shipping. Please email <strong>${returnContact}</strong> for the current warehouse return address before you ship.</p>`;
         const html = `
           <p>Hi ${requester.fullName || 'there'},</p>
           <p>We've received your return request for order <strong>${order.orderNumber}</strong>.</p>

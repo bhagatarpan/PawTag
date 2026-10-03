@@ -69,7 +69,7 @@ const SETTING_META: Record<string, { label: string; tooltip: string; type: 'togg
   'commerce.refunds.maxDaysAfterPurchase': { label: 'Refund Window (days)', tooltip: 'Maximum number of days after purchase when a refund can be requested', type: 'number' },
   'commerce.refunds.partialEnabled': { label: 'Allow Partial Refunds', tooltip: 'Let admins refund part of an order instead of the full amount', type: 'toggle' },
   'commerce.returns.warehouseAddress': { label: 'Return Warehouse Address', tooltip: 'Address included in customer return instruction emails. Leave empty to tell customers to email support for the address.', type: 'text' },
-  'commerce.returns.warehouseContact': { label: 'Return Warehouse Contact', tooltip: 'Optional contact details for returns', type: 'text' },
+  'commerce.returns.warehouseContact': { label: 'Return Contact Email', tooltip: 'Email-only return contact (no phone). Default support@pawtag.co.nz', type: 'text' },
   'commerce.returns.notificationEmail': { label: 'Return Tracking Notification Email', tooltip: 'Admin mailbox notified when customers submit return tracking', type: 'text' },
   'commerce.notifications.orderConfirmation': { label: 'Send Order Confirmation Email', tooltip: 'Email the customer when their order is placed', type: 'toggle' },
   'commerce.notifications.invoiceEmail': { label: 'Send Invoice Email', tooltip: 'Attach and send the invoice with the order confirmation', type: 'toggle' },

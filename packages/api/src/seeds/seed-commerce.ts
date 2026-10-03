@@ -72,8 +72,9 @@ const COMMERCE_SEED_SETTINGS = [
   // Warehouse street address intentionally empty until founder sets the real
   // address in Admin → Commerce Settings. Instruction emails then say to email
   // support@pawtag.co.nz for the return address.
+  // Contact is email-only (founder decision) — no phone.
   { key: 'commerce.returns.warehouseAddress', value: '', description: 'Warehouse return address for instruction emails (set real address in Admin before launch)' },
-  { key: 'commerce.returns.warehouseContact', value: 'PawTag Returns Team\nsupport@pawtag.co.nz\nNew Zealand', description: 'Optional warehouse/return contact shown in return emails' },
+  { key: 'commerce.returns.warehouseContact', value: 'support@pawtag.co.nz', description: 'Return contact email for return emails (email only)' },
   { key: 'commerce.returns.notificationEmail', value: 'return@pawtag.co.nz', description: 'Admin email notified when customers submit return tracking' },
 
   // ─── Promotions ───────────────────────────────────────────

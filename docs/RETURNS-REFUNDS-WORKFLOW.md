@@ -284,8 +284,8 @@ Detail modal / drawer:
 
 | Key | Default |
 |---|---|
-| `commerce.returns.warehouseAddress` | empty (must configure) |
-| `commerce.returns.warehouseContact` | optional |
+| `commerce.returns.warehouseAddress` | empty — set real street address in Admin when available |
+| `commerce.returns.warehouseContact` | `support@pawtag.co.nz` (email only, no phone) |
 | `commerce.returns.notificationEmail` | `return@pawtag.co.nz` |
 | Existing `commerce.refunds.*` | Enforce on returns path |
 
@@ -359,28 +359,34 @@ Never log card numbers, CVV, or Stripe secrets.
 | **0** | Discovery + this document | ✅ Complete | 2026-10-03 |
 | **1** | Money path: return → Stripe refund (admin process refund) | ✅ Complete | 2026-10-03 |
 | **1b** | Skill extraction + docs (AGENTS/README/DESIGN) | ✅ Complete | 2026-10-03 |
-| **2** | Tracking, warehouse receipt gate, return emails, customer status UI | ✅ Complete (receipt gate + emails + status card + tracking submit) | 2026-10-03 |
-| **2b** | Settings: warehouse address + return notification email | ✅ Complete (seeded contact + notification email; warehouse **street** address still empty until set in Admin) | 2026-10-03 |
-| **3** | Item-level refund state, multi-refund balance hardening, full E2E tests | ✅ Complete (code + unit tests; Playwright skipped by decision) | 2026-10-03 |
-| **4** | Merge to main after verification | 🔄 Branch `feature/returns-refunds-phase3` pending merge after tests | |
+| **2** | Tracking, warehouse receipt gate, return emails, customer status UI | ✅ Complete | 2026-10-03 |
+| **2b** | Settings seeds + Admin Commerce Settings for returns | ✅ Complete (email-only contact; street address empty until set in Admin) | 2026-10-03 |
+| **3** | Item-level refund state, multi-refund balance hardening | ✅ Complete (code + unit tests; Playwright skipped) | 2026-10-03 |
+| **3b** | Admin notifications: email + in-app + sidebar badge + dashboard tile | ✅ Complete (no blinking) | 2026-10-03 |
+| **4** | Merge all returns/refunds work to main | ✅ Complete | 2026-10-03 |
+| **5** | Founder Stripe **test-mode** smoke test | ⬜ **Founder-owned** — checklist below | |
 
-### Phase 3 acceptance criteria
+### Founder Stripe test-mode smoke test checklist
 
-- [x] Customer can submit return tracking after approval; admin sees it + gets email
-- [x] Instruction email includes warehouse address when configured; else “email PawTag for address”
-- [x] Remaining balance enforced in cents; over-refund rejected
-- [x] Item-level refunded state updated on refund success; blocks double-return of same lines
-- [x] Admin order partial refund does not mark whole order fully refunded incorrectly
-- [x] Unit tests for balance helpers + over-amount + existing Phase 1 guards
-- [ ] Full integration suite for return→refund API — not run this packet (unit coverage only)
-- [ ] Configure `commerce.returns.warehouseAddress` in production settings
+Founder runs this against `PAYMENT_MODE=stripe_test` (not live).
+
+1. Customer: Request Return on a paid/delivered order → pending; customer email; admin email + in-app notification  
+2. Admin: Approve return  
+3. Customer: submit return tracking on order detail  
+4. Admin: Mark as Received  
+5. Admin: Process Refund (reason + amount) → Stripe test refund succeeds  
+6. Verify: Return refunded; Order refund fields; PaymentTransaction + destination; refund email; sidebar pending count drops  
+7. Optional negative: Process Refund **before** Received → blocked  
 
 ### Remaining work (not hidden)
 
-- Integration tests for create-return / process-refund routes (optional follow-up)
-- Browser E2E skipped per founder decision
-- Consolidate cancel/admin-order Stripe call sites into one service (hardening later)
-- Live Stripe verification on a real test order
+- **Founder:** run Stripe test-mode smoke test (checklist above)  
+- **Founder:** set `commerce.returns.warehouseAddress` in Admin → Commerce Settings when real street address is known (until then instruction emails tell customers to email `support@pawtag.co.nz`)  
+- Return contact setting is **email only** — no phone  
+- Customer emails for approved/rejected returns (follow-up if product wants them)  
+- Optional integration tests for create-return HTTP routes  
+- Live (non-test) Stripe validation before production launch  
+- Optional later: consolidate cancel/admin-order Stripe call sites into one service  
 
 ---
 
@@ -394,6 +400,7 @@ Use existing DESIGN.md tokens only:
 - Failure: `red-50` / `red-700`
 - Cards: `bg-white rounded-2xl shadow-sm border border-gray-100`
 - Admin density: smaller text, tables, explicit confirm dialogs for money
+- Pending returns badge/tile: amber — **never blinking**
 
 ---
 

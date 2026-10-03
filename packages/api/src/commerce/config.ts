@@ -107,8 +107,8 @@ export const COMMERCE_SETTINGS = {
   'commerce.refunds.maxAutoRetries': { default: '1', description: 'Maximum number of automatic refund retries' },
 
   // ─── Returns ──────────────────────────────────────────────
-  'commerce.returns.warehouseAddress': { default: '', description: 'Warehouse return address shown in return instruction emails (configure before launch)' },
-  'commerce.returns.warehouseContact': { default: '', description: 'Optional warehouse contact for returns' },
+  'commerce.returns.warehouseAddress': { default: '', description: 'Warehouse return address for instruction emails (configure real address in Admin when available)' },
+  'commerce.returns.warehouseContact': { default: 'support@pawtag.co.nz', description: 'Return contact email shown in return emails (email only — no phone)' },
   'commerce.returns.notificationEmail': { default: 'return@pawtag.co.nz', description: 'Admin email notified when customers submit return tracking' },
 
   // ─── Stripe ───────────────────────────────────────────────
