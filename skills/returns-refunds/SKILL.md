@@ -118,7 +118,7 @@ On successful `POST /api/customer/returns`:
 3. **Admin in-app notification** — `Notification.audience: 'admin'`, `type: 'return_requested'`.
 4. **CSR approve** — customer email CMS `return-approved` (ship instructions + warehouse address/contact).
 5. **CSR reject** — customer email CMS `return-rejected`.
-6. **Tracking submit** — admin email `return-tracking-admin` + customer `return-tracking-received`.
+6. **Tracking submit/edit** — allowed only while status is **`approved`** (until warehouse marks `received`). Customer can edit tracking if they made a mistake. Admin email `return-tracking-admin` + customer `return-tracking-received` on first submit. Activity `tracking_submitted` / `tracking_updated`.
 7. **Process Refund** — customer email `refund-processed-csr` + Stripe webhook refund emails.
 8. **Sidebar badge** — amber pending count.
 9. **Dashboard tile** — “Pending Returns” (no blinking).
