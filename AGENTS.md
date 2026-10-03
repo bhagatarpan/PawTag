@@ -2001,6 +2001,7 @@ skills/security-boundary-review/     Auth, ownership, RBAC, privacy, sensitive r
 skills/commerce-safety/               Stripe, checkout, orders, inventory, refunds, subscriptions
 skills/refund-visibility/             Refund destination truthfulness, ARN/arrival data, customer/CSR refund display
 skills/returns-refunds/               Customer returns, CSR Stripe refunds, warehouse receipt, refund-without-return
+skills/email-cms-templates/           Email CMS slugs, renderCmsEmail/sendCmsEmailOrFallback, auditMeta
 skills/cart-checkout-experience/      Mini-cart + premium full cart/checkout experience
 skills/pawtag-ui-ux/                  PawTag design system, accessibility, responsive UX
 skills/mobile-native/                 Expo/RN, SecureStore, QR, NFC, push, native validation

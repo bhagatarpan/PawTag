@@ -1,5 +1,5 @@
 import { Notification, Order, User, type IOrderDocument } from '@pawtag/db';
-import { sendMail } from './email.service';
+import { sendMail, sendCmsEmailOrFallback } from './email.service';
 import { sendPushToUser } from './push-notification.service';
 import {
   renderRefundProcessingEmail,
@@ -173,15 +173,32 @@ export async function notifyCustomerOfStatusChange(
     }).catch(() => {}),
   );
 
-  // Send email
+  // Send email — CMS first (order-status template), hardcoded fallback
   const emailConfig = STATUS_EMAILS[newStatus];
   if (emailConfig && email) {
+    const viewOrderUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/orders`;
+    const statusVars: Record<string, string> = {
+      orderNumber: order.orderNumber,
+      customerName,
+      status: newStatus,
+      viewOrderUrl,
+      trackingNumber: extra?.trackingNumber || '',
+      carrier: extra?.carrier || '',
+      trackingUrl: getTrackingUrl(extra?.carrier || '', extra?.trackingNumber || ''),
+      reason: extra?.reason || '',
+    };
     sideEffects.push(
-      sendMail(
-        email,
-        emailConfig.subject(order.orderNumber),
-        emailConfig.html(order.orderNumber, extra),
-      ).catch((err) => {
+      sendCmsEmailOrFallback({
+        slug: 'order-status',
+        to: email,
+        vars: statusVars,
+        fallbackSubject: emailConfig.subject(order.orderNumber),
+        fallbackHtml: emailConfig.html(order.orderNumber, extra),
+        businessFlow: 'orders_commerce',
+        relatedEntityType: 'order',
+        relatedEntityId: order._id.toString(),
+        relatedEntityDisplay: order.orderNumber,
+      }).catch((err) => {
         logger.error({ err, orderNumber: order.orderNumber, status: newStatus }, 'Order status email error');
       }),
     );
@@ -210,14 +227,31 @@ export async function notifyCustomerOfStatusChange(
     );
 
     if (adminEmail) {
+      // CMS slug for cancelled admin alert; refund-complete uses order-status fallback wording
+      const adminSlug = newStatus === 'cancelled' ? 'admin-order-alert' : 'order-status';
+      const adminFallbackSubject = `Order ${order.orderNumber} ${newStatus}`;
+      const adminFallbackHtml = newStatus === 'cancelled'
+        ? renderOrderCancelledAlertEmail(order.orderNumber, customerName, email || '', order.payment?.amount || 0, extra?.reason)
+        : renderOrderStatusEmail({ orderNumber: order.orderNumber, customerName, status: 'refunded', reason: extra?.reason, viewOrderUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/orders` });
       sideEffects.push(
-        sendMail(
-          adminEmail,
-          `Order ${order.orderNumber} ${newStatus}`,
-          newStatus === 'cancelled'
-            ? renderOrderCancelledAlertEmail(order.orderNumber, customerName, email || '', order.payment?.amount || 0, extra?.reason)
-            : renderRefundFailedAlertEmail(order.orderNumber, '', order.payment?.amount || 0, 'NZD', extra?.reason || 'Refund processed', customerName, email || '', ''),
-        ).catch((err) => {
+        sendCmsEmailOrFallback({
+          slug: adminSlug,
+          to: adminEmail,
+          vars: {
+            orderNumber: order.orderNumber,
+            customerName,
+            customerEmail: email || '',
+            status: newStatus,
+            amount: String(order.payment?.amount || 0),
+            reason: extra?.reason || '',
+          },
+          fallbackSubject: adminFallbackSubject,
+          fallbackHtml: adminFallbackHtml,
+          businessFlow: 'admin_system',
+          relatedEntityType: 'order',
+          relatedEntityId: order._id.toString(),
+          relatedEntityDisplay: order.orderNumber,
+        }).catch((err) => {
           logger.error({ err }, 'Admin cancellation/refund notification email error');
         }),
       );
@@ -280,11 +314,29 @@ export async function notifyRefundUpdate(
   const baseUrl = process.env.PUBLIC_WEB_URL || 'http://localhost:3000';
   const viewOrderUrl = `${baseUrl}/account/orders/${order._id}`;
 
-  // Customer email + push notification
+  // Customer email + push notification — CMS-first for refund lifecycle
   let subject = '';
   let html = '';
+  let cmsSlug = 'refund-processing';
+  let fallbackRendererHtml = '';
+
+  const refundVars: Record<string, string> = {
+    name: user.fullName || 'Customer',
+    orderNumber: order.orderNumber,
+    refundId,
+    amount: amount.toFixed(2),
+    currency,
+    expectedArrival: expectedArrival || '',
+    destination: destination || 'Original payment method',
+    arn: arn || '',
+    settledAt,
+    failureReason: failureReason || '',
+    willRetry: 'false',
+    viewOrderUrl,
+  };
 
   if (newStatus === 'pending') {
+    cmsSlug = 'refund-processing';
     subject = `Refund Processing — Order ${order.orderNumber}`;
     html = renderRefundProcessingEmail({
       name: user.fullName || 'Customer',
@@ -296,7 +348,9 @@ export async function notifyRefundUpdate(
       destination,
       viewOrderUrl,
     });
+    fallbackRendererHtml = html;
   } else if (newStatus === 'succeeded') {
+    cmsSlug = 'refund-settled';
     subject = `Refund Settled — Order ${order.orderNumber}`;
 
     // Look up credit note if it exists
@@ -307,7 +361,6 @@ export async function notifyRefundUpdate(
       const creditNote = await Invoice.findOne({ orderId: order._id, type: 'credit_note' }).sort({ createdAt: -1 }).lean();
       if (creditNote) {
         creditNoteNumber = creditNote.invoiceNumber;
-        // Use the order detail page which shows invoices and credit notes
         creditNoteUrl = `${baseUrl}/account/orders/${order._id}`;
       }
     } catch { /* non-critical */ }
@@ -325,9 +378,14 @@ export async function notifyRefundUpdate(
       creditNoteNumber,
       creditNoteUrl,
     });
+    fallbackRendererHtml = html;
+    refundVars.creditNoteNumber = creditNoteNumber || '';
+    refundVars.creditNoteUrl = creditNoteUrl || '';
   } else if (newStatus === 'failed') {
+    cmsSlug = 'refund-failed';
     subject = `Refund Update — Order ${order.orderNumber}`;
     const willRetry = (order.refundAttemptCount || 0) < 1;
+    refundVars.willRetry = willRetry ? 'true' : 'false';
     html = renderRefundFailedEmail({
       name: user.fullName || 'Customer',
       orderNumber: order.orderNumber,
@@ -339,6 +397,7 @@ export async function notifyRefundUpdate(
       willRetry,
       viewOrderUrl,
     });
+    fallbackRendererHtml = html;
   } else {
     // 'canceled' — no customer email, just log
     logger.info({ refundId, orderNumber: order.orderNumber }, 'Refund canceled — no customer email sent');
@@ -346,7 +405,17 @@ export async function notifyRefundUpdate(
   }
 
   await Promise.allSettled([
-    sendMail(user.email, subject, html).catch((err) => {
+    sendCmsEmailOrFallback({
+      slug: cmsSlug,
+      to: user.email,
+      vars: refundVars,
+      fallbackSubject: subject,
+      fallbackHtml: fallbackRendererHtml,
+      businessFlow: 'orders_commerce',
+      relatedEntityType: 'order',
+      relatedEntityId: order._id.toString(),
+      relatedEntityDisplay: order.orderNumber,
+    }).catch((err) => {
       logger.error({ err, refundId, email: user.email }, 'Refund email error');
     }),
     sendPushToUser(String(order.userId), subject, `Refund ${newStatus} for order ${order.orderNumber}`, {
@@ -373,11 +442,26 @@ export async function notifyRefundUpdate(
         channel: 'alert',
       }).catch(() => {}),
       adminEmail
-        ? sendMail(
-            adminEmail,
-            `[ACTION REQUIRED] Refund Failed — ${order.orderNumber}`,
-            renderRefundFailedAlertEmail(order.orderNumber, refundId, amount, currency, failureReason || 'Unknown', user.fullName, user.email, (order.refundAttemptCount || 0) < 1 ? 'Auto-retry scheduled in 2h.' : 'Manual intervention required.'),
-          ).catch(() => {})
+        ? sendCmsEmailOrFallback({
+            slug: 'admin-refund-failed',
+            to: adminEmail,
+            vars: {
+              orderNumber: order.orderNumber,
+              refundId,
+              amount: amount.toFixed(2),
+              currency,
+              failureReason: failureReason || 'Unknown',
+              customerName: user.fullName,
+              customerEmail: user.email,
+              retryNote: (order.refundAttemptCount || 0) < 1 ? 'Auto-retry scheduled in 2h.' : 'Manual intervention required.',
+            },
+            fallbackSubject: `[ACTION REQUIRED] Refund Failed — ${order.orderNumber}`,
+            fallbackHtml: renderRefundFailedAlertEmail(order.orderNumber, refundId, amount, currency, failureReason || 'Unknown', user.fullName, user.email, (order.refundAttemptCount || 0) < 1 ? 'Auto-retry scheduled in 2h.' : 'Manual intervention required.'),
+            businessFlow: 'admin_system',
+            relatedEntityType: 'order',
+            relatedEntityId: order._id.toString(),
+            relatedEntityDisplay: order.orderNumber,
+          }).catch(() => {})
         : Promise.resolve(),
     ]);
   }

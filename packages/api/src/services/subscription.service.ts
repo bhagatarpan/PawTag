@@ -530,7 +530,7 @@ export async function createGoldSubscription(userId: string, price?: number, pla
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
   const dashboardUrl = `${frontendUrl}/account/guardian`;
   try {
-    const { sendMail } = await import('./email.service');
+    const { sendMail, sendCmsEmailOrFallback } = await import('./email.service');
     const { renderMembershipWelcomeEmail } = await import('./email/templates/membership-welcome');
     const html = renderMembershipWelcomeEmail({
       customerName: user.fullName || 'there',
@@ -539,7 +539,20 @@ export async function createGoldSubscription(userId: string, price?: number, pla
       renewalDate: subscription.currentPeriodEnd?.toLocaleDateString('en-NZ', { dateStyle: 'full' }) || 'N/A',
       dashboardUrl,
     });
-    await sendMail(user.email, 'Welcome to PawTag Gold Membership', html);
+    await sendCmsEmailOrFallback({
+      slug: 'gold-welcome',
+      to: user.email,
+      vars: {
+        customerName: user.fullName || 'there',
+        tierName: 'Gold',
+        price: String(goldPrice),
+        renewalDate: subscription.currentPeriodEnd?.toLocaleDateString('en-NZ', { dateStyle: 'full' }) || 'N/A',
+        dashboardUrl,
+      },
+      fallbackSubject: 'Welcome to PawTag Gold Membership',
+      fallbackHtml: html,
+      businessFlow: 'subscriptions',
+    });
   } catch (err) {
     logger.error({ err, userId }, '[Gold] Failed to send welcome email');
   }
