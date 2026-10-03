@@ -133,11 +133,16 @@ export class RefundService {
       throw new RefundError('No payment intent found for this order');
     }
 
-    // 7. Process refund via Stripe
+    // 7. Process refund via Stripe — adapter maps free-text reason to Stripe enum
     const stripeResult = await stripePaymentProvider.createRefund({
       paymentIntentId,
       amount: refundAmount,
-      reason: params.reason as any,
+      reason: params.reason,
+      metadata: {
+        orderId: String(orderId),
+        orderNumber: order.orderNumber,
+        pawtagReason: (params.reason || '').slice(0, 490),
+      },
     });
 
     if (!stripeResult.success) {

@@ -327,7 +327,13 @@ export class ReturnRefundService {
     const stripeResult = await stripePaymentProvider.createRefund({
       paymentIntentId,
       amount: requestedAmount,
-      reason: reason as any,
+      // Free-text CSR reason — Stripe adapter maps to enum; original kept on Return/Order
+      reason,
+      metadata: {
+        returnId: String(ret._id),
+        orderNumber: order.orderNumber,
+        pawtagReason: reason.slice(0, 490),
+      },
     });
 
     if (!stripeResult.success || !stripeResult.refundId) {

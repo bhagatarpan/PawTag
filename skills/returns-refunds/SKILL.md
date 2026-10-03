@@ -13,7 +13,7 @@ description: Implement or review PawTag customer returns and refunds end-to-end.
 2. **Return request ≠ Stripe refund.** Creating/updating a Return document must not invent money movement.
 3. **Default money path requires warehouse receipt** (`received`) before Process Refund.
 4. **Refund without return** is an explicit exception: permission `order.refund`, required reason, CSR identity, audit, `refundWithoutReturn=true`.
-5. **Reason is mandatory** for every refund request (customer and admin). Validate server-side.
+5. **Reason is mandatory** for every refund request (customer and admin). Validate server-side as **free text**. Stripe refund `reason` is a **provider enum** (`duplicate|fraudulent|requested_by_customer`) mapped in the Stripe adapter (`mapStripeRefundReason`); original PawTag reason is stored on Return/Order and in Stripe metadata `pawtagReason`.
 6. **Server owns amounts.** Client estimates are display only.
 7. **Stripe refund destination is always the original payment method.**
 8. **Never mark refunded unless Stripe accepted** the refund request.
