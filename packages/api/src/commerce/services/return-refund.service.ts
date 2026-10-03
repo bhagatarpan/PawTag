@@ -10,7 +10,7 @@
 import { Order, PaymentTransaction, Return, User, type IReturnDocument } from '@pawtag/db';
 import { stripePaymentProvider } from '../providers/stripe';
 import { getBooleanSetting, getNumberSetting } from '../config';
-import { formatRefundDestination } from '@pawtag/shared';
+import { formatRefundDestination, getTrackingUrl } from '@pawtag/shared';
 import logger from '../../lib/logger';
 
 export interface ProcessReturnRefundParams {
@@ -39,10 +39,35 @@ export interface ProcessReturnRefundResult {
   error?: string;
   order?: any;
   returnDocument?: IReturnDocument;
+  remainingRefundable?: number;
+  alreadyRefunded?: number;
+  capturedAmount?: number;
 }
 
-function toCents(amount: number): number {
+export function toCents(amount: number): number {
   return Math.round(amount * 100);
+}
+
+export function fromCents(cents: number): number {
+  return cents / 100;
+}
+
+/**
+ * Pure remaining-balance math in integer cents.
+ */
+export function computeRemainingRefundCents(
+  capturedCents: number,
+  alreadyRefundedCents: number,
+): number {
+  return Math.max(0, capturedCents - alreadyRefundedCents);
+}
+
+export function isFullRefundAmount(
+  capturedCents: number,
+  alreadyRefundedCents: number,
+  requestedCents: number,
+): boolean {
+  return alreadyRefundedCents + requestedCents >= capturedCents;
 }
 
 function pushReturnActivity(
@@ -64,6 +89,52 @@ function pushReturnActivity(
     actorType: entry.actorType,
     metadata: entry.metadata,
   });
+}
+
+/**
+ * Update Order item + Return item refunded quantities after a successful refund.
+ * Display/enforcement state only — money truth remains PaymentTransaction.
+ */
+export async function applyItemRefundState(
+  order: any,
+  ret: IReturnDocument,
+  requestedAmount: number,
+): Promise<void> {
+  const returnLineTotal = (ret.items || []).reduce((sum, item) => {
+    const unit = Number(item.unitPrice ?? 0);
+    const custom = Number(item.customizationTotal ?? 0);
+    const qty = Number(item.quantity ?? 0);
+    return sum + (unit + custom) * qty;
+  }, 0);
+
+  const refundRatio = returnLineTotal > 0 ? Math.min(1, requestedAmount / returnLineTotal) : 1;
+
+  for (const returnItem of ret.items || []) {
+    const qty = Number(returnItem.quantity || 0);
+    const refundedQty = Math.round(qty * refundRatio);
+    returnItem.refundedQuantity = Math.min(qty, (Number(returnItem.refundedQuantity) || 0) + refundedQty);
+
+    const orderItem = (order.items || []).find((oi: any) => {
+      const itemId = String((oi as any)._id || oi.productId);
+      const returnItemId = String(returnItem.orderItemId);
+      return itemId === returnItemId || String(oi.productId) === returnItemId;
+    });
+
+    if (orderItem) {
+      const prevRefunded = Number(orderItem.refundedQuantity || 0);
+      const nextRefunded = Math.min(
+        Number(orderItem.quantity || 0),
+        prevRefunded + refundedQty,
+      );
+      orderItem.refundedQuantity = nextRefunded;
+      if (nextRefunded <= 0) orderItem.refundStatus = 'none';
+      else if (nextRefunded >= Number(orderItem.quantity || 0)) orderItem.refundStatus = 'refunded';
+      else orderItem.refundStatus = 'partial';
+    }
+  }
+
+  await ret.save();
+  await order.save();
 }
 
 export class ReturnRefundService {
@@ -192,8 +263,19 @@ export class ReturnRefundService {
       return { success: false, error: 'Invalid refund amount' };
     }
 
-    // Remaining refundable balance (cents for safety)
+    const requestedCents = toCents(requestedAmount);
     const capturedCents = toCents(capturedAmount);
+
+    // Partial refund setting
+    const partialEnabled = await getBooleanSetting('commerce.refunds.partialEnabled');
+    if (!partialEnabled && requestedCents < capturedCents) {
+      return {
+        success: false,
+        error: 'Partial refunds are disabled in commerce settings',
+      };
+    }
+
+    // Remaining refundable balance (cents for safety) — re-read before Stripe
     const refundedTx = await PaymentTransaction.find({
       orderId: order._id,
       type: 'refund',
@@ -203,15 +285,17 @@ export class ReturnRefundService {
       (sum, t) => sum + toCents(Number(t.amount || 0)),
       0,
     );
-    const remainingCents = capturedCents - alreadyRefundedCents;
-    const requestedCents = toCents(requestedAmount);
+    const remainingCents = computeRemainingRefundCents(capturedCents, alreadyRefundedCents);
 
     if (requestedCents > remainingCents) {
       return {
         success: false,
         error:
           `Refund amount $${requestedAmount.toFixed(2)} exceeds remaining refundable ` +
-          `$${(remainingCents / 100).toFixed(2)}. Already refunded $${(alreadyRefundedCents / 100).toFixed(2)}.`,
+          `$${fromCents(remainingCents).toFixed(2)}. Already refunded $${fromCents(alreadyRefundedCents).toFixed(2)}.`,
+        remainingRefundable: fromCents(remainingCents),
+        alreadyRefunded: fromCents(alreadyRefundedCents),
+        capturedAmount,
       };
     }
 
@@ -225,7 +309,6 @@ export class ReturnRefundService {
     if (ret.refundExceptionReason === undefined && params.refundWithoutReturn) {
       ret.refundExceptionReason = params.exceptionReason?.trim();
     }
-    // Keep refundReason preference on return via notes if needed
     ret.refundAmount = requestedAmount;
     ret.refundStatus = 'pending';
     pushReturnActivity(ret, {
@@ -290,13 +373,14 @@ export class ReturnRefundService {
         error: ret.refundFailureReason,
         refundStatus: 'failed',
         returnDocument: ret,
+        remainingRefundable: fromCents(remainingCents),
+        alreadyRefunded: fromCents(alreadyRefundedCents),
+        capturedAmount,
       };
     }
 
     // Success path — persist provider truth
-    const isFullRefund = requestedCents >= remainingCents && alreadyRefundedCents === 0
-      ? requestedCents >= capturedCents
-      : alreadyRefundedCents + requestedCents >= capturedCents;
+    const isFullRefund = isFullRefundAmount(capturedCents, alreadyRefundedCents, requestedCents);
 
     ret.refundId = stripeResult.refundId;
     ret.refundStatus = stripeResult.status === 'pending' ? 'pending' : 'succeeded';
@@ -312,13 +396,10 @@ export class ReturnRefundService {
     } else {
       ret.refundWithoutReturn = false;
     }
-    ret.status = ret.refundStatus === 'succeeded' ? 'refunded' : ret.status;
-    // If stripe still pending, keep received or approved; money path continues via webhook
-    if (ret.refundStatus === 'pending' && ret.status !== 'received') {
-      ret.status = 'received';
-    }
     if (ret.refundStatus === 'succeeded') {
       ret.status = 'refunded';
+    } else if (ret.refundStatus === 'pending' && ret.status !== 'received') {
+      ret.status = 'received';
     }
 
     pushReturnActivity(ret, {
@@ -344,6 +425,9 @@ export class ReturnRefundService {
     if (isFullRefund) {
       order.status = 'refunded';
       order.payment.status = 'refunded';
+    } else {
+      // Partial refund: keep delivered/shipped/paid — do not claim full refund
+      order.payment.status = order.payment.status;
     }
     order.refundReason = reason;
     if (stripeResult.refundId) order.refundId = stripeResult.refundId;
@@ -351,7 +435,6 @@ export class ReturnRefundService {
     if (stripeResult.arn) order.refundArn = stripeResult.arn;
     if (ret.refundExpectedArrival) order.refundExpectedArrival = ret.refundExpectedArrival;
     order.refundLastSyncedAt = new Date();
-    await order.save();
 
     await PaymentTransaction.create({
       orderId: order._id,
@@ -370,6 +453,17 @@ export class ReturnRefundService {
       refundDestination: destination,
     });
 
+    // Item-level state (display/enforcement)
+    if (ret.refundStatus === 'succeeded' || ret.refundStatus === 'pending') {
+      try {
+        await applyItemRefundState(order, ret, requestedAmount);
+      } catch (itemErr) {
+        logger.error({ err: itemErr, returnId: ret._id }, 'Failed to update item refund state');
+      }
+    } else {
+      await order.save();
+    }
+
     await Order.updateOne(
       { _id: order._id },
       {
@@ -386,6 +480,7 @@ export class ReturnRefundService {
               reason,
               refundWithoutReturn: Boolean(ret.refundWithoutReturn),
               destination,
+              isFullRefund,
             },
           },
         },
@@ -403,6 +498,7 @@ export class ReturnRefundService {
         actor: params.actor.id,
         actorType: params.actor.type,
         refundWithoutReturn: Boolean(ret.refundWithoutReturn),
+        isFullRefund,
       },
       'Return refund processed successfully',
     );
@@ -435,8 +531,44 @@ export class ReturnRefundService {
       expectedArrival: ret.refundExpectedArrival,
       order,
       returnDocument: ret,
+      remainingRefundable: fromCents(remainingCents - requestedCents),
+      alreadyRefunded: fromCents(alreadyRefundedCents + requestedCents),
+      capturedAmount,
+    };
+  }
+
+  /**
+   * Read remaining refundable balance for admin UI.
+   */
+  async getBalance(orderId: string): Promise<{
+    capturedAmount: number;
+    alreadyRefunded: number;
+    remainingRefundable: number;
+  }> {
+    const order = await Order.findById(orderId);
+    if (!order) {
+      throw new Error('Order not found');
+    }
+    const capturedAmount = Number(order.payment?.amount || 0);
+    const refundedTx = await PaymentTransaction.find({
+      orderId: order._id,
+      type: 'refund',
+      status: { $in: ['succeeded', 'pending'] },
+    }).select('amount');
+    const alreadyRefundedCents = refundedTx.reduce(
+      (sum, t) => sum + toCents(Number(t.amount || 0)),
+      0,
+    );
+    const capturedCents = toCents(capturedAmount);
+    return {
+      capturedAmount,
+      alreadyRefunded: fromCents(alreadyRefundedCents),
+      remainingRefundable: fromCents(computeRemainingRefundCents(capturedCents, alreadyRefundedCents)),
     };
   }
 }
 
 export const returnRefundService = new ReturnRefundService();
+
+// Re-export for consumers that need tracking URL on returns
+export { getTrackingUrl };

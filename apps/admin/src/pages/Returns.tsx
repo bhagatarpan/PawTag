@@ -15,7 +15,7 @@ interface ReturnRequest {
   userId: { fullName: string; email: string; phoneNumber?: string } | string;
   status: 'pending' | 'approved' | 'rejected' | 'received' | 'refunded' | 'refund_failed';
   reason: string;
-  items: Array<{ productName: string; quantity: number; reason?: string; unitPrice?: number }>;
+  items: Array<{ productName: string; quantity: number; reason?: string; unitPrice?: number; refundedQuantity?: number }>;
   refundAmount?: number;
   refundId?: string;
   refundStatus?: string;
@@ -25,8 +25,15 @@ interface ReturnRequest {
   refundFailureReason?: string;
   returnShipProvider?: string;
   returnTrackingNumber?: string;
+  returnTrackingUrl?: string;
+  returnTrackingSubmittedAt?: string;
+  returnTrackingSource?: string;
   createdAt: string;
-  orderId?: { status?: string; payment?: { amount?: number; currency?: string; cardBrand?: string; cardLast4?: string } };
+  orderId?: {
+    _id?: string;
+    status?: string;
+    payment?: { amount?: number; currency?: string; cardBrand?: string; cardLast4?: string };
+  };
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
@@ -179,7 +186,38 @@ export default function Returns() {
                 <div className="flex justify-between"><span className="text-gray-500">Default refund amount</span><span className="font-semibold">${Number(selected.refundAmount).toFixed(2)}</span></div>
               )}
               {selected.returnTrackingNumber && (
-                <div className="flex justify-between"><span className="text-gray-500">Return tracking</span><span className="font-mono">{selected.returnShipProvider} {selected.returnTrackingNumber}</span></div>
+                <div className="flex justify-between gap-2">
+                  <span className="text-gray-500">Return tracking</span>
+                  <span className="font-mono text-xs text-right">
+                    {selected.returnShipProvider} {selected.returnTrackingNumber}
+                    {selected.returnTrackingUrl && (
+                      <>
+                        {' · '}
+                        <a href={selected.returnTrackingUrl} target="_blank" rel="noopener noreferrer" className="text-teal-600 underline">
+                          Track
+                        </a>
+                      </>
+                    )}
+                    {selected.returnTrackingSubmittedAt && (
+                      <span className="block text-gray-400 font-normal">
+                        {new Date(selected.returnTrackingSubmittedAt).toLocaleString('en-NZ')} · {selected.returnTrackingSource || 'customer'}
+                      </span>
+                    )}
+                  </span>
+                </div>
+              )}
+              {selected.orderId?.payment?.amount != null && (
+                <div className="pt-2 border-t border-gray-100 text-xs text-gray-500 space-y-1">
+                  <div className="flex justify-between">
+                    <span>Order captured</span>
+                    <span>${Number(selected.orderId.payment.amount).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Return default amount</span>
+                    <span>${Number(selected.refundAmount || 0).toFixed(2)}</span>
+                  </div>
+                  <p>Remaining refundable is re-checked server-side when Process Refund runs.</p>
+                </div>
               )}
               {selected.refundId && (
                 <div className="flex justify-between"><span className="text-gray-500">Stripe refund</span><span className="font-mono text-xs">{selected.refundId}</span></div>

@@ -106,6 +106,11 @@ export const COMMERCE_SETTINGS = {
   'commerce.refunds.retrySecondHours': { default: '24', description: 'Hours to wait before second auto-retry of failed refund' },
   'commerce.refunds.maxAutoRetries': { default: '1', description: 'Maximum number of automatic refund retries' },
 
+  // ─── Returns ──────────────────────────────────────────────
+  'commerce.returns.warehouseAddress': { default: '', description: 'Warehouse return address shown in return instruction emails (configure before launch)' },
+  'commerce.returns.warehouseContact': { default: '', description: 'Optional warehouse contact for returns' },
+  'commerce.returns.notificationEmail': { default: 'return@pawtag.co.nz', description: 'Admin email notified when customers submit return tracking' },
+
   // ─── Stripe ───────────────────────────────────────────────
   'commerce.stripe.statementDescriptor': { default: 'PAWTAG NZ', description: 'Text shown on customer bank statement' },
   'commerce.stripe.descriptionTemplate': { default: 'PawTag Order {orderNumber}', description: 'Template for Stripe charge description. Use {orderNumber}, {itemCount}' },

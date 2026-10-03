@@ -51,7 +51,7 @@ import {
   MembershipTier,
 } from '@pawtag/db';
 import { stripePaymentProvider } from '../commerce/providers/stripe';
-import { getNumberSetting } from '../commerce/config';
+import { getNumberSetting, getBooleanSetting } from '../commerce/config';
 import { auditService, type AuditContext } from '../services/audit';
 import { createAuditContextFromRequest, type AuditRequest } from '../middleware/audit';
 import { hashPassword, generateSecureToken, hashToken } from '../services/auth.service';
@@ -2961,10 +2961,36 @@ router.post('/orders/:id/refund', requirePermission('order.update'), async (req:
       return;
     }
 
-    // Validate refund amount
+    // Validate refund amount against remaining refundable balance
     const refundAmount = amount || order.payment.amount;
     if (refundAmount <= 0 || refundAmount > order.payment.amount) {
       res.status(400).json({ success: false, error: `Invalid refund amount: $${refundAmount}. Must be between $0.01 and $${order.payment.amount}` });
+      return;
+    }
+
+    const partialEnabled = await getBooleanSetting('commerce.refunds.partialEnabled');
+    const capturedCents = Math.round(order.payment.amount * 100);
+    const requestedCents = Math.round(refundAmount * 100);
+    if (!partialEnabled && requestedCents < capturedCents) {
+      res.status(400).json({ success: false, error: 'Partial refunds are disabled in commerce settings' });
+      return;
+    }
+
+    const existingRefundTx = await PaymentTransaction.find({
+      orderId: order._id,
+      type: 'refund',
+      status: { $in: ['succeeded', 'pending'] },
+    }).select('amount');
+    const alreadyRefundedCents = existingRefundTx.reduce(
+      (sum, t) => sum + Math.round(Number(t.amount || 0) * 100),
+      0,
+    );
+    const remainingCents = Math.max(0, capturedCents - alreadyRefundedCents);
+    if (requestedCents > remainingCents) {
+      res.status(400).json({
+        success: false,
+        error: `Refund amount $${refundAmount.toFixed(2)} exceeds remaining refundable $${(remainingCents / 100).toFixed(2)}`,
+      });
       return;
     }
 
@@ -3013,12 +3039,16 @@ router.post('/orders/:id/refund', requirePermission('order.update'), async (req:
     }
 
     const previousStatus = order.status;
-    order.status = 'refunded';
+    const isFullRefund = alreadyRefundedCents + requestedCents >= capturedCents;
+    // Only mark the whole order refunded when the capture is fully refunded
+    if (isFullRefund) {
+      order.status = 'refunded';
+      order.payment.status = 'refunded';
+    }
     order.refundReason = reason;
     order.refundId = refundResult.refundId;
     order.refundStatus = (refundResult.status as any) || 'pending';
     order.refundLastSyncedAt = new Date();
-    order.payment.status = 'refunded';
     order.refundedBy = refundedBy;
     order.refundedByType = actor.displayName;
     order.refundedByPortal = 'admin-web';

@@ -48,7 +48,7 @@ vi.mock('../../packages/api/src/services/email.service', () => ({
   sendMail: vi.fn(async () => true),
 }));
 
-import { returnRefundService } from '../../packages/api/src/commerce/services/return-refund.service';
+import { returnRefundService, computeRemainingRefundCents, isFullRefundAmount } from '../../packages/api/src/commerce/services/return-refund.service';
 import { stripePaymentProvider } from '../../packages/api/src/commerce/providers/stripe';
 
 function chainable(obj: Record<string, any>) {
@@ -244,5 +244,52 @@ describe('returnRefundService.processRefund', () => {
 
     expect(result.success).toBe(true);
     expect(ret.refundWithoutReturn).toBe(true);
+  });
+
+  it('rejects amount above remaining refundable balance', async () => {
+    const ret = chainable({
+      _id: 'r1',
+      status: 'received',
+      refundAmount: 100,
+      items: [],
+      reason: 'damaged',
+      orderId: 'o1',
+      orderNumber: 'WO-000486',
+    });
+    findByIdMock.mockReturnValue(ret);
+
+    orderFindByIdMock.mockReturnValue(chainable({
+      _id: 'o1',
+      orderNumber: 'WO-000486',
+      status: 'delivered',
+      userId: 'u1',
+      payment: {
+        amount: 50,
+        currency: 'NZD',
+        paidAt: new Date(),
+        stripePaymentIntentId: 'pi_test',
+      },
+    }));
+
+    paymentFindMock.mockImplementation(() => ({
+      select: vi.fn().mockResolvedValue([{ amount: 40 }]),
+    }));
+
+    const result = await returnRefundService.processRefund({
+      returnId: 'r1',
+      amount: 20,
+      reason: 'too much',
+      actor: { id: 'admin1', type: 'admin' },
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/exceeds remaining/i);
+    expect(stripePaymentProvider.createRefund).not.toHaveBeenCalled();
+  });
+
+  it('exposes remaining balance helpers for multi-refund math', () => {
+    expect(computeRemainingRefundCents(20000, 5000)).toBe(15000);
+    expect(isFullRefundAmount(20000, 5000, 15000)).toBe(true);
+    expect(isFullRefundAmount(20000, 5000, 14999)).toBe(false);
   });
 });

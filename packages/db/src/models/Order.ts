@@ -24,6 +24,9 @@ export interface IOrderDocument extends Document {
     totalPrice: number;
     customizationTotal?: number;
     customisationTexts?: string[];
+    /** Derived return/refund display state (not a second money ledger) */
+    refundedQuantity?: number;
+    refundStatus?: 'none' | 'partial' | 'refunded';
   }>;
   subtotal?: number;
   shippingCost?: number;
@@ -128,6 +131,8 @@ const OrderSchema = new Schema<IOrderDocument>(
         totalPrice: { type: Number, required: true },
         customizationTotal: { type: Number, default: 0 },
         customisationTexts: { type: [String], default: [] },
+        refundedQuantity: { type: Number, default: 0, min: 0 },
+        refundStatus: { type: String, enum: ['none', 'partial', 'refunded'], default: 'none' },
       },
     ],
     subtotal: { type: Number },
