@@ -339,7 +339,13 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 
 /**
  * POST /api/customer/returns/:id/tracking
- * Customer submits return shipment tracking after CSR approval.
+ * Customer submits or **edits** return shipment tracking after CSR approval.
+ * Allowed until warehouse marks return received... wait — user said until received.
+ * Business rule: customer can edit until warehouse marks it as received.
+ * So allowed statuses: approved only for edit? User said "until warehouse mark it as received"
+ * Meaning they can edit until received is set - so approved AND after tracking when still approved.
+ * Once received, cannot edit.
+ *
  * Does NOT mark warehouse received — tracking ≠ receipt.
  */
 router.post('/:id/tracking', validate(trackingSchema), async (req: AuthRequest, res: Response) => {
@@ -357,11 +363,14 @@ router.post('/:id/tracking', validate(trackingSchema), async (req: AuthRequest, 
       return;
     }
 
-    // Tracking only after CSR approval (or already received awaiting refund)
-    if (!['approved', 'received'].includes(ret.status)) {
+    // Submit or edit tracking only while return is approved (before warehouse receipt)
+    if (ret.status !== 'approved') {
       res.status(400).json({
         success: false,
-        error: 'You can submit return tracking after your return is approved',
+        error:
+          ret.status === 'received'
+            ? 'Return tracking can no longer be edited — the warehouse has marked this return as received'
+            : 'You can submit return tracking after your return is approved',
       });
       return;
     }
@@ -381,7 +390,13 @@ router.post('/:id/tracking', validate(trackingSchema), async (req: AuthRequest, 
     const url = String(trackingUrl || '').trim().slice(0, 500);
     const safeUrl = url && /^https?:\/\//i.test(url) ? url : getTrackingUrl(cleanProvider, cleanTracking) || undefined;
 
-    const isFirstSubmit = !ret.returnTrackingNumber;
+    const previousTracking = ret.returnTrackingNumber
+      ? `${ret.returnShipProvider || ''} ${ret.returnTrackingNumber}`.trim()
+      : null;
+    const isFirstSubmit = !previousTracking;
+    const isEdit = Boolean(previousTracking) && (
+      previousTracking !== `${cleanProvider} ${cleanTracking}`.trim()
+    );
     const user = await User.findById(userId).select('fullName email phoneNumber').lean();
 
     ret.returnShipProvider = cleanProvider;
@@ -392,12 +407,19 @@ router.post('/:id/tracking', validate(trackingSchema), async (req: AuthRequest, 
     ret.returnTrackingSource = 'customer';
     if (!ret.activity) ret.activity = [];
     ret.activity.push({
-      type: 'tracking_submitted',
-      message: `Customer submitted return tracking ${cleanProvider} ${cleanTracking}`,
+      type: isEdit ? 'tracking_updated' : 'tracking_submitted',
+      message: isEdit
+        ? `Customer updated return tracking to ${cleanProvider} ${cleanTracking}`
+        : `Customer submitted return tracking ${cleanProvider} ${cleanTracking}`,
       timestamp: new Date(),
       actor: user?.email || userId,
       actorType: 'customer',
-      metadata: { provider: cleanProvider, trackingNumber: cleanTracking, trackingUrl: safeUrl },
+      metadata: {
+        provider: cleanProvider,
+        trackingNumber: cleanTracking,
+        trackingUrl: safeUrl,
+        previousTracking: previousTracking || undefined,
+      },
     });
     await ret.save();
 
@@ -406,11 +428,18 @@ router.post('/:id/tracking', validate(trackingSchema), async (req: AuthRequest, 
       {
         $push: {
           activity: {
-            type: 'tracking_submitted',
-            message: `Return tracking submitted: ${cleanProvider} ${cleanTracking}`,
+            type: isEdit ? 'tracking_updated' : 'tracking_submitted',
+            message: isEdit
+              ? `Return tracking updated: ${cleanProvider} ${cleanTracking}`
+              : `Return tracking submitted: ${cleanProvider} ${cleanTracking}`,
             timestamp: new Date(),
             actor: 'customer',
-            metadata: { returnId: String(ret._id), provider: cleanProvider, trackingNumber: cleanTracking },
+            metadata: {
+              returnId: String(ret._id),
+              provider: cleanProvider,
+              trackingNumber: cleanTracking,
+              previousTracking: previousTracking || undefined,
+            },
           },
         },
       },
@@ -424,12 +453,13 @@ router.post('/:id/tracking', validate(trackingSchema), async (req: AuthRequest, 
         const order = await Order.findById(ret.orderId).select('orderNumber userId payment.amount payment.currency').lean();
         const orderUser = await User.findById(ret.userId).select('fullName email phoneNumber').lean();
         const html = `
-          <p><strong>Return tracking submitted</strong></p>
+          <p><strong>${isEdit ? 'Return tracking updated' : 'Return tracking submitted'}</strong></p>
           <p>Customer: ${orderUser?.fullName || 'Unknown'} (${orderUser?.email || ''})${orderUser?.phoneNumber ? ` · ${orderUser.phoneNumber}` : ''}</p>
           <p>Order: ${ret.orderNumber}</p>
           <p>Return ID: ${ret._id}</p>
           <p>Items: ${(ret.items || []).map((i) => `${i.productName} × ${i.quantity}`).join(', ')}</p>
           <p>Refund amount requested: $${Number(ret.refundAmount || 0).toFixed(2)} ${order?.payment?.currency || 'NZD'}</p>
+          ${previousTracking ? `<p>Previous tracking: ${previousTracking}</p>` : ''}
           <p>Carrier: ${cleanProvider}</p>
           <p>Tracking: ${cleanTracking}</p>
           ${safeUrl ? `<p>Tracking URL: ${safeUrl}</p>` : ''}
@@ -446,6 +476,7 @@ router.post('/:id/tracking', validate(trackingSchema), async (req: AuthRequest, 
             trackingNumber: cleanTracking,
             trackingUrl: safeUrl || '',
             returnId: String(ret._id),
+            previousTracking: previousTracking || '',
           },
           fallbackSubject: `Return tracking — ${ret.orderNumber}`,
           fallbackHtml: html,
@@ -460,7 +491,7 @@ router.post('/:id/tracking', validate(trackingSchema), async (req: AuthRequest, 
       logger.error({ err, returnId: ret._id }, 'Return tracking admin notification failed');
     }
 
-    // Customer confirmation
+    // Customer confirmation — first submit only (edits already visible on order)
     try {
       if (user?.email && isFirstSubmit) {
         const { sendCmsEmailOrFallback } = await import('../services/email.service');
