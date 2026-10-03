@@ -507,7 +507,11 @@ export class ReturnRefundService {
     try {
       const user = await User.findById(order.userId).select('email fullName').lean();
       if (user?.email) {
-        const { sendMail } = await import('../../services/email.service');
+        const { sendCmsEmailOrFallback } = await import('../../services/email.service');
+        const destination = formatRefundDestination(
+          order.payment?.cardBrand,
+          order.payment?.cardLast4,
+        );
         const html = `
           <p>Hi ${user.fullName || 'there'},</p>
           <p>We processed a refund of <strong>$${requestedAmount.toFixed(2)} ${order.payment?.currency || 'NZD'}</strong> for order <strong>${order.orderNumber}</strong>.</p>
@@ -516,7 +520,24 @@ export class ReturnRefundService {
           ${stripeResult.arn ? `<p>ARN: ${stripeResult.arn}</p>` : ''}
           <p>Refunds typically appear on your statement within 5–10 business days.</p>
         `;
-        await sendMail(user.email, `Refund processed — ${order.orderNumber}`, html).catch(() => {});
+        await sendCmsEmailOrFallback({
+          slug: 'refund-processed-csr',
+          to: user.email,
+          vars: {
+            customerName: user.fullName || 'there',
+            orderNumber: order.orderNumber,
+            amount: requestedAmount.toFixed(2),
+            currency: order.payment?.currency || 'NZD',
+            destination,
+            refundId: stripeResult.refundId || '',
+            arn: stripeResult.arn || '',
+          },
+          fallbackSubject: `Refund processed — ${order.orderNumber}`,
+          fallbackHtml: html,
+          businessFlow: 'orders_commerce',
+          relatedEntityType: 'order',
+          relatedEntityId: String(order._id),
+        }).catch(() => {});
       }
     } catch (err) {
       logger.error({ err, returnId: ret._id }, 'Failed to send return refund email');

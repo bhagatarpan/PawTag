@@ -794,35 +794,41 @@ export async function cancelSubscription(
 
   await subscription.save();
 
-  // Send cancellation confirmation email
+  // Send cancellation confirmation email — CMS-first
   try {
     const user = await User.findById(userId).select('fullName email').lean();
     if (user?.email) {
-      const { sendMail } = await import('./email.service');
       const cancelledAt = subscription.cancelledAt!.toLocaleDateString('en-NZ', { dateStyle: 'full' });
       const benefitsUntil = subscription.currentPeriodEnd?.toLocaleDateString('en-NZ', { dateStyle: 'full' }) || 'current billing period';
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      const planName = subscription.planName || 'PawTag Subscription';
 
-      // Standard cancellation email
       const { renderCancellationEmail } = await import('./email/templates/cancellation');
+      const { sendCmsEmailOrFallback } = await import('./email.service');
       const html = renderCancellationEmail({
         name: user.fullName || 'there',
-        planName: subscription.planName || 'PawTag Subscription',
+        planName,
         cancelledAt,
         currentPeriodEnd: benefitsUntil,
       });
-      const subject = `Your ${subscription.planName || 'PawTag'} subscription has been cancelled`;
-
-      await sendMail(user.email, subject, html, undefined, {
-        templateSlug: 'cancellation',
-        businessFlow: 'subscription',
+      await sendCmsEmailOrFallback({
+        slug: 'subscription-cancellation',
+        to: user.email,
+        vars: {
+          customerName: user.fullName || 'there',
+          planName,
+          benefitsUntil,
+          subscriptionsUrl: `${frontendUrl}/account/subscriptions`,
+        },
+        fallbackSubject: `Your ${planName} subscription has been cancelled`,
+        fallbackHtml: html,
+        businessFlow: 'subscriptions',
         relatedEntityType: 'subscription',
-        relatedEntityId: subscription._id.toString(),
-        relatedEntityDisplay: subscription.planName || 'Subscription',
-      }).catch(() => {});
+        relatedEntityId: String(subscription._id),
+      }).catch((err) => logger.error({ err, subscriptionId: subscription._id }, 'Subscription cancellation email error'));
     }
-  } catch (emailErr) {
-    logger.error({ err: emailErr, subscriptionId: subscription._id }, 'Failed to send cancellation email');
+  } catch (err) {
+    logger.error({ err, subscriptionId: subscription._id }, 'Subscription cancellation email error');
   }
 
   // Log audit event with request context when available

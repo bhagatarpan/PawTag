@@ -164,19 +164,19 @@ router.post('/', validate(createReturnSchema), async (req: AuthRequest, res: Res
     // Customer confirmation email — warehouse address only in email (product decision)
     try {
       if (requester?.email) {
-        const { sendMail } = await import('../services/email.service');
+        const { sendCmsEmailOrFallback } = await import('../services/email.service');
         const warehouseAddress = (await getSetting('commerce.returns.warehouseAddress')) || '';
         const returnContact = (await getSetting('commerce.returns.warehouseContact')) || 'support@pawtag.co.nz';
         const itemLines = returnItems
-          .map((i: { productName: string; quantity: number }) => `• ${i.productName} × ${i.quantity}`)
-          .join('<br>');
+          .map((i: { productName: string; quantity: number }) => `${i.productName} × ${i.quantity}`)
+          .join(', ');
         const addressBlock = warehouseAddress.trim()
           ? `<p><strong>Return address:</strong><br>${warehouseAddress.replace(/\n/g, '<br>')}</p>`
           : `<p>PawTag does not provide return shipping. Please email <strong>${returnContact}</strong> for the current warehouse return address before you ship.</p>`;
         const html = `
           <p>Hi ${requester.fullName || 'there'},</p>
           <p>We've received your return request for order <strong>${order.orderNumber}</strong>.</p>
-          <p><strong>Items:</strong><br>${itemLines}</p>
+          <p><strong>Items:</strong><br>${returnItems.map((i: { productName: string; quantity: number }) => `• ${i.productName} × ${i.quantity}`).join('<br>')}</p>
           <p><strong>Estimated refund:</strong> $${refundAmount.toFixed(2)} ${order.payment?.currency || 'NZD'}</p>
           <p><strong>Reason:</strong> ${reason}</p>
           <p>Our team will review it within 1–2 business days.</p>
@@ -184,7 +184,25 @@ router.post('/', validate(createReturnSchema), async (req: AuthRequest, res: Res
           ${addressBlock}
           <p>You'll be able to add return tracking on your order after you ship.</p>
         `;
-        await sendMail(requester.email, `Return request received — ${order.orderNumber}`, html).catch(() => {});
+        await sendCmsEmailOrFallback({
+          slug: 'return-request-received',
+          to: requester.email,
+          vars: {
+            customerName: requester.fullName || 'there',
+            orderNumber: order.orderNumber,
+            items: itemLines,
+            refundAmount: refundAmount.toFixed(2),
+            reason,
+            warehouseAddress,
+            returnContact,
+          },
+          fallbackSubject: `Return request received — ${order.orderNumber}`,
+          fallbackHtml: html,
+          businessFlow: 'orders_commerce',
+          relatedEntityType: 'order',
+          relatedEntityId: String(order._id),
+          relatedEntityDisplay: order.orderNumber,
+        }).catch(() => {});
       }
     } catch (err) {
       logger.error({ err, orderId }, 'Failed to send return request email');
@@ -215,10 +233,29 @@ router.post('/', validate(createReturnSchema), async (req: AuthRequest, res: Res
         <p>Return ID: ${returnRequest._id}</p>
         <p><a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/admin/returns">Open Returns in Admin</a></p>
       `;
-      const { sendMail } = await import('../services/email.service');
+      const { sendCmsEmailOrFallback } = await import('../services/email.service');
       await Promise.all(
         recipients.map((email) =>
-          sendMail(email, `New return request — ${order.orderNumber}`, adminHtml).catch((e) =>
+          sendCmsEmailOrFallback({
+            slug: 'return-request-admin',
+            to: email,
+            vars: {
+              orderNumber: order.orderNumber,
+              customerName: requester?.fullName || 'Unknown',
+              customerEmail: requester?.email || userId,
+              items: returnItems.map((i: { productName: string; quantity: number }) => `${i.productName} × ${i.quantity}`).join(', '),
+              reason,
+              refundAmount: refundAmount.toFixed(2),
+              returnId: String(returnRequest._id),
+              adminReturnsUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/admin/returns`,
+            },
+            fallbackSubject: `New return request — ${order.orderNumber}`,
+            fallbackHtml: adminHtml,
+            businessFlow: 'admin_system',
+            relatedEntityType: 'return',
+            relatedEntityId: String(returnRequest._id),
+            relatedEntityDisplay: order.orderNumber,
+          }).catch((e) =>
             logger.error({ err: e, orderId }, 'Failed to send admin return request email'),
           ),
         ),
@@ -383,7 +420,7 @@ router.post('/:id/tracking', validate(trackingSchema), async (req: AuthRequest, 
     try {
       const notificationEmail = (await getSetting('commerce.returns.notificationEmail')) || 'return@pawtag.co.nz';
       if (notificationEmail.trim()) {
-        const { sendMail } = await import('../services/email.service');
+        const { sendCmsEmailOrFallback } = await import('../services/email.service');
         const order = await Order.findById(ret.orderId).select('orderNumber userId payment.amount payment.currency').lean();
         const orderUser = await User.findById(ret.userId).select('fullName email phoneNumber').lean();
         const html = `
@@ -399,7 +436,23 @@ router.post('/:id/tracking', validate(trackingSchema), async (req: AuthRequest, 
           <p>Submitted at: ${ret.returnTrackingSubmittedAt?.toISOString()}</p>
           <p><a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/admin/returns">Open Returns in Admin</a></p>
         `;
-        await sendMail(notificationEmail, `Return tracking — ${ret.orderNumber}`, html).catch((e) =>
+        await sendCmsEmailOrFallback({
+          slug: 'return-tracking-admin',
+          to: notificationEmail,
+          vars: {
+            orderNumber: ret.orderNumber,
+            customerName: orderUser?.fullName || 'Unknown',
+            provider: cleanProvider,
+            trackingNumber: cleanTracking,
+            trackingUrl: safeUrl || '',
+            returnId: String(ret._id),
+          },
+          fallbackSubject: `Return tracking — ${ret.orderNumber}`,
+          fallbackHtml: html,
+          businessFlow: 'admin_system',
+          relatedEntityType: 'return',
+          relatedEntityId: String(ret._id),
+        }).catch((e) =>
           logger.error({ err: e, returnId: ret._id }, 'Failed to send return tracking admin email'),
         );
       }
@@ -410,12 +463,20 @@ router.post('/:id/tracking', validate(trackingSchema), async (req: AuthRequest, 
     // Customer confirmation
     try {
       if (user?.email && isFirstSubmit) {
-        const { sendMail } = await import('../services/email.service');
-        await sendMail(
-          user.email,
-          `Return tracking received — ${ret.orderNumber}`,
-          `<p>Hi ${user.fullName || 'there'},</p><p>We recorded your return tracking for order <strong>${ret.orderNumber}</strong>:</p><p>${cleanProvider} · ${cleanTracking}</p><p>Our warehouse team will mark the return received after the item arrives. You don't need to take further action.</p>`,
-        ).catch(() => {});
+        const { sendCmsEmailOrFallback } = await import('../services/email.service');
+        await sendCmsEmailOrFallback({
+          slug: 'return-tracking-received',
+          to: user.email,
+          vars: {
+            customerName: user.fullName || 'there',
+            orderNumber: ret.orderNumber,
+            provider: cleanProvider,
+            trackingNumber: cleanTracking,
+          },
+          fallbackSubject: `Return tracking received — ${ret.orderNumber}`,
+          fallbackHtml: `<p>Hi ${user.fullName || 'there'},</p><p>We recorded your return tracking for order <strong>${ret.orderNumber}</strong>:</p><p>${cleanProvider} · ${cleanTracking}</p><p>Our warehouse team will mark the return received after the item arrives. You don't need to take further action.</p>`,
+          businessFlow: 'orders_commerce',
+        }).catch(() => {});
       }
     } catch (err) {
       logger.error({ err, returnId: ret._id }, 'Failed to send tracking confirmation email');
