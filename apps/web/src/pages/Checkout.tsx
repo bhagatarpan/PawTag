@@ -100,6 +100,7 @@ export default function Checkout() {
   // Verification status
   const [emailVerified, setEmailVerified] = useState(false);
   const [mobileVerified, setMobileVerified] = useState(false);
+  const [contactExpanded, setContactExpanded] = useState(false);
 
   // Engraving editing state — tracks texts being edited per cart item
   const [editingTexts, setEditingTexts] = useState<Record<string, string[]>>({});
@@ -779,33 +780,80 @@ export default function Checkout() {
                   </p>
                 </div>
 
-                {/* Contact Verification — only shown for authenticated users */}
-                <div className="bg-white rounded-xl border border-gray-200 p-6 mb-4">
-                  <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2"><Mail className="h-5 w-5 text-primary-600" /> Contact Verification</h2>
-
-                  <div className={`flex items-center justify-between p-4 rounded-xl mb-3 ${emailVerified ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'}`}>
-                    <div className="flex items-center gap-3">
-                      <Mail className={`h-5 w-5 ${emailVerified ? 'text-green-600' : 'text-gray-400'}`} />
-                      <div><p className="font-medium text-gray-900">Email Verification</p><p className="text-xs text-gray-500">{user.email}</p></div>
+                {/* Contact verification — compact: C collapsible when fully verified, A strip when not */}
+                {emailVerified && mobileVerified ? (
+                  <div className="bg-white rounded-xl border border-gray-200 mb-4 overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => setContactExpanded((v) => !v)}
+                      className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-gray-50"
+                      aria-expanded={contactExpanded}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <Shield className="h-4 w-4 text-primary-600 shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-gray-900">Contact</p>
+                          <p className="text-xs text-gray-500 truncate">
+                            {user.email}{user.phoneNumber ? ` · ${user.phoneNumber}` : ''}
+                          </p>
+                        </div>
+                      </div>
+                      <span className="flex items-center gap-1 text-sm text-green-600 font-medium shrink-0">
+                        <Check className="h-4 w-4" /> Verified
+                        <ChevronRight size={14} className={`transition-transform ${contactExpanded ? 'rotate-90' : ''}`} />
+                      </span>
+                    </button>
+                    {contactExpanded && (
+                      <div className="px-4 pb-4 space-y-3 border-t border-gray-100 pt-3">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="flex items-center gap-2 text-gray-600"><Mail size={14} className="text-green-600" /> Email</span>
+                          <span className="text-gray-900 truncate max-w-[200px]">{user.email} <span className="text-green-600 font-medium">✓</span></span>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="flex items-center gap-2 text-gray-600"><Smartphone size={14} className="text-green-600" /> Mobile</span>
+                          <span className="text-gray-900">{user.phoneNumber || 'Not set'} <span className="text-green-600 font-medium">✓</span></span>
+                        </div>
+                        <p className="text-xs text-gray-500">
+                          We use verified email & mobile to secure your account and send important updates.
+                        </p>
+                        <Link to="/verify-account" className="inline-flex items-center gap-1 text-sm text-primary-600 hover:text-primary-700 font-medium">
+                          <Edit3 size={12} /> Edit contact
+                        </Link>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-gray-900 flex items-center gap-2">
+                          <Shield className="h-4 w-4 text-primary-600" /> Contact
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${emailVerified && mobileVerified ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                            {emailVerified && mobileVerified ? 'Verified' : 'Verification needed'}
+                          </span>
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1 truncate">
+                          {user.email}{user.phoneNumber ? ` · ${user.phoneNumber}` : ''}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-1">
+                          Email {emailVerified ? '✓' : '· not verified'} · Mobile {mobileVerified ? '✓' : '· not verified'}
+                        </p>
+                      </div>
                     </div>
-                    {emailVerified ? <span className="text-sm text-green-600 font-medium flex items-center gap-1"><Check className="h-4 w-4" /> Verified</span> : <span className="text-sm text-amber-600 font-medium">Not Verified</span>}
-                  </div>
-
-                  <div className={`flex items-center justify-between p-4 rounded-xl mb-4 ${mobileVerified ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'}`}>
-                    <div className="flex items-center gap-3">
-                      <Smartphone className={`h-5 w-5 ${mobileVerified ? 'text-green-600' : 'text-gray-400'}`} />
-                      <div><p className="font-medium text-gray-900">Mobile Verification</p><p className="text-xs text-gray-500">{user.phoneNumber || 'Not set'}</p></div>
+                    <div className="mt-3 flex flex-col sm:flex-row gap-2">
+                      {!emailVerified && (
+                        <Link to="/verify-account" className="flex-1 text-center py-2 text-sm text-primary-600 border border-primary-200 rounded-lg hover:bg-primary-50">
+                          Verify Email
+                        </Link>
+                      )}
+                      {!mobileVerified && (
+                        <Link to="/verify-account" className="flex-1 text-center py-2 text-sm text-primary-600 border border-primary-200 rounded-lg hover:bg-primary-50">
+                          Verify Mobile
+                        </Link>
+                      )}
                     </div>
-                    {mobileVerified ? <span className="text-sm text-green-600 font-medium flex items-center gap-1"><Check className="h-4 w-4" /> Verified</span> : <span className="text-sm text-amber-600 font-medium">Not Verified</span>}
                   </div>
-
-                  {!emailVerified && <Link to="/verify-account" className="block w-full py-2 text-center text-sm text-primary-600 border border-primary-200 rounded-lg hover:bg-primary-50 mb-2">Verify Email</Link>}
-                  {!mobileVerified && <Link to="/verify-account" className="block w-full py-2 text-center text-sm text-primary-600 border border-primary-200 rounded-lg hover:bg-primary-50">Verify Mobile</Link>}
-
-                  <div className="bg-primary-50 border border-primary-100 rounded-xl p-4 mt-4">
-                    <div className="flex items-start gap-2"><Shield className="h-4 w-4 text-primary-600 mt-0.5" /><p className="text-xs text-primary-700"><strong>Why do we verify?</strong> We use verified email & mobile to secure your account, send important updates and help reunite pets faster.</p></div>
-                  </div>
-                </div>
+                )}
 
                 {/* Shipping Address */}
                 <div className="bg-white rounded-xl border border-gray-200 p-6">

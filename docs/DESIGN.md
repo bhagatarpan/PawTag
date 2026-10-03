@@ -26,6 +26,18 @@ Do not invent a new visual language for returns. Use existing status-card and fo
 
 ---
 
+## Checkout contact status
+
+| State | Pattern | Tokens |
+|---|---|---|
+| Fully verified | Collapsible single row: Contact ✓ + email/phone; expand for details + Edit | White card, green check, `text-xs` muted contact |
+| Not fully verified | Compact strip: status pill + one CTA per missing channel | Amber pill `bg-amber-100 text-amber-700`; teal primary links |
+| Active OTP / verify task | Full `CheckoutVerificationGate` form | Unchanged |
+
+Do not stack two large green verification cards when already verified.
+
+---
+
 ## Refund destination display
 
 Refunds always return to the **original payment method**. UI must state that clearly and never invent a card.

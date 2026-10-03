@@ -199,9 +199,12 @@ function FulfilmentDetailDrawer({
             <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Items & Tag Assignment</h3>
             <div className="space-y-3">
               {fulfilment.items.map((item, idx) => {
-                const assignment = fulfilment.tagAssignments.find(
+                const assignments = fulfilment.tagAssignments.filter(
                   (ta) => ta.orderItemId === item.orderItemId
                 );
+                const assignedCount = assignments.length;
+                const maxTags = Number(item.quantity || 1);
+                const allAssigned = assignedCount >= maxTags;
                 return (
                   <div key={idx} className="border border-gray-200 rounded-lg p-3">
                     <div className="flex items-start justify-between mb-2">
@@ -209,9 +212,13 @@ function FulfilmentDetailDrawer({
                         <p className="text-sm font-medium text-gray-900">{item.productName}</p>
                         <p className="text-xs text-gray-500">Qty: {item.quantity}</p>
                       </div>
-                      {assignment ? (
+                      {allAssigned ? (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-700">
-                          <Check size={12} /> Tag Assigned
+                          <Check size={12} /> {assignedCount}/{maxTags} Tag{maxTags > 1 ? 's' : ''} Assigned
+                        </span>
+                      ) : assignedCount > 0 ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-yellow-100 text-yellow-700">
+                          <AlertTriangle size={12} /> {assignedCount}/{maxTags} Tags Assigned
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-yellow-100 text-yellow-700">
@@ -220,37 +227,43 @@ function FulfilmentDetailDrawer({
                       )}
                     </div>
 
-                    {assignment ? (
-                      <div className="bg-gray-50 rounded-lg p-2 space-y-1">
-                        <div className="flex items-center gap-2">
-                          <Tag size={12} className="text-gray-400" />
-                          <span className="font-mono text-sm font-medium text-gray-900">{assignment.tagId}</span>
-                          <button onClick={() => copyToClipboard(assignment.tagId)} className="text-gray-400 hover:text-gray-600">
-                            <Copy size={12} />
-                          </button>
-                        </div>
-                        <div className="flex items-center gap-2 text-xs text-gray-500">
-                          {assignment.nfcWritten ? (
-                            <span className="inline-flex items-center gap-1 text-green-600">
-                              <Check size={12} /> NFC Written
-                            </span>
-                          ) : (
-                            <button
-                              onClick={() => handleConfirmNfc(assignment.tagId)}
-                              disabled={confirmingNfc === assignment.tagId}
-                              className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 disabled:opacity-50"
-                            >
-                              {confirmingNfc === assignment.tagId ? (
-                                <Loader2 size={12} className="animate-spin" />
+                    {assignments.length > 0 && (
+                      <div className="bg-gray-50 rounded-lg p-2 space-y-2 mb-2">
+                        {assignments.map((assignment) => (
+                          <div key={assignment.tagId} className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <Tag size={12} className="text-gray-400" />
+                              <span className="font-mono text-sm font-medium text-gray-900">{assignment.tagId}</span>
+                              <button onClick={() => copyToClipboard(assignment.tagId)} className="text-gray-400 hover:text-gray-600">
+                                <Copy size={12} />
+                              </button>
+                            </div>
+                            <div className="flex items-center gap-2 text-xs text-gray-500">
+                              {assignment.nfcWritten ? (
+                                <span className="inline-flex items-center gap-1 text-green-600">
+                                  <Check size={12} /> NFC Written
+                                </span>
                               ) : (
-                                <Nfc size={12} />
+                                <button
+                                  onClick={() => handleConfirmNfc(assignment.tagId)}
+                                  disabled={confirmingNfc === assignment.tagId}
+                                  className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 disabled:opacity-50"
+                                >
+                                  {confirmingNfc === assignment.tagId ? (
+                                    <Loader2 size={12} className="animate-spin" />
+                                  ) : (
+                                    <Nfc size={12} />
+                                  )}
+                                  Confirm NFC Written
+                                </button>
                               )}
-                              Confirm NFC Written
-                            </button>
-                          )}
-                        </div>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    ) : (
+                    )}
+
+                    {!allAssigned && (
                       <button
                         onClick={() => handleAssignTag(item.orderItemId, item.orderItemId)}
                         disabled={assigning === item.orderItemId || fulfilment.status === 'fulfilled'}
@@ -261,7 +274,7 @@ function FulfilmentDetailDrawer({
                         ) : (
                           <Tag size={12} />
                         )}
-                        Assign Tag ID
+                        {assignedCount > 0 ? 'Assign another Tag ID' : 'Assign Tag ID'}
                       </button>
                     )}
                   </div>

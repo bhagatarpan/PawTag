@@ -21,6 +21,7 @@ description: Implement or review PawTag customer returns and refunds end-to-end.
 10. **Partial refunds** must respect remaining refundable balance on the order payment.
 11. **Do not break** customer cancel refund or Admin Orders Refund Order.
 12. **Do not create a third Stripe refund implementation** — reuse `stripePaymentProvider.createRefund`.
+13. **Shipped orders:** customer **Request Return** (not Cancel); admin **Refund Order** allowed (`shipped → refunded` in orderStatus). Return money path still uses warehouse receipt / exception.
 
 ## Current architecture
 
