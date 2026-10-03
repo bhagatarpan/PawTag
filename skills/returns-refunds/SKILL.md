@@ -69,7 +69,7 @@ Do **not** treat bare `PUT status → refunded` as money movement.
 
 ## Phase 3 rules (current)
 
-1. Customer tracking: `POST /api/customer/returns/:id/tracking` only when status is `approved` or `received`. Tracking ≠ warehouse receipt.
+1. Customer tracking: `POST /api/customer/returns/:id/tracking` only when status is **`approved`** (until warehouse `received`). Customer can edit tracking if they made a mistake. Tracking ≠ warehouse receipt.
 2. Warehouse address appears in **return instruction email** when `commerce.returns.warehouseAddress` is set; otherwise customers email support for the address. Do not require a large warehouse address block on the order page.
 3. Remaining refundable balance is computed in **cents** from PaymentTransaction (`succeeded` + `pending`); over-amount refunds are rejected server-side.
 4. Admin order partial refunds must **not** set the whole order to `refunded` unless the capture is fully refunded.
