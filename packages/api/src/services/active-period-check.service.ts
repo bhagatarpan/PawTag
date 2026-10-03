@@ -148,7 +148,21 @@ async function handleExpiredPeriod(
   };
 
   const html = renderTagActivePeriodExpiredEmail(emailData);
-  await sendMail(user.email, 'PawTag Active Period Has Expired', html).catch(() => {});
+  const { sendCmsEmailOrFallback } = await import('./email.service');
+  await sendCmsEmailOrFallback({
+    slug: 'active-period-expired',
+    to: user.email,
+    vars: {
+      customerName: emailData.customerName,
+      tagId: emailData.tagId,
+      membershipUrl: emailData.membershipUrl,
+    },
+    fallbackSubject: 'PawTag Active Period Has Expired',
+    fallbackHtml: html,
+    businessFlow: 'pet_tag',
+    relatedEntityType: 'tag',
+    relatedEntityId: String(tag._id),
+  }).catch(() => {});
 
   // In-app notification
   await createAndDeliverNotification({
@@ -191,7 +205,21 @@ async function handleLastDayWarning(
   };
 
   const html = renderTagActivePeriodExpiringLastDayEmail(emailData);
-  await sendMail(user.email, '🚨 PawTag Active Period Expires Today', html).catch(() => {});
+  const { sendCmsEmailOrFallback } = await import('./email.service');
+  await sendCmsEmailOrFallback({
+    slug: 'active-period-last-day',
+    to: user.email,
+    vars: {
+      customerName: emailData.customerName,
+      tagId: emailData.tagId,
+      membershipUrl: emailData.membershipUrl,
+    },
+    fallbackSubject: 'PawTag Active Period Expires Today',
+    fallbackHtml: html,
+    businessFlow: 'pet_tag',
+    relatedEntityType: 'tag',
+    relatedEntityId: String(tag._id),
+  }).catch(() => {});
 
   // In-app notification
   await createAndDeliverNotification({
@@ -239,7 +267,23 @@ async function handle7DayWarning(
   };
 
   const html = renderTagActivePeriodExpiring7DayEmail(emailData);
-  await sendMail(user.email, '⚠️ PawTag Active Period Expiring in 7 Days', html).catch(() => {});
+  const { sendCmsEmailOrFallback } = await import('./email.service');
+  await sendCmsEmailOrFallback({
+    slug: 'active-period-7day',
+    to: user.email,
+    vars: {
+      customerName: emailData.customerName,
+      tagId: emailData.tagId,
+      daysRemaining: String(daysRemaining),
+      activePeriodEndsAt: emailData.activePeriodEndsAt,
+      membershipUrl: emailData.membershipUrl,
+    },
+    fallbackSubject: 'PawTag Active Period Expiring in 7 Days',
+    fallbackHtml: html,
+    businessFlow: 'pet_tag',
+    relatedEntityType: 'tag',
+    relatedEntityId: String(tag._id),
+  }).catch(() => {});
 
   // In-app notification
   await createAndDeliverNotification({
@@ -287,7 +331,23 @@ async function handle30DayWarning(
   };
 
   const html = renderTagActivePeriodExpiring30DayEmail(emailData);
-  await sendMail(user.email, 'Your PawTag Active Period is Expiring', html).catch(() => {});
+  const { sendCmsEmailOrFallback } = await import('./email.service');
+  await sendCmsEmailOrFallback({
+    slug: 'active-period-30day',
+    to: user.email,
+    vars: {
+      customerName: emailData.customerName,
+      tagId: emailData.tagId,
+      daysRemaining: String(daysRemaining),
+      activePeriodEndsAt: emailData.activePeriodEndsAt,
+      membershipUrl: emailData.membershipUrl,
+    },
+    fallbackSubject: 'Your PawTag Active Period is Expiring',
+    fallbackHtml: html,
+    businessFlow: 'pet_tag',
+    relatedEntityType: 'tag',
+    relatedEntityId: String(tag._id),
+  }).catch(() => {});
 
   // In-app notification
   await createAndDeliverNotification({

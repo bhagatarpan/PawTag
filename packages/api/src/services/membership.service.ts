@@ -577,11 +577,12 @@ export async function activateMembership(membershipId: string) {
     });
   }
 
-  // Send welcome email
+  // Send welcome email — CMS-first
   try {
     const user = await User.findById(membership.userId).select('email fullName').lean();
     if (user?.email && tier) {
       const { renderMembershipWelcomeEmail } = await import('./email/templates/membership-welcome');
+      const { sendCmsEmailOrFallback } = await import('./email.service');
       const html = renderMembershipWelcomeEmail({
         customerName: user.fullName || 'there',
         tierName: tier.displayName,
@@ -589,7 +590,22 @@ export async function activateMembership(membershipId: string) {
         renewalDate: membership.currentPeriodEnd?.toLocaleDateString('en-NZ', { dateStyle: 'full' }) || 'N/A',
         dashboardUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/membership`,
       });
-      await sendMail(user.email, `Welcome to ${tier.name}!`, html).catch(() => {});
+      await sendCmsEmailOrFallback({
+        slug: 'membership-welcome',
+        to: user.email,
+        vars: {
+          customerName: user.fullName || 'there',
+          tierName: tier.displayName,
+          price: String(membership.price),
+          renewalDate: membership.currentPeriodEnd?.toLocaleDateString('en-NZ', { dateStyle: 'full' }) || 'N/A',
+          dashboardUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/membership`,
+        },
+        fallbackSubject: `Welcome to ${tier.name}!`,
+        fallbackHtml: html,
+        businessFlow: 'subscriptions',
+        relatedEntityType: 'membership',
+        relatedEntityId: String(membership._id),
+      }).catch(() => {});
     }
   } catch (err) {
     logger.error({ err, membershipId }, '[Membership] Failed to send welcome email');
@@ -702,25 +718,40 @@ export async function cancelMembership(userId: string, reason?: string) {
     logger.error({ err, membershipId: membership._id }, '[Membership] Failed to generate retention offer');
   }
 
-  // Send cancellation email
+  // Send cancellation email — CMS-first
   try {
     const user = await User.findById(userId).select('email fullName').lean();
     const tier = await MembershipTier.findById(membership.tierId).lean();
     if (user?.email && tier) {
       const { renderMembershipCancelledEmail } = await import('./email/templates/membership-cancelled');
+      const { sendCmsEmailOrFallback } = await import('./email.service');
+      const benefitsUntil = membership.currentPeriodEnd?.toLocaleDateString('en-NZ', { dateStyle: 'full' }) || 'N/A';
       const html = renderMembershipCancelledEmail({
         customerName: user.fullName || 'there',
         tierName: tier.displayName,
         cancelledAt: membership.cancelledAt?.toLocaleDateString('en-NZ', { dateStyle: 'full' }) || 'N/A',
-        benefitsUntil: membership.currentPeriodEnd?.toLocaleDateString('en-NZ', { dateStyle: 'full' }) || 'N/A',
+        benefitsUntil,
         resubscribeUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/membership`,
         retentionOffer: retentionOffer || undefined,
       });
-      await sendMail(user.email, `${tier.name} Membership Cancelled`, html)
-        .catch((err) => logger.error({ err, membershipId: membership._id }, '[Membership] Failed to send cancellation email'));
+      await sendCmsEmailOrFallback({
+        slug: 'membership-cancelled',
+        to: user.email,
+        vars: {
+          customerName: user.fullName || 'there',
+          tierName: tier.displayName,
+          benefitsUntil,
+          dashboardUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/membership`,
+        },
+        fallbackSubject: `${tier.name} Membership Cancelled`,
+        fallbackHtml: html,
+        businessFlow: 'subscriptions',
+        relatedEntityType: 'membership',
+        relatedEntityId: String(membership._id),
+      }).catch((err) => logger.error({ err, membershipId: membership._id }, '[Membership] Failed to send cancellation email'));
     }
   } catch (err) {
-    logger.error({ err, membershipId: membership._id }, 'Failed to send cancellation email');
+    logger.error({ err, membershipId: membership._id }, '[Membership] Failed to send cancellation email');
   }
 
   // In-app notification
@@ -826,21 +857,36 @@ export async function resumeMembership(userId: string) {
     logger.warn({ err, membershipId: membership._id }, '[Membership] Failed to invalidate entitlement cache after resume');
   }
 
-  // Email confirmation
+  // Email confirmation — CMS-first
   try {
     const user = await User.findById(userId).select('email fullName').lean();
     const tier = await MembershipTier.findById(membership.tierId).lean();
     if (user?.email && tier) {
       const { renderMembershipResumedEmail } = await import('./email/templates/membership-resumed');
+      const { sendCmsEmailOrFallback } = await import('./email.service');
+      const benefitsUntil = membership.currentPeriodEnd?.toLocaleDateString('en-NZ', { dateStyle: 'full' }) || 'N/A';
       const html = renderMembershipResumedEmail({
         customerName: user.fullName || 'there',
         tierName: tier.displayName,
         resumedAt: new Date().toLocaleDateString('en-NZ', { dateStyle: 'full' }),
-        benefitsUntil: membership.currentPeriodEnd?.toLocaleDateString('en-NZ', { dateStyle: 'full' }) || 'N/A',
+        benefitsUntil,
         dashboardUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/membership`,
       });
-      await sendMail(user.email, `${tier.displayName} Membership Resumed`, html)
-        .catch((err) => logger.error({ err, membershipId: membership._id }, '[Membership] Failed to send resume email'));
+      await sendCmsEmailOrFallback({
+        slug: 'membership-resumed',
+        to: user.email,
+        vars: {
+          customerName: user.fullName || 'there',
+          tierName: tier.displayName,
+          benefitsUntil,
+          dashboardUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/membership`,
+        },
+        fallbackSubject: `${tier.displayName} Membership Resumed`,
+        fallbackHtml: html,
+        businessFlow: 'subscriptions',
+        relatedEntityType: 'membership',
+        relatedEntityId: String(membership._id),
+      }).catch((err) => logger.error({ err, membershipId: membership._id }, '[Membership] Failed to send resume email'));
     }
   } catch (err) {
     logger.error({ err, membershipId: membership._id }, '[Membership] Failed to send resume email');
@@ -1238,21 +1284,38 @@ export async function changeTier(
     }
   }
 
-  // Send tier change email (fire-and-forget with logged errors)
+  // Send tier change email — CMS-first
   try {
     const user = await User.findById(userId).select('email fullName').lean();
     if (user?.email) {
       const { renderMembershipTierChangedEmail } = await import('./email/templates/membership-tier-changed');
+      const { sendCmsEmailOrFallback } = await import('./email.service');
+      const renewalDate = membership.currentPeriodEnd?.toLocaleDateString('en-NZ', { dateStyle: 'full' }) || 'N/A';
       const html = renderMembershipTierChangedEmail({
         customerName: user.fullName || 'there',
         oldTierName: oldTier?.displayName || 'Unknown',
         newTierName: newTier.displayName,
         newPrice: newTier.price,
-        renewalDate: membership.currentPeriodEnd?.toLocaleDateString('en-NZ', { dateStyle: 'full' }) || 'N/A',
+        renewalDate,
         dashboardUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/membership`,
       });
-      await sendMail(user.email, `Membership Changed to ${newTier.displayName}`, html)
-        .catch((err) => logger.error({ err, membershipId: membership._id }, '[Membership] Failed to send tier change email'));
+      await sendCmsEmailOrFallback({
+        slug: 'membership-tier-changed',
+        to: user.email,
+        vars: {
+          customerName: user.fullName || 'there',
+          oldTierName: oldTier?.displayName || 'Unknown',
+          newTierName: newTier.displayName,
+          newPrice: String(newTier.price),
+          renewalDate,
+          dashboardUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/membership`,
+        },
+        fallbackSubject: `Membership Changed to ${newTier.displayName}`,
+        fallbackHtml: html,
+        businessFlow: 'subscriptions',
+        relatedEntityType: 'membership',
+        relatedEntityId: String(membership._id),
+      }).catch((err) => logger.error({ err, membershipId: membership._id }, '[Membership] Failed to send tier change email'));
     }
   } catch (err) {
     logger.error({ err, membershipId: membership._id }, 'Failed to send tier change email');
@@ -1821,13 +1884,27 @@ export async function checkExpiredMemberships() {
       const tier = await MembershipTier.findById(membership.tierId).lean();
       if (user?.email && tier) {
         const { renderMembershipExpiredEmail } = await import('./email/templates/membership-expired');
+        const { sendCmsEmailOrFallback } = await import('./email.service');
         const html = renderMembershipExpiredEmail({
           customerName: user.fullName || 'there',
           tierName: tier.displayName,
           expiredAt: now.toLocaleDateString('en-NZ', { dateStyle: 'full' }) || 'N/A',
           resubscribeUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/membership`,
         });
-        await sendMail(user.email, `${tier.name} Membership Expired`, html).catch(() => {});
+        await sendCmsEmailOrFallback({
+          slug: 'membership-expired',
+          to: user.email,
+          vars: {
+            customerName: user.fullName || 'there',
+            tierName: tier.displayName,
+            dashboardUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/membership`,
+          },
+          fallbackSubject: `${tier.name} Membership Expired`,
+          fallbackHtml: html,
+          businessFlow: 'subscriptions',
+          relatedEntityType: 'membership',
+          relatedEntityId: String(membership._id),
+        }).catch(() => {});
       }
     } catch (err) {
       logger.error({ err, membershipId: membership._id }, 'Failed to send expiry email');
@@ -1912,7 +1989,21 @@ export async function sendRenewalReminders() {
             price: membership.price,
             dashboardUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/membership`,
           });
-          await sendMail(user.email, `Your ${tier.name} Renews in ${days} Days`, html).catch(() => {});
+          const { sendCmsEmailOrFallback } = await import('./email.service');
+          await sendCmsEmailOrFallback({
+            slug: 'membership-renewal-reminder',
+            to: user.email,
+            vars: {
+              customerName: user.fullName || 'there',
+              tierName: tier.displayName,
+              days: String(days),
+              renewalDate: membership.currentPeriodEnd?.toLocaleDateString('en-NZ', { dateStyle: 'full' }) || 'N/A',
+              dashboardUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/membership`,
+            },
+            fallbackSubject: `Your ${tier.name} Renews in ${days} Days`,
+            fallbackHtml: html,
+            businessFlow: 'subscriptions',
+          }).catch(() => {});
         }
 
         // In-app notification

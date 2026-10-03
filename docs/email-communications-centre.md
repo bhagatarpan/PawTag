@@ -35,9 +35,17 @@ See `skills/email-cms-templates/SKILL.md`.
 
 ---
 
-## Phase 2 — Seed missing product emails (not started)
+## Phase 2 — Seed missing product emails
 
-Membership lifecycle, returns, active period HYBRID 2, subscription cancel/pause/free-period — seed CMS + wire send paths.
+- [x] Seed membership-welcome/cancelled/resumed/tier-changed/expired/renewal-reminder
+- [x] Seed return-request-received, return-request-admin, return-tracking-admin, return-tracking-received, refund-processed-csr
+- [x] Seed active-period-expired/last-day/7day/30day
+- [x] Seed subscription-cancellation
+- [x] Wire membership.service emails CMS-first
+- [x] Wire customer-returns + return-refund.service
+- [x] Wire active-period-check.service
+- [x] Wire subscription.service cancellation
+- [ ] Remaining Category B (subscription reminders, grace period, pet milestones, low stock, support, referral, generic, invoice-otp)
 
 ---
 

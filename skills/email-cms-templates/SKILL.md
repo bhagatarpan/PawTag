@@ -58,17 +58,21 @@ await sendCmsEmailOrFallback({
 - Warehouse address in return instruction emails uses `commerce.returns.warehouseAddress` when set; else contact email (`commerce.returns.warehouseContact`, default `support@pawtag.co.nz`).
 - Money emails: never mark refunded in copy unless Stripe accepted (service already enforces this).
 
-## Phase 1 wiring status (email CMS)
+## Phase 1–2 wiring status
 
 | Area | Status |
 |---|---|
 | Auth welcome/verify/password/MFA/pet-found/order-confirmation/invoice-paid/guardian* | CMS used |
-| Order status + refund processing/settled/failed | **Wired CMS-first** (fallback renderers) |
-| Login notification | CMS-first; customer subject (not “admin account”) |
-| Pet birthday/anniversary | CMS slugs `pet-birthday` / `pet-anniversary` (fixed mismatches) |
-| Subscription renewal | CMS slug `subscription-renewed` seeded + wired |
-| Gold welcome | CMS-first `gold-welcome` |
-| Membership lifecycle, returns, active period, many subscription dunning emails | **Still hardcoded** — Phase 2 seed + wire |
+| Order status + refund processing/settled/failed | CMS-first |
+| Login notification | CMS-first; customer subject |
+| Pet birthday/anniversary | CMS `pet-birthday` / `pet-anniversary` |
+| Subscription renewal | CMS `subscription-renewed` |
+| Gold welcome | CMS `gold-welcome` |
+| Membership welcome/cancelled/resumed/tier-changed/expired/renewal-reminder | **CMS Phase 2** |
+| Returns request/admin/tracking/CSR refund | **CMS Phase 2** |
+| Active period expired/today/7d/30d | **CMS Phase 2** |
+| Subscription cancellation | **CMS Phase 2** |
+| Remaining Category B (reminders, grace, milestones, low stock, support, referral, generic) | Still unwired — later packet |
 
 ## Monitoring
 
