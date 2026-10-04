@@ -104,6 +104,7 @@ Estimate panel shows:
   • Current plan vs New plan
   • Prorated amount
   • Next renewal date
+  • If cancelling: "This upgrade also resumes your membership"
     │
     ▼
 Customer clicks "Confirm Upgrade — $X"
@@ -114,23 +115,29 @@ POST /membership/change-tier { tierId, prorationBehavior: 'now' }
     ▼
 Backend:
   1. Validates active membership
-  2. Updates Stripe subscription (proration: create_prorations)
-  3. Creates INVM- invoice for proration charge
-  4. Sends invoice email + tier-change email
-  5. Updates membership.tierId + price
-  6. Re-evaluates tag coverage
-  7. Invalidates entitlement cache
-  8. Audit log with request context
+  2. If cancelledAt set (cancelling window):
+     - Stripe: price update + cancel_at_period_end=false + create_prorations
+     - Local after Stripe success: clear cancelledAt, autoRenew=true
+  3. Else Stripe: price update + create_prorations
+  4. Creates INVM- invoice for proration charge
+  5. Sends invoice email + tier-change email
+  6. Updates membership.tierId + price
+  7. Re-evaluates tag coverage
+  8. Invalidates entitlement cache
+  9. Audit log (action membership_tier_changed or membership_tier_changed_resumed)
     │
     ▼
 Success screen:
   • "Welcome to Platinum!"
+  • If resumed: "Membership resumed — auto-renew back on"
   • Invoice number + prorated amount
   • "Check your email for invoice"
     │
     ▼
 Redirect to /account/membership
 ```
+
+**Fail-closed rules:** Stripe rejection (missing/canceled sub, card error) leaves local tier and cancel state unchanged. Typed error codes returned to the client (`membership.payment_method_required`, etc.).
 
 ### 3.2 Downgrade (Platinum → Gold)
 

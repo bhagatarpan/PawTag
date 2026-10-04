@@ -1053,11 +1053,13 @@ All membership benefits are driven from a single source of truth: the **Membersh
 
 - **Annual renewal:** Memberships renew yearly automatically via Stripe
 - **Upgrades:** Effective immediately with prorated charge; new benefits activate now
+- **Upgrade while cancelling (Option A):** Immediate upgrade **also resumes** membership — clears cancel-at-period-end, turns auto-renew back on, charges proration now. Stripe must accept first; local cancel state is cleared only after provider success
 - **Downgrades:** Effective at end of current subscription cycle; customer sees points-at-risk and entitlements-lost before accepting
 - **Points clawback:** On downgrade, customer loses multiplier bonus on points earned at higher tier rate
-- **Cancellation:** `cancel_at_period_end` — benefits continue until period end
+- **Cancellation:** `cancel_at_period_end` — benefits continue until period end; resume clears cancel in Stripe first
 - **Payment failure handling:** Dunning state, customer notification, CSR alert; Stripe retries automatically
 - **Payment method management:** Customers manage cards via Stripe Billing Portal
+- **Typed tier-change errors:** `membership.payment_method_required`, `membership.subscription_missing`, etc. with HTTP 402/409/502 for recovery UX
 - **Email notifications:** Renewal reminders (30/7 days), cancellations, tier changes, payment failures
 - **Tag extension:** Membership extends all tags within tier limit for 12 months
 
@@ -1068,14 +1070,17 @@ All membership benefits are driven from a single source of truth: the **Membersh
 - **Customer API:** `GET /api/membership/entitlements` — user's current entitlements
 - **Endpoint:** `POST /api/membership/subscribe` — Create membership subscription
 - **Endpoint:** `POST /api/membership/activate` — Activate after payment
-- **Endpoint:** `POST /api/membership/change-tier` — Immediate upgrade
+- **Endpoint:** `POST /api/membership/change-tier` — Immediate upgrade (resume+upgrade when cancelling); returns `resumedOnUpgrade`
+- **Endpoint:** `GET /api/membership/change-tier/estimate` — Proration preview (`isCancelling`, `willResumeOnUpgrade`)
 - **Endpoint:** `POST /api/membership/downgrade` — Deferred downgrade (requires terms acceptance)
+- **Endpoint:** `POST /api/membership/resume` — Undo scheduled cancellation
 - **Endpoint:** `GET /api/membership/payment-methods` — List saved cards
 - **Endpoint:** `POST /api/membership/payment-methods/portal` — Stripe Billing Portal
 - **Tag Status:** Use `calculateTagStatus()` service to check tag status (active/limited/expired)
 - **Active Period Check:** Background job runs daily to send warnings and update tag status
 - **Scheduled Downgrades:** Background job runs every 5 minutes to execute pending downgrades
 - **Full lifecycle documentation:** `docs/MEMBERSHIP-LIFECYCLE-SYSTEM.md`
+- **Operating rules:** `AGENTS.md` §16b Membership Lifecycle Rules
 
 ---
 

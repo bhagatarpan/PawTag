@@ -8,6 +8,7 @@ import { generateInvoiceHtml } from './invoice-html.service';
 import { generateSecureToken, hashToken } from './auth.service';
 import { createAndDeliverNotification } from './notification-delivery.service';
 import { auditService, type AuditContext } from './audit';
+import { AppError, type ErrorCode, type ErrorMetadata } from '../lib/app-errors';
 import logger from '../lib/logger';
 
 // Lazy-init Stripe client
@@ -18,6 +19,139 @@ export function getStripeClient(): Stripe {
   if (!key) throw new Error('STRIPE_SECRET_KEY is not configured');
   _stripe = new Stripe(key, { apiVersion: '2026-08-26.dahlia' as any });
   return _stripe;
+}
+
+/** Test helper — clear cached Stripe client after env/mocks change. */
+export function resetStripeClientCache(): void {
+  _stripe = null;
+}
+
+/** Test helper — inject a Stripe client without real API calls. */
+export function setStripeClientForTests(client: Stripe | null): void {
+  _stripe = client;
+}
+
+/**
+ * Machine-readable membership tier-change codes returned to clients.
+ * Kept separate from ErrorCode so HTTP mapping stays AppError-compatible.
+ */
+export type MembershipTierChangeCode =
+  | 'membership.no_active_membership'
+  | 'membership.tier_not_found'
+  | 'membership.tier_unavailable'
+  | 'membership.already_on_tier'
+  | 'membership.subscription_missing'
+  | 'membership.subscription_not_active'
+  | 'membership.subscription_invalid'
+  | 'membership.payment_method_required'
+  | 'membership.stripe_update_failed'
+  | 'membership.downgrade_already_scheduled'
+  | 'membership.not_cancelling'
+  | 'membership.terms_required';
+
+export class MembershipTierChangeError extends AppError {
+  public readonly membershipCode: MembershipTierChangeCode;
+
+  constructor(
+    membershipCode: MembershipTierChangeCode,
+    message: string,
+    httpStatus: number,
+    userMessage: string,
+    metadata?: ErrorMetadata,
+  ) {
+    const code: ErrorCode =
+      httpStatus === 402 || httpStatus === 502
+        ? 'EXTERNAL_SERVICE_ERROR'
+        : httpStatus === 409
+          ? 'CONFLICT_ERROR'
+          : httpStatus === 400
+            ? 'VALIDATION_ERROR'
+            : 'BUSINESS_RULE_ERROR';
+
+    super(message, {
+      code,
+      httpStatus,
+      userMessage,
+      metadata: { ...metadata, membershipCode },
+    });
+    this.name = 'MembershipTierChangeError';
+    this.membershipCode = membershipCode;
+  }
+}
+
+/** Demo/non-Stripe subscription IDs must never be sent to the Stripe API. */
+function isInvalidStripeSubscriptionId(id: string | undefined | null): boolean {
+  if (!id) return true;
+  if (id === 'demo') return true;
+  if (id.startsWith('pi_demo_') || id.startsWith('sub_demo')) return true;
+  return !id.startsWith('sub_');
+}
+
+function mapStripeSubscriptionFailure(err: any, membershipId: string): never {
+  const stripeCode: string | undefined = err?.code || err?.type;
+  const stripeMessage: string | undefined = err?.message;
+
+  logger.error(
+    {
+      err: { type: err?.type, code: stripeCode, message: stripeMessage, status: err?.status },
+      membershipId,
+      operation: 'changeTier.stripeSubscriptionUpdate',
+    },
+    '[Membership] Stripe subscription update failed',
+  );
+
+  const message = stripeMessage || '';
+  if (
+    stripeCode === 'resource_missing' ||
+    /no such subscription/i.test(message) ||
+    /resource_missing/i.test(message)
+  ) {
+    throw new MembershipTierChangeError(
+      'membership.subscription_missing',
+      `Stripe subscription missing for membership ${membershipId}`,
+      409,
+      'We could not find an active billing subscription for this membership. Please subscribe again or contact support.',
+      { stripeCode },
+    );
+  }
+
+  if (
+    stripeCode === 'invoice.payment_method_required' ||
+    stripeCode === 'payment_method_required' ||
+    stripeCode === 'invoice_upcoming_requires_payment_method' ||
+    /payment method/i.test(message)
+  ) {
+    throw new MembershipTierChangeError(
+      'membership.payment_method_required',
+      `Stripe requires a payment method for membership ${membershipId}`,
+      402,
+      'Please update your payment method, then try the upgrade again.',
+      { stripeCode },
+    );
+  }
+
+  if (
+    stripeCode === 'invoice.payment_intent_authentication_failure' ||
+    stripeCode === 'card_error' ||
+    stripeCode === 'expired_card' ||
+    stripeCode === 'incorrect_cvc'
+  ) {
+    throw new MembershipTierChangeError(
+      'membership.payment_method_required',
+      `Stripe payment method failed for membership ${membershipId}`,
+      402,
+      'Your payment method could not be charged for the upgrade. Please update your card, then try again.',
+      { stripeCode },
+    );
+  }
+
+  throw new MembershipTierChangeError(
+    'membership.stripe_update_failed',
+    `Stripe subscription update failed for membership ${membershipId}: ${stripeCode || 'unknown'}`,
+    502,
+    'Payment provider update failed. Please try again or contact support.',
+    { stripeCode },
+  );
 }
 
 // Cache for settings
@@ -952,6 +1086,13 @@ export interface TierChangeEstimate {
   entitlementsLost: Array<{ key: string; name: string; currentValue: any; newValue: any }>;
   /** For downgrades: ISO date when the downgrade takes effect */
   downgradeEffectiveDate: string;
+  /** Membership is in cancel-at-period-end window (cancelledAt set, status still active) */
+  isCancelling: boolean;
+  /**
+   * Option A: confirming an immediate upgrade while cancelling also resumes
+   * membership (clears cancel_at_period_end + cancelledAt, autoRenew on).
+   */
+  willResumeOnUpgrade: boolean;
 }
 
 /**
@@ -1000,6 +1141,11 @@ export async function estimateTierChange(
 
   // Prefer tier currency, fall back to membership currency, then NZD
   const currency = newTier.currency || membership.currency || 'NZD';
+
+  // Cancelling window: status remains 'active' until currentPeriodEnd, but
+  // cancelledAt/autoRenew show scheduled cancel. Immediate upgrade resumes.
+  const isCancelling = Boolean(membership.cancelledAt);
+  const willResumeOnUpgrade = isUpgrade && isCancelling;
 
   // For downgrades: compute points-at-risk and entitlements-lost
   let pointsAtRisk = 0;
@@ -1071,6 +1217,8 @@ export async function estimateTierChange(
     currentPointsBalance,
     entitlementsLost,
     downgradeEffectiveDate: isUpgrade ? '' : periodEnd.toISOString(),
+    isCancelling,
+    willResumeOnUpgrade,
   };
 }
 
@@ -1162,29 +1310,83 @@ export async function changeTier(
   userId: string,
   newTierId: string,
   prorationBehavior: 'now' | 'next_billing_cycle' = 'now',
-): Promise<{ membership: any; invoice: any; invoiceUrl?: string }> {
+): Promise<{ membership: any; invoice: any; invoiceUrl?: string; resumedOnUpgrade: boolean }> {
   const membership = await UserMembership.findOne({
     userId,
     status: 'active',
   });
 
-  if (!membership) throw new Error('No active membership found');
+  if (!membership) {
+    throw new MembershipTierChangeError(
+      'membership.no_active_membership',
+      'No active membership found',
+      400,
+      'No active membership found',
+    );
+  }
 
   const newTier = await MembershipTier.findById(newTierId).lean();
-  if (!newTier) throw new Error('Membership tier not found');
-  if (!newTier.isActive) throw new Error('This membership tier is not currently available');
+  if (!newTier) {
+    throw new MembershipTierChangeError(
+      'membership.tier_not_found',
+      'Membership tier not found',
+      404,
+      'Membership tier not found',
+    );
+  }
+  if (!newTier.isActive) {
+    throw new MembershipTierChangeError(
+      'membership.tier_unavailable',
+      'This membership tier is not currently available',
+      400,
+      'This membership tier is not currently available',
+    );
+  }
 
   const oldTier = await MembershipTier.findById(membership.tierId).lean();
-  if (oldTier?.tier === newTier.tier) throw new Error('Already on this tier');
+  if (oldTier?.tier === newTier.tier) {
+    throw new MembershipTierChangeError(
+      'membership.already_on_tier',
+      'Already on this tier',
+      409,
+      'Already on this tier',
+    );
+  }
+
+  // Option A: immediate tier change while cancelling also resumes membership.
+  const isCancelling = Boolean(membership.cancelledAt);
+  const resumedOnUpgrade = isCancelling && prorationBehavior === 'now';
 
   let prorationInvoiceId: string | undefined;
   let prorationAmount: number | undefined;
   let prorationCurrency: string | undefined;
 
+  // Stripe mode: proration upgrades require a real subscription. Fail closed —
+  // never grant a higher tier without provider acceptance of the charge/resume.
+  if (!isFakeMode() && prorationBehavior === 'now' && isInvalidStripeSubscriptionId(membership.stripeSubscriptionId)) {
+    throw new MembershipTierChangeError(
+      'membership.subscription_missing',
+      `Membership ${membership._id} has no valid Stripe subscription for tier change`,
+      409,
+      'We could not find an active billing subscription for this membership. Please subscribe again or contact support.',
+      { membershipId: membership._id.toString() },
+    );
+  }
+
   // Update Stripe subscription if needed
   if (membership.stripeSubscriptionId && !isFakeMode()) {
     try {
       const stripe = getStripeClient();
+
+      if (isInvalidStripeSubscriptionId(membership.stripeSubscriptionId)) {
+        throw new MembershipTierChangeError(
+          'membership.subscription_missing',
+          `Membership ${membership._id} has invalid Stripe subscription id`,
+          409,
+          'We could not find an active billing subscription for this membership. Please subscribe again or contact support.',
+          { membershipId: membership._id.toString() },
+        );
+      }
 
       // Get or create new price for new tier
       let newPriceId = newTier.stripePriceId;
@@ -1203,17 +1405,43 @@ export async function changeTier(
         await MembershipTier.findByIdAndUpdate(newTierId, { stripePriceId: priceObj.id });
       }
 
-      // Update subscription with proration behavior
-      // Expand latest_invoice to capture the proration invoice Stripe creates
       const subscription = await stripe.subscriptions.retrieve(membership.stripeSubscriptionId);
-      const updatedSubscription = await stripe.subscriptions.update(membership.stripeSubscriptionId, {
-        items: [{
-          id: subscription.items.data[0].id,
-          price: newPriceId,
-        }],
+
+      if (subscription.status === 'canceled' || subscription.status === 'incomplete_expired') {
+        throw new MembershipTierChangeError(
+          'membership.subscription_not_active',
+          `Stripe subscription ${membership.stripeSubscriptionId} status=${subscription.status}`,
+          409,
+          'This membership subscription has already ended with the payment provider. Please subscribe again.',
+          { stripeSubscriptionStatus: subscription.status },
+        );
+      }
+
+      const subscriptionItemId = subscription.items?.data?.[0]?.id;
+      if (!subscriptionItemId) {
+        throw new MembershipTierChangeError(
+          'membership.subscription_invalid',
+          `Stripe subscription ${membership.stripeSubscriptionId} has no billable items`,
+          409,
+          'This membership subscription is incomplete. Please contact support or subscribe again.',
+          { stripeSubscriptionStatus: subscription.status },
+        );
+      }
+
+      // Immediate charge path: also clear cancel_at_period_end when resuming.
+      const updateParams: Stripe.SubscriptionUpdateParams = {
+        items: [{ id: subscriptionItemId, price: newPriceId }],
         proration_behavior: prorationBehavior === 'now' ? 'create_prorations' : 'none',
         expand: ['latest_invoice'],
-      });
+      };
+      if (resumedOnUpgrade) {
+        updateParams.cancel_at_period_end = false;
+      }
+
+      const updatedSubscription = await stripe.subscriptions.update(
+        membership.stripeSubscriptionId,
+        updateParams,
+      );
 
       // Capture proration invoice data from Stripe response
       const latestInvoice = updatedSubscription.latest_invoice as any;
@@ -1224,28 +1452,33 @@ export async function changeTier(
         prorationCurrency = (latestInvoice.currency || 'nzd').toUpperCase();
       }
 
-      logger.info({
-        membershipId: membership._id,
-        oldTier: oldTier?.tier,
-        newTier: newTier.tier,
-        prorationBehavior,
-        prorationInvoiceId,
-        prorationAmount,
-      }, 'Stripe subscription updated');
+      logger.info(
+        {
+          membershipId: membership._id,
+          oldTier: oldTier?.tier,
+          newTier: newTier.tier,
+          prorationBehavior,
+          resumedOnUpgrade,
+          prorationInvoiceId,
+          prorationAmount,
+          stripeSubscriptionStatus: subscription.status,
+        },
+        'Stripe subscription updated',
+      );
     } catch (err: any) {
-      logger.error({ err, membershipId: membership._id }, 'Failed to update Stripe subscription');
-      // When proration is expected (immediate charge), a Stripe failure must
-      // not silently change the local tier — the customer would get new
-      // benefits without paying.
-      if (prorationBehavior === 'now') {
-        throw new Error('Payment processing failed. Please try again or contact support.');
-      }
+      if (err instanceof MembershipTierChangeError) throw err;
+      mapStripeSubscriptionFailure(err, membership._id.toString());
     }
   }
 
-  // Update membership
+  // Local updates only after Stripe accepted the operation (or fake mode).
   membership.tierId = newTier._id;
   membership.price = newTier.price;
+  if (resumedOnUpgrade) {
+    membership.cancelledAt = undefined;
+    membership.cancellationReason = undefined;
+    membership.autoRenew = true;
+  }
   await membership.save();
 
   // Update user
@@ -1329,7 +1562,9 @@ export async function changeTier(
       type: isUpgrade ? 'membership_upgraded' : 'membership_downgraded',
       title: isUpgrade ? `Welcome to ${newTier.displayName}!` : `Membership Changed to ${newTier.displayName}`,
       message: isUpgrade
-        ? `Congratulations! You've upgraded to ${newTier.displayName}. Enjoy your new benefits!`
+        ? resumedOnUpgrade
+          ? `Congratulations! You've upgraded to ${newTier.displayName} and your membership has been resumed. Enjoy your new benefits!`
+          : `Congratulations! You've upgraded to ${newTier.displayName}. Enjoy your new benefits!`
         : `Your membership has changed to ${newTier.displayName}. Your new benefits are now active.`,
       priority: 'normal',
       channel: 'info',
@@ -1339,14 +1574,15 @@ export async function changeTier(
     logger.error({ err, membershipId: membership._id }, '[Membership] Failed to send tier change notification');
   }
 
-  // Audit log
+  // Audit log — includes resume metadata when Option A applied
   await auditMembershipEvent({
-    action: 'membership_tier_changed',
-    eventType: 'membership.tier_changed',
-    eventCategory: 'UPDATE',
+    action: resumedOnUpgrade ? 'membership_tier_changed_resumed' : 'membership_tier_changed',
+    eventType: resumedOnUpgrade ? 'membership.tier_changed_resumed' : 'membership.tier_changed',
+    eventCategory: 'FINANCIAL',
     operationType: 'UPDATE',
     resourceType: 'UserMembership',
     resourceId: membership._id.toString(),
+    subjectUserId: membership.userId.toString(),
     outcome: 'SUCCESS',
     severity: 'HIGH',
     metadata: {
@@ -1357,10 +1593,24 @@ export async function changeTier(
       newPrice: newTier.price,
       prorationAmount: prorationAmount || 0,
       stripeInvoiceId: prorationInvoiceId || null,
+      resumedOnUpgrade,
+      cancelledAtCleared: resumedOnUpgrade,
+      autoRenewAfter: resumedOnUpgrade ? true : membership.autoRenew,
     },
   });
 
-  return { membership, invoice, invoiceUrl };
+  logger.info(
+    {
+      membershipId: membership._id,
+      userId,
+      resumedOnUpgrade,
+      newTier: newTier.tier,
+      prorationAmount: prorationAmount || 0,
+    },
+    '[Membership] Tier change completed',
+  );
+
+  return { membership, invoice, invoiceUrl, resumedOnUpgrade };
 }
 
 // ─── Request Downgrade (Deferred) ────────────────────────────

@@ -98,6 +98,31 @@ if (ownerTier !== 'black') { ... }
 - New benefits activate immediately
 - Invoice email + tier-change email sent
 - Tag re-evaluation: `removeMembershipFromTags()` + `extendTagsForMembership()`
+- Response includes `resumedOnUpgrade: boolean`
+
+### Upgrade while cancelling — Option A (resume + upgrade)
+When `membership.cancelledAt` is set and customer confirms an immediate upgrade:
+
+1. Estimate returns `isCancelling: true`, `willResumeOnUpgrade: true`
+2. Stripe update **must** include `cancel_at_period_end: false` + new price + `create_prorations`
+3. Local fields cleared **only after Stripe success**: `cancelledAt`, `cancellationReason`, `autoRenew=true`
+4. Stripe failures (card error, missing sub, canceled sub) leave cancel state intact
+5. Stripe mode rejects missing/`demo` subscription IDs with `membership.subscription_missing` (HTTP 409)
+6. Audit action: `membership_tier_changed_resumed` with `resumedOnUpgrade` metadata
+7. UI (`MembershipSubscribe.tsx`) discloses resume on banner, estimate, and success
+8. Never invent free upgrades — provider must accept the charge/resume first
+
+### Typed tier-change errors (client recovery)
+
+| Code | HTTP | Client action |
+|---|---|---|
+| `membership.payment_method_required` | 402 | Open Billing Portal, retry upgrade |
+| `membership.subscription_missing` | 409 | Subscribe again / support |
+| `membership.subscription_not_active` | 409 | Subscribe again |
+| `membership.stripe_update_failed` | 502 | Retry later / support |
+| `membership.already_on_tier` | 409 | No action |
+
+Route maps `MembershipTierChangeError` → `{ success:false, error, code }`.
 
 ### Downgrades (deferred to renewal)
 - Backend: `requestDowngrade(userId, { tierId, reason, termsAccepted, termsVersion })`
@@ -133,6 +158,14 @@ if (ownerTier !== 'black') { ... }
 - `checkExpiredMemberships` job transitions to 'expired' at period end
 - Generates retention offer (15% off + free shipping)
 - Audit logged with `cancelAtPeriodEnd: true` metadata
+
+## Resume (undo scheduled cancellation)
+
+- Backend: `resumeMembership(userId)`
+- Only valid while `status === 'active'` and `cancelledAt` set
+- Stripe first: retrieve sub; reject `canceled`/`incomplete_expired`; set `cancel_at_period_end: false`
+- Local only after Stripe success: clear `cancelledAt`/`cancellationReason`, `autoRenew=true`
+- Upgrade while cancelling uses the same Stripe-first resume principle (Option A)
 
 ## Payment Failure Handling
 
@@ -211,8 +244,10 @@ Gated by entitlements: `emergency_contact`, `pet_recovery`
 - Run `pnpm typecheck` after changes
 - Run `pnpm lint` after changes
 - Test: Subscribe → Activate → View on manage page → Upgrade → Downgrade → Cancel
+- Test upgrade-while-cancelling: estimate shows resume; confirm resumes + upgrades; Stripe fail leaves cancel intact
 - Verify invoices created with INVM- prefix
 - Verify notifications delivered
-- Verify audit trail captures all events
+- Verify audit trail captures all events including `membership_tier_changed_resumed`
 - Test adding new tier via admin → verify it appears everywhere
 - Test adding new benefit via admin → verify it's enforced
+- Integration: `pnpm test:integration -- membership-upgrade membership-cancel-resume`

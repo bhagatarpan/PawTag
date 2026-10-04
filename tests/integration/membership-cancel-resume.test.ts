@@ -15,6 +15,7 @@ let otherToken: string;
 let goldTierId: string;
 
 beforeAll(async () => {
+  process.env.PAYMENT_MODE = 'fake';
   await setupTestDb();
 
   const userRes = await mongoose.connection.collections.users.insertOne({

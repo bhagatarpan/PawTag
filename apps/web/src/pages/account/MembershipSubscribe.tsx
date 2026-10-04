@@ -31,6 +31,8 @@ interface CurrentMembership {
     tierId: { _id: string; tier: string; displayName: string; price: number; displayOrder?: number; currency?: string };
     status: string;
     currentPeriodEnd: string;
+    cancelledAt?: string | null;
+    autoRenew?: boolean;
   } | null;
   tier: { _id: string; tier: string; displayName: string; price: number; displayOrder?: number; currency?: string } | null;
 }
@@ -48,6 +50,13 @@ interface TierChangeEstimate {
   currentPointsBalance: number;
   entitlementsLost: Array<{ key: string; name: string; currentValue: any; newValue: any }>;
   downgradeEffectiveDate: string;
+  isCancelling?: boolean;
+  willResumeOnUpgrade?: boolean;
+}
+
+interface MembershipChangeErrorBody {
+  error?: string;
+  code?: string;
 }
 
 export default function MembershipSubscribe() {
@@ -59,6 +68,7 @@ export default function MembershipSubscribe() {
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [membershipId, setMembershipId] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [errorCode, setErrorCode] = useState<string | undefined>(undefined);
   const [success, setSuccess] = useState(false);
 
   // Upgrade flow state
@@ -66,7 +76,7 @@ export default function MembershipSubscribe() {
   const [estimate, setEstimate] = useState<TierChangeEstimate | null>(null);
   const [estimateLoading, setEstimateLoading] = useState(false);
   const [confirmingUpgrade, setConfirmingUpgrade] = useState(false);
-  const [upgradeResult, setUpgradeResult] = useState<{ invoiceNumber?: string; prorationAmount?: number; currency?: string; isDowngrade?: boolean; effectiveDate?: string } | null>(null);
+  const [upgradeResult, setUpgradeResult] = useState<{ invoiceNumber?: string; prorationAmount?: number; currency?: string; isDowngrade?: boolean; effectiveDate?: string; resumedOnUpgrade?: boolean } | null>(null);
 
   // Downgrade consent state
   const [downgradeTermsAccepted, setDowngradeTermsAccepted] = useState(false);
@@ -74,6 +84,36 @@ export default function MembershipSubscribe() {
 
   const hasActiveMembership = currentMembership?.hasMembership && currentMembership.membership?.status === 'active';
   const currentTier = currentMembership?.tier || currentMembership?.membership?.tierId || null;
+  const isCancelling = Boolean(currentMembership?.membership?.cancelledAt);
+
+  function extractErrorPayload(err: any): MembershipChangeErrorBody {
+    const data = err?.response?.data;
+    return {
+      error: data?.error || err?.message,
+      code: data?.code,
+    };
+  }
+
+  function applyError(err: any, fallback: string) {
+    const payload = extractErrorPayload(err);
+    setError(payload.error || fallback);
+    setErrorCode(payload.code);
+  }
+
+  async function handleOpenBillingPortal() {
+    try {
+      const res = await api.post(API.customer.membership.paymentMethodsPortal);
+      const { url } = res.data.data || {};
+      if (url) {
+        window.open(url, '_blank');
+        setError('Update your payment method in the secure portal, then confirm the upgrade again.');
+      } else {
+        setError('Payment settings are not available in demo mode.');
+      }
+    } catch (err: any) {
+      applyError(err, 'Failed to open payment settings');
+    }
+  }
 
   useEffect(() => {
     fetchData();
@@ -148,7 +188,10 @@ export default function MembershipSubscribe() {
     const renewal = formatDate(est.renewalDate, 'medium');
 
     if (est.isUpgrade) {
-      return `You'll be charged ${amount} today for the remaining ${est.remainingDays} days of your current period. Your ${est.newTier.displayName} benefits start immediately, and your next full renewal of ${newPrice}/year will be on ${renewal}.`;
+      const resumeNote = est.willResumeOnUpgrade
+        ? ' This upgrade also resumes your membership (auto-renew will be turned back on).'
+        : '';
+      return `You'll be charged ${amount} today for the remaining ${est.remainingDays} days of your current period. Your ${est.newTier.displayName} benefits start immediately, and your next full renewal of ${newPrice}/year will be on ${renewal}.${resumeNote}`;
     }
     return `Your ${est.newTier.displayName} benefits start immediately. You won't be charged the new rate until your renewal on ${renewal}.`;
   }
@@ -159,6 +202,7 @@ export default function MembershipSubscribe() {
     setSelectedTier(tier);
     setProcessing(true);
     setError('');
+    setErrorCode(undefined);
 
     // Existing member — route to change-tier instead of subscribe
     if (hasActiveMembership) {
@@ -188,7 +232,7 @@ export default function MembershipSubscribe() {
         setProcessing(false);
       }
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to start subscription');
+      applyError(err, 'Failed to start subscription');
       setProcessing(false);
     }
   }
@@ -200,21 +244,23 @@ export default function MembershipSubscribe() {
         prorationBehavior: 'now',
       });
 
-      // changeTier returns { membership, invoice, invoiceUrl }
-      // The invoice contains the proration charge record (if Stripe created one)
-      const { invoice } = res.data.data || {};
+      // changeTier returns { membership, invoice, invoiceUrl, resumedOnUpgrade }
+      const { invoice, resumedOnUpgrade } = res.data.data || {};
       if (invoice) {
         setUpgradeResult({
           invoiceNumber: invoice.invoiceNumber,
           prorationAmount: invoice.amount,
           currency: invoice.currency,
+          resumedOnUpgrade: Boolean(resumedOnUpgrade),
         });
+      } else {
+        setUpgradeResult({ resumedOnUpgrade: Boolean(resumedOnUpgrade) });
       }
 
       setSuccess(true);
       setTimeout(() => navigate('/account/membership'), 4000);
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to change membership tier');
+      applyError(err, 'Failed to change membership tier');
       setProcessing(false);
       setConfirmingUpgrade(false);
     }
@@ -224,22 +270,25 @@ export default function MembershipSubscribe() {
    * Second confirmation step: user has seen the proration estimate and clicks confirm.
    * For upgrades: calls changeTier endpoint (immediate).
    * For downgrades: calls downgrade endpoint (deferred) — requires terms acceptance.
+   * Cancelling members: upgrade also resumes membership (Option A).
    */
   async function handleConfirmUpgrade(tier: MembershipTier) {
     // For downgrades, require terms acceptance
     if (estimate && !estimate.isUpgrade && !downgradeTermsAccepted) {
       setError('You must accept the downgrade terms to proceed');
+      setErrorCode(undefined);
       return;
     }
 
     setConfirmingUpgrade(true);
     setError('');
+    setErrorCode(undefined);
 
     if (estimate && !estimate.isUpgrade) {
       // Downgrade flow — deferred to renewal
       await handleDowngrade(tier);
     } else {
-      // Upgrade flow — immediate
+      // Upgrade flow — immediate (resume+upgrade when cancelling)
       await handleChangeTier(tier);
     }
   }
@@ -261,7 +310,7 @@ export default function MembershipSubscribe() {
       setSuccess(true);
       setTimeout(() => navigate('/account/membership'), 5000);
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to schedule downgrade');
+      applyError(err, 'Failed to schedule downgrade');
       setProcessing(false);
       setConfirmingUpgrade(false);
     }
@@ -291,6 +340,7 @@ export default function MembershipSubscribe() {
 
   function handlePaymentError(error: string) {
     setError(error);
+    setErrorCode(undefined);
     setProcessing(false);
     setClientSecret(null);
   }
@@ -339,10 +389,20 @@ export default function MembershipSubscribe() {
           <>
             <h1 className="text-2xl font-bold text-gray-900 mb-2">Welcome to {selectedTier?.displayName}!</h1>
             <p className="text-gray-500">
-              {hasActiveMembership
-                ? 'Your membership has been updated.'
-                : 'Your membership is being activated.'}
+              {upgradeResult?.resumedOnUpgrade
+                ? 'Your membership has been upgraded and resumed.'
+                : hasActiveMembership
+                  ? 'Your membership has been updated.'
+                  : 'Your membership is being activated.'}
             </p>
+            {upgradeResult?.resumedOnUpgrade && (
+              <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-xl text-left">
+                <p className="text-sm font-semibold text-amber-900 mb-1">Membership resumed</p>
+                <p className="text-sm text-amber-700">
+                  Auto-renew is back on. You'll keep {selectedTier?.displayName} benefits through your current period and beyond.
+                </p>
+              </div>
+            )}
             {upgradeResult?.invoiceNumber && (
               <div className="mt-6 p-4 bg-primary-50 border border-primary-200 rounded-xl text-left">
                 <p className="text-sm font-semibold text-primary-900 mb-1">Upgrade invoice</p>
@@ -392,9 +452,34 @@ export default function MembershipSubscribe() {
         </div>
       )}
 
+      {/* Cancelling membership — Option A: upgrade also resumes */}
+      {hasActiveMembership && isCancelling && (
+        <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+          <div className="flex items-start gap-3">
+            <AlertTriangle size={18} className="text-amber-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-amber-900">Your membership is scheduled to cancel</p>
+              <p className="text-sm text-amber-700 mt-1">
+                Benefits stay active until {currentMembership?.membership?.currentPeriodEnd ? formatDate(currentMembership.membership.currentPeriodEnd, 'long') : 'your renewal date'}.
+                If you upgrade now, your membership will also be <span className="font-semibold">resumed</span> (auto-renew turned back on).
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {error && (
         <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
-          {error}
+          <div role="alert">{error}</div>
+          {errorCode === 'membership.payment_method_required' && (
+            <button
+              type="button"
+              onClick={handleOpenBillingPortal}
+              className="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition-colors"
+            >
+              Update payment method
+            </button>
+          )}
         </div>
       )}
 
@@ -437,6 +522,11 @@ export default function MembershipSubscribe() {
                 {estimate.isUpgrade ? 'Upgrade' : 'Downgrade'} to {estimate.newTier.displayName}
               </h3>
               <p className="text-sm text-gray-600">{buildEstimateMessage(estimate)}</p>
+              {estimate.willResumeOnUpgrade && (
+                <p className="text-xs text-amber-700 mt-2 font-medium">
+                  Confirming this upgrade will also resume your scheduled cancellation.
+                </p>
+              )}
             </div>
           </div>
 

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
 import mongoose from 'mongoose';
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
@@ -14,9 +14,10 @@ let platinumTierId: string;
 let blackTierId: string;
 
 beforeAll(async () => {
+  // Existing upgrade tests exercise local/fake-mode paths (no live Stripe calls).
+  process.env.PAYMENT_MODE = 'fake';
   await setupTestDb();
 
-  // Create customer user
   const userRes = await mongoose.connection.collections.users.insertOne({
     email: 'upgrade-test@example.com',
     passwordHash: '$2a$12$abcdefghijklmnopqrstuuABCDEFGHIJKLMNOPQRSTUVWXYZ012',
@@ -33,7 +34,6 @@ beforeAll(async () => {
   userId = userRes.insertedId.toString();
   token = jwt.sign({ id: userId, email: 'upgrade-test@example.com', role: 'customer' }, config.jwtSecret, { expiresIn: '1h' });
 
-  // Create membership tiers
   const goldRes = await mongoose.connection.collections.membershiptiers.insertOne({
     tier: 'gold',
     name: 'Gold',
@@ -88,7 +88,6 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
-  // Clean membership data between tests, keep tiers
   await mongoose.connection.collections.usermemberships?.deleteMany({});
   await mongoose.connection.collections.invoices?.deleteMany({});
 });
@@ -97,12 +96,16 @@ beforeEach(async () => {
  * Helper: create an active Gold membership for the test user.
  * Starts 90 days ago, ends in ~275 days (total 365).
  */
-async function createActiveGoldMembership() {
+async function createActiveGoldMembership(opts?: {
+  cancelledAt?: Date | null;
+  autoRenew?: boolean;
+  stripeSubscriptionId?: string | null;
+}) {
   const now = new Date();
   const periodStart = new Date(now);
-  periodStart.setDate(periodStart.getDate() - 90); // 90 days ago
+  periodStart.setDate(periodStart.getDate() - 90);
   const periodEnd = new Date(now);
-  periodEnd.setDate(periodEnd.getDate() + 275); // 275 days remaining
+  periodEnd.setDate(periodEnd.getDate() + 275);
 
   const res = await mongoose.connection.collections.usermemberships.insertOne({
     userId: new mongoose.Types.ObjectId(userId),
@@ -114,7 +117,10 @@ async function createActiveGoldMembership() {
     startDate: periodStart,
     currentPeriodStart: periodStart,
     currentPeriodEnd: periodEnd,
-    autoRenew: true,
+    autoRenew: opts?.autoRenew ?? true,
+    cancelledAt: opts?.cancelledAt ?? null,
+    cancellationReason: opts?.cancelledAt ? 'Too expensive' : undefined,
+    stripeSubscriptionId: opts?.stripeSubscriptionId ?? null,
     adminExtensionGraceUsed: false,
     adminExtensionCount: 0,
     createdAt: periodStart,
@@ -166,23 +172,31 @@ describe('Membership Upgrade Flow', () => {
       expect(estimate.newTier.tier).toBe('platinum');
       expect(estimate.isUpgrade).toBe(true);
       expect(estimate.currency).toBe('NZD');
+      expect(estimate.isCancelling).toBe(false);
+      expect(estimate.willResumeOnUpgrade).toBe(false);
 
-      // Price difference: $99 - $89 = $10
-      // Remaining ~275 of 365 days → prorated ≈ $10 * 275/365 ≈ $7.53
       expect(estimate.remainingDays).toBeGreaterThan(270);
       expect(estimate.remainingDays).toBeLessThanOrEqual(276);
       expect(estimate.totalDays).toBe(365);
       expect(estimate.proratedAmount).toBeGreaterThan(7);
       expect(estimate.proratedAmount).toBeLessThan(8);
 
-      // renewalDate should be an ISO string (data-only response, no pre-formatting)
       expect(estimate.renewalDate).toBeDefined();
       expect(new Date(estimate.renewalDate).getTime()).not.toBeNaN();
-      // Should NOT be a pre-formatted display string
       expect(estimate.renewalDate).not.toContain('Sep');
-
-      // Response should NOT contain a pre-formatted message (frontend builds its own copy)
       expect(estimate.message).toBeUndefined();
+    });
+
+    it('flags cancelling membership with willResumeOnUpgrade for upgrades', async () => {
+      await createActiveGoldMembership({ cancelledAt: new Date(), autoRenew: false });
+
+      const res = await request(app)
+        .get(`/api/membership/change-tier/estimate?tierId=${platinumTierId}`)
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.isCancelling).toBe(true);
+      expect(res.body.data.willResumeOnUpgrade).toBe(true);
     });
 
     it('returns 400 when target tier is same as current tier', async () => {
@@ -208,20 +222,6 @@ describe('Membership Upgrade Flow', () => {
     });
   });
 
-  describe('POST /api/membership/subscribe with existing membership', () => {
-    it('rejects subscribe when user already has an active membership', async () => {
-      await createActiveGoldMembership();
-
-      const res = await request(app)
-        .post('/api/membership/subscribe')
-        .set('Authorization', `Bearer ${token}`)
-        .send({ tierId: platinumTierId });
-
-      expect(res.status).toBe(400);
-      expect(res.body.error).toBe('You already have an active membership');
-    });
-  });
-
   describe('POST /api/membership/change-tier', () => {
     it('returns 401 without auth token', async () => {
       const res = await request(app)
@@ -239,6 +239,7 @@ describe('Membership Upgrade Flow', () => {
 
       expect(res.status).toBe(400);
       expect(res.body.error).toBe('tierId is required');
+      expect(res.body.code).toBe('membership.tier_required');
     });
 
     it('returns 400 when user has no active membership', async () => {
@@ -249,6 +250,7 @@ describe('Membership Upgrade Flow', () => {
 
       expect(res.status).toBe(400);
       expect(res.body.error).toBe('No active membership found');
+      expect(res.body.code).toBe('membership.no_active_membership');
     });
 
     it('successfully upgrades Gold → Platinum', async () => {
@@ -261,23 +263,17 @@ describe('Membership Upgrade Flow', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
-
-      // Response should include membership + invoice fields
       expect(res.body.data.membership).toBeDefined();
       expect(res.body.data.invoice).toBeDefined();
-
-      // In fake mode (no Stripe), invoice is null — no proration charge occurred
-      // In Stripe mode, invoice would contain the proration record
+      expect(res.body.data.resumedOnUpgrade).toBe(false);
       expect(res.body.data.invoice).toBeNull();
 
-      // Verify the membership document was updated
       const updated = await mongoose.connection.collections.usermemberships
         .findOne({ _id: new mongoose.Types.ObjectId(membershipId) });
       expect(updated).toBeTruthy();
       expect(updated!.tierId.toString()).toBe(platinumTierId);
       expect(updated!.price).toBe(99);
 
-      // Renewal date should NOT change (same billing period)
       const now = new Date();
       const periodEnd = updated!.currentPeriodEnd;
       const daysUntilRenewal = Math.ceil((periodEnd.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
@@ -285,7 +281,7 @@ describe('Membership Upgrade Flow', () => {
       expect(daysUntilRenewal).toBeLessThanOrEqual(276);
     });
 
-    it('returns 400 when trying to change to same tier', async () => {
+    it('returns 409 when trying to change to same tier', async () => {
       await createActiveGoldMembership();
 
       const res = await request(app)
@@ -293,8 +289,9 @@ describe('Membership Upgrade Flow', () => {
         .set('Authorization', `Bearer ${token}`)
         .send({ tierId: goldTierId });
 
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(409);
       expect(res.body.error).toBe('Already on this tier');
+      expect(res.body.code).toBe('membership.already_on_tier');
     });
 
     it('creates only one membership document after upgrade (no duplicates)', async () => {
@@ -311,6 +308,197 @@ describe('Membership Upgrade Flow', () => {
 
       expect(memberships.length).toBe(1);
       expect(memberships[0].tierId.toString()).toBe(platinumTierId);
+    });
+
+    describe('Option A — upgrade while cancelling resumes membership', () => {
+      it('resumes cancelling membership on upgrade (fake mode)', async () => {
+        const { membershipId } = await createActiveGoldMembership({
+          cancelledAt: new Date(),
+          autoRenew: false,
+        });
+
+        const res = await request(app)
+          .post('/api/membership/change-tier')
+          .set('Authorization', `Bearer ${token}`)
+          .send({ tierId: platinumTierId, prorationBehavior: 'now' });
+
+        expect(res.status).toBe(200);
+        expect(res.body.data.resumedOnUpgrade).toBe(true);
+
+        const updated = await mongoose.connection.collections.usermemberships
+          .findOne({ _id: new mongoose.Types.ObjectId(membershipId) });
+        expect(updated!.tierId.toString()).toBe(platinumTierId);
+        expect(updated!.price).toBe(99);
+        expect(updated!.cancelledAt).toBeFalsy();
+        expect(updated!.autoRenew).toBe(true);
+      });
+
+      it('returns membership.subscription_missing in stripe mode without a valid subscription', async () => {
+        process.env.PAYMENT_MODE = 'stripe_test';
+        try {
+          await createActiveGoldMembership({
+            cancelledAt: new Date(),
+            autoRenew: false,
+            stripeSubscriptionId: null,
+          });
+
+          const res = await request(app)
+            .post('/api/membership/change-tier')
+            .set('Authorization', `Bearer ${token}`)
+            .send({ tierId: platinumTierId, prorationBehavior: 'now' });
+
+          expect(res.status).toBe(409);
+          expect(res.body.code).toBe('membership.subscription_missing');
+
+          const updated = await mongoose.connection.collections.usermemberships.findOne({});
+          expect(updated!.cancelledAt).toBeTruthy();
+          expect(updated!.autoRenew).toBe(false);
+          expect(updated!.tierId.toString()).toBe(goldTierId);
+        } finally {
+          process.env.PAYMENT_MODE = 'fake';
+        }
+      });
+
+      it('rejects demo subscription ids in stripe mode (never calls Stripe with demo)', async () => {
+        process.env.PAYMENT_MODE = 'stripe_test';
+        try {
+          await createActiveGoldMembership({
+            cancelledAt: new Date(),
+            autoRenew: false,
+            stripeSubscriptionId: 'demo',
+          });
+
+          const res = await request(app)
+            .post('/api/membership/change-tier')
+            .set('Authorization', `Bearer ${token}`)
+            .send({ tierId: platinumTierId, prorationBehavior: 'now' });
+
+          expect(res.status).toBe(409);
+          expect(res.body.code).toBe('membership.subscription_missing');
+        } finally {
+          process.env.PAYMENT_MODE = 'fake';
+        }
+      });
+
+      it('keeps cancel state when Stripe update fails (stripe mode + mocked Stripe)', async () => {
+        process.env.PAYMENT_MODE = 'stripe_test';
+        process.env.STRIPE_SECRET_KEY = 'sk_test_mock_key_for_membership_upgrade';
+        const membershipService = await import('../../packages/api/src/services/membership.service');
+
+        const retrieve = vi.fn().mockResolvedValue({
+          id: 'sub_mock_123',
+          status: 'active',
+          cancel_at_period_end: true,
+          default_payment_method: 'pm_mock',
+          items: { data: [{ id: 'si_mock_1', price: { id: 'price_gold' } }] },
+        });
+        const update = vi.fn().mockRejectedValue(
+          Object.assign(new Error('This card was declined.'), {
+            type: 'StripeCardError',
+            code: 'card_error',
+          }),
+        );
+
+        membershipService.setStripeClientForTests({
+          subscriptions: { retrieve, update },
+          prices: { create: vi.fn() },
+        } as any);
+
+        try {
+          const { membershipId } = await createActiveGoldMembership({
+            cancelledAt: new Date(),
+            autoRenew: false,
+            stripeSubscriptionId: 'sub_mock_123',
+          });
+          await mongoose.connection.collections.membershiptiers.updateOne(
+            { _id: new mongoose.Types.ObjectId(platinumTierId) },
+            { $set: { stripePriceId: 'price_platinum_mock' } },
+          );
+
+          const res = await request(app)
+            .post('/api/membership/change-tier')
+            .set('Authorization', `Bearer ${token}`)
+            .send({ tierId: platinumTierId, prorationBehavior: 'now' });
+
+          expect(res.status).toBe(402);
+          expect(res.body.code).toBe('membership.payment_method_required');
+          expect(update).toHaveBeenCalled();
+          expect(update.mock.calls[0][1].cancel_at_period_end).toBe(false);
+
+          const updated = await mongoose.connection.collections.usermemberships
+            .findOne({ _id: new mongoose.Types.ObjectId(membershipId) });
+          expect(updated!.cancelledAt).toBeTruthy();
+          expect(updated!.autoRenew).toBe(false);
+          expect(updated!.tierId.toString()).toBe(goldTierId);
+        } finally {
+          membershipService.setStripeClientForTests(null);
+          process.env.PAYMENT_MODE = 'fake';
+          delete process.env.STRIPE_SECRET_KEY;
+        }
+      });
+
+      it('resumes when Stripe accepts resume+upgrade (stripe mode + mocked Stripe)', async () => {
+        process.env.PAYMENT_MODE = 'stripe_test';
+        process.env.STRIPE_SECRET_KEY = 'sk_test_mock_key_for_membership_upgrade';
+        const membershipService = await import('../../packages/api/src/services/membership.service');
+
+        const retrieve = vi.fn().mockResolvedValue({
+          id: 'sub_mock_ok',
+          status: 'active',
+          cancel_at_period_end: true,
+          default_payment_method: 'pm_mock',
+          items: { data: [{ id: 'si_mock_ok', price: { id: 'price_gold' } }] },
+        });
+        const update = vi.fn().mockResolvedValue({
+          id: 'sub_mock_ok',
+          status: 'active',
+          cancel_at_period_end: false,
+          latest_invoice: {
+            id: 'in_proration_mock',
+            amount_due: 995,
+            currency: 'nzd',
+          },
+        });
+
+        membershipService.setStripeClientForTests({
+          subscriptions: { retrieve, update },
+          prices: { create: vi.fn() },
+        } as any);
+
+        try {
+          const { membershipId } = await createActiveGoldMembership({
+            cancelledAt: new Date(),
+            autoRenew: false,
+            stripeSubscriptionId: 'sub_mock_ok',
+          });
+          await mongoose.connection.collections.membershiptiers.updateOne(
+            { _id: new mongoose.Types.ObjectId(platinumTierId) },
+            { $set: { stripePriceId: 'price_platinum_mock' } },
+          );
+
+          const res = await request(app)
+            .post('/api/membership/change-tier')
+            .set('Authorization', `Bearer ${token}`)
+            .send({ tierId: platinumTierId, prorationBehavior: 'now' });
+
+          expect(res.status).toBe(200);
+          expect(res.body.data.resumedOnUpgrade).toBe(true);
+          expect(res.body.data.invoice).toBeTruthy();
+          expect(res.body.data.invoice.amount).toBe(9.95);
+          expect(update.mock.calls[0][1].cancel_at_period_end).toBe(false);
+          expect(update.mock.calls[0][1].proration_behavior).toBe('create_prorations');
+
+          const updated = await mongoose.connection.collections.usermemberships
+            .findOne({ _id: new mongoose.Types.ObjectId(membershipId) });
+          expect(updated!.tierId.toString()).toBe(platinumTierId);
+          expect(updated!.cancelledAt).toBeFalsy();
+          expect(updated!.autoRenew).toBe(true);
+        } finally {
+          membershipService.setStripeClientForTests(null);
+          process.env.PAYMENT_MODE = 'fake';
+          delete process.env.STRIPE_SECRET_KEY;
+        }
+      });
     });
   });
 
@@ -350,10 +538,6 @@ describe('Membership Upgrade Flow', () => {
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
       expect(Array.isArray(res.body.data)).toBe(true);
-
-      // In fake mode, no Stripe proration invoice is created, so the list is empty.
-      // In Stripe mode, the upgrade proration invoice would appear here.
-      // The endpoint itself works and returns the correct shape.
     });
 
     it('returns 401 without auth token', async () => {

@@ -14,6 +14,7 @@ import {
   requestDowngrade,
   cancelPendingDowngrade,
   checkTagAccess,
+  MembershipTierChangeError,
 } from '../services/membership.service';
 import { membershipEntitlementService } from '../services/membership-entitlement.service';
 import { isFakeMode } from '../commerce/payment-mode';
@@ -21,6 +22,35 @@ import logger from '../lib/logger';
 
 const router = Router();
 router.use(authenticate);
+
+/**
+ * Map membership tier-change/service errors to stable HTTP responses.
+ * Clients can branch on `code` for recovery (e.g. payment_method_required).
+ */
+function sendMembershipError(res: Response, error: any, fallbackMessage: string): void {
+  if (error instanceof MembershipTierChangeError) {
+    res.status(error.httpStatus).json({
+      success: false,
+      error: error.userMessage || error.message,
+      code: error.membershipCode,
+    });
+    return;
+  }
+
+  if (error?.membershipCode) {
+    res.status(error.httpStatus || 400).json({
+      success: false,
+      error: error.userMessage || error.message || fallbackMessage,
+      code: error.membershipCode,
+    });
+    return;
+  }
+
+  res.status(400).json({
+    success: false,
+    error: error?.message || fallbackMessage,
+  });
+}
 
 /**
  * GET /api/membership/tiers
@@ -157,13 +187,14 @@ router.post('/resume', async (req: AuthRequest, res: Response) => {
 
 /**
  * GET /api/membership/change-tier/estimate?tierId=xxx
- * Estimate the prorated charge for a tier change (preview before confirm)
+ * Estimate the prorated charge for a tier change (preview before confirm).
+ * Includes isCancelling / willResumeOnUpgrade for Option A upgrade-while-cancelling.
  */
 router.get('/change-tier/estimate', async (req: AuthRequest, res: Response) => {
   try {
     const tierId = req.query.tierId as string;
     if (!tierId) {
-      res.status(400).json({ success: false, error: 'tierId is required' });
+      res.status(400).json({ success: false, error: 'tierId is required', code: 'membership.tier_required' });
       return;
     }
 
@@ -171,19 +202,20 @@ router.get('/change-tier/estimate', async (req: AuthRequest, res: Response) => {
     res.json({ success: true, data: estimate });
   } catch (error: any) {
     logger.error({ err: error, userId: req.user?.id }, '[Membership] Change tier estimate error');
-    res.status(400).json({ success: false, error: error.message || 'Failed to estimate tier change' });
+    sendMembershipError(res, error, 'Failed to estimate tier change');
   }
 });
 
 /**
  * POST /api/membership/change-tier
- * Change membership tier
+ * Change membership tier.
+ * Cancelling members: immediate upgrade also resumes (clears cancel + auto-renew on).
  */
 router.post('/change-tier', async (req: AuthRequest, res: Response) => {
   try {
     const { tierId, prorationBehavior } = req.body;
     if (!tierId) {
-      res.status(400).json({ success: false, error: 'tierId is required' });
+      res.status(400).json({ success: false, error: 'tierId is required', code: 'membership.tier_required' });
       return;
     }
 
@@ -194,11 +226,20 @@ router.post('/change-tier', async (req: AuthRequest, res: Response) => {
         membership: result.membership,
         invoice: result.invoice,
         invoiceUrl: result.invoiceUrl,
+        resumedOnUpgrade: result.resumedOnUpgrade,
       },
     });
   } catch (error: any) {
-    logger.error({ err: error, userId: req.user?.id }, '[Membership] Change tier error');
-    res.status(400).json({ success: false, error: error.message || 'Failed to change tier' });
+    logger.error(
+      {
+        err: error,
+        userId: req.user?.id,
+        membershipCode: error?.membershipCode,
+        stripeCode: error?.metadata?.stripeCode,
+      },
+      '[Membership] Change tier error',
+    );
+    sendMembershipError(res, error, 'Failed to change tier');
   }
 });
 

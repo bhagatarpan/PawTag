@@ -671,7 +671,21 @@ Finder pet-found and emergency escalation notifications respect the entitlement 
 | Action | Timing | Stripe | Local State |
 |---|---|---|---|
 | **Upgrade** | Immediate | `proration_behavior: 'create_prorations'`, charges now | `tierId` changes immediately |
+| **Upgrade while cancelling** | Immediate + **resume** | Price change + `cancel_at_period_end: false` + proration now | Clears `cancelledAt`, `autoRenew=true`, new `tierId` |
 | **Downgrade** | Deferred to renewal | Price updated for next renewal, no immediate charge | `pendingTierId` set, current tier active until `currentPeriodEnd` |
+
+## Upgrade-while-cancelling (Option A — product rule)
+
+When a membership is in the cancel-at-period-end window (`cancelledAt` set, `status` still `active`):
+
+1. Customer may still open `/account/membership/subscribe` and choose a higher tier.
+2. Estimate returns `isCancelling: true` and `willResumeOnUpgrade: true`.
+3. Confirming an immediate upgrade **also resumes** membership:
+   - Stripe: update price + `cancel_at_period_end: false` + proration now
+   - Local (only after Stripe success): clear `cancelledAt`/`cancellationReason`, set `autoRenew=true`, apply new tier
+4. Fail closed: if Stripe rejects (missing sub, canceled sub, card error), local cancel state and tier stay unchanged.
+5. Never grant a higher tier without Stripe accepting the resume+proration operation in `stripe_test`/`stripe_live`.
+6. UI must disclose resume on estimate + success (`MembershipSubscribe.tsx`).
 
 ## Downgrade Business Rules
 
@@ -696,6 +710,8 @@ Example: Black (3×) → Gold (1×): customer loses 2/3 of points earned at Blac
 - `User.membershipTier` NOT nulled until expiry
 - Tags remain active until expiry
 - Email copy must match actual behavior
+- **Resume** (`POST /membership/resume`) clears Stripe `cancel_at_period_end` first, then local `cancelledAt`/`autoRenew`
+- **Upgrade while cancelling** also resumes (see Option A above)
 
 ## Payment Failure Rules
 
@@ -704,6 +720,7 @@ Example: Black (3×) → Gold (1×): customer loses 2/3 of points earned at Blac
 - Notifies customer + alerts CSR
 - Stripe retries automatically; membership NOT expired on first failure
 - Expiry only after grace period or all retries exhausted
+- Tier-change/payment-method failures return typed codes (e.g. `membership.payment_method_required`) so UI can open Billing Portal
 
 ## Renewal Rules
 
@@ -719,6 +736,7 @@ Example: Black (3×) → Gold (1×): customer loses 2/3 of points earned at Blac
 - Customer manages cards via Stripe Billing Portal
 - `GET /membership/payment-methods` — list from Stripe Customer
 - `POST /membership/payment-methods/portal` — Billing Portal session
+- Upgrade errors with `code=membership.payment_method_required` should offer this portal
 
 ## Audit Requirements
 
@@ -727,6 +745,9 @@ Every membership lifecycle action must generate audit events with:
 - Real request context (IP, user-agent) where available
 - Business metadata (tier IDs, amounts, reasons)
 - Downgrade acceptance metadata (termsVersion, termsAcceptedAt)
+- Resume-on-upgrade metadata: `resumedOnUpgrade`, `cancelledAtCleared`, `autoRenewAfter`
+- Audit action: `membership_tier_changed_resumed` when Option A applied; otherwise `membership_tier_changed`
+- Operational logs include Stripe `err.code`/`err.type` on provider failures (never secrets)
 
 ---
 

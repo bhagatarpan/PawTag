@@ -527,6 +527,26 @@ Membership tier displays (badges, cards, progress indicators) must use these des
 | **Platinum** | `bg-gray-100 text-gray-700` | `bg-gray-50` | `text-gray-600` |
 | **Black** | `bg-gray-800 text-white` | `bg-gray-900` | `text-white` |
 
+### Membership Upgrade-While-Cancelling Pattern (Option A)
+
+When a member has scheduled cancellation (`cancelledAt` set, status still active) and opens `/account/membership/subscribe`:
+
+| Element | Classes / Behavior |
+|---------|-------------------|
+| **Cancelling banner** | `mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl` |
+| **Banner icon** | Lucide `AlertTriangle` `size={18} className="text-amber-600 shrink-0 mt-0.5"` |
+| **Banner title** | `text-sm font-semibold text-amber-900` — "Your membership is scheduled to cancel" |
+| **Banner body** | `text-sm text-amber-700` — benefits until date + upgrade will **resume** membership |
+| **Estimate resume note** | Estimate panel includes resume sentence + `text-xs text-amber-700 mt-2 font-medium` confirmation line |
+| **Success resume box** | `mt-4 p-4 bg-amber-50 border border-amber-200 rounded-xl` — "Membership resumed" / auto-renew on |
+| **Payment method recovery** | On error `code=membership.payment_method_required`, red alert + `bg-red-600 text-white` "Update payment method" → Billing Portal |
+
+Server contract:
+
+- Estimate: `isCancelling`, `willResumeOnUpgrade`
+- Change-tier success: `data.resumedOnUpgrade`
+- Change-tier errors: `{ error, code }` with codes like `membership.payment_method_required`, `membership.subscription_missing`, `membership.subscription_not_active`
+
 ### Guardian Points Display
 
 Guardian Points progress and balance displays must use these design tokens.
