@@ -602,6 +602,8 @@ pnpm dev:admin
 pnpm dev:finder
 ```
 
+**Shared package note:** Customer web (and web tests) import `@pawtag/shared` from TypeScript source via Vite aliases (`apps/web/vite.config.ts`). API runtime uses `packages/shared/dist` — run `pnpm build:shared` (or `pnpm --filter @pawtag/shared build`) after changing shared contracts if the API process is not using tsx watch. After editing shared code in web dev, restart the Vite server so aliases pick up new exports.
+
 ## Mobile
 
 ```bash
