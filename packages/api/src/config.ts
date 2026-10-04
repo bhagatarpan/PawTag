@@ -1,9 +1,34 @@
+import fs from 'fs';
 import path from 'path';
 import dotenv from 'dotenv';
 import { validateEnv } from './config/validateEnv';
 
-// Load .env from packages/api directory (not CWD)
-dotenv.config({ path: path.join(__dirname, '../.env') });
+/**
+ * Load API env files in priority order without overwriting already-set vars:
+ * 1) packages/api/.env
+ * 2) packages/api/.env.local
+ * 3) monorepo root .env (dev convenience)
+ *
+ * __dirname works for both tsx (src) and compiled dist.
+ */
+function loadApiEnvFiles(): void {
+  const candidates = [
+    path.join(__dirname, '../.env'),
+    path.join(__dirname, '../.env.local'),
+    path.join(__dirname, '../../../.env'),
+  ];
+
+  for (const envPath of candidates) {
+    if (!fs.existsSync(envPath)) continue;
+    const result = dotenv.config({ path: envPath });
+    if (result.error) {
+      // Non-fatal — continue with other files
+      continue;
+    }
+  }
+}
+
+loadApiEnvFiles();
 validateEnv();
 
 const parseAllowedOrigins = (): string[] => {

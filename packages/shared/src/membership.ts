@@ -86,6 +86,24 @@ export function requiresPaymentMethodRecovery(code: string | undefined | null): 
   return code === MEMBERSHIP_TIER_CHANGE_CODES.PAYMENT_METHOD_REQUIRED;
 }
 
+/**
+ * True when membership billing subscription is missing/ended/invalid.
+ * Customer must subscribe again — never grant a free higher tier.
+ */
+export function requiresResubscribeRecovery(code: string | undefined | null): boolean {
+  return (
+    code === MEMBERSHIP_TIER_CHANGE_CODES.SUBSCRIPTION_MISSING ||
+    code === MEMBERSHIP_TIER_CHANGE_CODES.SUBSCRIPTION_NOT_ACTIVE ||
+    code === MEMBERSHIP_TIER_CHANGE_CODES.SUBSCRIPTION_INVALID
+  );
+}
+
+/** True when the response body includes a machine-readable membership code. */
+export function isMembershipTierChangeCode(code: string | undefined | null): code is MembershipTierChangeCode {
+  if (!code) return false;
+  return (Object.values(MEMBERSHIP_TIER_CHANGE_CODES) as string[]).includes(code);
+}
+
 // ============================================================
 // Stripe cancel_at_period_end sync (Billing Portal cancel/resume)
 // One domain rule for UserMembership and tag Subscription.

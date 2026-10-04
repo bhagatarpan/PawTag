@@ -123,10 +123,35 @@ function validateAlwaysRequired(nodeEnv: string): string[] {
 function validateFeatureRequired(nodeEnv: string): string[] {
   const errors: string[] = [];
 
+  // Payments — required when Stripe mode is active (any environment)
+  const paymentMode = process.env.PAYMENT_MODE?.trim().toLowerCase();
+  if (paymentMode === 'stripe_test' || paymentMode === 'stripe_live') {
+    if (!process.env.STRIPE_SECRET_KEY) {
+      errors.push(
+        `PAYMENT_MODE=${paymentMode} requires STRIPE_SECRET_KEY. ` +
+          'Without it, membership tier changes fail with membership.subscription_missing (409). ' +
+          'Set the key in packages/api/.env and restart the API.',
+      );
+    }
+    if (!process.env.STRIPE_WEBHOOK_SECRET) {
+      logger.warn(
+        { variable: 'STRIPE_WEBHOOK_SECRET' },
+        `Config: STRIPE_WEBHOOK_SECRET is not set — Stripe webhooks will fail signature verification in ${paymentMode}`,
+      );
+    }
+  } else if (!paymentMode || paymentMode === 'fake') {
+    if (process.env.STRIPE_SECRET_KEY && process.env.STRIPE_SECRET_KEY !== 'sk_test_demo_key') {
+      logger.warn(
+        { variable: 'PAYMENT_MODE' },
+        'Config: STRIPE_SECRET_KEY is set but PAYMENT_MODE is fake/missing — Stripe API calls are disabled. ' +
+          'Set PAYMENT_MODE=stripe_test for local Stripe Test.',
+      );
+    }
+  }
+
   // Payments - always required in production
   if (nodeEnv === 'production') {
     // Validate PAYMENT_MODE is explicitly set and valid
-    const paymentMode = process.env.PAYMENT_MODE?.trim().toLowerCase();
     if (!paymentMode) {
       errors.push(
         'PAYMENT_MODE is required in production. Set it to "stripe_live". ' +

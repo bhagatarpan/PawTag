@@ -27,8 +27,11 @@
  *    Stripe / Email / SMS / Shipping
  */
 
+import path from 'path';
 import dotenv from 'dotenv';
-dotenv.config();
+// Same env loading as API config (packages/api/.env, not CWD-dependent)
+dotenv.config({ path: path.join(__dirname, '../.env') });
+dotenv.config({ path: path.join(__dirname, '../.env.local') });
 
 // Set worker role before any other imports
 process.env.PAWTAG_WORKER_ROLE = 'worker';

@@ -6,6 +6,8 @@ import {
   formatCurrency,
   formatDate,
   requiresPaymentMethodRecovery,
+  requiresResubscribeRecovery,
+  isMembershipTierChangeCode,
   type MembershipChangeErrorBody,
   type MembershipTierSummary,
   type TierChangeEstimate,
@@ -67,6 +69,8 @@ export default function MembershipSubscribe() {
   const currentTier = currentMembership?.tier || currentMembership?.membership?.tierId || null;
   const isCancelling = Boolean(currentMembership?.membership?.cancelledAt);
   const showPaymentMethodRecovery = requiresPaymentMethodRecovery(errorCode);
+  const showResubscribeRecovery = requiresResubscribeRecovery(errorCode);
+  const showMembershipErrorCode = isMembershipTierChangeCode(errorCode);
 
   function applyError(err: any, fallback: string) {
     const data = err?.response?.data as MembershipChangeErrorBody | undefined;
@@ -453,6 +457,25 @@ export default function MembershipSubscribe() {
             >
               Update payment method
             </button>
+          )}
+          {showResubscribeRecovery && (
+            <div className="mt-3">
+              <p className="text-sm text-red-700 mb-2">
+                Your membership billing subscription is missing or has ended at the payment provider.
+                Upgrade cannot continue until you have an active paid subscription.
+              </p>
+              <Link
+                to="/membership"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition-colors"
+              >
+                Subscribe again
+              </Link>
+            </div>
+          )}
+          {showMembershipErrorCode && (
+            <p className="mt-3 text-xs text-red-600 font-mono" data-testid="membership-error-code">
+              Code: {errorCode}
+            </p>
           )}
         </div>
       )}

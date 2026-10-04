@@ -3,7 +3,9 @@ import {
   MEMBERSHIP_TIER_CHANGE_CODES,
   MEMBERSHIP_TIER_CHANGE_HTTP_STATUS,
   goldStripePriceSettingKey,
+  isMembershipTierChangeCode,
   requiresPaymentMethodRecovery,
+  requiresResubscribeRecovery,
   resolveStripeCancelSyncAction,
 } from '../../packages/shared/src/membership';
 
@@ -72,6 +74,18 @@ describe('membership tier-change contracts', () => {
   it('detects payment method recovery codes', () => {
     expect(requiresPaymentMethodRecovery(MEMBERSHIP_TIER_CHANGE_CODES.PAYMENT_METHOD_REQUIRED)).toBe(true);
     expect(requiresPaymentMethodRecovery(MEMBERSHIP_TIER_CHANGE_CODES.STRIPE_UPDATE_FAILED)).toBe(false);
+  });
+
+  it('detects resubscribe recovery codes for broken billing subscriptions', () => {
+    expect(requiresResubscribeRecovery(MEMBERSHIP_TIER_CHANGE_CODES.SUBSCRIPTION_MISSING)).toBe(true);
+    expect(requiresResubscribeRecovery(MEMBERSHIP_TIER_CHANGE_CODES.SUBSCRIPTION_NOT_ACTIVE)).toBe(true);
+    expect(requiresResubscribeRecovery(MEMBERSHIP_TIER_CHANGE_CODES.SUBSCRIPTION_INVALID)).toBe(true);
+    expect(requiresResubscribeRecovery(MEMBERSHIP_TIER_CHANGE_CODES.PAYMENT_METHOD_REQUIRED)).toBe(false);
+  });
+
+  it('recognizes membership tier-change codes', () => {
+    expect(isMembershipTierChangeCode(MEMBERSHIP_TIER_CHANGE_CODES.SUBSCRIPTION_MISSING)).toBe(true);
+    expect(isMembershipTierChangeCode('not_a_code')).toBe(false);
   });
 
   it('uses one gold stripe price setting key convention', () => {
