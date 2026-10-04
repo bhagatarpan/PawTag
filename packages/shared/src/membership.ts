@@ -143,4 +143,4 @@ export function goldStripePriceSettingKey(interval: GoldBillingInterval): string
 }
 
 export const DEFAULT_CURRENCY = 'NZD';
-export const STRIPE_CURRENCY_NZD = 'nzd';
+export { STRIPE_DEFAULT_CURRENCY as STRIPE_CURRENCY_NZD } from './stripe';

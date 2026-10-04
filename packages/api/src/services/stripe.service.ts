@@ -1,17 +1,7 @@
-import Stripe from 'stripe';
 import { isFakeMode } from '../commerce/payment-mode';
 import { logIntegration } from '../lib/timing';
 import { ExternalServiceError } from '../lib/app-errors';
-
-// Lazy-init Stripe client — only create when not in fake mode
-let _stripe: Stripe | null = null;
-function getStripeClient(): Stripe {
-  if (_stripe) return _stripe;
-  const key = process.env.STRIPE_SECRET_KEY;
-  if (!key) throw new ExternalServiceError('Stripe', 'STRIPE_SECRET_KEY is not configured');
-  _stripe = new Stripe(key, { apiVersion: '2026-08-26.dahlia' as any });
-  return _stripe;
-}
+import { getStripeClient } from '../lib/stripe-client';
 
 export interface PaymentIntentData {
   amount: number;        // in cents

@@ -3,6 +3,7 @@
  * Used by membership tier-change and gold plan billing — do not
  * re-implement per service.
  */
+import { isStripeDemoSubscriptionId } from '@pawtag/shared';
 import logger from '../../lib/logger';
 
 export type StripeSubscriptionFailureKind =
@@ -53,7 +54,7 @@ export function classifyStripeSubscriptionFailure(err: unknown): ClassifiedStrip
   if (
     /already ended/i.test(message) ||
     /canceled subscription/i.test(message) ||
-    stripeCode === 'resource_missing' && /canceled/i.test(message)
+    (stripeCode === 'resource_missing' && /canceled/i.test(message))
   ) {
     return {
       kind: 'subscription_not_active',
@@ -107,10 +108,7 @@ export function logStripeSubscriptionFailure(
 
 /** Demo/non-Stripe subscription IDs must never be sent to the Stripe API. */
 export function isInvalidStripeSubscriptionId(id: string | undefined | null): boolean {
-  if (!id) return true;
-  if (id === 'demo') return true;
-  if (id.startsWith('pi_demo_') || id.startsWith('sub_demo')) return true;
-  return !id.startsWith('sub_');
+  return isStripeDemoSubscriptionId(id) || !String(id || '').startsWith('sub_');
 }
 
 export function stripeSubscriptionEnded(status: string | undefined | null): boolean {
@@ -122,3 +120,4 @@ export function firstSubscriptionItemId(subscription: {
 }): string | null {
   return subscription.items?.data?.[0]?.id || null;
 }
+

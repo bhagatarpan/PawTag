@@ -721,6 +721,17 @@ Example: Black (3×) → Gold (1×): customer loses 2/3 of points earned at Blac
 - Gold prices from CMS settings `guardian.goldPrice` / `guardian.goldAnnualPrice`
 - Do **not** send gold billing changes to `/membership/change-tier` (that endpoint changes MembershipTier tiers)
 
+## Stripe (payments, subscriptions, webhooks)
+
+- **Single client factory:** `packages/api/src/lib/stripe-client.ts` — `getStripeClient()` only
+- **Never** call `new Stripe(...)` in feature code or read `STRIPE_SECRET_KEY` outside the factory / payment-mode / validateEnv
+- API version: `STRIPE_API_VERSION` or `@pawtag/shared` `STRIPE_DEFAULT_API_VERSION` (no per-file literals)
+- Currency/price keys/demo IDs: `@pawtag/shared` stripe + membership modules
+- Payment mode: `PAYMENT_MODE` via `commerce/payment-mode.ts` (`fake` | `stripe_test` | `stripe_live`)
+- Webhooks: raw body + signature verify + event idempotency; domain logic in services
+- Tests inject via `setStripeClientForTests` / `resetStripeClientCache` on the factory
+- **Skill:** `skills/stripe-integration/SKILL.md` (use for all Stripe work)
+
 ## Payment Failure Rules
 
 - Webhook `invoice.payment_failed` handles `UserMembership` (not just tag Subscriptions)
@@ -2028,6 +2039,7 @@ skills/work-packet-executor/          One-work-packet execution discipline
 skills/production-readiness-review/  Implemented vs genuinely production-ready
 skills/security-boundary-review/     Auth, ownership, RBAC, privacy, sensitive resources
 skills/commerce-safety/               Stripe, checkout, orders, inventory, refunds, subscriptions
+skills/stripe-integration/            Stripe client factory, payment mode, webhooks, no scattered hardcodes
 skills/membership-lifecycle/          Membership subscribe/activate/cancel/resume/entitlements
 skills/membership-tier-change/        Tier change, Option A resume, portal cancel sync, gold billing
 skills/refund-visibility/             Refund destination truthfulness, ARN/arrival data, customer/CSR refund display

@@ -502,8 +502,9 @@ The application reads additional integration/observability variables in code, so
 
 | Variable | Purpose |
 |---|---|
-| `STRIPE_SECRET_KEY` | Stripe server API key |
-| `STRIPE_WEBHOOK_SECRET` | Stripe webhook signature secret |
+| `STRIPE_SECRET_KEY` | Stripe server API key (via central factory only) |
+| `STRIPE_WEBHOOK_SECRET` | Stripe webhook signature secret (server only) |
+| `STRIPE_API_VERSION` | Optional Stripe API version pin (default in `@pawtag/shared`) |
 | `VITE_STRIPE_PUBLISHABLE_KEY` | Customer-web Stripe publishable key |
 
 > [!CAUTION]
@@ -1082,7 +1083,9 @@ All membership benefits are driven from a single source of truth: the **Membersh
 - **Full lifecycle documentation:** `docs/MEMBERSHIP-LIFECYCLE-SYSTEM.md`
 - **Operating rules:** `AGENTS.md` §16b Membership Lifecycle Rules
 - **Shared contracts:** `packages/shared/src/membership.ts` (tier-change codes, estimate DTO, Stripe cancel-sync resolver)
-- **Specialist skill:** `skills/membership-tier-change/`
+- **Shared Stripe constants:** `packages/shared/src/stripe.ts` (API version, key prefixes, currency)
+- **Stripe client factory:** `packages/api/src/lib/stripe-client.ts` — all SDK construction goes here
+- **Specialist skills:** `skills/stripe-integration/`, `skills/membership-tier-change/`, `skills/commerce-safety/`
 
 ---
 

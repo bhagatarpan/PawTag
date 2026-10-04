@@ -6,6 +6,7 @@ import { createAndDeliverNotification } from './notification-delivery.service';
 import { renderSubscriptionReminderEmail, renderGracePeriodReminderEmail, renderPaymentFailureEmail, renderGracePeriodStartedEmail, renderPaymentRetrySuccessEmail, renderFreePeriodReminder2WeekEmail, renderFreePeriodReminder3DayEmail, renderGracePeriodReminder3DayEmail, renderTagExpiredEmail } from './email/templates';
 import { auditService, type AuditContext } from './audit';
 import { incrementCounter, METRICS } from '../lib/metrics';
+import { getStripeClient } from '../lib/stripe-client';
 import {
   cacheGoldStripePriceId,
   GoldBillingConfigError,
@@ -23,16 +24,6 @@ import {
 import logger from '../lib/logger';
 
 const REMINDER_CHECK_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
-
-// Lazy-init Stripe client — only create when not in fake mode
-let _stripe: Stripe | null = null;
-function getStripeClient(): Stripe {
-  if (_stripe) return _stripe;
-  const key = process.env.STRIPE_SECRET_KEY;
-  if (!key) throw new Error('STRIPE_SECRET_KEY is not configured');
-  _stripe = new Stripe(key, { apiVersion: '2026-08-26.dahlia' as any });
-  return _stripe;
-}
 
 // Cache for settings to avoid hitting DB on every call
 let settingsCache: Record<string, string> = {};

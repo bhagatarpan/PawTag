@@ -41,6 +41,7 @@ import type {
 } from '../../interfaces/payment-provider';
 import { PaymentFailedError, PaymentSignatureError } from '../../errors';
 import { getSetting, getBooleanSetting } from '../../config';
+import { getStripeClient } from '../../../lib/stripe-client';
 import logger from '../../../lib/logger';
 
 /**
@@ -153,9 +154,8 @@ export class StripePaymentProvider implements IPaymentProvider {
       throw new PaymentFailedError('Stripe is not configured (no STRIPE_SECRET_KEY)');
     }
 
-    this.stripe = new Stripe(apiKey, {
-      apiVersion: '2026-08-26.dahlia' as Stripe.LatestApiVersion,
-    });
+    // Central factory — do not construct Stripe clients here.
+    this.stripe = getStripeClient();
 
     return this.stripe;
   }

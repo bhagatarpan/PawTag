@@ -144,13 +144,11 @@ export class CheckoutService {
     let stripeCustomerId = user.stripeCustomerId;
     const { isFakeMode } = await import('../payment-mode');
     const fakeMode = isFakeMode();
-    
+
     if (!stripeCustomerId && !fakeMode) {
       try {
-        const Stripe = (await import('stripe')).default;
-        const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-          apiVersion: '2026-08-26.dahlia' as any,
-        });
+        const { getStripeClient } = await import('../../lib/stripe-client');
+        const stripe = getStripeClient();
         const customer = await stripe.customers.create({
           email: user.email,
           name: user.fullName || undefined,

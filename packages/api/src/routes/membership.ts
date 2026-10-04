@@ -19,6 +19,7 @@ import {
 import { MEMBERSHIP_TIER_CHANGE_CODES } from '@pawtag/shared';
 import { membershipEntitlementService } from '../services/membership-entitlement.service';
 import { isFakeMode } from '../commerce/payment-mode';
+import { getStripeClient } from '../lib/stripe-client';
 import logger from '../lib/logger';
 
 const router = Router();
@@ -360,7 +361,6 @@ router.get('/payment-methods', async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    const { getStripeClient } = await import('../services/membership.service');
     const stripe = getStripeClient();
     const paymentMethods = await stripe.customers.listPaymentMethods(user.stripeCustomerId, { type: 'card' });
 
@@ -397,7 +397,6 @@ router.post('/payment-methods/portal', async (req: AuthRequest, res: Response) =
       return;
     }
 
-    const { getStripeClient } = await import('../services/membership.service');
     const stripe = getStripeClient();
 
     const session = await stripe.billingPortal.sessions.create({

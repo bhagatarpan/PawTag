@@ -2,7 +2,6 @@ import { Router, Response } from 'express';
 import { AuthRequest, authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
 import { Subscription, Invoice, Tag, User, Pet } from '@pawtag/db';
-import Stripe from 'stripe';
 import { isFakeMode } from '../commerce/payment-mode';
 import { auditService, type AuditContext } from '../services/audit';
 import {
@@ -11,17 +10,8 @@ import {
   changeSubscriptionPlan,
   changeGoldPlan,
 } from '../services/subscription.service';
+import { getStripeClient } from '../lib/stripe-client';
 import logger from '../lib/logger';
-
-// Lazy-init Stripe client — only create when not in fake mode
-let _stripe: Stripe | null = null;
-function getStripeClient(): Stripe {
-  if (_stripe) return _stripe;
-  const key = process.env.STRIPE_SECRET_KEY;
-  if (!key) throw new Error('STRIPE_SECRET_KEY is not configured');
-  _stripe = new Stripe(key, { apiVersion: '2026-08-26.dahlia' as any });
-  return _stripe;
-}
 
 async function auditSubscriptionEvent(
   req: AuthRequest,

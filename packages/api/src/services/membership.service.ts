@@ -17,6 +17,11 @@ import { auditService, type AuditContext } from './audit';
 import { systemAuditContext } from '../lib/app-meta';
 import { AppError, type ErrorCode, type ErrorMetadata } from '../lib/app-errors';
 import {
+  getStripeClient,
+  resetStripeClientCache,
+  setStripeClientForTests,
+} from '../lib/stripe-client';
+import {
   classifyStripeSubscriptionFailure,
   firstSubscriptionItemId,
   isInvalidStripeSubscriptionId,
@@ -25,25 +30,8 @@ import {
 } from './stripe/stripe-subscription-errors';
 import logger from '../lib/logger';
 
-// Lazy-init Stripe client
-let _stripe: Stripe | null = null;
-export function getStripeClient(): Stripe {
-  if (_stripe) return _stripe;
-  const key = process.env.STRIPE_SECRET_KEY;
-  if (!key) throw new Error('STRIPE_SECRET_KEY is not configured');
-  _stripe = new Stripe(key, { apiVersion: '2026-08-26.dahlia' as any });
-  return _stripe;
-}
-
-/** Test helper — clear cached Stripe client after env/mocks change. */
-export function resetStripeClientCache(): void {
-  _stripe = null;
-}
-
-/** Test helper — inject a Stripe client without real API calls. */
-export function setStripeClientForTests(client: Stripe | null): void {
-  _stripe = client;
-}
+// Re-export central Stripe client for existing callers/tests.
+export { getStripeClient, resetStripeClientCache, setStripeClientForTests };
 
 function httpStatusForMembershipCode(code: MembershipTierChangeCode): number {
   return MEMBERSHIP_TIER_CHANGE_HTTP_STATUS[code] ?? 400;

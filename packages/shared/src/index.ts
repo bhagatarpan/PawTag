@@ -7,6 +7,7 @@ export * from './api';
 export * from './finder-dto';
 export * from './format';
 export * from './membership';
+export * from './stripe';
 
 // --- Enums & Constants ---
 
