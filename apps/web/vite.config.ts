@@ -15,6 +15,12 @@ export default defineConfig({
       '@pawtag/shared': path.resolve(sharedSrc, 'index.ts'),
     },
   },
+  // Do not prebundle workspace shared from node_modules/dist.
+  // Alias points at source; prebundle would re-introduce stale dist hashes
+  // ("Outdated Optimize Dep" 504 after shared contract changes).
+  optimizeDeps: {
+    exclude: ['@pawtag/shared', '@pawtag/shared/api'],
+  },
   server: {
     port: 3000,
     proxy: {
