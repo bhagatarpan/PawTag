@@ -80,6 +80,13 @@ function SubscriptionsInner() {
   const [pauseReason, setPauseReason] = useState('');
   const [pauseReasonDetails, setPauseReasonDetails] = useState('');
   const [pauseTargetId, setPauseTargetId] = useState<string | null>(null);
+  const [planChangeError, setPlanChangeError] = useState('');
+
+  // Gold tag subs: current interval is renewalMethod; others use planType.
+  const currentBillingInterval =
+    detail?.subscription.planType === 'gold'
+      ? detail.subscription.renewalMethod
+      : detail?.subscription.planType;
 
   useEffect(() => {
     fetchSubscriptions();
@@ -189,22 +196,18 @@ function SubscriptionsInner() {
     }
   }
 
-  async function handleChangePlan(id: string, planType: string) {
+  async function handleChangePlan(id: string, planType: 'annual' | 'monthly') {
     setActionLoading(true);
+    setPlanChangeError('');
     try {
-      // Use Gold-specific endpoint for Gold subscriptions
-      const sub = detail?.subscription;
-      if (sub?.planType === 'gold') {
-        await api.post('/membership/change-tier', { tierId: sub._id, planType });
-      } else {
-        await api.post(API.customer.subscriptions.changePlan(id), { planType });
-      }
+      // Shared endpoint: gold tag subs use gold billing rules (planType stays 'gold');
+      // other tag subs use annual/monthly plan change.
+      await api.post(API.customer.subscriptions.changePlan(id), { planType });
       setShowChangePlan(false);
       await fetchSubscriptions();
       if (selectedId === id) await fetchDetail(id);
     } catch (err: any) {
-      // Error will be shown via inline error state, not alert()
-      console.error('Failed to change plan:', err);
+      setPlanChangeError(err.response?.data?.error || 'Failed to change plan');
     } finally {
       setActionLoading(false);
     }
@@ -556,30 +559,39 @@ function SubscriptionsInner() {
         {/* Change Plan Bottom Sheet */}
         <BottomSheet
           open={showChangePlan}
-          onClose={() => setShowChangePlan(false)}
-          title="Change Plan"
-          description="Choose your new plan. Changes take effect at the next billing cycle."
+          onClose={() => { setShowChangePlan(false); setPlanChangeError(''); }}
+          title={sub.planType === 'gold' ? 'Change Gold Billing' : 'Change Plan'}
+          description={
+            sub.planType === 'gold'
+              ? 'Switch Gold membership between monthly and annual billing. Plan type stays Gold.'
+              : 'Choose your new plan. Price updates apply on Stripe; check confirmation email for details.'
+          }
         >
+          {planChangeError && (
+            <div role="alert" className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+              {planChangeError}
+            </div>
+          )}
           <div className="space-y-3">
             <button
               onClick={() => handleChangePlan(sub._id, 'annual')}
-              disabled={actionLoading || sub.planType === 'annual'}
-              className={`w-full text-left p-4 rounded-xl border-2 transition-all ${sub.planType === 'annual' ? 'border-teal-500 bg-teal-50' : 'border-gray-100 hover:border-gray-200 hover:bg-gray-50'} disabled:opacity-50`}
+              disabled={actionLoading || currentBillingInterval === 'annual'}
+              className={`w-full text-left p-4 rounded-xl border-2 transition-all ${currentBillingInterval === 'annual' ? 'border-teal-500 bg-teal-50' : 'border-gray-100 hover:border-gray-200 hover:bg-gray-50'} disabled:opacity-50`}
             >
               <div className="flex items-center justify-between">
                 <div className="font-semibold text-gray-900">Annual Plan</div>
-                {sub.planType === 'annual' && <span className="text-xs font-bold text-teal-600 bg-teal-100 px-2 py-0.5 rounded-full">CURRENT</span>}
+                {currentBillingInterval === 'annual' && <span className="text-xs font-bold text-teal-600 bg-teal-100 px-2 py-0.5 rounded-full">CURRENT</span>}
               </div>
               <div className="text-sm text-gray-500 mt-1">Billed annually</div>
             </button>
             <button
               onClick={() => handleChangePlan(sub._id, 'monthly')}
-              disabled={actionLoading || sub.planType === 'monthly'}
-              className={`w-full text-left p-4 rounded-xl border-2 transition-all ${sub.planType === 'monthly' ? 'border-teal-500 bg-teal-50' : 'border-gray-100 hover:border-gray-200 hover:bg-gray-50'} disabled:opacity-50`}
+              disabled={actionLoading || currentBillingInterval === 'monthly'}
+              className={`w-full text-left p-4 rounded-xl border-2 transition-all ${currentBillingInterval === 'monthly' ? 'border-teal-500 bg-teal-50' : 'border-gray-100 hover:border-gray-200 hover:bg-gray-50'} disabled:opacity-50`}
             >
               <div className="flex items-center justify-between">
                 <div className="font-semibold text-gray-900">Monthly Plan</div>
-                {sub.planType === 'monthly' && <span className="text-xs font-bold text-teal-600 bg-teal-100 px-2 py-0.5 rounded-full">CURRENT</span>}
+                {currentBillingInterval === 'monthly' && <span className="text-xs font-bold text-teal-600 bg-teal-100 px-2 py-0.5 rounded-full">CURRENT</span>}
               </div>
               <div className="text-sm text-gray-500 mt-1">Billed monthly</div>
             </button>

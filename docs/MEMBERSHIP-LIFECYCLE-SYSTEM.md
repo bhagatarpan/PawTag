@@ -238,6 +238,18 @@ At currentPeriodEnd:
   • checkExpiredMemberships marks as 'expired'
 ```
 
+### Stripe Billing Portal cancel/resume sync
+
+When a customer cancels or resumes in the **Stripe Billing Portal** (not PawTag UI):
+
+1. Stripe keeps subscription `status: active` but toggles `cancel_at_period_end`
+2. Webhook `customer.subscription.updated` updates local `UserMembership` (and tag `Subscription`):
+   - cancel → `cancelledAt` set, `autoRenew=false`
+   - resume → `cancelledAt` cleared, `autoRenew=true`
+3. Audit events: `membership_cancelled_via_stripe` / `membership_resumed_via_stripe`
+
+This prevents portal cancels from desyncing upgrade/resume flows.
+
 ---
 
 ## 4. Data Model Changes

@@ -34,6 +34,10 @@ import { isFakeMode } from '../commerce/payment-mode';
 import { logPaymentEvent, logOrderEvent } from '../commerce/audit';
 import { logCommerceEvent } from '../commerce/audit';
 import { activateMembership } from '../services/membership.service';
+import {
+  syncMembershipFromStripeSubscriptionUpdated,
+  syncTagSubscriptionFromStripeSubscriptionUpdated,
+} from '../services/billing-cancel-sync.service';
 import { sendSubscriptionRenewalEmail } from '../services/email.service';
 import logger from '../lib/logger';
 
@@ -693,62 +697,27 @@ async function handleMembershipPaymentFailure(membership: any, stripeInvoice: an
 
 /**
  * Handle customer.subscription.updated.
- * Sync Stripe subscription status changes to PawTag.
+ * Delegates cancel_at_period_end + status sync to billing-cancel-sync service.
  */
 async function handleSubscriptionUpdated(stripeSubscription: any): Promise<void> {
   if (!stripeSubscription?.id) return;
 
-  // Try tag-based Subscription first (existing behavior)
-  const sub = await Subscription.findOne({ stripeSubscriptionId: stripeSubscription.id });
-
-  if (!sub) {
-    // Try membership-tier subscription (UserMembership model)
-    try {
-      const membership = await UserMembership.findOne({ stripeSubscriptionId: stripeSubscription.id });
-      if (membership && membership.status === 'pending_payment') {
-        // Stripe subscription is now active — activate the membership
-        await activateMembership(membership._id.toString());
-        logger.info({ membershipId: membership._id, stripeStatus: stripeSubscription.status }, 'Membership activated via customer.subscription.updated webhook');
-      }
-    } catch (err) {
-      logger.error({ err, stripeSubscriptionId: stripeSubscription.id }, 'Failed to activate membership from customer.subscription.updated webhook');
-    }
-    return;
-  }
-
-  const oldStatus = sub.status;
-
-  // Map Stripe status to PawTag status
-  const statusMap: Record<string, string> = {
-    active: 'active',
-    past_due: 'active', // Keep active but dunning handles retry
-    trialing: 'active',
-    canceled: 'cancelled',
-    unpaid: 'grace_period',
-    incomplete_expired: 'expired',
+  const snapshot = {
+    id: String(stripeSubscription.id),
+    status: String(stripeSubscription.status || ''),
+    cancel_at_period_end: Boolean(stripeSubscription.cancel_at_period_end),
   };
 
-  const newStatus = statusMap[stripeSubscription.status] || sub.status;
-  if (newStatus !== oldStatus) {
-    sub.status = newStatus as any;
+  try {
+    const tagResult = await syncTagSubscriptionFromStripeSubscriptionUpdated(snapshot);
+    if (tagResult.handled) return;
 
-    if (newStatus === 'cancelled') {
-      sub.autoRenew = false;
-      sub.cancelledAt = new Date();
-      sub.cancellationReason = 'Updated via Stripe';
-      sub.cancelledBy = 'System (Stripe)';
-      sub.cancelledByType = 'System';
-      sub.cancelledByPortal = 'system';
-    }
-
-    await sub.save();
-
-    logger.info({
-      subscriptionId: sub._id,
-      oldStatus,
-      newStatus,
-      stripeStatus: stripeSubscription.status,
-    }, 'Subscription status synced from Stripe');
+    await syncMembershipFromStripeSubscriptionUpdated(snapshot);
+  } catch (err) {
+    logger.error(
+      { err, stripeSubscriptionId: snapshot.id },
+      'Failed to process customer.subscription.updated webhook',
+    );
   }
 }
 
@@ -1082,6 +1051,10 @@ async function handleChargeRefunded(charge: any): Promise<void> {
   }, 'Charge fully refunded');
 }
 
-export { handleEvent as handleStripeWebhookEvent };
+export {
+  handleEvent as handleStripeWebhookEvent,
+  handleSubscriptionUpdated as handleStripeSubscriptionUpdated,
+  handleSubscriptionDeleted as handleStripeSubscriptionDeleted,
+};
 
 export default router;

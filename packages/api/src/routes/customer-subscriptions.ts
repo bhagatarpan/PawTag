@@ -9,6 +9,7 @@ import {
   renewSubscription,
   cancelSubscription,
   changeSubscriptionPlan,
+  changeGoldPlan,
 } from '../services/subscription.service';
 import logger from '../lib/logger';
 
@@ -480,7 +481,7 @@ router.put('/:id/auto-renew', requirePermission('customer.read'), async (req: Au
  * @swagger
  * /api/customer/subscriptions/{id}/change-plan:
  *   post:
- *     summary: Change subscription plan (annual/monthly)
+ *     summary: Change subscription plan (annual/monthly). Gold tag subscriptions use gold billing rules.
  *     tags: [Customer Subscriptions]
  *     security:
  *       - bearerAuth: []
@@ -504,11 +505,25 @@ router.post('/:id/change-plan', requirePermission('customer.read'), async (req: 
       return;
     }
 
+    // Gold tag subscriptions change billing interval (monthly↔annual) via gold rules.
+    // planType stays 'gold'; only renewalMethod/price/Stripe interval change.
+    if (subscription.planType === 'gold') {
+      const updated = await changeGoldPlan(
+        subscription._id.toString(),
+        req.user!.id,
+        planType as 'monthly' | 'annual',
+      );
+      res.json({ success: true, data: updated });
+      return;
+    }
+
     const updated = await changeSubscriptionPlan(subscription._id.toString(), planType);
 
     res.json({ success: true, data: updated });
   } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message || 'Failed to change plan' });
+    const message = error?.message || 'Failed to change plan';
+    const status = /already on/i.test(message) ? 409 : 500;
+    res.status(status).json({ success: false, error: message });
   }
 });
 

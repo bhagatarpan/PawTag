@@ -1081,6 +1081,8 @@ All membership benefits are driven from a single source of truth: the **Membersh
 - **Scheduled Downgrades:** Background job runs every 5 minutes to execute pending downgrades
 - **Full lifecycle documentation:** `docs/MEMBERSHIP-LIFECYCLE-SYSTEM.md`
 - **Operating rules:** `AGENTS.md` §16b Membership Lifecycle Rules
+- **Shared contracts:** `packages/shared/src/membership.ts` (tier-change codes, estimate DTO, Stripe cancel-sync resolver)
+- **Specialist skill:** `skills/membership-tier-change/`
 
 ---
 

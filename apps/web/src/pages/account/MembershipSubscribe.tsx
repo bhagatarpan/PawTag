@@ -2,20 +2,23 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Check, Loader2, ArrowLeft, CreditCard, Info, TrendingUp, AlertTriangle, Clock } from 'lucide-react';
 import { API } from '@pawtag/shared/api';
-import { formatCurrency, formatDate } from '@pawtag/shared';
+import {
+  formatCurrency,
+  formatDate,
+  requiresPaymentMethodRecovery,
+  type MembershipChangeErrorBody,
+  type MembershipTierSummary,
+  type TierChangeEstimate,
+} from '@pawtag/shared';
 import { resolveTierIcon, resolveTierGradient, getTierMarketingFlags, EntitlementList } from '@pawtag/ui';
 import api from '../../lib/api';
 import StripePaymentForm from '../../components/StripePaymentForm';
 
-interface MembershipTier {
+interface MembershipTier extends MembershipTierSummary {
   _id: string;
   tier: 'gold' | 'platinum' | 'black';
   name: string;
-  displayName: string;
   description: string;
-  price: number;
-  currency: string;
-  displayOrder: number;
   entitlements: Record<string, { enabled: boolean; value: any; name?: string; description?: string }>;
   comingSoon: boolean;
   tagLimit: number;
@@ -28,35 +31,13 @@ interface CurrentMembership {
   hasMembership: boolean;
   membership: {
     _id: string;
-    tierId: { _id: string; tier: string; displayName: string; price: number; displayOrder?: number; currency?: string };
+    tierId: MembershipTierSummary & { _id: string };
     status: string;
     currentPeriodEnd: string;
     cancelledAt?: string | null;
     autoRenew?: boolean;
   } | null;
-  tier: { _id: string; tier: string; displayName: string; price: number; displayOrder?: number; currency?: string } | null;
-}
-
-interface TierChangeEstimate {
-  currentTier: { tier: string; displayName: string; price: number };
-  newTier: { tier: string; displayName: string; price: number };
-  remainingDays: number;
-  totalDays: number;
-  proratedAmount: number;
-  currency: string;
-  isUpgrade: boolean;
-  renewalDate: string;
-  pointsAtRisk: number;
-  currentPointsBalance: number;
-  entitlementsLost: Array<{ key: string; name: string; currentValue: any; newValue: any }>;
-  downgradeEffectiveDate: string;
-  isCancelling?: boolean;
-  willResumeOnUpgrade?: boolean;
-}
-
-interface MembershipChangeErrorBody {
-  error?: string;
-  code?: string;
+  tier: (MembershipTierSummary & { _id: string }) | null;
 }
 
 export default function MembershipSubscribe() {
@@ -85,19 +66,12 @@ export default function MembershipSubscribe() {
   const hasActiveMembership = currentMembership?.hasMembership && currentMembership.membership?.status === 'active';
   const currentTier = currentMembership?.tier || currentMembership?.membership?.tierId || null;
   const isCancelling = Boolean(currentMembership?.membership?.cancelledAt);
-
-  function extractErrorPayload(err: any): MembershipChangeErrorBody {
-    const data = err?.response?.data;
-    return {
-      error: data?.error || err?.message,
-      code: data?.code,
-    };
-  }
+  const showPaymentMethodRecovery = requiresPaymentMethodRecovery(errorCode);
 
   function applyError(err: any, fallback: string) {
-    const payload = extractErrorPayload(err);
-    setError(payload.error || fallback);
-    setErrorCode(payload.code);
+    const data = err?.response?.data as MembershipChangeErrorBody | undefined;
+    setError(data?.error || err?.message || fallback);
+    setErrorCode(data?.code);
   }
 
   async function handleOpenBillingPortal() {
@@ -471,7 +445,7 @@ export default function MembershipSubscribe() {
       {error && (
         <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
           <div role="alert">{error}</div>
-          {errorCode === 'membership.payment_method_required' && (
+          {showPaymentMethodRecovery && (
             <button
               type="button"
               onClick={handleOpenBillingPortal}

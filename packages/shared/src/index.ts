@@ -6,6 +6,7 @@ export * from './constants';
 export * from './api';
 export * from './finder-dto';
 export * from './format';
+export * from './membership';
 
 // --- Enums & Constants ---
 

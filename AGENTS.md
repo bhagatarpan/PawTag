@@ -712,6 +712,14 @@ Example: Black (3×) → Gold (1×): customer loses 2/3 of points earned at Blac
 - Email copy must match actual behavior
 - **Resume** (`POST /membership/resume`) clears Stripe `cancel_at_period_end` first, then local `cancelledAt`/`autoRenew`
 - **Upgrade while cancelling** also resumes (see Option A above)
+- **Billing Portal cancel/resume** is synced by webhook `customer.subscription.updated` (`cancel_at_period_end` → local `cancelledAt`/`autoRenew`)
+
+## Gold tag subscription billing interval
+
+- Tag subscriptions with `planType: 'gold'` change monthly↔annual via `POST /customer/subscriptions/:id/change-plan`
+- `planType` stays `'gold'`; only `renewalMethod`, price, and Stripe interval change
+- Gold prices from CMS settings `guardian.goldPrice` / `guardian.goldAnnualPrice`
+- Do **not** send gold billing changes to `/membership/change-tier` (that endpoint changes MembershipTier tiers)
 
 ## Payment Failure Rules
 
@@ -2020,6 +2028,8 @@ skills/work-packet-executor/          One-work-packet execution discipline
 skills/production-readiness-review/  Implemented vs genuinely production-ready
 skills/security-boundary-review/     Auth, ownership, RBAC, privacy, sensitive resources
 skills/commerce-safety/               Stripe, checkout, orders, inventory, refunds, subscriptions
+skills/membership-lifecycle/          Membership subscribe/activate/cancel/resume/entitlements
+skills/membership-tier-change/        Tier change, Option A resume, portal cancel sync, gold billing
 skills/refund-visibility/             Refund destination truthfulness, ARN/arrival data, customer/CSR refund display
 skills/returns-refunds/               Customer returns, CSR Stripe refunds, warehouse receipt, refund-without-return
 skills/email-cms-templates/           Email CMS slugs, renderCmsEmail/sendCmsEmailOrFallback, auditMeta

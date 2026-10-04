@@ -16,6 +16,7 @@ import {
   checkTagAccess,
   MembershipTierChangeError,
 } from '../services/membership.service';
+import { MEMBERSHIP_TIER_CHANGE_CODES } from '@pawtag/shared';
 import { membershipEntitlementService } from '../services/membership-entitlement.service';
 import { isFakeMode } from '../commerce/payment-mode';
 import logger from '../lib/logger';
@@ -194,7 +195,11 @@ router.get('/change-tier/estimate', async (req: AuthRequest, res: Response) => {
   try {
     const tierId = req.query.tierId as string;
     if (!tierId) {
-      res.status(400).json({ success: false, error: 'tierId is required', code: 'membership.tier_required' });
+      res.status(400).json({
+        success: false,
+        error: 'tierId is required',
+        code: MEMBERSHIP_TIER_CHANGE_CODES.TIER_REQUIRED,
+      });
       return;
     }
 
@@ -215,7 +220,11 @@ router.post('/change-tier', async (req: AuthRequest, res: Response) => {
   try {
     const { tierId, prorationBehavior } = req.body;
     if (!tierId) {
-      res.status(400).json({ success: false, error: 'tierId is required', code: 'membership.tier_required' });
+      res.status(400).json({
+        success: false,
+        error: 'tierId is required',
+        code: MEMBERSHIP_TIER_CHANGE_CODES.TIER_REQUIRED,
+      });
       return;
     }
 

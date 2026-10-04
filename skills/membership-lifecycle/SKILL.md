@@ -91,38 +91,16 @@ if (ownerTier !== 'black') { ... }
 
 ## Tier Changes (Upgrade/Downgrade)
 
+Specialist rules for tier change, Option A resume, portal cancel sync, gold billing interval, and shared error codes: **`skills/membership-tier-change/`**.
+
+Shared contracts: `packages/shared/src/membership.ts`.
+
 ### Upgrades (immediate)
 - Backend: `changeTier(userId, newTierId, prorationBehavior: 'now')`
 - Stripe subscription price updated with `proration_behavior: 'create_prorations'`
 - Proration invoice created immediately (INVM- prefix)
 - New benefits activate immediately
-- Invoice email + tier-change email sent
-- Tag re-evaluation: `removeMembershipFromTags()` + `extendTagsForMembership()`
 - Response includes `resumedOnUpgrade: boolean`
-
-### Upgrade while cancelling — Option A (resume + upgrade)
-When `membership.cancelledAt` is set and customer confirms an immediate upgrade:
-
-1. Estimate returns `isCancelling: true`, `willResumeOnUpgrade: true`
-2. Stripe update **must** include `cancel_at_period_end: false` + new price + `create_prorations`
-3. Local fields cleared **only after Stripe success**: `cancelledAt`, `cancellationReason`, `autoRenew=true`
-4. Stripe failures (card error, missing sub, canceled sub) leave cancel state intact
-5. Stripe mode rejects missing/`demo` subscription IDs with `membership.subscription_missing` (HTTP 409)
-6. Audit action: `membership_tier_changed_resumed` with `resumedOnUpgrade` metadata
-7. UI (`MembershipSubscribe.tsx`) discloses resume on banner, estimate, and success
-8. Never invent free upgrades — provider must accept the charge/resume first
-
-### Typed tier-change errors (client recovery)
-
-| Code | HTTP | Client action |
-|---|---|---|
-| `membership.payment_method_required` | 402 | Open Billing Portal, retry upgrade |
-| `membership.subscription_missing` | 409 | Subscribe again / support |
-| `membership.subscription_not_active` | 409 | Subscribe again |
-| `membership.stripe_update_failed` | 502 | Retry later / support |
-| `membership.already_on_tier` | 409 | No action |
-
-Route maps `MembershipTierChangeError` → `{ success:false, error, code }`.
 
 ### Downgrades (deferred to renewal)
 - Backend: `requestDowngrade(userId, { tierId, reason, termsAccepted, termsVersion })`
@@ -158,6 +136,16 @@ Route maps `MembershipTierChangeError` → `{ success:false, error, code }`.
 - `checkExpiredMemberships` job transitions to 'expired' at period end
 - Generates retention offer (15% off + free shipping)
 - Audit logged with `cancelAtPeriodEnd: true` metadata
+
+## Stripe Billing Portal cancel/resume sync
+
+Webhook `customer.subscription.updated` keeps local cancel state aligned with Stripe:
+
+- `cancel_at_period_end: true` + local not cancelling → set `cancelledAt`, `autoRenew=false`
+- `cancel_at_period_end: false` + local cancelling → clear cancel fields, `autoRenew=true`
+- Stripe `canceled`/`incomplete_expired` → mark membership/sub cancelled
+- Applies to both `UserMembership` and tag `Subscription`
+- Audit: `membership_cancelled_via_stripe` / `membership_resumed_via_stripe`
 
 ## Resume (undo scheduled cancellation)
 
