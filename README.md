@@ -1060,6 +1060,7 @@ All membership benefits are driven from a single source of truth: the **Membersh
 - **Downgrades:** Effective at end of current subscription cycle; customer sees points-at-risk and entitlements-lost before accepting
 - **Points clawback:** On downgrade, customer loses multiplier bonus on points earned at higher tier rate
 - **Cancellation:** `cancel_at_period_end` — benefits continue until period end; resume clears cancel in Stripe first
+- **Keep my Membership:** cancelling members get one calm CTA — no charge while benefits remain (original dates preserved); if period already ended, full tier price rejoin via Stripe
 - **Payment failure handling:** Dunning state, customer notification, CSR alert; Stripe retries automatically
 - **Payment method management:** Customers manage cards via Stripe Billing Portal
 - **Typed tier-change errors:** `membership.payment_method_required`, `membership.subscription_missing`, etc. with HTTP 402/409/502 for recovery UX
@@ -1074,6 +1075,7 @@ All membership benefits are driven from a single source of truth: the **Membersh
 - **Endpoint:** `POST /api/membership/subscribe` — Create membership subscription
 - **Endpoint:** `POST /api/membership/activate` — Activate after payment
 - **Endpoint:** `POST /api/membership/change-tier` — Immediate upgrade (resume+upgrade when cancelling); returns `resumedOnUpgrade`
+- **Endpoint:** `POST /api/membership/keep` — Keep my Membership (resume no-charge or paid rejoin)
 - **Endpoint:** `GET /api/membership/change-tier/estimate` — Proration preview (`isCancelling`, `willResumeOnUpgrade`)
 - **Endpoint:** `POST /api/membership/downgrade` — Deferred downgrade (requires terms acceptance)
 - **Endpoint:** `POST /api/membership/resume` — Undo scheduled cancellation

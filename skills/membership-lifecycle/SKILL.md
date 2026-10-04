@@ -137,6 +137,22 @@ Shared contracts: `packages/shared/src/membership.ts`.
 - Generates retention offer (15% off + free shipping)
 - Audit logged with `cancelAtPeriodEnd: true` metadata
 
+## Keep my Membership (single customer action)
+
+`POST /api/membership/keep` → `keepMyMembership(userId)`
+
+| Scenario | Behavior |
+|---|---|
+| Cancelling + benefits still active | Resume same Stripe sub + same membership doc; **no charge**; original start/end dates; `cancelledAt` cleared; `autoRenew=true` |
+| Benefits already ended | Close old membership; **paid rejoin** same tier at full CMS/tier price; `clientSecret` for Stripe Elements |
+| Not cancelling / no membership | Typed error |
+
+- UI: `KeepMembershipPanel` — calm single CTA (no noisy ConfirmDialog)
+- Manage + Subscribe pages: **only** Keep action while cancelling (hide upgrade grid)
+- Audit: `membership_kept` / `membership_reactivated_paid`
+- Email: `membership-resumed` (Path A); welcome/invoice on Path B activate
+- Stripe: central factory only (`lib/stripe-client.ts`)
+
 ## Stripe Billing Portal cancel/resume sync
 
 Webhook `customer.subscription.updated` keeps local cancel state aligned with Stripe:

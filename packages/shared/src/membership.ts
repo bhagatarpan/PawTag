@@ -105,6 +105,43 @@ export function isMembershipTierChangeCode(code: string | undefined | null): cod
 }
 
 // ============================================================
+// Keep my Membership (cancel window → keep / paid rejoin)
+// ============================================================
+
+export const KEEP_MEMBERSHIP_OUTCOMES = {
+  /** Benefits still active: resume same membership, no charge, original dates */
+  RESUMED: 'resumed',
+  /** Benefits ended: full tier price required before new membership activates */
+  PAYMENT_REQUIRED: 'payment_required',
+} as const;
+
+export type KeepMembershipOutcome =
+  (typeof KEEP_MEMBERSHIP_OUTCOMES)[keyof typeof KEEP_MEMBERSHIP_OUTCOMES];
+
+export const KEEP_MEMBERSHIP_AUDIT_ACTIONS = {
+  KEPT: 'membership_kept',
+  REACTIVATED_PAID: 'membership_reactivated_paid',
+} as const;
+
+export interface KeepMembershipResponseData {
+  outcome: KeepMembershipOutcome;
+  /** Path A: existing membership after resume */
+  membership?: unknown;
+  /** Path B: Stripe client secret for full-price rejoin payment */
+  clientSecret?: string;
+  membershipId?: string;
+  /** Path B: amount charged (tier price, major units) */
+  chargeAmount?: number;
+  currency?: string;
+  /** ISO benefits/renewal date for confirmation UI */
+  benefitsUntil?: string;
+  renewalDate?: string;
+  tierDisplayName?: string;
+  /** True when original start/end dates were preserved (Path A) */
+  preservedOriginalDates?: boolean;
+}
+
+// ============================================================
 // Stripe cancel_at_period_end sync (Billing Portal cancel/resume)
 // One domain rule for UserMembership and tag Subscription.
 // ============================================================

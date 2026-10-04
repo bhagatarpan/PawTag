@@ -15,6 +15,7 @@ import {
 import { resolveTierIcon, resolveTierGradient, getTierMarketingFlags, EntitlementList } from '@pawtag/ui';
 import api from '../../lib/api';
 import StripePaymentForm from '../../components/StripePaymentForm';
+import KeepMembershipPanel from '../../components/KeepMembershipPanel';
 
 interface MembershipTier extends MembershipTierSummary {
   _id: string;
@@ -35,6 +36,7 @@ interface CurrentMembership {
     _id: string;
     tierId: MembershipTierSummary & { _id: string };
     status: string;
+    currentPeriodStart?: string;
     currentPeriodEnd: string;
     cancelledAt?: string | null;
     autoRenew?: boolean;
@@ -67,7 +69,12 @@ export default function MembershipSubscribe() {
 
   const hasActiveMembership = currentMembership?.hasMembership && currentMembership.membership?.status === 'active';
   const currentTier = currentMembership?.tier || currentMembership?.membership?.tierId || null;
-  const isCancelling = Boolean(currentMembership?.membership?.cancelledAt);
+  const isCancelling = Boolean(currentMembership?.membership?.cancelledAt) ||
+    currentMembership?.membership?.status === 'cancelled';
+  const benefitsEnded =
+    Boolean(currentMembership?.membership?.currentPeriodEnd) &&
+    new Date(currentMembership!.membership!.currentPeriodEnd).getTime() <= Date.now();
+  const showKeepOnly = isCancelling || benefitsEnded;
   const showPaymentMethodRecovery = requiresPaymentMethodRecovery(errorCode);
   const showResubscribeRecovery = requiresResubscribeRecovery(errorCode);
   const showMembershipErrorCode = isMembershipTierChangeCode(errorCode);
@@ -410,17 +417,23 @@ export default function MembershipSubscribe() {
 
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900">
-          {hasActiveMembership ? 'Change Your Membership' : 'Choose Your Membership'}
+          {showKeepOnly && hasActiveMembership
+            ? 'Keep Your Membership'
+            : hasActiveMembership
+              ? 'Change Your Membership'
+              : 'Choose Your Membership'}
         </h1>
         <p className="text-gray-500 mt-1">
-          {hasActiveMembership
-            ? `You're currently on ${currentTier?.displayName}. Select a new tier to upgrade or change your plan.`
-            : 'Select a tier to protect your pet with PawTag membership benefits.'}
+          {showKeepOnly && hasActiveMembership
+            ? `Your ${currentTier?.displayName || 'membership'} is scheduled to end. Keep it to stay protected without losing your plan.`
+            : hasActiveMembership
+              ? `You're currently on ${currentTier?.displayName}. Select a new tier to upgrade or change your plan.`
+              : 'Select a tier to protect your pet with PawTag membership benefits.'}
         </p>
       </div>
 
       {/* Current membership banner */}
-      {hasActiveMembership && currentTier && (
+      {hasActiveMembership && currentTier && !showKeepOnly && (
         <div className="mb-6 flex items-center gap-3 p-4 bg-primary-50 border border-primary-200 rounded-xl">
           <Info size={18} className="text-primary-600 shrink-0" />
           <p className="text-sm text-primary-800">
@@ -430,19 +443,18 @@ export default function MembershipSubscribe() {
         </div>
       )}
 
-      {/* Cancelling membership — Option A: upgrade also resumes */}
-      {hasActiveMembership && isCancelling && (
-        <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl">
-          <div className="flex items-start gap-3">
-            <AlertTriangle size={18} className="text-amber-600 shrink-0 mt-0.5" />
-            <div>
-              <p className="text-sm font-semibold text-amber-900">Your membership is scheduled to cancel</p>
-              <p className="text-sm text-amber-700 mt-1">
-                Benefits stay active until {currentMembership?.membership?.currentPeriodEnd ? formatDate(currentMembership.membership.currentPeriodEnd, 'long') : 'your renewal date'}.
-                If you upgrade now, your membership will also be <span className="font-semibold">resumed</span> (auto-renew turned back on).
-              </p>
-            </div>
-          </div>
+      {/* Keep-only path: cancelling or benefits ended — single action, no upgrade grid */}
+      {showKeepOnly && hasActiveMembership && currentTier && (
+        <div className="mb-6">
+          <KeepMembershipPanel
+            tierDisplayName={currentTier.displayName}
+            benefitsUntil={currentMembership?.membership?.currentPeriodEnd}
+            currentPeriodStart={currentMembership?.membership?.currentPeriodStart}
+            chargeAmount={currentTier.price}
+            currency={currentTier.currency || 'NZD'}
+            periodEnded={benefitsEnded}
+            onSuccess={() => fetchData()}
+          />
         </div>
       )}
 
@@ -501,8 +513,8 @@ export default function MembershipSubscribe() {
         </div>
       )}
 
-      {/* Proration estimate confirmation (existing members upgrading/downgrading) */}
-      {estimate && selectedTier && !clientSecret && hasActiveMembership && (
+      {/* Proration estimate confirmation (existing members upgrading/downgrading) — not while keep-only */}
+      {estimate && selectedTier && !clientSecret && hasActiveMembership && !showKeepOnly && (
         <div className={`mb-6 rounded-2xl border-2 p-6 ${
           estimate.isUpgrade
             ? 'bg-primary-50 border-primary-300'
@@ -677,8 +689,8 @@ export default function MembershipSubscribe() {
         </div>
       )}
 
-      {/* Tier Selection */}
-      {!clientSecret && !estimate && (
+      {/* Tier Selection — hidden while keep-only (cancelling / benefits ended) */}
+      {!clientSecret && !estimate && !showKeepOnly && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {tiers.map((tier) => {
             const TierIcon = resolveTierIcon(tier.icon, tier.tier);

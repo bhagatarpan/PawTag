@@ -1865,6 +1865,26 @@ Used on `/account/membership/subscribe` when an existing member selects a lower 
 | **Summary title** | `text-sm font-semibold text-amber-900 mb-2` — "What happens next:" |
 | **Summary items** | `text-sm text-amber-700 space-y-1` — checkmarks + what stays/changes |
 
+### Membership Keep Panel (cancelling members)
+
+When membership is cancelling (or benefits ended), customer sees **one** action — not upgrade cards.
+
+| Element | Classes / Behavior |
+|---------|-------------------|
+| **Container** | `rounded-2xl border border-amber-200 bg-amber-50/60 p-5` |
+| **Icon** | Lucide `ShieldCheck` `size={22} className="text-amber-600"` |
+| **Title** | `text-sm font-semibold text-amber-900` — “Keep your {tier} membership” |
+| **Body (in period)** | Benefits until date + auto-renew on + **No charge today** |
+| **Body (period ended)** | Full price + new period starts today |
+| **Primary CTA** | `bg-primary-600 text-white` — “Yes, keep my membership” / “Keep membership — {price}” |
+| **Loading** | Spinner + “Keeping your membership…” |
+| **Success** | Green panel `border-green-200 bg-green-50` — kept + benefits until date |
+| **Payment path** | When period ended: Stripe Elements inline (same as subscribe) |
+
+Component: `apps/web/src/components/KeepMembershipPanel.tsx`  
+Endpoints: `POST /api/membership/keep`  
+While cancelling, Subscribe page **hides** tier grid / estimate.
+
 ### CSR Admin — Evidence Modal
 
 Used in admin `MembershipSubscriberDetail` for Change Tier and Cancel actions.

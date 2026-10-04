@@ -9,6 +9,7 @@ import {
   activateMembership,
   cancelMembership,
   resumeMembership,
+  keepMyMembership,
   changeTier,
   estimateTierChange,
   requestDowngrade,
@@ -184,6 +185,28 @@ router.post('/resume', async (req: AuthRequest, res: Response) => {
   } catch (error: any) {
     logger.error({ err: error, userId: req.user?.id }, '[Membership] Resume error');
     res.status(400).json({ success: false, error: error.message || 'Failed to resume membership' });
+  }
+});
+
+/**
+ * POST /api/membership/keep
+ * Keep my Membership — one action for cancelling members.
+ * Path A: resume no-charge (original dates). Path B: paid rejoin if benefits ended.
+ */
+router.post('/keep', async (req: AuthRequest, res: Response) => {
+  try {
+    const result = await keepMyMembership(req.user!.id);
+    res.json({ success: true, data: result });
+  } catch (error: any) {
+    logger.error(
+      {
+        err: error,
+        userId: req.user?.id,
+        membershipCode: error?.membershipCode,
+      },
+      '[Membership] Keep membership error',
+    );
+    sendMembershipError(res, error, 'Failed to keep membership');
   }
 });
 

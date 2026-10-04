@@ -30,6 +30,16 @@ When `UserMembership.cancelledAt` is set and customer confirms immediate upgrade
 5. Stripe mode rejects missing/`demo` subscription IDs (`membership.subscription_missing`)
 6. Audit: `membership_tier_changed_resumed`
 
+**Customer UI while cancelling:** Prefer **Keep my Membership** (`keepMyMembership`) over upgrade cards. Hide tier grid on Subscribe when `isCancelling` or benefits ended. Upgrade-while-cancelling remains for API/admin; customer path is Keep.
+
+## Keep my Membership
+
+- Endpoint: `POST /membership/keep`
+- Shared outcomes: `KEEP_MEMBERSHIP_OUTCOMES` (`resumed` | `payment_required`)
+- Path A (in period): resume, no charge, original dates
+- Path B (period ended): paid rejoin via `subscribeToTier` + payment
+- Component: `apps/web/src/components/KeepMembershipPanel.tsx`
+
 ## Stripe Billing Portal cancel/resume
 
 Route `stripe-webhooks.ts` must stay thin:

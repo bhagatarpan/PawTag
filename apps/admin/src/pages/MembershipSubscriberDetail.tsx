@@ -450,7 +450,17 @@ export default function MembershipSubscriberDetail() {
             {auditEvents.slice(0, 20).map((event) => (
               <div key={event._id} className="p-3 bg-gray-50 rounded-xl">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-900">{event.action}</span>
+                  <span className="text-sm font-medium text-gray-900">
+                    {event.action === 'membership_kept'
+                      ? 'Membership kept'
+                      : event.action === 'membership_reactivated_paid'
+                        ? 'Membership reactivated (paid)'
+                        : event.action === 'membership_resumed'
+                          ? 'Membership resumed'
+                          : event.action === 'membership_cancelled'
+                            ? 'Membership cancelled'
+                            : event.action}
+                  </span>
                   <span className="text-xs text-gray-500">{formatDate(event.occurredAt)}</span>
                 </div>
                 <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
@@ -462,6 +472,12 @@ export default function MembershipSubscriberDetail() {
                   }`}>
                     {event.outcome}
                   </span>
+                  {event.metadata?.chargeAmount !== undefined && (
+                    <span>Amount: {formatCurrency(event.metadata.chargeAmount, event.metadata.currency || 'NZD')}</span>
+                  )}
+                  {event.metadata?.preservedOriginalDates && (
+                    <span className="text-green-600">Original dates preserved</span>
+                  )}
                 </div>
               </div>
             ))}

@@ -711,7 +711,12 @@ Example: Black (3×) → Gold (1×): customer loses 2/3 of points earned at Blac
 - Tags remain active until expiry
 - Email copy must match actual behavior
 - **Resume** (`POST /membership/resume`) clears Stripe `cancel_at_period_end` first, then local `cancelledAt`/`autoRenew`
-- **Upgrade while cancelling** also resumes (see Option A above)
+- **Keep my Membership** (`POST /membership/keep`):
+  - Cancelling + benefits still active → resume same membership, **no charge**, original start/end dates
+  - Benefits already ended → **paid rejoin** at full tier price (Stripe factory + Elements)
+  - Customer UI while cancelling: **only** Keep CTA (hide upgrade grid)
+  - Audit: `membership_kept` / `membership_reactivated_paid`
+- **Upgrade while cancelling** (Option A) remains for API/admin; customer product path is Keep
 - **Billing Portal cancel/resume** is synced by webhook `customer.subscription.updated` (`cancel_at_period_end` → local `cancelledAt`/`autoRenew`)
 
 ## Gold tag subscription billing interval

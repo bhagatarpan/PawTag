@@ -238,6 +238,17 @@ At currentPeriodEnd:
   • checkExpiredMemberships marks as 'expired'
 ```
 
+### Keep my Membership (while cancelling)
+
+| Case | Charge | Dates | Stripe | Local |
+|---|---|---|---|---|
+| Benefits still active | No | Original start/end preserved | Clear `cancel_at_period_end` | Clear `cancelledAt`, `autoRenew=true` |
+| Benefits ended | Full tier price | New period from today | New subscription + payment | New membership after pay |
+
+- Endpoint: `POST /api/membership/keep`
+- UI: `KeepMembershipPanel` — single calm CTA (no upgrade grid while cancelling)
+- Audit: `membership_kept` / `membership_reactivated_paid`
+
 ### Stripe Billing Portal cancel/resume sync
 
 When a customer cancels or resumes in the **Stripe Billing Portal** (not PawTag UI):
