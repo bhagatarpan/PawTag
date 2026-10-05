@@ -101,10 +101,6 @@ export default function MembershipManage() {
     await fetchData();
   }
 
-  const isBenefitsEnded =
-    Boolean(membership?.currentPeriodEnd) &&
-    new Date(membership!.currentPeriodEnd).getTime() <= Date.now();
-
   async function handleOpenBillingPortal() {
     try {
       const res = await api.post(API.customer.membership.paymentMethodsPortal);
