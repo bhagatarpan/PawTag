@@ -1063,7 +1063,7 @@ All membership benefits are driven from a single source of truth: the **Membersh
 - **Keep my Membership:** cancelling members get one calm CTA — no charge while benefits remain (original dates preserved, even if Stripe sub already ended); if period already ended, full tier price rejoin via Stripe. Idempotent double-click safe. See `docs/KEEP-MY-MEMBERSHIP.md`
 - **Repair upgrade:** if membership is active but Stripe subscription ended, upgrade uses full target-tier price (new Stripe sub); benefits stay active until payment
 - **Payment failure handling:** Dunning state, customer notification, CSR alert; Stripe retries automatically
-- **Payment method management:** Customers manage cards via Stripe Billing Portal
+- **Payment method management:** Multiple saved cards on Stripe Customer; one default; view/add/set-default/remove in Membership Manage. Optional save-after-purchase on product and membership success. See `docs/SAVED-PAYMENT-METHODS.md`
 - **Typed tier-change errors:** `membership.payment_method_required`, `membership.subscription_missing`, etc. with HTTP 402/409/502 for recovery UX
 - **Email notifications:** Renewal reminders (30/7 days), cancellations, tier changes, payment failures
 - **Tag extension:** Membership extends all tags within tier limit for 12 months

@@ -4,6 +4,8 @@ import { CopyButton } from '@pawtag/ui';
 import { useState, useEffect } from 'react';
 import api from '../../lib/api';
 import OrderSummaryCard from './OrderSummaryCard';
+import SaveCardBanner from '../SaveCardBanner';
+import { useAuth } from '../../context/AuthContext';
 
 interface CheckoutConfirmationProps {
   orderNumber: string;
@@ -34,6 +36,9 @@ export default function CheckoutConfirmationStep({
 }: CheckoutConfirmationProps) {
   const [referralCode, setReferralCode] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [saveCardDismissed, setSaveCardDismissed] = useState(false);
+  const [showSaveCard, setShowSaveCard] = useState(false);
+  const { user: authUser } = useAuth();
 
   // Fetch referral code on mount
   useEffect(() => {
@@ -43,6 +48,26 @@ export default function CheckoutConfirmationStep({
         .catch(() => {});
     }
   }, [user]);
+
+  // Post-purchase save-card offer when customer is signed in
+  useEffect(() => {
+    if (!authUser || saveCardDismissed) return;
+    let cancelled = false;
+    api.get('/membership/payment-methods')
+      .then((res) => {
+        if (cancelled) return;
+        const hasPms = Array.isArray(res.data?.data) && res.data.data.length > 0;
+        // Offer when cards already on Customer (setup_future_usage) OR when none yet (SetupIntent path)
+        setShowSaveCard(true);
+        void hasPms;
+      })
+      .catch(() => {
+        if (!cancelled) setShowSaveCard(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [authUser, saveCardDismissed]);
 
   const handleInvoiceAction = async (action: 'view' | 'download' | 'print') => {
     try {
@@ -89,6 +114,18 @@ export default function CheckoutConfirmationStep({
             {new Date().toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })}
           </span>
         </div>
+
+        {showSaveCard && authUser && !saveCardDismissed && (
+          <div className="mt-4 max-w-xl mx-auto text-left">
+            <SaveCardBanner
+              onDismiss={() => {
+                setSaveCardDismissed(true);
+                setShowSaveCard(false);
+              }}
+              onSaved={() => setShowSaveCard(false)}
+            />
+          </div>
+        )}
       </div>
 
       {/* Confirmation Sent */}

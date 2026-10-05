@@ -16,6 +16,7 @@ import { resolveTierIcon, resolveTierGradient, getTierMarketingFlags, Entitlemen
 import api from '../../lib/api';
 import StripePaymentForm from '../../components/StripePaymentForm';
 import KeepMembershipPanel from '../../components/KeepMembershipPanel';
+import SaveCardBanner from '../../components/SaveCardBanner';
 
 interface MembershipTier extends MembershipTierSummary {
   _id: string;
@@ -62,6 +63,8 @@ export default function MembershipSubscribe() {
   const [estimateLoading, setEstimateLoading] = useState(false);
   const [confirmingUpgrade, setConfirmingUpgrade] = useState(false);
   const [upgradeResult, setUpgradeResult] = useState<{ invoiceNumber?: string; prorationAmount?: number; currency?: string; isDowngrade?: boolean; effectiveDate?: string; resumedOnUpgrade?: boolean } | null>(null);
+  const [saveCardDismissed, setSaveCardDismissed] = useState(false);
+  const [showSaveCard, setShowSaveCard] = useState(false);
 
   // Downgrade consent state
   const [downgradeTermsAccepted, setDowngradeTermsAccepted] = useState(false);
@@ -431,6 +434,14 @@ export default function MembershipSubscribe() {
                 <p className="text-xs text-primary-600 mt-2">
                   A copy has been emailed to you. You can also view it in Billing History.
                 </p>
+              </div>
+            )}
+            {!saveCardDismissed && (
+              <div className="mt-6 text-left">
+                <SaveCardBanner
+                  onDismiss={() => setSaveCardDismissed(true)}
+                  onSaved={() => setShowSaveCard(false)}
+                />
               </div>
             )}
           </>

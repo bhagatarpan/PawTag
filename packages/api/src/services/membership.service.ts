@@ -449,12 +449,16 @@ export async function subscribeToTier(
         await MembershipTier.findByIdAndUpdate(tierId, { stripePriceId: priceObj.id });
       }
 
-      // Create Stripe Subscription
+      // Create Stripe Subscription — preselect customer default PM when available
+      const { getDefaultPaymentMethodIdForUser } = await import('./payment-method.service');
+      const defaultPaymentMethodId = await getDefaultPaymentMethodIdForUser(userId).catch(() => null);
+
       const stripeSubscription = await stripe.subscriptions.create({
         customer: stripeCustomerId,
         items: [{ price: stripePriceId }],
         payment_behavior: 'default_incomplete',
         payment_settings: { save_default_payment_method: 'on_subscription' },
+        ...(defaultPaymentMethodId ? { default_payment_method: defaultPaymentMethodId } : {}),
         metadata: { userId: userId.toString(), tier: tier.tier },
         expand: ['latest_invoice.payment_intent'],
       });
@@ -2393,12 +2397,15 @@ export async function repairUpgradeToTier(
 
   const stripe = getStripeClient();
   const priceId = await resolveStripePriceIdForTier(stripe, newTier, String(newTier._id));
+  const { getDefaultPaymentMethodIdForUser } = await import('./payment-method.service');
+  const defaultPaymentMethodId = await getDefaultPaymentMethodIdForUser(userId).catch(() => null);
 
   const stripeSub = await stripe.subscriptions.create({
     customer: membership.stripeCustomerId,
     items: [{ price: priceId }],
     payment_behavior: 'default_incomplete',
     payment_settings: { save_default_payment_method: 'on_subscription' },
+    ...(defaultPaymentMethodId ? { default_payment_method: defaultPaymentMethodId } : {}),
     metadata: {
       userId: userId.toString(),
       membershipId: String(membership._id),

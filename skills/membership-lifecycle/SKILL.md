@@ -214,9 +214,18 @@ Webhook `customer.subscription.updated` keeps local cancel state aligned with St
 
 ## Payment Method Management
 
-- Card display data populated from Stripe subscription after activation
-- `GET /membership/payment-methods` — lists cards from Stripe Customer
-- `POST /membership/payment-methods/portal` — Stripe Billing Portal session
+- **Multiple** saved cards on Stripe Customer (source of truth)
+- One **default** PM (`invoice_settings.default_payment_method`)
+- First saved PM becomes default if none exists; adding another does **not** silently replace default
+- Portal UI: Membership Manage → Payment Methods (`PaymentMethodsPanel`)
+- Endpoints: list, setup-intent (add), default, detach, confirm-save, portal
+- Membership subscribe / repair pass `default_payment_method` when valid
+- Post-purchase banner: product **and** membership success (`SaveCardBanner`)
+- Never store raw PAN/CVC; display brand/last4/expiry only
+- Feature doc: `docs/SAVED-PAYMENT-METHODS.md`
+- Skill: commerce-safety + stripe factory (`lib/stripe-client.ts`)
+
+## Payment Failure Handling
 - Customer can add/change/delete cards via Stripe-hosted portal
 - "Update" button in MembershipManage opens portal
 
