@@ -155,6 +155,11 @@ export interface User {
 }
 
 export interface Address {
+  /** Optional when used for address-book entries */
+  _id?: string;
+  /** Free-text label, e.g. "Home" — not a typed enum */
+  label?: string;
+  isDefault?: boolean;
   line1: string;
   line2?: string;
   city: string;

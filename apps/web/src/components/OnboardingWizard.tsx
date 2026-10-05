@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Heart, AlertTriangle, Zap, Phone, MapPin, PhoneCall, CheckCircle,
   Shield, Info, Star, Gift, Bell, ArrowRight, ArrowLeft, Lock,
-  PawPrint, Scan, Crown,
+  PawPrint, Scan, Crown, AlertCircle,
 } from 'lucide-react';
 import { AddressAutocomplete, MembershipCheckboxes } from '@pawtag/ui';
 import type { AddressComponents } from '@pawtag/ui';
@@ -82,19 +83,27 @@ export default function OnboardingWizard() {
   const [goldError, setGoldError] = useState('');
   const [addGold, setAddGold] = useState(false);
   const [completed, setCompleted] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const [contactReverifyRequired, setContactReverifyRequired] = useState(false);
+  const [homeAddressSaved, setHomeAddressSaved] = useState(false);
+  // Set when profile save clears verification flags — blocks Next until reverified
+  const reverifyBlockedRef = useRef(false);
 
-  // Form state
-  const [phoneNumber, setPhoneNumber] = useState(user?.phoneNumber || '');
-  const [email, setEmail] = useState(user?.email || '');
-  const [addressLine1, setAddressLine1] = useState(user?.address?.line1 || '');
-  const [addressLine2, setAddressLine2] = useState(user?.address?.line2 || '');
-  const [addressCity, setAddressCity] = useState(user?.address?.city || '');
-  const [addressState, setAddressState] = useState(user?.address?.state || '');
-  const [addressZip, setAddressZip] = useState(user?.address?.zip || '');
-  const [ecName, setEcName] = useState(user?.emergencyContact?.name || '');
-  const [ecRelationship, setEcRelationship] = useState(user?.emergencyContact?.relationship || '');
-  const [ecPhone, setEcPhone] = useState(user?.emergencyContact?.phone || '');
-  const [ecEmail, setEcEmail] = useState(user?.emergencyContact?.email || '');
+  // Form state — synced from authenticated user when it first loads
+  const [formSynced, setFormSynced] = useState(false);
+  const [originalEmail, setOriginalEmail] = useState('');
+  const [originalPhone, setOriginalPhone] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [email, setEmail] = useState('');
+  const [addressLine1, setAddressLine1] = useState('');
+  const [addressLine2, setAddressLine2] = useState('');
+  const [addressCity, setAddressCity] = useState('');
+  const [addressState, setAddressState] = useState('');
+  const [addressZip, setAddressZip] = useState('');
+  const [ecName, setEcName] = useState('');
+  const [ecRelationship, setEcRelationship] = useState('');
+  const [ecPhone, setEcPhone] = useState('');
+  const [ecEmail, setEcEmail] = useState('');
 
   useEffect(() => {
     api.get('/public/cms/onboarding')
@@ -105,6 +114,30 @@ export default function OnboardingWizard() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
+
+  // Prefill form from authenticated user once /auth/me has loaded.
+  // Avoids the mount race that previously left fields blank.
+  useEffect(() => {
+    if (!user || formSynced) return;
+    setEmail(user.email || '');
+    setPhoneNumber(user.phoneNumber || '');
+    setOriginalEmail(user.email || '');
+    setOriginalPhone(user.phoneNumber || '');
+    if (user.address) {
+      setAddressLine1(user.address.line1 || '');
+      setAddressLine2(user.address.line2 || '');
+      setAddressCity(user.address.city || '');
+      setAddressState(user.address.state || '');
+      setAddressZip(user.address.zip || '');
+    }
+    if (user.emergencyContact) {
+      setEcName(user.emergencyContact.name || '');
+      setEcRelationship(user.emergencyContact.relationship || '');
+      setEcPhone(user.emergencyContact.phone || '');
+      setEcEmail(user.emergencyContact.email || '');
+    }
+    setFormSynced(true);
+  }, [user, formSynced]);
 
   // Check if user already has an active Gold subscription
   // Also check localStorage for deferred Gold preference from registration
@@ -141,17 +174,107 @@ export default function OnboardingWizard() {
   const progress = steps.length > 0 ? ((currentIdx + 1) / steps.length) * 100 : 0;
   const relationshipOptions = globalSettings.relationshipOptions || DEFAULT_RELATIONSHIP_OPTIONS;
 
-  async function handleNext() {
-    if (step?.type === 'form') {
-      await saveStepData();
+  const emailVerifiedNow = user?.emailVerified === true;
+  const phoneVerifiedNow = user?.phoneVerified === true;
+  const emailChanged = email.trim().toLowerCase() !== (originalEmail || '').trim().toLowerCase();
+  const phoneChanged = phoneNumber.trim() !== (originalPhone || '').trim();
+  const contactChanged = emailChanged || phoneChanged;
+
+  function renderVerifiedBadge(verified: boolean, changed: boolean) {
+    if (verified && !changed) {
+      return (
+        <span className="flex items-center gap-1 text-xs text-green-600 whitespace-nowrap">
+          <CheckCircle size={14} /> Verified
+        </span>
+      );
     }
+    return (
+      <Link
+        to="/verify-account"
+        className="flex items-center gap-1 text-xs text-amber-600 hover:text-amber-800 whitespace-nowrap"
+      >
+        <AlertCircle size={14} /> Verify
+      </Link>
+    );
+  }
+
+  async function syncHomeAddressToBook(payload: {
+    line1: string;
+    line2?: string;
+    city: string;
+    state?: string;
+    zip: string;
+    country: string;
+  }): Promise<void> {
+    const listRes = await api.get(API.customer.addresses.list);
+    const addresses: Array<{
+      _id?: string;
+      label?: string;
+      line1?: string;
+      city?: string;
+      zip?: string;
+      isDefault?: boolean;
+    }> = listRes.data?.data || [];
+
+    const homeBody = {
+      label: 'Home',
+      line1: payload.line1,
+      line2: payload.line2 || '',
+      city: payload.city,
+      state: payload.state || '',
+      zip: payload.zip,
+      country: payload.country,
+      isDefault: true,
+    };
+
+    const defaultHome = addresses.find((a) => a.isDefault && a.label === 'Home');
+    const samePlace = addresses.find(
+      (a) =>
+        a.line1 === payload.line1 &&
+        a.city === payload.city &&
+        a.zip === payload.zip,
+    );
+    const target = defaultHome || samePlace;
+
+    if (target?._id) {
+      await api.put(API.customer.addresses.update(String(target._id)), homeBody);
+      return;
+    }
+
+    if (addresses.length >= 5) {
+      throw new Error(
+        'You already have 5 saved addresses. Delete one in your profile before saving a new home address.',
+      );
+    }
+
+    await api.post(API.customer.addresses.create, homeBody);
+  }
+
+  async function handleNext() {
+    setSaveError('');
+    setContactReverifyRequired(false);
+    reverifyBlockedRef.current = false;
+
+    if (step?.type === 'form') {
+      const saved = await saveStepData();
+      if (!saved) return;
+
+      if (reverifyBlockedRef.current) {
+        setContactReverifyRequired(true);
+        setSaveError(
+          'Email or phone was updated. Please re-verify before continuing onboarding.',
+        );
+        return;
+      }
+    }
+
     // Subscribe to Gold if opted in on guardian step
     if (step?.stepId === 'guardian' && addGold && !goldJoined) {
       try {
         await api.post('/membership/subscribe', { planType: 'monthly' });
         setGoldJoined(true);
       } catch (err: any) {
-        setGoldError(err.response?.data?.error || 'Failed to join Gold');
+        setSaveError(err.response?.data?.error || 'Failed to join Gold');
         return; // Don't advance if Gold subscription fails
       }
     }
@@ -163,6 +286,8 @@ export default function OnboardingWizard() {
   }
 
   function handleBack() {
+    setSaveError('');
+    setContactReverifyRequired(false);
     if (!isFirst) setCurrentIdx(currentIdx - 1);
   }
 
@@ -174,23 +299,32 @@ export default function OnboardingWizard() {
     setAddressZip(address.zip);
   }
 
-  async function saveStepData() {
+  async function saveStepData(): Promise<boolean> {
     setSaving(true);
+    setSaveError('');
     try {
       const payload: Record<string, unknown> = {};
-      if (step.formFields?.some((f) => f.startsWith('address') || f === 'phoneNumber' || f === 'email')) {
-        payload.phoneNumber = phoneNumber;
-        payload.email = email;
-        payload.address = {
-          line1: addressLine1,
-          line2: addressLine2,
-          city: addressCity,
-          state: addressState,
-          zip: addressZip,
-          country: user?.address?.country || 'NZ',
-        };
+      const hasContact = step.formFields?.some((f) => f === 'phoneNumber' || f === 'email');
+      const hasAddress = step.formFields?.some((f) => f.startsWith('address'));
+      const hasEC = step.formFields?.some((f) => f.startsWith('emergencyContact'));
+
+      if (hasContact || hasAddress) {
+        if (hasContact) {
+          payload.phoneNumber = phoneNumber.trim();
+          payload.email = email.trim();
+        }
+        if (hasAddress) {
+          payload.address = {
+            line1: addressLine1,
+            line2: addressLine2,
+            city: addressCity,
+            state: addressState,
+            zip: addressZip,
+            country: user?.address?.country || 'NZ',
+          };
+        }
       }
-      if (step.formFields?.some((f) => f.startsWith('emergencyContact'))) {
+      if (hasEC) {
         payload.emergencyContact = {
           name: ecName,
           relationship: ecRelationship,
@@ -198,12 +332,65 @@ export default function OnboardingWizard() {
           email: ecEmail,
         };
       }
+
+      let updatedUser: {
+        email?: string;
+        phoneNumber?: string;
+        emailVerified?: boolean;
+        phoneVerified?: boolean;
+      } | null = null;
+
       if (Object.keys(payload).length > 0) {
-        await api.put(API.auth.profile, payload);
+        const res = await api.put(API.auth.profile, payload);
+        updatedUser = res.data?.data || null;
         await refreshUser();
       }
-    } catch {
-      // Silently handle — user can retry
+
+      // Persist onboarding address into the address book as default Home.
+      // Keep legacy User.address write (above) for Finder/shipping compatibility.
+      if (hasAddress && addressLine1 && addressCity && addressZip) {
+        try {
+          await syncHomeAddressToBook({
+            line1: addressLine1,
+            line2: addressLine2,
+            city: addressCity,
+            state: addressState,
+            zip: addressZip,
+            country: user?.address?.country || 'NZ',
+          });
+          setHomeAddressSaved(true);
+        } catch (err: any) {
+          const message =
+            err?.response?.data?.error ||
+            err?.message ||
+            'Could not save your home address. Please try again.';
+          setSaveError(message);
+          return false;
+        }
+      }
+
+      if (hasContact && updatedUser) {
+        const emailCleared = updatedUser.emailVerified === false;
+        const phoneCleared = updatedUser.phoneVerified === false;
+        if (emailCleared || phoneCleared) {
+          reverifyBlockedRef.current = true;
+          setContactReverifyRequired(true);
+          // Keep previous originals so "changed" UI stays accurate until reverified
+        } else {
+          setOriginalEmail(updatedUser.email || '');
+          setOriginalPhone(updatedUser.phoneNumber || '');
+          reverifyBlockedRef.current = false;
+        }
+      }
+
+      return true;
+    } catch (err: any) {
+      const message =
+        err?.response?.data?.error ||
+        err?.message ||
+        'Could not save this step. Please try again.';
+      setSaveError(message);
+      return false;
     } finally {
       setSaving(false);
     }
@@ -211,14 +398,22 @@ export default function OnboardingWizard() {
 
   async function completeOnboarding() {
     setSaving(true);
+    setSaveError('');
     try {
-      await api.put('/customer/settings/onboarding-complete');
+      await api.put(API.customer.settings.onboardingComplete);
       // Don't refreshUser() here — it would update onboardingCompleted=true
       // in the context, causing AccountLayout to unmount us before the
       // success screen can render. Refresh happens on "Go to Dashboard" click.
       setCompleted(true);
-    } catch {
-      // Silently handle
+    } catch (err: any) {
+      const code = err?.response?.data?.code;
+      const message =
+        err?.response?.data?.error ||
+        'Could not complete onboarding. Please verify your email and mobile number, then try again.';
+      setSaveError(message);
+      if (code === 'REQUIRES_VERIFICATION') {
+        setContactReverifyRequired(true);
+      }
     } finally {
       setSaving(false);
     }
@@ -226,11 +421,12 @@ export default function OnboardingWizard() {
 
   async function skipOnboarding() {
     setSaving(true);
+    setSaveError('');
     try {
-      await api.put('/customer/settings/onboarding-skip');
+      await api.put(API.customer.settings.onboardingSkip);
       await refreshUser();
-    } catch {
-      // Silently handle
+    } catch (err: any) {
+      setSaveError(err?.response?.data?.error || 'Could not skip onboarding. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -238,11 +434,12 @@ export default function OnboardingWizard() {
 
   async function dismissOnboarding() {
     setSaving(true);
+    setSaveError('');
     try {
-      await api.put('/customer/settings/onboarding-dismiss');
+      await api.put(API.customer.settings.onboardingDismiss);
       await refreshUser();
-    } catch {
-      // Silently handle
+    } catch (err: any) {
+      setSaveError(err?.response?.data?.error || 'Could not dismiss onboarding. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -259,18 +456,57 @@ export default function OnboardingWizard() {
       <div className="space-y-4 mt-6">
         {hasContact && (
           <>
+            {contactChanged && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                Changing your email or phone requires re-verification before you can continue.
+              </div>
+            )}
+            {contactReverifyRequired && (
+              <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 space-y-2">
+                <p>Please re-verify your contact details to continue.</p>
+                <Link
+                  to="/verify-account"
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-600 text-white text-xs font-semibold hover:bg-red-700"
+                >
+                  Verify email & phone <ArrowRight size={14} />
+                </Link>
+              </div>
+            )}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
-              <input type="tel" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500" placeholder="+64 21 123 4567" />
+              <div className="flex items-center gap-2">
+                <input
+                  type="tel"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  placeholder="+64 21 123 4567"
+                />
+                {renderVerifiedBadge(phoneVerifiedNow, phoneChanged)}
+              </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500" placeholder="you@example.com" />
+              <div className="flex items-center gap-2">
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  placeholder="you@example.com"
+                />
+                {renderVerifiedBadge(emailVerifiedNow, emailChanged)}
+              </div>
             </div>
           </>
         )}
         {hasAddress && (
           <>
+            {homeAddressSaved && (
+              <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-700">
+                Saved as your default Home address.
+              </div>
+            )}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Street Address</label>
               <AddressAutocomplete
@@ -565,6 +801,21 @@ export default function OnboardingWizard() {
           >
             {saving ? 'Saving...' : globalSettings.completionButtonText || 'Complete Setup'}
           </button>
+          {saveError && (
+            <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700" role="alert">
+              {saveError}
+              {contactReverifyRequired && (
+                <div className="mt-2">
+                  <Link
+                    to="/verify-account"
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-600 text-white text-xs font-semibold hover:bg-red-700"
+                  >
+                    Verify email & phone <ArrowRight size={14} />
+                  </Link>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     );
@@ -689,6 +940,21 @@ export default function OnboardingWizard() {
               {!isLast && !saving && <ArrowRight size={16} />}
             </button>
           </div>
+          {saveError && (
+            <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700" role="alert">
+              {saveError}
+              {contactReverifyRequired && (
+                <div className="mt-2">
+                  <Link
+                    to="/verify-account"
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-600 text-white text-xs font-semibold hover:bg-red-700"
+                  >
+                    Verify email & phone <ArrowRight size={14} />
+                  </Link>
+                </div>
+              )}
+            </div>
+          )}
           <div className="flex items-center justify-between mt-3">
             <button
               onClick={skipOnboarding}

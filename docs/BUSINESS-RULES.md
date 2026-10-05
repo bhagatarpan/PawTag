@@ -457,10 +457,16 @@ stateDiagram-v2
 | Rule | Value | Enforced At |
 |------|-------|-------------|
 | CMS-driven | Steps configurable via admin | `CmsOnboarding.ts` |
-| Gating | Checks `onboardingCompleted` + `onboardingSkipped` | `AccountLayout.tsx` |
-| Skip | "Maybe later" → `onboardingSkipped=true` | `OnboardingWizard.tsx` |
+| Verification gate | Wizard only mounts when `emailVerified && phoneVerified`; unverified → `/verify-account` | `AccountLayout.tsx` |
+| Complete gate | `PUT /customer/settings/onboarding-complete` requires both verified flags (covers admin-created `phoneVerified=false`) | `requireVerifiedChannels` in `verificationGuard.ts` |
+| Contact prefill + ticks | Email/phone prefilled; green Verified / amber Verify links | `OnboardingWizard.tsx` |
+| Contact change | Changing email/phone clears server flags; Next blocked until reverified | `PUT /auth/profile` + wizard |
+| Address → default Home | Onboarding address saved to legacy `User.address` **and** address book as `label: 'Home'`, `isDefault: true` | `OnboardingWizard.tsx` + `/customer/addresses*` |
+| Skip | "Maybe later" → `onboardingSkipped=true` (allowed without verification) | `OnboardingWizard.tsx` |
 | Dismiss | "Don't show me again" → `onboardingCompleted=true` | `OnboardingWizard.tsx` |
 | Success screen | Animated checkmark + confetti | `OnboardingWizard.tsx` |
+
+Full decision tree: `docs/ONBOARDING-VERIFICATION-AND-HOME-ADDRESS.md`.
 
 ---
 
