@@ -389,7 +389,11 @@ router.delete('/pets/:id', requirePermission('pet.delete'), async (req: AuthRequ
  */
 router.get('/tags', requirePermission('tag.read'), async (req: AuthRequest, res: Response) => {
   try {
-    const tags = await Tag.find({ ownerId: req.user!.id, deletedAt: null })
+    const tags = await Tag.find({
+      ownerId: req.user!.id,
+      deletedAt: null,
+      status: { $ne: 'returned' },
+    })
       .populate('petId', 'name petType species breed secondaryBreed color pattern photos photoUrl status')
       .sort({ createdAt: -1 });
     res.json({ success: true, data: tags });
@@ -790,9 +794,11 @@ router.get('/tags/unredeemed-count', requirePermission('tag.read'), async (req: 
     const orderIds = deliveredOrders.map((o) => o._id);
 
     // Find tags linked to these orders that haven't been redeemed yet
+    // Exclude returned tags (goods back with PawTag — not unredeemed customer stock)
     const unredeemedCount = await Tag.countDocuments({
       orderId: { $in: orderIds },
       ownerId: { $exists: false },
+      status: { $ne: 'returned' },
       deletedAt: null,
     });
 

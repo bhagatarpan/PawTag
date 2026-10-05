@@ -9,7 +9,7 @@ export interface ITagDocument extends Document {
   nfcEnabled: boolean;
   replacesTagId?: mongoose.Types.ObjectId;
   replacedByTagId?: mongoose.Types.ObjectId;
-  status: 'active' | 'inactive' | 'lost' | 'limited' | 'expired' | 'terminated' | 'replaced' | 'deleted';
+  status: 'active' | 'inactive' | 'lost' | 'limited' | 'expired' | 'terminated' | 'replaced' | 'deleted' | 'returned';
   qrCodeUrl?: string;
   nfcUrl?: string;
   lastScannedAt?: Date;
@@ -34,6 +34,10 @@ export interface ITagDocument extends Document {
   unlinkReason?: string;
   unlinkedBy?: mongoose.Types.ObjectId;
   unlinkedByName?: string;
+  /** Returned to PawTag (goods received). Ownership cleared. */
+  returnedAt?: Date;
+  returnId?: mongoose.Types.ObjectId;
+  returnedOwnerId?: mongoose.Types.ObjectId;
   deletedAt?: Date;
 }
 
@@ -47,7 +51,7 @@ const TagSchema = new Schema<ITagDocument>(
     nfcEnabled: { type: Boolean, default: false },
     replacesTagId: { type: Schema.Types.ObjectId, ref: 'Tag' },
     replacedByTagId: { type: Schema.Types.ObjectId, ref: 'Tag' },
-    status: { type: String, enum: ['active', 'inactive', 'lost', 'limited', 'expired', 'terminated', 'replaced', 'deleted'], default: 'inactive' },
+    status: { type: String, enum: ['active', 'inactive', 'lost', 'limited', 'expired', 'terminated', 'replaced', 'deleted', 'returned'], default: 'inactive' },
     qrCodeUrl: { type: String },
     nfcUrl: { type: String },
     lastScannedAt: { type: Date },
@@ -76,6 +80,9 @@ const TagSchema = new Schema<ITagDocument>(
     unlinkReason: { type: String },
     unlinkedBy: { type: Schema.Types.ObjectId, ref: 'User' },
     unlinkedByName: { type: String },
+    returnedAt: { type: Date },
+    returnId: { type: Schema.Types.ObjectId, ref: 'Return' },
+    returnedOwnerId: { type: Schema.Types.ObjectId, ref: 'User' },
     deletedAt: { type: Date, default: null },
   },
   { timestamps: true },

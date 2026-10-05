@@ -208,9 +208,10 @@ router.get('/:tagId', async (req: Request, res: Response) => {
     const isActiveForFinder = tagStatus.finderEnabled;
     const isLimited = tagStatus.status === 'limited';
     const isExpired = tagStatus.status === 'expired';
+    const isReturned = tagStatus.status === 'returned' || tag.status === 'returned';
 
-    if (isExpired) {
-      // Tag is expired — log the scan but return expired info
+    if (isExpired || isReturned) {
+      // Tag expired or returned to PawTag — log scan, no pet/owner data
       const userAgent = (req.headers['user-agent'] as string) || 'unknown';
       const { browser, device } = parseUserAgent(userAgent);
       const ipGeo = await getIpGeoData(req.ip || req.headers['x-forwarded-for']?.toString().split(',')[0]?.trim() || '');
@@ -227,8 +228,8 @@ router.get('/:tagId', async (req: Request, res: Response) => {
       });
 
       await auditFinderEvent(req, {
-        action: 'view_expired_tag',
-        eventType: 'finder_view_expired',
+        action: isReturned ? 'view_returned_tag' : 'view_expired_tag',
+        eventType: isReturned ? 'finder_view_returned' : 'finder_view_expired',
         eventCategory: 'READ',
         operationType: 'READ',
         resourceType: 'Tag',
@@ -237,7 +238,9 @@ router.get('/:tagId', async (req: Request, res: Response) => {
         severity: 'MEDIUM',
         metadata: {
           tagId: tag.tagId,
-          message: 'This PawTag is no longer active.',
+          message: isReturned
+            ? 'This PawTag is no longer active.'
+            : 'This PawTag is no longer active.',
           petInfo: null,
         },
       });
@@ -478,6 +481,18 @@ router.post('/:tagId/notify', finderNotifyLimiter, requireCaptcha, async (req: R
 
     if (!tag) {
       res.status(404).json({ success: false, error: 'Tag not found' });
+      return;
+    }
+
+    // Returned/expired tags must not notify owners
+    if (tag.status === 'returned' || tag.returnedAt) {
+      res.status(400).json({ success: false, error: 'This PawTag is no longer active.' });
+      return;
+    }
+    const { calculateTagStatus: calcNotify } = await import('../services/tag-status.service');
+    const notifyStatus = await calcNotify(tag);
+    if (!notifyStatus.finderEnabled) {
+      res.status(400).json({ success: false, error: 'This PawTag is no longer active.' });
       return;
     }
 

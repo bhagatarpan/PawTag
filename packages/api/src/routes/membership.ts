@@ -363,11 +363,16 @@ router.post('/downgrade/cancel', async (req: AuthRequest, res: Response) => {
 
 /**
  * GET /api/membership/tags
- * Get user's tags with access status
+ * Get user's tags with HYBRID 2 access status.
+ * Excludes returned/deleted tags.
  */
 router.get('/tags', async (req: AuthRequest, res: Response) => {
   try {
-    const tags = await Tag.find({ ownerId: req.user!.id, deletedAt: null });
+    const tags = await Tag.find({
+      ownerId: req.user!.id,
+      deletedAt: null,
+      status: { $ne: 'returned' },
+    });
     const tagsWithAccess = await Promise.all(
       tags.map(async (tag) => {
         const access = await checkTagAccess(tag._id.toString());

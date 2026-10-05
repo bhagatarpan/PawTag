@@ -26,7 +26,7 @@ import type { ITagDocument } from '@pawtag/db';
 import logger from '../lib/logger';
 
 export interface TagStatusResult {
-  status: 'active' | 'limited' | 'expired';
+  status: 'active' | 'limited' | 'expired' | 'returned';
   reason: string;
   activePeriodEndsAt?: Date;
   warrantyEndsAt?: Date;
@@ -44,6 +44,17 @@ export interface TagStatusResult {
  */
 export async function calculateTagStatus(tag: ITagDocument): Promise<TagStatusResult> {
   const now = new Date();
+
+  // Returned to PawTag — no longer the customer's tag; finder disabled
+  if (tag.status === 'returned' || tag.returnedAt) {
+    return {
+      status: 'returned',
+      reason: 'Tag returned to PawTag',
+      finderEnabled: false,
+      activePeriodEndsAt: tag.activePeriodEndsAt,
+      warrantyEndsAt: tag.warrantyEndsAt,
+    };
+  }
 
   // If tag doesn't have period dates, fall back to basic status check
   if (!tag.activePeriodEndsAt || !tag.warrantyEndsAt) {

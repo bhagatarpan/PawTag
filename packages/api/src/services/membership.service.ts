@@ -211,61 +211,68 @@ export async function getUserMembershipStatus(userId: string) {
 
 // ─── Check Tag Access ────────────────────────────────────────
 
+/**
+ * HYBRID 2 access for a tag.
+ * Uses stored Active Period / warranty + membership via calculateTagStatus.
+ */
 export async function checkTagAccess(tagId: string): Promise<{
   hasAccess: boolean;
+  finderEnabled: boolean;
   reason: string;
+  status?: string;
+  activePeriodEndsAt?: Date;
   warrantyEndsAt?: Date;
   membershipEndsAt?: Date;
 }> {
   const tag = await Tag.findById(tagId).lean();
   if (!tag) {
-    return { hasAccess: false, reason: 'Tag not found' };
+    return { hasAccess: false, finderEnabled: false, reason: 'Tag not found' };
   }
 
-  // Get the product to check warranty
-  // Tag doesn't have productId directly - we need to look up via Order
-  // For now, use default warranty of 12 months
-  const warrantyMonths = 12; // TODO: Get from product via order
-
-  // Calculate warranty end date from tag activation
-  const tagActivatedAt = tag.activatedAt || new Date();
-  const warrantyEndsAt = new Date(tagActivatedAt);
-  warrantyEndsAt.setMonth(warrantyEndsAt.getMonth() + warrantyMonths);
-
-  // Check if within warranty period
-  const now = new Date();
-  if (now <= warrantyEndsAt) {
+  if (tag.status === 'returned' || tag.returnedAt) {
     return {
-      hasAccess: true,
-      reason: 'Within warranty period',
-      warrantyEndsAt,
+      hasAccess: false,
+      finderEnabled: false,
+      reason: 'Tag returned to PawTag',
+      status: 'returned',
     };
   }
 
-  // Warranty expired — check for active membership
-  const ownerId = tag.ownerId?.toString();
-  if (!ownerId) {
-    return { hasAccess: false, reason: 'No owner found', warrantyEndsAt };
-  }
+  const { calculateTagStatus } = await import('./tag-status.service');
+  const result = await calculateTagStatus(tag as any);
 
-  const membership = await UserMembership.findOne({
-    userId: ownerId,
-    status: 'active',
-  }).lean();
-
-  if (membership) {
+  // Active period or membership → access + finder
+  if (result.status === 'active') {
     return {
       hasAccess: true,
-      reason: 'Covered by membership',
-      warrantyEndsAt,
-      membershipEndsAt: membership.currentPeriodEnd,
+      finderEnabled: result.finderEnabled,
+      reason: result.reason,
+      status: 'active',
+      activePeriodEndsAt: result.activePeriodEndsAt || tag.activePeriodEndsAt,
+      warrantyEndsAt: result.warrantyEndsAt || tag.warrantyEndsAt,
+      membershipEndsAt: result.membershipEndsAt,
     };
   }
 
+  // Limited: warranty still valid, no finder (needs membership)
+  if (result.status === 'limited') {
+    return {
+      hasAccess: true,
+      finderEnabled: false,
+      reason: 'Active period expired — membership required for finder notifications',
+      status: 'limited',
+      activePeriodEndsAt: result.activePeriodEndsAt,
+      warrantyEndsAt: result.warrantyEndsAt,
+    };
+  }
+
+  // Expired
   return {
     hasAccess: false,
-    reason: 'Warranty expired and no active membership',
-    warrantyEndsAt,
+    finderEnabled: false,
+    reason: result.reason,
+    status: 'expired',
+    warrantyEndsAt: result.warrantyEndsAt,
   };
 }
 
@@ -3034,7 +3041,11 @@ export async function checkExpiredMemberships() {
     }
 
     // Deactivate tags that depend on this membership
-    const tags = await Tag.find({ ownerId: membership.userId });
+    const tags = await Tag.find({
+      ownerId: membership.userId,
+      deletedAt: null,
+      status: { $ne: 'returned' },
+    });
     for (const tag of tags) {
       const tagAccess = await checkTagAccess(tag._id.toString());
       if (!tagAccess.hasAccess) {
