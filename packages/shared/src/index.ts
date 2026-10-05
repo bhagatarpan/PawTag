@@ -62,6 +62,9 @@ export enum TagStatus {
   TERMINATED = 'terminated',
   REPLACED = 'replaced',
   DELETED = 'deleted',
+  /** Returned to PawTag — goods received; ownership cleared. */
+  RETURNED = 'returned',
+  LIMITED = 'limited',
 }
 
 export enum NotificationType {

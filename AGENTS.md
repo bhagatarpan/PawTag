@@ -797,6 +797,7 @@ PawTag uses the HYBRID 2 model for tag lifecycle management.
 | After Active Period (no membership) | Until warranty expires | Limited (no notify) | Disabled |
 | After Active Period (with membership) | 12 months from membership | Full access | Enabled |
 | After Warranty Period | N/A | Expired | Disabled |
+| **Returned to PawTag** | Until re-fulfilment as new tag id | **No access** | **Disabled** |
 
 ## Tag Status Values
 
@@ -808,6 +809,13 @@ PawTag uses the HYBRID 2 model for tag lifecycle management.
 - `terminated`: Pet is terminal (deceased/sold)
 - `replaced`: Superseded by a new replacement tag
 - `deleted`: Admin soft-deleted
+- `returned`: **Returned to PawTag** — goods received; `ownerId` cleared; not on customer tag list; finder blocked
+
+## Access API
+
+- Customer tags use `checkTagAccess` → HYBRID 2 via `calculateTagStatus` (`finderEnabled`)
+- Do **not** treat “within warranty” as Active — Active Period / membership decide finder
+- Returned tags must not appear on Membership Manage “Your Tags”
 
 ## Tag Creation Rules
 

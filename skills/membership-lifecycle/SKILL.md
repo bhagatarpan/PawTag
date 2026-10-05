@@ -125,6 +125,24 @@ Shared contracts: `packages/shared/src/membership.ts`.
 - Ledger entry with `activity: 'membership_downgrade_clawback'`
 - Points ledger metadata includes `basePoints`, `multiplier`, `bonusPoints` (forward-only)
 
+## HYBRID 2 Tag Access (Membership Manage)
+
+- `checkTagAccess` uses `calculateTagStatus` — **not** warranty-from-activation alone
+- **Active Period open** → `status: active`, `finderEnabled: true` (no membership required)
+- **Active Period ended, no membership** → `limited`, finder disabled, purchase membership prompt
+- **Membership active** after Active Period → active + finder
+- **Returned tags** → excluded from customer tag lists; finder blocked
+
+## Returned Tags (returns/refunds)
+
+- New Tag `status: 'returned'` + `returnedAt`, `returnId`, `returnedOwnerId`
+- On **warehouse receipt** (and successful refund when goods received): detach tags (`status=returned`, clear `ownerId`/`petId`)
+- `Return.items[].tagIds` for partial returns (2 of 3)
+- **`refundWithoutReturn`:** do **not** detach tags
+- Finder treats returned like expired — no pet/owner data, no notify
+- Membership tags list / unredeemed count / tag extension exclude returned
+- Service: `packages/api/src/services/returns/tag-return-detach.service.ts`
+
 ## Cancellation (deferred to period end)
 
 - Backend: `cancelMembership(userId, reason)`

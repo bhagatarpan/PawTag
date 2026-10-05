@@ -17,6 +17,8 @@ export interface IReturnItem {
   unitPrice?: number;
   customizationTotal?: number;
   refundedQuantity?: number;
+  /** Physical tags covered by this return line (partial returns need per-tag ids). */
+  tagIds?: mongoose.Types.ObjectId[];
 }
 
 export interface IReturnActivity {
@@ -71,6 +73,7 @@ const ReturnItemSchema = new Schema<IReturnItem>({
   unitPrice: { type: Number, min: 0 },
   customizationTotal: { type: Number, min: 0, default: 0 },
   refundedQuantity: { type: Number, min: 0, default: 0 },
+  tagIds: [{ type: Schema.Types.ObjectId, ref: 'Tag' }],
 }, { _id: false });
 
 const ReturnActivitySchema = new Schema<IReturnActivity>({

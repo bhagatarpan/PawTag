@@ -186,6 +186,37 @@ router.put('/:id/status', requirePermission('order.update'), validate(updateRetu
     });
     await item.save();
 
+    // Warehouse receipt: detach tags from customer ownership (not refundWithoutReturn)
+    if (status === 'received') {
+      try {
+        const { detachTagsReturnedToPawTag } = await import('../services/returns/tag-return-detach.service');
+        const tagIds = (item.items || [])
+          .flatMap((i: { tagIds?: unknown[] }) => i.tagIds || [])
+          .filter(Boolean);
+        const result = await detachTagsReturnedToPawTag({
+          orderId: item.orderId,
+          returnId: item._id,
+          tagIds: tagIds as any[],
+          refundWithoutReturn: Boolean(item.refundWithoutReturn),
+        });
+        logger.info(
+          { returnId: item._id, orderNumber: item.orderNumber, ...result },
+          '[Returns] Tags detached on warehouse receipt',
+        );
+        item.activity?.push({
+          type: 'tags_detached',
+          message: `Detached ${result.detached} tag(s) after receipt`,
+          timestamp: new Date(),
+          actor: req.user?.email || req.user?.id,
+          actorType: 'admin',
+          metadata: { tagIds: result.tagIds, detached: result.detached },
+        });
+        await item.save();
+      } catch (err) {
+        logger.error({ err, returnId: item._id }, '[Returns] Failed to detach tags on receipt');
+      }
+    }
+
     await logCommerceEvent({
       action: `return_${status}`,
       eventType: `admin.return.${status}`,

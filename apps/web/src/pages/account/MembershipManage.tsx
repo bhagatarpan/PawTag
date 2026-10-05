@@ -46,10 +46,12 @@ interface Tag {
   membershipStartsAt?: string;
   access: {
     hasAccess: boolean;
+    finderEnabled?: boolean;
     reason: string;
+    status?: string;
     warrantyEndsAt?: string;
     membershipEndsAt?: string;
-    finderEnabled?: boolean;
+    activePeriodEndsAt?: string;
   };
 }
 
@@ -409,8 +411,8 @@ export default function MembershipManage() {
                   </div>
                 )}
 
-                {/* Show message if in limited mode */}
-                {tag.access.hasAccess && !tag.access.finderEnabled && (
+                {/* Show message if in limited mode (HYBRID 2: active period ended, no membership) */}
+                {tag.access.status === 'limited' || (tag.access.hasAccess && tag.access.finderEnabled === false && tag.access.status !== 'active') ? (
                   <div className="mt-3 p-2 bg-amber-50 border border-amber-200 rounded-lg">
                     <p className="text-xs text-amber-700">
                       ⚠️ Finder notifications are disabled. <Link to="/membership" className="font-medium underline">Purchase membership</Link> to restore full functionality.

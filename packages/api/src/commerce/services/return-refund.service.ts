@@ -422,6 +422,28 @@ export class ReturnRefundService {
     });
     await ret.save();
 
+    // Detach returned tags when goods were received (not refundWithoutReturn)
+    if (ret.refundStatus === 'succeeded' && hasReceipt && !ret.refundWithoutReturn) {
+      try {
+        const { detachTagsReturnedToPawTag } = await import('../../services/returns/tag-return-detach.service');
+        const tagIds = (ret.items || [])
+          .flatMap((i: { tagIds?: unknown[] }) => i.tagIds || [])
+          .filter(Boolean);
+        const detachResult = await detachTagsReturnedToPawTag({
+          orderId: ret.orderId,
+          returnId: ret._id,
+          tagIds: tagIds as any[],
+          refundWithoutReturn: false,
+        });
+        logger.info(
+          { returnId: ret._id, orderNumber: ret.orderNumber, ...detachResult },
+          '[Returns] Tags detached after successful refund (goods received)',
+        );
+      } catch (err) {
+        logger.error({ err, returnId: ret._id }, '[Returns] Failed to detach tags after refund');
+      }
+    }
+
     // Order updates — only full refund flips order status to refunded
     const destination = formatRefundDestination(
       order.payment?.cardBrand,
