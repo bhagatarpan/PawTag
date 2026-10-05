@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { CheckCircle2, X } from 'lucide-react';
 import { API } from '@pawtag/shared/api';
-import api from '../../lib/api';
+import api from '../lib/api';
 
 /**
  * Post-purchase optional save-card banner.
