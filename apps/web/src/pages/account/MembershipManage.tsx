@@ -126,19 +126,26 @@ export default function MembershipManage() {
     );
   }
 
+  // Cards are account-level: always visible, even without active membership
   if (!status?.hasMembership) {
     return (
-      <div className="max-w-3xl mx-auto py-12 px-4">
+      <div className="max-w-3xl mx-auto py-8 px-4 space-y-6">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center">
           <Crown className="h-16 w-16 text-gray-300 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-gray-900 mb-2">No Active Membership</h2>
-          <p className="text-gray-500 mb-6">Join PawTag membership to unlock premium benefits for your pets.</p>
+          <p className="text-gray-500 mb-6">
+            Join PawTag membership to unlock premium benefits for your pets. You can still manage saved cards below (shop purchases use the same cards).
+          </p>
           <Link
             to="/membership"
             className="inline-flex items-center gap-2 bg-primary-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-primary-700 transition-colors"
           >
             View Membership Plans
           </Link>
+        </div>
+
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+          <PaymentMethodsPanel onChanged={fetchData} />
         </div>
       </div>
     );

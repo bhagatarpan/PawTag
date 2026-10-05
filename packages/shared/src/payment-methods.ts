@@ -31,6 +31,14 @@ export interface SetupIntentResponseData {
   stripeCustomerId: string;
 }
 
+export interface ConfirmSavePaymentMethodResult {
+  /** False when nothing is on the Stripe Customer (UI must not claim saved). */
+  saved: boolean;
+  defaultPaymentMethodId: string | null;
+  data: SavedPaymentMethod[];
+  reason?: string;
+}
+
 export interface ConfirmSavePaymentMethodBody {
   /** Optional explicit PM to promote to default. If omitted, first PM becomes default when none exists. */
   paymentMethodId?: string;

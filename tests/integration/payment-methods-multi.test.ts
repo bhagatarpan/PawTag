@@ -80,6 +80,17 @@ describe('Saved payment methods (shared contracts + API)', () => {
     expect(res.status).toBe(400);
   });
 
+  it('confirm-save returns saved:false when no payment methods on file', async () => {
+    const res = await request(app)
+      .post('/api/membership/payment-methods/confirm-save')
+      .set('Authorization', `Bearer ${token}`)
+      .send({});
+    expect(res.status).toBe(200);
+    expect(res.body.data.saved).toBe(false);
+    expect(res.body.data.data).toEqual([]);
+    expect(res.body.data.reason).toBe('no_payment_methods');
+  });
+
   it('returns 401 without auth', async () => {
     const res = await request(app).get('/api/membership/payment-methods');
     expect(res.status).toBe(401);
