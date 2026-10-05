@@ -1077,6 +1077,8 @@ All membership benefits are driven from a single source of truth: the **Membersh
 - **Endpoint:** `POST /api/membership/activate` — Activate after payment
 - **Endpoint:** `POST /api/membership/change-tier` — Immediate upgrade (resume+upgrade when cancelling); returns `resumedOnUpgrade`
 - **Endpoint:** `POST /api/membership/keep` — Keep my Membership (resume no-charge or paid rejoin)
+- **Endpoint:** `GET /api/customer/invoices` — Customer invoice list (orders + membership + credit notes)
+- **Endpoint:** `POST /api/customer/invoices/:id/access` — Secure invoice view/download (reuse InvoiceView)
 - **Endpoint:** `GET /api/membership/change-tier/estimate` — Proration preview (`isCancelling`, `willResumeOnUpgrade`)
 - **Endpoint:** `POST /api/membership/downgrade` — Deferred downgrade (requires terms acceptance)
 - **Endpoint:** `POST /api/membership/resume` — Undo scheduled cancellation

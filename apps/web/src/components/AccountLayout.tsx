@@ -1,6 +1,6 @@
 import { ReactNode, useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { PawPrint, LogOut, User, ShoppingBag, Bell, Settings, ChevronRight, CreditCard, QrCode, Gift, LayoutDashboard, Home, Shield, Crown } from 'lucide-react';
+import { PawPrint, LogOut, User, ShoppingBag, Bell, Settings, ChevronRight, CreditCard, QrCode, Gift, LayoutDashboard, Home, Shield, Crown, FileText } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSiteSettings } from '../hooks/useCms';
 import { API } from '@pawtag/shared/api';
@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { path: '/account/pets', label: 'My Pets', icon: PawPrint },
   { path: '/account/profile', label: 'Profile', icon: User },
   { path: '/account/orders', label: 'Orders', icon: ShoppingBag },
+  { path: '/account/invoices', label: 'Invoices', icon: FileText },
   { path: '/account/subscriptions', label: 'Subscriptions', icon: CreditCard },
   { path: '/account/guardian', label: 'Guardian', icon: Shield },
   { path: '/account/membership', label: 'Membership', icon: Crown },

@@ -1,7 +1,16 @@
 import { Router, Response } from 'express';
 import { AuthRequest, authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
-import { InvoiceAccessToken, Invoice, Subscription, User } from '@pawtag/db';
+import {
+  InvoiceAccessToken,
+  Invoice,
+  Subscription,
+  User,
+  Order,
+  UserMembership,
+  MembershipTier,
+} from '@pawtag/db';
+import { CUSTOMER_INVOICE_LIST_PAGE_SIZE } from '@pawtag/shared';
 import { generateOtp, generateSecureToken, hashToken } from '../services/auth.service';
 import { sendInvoiceOtpEmail, sendInvoiceEmail } from '../services/email.service';
 import { generateInvoiceHtml } from '../services/invoice-html.service';
@@ -12,6 +21,193 @@ import { type AuditRequest } from '../middleware/audit';
 
 const router = Router();
 const FRONTEND_URL = config.frontendUrl || 'http://localhost:3000';
+
+function mapInvoiceListItem(inv: any) {
+  return {
+    _id: String(inv._id),
+    invoiceNumber: inv.invoiceNumber,
+    amount: Number(inv.amount || 0),
+    currency: inv.currency || 'NZD',
+    status: inv.status,
+    type: inv.type || 'invoice',
+    paidAt: inv.paidAt ? new Date(inv.paidAt).toISOString() : null,
+    createdAt: inv.createdAt ? new Date(inv.createdAt).toISOString() : String(inv.createdAt),
+    orderId: inv.orderId ? String(inv.orderId) : null,
+    userMembershipId: inv.userMembershipId ? String(inv.userMembershipId) : null,
+    subscriptionId: inv.subscriptionId ? String(inv.subscriptionId) : null,
+  };
+}
+
+/** Safe customer projection of related order/membership/subscription data. */
+async function buildInvoiceDetailProjection(invoice: any) {
+  const base = {
+    ...mapInvoiceListItem(invoice),
+    billingPeriod: invoice.billingPeriod
+      ? {
+          start: new Date(invoice.billingPeriod.start).toISOString(),
+          end: new Date(invoice.billingPeriod.end).toISOString(),
+        }
+      : null,
+    stripeInvoiceId: invoice.stripeInvoiceId || null,
+    paymentMethod: invoice.paymentMethod || null,
+    dueDate: invoice.dueDate ? new Date(invoice.dueDate).toISOString() : null,
+    voidedReason: invoice.voidedReason || null,
+    relatedInvoiceNumber: null as string | null,
+    order: null as any,
+    membership: null as any,
+    subscription: null as any,
+  };
+
+  if (invoice.relatedInvoiceId) {
+    const original = await Invoice.findById(invoice.relatedInvoiceId).select('invoiceNumber').lean();
+    base.relatedInvoiceNumber = original?.invoiceNumber || null;
+  }
+
+  if (invoice.orderId) {
+    const order = await Order.findById(invoice.orderId).lean();
+    if (order) {
+      const pay = order.payment as any;
+      base.order = {
+        orderNumber: order.orderNumber,
+        items: (order.items || []).map((i: any) => ({
+          productName: i.productName,
+          variantName: i.variantName || null,
+          quantity: Number(i.quantity || 0),
+          unitPrice: i.unitPrice != null ? Number(i.unitPrice) : null,
+          totalPrice: i.totalPrice != null ? Number(i.totalPrice) : null,
+          tagId: i.tagId || null,
+          petName: i.petName || null,
+          customisationTexts: i.customisationTexts || [],
+        })),
+        subtotal: order.subtotal != null ? Number(order.subtotal) : null,
+        shippingCost: order.shippingCost != null ? Number(order.shippingCost) : null,
+        tax: order.tax != null ? Number(order.tax) : null,
+        discount: order.discount
+          ? {
+              amount: order.discount.amount != null ? Number(order.discount.amount) : null,
+              reason: order.discount.reason || null,
+            }
+          : null,
+        cardBrand: pay?.cardBrand || null,
+        cardLast4: pay?.cardLast4 || null,
+        shippingAddress: order.shippingAddress
+          ? {
+              line1: order.shippingAddress.line1,
+              line2: order.shippingAddress.line2 || null,
+              city: order.shippingAddress.city,
+              state: order.shippingAddress.state || null,
+              zip: order.shippingAddress.zip || null,
+              country: order.shippingAddress.country || null,
+            }
+          : null,
+        refundArn: (order as any).refundArn || null,
+        refundExpectedArrival: (order as any).refundExpectedArrival
+          ? new Date((order as any).refundExpectedArrival).toISOString()
+          : null,
+      };
+    }
+  }
+
+  if (invoice.userMembershipId) {
+    const membership = await UserMembership.findById(invoice.userMembershipId).lean();
+    if (membership) {
+      const tier = membership.tierId
+        ? await MembershipTier.findById(membership.tierId).select('displayName name tier').lean()
+        : null;
+      base.membership = {
+        tierName: tier?.displayName || tier?.name || 'Membership',
+        tier: tier?.tier || null,
+        currentPeriodStart: membership.currentPeriodStart
+          ? new Date(membership.currentPeriodStart).toISOString()
+          : null,
+        currentPeriodEnd: membership.currentPeriodEnd
+          ? new Date(membership.currentPeriodEnd).toISOString()
+          : null,
+        price: membership.price != null ? Number(membership.price) : null,
+        currency: membership.currency || null,
+        cardBrand: membership.cardBrand || null,
+        cardLast4: membership.cardLast4 || null,
+      };
+    }
+  }
+
+  if (invoice.subscriptionId) {
+    const sub = await Subscription.findById(invoice.subscriptionId).lean();
+    if (sub) {
+      base.subscription = {
+        planName: (sub as any).planName || 'Subscription',
+        planType: (sub as any).planType || null,
+        currentPeriodStart: (sub as any).currentPeriodStart
+          ? new Date((sub as any).currentPeriodStart).toISOString()
+          : null,
+        currentPeriodEnd: (sub as any).currentPeriodEnd
+          ? new Date((sub as any).currentPeriodEnd).toISOString()
+          : null,
+      };
+    }
+  }
+
+  return base;
+}
+
+// Customer: list own invoices (orders + membership + subscriptions + credit notes)
+router.get('/customer/invoices', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const pageSize = Math.min(
+      50,
+      Math.max(1, Number(req.query.pageSize) || CUSTOMER_INVOICE_LIST_PAGE_SIZE),
+    );
+    const userId = req.user!.id;
+
+    const filter = { userId };
+    const total = await Invoice.countDocuments(filter);
+    const items = await Invoice.find(filter)
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * pageSize)
+      .limit(pageSize)
+      .lean();
+
+    await auditInvoiceEvent(req, 'customer_invoice_list', userId, {
+      page,
+      pageSize,
+      total,
+    }).catch(() => {});
+
+    res.json({
+      success: true,
+      data: {
+        data: items.map(mapInvoiceListItem),
+        page,
+        pageSize,
+        total,
+        hasMore: page * pageSize < total,
+      },
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error?.message || 'Failed to load invoices' });
+  }
+});
+
+// Customer: single invoice detail (ownership-scoped, enriched projection)
+router.get('/customer/invoices/:invoiceId', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const invoice = await Invoice.findOne({
+      _id: req.params.invoiceId,
+      userId: req.user!.id,
+    }).lean();
+
+    if (!invoice) {
+      res.status(404).json({ success: false, error: 'Invoice not found' });
+      return;
+    }
+
+    const data = await buildInvoiceDetailProjection(invoice);
+    res.json({ success: true, data });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to load invoice' });
+  }
+});
 
 async function auditInvoiceEvent(req: AuditRequest, action: string, resourceId: string, metadata: Record<string, unknown>): Promise<void> {
   await auditService.log({

@@ -729,6 +729,15 @@ Example: Black (3×) → Gold (1×): customer loses 2/3 of points earned at Blac
 - **Upgrade while cancelling** (Option A) remains for API/admin; customer product path is Keep
 - **Billing Portal cancel/resume** is synced by webhook `customer.subscription.updated` (`cancel_at_period_end` → local `cancelledAt`/`autoRenew`)
 
+## Customer invoices portal
+
+- Customer list: `GET /api/customer/invoices` (userId-scoped, paginated, includes credit notes)
+- Detail: `GET /api/customer/invoices/:id` (ownership-scoped)
+- View/download: **reuse** `POST /api/customer/invoices/:id/access` → `InvoiceView` (OTP/token) — do not reimplement invoice HTML/download
+- UI: `/account/invoices` + `/account/invoices/:id`; shared `StatusBadge`/`CopyButton`/`EmptyState`
+- Contracts: `packages/shared/src/customer-invoices.ts`
+- Feature doc: `docs/CUSTOMER-INVOICES-PORTAL.md`
+
 ## Gold tag subscription billing interval
 
 - Tag subscriptions with `planType: 'gold'` change monthly↔annual via `POST /customer/subscriptions/:id/change-plan`
