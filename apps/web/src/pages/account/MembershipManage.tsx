@@ -6,6 +6,7 @@ import { formatCurrency, formatDate } from '@pawtag/shared';
 import api from '../../lib/api';
 import { ConfirmDialog, resolveTierIcon, resolveTierGradient, EntitlementList } from '@pawtag/ui';
 import KeepMembershipPanel from '../../components/KeepMembershipPanel';
+import PaymentMethodsPanel from '../../components/PaymentMethodsPanel';
 
 interface MembershipStatus {
   hasMembership: boolean;
@@ -265,37 +266,9 @@ export default function MembershipManage() {
         />
       </div>
 
-      {/* Payment Method */}
+      {/* Payment Methods — multi-card manager (Stripe Customer source of truth) */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-semibold text-gray-900">Payment Method</h2>
-          <button
-            onClick={handleOpenBillingPortal}
-            className="text-sm text-primary-600 hover:text-primary-700 font-medium"
-          >
-            Update
-          </button>
-        </div>
-        {membership.cardBrand ? (
-          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
-            <CreditCard className="h-8 w-8 text-gray-400" />
-            <div>
-              <p className="text-sm font-medium text-gray-900">
-                {membership.cardBrand.charAt(0).toUpperCase() + membership.cardBrand.slice(1)} ending in {membership.cardLast4}
-              </p>
-              <p className="text-xs text-gray-500">
-                Expires {membership.cardExpMonth}/{membership.cardExpYear}
-              </p>
-            </div>
-          </div>
-        ) : (
-          <p className="text-sm text-gray-500">No payment method on file</p>
-        )}
-        <p className="text-xs text-gray-400 mt-2">
-          {membership.autoRenew
-            ? 'Default payment method for auto-renewal. Click "Update" to change via Stripe secure portal.'
-            : 'No further membership charges are scheduled. You can still update your saved card here.'}
-        </p>
+        <PaymentMethodsPanel onChanged={fetchData} />
       </div>
 
       {/* Billing History */}

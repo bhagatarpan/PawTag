@@ -18,6 +18,14 @@ import {
   checkTagAccess,
   MembershipTierChangeError,
 } from '../services/membership.service';
+import {
+  listSavedPaymentMethods,
+  setDefaultPaymentMethod,
+  detachPaymentMethod,
+  createSetupIntentForUser,
+  confirmSavePaymentMethod,
+  PaymentMethodError,
+} from '../services/payment-method.service';
 import { MEMBERSHIP_TIER_CHANGE_CODES } from '@pawtag/shared';
 import { membershipEntitlementService } from '../services/membership-entitlement.service';
 import { isFakeMode } from '../commerce/payment-mode';
@@ -407,37 +415,102 @@ router.get('/entitlements', async (req: AuthRequest, res: Response) => {
 
 /**
  * GET /api/membership/payment-methods
- * List saved payment methods from Stripe Customer
+ * List saved payment methods from Stripe Customer (multiple cards + default flag)
  */
 router.get('/payment-methods', async (req: AuthRequest, res: Response) => {
   try {
-    const user = await User.findById(req.user!.id).select('stripeCustomerId').lean();
-    if (!user?.stripeCustomerId) {
-      res.json({ success: true, data: [] });
-      return;
-    }
-
-    if (isFakeMode()) {
-      res.json({ success: true, data: [] });
-      return;
-    }
-
-    const stripe = getStripeClient();
-    const paymentMethods = await stripe.customers.listPaymentMethods(user.stripeCustomerId, { type: 'card' });
-
-    const formatted = paymentMethods.data.map((pm) => ({
-      id: pm.id,
-      brand: pm.card?.brand,
-      last4: pm.card?.last4,
-      expMonth: pm.card?.exp_month,
-      expYear: pm.card?.exp_year,
-      isDefault: false, // Stripe doesn't expose this directly; frontend can compare with membership.cardBrand/last4
-    }));
-
-    res.json({ success: true, data: formatted });
+    const result = await listSavedPaymentMethods(req.user!.id);
+    res.json({ success: true, data: result.data, defaultPaymentMethodId: result.defaultPaymentMethodId, hasStripeCustomer: result.hasStripeCustomer });
   } catch (error: any) {
+    if (error instanceof PaymentMethodError) {
+      res.status(error.httpStatus).json({ success: false, error: error.message, code: error.membershipCode });
+      return;
+    }
     logger.error({ err: error, userId: req.user?.id }, '[Membership] Failed to list payment methods');
     res.status(500).json({ success: false, error: 'Failed to list payment methods' });
+  }
+});
+
+/**
+ * POST /api/membership/payment-methods/setup-intent
+ * Start SetupIntent to add a saved card without a charge.
+ */
+router.post('/payment-methods/setup-intent', async (req: AuthRequest, res: Response) => {
+  try {
+    const result = await createSetupIntentForUser(req.user!.id);
+    res.json({ success: true, data: result });
+  } catch (error: any) {
+    if (error instanceof PaymentMethodError) {
+      res.status(error.httpStatus).json({ success: false, error: error.message, code: error.membershipCode });
+      return;
+    }
+    logger.error({ err: error, userId: req.user?.id }, '[Membership] SetupIntent failed');
+    res.status(500).json({ success: false, error: 'Failed to start payment method setup' });
+  }
+});
+
+/**
+ * POST /api/membership/payment-methods/default
+ * Set a saved payment method as the customer default.
+ */
+router.post('/payment-methods/default', async (req: AuthRequest, res: Response) => {
+  try {
+    const { paymentMethodId } = req.body;
+    if (!paymentMethodId) {
+      res.status(400).json({ success: false, error: 'paymentMethodId is required' });
+      return;
+    }
+    const data = await setDefaultPaymentMethod(req.user!.id, paymentMethodId);
+    res.json({ success: true, data });
+  } catch (error: any) {
+    if (error instanceof PaymentMethodError) {
+      res.status(error.httpStatus).json({ success: false, error: error.message, code: error.membershipCode });
+      return;
+    }
+    logger.error({ err: error, userId: req.user?.id }, '[Membership] Set default payment method failed');
+    res.status(500).json({ success: false, error: 'Failed to set default payment method' });
+  }
+});
+
+/**
+ * POST /api/membership/payment-methods/detach
+ * Remove a saved payment method (blocked if membership requires last card).
+ */
+router.post('/payment-methods/detach', async (req: AuthRequest, res: Response) => {
+  try {
+    const { paymentMethodId } = req.body;
+    if (!paymentMethodId) {
+      res.status(400).json({ success: false, error: 'paymentMethodId is required' });
+      return;
+    }
+    const data = await detachPaymentMethod(req.user!.id, paymentMethodId);
+    res.json({ success: true, data });
+  } catch (error: any) {
+    if (error instanceof PaymentMethodError) {
+      res.status(error.httpStatus).json({ success: false, error: error.message, code: error.membershipCode });
+      return;
+    }
+    logger.error({ err: error, userId: req.user?.id }, '[Membership] Detach payment method failed');
+    res.status(500).json({ success: false, error: 'Failed to remove payment method' });
+  }
+});
+
+/**
+ * POST /api/membership/payment-methods/confirm-save
+ * Post-purchase opt-in: promote first/default PM when none set.
+ */
+router.post('/payment-methods/confirm-save', async (req: AuthRequest, res: Response) => {
+  try {
+    const { paymentMethodId } = req.body || {};
+    const result = await confirmSavePaymentMethod(req.user!.id, paymentMethodId);
+    res.json({ success: true, data: result });
+  } catch (error: any) {
+    if (error instanceof PaymentMethodError) {
+      res.status(error.httpStatus).json({ success: false, error: error.message, code: error.membershipCode });
+      return;
+    }
+    logger.error({ err: error, userId: req.user?.id }, '[Membership] Confirm save payment method failed');
+    res.status(500).json({ success: false, error: 'Failed to save payment method' });
   }
 });
 

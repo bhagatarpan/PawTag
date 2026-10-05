@@ -9,6 +9,7 @@ export * from './format';
 export * from './membership';
 export * from './stripe';
 export * from './customer-invoices';
+export * from './payment-methods';
 
 // --- Enums & Constants ---
 

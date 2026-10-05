@@ -775,10 +775,16 @@ Example: Black (3×) → Gold (1×): customer loses 2/3 of points earned at Blac
 
 ## Payment Method Management
 
-- Card display data populated from Stripe subscription after activation
-- Customer manages cards via Stripe Billing Portal
-- `GET /membership/payment-methods` — list from Stripe Customer
-- `POST /membership/payment-methods/portal` — Billing Portal session
+- **Multiple** saved PaymentMethods on Stripe Customer; **one default** (`invoice_settings.default_payment_method`)
+- First saved card becomes default if none; adding another does **not** silently replace default
+- Customer portal: Membership Manage → Payment Methods (list / add / set default / remove)
+- Membership subscribe + repair preselect default PM when valid; Elements fallback
+- Post-purchase optional save banner (product + membership success); No → do not set default
+- Delete last/default card blocked while active membership requires billing
+- Never store raw card data; Stripe Customer is source of truth
+- Feature doc: `docs/SAVED-PAYMENT-METHODS.md`
+
+## Payment Failure Handling
 - Upgrade errors with `code=membership.payment_method_required` should offer this portal
 
 ## Audit Requirements
