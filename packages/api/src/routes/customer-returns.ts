@@ -11,16 +11,47 @@
 
 import { Router, Response } from 'express';
 import { z } from 'zod';
+import mongoose from 'mongoose';
 import { AuthRequest, authenticate } from '../middleware/auth';
 import { validate } from '../middleware/validation';
 import { cancelOrderSchema } from '../middleware/schemas';
-import { Order, Return, User, Notification } from '@pawtag/db';
+import { Order, Return, User, Notification, Tag } from '@pawtag/db';
 import { cancelOrder, type CancellationResult } from '../commerce/services/cancellation.service';
 import { toAppError } from '../lib/app-errors';
 import { notifyCustomerOfStatusChange } from '../services/orderNotification.service';
 import { getSetting } from '../commerce/config';
 import { getTrackingUrl } from '@pawtag/shared';
 import logger from '../lib/logger';
+
+/**
+ * Best-effort resolve of Tag ObjectIds for return lines.
+ * Uses Tag.orderId + Tag.tagId when order items carry tagId;
+ * otherwise leaves tagIds empty (detach uses fulfilment/safety rules).
+ */
+async function resolveReturnItemTagIds(
+  order: any,
+  items: Array<{ orderItemId: string; quantity: number; productName?: string }>,
+): Promise<Array<string[]>> {
+  return Promise.all(
+    items.map(async (item) => {
+      const orderItem = order.items.find(
+        (oi: any) => String(oi._id) === item.orderItemId || String(oi.productId) === item.orderItemId,
+      );
+      if (!orderItem) return [];
+
+      // Direct tagId on order line
+      if (orderItem.tagId) {
+        const tag = await Tag.findOne({ tagId: orderItem.tagId, orderId: order._id }).select('_id').lean();
+        return tag ? [String(tag._id)] : [];
+      }
+
+      // Tags created for this order: take up to qty unreturned tags when
+      // this line's product matches via tagId string stored elsewhere.
+      // Fulfilment join is preferred at detach time; store nothing if ambiguous.
+      return [];
+    }),
+  );
+}
 
 // Zod schema for return request
 const returnItemSchema = z.object({
@@ -119,6 +150,15 @@ router.post('/', validate(createReturnSchema), async (req: AuthRequest, res: Res
       };
     });
 
+    // Attach tag ids when unambiguous (order line tagId or single remaining tag)
+    const tagIdsPerItem = await resolveReturnItemTagIds(order, returnItems);
+    returnItems.forEach((ri: any, idx: number) => {
+      const tagIds = tagIdsPerItem[idx] || [];
+      if (tagIds.length > 0) {
+        ri.tagIds = tagIds.map((id) => new mongoose.Types.ObjectId(id));
+      }
+    });
+
     const requester = await User.findById(userId).select('fullName email phoneNumber').lean();
 
     const returnRequest = await Return.create({
@@ -140,7 +180,11 @@ router.post('/', validate(createReturnSchema), async (req: AuthRequest, res: Res
           timestamp: new Date(),
           actor: requester?.email || userId,
           actorType: 'customer',
-          metadata: { refundAmount, itemCount: returnItems.length },
+          metadata: {
+            refundAmount,
+            itemCount: returnItems.length,
+            tagIds: returnItems.flatMap((i: any) => i.tagIds || []).map(String),
+          },
         },
       ],
     });

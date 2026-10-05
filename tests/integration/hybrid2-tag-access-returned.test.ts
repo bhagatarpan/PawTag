@@ -218,6 +218,88 @@ describe('HYBRID 2 tag access + returned tags', () => {
       expect(updated!.ownerId).toBeTruthy();
     });
 
+    it('partial return without tagIds refuses order-wide detach (kept tag stays owned)', async () => {
+      await seedBase();
+      const orderId = new mongoose.Types.ObjectId();
+      const kept = await Tag.create({
+        tagId: 'PT-KEEP-1',
+        tagType: 'qr',
+        ownerId: new mongoose.Types.ObjectId(userId),
+        status: 'active',
+        orderId,
+        activePeriodEndsAt: daysFromNow(90),
+        warrantyEndsAt: daysFromNow(365),
+        nfcEnabled: false,
+        subscriptionStatus: 'none',
+      });
+      await Tag.create({
+        tagId: 'PT-GONE-2',
+        tagType: 'qr',
+        ownerId: new mongoose.Types.ObjectId(userId),
+        status: 'active',
+        orderId,
+        activePeriodEndsAt: daysFromNow(90),
+        warrantyEndsAt: daysFromNow(365),
+        nfcEnabled: false,
+        subscriptionStatus: 'none',
+      });
+
+      const result = await detachTagsReturnedToPawTag({
+        orderId,
+        returnId: new mongoose.Types.ObjectId(),
+        // no tagIds — return qty 1 of 2 tags
+        items: [{ productName: 'PawTag Plus', quantity: 1 }],
+      });
+      expect(result.detached).toBe(0);
+      expect(result.safety).toBe('partial_return_without_tag_ids');
+
+      const keptAfter = await Tag.findById(kept._id).lean();
+      expect(keptAfter!.status).toBe('active');
+      expect(keptAfter!.ownerId).toBeTruthy();
+    });
+
+    it('detaches only explicit tagIds on partial return', async () => {
+      await seedBase();
+      const orderId = new mongoose.Types.ObjectId();
+      const returned = await Tag.create({
+        tagId: 'PT-PART-RET',
+        tagType: 'qr',
+        ownerId: new mongoose.Types.ObjectId(userId),
+        status: 'active',
+        orderId,
+        activePeriodEndsAt: daysFromNow(90),
+        warrantyEndsAt: daysFromNow(365),
+        nfcEnabled: false,
+        subscriptionStatus: 'none',
+      });
+      const kept = await Tag.create({
+        tagId: 'PT-PART-KEEP',
+        tagType: 'qr',
+        ownerId: new mongoose.Types.ObjectId(userId),
+        status: 'active',
+        orderId,
+        activePeriodEndsAt: daysFromNow(90),
+        warrantyEndsAt: daysFromNow(365),
+        nfcEnabled: false,
+        subscriptionStatus: 'none',
+      });
+
+      const result = await detachTagsReturnedToPawTag({
+        orderId,
+        returnId: new mongoose.Types.ObjectId(),
+        tagIds: [returned._id],
+        items: [{ productName: 'PawTag Scan', quantity: 1, tagIds: [returned._id] }],
+      });
+      expect(result.detached).toBe(1);
+
+      const retAfter = await Tag.findById(returned._id).lean();
+      const keepAfter = await Tag.findById(kept._id).lean();
+      expect(retAfter!.status).toBe('returned');
+      expect(retAfter!.ownerId).toBeFalsy();
+      expect(keepAfter!.status).toBe('active');
+      expect(keepAfter!.ownerId).toBeTruthy();
+    });
+
     it('GET membership tags excludes returned tags', async () => {
       await seedBase();
       await insertTag({

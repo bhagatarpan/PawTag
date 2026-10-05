@@ -433,6 +433,7 @@ export class ReturnRefundService {
           orderId: ret.orderId,
           returnId: ret._id,
           tagIds: tagIds as any[],
+          items: (ret.items || []) as any,
           refundWithoutReturn: false,
         });
         logger.info(

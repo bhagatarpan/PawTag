@@ -197,6 +197,7 @@ router.put('/:id/status', requirePermission('order.update'), validate(updateRetu
           orderId: item.orderId,
           returnId: item._id,
           tagIds: tagIds as any[],
+          items: (item.items || []) as any,
           refundWithoutReturn: Boolean(item.refundWithoutReturn),
         });
         logger.info(

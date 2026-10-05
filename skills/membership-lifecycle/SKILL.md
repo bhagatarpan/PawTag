@@ -136,12 +136,14 @@ Shared contracts: `packages/shared/src/membership.ts`.
 ## Returned Tags (returns/refunds)
 
 - New Tag `status: 'returned'` + `returnedAt`, `returnId`, `returnedOwnerId`
-- On **warehouse receipt** (and successful refund when goods received): detach tags (`status=returned`, clear `ownerId`/`petId`)
-- `Return.items[].tagIds` for partial returns (2 of 3)
-- **`refundWithoutReturn`:** do **not** detach tags
+- On **warehouse receipt** (and successful refund when goods received): detach tags
+- **Partial returns (2 of 3):** detach **only** `Return.items[].tagIds` / resolved ids — **never** order-wide detach when return qty &lt; remaining tags
+- `refundWithoutReturn`: do **not** detach tags
+- Return create stores `tagIds` when unambiguous
 - Finder treats returned like expired — no pet/owner data, no notify
 - Membership tags list / unredeemed count / tag extension exclude returned
 - Service: `packages/api/src/services/returns/tag-return-detach.service.ts`
+- Ops repair example: `packages/api/scripts/repair-order-WO-000490.ts`
 
 ## Cancellation (deferred to period end)
 

@@ -249,6 +249,14 @@ At currentPeriodEnd:
 - UI: `KeepMembershipPanel` — single calm CTA (no upgrade grid while cancelling)
 - Audit: `membership_kept` / `membership_reactivated_paid`
 
+### Returned tags (partial returns)
+
+- Return/refund of physical tags sets `Tag.status='returned'`, clears `ownerId`/`petId`
+- **Partial returns:** only listed `Return.items[].tagIds` are detached — never all order tags
+- `refundWithoutReturn` does not detach tags
+- Customer “Your Tags” excludes returned tags; finder blocks them
+- Ops repair: `packages/api/scripts/repair-order-WO-000490.ts`
+
 ### Stripe Billing Portal cancel/resume sync
 
 When a customer cancels or resumes in the **Stripe Billing Portal** (not PawTag UI):
