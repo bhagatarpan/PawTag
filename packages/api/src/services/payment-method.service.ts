@@ -318,29 +318,48 @@ export async function detachPaymentMethod(userId: string, paymentMethodId: strin
 }
 
 /**
- * Post-purchase confirm-save: if customer has PMs but no default, promote first.
- * Idempotent when default already set.
+ * Post-purchase confirm-save: promote first PM to default only when PMs exist.
+ * Never reports success when nothing is on file.
  */
 export async function confirmSavePaymentMethod(
   userId: string,
   paymentMethodId?: string,
-): Promise<{ defaultPaymentMethodId: string | null; data: SavedPaymentMethod[] }> {
+): Promise<{
+  saved: boolean;
+  defaultPaymentMethodId: string | null;
+  data: SavedPaymentMethod[];
+  reason?: string;
+}> {
   const list = await listSavedPaymentMethods(userId);
   if (list.data.length === 0) {
-    return { defaultPaymentMethodId: null, data: [] };
+    await auditPaymentMethodEvent('saved_after_purchase', userId, {
+      saved: false,
+      reason: 'no_payment_methods_on_stripe_customer',
+    });
+    return {
+      saved: false,
+      defaultPaymentMethodId: null,
+      data: [],
+      reason: 'no_payment_methods',
+    };
   }
 
   const targetId = paymentMethodId || list.defaultPaymentMethodId || list.data[0]?.id;
   if (!targetId) {
-    return { defaultPaymentMethodId: null, data: list.data };
+    return { saved: false, defaultPaymentMethodId: null, data: list.data, reason: 'no_target' };
   }
 
   if (list.defaultPaymentMethodId && list.defaultPaymentMethodId === targetId) {
     await auditPaymentMethodEvent('saved_after_purchase', userId, {
       paymentMethodId: targetId,
       alreadyDefault: true,
+      saved: true,
     });
-    return { defaultPaymentMethodId: list.defaultPaymentMethodId, data: list.data };
+    return {
+      saved: true,
+      defaultPaymentMethodId: list.defaultPaymentMethodId,
+      data: list.data,
+    };
   }
 
   if (!list.defaultPaymentMethodId) {
@@ -348,15 +367,21 @@ export async function confirmSavePaymentMethod(
     await auditPaymentMethodEvent('saved_after_purchase', userId, {
       paymentMethodId: targetId,
       becameDefault: true,
+      saved: true,
     });
-    return { defaultPaymentMethodId: targetId, data };
+    return { saved: true, defaultPaymentMethodId: targetId, data };
   }
 
-  // Default already exists — do not silently replace
+  // Default already exists — card is already on file; do not silently replace default
   await auditPaymentMethodEvent('saved_after_purchase', userId, {
     paymentMethodId: targetId,
     becameDefault: false,
     existingDefault: list.defaultPaymentMethodId,
+    saved: true,
   });
-  return { defaultPaymentMethodId: list.defaultPaymentMethodId, data: list.data };
+  return {
+    saved: true,
+    defaultPaymentMethodId: list.defaultPaymentMethodId,
+    data: list.data,
+  };
 }

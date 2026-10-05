@@ -115,3 +115,4 @@ Membership Manage → Payment Methods
 | Date | Update |
 |---|---|
 | 2026-10-06 | Implemented multi-card service/routes/UI + save-after-purchase banners + default PM on subscribe/repair |
+| 2026-10-06 | Cards visible without membership; honest save for shop + membership (SetupIntent when empty; no false saved) |

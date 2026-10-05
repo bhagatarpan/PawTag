@@ -50,23 +50,10 @@ export default function CheckoutConfirmationStep({
   }, [user]);
 
   // Post-purchase save-card offer when customer is signed in
+  // Banner itself decides confirm-save vs add-card based on live Stripe list
   useEffect(() => {
     if (!authUser || saveCardDismissed) return;
-    let cancelled = false;
-    api.get('/membership/payment-methods')
-      .then((res) => {
-        if (cancelled) return;
-        const hasPms = Array.isArray(res.data?.data) && res.data.data.length > 0;
-        // Offer when cards already on Customer (setup_future_usage) OR when none yet (SetupIntent path)
-        setShowSaveCard(true);
-        void hasPms;
-      })
-      .catch(() => {
-        if (!cancelled) setShowSaveCard(false);
-      });
-    return () => {
-      cancelled = true;
-    };
+    setShowSaveCard(true);
   }, [authUser, saveCardDismissed]);
 
   const handleInvoiceAction = async (action: 'view' | 'download' | 'print') => {
