@@ -712,10 +712,20 @@ Example: Black (3×) → Gold (1×): customer loses 2/3 of points earned at Blac
 - Email copy must match actual behavior
 - **Resume** (`POST /membership/resume`) clears Stripe `cancel_at_period_end` first, then local `cancelledAt`/`autoRenew`
 - **Keep my Membership** (`POST /membership/keep`):
-  - Cancelling + benefits still active → resume same membership, **no charge**, original start/end dates
-  - Benefits already ended → **paid rejoin** at full tier price (Stripe factory + Elements)
+  - Cancelling + benefits still active → restore membership, **no charge**, original start/end dates
+  - Stripe resume is **best-effort**: if Stripe sub already ended, still keep local membership for the paid period
+  - Benefits already ended → **paid rejoin** at full tier price (Stripe factory + Elements); new period from payment date
+  - Already active + not cancelling → `already_active` (idempotent; never force paid rejoin)
+  - Server decides payment via `requiresPaymentForKeep()` — frontend must not invent prices
   - Customer UI while cancelling: **only** Keep CTA (hide upgrade grid)
-  - Audit: `membership_kept` / `membership_reactivated_paid`
+  - Audit: `membership_kept` / `membership_reactivated_paid` with operationId + dates
+  - Feature doc: `docs/KEEP-MY-MEMBERSHIP.md`
+- **Upgrade while local membership active but Stripe sub dead:**
+  - Proration `change-tier` → `membership.subscription_not_active` — do **not** marketing subscribe loop
+  - **Repair upgrade:** `POST /membership/change-tier/repair` — full target-tier price, no proration
+  - Local benefits stay active until payment; activate completes on the **same** membership doc
+  - New period starts after payment
+  - Skill: `skills/membership-tier-change/`
 - **Upgrade while cancelling** (Option A) remains for API/admin; customer product path is Keep
 - **Billing Portal cancel/resume** is synced by webhook `customer.subscription.updated` (`cancel_at_period_end` → local `cancelledAt`/`autoRenew`)
 

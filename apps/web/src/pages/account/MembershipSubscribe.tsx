@@ -252,6 +252,37 @@ export default function MembershipSubscribe() {
   }
 
   /**
+   * Active membership + dead/missing Stripe sub → full target-tier price.
+   * Local benefits stay active until payment; activate completes the upgrade.
+   */
+  async function handleRepairUpgrade(tier: MembershipTier) {
+    setProcessing(true);
+    setError('');
+    setErrorCode(undefined);
+    setSelectedTier(tier);
+    try {
+      const res = await api.post(API.customer.membership.changeTierRepair, { tierId: tier._id });
+      const data = res.data?.data;
+      if (data?.clientSecret) {
+        setClientSecret(data.clientSecret);
+        setMembershipId(data.membershipId || null);
+        setUpgradeResult({
+          prorationAmount: data.chargeAmount,
+          currency: data.currency,
+        });
+        setProcessing(false);
+        return;
+      }
+      // Fake mode: repair applied immediately
+      setSuccess(true);
+      setTimeout(() => navigate('/account/membership'), 2000);
+    } catch (err: any) {
+      applyError(err, 'Failed to start membership upgrade payment');
+      setProcessing(false);
+    }
+  }
+
+  /**
    * Second confirmation step: user has seen the proration estimate and clicks confirm.
    * For upgrades: calls changeTier endpoint (immediate).
    * For downgrades: calls downgrade endpoint (deferred) — requires terms acceptance.
@@ -450,9 +481,9 @@ export default function MembershipSubscribe() {
             tierDisplayName={currentTier.displayName}
             benefitsUntil={currentMembership?.membership?.currentPeriodEnd}
             currentPeriodStart={currentMembership?.membership?.currentPeriodStart}
-            chargeAmount={currentTier.price}
-            currency={currentTier.currency || 'NZD'}
             periodEnded={benefitsEnded}
+            chargeAmount={benefitsEnded ? currentTier.price : 0}
+            currency={currentTier.currency || 'NZD'}
             onSuccess={() => fetchData()}
           />
         </div>
@@ -473,15 +504,22 @@ export default function MembershipSubscribe() {
           {showResubscribeRecovery && (
             <div className="mt-3">
               <p className="text-sm text-red-700 mb-2">
-                Your membership billing subscription is missing or has ended at the payment provider.
-                Upgrade cannot continue until you have an active paid subscription.
+                Your membership billing subscription is missing or has ended at the payment
+                provider. You can upgrade with a new subscription at the full tier price — your
+                current benefits stay active until payment completes.
               </p>
-              <Link
-                to="/membership"
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition-colors"
-              >
-                Subscribe again
-              </Link>
+              {selectedTier && (
+                <button
+                  type="button"
+                  onClick={() => handleRepairUpgrade(selectedTier)}
+                  disabled={processing}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition-colors disabled:opacity-60"
+                >
+                  {processing
+                    ? 'Preparing payment…'
+                    : `Upgrade with a new subscription — ${formatCurrency(selectedTier.price, selectedTier.currency || 'NZD')}`}
+                </button>
+              )}
             </div>
           )}
           {showMembershipErrorCode && (

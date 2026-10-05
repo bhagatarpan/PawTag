@@ -202,9 +202,9 @@ export default function MembershipManage() {
             tierDisplayName={tier.displayName}
             benefitsUntil={membership.currentPeriodEnd}
             currentPeriodStart={membership.currentPeriodStart}
-            chargeAmount={membership.price}
-            currency={tierCurrency}
             periodEnded={isBenefitsEnded}
+            chargeAmount={isBenefitsEnded ? membership.price : 0}
+            currency={tierCurrency}
             onSuccess={handleKeepSuccess}
           />
 

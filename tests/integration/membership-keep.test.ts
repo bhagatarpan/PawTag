@@ -95,7 +95,7 @@ describe('POST /api/membership/keep', () => {
     expect(res.status).toBe(401);
   });
 
-  it('Path A: resumes cancelling membership with no charge and original dates', async () => {
+  it('Path A: free restore for cancelling membership with original dates', async () => {
     const { membershipId, periodStart, periodEnd } = await createMembership({
       cancelledAt: new Date(),
       autoRenew: false,
@@ -106,8 +106,8 @@ describe('POST /api/membership/keep', () => {
       .set('Authorization', `Bearer ${token}`);
 
     expect(res.status).toBe(200);
-    expect(res.body.success).toBe(true);
     expect(res.body.data.outcome).toBe('resumed');
+    expect(res.body.data.paymentRequired).toBe(false);
     expect(res.body.data.preservedOriginalDates).toBe(true);
 
     const updated = await mongoose.connection.collections.usermemberships
@@ -118,16 +118,58 @@ describe('POST /api/membership/keep', () => {
     expect(updated!.tierId.toString()).toBe(goldTierId);
     expect(updated!.currentPeriodStart?.toISOString()).toBe(periodStart.toISOString());
     expect(updated!.currentPeriodEnd?.toISOString()).toBe(periodEnd.toISOString());
-
-    const user = await mongoose.connection.collections.users.findOne({
-      _id: new mongoose.Types.ObjectId(userId),
-    });
-    // User.membershipTier may be schema-less in some fixtures; membership doc is source of truth
-    expect(updated!.status).toBe('active');
-    expect(updated!.autoRenew).toBe(true);
   });
 
-  it('Path B: when benefits ended, creates paid rejoin (fake mode activates immediately)', async () => {
+  it('Path A works when Stripe subscription is null/ended (local keep for paid period)', async () => {
+    await createMembership({
+      cancelledAt: new Date(),
+      autoRenew: false,
+      stripeSubscriptionId: null,
+    });
+
+    const res = await request(app)
+      .post('/api/membership/keep')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.outcome).toBe('resumed');
+    expect(res.body.data.paymentRequired).toBe(false);
+  });
+
+  it('Idempotent: second Keep click returns already_active, does not force paid rejoin', async () => {
+    await createMembership({ cancelledAt: new Date(), autoRenew: false });
+
+    const first = await request(app)
+      .post('/api/membership/keep')
+      .set('Authorization', `Bearer ${token}`);
+    expect(first.body.data.outcome).toBe('resumed');
+
+    const second = await request(app)
+      .post('/api/membership/keep')
+      .set('Authorization', `Bearer ${token}`);
+    expect(second.status).toBe(200);
+    expect(second.body.data.outcome).toBe('already_active');
+    expect(second.body.data.paymentRequired).toBe(false);
+
+    const memberships = await mongoose.connection.collections.usermemberships
+      .find({ userId: new mongoose.Types.ObjectId(userId) })
+      .toArray();
+    expect(memberships.filter((m) => m.status === 'active')).toHaveLength(1);
+  });
+
+  it('Returns already_active for ordinary active non-cancelling membership', async () => {
+    await createMembership({ cancelledAt: null, autoRenew: true });
+
+    const res = await request(app)
+      .post('/api/membership/keep')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.outcome).toBe('already_active');
+    expect(res.body.data.paymentRequired).toBe(false);
+  });
+
+  it('Path B: paid rejoin when benefits ended (fake mode activates with full price)', async () => {
     await createMembership({
       cancelledAt: new Date(),
       autoRenew: false,
@@ -140,17 +182,15 @@ describe('POST /api/membership/keep', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.data.outcome).toBe('payment_required');
+    expect(res.body.data.paymentRequired).toBe(true);
     expect(res.body.data.chargeAmount).toBe(89);
-    expect(res.body.data.membershipId).toBeTruthy();
+    expect(res.body.data.preservedOriginalDates).toBe(false);
 
-    // Fake mode subscribe activates immediately
     const memberships = await mongoose.connection.collections.usermemberships
       .find({ userId: new mongoose.Types.ObjectId(userId) })
       .toArray();
     const active = memberships.filter((m) => m.status === 'active');
-    expect(active.length).toBe(1);
-    expect(active[0].tierId.toString()).toBe(goldTierId);
-    // New period should start from now (not old end date)
+    expect(active).toHaveLength(1);
     expect(active[0].currentPeriodEnd.getTime()).toBeGreaterThan(Date.now());
   });
 

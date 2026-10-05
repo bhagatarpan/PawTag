@@ -143,14 +143,17 @@ Shared contracts: `packages/shared/src/membership.ts`.
 
 | Scenario | Behavior |
 |---|---|
-| Cancelling + benefits still active | Resume same Stripe sub + same membership doc; **no charge**; original start/end dates; `cancelledAt` cleared; `autoRenew=true` |
-| Benefits already ended | Close old membership; **paid rejoin** same tier at full CMS/tier price; `clientSecret` for Stripe Elements |
-| Not cancelling / no membership | Typed error |
+| Cancelling + benefits still active | Restore same membership; **no charge**; original start/end dates. Stripe `cancel_at_period_end` cleared **best-effort** — if Stripe sub already ended, still keep local membership for the paid period |
+| Benefits already ended | **Paid rejoin** same tier at full CMS/tier price; new period from payment date; `clientSecret` for Stripe Elements |
+| Already active + not cancelling | `outcome: already_active` (idempotent) — never force paid rejoin |
+| Pending payment | Return existing `clientSecret` (idempotent) |
 
-- UI: `KeepMembershipPanel` — calm single CTA (no noisy ConfirmDialog)
-- Manage + Subscribe pages: **only** Keep action while cancelling (hide upgrade grid)
-- Audit: `membership_kept` / `membership_reactivated_paid`
-- Email: `membership-resumed` (Path A); welcome/invoice on Path B activate
+- Server-only decision: `requiresPaymentForKeep()` from `@pawtag/shared`
+- Eligibility: `isCancellingMembership()` = `cancelledAt` set or `status === 'cancelled'`
+- UI: `KeepMembershipPanel` — calm single CTA; copy from server `paymentRequired` / `chargeAmount` / dates
+- Audit: `membership_kept` / `membership_reactivated_paid` with `operationId`, dates, payment flags
+- Email free: slug `membership-kept`; paid: welcome + invoice on activate
+- Points/Guardian: same-tier keep → registry multiplier; **no** extra points grant
 - Stripe: central factory only (`lib/stripe-client.ts`)
 
 ## Stripe Billing Portal cancel/resume sync

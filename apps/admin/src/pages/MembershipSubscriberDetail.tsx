@@ -452,7 +452,7 @@ export default function MembershipSubscriberDetail() {
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-gray-900">
                     {event.action === 'membership_kept'
-                      ? 'Membership kept'
+                      ? 'Customer kept membership'
                       : event.action === 'membership_reactivated_paid'
                         ? 'Membership reactivated (paid)'
                         : event.action === 'membership_resumed'

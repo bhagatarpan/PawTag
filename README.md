@@ -1060,7 +1060,8 @@ All membership benefits are driven from a single source of truth: the **Membersh
 - **Downgrades:** Effective at end of current subscription cycle; customer sees points-at-risk and entitlements-lost before accepting
 - **Points clawback:** On downgrade, customer loses multiplier bonus on points earned at higher tier rate
 - **Cancellation:** `cancel_at_period_end` — benefits continue until period end; resume clears cancel in Stripe first
-- **Keep my Membership:** cancelling members get one calm CTA — no charge while benefits remain (original dates preserved); if period already ended, full tier price rejoin via Stripe
+- **Keep my Membership:** cancelling members get one calm CTA — no charge while benefits remain (original dates preserved, even if Stripe sub already ended); if period already ended, full tier price rejoin via Stripe. Idempotent double-click safe. See `docs/KEEP-MY-MEMBERSHIP.md`
+- **Repair upgrade:** if membership is active but Stripe subscription ended, upgrade uses full target-tier price (new Stripe sub); benefits stay active until payment
 - **Payment failure handling:** Dunning state, customer notification, CSR alert; Stripe retries automatically
 - **Payment method management:** Customers manage cards via Stripe Billing Portal
 - **Typed tier-change errors:** `membership.payment_method_required`, `membership.subscription_missing`, etc. with HTTP 402/409/502 for recovery UX

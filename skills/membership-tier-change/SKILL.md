@@ -32,6 +32,16 @@ When `UserMembership.cancelledAt` is set and customer confirms immediate upgrade
 
 **Customer UI while cancelling:** Prefer **Keep my Membership** (`keepMyMembership`) over upgrade cards. Hide tier grid on Subscribe when `isCancelling` or benefits ended. Upgrade-while-cancelling remains for API/admin; customer path is Keep.
 
+## Repair upgrade (active membership + dead Stripe sub)
+
+- Endpoint: `POST /membership/change-tier/repair` `{ tierId }`
+- When: local membership `active` but Stripe sub missing/ended (`subscription_not_active` / `subscription_missing`)
+- Charge: **full target-tier price** from `MembershipTier` — no proration on dead sub
+- Stripe: create new subscription `default_incomplete`; return `clientSecret`
+- Local benefits stay active until payment; `pendingTierId` marks repair
+- On activate/`invoice.payment_succeeded`: `completeRepairUpgrade` updates same membership `_id`, new period from payment
+- UI: not “subscribe again” marketing loop — repair CTA + StripeElements
+
 ## Keep my Membership
 
 - Endpoint: `POST /membership/keep`
