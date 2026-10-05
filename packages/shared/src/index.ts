@@ -8,6 +8,7 @@ export * from './finder-dto';
 export * from './format';
 export * from './membership';
 export * from './stripe';
+export * from './customer-invoices';
 
 // --- Enums & Constants ---
 

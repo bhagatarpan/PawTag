@@ -39,6 +39,8 @@ import RedeemTag from './pages/account/RedeemTag';
 import Referrals from './pages/account/Referrals';
 import NotificationPreferences from './pages/account/NotificationPreferences';
 import InvoiceView from './pages/InvoiceView';
+import Invoices from './pages/account/Invoices';
+import InvoiceDetail from './pages/account/InvoiceDetail';
 import AccountDashboard from './pages/account/Dashboard';
 import GuardianDashboard from './pages/account/GuardianDashboard';
 import GuardianPoints from './pages/account/GuardianPoints';
@@ -132,6 +134,8 @@ export default function App() {
         <Route path="/account/orders" element={<ProtectedRoute><AccountLayout><Orders /></AccountLayout></ProtectedRoute>} />
         <Route path="/account/orders/:id" element={<ProtectedRoute><AccountLayout><OrderDetail /></AccountLayout></ProtectedRoute>} />
         <Route path="/account/orders/:id/return" element={<ProtectedRoute><AccountLayout><ReturnRequest /></AccountLayout></ProtectedRoute>} />
+        <Route path="/account/invoices" element={<ProtectedRoute><AccountLayout><Invoices /></AccountLayout></ProtectedRoute>} />
+        <Route path="/account/invoices/:id" element={<ProtectedRoute><AccountLayout><InvoiceDetail /></AccountLayout></ProtectedRoute>} />
         <Route path="/account/subscriptions" element={<ProtectedRoute><AccountLayout><Subscriptions /></AccountLayout></ProtectedRoute>} />
         <Route path="/account/guardian" element={<ProtectedRoute><AccountLayout><GuardianDashboard /></AccountLayout></ProtectedRoute>} />
         <Route path="/account/guardian/points" element={<ProtectedRoute><AccountLayout><GuardianPoints /></AccountLayout></ProtectedRoute>} />

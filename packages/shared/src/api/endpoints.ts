@@ -667,6 +667,8 @@ export const API = {
       unlinkPet: (id: string) => `/customer/tags/${id}/unlink-pet` as const,
     },
     invoices: {
+      list: '/customer/invoices',
+      get: (id: string) => `/customer/invoices/${id}` as const,
       access: (id: string) => `/customer/invoices/${id}/access` as const,
     },
     settings: {
