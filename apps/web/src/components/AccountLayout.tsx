@@ -1,5 +1,5 @@
 import { ReactNode, useEffect, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { PawPrint, LogOut, User, ShoppingBag, Bell, Settings, ChevronRight, CreditCard, QrCode, Gift, LayoutDashboard, Home, Shield, Crown, FileText } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSiteSettings } from '../hooks/useCms';
@@ -39,7 +39,7 @@ function formatLastLogin(dateStr: string): string {
 }
 
 export default function AccountLayout({ children }: { children: ReactNode }) {
-  const { user, logout, refreshUser } = useAuth();
+  const { user, logout, refreshUser, isLoading } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [unreadCount, setUnreadCount] = useState(0);
@@ -86,8 +86,27 @@ export default function AccountLayout({ children }: { children: ReactNode }) {
   const companyName = settings?.['company.name'] || 'PawTag';
 
   // Show onboarding wizard for users who haven't completed or dismissed it.
-  // Use !== true instead of === false to handle undefined (e.g. before /me completes).
-  const shouldShowWizard = user?.onboardingCompleted !== true && user?.onboardingSkipped !== true;
+  // Onboarding is only available after both email and phone are verified.
+  // Unverified users are sent to /verify-account instead of the wizard.
+  const userLoaded = !isLoading && !!user;
+  const channelsVerified = userLoaded && user.emailVerified === true && user.phoneVerified === true;
+  const shouldShowWizard =
+    channelsVerified &&
+    user.onboardingCompleted !== true &&
+    user.onboardingSkipped !== true;
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
+      </div>
+    );
+  }
+
+  if (userLoaded && !channelsVerified) {
+    return <Navigate to="/verify-account" replace />;
+  }
+
   if (shouldShowWizard) {
     return <OnboardingWizard />;
   }

@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import mongoose from 'mongoose';
 import { AuthRequest, authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
+import { requireVerifiedChannels } from '../middleware/verificationGuard';
 import { validate } from '../middleware/validation';
 import { createPetSchema, updatePetSchema } from '../middleware/schemas';
 import { Pet, Tag, Order, LocationEvent, Notification, FinderScan, User, generatePetId, Subscription, Referral, Setting, Invoice, EscalationRecord } from '@pawtag/db';
@@ -2500,7 +2501,9 @@ router.put('/settings/finder-privacy', requirePermission('pet.read'), async (req
 });
 
 // --- Onboarding ---
-router.put('/settings/onboarding-complete', requirePermission('pet.read'), async (req: AuthRequest, res: Response) => {
+// Complete onboarding requires both email and phone verified (server-enforced).
+// Skip/dismiss remain available without verification (product decision).
+router.put('/settings/onboarding-complete', requirePermission('pet.read'), requireVerifiedChannels, async (req: AuthRequest, res: Response) => {
   try {
     const user = await User.findById(req.user!.id);
     if (!user || user.deletedAt) {

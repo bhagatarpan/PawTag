@@ -1377,6 +1377,10 @@ router.put('/profile', authenticate, validate(updateProfileSchema), async (req: 
         return;
       }
     }
+    // Normalize phone like register/OTP paths so verification comparisons stay consistent
+    if (typeof update.phoneNumber === 'string' && update.phoneNumber.trim()) {
+      update.phoneNumber = normalizePhone(update.phoneNumber);
+    }
     // Reset email verification if email changed
     if (update.email && update.email !== existing.email) {
       update.emailVerified = false;
