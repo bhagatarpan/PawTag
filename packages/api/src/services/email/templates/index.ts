@@ -42,4 +42,5 @@ export { renderJobNotificationEmail } from './job-notification';
 export { renderSubscriptionPlanChangedEmail } from './subscription-plan-changed';
 export { renderSubscriptionResumedEmail } from './subscription-resumed';
 export { renderMembershipResumedEmail } from './membership-resumed';
+export { renderMembershipKeptEmail } from './membership-kept';
 export { renderFulfilmentAlertEmail } from './fulfilment-alert';

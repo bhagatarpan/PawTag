@@ -11,6 +11,7 @@ import {
   resumeMembership,
   keepMyMembership,
   changeTier,
+  repairUpgradeToTier,
   estimateTierChange,
   requestDowngrade,
   cancelPendingDowngrade,
@@ -273,6 +274,38 @@ router.post('/change-tier', async (req: AuthRequest, res: Response) => {
       '[Membership] Change tier error',
     );
     sendMembershipError(res, error, 'Failed to change tier');
+  }
+});
+
+/**
+ * POST /api/membership/change-tier/repair
+ * Active local membership + dead/missing Stripe sub → full target-tier price upgrade.
+ * Local benefits stay active until payment; activate completes the tier change.
+ */
+router.post('/change-tier/repair', async (req: AuthRequest, res: Response) => {
+  try {
+    const { tierId } = req.body;
+    if (!tierId) {
+      res.status(400).json({
+        success: false,
+        error: 'tierId is required',
+        code: MEMBERSHIP_TIER_CHANGE_CODES.TIER_REQUIRED,
+      });
+      return;
+    }
+
+    const result = await repairUpgradeToTier(req.user!.id, tierId);
+    res.json({ success: true, data: result });
+  } catch (error: any) {
+    logger.error(
+      {
+        err: error,
+        userId: req.user?.id,
+        membershipCode: error?.membershipCode,
+      },
+      '[Membership] Repair upgrade error',
+    );
+    sendMembershipError(res, error, 'Failed to repair membership upgrade');
   }
 });
 

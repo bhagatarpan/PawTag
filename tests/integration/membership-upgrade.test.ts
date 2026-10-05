@@ -500,6 +500,88 @@ describe('Membership Upgrade Flow', () => {
         }
       });
     });
+
+    describe('Repair upgrade — active membership + dead Stripe sub', () => {
+      it('returns membership.subscription_not_active on proration change-tier when sub is dead', async () => {
+        process.env.PAYMENT_MODE = 'stripe_test';
+        process.env.STRIPE_SECRET_KEY = 'sk_test_mock_key_repair';
+        const membershipService = await import('../../packages/api/src/services/membership.service');
+        membershipService.setStripeClientForTests({
+          subscriptions: {
+            retrieve: vi.fn().mockResolvedValue({
+              id: 'sub_dead',
+              status: 'canceled',
+              items: { data: [{ id: 'si_dead' }] },
+            }),
+            update: vi.fn(),
+            create: vi.fn(),
+          },
+          prices: { create: vi.fn() },
+        } as any);
+
+        try {
+          const { membershipId } = await createActiveGoldMembership({
+            stripeSubscriptionId: 'sub_dead',
+          });
+          await mongoose.connection.collections.membershiptiers.updateOne(
+            { _id: new mongoose.Types.ObjectId(platinumTierId) },
+            { $set: { stripePriceId: 'price_platinum_mock' } },
+          );
+
+          const res = await request(app)
+            .post('/api/membership/change-tier')
+            .set('Authorization', `Bearer ${token}`)
+            .send({ tierId: platinumTierId, prorationBehavior: 'now' });
+
+          expect(res.status).toBe(409);
+          expect(res.body.code).toBe('membership.subscription_not_active');
+
+          const updated = await mongoose.connection.collections.usermemberships
+            .findOne({ _id: new mongoose.Types.ObjectId(membershipId) });
+          expect(updated!.tierId.toString()).toBe(goldTierId);
+        } finally {
+          membershipService.setStripeClientForTests(null);
+          process.env.PAYMENT_MODE = 'fake';
+          delete process.env.STRIPE_SECRET_KEY;
+        }
+      });
+
+      it('fake mode: repair upgrade applies full target tier price immediately', async () => {
+        const { membershipId } = await createActiveGoldMembership({
+          stripeSubscriptionId: 'sub_dead',
+        });
+        await mongoose.connection.collections.membershiptiers.updateOne(
+          { _id: new mongoose.Types.ObjectId(platinumTierId) },
+          { $set: { stripePriceId: 'price_platinum_mock' } },
+        );
+
+        const res = await request(app)
+          .post('/api/membership/change-tier/repair')
+          .set('Authorization', `Bearer ${token}`)
+          .send({ tierId: platinumTierId });
+
+        expect(res.status).toBe(200);
+        expect(res.body.data.chargeAmount).toBe(99);
+        expect(res.body.data.tierDisplayName).toBe('Platinum');
+
+        const updated = await mongoose.connection.collections.usermemberships
+          .findOne({ _id: new mongoose.Types.ObjectId(membershipId) });
+        expect(updated!.tierId.toString()).toBe(platinumTierId);
+        expect(updated!.price).toBe(99);
+      });
+
+      it('repair upgrade rejects same tier', async () => {
+        await createActiveGoldMembership({ stripeSubscriptionId: 'sub_dead' });
+
+        const res = await request(app)
+          .post('/api/membership/change-tier/repair')
+          .set('Authorization', `Bearer ${token}`)
+          .send({ tierId: goldTierId });
+
+        expect(res.status).toBe(409);
+        expect(res.body.code).toBe('membership.already_on_tier');
+      });
+    });
   });
 
   describe('GET /api/membership/status after upgrade', () => {

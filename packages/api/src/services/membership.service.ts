@@ -8,9 +8,12 @@ import {
   MEMBERSHIP_TIER_CHANGE_CODES,
   MEMBERSHIP_TIER_CHANGE_HTTP_STATUS,
   STRIPE_CURRENCY_NZD,
+  isCancellingMembership,
+  requiresPaymentForKeep,
   type KeepMembershipOutcome,
   type KeepMembershipResponseData,
   type MembershipTierChangeCode,
+  type RepairUpgradeResponseData,
 } from '@pawtag/shared';
 import { sendMail } from './email.service';
 import { sendInvoiceEmail } from './email.service';
@@ -19,6 +22,7 @@ import { generateSecureToken, hashToken } from './auth.service';
 import { createAndDeliverNotification } from './notification-delivery.service';
 import { auditService, type AuditContext } from './audit';
 import { systemAuditContext } from '../lib/app-meta';
+import { getRequestContext } from '../lib/request-context';
 import { AppError, type ErrorCode, type ErrorMetadata } from '../lib/app-errors';
 import {
   getStripeClient,
@@ -151,7 +155,23 @@ async function auditMembershipEvent(
   overrides: Partial<AuditContext> = {},
 ): Promise<void> {
   try {
-    await auditService.log(systemAuditContext('SERVICE', overrides), input);
+    const reqCtx = getRequestContext();
+    const context: AuditContext = systemAuditContext('SERVICE', {
+      ...(reqCtx?.requestId ? { requestId: reqCtx.requestId } : {}),
+      ...(reqCtx?.correlationId ? { correlationId: reqCtx.correlationId } : {}),
+      ...(reqCtx?.userId ? { actorId: reqCtx.userId, actorUsername: reqCtx.email || reqCtx.userId } : {}),
+      ...(reqCtx?.ip ? { sourceIp: reqCtx.ip } : {}),
+      ...(reqCtx?.userId ? { subjectUserId: reqCtx.userId } : {}),
+      ...overrides,
+    });
+    // Customer-initiated keep/resume/cancel: prefer real actor when request context has userId
+    if (reqCtx?.userId && input.action?.startsWith('membership_')) {
+      context.actorType = 'SERVICE';
+      context.actorId = reqCtx.userId;
+      context.actorUsername = reqCtx.email || reqCtx.userId;
+      if (reqCtx.ip) context.sourceIp = reqCtx.ip;
+    }
+    await auditService.log(context, input);
   } catch (err) {
     logger.error({ err }, '[Audit] Failed to log membership event');
   }
@@ -573,6 +593,12 @@ export async function subscribeToTier(
 export async function activateMembership(membershipId: string) {
   const membership = await UserMembership.findById(membershipId);
   if (!membership) throw new Error('Membership not found');
+
+  // Paid repair upgrade: active local membership + pendingTierId after Stripe payment
+  if (membership.status === 'active' && membership.pendingTierId) {
+    return completeRepairUpgrade(membership);
+  }
+
   if (membership.status === 'active') return membership;
 
   membership.status = 'active';
@@ -1020,20 +1046,25 @@ export async function resumeMembership(userId: string) {
 /**
  * Keep my Membership — single customer action for cancelling members.
  *
- * Path A (benefits still active until currentPeriodEnd):
- *   Resume same Stripe subscription + same UserMembership document.
- *   No charge. Preserve original start/end dates. Clear cancelledAt / autoRenew.
+ * Path A (benefits still active): no charge, original start/end dates.
+ *   Local restore always; Stripe cancel_at_period_end cleared best-effort
+ *   (if provider sub already ended, still keep the paid period locally).
  *
- * Path B (currentPeriodEnd already passed):
- *   Close old membership; start paid rejoin for the same tier at full CMS/tier price.
- *   Returns clientSecret for Stripe Elements payment — never free.
+ * Path B (benefits exhausted): full current tier price via subscribeToTier.
+ *   New period from payment date. Activate only after payment.
+ *
+ * Idempotent: double-click must not create duplicate memberships/charges.
+ * Eligibility: cancelling members (cancelledAt or status cancelled), or
+ * benefits-exhausted paid rejoin. Ordinary active non-cancelling members
+ * who still have benefits get already_active — never force Path B.
  */
 export async function keepMyMembership(userId: string): Promise<KeepMembershipResponseData> {
   const now = new Date();
+  const operationId = `keep_${userId}_${now.getTime()}`;
 
   const membership = await UserMembership.findOne({
     userId,
-    status: { $in: ['active', 'cancelled'] },
+    status: { $in: ['active', 'cancelled', 'pending_payment', 'expired'] },
   }).sort({ createdAt: -1 });
 
   if (!membership) {
@@ -1055,54 +1086,113 @@ export async function keepMyMembership(userId: string): Promise<KeepMembershipRe
 
   const benefitsEnded =
     !membership.currentPeriodEnd || membership.currentPeriodEnd.getTime() <= now.getTime();
+  const { requiresPayment } = requiresPaymentForKeep(membership, now);
+  const cancelling = isCancellingMembership(membership);
 
-  // Path A — still in paid period: resume, no charge, original dates
-  if (!benefitsEnded && (membership.cancelledAt || membership.status === 'cancelled')) {
+  // Idempotent paid path: already waiting on payment
+  if (membership.status === 'pending_payment' && membership.stripeSubscriptionId && !isFakeMode()) {
+    try {
+      const stripe = getStripeClient();
+      const stripeSub = await stripe.subscriptions.retrieve(membership.stripeSubscriptionId, {
+        expand: ['latest_invoice.payment_intent'],
+      });
+      const clientSecret = (stripeSub.latest_invoice as any)?.payment_intent?.client_secret;
+      if (clientSecret) {
+        logger.info(
+          { membershipId: membership._id, userId, operationId },
+          '[Membership] Keep: already pending payment — returning existing client secret',
+        );
+        return {
+          outcome: KEEP_MEMBERSHIP_OUTCOMES.PAYMENT_REQUIRED,
+          membership,
+          clientSecret,
+          membershipId: String(membership._id),
+          chargeAmount: membership.price,
+          currency: membership.currency || tier.currency || STRIPE_CURRENCY_NZD.toUpperCase(),
+          paymentRequired: true,
+          tierDisplayName: tier.displayName,
+          benefitsUntil: membership.currentPeriodEnd?.toISOString(),
+        };
+      }
+    } catch (err) {
+      logger.warn(
+        { err, membershipId: membership._id, userId },
+        '[Membership] Keep: failed to reload pending payment client secret',
+      );
+    }
+  }
+
+  // Idempotent free path: already active, not cancelling, benefits still ongoing
+  if (membership.status === 'active' && !cancelling && !requiresPayment) {
+    logger.info(
+      { membershipId: membership._id, userId, operationId },
+      '[Membership] Keep: already active — idempotent success',
+    );
+    return {
+      outcome: KEEP_MEMBERSHIP_OUTCOMES.ALREADY_ACTIVE,
+      membership,
+      membershipId: String(membership._id),
+      benefitsUntil: membership.currentPeriodEnd?.toISOString(),
+      renewalDate: membership.currentPeriodEnd?.toISOString(),
+      tierDisplayName: tier.displayName,
+      preservedOriginalDates: true,
+      paymentRequired: false,
+      startDate: membership.currentPeriodStart?.toISOString() || membership.startDate?.toISOString(),
+      endDate: membership.currentPeriodEnd?.toISOString(),
+    };
+  }
+
+  // ── Path A — benefits still active: free restore, original dates ──
+  if (!requiresPayment && cancelling) {
     const previousCancelledAt = membership.cancelledAt;
 
+    // Stripe resume best-effort — free keep must not fail if provider sub is dead
+    let stripeResumeStatus = 'skipped';
     if (membership.stripeSubscriptionId && !isFakeMode()) {
       try {
         const stripe = getStripeClient();
         if (isInvalidStripeSubscriptionId(membership.stripeSubscriptionId)) {
-          throwMembershipTierError(
-            MEMBERSHIP_TIER_CHANGE_CODES.SUBSCRIPTION_MISSING,
-            `Membership ${membership._id} has invalid Stripe subscription id`,
-            'We could not find an active billing subscription for this membership. Please subscribe again or contact support.',
-            { membershipId: membership._id.toString() },
+          stripeResumeStatus = 'invalid_subscription_id_local_keep';
+          logger.warn(
+            { membershipId: membership._id, userId, operationId },
+            '[Membership] Keep: invalid Stripe subscription id — local keep for paid period',
           );
+        } else {
+          const subscription = await stripe.subscriptions.retrieve(membership.stripeSubscriptionId);
+          if (stripeSubscriptionEnded(subscription.status)) {
+            stripeResumeStatus = 'subscription_ended_local_keep';
+            logger.warn(
+              {
+                membershipId: membership._id,
+                userId,
+                operationId,
+                stripeSubscriptionStatus: subscription.status,
+              },
+              '[Membership] Keep: Stripe subscription already ended — local keep for paid period',
+            );
+          } else {
+            await stripe.subscriptions.update(membership.stripeSubscriptionId, {
+              cancel_at_period_end: false,
+            });
+            stripeResumeStatus = 'resumed';
+            logger.info(
+              { membershipId: membership._id, stripeSubscriptionId: membership.stripeSubscriptionId },
+              '[Membership] Keep: Stripe cancel_at_period_end cleared',
+            );
+          }
         }
-
-        const subscription = await stripe.subscriptions.retrieve(membership.stripeSubscriptionId);
-        if (stripeSubscriptionEnded(subscription.status)) {
-          throwMembershipTierError(
-            MEMBERSHIP_TIER_CHANGE_CODES.SUBSCRIPTION_NOT_ACTIVE,
-            `Stripe subscription ${membership.stripeSubscriptionId} status=${subscription.status}`,
-            'This membership subscription has already ended with the payment provider. Please subscribe again.',
-            { stripeSubscriptionStatus: subscription.status },
-          );
-        }
-
-        await stripe.subscriptions.update(membership.stripeSubscriptionId, {
-          cancel_at_period_end: false,
-        });
-        logger.info(
-          { membershipId: membership._id, stripeSubscriptionId: membership.stripeSubscriptionId },
-          '[Membership] Keep: Stripe cancel_at_period_end cleared',
+      } catch (err) {
+        stripeResumeStatus = 'stripe_error_local_keep';
+        logger.warn(
+          { err, membershipId: membership._id, userId, operationId },
+          '[Membership] Keep: Stripe resume failed — local keep for paid period',
         );
-      } catch (err: any) {
-        if (err instanceof MembershipTierChangeError) throw err;
-        mapStripeSubscriptionFailure(err, membership._id.toString());
       }
-    } else if (!isFakeMode() && isInvalidStripeSubscriptionId(membership.stripeSubscriptionId)) {
-      throwMembershipTierError(
-        MEMBERSHIP_TIER_CHANGE_CODES.SUBSCRIPTION_MISSING,
-        `Membership ${membership._id} has no valid Stripe subscription for keep`,
-        'We could not find an active billing subscription for this membership. Please subscribe again or contact support.',
-        { membershipId: membership._id.toString() },
-      );
+    } else {
+      stripeResumeStatus = isFakeMode() ? 'fake_mode' : 'no_subscription';
     }
 
-    // Preserve original billing dates — only reverse cancellation state
+    // Local restore — preserve original start/end dates
     membership.cancelledAt = undefined;
     membership.cancellationReason = undefined;
     membership.autoRenew = true;
@@ -1132,31 +1222,37 @@ export async function keepMyMembership(userId: string): Promise<KeepMembershipRe
       logger.error({ err, membershipId: membership._id }, '[Membership] Keep: tag re-eval failed');
     }
 
-    // Email — CMS-first, slug membership-resumed (keep = resume)
+    const startDateStr =
+      membership.currentPeriodStart?.toLocaleDateString('en-NZ', { dateStyle: 'full' }) ||
+      membership.startDate?.toLocaleDateString('en-NZ', { dateStyle: 'full' }) ||
+      'N/A';
+    const endDateStr =
+      membership.currentPeriodEnd?.toLocaleDateString('en-NZ', { dateStyle: 'full' }) || 'N/A';
+
+    // Email — membership-kept (free)
     try {
       const user = await User.findById(userId).select('email fullName').lean();
       if (user?.email) {
-        const { renderMembershipResumedEmail } = await import('./email/templates/membership-resumed');
+        const { renderMembershipKeptEmail } = await import('./email/templates/membership-kept');
         const { sendCmsEmailOrFallback } = await import('./email.service');
-        const benefitsUntil =
-          membership.currentPeriodEnd?.toLocaleDateString('en-NZ', { dateStyle: 'full' }) || 'N/A';
-        const html = renderMembershipResumedEmail({
+        const html = renderMembershipKeptEmail({
           customerName: user.fullName || 'there',
           tierName: tier.displayName,
-          resumedAt: now.toLocaleDateString('en-NZ', { dateStyle: 'full' }),
-          benefitsUntil,
+          startDate: startDateStr,
+          endDate: endDateStr,
           dashboardUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/membership`,
         });
         await sendCmsEmailOrFallback({
-          slug: 'membership-resumed',
+          slug: 'membership-kept',
           to: user.email,
           vars: {
             customerName: user.fullName || 'there',
             tierName: tier.displayName,
-            benefitsUntil,
+            startDate: startDateStr,
+            endDate: endDateStr,
             dashboardUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/membership`,
           },
-          fallbackSubject: `${tier.displayName} Membership Kept`,
+          fallbackSubject: 'Your membership is active again',
           fallbackHtml: html,
           businessFlow: 'subscriptions',
           relatedEntityType: 'membership',
@@ -1174,7 +1270,7 @@ export async function keepMyMembership(userId: string): Promise<KeepMembershipRe
         userId: membership.userId.toString(),
         type: 'membership_resumed',
         title: `${tier.displayName} Membership Kept`,
-        message: `Your ${tier.displayName} membership has been kept. Auto-renewal is on and benefits remain until ${membership.currentPeriodEnd?.toLocaleDateString('en-NZ', { dateStyle: 'full' }) || 'your renewal date'}.`,
+        message: `Your ${tier.displayName} membership is active again. Benefits remain until ${endDateStr}. No charge was required.`,
         priority: 'normal',
         channel: 'info',
         actionUrl: '/account/membership',
@@ -1196,15 +1292,23 @@ export async function keepMyMembership(userId: string): Promise<KeepMembershipRe
       businessOperation: 'Customer kept membership from cancelling state',
       metadata: {
         userId,
+        operationId,
         tierId: membership.tierId.toString(),
         tier: tier.tier,
+        previousStatus: 'cancelling',
+        newStatus: 'active',
         previousCancelledAt,
+        paymentRequired: false,
         chargeAmount: 0,
+        currency: membership.currency || 'NZD',
         preservedOriginalDates: true,
+        startDate: membership.currentPeriodStart || membership.startDate,
         currentPeriodStart: membership.currentPeriodStart,
         currentPeriodEnd: membership.currentPeriodEnd,
         stripeSubscriptionId: membership.stripeSubscriptionId,
+        stripeResumeStatus,
         autoRenewAfter: true,
+        initiatedBy: 'customer',
       },
     });
 
@@ -1212,6 +1316,8 @@ export async function keepMyMembership(userId: string): Promise<KeepMembershipRe
       {
         membershipId: membership._id,
         userId,
+        operationId,
+        stripeResumeStatus,
         benefitsUntil: membership.currentPeriodEnd,
         chargeAmount: 0,
       },
@@ -1221,18 +1327,34 @@ export async function keepMyMembership(userId: string): Promise<KeepMembershipRe
     return {
       outcome: KEEP_MEMBERSHIP_OUTCOMES.RESUMED,
       membership,
+      membershipId: String(membership._id),
       benefitsUntil: membership.currentPeriodEnd?.toISOString(),
       renewalDate: membership.currentPeriodEnd?.toISOString(),
       tierDisplayName: tier.displayName,
       preservedOriginalDates: true,
+      paymentRequired: false,
+      startDate: membership.currentPeriodStart?.toISOString() || membership.startDate?.toISOString(),
+      endDate: membership.currentPeriodEnd?.toISOString(),
     };
   }
 
-  // Path B — benefits already ended: paid rejoin at full tier price
+  // ── Path B — benefits exhausted: paid rejoin, new period from payment ──
+  if (!requiresPayment) {
+    // Cancelling but benefits still active should have hit Path A; safety net
+    throw new MembershipTierChangeError(
+      MEMBERSHIP_TIER_CHANGE_CODES.NOT_CANCELLING,
+      'Membership keep path unexpected',
+      'Unable to keep membership right now. Please try again or contact support.',
+    );
+  }
+
+  // Close old membership before paid rejoin (keep original id in audit)
   if (membership.status === 'active' || membership.status === 'cancelled') {
+    const previousStatus = membership.status;
     membership.status = 'expired';
     membership.autoRenew = false;
-    membership.cancellationReason = membership.cancellationReason || 'Period ended before keep membership';
+    membership.cancellationReason =
+      membership.cancellationReason || 'Period ended before keep membership';
     await membership.save();
 
     await User.findByIdAndUpdate(userId, {
@@ -1260,15 +1382,17 @@ export async function keepMyMembership(userId: string): Promise<KeepMembershipRe
       businessOperation: 'Keep membership — benefits ended, preparing paid rejoin',
       metadata: {
         userId,
+        operationId,
         tierId: membership.tierId.toString(),
-        previousStatus: 'active_or_cancelled',
+        previousStatus,
         reason: 'keep_membership_period_ended',
         benefitsUntil: membership.currentPeriodEnd,
+        initiatedBy: 'customer',
       },
     });
   }
 
-  // Full-price rejoin for same tier — reuse subscribe pipeline (Stripe test/live)
+  // Full-price rejoin — reuse subscribe pipeline (authoritative tier price)
   const subscribeResult = await subscribeToTier(userId, membership.tierId.toString());
   const chargeAmount = subscribeResult.membership?.price ?? tier.price;
   const currency =
@@ -1288,18 +1412,23 @@ export async function keepMyMembership(userId: string): Promise<KeepMembershipRe
     businessOperation: 'Keep membership after period ended — full price rejoin',
     metadata: {
       userId,
+      operationId,
       tierId: membership.tierId.toString(),
       tier: tier.tier,
+      paymentRequired: true,
       chargeAmount,
       currency,
       newPeriodEnd,
       previousMembershipId: membership._id.toString(),
+      preservedOriginalDates: false,
+      initiatedBy: 'customer',
     },
   });
 
   logger.info(
     {
       userId,
+      operationId,
       tierId: membership.tierId.toString(),
       chargeAmount,
       membershipId: subscribeResult.membership?._id,
@@ -1319,6 +1448,7 @@ export async function keepMyMembership(userId: string): Promise<KeepMembershipRe
     renewalDate: newPeriodEnd?.toISOString(),
     tierDisplayName: tier.displayName,
     preservedOriginalDates: false,
+    paymentRequired: true,
   };
 }
 
@@ -1946,6 +2076,398 @@ export async function changeTier(
   );
 
   return { membership, invoice, invoiceUrl, resumedOnUpgrade };
+}
+
+// ─── Repair upgrade (active membership + dead Stripe sub) ───
+
+/**
+ * Complete a paid repair upgrade after Stripe payment succeeds.
+ * Membership may already be status 'active' (local benefits kept during payment).
+ */
+export async function completeRepairUpgrade(membership: any) {
+  const targetTierId = membership.pendingTierId;
+  if (!targetTierId) return membership;
+
+  const newTier = await MembershipTier.findById(targetTierId).lean();
+  if (!newTier) throw new Error('Membership tier not found');
+
+  const oldTier = await MembershipTier.findById(membership.tierId).lean();
+  const now = new Date();
+  const periodEnd = new Date(now);
+  periodEnd.setFullYear(periodEnd.getFullYear() + 1);
+
+  const previousTier = oldTier?.tier;
+  const previousStripeSubscriptionId = membership.stripeSubscriptionId;
+  const previousPrice = membership.price;
+
+  membership.tierId = newTier._id;
+  membership.price = newTier.price;
+  membership.currentPeriodStart = now;
+  membership.currentPeriodEnd = periodEnd;
+  membership.startDate = membership.startDate || now;
+  membership.status = 'active';
+  membership.autoRenew = true;
+  membership.cancelledAt = undefined;
+  membership.cancellationReason = undefined;
+  membership.pendingTierId = undefined;
+  membership.pendingTierEffectiveAt = undefined;
+  membership.downgradeRequestedAt = undefined;
+  membership.downgradeTermsAcceptedAt = undefined;
+  membership.downgradeTermsVersion = undefined;
+  membership.downgradeReason = undefined;
+  membership.downgradeCancelledAt = undefined;
+  membership.dunningStatus = 'active';
+  await membership.save();
+
+  await User.findByIdAndUpdate(membership.userId, {
+    membershipTier: newTier.tier,
+    membershipId: membership._id,
+  });
+
+  try {
+    const { membershipEntitlementService } = await import('./membership-entitlement.service');
+    membershipEntitlementService.invalidateCache();
+  } catch (err) {
+    logger.warn({ err, membershipId: membership._id }, '[Membership] Repair upgrade: cache invalidate failed');
+  }
+
+  try {
+    await removeMembershipFromTags(String(membership.userId), membership._id.toString());
+    await extendTagsForMembership(String(membership.userId), membership._id.toString());
+  } catch (err) {
+    logger.error({ err, membershipId: membership._id }, '[Membership] Repair upgrade: tag re-eval failed');
+  }
+
+  let invoice: any = null;
+  if (membership.stripeSubscriptionId && !isFakeMode()) {
+    try {
+      const stripe = getStripeClient();
+      const stripeSub = await stripe.subscriptions.retrieve(membership.stripeSubscriptionId, {
+        expand: ['latest_invoice'],
+      });
+      const latestInvoice = stripeSub.latest_invoice as any;
+      if (latestInvoice?.id && latestInvoice.amount_due) {
+        invoice = await createMembershipInvoice({
+          userId: membership.userId,
+          membershipId: membership._id,
+          stripeSubscriptionId: membership.stripeSubscriptionId,
+          stripeInvoiceId: latestInvoice.id,
+          amount: (latestInvoice.amount_due || 0) / 100,
+          currency: (latestInvoice.currency || STRIPE_CURRENCY_NZD).toUpperCase(),
+          billingPeriod: { start: membership.currentPeriodStart, end: membership.currentPeriodEnd },
+        });
+      }
+    } catch (err) {
+      logger.error({ err, membershipId: membership._id }, '[Membership] Repair upgrade: invoice failed');
+    }
+  }
+
+  try {
+    const user = await User.findById(membership.userId).select('email fullName').lean();
+    if (user?.email) {
+      const { renderMembershipTierChangedEmail } = await import('./email/templates/membership-tier-changed');
+      const { sendCmsEmailOrFallback } = await import('./email.service');
+      const renewalDate = membership.currentPeriodEnd?.toLocaleDateString('en-NZ', { dateStyle: 'full' }) || 'N/A';
+      const html = renderMembershipTierChangedEmail({
+        customerName: user.fullName || 'there',
+        oldTierName: oldTier?.displayName || 'Unknown',
+        newTierName: newTier.displayName,
+        newPrice: newTier.price,
+        renewalDate,
+        dashboardUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/membership`,
+      });
+      await sendCmsEmailOrFallback({
+        slug: 'membership-tier-changed',
+        to: user.email,
+        vars: {
+          customerName: user.fullName || 'there',
+          oldTierName: oldTier?.displayName || 'Unknown',
+          newTierName: newTier.displayName,
+          newPrice: String(newTier.price),
+          renewalDate,
+          dashboardUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/membership`,
+        },
+        fallbackSubject: `Membership Upgraded to ${newTier.displayName}`,
+        fallbackHtml: html,
+        businessFlow: 'subscriptions',
+        relatedEntityType: 'membership',
+        relatedEntityId: String(membership._id),
+      }).catch((err) => logger.error({ err, membershipId: membership._id }, '[Membership] Repair upgrade: email failed'));
+    }
+  } catch (err) {
+    logger.error({ err, membershipId: membership._id }, '[Membership] Repair upgrade: email failed');
+  }
+
+  try {
+    await createAndDeliverNotification({
+      userId: membership.userId.toString(),
+      type: 'membership_upgraded',
+      title: `Welcome to ${newTier.displayName}!`,
+      message: `Your membership is now ${newTier.displayName}. A new billing period starts today.`,
+      priority: 'normal',
+      channel: 'info',
+      actionUrl: '/account/membership',
+    });
+  } catch (err) {
+    logger.error({ err, membershipId: membership._id }, '[Membership] Repair upgrade: notification failed');
+  }
+
+  await auditMembershipEvent({
+    action: 'membership_upgrade_repaired',
+    eventType: 'membership.tier_upgraded_paid',
+    eventCategory: 'FINANCIAL',
+    operationType: 'UPDATE',
+    resourceType: 'UserMembership',
+    resourceId: membership._id.toString(),
+    subjectUserId: String(membership.userId),
+    outcome: 'SUCCESS',
+    severity: 'HIGH',
+    businessOperation: 'Paid repair upgrade — Stripe sub was dead/missing',
+    metadata: {
+      userId: String(membership.userId),
+      previousTier,
+      newTier: newTier.tier,
+      previousPrice,
+      newPrice: newTier.price,
+      previousStripeSubscriptionId,
+      stripeSubscriptionId: membership.stripeSubscriptionId,
+      chargeAmount: newTier.price,
+      newPeriodStart: membership.currentPeriodStart,
+      newPeriodEnd: membership.currentPeriodEnd,
+      reason: 'stripe_subscription_ended',
+    },
+  });
+
+  logger.info(
+    {
+      membershipId: membership._id,
+      userId: membership.userId,
+      previousTier,
+      newTier: newTier.tier,
+      newPeriodEnd: membership.currentPeriodEnd,
+    },
+    '[Membership] Repair upgrade completed after payment',
+  );
+
+  return membership;
+}
+
+/**
+ * Active local membership + dead/missing Stripe sub.
+ * Charges full target-tier price (no proration). Local benefits stay active
+ * until payment succeeds. New period starts after payment.
+ */
+export async function repairUpgradeToTier(
+  userId: string,
+  targetTierId: string,
+): Promise<RepairUpgradeResponseData> {
+  const membership = await UserMembership.findOne({ userId, status: 'active' });
+  if (!membership) {
+    throw new MembershipTierChangeError(
+      MEMBERSHIP_TIER_CHANGE_CODES.NO_ACTIVE_MEMBERSHIP,
+      'No active membership found for repair upgrade',
+      'No active membership found. Please subscribe to join.',
+    );
+  }
+
+  const newTier = await MembershipTier.findById(targetTierId).lean();
+  if (!newTier) {
+    throw new MembershipTierChangeError(
+      MEMBERSHIP_TIER_CHANGE_CODES.TIER_NOT_FOUND,
+      'Membership tier not found',
+      'Membership tier not found',
+    );
+  }
+  if (!newTier.isActive) {
+    throw new MembershipTierChangeError(
+      MEMBERSHIP_TIER_CHANGE_CODES.TIER_UNAVAILABLE,
+      'This membership tier is not currently available',
+      'This membership tier is not currently available',
+    );
+  }
+
+  const oldTier = await MembershipTier.findById(membership.tierId).lean();
+  if (oldTier?.tier === newTier.tier) {
+    throw new MembershipTierChangeError(
+      MEMBERSHIP_TIER_CHANGE_CODES.ALREADY_ON_TIER,
+      'Already on this tier',
+      'Already on this tier',
+    );
+  }
+
+  const previousStripeSubscriptionId = membership.stripeSubscriptionId;
+
+  // Idempotent: already waiting on payment for this target tier
+  if (membership.pendingTierId && String(membership.pendingTierId) === String(newTier._id)) {
+    if (!isFakeMode() && membership.stripeSubscriptionId && !isInvalidStripeSubscriptionId(membership.stripeSubscriptionId)) {
+      try {
+        const stripe = getStripeClient();
+        const stripeSub = await stripe.subscriptions.retrieve(membership.stripeSubscriptionId, {
+          expand: ['latest_invoice.payment_intent'],
+        });
+        const clientSecret = (stripeSub.latest_invoice as any)?.payment_intent?.client_secret;
+        if (clientSecret) {
+          return {
+            clientSecret,
+            membershipId: String(membership._id),
+            chargeAmount: newTier.price,
+            currency: newTier.currency || STRIPE_CURRENCY_NZD.toUpperCase(),
+            tierDisplayName: newTier.displayName,
+            membershipStatus: membership.status,
+          };
+        }
+      } catch (err) {
+        logger.warn({ err, membershipId: membership._id }, '[Membership] Repair upgrade: reload pending payment failed');
+      }
+    }
+  }
+
+  const currency = newTier.currency || STRIPE_CURRENCY_NZD.toUpperCase();
+  const chargeAmount = newTier.price;
+
+  if (isFakeMode()) {
+    membership.tierId = newTier._id;
+    membership.price = chargeAmount;
+    membership.pendingTierId = undefined;
+    membership.autoRenew = true;
+    membership.cancelledAt = undefined;
+    await membership.save();
+    await User.findByIdAndUpdate(userId, { membershipTier: newTier.tier, membershipId: membership._id });
+    try {
+      const { membershipEntitlementService } = await import('./membership-entitlement.service');
+      membershipEntitlementService.invalidateCache();
+    } catch {
+      /* ignore */
+    }
+    await auditMembershipEvent({
+      action: 'membership_upgrade_repaired',
+      eventType: 'membership.tier_upgraded_paid',
+      eventCategory: 'FINANCIAL',
+      operationType: 'UPDATE',
+      resourceType: 'UserMembership',
+      resourceId: membership._id.toString(),
+      subjectUserId: userId,
+      outcome: 'SUCCESS',
+      severity: 'HIGH',
+      businessOperation: 'Fake-mode repair upgrade (no Stripe charge)',
+      metadata: {
+        userId,
+        newTier: newTier.tier,
+        chargeAmount: 0,
+        reason: 'fake_mode_repair_upgrade',
+      },
+    });
+    return {
+      clientSecret: '',
+      membershipId: String(membership._id),
+      chargeAmount,
+      currency,
+      tierDisplayName: newTier.displayName,
+      membershipStatus: 'active',
+    };
+  }
+
+  if (!membership.stripeCustomerId) {
+    const user = await User.findById(userId).select('email fullName stripeCustomerId').lean();
+    if (!user) throw new Error('User not found');
+    if (!user.stripeCustomerId) {
+      const stripe = getStripeClient();
+      const customer = await stripe.customers.create({
+        email: user.email,
+        name: user.fullName || undefined,
+        metadata: { userId: userId.toString(), source: 'pawtag-membership-repair' },
+      });
+      await User.findByIdAndUpdate(userId, { stripeCustomerId: customer.id });
+      membership.stripeCustomerId = customer.id;
+    } else {
+      membership.stripeCustomerId = user.stripeCustomerId;
+    }
+  }
+
+  const stripe = getStripeClient();
+  const priceId = await resolveStripePriceIdForTier(stripe, newTier, String(newTier._id));
+
+  const stripeSub = await stripe.subscriptions.create({
+    customer: membership.stripeCustomerId,
+    items: [{ price: priceId }],
+    payment_behavior: 'default_incomplete',
+    payment_settings: { save_default_payment_method: 'on_subscription' },
+    metadata: {
+      userId: userId.toString(),
+      membershipId: String(membership._id),
+      purpose: 'membership_repair_upgrade',
+      targetTier: newTier.tier,
+    },
+    expand: ['latest_invoice.payment_intent'],
+  });
+
+  const latestInvoice = stripeSub.latest_invoice as any;
+  let clientSecret = latestInvoice?.payment_intent?.client_secret;
+  if (!clientSecret && stripeSub.latest_invoice) {
+    const inv = (await stripe.invoices.retrieve(String(stripeSub.latest_invoice))) as any;
+    if (inv.amount_due && inv.payment_intent) {
+      const pi = await stripe.paymentIntents.retrieve(String(inv.payment_intent));
+      clientSecret = pi.client_secret || undefined;
+    }
+  }
+  if (!clientSecret) {
+    try {
+      await stripe.subscriptions.cancel(stripeSub.id);
+    } catch {
+      /* best-effort cleanup */
+    }
+    throw new Error('Unable to initialize payment for membership upgrade. Please try again.');
+  }
+
+  membership.pendingTierId = newTier._id as any;
+  membership.stripeSubscriptionId = stripeSub.id;
+  membership.autoRenew = false;
+  await membership.save();
+
+  await auditMembershipEvent({
+    action: 'membership_upgrade_repair_started',
+    eventType: 'membership.tier_upgrade_repair_started',
+    eventCategory: 'FINANCIAL',
+    operationType: 'UPDATE',
+    resourceType: 'UserMembership',
+    resourceId: membership._id.toString(),
+    subjectUserId: userId,
+    outcome: 'SUCCESS',
+    severity: 'HIGH',
+    businessOperation: 'Repair upgrade payment started — full target tier price',
+    metadata: {
+      userId,
+      targetTierId: String(newTier._id),
+      targetTier: newTier.tier,
+      chargeAmount,
+      currency,
+      stripeSubscriptionId: stripeSub.id,
+      previousStripeSubscriptionId,
+      reason: 'stripe_subscription_ended',
+    },
+  });
+
+  logger.info(
+    {
+      membershipId: membership._id,
+      userId,
+      targetTier: newTier.tier,
+      chargeAmount,
+      stripeSubscriptionId: stripeSub.id,
+      hasClientSecret: Boolean(clientSecret),
+    },
+    '[Membership] Repair upgrade payment created (full tier price)',
+  );
+
+  return {
+    clientSecret,
+    membershipId: String(membership._id),
+    chargeAmount,
+    currency,
+    tierDisplayName: newTier.displayName,
+    membershipStatus: membership.status,
+    newPeriodStart: new Date().toISOString(),
+  };
 }
 
 // ─── Request Downgrade (Deferred) ────────────────────────────

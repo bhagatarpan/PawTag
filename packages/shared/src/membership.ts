@@ -81,6 +81,26 @@ export interface MembershipChangeTierResponseData {
   resumedOnUpgrade: boolean;
 }
 
+/**
+ * Active local membership + dead/missing Stripe sub.
+ * Proration change-tier cannot run — use paid repair upgrade instead.
+ */
+export function requiresBillingRepair(code: string | undefined | null): boolean {
+  return requiresResubscribeRecovery(code);
+}
+
+export interface RepairUpgradeResponseData {
+  clientSecret: string;
+  membershipId: string;
+  /** Server-side full target-tier price (major units not required — service returns tier.price) */
+  chargeAmount: number;
+  currency: string;
+  tierDisplayName: string;
+  membershipStatus: string;
+  /** New billing period starts after successful payment */
+  newPeriodStart?: string;
+}
+
 /** True when an error body should offer Billing Portal recovery. */
 export function requiresPaymentMethodRecovery(code: string | undefined | null): boolean {
   return code === MEMBERSHIP_TIER_CHANGE_CODES.PAYMENT_METHOD_REQUIRED;
@@ -109,10 +129,12 @@ export function isMembershipTierChangeCode(code: string | undefined | null): cod
 // ============================================================
 
 export const KEEP_MEMBERSHIP_OUTCOMES = {
-  /** Benefits still active: resume same membership, no charge, original dates */
+  /** Benefits still active: restore membership, no charge, original dates */
   RESUMED: 'resumed',
   /** Benefits ended: full tier price required before new membership activates */
   PAYMENT_REQUIRED: 'payment_required',
+  /** Idempotent: membership already active and not cancelling */
+  ALREADY_ACTIVE: 'already_active',
 } as const;
 
 export type KeepMembershipOutcome =
@@ -125,7 +147,7 @@ export const KEEP_MEMBERSHIP_AUDIT_ACTIONS = {
 
 export interface KeepMembershipResponseData {
   outcome: KeepMembershipOutcome;
-  /** Path A: existing membership after resume */
+  /** Path A: existing membership after restore */
   membership?: unknown;
   /** Path B: Stripe client secret for full-price rejoin payment */
   clientSecret?: string;
@@ -139,6 +161,41 @@ export interface KeepMembershipResponseData {
   tierDisplayName?: string;
   /** True when original start/end dates were preserved (Path A) */
   preservedOriginalDates?: boolean;
+  /** Server-side payment decision (Path B true) */
+  paymentRequired?: boolean;
+  /** Path A: original membership start (preserved) */
+  startDate?: string;
+  /** Path A: original membership end (preserved) */
+  endDate?: string;
+}
+
+/**
+ * Cancelling = cancel window (cancelledAt) or webhook-synced cancelled status.
+ * PawTag has no separate `cancelling` enum on UserMembership.
+ */
+export function isCancellingMembership(m: {
+  cancelledAt?: Date | string | null;
+  status: string;
+}): boolean {
+  return Boolean(m.cancelledAt) || m.status === 'cancelled';
+}
+
+/**
+ * Server-only decision: does Keep require payment?
+ * Frontend must not duplicate this calculation as authority.
+ */
+export function requiresPaymentForKeep(
+  membership: { currentPeriodEnd?: Date | string | null },
+  now: Date = new Date(),
+): { requiresPayment: boolean; reason: 'benefits_active' | 'benefits_exhausted' } {
+  const end = membership.currentPeriodEnd
+    ? new Date(membership.currentPeriodEnd)
+    : null;
+  const benefitsEnded = !end || end.getTime() <= now.getTime();
+  return {
+    requiresPayment: benefitsEnded,
+    reason: benefitsEnded ? 'benefits_exhausted' : 'benefits_active',
+  };
 }
 
 // ============================================================
