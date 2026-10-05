@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { CheckCircle2, CreditCard, Loader2, ShieldCheck } from 'lucide-react';
 import { formatCurrency, formatDate } from '@pawtag/shared';
 import { API } from '@pawtag/shared/api';
-import api from '../../lib/api';
+import api from '../lib/api';
 import StripePaymentForm from './StripePaymentForm';
 
 interface KeepMembershipPanelProps {
