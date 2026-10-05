@@ -6,7 +6,7 @@ import {
   type SavedPaymentMethod,
 } from '@pawtag/shared';
 import { EmptyState } from '@pawtag/ui';
-import api from '../../lib/api';
+import api from '../lib/api';
 import SetupPaymentMethodForm from './SetupPaymentMethodForm';
 
 interface PaymentMethodsPanelProps {
