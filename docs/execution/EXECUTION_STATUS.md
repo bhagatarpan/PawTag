@@ -137,6 +137,39 @@
 
 **Next phase:** `docs/execution/2026-10-06/phases/03_COMMUNICATIONS_DOCUMENTS_SUBSCRIPTIONS.md` — **STOP. Do not execute Phase 03 until founder authorizes.**
 
+### Phase 03 — Email, Invoices, Notifications, Subscription Entitlements (complete for automated evidence)
+
+**Status:** `CODED_NOT_RUNTIME_VALIDATED` — implementation + automated tests green; live Resend/Stripe not executed.  
+**Started/Completed:** 2026-10-06  
+**Commit:** `92fc480`
+
+**What changed:**
+1. **Email audit durability** — `EmailAudit.idempotencyKey` (sparse unique); `recordEmailAudit` idempotent; `updateEmailAuditStatus` does not duplicate timeline entries; `sendMail` accepts `idempotencyKey`; order confirmation uses `order-confirmation:{orderNumber}`.
+2. **Resend webhook idempotency** — `WebhookEvent.source` includes `resend`; dedupe by Svix event id; spoofed events still rejected.
+3. **Membership entitlement gate** — `activateMembership` in real Stripe mode refuses activation unless Stripe status is `active`/`trialing`. Frontend `/membership/activate` cannot activate unpaid memberships.
+4. **Invoice access** — hashed tokens, expiry, OTP; ownership-scoped customer invoice routes retained.
+5. **Push provider architecture** — documented Expo ≠ FCM; production fail-closed preserved; native push **DEFERRED** Phase 09/10.
+
+**Automated commands actually run:**
+
+| Command | Result |
+|---|---|
+| `pnpm typecheck` | **PASS** |
+| `pnpm test:unit` | **PASS** — 85 files / 934 tests |
+| `pnpm test:integration` | **PASS** — 71 files / 796 passed / 2 skipped |
+| `pnpm test:smoke` | **PASS** — 6 tests |
+| `pnpm test:regression` | **PASS** — 33 tests |
+| `pnpm build` | **PASS** |
+
+**Manual/provider validation:** none (no live Resend/Stripe).  
+
+**Remaining risks:**
+- Live Resend outbound + delivery webhooks
+- Live Stripe membership activate/renew/fail
+- Physical-device push deferred Phase 09/10
+
+**Next phase:** `docs/execution/2026-10-06/phases/04_PREMIUM_CART_CHECKOUT_CUSTOMER_WEB.md` — **STOP. Do not execute Phase 04 until founder authorizes.**
+
 ### Track A0 — Baseline Recovery (complete)
 
 **Status:** PROVEN — quality gates recovered on `main` working tree.  
