@@ -24,16 +24,30 @@ export interface CreateShipmentParams {
 
 /**
  * Create a shipment via the configured courier API.
- * Falls back to demo mode if no API key is configured.
+ *
+ * Production fail-closed rule:
+ * - Missing/placeholder API key must NOT fabricate a tracking number.
+ * - Development/test may use deterministic demo data for local CI only.
  *
  * NOTE: Requires SHIPPING_PROVIDER_API_KEY env var for live use.
- * Demo mode returns realistic fake data for local dev and CI.
+ * Real courier API (Sendle/NZ Post) is still pending; production with a real
+ * key returns an explicit failure until that integration is implemented.
  */
 export async function createShipment(_params: CreateShipmentParams): Promise<ShipmentResult> {
   const apiKey = process.env.SHIPPING_PROVIDER_API_KEY;
+  const isProduction = process.env.NODE_ENV === 'production';
+  const isMissingKey = !apiKey || apiKey === 'demo_key';
 
-  // Demo mode — return realistic fake data
-  if (!apiKey || apiKey === 'demo_key') {
+  // Production: never invent tracking numbers.
+  if (isProduction && isMissingKey) {
+    return {
+      success: false,
+      error: 'Shipping provider is not configured in production. Set SHIPPING_PROVIDER_API_KEY before creating shipments.',
+    };
+  }
+
+  // Development/test only — demo data for local CI. Not a production success path.
+  if (isMissingKey) {
     const trackingNumber = `NZ${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
     return {
       success: true,
@@ -44,24 +58,8 @@ export async function createShipment(_params: CreateShipmentParams): Promise<Shi
   }
 
   // Real API call (Sendle/NZ Post — implement when API key is available)
-  // For now, throw an error indicating the real integration is pending
   try {
     // TODO: Replace with real Sendle/NZ Post API integration
-    // Example Sendle API call:
-    // const response = await fetch('https://api.sendle.com/api/orders', {
-    //   method: 'POST',
-    //   headers: {
-    //     'Authorization': `Sendle ApiKey ${apiKey}`,
-    //     'Content-Type': 'application/json',
-    //   },
-    //   body: JSON.stringify({
-    //     sender: { ... },
-    //     receiver: params.shippingAddress,
-    //     description: params.items.map(i => i.productName).join(', '),
-    //     ...
-    //   }),
-    // });
-
     return {
       success: false,
       error: 'Real courier API integration requires a shipping provider API key. Set SHIPPING_PROVIDER_API_KEY in your environment.',

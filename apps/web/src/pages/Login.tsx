@@ -123,11 +123,10 @@ export default function Login() {
         otp: mfaOtp,
         rememberMe,
       });
-      const { token: newToken, refreshToken: newRefreshToken, user: userData } = res.data.data;
+      const { token: newToken, user: userData } = res.data.data;
       localStorage.setItem('pawtag_token', newToken);
-      if (newRefreshToken) {
-        localStorage.setItem('pawtag_refresh_token', newRefreshToken);
-      }
+      // Browser security: refresh token is HttpOnly cookie only — never localStorage
+      localStorage.removeItem('pawtag_refresh_token');
 
       // Show success animation
       setMfaSuccess(true);

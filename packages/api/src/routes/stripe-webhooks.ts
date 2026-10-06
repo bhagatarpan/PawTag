@@ -139,21 +139,39 @@ router.post('/', async (req: Request, res: Response) => {
   } catch (err: any) {
     logger.error({ err, eventType: (req.body as any)?.type }, 'Stripe webhook error');
 
-    // Mark as failed for retry
-    const bodyAny = req.body as any;
-    if (bodyAny?.id) {
+    // Body is a raw Buffer after signature verification failure/processing error.
+    // Parse only to recover event identity for durable retry records — never process unverified events.
+    let eventId: string | undefined;
+    let eventType: string | undefined;
+    try {
+      const raw = Buffer.isBuffer(req.body)
+        ? JSON.parse(req.body.toString('utf8'))
+        : req.body;
+      eventId = typeof raw?.id === 'string' ? raw.id : undefined;
+      eventType = typeof raw?.type === 'string' ? raw.type : undefined;
+    } catch {
+      // Leave identity undefined if body is not parseable JSON
+    }
+
+    if (eventId) {
       await WebhookEvent.findOneAndUpdate(
-        { source: 'stripe', eventId: bodyAny.id },
+        { source: 'stripe', eventId },
         {
           status: 'failed',
+          event: eventType || 'unknown',
           lastError: err.message,
           $inc: { attempts: 1 },
-          nextRetryAt: new Date(Date.now() + 60_000), // Retry in 60s
+          nextRetryAt: new Date(Date.now() + 60_000),
+          $setOnInsert: {
+            payload: {},
+          },
         },
+        { upsert: true },
       ).catch(() => {});
     }
 
-    res.status(400).json({ error: err.message });
+    // Invalid signature / processing failure must not look like success
+    res.status(400).json({ success: false, error: err.message || 'Webhook processing failed' });
   }
 });
 

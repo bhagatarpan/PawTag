@@ -84,14 +84,16 @@ export default function VerifyAccount() {
     }
   }, [emailStatus, fetchStatus, status, emailParam, phoneParam]);
 
-  // Capture tokens from URL params (when redirected from email verification after activation)
+  // Capture access token from URL params when redirected after activation.
+  // Refresh tokens are never accepted from URLs — they travel only as HttpOnly cookies.
   useEffect(() => {
     const tokenParam = searchParams.get('token');
     const refreshTokenParam = searchParams.get('refreshToken');
-    if (tokenParam && refreshTokenParam) {
+    if (tokenParam) {
       localStorage.setItem('pawtag_token', tokenParam);
-      localStorage.setItem('pawtag_refresh_token', refreshTokenParam);
-      // Clean URL params
+      localStorage.removeItem('pawtag_refresh_token');
+    }
+    if (tokenParam || refreshTokenParam) {
       searchParams.delete('token');
       searchParams.delete('refreshToken');
       setSearchParams(searchParams, { replace: true });
@@ -154,11 +156,12 @@ export default function VerifyAccount() {
     setSuccess('');
     try {
       const res = await api.post(API.auth.verifyPhone, { otp: otpValue, phoneNumber: effectivePhone });
-      // Store tokens if user was just activated
-      const { token, refreshToken } = res.data.data || {};
-      if (token && refreshToken) {
+      // Store access token if user was just activated.
+      // Refresh token is HttpOnly cookie only — never localStorage.
+      const { token } = res.data.data || {};
+      if (token) {
         localStorage.setItem('pawtag_token', token);
-        localStorage.setItem('pawtag_refresh_token', refreshToken);
+        localStorage.removeItem('pawtag_refresh_token');
       }
       setSuccess('Phone number verified successfully!');
       setOtpValue('');

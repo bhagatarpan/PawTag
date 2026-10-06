@@ -34,6 +34,7 @@ beforeAll(async () => {
 
   const loginRes = await request(app)
     .post('/api/auth/login')
+    .set('x-client-platform', 'ios') // Non-browser: get refresh token in body
     .send({ email: 'refresh-test@example.com', password: 'TestPass123!' });
   refreshToken = loginRes.body.data.refreshToken;
 });

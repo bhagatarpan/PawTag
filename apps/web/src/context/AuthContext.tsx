@@ -25,6 +25,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .then((res) => setUser(res.data.data))
         .catch(() => {
           localStorage.removeItem('pawtag_token');
+          // Refresh token is HttpOnly cookie only — clear any legacy localStorage copy
           localStorage.removeItem('pawtag_refresh_token');
           setToken(null);
         })
@@ -57,11 +58,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return data.data;
     }
 
-    const { token: newToken, refreshToken: newRefreshToken, user: userData } = data.data;
+    const { token: newToken, user: userData } = data.data;
     localStorage.setItem('pawtag_token', newToken);
-    if (newRefreshToken) {
-      localStorage.setItem('pawtag_refresh_token', newRefreshToken);
-    }
+    // Browser security: never persist refresh tokens in localStorage.
+    // The API sets an HttpOnly refresh cookie on login; api client refreshes via cookie.
+    localStorage.removeItem('pawtag_refresh_token');
     setToken(newToken);
     setUser(userData);
     return userData;

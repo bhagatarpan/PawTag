@@ -36,10 +36,14 @@ import axios, { type AxiosInstance, type InternalAxiosRequestConfig } from 'axio
 export interface TokenStorage {
   /** Read the access token */
   getAccessToken(): Promise<string | null>;
-  /** Read the refresh token */
+  /**
+   * Read the refresh token.
+   * Browser adapters return null — refresh tokens live only in HttpOnly cookies.
+   * Native adapters may return a SecureStore/Keychain value when required.
+   */
   getRefreshToken(): Promise<string | null>;
-  /** Write tokens */
-  setTokens(accessToken: string, refreshToken: string): Promise<void>;
+  /** Write tokens. Browser adapters ignore the refresh token argument. */
+  setTokens(accessToken: string, refreshToken?: string | null): Promise<void>;
   /** Clear tokens */
   clearTokens(): Promise<void>;
 }
@@ -148,14 +152,17 @@ export function createApiClient(config: ApiClientConfig): AxiosInstance {
 
         try {
           const url = absoluteRefreshUrl || refreshEndpoint;
-          // Send refresh token in body if available; cookies sent automatically via withCredentials
-          const res = await axios.post(url, refreshToken ? { refreshToken } : {}, { withCredentials: true });
+          // Browser: refresh via HttpOnly cookie (withCredentials). Do not send body refresh token.
+          // Native: may send refresh token in body when storage provides one.
+          const res = await axios.post(
+            url,
+            refreshToken ? { refreshToken } : {},
+            { withCredentials: true },
+          );
           const { token: newAccessToken, refreshToken: newRefreshToken } = res.data.data;
 
-          // Store new tokens
-          if (newRefreshToken) {
-            await storage.setTokens(newAccessToken, newRefreshToken);
-          }
+          // Store new access token. Browser storage ignores refresh tokens (cookie owns them).
+          await storage.setTokens(newAccessToken, newRefreshToken ?? null);
 
           client.defaults.headers.common.Authorization = `Bearer ${newAccessToken}`;
           originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
@@ -196,8 +203,13 @@ export function createApiClient(config: ApiClientConfig): AxiosInstance {
 // ---------------------------------------------------------------------------
 
 /**
- * Create a localStorage-based token storage for browser apps.
- * Wraps synchronous localStorage with Promise.resolve() for async consistency.
+ * Create a browser token storage adapter.
+ *
+ * Security contract (Phase 01):
+ * - Access token may live in localStorage for authenticated API calls.
+ * - Refresh token MUST NOT be persisted in localStorage.
+ * - Refresh tokens travel only as HttpOnly cookies (withCredentials on refresh).
+ * - Any legacy refresh token values are cleared on write/clear.
  */
 export function createLocalStorageTokenStorage(
   tokenKey: string,
@@ -205,10 +217,12 @@ export function createLocalStorageTokenStorage(
 ): TokenStorage {
   return {
     getAccessToken: () => Promise.resolve(localStorage.getItem(tokenKey)),
-    getRefreshToken: () => Promise.resolve(localStorage.getItem(refreshTokenKey)),
-    setTokens: (accessToken: string, refreshToken: string) => {
+    // Never read refresh tokens from localStorage — cookie is authoritative for browsers.
+    getRefreshToken: () => Promise.resolve(null),
+    setTokens: (accessToken: string) => {
       localStorage.setItem(tokenKey, accessToken);
-      localStorage.setItem(refreshTokenKey, refreshToken);
+      // Clear any legacy refresh token persisted by older builds.
+      localStorage.removeItem(refreshTokenKey);
       return Promise.resolve();
     },
     clearTokens: () => {

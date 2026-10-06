@@ -13,7 +13,7 @@
 | Phase | Status | Commit/branch | Automated evidence | Runtime/provider evidence | Blockers | Notes |
 |---|---|---|---|---|---|---|
 | 00 Baseline | **PROVEN** (evidence reset done; baseline quality gates recovered) | `main` @ baseline-recovery commit | typecheck/lint/unit/integration/regression/smoke/build **PASS** | none executed (no provider/staging/device run) | green baseline restored in code; provider/staging/device still unproven | Phase 00 evidence reset complete; Track A baseline recovery complete. See `docs/execution/BASELINE_EVIDENCE.md` |
-| 01 Production safety | NOT_STARTED | | | | depends on baseline recovery | payment/CAPTCHA/email configs coded only |
+| 01 Production safety | **CODED_NOT_RUNTIME_VALIDATED** (automated gates green; live providers not run) | `main` @ Phase 01 commit | payment env matrix tests PASS; provider fail-closed tests PASS; browser session tests PASS; Resend/Stripe webhook tests PASS; typecheck/lint/unit/integration/smoke/regression/build PASS | none executed (no live Stripe/Resend/Firebase/courier run) | live provider/staging proof still required | fail-closed + session/webhook hardening implemented; see `verification/PAYMENT_PROVIDER_MODE_MATRIX.md` |
 | 02 Financial integrity | NOT_STARTED | | | | depends on baseline + Phase 01 | audit synthesis lists inventory/rewards risks |
 | 03 Communications/auth | NOT_STARTED | | | | depends on baseline | email provider coded; not production-validated |
 | 04 Cart/Checkout web | NOT_STARTED | | | | depends on baseline | cart/checkout coded |
@@ -39,6 +39,57 @@
 **Status:** PROVEN — evidence written 2026-10-06.  
 **Files:** `docs/execution/EXECUTION_STATUS.md`, `docs/execution/BASELINE_EVIDENCE.md`  
 **Result:** Historical claims re-labeled; quality gates initially FAILED on pack overlay state.
+
+### Phase 01 — Production Security, Provider Modes, Webhooks, Session Boundaries (complete for automated evidence)
+
+**Status:** `CODED_NOT_RUNTIME_VALIDATED` — implementation + automated tests green; live provider/runtime proof not executed this phase.  
+**Started/Completed:** 2026-10-06  
+
+**What changed:**
+1. **Payment env contract** — production rejects missing/invalid `PAYMENT_MODE` (must be `stripe_live`), test/demo Stripe keys, placeholder webhook secrets. Env-only resolution; DB settings cannot downgrade payment mode. Health exposes sanitized mode only.
+2. **Stripe webhook safety** — raw body preserved; signature failures return 400 (never success); event identity recovered from raw Buffer on failure; unique event ID idempotency; retry job recovers stranded `processing` events after crash.
+3. **Browser session contract** — browser login/refresh/MFA/verify set HttpOnly refresh cookie **before** response body; **no refreshToken in browser JSON body**; browser localStorage never stores refresh tokens (legacy copies cleared); native apps (`x-client-platform: ios/android`) still receive refreshToken for SecureStore; email/phone activation no longer puts refresh tokens in redirect URLs.
+4. **Provider fail-closed** — production: push without Firebase fails delivery (never “sent”); shipping without API key fails (no fake tracking); SMS without provider fails; email without Resend already failed closed. Resend webhooks: correct mount path + Svix signature verification (production requires `RESEND_WEBHOOK_SECRET`).
+
+**Files changed (material):**
+- `packages/api/src/config/validateEnv.ts` (already strong; verified by tests)
+- `packages/api/src/commerce/payment-mode.ts` (verified; env-only)
+- `packages/api/src/routes/stripe-webhooks.ts` (eventId from raw Buffer; fail closed status)
+- `packages/api/src/jobs/webhookRetry.ts` (stranded processing recovery)
+- `packages/api/src/routes/resend-webhooks.ts` (route + signature)
+- `packages/api/src/index.ts` (resend raw body mount)
+- `packages/api/src/routes/auth.ts` (browser-safe auth payloads + cookies)
+- `packages/api/src/services/push-notification.service.ts`
+- `packages/api/src/services/shipping.service.ts`
+- `packages/api/src/services/sms.service.ts`
+- `packages/shared/src/api/client-factory.ts` (browser storage never persists refresh)
+- `apps/web/src/context/AuthContext.tsx`, `apps/web/src/pages/Login.tsx`, `VerifyAccount.tsx`
+- `apps/admin/src/lib/auth.tsx`, `apps/admin/src/pages/Login.tsx`
+- Tests: `provider-fail-closed`, `browser-token-storage`, `browser-auth-session`, `resend-webhook-signature`, `stripe-webhook-durability`
+- `docs/execution/2026-10-06/verification/PAYMENT_PROVIDER_MODE_MATRIX.md`
+
+**Automated commands actually run:**
+
+| Command | Result |
+|---|---|
+| `pnpm typecheck` | **PASS** |
+| `pnpm lint` | **PASS** (0 errors) |
+| `pnpm test:unit` | **PASS** — 84 files / 932 tests |
+| `pnpm test:integration` | **PASS** — 65 files / 779 passed / 2 skipped |
+| `pnpm test:regression` | **PASS** — 33 tests |
+| `pnpm test:smoke` | **PASS** — 6 tests |
+| `pnpm build` | **PASS** — api/admin/web/finder |
+
+**Manual/provider/device validation actually performed:** none (no live Stripe/Resend/Firebase/courier).  
+
+**Remaining risks / external blockers:**
+- Live Stripe test/live webhooks, Resend outbound+webhook, Firebase push, courier API not runtime-validated
+- CAPTCHA production-like finder notify not re-proven this phase
+- Real courier shipping API still pending implementation (production fails closed until configured + implemented)
+
+**Rollback:** revert Phase 01 commit; fail-closed provider guards can be temporarily relaxed only in non-production env, never by re-enabling demo success in production.
+
+**Next phase:** `docs/execution/2026-10-06/phases/02_FINANCIAL_STATE_INTEGRITY.md` — **STOP. Do not execute Phase 02 until founder authorizes.**
 
 ### Track A0 — Baseline Recovery (complete)
 

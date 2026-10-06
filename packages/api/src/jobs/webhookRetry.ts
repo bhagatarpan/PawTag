@@ -33,10 +33,28 @@ const claimedRetryFailedEvents = createClaimedJob(
   workerId,
   async () => {
   try {
+    const now = new Date();
+
+    // Recover events stranded in processing after a crash (stale lease).
+    // Older than 5 minutes with no progress = orphaned work.
+    const staleProcessingCutoff = new Date(now.getTime() - 5 * 60 * 1000);
+    const stranded = await WebhookEvent.find({
+      status: 'processing',
+      updatedAt: { $lte: staleProcessingCutoff },
+    }).limit(20);
+
+    for (const event of stranded) {
+      event.status = 'failed';
+      event.lastError = event.lastError || 'Recovered from stranded processing after crash/stale lease';
+      event.nextRetryAt = now;
+      await event.save();
+      logger.warn({ eventId: event.eventId, event: event.event }, 'Webhook event recovered from stranded processing');
+    }
+
     // Find events that are due for retry
     const retryableEvents = await WebhookEvent.find({
       status: { $in: ['pending', 'failed'] },
-      nextRetryAt: { $lte: new Date() },
+      nextRetryAt: { $lte: now },
     }).limit(50);
 
     if (!retryableEvents.length) return;
@@ -50,6 +68,7 @@ const claimedRetryFailedEvents = createClaimedJob(
         await event.save();
 
         // Re-process the event (Stripe-specific for now)
+        // Payload is stored as the unwrapped provider object (event.data.object)
         if (event.source === 'stripe') {
           await processStripeEvent(event.event, event.payload);
         }

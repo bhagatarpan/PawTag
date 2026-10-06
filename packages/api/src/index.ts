@@ -324,8 +324,8 @@ app.use('/api/public/promo', promoPublicRoutes);
 app.use('/api/public/commerce', commercePublicRoutes);
 app.use('/api/public/points', pointsEstimateRoutes);
 
-// Resend webhooks for email delivery tracking
-app.use('/api/webhooks/resend', express.json(), resendWebhookRoutes);
+// Resend webhooks for email delivery tracking — raw body for Svix signature verification
+app.use('/api/webhooks/resend', express.raw({ type: 'application/json' }), resendWebhookRoutes);
 
 // --- Error Handling ---
 app.use(notFoundHandler);

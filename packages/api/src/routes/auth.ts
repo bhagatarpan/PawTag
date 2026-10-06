@@ -95,6 +95,17 @@ function isBrowserRequest(req: Request): boolean {
   return true;
 }
 
+/**
+ * Browser clients must not receive refresh tokens in the response body.
+ * Refresh tokens travel only as HttpOnly cookies (XSS cannot read them).
+ * Native apps (x-client-platform: ios/android) still receive tokens in the body
+ * for SecureStore/Keychain bridges.
+ */
+function browserSafeAuthPayload(isBrowser: boolean, refreshToken?: string): Record<string, unknown> {
+  if (isBrowser) return {};
+  return refreshToken ? { refreshToken } : {};
+}
+
 function setRefreshTokenCookie(res: Response, token: string): void {
   const maxAge = parseInt(process.env.REFRESH_TOKEN_EXPIRES_IN_DAYS || '30', 10) * 24 * 60 * 60 * 1000;
   res.cookie(REFRESH_COOKIE_NAME, token, {
@@ -627,9 +638,9 @@ if (user.status === 'inactive') {
       success: true,
       data: {
         token,
-        // Always return refreshToken in body for all clients
-        // HttpOnly cookie is an ADDITIONAL security layer, not a replacement
-        refreshToken: refreshTokens.token,
+        // Browser: HttpOnly cookie only — never expose refresh token in JSON body.
+        // Native apps: still receive refreshToken for secure native storage.
+        ...browserSafeAuthPayload(isBrowser, refreshTokens.token),
         user: {
           id: user._id,
           email: user.email,
@@ -723,13 +734,29 @@ router.get('/verify-email', async (req, res: Response) => {
 
     const activationTokens = await checkAndActivateUser(user._id.toString());
 
+    // Browser: set HttpOnly refresh cookie; never put refresh tokens in redirect URLs
+    // (URLs leak via history, logs, and Referer headers).
+    const activationIsBrowser = isBrowserRequest(req);
+    if (activationIsBrowser && activationTokens.refreshToken) {
+      setRefreshTokenCookie(res, activationTokens.refreshToken);
+    }
+
     if (isAjax) {
-      res.json({ success: true, data: { message: 'Email verified successfully!', email: user.email, phoneNumber: user.phoneNumber, ...activationTokens } });
+      res.json({
+        success: true,
+        data: {
+          message: 'Email verified successfully!',
+          email: user.email,
+          phoneNumber: user.phoneNumber,
+          token: activationTokens.token,
+          ...browserSafeAuthPayload(activationIsBrowser, activationTokens.refreshToken),
+        },
+      });
       return;
     }
     const redirectParams = new URLSearchParams({ email_status: 'verified' });
     if (activationTokens.token) redirectParams.set('token', activationTokens.token);
-    if (activationTokens.refreshToken) redirectParams.set('refreshToken', activationTokens.refreshToken);
+    // Refresh token travels only via HttpOnly cookie for browser redirects.
     res.redirect(`${config.frontendUrl}/verify-account?${redirectParams.toString()}`);
   } catch (error) {
     logger.error({ err: error }, 'Email verification error');
@@ -1064,7 +1091,20 @@ router.post('/verify-phone', validate(verifyPhoneSchema), async (req: AuthReques
 
     const activationTokens = await checkAndActivateUser(user._id.toString());
 
-    res.json({ success: true, data: { message: 'Phone number verified successfully.', ...activationTokens } });
+    // Browser: HttpOnly refresh cookie only; never expose refreshToken in JSON body.
+    const verifyPhoneIsBrowser = isBrowserRequest(req);
+    if (verifyPhoneIsBrowser && activationTokens.refreshToken) {
+      setRefreshTokenCookie(res, activationTokens.refreshToken);
+    }
+
+    res.json({
+      success: true,
+      data: {
+        message: 'Phone number verified successfully.',
+        token: activationTokens.token,
+        ...browserSafeAuthPayload(verifyPhoneIsBrowser, activationTokens.refreshToken),
+      },
+    });
   } catch (error) {
     logger.error({ err: error }, 'Verify phone error');
     res.status(500).json({ success: false, error: 'Verification failed' });
@@ -1525,8 +1565,8 @@ router.post('/refresh', async (req, res: Response) => {
       success: true,
       data: {
         token: newAccessToken,
-        // Always return refreshToken in body for all clients
-        refreshToken: newRefreshTokens.token,
+        // Browser: refresh token is HttpOnly cookie only.
+        ...browserSafeAuthPayload(isBrowser, newRefreshTokens.token),
       },
     });
   } catch {
@@ -1879,8 +1919,8 @@ router.post('/mfa/verify', mfaVerifyLimiter, async (req: AuthRequest, res: Respo
       success: true,
       data: {
         token: jwtToken,
-        // Always return refreshToken in body for all clients
-        refreshToken: refreshTokens.token,
+        // Browser: HttpOnly cookie only. Native apps still receive refreshToken in body.
+        ...browserSafeAuthPayload(isBrowser, refreshTokens.token),
         user: {
           id: user._id,
           email: user.email,

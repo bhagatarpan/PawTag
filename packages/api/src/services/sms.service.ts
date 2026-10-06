@@ -14,8 +14,14 @@ interface SMSProvider {
 
 class DemoSMSProvider implements SMSProvider {
   async send(to: string, message: string): Promise<SMSResult> {
+    // Production must fail closed — demo SMS must never report success.
+    if (process.env.NODE_ENV === 'production') {
+      logger.error({ to }, 'SMS FAILED — SMS_PROVIDER not configured in production');
+      return { success: false, error: 'SMS provider not configured in production' };
+    }
+
     const otpMatch = message.match(/\b(\d{6})\b/);
-    logger.debug({ to, messagePreview: message.substring(0, 50), otp: otpMatch?.[1] }, 'DEMO SMS — No SMS_PROVIDER set');
+    logger.debug({ to, messagePreview: message.substring(0, 50), otp: otpMatch?.[1] }, 'DEMO SMS — No SMS_PROVIDER set (non-production only)');
     return { success: true, messageId: `demo_sms_${Date.now()}` };
   }
 }
@@ -71,6 +77,10 @@ function createSMSProvider(): SMSProvider {
       return new TwilioSMSProvider();
     case 'demo':
     default:
+      // Production without an explicit SMS provider must fail closed.
+      if (process.env.NODE_ENV === 'production' && provider !== 'twilio') {
+        return new DemoSMSProvider(); // DemoSMSProvider itself fails closed in production
+      }
       return new DemoSMSProvider();
   }
 }

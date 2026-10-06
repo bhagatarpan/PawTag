@@ -14,7 +14,15 @@ async function getFirebaseMessaging() {
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
 
   if (!projectId || !privateKey || !clientEmail) {
-    logger.info('[PushService] Firebase not configured — running in demo mode');
+    // Production must fail closed — never report push as delivered without a provider.
+    if (process.env.NODE_ENV === 'production') {
+      logger.error(
+        { projectId: !!projectId, clientEmail: !!clientEmail, privateKey: !!privateKey },
+        '[PushService] Firebase is not configured in production — push delivery will fail closed',
+      );
+    } else {
+      logger.info('[PushService] Firebase not configured — running in demo mode (non-production only)');
+    }
     firebaseInitialized = true;
     return null;
   }
@@ -67,15 +75,24 @@ export async function sendPushToUser(
   title: string,
   body: string,
   data?: Record<string, string>,
-): Promise<{ sent: number; failed: number }> {
+): Promise<{ sent: number; failed: number; error?: string }> {
   const tokens = await getUserPushTokens(userId);
   if (tokens.length === 0) return { sent: 0, failed: 0 };
 
   const messaging = await getFirebaseMessaging();
 
   if (!messaging) {
-    // Demo mode — log to console
-    logger.info({ userId, title, tokenCount: tokens.length }, '[PushService] DEMO PUSH');
+    // Fail closed in production — never claim pushes were delivered.
+    if (process.env.NODE_ENV === 'production') {
+      logger.error(
+        { userId, title, tokenCount: tokens.length },
+        '[PushService] Push delivery failed closed — Firebase not configured in production',
+      );
+      return { sent: 0, failed: tokens.length, error: 'Push provider not configured in production' };
+    }
+
+    // Development/test only: log demo push (never a production success path)
+    logger.info({ userId, title, tokenCount: tokens.length }, '[PushService] DEMO PUSH (non-production only)');
     return { sent: tokens.length, failed: 0 };
   }
 

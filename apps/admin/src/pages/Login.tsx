@@ -76,11 +76,10 @@ export default function Login() {
         tempToken: mfaTempToken,
         otp: mfaOtp,
       });
-      const { token: newToken, refreshToken: newRefreshToken, user: _userData } = res.data.data;
+      const { token: newToken, user: _userData } = res.data.data;
       localStorage.setItem('admin_token', newToken);
-      if (newRefreshToken) {
-        localStorage.setItem('admin_refresh_token', newRefreshToken);
-      }
+      // Browser security: refresh token is HttpOnly cookie only — never localStorage
+      localStorage.removeItem('admin_refresh_token');
       window.location.href = '/dashboard';
     } catch (err: any) {
       const code = err.response?.data?.code;
