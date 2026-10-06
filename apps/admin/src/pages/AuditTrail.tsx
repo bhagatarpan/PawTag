@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
-import { buildChangeRows, formatAuditValue, type AuditChangeRow, getActualChanges, getFieldDisplayName, getEntityDisplayName, getActionDisplayName, type ActualChange } from '../lib/audit-diff';
+import { buildChangeRows, type AuditChangeRow, getActualChanges, getEntityDisplayName, getActionDisplayName } from '../lib/audit-diff';
 import {
   Search,
   Filter,
@@ -14,14 +14,11 @@ import {
   ChevronLeft,
   Download,
   Shield,
-  Clock,
   AlertTriangle,
   Users,
   Activity,
   Copy,
-  ExternalLink,
   FileText,
-  Eye,
   RotateCcw,
   ArrowUpDown,
   Loader2,
@@ -33,9 +30,7 @@ import {
   Fingerprint,
   Globe,
   Calendar,
-  ChevronUp,
   SlidersHorizontal,
-  Ban,
   Trash2,
   Plus,
   Pencil,
@@ -43,21 +38,14 @@ import {
   LogOut,
   Settings,
   Upload,
-  Bell,
   Send,
-  Tag,
   ShieldAlert,
   ShieldCheck,
   Database,
   Layers,
-  Hash,
   Box,
   User,
-  Mail,
   Clock3,
-  MapPin,
-  Smartphone,
-  Laptop,
   OctagonAlert,
   Circle,
 } from 'lucide-react';
@@ -308,7 +296,7 @@ function formatLabel(str: string): string {
   return str.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-function getActionGroup(action: string): string {
+function _getActionGroup(action: string): string {
   const a = action.toLowerCase();
   for (const [group, keywords] of Object.entries(ACTION_GROUPS)) {
     if (keywords.some((k) => a.includes(k))) return group;
@@ -685,7 +673,7 @@ function DetailDrawer({
                   ) : entityHistory && entityHistory.length > 0 ? (
                     <div className="relative pl-4">
                       <div className="absolute left-1 top-1 bottom-1 w-px bg-gray-200" />
-                      {entityHistory.map((eh, i) => (
+                      {entityHistory.map((eh, _i) => (
                         <div key={eh.auditEventId} className="relative flex items-start gap-3 pb-3 last:pb-0">
                           <div className="absolute left-[-3px] top-1.5 w-2 h-2 rounded-full bg-primary-400 border-2 border-white" />
                           <div className="ml-3">
@@ -1008,7 +996,7 @@ export default function AuditTrail() {
     if (filters.startDate) params.startDate = filters.startDate;
     if (filters.endDate) params.endDate = filters.endDate;
     setSearchParams(params, { replace: true });
-  }, [filters]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [filters]);
 
   // Fetch summary
   const fetchSummary = useCallback(async () => {

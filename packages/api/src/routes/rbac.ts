@@ -13,7 +13,7 @@ import {
 } from '@pawtag/db';
 import { getEffectivePermissions } from '../services/authorization.service';
 import { auditService, type AuditContext } from '../services/audit';
-import { createAuditContextFromRequest, type AuditRequest } from '../middleware/audit';
+import { type AuditRequest } from '../middleware/audit';
 import { z } from 'zod';
 
 const router = Router();

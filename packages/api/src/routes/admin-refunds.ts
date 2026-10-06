@@ -16,7 +16,7 @@
 import { Router, Request, Response } from 'express';
 import { AuthRequest, authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
-import { Order, PaymentTransaction, User } from '@pawtag/db';
+import { Order, PaymentTransaction } from '@pawtag/db';
 import { stripePaymentProvider } from '../commerce/providers/stripe';
 import { manualRefundRetry, getPendingRetries } from '../commerce/services/refund-retry.service';
 import { exportRefundsToCsv, type RefundExportRow, type CsvColumnMode } from '../integrations/accounting/csvExporter';
@@ -28,8 +28,8 @@ import {
   disconnectXero,
   exportRefundsToXero,
 } from '../integrations/accounting/xeroExporter';
-import { auditService, type AuditContext } from '../services/audit';
-import { createAuditContextFromRequest, type AuditRequest } from '../middleware/audit';
+import { auditService } from '../services/audit';
+import { type AuditRequest } from '../middleware/audit';
 import logger from '../lib/logger';
 import { isMyobConnected } from '../integrations/accounting/myobExporter';
 import { runRefundReconciliation } from '../jobs/refundReconciliation';

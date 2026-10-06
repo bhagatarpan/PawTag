@@ -140,7 +140,7 @@ export default function InvoiceDetail() {
           <div>
             <p className="text-gray-500">Status</p>
             <div className="mt-1">
-              <StatusBadge status={invoice.status} />
+              <StatusBadge label={invoice.status} variant={invoice.status === 'paid' ? 'success' : invoice.status === 'void' ? 'neutral' : 'info'} />
             </div>
           </div>
           {invoice.paidAt && (

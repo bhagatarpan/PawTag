@@ -1,4 +1,4 @@
-import { renderBase, renderInfoBox, renderCtaButton } from './base';
+import { renderBase, renderInfoBox } from './base';
 
 interface CancellationEmailData {
   name: string;

@@ -26,18 +26,18 @@
  * ```
  */
 
-import { PendingOrder, Order, Invoice, InvoiceAccessToken, Cart, User, PaymentTransaction, Product, type IPendingOrderDocument } from '@pawtag/db';
+import { PendingOrder, Order, Invoice, InvoiceAccessToken, Cart, User, PaymentTransaction, Product } from '@pawtag/db';
 import crypto from 'crypto';
 import { NotFoundError } from '../../lib/app-errors';
-import { InvalidCartError, CheckoutExpiredError, DuplicateOrderError, PaymentFailedError, PriceMismatchError } from '../errors';
+import { InvalidCartError, CheckoutExpiredError, PaymentFailedError } from '../errors';
 import { stripePaymentProvider } from '../providers/stripe';
 import { inventoryService } from './inventory.service';
-import { pricingService } from './pricing.service';
+
 import { cartService } from './cart.service';
 import { getSetting, getNumberSetting, getBooleanSetting } from '../config';
-import { getGuardianNumber } from '../../services/loyalty/guardian-config';
+
 import { membershipEntitlementService } from '../../services/membership-entitlement.service';
-import { logPaymentEvent, logOrderEvent } from '../audit';
+import { logOrderEvent } from '../audit';
 import { generateSecureToken, hashToken } from '../../services/auth.service';
 import { sendOrderConfirmation, sendInvoiceEmail, sendMail } from '../../services/email.service';
 import { generateInvoiceHtml } from '../../services/invoice-html.service';
@@ -742,7 +742,7 @@ export class CheckoutService {
     // Create secure access token
     const secureToken = generateSecureToken();
     const tokenHash = hashToken(secureToken);
-    const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const _FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 
     await InvoiceAccessToken.create({
       invoiceId: invoice._id,

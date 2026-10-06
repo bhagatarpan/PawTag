@@ -9,7 +9,6 @@ import {
   LEVEL_DOT_COLORS,
   CATEGORY_COLORS,
   LEVEL_ICONS,
-  CATEGORY_ICONS,
   formatDuration,
   truncateMessage,
 } from '../lib/system-log-utils';
@@ -623,7 +622,7 @@ export default function SystemLogs() {
                 </tr>
               ) : (
                 items.map((log) => {
-                  const LevelIcon = LEVEL_ICONS[log.level] || Info;
+                  const _LevelIcon = LEVEL_ICONS[log.level] || Info;
                   return (
                     <tr key={log.logId} onClick={() => openDetail(log)} className="hover:bg-gray-50 cursor-pointer transition-colors">
                       <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-500">

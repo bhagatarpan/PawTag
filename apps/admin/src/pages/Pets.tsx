@@ -4,14 +4,43 @@ import api, { PaginatedData } from '../lib/api';
 import { toast } from '../lib/toast';
 import { ConfirmDialog } from '@pawtag/ui';
 import {
-  Search, X, ChevronDown, ChevronLeft, ChevronRight, Download,
-  Trash2, Plus, Edit2, Save, Camera, Star, Upload, Info,
-  Loader2, AlertTriangle, Users as UsersIcon, Dog, Cat,
-  Activity, CheckCircle, AlertCircle, Clock, Copy, Settings,
-  Database, FileText, User, Shield, Lock, Unlock, RotateCcw,
-  ExternalLink, Scan, Monitor, Smartphone, Tablet, Unlink,
+  Search,
+  X,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  Trash2,
+  Plus,
+  Edit2,
+  Save,
+  Camera,
+  Star,
+  Upload,
+  Info,
+  Loader2,
+  AlertTriangle,
+  Dog,
+  Cat,
+  Activity,
+  CheckCircle,
+  AlertCircle,
+  Clock,
+  Copy,
+  Settings,
+  Database,
+  FileText,
+  User,
+  Shield,
+  RotateCcw,
+  ExternalLink,
+  Scan,
+  Monitor,
+  Smartphone,
+  Tablet,
+  Unlink,
 } from 'lucide-react';
-import { BREED_ORIGINS, getBreedsForOrigin, PET_BREEDS } from '@pawtag/shared';
+import { BREED_ORIGINS, getBreedsForOrigin } from '@pawtag/shared';
 import type { PetType } from '@pawtag/shared';
 import { DetailDrawer as UserDetailDrawer, type UserRecord } from './Users';
 import { DetailDrawer as TagDetailDrawer, type TagItem } from './Tags';
@@ -978,7 +1007,7 @@ export default function Pets() {
 
   // Form handlers
   const startAdd = () => { setEditingPet(null); setForm(emptyForm); setPhotos([]); setShowForm(true); };
-  const startEdit = (pet: PetRecord) => {
+  const _startEdit = (pet: PetRecord) => {
     setEditingPet(pet);
     setForm({
       name: pet.name, petType: pet.petType || 'Dog', breedOrigin: pet.breedOrigin || 'Purebred',
@@ -1367,7 +1396,7 @@ export default function Pets() {
               ) : (
                 data?.items.map((pet) => {
               const mainPhoto = pet.photos && pet.photos.length > 0 ? (pet.photos.find((p) => p.isMain) || pet.photos[0])?.url : pet.photoUrl;
-                  const genderLabel = pet.gender === 'male' ? 'Male' : pet.gender === 'female' ? 'Female' : 'Unknown';
+                  const _genderLabel = pet.gender === 'male' ? 'Male' : pet.gender === 'female' ? 'Female' : 'Unknown';
                   return (
                     <tr key={pet._id} className="group hover:bg-gray-50 cursor-pointer transition-colors" onClick={() => setSelectedPet(pet)}>
                       <td className="px-4 py-3">

@@ -1,18 +1,16 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
   FlatList,
   TouchableOpacity,
   StyleSheet,
-  TextInput,
-  Modal,
   ActivityIndicator,
   Alert,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import api from '../../api/client';
-import { colors, typography, spacing, borderRadius, shadows } from '../../theme/tokens';
+import { colors, typography, spacing, borderRadius } from '../../theme/tokens';
 import { hapticLight, hapticSuccess } from '../../lib/haptics';
 
 interface HealthRecordsScreenProps {
@@ -32,13 +30,13 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'conditions', label: 'Conditions' },
 ];
 
-export function HealthRecordsScreen({ navigation, route }: HealthRecordsScreenProps) {
+export function HealthRecordsScreen({ route }: HealthRecordsScreenProps) {
   const { petId, petName } = route.params;
   const [activeTab, setActiveTab] = useState<Tab>('vaccinations');
   const [records, setRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [showAdd, setShowAdd] = useState(false);
+  const [_showAdd, _setShowAdd] = useState(false);
 
   const fetchRecords = async () => {
     try {

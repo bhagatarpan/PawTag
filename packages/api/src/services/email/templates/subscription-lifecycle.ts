@@ -1,4 +1,4 @@
-import { renderBase, renderCtaButton, renderDataTable, renderInfoBox, renderStatusCard, type EmailTheme } from './base';
+import { renderBase, renderCtaButton, renderDataTable, renderStatusCard, type EmailTheme } from './base';
 
 // ─── Subscription Welcome ──────────────────────────────────────────
 

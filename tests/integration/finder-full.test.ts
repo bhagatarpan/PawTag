@@ -3,7 +3,7 @@ import request from 'supertest';
 import mongoose from 'mongoose';
 import { setupTestDb, teardownTestDb, clearDb } from './setup';
 import app from '../../packages/api/src/index';
-import { createCustomerWithRBAC, createPet, createTag } from './helpers';
+import { createCustomer, createCustomerWithRBAC, createPet, createTag, seedMembershipEntitlements } from './helpers';
 
 beforeAll(async () => {
   await setupTestDb();
@@ -24,6 +24,7 @@ beforeEach(async () => {
 describe('Integration: Finder Full - Tag Lookup', () => {
   it('returns pet and owner info for a valid active tag', async () => {
     const { userId } = await createCustomerWithRBAC({ fullName: 'Alice Owner' });
+    await seedMembershipEntitlements(userId);
     const petId = await createPet(userId, { name: 'Rex', species: 'dog', breed: 'Labrador', status: 'lost' });
     await createTag(userId, petId, { tagId: 'TAG-HAPPY-001', status: 'active' });
 
@@ -63,14 +64,18 @@ describe('Integration: Finder Full - Tag Lookup', () => {
     expect(res.status).toBe(404);
   });
 
-  it('returns limited info for expired subscription', async () => {
-    const { userId } = await createCustomerWithRBAC();
+  it('hides pet info when tag is not active (product rule: finders only find active tags)', async () => {
+    // Owner without membership — limited tags must not be findable
+    const { userId } = await createCustomer();
     const petId = await createPet(userId, { name: 'Ghost', status: 'safe' });
-    await createTag(userId, petId, { tagId: 'TAG-EXPIRED' });
+    await createTag(userId, petId, { tagId: 'TAG-EXPIRED', status: 'limited' });
 
+    // Active period already ended, no membership coverage
+    const past = new Date();
+    past.setMonth(past.getMonth() - 1);
     await mongoose.connection.collections.tags.updateOne(
       { tagId: 'TAG-EXPIRED' },
-      { $set: { subscriptionStatus: 'expired' } }
+      { $set: { activePeriodEndsAt: past, subscriptionStatus: 'expired' } }
     );
 
     const res = await request(app).get('/api/finder/TAG-EXPIRED');
@@ -78,13 +83,13 @@ describe('Integration: Finder Full - Tag Lookup', () => {
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
     expect(res.body.data.tagActive).toBe(false);
-    expect(res.body.data.subscriptionStatus).toBe('expired');
     expect(res.body.data.petInfo).toBeNull();
     expect(res.body.data.message).toMatch(/no longer active/i);
   });
 
-  it('treats tag with subscriptionStatus "none" as active', async () => {
+  it('treats tag with subscriptionStatus "none" as active when within active period', async () => {
     const { userId } = await createCustomerWithRBAC({ fullName: 'Free User' });
+    await seedMembershipEntitlements(userId);
     const petId = await createPet(userId, { name: 'Buddy' });
     await createTag(userId, petId, { tagId: 'TAG-FREE', subscriptionStatus: 'none' });
 
@@ -95,15 +100,24 @@ describe('Integration: Finder Full - Tag Lookup', () => {
     expect(res.body.data.ownerName).toBe('Free User');
   });
 
-  it('treats tag with subscriptionStatus "grace_period" as active', async () => {
-    const { userId } = await createCustomerWithRBAC();
+  it('does not find grace-period tags without active coverage (only active tags are findable)', async () => {
+    // Owner without membership — grace/limited tags must not be findable
+    const { userId } = await createCustomer();
     const petId = await createPet(userId, { name: 'Grace' });
-    await createTag(userId, petId, { tagId: 'TAG-GRACE', subscriptionStatus: 'grace_period' });
+    await createTag(userId, petId, { tagId: 'TAG-GRACE', subscriptionStatus: 'grace_period', status: 'limited' });
+
+    const past = new Date();
+    past.setMonth(past.getMonth() - 1);
+    await mongoose.connection.collections.tags.updateOne(
+      { tagId: 'TAG-GRACE' },
+      { $set: { activePeriodEndsAt: past } }
+    );
 
     const res = await request(app).get('/api/finder/TAG-GRACE');
 
     expect(res.status).toBe(200);
-    expect(res.body.data.pet.name).toBe('Grace');
+    expect(res.body.data.tagActive).toBe(false);
+    expect(res.body.data.petInfo).toBeNull();
   });
 
   it('logs a FinderScan with action "viewed" on lookup', async () => {
@@ -163,6 +177,7 @@ describe('Integration: Finder Full - Notify Owner', () => {
 
   it('creates a notification with phone contact info', async () => {
     const { userId } = await createCustomerWithRBAC({ fullName: 'Notify Owner' });
+    await seedMembershipEntitlements(userId);
     const petId = await createPet(userId, { name: 'Ziggy', status: 'lost' });
     await createTag(userId, petId, { tagId: 'TAG-NF-PHONE' });
 
@@ -378,6 +393,7 @@ describe('Integration: Finder Full - Stats', () => {
 
   it('counts pets, tags, and users after seeding data', async () => {
     const { userId } = await createCustomerWithRBAC({ email: 'stat-user@test.com' });
+    await seedMembershipEntitlements(userId);
     await createPet(userId, { status: 'lost' });
     await createTag(userId, (await mongoose.connection.collections.pets.findOne({ ownerId: new mongoose.Types.ObjectId(userId) }))?._id.toString() || '', { status: 'active' });
 
@@ -392,6 +408,7 @@ describe('Integration: Finder Full - Stats', () => {
 
   it('counts lost and found pets correctly', async () => {
     const { userId } = await createCustomerWithRBAC({ email: 'stat-pets@test.com' });
+    await seedMembershipEntitlements(userId);
     const lostPetId = await createPet(userId, { status: 'lost', name: 'LostDog', petId: 'PET-LOST-001' });
     const foundPetId = await createPet(userId, { status: 'found', name: 'FoundCat', petId: 'PET-FOUND-001' });
     await createTag(userId, lostPetId, { tagId: 'TAG-LOST-001' });
@@ -405,6 +422,7 @@ describe('Integration: Finder Full - Stats', () => {
 
   it('increments scan count after a tag lookup', async () => {
     const { userId } = await createCustomerWithRBAC({ email: 'stat-scan@test.com' });
+    await seedMembershipEntitlements(userId);
     const petId = await createPet(userId);
     await createTag(userId, petId, { tagId: 'TAG-STAT-SCAN' });
 

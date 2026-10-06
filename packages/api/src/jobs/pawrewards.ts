@@ -60,7 +60,7 @@ async function reQualifyTiers(): Promise<void> {
     let tierChanges = 0;
     for (const user of usersWithGuardian) {
       try {
-        const result = await updateTier(user._id.toString());
+        const _result = await updateTier(user._id.toString());
         // updateTier logs tier changes internally
         tierChanges++;
       } catch (err) {

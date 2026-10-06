@@ -125,7 +125,7 @@ export default function PaymentMethodsPanel({ readOnly = false, onChanged }: Pay
 
       {items.length === 0 ? (
         <EmptyState
-          title="No saved payment methods"
+          message="No saved payment methods"
           description="Add a card to speed up checkout and membership renewals."
         />
       ) : (

@@ -13,7 +13,7 @@
  * ```
  */
 
-import { Cart, Order, ShippingMethod, type ICartDocument } from '@pawtag/db';
+import { Cart, Order, ShippingMethod } from '@pawtag/db';
 import { nzShippingProvider } from '../providers/nz-shipping';
 import type { ShippingAddress, ShippingRate } from '../interfaces/shipping-provider';
 import { ShippingError } from '../errors';

@@ -1,5 +1,5 @@
 import { Product, Setting, Notification, User } from '@pawtag/db';
-import { sendMail } from '../services/email.service';
+
 import { renderLowStockAlertEmail } from '../services/email/templates';
 import { auditService, type AuditContext } from '../services/audit';
 import logger from '../lib/logger';

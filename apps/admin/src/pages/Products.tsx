@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { API } from '@pawtag/shared/api';
 import { useSearchParams } from 'react-router-dom';
-import { ImagePlus, X, Upload, Loader2, Search, SlidersHorizontal, ChevronDown, ChevronLeft, ChevronRight, Download, Trash2, Edit2, Save, Settings, AlertTriangle, RotateCcw, Database, FileText, Package, Activity, CheckCircle, AlertCircle, Info, Copy, Eye, Plus, GripVertical } from 'lucide-react';
-import { IconPicker, ICON_MAP, type IconPickerProps, type IFeatureHighlight } from '@pawtag/ui';
+import { ImagePlus, X, Loader2, Search, SlidersHorizontal, ChevronDown, ChevronLeft, ChevronRight, Download, Edit2, Settings, AlertTriangle, RotateCcw, Database, FileText, Package, Activity, CheckCircle, AlertCircle, Info, Copy, GripVertical } from 'lucide-react';
+import { ICON_MAP, type IFeatureHighlight } from '@pawtag/ui';
 import { FeatureHighlightsEditor, HIGHLIGHT_COLORS } from '../components/FeatureHighlightsEditor';
 import { Check } from 'lucide-react';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
@@ -401,7 +401,7 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
 function SortableProductRow({
   product,
   onSelect,
-  onEdit,
+  onEdit: _onEdit,
 }: {
   product: Product;
   onSelect: (p: Product) => void;

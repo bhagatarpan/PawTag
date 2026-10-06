@@ -6,7 +6,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { API } from '@pawtag/shared/api';
 import { Link } from 'react-router-dom';
-import { Save, Loader2, RefreshCcw, CreditCard, Truck, Receipt, Package, ShoppingCart, Clock, RotateCcw, Settings, Shield, Bell, Info, Plus, Trash2, Ban, X, Database, Link2, Unlink } from 'lucide-react';
+import { Save, Loader2, RefreshCcw, CreditCard, Truck, Receipt, Package, ShoppingCart, Clock, RotateCcw, Shield, Bell, Info, Plus, Trash2, Ban, Database, Link2, Unlink } from 'lucide-react';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
 

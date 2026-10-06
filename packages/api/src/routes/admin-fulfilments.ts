@@ -11,7 +11,7 @@ import { Fulfilment, Order, Tag, Product } from '@pawtag/db';
 import { toAppError } from '../lib/app-errors';
 import logger from '../lib/logger';
 import { auditService, type AuditContext } from '../services/audit';
-import { createAuditContextFromRequest, type AuditRequest } from '../middleware/audit';
+import { type AuditRequest } from '../middleware/audit';
 import { generateTagId } from '../lib/tag-id';
 import { resolveOrderStatusFromFulfilment } from '../services/fulfilment-sync';
 

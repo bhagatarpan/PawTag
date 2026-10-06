@@ -172,7 +172,7 @@ export async function enforceRetention(): Promise<{ deleted: number; archived: n
 }
 
 async function archiveEvent(event: IAuditEventDocument): Promise<void> {
-  const archiveData = {
+  const _archiveData = {
     ...event.toObject(),
     archivedAt: new Date(),
     originalCollection: 'audit_events',

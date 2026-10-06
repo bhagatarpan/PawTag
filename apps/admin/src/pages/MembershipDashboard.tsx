@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Crown, Shield, Settings, Users, DollarSign, TrendingUp } from 'lucide-react';
+import { Crown, Settings, Users, DollarSign, TrendingUp } from 'lucide-react';
 import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
 

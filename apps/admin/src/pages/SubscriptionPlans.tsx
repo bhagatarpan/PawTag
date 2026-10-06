@@ -4,13 +4,10 @@ import api from '../lib/api';
 import {
   Search,
   Plus,
-  Filter,
   DollarSign,
   Calendar,
   Zap,
-  Tag as TagIcon,
   CreditCard,
-  RefreshCw,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';

@@ -209,7 +209,7 @@ router.post('/pet-references/bulk', requirePermission('cms.pet_reference.create'
           createdBy: req.user!.id, updatedBy: req.user!.id,
         });
         created.push(reference);
-      } catch (err) {
+      } catch (_err) {
         errors.push({ item, error: 'Failed to create' });
       }
     }

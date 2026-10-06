@@ -91,7 +91,7 @@ export default function Invoices() {
           </div>
         ) : items.length === 0 ? (
           <EmptyState
-            title="No invoices yet"
+            message="No invoices yet"
             description="Invoices appear here after membership purchases and paid orders."
           />
         ) : (
@@ -126,7 +126,7 @@ export default function Invoices() {
                   <p className="text-sm font-semibold text-gray-900">
                     {formatCurrency(invoice.amount, invoice.currency || 'NZD')}
                   </p>
-                  <StatusBadge status={invoice.status} />
+                  <StatusBadge label={invoice.status} variant={invoice.status === 'paid' ? 'success' : invoice.status === 'void' ? 'neutral' : 'info'} />
                   <button
                     type="button"
                     aria-label={`Download ${invoice.invoiceNumber}`}

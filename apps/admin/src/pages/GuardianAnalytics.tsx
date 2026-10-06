@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { TrendingUp, Users, Star, Gift, DollarSign, RefreshCw } from 'lucide-react';
+import { TrendingUp, Users, Star, Gift, RefreshCw } from 'lucide-react';
 import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
 

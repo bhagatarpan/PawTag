@@ -68,7 +68,7 @@ export default function OrderRefunds() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [search, setSearch] = useState('');
-  const [selectedRefund, setSelectedRefund] = useState<RefundListItem | null>(null);
+  const [_selectedRefund, _setSelectedRefund] = useState<RefundListItem | null>(null);
   const [exporting, setExporting] = useState(false);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [reconciling, setReconciling] = useState(false);

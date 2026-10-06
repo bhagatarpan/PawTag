@@ -12,13 +12,13 @@
  * ```
  */
 
-import { Order, PaymentTransaction, Invoice, User, type IOrderDocument } from '@pawtag/db';
+import { Order, PaymentTransaction, Invoice, type IOrderDocument } from '@pawtag/db';
 import mongoose from 'mongoose';
 import { NotFoundError } from '../../lib/app-errors';
 import { RefundError } from '../errors';
 import { stripePaymentProvider } from '../providers/stripe';
 import { logRefundEvent } from '../audit';
-import { getBooleanSetting, getNumberSetting } from '../config';
+import { getNumberSetting } from '../config';
 import { formatRefundDestination } from '@pawtag/shared';
 import logger from '../../lib/logger';
 

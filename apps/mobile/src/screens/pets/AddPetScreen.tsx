@@ -12,7 +12,7 @@ import {
   Alert,
 } from 'react-native';
 import api from '../../api/client';
-import { colors, typography, spacing, borderRadius, shadows } from '../../theme/tokens';
+import { colors, typography, spacing, borderRadius } from '../../theme/tokens';
 
 const PET_TYPES = ['Dog', 'Cat', 'Rabbit', 'Hamster', 'Guinea Pig', 'Bird'];
 const GENDERS = [

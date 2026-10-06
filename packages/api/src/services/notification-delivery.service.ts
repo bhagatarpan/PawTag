@@ -1,5 +1,5 @@
-import { Notification, User, PushToken } from '@pawtag/db';
-import { sendMail } from './email.service';
+import { Notification, User } from '@pawtag/db';
+
 import { renderGenericNotificationEmail } from './email/templates';
 import { sendPushToUser } from './push-notification.service';
 import { membershipEntitlementService } from './membership-entitlement.service';

@@ -1,5 +1,5 @@
 import { ReferralCode, Referral, User, Subscription } from '@pawtag/db';
-import { sendMail } from './email.service';
+
 import { renderReferralRewardEmail } from './email/templates';
 import { auditService, type AuditContext } from './audit';
 import logger from '../lib/logger';

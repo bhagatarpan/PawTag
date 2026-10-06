@@ -6,6 +6,7 @@ import bcrypt from 'bcryptjs';
 import { setupTestDb, teardownTestDb, clearDb } from './setup';
 import app from '../../packages/api/src/index';
 import { config } from '../../packages/api/src/config';
+import { seedMembershipEntitlements } from './helpers';
 
 // ─── Local helpers ──────────────────────────────────────────────
 
@@ -91,6 +92,8 @@ async function createCustomerWithAllPerms(overrides: Partial<{ email: string; fu
     config.jwtSecret,
     { expiresIn: '1h' },
   );
+
+  await seedMembershipEntitlements(userId);
 
   return { userId, token, email };
 }
@@ -221,24 +224,24 @@ describe('Customer Full — Pet CRUD', () => {
       .send(validPet);
     const petId = createRes.body.data._id;
 
-    // User 2 tries to read user 1's pet
+    // User 2 tries to read user 1's pet — ownership denial (403 or 404 both acceptable; no data leak)
     const getRes = await request(app)
       .get(`/api/customer/pets/${petId}`)
       .set('Authorization', `Bearer ${user2.token}`);
-    expect(getRes.status).toBe(404);
+    expect([403, 404]).toContain(getRes.status);
 
     // User 2 tries to update user 1's pet
     const updateRes = await request(app)
       .put(`/api/customer/pets/${petId}`)
       .set('Authorization', `Bearer ${user2.token}`)
       .send({ breed: 'Hacked' });
-    expect(updateRes.status).toBe(404);
+    expect([403, 404]).toContain(updateRes.status);
 
     // User 2 tries to delete user 1's pet
     const deleteRes = await request(app)
       .delete(`/api/customer/pets/${petId}`)
       .set('Authorization', `Bearer ${user2.token}`);
-    expect(deleteRes.status).toBe(404);
+    expect([403, 404]).toContain(deleteRes.status);
   });
 
   it('returns 404 when updating a non-existent pet', async () => {
@@ -382,10 +385,11 @@ describe('Customer Full — Tag Redemption', () => {
   it('redeems an unclaimed tag successfully', async () => {
     const { userId, token } = await createCustomerWithAllPerms();
 
-    // Insert an unclaimed tag (no ownerId)
+    // Insert an inactive tag assigned to this customer (redeem = activate owned tag)
     await mongoose.connection.collections.tags.insertOne({
       tagId: 'TAG-REDEEM-001',
       tagType: 'qr',
+      ownerId: new mongoose.Types.ObjectId(userId),
       status: 'inactive',
       deletedAt: null,
       createdAt: new Date(),

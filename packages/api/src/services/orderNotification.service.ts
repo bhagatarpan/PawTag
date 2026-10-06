@@ -1,12 +1,11 @@
 import { Notification, Order, User, type IOrderDocument } from '@pawtag/db';
-import { sendMail, sendCmsEmailOrFallback } from './email.service';
+import { sendCmsEmailOrFallback } from './email.service';
 import { sendPushToUser } from './push-notification.service';
 import {
   renderRefundProcessingEmail,
   renderRefundSettledEmail,
   renderRefundFailedEmail,
   renderOrderStatusEmail,
-  renderNewOrderAlertEmail,
   renderOrderCancelledAlertEmail,
   renderRefundFailedAlertEmail,
 } from './email/templates';

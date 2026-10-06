@@ -5,11 +5,13 @@ import { setupTestDb, teardownTestDb, clearDb } from './setup';
 import app from '../../packages/api/src/index';
 import { Order, Notification } from '@pawtag/db';
 import { createSuperAdmin } from './helpers';
-import { sendMail } from '../../packages/api/src/services/email.service';
+import { sendMail, sendCmsEmailOrFallback } from '../../packages/api/src/services/email.service';
 
 vi.mock('../../packages/api/src/services/email.service', () => ({
   sendMail: vi.fn().mockResolvedValue({ success: true }),
   sendOrderConfirmation: vi.fn().mockResolvedValue({ success: true }),
+  sendCmsEmailOrFallback: vi.fn().mockResolvedValue({ success: true }),
+  renderCmsEmail: vi.fn().mockResolvedValue(null),
 }));
 
 // Mock Stripe payment provider to avoid real API calls in tests
@@ -118,7 +120,7 @@ describe('Phase 10 — Centralized Order Notifications', () => {
       expect(deliveredNotif).toBeDefined();
 
       // Verify emails were sent
-      expect(sendMail).toHaveBeenCalled();
+      expect(sendCmsEmailOrFallback).toHaveBeenCalled();
     });
   });
 
@@ -167,7 +169,7 @@ describe('Phase 10 — Centralized Order Notifications', () => {
       expect(notifs[0].message).toContain('cancelled');
       expect(notifs[0].message).toContain('Customer requested cancellation');
 
-      expect(sendMail).toHaveBeenCalled();
+      expect(sendCmsEmailOrFallback).toHaveBeenCalled();
     });
   });
 
@@ -217,7 +219,7 @@ describe('Phase 10 — Centralized Order Notifications', () => {
       expect(notifs[0].message).toContain('refunded');
       expect(notifs[0].message).toContain('Duplicate order');
 
-      expect(sendMail).toHaveBeenCalled();
+      expect(sendCmsEmailOrFallback).toHaveBeenCalled();
     });
   });
 

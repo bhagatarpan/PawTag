@@ -11,8 +11,6 @@ import { Router, Request, Response } from 'express';
 import mongoose from 'mongoose';
 import { resolvePaymentMode, isStripeEnabled } from '../commerce/payment-mode';
 import { collectMetrics } from '../lib/metrics';
-import logger from '../lib/logger';
-
 const router = Router();
 
 const startTime = Date.now();
@@ -131,7 +129,7 @@ router.get('/dependencies', async (_req: Request, res: Response) => {
     configured: !!(process.env.NZPOST_CLIENT_ID || process.env.COMMERCE_SHIPPING_NZPOST_CLIENT_ID),
   };
 
-  const anyConfigured = Object.values(checks).some(c => c.configured);
+  const _anyConfigured = Object.values(checks).some(c => c.configured);
 
   res.status(200).json({
     status: 'ok',

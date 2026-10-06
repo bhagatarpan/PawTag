@@ -179,7 +179,6 @@ export default function KeepMembershipPanel({
           clientSecret={clientSecret}
           onPaymentSuccess={handlePaymentSuccess}
           onPaymentError={(msg) => setError(msg)}
-          disabled={phase === 'working'}
         />
         {error && (
           <div role="alert" className="mt-3 text-sm text-red-600">

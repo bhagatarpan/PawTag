@@ -25,8 +25,8 @@
  */
 
 import mongoose from 'mongoose';
-import { User, Subscription, Order, Setting, PawRewardsLedger } from '@pawtag/db';
-import { calculateTier, TIER_BENEFITS, TierName } from './tier.service';
+import { User, Subscription, PawRewardsLedger } from '@pawtag/db';
+import { calculateTier, TierName } from './tier.service';
 import { isGoldSubscription } from './points-earning.service';
 import { sendMonthlySummaryEmail, sendPawRewardsReminderEmail } from '../email.service';
 import { incrementCounter, METRICS } from '../../lib/metrics';

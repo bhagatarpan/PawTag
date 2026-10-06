@@ -3,8 +3,8 @@ import { AuthRequest, authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
 import { User, Setting, Subscription, GuardianPointsLedger, PawRewardsLedger } from '@pawtag/db';
 import { auditService, type AuditContext } from '../services/audit';
-import { createAuditContextFromRequest, type AuditRequest } from '../middleware/audit';
-import { guardianSettingsSchema, membersQuerySchema, activityQuerySchema } from '../validation/loyalty';
+import { type AuditRequest } from '../middleware/audit';
+import { guardianSettingsSchema } from '../validation/loyalty';
 import { clearGuardianCache } from '../services/loyalty/guardian-config';
 import logger from '../lib/logger';
 

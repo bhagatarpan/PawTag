@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { AuthRequest, authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
-import { Referral, ReferralCode, User } from '@pawtag/db';
+import { Referral, ReferralCode } from '@pawtag/db';
 import {
   getOrCreateReferralCode,
   validateReferralCode,
@@ -9,7 +9,7 @@ import {
   getReferralHistory,
 } from '../services/referral.service';
 import { auditService, type AuditContext } from '../services/audit';
-import { createAuditContextFromRequest, type AuditRequest } from '../middleware/audit';
+import { type AuditRequest } from '../middleware/audit';
 import logger from '../lib/logger';
 
 async function auditReferralEvent(
@@ -179,7 +179,7 @@ router.put('/admin/referrals/:id/status', authenticate, requirePermission('order
 
     logger.info({ referralId: req.params.id, previousStatus, newStatus: status, updatedBy: req.user!.id }, 'Referral status updated by admin');
     res.json({ success: true, data: referral });
-  } catch (error) {
+  } catch (_error) {
     await auditReferralEvent(req, {
       action: 'referral_status_override',
       eventType: 'referral.status.updated',
@@ -226,7 +226,7 @@ router.delete('/admin/referrals/:id', authenticate, requirePermission('order.upd
 
     logger.info({ referralId: req.params.id, deletedBy: req.user!.id }, 'Referral deleted by admin');
     res.json({ success: true, data: { message: 'Referral deleted' } });
-  } catch (error) {
+  } catch (_error) {
     await auditReferralEvent(req, {
       action: 'referral_delete',
       eventType: 'referral.deleted',

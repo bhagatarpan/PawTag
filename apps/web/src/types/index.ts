@@ -57,6 +57,8 @@ export interface Order {
     quantity: number;
     unitPrice: number;
     totalPrice: number;
+    refundStatus?: string | null;
+    refundedQuantity?: number | null;
   }>;
   subtotal?: number;
   shippingCost?: number;
@@ -67,6 +69,8 @@ export interface Order {
     reason: string;
   };
   status: 'pending' | 'pending_payment' | 'paid' | 'packing' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
+  refundStatus?: 'pending' | 'succeeded' | 'failed' | 'canceled';
+  refundAmount?: number;
   payment: {
     method: 'card' | 'paypal' | 'bank_transfer';
     status: 'pending' | 'completed' | 'failed' | 'refunded';

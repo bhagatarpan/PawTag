@@ -1,9 +1,15 @@
 import { useState, useEffect } from 'react';
 import { API } from '@pawtag/shared/api';
 import {
-  Plus, Trash2, GripVertical, Save, Eye, EyeOff, ChevronDown, ChevronUp,
-  Heart, AlertTriangle, Zap, Phone, MapPin, PhoneCall, CheckCircle,
-  Shield, Info, Star, Gift, Bell, Settings,
+  Plus,
+  Trash2,
+  GripVertical,
+  Save,
+  Eye,
+  EyeOff,
+  ChevronDown,
+  ChevronUp,
+  Settings,
 } from 'lucide-react';
 import api from '../../lib/api';
 import { toast } from '../../lib/toast';

@@ -13,7 +13,7 @@ router.use(authenticate);
  */
 router.get('/', requirePermission('subscription.read'), async (req: AuthRequest, res: Response) => {
   try {
-    const { status, stage, priority, page = '1', limit = '20' } = req.query;
+    const { status, stage, _priority, page = '1', limit = '20' } = req.query;
     const query: any = {};
 
     if (status) query.status = status;

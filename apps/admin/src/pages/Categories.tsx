@@ -17,7 +17,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { API } from '@pawtag/shared/api';
-import { Search, Loader2, Plus, Edit2, Trash2, ChevronRight, FolderTree, X } from 'lucide-react';
+import { Search, Loader2, Plus, Edit2, Trash2, FolderTree, X } from 'lucide-react';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
 

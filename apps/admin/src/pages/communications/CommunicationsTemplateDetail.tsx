@@ -1,8 +1,19 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  ArrowLeft, Save, Send, Eye, Edit, Clock, CheckCircle, AlertTriangle,
-  Mail, Copy, ChevronDown, ChevronRight, History, Info,
+  ArrowLeft,
+  Save,
+  Send,
+  Edit,
+  Clock,
+  CheckCircle,
+  AlertTriangle,
+  Mail,
+  Copy,
+  ChevronDown,
+  ChevronRight,
+  History,
+  Info,
 } from 'lucide-react';
 import api from '../../lib/api';
 import { API } from '@pawtag/shared/api';
@@ -87,7 +98,7 @@ export default function CommunicationsTemplateDetail() {
   const [saving, setSaving] = useState(false);
   const [testEmail, setTestEmail] = useState('');
   const [showVersions, setShowVersions] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
+  const [_showPreview, _setShowPreview] = useState(false);
   const [form, setForm] = useState<Partial<Template>>({});
 
   const fetchTemplate = async () => {

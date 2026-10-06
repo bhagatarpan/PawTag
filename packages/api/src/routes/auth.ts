@@ -5,7 +5,6 @@ import { validate } from '../middleware/validation';
 import {
   registerSchema,
   loginSchema,
-  verifyEmailSchema,
   resendEmailVerificationSchema,
   sendPhoneOtpSchema,
   verifyPhoneSchema,
@@ -35,10 +34,10 @@ import { sendVerificationEmail, sendPasswordResetEmail, sendPasswordChangedEmail
 import { sendPhoneOtpSMS } from '../services/sms.service';
 import { isRegistrationOtpDisabled } from '../services/otp-settings.service';
 import { getMaxLoginAttempts, getLockoutMinutes, getCaptchaRequiredAfterAttempts, getCaptchaTokenExpiryMinutes } from '../services/auth-settings.service';
-import { User, Role, UserRole, VerificationToken, Setting, AuditEvent } from '@pawtag/db';
+import { User, Role, UserRole, VerificationToken, Setting } from '@pawtag/db';
 import { auditService, resolveActorType, type AuditContext } from '../services/audit';
 import { getLocationFromIp } from '../lib/geo-location';
-import { createAuditContextFromRequest, setAuditActor, type AuditRequest } from '../middleware/audit';
+import { setAuditActor, type AuditRequest } from '../middleware/audit';
 import { config } from '../config';
 import logger from '../lib/logger';
 import { createDbRateLimiter } from '../lib/rate-limiter';
@@ -558,8 +557,8 @@ if (user.status === 'inactive') {
 
       // Send OTP email (test mode: send to test email)
       const recipient = siteTestMode && siteTestEmail ? siteTestEmail : user.email;
-      const ip = req.ip || req.connection?.remoteAddress || 'unknown';
-      const ua = req.headers['user-agent'] || 'unknown';
+      const _ip = req.ip || req.connection?.remoteAddress || 'unknown';
+      const _ua = req.headers['user-agent'] || 'unknown';
       sendLoginOtpEmail(recipient, user.fullName, otp, `${mfaOtpExpiry} minutes`).catch(() => {});
 
       await auditAuthEvent(req as AuditRequest, {
@@ -1313,7 +1312,7 @@ router.post('/reset-password', validate(resetPasswordSchema), async (req, res: R
       businessOperation: 'Reset password',
     }, { actorType: 'USER', authenticationMethod: 'password_reset_token' });
 
-    const location = clientInfo.ipAddress ? await getLocationFromIp(clientInfo.ipAddress).catch(() => undefined) : undefined;
+    const _location = clientInfo.ipAddress ? await getLocationFromIp(clientInfo.ipAddress).catch(() => undefined) : undefined;
     sendPasswordChangedEmail(user.email, user.fullName, 'self', clientInfo.ipAddress, clientInfo.userAgent).catch((err) => {
       logger.error({ err, email: user.email }, 'Failed to send password changed email');
     });
@@ -1638,8 +1637,8 @@ router.post('/mfa/send-otp', mfaSendLimiter, async (req: AuthRequest, res: Respo
     const recipient = siteTestMode && siteTestEmail ? siteTestEmail : user.email;
 
     // Send OTP email
-    const ip = req.ip || req.connection?.remoteAddress || 'unknown';
-    const ua = req.headers['user-agent'] || 'unknown';
+    const _ip = req.ip || req.connection?.remoteAddress || 'unknown';
+    const _ua = req.headers['user-agent'] || 'unknown';
     sendLoginOtpEmail(recipient, user.fullName, otp, `${mfaOtpExpiry} minutes`).catch(() => {});
 
     await auditAuthEvent(req as AuditRequest, {

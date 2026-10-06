@@ -24,8 +24,6 @@
 
 import type { ITaxProvider, TaxCalculationResult, LineItemTax } from '../../interfaces/tax-provider';
 import { getNumberSetting, getSetting, getBooleanSetting } from '../../config';
-import logger from '../../../lib/logger';
-
 /**
  * NZ GST tax provider for PawTag Commerce.
  */

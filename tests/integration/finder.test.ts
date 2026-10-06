@@ -6,6 +6,7 @@ import jwt from 'jsonwebtoken';
 import { setupTestDb, teardownTestDb, clearDb } from './setup';
 import app from '../../packages/api/src/index';
 import { config } from '../../packages/api/src/config';
+import { seedMembershipEntitlements } from './helpers';
 
 async function createCustomer(overrides: Partial<{ email: string; fullName: string }> = {}) {
   const email = overrides.email || 'owner@example.com';
@@ -25,7 +26,11 @@ async function createCustomer(overrides: Partial<{ email: string; fullName: stri
     updatedAt: new Date(),
   });
 
-  return user.insertedId.toString();
+  const userId = user.insertedId.toString();
+  // Finder notifications respect the membership entitlement registry.
+  // Seed entitled membership so pet_found notifications can be delivered in tests.
+  await seedMembershipEntitlements(userId);
+  return userId;
 }
 
 async function createPet(ownerId: string, overrides: Record<string, any> = {}) {
@@ -49,15 +54,26 @@ async function createPet(ownerId: string, overrides: Record<string, any> = {}) {
 }
 
 async function createTag(ownerId: string, petId: string, overrides: Record<string, any> = {}) {
+  const status = overrides.status || 'active';
+  const now = new Date();
+  const activePeriodEndsAt = new Date(now);
+  activePeriodEndsAt.setMonth(activePeriodEndsAt.getMonth() + 3);
+  const warrantyEndsAt = new Date(now);
+  warrantyEndsAt.setMonth(warrantyEndsAt.getMonth() + 12);
+
   const tag = await mongoose.connection.collections.tags.insertOne({
     tagId: overrides.tagId || 'TAG-FINDER-001',
     petId: new mongoose.Types.ObjectId(petId),
     ownerId: new mongoose.Types.ObjectId(ownerId),
-    status: overrides.status || 'active',
+    status,
     tagType: 'qr',
+    subscriptionStatus: overrides.subscriptionStatus || 'none',
+    activatedAt: now,
+    activePeriodEndsAt,
+    warrantyEndsAt,
     deletedAt: null,
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    createdAt: now,
+    updatedAt: now,
   });
 
   return tag.insertedId.toString();

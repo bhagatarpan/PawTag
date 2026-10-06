@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Scan, Calendar, Filter, ChevronDown, Monitor, Smartphone, Tablet, Globe, Eye, Bell, MapPin } from 'lucide-react';
+import { Scan, Calendar, ChevronDown, Monitor, Smartphone, Tablet, Globe, Bell, MapPin } from 'lucide-react';
 import api from '../lib/api';
 import { API } from '@pawtag/shared/api';
 import { toast } from '../lib/toast';

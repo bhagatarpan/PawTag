@@ -1,4 +1,4 @@
-import { PromoCode, UserMembership, MembershipTier } from '@pawtag/db';
+import { PromoCode, MembershipTier } from '@pawtag/db';
 import { getMembershipRetentionNumber } from './membership-config';
 import logger from '../lib/logger';
 

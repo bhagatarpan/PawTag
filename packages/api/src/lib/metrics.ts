@@ -7,7 +7,7 @@
  * Designed to be vendor-neutral and exportable to any metrics backend.
  */
 
-import { getRequestContext } from './request-context';
+
 
 // ─── Types ─────────────────────────────────────────────────────────
 

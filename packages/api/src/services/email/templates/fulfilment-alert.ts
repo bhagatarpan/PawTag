@@ -11,7 +11,7 @@ interface FulfilmentAlertData {
 }
 
 export function renderFulfilmentAlertEmail(data: FulfilmentAlertData): string {
-  const { orderNumber, customerName, customerEmail, items, total, fulfilmentId, autoTagCreated } = data;
+  const { orderNumber, customerName, customerEmail, items, total, autoTagCreated } = data;
 
   const tagMode = autoTagCreated
     ? 'Tag IDs have been auto-generated and are ready for NFC writing.'

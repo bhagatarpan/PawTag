@@ -782,7 +782,7 @@ router.post('/media/upload', requirePermission('cms.media.upload'), (req: AuthRe
       }
 
       res.json({ success: true, data: { files: uploaded } });
-    } catch (e) {
+    } catch (_e) {
       res.status(500).json({ success: false, error: 'Failed to process uploads' });
     }
   });
@@ -814,7 +814,7 @@ router.delete('/media/:id', requirePermission('cms.media.delete'), async (req: A
 
     await auditCmsEvent(req, 'delete', 'CmsMedia', media._id.toString(), { filename: media.filename });
     res.json({ success: true, data: { message: 'Media deleted' } });
-  } catch (e) {
+  } catch (_e) {
     res.status(500).json({ success: false, error: 'Failed to delete media' });
   }
 });

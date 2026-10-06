@@ -9,7 +9,6 @@ import {
   Platform,
   ScrollView,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { useAuth } from '../lib/auth-context';
 import { colors, typography, spacing, borderRadius, shadows } from '../theme/tokens';

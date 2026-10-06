@@ -24,14 +24,14 @@
 import { Cart, Product, PromoCode, type ICartDocument } from '@pawtag/db';
 import { NotFoundError } from '../../lib/app-errors';
 import { InvalidCartError, InsufficientStockError, ProductUnavailableError } from '../errors';
-import { pricingService } from './pricing.service';
+
 import { inventoryService } from './inventory.service';
 import { nzGstProvider } from '../providers/simple-gst';
-import { getNumberSetting, getBooleanSetting } from '../config';
+import { getNumberSetting } from '../config';
 import logger from '../../lib/logger';
 
 /** Cart abandonment threshold (30 minutes) */
-const ABANDONMENT_THRESHOLD_MS = 30 * 60 * 1000;
+const _ABANDONMENT_THRESHOLD_MS = 30 * 60 * 1000;
 
 /**
  * Input for adding an item to the cart.
@@ -526,7 +526,7 @@ export class CartService {
           .reduce((sum, item) => sum + item.lineTotal, 0);
         accessoryDiscount = Math.round(accessorySubtotal * (accessoryDiscountPercent / 100) * 100) / 100;
       }
-    } catch (err) {
+    } catch (_err) {
       // Membership lookup failed — continue without accessory discount
     }
 

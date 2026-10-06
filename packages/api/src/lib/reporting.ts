@@ -4,11 +4,9 @@
  * Turns raw logs, traces, metrics and audit events into useful operational reports.
  * Reports distinguish between FACT, OBSERVATION, INFERENCE, and RECOMMENDATION.
  */
-
-import logger from './logger';
 import { collectMetrics } from './metrics';
-import { getRequestContext } from './request-context';
-import { getFeatureRegistry, getExpectedAuditEvents } from './correlation';
+
+import { getFeatureRegistry } from './correlation';
 
 // ─── Types ─────────────────────────────────────────────────────────
 

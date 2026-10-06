@@ -3,12 +3,37 @@ import { API } from '@pawtag/shared/api';
 import api, { PaginatedData } from '../lib/api';
 import { toast } from '../lib/toast';
 import {
-  Search, X, ChevronDown, ChevronLeft, ChevronRight, Download,
-  Trash2, Plus, Edit2, Save, Tag as TagIcon, QrCode, Printer,
-  Copy, Loader2, AlertTriangle, Shield, Lock, Unlock, RotateCcw,
-  Database, FileText, User, Settings, Activity, CheckCircle,
-  AlertCircle, Info, Clock, ExternalLink, Eye, Scan, Monitor, Smartphone, Tablet,
-  XCircle, RefreshCw,
+  Search,
+  X,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  Trash2,
+  Plus,
+  Edit2,
+  Save,
+  Tag as TagIcon,
+  QrCode,
+  Printer,
+  Copy,
+  Loader2,
+  AlertTriangle,
+  RotateCcw,
+  Database,
+  FileText,
+  User,
+  Settings,
+  CheckCircle,
+  AlertCircle,
+  Info,
+  ExternalLink,
+  Scan,
+  Monitor,
+  Smartphone,
+  Tablet,
+  XCircle,
+  RefreshCw,
 } from 'lucide-react';
 import { DetailDrawer as PetDetailDrawer, type PetRecord } from './Pets';
 import { DetailDrawer as UserDetailDrawer, type UserRecord } from './Users';
@@ -333,7 +358,7 @@ export function DetailDrawer({
     }
   };
 
-  const handleDelete = async () => {
+  const _handleDelete = async () => {
     if (!window.confirm(`Delete tag "${tag.tagId}"? This cannot be undone.`)) return;
     setActionLoading('delete');
     try {
@@ -950,7 +975,7 @@ export default function Tags() {
 
   // Form handlers
   const startAdd = () => { setEditingTag(null); setForm({ petId: '', ownerId: '', tagId: '', tagType: 'qr', status: 'inactive' }); setFormError(''); setShowForm(true); };
-  const startEdit = (tag: TagItem) => {
+  const _startEdit = (tag: TagItem) => {
     setEditingTag(tag);
     setForm({
       petId: tag.petId?._id || '', ownerId: tag.ownerId?._id || '',

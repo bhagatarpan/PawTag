@@ -34,7 +34,7 @@ import { productService } from '../commerce/services/product.service';
 import { inventoryService } from '../commerce/services/inventory.service';
 import { shippingService } from '../commerce/services/shipping.service';
 import { getAllSettings, updateSetting, type CommerceSettingKey } from '../commerce/config';
-import { Order, Invoice, Setting, Subscription, Tag, Pet } from '@pawtag/db';
+import { Order, Invoice, Setting, Subscription, Pet } from '@pawtag/db';
 import { toAppError } from '../lib/app-errors';
 import { auditService } from '../services/audit';
 

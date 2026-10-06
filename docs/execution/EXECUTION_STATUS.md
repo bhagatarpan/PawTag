@@ -1,7 +1,7 @@
 # Autonomous Execution Status
 
 > Working copy: `docs/execution/EXECUTION_STATUS.md`
-> Created: Phase 00 evidence reset (2026-10-06)
+> Updated: Baseline recovery complete (2026-10-06)
 > Source of truth: this file is updated only from executed commands/runtime evidence, not historical checkboxes.
 
 ## Evidence states
@@ -12,12 +12,12 @@
 
 | Phase | Status | Commit/branch | Automated evidence | Runtime/provider evidence | Blockers | Notes |
 |---|---|---|---|---|---|---|
-| 00 Baseline | **PROVEN** (phase complete; baseline quality gates FAILED) | `main` @ `f7027c2` (dirty pack install) | typecheck/lint/unit/integration/smoke/build FAIL; regression PASS | none executed (no provider/staging/device run) | green baseline not restored — deferred to later Track A phases | Phase 00 acceptance met: state captured, all commands run, status reset, blockers explicit. See `docs/execution/BASELINE_EVIDENCE.md` |
+| 00 Baseline | **PROVEN** (evidence reset done; baseline quality gates recovered) | `main` @ baseline-recovery commit | typecheck/lint/unit/integration/regression/smoke/build **PASS** | none executed (no provider/staging/device run) | green baseline restored in code; provider/staging/device still unproven | Phase 00 evidence reset complete; Track A baseline recovery complete. See `docs/execution/BASELINE_EVIDENCE.md` |
 | 01 Production safety | NOT_STARTED | | | | depends on baseline recovery | payment/CAPTCHA/email configs coded only |
 | 02 Financial integrity | NOT_STARTED | | | | depends on baseline + Phase 01 | audit synthesis lists inventory/rewards risks |
 | 03 Communications/auth | NOT_STARTED | | | | depends on baseline | email provider coded; not production-validated |
-| 04 Cart/Checkout web | NOT_STARTED | | | | depends on baseline | cart/checkout coded; types/build red |
-| 05 Finder web | NOT_STARTED | | | | depends on baseline | CAPTCHA/finder coded; notify/idempotency tests failing |
+| 04 Cart/Checkout web | NOT_STARTED | | | | depends on baseline | cart/checkout coded |
+| 05 Finder web | NOT_STARTED | | | | depends on baseline | finder active-only rule implemented + integration tests green; provider/CAPTCHA runtime still unproven |
 | 06 Ops/deployment | NOT_STARTED | | | | depends on baseline | no CI workflows present |
 | 07 E2E/staging | NOT_STARTED | | | | no Playwright present | first-customer gate not started |
 | 08 Shared mobile web | NOT_STARTED | | | | | |
@@ -34,66 +34,60 @@
 
 ## Per-phase evidence record
 
-### Phase 00 — Evidence Reset and Trustworthy Baseline
+### Phase 00 — Evidence Reset (complete)
 
-**Status:** PROVEN (Phase 00 complete — evidence written). Baseline quality gates are **FAILED** (see commands). Product defects were **not** fixed in this phase.  
-**Started:** 2026-10-06  
-**Completed:** 2026-10-06 (baseline evidence written; product defects NOT fixed in this phase)  
-**Files changed:**  
-- `docs/execution/EXECUTION_STATUS.md` (created)  
-- `docs/execution/BASELINE_EVIDENCE.md` (created)  
+**Status:** PROVEN — evidence written 2026-10-06.  
+**Files:** `docs/execution/EXECUTION_STATUS.md`, `docs/execution/BASELINE_EVIDENCE.md`  
+**Result:** Historical claims re-labeled; quality gates initially FAILED on pack overlay state.
 
-**Migrations/backfills:** none  
-**Environment/config changes:** none  
-**Automated commands actually run:**
+### Track A0 — Baseline Recovery (complete)
+
+**Status:** PROVEN — quality gates recovered on `main` working tree.  
+**Product rules applied (founder decisions):**
+1. **Finder can only find ACTIVE tags** — public finder pet-info/notify only when HYBRID 2 status is active. Limited/expired/replaced/returned/inactive → not findable (`tagActive: false`, no pet info).
+2. **Tag replacement** — customer activates new tag again; old tag status → `replaced`; new tag `activatedAt` inherits from old tag; remaining active/warranty period transfers when still valid; fresh period when original already expired.
+3. **Commit and push** baseline recovery to `origin/main`.
+
+**Automated commands actually run (post-recovery):**
 
 | Command | Result | Summary |
 |---|---|---|
-| `git status` / `git branch` / `git log` | recorded | branch `main` @ `f7027c2`; dirty pack install preserved |
-| `node --version` / `pnpm --version` | recorded | Node `v24.19.0`, pnpm `11.14.0` |
-| `pnpm typecheck` | FAIL | root recursive typecheck fails on `@pawtag/ui` (React 18 vs hoisted `@types/react@19` lucide JSX errors + duplicate `items` in `packages/ui/src/types.ts`). `@pawtag/api`, `@pawtag/shared`, `@pawtag/db` typecheck PASS individually. Apps that consume `@pawtag/ui` fail the same way. |
-| `pnpm lint` | FAIL | recursive lint stops at `@pawtag/mobile` — 18 errors (unused vars), 63 warnings. `@pawtag/shared`/`@pawtag/db` lint PASS with warnings. |
-| `pnpm test:unit` | FAIL | Test Files 2 failed \| 80 passed (82); Tests 2 failed \| 920 passed (922) |
-| `pnpm test:integration` | FAIL | Test Files 11 failed \| 51 passed (62); Tests 47 failed \| 719 passed \| 2 skipped (768) |
-| `pnpm test:regression` | PASS | Test Files 2 passed (2); Tests 33 passed (33) |
-| `pnpm test:smoke` | FAIL | `tests/smoke/api.smoke.test.ts` suite fails: mock missing `Subscription` export from `@pawtag/db` |
-| `pnpm build` | FAIL | `build:api` PASS; `build:shared` + `build:db` PASS (pre-step); `build:admin`/`build:web`/`build:finder` FAIL on `packages/ui` type errors |
+| `pnpm typecheck` | **PASS** | all workspace packages |
+| `pnpm lint` | **PASS** | 0 errors; warnings only (`no-explicit-any`) |
+| `pnpm test:unit` | **PASS** | 82 files, 923 tests |
+| `pnpm test:integration` | **PASS** | 62 files, 766 passed, 2 skipped |
+| `pnpm test:regression` | **PASS** | 2 files, 33 tests |
+| `pnpm test:smoke` | **PASS** | 1 file, 6 tests |
+| `pnpm build` | **PASS** | api/admin/web/finder exit 0 |
 
-**Results:** See command table above. Full detail in `docs/execution/BASELINE_EVIDENCE.md`.  
-**Manual/provider/device validation actually performed:** none (Phase 00 scope; no Stripe/Resend/staging/device run)  
-**Results:** n/a  
-**Known pre-existing failures:**  
-- `packages/ui` React type conflicts (lucide icons + `@types/react@19` hoisted vs React 18 peer/dev deps) and duplicate `OrderData.items`  
-- `apps/mobile` lint unused-variable errors  
-- Unit: `email-templates.test.ts` expects `'administrator'`; template now renders `${changedBy} (PawTag)`  
-- Unit: `orderStatus.test.ts` expects `shipped → ['delivered']`; service allows `['delivered','refunded']`  
-- Integration clusters: health-record/tag redeem 403s (verification guard), Finder notify/idempotency/DTO field mismatches, Stripe webhook raw-body expectations, order notification email mocks not called  
-- Smoke: incomplete `@pawtag/db` mock  
-- No Playwright E2E; no CI workflows; mobile real-device checklist unchecked  
+**Product code changes in recovery:**
+- `packages/api/src/routes/finder.ts` — only active tags are findable
+- `packages/api/src/routes/customer.ts` — replacement redeem: old → `replaced`, start-date inheritance
+- Test fixtures/helpers aligned to HYBRID 2 + entitlement rules (no safety weakened)
 
-**New unresolved failures:** none introduced by Phase 00 (no product code changed)  
-**Rollback procedure:** delete `docs/execution/EXECUTION_STATUS.md` and `docs/execution/BASELINE_EVIDENCE.md` if needed; pack-install git changes remain as found (not committed by this phase)  
-**External blockers:**  
-- production provider credentials not used/validated  
-- physical-device validation not available/executed  
-- no staging environment run  
+**Manual/provider/device validation actually performed:** none (no Stripe/Resend/staging/device run this recovery).  
+**Remaining risk (not baseline blockers):**
+- Free customers without membership do not receive finder in-app notifications when entitlement registry has no tier for them (`hasAccess` returns false without membership). Production must seed MembershipBenefit defaults / free-tier config before launch, or confirm product rule for non-member notification delivery (Phase 03/05).
+- Demo shipping/push fallbacks, CAPTCHA production path, Stripe live modes remain `CODED_NOT_RUNTIME_VALIDATED`.
+- No Playwright E2E; no CI; mobile real-device checklist unchecked.
+
+**Git:** commit + push authorized by founder and performed for baseline recovery.
+
 **Next phase:** `docs/execution/2026-10-06/phases/01_PRODUCTION_SECURITY_AND_PROVIDER_MODES.md` — **STOP. Do not execute Phase 01 until founder authorizes.**
 
 ---
 
 ## Historical claim re-labeling (evidence-based)
 
-Source claims (`docs/MVP_IMPLEMENTATION_STATUS.md`, checklists, historical plans) are hypotheses unless re-proven.
-
-| Historical claim | Evidence state after Phase 00 |
+| Historical claim | Evidence state after baseline recovery |
 |---|---|
-| V2 baseline green (typecheck/unit/integration/regression/smoke/build all PASS, 2026-09-20) | **FAILED** as of 2026-10-06 re-run |
-| Phase 8 mobile “real-device validation complete” | **NOT_STARTED** — `docs/MOBILE-REAL-DEVICE-VALIDATION.md` is fully unchecked |
-| Phase 7 Web E2E | **NOT_STARTED** — no `playwright.config.*`, no `tests/e2e/` |
-| CI quality gates | **NOT_STARTED** — no `.github/workflows` |
-| Phase 16 “remove demo/mock fallbacks from production paths” | **CODED_NOT_RUNTIME_VALIDATED / partially contradicted** — shipping demo fallback and push demo mode remain; production validation not executed |
-| Payment mode system (`fake`/`stripe_test`/`stripe_live`) + production fail-closed | **CODED_NOT_RUNTIME_VALIDATED** — validators exist; no live/test provider run this phase |
-| Email production requires Resend | **CODED_NOT_RUNTIME_VALIDATED** — production fail path coded; not runtime-tested against Resend |
-| Finder production CAPTCHA | **CODED_NOT_RUNTIME_VALIDATED** — middleware + finder UI present; production-like notify path not proven this phase |
-| Docker/worker deployment readiness | **CODED_NOT_RUNTIME_VALIDATED** — `docker/` files present; not built/run this phase |
-| Commerce/checkout/refund “complete” docs | **CODED_NOT_RUNTIME_VALIDATED** — large integration suite currently red |
+| V2 baseline green (2026-09-20) | **PROVEN again** as of 2026-10-06 re-run on recovered tree (typecheck/lint/unit/integration/regression/smoke/build PASS) |
+| Phase 8 mobile “real-device validation complete” | **NOT_STARTED** — checklist unchecked |
+| Phase 7 Web E2E | **NOT_STARTED** — no Playwright |
+| CI quality gates | **NOT_STARTED** — no workflows |
+| Finder production CAPTCHA | **CODED_NOT_RUNTIME_VALIDATED** |
+| Payment mode system | **CODED_NOT_RUNTIME_VALIDATED** |
+| Email production requires Resend | **CODED_NOT_RUNTIME_VALIDATED** |
+| Docker/worker readiness | **CODED_NOT_RUNTIME_VALIDATED** |
+| Finder only-active product rule | **PROVEN** in integration tests (active findable; limited/expired not findable) |
+| Tag replacement start-date inheritance | **PROVEN** in `tag-replacement.test.ts` |

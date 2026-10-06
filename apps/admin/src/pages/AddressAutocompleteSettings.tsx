@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { MapPin, Key, Globe, Info, Save, Loader2, CheckCircle, Shield } from 'lucide-react';
+import { MapPin, Globe, Info, Save, Loader2, CheckCircle, Shield } from 'lucide-react';
 import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
 import { toast } from '../lib/toast';

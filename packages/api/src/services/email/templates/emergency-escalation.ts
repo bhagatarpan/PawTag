@@ -1,4 +1,4 @@
-import { renderBase, renderCtaButton, renderDataTable } from './base';
+import { renderBase, renderCtaButton } from './base';
 
 interface EmergencyEscalationData {
   ownerName: string;

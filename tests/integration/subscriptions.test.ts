@@ -613,11 +613,27 @@ describe('Admin Subscription Routes', () => {
 
 describe('Finder Subscription Check', () => {
   describe('GET /api/finder/:tagId', () => {
-    it('should return pet data when subscription is active', async () => {
-      // Setup tag with active subscription
+    // Product rule: finders can only find tags that are currently active.
+    // Public finder responses do not expose internal subscriptionStatus.
+
+    it('should return pet data when tag is active (within active period)', async () => {
+      const now = new Date();
+      const activeEnd = new Date(now);
+      activeEnd.setMonth(activeEnd.getMonth() + 3);
+      const warrantyEnd = new Date(now);
+      warrantyEnd.setMonth(warrantyEnd.getMonth() + 12);
+
       await mongoose.connection.collections.tags.updateOne(
         { tagId: 'PT-SUB-001' },
-        { $set: { subscriptionStatus: 'active' } }
+        {
+          $set: {
+            status: 'active',
+            subscriptionStatus: 'active',
+            activatedAt: now,
+            activePeriodEndsAt: activeEnd,
+            warrantyEndsAt: warrantyEnd,
+          },
+        }
       );
 
       const res = await request(app)
@@ -625,27 +641,23 @@ describe('Finder Subscription Check', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
-      expect(res.body.data.subscriptionStatus).toBe('active');
-    });
-
-    it('should return pet data during grace period', async () => {
-      await mongoose.connection.collections.tags.updateOne(
-        { tagId: 'PT-SUB-001' },
-        { $set: { subscriptionStatus: 'grace_period' } }
-      );
-
-      const res = await request(app)
-        .get('/api/finder/PT-SUB-001');
-
-      expect(res.status).toBe(200);
-      expect(res.body.data.subscriptionStatus).toBe('grace_period');
       expect(res.body.data.pet).toBeDefined();
+      expect(res.body.data.tagActive).not.toBe(false);
     });
 
-    it('should return inactive message when subscription expired', async () => {
+    it('should not find grace-period tags without active coverage', async () => {
+      const past = new Date();
+      past.setMonth(past.getMonth() - 1);
+
       await mongoose.connection.collections.tags.updateOne(
         { tagId: 'PT-SUB-001' },
-        { $set: { subscriptionStatus: 'inactive' } }
+        {
+          $set: {
+            status: 'limited',
+            subscriptionStatus: 'grace_period',
+            activePeriodEndsAt: past,
+          },
+        }
       );
 
       const res = await request(app)
@@ -657,10 +669,51 @@ describe('Finder Subscription Check', () => {
       expect(res.body.data.message).toContain('no longer active');
     });
 
-    it('should work when subscription status is none', async () => {
+    it('should return inactive message when subscription expired', async () => {
+      const past = new Date();
+      past.setMonth(past.getMonth() - 2);
+      const warrantyFuture = new Date();
+      warrantyFuture.setMonth(warrantyFuture.getMonth() + 6);
+
       await mongoose.connection.collections.tags.updateOne(
         { tagId: 'PT-SUB-001' },
-        { $set: { subscriptionStatus: 'none' } }
+        {
+          $set: {
+            status: 'limited',
+            subscriptionStatus: 'inactive',
+            activePeriodEndsAt: past,
+            warrantyEndsAt: warrantyFuture,
+          },
+        }
+      );
+
+      const res = await request(app)
+        .get('/api/finder/PT-SUB-001');
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.tagActive).toBe(false);
+      expect(res.body.data.petInfo).toBeNull();
+      expect(res.body.data.message).toContain('no longer active');
+    });
+
+    it('should work when subscription status is none and tag is within active period', async () => {
+      const now = new Date();
+      const activeEnd = new Date(now);
+      activeEnd.setMonth(activeEnd.getMonth() + 3);
+      const warrantyEnd = new Date(now);
+      warrantyEnd.setMonth(warrantyEnd.getMonth() + 12);
+
+      await mongoose.connection.collections.tags.updateOne(
+        { tagId: 'PT-SUB-001' },
+        {
+          $set: {
+            status: 'active',
+            subscriptionStatus: 'none',
+            activatedAt: now,
+            activePeriodEndsAt: activeEnd,
+            warrantyEndsAt: warrantyEnd,
+          },
+        }
       );
 
       const res = await request(app)

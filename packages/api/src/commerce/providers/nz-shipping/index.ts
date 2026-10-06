@@ -259,7 +259,7 @@ export class NzShippingProvider implements IShippingProvider {
         0,
       );
 
-      const totalQuantity = params.items.reduce((sum, item) => sum + item.quantity, 0);
+      const _totalQuantity = params.items.reduce((sum, item) => sum + item.quantity, 0);
 
       // NZ Post Shipment API request
       const shipmentRequest = {

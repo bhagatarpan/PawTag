@@ -139,7 +139,7 @@ export async function createCustomerWithRBAC(overrides: Partial<{ email: string;
   // Create permissions needed for customer routes
   const permNames = [
     'pet.read', 'pet.create', 'pet.update', 'pet.delete',
-    'tag.read',
+    'tag.read', 'tag.create', 'tag.update',
     'order.read', 'order.create',
     'notification.read', 'notification.update',
     'customer.read',
@@ -187,6 +187,8 @@ export async function createCustomerWithRBAC(overrides: Partial<{ email: string;
     { expiresIn: '1h' }
   );
 
+  await seedMembershipEntitlements(userId);
+
   return { userId, token, email };
 }
 
@@ -211,16 +213,116 @@ export async function createPet(ownerId: string, overrides: Record<string, any> 
 }
 
 export async function createTag(ownerId: string, petId: string, overrides: Record<string, any> = {}) {
+  const status = overrides.status || 'active';
+  const now = new Date();
+
+  // HYBRID 2 period dates — active/limited tags need real active/warranty windows
+  // so calculateTagStatus (and finder access) behaves like production.
+  const defaultActiveEnd = new Date(now);
+  defaultActiveEnd.setMonth(defaultActiveEnd.getMonth() + 3);
+  const defaultWarrantyEnd = new Date(now);
+  defaultWarrantyEnd.setMonth(defaultWarrantyEnd.getMonth() + 12);
+
+  const activePeriodEndsAt = overrides.activePeriodEndsAt
+    ?? (status === 'active' || status === 'limited' ? defaultActiveEnd : undefined);
+  const warrantyEndsAt = overrides.warrantyEndsAt ?? defaultWarrantyEnd;
+
   const tag = await mongoose.connection.collections.tags.insertOne({
     tagId: overrides.tagId || 'TAG-TEST-001',
     petId: new mongoose.Types.ObjectId(petId),
     ownerId: new mongoose.Types.ObjectId(ownerId),
-    status: overrides.status || 'active',
+    status,
     tagType: 'qr',
+    subscriptionStatus: overrides.subscriptionStatus || 'none',
+    activatedAt: status === 'active' || status === 'limited' ? (overrides.activatedAt || now) : overrides.activatedAt,
+    activePeriodEndsAt,
+    warrantyEndsAt,
+    replacesTagId: overrides.replacesTagId ? new mongoose.Types.ObjectId(overrides.replacesTagId) : undefined,
     deletedAt: null,
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    createdAt: now,
+    updatedAt: now,
   });
 
   return tag.insertedId.toString();
+}
+
+/**
+ * Seed membership entitlement registry rows so entitlement-gated customer routes
+ * (e.g. pet health records, finder in-app notifications) can be exercised.
+ * Does not weaken production entitlement checks.
+ */
+export async function seedMembershipEntitlements(
+  userId: string,
+  options: { tier?: string; benefits?: Array<{ key: string; defaultValue?: boolean; value?: boolean }> } = {},
+) {
+  const tier = options.tier || 'platinum';
+  const benefits = options.benefits || [
+    { key: 'pet_health_records', defaultValue: true, value: true },
+    { key: 'in_app_notifications', defaultValue: true, value: true },
+    { key: 'email_notifications', defaultValue: true, value: true },
+    { key: 'medical_alerts', defaultValue: true, value: true },
+  ];
+
+  let tierDoc = await mongoose.connection.collections.membershiptiers.findOne({ tier });
+  if (!tierDoc) {
+    const inserted = await mongoose.connection.collections.membershiptiers.insertOne({
+      tier,
+      displayName: tier.charAt(0).toUpperCase() + tier.slice(1),
+      price: 19.99,
+      tagLimit: 10,
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    tierDoc = await mongoose.connection.collections.membershiptiers.findOne({ _id: inserted.insertedId });
+  }
+
+  for (const b of benefits) {
+    const existing = await mongoose.connection.collections.membershipbenefits.findOne({ key: b.key });
+    if (!existing) {
+      await mongoose.connection.collections.membershipbenefits.insertOne({
+        key: b.key,
+        displayName: b.key,
+        enabled: true,
+        defaultValue: b.defaultValue ?? true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+    }
+    await mongoose.connection.collections.membershiptierbenefits.updateOne(
+      { tier, benefitKey: b.key },
+      {
+        $set: {
+          tier,
+          benefitKey: b.key,
+          enabled: b.value ?? true,
+          value: b.value ?? true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      },
+      { upsert: true },
+    );
+  }
+
+  await mongoose.connection.collections.usermemberships.updateOne(
+    { userId: new mongoose.Types.ObjectId(userId) },
+    {
+      $set: {
+        userId: new mongoose.Types.ObjectId(userId),
+        tierId: tierDoc!._id,
+        status: 'active',
+        autoRenew: true,
+        currentPeriodStart: new Date(),
+        currentPeriodEnd: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    },
+    { upsert: true },
+  );
+
+  // Module-level entitlement cache would otherwise hide freshly seeded registry rows.
+  const { membershipEntitlementService } = await import('../../packages/api/src/services/membership-entitlement.service');
+  membershipEntitlementService.invalidateCache();
 }

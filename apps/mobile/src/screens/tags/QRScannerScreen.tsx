@@ -2,8 +2,7 @@ import React, { useState, useRef, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, typography, spacing, borderRadius, shadows } from '../../theme/tokens';
-import api from '../../api/client';
+import { colors, typography, spacing, borderRadius } from '../../theme/tokens';
 import { hapticSuccess } from '../../lib/haptics';
 
 interface QRScannerScreenProps {

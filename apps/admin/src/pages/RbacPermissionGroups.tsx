@@ -4,8 +4,14 @@ import api from '../lib/api';
 import { toast } from '../lib/toast';
 import { ConfirmDialog, IconPicker, ICON_MAP } from '@pawtag/ui';
 import {
-  Plus, X, Save, Trash2, Search, Shield, Loader2,
-  ChevronDown, ChevronUp, LayoutGrid, Package,
+  Plus,
+  X,
+  Save,
+  Trash2,
+  Search,
+  Loader2,
+  LayoutGrid,
+  Package,
 } from 'lucide-react';
 
 /* ------------------------------------------------------------------ */
@@ -50,7 +56,7 @@ export default function RbacPermissionGroups() {
   const [form, setForm] = useState({ name: '', displayName: '', description: '', icon: '', sortOrder: 0 });
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState<string | null>(null);
+  const [deleting, _setDeleting] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<{
     open: boolean;
     title: string;

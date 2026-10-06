@@ -31,7 +31,7 @@
  */
 
 import Stripe from 'stripe';
-import { resolvePaymentMode, isFakePaymentIntentId } from '../../payment-mode';
+import { resolvePaymentMode } from '../../payment-mode';
 import type {
   IPaymentProvider,
   PaymentIntent,
@@ -40,7 +40,7 @@ import type {
   PaymentWebhookEvent,
 } from '../../interfaces/payment-provider';
 import { PaymentFailedError, PaymentSignatureError } from '../../errors';
-import { getSetting, getBooleanSetting } from '../../config';
+import { getSetting } from '../../config';
 import { getStripeClient } from '../../../lib/stripe-client';
 import logger from '../../../lib/logger';
 

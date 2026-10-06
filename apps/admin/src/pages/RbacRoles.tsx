@@ -4,8 +4,21 @@ import api from '../lib/api';
 import { toast } from '../lib/toast';
 import { ConfirmDialog } from '@pawtag/ui';
 import {
-  Shield, Plus, X, Save, Copy, Trash2, Check, ChevronDown, ChevronRight,
-  Search, Loader2, Users, Crown, Settings, Key, Eye, EyeOff, Pencil,
+  Shield,
+  Plus,
+  X,
+  Save,
+  Copy,
+  Trash2,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  Search,
+  Loader2,
+  Crown,
+  Key,
+  Eye,
+  Pencil,
 } from 'lucide-react';
 
 /* ------------------------------------------------------------------ */
@@ -83,7 +96,7 @@ export default function RbacRoles() {
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
   const [cloning, setCloning] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState<string | null>(null);
+  const [deleting, _setDeleting] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<{
     open: boolean;
     title: string;

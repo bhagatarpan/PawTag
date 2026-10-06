@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Users, Search, Filter } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { API } from '@pawtag/shared/api';
 import { formatDate } from '@pawtag/shared';
 import { TIER_ICONS } from '@pawtag/ui';

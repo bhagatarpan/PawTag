@@ -7,7 +7,7 @@ export default function TagExpiryNotifications() {
   const [data, setData] = useState<any>({ items: [], total: 0 });
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(1);
+  const [page, _setPage] = useState(1);
   const [showAcknowledged, setShowAcknowledged] = useState(false);
 
   const fetchData = () => {

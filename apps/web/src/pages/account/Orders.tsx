@@ -273,16 +273,16 @@ export default function Orders() {
                     <OrderStatusBanner
                       status={order.status}
                       amount={order.payment?.amount}
-                      refundStatus={(order as any).refundStatus}
-                      refundAmount={(order as any).refundAmount}
+                      refundStatus={order.refundStatus}
+                      refundAmount={order.refundAmount}
                       destinationLabel={formatRefundDestinationShort(order.payment?.cardBrand, order.payment?.cardLast4) || undefined}
                     />
                   ) : (
                     <OrderProgressStepper
                       status={order.status}
                       variant="compact"
-                      refundStatus={(order as any).refundStatus}
-                      refundAmount={(order as any).refundAmount}
+                      refundStatus={order.refundStatus}
+                      refundAmount={order.refundAmount}
                     />
                   )}
                   {(order.status === 'cancelled' || order.status === 'refunded' || order.refundStatus) && order.refundStatus && (
@@ -293,9 +293,9 @@ export default function Orders() {
                           || 'Refund to original payment method'}
                     </p>
                   )}
-                  {getOrderRefundDisplay(order as any) === 'partial' && (
+                  {getOrderRefundDisplay(order) === 'partial' && (
                     <p className="mt-1.5 text-xs text-amber-700 font-medium">
-                      Partially refunded{(order as any).refundAmount != null ? ` · $${Number((order as any).refundAmount).toFixed(2)}` : ''}
+                      Partially refunded{order.refundAmount != null ? ` · $${Number(order.refundAmount).toFixed(2)}` : ''}
                     </p>
                   )}
                 </div>

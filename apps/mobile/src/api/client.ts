@@ -1,4 +1,4 @@
-import { createApiClient, API } from '@pawtag/shared/api';
+import { createApiClient } from '@pawtag/shared/api';
 import { getAccessToken, getRefreshToken, setTokens, clearTokens } from '../lib/tokenStorage';
 import { Platform } from 'react-native';
 

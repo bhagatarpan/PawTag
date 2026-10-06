@@ -15,8 +15,20 @@
 import { useEffect, useState, useCallback } from 'react';
 import { API } from '@pawtag/shared/api';
 import {
-  Search, Loader2, ClipboardCheck, Clock, Package, CheckCircle, Filter,
-  Eye, X, Copy, ExternalLink, Tag, Nfc, AlertTriangle, Check,
+  Search,
+  Loader2,
+  ClipboardCheck,
+  Clock,
+  Package,
+  CheckCircle,
+  Filter,
+  Eye,
+  X,
+  Copy,
+  Tag,
+  Nfc,
+  AlertTriangle,
+  Check,
 } from 'lucide-react';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
@@ -145,7 +157,7 @@ function FulfilmentDetailDrawer({
   const allAssigned = fulfilment.items.every((item) =>
     fulfilment.tagAssignments.some((ta) => ta.orderItemId === item.orderItemId)
   );
-  const allNfcWritten = fulfilment.tagAssignments.length > 0 &&
+  const _allNfcWritten = fulfilment.tagAssignments.length > 0 &&
     fulfilment.tagAssignments.every((ta) => ta.nfcWritten);
 
   return (

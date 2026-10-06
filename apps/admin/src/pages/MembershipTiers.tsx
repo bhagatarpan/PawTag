@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Edit, Save, X, ExternalLink } from 'lucide-react';
+import { Edit, X, ExternalLink } from 'lucide-react';
 import { API } from '@pawtag/shared/api';
 import { formatCurrency } from '@pawtag/shared';
 import { TIER_ICONS, resolveTierGradient } from '@pawtag/ui';

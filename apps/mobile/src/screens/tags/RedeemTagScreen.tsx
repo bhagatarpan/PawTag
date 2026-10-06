@@ -6,11 +6,10 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  Alert,
   ScrollView,
 } from 'react-native';
 import api from '../../api/client';
-import { colors, typography, spacing, borderRadius, shadows } from '../../theme/tokens';
+import { colors, typography, spacing, borderRadius } from '../../theme/tokens';
 
 interface RedeemTagScreenProps {
   navigation: any;

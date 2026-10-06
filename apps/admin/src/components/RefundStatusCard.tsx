@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { API } from '@pawtag/shared/api';
-import { RefreshCw, CheckCircle, XCircle, Clock, AlertTriangle, Copy, ExternalLink } from 'lucide-react';
+import { RefreshCw, CheckCircle, XCircle, Clock, AlertTriangle, Copy } from 'lucide-react';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
 
@@ -69,7 +69,7 @@ const STATUS_CONFIG: Record<NonNullable<RefundStatus>, { label: string; icon: an
 
 export default function RefundStatusCard({
   orderId,
-  orderNumber,
+  orderNumber: _orderNumber,
   details,
   onSynced,
   showActions = true,

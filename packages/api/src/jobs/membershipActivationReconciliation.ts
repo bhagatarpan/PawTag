@@ -1,4 +1,4 @@
-import { UserMembership, MembershipTier } from '@pawtag/db';
+import { UserMembership } from '@pawtag/db';
 import { activateMembership } from '../services/membership.service';
 import { membershipEntitlementService } from '../services/membership-entitlement.service';
 import logger from '../lib/logger';
@@ -28,7 +28,7 @@ export async function runMembershipActivationReconciliation(): Promise<import('.
     logger.info({ count: stuckMemberships.length }, '[Membership Reconciliation] Found stuck pending_payment memberships');
 
     let activated = 0;
-    let cancelled = 0;
+    let _cancelled = 0;
     let failed = 0;
 
     for (const membership of stuckMemberships) {

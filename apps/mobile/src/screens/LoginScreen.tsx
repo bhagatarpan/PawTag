@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -66,7 +66,7 @@ export function LoginScreen({ navigation }: LoginScreenProps) {
         tempToken: mfaTempToken,
         otp: mfaOtp,
       });
-      const { token, refreshToken, user } = res.data.data;
+      const { token, refreshToken } = res.data.data;
       const { setTokens } = await import('../lib/tokenStorage');
       await setTokens(token, refreshToken);
       // User will be set by the auth context on next refresh

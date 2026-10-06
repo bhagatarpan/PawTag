@@ -10,7 +10,6 @@ import {
   STRIPE_CURRENCY_NZD,
   isCancellingMembership,
   requiresPaymentForKeep,
-  type KeepMembershipOutcome,
   type KeepMembershipResponseData,
   type MembershipTierChangeCode,
   type RepairUpgradeResponseData,
@@ -30,7 +29,6 @@ import {
   setStripeClientForTests,
 } from '../lib/stripe-client';
 import {
-  classifyStripeSubscriptionFailure,
   firstSubscriptionItemId,
   isInvalidStripeSubscriptionId,
   logStripeSubscriptionFailure,
@@ -126,7 +124,7 @@ let settingsCache: Record<string, string> = {};
 let settingsCacheTimestamp = 0;
 const SETTINGS_CACHE_TTL = 60 * 1000;
 
-async function loadSettings(): Promise<Record<string, string>> {
+async function _loadSettings(): Promise<Record<string, string>> {
   const now = Date.now();
   if (now - settingsCacheTimestamp < SETTINGS_CACHE_TTL && Object.keys(settingsCache).length > 0) {
     return settingsCache;
@@ -1095,7 +1093,7 @@ export async function keepMyMembership(userId: string): Promise<KeepMembershipRe
     );
   }
 
-  const benefitsEnded =
+  const _benefitsEnded =
     !membership.currentPeriodEnd || membership.currentPeriodEnd.getTime() <= now.getTime();
   const { requiresPayment } = requiresPaymentForKeep(membership, now);
   const cancelling = isCancellingMembership(membership);
@@ -2149,7 +2147,7 @@ export async function completeRepairUpgrade(membership: any) {
     logger.error({ err, membershipId: membership._id }, '[Membership] Repair upgrade: tag re-eval failed');
   }
 
-  let invoice: any = null;
+  let _invoice: any = null;
   if (membership.stripeSubscriptionId && !isFakeMode()) {
     try {
       const stripe = getStripeClient();
@@ -2158,7 +2156,7 @@ export async function completeRepairUpgrade(membership: any) {
       });
       const latestInvoice = stripeSub.latest_invoice as any;
       if (latestInvoice?.id && latestInvoice.amount_due) {
-        invoice = await createMembershipInvoice({
+        _invoice = await createMembershipInvoice({
           userId: membership.userId,
           membershipId: membership._id,
           stripeSubscriptionId: membership.stripeSubscriptionId,
@@ -2861,7 +2859,7 @@ export async function processScheduledDowngrades() {
       }
 
       // Renewal succeeded — execute the downgrade
-      const previousTierId = membership.tierId;
+      const _previousTierId = membership.tierId;
       const previousPrice = membership.price;
 
       membership.tierId = newTier._id;

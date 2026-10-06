@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { AuthRequest, authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
-import { UserMembership, MembershipTier, User, Tag } from '@pawtag/db';
+import { UserMembership, MembershipTier, Tag } from '@pawtag/db';
 import { extendMembership, changeTier, cancelMembership } from '../services/membership.service';
 import { auditService } from '../services/audit';
 import { Setting } from '@pawtag/db';
@@ -114,7 +114,7 @@ router.put('/tiers/:tierId', requirePermission('setting.update'), async (req: Au
  */
 router.get('/subscribers', requirePermission('subscription.read'), async (req: AuthRequest, res: Response) => {
   try {
-    const { tier, status, search, page = 1, limit = 50 } = req.query;
+    const { tier, status, _search, page = 1, limit = 50 } = req.query;
     
     const filter: any = {};
     if (tier) filter['tierId'] = tier;

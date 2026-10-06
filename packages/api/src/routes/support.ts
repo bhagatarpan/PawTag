@@ -3,12 +3,12 @@ import { z } from 'zod';
 import rateLimit from 'express-rate-limit';
 import mongoose from 'mongoose';
 import { SupportRequest } from '@pawtag/db';
-import { sendMail } from '../services/email.service';
+
 import { renderSupportRequestAlertEmail } from '../services/email/templates';
 import { AuthRequest, authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
 import { auditService, type AuditContext } from '../services/audit';
-import { createAuditContextFromRequest, type AuditRequest } from '../middleware/audit';
+import { type AuditRequest } from '../middleware/audit';
 
 async function auditSupportEvent(
   req: AuditRequest,
@@ -132,7 +132,7 @@ adminRouter.patch('/:id/resolve', authenticate, requirePermission('admin.update'
     });
 
     res.json({ success: true, data: request });
-  } catch (error) {
+  } catch (_error) {
     await auditSupportEvent(req, {
       action: 'support_request_resolve',
       eventType: 'support_request.resolved',
@@ -177,7 +177,7 @@ adminRouter.patch('/:id/reopen', authenticate, requirePermission('admin.update')
     });
 
     res.json({ success: true, data: request });
-  } catch (error) {
+  } catch (_error) {
     await auditSupportEvent(req, {
       action: 'support_request_reopen',
       eventType: 'support_request.reopened',
@@ -233,7 +233,7 @@ adminRouter.put('/:id', authenticate, requirePermission('admin.update'), async (
     });
 
     res.json({ success: true, data: request });
-  } catch (error) {
+  } catch (_error) {
     await auditSupportEvent(req, {
       action: 'support_request_update',
       eventType: 'support_request.updated',
@@ -273,7 +273,7 @@ adminRouter.delete('/:id', authenticate, requirePermission('admin.update'), asyn
     });
 
     res.json({ success: true, data: { message: 'Support request deleted' } });
-  } catch (error) {
+  } catch (_error) {
     await auditSupportEvent(req, {
       action: 'support_request_delete',
       eventType: 'support_request.deleted',

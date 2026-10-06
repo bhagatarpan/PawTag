@@ -17,8 +17,6 @@ import { requirePermission } from '../middleware/permission';
 import { shipmentService } from '../commerce/services/shipment.service';
 import { generateShippingLabelHtml } from '../services/shipping-label.service';
 import { toAppError } from '../lib/app-errors';
-import logger from '../lib/logger';
-
 const router = Router();
 router.use(authenticate);
 

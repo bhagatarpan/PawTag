@@ -1,307 +1,110 @@
-# Phase 00 Baseline Evidence
+# Baseline Recovery Evidence
 
 **Executed:** 2026-10-06  
-**Packet:** `docs/execution/2026-10-06/phases/00_EVIDENCE_RESET_AND_BASELINE.md`  
-**Rule:** counts below come from commands actually run in this environment, not from historical docs.
+**Context:** Phase 00 evidence reset recorded a red baseline. Track A0 recovered quality gates on the current `main` working tree using founder product rules.  
+**Rule:** counts below come from commands actually run in this environment.
 
 ---
 
-## 1. Repository state
+## 1. Repository state at recovery
 
 | Item | Value |
 |---|---|
 | Branch | `main` |
-| HEAD | `f7027c2` — `PawTag_Autonomous_Execution_Pack_2026-10-06` |
-| Upstream | branch reports up to date with `origin/main` (not pulled/fetched by agent) |
-| Working tree | **Dirty** — pack overlay installed, not committed |
-
-### Dirty / untracked state (preserved)
-
-Unstaged modifications:
-- `AGENTS.md`
-- `docs/PawTag_Autonomous_Execution_Pack_2026-10-06.zip` (deleted)
-- multiple `skills/*/SKILL.md` and one `skills/mobile-native/agents/openai.yaml`
-
-Untracked:
-- `docs/execution/` (execution pack + Phase 00 evidence)
-- `skills/donation-domain/`
-- `skills/dynamodb-migration/`
-- `skills/financial-document-integrity/`
-- `skills/web-first-mobile-shell/`
-
-**Git actions performed by Phase 00:** read-only (`status`, `branch`, `log`, `rev-parse`).  
-**Git actions not performed:** pull, fetch, reset, stash, clean, commit, push, branch switch.
-
-### Recent commits (context)
-
-```
-f7027c2 PawTag_Autonomous_Execution_Pack_2026-10-06
-330d709 Merge branch 'feature/payment-methods-visibility' into main
-006a865 fix(payments): visible saved cards without membership + honest save banner
-0d4339c fix(web): correct api import path in SaveCardBanner
-ee224f8 fix(web): correct api import path in SetupPaymentMethodForm
-```
+| Starting HEAD | `85925e1` (pack docs + Phase 00 evidence) |
+| Upstream | `origin/main` (https://github.com/bhagatarpan/PawTag.git) |
+| Working tree before recovery | Dirty — 153 modified files (uncommitted prior recovery + lint/type/test fixture work) |
+| Node / pnpm | `v24.19.0` / `11.14.0` |
 
 ---
 
-## 2. Environment assumptions
+## 2. Product rules applied (founder decisions)
 
-| Item | Observed |
-|---|---|
-| OS shell | Windows + bash tool |
-| Node | `v24.19.0` |
-| pnpm | `11.14.0` |
-| engines | `node >=22` |
-| packageManager | `pnpm@11.14.0` |
-| node_modules | present (install not required for baseline run) |
-| Workspace packages | all version `0.1.0` |
-
-### Workspace packages inspected
-
-| Path | Name |
-|---|---|
-| root | `pawtag` |
-| `apps/web` | `@pawtag/web` |
-| `apps/admin` | `@pawtag/admin` |
-| `apps/finder` | `@pawtag/finder` |
-| `apps/mobile` | `@pawtag/mobile` |
-| `packages/api` | `@pawtag/api` |
-| `packages/db` | `@pawtag/db` |
-| `packages/shared` | `@pawtag/shared` |
-| `packages/ui` | `@pawtag/ui` |
-| `packages/design-tokens` | `@pawtag/design-tokens` |
-
-### Tooling present
-
-- Root scripts: `typecheck`, `lint`, `test`, `test:unit`, `test:integration`, `test:regression`, `test:smoke`, `test:all`, `build` (+ per-package builds)
-- Vitest root config: `vitest.config.ts`
-- API env example: `packages/api/.env.example`
-- API `.env` present on disk (not read for secrets; not printed)
-- Docker: `docker/docker-compose.yml`, `Dockerfile.api`, `Dockerfile.web`, `nginx.conf`
-- OpenCode config: `opencode.json` → `AGENTS.md` + `skills/`
-- Execution pack installed under `docs/execution/2026-10-06/`
-
-### Missing / not found
-
-| Item | Finding |
-|---|---|
-| Playwright config | **not present** |
-| Browser E2E suite (`tests/e2e/`) | **not present** |
-| CI workflows (`.github/workflows/`) | **not present** |
-| Root-level `EXECUTION_STATUS.md` before Phase 00 | **not present** (created this phase) |
+1. **Finder can only find active tags.** Public finder responses expose pet data only when HYBRID 2 calculated status is `active` and finder is enabled. Limited, expired, replaced, returned, inactive, deleted → `tagActive: false`, `petInfo: null`, message “This PawTag is no longer active.”
+2. **Tag replacement:** customer activates the new tag again; old tag status becomes `replaced`; new tag start date (`activatedAt`) inherits from the old tag; remaining active/warranty period transfers when still valid; fresh period when the original already expired.
+3. **Commit and push** the recovered baseline.
 
 ---
 
-## 3. Baseline commands — executed results
+## 3. Quality gates — final results (post-recovery)
 
-### 3.1 `pnpm typecheck` — FAIL
-
-Command: `pnpm typecheck`  
-Script expands to: `pnpm run build:shared && pnpm run build:db && pnpm -r typecheck`
-
-Observed:
-- Shared/db builds proceed as pre-step for typecheck script.
-- Recursive typecheck fails at `@pawtag/ui`.
-- Follow-on apps that compile `packages/ui` sources fail with the same root cause.
-
-Primary defect classes in `packages/ui`:
-1. **React type mismatch:** lucide-react icons fail as JSX components because TypeScript resolves `@types/react@19.1.17` (`ReactNode` includes `bigint` incompatibility path) while package declares React 18 peer/dev types. Both `@types+react@18.3.31` and `@types+react@19.1.17` exist under `node_modules/.pnpm`.
-2. **Duplicate property:** `packages/ui/src/types.ts` `OrderData` declares `items` twice (lines ~249 and ~279) with incompatible types.
-
-Per-package re-checks (individual commands):
-
-| Package | typecheck |
-|---|---|
-| `@pawtag/api` | **PASS** |
-| `@pawtag/shared` | **PASS** |
-| `@pawtag/db` | **PASS** |
-| `@pawtag/ui` | **FAIL** |
-| `@pawtag/admin` | **FAIL** (same ui type errors) |
-| `@pawtag/web` | **FAIL** (same ui type errors) |
-| `@pawtag/finder` | **FAIL** (same ui type errors) |
-
-**Phase 00 treatment:** recorded as pre-existing product/tooling defect. Not fixed (would be unrelated product/type repair outside baseline documentation scope).
-
-### 3.2 `pnpm lint` — FAIL
-
-Command: `pnpm lint` (`pnpm -r lint`)
-
-Observed:
-- `@pawtag/shared` — PASS with warnings (11 `no-explicit-any`)
-- `@pawtag/db` — PASS with warnings (3 `no-explicit-any`)
-- `@pawtag/mobile` — **FAIL**: 81 problems (18 errors, 63 warnings); errors are unused vars (`API`, `useRef`, `user`, `Alert`, `useEffect`, `shadows`, `navigation`, `showAdd`/`setShowAdd`, `getMainPhoto`, `api`, etc.)
-- Recursive run stops at first failure (`apps/mobile`), so remaining packages were not fully re-run by root command in this baseline.
-
-### 3.3 `pnpm test:unit` — FAIL
-
-```
-Test Files  2 failed | 80 passed (82)
-Tests       2 failed | 920 passed (922)
-Duration    87.22s
-```
-
-Failed tests (pre-existing):
-
-| Test | Expected vs actual |
-|---|---|
-| `tests/unit/email-templates.test.ts` > Password Changed > includes admin ID when changed by admin | expects HTML to contain `'administrator'`; actual template `packages/api/src/services/email/templates/password-changed.ts` renders `${changedBy} (PawTag)` |
-| `tests/unit/orderStatus.test.ts` > getValidTransitions > returns correct transitions for shipped | test expects `['delivered']`; production service `packages/api/src/services/orderStatus.service.ts` allows `shipped: ['delivered','refunded']` |
-
-**Note:** These look like stale tests vs intentional/current code (or incomplete test updates). Phase 00 does **not** decide which side is product-correct; later phases must decide and either fix code or update tests with product justification.
-
-### 3.4 `pnpm test:integration` — FAIL
-
-```
-Test Files  11 failed | 51 passed (62)
-Tests       47 failed | 719 passed | 2 skipped (768)
-Duration    92.97s
-```
-
-Failing suites (11):
-
-| Suite | Failed tests | Failure pattern |
+| Command | Result | Counts |
 |---|---|---|
-| `mobile-features.test.ts` | 17 | many 403 vs expected 201/200/404/409; finder notify DB writes null |
-| `customer-full.test.ts` | 7 | health records + tag redeem 403 |
-| `finder-idempotency.test.ts` | 4 | duplicate notify contract fields/notification counts |
-| `tag-redemption.test.ts` | 4 | redeem 403; error message wording; auto-tag creation 400 |
-| `finder-full.test.ts` | 3 | `tagActive` undefined; notify notifications length 0 |
-| `order-notifications.test.ts` | 3 | `sendMail` mock not called |
-| `stripe-webhook-raw-body.test.ts` | 3 | webhook body/`received`/status expectations |
-| `subscriptions.test.ts` | 3 | finder subscriptionStatus/tagActive fields undefined |
-| `finder-dto-privacy.test.ts` | 1 | `medicalAlerts` undefined |
-| `finder.test.ts` | 1 (2 skipped) | notify creates notification for owner |
-| `tag-replacement.test.ts` | 1 | replacement transfer redeem 403 |
+| `pnpm typecheck` | **PASS** | all workspace packages |
+| `pnpm lint` | **PASS** | 0 errors; warnings only |
+| `pnpm test:unit` | **PASS** | 82 files / 923 tests |
+| `pnpm test:integration` | **PASS** | 62 files / 766 passed / 2 skipped |
+| `pnpm test:regression` | **PASS** | 2 files / 33 tests |
+| `pnpm test:smoke` | **PASS** | 1 file / 6 tests |
+| `pnpm build` | **PASS** | api, admin, web, finder exit 0 |
 
-Important observation for later phases:
-- Many 403s align with recent auth work (`requireVerifiedChannels` / `verificationGuard` returning `REQUIRES_VERIFICATION` / 403). Recent commits explicitly added “require verified email+phone before complete”. Integration fixtures may not set `emailVerified`/`phoneVerified` the same way current production rules require. This is a **contract/fixture/authorization alignment** issue for later phases — **do not weaken verification** to green tests.
-- Finder notify/idempotency failures are launch-critical; treat as Phase 05/02 evidence debt.
-- Stripe webhook raw-body failures are financially critical; treat as Phase 01/02 evidence debt.
+### Pre-recovery (Phase 00 snapshot, for contrast)
 
-Integration logs also showed validateEnv warnings under test runs (missing Firebase/Resend/PAYMENT_MODE etc.). That is expected for unit/integration isolation but confirms provider runtime proof is absent.
-
-### 3.5 `pnpm test:regression` — PASS
-
-```
-Test Files  2 passed (2)
-Tests       33 passed (33)
-Duration    3.33s
-```
-
-Suites: `tests/regression/auth.regression.test.ts`, `tests/regression/security.regression.test.ts`.
-
-### 3.6 `pnpm test:smoke` — FAIL
-
-```
-FAIL tests/smoke/api.smoke.test.ts
-Error: [vitest] No "Subscription" export is defined on the "@pawtag/db" mock.
-  packages/api/src/routes/admin-test-data-reset.ts imports Subscription from @pawtag/db
-Test Files  1 failed | no tests executed
-```
-
-### 3.7 `pnpm build` — FAIL
-
-Script: `build:shared && build:db && concurrently(api, admin, web, finder)`
-
-| Step | Result |
-|---|---|
-| `build:shared` | PASS (pre-step) |
-| `build:db` | PASS (pre-step) |
-| `build:api` | **PASS** (exit 0) |
-| `build:admin` | **FAIL** (exit 1) — packages/ui type errors |
-| `build:web` | **FAIL** (exit 1) — packages/ui type errors |
-| `build:finder` | **FAIL** (exit 1) — packages/ui type errors |
+| Gate | Phase 00 | After Track A0 |
+|---|---|---|
+| typecheck | FAIL | PASS |
+| lint | FAIL | PASS |
+| unit | FAIL (2) | PASS |
+| integration | FAIL (47 / 11 suites) | PASS (0 failed) |
+| regression | PASS | PASS |
+| smoke | FAIL | PASS |
+| build | FAIL | PASS |
 
 ---
 
-## 4. Evidence inventories
+## 4. Remaining 6 integration failures — triage outcome
 
-### 4.1 Browser E2E / Playwright
+| Suite | Failure | Resolution |
+|---|---|---|
+| `finder.test.ts` notify creates notification | 0 owner notifications | **Fixture:** seed membership entitlements (production respects registry; tests must configure entitled owners). Not a weakened control. |
+| `subscriptions.test.ts` ×3 | Finder DTO missing `subscriptionStatus` / grace/expired still “found” | **Product rule:** only active tags findable; public DTO does not expose internal `subscriptionStatus`. Tests updated to real public contract + HYBRID 2 dates. |
+| `finder-full.test.ts` expired subscription | `tagActive` undefined | Same as above — limited/expired not findable. |
+| `tag-replacement.test.ts` | Expected old tag `inactive` | **Product rule:** old tag → `replaced`. Test updated; start-date inheritance asserted. |
 
-| Check | Result |
-|---|---|
-| `playwright.config.*` | not found |
-| `tests/e2e/` | not found |
-| Root package scripts for Playwright | none |
-| Historical docs mentioning Playwright | plans/markdown only (e.g. enterprise roadmap, verification gate) |
-
-**State:** `NOT_STARTED` for actual browser E2E execution and enforcement.  
-`docs/MVP_IMPLEMENTATION_STATUS.md` Phase 7.1/7.2 already unchecked; reconfirmed by repo search.
-
-### 4.2 Mobile physical-device evidence
-
-| Check | Result |
-|---|---|
-| `docs/MOBILE-REAL-DEVICE-VALIDATION.md` | exists |
-| Checklist items | **all unchecked** |
-| CI device artifacts | none found |
-
-**State:** `NOT_STARTED`.  
-**Contradiction:** `docs/MVP_IMPLEMENTATION_STATUS.md` marks Phase 8.4 real-device validation and Phase 8 “Complete”. That claim is **not supported** by executed evidence and must not be treated as PROVEN.
-
-### 4.3 Production-provider modes and fallbacks (code inventory, not runtime proof)
-
-| Domain | Code location / mechanism | Mode/fallback observed | Evidence state |
-|---|---|---|---|
-| Payments / Stripe | `packages/api/src/commerce/payment-mode.ts`, `packages/api/src/config/validateEnv.ts`, `packages/api/src/lib/stripe-client.ts`, provider under `commerce/providers/stripe/` | `PAYMENT_MODE`: `fake` \| `stripe_test` \| `stripe_live`; production requires `stripe_live`; fake demo IDs exist in provider; production validates test keys/placeholders | `CODED_NOT_RUNTIME_VALIDATED` |
-| Stripe webhooks | `packages/api/src/routes/stripe-webhooks.ts` | raw-body + signature path; fake-mode webhook special-cased; production fake mode logs error | `CODED_NOT_RUNTIME_VALIDATED` (integration raw-body tests currently failing) |
-| Email | `packages/api/src/services/email.service.ts`, `validateEnv.ts` feature email | Resend (`RESEND_API_KEY`); production missing key → failure (not success); dev demo logs/simulates | `CODED_NOT_RUNTIME_VALIDATED` |
-| SMS | Twilio feature flags in validateEnv | optional provider path present | `CODED_NOT_RUNTIME_VALIDATED` |
-| Storage | `STORAGE_DRIVER` (`local` \| `r2`), R2 env keys, `r2.service.ts` / `storage/*` | local default; R2 requires keys when selected | `CODED_NOT_RUNTIME_VALIDATED` |
-| Shipping | `packages/api/src/services/shipping.service.ts`, NZ Post provider notes | **demo fallback** when no/`demo_key` API key returns fake tracking; real courier API path incomplete (TODO comment) | `CODED_NOT_RUNTIME_VALIDATED` + demo fallback remains |
-| Push | `packages/api/src/services/push-notification.service.ts` | Firebase Admin when env set; **demo mode logs success-like DEMO PUSH when unconfigured** | `CODED_NOT_RUNTIME_VALIDATED`; production risk if unconfigured |
-| CAPTCHA | `packages/api/src/middleware/captcha.ts`, finder `NotifyOwnerForm.tsx` | math JWT CAPTCHA; skipped in `development`/`test`; required otherwise; finder UI loads challenge | `CODED_NOT_RUNTIME_VALIDATED` for production-like notify |
-| Rate limiting | `packages/api/src/lib/rate-limiter.ts`, seeds `rateLimit.*` keys, finder/auth route limiters | DB-configured maxima (global/auth/finder/guardian/etc.) | `CODED_NOT_RUNTIME_VALIDATED` |
-
-### 4.4 CI / deployment inventory
-
-| Item | Finding |
-|---|---|
-| GitHub Actions workflows | none |
-| Docker files | present (`docker/`) |
-| Worker role env | `PAWTAG_WORKER_ROLE` documented in API `.env.example` |
-| Backup/restore rehearsal evidence | not executed in Phase 00 |
+No authentication, authorization, payment, or privacy control was weakened.
 
 ---
 
-## 5. Gaps and next-phase blockers
+## 5. Product code changes in Track A0
 
-### Hard blockers for trusting “green production readiness”
+| File | Change |
+|---|---|
+| `packages/api/src/routes/finder.ts` | Only active tags return pet info; all non-active states return not-found style public response |
+| `packages/api/src/routes/customer.ts` | Replacement redeem inherits start date + remaining periods; old tag → `replaced` |
+| `tests/integration/helpers.ts` | `createTag` sets HYBRID 2 period dates; entitlement seeding available |
+| `tests/integration/finder.test.ts` | Notify tests seed entitlements; fixtures use real active-period dates |
+| `tests/integration/finder-full.test.ts` | Align with only-active finder rule |
+| `tests/integration/subscriptions.test.ts` | Finder subscription checks aligned to only-active + public DTO |
+| `tests/integration/tag-replacement.test.ts` | Assert `replaced` + start-date inheritance |
 
-1. **Baseline is red.** typecheck/lint/unit/integration/smoke/build are not green on current `main` + pack overlay working tree.
-2. **No browser E2E.** Critical journeys are not proven end-to-end in a browser.
-3. **No CI gates.** Nothing automatically enforces baseline.
-4. **No provider/staging/device validation executed** this phase (and historical docs overclaimed some of these).
-5. **Finder notify/idempotency + Stripe webhook integration tests currently fail** — launch-critical debt for Phases 01/02/05.
-6. **Authorization verification rules vs fixtures** appear misaligned (403s). Fix by aligning fixtures to real rules or fixing real authorization defects — never by removing verification.
-7. **`packages/ui` type breakage blocks admin/web/finder builds** — must be repaired in an appropriate early phase (tooling/types, not by weakening product types blindly).
-8. **Demo/fallback paths remain** in shipping and push; Phase 01 must decide production policy and fail-closed behavior.
-
-### Recommended sequencing note (not executed)
-
-Per execution pack: stabilize Track A first. Do **not** start Phase 01 until founder authorizes next packet. Do **not** mix DynamoDB/donations into baseline repair.
+Plus the pre-existing uncommitted working-tree recovery (type fixes, lint config, smoke mock, unit-test alignment) that was already present when Track A0 started and is included in the same push.
 
 ---
 
-## 6. What Phase 00 did not do
+## 6. What this recovery did not do
 
-- Did not change product/business code
+- Did not start Phase 01
 - Did not weaken auth/authz/payment/privacy controls
-- Did not delete or skip failing tests
 - Did not reseed/reset any database
-- Did not commit/push/reset Git
 - Did not run Stripe/Resend/Firebase/AWS/Apple real integrations
-- Did not claim production readiness
+- Did not claim production readiness beyond automated quality gates
 
 ---
 
-## 7. Rollback
+## 7. Remaining risks (explicit)
 
-Phase 00 only created documentation:
+1. **Non-member finder notifications:** `hasAccess(userId, key)` returns `false` when the user has no active membership. Free customers may not receive in-app `pet_found` notifications unless MembershipBenefit defaults / free-tier config exist in production. Decide and configure before first real customers (Phase 03/05).
+2. Provider modes (Stripe/Resend/push/shipping/CAPTCHA) remain `CODED_NOT_RUNTIME_VALIDATED`.
+3. No browser E2E, no CI workflows, no mobile physical-device evidence.
+
+---
+
+## 8. Rollback
+
+Baseline recovery is committed to `main`. To roll back the recovery commit only:
 
 ```text
-docs/execution/EXECUTION_STATUS.md
-docs/execution/BASELINE_EVIDENCE.md
+git revert <baseline-recovery-sha>
 ```
 
-If these should not be retained, delete those two files. The execution-pack overlay changes already present in the working tree remain as the founder left them (uncommitted).
+Do not `reset --hard` or force-push without explicit founder authorization.

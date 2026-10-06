@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { API } from '@pawtag/shared/api';
 import api, { PaginatedData } from '../lib/api';
@@ -10,14 +10,13 @@ import {
 import { OrderProgressStepper, OrderStatusBanner } from '@pawtag/ui';
 import RefundStatusCard from '../components/RefundStatusCard';
 import {
-  Search, X, ChevronDown, Download, Loader2, ShoppingCart, CreditCard,
-  Truck, Package, CheckCircle, AlertCircle, Info, Clock, FileText,
+  ChevronDown, Download, Loader2, ShoppingCart, CreditCard,
+  Truck, Package, CheckCircle, Info, Clock, FileText,
   RefreshCw, Ban, Send, Eye, Printer, Copy, ExternalLink, AlertTriangle, XCircle, RotateCcw, PlusCircle, Shield,
 } from 'lucide-react';
 import {
   ORDER_STATUS_LABELS,
   getStatusBadgeVariant,
-  getStatusBorderColor,
   getTrackingUrl,
   isTerminalStatus,
   isShipmentTrackingMissing,
@@ -264,8 +263,8 @@ export function OrderDetailDrawer({
   onRefresh,
   onCancel,
   onRefund,
-  cancellationReasons,
-  onNotesChange,
+  cancellationReasons: _cancellationReasons,
+  onNotesChange: _onNotesChange,
 }: {
   order: Order | null;
   onClose: () => void;
@@ -277,7 +276,7 @@ export function OrderDetailDrawer({
 }) {
   const [activeTab, setActiveTab] = useState<'info' | 'items' | 'shipping' | 'activity'>('info');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState('');
+  const [_statusFilter, setStatusFilter] = useState('');
   const [orderSubscriptions, setOrderSubscriptions] = useState<any[]>([]);
   const [repairLoading, setRepairLoading] = useState(false);
 
@@ -294,7 +293,7 @@ export function OrderDetailDrawer({
     setRepairLoading(true);
     try {
       const res = await api.post(API.admin.commerce.orders.repairSubscriptions(order._id));
-      const { created, skipped, errors } = res.data.data;
+      const { created, _skipped, errors } = res.data.data;
       if (errors.length === 0 && created.length > 0) {
         toast.success(`Created ${created.length} subscription(s)`);
       } else if (errors.length > 0) {
@@ -1340,10 +1339,10 @@ export default function Orders() {
     setPage(1);
   };
 
-  const canCancel = (status: string) => ORDER_STATUS_TRANSITIONS[status]?.includes('cancelled');
-  const canRefund = (status: string) => ORDER_STATUS_TRANSITIONS[status]?.includes('refunded');
-  const canShip = (status: string) => ORDER_STATUS_TRANSITIONS[status]?.includes('shipped');
-  const canDeliver = (status: string) => ORDER_STATUS_TRANSITIONS[status]?.includes('delivered');
+  const _canCancel = (status: string) => ORDER_STATUS_TRANSITIONS[status]?.includes('cancelled');
+  const _canRefund = (status: string) => ORDER_STATUS_TRANSITIONS[status]?.includes('refunded');
+  const _canShip = (status: string) => ORDER_STATUS_TRANSITIONS[status]?.includes('shipped');
+  const _canDeliver = (status: string) => ORDER_STATUS_TRANSITIONS[status]?.includes('delivered');
 
   return (
     <div className="space-y-6">

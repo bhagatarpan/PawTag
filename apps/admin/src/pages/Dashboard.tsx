@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
-import { Users, PawPrint, QrCode, ShoppingBag, AlertTriangle, Activity, TrendingUp, Package, Repeat, LayoutDashboard, RotateCcw } from 'lucide-react';
+import { QrCode, AlertTriangle, Activity, TrendingUp, Package, Repeat, LayoutDashboard, RotateCcw } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 
 interface AnalyticsData {

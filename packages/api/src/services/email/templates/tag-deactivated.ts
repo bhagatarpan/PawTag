@@ -8,7 +8,7 @@ interface TagDeactivatedEmailData {
 }
 
 export function renderTagDeactivatedEmail(data: TagDeactivatedEmailData): string {
-  const { customerName, tagName, tagId, resubscribeUrl } = data;
+  const { customerName, tagName, resubscribeUrl } = data;
 
   const bodyHtml = `
     <p style="color:#374151;font-size:15px;line-height:1.7;margin:0 0 20px;">

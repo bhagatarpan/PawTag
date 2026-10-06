@@ -4,8 +4,15 @@ import api from '../lib/api';
 import { toast } from '../lib/toast';
 import { ConfirmDialog } from '@pawtag/ui';
 import {
-  Plus, X, Save, Trash2, Search, Shield, Loader2,
-  Key, Filter, Pencil, Eye,
+  Plus,
+  X,
+  Save,
+  Trash2,
+  Search,
+  Loader2,
+  Key,
+  Filter,
+  Pencil,
 } from 'lucide-react';
 
 /* ------------------------------------------------------------------ */
@@ -77,7 +84,7 @@ export default function RbacPermissions() {
   const [form, setForm] = useState({ name: '', displayName: '', description: '', resource: '', action: '', permissionGroupId: '' });
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState<string | null>(null);
+  const [deleting, _setDeleting] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<{
     open: boolean;
     title: string;

@@ -130,19 +130,31 @@ describe('Phase 13 — Replacement/Damaged Tag Flow', () => {
         },
       });
 
-      // Create old tag with pet linkage
+      // Create old tag with pet linkage and real active-period start
       const petId = new mongoose.Types.ObjectId();
+      const oldActivatedAt = new Date('2026-01-15T00:00:00.000Z');
+      // Ensure old period is in the future so remaining period transfers on replacement
+      const now = new Date();
+      const futureEnd = new Date(now);
+      futureEnd.setMonth(futureEnd.getMonth() + 2);
+      const oldWarrantyEnd = new Date(now);
+      oldWarrantyEnd.setMonth(oldWarrantyEnd.getMonth() + 10);
       const oldTag = await Tag.create({
         tagId: 'PT-OLD-TAG-001',
         petId,
         ownerId: userId,
         status: 'active',
+        activatedAt: oldActivatedAt,
+        activePeriodEndsAt: futureEnd,
+        warrantyEndsAt: oldWarrantyEnd,
       });
 
-      // Create new replacement tag linked to old tag
+      // Create new replacement tag linked to old tag, assigned to this customer
+      // Product rule: customer still needs to activate the new tag again
       const newTag = await Tag.create({
         tagId: 'PT-NEW-TAG-001',
         orderId: order._id,
+        ownerId: userId,
         replacesTagId: oldTag._id,
         status: 'inactive',
       });
@@ -159,10 +171,16 @@ describe('Phase 13 — Replacement/Damaged Tag Flow', () => {
       expect(res.body.data.petId?.toString()).toBe(petId.toString());
       expect(res.body.data.status).toBe('active');
 
-      // Verify old tag was deactivated
+      // Product rule: old tag goes to replaced
       const updatedOldTag = await Tag.findById(oldTag._id);
-      expect(updatedOldTag!.status).toBe('inactive');
+      expect(updatedOldTag!.status).toBe('replaced');
       expect(updatedOldTag!.replacedByTagId?.toString()).toBe(newTag._id.toString());
+
+      // Product rule: new tag start date = old replaced tag start date
+      const updatedNewTag = await Tag.findById(newTag._id);
+      expect(updatedNewTag!.activatedAt?.toISOString()).toBe(oldActivatedAt.toISOString());
+      // Remaining active period transfers from the old tag when still valid
+      expect(updatedNewTag!.activePeriodEndsAt?.toISOString()).toBe(futureEnd.toISOString());
 
       // Verify pet data is still intact (petId still exists)
       const pet = await (await import('@pawtag/db')).Pet.findById(petId);

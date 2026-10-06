@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { API } from '@pawtag/shared/api';
-import { Database, Plus, Search, Edit, Trash2, Filter, Upload, Eye, EyeOff } from 'lucide-react';
+import { Database, Plus, Search, Edit, Trash2, Upload, Eye, EyeOff } from 'lucide-react';
 import api from '../../lib/api';
 
 interface PetReference {

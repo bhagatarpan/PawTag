@@ -27,12 +27,12 @@
  */
 
 import { Router, Request, Response } from 'express';
-import { Order, Invoice, InvoiceAccessToken, Subscription, Tag, User, Notification, WebhookEvent, PendingOrder, PaymentTransaction, UserMembership, MembershipTier } from '@pawtag/db';
+import { Order, Invoice, Subscription, Tag, User, Notification, WebhookEvent, PendingOrder, PaymentTransaction, UserMembership, MembershipTier } from '@pawtag/db';
 import { stripePaymentProvider } from '../commerce/providers/stripe';
 import { checkoutService } from '../commerce/services/checkout.service';
 import { isFakeMode } from '../commerce/payment-mode';
-import { logPaymentEvent, logOrderEvent } from '../commerce/audit';
-import { logCommerceEvent } from '../commerce/audit';
+import { logPaymentEvent } from '../commerce/audit';
+
 import { activateMembership } from '../services/membership.service';
 import {
   syncMembershipFromStripeSubscriptionUpdated,

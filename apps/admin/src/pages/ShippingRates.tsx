@@ -14,7 +14,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { API } from '@pawtag/shared/api';
-import { Loader2, Save, DollarSign, Percent, Weight, Tag } from 'lucide-react';
+import { Loader2, Save, DollarSign } from 'lucide-react';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
 

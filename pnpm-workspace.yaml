@@ -7,6 +7,9 @@ allowBuilds:
   mongodb-memory-server: true
   msgpackr-extract: true
   protobufjs: true
+overrides:
+  "@types/react": "18.3.31"
+  "@types/react-dom": "18.3.1"
 publicHoistPattern:
   - '@tanstack/react-query'
   - 'react-i18next'

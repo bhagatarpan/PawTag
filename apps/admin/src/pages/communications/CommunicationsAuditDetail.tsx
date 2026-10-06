@@ -1,8 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft, Mail, Clock, CheckCircle, AlertTriangle, XCircle,
-  ChevronDown, ChevronRight, ExternalLink, Copy, Eye,
+  ArrowLeft,
+  Mail,
+  Clock,
+  CheckCircle,
+  AlertTriangle,
+  XCircle,
+  ChevronDown,
+  ChevronRight,
+  Copy,
+  Eye,
 } from 'lucide-react';
 import api from '../../lib/api';
 import { API } from '@pawtag/shared/api';

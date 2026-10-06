@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import logger from '../lib/logger';
-import { isAppError, toAppError, AppError } from '../lib/app-errors';
+import { isAppError, toAppError } from '../lib/app-errors';
 import { getRequestContext } from '../lib/request-context';
 
 export function errorHandler(err: Error, req: Request, res: Response, _next: NextFunction): void {

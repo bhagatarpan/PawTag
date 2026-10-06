@@ -508,6 +508,8 @@ export interface Order {
     reason: string;
   };
   referredByCode?: string;
+  refundStatus?: 'pending' | 'succeeded' | 'failed' | 'canceled';
+  refundAmount?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -522,6 +524,8 @@ export interface OrderItem {
   petName?: string;
   customizationTotal?: number;
   customisationTexts?: string[];
+  refundStatus?: string | null;
+  refundedQuantity?: number | null;
 }
 
 export interface PaymentInfo {

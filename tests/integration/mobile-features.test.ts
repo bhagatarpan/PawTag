@@ -6,7 +6,7 @@ import jwt from 'jsonwebtoken';
 import { setupTestDb, teardownTestDb, clearDb } from './setup';
 import app from '../../packages/api/src/index';
 import { config } from '../../packages/api/src/config';
-import { createCustomerWithRBAC, createSuperAdmin, createPet, createTag } from './helpers';
+import { createCustomerWithRBAC, createSuperAdmin, createPet, createTag, seedMembershipEntitlements } from './helpers';
 
 beforeAll(async () => {
   await setupTestDb();
@@ -158,6 +158,8 @@ async function createSecondCustomer(email: string) {
     config.jwtSecret,
     { expiresIn: '24h' }
   );
+
+  await seedMembershipEntitlements(userId);
 
   return { userId, token, email };
 }
@@ -791,7 +793,10 @@ describe('Tag Redemption — Edge Cases (Phase 23)', () => {
     await addPermissionsToCustomer(role!._id.toString(), ['tag.create']);
 
     await mongoose.connection.collections.tags.insertOne({
-      tagId: 'PT-FREE-001', status: 'active', tagType: 'qr',
+      tagId: 'PT-FREE-001',
+      ownerId: new mongoose.Types.ObjectId(userId),
+      status: 'inactive',
+      tagType: 'qr',
       deletedAt: null, createdAt: new Date(), updatedAt: new Date(),
     });
 
@@ -835,12 +840,19 @@ describe('Tag Redemption — Edge Cases (Phase 23)', () => {
       deletedAt: null, createdAt: new Date(), updatedAt: new Date(),
     });
 
-    const res = await request(app)
+    // Owner tries to re-redeem already activated tag → 409
+    const ownerRes = await request(app)
+      .post('/api/customer/tags/redeem')
+      .set('Authorization', `Bearer ${user1.token}`)
+      .send({ tagId: 'PT-CLAIMED-001' });
+    expect(ownerRes.status).toBe(409);
+
+    // Different user cannot redeem another owner's tag → 403
+    const otherRes = await request(app)
       .post('/api/customer/tags/redeem')
       .set('Authorization', `Bearer ${user2.token}`)
       .send({ tagId: 'PT-CLAIMED-001' });
-
-    expect(res.status).toBe(409);
+    expect(otherRes.status).toBe(403);
   });
 });
 

@@ -21,7 +21,7 @@
  */
 
 import mongoose from 'mongoose';
-import { User, Subscription, Setting, GuardianTierHistory } from '@pawtag/db';
+import { User, GuardianTierHistory } from '@pawtag/db';
 import { sendTierUpgradeEmail } from '../email.service';
 import { incrementCounter, METRICS } from '../../lib/metrics';
 import logger from '../../lib/logger';

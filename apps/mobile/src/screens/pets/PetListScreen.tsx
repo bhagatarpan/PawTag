@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -64,7 +64,7 @@ export function PetListScreen({ navigation }: PetListScreenProps) {
     fetchPets();
   };
 
-  const getMainPhoto = (pet: Pet) => {
+  const _getMainPhoto = (pet: Pet) => {
     const main = pet.photos?.find((p) => p.isMain);
     return main?.url || pet.photos?.[0]?.url;
   };

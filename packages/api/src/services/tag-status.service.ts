@@ -21,7 +21,7 @@
  * ```
  */
 
-import { Tag, UserMembership, MembershipTier } from '@pawtag/db';
+import { Tag, UserMembership } from '@pawtag/db';
 import type { ITagDocument } from '@pawtag/db';
 import logger from '../lib/logger';
 

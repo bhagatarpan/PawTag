@@ -1,7 +1,7 @@
-import { AuditEvent, type IAuditEventDocument, type ActorType } from '@pawtag/db';
+import { type IAuditEventDocument, type ActorType } from '@pawtag/db';
 import mongoose from 'mongoose';
 import { auditService, type AuditContext, type AuditEventInput } from './audit.service';
-import { getAuditContext, type AuditRequest } from '../../middleware/audit';
+import { type AuditRequest } from '../../middleware/audit';
 
 export interface TransactionalAuditOptions {
   session?: mongoose.ClientSession;

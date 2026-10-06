@@ -1,6 +1,6 @@
 import { isFakeMode } from '../commerce/payment-mode';
 import { logIntegration } from '../lib/timing';
-import { ExternalServiceError } from '../lib/app-errors';
+
 import { getStripeClient } from '../lib/stripe-client';
 
 export interface PaymentIntentData {

@@ -1,7 +1,12 @@
 import {
-  renderBase, renderCtaButton, renderInfoBox, renderDivider,
-  renderSectionHeading, renderTwoColumnGrid, renderTierProgression,
-  renderBenefitsList, renderCard, TIER_COLORS,
+  renderBase,
+  renderCtaButton,
+  renderDivider,
+  renderSectionHeading,
+  renderTwoColumnGrid,
+  renderTierProgression,
+  renderBenefitsList,
+  TIER_COLORS,
 } from './base';
 
 interface GuardianWelcomeEmailData {

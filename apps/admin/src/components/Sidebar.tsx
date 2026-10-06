@@ -14,7 +14,6 @@ import {
   Key,
   FolderTree,
   Target,
-  Globe,
   Layout,
   Navigation,
   PanelBottom,
@@ -42,14 +41,10 @@ import {
   Zap,
   Package,
   Truck,
-  CheckCircle,
-  XCircle,
   Tag,
   RotateCcw,
   Clock,
   Activity,
-  Receipt,
-  Menu,
   X,
   Sun,
   Crown,
@@ -316,7 +311,7 @@ const sections: SidebarSection[] = [
   },
 ];
 
-function Tooltip({ children, content, visible }: { children: React.ReactNode; content: string; visible: boolean }) {
+function Tooltip({ children: _children, content, visible }: { children: React.ReactNode; content: string; visible: boolean }) {
   if (!visible) return null;
   return (
     <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2 z-50 pointer-events-none">

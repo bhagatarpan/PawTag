@@ -20,7 +20,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { API } from '@pawtag/shared/api';
-import { Search, Loader2, Package, AlertTriangle, Plus, Minus, History, ChevronDown, ChevronUp } from 'lucide-react';
+import { Search, Loader2, Package, AlertTriangle, Plus, Minus, History, ChevronUp } from 'lucide-react';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
 
@@ -39,7 +39,7 @@ interface Product {
   isActive: boolean;
 }
 
-interface InventoryStatus {
+interface _InventoryStatus {
   productId: string;
   onHand: number;
   reserved: number;

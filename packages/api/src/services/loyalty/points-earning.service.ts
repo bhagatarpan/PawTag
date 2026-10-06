@@ -22,7 +22,7 @@
  */
 
 import mongoose from 'mongoose';
-import { User, Subscription, Order, Setting, GuardianPointsLedger } from '@pawtag/db';
+import { User, Order, Setting, GuardianPointsLedger } from '@pawtag/db';
 import { incrementCounter, METRICS } from '../../lib/metrics';
 import logger from '../../lib/logger';
 import { getGuardianNumber, type GuardianSettingKey } from './guardian-config';
@@ -66,7 +66,7 @@ async function getPointsMultiplier(userId: string): Promise<number> {
  * Get the purchase rate and spent amount for a user.
  * Uses entitlement-based multiplier applied to base Guardian rates.
  */
-async function getPurchaseConfig(userId: string): Promise<{ rate: number; spentAmount: number; repeatBonus: number }> {
+async function _getPurchaseConfig(userId: string): Promise<{ rate: number; spentAmount: number; repeatBonus: number }> {
   const multiplier = await getPointsMultiplier(userId);
   const baseRate = await getGuardianNumber('purchaseRateGuardian');
   const baseSpentAmount = await getGuardianNumber('purchaseSpentAmount');

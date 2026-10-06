@@ -195,7 +195,7 @@ describe('Order Status State Machine', () => {
     });
 
     it('returns correct transitions for shipped', () => {
-      expect(getValidTransitions('shipped')).toEqual(['delivered']);
+      expect(getValidTransitions('shipped')).toEqual(['delivered', 'refunded']);
     });
 
     it('returns correct transitions for delivered', () => {

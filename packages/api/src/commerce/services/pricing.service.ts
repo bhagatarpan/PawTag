@@ -20,8 +20,8 @@
  */
 
 import { Product, type IProductDocument } from '@pawtag/db';
-import { PriceMismatchError, InvalidCartError } from '../errors';
-import { getNumberSetting, getBooleanSetting } from '../config';
+import { PriceMismatchError } from '../errors';
+import { getNumberSetting } from '../config';
 import logger from '../../lib/logger';
 
 /**

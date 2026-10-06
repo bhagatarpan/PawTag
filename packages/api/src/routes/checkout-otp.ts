@@ -9,7 +9,7 @@ import { sendPhoneOtpSMS } from '../services/sms.service';
 import { getTestEmailRecipient } from './auth';
 import { config } from '../config';
 import { auditService } from '../services/audit';
-import { createAuditContextFromRequest, type AuditRequest } from '../middleware/audit';
+import { type AuditRequest } from '../middleware/audit';
 import logger from '../lib/logger';
 
 const router = Router();
@@ -199,7 +199,7 @@ router.post('/verify', validate(verifyCheckoutOtpSchema), async (req: AuthReques
 
     if (allVerified) {
       const expirySetting = await Setting.findOne({ key: 'checkout.otp.expiryMinutes' }).lean();
-      const expiryMinutes = expirySetting ? parseInt(expirySetting.value, 10) : 15;
+      const _expiryMinutes = expirySetting ? parseInt(expirySetting.value, 10) : 15;
 
       user.checkoutOtpVerified = true;
       user.checkoutOtpVerifiedAt = new Date();

@@ -1,4 +1,4 @@
-import { Plus, Trash2, GripVertical } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import ImagePicker from './ImagePicker';
 
 interface SectionContentEditorProps {

@@ -3,7 +3,6 @@ import { AuthRequest, authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
 import { Subscription, Invoice, Tag, User } from '@pawtag/db';
 import {
-  renewSubscription,
   cancelSubscription,
 } from '../services/subscription.service';
 import logger from '../lib/logger';
@@ -331,7 +330,7 @@ router.put('/:id/auto-renew', requirePermission('subscription.update'), async (r
     const adminUser = await User.findById(req.user!.id).select('fullName roles').lean();
     const roleName = (adminUser?.roles as any[])?.[0] || 'Admin';
 
-    const oldAutoRenew = subscription.autoRenew;
+    const _oldAutoRenew = subscription.autoRenew;
     subscription.autoRenew = autoRenew;
 
     if (!autoRenew) {

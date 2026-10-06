@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { API } from '@pawtag/shared/api';
 import api, { PaginatedData } from '../../lib/api';
-import { Plus, Trash2 } from 'lucide-react';
+
 
 interface Redirect {
   _id: string;

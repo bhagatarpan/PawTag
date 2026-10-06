@@ -1,8 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Mail, Search, Filter, ChevronDown, ChevronRight, Edit, Eye, Trash2,
-  Send, Clock, CheckCircle, AlertTriangle, Activity, BarChart3, Database,
+  Mail,
+  Search,
+  Edit,
+  Eye,
+  Trash2,
+  Clock,
+  CheckCircle,
+  AlertTriangle,
+  Activity,
+  BarChart3,
 } from 'lucide-react';
 import api from '../../lib/api';
 import { API } from '@pawtag/shared/api';

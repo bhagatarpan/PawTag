@@ -1,6 +1,5 @@
 import { Router, Response } from 'express';
 import { AuthRequest, authenticate } from '../middleware/auth';
-import { PushToken } from '@pawtag/db';
 import { registerPushToken, removePushToken, getUserPushTokens } from '../services/push-notification.service';
 
 const router = Router();

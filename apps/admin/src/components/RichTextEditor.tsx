@@ -15,10 +15,29 @@ import TableCell from '@tiptap/extension-table-cell';
 import TableHeader from '@tiptap/extension-table-header';
 import { common, createLowlight } from 'lowlight';
 import {
-  Bold, Italic, Underline as UnderlineIcon, Strikethrough, Code, Heading1, Heading2, Heading3,
-  List, ListOrdered, AlignLeft, AlignCenter, AlignRight, AlignJustify,
-  Highlighter, Link as LinkIcon, Image as ImageIcon, CodeSquare, Quote,
-  Undo, Redo, Table as TableIcon, Minus, Palette,
+  Bold,
+  Italic,
+  Underline as UnderlineIcon,
+  Strikethrough,
+  Code,
+  Heading1,
+  Heading2,
+  Heading3,
+  List,
+  ListOrdered,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  AlignJustify,
+  Highlighter,
+  Link as LinkIcon,
+  Image as ImageIcon,
+  CodeSquare,
+  Quote,
+  Undo,
+  Redo,
+  Table as TableIcon,
+  Minus,
 } from 'lucide-react';
 import { useCallback, useEffect } from 'react';
 

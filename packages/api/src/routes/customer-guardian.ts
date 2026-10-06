@@ -1,8 +1,8 @@
 import { Router, Response } from 'express';
 import { AuthRequest, authenticate } from '../middleware/auth';
-import { User, Subscription, GuardianPointsLedger, PawRewardsLedger, Setting } from '@pawtag/db';
+import { User, GuardianPointsLedger, PawRewardsLedger } from '@pawtag/db';
 import { auditService, type AuditContext } from '../services/audit';
-import { createAuditContextFromRequest, type AuditRequest } from '../middleware/audit';
+import { type AuditRequest } from '../middleware/audit';
 import { createDbRateLimiter } from '../lib/rate-limiter';
 import { redeemRewardsSchema, paginationQuerySchema } from '../validation/loyalty';
 import { getTierBenefits, TIER_THRESHOLDS, calculateTier } from '../services/loyalty/tier.service';

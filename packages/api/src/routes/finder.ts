@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
-import { Tag, FinderScan, LocationEvent, Notification, Subscription, User, Pet, SiteContent, Setting, EscalationRecord } from '@pawtag/db';
+import { Tag, FinderScan, LocationEvent, Notification, User, Pet, SiteContent, Setting, EscalationRecord } from '@pawtag/db';
 import { toFinderPetView } from '@pawtag/shared';
 import { sendPushToUser } from '../services/push-notification.service';
 import { sendPetFoundEmail } from '../services/email.service';
@@ -205,13 +205,17 @@ router.get('/:tagId', async (req: Request, res: Response) => {
     // HYBRID 2: Check tag status using centralized service
     const { calculateTagStatus } = await import('../services/tag-status.service');
     const tagStatus = await calculateTagStatus(tag);
-    const isActiveForFinder = tagStatus.finderEnabled;
-    const isLimited = tagStatus.status === 'limited';
-    const isExpired = tagStatus.status === 'expired';
-    const isReturned = tagStatus.status === 'returned' || tag.status === 'returned';
 
-    if (isExpired || isReturned) {
-      // Tag expired or returned to PawTag — log scan, no pet/owner data
+    // Product rule: finders can only find tags that are currently active.
+    // Limited / expired / replaced / returned / inactive / deleted are not findable.
+    const rawStatus = tag.status as string;
+    const nonFindableRawStatuses = new Set(['replaced', 'returned', 'deleted', 'inactive', 'terminated']);
+    const isFindable = tagStatus.status === 'active'
+      && tagStatus.finderEnabled
+      && !nonFindableRawStatuses.has(rawStatus);
+
+    if (!isFindable) {
+      // Tag is not findable — log scan, no pet/owner data
       const userAgent = (req.headers['user-agent'] as string) || 'unknown';
       const { browser, device } = parseUserAgent(userAgent);
       const ipGeo = await getIpGeoData(req.ip || req.headers['x-forwarded-for']?.toString().split(',')[0]?.trim() || '');
@@ -227,9 +231,17 @@ router.get('/:tagId', async (req: Request, res: Response) => {
         action: 'viewed',
       });
 
+      const notFindableReason = rawStatus === 'returned' || tag.returnedAt
+        ? 'returned'
+        : rawStatus === 'replaced'
+          ? 'replaced'
+          : tagStatus.status === 'limited'
+            ? 'limited'
+            : 'expired';
+
       await auditFinderEvent(req, {
-        action: isReturned ? 'view_returned_tag' : 'view_expired_tag',
-        eventType: isReturned ? 'finder_view_returned' : 'finder_view_expired',
+        action: notFindableReason === 'returned' ? 'view_returned_tag' : 'view_inactive_tag',
+        eventType: notFindableReason === 'returned' ? 'finder_view_returned' : 'finder_view_inactive',
         eventCategory: 'READ',
         operationType: 'READ',
         resourceType: 'Tag',
@@ -238,9 +250,8 @@ router.get('/:tagId', async (req: Request, res: Response) => {
         severity: 'MEDIUM',
         metadata: {
           tagId: tag.tagId,
-          message: isReturned
-            ? 'This PawTag is no longer active.'
-            : 'This PawTag is no longer active.',
+          reason: notFindableReason,
+          message: 'This PawTag is no longer active.',
           petInfo: null,
         },
       });
@@ -252,70 +263,6 @@ router.get('/:tagId', async (req: Request, res: Response) => {
           tagLimited: false,
           message: 'This PawTag is no longer active.',
           petInfo: null,
-        },
-      });
-      return;
-    }
-
-    if (isLimited) {
-      // HYBRID 2: Limited mode — show pet info but no notify button
-      const userAgent = (req.headers['user-agent'] as string) || 'unknown';
-      const { browser, device } = parseUserAgent(userAgent);
-      const ipGeo = await getIpGeoData(req.ip || req.headers['x-forwarded-for']?.toString().split(',')[0]?.trim() || '');
-
-      await FinderScan.create({
-        tagId: tag._id,
-        petId: pet?._id || tag._id,
-        deviceInfo: userAgent,
-        deviceBrowser: browser,
-        deviceOS: device,
-        deviceType: detectDeviceType(userAgent),
-        ipLocation: ipGeo || undefined,
-        action: 'viewed',
-      });
-
-      // Update tag scan info
-      tag.lastScannedAt = new Date();
-      await tag.save();
-
-      // Build limited pet info (no owner contact)
-      const safePetInfo = pet ? {
-        name: pet.name,
-        breed: pet.breed,
-        color: pet.color,
-        age: pet.age,
-        gender: pet.gender,
-        photo: pet.photos?.[0] || null,
-        medicalAlerts: pet.medicalAlerts || [],
-        description: pet.description,
-        status: pet.status,
-      } : null;
-
-      await auditFinderEvent(req, {
-        action: 'view_limited_tag',
-        eventType: 'finder_view_limited',
-        eventCategory: 'READ',
-        operationType: 'READ',
-        resourceType: 'Tag',
-        resourceId: tag._id.toString(),
-        outcome: 'SUCCESS',
-        severity: 'MEDIUM',
-        metadata: {
-          tagId: tag.tagId,
-          message: 'Tag active period expired. Finder notifications disabled.',
-          petInfo: safePetInfo,
-        },
-      });
-
-      res.json({
-        success: true,
-        data: {
-          tagActive: true,
-          tagLimited: true,
-          message: "This tag's active period has expired. The owner hasn't renewed their membership yet.",
-          petInfo: safePetInfo,
-          ownerContact: null,
-          notifyEnabled: false,
         },
       });
       return;

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { API } from '@pawtag/shared/api';
 import api, { PaginatedData } from '../lib/api';
 import { toast } from '../lib/toast';
-import { StatusBadge, AddressAutocomplete, AddressManager, CancellationInfoCard } from '@pawtag/ui';
+import { StatusBadge, AddressManager, CancellationInfoCard } from '@pawtag/ui';
 import { OrderProgressStepper, OrderStatusBanner } from '@pawtag/ui';
 import type { AddressComponents } from '@pawtag/ui';
 import { ORDER_STATUS_LABELS, getStatusBadgeVariant, getStatusBorderColor, isTerminalStatus } from '@pawtag/shared';
@@ -23,7 +23,6 @@ import {
   Trash2,
   Edit2,
   Key,
-  Plus,
   Save,
   Loader2,
   UserCheck,
@@ -112,7 +111,7 @@ function formatDateTime(iso: string): string {
   return new Date(iso).toLocaleString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
-function timeAgo(iso: string): string {
+function _timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   if (diff < 60000) return 'Just now';
   if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
@@ -168,7 +167,7 @@ function formatStatusLabel(status: string): string {
   return status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-function getOrderStatusVariant(status: string): 'success' | 'danger' | 'warning' | 'info' | 'neutral' | 'primary' {
+function _getOrderStatusVariant(status: string): 'success' | 'danger' | 'warning' | 'info' | 'neutral' | 'primary' {
   switch (status) {
     case 'delivered': return 'success';
     case 'shipped': return 'primary';
@@ -232,7 +231,7 @@ export function UserDetailContent({
   rbacRoles: any[];
   fullWidth?: boolean;
 }) {
-  const [activeTab, setActiveTab] = useState<'profile' | 'rbac' | 'orders' | 'subscriptions' | 'referrals' | 'settings'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'rbac' | 'orders' | 'subscriptions' | 'invoices' | 'referrals' | 'settings'>('profile');
   const [editMode, setEditMode] = useState(false);
   const [editForm, setEditForm] = useState({ fullName: '', email: '', phoneNumber: '', responsibilityScore: 0, address: { line1: '', line2: '', city: '', state: '', zip: '', country: '' }, emergencyContact: { name: '', phone: '', email: '', relationship: '' }, showOwnerNameInFinder: true, notificationPreferences: { email: true, push: true, inApp: true, channels: { petFound: true, orderUpdate: true, subscriptionReminder: true, referral: true, marketing: false } } });
   const [editError, setEditError] = useState('');
@@ -342,7 +341,7 @@ export function UserDetailContent({
     if (!user) return;
     setUserInvoicesLoading(true);
     try {
-      const res = await api.get(`/admin/users/${user._id}/invoices`, { params: { limit: 50 } });
+      const res = await api.get(API.admin.users.invoices(user._id), { params: { limit: 50 } });
       setUserInvoices(res.data.data?.items || []);
       setUserInvoicesTotal(res.data.data?.total || 0);
     } catch { /* non-critical */ } finally { setUserInvoicesLoading(false); }
@@ -412,7 +411,7 @@ export function UserDetailContent({
     }
   };
 
-  const handleAddressSelect = (address: AddressComponents) => {
+  const _handleAddressSelect = (address: AddressComponents) => {
     setEditForm(prev => ({
       ...prev,
       address: {
@@ -696,7 +695,7 @@ export function UserDetailContent({
                     onChange={() => {
                       // Refresh user data after address changes
                       if (user?._id) {
-                        api.get(API.admin.users.get(user._id)).then(res => {
+                        api.get(API.admin.users.get(user._id)).then(_res => {
                           onRefresh();
                         }).catch(() => {});
                       }
@@ -979,7 +978,7 @@ export function UserDetailContent({
                   const isCancelled = sub.status === 'cancelled';
                   return (
                     <div key={sub._id} className="bg-white rounded-xl border border-gray-100 overflow-hidden hover:border-gray-200 hover:shadow-sm transition-all duration-200">
-                      <div onClick={() => { onClose(); navigate(`/customer-subscriptions/${sub._id}`); }} className="p-5 cursor-pointer">
+                      <div onClick={() => { onClose?.(); navigate(`/customer-subscriptions/${sub._id}`); }} className="p-5 cursor-pointer">
                         <div className="flex items-start justify-between mb-3">
                           <div className="flex items-center gap-3">
                             <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isActive ? 'bg-emerald-50' : isGrace ? 'bg-amber-50' : 'bg-gray-50'}`}>
@@ -1072,7 +1071,7 @@ export function UserDetailContent({
                             <span>Gold membership cancelled — benefits until {formatDate(sub.currentPeriodEnd)}</span>
                           </div>
                           <button
-                            onClick={(e) => { e.stopPropagation(); onClose(); navigate(`/customer-subscriptions/${sub._id}`); }}
+                            onClick={(e) => { e.stopPropagation(); onClose?.(); navigate(`/customer-subscriptions/${sub._id}`); }}
                             className="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-lg text-sm font-semibold hover:from-amber-600 hover:to-orange-600 shadow-sm transition-all"
                           >
                             View & Re-subscribe

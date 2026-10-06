@@ -1,4 +1,4 @@
-import { renderBase, renderCtaButton } from './base';
+import { renderBase } from './base';
 
 interface ReferralRewardData {
   referrerName: string;

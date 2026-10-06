@@ -19,8 +19,8 @@
  * ```
  */
 
-import { Order, Invoice, InvoiceAccessToken, User, Notification, Tag, Subscription } from '@pawtag/db';
-import { DuplicateOrderError } from '../commerce/errors';
+import { Order, Invoice, InvoiceAccessToken, User, Notification, Tag } from '@pawtag/db';
+
 import { sendOrderConfirmation, sendInvoiceEmail, sendMail } from './email.service';
 import { renderNewOrderAlertEmail } from './email/templates';
 import { generateInvoiceHtml } from './invoice-html.service';
@@ -135,7 +135,7 @@ export async function createPawTagOrder(params: CreateOrderParams): Promise<Crea
     cardLast4,
     shippingAddress,
     referralCode,
-    promoCode,
+    promoCode: _promoCode,
     portal = 'customer-web',
   } = params;
 

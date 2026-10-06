@@ -175,6 +175,8 @@ describe('Integration: Finder DTO Privacy', () => {
 
   it('DOES expose medicalAlerts (owner-approved)', async () => {
     const ownerId = await createCustomer();
+    const { seedMembershipEntitlements } = await import('./helpers');
+    await seedMembershipEntitlements(ownerId);
     const petId = await createPet(ownerId, { medicalAlerts: 'Diabetic - needs insulin' });
     await createTag(ownerId, petId, { tagId: 'TAG-PRIV-007' });
 

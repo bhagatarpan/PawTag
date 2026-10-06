@@ -4,8 +4,15 @@ import api from '../lib/api';
 import { toast } from '../lib/toast';
 import { ConfirmDialog } from '@pawtag/ui';
 import {
-  Plus, X, Save, Trash2, Search, Globe, Loader2,
-  Pencil, Info, Layers,
+  Plus,
+  X,
+  Save,
+  Trash2,
+  Search,
+  Loader2,
+  Pencil,
+  Info,
+  Layers,
 } from 'lucide-react';
 
 /* ------------------------------------------------------------------ */
@@ -48,7 +55,7 @@ export default function RbacScopes() {
   const [form, setForm] = useState({ code: '', name: '', description: '' });
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState<string | null>(null);
+  const [deleting, _setDeleting] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<{
     open: boolean;
     title: string;

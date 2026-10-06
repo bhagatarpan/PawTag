@@ -5,7 +5,7 @@
 
 import { Router, Response } from 'express';
 import { AuthRequest, authenticate } from '../middleware/auth';
-import { DigitalProduct, DigitalEntitlement, Product } from '@pawtag/db';
+import { DigitalEntitlement } from '@pawtag/db';
 import { NotFoundError } from '../lib/app-errors';
 import logger from '../lib/logger';
 

@@ -24,7 +24,7 @@ import { revokeAllUserRefreshTokens } from '../services/auth.service';
 import { getLocationFromIp } from '../lib/geo-location';
 import { isValidTransition } from '../services/orderStatus.service';
 import { notifyCustomerOfStatusChange } from '../services/orderNotification.service';
-import { resolveActor, formatActivityMessage, formatCancelledBy, formatCancelledByDescription, formatRefundedBy, formatRefundedByDescription } from '../lib/actor';
+import { resolveActor, formatActivityMessage, formatCancelledBy, formatCancelledByDescription, formatRefundedByDescription } from '../lib/actor';
 import {
   User,
   Pet,
@@ -48,19 +48,18 @@ import {
   PaymentTransaction,
   InvoiceAccessToken,
   UserMembership,
-  MembershipTier,
 } from '@pawtag/db';
 import { stripePaymentProvider } from '../commerce/providers/stripe';
 import { getNumberSetting, getBooleanSetting } from '../commerce/config';
 import { auditService, type AuditContext } from '../services/audit';
-import { createAuditContextFromRequest, type AuditRequest } from '../middleware/audit';
+import { type AuditRequest } from '../middleware/audit';
 import { hashPassword, generateSecureToken, hashToken } from '../services/auth.service';
 import { getReferralStats, getReferralHistory } from '../services/referral.service';
 import logger from '../lib/logger';
 
 const router = Router();
 
-function getClientInfo(req: any) {
+function _getClientInfo(req: any) {
   return { ipAddress: req.ip || req.connection?.remoteAddress, userAgent: req.headers['user-agent'] };
 }
 
@@ -594,8 +593,8 @@ router.post('/users/:id/reset-password', requirePermission('user.reset_password'
     // Get admin user's role name for email
     let adminRoleName = 'Admin';
     try {
-      const adminUser = await User.findById(req.user!.id).select('fullName').lean();
-      const { UserRole: UserRoleModel, Role } = await import('@pawtag/db');
+      const _adminUser = await User.findById(req.user!.id).select('fullName').lean();
+      const { UserRole: UserRoleModel } = await import('@pawtag/db');
       const adminRole = await UserRoleModel.findOne({ userId: req.user!.id, isActive: true }).populate('roleId', 'displayName').lean();
       if (adminRole?.roleId) {
         adminRoleName = (adminRole.roleId as any)?.displayName || 'Admin';
@@ -604,7 +603,7 @@ router.post('/users/:id/reset-password', requirePermission('user.reset_password'
       // Fallback to default
     }
     
-    const location = clientInfo.ipAddress ? await getLocationFromIp(clientInfo.ipAddress).catch(() => undefined) : undefined;
+    const _location = clientInfo.ipAddress ? await getLocationFromIp(clientInfo.ipAddress).catch(() => undefined) : undefined;
     sendPasswordChangedEmail(user.email, user.fullName, req.user!.id, clientInfo.ipAddress, clientInfo.userAgent, adminRoleName).catch((err) => {
       logger.error({ err, targetUserId: req.params.id, targetEmail: user.email }, 'Failed to send password changed email');
     });

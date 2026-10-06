@@ -9,14 +9,20 @@ import app from '../../packages/api/src/index';
 const TEST_WEBHOOK_SECRET = 'whsec_test_secret_for_testing';
 
 beforeAll(async () => {
+  process.env.PAYMENT_MODE = 'fake';
+  process.env.STRIPE_WEBHOOK_SECRET = TEST_WEBHOOK_SECRET;
+  delete process.env.STRIPE_SECRET_KEY;
   await setupTestDb();
 }, 30000);
 
 afterAll(async () => {
   await teardownTestDb();
+  process.env.PAYMENT_MODE = 'fake';
 }, 10000);
 
 beforeEach(async () => {
+  process.env.PAYMENT_MODE = 'fake';
+  process.env.STRIPE_WEBHOOK_SECRET = TEST_WEBHOOK_SECRET;
   await clearDb();
 });
 

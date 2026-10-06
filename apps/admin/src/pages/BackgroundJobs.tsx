@@ -1,8 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Clock, RefreshCw, Play, Pause, ChevronRight, X,
-  CheckCircle, XCircle, AlertTriangle, Settings,
+  RefreshCw,
+  Play,
+  Pause,
+  ChevronRight,
+  X,
+  CheckCircle,
+  XCircle,
+  AlertTriangle,
+  Settings,
 } from 'lucide-react';
 import { toast } from '../lib/toast';
 import { API } from '@pawtag/shared/api';
@@ -98,7 +105,7 @@ export default function BackgroundJobs() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>('all');
-  const [selectedJob, setSelectedJob] = useState<BackgroundJob | null>(null);
+  const [_selectedJob, _setSelectedJob] = useState<BackgroundJob | null>(null);
   const [editingJob, setEditingJob] = useState<BackgroundJob | null>(null);
   const [editForm, setEditForm] = useState<any>({});
   const [saving, setSaving] = useState(false);

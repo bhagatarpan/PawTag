@@ -122,7 +122,7 @@ export async function executeRefundRetry(
   }
 
   const amount = order.payment.amount;
-  const reason = order.cancellationReason || 'Customer requested cancellation';
+  const _reason = order.cancellationReason || 'Customer requested cancellation';
 
   logger.info({
     orderId,

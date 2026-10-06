@@ -1,4 +1,4 @@
-import { renderBase, renderCtaButton, renderDataTable, renderStatusCard } from './base';
+import { renderBase, renderCtaButton, renderStatusCard } from './base';
 
 interface OrderStatusData {
   orderNumber: string;

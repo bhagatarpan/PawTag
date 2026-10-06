@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { AuthRequest, authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
-import { Subscription, Invoice, Tag, User, Pet } from '@pawtag/db';
+import { Subscription, Invoice, User, Pet } from '@pawtag/db';
 import { isFakeMode } from '../commerce/payment-mode';
 import { auditService, type AuditContext } from '../services/audit';
 import {

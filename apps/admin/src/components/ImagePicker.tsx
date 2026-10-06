@@ -20,7 +20,7 @@ interface ImagePickerProps {
   label?: string;
 }
 
-export default function ImagePicker({ value, onChange, placeholder = 'https://example.com/image.jpg', label }: ImagePickerProps) {
+export default function ImagePicker({ value, onChange, placeholder = 'https://example.com/image.jpg', label: _label }: ImagePickerProps) {
   const [showModal, setShowModal] = useState(false);
   const [showViewer, setShowViewer] = useState(false);
   const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);

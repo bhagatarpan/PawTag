@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { AuthRequest, authenticate } from '../middleware/auth';
-import { requirePermission } from '../middleware/permission';
-import { UserMembership, MembershipTier, User, Tag, Invoice } from '@pawtag/db';
+
+import { UserMembership, User, Tag, Invoice } from '@pawtag/db';
 import {
   getMembershipTiers,
   getUserMembershipStatus,

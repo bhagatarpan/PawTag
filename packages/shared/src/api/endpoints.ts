@@ -62,6 +62,7 @@ export const API = {
       skipInvoiceOtp: (id: string) => `/admin/users/${id}/skip-invoice-otp` as const,
       orders: (id: string) => `/admin/users/${id}/orders` as const,
       subscriptions: (id: string) => `/admin/users/${id}/subscriptions` as const,
+      invoices: (id: string) => `/admin/users/${id}/invoices` as const,
       referrals: (id: string) => `/admin/users/${id}/referrals` as const,
       membershipAudit: (id: string) => `/admin/users/${id}/membership-audit` as const,
       registerOwner: '/admin/owners/register' as const,

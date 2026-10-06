@@ -8,7 +8,7 @@
  */
 
 import { NodeSDK } from '@opentelemetry/sdk-node';
-import { trace, context, SpanStatusCode, SpanKind, Attributes } from '@opentelemetry/api';
+import { trace, SpanStatusCode, SpanKind, Attributes } from '@opentelemetry/api';
 import { resourceFromAttributes } from '@opentelemetry/resources';
 import { SEMRESATTRS_SERVICE_NAME, SEMRESATTRS_SERVICE_VERSION } from '@opentelemetry/semantic-conventions';
 import { BatchSpanProcessor, ConsoleSpanExporter } from '@opentelemetry/sdk-trace-node';
@@ -159,7 +159,7 @@ export async function withSpan<T>(
   attributes?: Attributes,
   kind: SpanKind = SpanKind.INTERNAL
 ): Promise<T> {
-  const { span, end, setError } = startSpan(name, attributes, kind);
+  const { span: _span, end, setError } = startSpan(name, attributes, kind);
 
   try {
     const result = await fn();

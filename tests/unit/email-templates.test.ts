@@ -143,7 +143,12 @@ describe('Password Changed Email', () => {
   it('includes admin ID when changed by admin', () => {
     const html = renderPasswordChangedEmail({ name: 'Bob', changedBy: 'admin-user-id-123' });
     expect(html).toContain('admin-user-id-123');
-    expect(html).toContain('administrator');
+    expect(html).toContain('PawTag');
+  });
+
+  it('includes role when changedByRole is provided', () => {
+    const html = renderPasswordChangedEmail({ name: 'Bob', changedBy: 'admin-user-id-123', changedByRole: 'Admin' });
+    expect(html).toContain('admin-user-id-123 (PawTag - Admin)');
   });
 
   it('includes IP address when provided', () => {

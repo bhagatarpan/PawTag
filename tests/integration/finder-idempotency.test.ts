@@ -4,6 +4,7 @@ import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 import { setupTestDb, teardownTestDb, clearDb } from './setup';
 import app from '../../packages/api/src/index';
+import { seedMembershipEntitlements } from './helpers';
 
 async function createCustomer(overrides: Partial<{ email: string; fullName: string }> = {}) {
   const email = overrides.email || `idempotent-${Date.now()}@example.com`;
@@ -24,6 +25,10 @@ async function createCustomer(overrides: Partial<{ email: string; fullName: stri
   });
 
   return user.insertedId.toString();
+}
+
+async function seedOwnerEntitlements(ownerId: string) {
+  await seedMembershipEntitlements(ownerId);
 }
 
 async function createPet(ownerId: string, overrides: Record<string, any> = {}) {
@@ -80,6 +85,7 @@ beforeEach(async () => {
 describe('Integration: Finder Notify Idempotency', () => {
   it('duplicate notify with same contact info returns existing notification', async () => {
     const ownerId = await createCustomer({ email: 'idemp-owner-1@example.com' });
+    await seedOwnerEntitlements(ownerId);
     const petId = await createPet(ownerId, { status: 'lost' });
     await createTag(ownerId, petId, { tagId: 'TAG-IDEMP-001' });
 
@@ -103,6 +109,7 @@ describe('Integration: Finder Notify Idempotency', () => {
 
   it('duplicate notify does NOT create duplicate notifications', async () => {
     const ownerId = await createCustomer({ email: 'idemp-owner-2@example.com' });
+    await seedOwnerEntitlements(ownerId);
     const petId = await createPet(ownerId, { status: 'lost' });
     await createTag(ownerId, petId, { tagId: 'TAG-IDEMP-002' });
 
@@ -125,6 +132,7 @@ describe('Integration: Finder Notify Idempotency', () => {
 
   it('duplicate notify does NOT create duplicate escalation records', async () => {
     const ownerId = await createCustomer({ email: 'idemp-owner-3@example.com' });
+    await seedOwnerEntitlements(ownerId);
     const petId = await createPet(ownerId, { status: 'lost' });
     await createTag(ownerId, petId, { tagId: 'TAG-IDEMP-003' });
 
@@ -147,6 +155,7 @@ describe('Integration: Finder Notify Idempotency', () => {
 
   it('different contact info creates separate notifications', async () => {
     const ownerId = await createCustomer({ email: 'idemp-owner-4@example.com' });
+    await seedOwnerEntitlements(ownerId);
     const petId = await createPet(ownerId, { status: 'lost' });
     await createTag(ownerId, petId, { tagId: 'TAG-IDEMP-004' });
 
@@ -169,6 +178,7 @@ describe('Integration: Finder Notify Idempotency', () => {
 
   it('rapid sequential retries produce one logical notification', async () => {
     const ownerId = await createCustomer({ email: 'idemp-owner-5@example.com' });
+    await seedOwnerEntitlements(ownerId);
     const petId = await createPet(ownerId, { status: 'lost' });
     await createTag(ownerId, petId, { tagId: 'TAG-IDEMP-005' });
 

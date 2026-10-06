@@ -16,8 +16,8 @@
  * ```
  */
 
-import { Product, StockMovement, type IProductDocument } from '@pawtag/db';
-import { InsufficientStockError } from '../errors';
+import { Product, StockMovement } from '@pawtag/db';
+
 import logger from '../../lib/logger';
 import type { InventoryStatus, ReservationResult, StockMovement as StockMovementType } from '../interfaces/inventory-provider';
 

@@ -726,7 +726,7 @@ export const pawtagConfig: Config<PawtagComponents> = {
         zoom: { type: 'number', label: 'Zoom Level' },
       },
       defaultProps: { latitude: -36.8485, longitude: 174.7633, zoom: 12 },
-      render: ({ latitude, longitude, zoom }) => (
+      render: ({ latitude, longitude, zoom: _zoom }) => (
         <section className="py-8 px-6">
           <div className="max-w-5xl mx-auto rounded-xl overflow-hidden shadow-lg h-80 bg-gray-100 flex items-center justify-center">
             <iframe

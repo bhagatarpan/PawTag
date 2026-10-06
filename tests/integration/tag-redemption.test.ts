@@ -7,6 +7,8 @@ import { Order, Tag, Product } from '@pawtag/db';
 import { createSuperAdmin } from './helpers';
 
 beforeAll(async () => {
+  process.env.PAYMENT_MODE = 'fake';
+  delete process.env.STRIPE_SECRET_KEY;
   await setupTestDb();
 }, 30000);
 
@@ -52,10 +54,11 @@ describe('Phase 11 — Tag Activation & Redemption', () => {
         },
       });
 
-      // Create an unclaimed tag linked to the order
+      // Create an inactive tag assigned to this customer (redeem = activate owned tag)
       const tag = await Tag.create({
         tagId: 'PT-REDEM-001',
         orderId: order._id,
+        ownerId: userId,
         status: 'inactive',
       });
 
@@ -140,10 +143,11 @@ describe('Phase 11 — Tag Activation & Redemption', () => {
         },
       });
 
-      // Create a tag linked to the other user's order
+      // Create a tag linked to the other user's order (owned by that other user)
       await Tag.create({
         tagId: 'PT-OTHER-001',
         orderId: order._id,
+        ownerId: order.userId,
         status: 'inactive',
       });
 
@@ -153,15 +157,16 @@ describe('Phase 11 — Tag Activation & Redemption', () => {
         .send({ tagId: 'PT-OTHER-001' });
 
       expect(res.status).toBe(403);
-      expect(res.body.error).toContain('different customer');
+      expect(res.body.error).toMatch(/does not belong to you|different customer/);
     });
 
     it('should allow redemption of a tag without orderId (legacy/bulk-provisioned)', async () => {
       const { userId, token } = await createSuperAdmin();
 
-      // Create a tag without orderId (legacy tag)
+      // Legacy tag assigned to this customer, not yet activated
       await Tag.create({
         tagId: 'PT-LEGACY-001',
+        ownerId: userId,
         status: 'inactive',
       });
 

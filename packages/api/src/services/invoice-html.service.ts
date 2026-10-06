@@ -125,15 +125,15 @@ function buildDefaultInvoiceHtml(data: InvoiceData, company: Record<string, stri
   const descHeader = hasOrderItems ? 'Item' : 'Description';
   const qtyHeader = hasOrderItems ? 'Qty' : 'Billing Period';
 
-  let qtyCol: string;
+  let _qtyCol: string;
   if (hasOrderItems) {
-    qtyCol = '';
+    _qtyCol = '';
   } else if (membership && membership.currentPeriodStart && membership.currentPeriodEnd) {
-    qtyCol = `${formatDate(membership.currentPeriodStart)} — ${formatDate(membership.currentPeriodEnd)}`;
+    _qtyCol = `${formatDate(membership.currentPeriodStart)} — ${formatDate(membership.currentPeriodEnd)}`;
   } else if (hasSubscription && invoice.billingPeriod) {
-    qtyCol = `${formatDate(getBillingPeriod(invoice).start)} — ${formatDate(getBillingPeriod(invoice).end)}`;
+    _qtyCol = `${formatDate(getBillingPeriod(invoice).start)} — ${formatDate(getBillingPeriod(invoice).end)}`;
   } else {
-    qtyCol = '—';
+    _qtyCol = '—';
   }
 
   // Totals breakdown — only for order invoices with stored breakdown
@@ -611,7 +611,7 @@ export async function generateInvoiceEmailHtml(invoiceId: string): Promise<{ htm
   const invoice = await Invoice.findById(invoiceId).lean();
   if (!invoice) throw new Error('Invoice not found');
 
-  const user = await User.findById(invoice.userId).select('fullName name email').lean();
+  const _user = await User.findById(invoice.userId).select('fullName name email').lean();
   const companyName = (await getCompanySettings())['company.name'] || 'PawTag Ltd';
 
   const html = await generateInvoiceHtml(invoiceId);

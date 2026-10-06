@@ -13,8 +13,17 @@
 import { useState, useCallback, useMemo } from 'react';
 import { API } from '@pawtag/shared/api';
 import {
-  Search, Loader2, CreditCard, ExternalLink, User, Receipt, ShoppingCart,
-  RefreshCcw, Crown, Shield, DollarSign, TrendingUp, AlertTriangle, Package,
+  Search,
+  Loader2,
+  CreditCard,
+  ExternalLink,
+  User,
+  Receipt,
+  ShoppingCart,
+  RefreshCcw,
+  Crown,
+  DollarSign,
+  AlertTriangle,
 } from 'lucide-react';
 import api from '../lib/api';
 import { toast } from '../lib/toast';

@@ -229,6 +229,7 @@ export interface AddressAutocompleteProps {
 /* ------------------------------------------------------------------ */
 
 export interface OrderItemData {
+  productId?: string;
   productName: string;
   variantName?: string;
   sku?: string;
@@ -240,6 +241,8 @@ export interface OrderItemData {
   image?: string;
   customizationTotal?: number;
   customisationTexts?: string[];
+  refundedQuantity?: number;
+  refundStatus?: 'none' | 'partial' | 'refunded';
 }
 
 export interface OrderData {
@@ -276,14 +279,6 @@ export interface OrderData {
   trackingNumber?: string;
   carrier?: string;
   shippingLabelUrl?: string;
-  items?: Array<{
-    productId?: string;
-    productName: string;
-    quantity: number;
-    unitPrice?: number;
-    refundedQuantity?: number;
-    refundStatus?: 'none' | 'partial' | 'refunded';
-  }>;
   notes?: string;
   cancellationReason?: string;
   cancellationNotes?: string;

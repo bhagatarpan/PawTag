@@ -5,12 +5,12 @@ import { requirePermission } from '../middleware/permission';
 import { requireVerifiedChannels } from '../middleware/verificationGuard';
 import { validate } from '../middleware/validation';
 import { createPetSchema, updatePetSchema } from '../middleware/schemas';
-import { Pet, Tag, Order, LocationEvent, Notification, FinderScan, User, generatePetId, Subscription, Referral, Setting, Invoice, EscalationRecord } from '@pawtag/db';
+import { Pet, Tag, Order, LocationEvent, Notification, FinderScan, User, generatePetId, Subscription, Setting, Invoice, EscalationRecord } from '@pawtag/db';
 import { auditService, type AuditContext } from '../services/audit';
-import { createAuditContextFromRequest, type AuditRequest } from '../middleware/audit';
-import { sendOrderConfirmation } from '../services/email.service';
+
+
 import { formatCreatedBy, formatCreatedByDescription } from '../lib/actor';
-import { createSubscription } from '../services/subscription.service';
+
 import { isFakePaymentIntentId } from '../commerce/payment-mode';
 import logger from '../lib/logger';
 
@@ -481,11 +481,14 @@ router.post('/tags/redeem', requirePermission('tag.create'), async (req: AuthReq
       }
     }
 
-    // All checks passed — activate the tag
+    // All checks passed — activate the tag.
+    // Product rules for replacement tags:
+    // 1) Customer must activate the new tag again (status inactive → active).
+    // 2) Old tag status becomes 'replaced'.
+    // 3) New tag start date (activatedAt) inherits from the old replaced tag.
+    const now = new Date();
     tag.status = 'active';
-    tag.activatedAt = new Date();
 
-    // Handle replacement tag: transfer pet linkage from old tag
     if (tag.replacesTagId) {
       const oldTag = await Tag.findById(tag.replacesTagId);
       if (oldTag && oldTag.ownerId?.toString() === req.user!.id) {
@@ -493,11 +496,59 @@ router.post('/tags/redeem', requirePermission('tag.create'), async (req: AuthReq
         if (oldTag.petId) {
           tag.petId = oldTag.petId;
         }
-        // Mark old tag as replaced
+        // Product rule: old tag goes to replaced (not inactive)
         oldTag.status = 'replaced';
         oldTag.replacedByTagId = tag._id;
         await oldTag.save();
+
+        // Product rule: replacement tag start date = original tag start date
+        if (oldTag.activatedAt) {
+          tag.activatedAt = oldTag.activatedAt;
+        } else {
+          tag.activatedAt = now;
+        }
+
+        // Active period: transfer remaining period when the old period is still valid.
+        // If the old active period already ended, start a fresh period from activation
+        // (expired original → fresh period for the replacement).
+        if (oldTag.activePeriodEndsAt && oldTag.activePeriodEndsAt > now) {
+          tag.activePeriodEndsAt = oldTag.activePeriodEndsAt;
+        } else {
+          const inheritedStart = tag.activatedAt || now;
+          const fromInherited = new Date(inheritedStart);
+          fromInherited.setMonth(fromInherited.getMonth() + 3);
+          if (fromInherited <= now) {
+            const freshStart = new Date(now);
+            const freshEnd = new Date(now);
+            freshEnd.setMonth(freshEnd.getMonth() + 3);
+            tag.activatedAt = freshStart;
+            tag.activePeriodEndsAt = freshEnd;
+          } else {
+            tag.activePeriodEndsAt = fromInherited;
+          }
+        }
+
+        // Warranty: transfer remaining warranty when still valid; otherwise recompute
+        // from the tag's active start (12-month default warranty).
+        if (oldTag.warrantyEndsAt && oldTag.warrantyEndsAt > now) {
+          tag.warrantyEndsAt = oldTag.warrantyEndsAt;
+        } else {
+          const start = tag.activatedAt || now;
+          const warrantyEnd = new Date(start);
+          warrantyEnd.setMonth(warrantyEnd.getMonth() + 12);
+          if (warrantyEnd <= now) {
+            const freshWarranty = new Date(now);
+            freshWarranty.setMonth(freshWarranty.getMonth() + 12);
+            tag.warrantyEndsAt = freshWarranty;
+          } else {
+            tag.warrantyEndsAt = warrantyEnd;
+          }
+        }
+      } else {
+        tag.activatedAt = now;
       }
+    } else {
+      tag.activatedAt = now;
     }
 
     await tag.save();

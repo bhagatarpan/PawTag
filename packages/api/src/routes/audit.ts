@@ -3,7 +3,7 @@ import { AuthRequest, authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
 import { validate } from '../middleware/validation';
 import { z } from 'zod';
-import { AuditEvent, Setting, type IAuditEventDocument } from '@pawtag/db';
+import { AuditEvent, Setting } from '@pawtag/db';
 import { auditService } from '../services/audit/audit.service';
 import { AUDIT_ACTORS, AUDIT_CATEGORIES, auditPolicyKey, getAuditPolicy, invalidateAuditPolicyCache } from '../services/audit/audit.policy';
 import { enforceRetention, getRetentionStats, placeLegalHold, removeLegalHold } from '../services/audit/audit.retention';

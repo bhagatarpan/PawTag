@@ -12,7 +12,7 @@
 
 import { Tag, User } from '@pawtag/db';
 import type { ITagDocument } from '@pawtag/db';
-import { sendMail } from './email.service';
+
 import { createAndDeliverNotification } from './notification-delivery.service';
 import {
   renderTagActivePeriodExpiring30DayEmail,
@@ -23,9 +23,9 @@ import {
 import logger from '../lib/logger';
 
 // Cache for settings
-let settingsCache: Record<string, string> = {};
-let settingsCacheTimestamp = 0;
-const SETTINGS_CACHE_TTL = 60 * 1000; // 1 minute
+let _settingsCache: Record<string, string> = {};
+let _settingsCacheTimestamp = 0;
+const _SETTINGS_CACHE_TTL = 60 * 1000; // 1 minute
 
 /**
  * Check tags with expiring Active Periods and send warnings.

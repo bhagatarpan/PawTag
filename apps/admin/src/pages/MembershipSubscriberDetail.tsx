@@ -1,8 +1,18 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
-  ArrowLeft, CreditCard, Calendar, Tag, Shield, AlertTriangle,
-  FileText, History, Settings, Loader2, Check, X, Lock,
+  ArrowLeft,
+  CreditCard,
+  Calendar,
+  Tag,
+  Shield,
+  AlertTriangle,
+  FileText,
+  History,
+  Settings,
+  Loader2,
+  X,
+  Lock,
 } from 'lucide-react';
 import { API } from '@pawtag/shared/api';
 import { formatDate, formatCurrency } from '@pawtag/shared';

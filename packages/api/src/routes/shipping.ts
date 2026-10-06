@@ -12,8 +12,6 @@ import { AuthRequest, authenticate } from '../middleware/auth';
 import { shippingService } from '../commerce/services/shipping.service';
 import { Cart } from '@pawtag/db';
 import { toAppError } from '../lib/app-errors';
-import logger from '../lib/logger';
-
 const router = Router();
 router.use(authenticate);
 
@@ -34,7 +32,7 @@ router.get('/rates', async (req: AuthRequest, res: Response) => {
 
     // Server-authoritative: derive cart total from the authenticated cart
     const cart = await Cart.findOne({ userId: req.user!.id, status: 'active' });
-    const cartSubtotal = cart?.items?.reduce((sum: number, item: any) => {
+    const _cartSubtotal = cart?.items?.reduce((sum: number, item: any) => {
       return sum + (item.unitPrice || 0) * (item.quantity || 0);
     }, 0) ?? 0;
 

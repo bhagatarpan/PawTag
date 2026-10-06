@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, CheckCircle, Clock, Gift, ExternalLink } from 'lucide-react';
+import { Users, CheckCircle, Clock, Gift } from 'lucide-react';
 import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
 

@@ -58,7 +58,7 @@ export async function claimJob(
 
   try {
     // Atomic update: only claim if no active lock exists
-    const result = await Lock.updateOne(
+    const _result = await Lock.updateOne(
       {
         _id: jobName,
         // Allow claim if: no lock exists OR lock has expired

@@ -1,6 +1,5 @@
-import { Subscription, Tag, Invoice, InvoiceAccessToken, User, Notification, Product, TagExpiryNotification, Setting } from '@pawtag/db';
+import { Subscription, Tag, Invoice, InvoiceAccessToken, User, Product, TagExpiryNotification, Setting } from '@pawtag/db';
 import { isFakeMode } from '../commerce/payment-mode';
-import Stripe from 'stripe';
 import { sendMail, sendInvoiceEmail, sendSubscriptionRenewalEmail } from './email.service';
 import { createAndDeliverNotification } from './notification-delivery.service';
 import { renderSubscriptionReminderEmail, renderGracePeriodReminderEmail, renderPaymentFailureEmail, renderGracePeriodStartedEmail, renderPaymentRetrySuccessEmail, renderFreePeriodReminder2WeekEmail, renderFreePeriodReminder3DayEmail, renderGracePeriodReminder3DayEmail, renderTagExpiredEmail } from './email/templates';
@@ -535,7 +534,7 @@ export async function createGoldSubscription(userId: string, price?: number, pla
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
   const dashboardUrl = `${frontendUrl}/account/guardian`;
   try {
-    const { sendMail, sendCmsEmailOrFallback } = await import('./email.service');
+    const { sendCmsEmailOrFallback } = await import('./email.service');
     const { renderMembershipWelcomeEmail } = await import('./email/templates/membership-welcome');
     const html = renderMembershipWelcomeEmail({
       customerName: user.fullName || 'there',
@@ -991,10 +990,10 @@ export async function checkExpiringSubscriptions() {
 
   // Time thresholds
   const in30Days = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-  const in14Days = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
-  const in7Days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-  const in3Days = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
-  const in1Day = new Date(now.getTime() + 1 * 24 * 60 * 60 * 1000);
+  const _in14Days = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+  const _in7Days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const _in3Days = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+  const _in1Day = new Date(now.getTime() + 1 * 24 * 60 * 60 * 1000);
 
   // Find active subscriptions expiring within 30 days
   const expiringSubs = await Subscription.find({
@@ -1078,7 +1077,7 @@ export async function checkExpiredSubscriptions() {
   });
 
   for (const sub of expiredSubs) {
-    const oldStatus = sub.status;
+    const _oldStatus = sub.status;
     sub.status = 'grace_period';
     
     // Read grace period from Product (not CMS settings)
@@ -1567,7 +1566,7 @@ export async function changeSubscriptionPlan(subscriptionId: string, newPlanType
 
       // Look up the product's Stripe price ID or create a new one
       const product = subscription.planId ? await Product.findById(subscription.planId).lean() : null;
-      const stripeProductId = product?.subscriptionConfig?.stripePriceId;
+      const _stripeProductId = product?.subscriptionConfig?.stripePriceId;
 
       // Create a new Stripe Price for the new interval
       if (subscription.planId) {

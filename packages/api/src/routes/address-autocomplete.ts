@@ -277,7 +277,7 @@ router.get('/suggest', async (req: Request, res: Response) => {
         }
       }
     }
-  } catch (err) {
+  } catch (_err) {
     res.status(500).json({ success: false, error: 'Internal server error' });
   }
 });

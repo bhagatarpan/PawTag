@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import { AuthRequest, authenticate } from '../middleware/auth';
+import { AuthRequest } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
 import { Order, Tag, FinderScan, Pet, Product, Setting } from '@pawtag/db';
 
