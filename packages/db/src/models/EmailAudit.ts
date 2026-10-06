@@ -26,6 +26,8 @@ export interface IEmailAuditDocument extends Document {
   relatedEntityType?: 'customer' | 'order' | 'subscription' | 'pet' | 'tag' | 'referral';
   relatedEntityId?: mongoose.Types.ObjectId;
   relatedEntityDisplay?: string;
+  /** Optional durable key so retries do not create duplicate audit/dispatch rows */
+  idempotencyKey?: string;
   isTest: boolean;
   ipAddress?: string;
   userAgent?: string;
@@ -76,6 +78,7 @@ const EmailAuditSchema = new Schema<IEmailAuditDocument>(
     relatedEntityType: { type: String, enum: ['customer', 'order', 'subscription', 'pet', 'tag', 'referral'] },
     relatedEntityId: { type: Schema.Types.ObjectId },
     relatedEntityDisplay: { type: String },
+    idempotencyKey: { type: String },
     isTest: { type: Boolean, default: false, index: true },
     ipAddress: { type: String },
     userAgent: { type: String },
@@ -94,6 +97,11 @@ EmailAuditSchema.index({ templateSlug: 1, createdAt: -1 });
 EmailAuditSchema.index({ status: 1, createdAt: -1 });
 EmailAuditSchema.index({ relatedEntityType: 1, relatedEntityId: 1 });
 EmailAuditSchema.index({ isTest: 1, createdAt: -1 });
+// Sparse unique: only rows that set a key enforce uniqueness (idempotent dispatch)
+EmailAuditSchema.index(
+  { idempotencyKey: 1 },
+  { unique: true, partialFilterExpression: { idempotencyKey: { $type: 'string' } } },
+);
 
 // TTL index for automatic cleanup (configurable retention, default 1 year)
 EmailAuditSchema.index({ createdAt: 1 }, { expireAfterSeconds: 365 * 24 * 60 * 60 });

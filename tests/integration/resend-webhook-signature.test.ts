@@ -88,6 +88,29 @@ describe('Integration: Resend Webhook Signature + Route', () => {
     expect(res.body.success).toBe(true);
   });
 
+  it('is idempotent for duplicate svix events', async () => {
+    const payload = JSON.stringify({
+      type: 'email.delivered',
+      data: { email_id: 'email_dupe_1' },
+    });
+    const headers = signResend(payload, WEBHOOK_SECRET);
+
+    const first = await request(app)
+      .post('/api/webhooks/resend')
+      .set('Content-Type', 'application/json')
+      .set(headers)
+      .send(payload);
+    const second = await request(app)
+      .post('/api/webhooks/resend')
+      .set('Content-Type', 'application/json')
+      .set(headers)
+      .send(payload);
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(second.body.message).toMatch(/already/i);
+  });
+
   it('rejects webhook in production when RESEND_WEBHOOK_SECRET is missing', async () => {
     const prev = process.env.NODE_ENV;
     process.env.NODE_ENV = 'production';

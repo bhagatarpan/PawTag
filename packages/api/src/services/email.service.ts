@@ -138,7 +138,7 @@ export async function sendCmsEmailOrFallback(params: {
   return sendMail(params.to, params.fallbackSubject, params.fallbackHtml, params.fallbackFrom, auditMeta);
 }
 
-export async function sendMail(to: string, subject: string, html: string, from?: string, auditMeta?: { templateSlug?: string; businessFlow?: string; relatedEntityType?: string; relatedEntityId?: string; relatedEntityDisplay?: string; isTest?: boolean }): Promise<EmailResult> {
+export async function sendMail(to: string, subject: string, html: string, from?: string, auditMeta?: { templateSlug?: string; businessFlow?: string; relatedEntityType?: string; relatedEntityId?: string; relatedEntityDisplay?: string; isTest?: boolean; idempotencyKey?: string }): Promise<EmailResult> {
   // In dev mode with test mode enabled, route ALL emails to test address
   const originalRecipient = to;
   if (process.env.NODE_ENV !== 'production') {
@@ -177,6 +177,7 @@ export async function sendMail(to: string, subject: string, html: string, from?:
         relatedEntityType: auditMeta?.relatedEntityType as any,
         relatedEntityId: auditMeta?.relatedEntityId,
         relatedEntityDisplay: auditMeta?.relatedEntityDisplay,
+        idempotencyKey: auditMeta?.idempotencyKey,
         isTest: false,
       }).catch(() => {});
       return { success: false, error: 'Email provider not configured (RESEND_API_KEY missing)' };
@@ -197,6 +198,7 @@ export async function sendMail(to: string, subject: string, html: string, from?:
       relatedEntityType: auditMeta?.relatedEntityType as any,
       relatedEntityId: auditMeta?.relatedEntityId,
       relatedEntityDisplay: auditMeta?.relatedEntityDisplay,
+      idempotencyKey: auditMeta?.idempotencyKey,
       isTest: auditMeta?.isTest ?? true,
     }).catch(() => {});
     return { success: true, messageId: `demo_${Date.now()}` };
@@ -225,6 +227,7 @@ export async function sendMail(to: string, subject: string, html: string, from?:
         relatedEntityType: auditMeta?.relatedEntityType as any,
         relatedEntityId: auditMeta?.relatedEntityId,
         relatedEntityDisplay: auditMeta?.relatedEntityDisplay,
+        idempotencyKey: auditMeta?.idempotencyKey,
         isTest: auditMeta?.isTest ?? false,
       }).catch(() => {}); // fire-and-forget
       return { success: false, error: error.message };
@@ -244,6 +247,7 @@ export async function sendMail(to: string, subject: string, html: string, from?:
       relatedEntityType: auditMeta?.relatedEntityType as any,
       relatedEntityId: auditMeta?.relatedEntityId,
       relatedEntityDisplay: auditMeta?.relatedEntityDisplay,
+      idempotencyKey: auditMeta?.idempotencyKey,
       isTest: auditMeta?.isTest ?? false,
     }).catch(() => {}); // fire-and-forget
     return { success: true, messageId: data?.id };
@@ -417,8 +421,15 @@ export async function sendOrderConfirmation(data: OrderEmailData): Promise<Email
     'shippingAddress.zip': data.shippingAddress.zip,
     viewOrderUrl,
   };
+  const auditMeta = {
+    templateSlug: 'order-confirmation',
+    businessFlow: 'orders_commerce',
+    relatedEntityType: 'order' as const,
+    relatedEntityDisplay: data.orderNumber,
+    idempotencyKey: `order-confirmation:${data.orderNumber}`,
+  };
   const cms = await renderCmsEmail('order-confirmation', vars);
-  if (cms) return sendMail(data.to, cms.subject, cms.html, cms.from);
+  if (cms) return sendMail(data.to, cms.subject, cms.html, cms.from, auditMeta);
   const html = await renderOrderConfirmationEmail({
     name: data.customerName,
     orderNumber: data.orderNumber,
@@ -432,6 +443,7 @@ export async function sendOrderConfirmation(data: OrderEmailData): Promise<Email
     `Order Confirmed — ${data.orderNumber} | PawTag`,
     html,
     '"PawTag" <orders@pawtag.co.nz>',
+    auditMeta,
   );
 }
 

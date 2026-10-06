@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
+import { WebhookEvent } from '@pawtag/db';
 import { updateEmailAuditStatus } from '../services/email-audit.service';
 import logger from '../lib/logger';
 
@@ -111,13 +112,48 @@ router.post('/', async (req: Request, res: Response) => {
       return;
     }
 
+    // Durable idempotency: Resend/Svix event id (svix-id header)
+    const svixId = typeof req.headers['svix-id'] === 'string' ? req.headers['svix-id'] : undefined;
+    if (svixId) {
+      const existing = await WebhookEvent.findOne({ source: 'resend', eventId: svixId });
+      if (existing?.status === 'completed') {
+        logger.info({ svixId, eventType }, 'Resend webhook already processed (idempotent)');
+        res.json({ success: true, message: 'Event already processed' });
+        return;
+      }
+      if (!existing) {
+        try {
+          await WebhookEvent.create({
+            source: 'resend',
+            event: eventType,
+            eventId: svixId,
+            payload: body as any,
+            status: 'processing',
+          });
+        } catch (err: any) {
+          if (err.code === 11000) {
+            res.json({ success: true, message: 'Event already being processed' });
+            return;
+          }
+          throw err;
+        }
+      }
+    }
+
     const details: Record<string, any> = {};
     if (data.bounce) details.reason = data.bounce.message || data.bounce.type;
     if (data.click) details.url = data.click.url;
 
     await updateEmailAuditStatus(providerMessageId, status, details);
 
-    logger.info({ eventType, providerMessageId }, 'Resend webhook processed');
+    if (svixId) {
+      await WebhookEvent.findOneAndUpdate(
+        { source: 'resend', eventId: svixId },
+        { status: 'completed', processedAt: new Date() },
+      ).catch(() => {});
+    }
+
+    logger.info({ eventType, providerMessageId, svixId }, 'Resend webhook processed');
     res.json({ success: true });
   } catch (err) {
     logger.error({ err }, 'Resend webhook processing failed');

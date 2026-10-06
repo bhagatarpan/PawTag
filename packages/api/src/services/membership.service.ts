@@ -610,6 +610,29 @@ export async function activateMembership(membershipId: string) {
 
   if (membership.status === 'active') return membership;
 
+  // Production rule: local paid/active entitlement must not precede authoritative
+  // successful Stripe payment. Webhook already checks this; frontend activate must too.
+  if (!isFakeMode() && membership.stripeSubscriptionId) {
+    try {
+      const stripe = getStripeClient();
+      const sub = await stripe.subscriptions.retrieve(membership.stripeSubscriptionId);
+      const stripeStatus = sub.status;
+      // Only activate when Stripe reports a paid/trialing subscription.
+      // incomplete/incomplete_expired/unpaid/past_due/canceled must not activate a NEW membership.
+      if (stripeStatus !== 'active' && stripeStatus !== 'trialing') {
+        logger.warn(
+          { membershipId, stripeSubscriptionId: membership.stripeSubscriptionId, stripeStatus },
+          '[Membership] Refusing activation — Stripe subscription not in payable state',
+        );
+        throw new Error(`Membership payment is not complete (Stripe status: ${stripeStatus}). Please complete payment or contact support.`);
+      }
+    } catch (err: any) {
+      if (err?.message?.startsWith('Membership payment is not complete')) throw err;
+      logger.error({ err, membershipId }, '[Membership] Failed to verify Stripe subscription before activation');
+      throw new Error('Unable to verify membership payment. Please try again or contact support.');
+    }
+  }
+
   membership.status = 'active';
   await membership.save();
 

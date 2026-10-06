@@ -20,6 +20,8 @@ interface AuditEmailParams {
   relatedEntityType?: 'customer' | 'order' | 'subscription' | 'pet' | 'tag' | 'referral';
   relatedEntityId?: string;
   relatedEntityDisplay?: string;
+  /** Optional durable key so retries do not create duplicate audit rows */
+  idempotencyKey?: string;
   isTest?: boolean;
   ipAddress?: string;
   userAgent?: string;
@@ -28,9 +30,17 @@ interface AuditEmailParams {
 /**
  * Record an email audit entry.
  * Called after every successful or attempted email send.
+ * Idempotent when `idempotencyKey` is provided.
  */
 export async function recordEmailAudit(params: AuditEmailParams): Promise<string | null> {
   try {
+    if (params.idempotencyKey) {
+      const existing = await EmailAudit.findOne({ idempotencyKey: params.idempotencyKey }).lean();
+      if (existing) {
+        return existing._id.toString();
+      }
+    }
+
     const audit = await EmailAudit.create({
       templateId: params.templateId || undefined,
       templateSlug: params.templateSlug,
@@ -59,6 +69,7 @@ export async function recordEmailAudit(params: AuditEmailParams): Promise<string
       relatedEntityType: params.relatedEntityType || undefined,
       relatedEntityId: params.relatedEntityId || undefined,
       relatedEntityDisplay: params.relatedEntityDisplay || undefined,
+      idempotencyKey: params.idempotencyKey || undefined,
       isTest: params.isTest || false,
       ipAddress: params.ipAddress || undefined,
       userAgent: params.userAgent || undefined,
@@ -67,7 +78,12 @@ export async function recordEmailAudit(params: AuditEmailParams): Promise<string
     });
 
     return audit._id.toString();
-  } catch (err) {
+  } catch (err: any) {
+    // Unique idempotencyKey race — return existing row
+    if (err?.code === 11000 && params.idempotencyKey) {
+      const existing = await EmailAudit.findOne({ idempotencyKey: params.idempotencyKey }).lean();
+      if (existing) return existing._id.toString();
+    }
     logger.error({ err, templateSlug: params.templateSlug, recipient: params.recipientEmail }, 'Failed to record email audit');
     return null;
   }
@@ -75,6 +91,7 @@ export async function recordEmailAudit(params: AuditEmailParams): Promise<string
 
 /**
  * Update an email audit record with delivery status from webhook.
+ * Idempotent: does not append a duplicate timeline entry for the same status.
  */
 export async function updateEmailAuditStatus(
   providerMessageId: string,
@@ -93,12 +110,21 @@ export async function updateEmailAuditStatus(
       update.failureReason = details?.reason || details?.message || status;
     }
 
+    const existing = await EmailAudit.findOne({ providerMessageId }).lean();
+    if (!existing) return;
+
+    const alreadyHasStatus = (existing.deliveryTimeline || []).some(
+      (t: any) => t.event === status,
+    );
+
     await EmailAudit.findOneAndUpdate(
       { providerMessageId },
-      {
-        $set: update,
-        $push: { deliveryTimeline: timelineEntry },
-      },
+      alreadyHasStatus
+        ? { $set: update }
+        : {
+            $set: update,
+            $push: { deliveryTimeline: timelineEntry },
+          },
     );
   } catch (err) {
     logger.error({ err, providerMessageId, status }, 'Failed to update email audit status');
