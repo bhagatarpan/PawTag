@@ -170,6 +170,38 @@
 
 **Next phase:** `docs/execution/2026-10-06/phases/04_PREMIUM_CART_CHECKOUT_CUSTOMER_WEB.md` — **STOP. Do not execute Phase 04 until founder authorizes.**
 
+### Phase 04 — Premium Cart, Persistent Checkout Shell, Customer Web (complete for automated evidence)
+
+**Status:** `CODED_NOT_RUNTIME_VALIDATED` — automated gates green; no interactive browser/staging visual QA this session.  
+**Started/Completed:** 2026-10-06  
+**Commit:** `7466bd6`
+
+**What changed (Checkout business logic not rewritten):**
+1. Delivery step: persistent 8/4 shell + sticky OrderSummaryCard (was `max-w-2xl`)
+2. Saved address cards show each address’s own lines
+3. Save-address checkbox controlled + persisted when leaving Delivery
+4. Shipping rates: AbortController + request sequence (no stale overwrite)
+5. `GET /api/checkout/quote` wired into Delivery summary
+6. Mobile sticky total/CTA on checkout; Review/Payment sticky right columns
+7. Cart already 8/4 + mobile sticky (verified)
+
+**Automated commands actually run:**
+
+| Command | Result |
+|---|---|
+| web/shared typecheck | **PASS** |
+| `pnpm test:unit` | **PASS** — 86 files / 936 tests |
+| smoke / regression / build | **PASS** |
+| Focused integration subset | **PASS** — 10 files / 31 tests |
+
+**Manual/browser validation:** not performed this session.  
+
+**Pre-existing:** full integration suite intermittently fails MongoMemoryServer setup under parallel load; individual suites pass.
+
+**Remaining risks:** visual QA on real viewports (Phase 07); live Stripe UI not proven; Checkout.tsx still large (layout improved only).
+
+**Next phase:** `docs/execution/2026-10-06/phases/05_FINDER_WEB_RECOVERY.md` — **STOP. Do not execute Phase 05 until founder authorizes.**
+
 ### Track A0 — Baseline Recovery (complete)
 
 **Status:** PROVEN — quality gates recovered on `main` working tree.  
