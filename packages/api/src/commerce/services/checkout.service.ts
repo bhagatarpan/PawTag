@@ -50,17 +50,26 @@ export interface CheckoutPaymentIntent {
   /** PendingOrder ID */
   pendingOrderId: string;
 
-  /** Stripe PaymentIntent ID */
+  /** Stripe PaymentIntent ID (or synthetic zero-total id) */
   paymentIntentId: string;
 
   /** Client secret for frontend Stripe Elements */
   clientSecret: string;
 
-  /** Amount to charge */
+  /** Amount to charge (server-authoritative quote total) */
   amount: number;
 
   /** Currency */
   currency: string;
+
+  /** Server quote revision for stale detection */
+  quoteRevision?: string;
+
+  /** Quote expiry */
+  quoteExpiresAt?: Date;
+
+  /** True when total is 0 and no Stripe charge is required */
+  isZeroTotal?: boolean;
 }
 
 /** Final checkout result after payment confirmation */
@@ -123,18 +132,9 @@ export class CheckoutService {
       logger.info({ userId, freeShippingThreshold, subtotal: totals.subtotal }, 'Membership free shipping applied at checkout');
     }
 
-    // 3c. Check PawRewards reservation (if any)
+    // 3c. PawRewards requested amount is applied atomically after PendingOrder
+    // is created (see reserveRewards below). Do not trust client totals.
     const requestedRewards = (pawRewardsRedemption ?? 0);
-    let reservedRewards = 0;
-    if (requestedRewards > 0) {
-      const { User: UserModel } = await import('@pawtag/db');
-      const currentUser = await UserModel.findById(userId).select('pawRewardsBalance').lean();
-      const availableBalance = currentUser?.pawRewardsBalance || 0;
-      reservedRewards = Math.min(requestedRewards, availableBalance);
-      // Deduct from total
-      totals.total = Math.max(0, totals.total - reservedRewards);
-      logger.info({ userId, reservedRewards, newTotal: totals.total }, 'PawRewards applied at checkout');
-    }
 
     // 4. Get user info for Stripe
     const user = await User.findById(userId).lean();
@@ -165,19 +165,35 @@ export class CheckoutService {
     // 5. Generate order number for PendingOrder
     const orderNumber = await this.generateOrderNumber();
 
-    // 7. Create Stripe PaymentIntent
-    const paymentIntent = await stripePaymentProvider.createPaymentIntent({
-      amount: totals.total,
-      currency: totals.currency,
-      orderId: orderNumber,
-      customerEmail: user.email,
-      customerName: user.fullName,
-      stripeCustomerId: stripeCustomerId || undefined,
-      metadata: {
-        userId,
-        orderNumber,
-      },
+    // Build authoritative server quote (client monetary fields are never trusted)
+    const quote = await this.buildCheckoutQuote(userId, {
+      requestedRewards,
+      shippingAddress,
+      shippingMethodId: cart.shippingMethodId,
     });
+
+    // Zero-total orders: no Stripe PaymentIntent — explicit paid-zero path via synthetic PI id
+    let paymentIntent: { id: string; clientSecret: string };
+    if (quote.total <= 0) {
+      paymentIntent = {
+        id: `pi_zero_${orderNumber}`,
+        clientSecret: `pi_zero_${orderNumber}_secret`,
+      };
+      logger.info({ userId, orderNumber, total: quote.total }, 'Zero-total checkout — skipping Stripe PaymentIntent');
+    } else {
+      paymentIntent = await stripePaymentProvider.createPaymentIntent({
+        amount: quote.total,
+        currency: quote.currency,
+        orderId: orderNumber,
+        customerEmail: user.email,
+        customerName: user.fullName,
+        stripeCustomerId: stripeCustomerId || undefined,
+        metadata: {
+          userId,
+          orderNumber,
+        },
+      });
+    }
 
     // 7. Create PendingOrder
     const ttlMinutes = await getNumberSetting('commerce.checkout.pendingOrderTtlMinutes');
@@ -197,27 +213,59 @@ export class CheckoutService {
         customisation: item.customisation,
         customisationTexts: item.customisationTexts || [],
       })),
-      subtotal: totals.subtotal,
-      discount: totals.discount,
+      subtotal: quote.subtotal,
+      discount: quote.discount,
       promoCode: cart.promoCode,
-      shipping: totals.shipping,
-      shippingMethodId: cart.shippingMethodId,
-      shippingMethodName: cart.shippingMethodName,
-      tax: totals.tax,
-      total: totals.total,
-      currency: totals.currency,
+      shipping: quote.shipping,
+      shippingMethodId: quote.shippingMethodId || cart.shippingMethodId,
+      shippingMethodName: quote.shippingMethodName || cart.shippingMethodName,
+      tax: quote.tax,
+      total: quote.total,
+      currency: quote.currency,
       stripePaymentIntentId: paymentIntent.id,
       stripeClientSecret: paymentIntent.clientSecret,
       shippingAddress: shippingAddress || undefined,
       status: 'pending',
       referralCode: cart.promoCode,
       autoRenew: typeof autoRenew === 'boolean' ? autoRenew : (autoRenew !== undefined ? true : true),
-      pawRewardsRedemption: reservedRewards,
-      pawRewardsReserved: reservedRewards > 0,
+      pawRewardsRedemption: 0,
+      pawRewardsReserved: false,
       autoRenewMap: typeof autoRenew === 'object' && autoRenew !== null ? autoRenew : undefined,
       expiresAt,
       lastAccessedAt: new Date(),
-    });
+      quoteRevision: quote.quoteRevision,
+      quoteExpiresAt: quote.expiresAt,
+    } as any);
+
+    // Atomic PawRewards reservation keyed to PendingOrder
+    if (requestedRewards > 0) {
+      try {
+        const { reserveRewards } = await import('../../services/loyalty/pawrewards.service');
+        const reservation = await reserveRewards(
+          userId,
+          requestedRewards,
+          String(pendingOrder._id),
+          expiresAt,
+        );
+        const reservedRewards = reservation.reserved;
+        if (reservedRewards > 0) {
+          const rewardsDiscount = Math.min(reservedRewards, quote.total);
+          pendingOrder.pawRewardsRedemption = reservedRewards;
+          pendingOrder.pawRewardsReserved = true;
+          pendingOrder.total = Math.max(0, quote.total - reservedRewards);
+          pendingOrder.discount = (pendingOrder.discount || 0) + reservedRewards;
+          await pendingOrder.save();
+          logger.info(
+            { userId, pendingOrderId: pendingOrder._id, reservedRewards, rewardsDiscount, newTotal: pendingOrder.total },
+            'PawRewards reserved atomically for checkout',
+          );
+        }
+      } catch (err) {
+        logger.error({ err, userId, pendingOrderId: pendingOrder._id }, 'PawRewards reservation failed — cleaning up pending order');
+        await PendingOrder.findByIdAndDelete(pendingOrder._id);
+        throw new InvalidCartError('Could not reserve PawRewards for this checkout');
+      }
+    }
 
     // 8. Reserve stock for all items (with compensation on failure)
     const reservationResult = await inventoryService.reserveAll(
@@ -229,7 +277,11 @@ export class CheckoutService {
     );
 
     if (!reservationResult.success) {
-      // Reservation failed and was compensated — clean up the pending order
+      // Reservation failed and was compensated — clean up pending order + rewards hold
+      if (pendingOrder.pawRewardsReserved && pendingOrder.pawRewardsRedemption) {
+        const { releaseRewardsReservation } = await import('../../services/loyalty/pawrewards.service');
+        await releaseRewardsReservation(userId, pendingOrder.pawRewardsRedemption, String(pendingOrder._id), String(pendingOrder._id)).catch(() => {});
+      }
       await PendingOrder.findByIdAndDelete(pendingOrder._id);
       throw new InvalidCartError(`Could not reserve stock: ${reservationResult.error}`);
     }
@@ -238,16 +290,106 @@ export class CheckoutService {
       userId,
       pendingOrderId: pendingOrder._id,
       paymentIntentId: paymentIntent.id,
-      total: totals.total,
+      total: pendingOrder.total,
+      quoteRevision: (pendingOrder as any).quoteRevision,
     }, 'Checkout payment intent created');
 
     return {
       pendingOrderId: String(pendingOrder._id),
       paymentIntentId: paymentIntent.id,
       clientSecret: paymentIntent.clientSecret,
-      amount: totals.total,
-      currency: totals.currency,
+      amount: pendingOrder.total,
+      currency: pendingOrder.currency,
+      quoteRevision: (pendingOrder as any).quoteRevision,
+      quoteExpiresAt: (pendingOrder as any).quoteExpiresAt,
+      isZeroTotal: pendingOrder.total <= 0,
     };
+  }
+
+  /**
+   * Build an authoritative checkout quote from server state.
+   * Client-submitted monetary values are ignored.
+   */
+  async buildCheckoutQuote(
+    userId: string,
+    opts: {
+      requestedRewards?: number;
+      shippingAddress?: { line1: string; line2?: string; city: string; state: string; zip: string; country?: string };
+      shippingMethodId?: string;
+    } = {},
+  ): Promise<import('@pawtag/shared').CheckoutQuote> {
+    const totals = await cartService.calculateTotals(userId);
+
+    // Membership free shipping
+    const freeShippingThreshold = await membershipEntitlementService.getValue<number>(userId, 'free_shipping_threshold');
+    let shipping = totals.shipping;
+    if (freeShippingThreshold !== null && freeShippingThreshold >= 0 && totals.subtotal >= freeShippingThreshold) {
+      shipping = 0;
+    }
+
+    // Resolve shipping method authoritatively by stable id when present
+    let shippingMethodId = opts.shippingMethodId;
+    let shippingMethodName: string | undefined;
+    if (shippingMethodId) {
+      const { ShippingMethod } = await import('@pawtag/db');
+      const method = await ShippingMethod.findById(shippingMethodId).lean();
+      if (method && method.isActive) {
+        shipping = method.rate;
+        shippingMethodName = method.name;
+      }
+    }
+
+    // Rewards: clamp to available unreserved balance (actual hold happens later)
+    const requestedRewards = opts.requestedRewards || 0;
+    let rewardsToApply = 0;
+    if (requestedRewards > 0) {
+      const { User: UserModel } = await import('@pawtag/db');
+      const currentUser = await UserModel.findById(userId).select('pawRewardsBalance pawRewardsReserved').lean();
+      const available = Math.max(
+        0,
+        (currentUser?.pawRewardsBalance || 0) - (currentUser?.pawRewardsReserved || 0),
+      );
+      rewardsToApply = Math.min(requestedRewards, available);
+    }
+
+    const discount = (totals.discount || 0) + rewardsToApply;
+    const tax = totals.tax || 0;
+    const subtotal = totals.subtotal;
+    const total = Math.max(0, subtotal - discount + shipping + tax);
+
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 15 * 60 * 1000);
+    const quoteRevision = crypto.createHash('sha256')
+      .update(JSON.stringify({ userId, subtotal, discount, shipping, tax, total, rewardsToApply, shippingMethodId, at: now.toISOString() }))
+      .digest('hex')
+      .slice(0, 16);
+
+    return {
+      userId,
+      currency: totals.currency || 'NZD',
+      subtotal,
+      discount,
+      rewardsDiscount: rewardsToApply,
+      shipping,
+      shippingMethodId,
+      shippingMethodName,
+      tax,
+      total,
+      quoteRevision,
+      quotedAt: now,
+      expiresAt,
+      isZeroTotal: total <= 0,
+    };
+  }
+
+  /**
+   * Public quote endpoint helper — recalculates from authoritative state.
+   */
+  async getCheckoutQuote(
+    userId: string,
+    opts: { requestedRewards?: number; shippingMethodId?: string } = {},
+  ): Promise<import('@pawtag/shared').CheckoutQuote> {
+    return this.buildCheckoutQuote(userId, opts);
   }
 
   /**
@@ -311,11 +453,21 @@ export class CheckoutService {
     }
 
     // 4. Validate payment via Stripe API (server-side)
-    const payment = await stripePaymentProvider.retrievePaymentIntent(paymentIntentId);
-    logger.info({ paymentStatus: payment.status, paymentId: payment.id }, 'Stripe payment status');
-    if (payment.status !== 'succeeded' && payment.status !== 'requires_capture') {
-      logger.error({ paymentStatus: payment.status, paymentIntentId }, 'Payment not in expected state');
-      throw new PaymentFailedError(`Payment status is ${payment.status}`);
+    // Zero-total checkouts use a synthetic PI id and skip Stripe retrieval.
+    const isZeroTotalPayment = paymentIntentId.startsWith('pi_zero_');
+    let payment: { cardBrand?: string; cardLast4?: string; status?: string } | null = null;
+    if (isZeroTotalPayment) {
+      if (pending.total > 0) {
+        throw new PaymentFailedError('Zero-total payment id used for non-zero pending order');
+      }
+      logger.info({ paymentIntentId, pendingId: pending._id }, 'Zero-total checkout confirmed without Stripe');
+    } else {
+      payment = await stripePaymentProvider.retrievePaymentIntent(paymentIntentId);
+      logger.info({ paymentStatus: payment.status, paymentId: paymentIntentId }, 'Stripe payment status');
+      if (payment.status !== 'succeeded' && payment.status !== 'requires_capture') {
+        logger.error({ paymentStatus: payment.status, paymentIntentId }, 'Payment not in expected state');
+        throw new PaymentFailedError(`Payment status is ${payment.status}`);
+      }
     }
 
     // 5. Check if order already exists for this payment (idempotent — previous attempt may have partially succeeded)
@@ -370,8 +522,8 @@ export class CheckoutService {
             status: 'completed',
             transactionId: paymentIntentId,
             stripePaymentIntentId: paymentIntentId,
-            cardBrand: payment.cardBrand,
-            cardLast4: payment.cardLast4,
+            cardBrand: (payment as any)?.cardBrand,
+            cardLast4: (payment as any)?.cardLast4,
             amount: pending.total,
             currency: pending.currency,
             paidAt: new Date(),
@@ -380,9 +532,11 @@ export class CheckoutService {
           referredByCode: pending.referralCode,
           autoRenew: pending.autoRenew !== false,
           autoRenewMap: pending.autoRenewMap,
-          notes: payment.cardBrand
-            ? `Paid with ${payment.cardBrand.charAt(0).toUpperCase() + payment.cardBrand.slice(1).toLowerCase()}${payment.cardLast4 ? ` ••••${payment.cardLast4}` : ''} — Stripe PaymentIntent: ${paymentIntentId}`
-            : `Stripe PaymentIntent: ${paymentIntentId}`,
+          notes: (payment as any)?.cardBrand
+            ? `Paid with ${(payment as any).cardBrand.charAt(0).toUpperCase() + (payment as any).cardBrand.slice(1).toLowerCase()}${(payment as any).cardLast4 ? ` ••••${(payment as any).cardLast4}` : ''} — Stripe PaymentIntent: ${paymentIntentId}`
+            : isZeroTotalPayment
+              ? `Zero-total checkout — Stripe PaymentIntent: ${paymentIntentId}`
+              : `Stripe PaymentIntent: ${paymentIntentId}`,
           createdBy,
           createdByType: 'Customer',
           createdByPortal: portal,
@@ -443,7 +597,7 @@ export class CheckoutService {
     // Each step is tracked individually so failures are queryable and retryable.
     const completionErrors: Array<{ step: string; error: string; productId?: string; timestamp: Date }> = [];
 
-    // 8. Confirm stock (deduct actual inventory)
+    // 8. Confirm stock (deduct actual inventory) — fail-loud on atomic transition miss
     try {
       for (const item of pending.items) {
         await inventoryService.confirmSale(String(item.productId), item.quantity, order.orderNumber);
@@ -454,15 +608,47 @@ export class CheckoutService {
       completionErrors.push({ step: 'inventory_confirmation', error: errorMsg, timestamp: new Date() });
     }
 
-    // 8a. Increment promo code usage (only on successful order)
+    // 8a. Increment promo code usage exactly once per order (idempotent)
     if (pending.promoCode) {
       try {
-        const { PromoCode } = await import('@pawtag/db');
-        await PromoCode.updateOne(
-          { code: pending.promoCode },
-          { $inc: { usageCount: 1 } },
+        const { PromoCode, PromoUsage } = await import('@pawtag/db');
+        const code = pending.promoCode.toUpperCase();
+        // Durable unique guard — retries must not increment twice
+        const usage = await PromoUsage.findOneAndUpdate(
+          { code, orderId: order._id },
+          {
+            $setOnInsert: {
+              code,
+              orderId: order._id,
+              orderNumber: order.orderNumber,
+              userId: order.userId,
+            },
+          },
+          { upsert: true, new: false },
         );
-        logger.info({ orderId: order._id, promoCode: pending.promoCode }, 'Promo usage incremented');
+
+        if (!usage) {
+          // First commit for this order — increment usage with limit guard
+          const promo = await PromoCode.findOne({ code });
+          if (promo) {
+            const limitFilter: Record<string, unknown> = { code };
+            if (promo.usageLimit && promo.usageLimit > 0) {
+              limitFilter.usageCount = { $lt: promo.usageLimit };
+            }
+            const updated = await PromoCode.findOneAndUpdate(
+              limitFilter,
+              { $inc: { usageCount: 1 } },
+              { new: true },
+            );
+            if (!updated && promo.usageLimit && promo.usageCount >= promo.usageLimit) {
+              logger.warn({ orderId: order._id, promoCode: code, usageLimit: promo.usageLimit }, 'Promo usage limit reached at finalization');
+            } else {
+              logger.info({ orderId: order._id, promoCode: code }, 'Promo usage incremented');
+            }
+          }
+        } else {
+          logger.info({ orderId: order._id, promoCode: code }, 'Promo usage already committed for this order');
+        }
       } catch (err: any) {
         const errorMsg = err?.message || String(err);
         logger.error({ err, orderId: order._id, correlationId }, 'Completion step failed: promo usage increment');
@@ -470,7 +656,7 @@ export class CheckoutService {
       }
     }
 
-    // 8a2. Commit PawRewards reservation (only on successful order)
+    // 8a2. Commit PawRewards reservation (idempotent per PendingOrder)
     if (pending.pawRewardsRedemption && pending.pawRewardsRedemption > 0) {
       try {
         const { commitRewardsReservation } = await import('../../services/loyalty/pawrewards.service');
@@ -478,6 +664,7 @@ export class CheckoutService {
           userId,
           pending.pawRewardsRedemption,
           order.orderNumber,
+          String(pending._id),
         );
         logger.info({ orderId: order._id, amount: pending.pawRewardsRedemption }, 'PawRewards reservation committed');
       } catch (err: any) {

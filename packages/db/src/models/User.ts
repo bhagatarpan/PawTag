@@ -80,6 +80,8 @@ export interface IUserDocument extends Document {
   pawRewardsTotalEarned: number;
   pawRewardsTotalRedeemed: number;
   pawRewardsTotalExpired: number;
+  /** Amount currently held as open checkout reservations (not spendable). */
+  pawRewardsReserved: number;
   stripeCustomerId?: string;
   deletedAt?: Date;
 }
@@ -172,6 +174,7 @@ const UserSchema = new Schema<IUserDocument>(
     pawRewardsTotalEarned: { type: Number, default: 0, min: 0 },
     pawRewardsTotalRedeemed: { type: Number, default: 0, min: 0 },
     pawRewardsTotalExpired: { type: Number, default: 0, min: 0 },
+    pawRewardsReserved: { type: Number, default: 0, min: 0 },
     stripeCustomerId: { type: String },
     deletedAt: { type: Date, default: null },
   },

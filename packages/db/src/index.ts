@@ -63,6 +63,8 @@ export { IntegrationConnection, type IIntegrationConnectionDocument, type Integr
 export { GuardianPointsLedger, type IGuardianPointsLedgerDocument } from './models/GuardianPointsLedger';
 export { GuardianTierHistory, type IGuardianTierHistoryDocument } from './models/GuardianTierHistory';
 export { PawRewardsLedger, type IPawRewardsLedgerDocument } from './models/PawRewardsLedger';
+export { PawRewardsReservation, type IPawRewardsReservationDocument, type PawRewardsReservationStatus } from './models/PawRewardsReservation';
+export { PromoUsage, type IPromoUsageDocument } from './models/PromoUsage';
 export { BackgroundJob, type IBackgroundJobDocument } from './models/BackgroundJob';
 export { PendingRefundRetry, type IPendingRefundRetryDocument } from './models/PendingRefundRetry';
 export { MembershipTier, type IMembershipTierDocument } from './models/MembershipTier';

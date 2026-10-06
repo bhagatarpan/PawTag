@@ -13,6 +13,7 @@
  * ```
  */
 
+import mongoose from 'mongoose';
 import { Cart, Order, ShippingMethod } from '@pawtag/db';
 import { nzShippingProvider } from '../providers/nz-shipping';
 import type { ShippingAddress, ShippingRate } from '../interfaces/shipping-provider';
@@ -27,36 +28,70 @@ export class ShippingService {
    * Get available shipping rates for a user's cart.
    *
    * Reads from ShippingMethod MongoDB model first.
-   * Falls back to NZ shipping provider if no methods configured.
+   * If none are configured, upserts standard fallback methods so returned IDs
+   * are always resolvable by selectMethod (never synthetic unresolvable IDs).
    *
    * @param userId - User ID
    * @param address - Shipping address
    * @returns Available shipping rates
    */
-  async getRates(_userId: string, address: ShippingAddress): Promise<ShippingRate[]> {
+  async getRates(_userId: string, _address: ShippingAddress): Promise<ShippingRate[]> {
     // Try to get rates from ShippingMethod model first
-    const methods = await ShippingMethod.find({ isActive: true }).sort({ sortOrder: 1 });
+    let methods = await ShippingMethod.find({ isActive: true }).sort({ sortOrder: 1 });
 
-    if (methods.length > 0) {
-      // Use configured shipping methods from admin
-      return methods.map((m) => ({
-        id: String(m._id),
-        name: m.name,
-        description: m.description,
-        cost: m.rate,
-        estimatedDays: m.estimatedDays,
-        carrier: m.carrier,
-      }));
+    if (methods.length === 0) {
+      // Ensure fallback methods exist as real documents with stable IDs
+      methods = await this.ensureDefaultShippingMethods();
     }
 
-    // Fallback to NZ shipping provider (hardcoded free shipping)
-    const rates = await nzShippingProvider.getRates({
-      address,
-      items: [],
-      subtotal: 0,
-    });
+    // Use configured shipping methods from admin (or ensured defaults)
+    return methods.map((m) => ({
+      id: String(m._id),
+      name: m.name,
+      description: m.description,
+      cost: m.rate,
+      estimatedDays: m.estimatedDays,
+      carrier: m.carrier,
+    }));
+  }
 
-    return rates;
+  /**
+   * Upsert standard NZ shipping methods when none are configured.
+   * Returns active methods so rate IDs are always DB-resolvable.
+   */
+  private async ensureDefaultShippingMethods(): Promise<Array<any>> {
+    const defaults = [
+      {
+        name: 'Standard NZ Shipping',
+        description: 'Standard delivery within New Zealand',
+        rate: 0,
+        rateType: 'free' as const,
+        estimatedDays: '3-5 business days',
+        carrier: 'NZ Post',
+        isActive: true,
+        sortOrder: 1,
+      },
+      {
+        name: 'Express NZ Shipping',
+        description: 'Express delivery within New Zealand',
+        rate: 9.99,
+        rateType: 'flat_rate' as const,
+        estimatedDays: '1-2 business days',
+        carrier: 'NZ Post',
+        isActive: true,
+        sortOrder: 2,
+      },
+    ];
+
+    for (const d of defaults) {
+      await ShippingMethod.updateOne(
+        { name: d.name },
+        { $setOnInsert: d },
+        { upsert: true },
+      );
+    }
+
+    return ShippingMethod.find({ isActive: true }).sort({ sortOrder: 1 });
   }
 
   /**
@@ -79,18 +114,38 @@ export class ShippingService {
       throw new ShippingError('Cart not found');
     }
 
+    if (!methodId || typeof methodId !== 'string') {
+      throw new ShippingError('Shipping method id is required');
+    }
+
     // Server-authoritative: look up the cost from ShippingMethod collection
-    const method = await ShippingMethod.findById(methodId);
+    let method: any = null;
+    if (mongoose.isValidObjectId(methodId)) {
+      method = await ShippingMethod.findById(methodId).lean();
+    }
+    if (!method || !method.isActive) {
+      // Resolve legacy/synthetic names by ensuring defaults then matching by name
+      await this.ensureDefaultShippingMethods();
+      const or: Record<string, unknown>[] = [{ name: methodName || methodId }];
+      if (mongoose.isValidObjectId(methodId)) {
+        or.push({ _id: methodId });
+      }
+      method = await ShippingMethod.findOne({
+        $or: or,
+        isActive: true,
+      }).lean();
+    }
+
     if (!method) {
       throw new ShippingError(`Shipping method not found: ${methodId}`);
     }
 
-    cart.shippingMethodId = methodId;
+    cart.shippingMethodId = String(method._id);
     cart.shippingMethodName = method.name || methodName;
     cart.shippingCost = method.rate;
     await cart.save();
 
-    logger.info({ userId, methodId, methodName: method.name, cost: method.rate }, 'Shipping method selected');
+    logger.info({ userId, methodId: String(method._id), methodName: method.name, cost: method.rate }, 'Shipping method selected');
   }
 
   /**

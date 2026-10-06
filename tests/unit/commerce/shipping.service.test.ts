@@ -8,7 +8,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('@pawtag/db', () => ({
   Cart: { findOne: vi.fn() },
   Order: { findById: vi.fn(), updateOne: vi.fn() },
-  ShippingMethod: { find: vi.fn(), findById: vi.fn() },
+  ShippingMethod: {
+    find: vi.fn(),
+    findById: vi.fn(),
+    findOne: vi.fn(),
+    updateOne: vi.fn(),
+  },
 }));
 
 vi.mock('../../../packages/api/src/commerce/providers/nz-shipping', () => ({
@@ -64,15 +69,20 @@ describe('ShippingService', () => {
       expect(rates[0].cost).toBe(0);
     });
 
-    it('should fall back to NZ shipping provider when no methods configured', async () => {
+    it('should ensure default resolvable methods when none configured', async () => {
       (ShippingMethod.find as any).mockReturnValue({
-        sort: () => Promise.resolve([]),
+        sort: vi.fn().mockResolvedValueOnce([]).mockResolvedValueOnce([
+          { _id: 'method_std', name: 'Standard NZ Shipping', rate: 0, estimatedDays: '3-5 business days', carrier: 'NZ Post' },
+        ]),
       });
+      (ShippingMethod.updateOne as any).mockResolvedValue({});
 
       const rates = await shippingService.getRates('user_1', mockAddress);
 
       expect(rates).toHaveLength(1);
       expect(rates[0].name).toBe('Standard NZ Shipping');
+      expect(rates[0].id).toBe('method_std');
+      expect(ShippingMethod.updateOne).toHaveBeenCalled();
     });
   });
 
@@ -80,12 +90,14 @@ describe('ShippingService', () => {
     it('should update cart with shipping method from server lookup', async () => {
       const mockCart = { shippingMethodId: undefined, shippingMethodName: undefined, shippingCost: 0, save: vi.fn() };
       (Cart.findOne as any).mockResolvedValue(mockCart);
-      (ShippingMethod.findById as any).mockResolvedValue({ _id: 'method_1', name: 'Standard', rate: 9.99 });
+      (ShippingMethod.findById as any).mockReturnValue({
+        lean: () => Promise.resolve({ _id: '507f1f77bcf86cd799439011', name: 'Standard', rate: 9.99, isActive: true }),
+      });
 
-      await shippingService.selectMethod('user_1', 'method_1', 'Standard');
+      await shippingService.selectMethod('user_1', '507f1f77bcf86cd799439011', 'Standard');
 
       expect(mockCart.save).toHaveBeenCalled();
-      expect(mockCart.shippingMethodId).toBe('method_1');
+      expect(mockCart.shippingMethodId).toBe('507f1f77bcf86cd799439011');
       expect(mockCart.shippingMethodName).toBe('Standard');
       expect(mockCart.shippingCost).toBe(9.99); // Server-authoritative cost
     });
@@ -93,7 +105,10 @@ describe('ShippingService', () => {
     it('should throw if shipping method not found', async () => {
       const mockCart = { shippingMethodId: undefined, shippingMethodName: undefined, shippingCost: 0, save: vi.fn() };
       (Cart.findOne as any).mockResolvedValue(mockCart);
-      (ShippingMethod.findById as any).mockResolvedValue(null);
+      (ShippingMethod.findById as any).mockReturnValue({ lean: () => Promise.resolve(null) });
+      (ShippingMethod.findOne as any).mockReturnValue({ lean: () => Promise.resolve(null) });
+      (ShippingMethod.find as any).mockReturnValue({ sort: () => Promise.resolve([]) });
+      (ShippingMethod.updateOne as any).mockResolvedValue({});
 
       await expect(shippingService.selectMethod('user_1', 'nonexistent', 'Standard'))
         .rejects.toThrow('Shipping method not found');

@@ -105,6 +105,12 @@ export interface IPendingOrderDocument extends Document {
   /** Whether PawRewards are reserved on this checkout */
   pawRewardsReserved?: boolean;
 
+  /** Server quote revision for stale checkout detection */
+  quoteRevision?: string;
+
+  /** Server quote expiry */
+  quoteExpiresAt?: Date;
+
   /** Timestamp when this checkout expires */
   expiresAt: Date;
 
@@ -166,6 +172,8 @@ const PendingOrderSchema = new Schema<IPendingOrderDocument>(
     autoRenewMap: { type: Schema.Types.Mixed },
     pawRewardsRedemption: { type: Number, default: 0, min: 0 },
     pawRewardsReserved: { type: Boolean, default: false },
+    quoteRevision: { type: String },
+    quoteExpiresAt: { type: Date },
     expiresAt: { type: Date, required: true, index: { expireAfterSeconds: 0 } },
     lastAccessedAt: { type: Date, default: Date.now },
     convertedOrderId: { type: Schema.Types.ObjectId, ref: 'Order' },

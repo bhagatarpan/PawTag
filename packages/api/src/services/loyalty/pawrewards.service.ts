@@ -25,7 +25,7 @@
  */
 
 import mongoose from 'mongoose';
-import { User, Subscription, PawRewardsLedger } from '@pawtag/db';
+import { User, Subscription, PawRewardsLedger, PawRewardsReservation } from '@pawtag/db';
 import { calculateTier, TierName } from './tier.service';
 import { isGoldSubscription } from './points-earning.service';
 import { sendMonthlySummaryEmail, sendPawRewardsReminderEmail } from '../email.service';
@@ -297,56 +297,209 @@ export async function redeemRewards(
 }
 
 /**
- * Commit a PawRewards reservation to a permanent debit.
- * Called from checkout.service.ts confirmCheckout after payment succeeds.
+ * Atomically reserve PawRewards for a checkout.
+ *
+ * Concurrency safety: available = pawRewardsBalance - pawRewardsReserved.
+ * The reservation is held on User.pawRewardsReserved and recorded in
+ * PawRewardsReservation (unique checkoutId) so retries cannot double-hold.
+ */
+export async function reserveRewards(
+  userId: string,
+  amount: number,
+  checkoutId: string,
+  expiresAt: Date = new Date(Date.now() + 30 * 60 * 1000),
+): Promise<{ reserved: number; availableAfter: number }> {
+  if (amount <= 0) {
+    return { reserved: 0, availableAfter: 0 };
+  }
+
+  // Idempotent: already reserved for this checkout
+  const existing = await PawRewardsReservation.findOne({ checkoutId, userId });
+  if (existing && existing.status === 'reserved') {
+    const user = await User.findById(userId).select('pawRewardsBalance pawRewardsReserved').lean();
+    return {
+      reserved: existing.amount,
+      availableAfter: Math.max(0, (user?.pawRewardsBalance || 0) - (user?.pawRewardsReserved || 0)),
+    };
+  }
+  if (existing && existing.status === 'committed') {
+    throw new Error('Rewards reservation already committed for this checkout');
+  }
+
+  const user = await User.findById(userId).select('pawRewardsBalance pawRewardsReserved pawRewardsBalance').lean();
+  if (!user) throw new Error('User not found');
+
+  const balance = user.pawRewardsBalance || 0;
+  const reserved = user.pawRewardsReserved || 0;
+  const available = Math.max(0, balance - reserved);
+  const toReserve = Math.min(amount, available);
+
+  if (toReserve <= 0) {
+    throw new Error('Insufficient PawRewards balance available to reserve');
+  }
+
+  // Atomic hold: only succeed if available (balance - reserved) still covers amount
+  const updated = await User.findOneAndUpdate(
+    {
+      _id: userId,
+      $expr: {
+        $gte: [
+          { $subtract: ['$pawRewardsBalance', { $ifNull: ['$pawRewardsReserved', 0] }] },
+          toReserve,
+        ],
+      },
+    },
+    { $inc: { pawRewardsReserved: toReserve } },
+    { new: true },
+  ).lean();
+
+  if (!updated) {
+    throw new Error('Insufficient PawRewards balance available to reserve');
+  }
+
+  await PawRewardsReservation.findOneAndUpdate(
+    { checkoutId, userId },
+    {
+      $set: {
+        userId,
+        checkoutId,
+        amount: toReserve,
+        status: 'reserved',
+        expiresAt,
+      },
+    },
+    { upsert: true, new: true },
+  );
+
+  await recordPawRewardsTransaction(userId, 0, 'redemption', `Reserved $${toReserve} for checkout ${checkoutId}`).catch(() => {});
+
+  logger.info(
+    {
+      userId,
+      checkoutId,
+      reserved: toReserve,
+      balance: updated.pawRewardsBalance,
+      reservedTotal: updated.pawRewardsReserved,
+      availableAfter: Math.max(0, (updated.pawRewardsBalance || 0) - (updated.pawRewardsReserved || 0)),
+    },
+    'PawRewards reserved atomically for checkout',
+  );
+
+  return {
+    reserved: toReserve,
+    availableAfter: Math.max(0, (updated.pawRewardsBalance || 0) - (updated.pawRewardsReserved || 0)),
+  };
+}
+
+/**
+ * Commit a reserved PawRewards amount to a permanent debit.
+ * Idempotent per checkoutId. Fail-loud if reservation is missing/insufficient.
  */
 export async function commitRewardsReservation(
   userId: string,
   amount: number,
   orderId: string,
-): Promise<void> {
-  if (amount <= 0) return;
+  checkoutId?: string,
+): Promise<{ committed: boolean; alreadyCommitted: boolean }> {
+  if (amount <= 0) return { committed: false, alreadyCommitted: false };
 
-  const user = await User.findById(userId).lean();
-  if (!user) throw new Error('User not found');
+  const lookup = checkoutId
+    ? await PawRewardsReservation.findOne({ checkoutId, userId })
+    : await PawRewardsReservation.findOne({ userId, status: 'reserved', amount, orderId: null as any }).sort({ createdAt: -1 });
 
-  const currentBalance = user.pawRewardsBalance || 0;
-  if (currentBalance < amount) {
-    // Insufficient balance at commit time — log but don't fail the order
-    logger.error({ userId, amount, currentBalance, orderId }, 'Insufficient balance at rewards commit');
-    return;
+  if (lookup && lookup.status === 'committed') {
+    logger.info({ userId, orderId, checkoutId }, 'PawRewards commit skipped — already committed');
+    return { committed: false, alreadyCommitted: true };
   }
 
-  await recordPawRewardsTransaction(userId, -amount, 'redemption', `Committed for order ${orderId}`);
+  if (lookup && lookup.status === 'released') {
+    logger.error({ userId, orderId, checkoutId }, 'PawRewards commit skipped — reservation already released');
+    return { committed: false, alreadyCommitted: false };
+  }
 
-  await User.findByIdAndUpdate(
-    userId,
-    { 
-      $inc: { 
-        pawRewardsBalance: -amount,
-        pawRewardsTotalRedeemed: amount,
-      } 
+  const reservationAmount = lookup?.amount ?? amount;
+
+  // Atomic commit: reduce balance and reserved together; require reserved >= amount
+  const updated = await User.findOneAndUpdate(
+    { _id: userId, pawRewardsReserved: { $gte: reservationAmount } },
+    {
+      $inc: {
+        pawRewardsBalance: -reservationAmount,
+        pawRewardsTotalRedeemed: reservationAmount,
+        pawRewardsReserved: -reservationAmount,
+      },
     },
-  );
+    { new: true },
+  ).lean();
 
-  incrementCounter(METRICS.LOYALTY_PAWREWARDS_REDEEMED_TOTAL, { }, amount);
+  if (!updated) {
+    // Insufficient reserved hold — fail loud so order repair path can surface it
+    logger.error({ userId, amount, orderId, checkoutId }, 'Insufficient reserved PawRewards at commit');
+    throw new Error('Unable to commit PawRewards reservation: insufficient reserved balance');
+  }
 
-  logger.info({ userId, orderId, amount }, 'PawRewards reservation committed');
+  await recordPawRewardsTransaction(userId, -reservationAmount, 'redemption', `Committed for order ${orderId}`);
+
+  if (lookup) {
+    lookup.status = 'committed';
+    if (mongoose.Types.ObjectId.isValid(orderId)) {
+      lookup.orderId = new mongoose.Types.ObjectId(orderId);
+    }
+    lookup.committedAt = new Date();
+    await lookup.save();
+  }
+
+  incrementCounter(METRICS.LOYALTY_PAWREWARDS_REDEEMED_TOTAL, { }, reservationAmount);
+
+  logger.info({ userId, orderId, checkoutId, amount: reservationAmount }, 'PawRewards reservation committed');
+  return { committed: true, alreadyCommitted: false };
 }
 
 /**
- * Release a PawRewards reservation (e.g., on checkout failure/cancel).
- * No-op if amount is 0.
+ * Release a reserved PawRewards amount (checkout failure/expiry).
+ * Idempotent per checkoutId.
  */
 export async function releaseRewardsReservation(
-  _userId: string,
+  userId: string,
   amount: number,
-  _orderId: string,
-): Promise<void> {
-  if (amount <= 0) return;
-  // Since we don't actually debit during reservation, releasing is a no-op.
-  // The balance was never reduced.
-  logger.info({ userId: _userId, amount, orderId: _orderId }, 'PawRewards reservation released (no-op)');
+  orderId: string,
+  checkoutId?: string,
+): Promise<{ released: boolean }> {
+  if (amount <= 0) return { released: false };
+
+  const lookup = checkoutId
+    ? await PawRewardsReservation.findOne({ checkoutId, userId })
+    : null;
+
+  if (lookup && (lookup.status === 'released' || lookup.status === 'committed')) {
+    return { released: false };
+  }
+
+  const releaseAmount = lookup?.amount ?? amount;
+
+  const updated = await User.findOneAndUpdate(
+    { _id: userId, pawRewardsReserved: { $gte: releaseAmount } },
+    { $inc: { pawRewardsReserved: -releaseAmount } },
+    { new: true },
+  ).lean();
+
+  if (lookup) {
+    lookup.status = 'released';
+    lookup.releasedAt = new Date();
+    await lookup.save();
+  }
+
+  logger.info(
+    {
+      userId,
+      orderId,
+      checkoutId,
+      amount: releaseAmount,
+      reservedAfter: updated?.pawRewardsReserved,
+    },
+    'PawRewards reservation released',
+  );
+  return { released: true };
 }
 
 /**

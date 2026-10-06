@@ -199,6 +199,9 @@ export class InventoryService {
    * Called when order payment is confirmed. Decrements actual stock
    * and removes the reservation.
    *
+   * Fail-closed rule: if the expected atomic transition does not happen,
+   * throw. Silent no-op is never success for financially important stock.
+   *
    * @param productId - Product ID
    * @param quantity - Quantity sold
    * @param orderId - Order reference
@@ -212,19 +215,35 @@ export class InventoryService {
       { new: true },
     );
 
-    if (result) {
-      await StockMovement.create({
-        productId,
-        type: 'sale',
-        quantity: -quantity,
-        stockAfter: result.stock - result.reserved,
-        referenceId: orderId,
-        reason: `Sale confirmed for order ${orderId}`,
-        actor: 'system',
-      });
+    if (!result) {
+      const product = await Product.findById(productId).lean();
+      const stockPolicy = product?.stockPolicy || 'deny';
+      const onHand = product?.stock ?? 0;
+      const reserved = product?.reserved ?? 0;
 
-      logger.info({ productId, quantity, orderId, stock: result.stock }, 'Sale confirmed');
+      // stockPolicy 'allow' (digital/unlimited) still requires a reservation to exist.
+      // If reserve succeeded but confirm fails, that is a real integrity problem.
+      logger.error(
+        { productId, quantity, orderId, stockPolicy, onHand, reserved },
+        'Inventory confirmSale failed — atomic transition did not occur',
+      );
+      throw new Error(
+        `Inventory confirmation failed for product ${productId} (order ${orderId}): ` +
+        `expected stock>=${quantity} and reserved>=${quantity}, found stock=${onHand} reserved=${reserved}`,
+      );
     }
+
+    await StockMovement.create({
+      productId,
+      type: 'sale',
+      quantity: -quantity,
+      stockAfter: result.stock - result.reserved,
+      referenceId: orderId,
+      reason: `Sale confirmed for order ${orderId}`,
+      actor: 'system',
+    });
+
+    logger.info({ productId, quantity, orderId, stock: result.stock }, 'Sale confirmed');
   }
 
   /**

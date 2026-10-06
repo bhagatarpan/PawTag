@@ -14,7 +14,7 @@
 |---|---|---|---|---|---|---|
 | 00 Baseline | **PROVEN** (evidence reset done; baseline quality gates recovered) | `main` @ baseline-recovery commit | typecheck/lint/unit/integration/regression/smoke/build **PASS** | none executed (no provider/staging/device run) | green baseline restored in code; provider/staging/device still unproven | Phase 00 evidence reset complete; Track A baseline recovery complete. See `docs/execution/BASELINE_EVIDENCE.md` |
 | 01 Production safety | **CODED_NOT_RUNTIME_VALIDATED** (automated gates green; live providers not run) | `main` @ Phase 01 commit | payment env matrix tests PASS; provider fail-closed tests PASS; browser session tests PASS; Resend/Stripe webhook tests PASS; typecheck/lint/unit/integration/smoke/regression/build PASS | none executed (no live Stripe/Resend/Firebase/courier run) | live provider/staging proof still required | fail-closed + session/webhook hardening implemented; see `verification/PAYMENT_PROVIDER_MODE_MATRIX.md` |
-| 02 Financial integrity | NOT_STARTED | | | | depends on baseline + Phase 01 | audit synthesis lists inventory/rewards risks |
+| 02 Financial integrity | **CODED_NOT_RUNTIME_VALIDATED** (automated gates green; live Stripe not run) | `main` @ Phase 02 commit | inventory fail-loud + concurrency tests PASS; PawRewards atomic reservation tests PASS; promo idempotency PASS; shipping method identity PASS; pending-order expiry PASS; typecheck/lint/unit/integration/smoke/regression/build PASS | none executed (no live Stripe run) | live payment/reconciliation still required | quote contract + rewards hold + inventory confirm fail-loud + pending expiry job implemented |
 | 03 Communications/auth | NOT_STARTED | | | | depends on baseline | email provider coded; not production-validated |
 | 04 Cart/Checkout web | NOT_STARTED | | | | depends on baseline | cart/checkout coded |
 | 05 Finder web | NOT_STARTED | | | | depends on baseline | finder active-only rule implemented + integration tests green; provider/CAPTCHA runtime still unproven |
@@ -90,6 +90,52 @@
 **Rollback:** revert Phase 01 commit; fail-closed provider guards can be temporarily relaxed only in non-production env, never by re-enabling demo success in production.
 
 **Next phase:** `docs/execution/2026-10-06/phases/02_FINANCIAL_STATE_INTEGRITY.md` — **STOP. Do not execute Phase 02 until founder authorizes.**
+
+### Phase 02 — Financial State Integrity (complete for automated evidence)
+
+**Status:** `CODED_NOT_RUNTIME_VALIDATED` — implementation + automated tests green; live Stripe/runtime proof not executed.  
+**Started/Completed:** 2026-10-06  
+
+**What changed:**
+1. **Inventory lifecycle** — `confirmSale()` now **throws** if the atomic stock transition fails (no silent no-op). Multi-line `reserveAll()` already compensated; concurrent reserve test proves no oversell.
+2. **PawRewards atomic reservation** — `User.pawRewardsReserved` hold + `PawRewardsReservation` ledger (unique checkoutId). Concurrent checkouts cannot double-spend; commit/release idempotent; commit fails loud if hold missing.
+3. **Promo idempotency** — `PromoUsage` unique `{code, orderId}` prevents double-increment on checkout retries; usage limit enforced at finalization.
+4. **Checkout quote** — shared `CheckoutQuote` contract; server-only `buildCheckoutQuote` / `GET /api/checkout/quote`; PaymentIntent amount only from server quote; quoteRevision stored on PendingOrder.
+5. **Zero-total checkout** — explicit `pi_zero_*` path; no fake Stripe success for non-zero pending orders.
+6. **Shipping method identity** — default methods upserted as real ShippingMethod docs; `selectMethod` never trusts client cost; synthetic IDs cannot `findById` and fail closed.
+7. **PendingOrder expiry job** — `runPendingOrderExpiryJob` releases stock + rewards **before** Mongo TTL can silently delete abandoned checkouts.
+
+**Files changed (material):**
+- `packages/api/src/commerce/services/inventory.service.ts`
+- `packages/api/src/commerce/services/checkout.service.ts`
+- `packages/api/src/commerce/services/shipping.service.ts`
+- `packages/api/src/services/loyalty/pawrewards.service.ts`
+- `packages/api/src/routes/checkout.ts`
+- `packages/api/src/jobs/pendingOrderExpiry.ts` (new) + index/worker registration
+- `packages/db/src/models/User.ts`, `PendingOrder.ts`
+- `packages/db/src/models/PawRewardsReservation.ts`, `PromoUsage.ts` (new)
+- `packages/shared/src/checkout-quote.ts`
+- Tests: `inventory-lifecycle`, `pawrewards-reservation`, `promo-usage-idempotency`, `shipping-method-identity`, `pending-order-expiry`
+
+**Automated commands actually run:**
+
+| Command | Result |
+|---|---|
+| `pnpm typecheck` | **PASS** |
+| `pnpm test:unit` | **PASS** — 84 files / 932 tests |
+| `pnpm test:integration` | **PASS** — 70 files / 793 passed / 2 skipped |
+| `pnpm test:smoke` | **PASS** — 6 tests |
+| `pnpm test:regression` | **PASS** — 33 tests |
+| `pnpm build` | **PASS** |
+
+**Manual/provider validation:** none (no live Stripe).  
+
+**Remaining risks:**
+- Live Stripe payment + webhook reconciliation not runtime-proven this phase
+- Frontend checkout not fully rewired to `GET /api/checkout/quote` (server contract ready; Phase 04 UX)
+- Full refund/return matrix verification remains for later packet depth
+
+**Next phase:** `docs/execution/2026-10-06/phases/03_COMMUNICATIONS_DOCUMENTS_SUBSCRIPTIONS.md` — **STOP. Do not execute Phase 03 until founder authorizes.**
 
 ### Track A0 — Baseline Recovery (complete)
 

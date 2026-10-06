@@ -33,6 +33,32 @@ const router = Router();
 router.use(authenticate);
 
 /**
+ * GET /api/checkout/quote
+ *
+ * Server-authoritative checkout quote. Recalculates pricing from catalog/cart/
+ * membership/promo/rewards/shipping state. Clients never author monetary values.
+ *
+ * Query: pawRewardsRedemption?, shippingMethodId?
+ */
+router.get('/quote', async (req: AuthRequest, res: Response) => {
+  try {
+    const requestedRewards = Number(req.query.pawRewardsRedemption || 0) || 0;
+    const shippingMethodId = typeof req.query.shippingMethodId === 'string' ? req.query.shippingMethodId : undefined;
+
+    const quote = await checkoutService.getCheckoutQuote(req.user!.id, {
+      requestedRewards,
+      shippingMethodId,
+    });
+
+    res.json({ success: true, data: quote });
+  } catch (err) {
+    const error = toAppError(err);
+    logger.error({ err, userId: req.user?.id }, 'Failed to build checkout quote');
+    res.status(error.httpStatus).json({ success: false, error: error.userMessage });
+  }
+});
+
+/**
  * POST /api/checkout/payment-intent
  *
  * Create a Stripe PaymentIntent and PendingOrder.
@@ -43,7 +69,14 @@ router.use(authenticate);
 router.post('/payment-intent', async (req: AuthRequest, res: Response) => {
   try {
     const { shippingAddress, autoRenew, pawRewardsRedemption } = req.body || {};
-    const result = await checkoutService.createPaymentIntent(req.user!.id, shippingAddress, autoRenew, pawRewardsRedemption);
+    // Client may only request an amount; server clamps/holds authoritatively
+    const requested = Number(pawRewardsRedemption) || 0;
+    const result = await checkoutService.createPaymentIntent(
+      req.user!.id,
+      shippingAddress,
+      autoRenew,
+      requested > 0 ? requested : undefined,
+    );
 
     res.json({
       success: true,
