@@ -1,0 +1,3 @@
+interface:
+  display_name: "Financial Document Integrity"
+  short_description: "Protect invoices, credit notes, receipts, PDFs, and delivery workflows"

@@ -1,0 +1,6138 @@
+DONATION-SYSTEM-IMPLEMENTATION-PLAN.md
+
+ I’ve designed it around the PawTag architecture you shared, including your existing customer identity, Stripe, invoice/PDF/email mechanisms, customer portal, admin portal, background jobs, audit logging, and the planned DynamoDB direction.
+
+ One important correction from your original requirement: **do not promise an IRD tax credit merely because someone donates.** In New Zealand, the tax credit applies to eligible donations to an approved donee organisation, and the receipt must contain prescribed information. IRD currently says eligible individual donors can claim 1/3 of qualifying donations over $5, subject to the applicable limits.  Inland Revenue+2
+
+ # PawTag — End-to-End Donation System Implementation Plan
+
+ **Document type:** Engineering / Product / Architecture Implementation Specification\
+ **Status:** Proposed\
+ **Target:** PawTag pre-MVP / first-customer hardening\
+ **Primary payment provider:** Stripe\
+ **Primary database direction:** DynamoDB\
+ **Country:** New Zealand\
+ **Tax/receipt jurisdiction:** New Zealand — Inland Revenue (IRD)
+
+---
+
+ # 1\. Executive Summary
+
+ PawTag should introduce a first-class donation capability that allows visitors, existing PawTag customers, and new supporters to financially support the PawTag mission.
+
+ The donation system must not be treated as a simple Stripe payment button.
+
+ It should be implemented as a complete financial domain integrated into the existing PawTag platform:
+
+```
+Visitor
+   ↓
+Donate
+   ↓
+Donation page
+   ↓
+Choose one-time / recurring
+   ↓
+Enter donor details
+   ↓
+Create/reuse PawTag customer
+   ↓
+Stripe payment
+   ↓
+Stripe webhook
+   ↓
+Persist donation
+   ↓
+Generate donation receipt
+   ↓
+Generate PDF
+   ↓
+Email donor
+   ↓
+Customer portal
+   ↓
+Admin portal
+   ↓
+Reconciliation / reporting / audit
+```
+
+ The system should support:
+
+ - one-time donations;
+- recurring donations;
+- custom donation amounts;
+- suggested donation amounts;
+- existing PawTag customers;
+- completely new donors;
+- donors who do not own pets;
+- donors who do not want to complete normal PawTag onboarding;
+- customer account creation without mandatory pet creation;
+- customer account creation without requiring normal email/mobile verification before donation;
+- Stripe Customer records;
+- Stripe PaymentIntents;
+- Stripe subscriptions for recurring donations;
+- Stripe payment methods;
+- Stripe webhook processing;
+- refunds;
+- failed payments;
+- recurring-payment retries;
+- donation history;
+- donation receipts;
+- downloadable receipt PDFs;
+- online receipt links;
+- customer portal visibility;
+- admin portal visibility;
+- audit logging;
+- reconciliation;
+- reporting;
+- donor communication;
+- receipt reissue/correction workflows.
+
+ The donation system must reuse PawTag's existing infrastructure wherever practical instead of introducing an entirely separate financial architecture.
+
+---
+
+ # 2\. Critical New Zealand Tax Requirement
+
+ ## 2.1 Do not assume every donation is tax deductible
+
+ PawTag must not describe a donation as "IRD claimable" merely because money was received.
+
+ New Zealand donation tax credits depend on the recipient organisation being an approved donee organisation and the donation meeting the applicable requirements.
+
+ IRD currently states that individuals can generally claim a donation tax credit for qualifying donations of $5 or more to an approved donee organisation, subject to the relevant rules and limits.  Inland Revenue+1
+
+ Therefore the application must have an explicit organisation-level configuration:
+
+```
+DONATION_TAX_CREDIT_STATUS
+
+NOT_ENABLED
+PENDING_APPROVAL
+APPROVED_DONEE
+SUSPENDED
+```
+
+ The UI, receipts and email templates must derive their tax-credit language from this configuration.
+
+ Never hard-code:
+
+ > "Your donation is tax deductible."
+
+ Instead use controlled copy such as:
+
+ > "If PawTag is an approved donee organisation and your donation qualifies under New Zealand rules, you may be able to claim a donation tax credit."
+
+ Once PawTag has confirmed approved donee status and the appropriate legal/accounting advice has been obtained, the copy can be changed accordingly.
+
+---
+
+ # 3\. IRD Receipt Requirements
+
+ The donation receipt implementation must follow the current IRD requirements rather than inventing a PawTag-specific format.
+
+ IRD currently states that donation receipts should contain information including:
+
+ - donor's full name;
+- donation amount;
+- donation date or relevant tax year;
+- a clear statement that the amount is a donation;
+- organisation name;
+- organisation IRD number;
+- Charities Services registration number where applicable;
+- official organisation identification/letterhead;
+- authorised person's name/designation/signature;
+- unique receipt number where applicable;
+- `COPY` or `REPLACEMENT` designation when applicable.  Inland Revenue
+
+ The system should therefore generate receipts containing the applicable fields.
+
+ ## 3.1 Receipt data model
+
+ A donation receipt should contain at least:
+
+```
+Receipt Number
+Receipt Version
+Receipt Status
+
+Organisation:
+    Legal Name
+    Trading Name
+    IRD Number
+    Charities Registration Number
+    Registered Address
+    Official Logo
+    Authorised Signatory
+    Signatory Designation
+
+Donor:
+    Full Name
+    Email
+    Postal Address where required/collected
+
+Donation:
+    Donation ID
+    Donation Date
+    Donation Amount
+    Currency
+    Donation Type
+    One-time / Recurring
+    Payment Reference
+
+Tax:
+    Eligible For Donation Tax Credit
+    Tax Credit Disclaimer / Classification
+    Relevant Tax Year
+
+Stripe:
+    PaymentIntent ID
+    Charge ID
+    Customer ID
+    Subscription ID where applicable
+
+Document:
+    PDF URL / storage key
+    Online Receipt URL
+    Issued At
+    Generated At
+```
+
+---
+
+ # 4\. Receipt vs Invoice
+
+ ## Important architectural decision
+
+ Do not treat a donation receipt as a normal commerce invoice.
+
+ PawTag already has an invoice mechanism.
+
+ Reuse the:
+
+ - PDF generation infrastructure;
+- document storage;
+- email delivery;
+- online document viewing;
+- customer portal document components;
+- admin document components;
+- audit infrastructure.
+
+ But introduce a distinct financial document type:
+
+```
+COMMERCE_INVOICE
+CREDIT_NOTE
+DONATION_RECEIPT
+DONATION_RECEIPT_REPLACEMENT
+```
+
+ A donation is not a product sale.
+
+ The donation receipt must therefore be its own domain document.
+
+---
+
+ # 5\. Product Philosophy
+
+ The donation experience should feel like PawTag rather than a generic charity checkout.
+
+ The design should communicate:
+
+ > "You're helping us build a safer, faster way to reunite lost pets with their families."
+
+ The experience should be:
+
+ - warm;
+- trustworthy;
+- transparent;
+- emotionally positive;
+- fast;
+- mobile-first;
+- accessible;
+- financially professional;
+- consistent with the existing PawTag brand.
+
+ Avoid:
+
+ - guilt-driven messaging;
+- aggressive donation popups;
+- manipulative countdowns;
+- fake urgency;
+- confusing pricing;
+- overly complicated forms.
+
+---
+
+ # 6\. Donation Entry Points
+
+ Donation should be discoverable throughout the website.
+
+ ## 6.1 Header
+
+ Add a visible:
+
+```
+DONATE
+```
+
+ CTA in the primary website navigation.
+
+ Desktop:
+
+```
+Logo | Products | How PawTag Works | About | Support | DONATE | Account
+```
+
+ Mobile:
+
+```
+☰
+```
+
+ with Donate prominently accessible.
+
+ ## 6.2 Homepage
+
+ Add at least one highly visible donation CTA.
+
+ Suggested hero-area concept:
+
+```
+Help us bring lost pets home.
+
+Every contribution helps us make pet recovery
+faster, safer and more accessible.
+
+[ Donate to PawTag ]
+```
+
+ ## 6.3 Homepage secondary CTA
+
+ Near the PawTag mission section:
+
+```
+Support the mission
+
+We're building PawTag step by step.
+If you believe every lost pet deserves a better
+chance of getting home, you can help us build it.
+
+[ Support PawTag ]
+```
+
+ ## 6.4 Footer
+
+ Add:
+
+```
+Support PawTag
+Donate
+```
+
+ ## 6.5 Finder experience
+
+ Do not distract a finder who has just found a lost pet.
+
+ Donation should not appear as a primary CTA during the emergency/recovery flow.
+
+ It may appear after successful completion:
+
+```
+You helped make this reunion possible.
+
+If you'd like to support PawTag's mission:
+
+[ Support PawTag ]
+```
+
+ This must remain secondary.
+
+---
+
+ # 7\. Dedicated Donation Page
+
+ Route:
+
+```
+/donate
+```
+
+ Potential supporting routes:
+
+```
+/donate/success
+/donate/cancelled
+/donate/receipt/:receiptId
+/donate/manage
+```
+
+ The primary donation page should contain:
+
+```
+------------------------------------------------
+              SUPPORT PAWTAG
+
+Help us give lost pets a better chance
+of getting home.
+
+[ $10 ] [ $25 ] [ $50 ] [ $100 ]
+[ Custom amount ]
+
+How often?
+
+(•) Once
+( ) Monthly
+( ) Yearly
+
+Your details
+
+First name
+Last name
+Email
+Mobile
+Country
+Address
+
+[ ] I would like to receive occasional PawTag
+    updates
+
+Donation summary
+
+Donation             $50.00
+
+[ Donate $50 ]
+
+Secure payment powered by Stripe
+------------------------------------------------
+```
+
+---
+
+ # 8\. Suggested Donation Amounts
+
+ Initial suggested amounts:
+
+```
+$10
+$25
+$50
+$100
+Custom
+```
+
+ Do not permanently hard-code these.
+
+ Create configuration:
+
+```
+DonationSettings
+    suggestedAmounts
+    minimumAmount
+    maximumAmount
+    defaultAmount
+    defaultFrequency
+```
+
+ Admin should eventually be able to configure these.
+
+---
+
+ # 9\. Donation Frequencies
+
+ Support:
+
+```
+ONE_TIME
+MONTHLY
+YEARLY
+```
+
+ Potential future frequencies:
+
+```
+WEEKLY
+QUARTERLY
+```
+
+ Do not implement additional frequencies until there is a demonstrated business requirement.
+
+---
+
+ # 10\. Custom Amount Rules
+
+ The server must validate:
+
+```
+minimumDonationAmount
+maximumDonationAmount
+currency
+decimal precision
+```
+
+ Never trust the client.
+
+ Example:
+
+```
+Client:
+    amount = 5000
+
+Server:
+    validates configured limits
+    validates currency
+    validates donation eligibility
+    calculates authoritative amount
+```
+
+ The amount used for Stripe must come from server-authoritative state.
+
+---
+
+ # 11\. Donor Identity Model
+
+ ## 11.1 Do not create a separate donor account system
+
+ Use the existing PawTag customer identity.
+
+ A customer can have:
+
+```
+CUSTOMER
+    ├── Pet Owner
+    ├── Donor
+    ├── Pet Owner + Donor
+    └── Supporter
+```
+
+ Recommended account capabilities:
+
+```
+Customer
+    accountStatus
+    onboardingStatus
+    roles
+    capabilities
+```
+
+ Donation does not require:
+
+```
+pet exists
+tag exists
+email verified
+mobile verified
+full onboarding completed
+```
+
+ unless a separate security requirement requires it.
+
+---
+
+ # 12\. New Visitor Donation Flow
+
+ A visitor who has no PawTag account should be able to donate.
+
+ Flow:
+
+```
+Visitor
+   ↓
+Donate
+   ↓
+Enter donor details
+   ↓
+System searches for existing customer
+   ↓
+No match
+   ↓
+Create customer
+   ↓
+Mark donor capability
+   ↓
+Skip pet onboarding
+   ↓
+Skip normal verification gate
+   ↓
+Create Stripe Customer
+   ↓
+Process donation
+   ↓
+Generate receipt
+   ↓
+Send receipt
+   ↓
+Create customer portal access
+```
+
+ The donor should not be forced to:
+
+ - create a pet;
+- activate a tag;
+- complete owner onboarding;
+- verify mobile;
+- verify email before making the donation.
+
+---
+
+ # 13\. Existing Customer Donation Flow
+
+ Existing authenticated customer:
+
+```
+Customer
+   ↓
+Donate
+   ↓
+Customer identity detected
+   ↓
+Use existing profile
+   ↓
+Use existing Stripe Customer
+   ↓
+Create donation
+   ↓
+Stripe payment
+   ↓
+Receipt
+```
+
+ Do not create another customer.
+
+---
+
+ # 14\. Existing Customer but Logged Out
+
+ If the email matches an existing account but the donor is not authenticated:
+
+ Do not automatically reveal:
+
+ > "An account already exists for this email."
+
+ That can become an account-enumeration vulnerability.
+
+ Instead:
+
+```
+Continue as guest donor
+```
+
+ or:
+
+```
+Sign in to use your existing PawTag account
+```
+
+ without exposing whether an account exists.
+
+---
+
+ # 15\. Donor Account Creation
+
+ The donor account should have a clear state:
+
+```
+registrationSource = DONATION
+onboardingStatus = NOT_REQUIRED
+emailVerificationStatus = UNVERIFIED
+mobileVerificationStatus = UNVERIFIED
+```
+
+ This allows:
+
+```
+donor created through donation
+```
+
+ without confusing the normal customer onboarding flow.
+
+---
+
+ # 16\. Donor Authentication
+
+ Because donation-created customers may not have verified credentials, the system should provide a secure mechanism to later access the portal.
+
+ Preferred approach:
+
+```
+Magic-link / secure account activation
+```
+
+ or the existing PawTag password setup/reset mechanism.
+
+ Do not send passwords by email.
+
+ Do not expose donation history based solely on an email address.
+
+---
+
+ # 17\. Customer Classification
+
+ Add donor-related fields/capabilities without breaking existing customer logic.
+
+ Possible model:
+
+```
+customerType:
+    CUSTOMER
+    DONOR
+    CUSTOMER_AND_DONOR
+```
+
+ However, avoid making `customerType` mutually exclusive if PawTag already assumes all users are customers.
+
+ Prefer:
+
+```
+roles/capabilities:
+
+hasDonations
+hasPets
+hasOrders
+hasMembership
+```
+
+ This is more future-proof.
+
+---
+
+ # 18\. Donation Domain Model
+
+ Recommended entities:
+
+```
+Donation
+DonationPayment
+RecurringDonation
+DonationReceipt
+DonationRefund
+DonationCampaign
+DonationWebhookEvent
+DonationAuditEvent
+```
+
+ Not all need to be separate physical tables/entities if the persistence abstraction can safely model them.
+
+---
+
+ # 19\. Donation
+
+ Conceptual model:
+
+```
+Donation {
+    id: string
+
+    customerId: string
+
+    donorSnapshot: {
+        fullName: string
+        email: string
+        phone?: string
+        address?: Address
+    }
+
+    amount: number
+    currency: string
+
+    frequency:
+        ONE_TIME
+        MONTHLY
+        YEARLY
+
+    status:
+        PENDING
+        PROCESSING
+        SUCCEEDED
+        FAILED
+        REFUNDED
+        PARTIALLY_REFUNDED
+        CANCELLED
+
+    taxEligibility:
+        ELIGIBLE
+        NOT_ELIGIBLE
+        UNKNOWN
+
+    source:
+        WEBSITE
+        ADMIN
+        OTHER
+
+    campaignId?: string
+
+    stripeCustomerId?: string
+    stripePaymentIntentId?: string
+    stripeChargeId?: string
+    stripeSubscriptionId?: string
+
+    receiptId?: string
+
+    createdAt
+    updatedAt
+}
+```
+
+---
+
+ # 20\. Recurring Donation
+
+ Conceptual model:
+
+```
+RecurringDonation {
+    id: string
+
+    customerId: string
+
+    donationAmount: number
+    currency: string
+
+    frequency:
+        MONTHLY
+        YEARLY
+
+    status:
+        ACTIVE
+        PAST_DUE
+        PAUSED
+        CANCELLED
+        INCOMPLETE
+
+    stripeCustomerId
+    stripeSubscriptionId
+
+    currentPeriodStart
+    currentPeriodEnd
+
+    cancelAtPeriodEnd
+
+    createdAt
+    updatedAt
+}
+```
+
+---
+
+ # 21\. Donation Payment
+
+ A separate payment record is recommended because one recurring donation represents multiple payments over time.
+
+```
+DonationPayment {
+    id
+
+    donationId
+    recurringDonationId?
+
+    customerId
+
+    amount
+    currency
+
+    status
+
+    stripePaymentIntentId
+    stripeChargeId
+    stripeInvoiceId?
+
+    paymentMethodType?
+    paymentMethodBrand?
+    paymentMethodLast4?
+
+    failureCode?
+    failureMessage?
+
+    paidAt?
+
+    createdAt
+    updatedAt
+}
+```
+
+---
+
+ # 22\. Donation Receipt
+
+```
+DonationReceipt {
+    id
+
+    receiptNumber
+    receiptVersion
+
+    donationId
+    donationPaymentId
+
+    customerId
+
+    donorName
+    donorEmail
+
+    amount
+    currency
+    donationDate
+
+    taxEligible
+    taxYear
+
+    status:
+        ISSUED
+        VOIDED
+        REPLACED
+
+    pdfStorageKey
+    onlineAccessTokenReference
+
+    issuedAt
+    createdAt
+    updatedAt
+}
+```
+
+ Receipt records should be treated as immutable financial documents.
+
+---
+
+ # 23\. Receipt Numbering
+
+ Use a dedicated donation receipt sequence.
+
+ Example:
+
+```
+PT-DON-2026-000001
+PT-DON-2026-000002
+PT-DON-2026-000003
+```
+
+ Do not reuse receipt numbers.
+
+ Do not recycle receipt numbers after refunds.
+
+ Do not silently alter issued receipts.
+
+---
+
+ # 24\. Receipt Corrections
+
+ If a receipt is wrong:
+
+```
+Original receipt
+      ↓
+VOID / REPLACED
+      ↓
+New receipt
+```
+
+ The replacement should be clearly marked:
+
+```
+REPLACEMENT RECEIPT
+```
+
+ and reference the original receipt number.
+
+ IRD explicitly requires replacement receipts to be identified appropriately.  Inland Revenue
+
+---
+
+ # 25\. Receipt PDF
+
+ The PDF should be professionally branded.
+
+ Header:
+
+```
+PAWTAG
+
+DONATION RECEIPT
+```
+
+ Body:
+
+```
+Receipt number:
+PT-DON-2026-000123
+
+Donation date:
+12 October 2026
+
+Donor:
+Jane Citizen
+
+Donation:
+NZD $100.00
+
+Thank you for supporting PawTag.
+```
+
+ Organisation section:
+
+```
+PawTag
+Legal organisation name
+IRD number
+Charities Services registration number
+Registered address
+```
+
+ Tax section:
+
+```
+This receipt records a donation to PawTag.
+
+[Tax-credit wording only when legally applicable.]
+```
+
+ Authorisation:
+
+```
+Authorised by:
+Name
+Designation
+
+Electronic signature / approved signature
+```
+
+---
+
+ # 26\. Online Receipt
+
+ Each receipt should have a secure online representation.
+
+ Example:
+
+```
+/account/donations/receipts/:id
+```
+
+ or:
+
+```
+/account/documents/donation-receipt/:id
+```
+
+ The URL must not expose sequential database identifiers without authorization.
+
+ Use:
+
+```
+opaque public document identifier
+```
+
+ and server-side authorization.
+
+---
+
+ # 27\. Customer Portal
+
+ Add:
+
+```
+My Donations
+```
+
+ to the customer portal.
+
+ Potential navigation:
+
+```
+Account
+├── Profile
+├── Pets
+├── Tags
+├── Orders
+├── Membership
+├── Donations
+├── Notifications
+└── Settings
+```
+
+---
+
+ # 28\. Donation Customer Portal
+
+ Donation page:
+
+```
+My Donations
+
+Total donated:
+$350.00
+
+This year:
+$250.00
+
+Recurring:
+$25/month
+
+------------------------------------
+
+12 Oct 2026
+Donation
+$100.00
+Paid
+
+[ View receipt ]
+[ Download PDF ]
+
+------------------------------------
+
+12 Sep 2026
+Donation
+$25.00
+Paid
+
+[ View receipt ]
+[ Download PDF ]
+```
+
+---
+
+ # 29\. Recurring Donation Management
+
+ Customer should be able to:
+
+```
+View recurring donation
+Change amount
+Change payment method
+Pause if supported
+Cancel
+Resume if supported
+View payment history
+View receipts
+```
+
+ Do not allow a frontend-only cancellation.
+
+ Cancellation must update Stripe and PawTag state safely.
+
+---
+
+ # 30\. Recurring Cancellation
+
+ Preferred flow:
+
+```
+Customer
+   ↓
+Cancel recurring donation
+   ↓
+Confirmation
+   ↓
+Stripe subscription cancellation
+   ↓
+Webhook confirmation
+   ↓
+PawTag state updated
+   ↓
+Customer notified
+```
+
+ The system must be idempotent.
+
+ Double-clicking Cancel must not produce inconsistent state.
+
+---
+
+ # 31\. Stripe Architecture
+
+ Do not implement donations as an isolated Stripe integration.
+
+ Reuse PawTag's existing Stripe client factory:
+
+```
+packages/api/src/lib/stripe-client.ts
+```
+
+ All Stripe SDK creation must continue to go through the centralized factory.
+
+---
+
+ # 32\. One-Time Donation Payment
+
+ Preferred flow:
+
+```
+POST /api/donations
+
+        ↓
+
+Create pending donation
+
+        ↓
+
+Create/retrieve Stripe Customer
+
+        ↓
+
+Create PaymentIntent
+
+        ↓
+
+Return client secret
+
+        ↓
+
+Stripe.js confirms payment
+
+        ↓
+
+Stripe webhook
+
+        ↓
+
+payment_intent.succeeded
+
+        ↓
+
+Mark donation paid
+
+        ↓
+
+Create donation payment
+
+        ↓
+
+Generate receipt
+
+        ↓
+
+Send email
+```
+
+ The webhook must be authoritative for final payment state.
+
+ Do not mark the donation successful merely because the browser returned from Stripe.
+
+---
+
+ # 33\. Recurring Donation Payment
+
+ Recommended architecture:
+
+```
+Create Donation
+      ↓
+Create/retrieve Stripe Customer
+      ↓
+Create Stripe recurring Price
+      ↓
+Create Subscription
+      ↓
+Initial payment
+      ↓
+Stripe webhook
+      ↓
+RecurringDonation ACTIVE
+      ↓
+Generate receipt for successful payment
+```
+
+ Each subsequent recurring payment creates a separate donation payment/receipt record.
+
+---
+
+ # 34\. Stripe Customer
+
+ Each PawTag customer who donates should map to one Stripe Customer.
+
+ Store:
+
+```
+pawtagCustomerId
+stripeCustomerId
+```
+
+ Use metadata:
+
+```
+pawtag_customer_id
+pawtag_donation_id
+pawtag_recurring_donation_id
+```
+
+ where applicable.
+
+ Never place sensitive personal data into Stripe metadata unnecessarily.
+
+---
+
+ # 35\. Stripe Metadata
+
+ Recommended metadata:
+
+```
+pawtag_environment
+pawtag_customer_id
+pawtag_donation_id
+pawtag_recurring_donation_id
+pawtag_campaign_id
+pawtag_source
+```
+
+ Avoid:
+
+```
+password
+JWT
+full address
+private health information
+```
+
+---
+
+ # 36\. Stripe Webhook Events
+
+ Create an explicit donation webhook event matrix.
+
+ At minimum consider:
+
+```
+payment_intent.succeeded
+payment_intent.payment_failed
+payment_intent.canceled
+
+charge.refunded
+charge.refund.updated
+
+customer.subscription.created
+customer.subscription.updated
+customer.subscription.deleted
+
+invoice.paid
+invoice.payment_failed
+invoice.finalized
+invoice.voided
+```
+
+ The exact event set must match the final Stripe architecture.
+
+---
+
+ # 37\. Webhook Idempotency
+
+ Every Stripe event must be processed exactly once from PawTag's business perspective.
+
+ Store:
+
+```
+stripeEventId
+eventType
+receivedAt
+processedAt
+processingStatus
+attemptCount
+error
+```
+
+ Unique constraint:
+
+```
+stripeEventId
+```
+
+ If the same event arrives twice:
+
+```
+DO NOT execute business side effects twice.
+```
+
+---
+
+ # 38\. Payment Idempotency
+
+ Client requests must support an idempotency key.
+
+ Example:
+
+```
+Idempotency-Key: donation-session-<opaque-id>
+```
+
+ The server should store the result.
+
+ Repeated request:
+
+```
+same idempotency key
+      ↓
+return original result
+```
+
+ Do not create another donation.
+
+---
+
+ # 39\. Payment State Machine
+
+ Recommended:
+
+```
+PENDING
+   ↓
+PROCESSING
+   ├── SUCCEEDED
+   ├── FAILED
+   └── CANCELLED
+
+SUCCEEDED
+   ↓
+REFUNDED
+   or
+PARTIALLY_REFUNDED
+```
+
+ Never use generic:
+
+```
+paid = true
+```
+
+ as the only financial state.
+
+---
+
+ # 40\. Donation Refunds
+
+ Donation refunds require special care.
+
+ Admin may refund a donation if permitted.
+
+ Flow:
+
+```
+Admin
+ ↓
+Refund donation
+ ↓
+Authorization
+ ↓
+Create Stripe refund
+ ↓
+Stripe confirms
+ ↓
+Persist refund
+ ↓
+Update donation
+ ↓
+Update receipt/tax status
+ ↓
+Notify donor
+```
+
+ If an eligible donation is refunded, the donor may need to account for the returned donation/tax credit under applicable IRD rules. IRD specifically notes that returned donations can require repayment of the related donation tax credit.  Inland Revenue
+
+ Therefore the system should not leave an original eligible receipt looking unqualified after a full refund.
+
+ Recommended approach:
+
+```
+Original receipt
+      ↓
+REFUNDED / VOIDED
+      ↓
+Refund notification
+```
+
+ Do not delete the original financial record.
+
+---
+
+ # 41\. Donation Receipt Lifecycle
+
+```
+PAYMENT SUCCEEDED
+       ↓
+RECEIPT PENDING
+       ↓
+GENERATING
+       ↓
+ISSUED
+       ↓
+EMAIL SENT
+```
+
+ Failure:
+
+```
+PAYMENT SUCCEEDED
+       ↓
+RECEIPT GENERATION FAILED
+       ↓
+ALERT
+       ↓
+RETRY
+```
+
+ Payment success must never be rolled back merely because email/PDF generation failed.
+
+---
+
+ # 42\. Email Architecture
+
+ Reuse PawTag's existing CMS-first email system.
+
+ Templates:
+
+```
+donation.received
+donation.receipt
+donation.recurring.created
+donation.recurring.payment
+donation.recurring.payment_failed
+donation.recurring.cancelled
+donation.refunded
+donation.receipt.reissued
+```
+
+---
+
+ # 43\. Donation Confirmation Email
+
+ Subject example:
+
+```
+Thank you for supporting PawTag
+```
+
+ Body should contain:
+
+```
+Thank you, Jane.
+
+Your donation of $100.00 has been received.
+
+Donation:
+PT-DON-2026-000123
+
+Date:
+12 October 2026
+
+[ View donation receipt ]
+
+Your donation receipt is attached as a PDF.
+```
+
+---
+
+ # 44\. Email Attachment
+
+ Attach:
+
+```
+PawTag-Donation-Receipt-PT-DON-2026-000123.pdf
+```
+
+ The PDF should be generated from the same authoritative receipt record displayed online.
+
+ Do not generate one document for the portal and a different document for email.
+
+---
+
+ # 45\. Online Receipt Link
+
+ Email:
+
+```
+[ Open your receipt online ]
+```
+
+ The link must:
+
+ - use HTTPS;
+- use an opaque identifier/token;
+- expire if appropriate;
+- not expose sensitive information in query parameters;
+- require authentication where appropriate;
+- support secure unauthenticated document access only if deliberately designed.
+
+ Preferred:
+
+```
+Login → Customer portal → Receipt
+```
+
+ For newly created donors, a secure one-time or limited-time receipt link can provide convenient access.
+
+---
+
+ # 46\. Customer Donation History
+
+ Each payment should appear individually.
+
+ For recurring donations:
+
+```
+Recurring donation:
+$25 monthly
+
+Payments:
+12 Oct 2026  $25
+12 Nov 2026  $25
+12 Dec 2026  $25
+```
+
+ Do not represent an entire recurring subscription as a single financial transaction.
+
+---
+
+ # 47\. Annual Donation Summary
+
+ Useful future capability:
+
+```
+Donation summary — 2026 tax year
+
+Total donations:
+$350.00
+
+Number of donations:
+8
+
+Receipts:
+8
+
+[ Download annual summary ]
+```
+
+ Important:
+
+ An annual summary should not replace the underlying donation receipts if IRD requires individual receipt evidence.
+
+---
+
+ # 48\. Admin Portal
+
+ Add:
+
+```
+Admin
+└── Donations
+    ├── Dashboard
+    ├── Donations
+    ├── Recurring Donations
+    ├── Donors
+    ├── Receipts
+    ├── Refunds
+    └── Reconciliation
+```
+
+---
+
+ # 49\. Admin Donation Dashboard
+
+ Display:
+
+```
+Total donated
+This month
+This year
+Recurring revenue
+One-time donations
+Number of donors
+Average donation
+Failed recurring payments
+Refunded donations
+Pending receipts
+```
+
+ Do not call donation income "revenue" in accounting contexts unless that terminology has been approved by the accountant.
+
+ Prefer:
+
+```
+Donation volume
+```
+
+ for general dashboard language.
+
+---
+
+ # 50\. Donation List
+
+ Columns:
+
+```
+Date
+Donor
+Amount
+Frequency
+Status
+Payment
+Receipt
+Campaign
+Stripe
+```
+
+ Filters:
+
+```
+Date
+Status
+Frequency
+Amount
+Customer
+Campaign
+Receipt status
+Payment status
+```
+
+---
+
+ # 51\. Donor Detail
+
+ Admin donor view:
+
+```
+Donor
+
+Jane Citizen
+jane@example.com
+
+Customer ID:
+CUS-123
+
+Donor since:
+12 Oct 2026
+
+Total donated:
+$350
+
+Recurring:
+$25/month
+
+Donations:
+...
+```
+
+---
+
+ # 52\. Donation Detail
+
+ Show:
+
+```
+Donation ID
+Customer
+Donor snapshot
+Amount
+Currency
+Frequency
+Status
+Created
+Paid
+Refunded
+
+Stripe Customer
+Stripe PaymentIntent
+Stripe Charge
+Stripe Invoice
+Stripe Subscription
+
+Receipt
+Receipt status
+PDF
+Email delivery
+
+Audit history
+```
+
+ Provide safe links to Stripe Dashboard where appropriate.
+
+---
+
+ # 53\. Admin Refund
+
+ Admin refund should require:
+
+```
+Permission:
+donations.refund
+```
+
+ Confirmation:
+
+```
+You are about to refund NZD $100.00.
+
+This action will:
+- refund the Stripe payment;
+- update the donation record;
+- update receipt status;
+- notify the donor;
+- create an audit event.
+
+[ Cancel ]
+[ Refund donation ]
+```
+
+---
+
+ # 54\. Admin Receipt Reissue
+
+ Admin action:
+
+```
+Reissue receipt
+```
+
+ Require reason:
+
+```
+Incorrect donor name
+Incorrect address
+PDF generation issue
+Customer request
+Administrative correction
+Other
+```
+
+ The old receipt must remain auditable.
+
+---
+
+ # 55\. Audit Logging
+
+ Every sensitive donation operation must create an audit event.
+
+ Examples:
+
+```
+DONATION_CREATED
+DONATION_PAYMENT_SUCCEEDED
+DONATION_PAYMENT_FAILED
+DONATION_REFUNDED
+RECURRING_DONATION_CREATED
+RECURRING_DONATION_CANCELLED
+RECEIPT_ISSUED
+RECEIPT_REPLACED
+RECEIPT_VOIDED
+DONOR_DETAILS_UPDATED
+```
+
+ Audit information:
+
+```
+actor
+actorType
+timestamp
+entity
+entityId
+action
+previousState
+newState
+requestId
+ipAddress where appropriate
+userAgent where appropriate
+reason
+```
+
+---
+
+ # 56\. Privacy
+
+ Donation data is personal information.
+
+ Collect only what is needed.
+
+ Minimum:
+
+```
+Full name
+Email
+Amount
+Payment details handled by Stripe
+```
+
+ Collect address where required/appropriate for receipts or customer records.
+
+ Do not collect:
+
+```
+pet information
+health information
+unnecessary identity data
+```
+
+ from a donor simply because PawTag supports those fields for pet owners.
+
+---
+
+ # 57\. Marketing Consent
+
+ Do not automatically subscribe donors to marketing.
+
+ Use:
+
+```
+[ ] I'd like to receive occasional updates from PawTag.
+```
+
+ Store consent independently:
+
+```
+marketingConsent
+marketingConsentAt
+marketingConsentSource
+```
+
+ Donation transaction emails are not the same as marketing consent.
+
+---
+
+ # 58\. Data Retention
+
+ Donation financial records must follow PawTag's financial, tax, privacy and accounting retention policies.
+
+ Do not implement arbitrary deletion of:
+
+```
+Donation
+DonationPayment
+Receipt
+Refund
+Stripe references
+Audit records
+```
+
+ The retention policy should be reviewed with the accountant/legal adviser.
+
+---
+
+ # 59\. DynamoDB Architecture
+
+ Because PawTag is moving away from MongoDB, donation persistence must not introduce Mongo-specific assumptions.
+
+ Do not create donation code that directly depends on:
+
+```
+Mongoose
+Mongo Query API
+Mongo ObjectId semantics
+Mongo-specific transaction assumptions
+```
+
+ Instead use repository interfaces.
+
+ Example:
+
+```
+interface DonationRepository {
+    create(...)
+    getById(...)
+    getByCustomerId(...)
+    getByStripePaymentIntentId(...)
+    updateStatus(...)
+    findByIdempotencyKey(...)
+}
+```
+
+---
+
+ # 60\. DynamoDB Access Patterns
+
+ Design DynamoDB around access patterns.
+
+ Required access patterns:
+
+```
+Get donation by donation ID
+
+Get donations by customer ID
+
+Get donation payment by Stripe PaymentIntent ID
+
+Get recurring donation by Stripe Subscription ID
+
+Get donation by idempotency key
+
+Get receipt by receipt ID
+
+Get receipt by receipt number
+
+Get donations by date
+
+Get donations by status
+
+Get pending receipt jobs
+
+Get unprocessed Stripe webhook event
+
+Get customer donations sorted newest-first
+```
+
+---
+
+ # 61\. DynamoDB Keys
+
+ Do not blindly translate Mongo documents into DynamoDB.
+
+ Example single-table strategy:
+
+```
+PK = CUSTOMER#<customerId>
+SK = DONATION#<donationId>
+```
+
+ Payment:
+
+```
+PK = DONATION#<donationId>
+SK = PAYMENT#<paymentId>
+```
+
+ Receipt:
+
+```
+PK = DONATION#<donationId>
+SK = RECEIPT#<receiptId>
+```
+
+ Stripe lookup via GSI:
+
+```
+GSI1PK = STRIPE_PAYMENT_INTENT#<paymentIntentId>
+GSI1SK = DONATION#<donationId>
+```
+
+ Recurring:
+
+```
+GSI2PK = STRIPE_SUBSCRIPTION#<subscriptionId>
+GSI2SK = RECURRING_DONATION#<id>
+```
+
+ Actual key design must be finalized against the entire PawTag DynamoDB migration rather than designing a donation island independently.
+
+---
+
+ # 62\. DynamoDB Transactions
+
+ Use DynamoDB transactional writes where required.
+
+ Example:
+
+```
+Create Donation
++
+Create Idempotency Record
+```
+
+ or:
+
+```
+Mark Payment Succeeded
++
+Create Receipt Job
+```
+
+ Do not use transactions unnecessarily.
+
+ External Stripe operations cannot be made atomic with DynamoDB.
+
+ Instead use:
+
+```
+durable state
++
+idempotency
++
+reconciliation
+```
+
+---
+
+ # 63\. Stripe + DynamoDB Failure Model
+
+ Example:
+
+```
+Stripe payment succeeds
+        ↓
+DynamoDB write fails
+        ↓
+Webhook retries
+        ↓
+Donation recovered
+```
+
+ This is why the webhook event must be persisted/processed safely.
+
+ Another scenario:
+
+```
+DynamoDB donation created
+        ↓
+Stripe PaymentIntent creation fails
+        ↓
+Donation remains PENDING/FAILED
+        ↓
+No receipt generated
+```
+
+ Never pretend the donation succeeded.
+
+---
+
+ # 64\. Background Jobs
+
+ Add donation-related jobs to the existing scheduler.
+
+ Recommended:
+
+```
+Donation Receipt Retry
+Donation Email Retry
+Donation Payment Reconciliation
+Recurring Donation Reconciliation
+Donation Webhook Recovery
+Failed Donation Alert
+Receipt Integrity Check
+```
+
+---
+
+ # 65\. Donation Receipt Retry
+
+ If:
+
+```
+payment succeeded
+receipt generation failed
+```
+
+ job should retry.
+
+ Example:
+
+```
+attempt 1
+attempt 2
+attempt 3
+dead-letter / admin alert
+```
+
+ Never generate duplicate receipt numbers on retries.
+
+---
+
+ # 66\. Email Retry
+
+ Email delivery should be independently retryable.
+
+ State:
+
+```
+PENDING
+SENDING
+SENT
+FAILED
+```
+
+ The email job should reference the same receipt PDF.
+
+ Do not generate a new receipt for every email retry.
+
+---
+
+ # 67\. Reconciliation
+
+ Donation reconciliation should compare:
+
+```
+Stripe
+vs
+PawTag
+```
+
+ Examples:
+
+```
+Stripe paid
+PawTag pending
+
+Stripe subscription active
+PawTag cancelled
+
+Stripe invoice paid
+PawTag payment missing
+
+PawTag payment exists
+Stripe payment missing
+
+Stripe refunded
+PawTag still paid
+```
+
+ Each mismatch should enter a repair workflow.
+
+---
+
+ # 68\. Stripe Dashboard Traceability
+
+ Every PawTag donation should be traceable:
+
+```
+PawTag Donation
+    ↓
+Stripe Customer
+    ↓
+PaymentIntent
+    ↓
+Charge
+    ↓
+Invoice / Subscription where applicable
+```
+
+ Admin should be able to navigate to Stripe using server-generated safe URLs or IDs.
+
+---
+
+ # 69\. Security
+
+ Donation endpoints must have:
+
+ - rate limiting;
+- amount validation;
+- request validation;
+- CSRF protection where applicable;
+- secure authentication;
+- ownership enforcement;
+- anti-automation controls;
+- Stripe webhook signature validation;
+- idempotency;
+- fraud monitoring;
+- secure logs.
+
+ Never log:
+
+```
+card number
+CVC
+Stripe secret key
+payment method secrets
+authentication tokens
+```
+
+---
+
+ # 70\. Fraud / Abuse
+
+ Donation systems can be abused for:
+
+ - card testing;
+- stolen cards;
+- automated payments;
+- excessive failed transactions;
+- refund abuse.
+
+ Implement appropriate Stripe and application-level protections.
+
+ Do not build an unnecessarily aggressive system that blocks legitimate donors.
+
+---
+
+ # 71\. CAPTCHA
+
+ CAPTCHA/abuse protection may be appropriate on:
+
+```
+Donation initiation
+Guest donor registration
+```
+
+ but must not make the donation experience unnecessarily difficult.
+
+ Production and development behaviour must be explicitly different.
+
+---
+
+ # 72\. Guest Donor Rate Limits
+
+ Potential limits:
+
+```
+per IP
+per email
+per session
+per customer
+```
+
+ Exact limits should be tuned after observing real behaviour.
+
+ Do not use a single crude IP limit as the only protection because mobile networks and shared networks can create false positives.
+
+---
+
+ # 73\. Donation Amount Security
+
+ Reject:
+
+```
+negative amounts
+zero amounts
+NaN
+Infinity
+too many decimal places
+unsupported currency
+amount over configured maximum
+```
+
+ Normalize monetary values using integer minor units internally where appropriate:
+
+```
+NZD $25.50
+→
+2550 cents
+```
+
+ Avoid floating-point financial calculations.
+
+---
+
+ # 74\. Currency
+
+ Initial launch:
+
+```
+NZD
+```
+
+ Do not introduce multi-currency donations until there is a business requirement.
+
+ The organisation's tax/receipt system should be designed around NZD initially.
+
+---
+
+ # 75\. Donation Campaigns
+
+ Create an optional campaign model.
+
+ Example:
+
+```
+Campaign:
+Launch Support 2026
+```
+
+ Fields:
+
+```
+campaignId
+name
+slug
+description
+status
+startDate
+endDate
+suggestedAmounts
+goalAmount
+displayGoal
+```
+
+ A campaign should not change tax eligibility.
+
+---
+
+ # 76\. Campaign Attribution
+
+ Track:
+
+```
+campaignId
+source
+medium
+referrer
+landingPage
+```
+
+ Avoid storing unnecessary personal tracking data.
+
+ This enables:
+
+```
+Homepage donation
+Social donation
+Email campaign
+QR code
+Founder campaign
+```
+
+ to be analysed separately.
+
+---
+
+ # 77\. Donation Page UX
+
+ The page should not feel like a normal product checkout.
+
+ Recommended hierarchy:
+
+```
+MISSION
+ ↓
+AMOUNT
+ ↓
+FREQUENCY
+ ↓
+DONOR DETAILS
+ ↓
+PAYMENT
+ ↓
+CONFIRMATION
+```
+
+ Keep the donation action obvious.
+
+---
+
+ # 78\. Donation Success Page
+
+ After payment:
+
+```
+Thank you, Jane ❤️
+
+Your $50 donation has been received.
+
+You've helped PawTag continue building technology
+that gives lost pets a better chance of getting home.
+
+Receipt:
+PT-DON-2026-000123
+
+[ View receipt ]
+[ Download PDF ]
+
+[ Create / access my PawTag account ]
+```
+
+ Do not require account setup before showing successful payment.
+
+---
+
+ # 79\. Failed Payment Page
+
+ Do not show:
+
+```
+Something went wrong.
+```
+
+ only.
+
+ Instead:
+
+```
+We couldn't complete your donation.
+
+No successful donation was recorded.
+
+Please try again or use another payment method.
+
+[ Try again ]
+```
+
+ If Stripe provides a safe user-facing reason, display it appropriately.
+
+ Never expose raw Stripe/internal errors.
+
+---
+
+ # 80\. Recurring Donation Confirmation
+
+ Example:
+
+```
+You're now supporting PawTag with $25 every month.
+
+Your next scheduled donation:
+12 November 2026
+
+[ Manage recurring donation ]
+[ View receipt ]
+```
+
+---
+
+ # 81\. Existing PawTag Branding
+
+ Reuse:
+
+ - existing logo;
+- colour palette;
+- typography;
+- buttons;
+- cards;
+- spacing;
+- form controls;
+- responsive patterns;
+- notification components.
+
+ Do not create a separate "charity" visual identity.
+
+ Donation should feel like a natural PawTag capability.
+
+---
+
+ # 82\. Accessibility
+
+ Donation flow must support:
+
+ - keyboard navigation;
+- screen readers;
+- labelled inputs;
+- visible focus;
+- accessible amount buttons;
+- accessible custom amount field;
+- accessible radio/segmented controls;
+- error announcements;
+- payment loading states;
+- sufficient contrast;
+- mobile touch targets;
+- reduced motion.
+
+---
+
+ # 83\. API Design
+
+ Suggested endpoints:
+
+```
+POST   /api/donations
+GET    /api/donations/:id
+GET    /api/customer/donations
+GET    /api/customer/donations/:id
+GET    /api/customer/donations/:id/receipt
+GET    /api/customer/donations/:id/receipt/pdf
+
+POST   /api/donations/:id/refund
+```
+
+ Recurring:
+
+```
+POST   /api/donations/recurring
+GET    /api/customer/donations/recurring
+GET    /api/customer/donations/recurring/:id
+PATCH  /api/customer/donations/recurring/:id
+POST   /api/customer/donations/recurring/:id/cancel
+POST   /api/customer/donations/recurring/:id/resume
+```
+
+ Webhook:
+
+```
+POST /api/webhooks/stripe
+```
+
+ Existing Stripe webhook architecture should be extended rather than duplicated.
+
+---
+
+ # 84\. Admin API
+
+ Suggested:
+
+```
+GET /api/admin/donations
+GET /api/admin/donations/:id
+GET /api/admin/donors
+GET /api/admin/recurring-donations
+GET /api/admin/donation-receipts
+
+POST /api/admin/donations/:id/refund
+POST /api/admin/donation-receipts/:id/reissue
+POST /api/admin/donation-receipts/:id/resend
+
+GET /api/admin/donations/reconciliation
+POST /api/admin/donations/reconciliation/:id/repair
+```
+
+ Every endpoint requires appropriate RBAC.
+
+---
+
+ # 85\. Shared Contracts
+
+ Add shared TypeScript contracts.
+
+ Example:
+
+```
+packages/shared/src/donations.ts
+```
+
+ Containing:
+
+```
+Donation
+DonationStatus
+DonationFrequency
+DonationPayment
+RecurringDonation
+DonationReceipt
+DonationSummary
+CreateDonationRequest
+CreateDonationResponse
+DonationErrorCode
+```
+
+ Frontend and backend should use the shared contracts.
+
+---
+
+ # 86\. Error Codes
+
+ Use stable domain error codes.
+
+ Examples:
+
+```
+donation.invalid_amount
+donation.minimum_amount
+donation.maximum_amount
+donation.invalid_frequency
+donation.payment_failed
+donation.payment_requires_action
+donation.not_found
+donation.not_authorized
+donation.already_refunded
+donation.refund_failed
+donation.recurring_not_found
+donation.recurring_cancel_failed
+donation.receipt_unavailable
+```
+
+ Do not expose internal implementation details.
+
+---
+
+ # 87\. Customer Registration Integration
+
+ Do not duplicate the customer registration service.
+
+ Extend it.
+
+ Recommended:
+
+```
+createCustomer({
+    source: "DONATION",
+    onboardingRequired: false,
+    emailVerificationRequired: false,
+    mobileVerificationRequired: false
+})
+```
+
+ However, the final API should be designed according to PawTag's actual existing registration implementation.
+
+ Do not introduce boolean combinations that create unsafe account states.
+
+ Prefer an explicit registration context:
+
+```
+RegistrationContext:
+    STANDARD_CUSTOMER
+    DONATION
+    ADMIN_CREATED
+```
+
+---
+
+ # 88\. Account Security
+
+ Donation-created accounts require special treatment.
+
+ If the donor later wants to access:
+
+```
+donation history
+payment methods
+recurring donation
+```
+
+ they must prove control of the account.
+
+ A secure email-based activation flow is recommended.
+
+ Do not consider:
+
+```
+knowing donor email
+```
+
+ sufficient authentication.
+
+---
+
+ # 89\. Account Merge
+
+ A donor may later register normally.
+
+ Example:
+
+```
+Donation-created customer
+        +
+Normal PawTag registration
+        ↓
+Same email
+        ↓
+Same customer identity
+```
+
+ The system must avoid creating duplicate accounts.
+
+ If duplicate accounts already exist, provide an audited merge mechanism.
+
+---
+
+ # 90\. Donation + Pet Owner Transition
+
+ A donor can later become a PawTag owner.
+
+ Example:
+
+```
+Donor
+ ↓
+Buys PawTag
+ ↓
+Creates pet
+ ↓
+Activates tag
+ ↓
+Existing donor account becomes normal customer + donor
+```
+
+ No account migration should be required.
+
+---
+
+ # 91\. Invoice System Reuse
+
+ Reuse existing:
+
+```
+invoice/document renderer
+PDF renderer
+document storage
+email attachment
+online invoice viewer
+customer document list
+admin document viewer
+```
+
+ But add:
+
+```
+DonationReceiptRenderer
+```
+
+ rather than forcing donation data into commerce invoice structures.
+
+---
+
+ # 92\. Stripe Invoice Consideration
+
+ Recurring donations may involve Stripe Billing invoices depending on the chosen Stripe implementation.
+
+ Do not automatically treat a Stripe Billing invoice as the PawTag donation receipt.
+
+ There may be two concepts:
+
+```
+Stripe billing document
++
+PawTag donation receipt
+```
+
+ The PawTag receipt is the organisation-facing donor document.
+
+---
+
+ # 93\. Accounting
+
+ Donation records should be designed so accounting can distinguish:
+
+```
+Product revenue
+Membership revenue
+Shipping
+Tax/GST where applicable
+Donation income
+Refunds
+Payment processing fees
+```
+
+ Do not mix donations into product revenue reports.
+
+ Accounting classification must be confirmed with PawTag's accountant.
+
+---
+
+ # 94\. GST / Tax Treatment
+
+ Do not allow the coding agent to infer GST treatment for donations.
+
+ Donation tax/accounting treatment should be explicitly confirmed by PawTag's accountant/tax adviser.
+
+ The system should nevertheless store:
+
+```
+financialClassification
+taxClassification
+```
+
+ where needed so accounting treatment can be represented explicitly.
+
+---
+
+ # 95\. Donation vs Sponsorship
+
+ A future sponsorship/payment may provide a direct benefit.
+
+ That can affect whether a payment qualifies as a donation.
+
+ Therefore the system should distinguish:
+
+```
+DONATION
+SPONSORSHIP
+PRODUCT_PURCHASE
+MEMBERSHIP
+OTHER
+```
+
+ Do not issue a donation receipt for something that is actually a commercial purchase or provides a direct benefit merely because the checkout was labelled "donate".
+
+ IRD specifically excludes donations providing a direct benefit to the donor or their family from donation tax-credit eligibility.  Inland Revenue+1
+
+---
+
+ # 96\. Donation Terms
+
+ Create a donation terms/privacy section.
+
+ Explain:
+
+ - what donations support;
+- whether donations are refundable;
+- recurring donation cancellation;
+- payment processing;
+- receipt issuance;
+- tax-credit eligibility;
+- privacy;
+- contact information.
+
+ Avoid claiming:
+
+```
+100% of every dollar goes directly to pets
+```
+
+ unless that statement is factually supportable.
+
+---
+
+ # 97\. Refund Policy
+
+ Define donation refund rules before implementation.
+
+ Suggested policy:
+
+```
+Donations are generally voluntary contributions.
+
+Where a payment was made in error, duplicated,
+fraudulently, or otherwise requires correction,
+contact PawTag support.
+
+Recurring donations may be cancelled at any time
+for future payments.
+```
+
+ Final legal wording must be reviewed.
+
+---
+
+ # 98\. Customer Support
+
+ Admin needs an operational workflow.
+
+ Example:
+
+```
+Customer:
+"I donated $100 but haven't received my receipt."
+
+Admin:
+Search email/name/payment
+ ↓
+Find Donation
+ ↓
+Check payment
+ ↓
+Check receipt
+ ↓
+Resend receipt
+```
+
+ Another:
+
+```
+Customer:
+"I accidentally donated twice."
+
+Admin:
+Find two payments
+ ↓
+Verify
+ ↓
+Refund duplicate
+ ↓
+Audit
+ ↓
+Notify customer
+```
+
+---
+
+ # 99\. Operational Alerts
+
+ Alert on:
+
+```
+Stripe payment succeeded but donation missing
+Payment succeeded but receipt missing
+Receipt generation repeatedly failing
+Email delivery repeatedly failing
+Recurring payment failed
+Recurring payment remains past_due
+Webhook processing failure
+Reconciliation mismatch
+Unexpected refund
+High donation fraud rate
+```
+
+---
+
+ # 100\. Metrics
+
+ Track:
+
+```
+donation_started
+donation_amount_selected
+donation_frequency_selected
+donor_details_submitted
+payment_started
+payment_succeeded
+payment_failed
+donation_completed
+receipt_generated
+receipt_emailed
+recurring_created
+recurring_cancelled
+recurring_payment_failed
+```
+
+ Do not include payment card data.
+
+---
+
+ # 101\. Analytics Funnel
+
+ Measure:
+
+```
+Donation page visits
+        ↓
+Amount selected
+        ↓
+Details submitted
+        ↓
+Payment initiated
+        ↓
+Payment succeeded
+        ↓
+Receipt delivered
+```
+
+ This allows identification of:
+
+```
+UX problem
+payment problem
+Stripe problem
+email problem
+```
+
+---
+
+ # 102\. Email Delivery Tracking
+
+ Store:
+
+```
+emailMessageId
+template
+recipient
+sentAt
+deliveryStatus
+failureReason
+```
+
+ If the email provider supports webhooks, integrate them later.
+
+---
+
+ # 103\. Receipt Download Tracking
+
+ Optional.
+
+ Track:
+
+```
+receiptViewed
+receiptDownloaded
+```
+
+ Avoid tracking excessively sensitive behaviour.
+
+---
+
+ # 104\. Admin Reporting
+
+ Export CSV:
+
+```
+Donation ID
+Receipt Number
+Donation Date
+Donor Name
+Donor Email
+Amount
+Currency
+Frequency
+Status
+Refunded
+Campaign
+Stripe Payment ID
+Stripe Customer ID
+Tax Eligibility
+```
+
+ Ensure exports are permission-protected.
+
+---
+
+ # 105\. Annual Tax-Year Reporting
+
+ The admin portal should eventually support:
+
+```
+Tax year:
+2026
+
+Eligible donations:
+$XX,XXX
+
+Number:
+XXX
+
+Refunded:
+$XXX
+
+Net:
+$XX,XXX
+```
+
+ Do not call the resulting number the official tax filing amount without accounting review.
+
+---
+
+ # 106\. Donation Receipt Annual Process
+
+ At tax-year end:
+
+```
+31 March
+   ↓
+Run reconciliation
+   ↓
+Identify eligible donations
+   ↓
+Verify receipts
+   ↓
+Generate annual report
+   ↓
+Accounting review
+```
+
+ IRD currently allows eligible donors to submit donation receipts through myIR, and receipts can be uploaded as PDFs.  Inland Revenue
+
+---
+
+ # 107\. Four-Year Receipt Accessibility
+
+ IRD currently states that eligible donation receipts can be submitted within four years.  Inland Revenue
+
+ Therefore PawTag should retain receipt documents according to its legal/accounting retention requirements and ensure customers can retrieve historical receipts.
+
+ Do not implement a short-lived receipt URL as the only means of accessing the financial document.
+
+---
+
+ # 108\. Data Integrity Rules
+
+ Never allow:
+
+```
+Donation amount changed after payment
+Receipt amount changed after issue
+Receipt number reused
+Stripe payment assigned to two donations
+Donation refunded twice
+Recurring subscription mapped to two active PawTag records
+```
+
+ Use database conditional writes/constraints to enforce these rules.
+
+---
+
+ # 109\. Concurrency
+
+ Test:
+
+```
+double-click donate
+browser refresh
+mobile reconnect
+Stripe webhook retry
+two webhook workers
+admin refund + Stripe refund
+customer cancel + webhook
+```
+
+ Every scenario must be safe.
+
+---
+
+ # 110\. Double Donation Prevention
+
+ Important distinction:
+
+ Two separate intentional donations should be allowed.
+
+ But:
+
+```
+same checkout session
+same idempotency key
+same payment intent
+```
+
+ must not create duplicate donation records.
+
+---
+
+ # 111\. Stripe PaymentIntent Reuse
+
+ If a pending donation already has a PaymentIntent:
+
+```
+reuse existing PaymentIntent
+```
+
+ where safe.
+
+ Do not create multiple PaymentIntents for a single donation attempt without a clear reason.
+
+---
+
+ # 112\. Recurring Donation Idempotency
+
+ Creating recurring donation must be protected.
+
+ If request repeats:
+
+```
+same idempotency key
+```
+
+ return the original recurring donation.
+
+ Do not create two Stripe subscriptions.
+
+---
+
+ # 113\. Customer Creation Race
+
+ Two simultaneous donation attempts for a new donor may both attempt:
+
+```
+create customer
+```
+
+ Use deterministic identity matching and conditional writes.
+
+ Do not rely on:
+
+```
+check then create
+```
+
+ without concurrency protection.
+
+---
+
+ # 114\. Email Address Normalization
+
+ Normalize email consistently.
+
+ At minimum:
+
+```
+trim
+lowercase
+```
+
+ Use the same canonicalization strategy as the existing PawTag customer system.
+
+ Do not introduce a separate email normalization policy for donations.
+
+---
+
+ # 115\. Mobile Number
+
+ If collecting phone:
+
+```
+validate
+normalize
+store canonical representation
+```
+
+ Do not require mobile verification solely because normal PawTag registration does.
+
+---
+
+ # 116\. Address
+
+ If an address is required for the receipt/customer profile:
+
+ Reuse PawTag's existing address model and validation.
+
+ Do not create:
+
+```
+DonationAddress
+```
+
+ unless there is a demonstrated reason.
+
+---
+
+ # 117\. Guest Checkout
+
+ The visitor should be able to complete donation without:
+
+```
+creating password
+verifying email
+verifying mobile
+creating pet
+```
+
+ The system creates the customer identity behind the scenes.
+
+---
+
+ # 118\. Donor Portal Access
+
+ After donation:
+
+```
+Want to manage your donation?
+
+Set up your PawTag account access:
+[ Secure my account ]
+```
+
+ This is optional after successful payment.
+
+ Do not block the donation receipt on account setup.
+
+---
+
+ # 119\. Account Setup Email
+
+ Separate email:
+
+```
+Your PawTag supporter account
+```
+
+ with:
+
+```
+[ Secure my account ]
+```
+
+ Do not combine authentication links with payment receipt links unnecessarily.
+
+---
+
+ # 120\. Stripe Payment Methods
+
+ Support Stripe-supported methods configured for PawTag's account and NZ market.
+
+ The application should not hard-code payment method assumptions beyond what Stripe/account configuration requires.
+
+ Potential methods may include:
+
+```
+Card
+Apple Pay
+Google Pay
+Other Stripe-supported methods
+```
+
+ Actual availability should be determined by Stripe configuration and PawTag's account eligibility.
+
+---
+
+ # 121\. Payment Method Storage
+
+ For recurring donations, Stripe should remain the system handling payment method storage.
+
+ PawTag should store only non-sensitive display information such as:
+
+```
+Visa
+•••• 4242
+```
+
+ when available.
+
+ Never store card numbers.
+
+---
+
+ # 122\. Stripe Checkout vs Payment Element
+
+ Because PawTag needs deep integration with:
+
+ - customer identity;
+- donation records;
+- custom UX;
+- recurring donations;
+- customer portal;
+- receipt workflow;
+- admin reconciliation;
+
+ prefer an integrated Stripe payment architecture rather than simply embedding a static Stripe Payment Link.
+
+ Stripe itself supports one-time and recurring donation Payment Links, but Payment Links are better suited to a simpler implementation.  Stripe Support+1
+
+ For PawTag's requirements, use the existing Stripe integration and a controlled application checkout flow.
+
+---
+
+ # 123\. Stripe Billing
+
+ For recurring donations, use Stripe Billing where appropriate.
+
+ Stripe Billing already integrates PaymentIntents into invoice/subscription payment flows.  Stripe Support
+
+ The exact subscription architecture should align with PawTag's existing membership Stripe implementation.
+
+ Do not create a second subscription framework.
+
+---
+
+ # 124\. Reuse Existing Membership Stripe Infrastructure
+
+ PawTag already has:
+
+```
+Stripe client factory
+subscription lifecycle
+webhooks
+payment methods
+billing portal
+reconciliation
+dunning
+audit
+```
+
+ The donation implementation should reuse the infrastructure where the semantics match.
+
+ Do not copy/paste membership code into:
+
+```
+donation.service.ts
+```
+
+ Instead extract shared primitives where justified.
+
+---
+
+ # 125\. Shared Stripe Financial Infrastructure
+
+ Potential shared services:
+
+```
+stripe-client
+stripe-webhook-service
+stripe-event-ledger
+payment-idempotency-service
+stripe-customer-service
+payment-reconciliation-service
+refund-service
+document-service
+email-service
+```
+
+ Donation-specific services:
+
+```
+donation-service
+donation-receipt-service
+recurring-donation-service
+```
+
+---
+
+ # 126\. Service Architecture
+
+ Target:
+
+```
+Route
+ ↓
+Validation
+ ↓
+Authorization
+ ↓
+Donation Service
+ ↓
+Payment Service
+ ↓
+Stripe
+ ↓
+Repository
+```
+
+ Routes should not contain:
+
+```
+Stripe SDK orchestration
+receipt rendering
+customer creation logic
+database transaction logic
+```
+
+---
+
+ # 127\. Recommended API Service Files
+
+ Potential:
+
+```
+packages/api/src/services/donation.service.ts
+packages/api/src/services/donation-payment.service.ts
+packages/api/src/services/recurring-donation.service.ts
+packages/api/src/services/donation-receipt.service.ts
+packages/api/src/services/donation-reconciliation.service.ts
+```
+
+ Actual names should follow PawTag conventions.
+
+---
+
+ # 128\. Repository Layer
+
+ Potential:
+
+```
+packages/db/src/repositories/donation.repository.ts
+packages/db/src/repositories/donation-payment.repository.ts
+packages/db/src/repositories/donation-receipt.repository.ts
+```
+
+ If the DynamoDB migration has its own repository conventions, use those instead.
+
+---
+
+ # 129\. DynamoDB Migration Compatibility
+
+ Donation implementation should ideally be introduced after the persistence abstraction exists.
+
+ Recommended sequence:
+
+```
+Persistence abstraction
+        ↓
+DynamoDB repository
+        ↓
+Donation domain
+        ↓
+Stripe integration
+```
+
+ Avoid:
+
+```
+Donation feature directly against Mongo
+        ↓
+Later rewrite donation for DynamoDB
+```
+
+ That creates unnecessary migration work.
+
+---
+
+ # 130\. Database Migration Strategy
+
+ Do not migrate the entire PawTag database solely because donations are being added.
+
+ If DynamoDB migration is already underway:
+
+```
+Phase 1
+Persistence abstraction
+
+Phase 2
+Existing domain migration
+
+Phase 3
+Donation implementation on DynamoDB
+
+Phase 4
+Mongo removal
+```
+
+ Alternatively, if PawTag needs donations immediately:
+
+```
+Donation repository interface
+        ↓
+Current Mongo adapter
+        ↓
+DynamoDB adapter
+```
+
+ Then swap implementations later.
+
+---
+
+ # 131\. Testing Strategy
+
+ Donation testing must be significantly stronger than basic CRUD testing.
+
+ Test:
+
+```
+happy path
+payment failure
+Stripe timeout
+webhook retry
+duplicate webhook
+duplicate request
+refund
+recurring payment
+recurring failure
+receipt failure
+email failure
+customer creation race
+admin refund
+account access
+authorization
+```
+
+---
+
+ # 132\. Unit Tests
+
+ Test:
+
+```
+amount validation
+frequency validation
+tax classification
+receipt numbering
+receipt status transitions
+refund transitions
+idempotency
+customer classification
+error mapping
+```
+
+---
+
+ # 133\. Integration Tests
+
+ Test against:
+
+```
+DynamoDB test environment
+Stripe test mode
+email test adapter
+PDF renderer
+```
+
+ Test actual cross-service behaviour.
+
+---
+
+ # 134\. Stripe Tests
+
+ Use Stripe test-mode events and fixtures.
+
+ Verify:
+
+```
+PaymentIntent succeeded
+PaymentIntent failed
+Subscription created
+Invoice paid
+Invoice failed
+Refund
+Duplicate webhook
+Out-of-order webhook
+```
+
+---
+
+ # 135\. Browser E2E
+
+ At minimum:
+
+ ### Test 1 — Guest one-time donation
+
+```
+Visitor
+→ /donate
+→ $50
+→ one-time
+→ donor details
+→ payment
+→ success
+→ receipt
+```
+
+ ### Test 2 — Guest recurring donation
+
+```
+Visitor
+→ monthly
+→ $25
+→ payment
+→ subscription
+→ confirmation
+```
+
+ ### Test 3 — Existing customer
+
+```
+Login
+→ Donate
+→ existing identity
+→ payment
+→ customer portal
+→ donation history
+```
+
+---
+
+ # 136\. Customer Portal E2E
+
+ Test:
+
+```
+Donation visible
+Receipt visible
+PDF downloadable
+Online receipt works
+Recurring donation visible
+Cancel recurring donation
+Payment history visible
+```
+
+---
+
+ # 137\. Admin E2E
+
+ Test:
+
+```
+Donation search
+Donation detail
+Stripe references
+Receipt view
+Receipt resend
+Refund
+Audit record
+Reconciliation
+```
+
+---
+
+ # 138\. Security Tests
+
+ Test:
+
+```
+Customer A cannot view Customer B donation
+Customer A cannot view Customer B receipt
+Guest cannot enumerate receipts
+Guest cannot retrieve donation by sequential ID
+Admin permissions enforced
+Unauthorised refund rejected
+Stripe webhook without valid signature rejected
+Duplicate webhook safe
+```
+
+---
+
+ # 139\. Performance
+
+ Donation flow should remain fast.
+
+ Target:
+
+```
+Donation page:
+fast initial load
+
+Create donation:
+< reasonable API latency
+
+Stripe:
+provider dependent
+
+Receipt:
+asynchronous where necessary
+```
+
+ Do not make the customer wait synchronously for:
+
+```
+PDF rendering
+email delivery
+analytics
+```
+
+ Payment completion should return as quickly as possible once authoritative payment state is available.
+
+---
+
+ # 140\. Receipt Generation Architecture
+
+ Prefer:
+
+```
+Payment succeeded
+        ↓
+Persist payment
+        ↓
+Queue receipt generation
+        ↓
+Generate PDF
+        ↓
+Store PDF
+        ↓
+Mark receipt issued
+        ↓
+Queue email
+```
+
+ However, if the current PawTag invoice system can generate the PDF synchronously within acceptable latency, it may do so.
+
+ The architecture must not make successful payment dependent on email provider availability.
+
+---
+
+ # 141\. Object Storage
+
+ Store receipt PDFs in durable object storage.
+
+ Potential existing PawTag infrastructure:
+
+```
+Cloudflare R2
+```
+
+ Use private storage where appropriate.
+
+ Online access should go through controlled authorization or signed URLs.
+
+---
+
+ # 142\. PDF Security
+
+ PDFs may contain:
+
+```
+name
+email
+address
+donation amount
+receipt information
+```
+
+ Therefore:
+
+ - don't expose public buckets;
+- don't use predictable file names;
+- use authorization;
+- use signed URLs where appropriate;
+- don't put donor data into object paths unnecessarily.
+
+---
+
+ # 143\. Email Security
+
+ Receipt emails should contain only appropriate information.
+
+ The attached PDF is the authoritative document.
+
+ Do not put:
+
+```
+full payment credentials
+private account tokens
+internal IDs
+```
+
+ in the email.
+
+---
+
+ # 144\. Donation Page SEO
+
+ Create:
+
+```
+/donate
+```
+
+ with appropriate:
+
+```
+title
+description
+OpenGraph
+canonical
+structured content
+```
+
+ Potential title:
+
+```
+Support PawTag | Help Lost Pets Find Their Way Home
+```
+
+ Do not use misleading tax claims in SEO metadata.
+
+---
+
+ # 145\. Donation Page Content
+
+ Suggested sections:
+
+```
+Hero
+Why PawTag needs support
+What donations help fund
+Donation form
+How donations help
+Transparency
+FAQ
+Tax/receipt information
+```
+
+---
+
+ # 146\. Suggested "What Your Donation Helps"
+
+ Avoid guaranteed claims unless financially supported.
+
+ Example:
+
+```
+Your support helps us build and operate:
+
+• pet recovery technology
+• finder communication tools
+• notification infrastructure
+• PawTag platform development
+• customer support
+• reliability and security
+```
+
+ This is safer than saying:
+
+```
+$25 = one pet saved
+```
+
+ unless that relationship is demonstrably true.
+
+---
+
+ # 147\. Donation Transparency
+
+ Consider a simple section:
+
+```
+Where your support goes
+
+Technology
+Recovery infrastructure
+Customer support
+Security & reliability
+Operations
+```
+
+ Percentages should only be shown if accounting data supports them.
+
+---
+
+ # 148\. Donation FAQ
+
+ Include:
+
+ ### Can I donate without owning a PawTag?
+
+ Yes.
+
+ ### Do I need a pet?
+
+ No.
+
+ ### Do I need a PawTag account?
+
+ No.
+
+ ### Can I make a recurring donation?
+
+ Yes.
+
+ ### Can I cancel a recurring donation?
+
+ Yes.
+
+ ### Will I receive a receipt?
+
+ Yes, after successful payment.
+
+ ### Can I claim a tax credit?
+
+ Only if the donation and PawTag's status meet the applicable New Zealand requirements.
+
+---
+
+ # 149\. Tax Disclaimer
+
+ Until PawTag's donee status is confirmed:
+
+```
+Donation tax credits
+
+Donation tax credits in New Zealand are available only
+for qualifying donations to approved donee organisations.
+
+PawTag will provide appropriate payment and donation
+documentation. Please check your eligibility with Inland
+Revenue or your tax adviser.
+```
+
+ Once donee status is confirmed, update the wording based on professional advice and current IRD requirements.
+
+---
+
+ # 150\. IRD Receipt Validation
+
+ Create automated receipt validation tests.
+
+ Example:
+
+```
+receipt contains organisation name
+receipt contains IRD number
+receipt contains charity number when applicable
+receipt contains donor name
+receipt contains amount
+receipt contains donation date
+receipt says donation
+receipt has unique number
+receipt has authorised signatory information
+replacement receipt says replacement
+```
+
+---
+
+ # 151\. Receipt Golden PDF Test
+
+ Create a known receipt fixture.
+
+ Test:
+
+```
+data
+→ PDF
+→ expected content
+```
+
+ Do not depend solely on pixel-perfect screenshot comparison.
+
+ Validate text and required fields.
+
+---
+
+ # 152\. Receipt Number Race Test
+
+ Simulate:
+
+```
+100 concurrent donation completions
+```
+
+ Ensure:
+
+```
+100 unique receipt numbers
+```
+
+ No duplicates.
+
+---
+
+ # 153\. Payment Concurrency Test
+
+ Simulate:
+
+```
+same donation
+100 webhook deliveries
+```
+
+ Expected:
+
+```
+1 successful donation state
+1 receipt
+1 receipt number
+1 email job
+```
+
+---
+
+ # 154\. Recurring Payment Concurrency
+
+ Simulate:
+
+```
+invoice.paid
+invoice.paid duplicate
+```
+
+ Expected:
+
+```
+one donation payment
+one receipt
+```
+
+---
+
+ # 155\. Refund Concurrency
+
+ Simulate:
+
+```
+Admin refund
++
+Stripe refund webhook
++
+duplicate admin request
+```
+
+ Expected:
+
+```
+one refund
+consistent final state
+one audit chain
+```
+
+---
+
+ # 156\. Admin Permissions
+
+ Introduce permissions:
+
+```
+donations.view
+donations.manage
+donations.refund
+donations.receipts
+donations.export
+donations.reconciliation
+```
+
+ Use existing PawTag RBAC infrastructure.
+
+---
+
+ # 157\. Customer Authorization
+
+ A customer can only access:
+
+```
+their donations
+their receipts
+their recurring donations
+their payment history
+```
+
+ Ownership must be enforced server-side.
+
+---
+
+ # 158\. Public Receipt Access
+
+ If public receipt access is supported:
+
+```
+receipt token
++
+expiration
++
+revocation
++
+rate limit
+```
+
+ Otherwise require authenticated customer access.
+
+ Preferred default:
+
+```
+authenticated access
+```
+
+ with a secure emailed access mechanism for newly created donors.
+
+---
+
+ # 159\. Donation Admin Search
+
+ Search by:
+
+```
+donor name
+email
+customer ID
+donation ID
+receipt number
+Stripe PaymentIntent
+Stripe Customer
+```
+
+ Do not allow unrestricted wildcard searches across huge datasets.
+
+---
+
+ # 160\. Reconciliation Dashboard
+
+ Example:
+
+```
+Donation Reconciliation
+
+Healthy:
+12,431
+
+Needs review:
+3
+
+Payment succeeded / local pending:
+1
+
+Refund mismatch:
+1
+
+Subscription mismatch:
+1
+```
+
+ Clicking a mismatch opens a repair workflow.
+
+---
+
+ # 161\. Repair Workflow
+
+ Never silently repair financial state.
+
+ Example:
+
+```
+Stripe:
+PaymentIntent succeeded
+
+PawTag:
+Donation PENDING
+
+Recommended repair:
+Mark donation successful
+Generate receipt
+```
+
+ Admin must confirm or automated reconciliation must operate under documented rules.
+
+ All repair actions must be audited.
+
+---
+
+ # 162\. Observability
+
+ Add metrics:
+
+```
+donation_payment_success
+donation_payment_failure
+donation_receipt_generation_failure
+donation_email_failure
+donation_webhook_failure
+donation_reconciliation_mismatch
+```
+
+ Add structured logs with:
+
+```
+requestId
+donationId
+customerId
+stripePaymentIntentId
+stripeEventId
+```
+
+ Never log sensitive payment information.
+
+---
+
+ # 163\. Sentry
+
+ Capture unexpected donation failures with:
+
+```
+donationId
+customerId
+paymentIntentId
+environment
+```
+
+ where safe.
+
+ Avoid:
+
+```
+email
+phone
+address
+payment credentials
+```
+
+ unless absolutely necessary.
+
+---
+
+ # 164\. OpenTelemetry
+
+ Trace:
+
+```
+HTTP request
+ ↓
+Donation service
+ ↓
+Stripe
+ ↓
+Database
+```
+
+ Webhook:
+
+```
+Stripe
+ ↓
+Webhook
+ ↓
+Donation service
+ ↓
+Database
+ ↓
+Receipt job
+```
+
+ This will make payment/reconciliation debugging substantially easier.
+
+---
+
+ # 165\. Deployment Configuration
+
+ New environment/configuration should be documented.
+
+ Potential:
+
+```
+DONATION_ENABLED
+DONATION_MIN_AMOUNT
+DONATION_MAX_AMOUNT
+DONATION_DEFAULT_AMOUNT
+DONATION_CURRENCY
+DONATION_RECEIPTS_ENABLED
+DONATION_TAX_CREDIT_ENABLED
+DONATION_DONEE_NAME
+DONATION_DONEE_IRD_NUMBER
+DONATION_CHARITIES_NUMBER
+DONATION_RECEIPT_SIGNATORY_NAME
+DONATION_RECEIPT_SIGNATORY_TITLE
+```
+
+ Secrets remain in the deployment secret manager.
+
+---
+
+ # 166\. Feature Flag
+
+ Initially:
+
+```
+DONATION_ENABLED=false
+```
+
+ Deploy code.
+
+ Validate.
+
+ Then enable:
+
+```
+DONATION_ENABLED=true
+```
+
+ This allows a controlled launch.
+
+---
+
+ # 167\. Test vs Production
+
+ Donation test mode must be unmistakable.
+
+ Development:
+
+```
+Stripe TEST
+```
+
+ Production:
+
+```
+Stripe LIVE
+```
+
+ The application must fail safely if production donation configuration is incomplete.
+
+ Never silently fall back to test/demo behaviour in production.
+
+---
+
+ # 168\. Launch Strategy
+
+ Use staged rollout.
+
+ ### Stage 1
+
+ Internal test:
+
+```
+Stripe test mode
+DynamoDB test environment
+test email
+test receipts
+```
+
+ ### Stage 2
+
+ Controlled production:
+
+```
+real Stripe
+small internal donation
+real receipt
+real email
+real refund
+```
+
+ ### Stage 3
+
+ Founder/friends:
+
+```
+small group
+real donations
+real recurring donation
+```
+
+ ### Stage 4
+
+ Public:
+
+```
+homepage CTA
+navigation CTA
+social campaign
+```
+
+---
+
+ # 169\. Production Smoke Test
+
+ Before public launch:
+
+```
+$5 one-time donation
+```
+
+ Verify:
+
+```
+Stripe
+DynamoDB
+Donation
+Payment
+Receipt
+PDF
+Email
+Customer portal
+Admin portal
+Audit
+```
+
+ Then perform:
+
+```
+refund
+```
+
+ and verify the entire refund lifecycle.
+
+---
+
+ # 170\. Recurring Smoke Test
+
+ Create:
+
+```
+small recurring donation
+```
+
+ Verify:
+
+```
+Stripe subscription
+PawTag recurring donation
+payment
+receipt
+customer portal
+admin portal
+webhook
+```
+
+ Then cancel.
+
+---
+
+ # 171\. First Production Donor
+
+ Do not use an anonymous unknown transaction for the first production test.
+
+ Use a controlled internal account.
+
+ Record:
+
+```
+timestamp
+amount
+Stripe IDs
+PawTag IDs
+receipt number
+```
+
+ for verification.
+
+---
+
+ # 172\. Rollback Strategy
+
+ Feature flag:
+
+```
+DONATION_ENABLED=false
+```
+
+ should immediately stop new donations while allowing existing recurring subscriptions to continue being managed.
+
+ Do not simply delete donation routes.
+
+ Existing financial data must remain accessible.
+
+---
+
+ # 173\. Recurring Donation Emergency
+
+ If the donation feature has a serious bug:
+
+```
+disable new donation creation
+```
+
+ but do not automatically cancel existing recurring donations.
+
+ Admin must have an explicit operational decision process.
+
+---
+
+ # 174\. Customer Communication
+
+ If a donation system incident occurs:
+
+```
+payment received
+but receipt delayed
+```
+
+ the customer should eventually receive the receipt.
+
+ Do not issue false "payment failed" messages when Stripe confirms payment.
+
+---
+
+ # 175\. Documentation
+
+ Add:
+
+```
+docs/DONATIONS.md
+docs/DONATION-OPERATIONS-RUNBOOK.md
+docs/DONATION-RECEIPTS.md
+docs/DONATION-RECONCILIATION.md
+docs/DONATION-SECURITY.md
+```
+
+ Update:
+
+```
+README.md
+AGENTS.md
+docs/database-schema.md
+docs/ARCHITECTURE.md
+docs/OBSERVABILITY-ARCHITECTURE.md
+```
+
+ as appropriate.
+
+---
+
+ # 176\. AGENTS.md Rules
+
+ Add explicit AI rules:
+
+```
+Donation financial records are immutable.
+
+Never:
+- trust client donation amounts
+- create duplicate Stripe subscriptions
+- mark payment successful from frontend redirects
+- generate duplicate receipts
+- delete financial records
+- modify issued receipt content silently
+- bypass Stripe webhook verification
+- bypass customer ownership
+- classify a donation as tax-credit eligible without configured eligibility
+```
+
+---
+
+ # 177\. AI Coding Agent Execution Rules
+
+ The coding agent must not attempt the entire implementation in one autonomous change.
+
+ Work in packets.
+
+ Each packet:
+
+```
+inspect
+→ implement
+→ test
+→ typecheck
+→ build
+→ report
+```
+
+ Then stop.
+
+---
+
+ # 178\. Recommended Implementation Sequence
+
+ ## Phase 0 — Legal / Accounting Gate
+
+ Before coding tax-credit claims:
+
+ Suggested policy:
+
+```
+Donations are generally voluntary contributions.
+
+Where a payment was made in error, duplicated,
+fraudulently, or otherwise requires correction,
+contact PawTag support.
+
+Recurring donations may be cancelled at any time
+for future payments.
+```
+
+ Final legal wording must be reviewed.
+
+---
+
+ # 98\. Customer Support
+
+ Admin needs an operational workflow.
+
+ Example:
+
+```
+Customer:
+"I donated $100 but haven't received my receipt."
+
+Admin:
+Search email/name/payment
+ ↓
+Find Donation
+ ↓
+Check payment
+ ↓
+Check receipt
+ ↓
+Resend receipt
+```
+
+ Another:
+
+```
+Customer:
+"I accidentally donated twice."
+
+Admin:
+Find two payments
+ ↓
+Verify
+ ↓
+Refund duplicate
+ ↓
+Audit
+ ↓
+Notify customer
+```
+
+---
+
+ # 99\. Operational Alerts
+
+ Alert on:
+
+```
+Stripe payment succeeded but donation missing
+Payment succeeded but receipt missing
+Receipt generation repeatedly failing
+Email delivery repeatedly failing
+Recurring payment failed
+Recurring payment remains past_due
+Webhook processing failure
+Reconciliation mismatch
+Unexpected refund
+High donation fraud rate
+```
+
+---
+
+ # 100\. Metrics
+
+ Track:
+
+```
+donation_started
+donation_amount_selected
+donation_frequency_selected
+donor_details_submitted
+payment_started
+payment_succeeded
+payment_failed
+donation_completed
+receipt_generated
+receipt_emailed
+recurring_created
+recurring_cancelled
+recurring_payment_failed
+```
+
+ Do not include payment card data.
+
+---
+
+ # 101\. Analytics Funnel
+
+ Measure:
+
+```
+Donation page visits
+        ↓
+Amount selected
+        ↓
+Details submitted
+        ↓
+Payment initiated
+        ↓
+Payment succeeded
+        ↓
+Receipt delivered
+```
+
+ This allows identification of:
+
+```
+UX problem
+payment problem
+Stripe problem
+email problem
+```
+
+---
+
+ # 102\. Email Delivery Tracking
+
+ Store:
+
+```
+emailMessageId
+template
+recipient
+sentAt
+deliveryStatus
+failureReason
+```
+
+ If the email provider supports webhooks, integrate them later.
+
+---
+
+ # 103\. Receipt Download Tracking
+
+ Optional.
+
+ Track:
+
+```
+receiptViewed
+receiptDownloaded
+```
+
+ Avoid tracking excessively sensitive behaviour.
+
+---
+
+ # 104\. Admin Reporting
+
+ Export CSV:
+
+```
+Donation ID
+Receipt Number
+Donation Date
+Donor Name
+Donor Email
+Amount
+Currency
+Frequency
+Status
+Refunded
+Campaign
+Stripe Payment ID
+Stripe Customer ID
+Tax Eligibility
+```
+
+ Ensure exports are permission-protected.
+
+---
+
+ # 105\. Annual Tax-Year Reporting
+
+ The admin portal should eventually support:
+
+```
+Tax year:
+2026
+
+Eligible donations:
+$XX,XXX
+
+Number:
+XXX
+
+Refunded:
+$XXX
+
+Net:
+$XX,XXX
+```
+
+ Do not call the resulting number the official tax filing amount without accounting review.
+
+---
+
+ # 106\. Donation Receipt Annual Process
+
+ At tax-year end:
+
+```
+31 March
+   ↓
+Run reconciliation
+   ↓
+Identify eligible donations
+   ↓
+Verify receipts
+   ↓
+Generate annual report
+   ↓
+Accounting review
+```
+
+ IRD currently allows eligible donors to submit donation receipts through myIR, and receipts can be uploaded as PDFs.  Inland Revenue
+
+---
+
+ # 107\. Four-Year Receipt Accessibility
+
+ IRD currently states that eligible donation receipts can be submitted within four years.  Inland Revenue
+
+ Therefore PawTag should retain receipt documents according to its legal/accounting retention requirements and ensure customers can retrieve historical receipts.
+
+ Do not implement a short-lived receipt URL as the only means of accessing the financial document.
+
+---
+
+ # 108\. Data Integrity Rules
+
+ Never allow:
+
+```
+Donation amount changed after payment
+Receipt amount changed after issue
+Receipt number reused
+Stripe payment assigned to two donations
+Donation refunded twice
+Recurring subscription mapped to two active PawTag records
+```
+
+ Use database conditional writes/constraints to enforce these rules.
+
+---
+
+ # 109\. Concurrency
+
+ Test:
+
+```
+double-click donate
+browser refresh
+mobile reconnect
+Stripe webhook retry
+two webhook workers
+admin refund + Stripe refund
+customer cancel + webhook
+```
+
+ Every scenario must be safe.
+
+---
+
+ # 110\. Double Donation Prevention
+
+ Important distinction:
+
+ Two separate intentional donations should be allowed.
+
+ But:
+
+```
+same checkout session
+same idempotency key
+same payment intent
+```
+
+ must not create duplicate donation records.
+
+---
+
+ # 111\. Stripe PaymentIntent Reuse
+
+ If a pending donation already has a PaymentIntent:
+
+```
+reuse existing PaymentIntent
+```
+
+ where safe.
+
+ Do not create multiple PaymentIntents for a single donation attempt without a clear reason.
+
+---
+
+ # 112\. Recurring Donation Idempotency
+
+ Creating recurring donation must be protected.
+
+ If request repeats:
+
+```
+same idempotency key
+```
+
+ return the original recurring donation.
+
+ Do not create two Stripe subscriptions.
+
+---
+
+ # 113\. Customer Creation Race
+
+ Two simultaneous donation attempts for a new donor may both attempt:
+
+```
+create customer
+```
+
+ Use deterministic identity matching and conditional writes.
+
+ Do not rely on:
+
+```
+check then create
+```
+
+ without concurrency protection.
+
+---
+
+ # 114\. Email Address Normalization
+
+ Normalize email consistently.
+
+ At minimum:
+
+```
+trim
+lowercase
+```
+
+ Use the same canonicalization strategy as the existing PawTag customer system.
+
+ Do not introduce a separate email normalization policy for donations.
+
+---
+
+ # 115\. Mobile Number
+
+ If collecting phone:
+
+```
+validate
+normalize
+store canonical representation
+```
+
+ Do not require mobile verification solely because normal PawTag registration does.
+
+---
+
+ # 116\. Address
+
+ If an address is required for the receipt/customer profile:
+
+ Reuse PawTag's existing address model and validation.
+
+ Do not create:
+
+```
+DonationAddress
+```
+
+ unless there is a demonstrated reason.
+
+---
+
+ # 117\. Guest Checkout
+
+ The visitor should be able to complete donation without:
+
+```
+creating password
+verifying email
+verifying mobile
+creating pet
+```
+
+ The system creates the customer identity behind the scenes.
+
+---
+
+ # 118\. Donor Portal Access
+
+ After donation:
+
+```
+Want to manage your donation?
+
+Set up your PawTag account access:
+[ Secure my account ]
+```
+
+ This is optional after successful payment.
+
+ Do not block the donation receipt on account setup.
+
+---
+
+ # 119\. Account Setup Email
+
+ Separate email:
+
+```
+Your PawTag supporter account
+```
+
+ with:
+
+```
+[ Secure my account ]
+```
+
+ Do not combine authentication links with payment receipt links unnecessarily.
+
+---
+
+ # 120\. Stripe Payment Methods
+
+ Support Stripe-supported methods configured for PawTag's account and NZ market.
+
+ The application should not hard-code payment method assumptions beyond what Stripe/account configuration requires.
+
+ Potential methods may include:
+
+```
+Card
+Apple Pay
+Google Pay
+Other Stripe-supported methods
+```
+
+ Actual availability should be determined by Stripe configuration and PawTag's account eligibility.
+
+---
+
+ # 121\. Payment Method Storage
+
+ For recurring donations, Stripe should remain the system handling payment method storage.
+
+ PawTag should store only non-sensitive display information such as:
+
+```
+Visa
+•••• 4242
+```
+
+ when available.
+
+ Never store card numbers.
+
+---
+
+ # 122\. Stripe Checkout vs Payment Element
+
+ Because PawTag needs deep integration with:
+
+ - customer identity;
+- donation records;
+- custom UX;
+- recurring donations;
+- customer portal;
+- receipt workflow;
+- admin reconciliation;
+
+   For PawTag's requirements, use the existing Stripe integration and a controlled application checkout flow.
+
+---
+
+ - confirm PawTag legal entity;
+- confirm whether PawTag is an approved donee organisation;
+- confirm IRD number;
+- confirm Charities Services status where applicable;
+- confirm whether proposed donations qualify;
+- confirm receipt wording;
+- confirm GST/accounting treatment;
+- confirm refund/tax-credit treatment.
+
+ This is not something the AI coding agent should decide.
+
+---
+
+ # 179\. Phase 1 — Architecture Discovery
+
+ Agent must inspect:
+
+```
+packages/db
+packages/api
+packages/shared
+existing Stripe services
+existing invoice services
+existing PDF generation
+email CMS
+customer registration
+customer portal
+admin portal
+audit service
+background jobs
+DynamoDB migration work
+```
+
+ Output:
+
+```
+DONATION-ARCHITECTURE-AUDIT.md
+```
+
+ Do not modify code yet.
+
+---
+
+ # 180\. Phase 2 — Persistence Abstraction
+
+ Implement:
+
+```
+DonationRepository
+DonationPaymentRepository
+RecurringDonationRepository
+DonationReceiptRepository
+```
+
+ against the target persistence architecture.
+
+ If DynamoDB migration is incomplete, implement the appropriate adapter rather than tying domain logic to Mongo.
+
+---
+
+ # 181\. Phase 3 — Shared Contracts
+
+ Create:
+
+```
+packages/shared/src/donations.ts
+```
+
+ Add:
+
+```
+types
+schemas
+DTOs
+error codes
+enums
+```
+
+ Use Zod where appropriate.
+
+---
+
+ # 182\. Phase 4 — Customer Identity Integration
+
+ Extend customer registration with:
+
+```
+DONATION
+```
+
+ context.
+
+ Implement:
+
+```
+existing customer reuse
+new donor customer creation
+no pet requirement
+no onboarding requirement
+secure later account activation
+```
+
+ Write tests before continuing.
+
+---
+
+ # 183\. Phase 5 — Donation Domain
+
+ Implement:
+
+```
+DonationService
+DonationPaymentService
+RecurringDonationService
+```
+
+ without UI first.
+
+ Test:
+
+```
+create
+validate
+status transitions
+idempotency
+ownership
+```
+
+---
+
+ # 184\. Phase 6 — Stripe One-Time Donation
+
+ Implement:
+
+```
+PaymentIntent
+Stripe Customer
+metadata
+idempotency
+webhooks
+payment state
+```
+
+ Test using Stripe test mode.
+
+---
+
+ # 185\. Phase 7 — Stripe Recurring Donation
+
+ Implement:
+
+```
+subscription
+recurring donation state
+payment lifecycle
+cancellation
+payment failure
+retry
+```
+
+ Reuse existing PawTag Stripe Billing infrastructure.
+
+---
+
+ # 186\. Phase 8 — Receipt System
+
+ Implement:
+
+```
+DonationReceipt
+receipt numbering
+PDF
+storage
+online viewer
+replacement/void workflow
+```
+
+ Use current PawTag invoice/document infrastructure.
+
+---
+
+ # 187\. Phase 9 — Email
+
+ Implement:
+
+```
+receipt email
+payment confirmation
+recurring donation confirmation
+payment failure
+cancellation
+refund
+```
+
+ Use CMS-first templates.
+
+---
+
+ # 188\. Phase 10 — Customer Portal
+
+ Implement:
+
+```
+My Donations
+Donation detail
+Receipt
+PDF
+Recurring donations
+Payment history
+```
+
+---
+
+ # 189\. Phase 11 — Admin Portal
+
+ Implement:
+
+```
+Donation dashboard
+Donation list
+Donation detail
+Donor
+Recurring donations
+Receipts
+Refund
+Reissue
+Reconciliation
+Export
+```
+
+---
+
+ # 190\. Phase 12 — Public Donation Page
+
+ Implement:
+
+```
+/donate
+```
+
+ with PawTag branding.
+
+ Then add:
+
+```
+homepage CTA
+header CTA
+footer CTA
+```
+
+---
+
+ # 191\. Phase 13 — Background Jobs
+
+ Implement:
+
+```
+receipt retry
+email retry
+reconciliation
+subscription reconciliation
+webhook recovery
+```
+
+---
+
+ # 192\. Phase 14 — Observability
+
+ Add:
+
+```
+logs
+metrics
+Sentry
+OpenTelemetry
+alerts
+```
+
+---
+
+ # 193\. Phase 15 — E2E
+
+ Implement:
+
+```
+guest one-time
+guest recurring
+existing customer
+payment failure
+receipt
+customer portal
+admin portal
+refund
+duplicate webhook
+duplicate request
+```
+
+---
+
+ # 194\. Phase 16 — Production Rehearsal
+
+ Use:
+
+```
+production build
+production-like configuration
+Stripe test mode initially
+real deployment
+real email sandbox/test account
+DynamoDB production-like table
+```
+
+ Validate everything.
+
+---
+
+ # 195\. Phase 17 — Real Production Smoke Test
+
+ After Stripe LIVE configuration:
+
+```
+small donation
+verify
+refund
+verify
+```
+
+ Then:
+
+```
+small recurring donation
+verify
+cancel
+verify
+```
+
+ Only after this should the public Donate CTA be enabled.
+
+---
+
+ # 196\. Definition of Done — Core Donation
+
+ - [ ] Visitor can donate without owning a pet.
+- [ ] Visitor can donate without normal onboarding.
+- [ ] Existing customer can donate.
+- [ ] Existing customer is not duplicated.
+- [ ] New donor gets a PawTag customer identity.
+- [ ] One-time donation works.
+- [ ] Recurring donation works.
+- [ ] Custom amount works.
+- [ ] Server validates amount.
+- [ ] Stripe payment works.
+- [ ] Stripe Customer is linked.
+- [ ] Stripe PaymentIntent is linked.
+- [ ] Webhook is authoritative.
+- [ ] Webhook is idempotent.
+- [ ] Payment is idempotent.
+- [ ] Refund works.
+- [ ] Refund is idempotent.
+- [ ] Donation appears in customer portal.
+- [ ] Donation appears in admin portal.
+- [ ] Receipt is generated.
+- [ ] Receipt PDF is stored.
+- [ ] Receipt PDF is downloadable.
+- [ ] Online receipt works.
+- [ ] Receipt is emailed.
+- [ ] Receipt PDF is attached.
+- [ ] Audit event exists.
+- [ ] Reconciliation works.
+
+---
+
+ # 197\. Definition of Done — NZ Receipt
+
+ - [ ] Donee status confirmed.
+- [ ] IRD number confirmed.
+- [ ] Charities Services number confirmed where applicable.
+- [ ] Receipt wording approved.
+- [ ] Donor name included.
+- [ ] Donation amount included.
+- [ ] Donation date included.
+- [ ] Clear donation statement included.
+- [ ] Organisation name included.
+- [ ] Required organisation identifiers included.
+- [ ] Authorised person information included.
+- [ ] Receipt number unique.
+- [ ] Replacement receipts clearly identified.
+- [ ] PDF passes manual review.
+- [ ] PDF works when uploaded to myIR.
+- [ ] Accountant/tax adviser has reviewed the receipt.
+
+ IRD currently instructs donors to submit donation receipts through myIR and says PDF is the preferred attachment format.  Inland Revenue
+
+---
+
+ # 198\. Definition of Done — Security
+
+ - [ ] Ownership enforced.
+- [ ] Admin RBAC enforced.
+- [ ] Stripe signatures verified.
+- [ ] Idempotency implemented.
+- [ ] Rate limiting implemented.
+- [ ] No card data stored.
+- [ ] No secrets logged.
+- [ ] Receipt URLs protected.
+- [ ] Account enumeration prevented.
+- [ ] Duplicate customer creation protected.
+- [ ] Duplicate subscription creation protected.
+- [ ] Refund authorization enforced.
+- [ ] Financial records immutable.
+
+---
+
+ # 199\. Definition of Done — Production
+
+ - [ ] Production Stripe account configured.
+- [ ] Production webhook configured.
+- [ ] LIVE/TEST separation verified.
+- [ ] Donation feature flag tested.
+- [ ] DynamoDB production table configured.
+- [ ] Backups/recovery validated.
+- [ ] Receipt storage durable.
+- [ ] Email delivery validated.
+- [ ] Sentry configured.
+- [ ] Monitoring configured.
+- [ ] Reconciliation job active.
+- [ ] Runbook documented.
+- [ ] Rollback tested.
+- [ ] First real donation tested.
+- [ ] First refund tested.
+- [ ] First recurring donation tested.
+
+---
+
+ # 200\. Recommended Additional Features
+
+ These are not required for the first release but should be considered.
+
+ ## 200.1 Donation Goals
+
+ Campaign:
+
+```
+Help us raise $10,000
+```
+
+ with progress.
+
+ Only show a progress bar if the target and accounting treatment are genuine.
+
+---
+
+ # 201\. Donor Wall
+
+ Optional:
+
+```
+Supporters
+
+Jane C.
+Anonymous
+Mark T.
+```
+
+ This must be opt-in.
+
+ Default:
+
+```
+private
+```
+
+ Never publish donor names automatically.
+
+---
+
+ # 202\. Anonymous Donation
+
+ Offer:
+
+```
+Display my name publicly
+```
+
+ separately from:
+
+```
+Receipt name
+```
+
+ The donor's legal/receipt name should not be replaced with "Anonymous" merely because they don't want public recognition.
+
+ Store:
+
+```
+receiptName
+publicRecognitionName
+publicRecognitionEnabled
+```
+
+---
+
+ # 203\. Tribute Donations
+
+ Future:
+
+```
+Donate in memory of a pet
+Donate in honour of someone
+```
+
+ This is a separate feature.
+
+ Do not mix into initial implementation.
+
+---
+
+ # 204\. Corporate Donations
+
+ Future:
+
+```
+Company donor
+Company name
+NZBN
+```
+
+ Do not assume corporate donations receive the same individual donation tax-credit treatment.
+
+ Corporate accounting needs separate treatment.
+
+---
+
+ # 205\. International Donations
+
+ Future only.
+
+ Initial implementation:
+
+```
+NZD
+New Zealand
+```
+
+ International tax treatment can become complex.
+
+---
+
+ # 206\. Donation Receipts for Companies
+
+ Do not promise IRD individual donation tax credits to companies.
+
+ Receipt wording should remain neutral unless eligibility is known.
+
+---
+
+ # 207\. Payment Processing Fees
+
+ Do not automatically add:
+
+```
+Stripe fee
+```
+
+ to the donor's amount unless PawTag deliberately chooses to offer such functionality and it is legally/accounting appropriate.
+
+ The donor's selected donation should remain clear.
+
+---
+
+ # 208\. Optional "Cover Fees"
+
+ This could be considered later:
+
+```
+I'd like to contribute a little extra to help cover
+payment processing costs.
+```
+
+ Do not implement in the first release.
+
+ It complicates:
+
+ - donation classification;
+- receipts;
+- accounting;
+- donor expectations.
+
+---
+
+ # 209\. Recurring Donation Retention
+
+ Future:
+
+```
+Thank-you email
+impact updates
+annual summary
+```
+
+ But do not automatically market to donors without consent.
+
+---
+
+ # 210\. Founder Story
+
+ Because PawTag is an early-stage startup, the donation page can transparently communicate:
+
+```
+We're building PawTag step by step.
+
+We're not a giant organisation.
+We're building this because we believe losing a pet
+shouldn't mean losing hope.
+
+If you believe in what we're building,
+your support helps us take the next step.
+```
+
+ This should be authentic rather than artificially corporate.
+
+---
+
+ # 211\. Avoid "Enterprise Theatre"
+
+ PawTag is a startup.
+
+ Do not introduce:
+
+```
+microservices
+Kafka
+Redis
+complex event buses
+separate donation database
+separate donor identity
+```
+
+ merely because the donation system is described as "enterprise level".
+
+ Enterprise quality should mean:
+
+```
+correct
+auditable
+secure
+recoverable
+idempotent
+observable
+maintainable
+```
+
+ not:
+
+```
+lots of infrastructure
+```
+
+---
+
+ # 212\. Final Architecture
+
+ Target:
+
+```
+                    PAWTAG WEBSITE
+                          │
+                          ▼
+                    /donate
+                          │
+              ┌───────────┴───────────┐
+              │                       │
+        Existing Customer        New Supporter
+              │                       │
+              └───────────┬───────────┘
+                          ▼
+                  PawTag Customer
+                          │
+                          ▼
+                  Donation Service
+                          │
+                ┌─────────┴─────────┐
+                │                   │
+             Stripe             DynamoDB
+                │                   │
+                │                   │
+         PaymentIntent          Donation
+         Subscription           Payment
+         Customer               Receipt
+         Refund                 Audit
+                │                   │
+                └─────────┬─────────┘
+                          ▼
+                    Stripe Webhooks
+                          │
+                          ▼
+                  Reconciliation
+                          │
+              ┌───────────┴───────────┐
+              │                       │
+       Customer Portal          Admin Portal
+              │                       │
+       Donations/Receipts       Donations/Reports
+              │                       │
+              └───────────┬───────────┘
+                          ▼
+                 Email + PDF + R2
+```
+
+---
+
+ # 213\. Agent Prompt — Master Implementation Instruction
+
+ The following can be given to the PawTag AI coding agent after the architecture audit:
+
+```
+Implement the PawTag donation system according to:
+
+docs/DONATION-SYSTEM-IMPLEMENTATION-PLAN.md
+
+Do NOT attempt the entire implementation in one change.
+
+Work in small, independently verifiable work packets.
+
+Before modifying code:
+
+1. Read AGENTS.md.
+2. Inspect the existing customer registration flow.
+3. Inspect existing Stripe integration.
+4. Inspect stripe-client.ts.
+5. Inspect Stripe webhook handling.
+6. Inspect existing subscription implementation.
+7. Inspect existing payment/reconciliation services.
+8. Inspect invoice/PDF generation.
+9. Inspect email CMS/document delivery.
+10. Inspect customer portal.
+11. Inspect admin portal.
+12. Inspect audit service.
+13. Inspect background-job scheduler.
+14. Inspect current DynamoDB migration architecture.
+15. Inspect all relevant tests.
+
+Do not assume this README is more authoritative than source code.
+
+First produce:
+
+docs/DONATION-ARCHITECTURE-AUDIT.md
+
+The audit must identify:
+
+- reusable components;
+- existing Stripe primitives;
+- existing customer-registration primitives;
+- existing PDF/invoice infrastructure;
+- existing email infrastructure;
+- existing document storage;
+- existing portal components;
+- existing admin components;
+- existing reconciliation;
+- existing DynamoDB repository patterns;
+- gaps;
+- risks;
+- proposed file changes.
+
+Do not implement until the audit is complete.
+
+Then implement in this order:
+
+1. Persistence contracts/repositories
+2. Shared donation types
+3. Customer donation registration context
+4. Donation domain
+5. One-time Stripe donation
+6. Stripe webhook integration
+7. Donation receipt
+8. PDF/document storage
+9. Donation emails
+10. Recurring donations
+11. Customer portal
+12. Admin portal
+13. Public /donate page
+14. Homepage/header/footer donation CTAs
+15. Reconciliation
+16. Observability
+17. E2E tests
+18. Documentation
+
+For every packet:
+
+- make the smallest safe change;
+- add tests;
+- run relevant tests;
+- run typecheck;
+- run build where relevant;
+- inspect the diff;
+- report changed files;
+- report tests;
+- report remaining risks;
+- stop.
+
+Financial rules:
+
+- Never trust client donation amounts.
+- Never mark payment successful solely from browser redirect.
+- Stripe webhooks are authoritative for payment completion.
+- Stripe webhook processing must be idempotent.
+- Donation creation must be idempotent.
+- Recurring subscription creation must be idempotent.
+- Refunds must be idempotent.
+- Receipt numbers must be unique.
+- Issued receipts are immutable.
+- Replacement receipts must retain the original audit history.
+- Never delete financial records.
+- Never store card numbers/CVC.
+- Never log Stripe secrets.
+- Never bypass ownership checks.
+- Never weaken authorization to make tests pass.
+- Never claim a donation is IRD tax-credit eligible unless the configured organisation status and approved receipt rules support it.
+- Do not invent NZ tax/legal rules.
+
+Customer rules:
+
+- Existing PawTag customers can donate.
+- New donors can donate without owning a pet.
+- Donation-created customers do not need normal pet onboarding.
+- Do not create duplicate customer identities.
+- Do not reveal whether an email belongs to an existing account.
+- Do not require email/mobile verification before accepting the donation unless a specific security requirement makes it necessary.
+- Provide a secure way for the donor to later access their PawTag account.
+
+Stripe rules:
+
+- Reuse the existing Stripe client factory.
+- Reuse existing subscription/payment infrastructure.
+- Do not create a second Stripe abstraction unnecessarily.
+- Store appropriate PawTag/Stripe IDs.
+- Use safe Stripe metadata.
+- Verify webhook signatures.
+- Handle duplicate/out-of-order events.
+- Implement reconciliation.
+
+Receipt rules:
+
+- Reuse existing PawTag PDF/document/email infrastructure.
+- Donation receipt is a distinct financial document from a commerce invoice.
+- Follow current IRD receipt requirements.
+- Have tax/accounting wording reviewed by a qualified NZ professional.
+- Generate PDF.
+- Store PDF durably.
+- Display receipt online.
+- Email receipt.
+- Attach PDF.
+- Support replacement/correction.
+- Keep historical records.
+
+DynamoDB rules:
+
+- Do not introduce Mongo/Mongoose dependencies into the donation domain.
+- Use repository interfaces.
+- Design access patterns explicitly.
+- Use conditional writes/transactions where appropriate.
+- Use idempotency and reconciliation for cross-system operations.
+- Follow the existing PawTag DynamoDB migration architecture.
+
+Do not introduce Redis, Kafka, microservices, new UI frameworks, or other infrastructure unless a demonstrated requirement exists.
+
+Do not perform unrelated refactors.
+
+Do not modify unrelated commerce behaviour.
+
+Do not change the existing membership/payment architecture unless required for safe reuse.
+
+The final implementation must be production-hardened, observable, auditable, recoverable, and testable.
+```
+
+---
+
+ # 214\. Final Launch Gate
+
+ Do not enable the public donation CTA until the following statement is demonstrably true:
+
+ > A stranger can visit PawTag, donate without owning a pet, receive a successful Stripe payment result, have a PawTag customer identity created safely, receive an appropriate donation receipt as a PDF by email, retrieve the receipt from the customer portal, have the donation visible to PawTag staff, and have the entire transaction remain traceable from PawTag through Stripe and back again — including retries, webhook duplication, refunds and failures.
+
+ And, separately:
+
+ > PawTag must not represent a donation as eligible for an NZ donation tax credit until its approved donee status and receipt/tax treatment have been confirmed.
+
+---
+
+ # 215\. Recommended First Implementation Scope
+
+ For PawTag's current stage, implement the first production release with:
+
+```
+✓ One-time donations
+✓ Monthly recurring donations
+✓ NZD
+✓ Guest donor
+✓ Existing customer donor
+✓ Customer identity creation
+✓ No pet required
+✓ Stripe Customer
+✓ Stripe PaymentIntent
+✓ Stripe Billing subscription
+✓ Stripe webhooks
+✓ Idempotency
+✓ Donation record
+✓ Donation payment record
+✓ Donation receipt
+✓ PDF receipt
+✓ Email receipt
+✓ Online receipt
+✓ Customer portal
+✓ Admin portal
+✓ Refund
+✓ Audit logging
+✓ Reconciliation
+✓ Homepage Donate CTA
+✓ Dedicated /donate page
+✓ Mobile responsive experience
+✓ Security/rate limiting
+✓ E2E tests
+✓ Production smoke testing
+```
+
+ Defer:
+
+```
+○ Corporate donations
+○ International currencies
+○ Tribute donations
+○ Donor wall
+○ Campaign complexity
+○ Fee covering
+○ Advanced donor analytics
+○ Tax-credit API submission automation
+○ Complex fundraising campaigns
+```
+
+---
+
+ # 216\. Final Recommendation
+
+ PawTag should **not** build "a donation button".
+
+ It should build a small, well-designed **Donation Domain** that plugs into the existing PawTag financial platform.
+
+ The ideal architecture is:
+
+```
+ONE PAWTAG CUSTOMER
+        │
+        ├── Pets
+        ├── Tags
+        ├── Orders
+        ├── Memberships
+        └── Donations
+                │
+                ├── One-time
+                ├── Recurring
+                ├── Payments
+                ├── Refunds
+                └── Receipts
+```
+
+ This gives PawTag a very strong long-term position.
+
+ A person can first encounter PawTag as:
+
+```
+Someone who found a lost pet
+```
+
+ then become:
+
+```
+A supporter
+```
+
+ then:
+
+```
+A donor
+```
+
+ then:
+
+```
+A PawTag customer
+```
+
+ then:
+
+```
+A pet owner with PawTag
+```
+
+ without ever needing a second identity system.
+
+ That is the right foundation for PawTag.
+
+---
+
+ # 217\. External Regulatory References
+
+ The implementation team should keep these official references available during receipt implementation:
+
+ - IRD — Donation tax credits
+- IRD — Approved donee organisations
+- IRD — Donation receipt requirements
+- IRD — Submitting donation receipts through myIR
+
+ These must be checked again immediately before production release because tax and regulatory requirements can change.
+
+ Current IRD guidance confirms that donation receipts are used to support claims through myIR and that receipts must contain specified information.  Inland Revenue+1
+
+---
+
+ # 218\. Document Status
+
+```
+Status: Proposed implementation specification
+
+Next action:
+1. Confirm PawTag donee/tax status with appropriate NZ adviser.
+2. Run donation architecture audit against actual repository.
+3. Confirm DynamoDB migration architecture.
+4. Confirm existing Stripe reusable primitives.
+5. Break implementation into AI coding work packets.
+6. Implement.
+7. Test.
+8. Production-rehearse.
+9. Enable donations gradually.
+```
+
+ **End of document.**\
+ :::

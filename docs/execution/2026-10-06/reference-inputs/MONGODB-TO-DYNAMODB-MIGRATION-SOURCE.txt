@@ -1,0 +1,1573 @@
+PawTag — MongoDB → DynamoDB Migration
+Objective
+Migrate PawTag's persistence layer from MongoDB/Mongoose to Amazon DynamoDB while preserving the existing application behaviour, API contracts, business rules, security boundaries, background-job semantics, commerce correctness, and client behaviour.
+
+This is a database persistence migration, not a product rewrite.
+
+The application currently uses:
+
+Node.js / TypeScript
+
+Express
+
+Mongoose 7
+
+MongoDB
+
+pnpm monorepo
+
+packages/db for persistence models
+
+packages/api for routes/services/jobs
+
+apps/web
+
+apps/admin
+
+apps/finder
+
+apps/mobile
+
+The repository README and source code are the source of truth. Do not assume documentation is completely accurate.
+
+NON-NEGOTIABLE RULES
+1. Do not perform a big-bang rewrite
+Do NOT delete packages/db, Mongoose models, or MongoDB configuration at the beginning.
+
+Build the DynamoDB persistence layer alongside the existing MongoDB implementation.
+
+Migration must proceed incrementally.
+
+2. Preserve public API behaviour
+Existing API routes, request payloads, response DTOs, status codes, authentication behaviour, authorization behaviour, and client expectations should remain unchanged unless a change is demonstrably required.
+
+The frontend/mobile applications should NOT need to know that MongoDB was replaced.
+
+Target architecture:
+
+Applications
+    ↓
+API routes/controllers
+    ↓
+Domain/services
+    ↓
+Persistence interfaces/repositories
+    ↓
+DynamoDB
+
+The database implementation should be replaceable without changing business logic.
+
+3. Do not mechanically translate Mongoose into DynamoDB
+Do NOT create:
+
+Mongo model → DynamoDB table
+
+for every model.
+
+DynamoDB requires access-pattern-first data modelling.
+
+For every existing model:
+
+identify how the application reads/writes it;
+
+identify query patterns;
+
+identify ownership boundaries;
+
+identify uniqueness requirements;
+
+identify transaction requirements;
+
+identify high-volume access patterns;
+
+identify TTL/retention requirements;
+
+identify relationships;
+
+design DynamoDB keys/indexes around those access patterns.
+
+4. Do not introduce a generic "Mongo compatibility" layer
+Do not build a fake Mongoose-like abstraction over DynamoDB.
+
+Do not reproduce:
+
+.find()
+
+.populate()
+
+.aggregate()
+
+.save()
+
+arbitrary Mongo query semantics
+
+inside a DynamoDB wrapper.
+
+Create explicit repositories/domain persistence operations instead.
+
+Examples:
+
+getUserById()
+getUserByEmail()
+listUserPets()
+getPetById()
+getTagByPublicCode()
+createOrder()
+getOrderForCustomer()
+listCustomerOrders()
+claimBackgroundJob()
+recordWebhookEvent()
+
+Repository methods should describe business access patterns rather than database syntax.
+
+PHASE 0 — REPOSITORY DISCOVERY
+Before changing code, perform a complete persistence audit.
+
+Do not edit production code yet.
+
+Create:
+
+docs/dynamodb-migration/
+    00-inventory.md
+    01-access-patterns.md
+    02-entity-map.md
+    03-transaction-map.md
+    04-index-design.md
+    05-migration-plan.md
+
+Inventory
+Find and catalogue:
+
+all Mongoose models;
+
+schemas;
+
+indexes;
+
+unique constraints;
+
+virtuals;
+
+pre/post hooks;
+
+validators;
+
+middleware;
+
+population;
+
+aggregation pipelines;
+
+transactions/session usage;
+
+bulkWrite;
+
+findOneAndUpdate;
+
+atomic $inc;
+
+$push;
+
+$pull;
+
+$addToSet;
+
+$set;
+
+$unset;
+
+$setOnInsert;
+
+upserts;
+
+TTL indexes;
+
+soft deletes;
+
+pagination;
+
+sorting;
+
+text/search queries;
+
+regex queries;
+
+raw MongoDB access;
+
+direct mongoose usage outside packages/db.
+
+Search the entire repository.
+
+Do not assume all database access goes through packages/db.
+
+Produce an access-pattern table
+For every persistence operation document:
+
+Operation	Caller	Entity	Read/write	Query pattern	Frequency	Consistency	Ownership
+
+Include all critical workflows.
+
+PHASE 1 — IDENTIFY BUSINESS AGGREGATES
+Group the existing ~63 models into logical domains.
+
+At minimum investigate:
+
+Identity
+users/accounts
+
+refresh tokens
+
+OTP/verification
+
+sessions
+
+MFA
+
+password reset
+
+Pet/recovery
+pets
+
+tags
+
+activations
+
+finder events
+
+recovery events
+
+emergency contacts
+
+finder/privacy data
+
+notifications
+
+Commerce
+products
+
+variants
+
+carts
+
+orders
+
+order items
+
+payments
+
+refunds
+
+inventory
+
+shipments
+
+invoices
+
+returns
+
+Membership
+subscriptions
+
+membership tiers
+
+membership benefits
+
+entitlements
+
+scheduled changes
+
+payment states
+
+Rewards
+points
+
+point transactions
+
+tiers
+
+referrals
+
+Administration
+roles
+
+permissions
+
+audit events
+
+system logs
+
+admin notifications
+
+settings
+
+Background jobs
+jobs
+
+job configuration
+
+job execution history
+
+job locks
+
+CMS
+pages
+
+content
+
+media metadata
+
+templates
+
+Integrations
+webhook events
+
+provider state
+
+reconciliation records
+
+external identifiers
+
+Do not assume the above list exactly matches the repository. Verify against source.
+
+PHASE 2 — DEFINE ACCESS PATTERNS BEFORE TABLE DESIGN
+For each domain determine its actual access patterns.
+
+Examples:
+
+Users
+Likely access patterns:
+
+get user by ID
+get user by email
+get user by phone
+update profile
+lock/unlock user
+soft delete user
+get customer orders
+get customer pets
+get customer subscriptions
+
+Pets
+get pet by ID
+get pets for owner
+create pet
+update pet
+delete/soft-delete pet
+get pet associated with tag
+
+Tags
+get tag by public tag code
+get tag by ID
+get tags for owner
+activate tag
+assign tag to pet
+change tag state
+find tags by status
+
+Orders
+get order by ID
+get order by customer
+list customer orders
+get order by Stripe/payment identifier
+find pending orders
+find orders requiring reconciliation
+update payment state
+update fulfilment state
+
+Finder
+resolve public tag
+load intentionally-public pet/recovery data
+create finder event
+rate-limit finder action
+create owner notification
+
+Stripe webhooks
+check webhook event ID
+record webhook event
+process webhook
+retry failed webhook
+
+Jobs
+find due jobs
+claim job
+renew lease
+release job
+record execution
+find failed executions
+
+Document the real patterns found in code.
+
+PHASE 3 — DESIGN DYNAMODB MODEL
+Create an explicit DynamoDB design document before implementation.
+
+Prefer a small number of purpose-designed tables rather than automatically creating one table per Mongo collection.
+
+However, do NOT force a single-table design merely because it is considered "advanced DynamoDB".
+
+Choose the simplest design that reliably satisfies PawTag's actual access patterns.
+
+Possible initial structure:
+
+pawtag-main
+pawtag-jobs
+pawtag-webhooks
+
+But this is only a hypothesis.
+
+Determine the actual design from the access-pattern audit.
+
+Important
+DynamoDB item design must explicitly account for:
+
+PK
+
+SK
+
+GSI PK/SK
+
+conditional writes
+
+optimistic concurrency
+
+transactions
+
+pagination
+
+TTL
+
+hot partitions
+
+item size
+
+sparse indexes
+
+uniqueness
+
+idempotency
+
+Do not create indexes merely because Mongo had an index.
+
+PHASE 4 — MODEL IDENTIFIERS
+Preserve application-level IDs where practical.
+
+Do not expose DynamoDB implementation details to clients.
+
+If existing IDs are Mongo ObjectIds, decide explicitly whether to:
+
+preserve them as strings;
+
+migrate them to UUIDs;
+
+support both temporarily.
+
+Do NOT silently change identifier formats.
+
+Existing external identifiers such as:
+
+Stripe IDs
+
+public tag codes
+
+referral codes
+
+webhook IDs
+
+invoice IDs
+
+shipment IDs
+
+must remain stable unless there is a documented reason to change them.
+
+PHASE 5 — BUILD THE PERSISTENCE CONTRACT
+Create persistence interfaces independent of DynamoDB.
+
+Suggested structure:
+
+packages/db/
+    src/
+        domain/
+        repositories/
+        dynamodb/
+        types/
+        errors/
+        transactions/
+
+For example:
+
+interface UserRepository {
+  getById(id: string): Promise<User | null>;
+  getByEmail(email: string): Promise<User | null>;
+  create(input: CreateUserInput): Promise<User>;
+  update(id: string, patch: UpdateUserInput): Promise<User>;
+}
+
+Do NOT expose DynamoDB AttributeValue types to services.
+
+Services should work with domain objects.
+
+PHASE 6 — BUILD DYNAMODB INFRASTRUCTURE
+Use the official AWS SDK for JavaScript v3.
+
+Prefer:
+
+@aws-sdk/client-dynamodb
+@aws-sdk/lib-dynamodb
+
+Use DynamoDBDocumentClient where appropriate.
+
+Create a central DynamoDB client factory.
+
+Do not instantiate clients throughout the application.
+
+Configuration must support:
+
+DYNAMODB_REGION
+DYNAMODB_ENDPOINT
+DYNAMODB_TABLE_PREFIX
+DYNAMODB_ACCESS_KEY_ID
+DYNAMODB_SECRET_ACCESS_KEY
+
+For local development/testing support DynamoDB Local.
+
+Example conceptual modes:
+
+local:
+    DynamoDB Local
+
+integration:
+    real AWS DynamoDB
+
+production:
+    real AWS DynamoDB
+
+Never commit credentials.
+
+Never put AWS credentials into frontend/mobile code.
+
+PHASE 7 — LOCAL DEVELOPMENT ENVIRONMENT
+Add DynamoDB Local to the development infrastructure.
+
+Prefer Docker so a developer can run:
+
+docker compose up dynamodb
+
+Document:
+
+DynamoDB Local endpoint
+AWS region
+development credentials
+table creation
+seed/reset procedure
+
+Local credentials may be dummy credentials because DynamoDB Local does not require real AWS credentials.
+
+Never use real production credentials locally.
+
+PHASE 8 — CREATE TABLE INFRASTRUCTURE AS CODE
+Do not manually create production tables from the AWS console and forget how they were configured.
+
+Create repeatable infrastructure.
+
+Use the repository's existing deployment approach where practical.
+
+The infrastructure definition must specify:
+
+tables;
+
+PK/SK;
+
+GSIs;
+
+TTL;
+
+billing mode;
+
+point-in-time recovery;
+
+encryption;
+
+deletion protection where appropriate;
+
+tags;
+
+environment naming.
+
+For testing, use PAY_PER_REQUEST unless there is a demonstrated reason otherwise.
+
+Do not assume production capacity requirements yet.
+
+PHASE 9 — MIGRATE LOW-RISK DOMAINS FIRST
+Do NOT begin with orders, payments, subscriptions, inventory or background jobs.
+
+Start with a low-risk domain.
+
+Recommended order:
+
+settings/configuration
+
+CMS/supporting data
+
+users
+
+pets
+
+tags
+
+notifications
+
+finder/recovery
+
+carts
+
+products/catalog
+
+orders
+
+payments/refunds
+
+inventory
+
+subscriptions/membership
+
+rewards
+
+audit/system logs
+
+background jobs
+
+webhooks/reconciliation
+
+Re-evaluate this order after the access-pattern audit.
+
+PHASE 10 — DUAL-READ / SHADOW VALIDATION
+For each migrated domain:
+
+Mongo remains authoritative initially.
+
+Write/read the new DynamoDB implementation in shadow mode where safe.
+
+Compare normalized results.
+
+Record mismatches.
+
+Fix modelling/conversion bugs.
+
+Only then switch reads.
+
+Keep rollback capability.
+
+Do NOT blindly write to both databases for operations where doing so could create dangerous financial side effects.
+
+For example, payment state changes require deliberate consistency design rather than casual dual writes.
+
+PHASE 11 — DATA MIGRATION
+Build an explicit migration tool.
+
+Example:
+
+scripts/migrate-mongo-to-dynamodb/
+
+Requirements:
+
+resumable;
+
+idempotent;
+
+checkpointed;
+
+batched;
+
+rate-limited;
+
+observable;
+
+dry-run capable;
+
+produces counts;
+
+produces validation reports;
+
+does not delete Mongo data.
+
+It must support:
+
+pnpm migrate:dynamodb --dry-run
+pnpm migrate:dynamodb
+pnpm migrate:dynamodb --domain users
+pnpm migrate:dynamodb --domain pets
+pnpm migrate:dynamodb --resume
+
+Do not make migration scripts one-shot unless absolutely necessary.
+
+PHASE 12 — VALIDATION
+For each migrated domain compare:
+
+record counts;
+
+IDs;
+
+ownership;
+
+status;
+
+timestamps;
+
+monetary values;
+
+relationships;
+
+provider IDs;
+
+soft-delete state;
+
+membership state;
+
+critical flags.
+
+Do not compare raw Mongo documents directly to DynamoDB items because the storage representation will intentionally differ.
+
+Compare normalized domain representations.
+
+Create:
+
+docs/dynamodb-migration/validation-report.md
+
+PHASE 13 — TRANSACTION ANALYSIS
+This is one of the most important parts of this migration.
+
+Find every MongoDB transaction/session.
+
+For each transaction document:
+
+Transaction:
+Purpose:
+Collections:
+Operations:
+Required atomicity:
+DynamoDB equivalent:
+Potential redesign:
+Failure/recovery behaviour:
+
+Use DynamoDB transactions only where true atomicity is required.
+
+Do not automatically replace every Mongo transaction with TransactWriteItems.
+
+Also consider:
+
+conditional writes;
+
+optimistic locking;
+
+idempotency;
+
+durable state machines;
+
+reconciliation.
+
+PHASE 14 — CONCURRENCY ANALYSIS
+Explicitly audit all uses of:
+
+$inc
+
+atomic updates
+
+conditional updates
+
+findOneAndUpdate
+
+upserts
+
+job locks
+
+inventory reservations
+
+points balance updates
+
+subscription state transitions
+
+payment transitions
+
+webhook processing
+
+Replace them with appropriate DynamoDB conditional expressions / transactions.
+
+Never implement:
+
+read
+modify in JavaScript
+write
+
+for a value that can be concurrently modified unless optimistic locking or another concurrency mechanism is used.
+
+PHASE 15 — MONEY AND COMMERCE
+Treat commerce as a separate migration phase.
+
+Do not change business behaviour while changing persistence unless necessary.
+
+Preserve:
+
+order state machine;
+
+payment state;
+
+Stripe IDs;
+
+refund state;
+
+idempotency keys;
+
+inventory reservation semantics;
+
+reconciliation;
+
+return state;
+
+subscription state;
+
+auditability.
+
+For every financial operation document:
+
+External provider operation
+        ↓
+Local state transition
+        ↓
+Retry behaviour
+        ↓
+Idempotency mechanism
+        ↓
+Reconciliation mechanism
+
+The system must remain repairable if:
+
+Stripe succeeds
+DynamoDB write fails
+
+or:
+
+DynamoDB succeeds
+HTTP response fails
+client retries
+
+or:
+
+Webhook delivered twice
+
+PHASE 16 — BACKGROUND JOBS
+Do not migrate the job scheduler until the DynamoDB concurrency model has been designed.
+
+The existing MongoDB job locks must be replaced with DynamoDB conditional writes.
+
+A job claim should behave conceptually like:
+
+claim only if:
+    no active lease
+    OR lease expired
+
+The operation must be atomic.
+
+Do not use:
+
+read lock
+if available
+write lock
+
+because multiple workers can race.
+
+Use conditional writes.
+
+Jobs must remain idempotent.
+
+PHASE 17 — TTL
+Identify data that MongoDB currently expires automatically.
+
+For each TTL collection determine:
+
+business retention requirement;
+
+whether DynamoDB TTL is appropriate;
+
+whether deletion must be exact/timely;
+
+whether compliance requires explicit deletion;
+
+whether a scheduled cleanup job is still required.
+
+Important:
+
+DynamoDB TTL deletion is asynchronous.
+
+Do not use DynamoDB TTL when the business rule requires deletion at an exact second.
+
+PHASE 18 — PAGINATION
+Replace Mongo pagination patterns carefully.
+
+Do not translate:
+
+skip + limit
+
+into DynamoDB.
+
+Prefer DynamoDB cursor pagination using:
+
+LastEvaluatedKey
+ExclusiveStartKey
+
+The API should continue exposing the application's existing pagination contract if possible.
+
+If the API currently exposes page numbers, determine whether the service can internally maintain compatible behaviour without creating inefficient DynamoDB scans.
+
+Never use table scans as a normal replacement for Mongo queries.
+
+PHASE 19 — SEARCH
+Identify every Mongo query that depends on:
+
+regex;
+
+text search;
+
+arbitrary filtering;
+
+sorting by non-key fields.
+
+Do not assume DynamoDB can replace these queries efficiently.
+
+For each one choose explicitly:
+
+GSI;
+
+denormalized lookup item;
+
+prefix key;
+
+application-level filtering for small bounded datasets;
+
+separate search engine/service if truly required.
+
+Do NOT introduce Elasticsearch/OpenSearch merely because one query is inconvenient.
+
+First determine whether the query is actually needed at MVP scale.
+
+PHASE 20 — REMOVE MONGOOSE DEPENDENCY
+Only after all domains have migrated and validation has passed:
+
+stop application reads from Mongo;
+
+stop application writes to Mongo;
+
+run production-like testing;
+
+retain Mongo backup;
+
+monitor DynamoDB;
+
+keep rollback documentation;
+
+remove Mongoose dependencies;
+
+remove Mongo connection code;
+
+remove obsolete models;
+
+update CI;
+
+update Docker;
+
+update documentation.
+
+Do not delete Mongo migration code until rollback/retention requirements are satisfied.
+
+TESTING REQUIREMENTS
+The migration is NOT complete because TypeScript compiles.
+
+Run:
+
+pnpm typecheck
+pnpm lint
+pnpm test:unit
+pnpm test:integration
+pnpm test:regression
+pnpm build
+
+Add DynamoDB-specific integration tests.
+
+The tests must cover at least:
+
+Identity
+create user
+
+lookup by email
+
+login
+
+refresh
+
+logout/revocation
+
+password reset
+
+ownership checks
+
+Pets/tags
+create pet
+
+update pet
+
+assign tag
+
+activate tag
+
+list owner tags
+
+public tag lookup
+
+Finder
+anonymous public lookup
+
+public DTO projection
+
+finder event
+
+notification
+
+duplicate finder action
+
+privacy boundaries
+
+Commerce
+cart
+
+order
+
+inventory
+
+payment
+
+webhook
+
+refund
+
+return
+
+duplicate request
+
+retry after failure
+
+concurrent update
+
+Membership
+subscription
+
+upgrade
+
+downgrade
+
+cancellation
+
+renewal
+
+payment failure
+
+entitlement lookup
+
+Jobs
+claim
+
+duplicate claim prevention
+
+expired lease
+
+execution record
+
+retry
+
+Authorization
+Every customer-scoped repository/service operation must have tests proving that customer A cannot access customer B's data.
+
+FAILURE INJECTION
+For critical operations create tests for:
+
+database unavailable
+conditional write fails
+transaction fails
+provider succeeds + local write fails
+local write succeeds + response fails
+duplicate request
+duplicate webhook
+worker crashes after claim
+worker crashes after external side effect
+
+The objective is not merely happy-path compatibility.
+
+The objective is preservation of PawTag's existing reliability guarantees.
+
+PERFORMANCE SAFETY
+Do not use DynamoDB Scan in request paths unless the dataset is intentionally tiny and bounded.
+
+Before approving every repository method ask:
+
+Does this operation know its partition key?
+Can this query use a key/index?
+Could this become a hot partition?
+Could this return an unbounded result?
+Is pagination implemented?
+
+Document intentional scans.
+
+SECURITY
+AWS credentials must exist only on the server/worker.
+
+Never expose:
+
+AWS_ACCESS_KEY_ID
+AWS_SECRET_ACCESS_KEY
+DYNAMODB credentials
+
+to:
+
+web;
+
+admin frontend;
+
+finder;
+
+mobile.
+
+Use least-privilege IAM permissions.
+
+Separate local/test/production AWS resources.
+
+Do not allow local development configuration to accidentally point at production tables.
+
+Use environment-specific table names, for example:
+
+pawtag-local-*
+pawtag-test-*
+pawtag-staging-*
+pawtag-prod-*
+
+OBSERVABILITY
+Add structured logging around migration and critical DynamoDB operations.
+
+At minimum capture:
+
+operation name;
+
+domain;
+
+duration;
+
+success/failure;
+
+retry;
+
+conditional failure;
+
+transaction failure;
+
+throttling;
+
+consumed capacity where useful;
+
+correlation/request ID.
+
+Never log:
+
+passwords;
+
+tokens;
+
+payment secrets;
+
+AWS credentials;
+
+sensitive finder data.
+
+ROLLBACK STRATEGY
+Before each domain cutover define:
+
+Current source of truth:
+New source of truth:
+Rollback trigger:
+Rollback procedure:
+Data reconciliation required:
+Maximum acceptable rollback window:
+
+Do not claim rollback is possible if writes have diverged between databases and there is no reconciliation strategy.
+
+For financial domains, rollback must be especially conservative.
+
+DEFINITION OF DONE
+The MongoDB → DynamoDB migration is complete only when:
+
+all required access patterns are documented;
+
+DynamoDB schema/indexes are documented;
+
+infrastructure is reproducible;
+
+local DynamoDB environment works;
+
+integration environment works against real AWS;
+
+persistence interfaces exist;
+
+all required domains have DynamoDB repositories;
+
+migration scripts are resumable/idempotent;
+
+existing data has been migrated;
+
+normalized data validation passes;
+
+critical API behaviour is unchanged;
+
+ownership tests pass;
+
+concurrency tests pass;
+
+commerce failure tests pass;
+
+webhook idempotency tests pass;
+
+job locking tests pass;
+
+production-like E2E tests pass;
+
+observability exists;
+
+rollback is documented;
+
+MongoDB is no longer required by application runtime;
+
+Mongoose is removed only after the above is proven;
+
+README and environment documentation are updated.
+
+EXECUTION RULE
+Do NOT attempt all phases in one autonomous operation.
+
+Work phase-by-phase.
+
+At the end of every phase report:
+
+files created/changed;
+
+architecture decisions;
+
+assumptions;
+
+tests run;
+
+test results;
+
+unresolved issues;
+
+migration risks;
+
+exact next phase.
+
+STOP after each phase unless explicitly instructed to continue.
+
+Never silently expand scope.
+
+The first task is PHASE 0 — repository discovery only.
+
+Do not modify application behaviour during Phase 0.
+
+One thing I'd change from that master prompt
+I would not let the agent start migrating models immediately.
+
+Your first prompt to it should actually be much smaller:
+
+Phase 0 Agent Prompt
+
+
+Read the PawTag repository and perform Phase 0 — MongoDB → DynamoDB discovery only.
+
+Do not modify application code yet.
+
+I want a complete inventory of how MongoDB/Mongoose is actually used throughout the repository.
+
+Inspect:
+
+every Mongoose model/schema;
+
+every Mongoose query;
+
+every aggregation;
+
+every transaction/session;
+
+every findOneAndUpdate / atomic update;
+
+every upsert;
+
+every bulkWrite;
+
+every index/unique constraint;
+
+every TTL index;
+
+every populate;
+
+every direct MongoDB/Mongoose usage outside packages/db;
+
+all database-related background jobs;
+
+webhook persistence/idempotency;
+
+payment/order/inventory persistence;
+
+authentication/session persistence;
+
+audit/log persistence.
+
+Then produce:
+
+docs/dynamodb-migration/00-inventory.md
+
+docs/dynamodb-migration/01-access-patterns.md
+
+docs/dynamodb-migration/02-entity-map.md
+
+docs/dynamodb-migration/03-transaction-map.md
+
+docs/dynamodb-migration/04-index-design.md
+
+docs/dynamodb-migration/05-migration-plan.md
+
+For every model, show:
+
+current Mongo collection;
+
+fields;
+
+relationships;
+
+indexes;
+
+unique constraints;
+
+TTL;
+
+actual read patterns;
+
+actual write patterns;
+
+callers;
+
+criticality;
+
+candidate DynamoDB access patterns;
+
+whether it should be an item in an existing table or its own table.
+
+Do not mechanically propose one DynamoDB table per Mongo collection.
+
+Do not assume single-table DynamoDB is automatically better.
+
+Do not modify routes, services, models, frontend, mobile, authentication, payments, jobs, or tests yet.
+
+Pay particular attention to:
+
+Stripe/payment state;
+
+order/inventory concurrency;
+
+webhook idempotency;
+
+background-job locks;
+
+customer ownership checks;
+
+finder anonymous access;
+
+notification deduplication;
+
+membership state transitions;
+
+audit records.
+
+At the end, give me:
+
+A. Recommended DynamoDB architecture
+Explain the proposed tables, PK/SK design and GSIs.
+
+B. Migration sequence
+Give me a safe domain-by-domain order.
+
+C. High-risk areas
+Identify anything that cannot be safely migrated with a simple Mongo → DynamoDB translation.
+
+D. Required application refactoring
+Identify where the current code is too coupled to Mongoose and needs a repository/persistence boundary.
+
+E. Local development strategy
+Design how DynamoDB Local should be used alongside a real AWS DynamoDB integration environment.
+
+F. Rollback strategy
+Explain how we can switch back to MongoDB if a migrated domain fails testing.
+
+Do not start Phase 1 until I review the discovery output.
+
+A few decisions I strongly recommend for PawTag
+1. Don't give the agent your AWS production account yet
+For your current stage, I'd establish three distinct environments:
+
+Local
+  ↓
+DynamoDB Local
+
+Integration/Test
+  ↓
+Real AWS DynamoDB
+
+Production
+  ↓
+Separate AWS resources/account/environment
+
+Your current situation is actually ideal for doing this properly. You're testing the actual integrated application, not just a toy demo, so you want to test against real DynamoDB before declaring the migration complete.
+
+2. DynamoDB Local is not enough
+This is important.
+
+DynamoDB Local is excellent for fast local development, but it shouldn't be your only validation.
+
+Your real integration environment should exercise:
+
+IAM permissions
+
+real DynamoDB API behaviour
+
+transactions
+
+conditional writes
+
+GSIs
+
+throttling/retry behaviour
+
+TTL semantics
+
+AWS SDK configuration
+
+real networking
+
+You don't need to run production infrastructure locally.
+
+3. Don't make packages/db mean "Mongoose"
+I'd eventually turn:
+
+packages/db
+
+from something conceptually like:
+
+packages/db
+└── mongoose models
+
+into:
+
+packages/db
+├── repositories
+├── domain types
+├── dynamodb
+├── transactions
+├── errors
+└── infrastructure
+
+The key architectural boundary becomes:
+
+API
+ ↓
+Services
+ ↓
+Repository interfaces
+ ↓
+DynamoDB
+
+That gives you something extremely valuable during this migration: you can test the business logic without caring whether persistence is Mongo or DynamoDB.
+
+4. Your biggest migration risks aren't the 63 models
+They're these:
+
+Commerce concurrency
+
+inventory
+orders
+payments
+refunds
+subscriptions
+
+Idempotency
+
+Stripe webhook
+payment retry
+refund retry
+background job retry
+finder notification retry
+
+Queries that Mongo makes easy
+
+arbitrary filtering
+sorting
+search
+aggregation
+relationships
+
+Mongo transactions
+
+These need to be explicitly mapped to DynamoDB transactions, conditional writes, or redesigned state transitions.
+
+Background job locking
+
+Your README specifically says the scheduler relies on MongoDB locking. That is a particularly good candidate for DynamoDB conditional writes, but it must be designed carefully.
+
+5. Don't make the agent migrate the frontend
+Ideally, zero frontend code needs to change because of this migration.
+
+The desired end state is:
+
+                     ┌── Web
+                     ├── Admin
+                     ├── Finder
+                     └── Mobile
+                           │
+                           ▼
+                     Existing API
+                           │
+                           ▼
+                    Existing services
+                           │
+                           ▼
+                 Repository interfaces
+                           │
+                           ▼
+                       DynamoDB
+
+The clients shouldn't care.
+
+One more thing: AWS account setup
+Since you said you don't have a DynamoDB account, you don't actually need a "DynamoDB account." DynamoDB is an AWS service, so you'll need an AWS account, then create DynamoDB resources inside it.
+
+Before letting the agent touch AWS, I'd first set up:
+
+AWS account
+
+MFA on your root account
+
+an administrative/IAM identity for yourself
+
+a non-production AWS environment
+
+AWS CLI locally
+
+separate credentials/profile for PawTag testing
+
+billing alerts/budget
+
+DynamoDB Local for normal development
+
+And don't give your coding agent root AWS credentials. Ideally it gets only the permissions required for the integration environment.
+
+If you want, I can next give you a concrete AWS setup checklist + exact DynamoDB Local Docker setup + IAM policy + .env changes for PawTag, so you can get the environment ready before your agent starts Phase 0/1.

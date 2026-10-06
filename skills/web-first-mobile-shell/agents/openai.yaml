@@ -1,0 +1,3 @@
+interface:
+  display_name: "Web First Mobile Shell"
+  short_description: "Package PawTag customer web UI as a Capacitor iOS/Android app"

@@ -1,0 +1,3 @@
+interface:
+  display_name: "DynamoDB Migration"
+  short_description: "Safely migrate PawTag persistence from MongoDB to DynamoDB"

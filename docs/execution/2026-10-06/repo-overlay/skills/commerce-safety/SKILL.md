@@ -1,0 +1,85 @@
+---
+name: commerce-safety
+description: Implement or review PawTag commerce changes involving cart pricing, checkout, Stripe, PaymentIntents, orders, inventory, discounts, refunds, subscriptions, invoices, shipping, reconciliation, or webhooks. Use for financially sensitive code. Enforce server-authoritative pricing, ownership, idempotency, concurrency safety, persistent recovery, webhook authenticity, and production-safe configuration.
+---
+
+# Commerce Safety
+
+Financial correctness outranks convenience. `AGENTS.md` remains authoritative.
+
+## Model commerce as state transitions
+
+Do not reason about checkout as one happy-path function. Identify states and transitions for payment, order, reservation, fulfillment, entitlement/subscription, refund, and webhook processing.
+
+At every external or persistent step ask:
+
+> What happens if the process dies immediately after this line?
+
+## Required properties
+
+### Pricing
+- Server calculates authoritative product, customization, discount, tax/GST, shipping, and total values.
+- Client-submitted totals are display/context only, never authority.
+- Detect stale product price or unavailable inventory before final confirmation.
+
+### Ownership
+- PaymentIntent/order/cart/pending-order lookup must preserve user ownership.
+- Never fall back from an ownership-constrained query to an unconstrained query to "recover" a workflow.
+
+### Stripe/webhooks
+- Verify signatures using the raw request body.
+- Ensure middleware ordering preserves raw bodies.
+- Persist provider event IDs and deduplicate replay.
+- Reject unsafe production test/demo configuration.
+
+### Idempotency
+- Retried client requests and repeated provider webhooks must not create duplicate charges, orders, refunds, entitlements, or stock movements.
+- Use durable keys/state, not process memory.
+
+### Inventory
+- Reservation/commit/release operations must be safe under concurrent checkouts.
+- If partial reservation can occur, compensate or transact.
+
+### Multi-step consistency
+- Use Mongo transactions for tightly coupled database state where justified.
+- External calls cannot participate in Mongo transactions; persist explicit intermediate/repairable states.
+- Never silently log a financially important failure and still present the overall operation as complete without a repair workflow.
+
+### External providers
+- External systems are **adapters**. Map provider-specific values (e.g. Stripe refund `reason` enum) at the provider boundary.
+- PawTag free-text business reasons must not be sent raw to providers that only accept enums.
+- Preserve original business text in PawTag records + provider metadata where useful.
+- Provider terminology is not automatically PawTag domain terminology.
+
+### Refunds
+- Authorize refund capability separately.
+- Make retries safe.
+- Persist external refund IDs and reconcile PawTag state against Stripe.
+- Refund destination is the original payment method; display that truthfully (`skills/refund-visibility/`).
+- Persist Stripe ARN/arrival when provided; snapshot destination on refund transactions.
+
+### Order ↔ Fulfilment status sync
+- Fulfilment and Order use **different enums**:
+  - Fulfilment: `pending | picking | packing | fulfilled`
+  - Order: `pending | pending_payment | paid | packing | shipped | delivered | ...`
+- Resolve order status only via **explicit mapping** in `packages/api/src/services/fulfilment-sync.ts` (`resolveOrderStatusFromFulfilment`).
+- **Never** `indexOf()` a fulfilment status name against the order status sequence. `'fulfilled'` is not an order status (`indexOf` → `-1`) and previously made fulfilled look like a backward transition, leaving orders stuck at `packing` while warehouse fulfilment was already `fulfilled`.
+- Forward map today: `packing → packing`, `fulfilled → shipped`.
+- Do not overwrite terminal order statuses (`cancelled`, `refunded`) from fulfilment sync.
+- Data repairs that align order status with fulfilled fulfilment are status corrections only — do not invent tracking, shipment, payment, or refund state.
+- Regression test: `tests/unit/fulfilment-order-sync.test.ts`.
+
+### Shipment tracking after packing/fulfilled
+- Shared helpers: `isShipmentTrackingMissing`, `canCreateShipmentForOrder` in `@pawtag/shared`.
+- Create Shipment is allowed for:
+  - `packing` without tracking (normal ship → status `shipped` + tracking + customer notify)
+  - `shipped` without tracking (repair fill of tracking/carrier/label; status stays `shipped`; still notify with tracking)
+- Reject if tracking already exists or order is `cancelled`/`refunded`.
+- Admin CSR warning when packing/shipped has no tracking; Actions sit under Order Progress on Order Info and Activity tabs.
+- Customer OrderDetailView shows **“Shipped — tracking pending”** when shipped without tracking; tracking card appears once `trackingNumber` exists.
+- Fulfilment mark-fulfilled returns `orderSync.trackingMissing` so admin can prompt Create Shipment.
+- Regression tests: `tests/unit/shipment-tracking-helpers.test.ts`.
+
+## Verification
+
+Add tests for duplicate requests, replayed webhooks, ownership violations, concurrent inventory, partial failures, and production configuration where the touched change creates those risks.

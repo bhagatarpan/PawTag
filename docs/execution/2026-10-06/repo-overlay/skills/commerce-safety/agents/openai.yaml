@@ -1,0 +1,3 @@
+interface:
+  display_name: "Commerce Safety"
+  short_description: "Make PawTag payments, orders, inventory, and refunds safe."

@@ -1,0 +1,3 @@
+interface:
+  display_name: "Donation Domain"
+  short_description: "Build PawTag donations, receipts, recurring giving, and reconciliation"

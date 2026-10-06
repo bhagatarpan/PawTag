@@ -1,0 +1,72 @@
+# Critical API Route-Module Verification Matrix
+
+This is a route-module inventory from the reviewed repository snapshot. During execution, update if files/routes change. For each module verify mount path, auth, RBAC/ownership, validation, response/error contract, rate limits where needed, idempotency for mutations, tests, and frontend callers.
+
+| Route module | Mount/paths verified | Auth/RBAC | Validation | Idempotency/concurrency | Frontend/shared contract | Tests | Notes |
+|---|---|---|---|---|---|---|---|
+| `address-autocomplete.ts` | | | | | | | |
+| `admin-analytics.ts` | | | | | | | |
+| `admin-background-jobs.ts` | | | | | | | |
+| `admin-brands.ts` | | | | | | | |
+| `admin-categories.ts` | | | | | | | |
+| `admin-collections.ts` | | | | | | | |
+| `admin-commerce.ts` | | | | | | | |
+| `admin-digital-products.ts` | | | | | | | |
+| `admin-entitlements.ts` | | | | | | | |
+| `admin-escalations.ts` | | | | | | | |
+| `admin-fulfilments.ts` | | | | | | | |
+| `admin-guardian.ts` | | | | | | | |
+| `admin-membership.ts` | | | | | | | |
+| `admin-payments.ts` | | | | | | | |
+| `admin-promocodes.ts` | | | | | | | |
+| `admin-refunds.ts` | | | | | | | |
+| `admin-returns.ts` | | | | | | | |
+| `admin-shipments.ts` | | | | | | | |
+| `admin-shipping.ts` | | | | | | | |
+| `admin-stripe-report.ts` | | | | | | | |
+| `admin-subscriptions.ts` | | | | | | | |
+| `admin-test-data-reset.ts` | | | | | | | |
+| `admin-webhooks.ts` | | | | | | | |
+| `admin.ts` | | | | | | | |
+| `audit.ts` | | | | | | | |
+| `auth.ts` | | | | | | | |
+| `cart.ts` | | | | | | | |
+| `checkout-otp.ts` | | | | | | | |
+| `checkout.ts` | | | | | | | |
+| `cms-admin.ts` | | | | | | | |
+| `cms-auth-admin.ts` | | | | | | | |
+| `cms-email-admin.ts` | | | | | | | |
+| `cms-homepage-admin.ts` | | | | | | | |
+| `cms-onboarding-admin.ts` | | | | | | | |
+| `cms-pet-ref-admin.ts` | | | | | | | |
+| `cms-public-v2.ts` | | | | | | | |
+| `cms-public.ts` | | | | | | | |
+| `cms-settings-public.ts` | | | | | | | |
+| `cms-shop-admin.ts` | | | | | | | |
+| `cms-sms-admin.ts` | | | | | | | |
+| `commerce-public.ts` | | | | | | | |
+| `communications.ts` | | | | | | | |
+| `customer-digital.ts` | | | | | | | |
+| `customer-guardian.ts` | | | | | | | |
+| `customer-returns.ts` | | | | | | | |
+| `customer-subscriptions.ts` | | | | | | | |
+| `customer.ts` | | | | | | | |
+| `finder.ts` | | | | | | | |
+| `health.ts` | | | | | | | |
+| `invoice-access.ts` | | | | | | | |
+| `membership-public.ts` | | | | | | | |
+| `membership.ts` | | | | | | | |
+| `points-estimate.ts` | | | | | | | |
+| `products.ts` | | | | | | | |
+| `promo-public.ts` | | | | | | | |
+| `push-tokens.ts` | | | | | | | |
+| `rbac.ts` | | | | | | | |
+| `referrals.ts` | | | | | | | |
+| `resend-webhooks.ts` | | | | | | | |
+| `shipping.ts` | | | | | | | |
+| `site-availability.ts` | | | | | | | |
+| `stripe-webhooks.ts` | | | | | | | |
+| `support.ts` | | | | | | | |
+| `system-logs.ts` | | | | | | | |
+| `system-status.ts` | | | | | | | |
+| `upload.ts` | | | | | | | |
