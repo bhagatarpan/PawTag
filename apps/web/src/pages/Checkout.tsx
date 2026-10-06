@@ -22,6 +22,8 @@ import ShippingMethodSelect from '../components/cart/ShippingMethodSelect';
 import AutoRenewToggle from '../components/cart/AutoRenewToggle';
 import GuardianPointsPreview from '../components/cart/GuardianPointsPreview';
 import analytics from '../lib/analytics';
+import { formatSavedAddressLines } from '../lib/checkout-address';
+import OrderSummaryCard from '../components/checkout/OrderSummaryCard';
 
 // Confirmation page animations
 const confirmationStyles = `
@@ -199,24 +201,39 @@ export default function Checkout() {
   const [selectedShippingOption, setSelectedShippingOption] = useState<string>('');
   const [shippingLoading, setShippingLoading] = useState(false);
   const [shippingError, setShippingError] = useState<string | null>(null);
+  // Race protection: ignore stale rate responses when address changes quickly
+  const shippingRequestSeqRef = useRef(0);
+  const shippingAbortRef = useRef<AbortController | null>(null);
+  // Server-authoritative checkout quote (Phase 02 contract)
+  const [serverQuote, setServerQuote] = useState<{
+    subtotal: number; discount: number; shipping: number; tax: number; total: number;
+    quoteRevision?: string; isZeroTotal?: boolean;
+  } | null>(null);
 
   // Fetch shipping options when address is entered
   useEffect(() => {
     if (!form.line1) return;
+    const requestId = ++shippingRequestSeqRef.current;
+    shippingAbortRef.current?.abort();
+    const controller = new AbortController();
+    shippingAbortRef.current = controller;
+
     setShippingLoading(true);
     setShippingError(null);
     api.get(API.shipping.rates, {
       params: { line1: form.line1, city: form.city, state: form.state, zip: form.zip, country: form.country },
+      signal: controller.signal,
     })
       .then((res) => {
+        if (requestId !== shippingRequestSeqRef.current) return; // stale response
         const rates = res.data?.data || [];
         setShippingOptions(rates);
-        // Auto-select first option if none selected
         if (rates.length > 0 && !selectedShippingOption) {
           setSelectedShippingOption(rates[0].id);
         }
       })
       .catch((err) => {
+        if (controller.signal.aborted || requestId !== shippingRequestSeqRef.current) return;
         console.error('[Checkout] Shipping rates failed:', err?.response?.data || err.message);
         const status = err?.response?.status;
         if (status === 401) {
@@ -226,8 +243,75 @@ export default function Checkout() {
         }
         setShippingOptions([]);
       })
-      .finally(() => setShippingLoading(false));
+      .finally(() => {
+        if (requestId === shippingRequestSeqRef.current) {
+          setShippingLoading(false);
+        }
+      });
   }, [form.line1, form.city, form.state, form.zip, form.country]);
+
+  // Refresh server checkout quote when cart/shipping context changes
+  // (pawRewardsDiscount is derived later; totals from server cart are authoritative)
+  useEffect(() => {
+    if (!user || items.length === 0) {
+      setServerQuote(null);
+      return;
+    }
+    let cancelled = false;
+    const controller = new AbortController();
+    const params: Record<string, string | number> = {};
+    if (selectedShippingOption) params.shippingMethodId = selectedShippingOption;
+    api.get(API.checkout.quote, { params, signal: controller.signal })
+      .then((res) => {
+        if (cancelled) return;
+        const q = res.data?.data;
+        if (q) {
+          setServerQuote({
+            subtotal: Number(q.subtotal || 0),
+            discount: Number(q.discount || 0),
+            shipping: Number(q.shipping || 0),
+            tax: Number(q.tax || 0),
+            total: Number(q.total || 0),
+            quoteRevision: q.quoteRevision,
+            isZeroTotal: !!q.isZeroTotal,
+          });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setServerQuote(null);
+      });
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [user, items.length, totals?.subtotal, totals?.discount, selectedShippingOption, promoApplied]);
+
+  // Save this address — persisted when enabled and user proceeds past Delivery
+  const [saveAddress, setSaveAddress] = useState(false);
+  const persistSavedAddress = async (): Promise<void> => {
+    if (!user || !saveAddress || addressMode !== 'custom') return;
+    if (!form.line1 || !form.city || !form.zip) return;
+    // Skip if an identical address already exists
+    const exists = savedAddresses.some(
+      (a) => a.line1 === form.line1 && a.city === form.city && a.zip === form.zip,
+    );
+    if (exists) return;
+    try {
+      await api.post(API.customer.addresses.create, {
+        label: form.label || 'Home',
+        line1: form.line1,
+        line2: form.line2 || undefined,
+        city: form.city,
+        state: form.state || '',
+        zip: form.zip,
+        country: form.country || 'NZ',
+      });
+      const res = await api.get(API.customer.addresses.list);
+      setSavedAddresses(res.data?.data || []);
+    } catch (err) {
+      console.error('[Checkout] Failed to save address', err);
+    }
+  };
 
   // Sync shipping method to cart when selection changes
   const prevShippingRef = useRef(selectedShippingOption);
@@ -456,10 +540,13 @@ export default function Checkout() {
   const canProceedToPayment = canProceedToReview;
 
   // Step navigation
-  const goToStep = (step: Step) => {
+  const goToStep = async (step: Step) => {
     if (step === 'checkout' && !canProceedToCheckout) return;
     if (step === 'review' && !canProceedToReview) return;
     if (step === 'payment' && !canProceedToPayment) return;
+    if (step === 'review') {
+      await persistSavedAddress();
+    }
     setCurrentStep(step);
     setError(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -771,7 +858,9 @@ export default function Checkout() {
             {!user ? (
               <CheckoutAuth />
             ) : (
-              <div className="max-w-2xl">
+              /* Persistent 8/4 checkout shell — Delivery step (Phase 04) */
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
+                <div className="lg:col-span-8 space-y-4">
                 {/* Welcome message for signed-in user */}
                 <div className="bg-primary-50 border border-primary-100 rounded-xl p-4 mb-4 flex items-center gap-3">
                   <CheckCircle className="h-5 w-5 text-primary-600 flex-shrink-0" />
@@ -889,10 +978,10 @@ export default function Checkout() {
                               : 'border-gray-200 hover:border-gray-300 bg-white'
                           }`}
                         >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2">
+                            <div className="min-w-0">
                               <span className="font-medium text-gray-900">{addr.label}</span>
-                              {addr.isDefault && <span className="text-xs bg-primary-100 text-primary-700 px-2 py-0.5 rounded-full">Preferred</span>}
+                              {addr.isDefault && <span className="ml-2 text-xs bg-primary-100 text-primary-700 px-2 py-0.5 rounded-full">Preferred</span>}
                             </div>
                             <input
                               type="radio"
@@ -910,11 +999,17 @@ export default function Checkout() {
                                   country: addr.country || 'NZ',
                                 });
                               }}
-                              className="w-4 h-4 text-primary-600"
+                              className="w-4 h-4 text-primary-600 ml-auto"
+                              aria-label={`Select ${addr.label || 'saved address'}`}
                             />
                           </div>
-                          <p className="text-sm text-gray-600 mt-1">{form.line1}{form.line2 ? `, ${form.line2}` : ''}</p>
-                          <p className="text-sm text-gray-600">{addr.city} {addr.zip}</p>
+                          {/* Show THIS address's own lines — not the shared form state */}
+                          <p className="text-sm text-gray-600 mt-1">
+                            {formatSavedAddressLines(addr).lineA}
+                          </p>
+                          <p className="text-sm text-gray-600">
+                            {formatSavedAddressLines(addr).lineB}
+                          </p>
                         </div>
                       ))}
                     </div>
@@ -941,7 +1036,13 @@ export default function Checkout() {
                         <div><label className="block text-sm font-medium text-gray-700 mb-1">Postcode *</label><input type="text" required value={form.zip} onChange={e => setForm({ ...form, zip: e.target.value })} className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 text-sm" /></div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <input type="checkbox" id="saveAddress" className="w-4 h-4 text-primary-600 rounded" />
+                        <input
+                          type="checkbox"
+                          id="saveAddress"
+                          checked={saveAddress}
+                          onChange={(e) => setSaveAddress(e.target.checked)}
+                          className="w-4 h-4 text-primary-600 rounded"
+                        />
                         <label htmlFor="saveAddress" className="text-sm text-gray-700">Save this address to my account</label>
                       </div>
                       {savedAddresses.length > 0 && (
@@ -1028,6 +1129,28 @@ export default function Checkout() {
                     Review Order <ChevronRight className="h-4 w-4" />
                   </button>
                 </div>
+                </div>
+
+                {/* Right 33% — sticky server-authoritative order summary */}
+                <div className="lg:col-span-4">
+                  <div className="lg:sticky lg:top-24">
+                    <OrderSummaryCard
+                      items={items.map((item) => ({
+                        productName: item.productName || item.name,
+                        quantity: item.quantity || 1,
+                        unitPrice: item.unitPrice || item.price || 0,
+                        customisationTexts: item.customisationTexts,
+                      }))}
+                      subtotal={serverQuote?.subtotal ?? totals?.subtotal ?? 0}
+                      shipping={serverQuote?.shipping ?? shippingCost ?? 0}
+                      total={serverQuote?.total ?? totals?.total ?? 0}
+                      shippingAddress={form.line1 ? { line1: form.line1, city: form.city, zip: form.zip } : undefined}
+                    />
+                    <p className="mt-3 text-xs text-gray-400 text-center">
+                      Prices are calculated by PawTag from your cart and shipping options.
+                    </p>
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -1090,6 +1213,7 @@ export default function Checkout() {
 
               {/* Right 33%: Payment Method */}
               <div className="lg:col-span-4 space-y-4">
+                <div className="lg:sticky lg:top-24 space-y-4">
                 <div className="bg-white rounded-xl border border-gray-200 p-6">
                   <h2 className="text-lg font-semibold text-gray-900 mb-4">Payment Method</h2>
                   {paymentClientSecret ? (
@@ -1172,6 +1296,7 @@ export default function Checkout() {
 
                 <p className="text-xs text-gray-400 text-center">By placing this order, you agree to our <Link to="/terms" className="underline">Terms of Service</Link> and <Link to="/privacy" className="underline">Privacy Policy</Link>.</p>
                 <p className="text-xs text-gray-400 text-center">Powered by Stripe</p>
+                </div>
               </div>
             </div>
           </div>
@@ -1362,6 +1487,43 @@ export default function Checkout() {
             pointsToNextTier={pointsToNextTier}
             nextTierName={nextTierName}
           />
+        )}
+
+        {/* Mobile sticky total + primary action (Phase 04 — do not squeeze desktop 70/30) */}
+        {user && currentStep !== 'confirmed' && items.length > 0 && (
+          <div className="fixed bottom-0 left-0 right-0 lg:hidden bg-white border-t border-gray-200 px-4 py-3 z-40 safe-area-pb">
+            <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-xs text-gray-500">Estimated total</p>
+                <p className="text-lg font-bold text-gray-900">
+                  ${(serverQuote?.total ?? totals?.total ?? 0).toFixed(2)}
+                </p>
+              </div>
+              {currentStep === 'checkout' && (
+                <button
+                  onClick={() => goToStep('review')}
+                  disabled={!canProceedToReview || loading}
+                  className="flex-shrink-0 bg-primary-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-primary-700 transition-colors disabled:opacity-50"
+                >
+                  Review Order
+                </button>
+              )}
+              {currentStep === 'review' && (
+                <button
+                  onClick={() => goToStep('payment')}
+                  disabled={!canProceedToPayment || loading}
+                  className="flex-shrink-0 bg-primary-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-primary-700 transition-colors disabled:opacity-50"
+                >
+                  Continue to Payment
+                </button>
+              )}
+              {currentStep === 'payment' && (
+                <span className="text-sm text-gray-500 flex items-center gap-2">
+                  <Lock className="h-4 w-4" /> Secure payment
+                </span>
+              )}
+            </div>
+          </div>
         )}
       </div>
     </div>

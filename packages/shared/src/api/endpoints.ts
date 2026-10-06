@@ -716,6 +716,7 @@ export const API = {
   // Checkout
   // ---------------------------------------------------------------------------
   checkout: {
+    quote: '/checkout/quote',
     paymentIntent: '/checkout/payment-intent',
     confirm: '/checkout/confirm',
     pending: '/checkout/pending',

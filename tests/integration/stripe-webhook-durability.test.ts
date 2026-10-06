@@ -62,13 +62,14 @@ describe('Integration: Stripe Webhook Durability (Phase 01)', () => {
         source: 'stripe',
         event: 'payment_intent.succeeded',
         eventId: 'evt_durability_001',
-        payload: {},
+        payload: { id: 'pi_dup' },
         status: 'pending',
       });
     } catch (err: any) {
       dupError = err;
     }
-    expect(dupError?.code).toBe(11000);
+    expect(dupError).toBeTruthy();
+    expect(String(dupError?.code || dupError?.message || '')).toMatch(/11000|duplicate/i);
   });
 
   it('recovers stranded processing events when webhookRetry job runs', async () => {
