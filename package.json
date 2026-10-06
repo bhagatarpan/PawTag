@@ -26,7 +26,8 @@
     "test:smoke": "vitest run tests/smoke",
     "test:regression": "vitest run tests/regression",
     "test:coverage": "vitest run --coverage",
-    "test:all": "vitest run tests/unit tests/integration tests/smoke tests/regression"
+    "test:all": "vitest run tests/unit tests/integration tests/smoke tests/regression",
+    "test:e2e": "playwright test"
   },
   "//scripts": "dev:all/build run the four dev servers (and builds) in parallel via concurrently, since this shell doesn't support background jobs; name/color flags keep the log streams distinguishable. Note: deliberately NO -k flag -- with -k, the moment the fastest process exits (e.g. the finder build) concurrently kills all the others and the build fails.",
   "engines": {

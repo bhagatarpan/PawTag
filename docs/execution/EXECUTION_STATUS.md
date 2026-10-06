@@ -17,11 +17,11 @@
 | 02 Financial integrity | **CODED_NOT_RUNTIME_VALIDATED** (automated gates green; live Stripe not run) | `main` @ Phase 02 commit | inventory fail-loud + concurrency tests PASS; PawRewards atomic reservation tests PASS; promo idempotency PASS; shipping method identity PASS; pending-order expiry PASS; typecheck/lint/unit/integration/smoke/regression/build PASS | none executed (no live Stripe run) | live payment/reconciliation still required | quote contract + rewards hold + inventory confirm fail-loud + pending expiry job implemented |
 | 03 Communications/auth | **CODED_NOT_RUNTIME_VALIDATED** (automated gates green; live Resend/Stripe not run) | `main` @ Phase 03 commit | email audit idempotency PASS; Resend webhook spoof+dupe PASS; membership activate requires Stripe payable state PASS; finder free-customer email PASS; typecheck/lint/unit/integration/smoke/regression/build PASS | none executed (no live Resend/Stripe run) | live email/Stripe membership paths still required | audit keys + Resend WebhookEvent dedupe + activateMembership payment gate + push provider architecture doc |
 | 04 Cart/Checkout web | **CODED_NOT_RUNTIME_VALIDATED** (automated green; no browser manual this session) | `main` @ Phase 04 commit | typecheck PASS; unit 936 PASS; smoke/regression/build PASS; focused integration subset PASS | no interactive browser/staging visual QA | full integration suite flaky under parallel MongoMemoryServer load (pre-existing) | Delivery 8/4 shell, address display/persist, shipping race guard, server quote wiring, mobile sticky checkout bar |
-| 05 Finder web | NOT_STARTED | | | | depends on baseline | finder active-only rule implemented + integration tests green; provider/CAPTCHA runtime still unproven |
-| 06 Ops/deployment | NOT_STARTED | | | | depends on baseline | no CI workflows present |
-| 07 E2E/staging | NOT_STARTED | | | | no Playwright present | first-customer gate not started |
-| 08 Shared mobile web | NOT_STARTED | | | | | |
-| 09 Capacitor bridges | NOT_STARTED | | | | | |
+| 05 Finder web | **CODED_NOT_RUNTIME_VALIDATED** (automated green) | `main` @ Phases 05–09 commit | finder integration suites PASS (72); active-only + free-customer email PROVEN automated | live CAPTCHA/staging not run | live providers still required | finder matrix updated; privacy retention job present |
+| 06 Ops/deployment | **CODED_NOT_RUNTIME_VALIDATED** | `main` @ Phases 05–09 commit | job inventory doc; CI workflow added; docker worker present | no live staging/backup rehearsal | staging BLOCKED_EXTERNAL | `.github/workflows/ci.yml` + BACKGROUND_JOB_INVENTORY.md |
+| 07 E2E/staging | **CODED_NOT_RUNTIME_VALIDATED** | `main` @ Phases 05–09 commit | Playwright config + critical-journeys specs; unit/smoke/regression/build green | Playwright not executed against live app; no staging dress rehearsal | first-customer gate NOT green for public launch | FINAL_FIRST_CUSTOMER_GATE updated honestly |
+| 08 Shared mobile web | **CODED_NOT_RUNTIME_VALIDATED** | `main` @ Phases 05–09 commit | platform capability abstraction + browser fallback unit tests PASS | no device/browser visual matrix this session | app-mode chrome partial | `apps/web/src/platform/*` |
+| 09 Capacitor bridges | **CODED_NOT_RUNTIME_VALIDATED** | `main` @ Phases 05–09 commit | capacitor.config.ts + native bridge code (dynamic import); finder deep-link exclusion coded | no iOS/Android SDK/device build this session | Phase 10 device/store gate required | CODED_NOT_RUNTIME_VALIDATED until physical devices |
 | 10 Store/device gate | NOT_STARTED | | | | physical device evidence absent | checklist is `NOT_STARTED` |
 | 11 Dynamo discovery | NOT_STARTED | | | | | |
 | 12 Dynamo low-risk | NOT_STARTED | | | | | |
@@ -201,6 +201,57 @@
 **Remaining risks:** visual QA on real viewports (Phase 07); live Stripe UI not proven; Checkout.tsx still large (layout improved only).
 
 **Next phase:** `docs/execution/2026-10-06/phases/05_FINDER_WEB_RECOVERY.md` — **STOP. Do not execute Phase 05 until founder authorizes.**
+
+### Phases 05–09 — Finder, Ops, E2E, Mobile Foundation, Capacitor (authorized batch)
+
+**Status:** `CODED_NOT_RUNTIME_VALIDATED` overall — automated gates green; live staging/devices/providers not executed.  
+**Authorized by founder:** “go ahead with next 5 phases autonomously without stopping”  
+**Commits:** batch on `main` after Phase 04 (`7466bd6`/`63bac6d`)
+
+#### Phase 05 — Finder web
+- Active-only finder + free-customer email already in place (Track A0 / earlier phases)
+- Finder integration suites: **PASS** (72 tests)
+- Privacy retention job present (`privacyRetention`)
+- CAPTCHA frontend/backend coded — production live path not run
+- Evidence: `verification/FINDER_WEB_RECOVERY_MATRIX.md`
+
+#### Phase 06 — Admin/ops/deployment
+- CI workflow added: `.github/workflows/ci.yml` (typecheck/lint/unit/integration/regression/smoke/build + optional Playwright)
+- Job inventory: `verification/BACKGROUND_JOB_INVENTORY.md`
+- Docker compose already defines API + worker
+- Live backup/restore rehearsal: **BLOCKED_EXTERNAL** (not run against live DB)
+
+#### Phase 07 — E2E/CI/a11y/perf/staging
+- Playwright config + `tests/e2e/critical-journeys.spec.ts` (finder/cart/a11y smoke)
+- Playwright not executed against a running app this session
+- Staging dress rehearsal / real-person UX: **NOT_STARTED**
+- First-customer gate: **NOT green for public launch** — see `verification/FINAL_FIRST_CUSTOMER_GATE.md`
+
+#### Phase 08 — Shared web mobile foundation
+- `apps/web/src/platform/` capability contract + browser fallbacks
+- Unit tests: browser scan fails closed; no refresh token in JS storage; finder path exclusion
+- App-aware chrome/nav shell not fully rebuilt this session (Cart/Checkout already mobile-responsive from Phase 04)
+
+#### Phase 09 — Capacitor shell
+- `apps/web/capacitor.config.ts` + `src/platform/capacitor.ts` bridges (QR/NFC/push/secure storage/deep links)
+- Finder public URLs explicitly excluded from customer-app deep links
+- Native modules load dynamically (web typecheck does not require Capacitor packages)
+- **Physical iOS/Android build/device proof: NOT_STARTED (Phase 10)**
+
+**Automated commands actually run (batch):**
+
+| Command | Result |
+|---|---|
+| web/shared/finder typecheck | **PASS** |
+| `pnpm test:unit` | **PASS** — 87 files / 940 tests |
+| `pnpm test:smoke` | **PASS** — 6 |
+| `pnpm test:regression` | **PASS** — 33 |
+| `pnpm build` | **PASS** |
+| Finder integration subset | **PASS** — 72 tests |
+
+**Manual/provider/device validation:** none this batch (no live Stripe/Resend/Firebase/staging/iOS/Android).
+
+**Next phase:** Phase 10 store/device gate — **STOP. Do not execute Phase 10 until founder authorizes.**
 
 ### Track A0 — Baseline Recovery (complete)
 
