@@ -551,12 +551,41 @@ router.post('/:tagId/notify', finderNotifyLimiter, requireCaptcha, async (req: R
       const notifTitle = `Your pet ${pet?.name || 'Unknown'} has been found!`;
       const notifMessage = `A kind person found your pet ${pet?.name || ''} (${pet?.petId || ''}). They left their contact details so you can reach them. ${contactInfo}${locationContext ? '\n\n' + locationContext : ''}`;
 
-      // Check owner's notification entitlements
-      const { membershipEntitlementService } = await import('../services/membership-entitlement.service');
-      const ownerInAppEntitled = await membershipEntitlementService.hasAccess(owner._id.toString(), 'in_app_notifications');
-      const ownerEmailEntitled = await membershipEntitlementService.hasAccess(owner._id.toString(), 'email_notifications');
+      // Product rule (founder): when a finder notifies on an ACTIVE tag, email the owner
+      // regardless of membership. Free customers get this for the 3-month Active Period;
+      // after that the tag is no longer finder-active unless membership keeps it active.
+      // Email is isolated from in-app/push so a provider failure cannot block recovery contact.
+      if (owner.email) {
+        try {
+          const scanLocation = locationSaved
+            ? `${latitude}, ${longitude}${accuracy ? ` (±${Math.round(accuracy)}m)` : ''}`
+            : undefined;
+          await sendPetFoundEmail(
+            owner.email,
+            owner.fullName || 'Pet Owner',
+            pet?.name || 'your pet',
+            contactInfo,
+            contactInfo,
+            scanLocation,
+          ).catch(() => {});
+        } catch (emailErr) {
+          logger.error({ err: emailErr, petId: pet?._id, ownerEmail: owner.email }, '[Finder] Failed to send pet-found email to owner');
+        }
+      }
 
-      // In-app notification + push (isolated — must not block email to owner)
+      // In-app + push:
+      // - Free customers (no membership): delivered while the tag is finder-active (Active Period).
+      // - Members: entitlement registry still governs (a tier may disable in_app_notifications).
+      const { membershipEntitlementService } = await import('../services/membership-entitlement.service');
+      const { UserMembership } = await import('@pawtag/db');
+      const ownerMembership = await UserMembership.findOne({
+        userId: owner._id,
+        status: 'active',
+      }).lean();
+      const ownerInAppEntitled = ownerMembership
+        ? await membershipEntitlementService.hasAccess(owner._id.toString(), 'in_app_notifications')
+        : true;
+
       if (ownerInAppEntitled) {
         try {
           await Notification.create({
@@ -585,25 +614,6 @@ router.post('/:tagId/notify', finderNotifyLimiter, requireCaptcha, async (req: R
           }).catch(() => {});
         } catch (notifErr) {
           logger.error({ err: notifErr, petId: pet?._id, ownerId: owner._id }, '[Finder] Failed to deliver in-app/push notification to owner');
-        }
-      }
-
-      // Send email notification to owner (isolated — must not be blocked by in-app/push failure)
-      if (ownerEmailEntitled && owner.email) {
-        try {
-          const scanLocation = locationSaved
-            ? `${latitude}, ${longitude}${accuracy ? ` (±${Math.round(accuracy)}m)` : ''}`
-            : undefined;
-          await sendPetFoundEmail(
-            owner.email,
-            owner.fullName || 'Pet Owner',
-            pet?.name || 'your pet',
-            contactInfo,
-            contactInfo,
-            scanLocation,
-          ).catch(() => {});
-        } catch (emailErr) {
-          logger.error({ err: emailErr, petId: pet?._id, ownerEmail: owner.email }, '[Finder] Failed to send pet-found email to owner');
         }
       }
 

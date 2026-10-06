@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
 import request from 'supertest';
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
@@ -7,8 +7,17 @@ import { setupTestDb, teardownTestDb, clearDb } from './setup';
 import app from '../../packages/api/src/index';
 import { config } from '../../packages/api/src/config';
 import { seedMembershipEntitlements } from './helpers';
+import { sendPetFoundEmail } from '../../packages/api/src/services/email.service';
 
-async function createCustomer(overrides: Partial<{ email: string; fullName: string }> = {}) {
+vi.mock('../../packages/api/src/services/email.service', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../packages/api/src/services/email.service')>();
+  return {
+    ...actual,
+    sendPetFoundEmail: vi.fn().mockResolvedValue({ success: true }),
+  };
+});
+
+async function createCustomer(overrides: Partial<{ email: string; fullName: string; seedEntitlements?: boolean }> = {}) {
   const email = overrides.email || 'owner@example.com';
   const passwordHash = await bcrypt.hash('Password123!', 12);
 
@@ -27,9 +36,11 @@ async function createCustomer(overrides: Partial<{ email: string; fullName: stri
   });
 
   const userId = user.insertedId.toString();
-  // Finder notifications respect the membership entitlement registry.
-  // Seed entitled membership so pet_found notifications can be delivered in tests.
-  await seedMembershipEntitlements(userId);
+  // Default: seed entitled membership for in-app notification paths.
+  // Pass seedEntitlements: false for free-customer (no membership) scenarios.
+  if (overrides.seedEntitlements !== false) {
+    await seedMembershipEntitlements(userId);
+  }
   return userId;
 }
 
@@ -89,6 +100,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await clearDb();
+  vi.clearAllMocks();
 });
 
 // ═══════════════════════════════════════════
@@ -228,6 +240,38 @@ describe('Integration: Finder - Notify Owner', () => {
       .toArray();
     expect(notifs.length).toBeGreaterThanOrEqual(1);
     expect(notifs[0].type).toBe('pet_found');
+  });
+
+  it('emails free (non-member) owners when finder notifies on an active tag', async () => {
+    // Product rule: any customer gets finder email while the tag is active.
+    // Free customers get this for the 3-month Active Period; membership extends beyond.
+    const ownerId = await createCustomer({ email: 'free-owner@example.com', seedEntitlements: false });
+    const petId = await createPet(ownerId, { name: 'Milo', status: 'lost' });
+    await createTag(ownerId, petId, { tagId: 'TAG-NOTIFY-FREE-EMAIL' });
+
+    // Confirm no membership was seeded
+    const memberships = await mongoose.connection.collections.usermemberships
+      .find({ userId: new mongoose.Types.ObjectId(ownerId) })
+      .toArray();
+    expect(memberships.length).toBe(0);
+
+    const res = await request(app)
+      .post('/api/finder/TAG-NOTIFY-FREE-EMAIL/notify')
+      .send({ finderPhone: '+64222222222', finderName: 'Finder Sam' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(sendPetFoundEmail).toHaveBeenCalledTimes(1);
+    const emailArgs = vi.mocked(sendPetFoundEmail).mock.calls[0];
+    expect(emailArgs[0]).toBe('free-owner@example.com');
+    expect(emailArgs[2]).toBe('Milo');
+    expect(emailArgs[3]).toContain('Finder Sam');
+
+    // Free customer within Active Period also gets in-app notification
+    const notifs = await mongoose.connection.collections.notifications
+      .find({ userId: new mongoose.Types.ObjectId(ownerId), type: 'pet_found' })
+      .toArray();
+    expect(notifs.length).toBeGreaterThanOrEqual(1);
   });
 
   it('POST /api/finder/:tagId/notify keeps pet as "lost" (finder report, not recovery)', async () => {

@@ -22,7 +22,8 @@
 
 1. **Finder can only find active tags.** Public finder responses expose pet data only when HYBRID 2 calculated status is `active` and finder is enabled. Limited, expired, replaced, returned, inactive, deleted → `tagActive: false`, `petInfo: null`, message “This PawTag is no longer active.”
 2. **Tag replacement:** customer activates the new tag again; old tag status becomes `replaced`; new tag start date (`activatedAt`) inherits from the old tag; remaining active/warranty period transfers when still valid; fresh period when the original already expired.
-3. **Commit and push** the recovered baseline.
+3. **Finder email for any customer:** when a finder notifies on an active tag, email the owner regardless of membership. Free customers get this for the 3-month Active Period; after that membership is required to keep the tag finder-active. In-app/push is delivered for free customers while the tag is active; paid tiers may still disable in-app via the entitlement registry.
+4. **Commit and push** the recovered baseline.
 
 ---
 
@@ -33,7 +34,7 @@
 | `pnpm typecheck` | **PASS** | all workspace packages |
 | `pnpm lint` | **PASS** | 0 errors; warnings only |
 | `pnpm test:unit` | **PASS** | 82 files / 923 tests |
-| `pnpm test:integration` | **PASS** | 62 files / 766 passed / 2 skipped |
+| `pnpm test:integration` | **PASS** | 62 files / 767 passed / 2 skipped |
 | `pnpm test:regression` | **PASS** | 2 files / 33 tests |
 | `pnpm test:smoke` | **PASS** | 1 file / 6 tests |
 | `pnpm build` | **PASS** | api, admin, web, finder exit 0 |
@@ -71,6 +72,7 @@ No authentication, authorization, payment, or privacy control was weakened.
 |---|---|
 | `packages/api/src/routes/finder.ts` | Only active tags return pet info; all non-active states return not-found style public response |
 | `packages/api/src/routes/customer.ts` | Replacement redeem inherits start date + remaining periods; old tag → `replaced` |
+| `packages/api/src/routes/finder.ts` | Active-only finder + email any customer on active-tag notify; free in-app during Active Period |
 | `tests/integration/helpers.ts` | `createTag` sets HYBRID 2 period dates; entitlement seeding available |
 | `tests/integration/finder.test.ts` | Notify tests seed entitlements; fixtures use real active-period dates |
 | `tests/integration/finder-full.test.ts` | Align with only-active finder rule |
@@ -93,9 +95,10 @@ Plus the pre-existing uncommitted working-tree recovery (type fixes, lint config
 
 ## 7. Remaining risks (explicit)
 
-1. **Non-member finder notifications:** `hasAccess(userId, key)` returns `false` when the user has no active membership. Free customers may not receive in-app `pet_found` notifications unless MembershipBenefit defaults / free-tier config exist in production. Decide and configure before first real customers (Phase 03/05).
-2. Provider modes (Stripe/Resend/push/shipping/CAPTCHA) remain `CODED_NOT_RUNTIME_VALIDATED`.
-3. No browser E2E, no CI workflows, no mobile physical-device evidence.
+1. **Finder email for free customers — implemented.** Any customer with an active tag gets finder email (Active Period = 3 months; membership required after). Regression test: free non-member owner receives `sendPetFoundEmail` on active-tag notify.
+2. Paid members may disable `in_app_notifications` via entitlement registry; email remains the guaranteed recovery channel for active tags.
+3. Provider modes (Stripe/Resend/push/shipping/CAPTCHA) remain `CODED_NOT_RUNTIME_VALIDATED`.
+4. No browser E2E, no CI workflows, no mobile physical-device evidence.
 
 ---
 

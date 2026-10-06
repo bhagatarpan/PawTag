@@ -46,7 +46,8 @@
 **Product rules applied (founder decisions):**
 1. **Finder can only find ACTIVE tags** — public finder pet-info/notify only when HYBRID 2 status is active. Limited/expired/replaced/returned/inactive → not findable (`tagActive: false`, no pet info).
 2. **Tag replacement** — customer activates new tag again; old tag status → `replaced`; new tag `activatedAt` inherits from old tag; remaining active/warranty period transfers when still valid; fresh period when original already expired.
-3. **Commit and push** baseline recovery to `origin/main`.
+3. **Finder email for any customer** — when a finder notifies on an active tag, email the owner regardless of membership. Free customers get this for the 3-month Active Period; after that membership is required to keep the tag finder-active.
+4. **Commit and push** baseline recovery to `origin/main`.
 
 **Automated commands actually run (post-recovery):**
 
@@ -55,7 +56,7 @@
 | `pnpm typecheck` | **PASS** | all workspace packages |
 | `pnpm lint` | **PASS** | 0 errors; warnings only (`no-explicit-any`) |
 | `pnpm test:unit` | **PASS** | 82 files, 923 tests |
-| `pnpm test:integration` | **PASS** | 62 files, 766 passed, 2 skipped |
+| `pnpm test:integration` | **PASS** | 62 files, 767 passed, 2 skipped |
 | `pnpm test:regression` | **PASS** | 2 files, 33 tests |
 | `pnpm test:smoke` | **PASS** | 1 file, 6 tests |
 | `pnpm build` | **PASS** | api/admin/web/finder exit 0 |
@@ -67,7 +68,8 @@
 
 **Manual/provider/device validation actually performed:** none (no Stripe/Resend/staging/device run this recovery).  
 **Remaining risk (not baseline blockers):**
-- Free customers without membership do not receive finder in-app notifications when entitlement registry has no tier for them (`hasAccess` returns false without membership). Production must seed MembershipBenefit defaults / free-tier config before launch, or confirm product rule for non-member notification delivery (Phase 03/05).
+- **Resolved for free-customer finder email:** any customer with an active tag gets finder email (3-month Active Period; membership required after). Regression test added.
+- Paid members can still have `in_app_notifications` disabled via entitlement registry; email remains the guaranteed recovery channel for active tags.
 - Demo shipping/push fallbacks, CAPTCHA production path, Stripe live modes remain `CODED_NOT_RUNTIME_VALIDATED`.
 - No Playwright E2E; no CI; mobile real-device checklist unchecked.
 
