@@ -54,6 +54,7 @@ import {
   ChevronsDown,
   ChevronsUp,
   Scan,
+  Heart,
 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { useTheme } from '../hooks/useTheme';
@@ -141,6 +142,7 @@ const sections: SidebarSection[] = [
     color: 'text-green-300',
     links: [
       { to: '/payments', label: 'Transactions', icon: CreditCard, permission: 'order.read' },
+      { to: '/donations', label: 'Donations', icon: Heart, permission: 'donation.read' },
       { to: '/refunds', label: 'Refunds', icon: RotateCcw, permission: 'order.refund' },
       { to: '/refund-report', label: 'Refund Report', icon: FileText, permission: 'order.refund' },
       { to: '/payments/reconciliation', label: 'Reconciliation', icon: AlertTriangle, permission: 'order.read' },

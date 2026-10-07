@@ -370,6 +370,7 @@ async function start() {
         const { runOrphanPaymentJob } = await import('./jobs/orphanPaymentDetection');
         const { runOrderAutoCancelJob } = await import('./jobs/orderAutoCancel');
         const { runPendingOrderExpiryJob } = await import('./jobs/pendingOrderExpiry');
+        const { runDonationReconciliationJob } = await import('./jobs/donationReconciliation');
         const { runShippingTrackingJob } = await import('./jobs/shippingTrackingPoll');
         const { runWebhookRetryJob } = await import('./jobs/webhookRetry');
         const { runPaymentReconciliationJob } = await import('./jobs/paymentReconciliation');
@@ -403,6 +404,7 @@ async function start() {
         registerJobFunction('runOrphanPaymentJob', runOrphanPaymentJob);
         registerJobFunction('runOrderAutoCancelJob', runOrderAutoCancelJob);
         registerJobFunction('runPendingOrderExpiryJob', runPendingOrderExpiryJob);
+        registerJobFunction('runDonationReconciliationJob', runDonationReconciliationJob);
         registerJobFunction('runShippingTrackingJob', runShippingTrackingJob);
         registerJobFunction('runWebhookRetryJob', runWebhookRetryJob);
         registerJobFunction('runPaymentReconciliationJob', runPaymentReconciliationJob);

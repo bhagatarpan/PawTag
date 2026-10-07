@@ -1,10 +1,20 @@
 import { Link } from 'react-router-dom';
-import { PawPrint, Mail, Phone, MapPin, Shield } from 'lucide-react';
+import { PawPrint, Mail, MapPin, Heart } from 'lucide-react';
 import { useFooter, useSiteSettings } from '../hooks/useCms';
+import { useEffect, useState } from 'react';
+import { API } from '@pawtag/shared/api';
+import api from '../lib/api';
 
 export default function Footer() {
   const { footer, loading: footerLoading } = useFooter();
   const { settings, loading: settingsLoading } = useSiteSettings();
+  const [donatePublic, setDonatePublic] = useState(false);
+
+  useEffect(() => {
+    api.get(API.donations.settings)
+      .then((res) => setDonatePublic(!!res.data?.data?.publicEnabled))
+      .catch(() => setDonatePublic(false));
+  }, []);
 
   // Fallback data
   const fallbackGroups = [
@@ -16,6 +26,8 @@ export default function Footer() {
         { label: 'Guardian Rewards', url: '/account/guardian', type: 'custom' as const },
         { label: 'Membership', url: '/membership', type: 'custom' as const },
         { label: 'Sign In', url: '/login', type: 'custom' as const },
+        // Donate appears only when donation.publicEnabled=true
+        ...(donatePublic ? [{ label: 'Donate', url: '/donate', type: 'custom' as const }] : []),
       ],
     },
     {
@@ -90,6 +102,11 @@ export default function Footer() {
         <div className="border-t border-gray-800 mt-12 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-gray-500 text-sm">&copy; {new Date().getFullYear()} {companyName}. All rights reserved.</p>
           <div className="flex gap-6">
+            {donatePublic && (
+              <Link to="/donate" className="text-gray-500 hover:text-teal-400 text-sm transition-colors inline-flex items-center gap-1">
+                <Heart className="h-3.5 w-3.5" /> Donate
+              </Link>
+            )}
             <Link to="/privacy" className="text-gray-500 hover:text-teal-400 text-sm transition-colors">Privacy</Link>
             <Link to="/terms" className="text-gray-500 hover:text-teal-400 text-sm transition-colors">Terms</Link>
           </div>

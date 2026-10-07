@@ -735,6 +735,13 @@ export const API = {
     receiptHtml: (receiptId: string) => `/donations/receipt/${receiptId}/html` as const,
   },
 
+  adminDonations: {
+    list: '/admin/donations',
+    refund: (id: string) => `/admin/donations/${id}/refund` as const,
+    resendReceipt: (receiptId: string) => `/admin/donations/receipts/${receiptId}/resend` as const,
+    receiptHtml: (receiptId: string) => `/admin/donations/receipts/${receiptId}/html` as const,
+  },
+
   // ---------------------------------------------------------------------------
   // Shipping
   // ---------------------------------------------------------------------------

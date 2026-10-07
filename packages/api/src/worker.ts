@@ -57,6 +57,7 @@ import { runPawRewardsJob } from './jobs/pawrewards';
 import { runOrphanPaymentJob } from './jobs/orphanPaymentDetection';
 import { runOrderAutoCancelJob } from './jobs/orderAutoCancel';
 import { runPendingOrderExpiryJob } from './jobs/pendingOrderExpiry';
+import { runDonationReconciliationJob } from './jobs/donationReconciliation';
 import { runShippingTrackingJob } from './jobs/shippingTrackingPoll';
 import { runWebhookRetryJob } from './jobs/webhookRetry';
 import { runPaymentReconciliationJob } from './jobs/paymentReconciliation';
@@ -110,6 +111,7 @@ async function startWorker(): Promise<void> {
     registerJobFunction('runOrphanPaymentJob', runOrphanPaymentJob);
     registerJobFunction('runOrderAutoCancelJob', runOrderAutoCancelJob);
     registerJobFunction('runPendingOrderExpiryJob', runPendingOrderExpiryJob);
+    registerJobFunction('runDonationReconciliationJob', runDonationReconciliationJob);
     registerJobFunction('runShippingTrackingJob', runShippingTrackingJob);
     registerJobFunction('runWebhookRetryJob', runWebhookRetryJob);
     registerJobFunction('runPaymentReconciliationJob', runPaymentReconciliationJob);

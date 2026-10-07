@@ -4,12 +4,12 @@ import { Heart, ShieldCheck, Loader2 } from 'lucide-react';
 import { API } from '@pawtag/shared/api';
 import { centsToDollars, type DonationSettingsPublic } from '@pawtag/shared';
 import api from '../lib/api';
+import StripePaymentForm from '../components/StripePaymentForm';
 
 /**
- * Public /donate page — one-time NZD donations.
- * All product copy/amounts come from server settings (configurable).
- * Public CTA remains admin-gated via donation.publicEnabled on the server;
- * this page can still load settings for controlled testing.
+ * Public /donate page — NZD one-time and monthly donations.
+ * Amount/copy from server settings. Card entry via Stripe Elements.
+ * Public menu visibility is controlled by donation.publicEnabled (footer).
  */
 export default function DonatePage() {
   const [settings, setSettings] = useState<DonationSettingsPublic | null>(null);
@@ -21,7 +21,10 @@ export default function DonatePage() {
   const [name, setName] = useState('');
   const [marketing, setMarketing] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<{ donationId: string; clientSecret: string; amountCents: number } | null>(null);
+  const [paymentClientSecret, setPaymentClientSecret] = useState<string | null>(null);
+  const [donationId, setDonationId] = useState<string | null>(null);
+  const [paymentAmountCents, setPaymentAmountCents] = useState(0);
+  const [success, setSuccess] = useState(false);
   const [submitError, setSubmitError] = useState('');
 
   useEffect(() => {
@@ -51,14 +54,38 @@ export default function DonatePage() {
         marketingConsent: marketing,
         idempotencyKey,
       });
-      setResult(res.data.data);
-      // Stripe.js confirmation is Phase 15 minimal: show success path for test-mode PI
-      // Full Stripe Elements mount can be added when publishable key is wired in UI env.
+      const data = res.data.data;
+      setDonationId(data.donationId);
+      setPaymentAmountCents(data.amountCents);
+      setPaymentClientSecret(data.clientSecret);
     } catch (err: any) {
       setSubmitError(err?.response?.data?.error || 'Could not start your donation. Please try again.');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handlePaymentSuccess = async (paymentIntentId: string) => {
+    // Poll status — Stripe webhook is authoritative; this is UX confirmation
+    if (!donationId) return;
+    try {
+      for (let i = 0; i < 10; i++) {
+        const res = await api.get(API.donations.status(donationId));
+        const st = res.data?.data?.status;
+        if (st === 'succeeded') {
+          setSuccess(true);
+          setPaymentClientSecret(null);
+          return;
+        }
+        await new Promise((r) => setTimeout(r, 800));
+      }
+      setSuccess(true);
+      setPaymentClientSecret(null);
+    } catch {
+      setSuccess(true);
+      setPaymentClientSecret(null);
+    }
+    void paymentIntentId;
   };
 
   if (error) {
@@ -73,7 +100,7 @@ export default function DonatePage() {
     );
   }
 
-  if (result) {
+  if (success) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
         <div className="max-w-md w-full bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center">
@@ -82,15 +109,18 @@ export default function DonatePage() {
           </div>
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Thank you</h1>
           <p className="text-gray-600 mb-2">
-            Your donation of <strong>${centsToDollars(result.amountCents).toFixed(2)}</strong> has been started.
+            Your donation of <strong>${centsToDollars(paymentAmountCents).toFixed(2)}</strong> has been received.
           </p>
           <p className="text-sm text-gray-500 mb-4">
-            Reference: {result.donationId}. Complete payment in the secure Stripe window if prompted.
-            You will receive a receipt email after payment is confirmed.
+            A receipt email is on its way. You can also view donations in your account after signing in.
           </p>
           <p className="text-xs text-gray-400">
             {settings?.organisationName || 'PawTag'} — {settings?.receiptStatement}
           </p>
+          <div className="mt-6 flex flex-col gap-2">
+            <Link to="/" className="inline-block text-primary-600 font-medium">Back to home</Link>
+            <Link to="/account/donations" className="text-sm text-gray-500 hover:text-gray-700">My Donations</Link>
+          </div>
         </div>
       </div>
     );
@@ -112,143 +142,163 @@ export default function DonatePage() {
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8">
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Donation amount (NZD)</label>
-              <div className="grid grid-cols-4 gap-2 mb-3">
-                {(settings?.suggestedAmounts || [5, 10, 20, 50]).map((a) => (
-                  <button
-                    key={a}
-                    type="button"
-                    onClick={() => { setAmount(a); setCustom(''); }}
-                    className={`py-3 rounded-xl border-2 font-semibold transition ${
-                      amount === a
-                        ? 'border-primary-500 bg-primary-50 text-primary-700'
-                        : 'border-gray-200 text-gray-700 hover:border-gray-300'
-                    }`}
-                    aria-pressed={amount === a}
-                  >
-                    ${a}
-                  </button>
-                ))}
-              </div>
-              <label htmlFor="custom-amount" className="block text-sm font-medium text-gray-700 mb-1">
-                Or enter another amount
-              </label>
-              <input
-                id="custom-amount"
-                type="number"
-                min={settings ? settings.minAmountCents / 100 : 5}
-                max={settings ? settings.maxAmountCents / 100 : 10000}
-                step="0.01"
-                value={custom}
-                onChange={(e) => { setCustom(e.target.value); setAmount(''); }}
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500"
-                placeholder="e.g. 15.00"
-              />
-              {settings && (
-                <p className="text-xs text-gray-400 mt-1">
-                  Min ${(settings.minAmountCents / 100).toFixed(2)} · Max ${(settings.maxAmountCents / 100).toFixed(2)}
-                </p>
-              )}
-            </div>
-
-            {settings?.frequencies?.includes('monthly') && (
+          {!paymentClientSecret ? (
+            <form onSubmit={handleSubmit} className="space-y-5">
               <div>
-                <span className="block text-sm font-medium text-gray-700 mb-2">Frequency</span>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setFrequency('one_time')}
-                    className={`py-3 rounded-xl border-2 font-semibold transition ${
-                      frequency === 'one_time'
-                        ? 'border-primary-500 bg-primary-50 text-primary-700'
-                        : 'border-gray-200 text-gray-700 hover:border-gray-300'
-                    }`}
-                    aria-pressed={frequency === 'one_time'}
-                  >
-                    One-time
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFrequency('monthly')}
-                    className={`py-3 rounded-xl border-2 font-semibold transition ${
-                      frequency === 'monthly'
-                        ? 'border-primary-500 bg-primary-50 text-primary-700'
-                        : 'border-gray-200 text-gray-700 hover:border-gray-300'
-                    }`}
-                    aria-pressed={frequency === 'monthly'}
-                  >
-                    Monthly
-                  </button>
+                <span className="block text-sm font-medium text-gray-700 mb-2">Donation amount (NZD)</span>
+                <div className="grid grid-cols-4 gap-2 mb-3">
+                  {(settings?.suggestedAmounts || [5, 10, 20, 50]).map((a) => (
+                    <button
+                      key={a}
+                      type="button"
+                      onClick={() => { setAmount(a); setCustom(''); }}
+                      className={`py-3 rounded-xl border-2 font-semibold transition ${
+                        amount === a
+                          ? 'border-primary-500 bg-primary-50 text-primary-700'
+                          : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                      }`}
+                      aria-pressed={amount === a}
+                    >
+                      ${a}
+                    </button>
+                  ))}
                 </div>
+                <label htmlFor="custom-amount" className="block text-sm font-medium text-gray-700 mb-1">
+                  Or enter another amount
+                </label>
+                <input
+                  id="custom-amount"
+                  type="number"
+                  min={settings ? settings.minAmountCents / 100 : 5}
+                  max={settings ? settings.maxAmountCents / 100 : 10000}
+                  step="0.01"
+                  value={custom}
+                  onChange={(e) => { setCustom(e.target.value); setAmount(''); }}
+                  className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500"
+                  placeholder="e.g. 15.00"
+                />
+                {settings && (
+                  <p className="text-xs text-gray-400 mt-1">
+                    Min ${(settings.minAmountCents / 100).toFixed(2)} · Max ${(settings.maxAmountCents / 100).toFixed(2)}
+                  </p>
+                )}
               </div>
-            )}
 
-            <div>
-              <label htmlFor="donor-email" className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
-              <input
-                id="donor-email"
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500"
-                placeholder="you@example.com"
-                autoComplete="email"
-              />
-              <p className="text-xs text-gray-400 mt-1">We use this to send your receipt. No pet account required.</p>
-            </div>
-
-            <div>
-              <label htmlFor="donor-name" className="block text-sm font-medium text-gray-700 mb-1">Name (optional)</label>
-              <input
-                id="donor-name"
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500"
-                autoComplete="name"
-              />
-            </div>
-
-            <div className="flex items-start gap-2">
-              <input
-                id="marketing"
-                type="checkbox"
-                checked={marketing}
-                onChange={(e) => setMarketing(e.target.checked)}
-                className="mt-1 w-4 h-4 text-primary-600"
-              />
-              <label htmlFor="marketing" className="text-sm text-gray-600">
-                I would like occasional updates from PawTag (optional)
-              </label>
-            </div>
-
-            {submitError && (
-              <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700" role="alert">
-                {submitError}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading || !email || selectedAmount === ''}
-              className="w-full py-3.5 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition flex items-center justify-center gap-2"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" /> Processing…
-                </>
-              ) : (
-                <>Donate {selectedAmount !== '' ? `$${Number(selectedAmount).toFixed(2)}` : ''}</>
+              {settings?.frequencies?.includes('monthly') && (
+                <div>
+                  <span className="block text-sm font-medium text-gray-700 mb-2">Frequency</span>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setFrequency('one_time')}
+                      className={`py-3 rounded-xl border-2 font-semibold transition ${
+                        frequency === 'one_time'
+                          ? 'border-primary-500 bg-primary-50 text-primary-700'
+                          : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                      }`}
+                      aria-pressed={frequency === 'one_time'}
+                    >
+                      One-time
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFrequency('monthly')}
+                      className={`py-3 rounded-xl border-2 font-semibold transition ${
+                        frequency === 'monthly'
+                          ? 'border-primary-500 bg-primary-50 text-primary-700'
+                          : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                      }`}
+                      aria-pressed={frequency === 'monthly'}
+                    >
+                      Monthly
+                    </button>
+                  </div>
+                </div>
               )}
-            </button>
 
-            <p className="flex items-center justify-center gap-2 text-xs text-gray-400">
-              <ShieldCheck className="h-4 w-4" /> Secure payment via Stripe
-            </p>
-          </form>
+              <div>
+                <label htmlFor="donor-email" className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+                <input
+                  id="donor-email"
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500"
+                  placeholder="you@example.com"
+                  autoComplete="email"
+                />
+                <p className="text-xs text-gray-400 mt-1">We use this to send your receipt. No pet account required.</p>
+              </div>
+
+              <div>
+                <label htmlFor="donor-name" className="block text-sm font-medium text-gray-700 mb-1">Name (optional)</label>
+                <input
+                  id="donor-name"
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500"
+                  autoComplete="name"
+                />
+              </div>
+
+              <div className="flex items-start gap-2">
+                <input
+                  id="marketing"
+                  type="checkbox"
+                  checked={marketing}
+                  onChange={(e) => setMarketing(e.target.checked)}
+                  className="mt-1 w-4 h-4 text-primary-600"
+                />
+                <label htmlFor="marketing" className="text-sm text-gray-600">
+                  I would like occasional updates from PawTag (optional)
+                </label>
+              </div>
+
+              {submitError && (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700" role="alert">
+                  {submitError}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={loading || !email || selectedAmount === ''}
+                className="w-full py-3.5 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition flex items-center justify-center gap-2"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" /> Processing…
+                  </>
+                ) : (
+                  <>Continue to payment{selectedAmount !== '' ? ` — $${Number(selectedAmount).toFixed(2)}` : ''}</>
+                )}
+              </button>
+            </form>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-gray-900">Payment details</h2>
+                <span className="text-sm font-medium text-gray-700">
+                  ${centsToDollars(paymentAmountCents).toFixed(2)} {settings?.currency || 'NZD'}
+                </span>
+              </div>
+              <p className="text-xs text-gray-500">
+                Enter your card securely via Stripe. PawTag never stores your card number.
+              </p>
+              <StripePaymentForm
+                clientSecret={paymentClientSecret}
+                onPaymentSuccess={handlePaymentSuccess}
+                onPaymentError={(msg) => setSubmitError(msg)}
+                disabled={loading}
+              />
+            </div>
+          )}
+
+          <p className="flex items-center justify-center gap-2 text-xs text-gray-400 mt-6">
+            <ShieldCheck className="h-4 w-4" /> Secure payment via Stripe
+          </p>
         </div>
 
         <p className="text-center text-xs text-gray-400 mt-6">

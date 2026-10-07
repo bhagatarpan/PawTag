@@ -30,7 +30,7 @@
 | 14 Donation gate | **PROVEN** (architecture audit complete; no donate UI code) | `main` @ Phase 14 commit | docs/donations/ 00-05 + SETTINGS_CATALOG; Stripe test keys present in .env.local | NZ legal/tax BLOCKED_EXTERNAL | neutral receipts until donee confirmed | settings catalog defined; Phase 15 not started |
 | 15 Donation one-time | **CODED_NOT_RUNTIME_VALIDATED** (one-time donate coded + tests; live Stripe webhook not run) | `main` @ Phase 15 commit | donation models/routes/service/webhook/receipt neutral + /donate page; donation integration tests PASS (9); typecheck/unit/build PASS | no live Stripe PI + webhook this session | public flag default false; Phase 16 not started | settings all configurable; no tax-credit claims |
 | 16 Donation recurring/portals | NOT_STARTED | | | | depends on Phase 15 | | |
-| 17 Donation release | NOT_STARTED | | | | depends on 15–16 + live rehearsal | | |
+| 17 Donation release | **CODED_NOT_RUNTIME_VALIDATED** (card form + admin UI + security + recon job; public flag still false; live Stripe not run) | `main` @ Phase 17 commit | Stripe Elements on /donate; footer Donate behind publicEnabled; admin Donations page; recon job; security tests PASS; typecheck/unit/build PASS | no live Stripe card this session | NZ tax wording BLOCKED_EXTERNAL; flip publicEnabled after rehearsal | Phase 17 coded; Track D automation complete pending live rehearsal |
 | 18 Final reconciliation | NOT_STARTED | | | | | |
 
 ## Per-phase evidence record
@@ -462,6 +462,36 @@
 **Remaining risks:** live Stripe monthly + webhook not run; admin UI is API-level (full admin page polish later); public `/donate` still flag-off until Phase 17.
 
 **Next phase:** Phase 17 donation reconciliation/security/controlled launch — **STOP. Do not execute Phase 17 until founder says go.**
+
+### Phase 17 — Donation Card Form, Admin UI, Security, Reconciliation (complete for coded evidence)
+
+**Status:** `CODED_NOT_RUNTIME_VALIDATED` — Phase 17 coded + automated tests green; **live Stripe card charge not run**. Public Donate menu **still off** until you flip the setting after rehearsal.  
+**Started/Completed:** 2026-10-07  
+
+**What changed:**
+1. **`/donate` Stripe card form** — after amount/email, Stripe Elements collects payment (server owns amount)
+2. **Footer Donate link** — appears only when `donation.publicEnabled=true` (default **false**)
+3. **Admin Donations UI** — list/search/filter/refund (`/admin/donations`, permission `donation.read`)
+4. **Reconciliation job** — flags pending donations and succeeded payments missing receipts
+5. **Security tests** — min/max amount, no card data in status, ownership on cancel, recon job runs
+6. **Neutral tax wording** preserved (no IRD claims)
+
+**Automated commands:**
+
+| Command | Result |
+|---|---|
+| typecheck (api/web/admin/shared) | **PASS** |
+| donation tests (all Phase 15–17) | **PASS** — 21 |
+| unit / smoke / build | **PASS** |
+
+**What you still need for live proof:**
+1. Stripe **live** keys + webhook URL in Stripe dashboard  
+2. Small real card charge (e.g. NZ$5) after you are ready  
+3. Then set `donation.publicEnabled=true` (admin settings) to show Donate in footer  
+
+**NZ tax wording:** still **BLOCKED_EXTERNAL** until accountant/legal — receipts stay neutral.
+
+**Next phase:** Suggested next tracks (staging first web customer / more DynamoDB / phone app) — **STOP. Do not start a new phase until founder chooses.**
 
 ### Track A0 — Baseline Recovery (complete)
 
