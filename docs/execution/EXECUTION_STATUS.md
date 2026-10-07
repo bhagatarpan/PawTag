@@ -436,6 +436,33 @@
 
 **Next phase:** Phase 16 recurring + portals — **STOP. Do not execute Phase 16 until founder says go.**
 
+### Phase 16 — Recurring Donations, Portal, Admin, Receipts (complete for coded evidence)
+
+**Status:** `CODED_NOT_RUNTIME_VALIDATED` — monthly + portal + admin implemented + tests green; live Stripe Billing not run.  
+**Started/Completed:** 2026-07-07 → 2026-10-07 session (Phase 16 coding).
+
+**What changed:**
+1. **Monthly donations** — Stripe Billing `price_data` (configurable amount, no hardcoded price IDs); fake-mode local sub for tests
+2. **Invoice webhooks** — paid → DonationPayment + neutral receipt (idempotent); failed → past_due
+3. **Subscription deleted** → cancelled idempotent
+4. **Cancel recurring** — supporter + Stripe cancel
+5. **Customer portal** — `/account/donations` My Donations + receipt HTML view + cancel
+6. **Admin** — `GET/POST /api/admin/donations` list/refund/resend/receipts (RBAC)
+7. **Receipt HTML** — neutral wording; ownership-scoped
+8. **Endpoints** — `donations.me`, cancel, receiptHtml
+
+**Automated commands:**
+
+| Command | Result |
+|---|---|
+| typecheck | **PASS** |
+| donation integration | **PASS** — 15 tests |
+| unit / smoke / build | **PASS** |
+
+**Remaining risks:** live Stripe monthly + webhook not run; admin UI is API-level (full admin page polish later); public `/donate` still flag-off until Phase 17.
+
+**Next phase:** Phase 17 donation reconciliation/security/controlled launch — **STOP. Do not execute Phase 17 until founder says go.**
+
 ### Track A0 — Baseline Recovery (complete)
 
 **Status:** PROVEN — quality gates recovered on `main` working tree.  

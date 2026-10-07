@@ -16,6 +16,7 @@ export default function DonatePage() {
   const [error, setError] = useState('');
   const [amount, setAmount] = useState<number | ''>('');
   const [custom, setCustom] = useState('');
+  const [frequency, setFrequency] = useState<'one_time' | 'monthly'>('one_time');
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [marketing, setMarketing] = useState(false);
@@ -44,7 +45,7 @@ export default function DonatePage() {
       const res = await api.post(API.donations.create, {
         amount: Number(selectedAmount),
         currency: settings?.currency || 'NZD',
-        frequency: 'one_time',
+        frequency,
         email,
         name: name || undefined,
         marketingConsent: marketing,
@@ -151,6 +152,38 @@ export default function DonatePage() {
                 </p>
               )}
             </div>
+
+            {settings?.frequencies?.includes('monthly') && (
+              <div>
+                <span className="block text-sm font-medium text-gray-700 mb-2">Frequency</span>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setFrequency('one_time')}
+                    className={`py-3 rounded-xl border-2 font-semibold transition ${
+                      frequency === 'one_time'
+                        ? 'border-primary-500 bg-primary-50 text-primary-700'
+                        : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                    }`}
+                    aria-pressed={frequency === 'one_time'}
+                  >
+                    One-time
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFrequency('monthly')}
+                    className={`py-3 rounded-xl border-2 font-semibold transition ${
+                      frequency === 'monthly'
+                        ? 'border-primary-500 bg-primary-50 text-primary-700'
+                        : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                    }`}
+                    aria-pressed={frequency === 'monthly'}
+                  >
+                    Monthly
+                  </button>
+                </div>
+              </div>
+            )}
 
             <div>
               <label htmlFor="donor-email" className="block text-sm font-medium text-gray-700 mb-1">Email *</label>

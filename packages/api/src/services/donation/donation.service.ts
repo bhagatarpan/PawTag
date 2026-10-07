@@ -33,18 +33,24 @@ export interface CreateDonationResult {
   amountCents: number;
   currency: string;
   status: string;
+  frequency?: 'one_time' | 'monthly';
+  stripeSubscriptionId?: string;
 }
 
 export class DonationService {
-  /** Idempotent create + PaymentIntent for one-time donations. */
-  async createOneTimeDonation(input: CreateDonationInput): Promise<CreateDonationResult> {
+  /** Create one-time or monthly donation (server-authoritative amount). */
+  async createDonation(input: CreateDonationInput): Promise<CreateDonationResult> {
     if (!(await isDonationModuleEnabled())) {
       throw new Error('Donations are currently unavailable');
     }
 
     const frequency = input.frequency || 'one_time';
-    if (frequency !== 'one_time') {
-      throw new Error('Only one-time donations are enabled in this release');
+    const settings = await getDonationSettings();
+    if (frequency === 'monthly' && settings.frequencies.indexOf('monthly') === -1) {
+      throw new Error('Monthly donations are not enabled');
+    }
+    if (frequency !== 'one_time' && frequency !== 'monthly') {
+      throw new Error('Unsupported donation frequency');
     }
 
     const email = (input.email || '').trim().toLowerCase();
@@ -57,10 +63,8 @@ export class DonationService {
       throw new Error(amountCheck.error);
     }
     const amountCents = amountCheck.amountCents;
-    const settings = await getDonationSettings();
     const currency = (input.currency || settings.currency || 'NZD').toUpperCase();
 
-    // Idempotent create
     if (input.idempotencyKey) {
       const existing = await Donation.findOne({ idempotencyKey: input.idempotencyKey });
       if (existing) {
@@ -68,10 +72,8 @@ export class DonationService {
       }
     }
 
-    // Supporter: reuse or create User in DONATION context — never reveal existence via response shape
     const supporter = await this.resolveOrCreateSupporter(email, input.name);
 
-    // Stripe customer (best-effort for save; not required for one-time)
     let stripeCustomerId: string | undefined;
     if (!isFakeMode()) {
       try {
@@ -98,7 +100,7 @@ export class DonationService {
       nameSnapshot: input.name || supporter.fullName || '',
       amountCents,
       currency,
-      frequency: 'one_time',
+      frequency,
       status: 'pending',
       stripeCustomerId,
       registrationContext: 'DONATION',
@@ -106,20 +108,40 @@ export class DonationService {
       marketingConsent: !!input.marketingConsent,
     });
 
-    // PaymentIntent — amount in major units for existing provider API
+    if (frequency === 'monthly') {
+      return this.createMonthlySubscription(donation, amountCents, currency, email, input.name);
+    }
+
+    return this.createOneTimePayment(donation, amountCents, currency, email, input.name, stripeCustomerId);
+  }
+
+  /** Back-compat wrapper */
+  async createOneTimeDonation(input: CreateDonationInput): Promise<CreateDonationResult> {
+    return this.createDonation({ ...input, frequency: input.frequency || 'one_time' });
+  }
+
+  private async createOneTimePayment(
+    donation: any,
+    amountCents: number,
+    currency: string,
+    email: string,
+    name?: string,
+    stripeCustomerId?: string,
+  ): Promise<CreateDonationResult> {
     const paymentIntent = await stripePaymentProvider.createPaymentIntent({
       amount: amountCents / 100,
       currency,
       orderId: `DON-${String(donation._id).slice(-8)}`,
       orderNumber: `DON-${String(donation._id).slice(-8)}`,
       customerEmail: email,
-      customerName: input.name || undefined,
+      customerName: name || undefined,
       stripeCustomerId,
       description: `PawTag donation ${donation._id}`,
       metadata: {
         domain: 'donation',
         donationId: String(donation._id),
         amountCents: String(amountCents),
+        frequency: 'one_time',
       },
     });
 
@@ -137,6 +159,105 @@ export class DonationService {
     return this.toCreateResult(donation, paymentIntent.id, paymentIntent.clientSecret);
   }
 
+  private async createMonthlySubscription(
+    donation: any,
+    amountCents: number,
+    currency: string,
+    _email: string,
+    name?: string,
+  ): Promise<CreateDonationResult> {
+    const donorName = name || donation.nameSnapshot || 'Supporter';
+
+    if (isFakeMode()) {
+      // Deterministic local subscription for tests/dev without live Stripe
+      const fakeSubId = `sub_demo_donation_${String(donation._id).slice(-8)}`;
+      donation.stripeSubscriptionId = fakeSubId;
+      donation.status = 'pending';
+      donation.currentPeriodStart = new Date();
+      const periodEnd = new Date();
+      periodEnd.setMonth(periodEnd.getMonth() + 1);
+      donation.currentPeriodEnd = periodEnd;
+      await donation.save();
+
+      await DonationPayment.create({
+        donationId: donation._id,
+        amountCents,
+        currency,
+        status: 'pending',
+        stripeInvoiceId: `in_demo_${fakeSubId}`,
+      });
+
+      return {
+        donationId: String(donation._id),
+        clientSecret: `${fakeSubId}_secret`,
+        paymentIntentId: fakeSubId,
+        amountCents,
+        currency,
+        status: donation.status,
+        frequency: 'monthly',
+        stripeSubscriptionId: fakeSubId,
+      };
+    }
+
+    const stripe = getStripeClient();
+    const customerId = donation.stripeCustomerId;
+    if (!customerId) {
+      throw new Error('Unable to create monthly donation without Stripe customer');
+    }
+
+    // Configurable amount via price_data — no hardcoded Stripe price IDs
+    const subscription = await stripe.subscriptions.create({
+      customer: customerId,
+      items: [
+        {
+          price_data: {
+            currency: currency.toLowerCase(),
+            unit_amount: amountCents,
+            recurring: { interval: 'month' },
+            product_data: {
+              name: `PawTag monthly donation — ${donorName}`,
+            },
+          } as any,
+        },
+      ],
+      payment_behavior: 'default_incomplete',
+      payment_settings: { save_default_payment_method: 'on_subscription' },
+      metadata: {
+        domain: 'donation',
+        donationId: String(donation._id),
+        amountCents: String(amountCents),
+      },
+      expand: ['latest_invoice.payment_intent'],
+    });
+
+    donation.stripeSubscriptionId = subscription.id;
+    await donation.save();
+
+    const latestInvoice = subscription.latest_invoice as any;
+    const clientSecret =
+      latestInvoice?.payment_intent?.client_secret ||
+      `${subscription.id}_secret`;
+
+    await DonationPayment.create({
+      donationId: donation._id,
+      amountCents,
+      currency,
+      status: 'pending',
+      stripeInvoiceId: latestInvoice?.id,
+    });
+
+    return {
+      donationId: String(donation._id),
+      clientSecret,
+      paymentIntentId: subscription.id,
+      amountCents,
+      currency,
+      status: donation.status,
+      frequency: 'monthly',
+      stripeSubscriptionId: subscription.id,
+    };
+  }
+
   private toCreateResult(donation: any, paymentIntentId: string, clientSecret: string): CreateDonationResult {
     return {
       donationId: String(donation._id),
@@ -145,7 +266,145 @@ export class DonationService {
       amountCents: donation.amountCents,
       currency: donation.currency,
       status: donation.status,
+      frequency: donation.frequency,
+      stripeSubscriptionId: donation.stripeSubscriptionId || undefined,
     };
+  }
+
+  /** Cancel monthly recurring donation (idempotent). */
+  async cancelRecurring(donationId: string, userId?: string): Promise<{ status: string; cancelledAt?: Date }> {
+    const donation = await Donation.findById(donationId);
+    if (!donation) throw new Error('Donation not found');
+    if (userId && String(donation.supporterUserId) !== userId) {
+      throw new Error('Donation not found');
+    }
+    if (donation.frequency !== 'monthly') {
+      throw new Error('Only monthly donations can be cancelled');
+    }
+    if (donation.status === 'cancelled') {
+      return { status: 'cancelled', cancelledAt: donation.cancelledAt };
+    }
+
+    if (donation.stripeSubscriptionId && !isFakeMode() && !donation.stripeSubscriptionId.startsWith('sub_demo_')) {
+      try {
+        const stripe = getStripeClient();
+        await stripe.subscriptions.cancel(donation.stripeSubscriptionId);
+      } catch (err) {
+        logger.warn({ err, donationId }, 'Stripe cancel failed; marking local cancelled');
+      }
+    }
+
+    donation.status = 'cancelled';
+    donation.cancelledAt = new Date();
+    donation.cancellationReason = 'Cancelled by supporter';
+    await donation.save();
+
+    return { status: 'cancelled', cancelledAt: donation.cancelledAt };
+  }
+
+  /** Customer portal list (ownership scoped). */
+  async listForUser(userId: string): Promise<any[]> {
+    const donations = await Donation.find({ supporterUserId: userId }).sort({ createdAt: -1 }).limit(100).lean();
+    const payments = await DonationPayment.find({
+      donationId: { $in: donations.map((d) => d._id) },
+    }).sort({ createdAt: -1 }).lean();
+
+    const paymentsByDonation = new Map<string, any[]>();
+    for (const p of payments) {
+      const key = String(p.donationId);
+      if (!paymentsByDonation.has(key)) paymentsByDonation.set(key, []);
+      paymentsByDonation.get(key)!.push(p);
+    }
+
+    return donations.map((d) => ({
+      id: String(d._id),
+      amountCents: d.amountCents,
+      currency: d.currency,
+      frequency: d.frequency,
+      status: d.status,
+      pastDue: !!d.pastDue,
+      cancelledAt: d.cancelledAt,
+      createdAt: d.createdAt,
+      payments: (paymentsByDonation.get(String(d._id)) || []).map((p) => ({
+        id: String(p._id),
+        amountCents: p.amountCents,
+        status: p.status,
+        paidAt: p.paidAt,
+        receiptId: p.receiptId ? String(p.receiptId) : undefined,
+      })),
+    }));
+  }
+
+  /** Admin list (permission enforced in route). */
+  async listAdmin(filters: { status?: string; frequency?: string; q?: string } = {}): Promise<any[]> {
+    const query: any = {};
+    if (filters.status) query.status = filters.status;
+    if (filters.frequency) query.frequency = filters.frequency;
+    if (filters.q) {
+      query.$or = [
+        { emailSnapshot: { $regex: filters.q, $options: 'i' } },
+        { nameSnapshot: { $regex: filters.q, $options: 'i' } },
+      ];
+    }
+    const donations = await Donation.find(query).sort({ createdAt: -1 }).limit(200).lean();
+    return donations.map((d) => ({
+      id: String(d._id),
+      email: d.emailSnapshot,
+      name: d.nameSnapshot,
+      amountCents: d.amountCents,
+      currency: d.currency,
+      frequency: d.frequency,
+      status: d.status,
+      pastDue: !!d.pastDue,
+      stripeSubscriptionId: d.stripeSubscriptionId,
+      createdAt: d.createdAt,
+    }));
+  }
+
+  /** Neutral receipt HTML (same fields as stored receipt). */
+  async getReceiptHtml(receiptId: string, userId?: string): Promise<string> {
+    const receipt = await DonationReceipt.findById(receiptId);
+    if (!receipt) throw new Error('Receipt not found');
+    const donation = await Donation.findById(receipt.donationId).lean();
+    if (userId && donation && String(donation.supporterUserId) !== userId) {
+      throw new Error('Receipt not found');
+    }
+
+    const amount = (receipt.amountCents / 100).toFixed(2);
+    // Tax classification from settings only — never invent IRD claims
+    const taxNote =
+      receipt.taxClassification === 'neutral' || !receipt.taxClassification
+        ? 'This is a donation payment receipt. Tax treatment, if any, depends on your circumstances and applicable law.'
+        : `Tax classification (configured): ${receipt.taxClassification}`;
+
+    return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"/><title>Donation receipt ${receipt.receiptNumber}</title></head>
+<body style="font-family: Georgia, serif; max-width: 640px; margin: 40px auto; color: #111;">
+  <h1 style="margin-bottom: 0;">${escapeHtml(receipt.organisationName)}</h1>
+  <p style="margin-top: 0; color: #555;">Donation receipt</p>
+  <hr/>
+  <p><strong>Receipt number:</strong> ${escapeHtml(receipt.receiptNumber)}</p>
+  <p><strong>Issued:</strong> ${receipt.issuedAt ? new Date(receipt.issuedAt).toLocaleString('en-NZ') : ''}</p>
+  <p><strong>Donor:</strong> ${escapeHtml(receipt.donorNameSnapshot || 'Supporter')}</p>
+  <p><strong>Amount:</strong> ${escapeHtml(receipt.currency)} $${amount}</p>
+  <p><strong>Statement:</strong> ${escapeHtml(receipt.statement)}</p>
+  ${receipt.irdNumber ? `<p><strong>IRD number:</strong> ${escapeHtml(receipt.irdNumber)}</p>` : ''}
+  ${receipt.charitiesNumber ? `<p><strong>Charities number:</strong> ${escapeHtml(receipt.charitiesNumber)}</p>` : ''}
+  <p style="font-size: 13px; color: #444;">${escapeHtml(taxNote)}</p>
+  ${receipt.signatory ? `<p><strong>Authorised by:</strong> ${escapeHtml(receipt.signatory)}</p>` : ''}
+  <hr/>
+  <p style="font-size: 12px; color: #666;">Status: ${escapeHtml(receipt.status)} · Reference: ${escapeHtml(receipt.receiptNumber)}</p>
+</body></html>`;
+  }
+
+  /** Resend receipt email (same receipt — no new receipt number). */
+  async resendReceiptEmail(receiptId: string, adminActor?: string): Promise<void> {
+    const receipt = await DonationReceipt.findById(receiptId);
+    if (!receipt) throw new Error('Receipt not found');
+    const donation = await Donation.findById(receipt.donationId);
+    if (!donation) throw new Error('Donation not found');
+    await this.sendDonationReceiptEmail(donation, receipt);
+    logger.info({ receiptId, adminActor }, 'Donation receipt email resent');
   }
 
   private async resolveOrCreateSupporter(email: string, name?: string): Promise<any> {
@@ -198,6 +457,81 @@ export class DonationService {
       taxClassification: receipt?.taxClassification,
       statement: receipt?.statement,
     };
+  }
+
+  /**
+   * Stripe invoice webhook for monthly donations.
+   * Every successful invoice → one DonationPayment + one receipt.
+   */
+  async handleInvoiceUpdate(
+    stripeInvoiceId: string,
+    stripeSubscriptionId: string,
+    status: 'paid' | 'failed',
+    amountCents?: number,
+  ): Promise<void> {
+    if (!stripeSubscriptionId) return;
+    const donation = await Donation.findOne({ stripeSubscriptionId });
+    if (!donation) return;
+
+    if (status === 'paid') {
+      // Idempotent: one payment+receipt per stripeInvoiceId
+      const existingPayment = await DonationPayment.findOne({ stripeInvoiceId });
+      if (existingPayment?.status === 'succeeded') return;
+
+      const amount = amountCents || donation.amountCents;
+      if (existingPayment) {
+        existingPayment.status = 'succeeded';
+        existingPayment.paidAt = new Date();
+        await existingPayment.save();
+      } else {
+        await DonationPayment.create({
+          donationId: donation._id,
+          amountCents: amount,
+          currency: donation.currency,
+          status: 'succeeded',
+          stripeInvoiceId,
+          paidAt: new Date(),
+        });
+      }
+
+      if (donation.status !== 'succeeded' && donation.status !== 'refunded') {
+        donation.status = 'succeeded';
+        donation.pastDue = false;
+        await donation.save();
+      }
+
+      const receipt = await this.issueReceipt(donation);
+      if (receipt) {
+        await DonationPayment.updateOne({ stripeInvoiceId }, { $set: { receiptId: receipt._id } });
+        try {
+          await this.sendDonationReceiptEmail(donation, receipt);
+        } catch (err) {
+          logger.error({ err, stripeInvoiceId }, 'Failed to email recurring donation receipt');
+        }
+      }
+    } else if (status === 'failed') {
+      if (donation.status === 'cancelled' || donation.status === 'refunded') return;
+      donation.pastDue = true;
+      if (donation.frequency === 'monthly' && donation.status !== 'succeeded') {
+        donation.status = 'failed';
+      }
+      await donation.save();
+      await DonationPayment.updateOne(
+        { stripeInvoiceId },
+        { $set: { status: 'failed', failureReason: 'Invoice payment failed' } },
+        { upsert: true },
+      );
+    }
+  }
+
+  async handleSubscriptionDeleted(stripeSubscriptionId: string): Promise<void> {
+    if (!stripeSubscriptionId) return;
+    const donation = await Donation.findOne({ stripeSubscriptionId });
+    if (!donation || donation.status === 'cancelled') return;
+    donation.status = 'cancelled';
+    donation.cancelledAt = new Date();
+    donation.cancellationReason = 'Cancelled via Stripe';
+    await donation.save();
   }
 
   /**
@@ -330,6 +664,14 @@ export class DonationService {
 async function readOptionalSetting(key: string): Promise<string> {
   const doc = await Setting.findOne({ key }).lean();
   return doc?.value || '';
+}
+
+function escapeHtml(s: string): string {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
 export const donationService = new DonationService();

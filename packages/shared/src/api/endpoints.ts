@@ -729,7 +729,10 @@ export const API = {
   donations: {
     settings: '/donations/settings',
     create: '/donations',
+    me: '/donations/me',
     status: (id: string) => `/donations/${id}` as const,
+    cancel: (id: string) => `/donations/${id}/cancel` as const,
+    receiptHtml: (receiptId: string) => `/donations/receipt/${receiptId}/html` as const,
   },
 
   // ---------------------------------------------------------------------------

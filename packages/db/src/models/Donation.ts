@@ -27,6 +27,12 @@ export interface IDonationDocument extends Document {
   marketingConsent: boolean;
   receiptId?: mongoose.Types.ObjectId;
   failureReason?: string;
+  /** Recurring lifecycle */
+  pastDue?: boolean;
+  cancelledAt?: Date;
+  cancellationReason?: string;
+  currentPeriodStart?: Date;
+  currentPeriodEnd?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -53,6 +59,11 @@ const DonationSchema = new Schema<IDonationDocument>(
     marketingConsent: { type: Boolean, default: false },
     receiptId: { type: Schema.Types.ObjectId, ref: 'DonationReceipt' },
     failureReason: { type: String },
+    pastDue: { type: Boolean, default: false },
+    cancelledAt: { type: Date },
+    cancellationReason: { type: String },
+    currentPeriodStart: { type: Date },
+    currentPeriodEnd: { type: Date },
   },
   { timestamps: true },
 );

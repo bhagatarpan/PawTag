@@ -313,6 +313,24 @@ async function handlePaymentIntentFailed(paymentIntent: any): Promise<void> {
 async function handleInvoicePaymentSucceeded(invoice: any): Promise<void> {
   if (!invoice?.subscription) return;
 
+  // Donation monthly recurring (Phase 16)
+  const { Donation } = await import('@pawtag/db');
+  const donationBySub = await Donation.findOne({ stripeSubscriptionId: invoice.subscription });
+  if (donationBySub) {
+    try {
+      const { donationService } = await import('../services/donation/donation.service');
+      await donationService.handleInvoiceUpdate(
+        invoice.id,
+        invoice.subscription,
+        'paid',
+        invoice.amount_paid || invoice.amount_due,
+      );
+    } catch (err) {
+      logger.error({ err, invoiceId: invoice.id }, 'Donation invoice webhook failed');
+    }
+    return;
+  }
+
   // Try tag-based Subscription first (existing behavior)
   const subscription = await Subscription.findOne({ stripeSubscriptionId: invoice.subscription });
 
@@ -551,6 +569,24 @@ async function handleMembershipInvoice(membership: any, stripeInvoice: any): Pro
 async function handleInvoicePaymentFailed(invoice: any): Promise<void> {
   if (!invoice?.subscription) return;
 
+  // Donation monthly recurring failure
+  const { Donation } = await import('@pawtag/db');
+  const donationBySub = await Donation.findOne({ stripeSubscriptionId: invoice.subscription });
+  if (donationBySub) {
+    try {
+      const { donationService } = await import('../services/donation/donation.service');
+      await donationService.handleInvoiceUpdate(
+        invoice.id,
+        invoice.subscription,
+        'failed',
+        invoice.amount_due,
+      );
+    } catch (err) {
+      logger.error({ err, invoiceId: invoice.id }, 'Donation invoice failure webhook failed');
+    }
+    return;
+  }
+
   // Try tag-based Subscription first (existing behavior)
   const subscription = await Subscription.findOne({ stripeSubscriptionId: invoice.subscription });
 
@@ -773,6 +809,19 @@ async function handleSubscriptionUpdated(stripeSubscription: any): Promise<void>
  * PawTag must sync its local state accordingly.
  */
 async function handleSubscriptionDeleted(subscription: any): Promise<void> {
+  // Donation monthly recurring cancellation
+  try {
+    const { Donation } = await import('@pawtag/db');
+    const donationBySub = await Donation.findOne({ stripeSubscriptionId: subscription.id });
+    if (donationBySub) {
+      const { donationService } = await import('../services/donation/donation.service');
+      await donationService.handleSubscriptionDeleted(subscription.id);
+      return;
+    }
+  } catch (err) {
+    logger.error({ err, subId: subscription.id }, 'Donation subscription.deleted handling failed');
+  }
+
   // Try tag-based Subscription first (existing behavior)
   const sub = await Subscription.findOne({ stripeSubscriptionId: subscription.id });
 

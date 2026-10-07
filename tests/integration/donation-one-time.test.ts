@@ -96,11 +96,12 @@ describe('Phase 15 — Donation create API (stripe_test / fake provider)', () =>
     expect(payments[0].status).toBe('pending');
   });
 
-  it('rejects monthly in this release (one-time only)', async () => {
+  it('accepts monthly when frequency settings allow (Phase 16)', async () => {
     const res = await request(app)
       .post('/api/donations')
-      .send({ amount: 10, email: 'm@example.com', frequency: 'monthly' });
-    expect(res.status).toBe(400);
+      .send({ amount: 10, email: 'm@example.com', frequency: 'monthly', idempotencyKey: `m-ok-${Date.now()}` });
+    expect(res.status).toBe(201);
+    expect(res.body.data.frequency).toBe('monthly');
   });
 
   it('status endpoint hides other users donations', async () => {

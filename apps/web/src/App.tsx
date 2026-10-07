@@ -31,6 +31,7 @@ import NotFound from './pages/NotFound';
 import MyPets from './pages/account/MyPets';
 import Profile from './pages/account/Profile';
 import Orders from './pages/account/Orders';
+import MyDonations from './pages/account/MyDonations';
 import OrderDetail from './pages/account/OrderDetail';
 import ReturnRequest from './pages/account/ReturnRequest';
 import Notifications from './pages/account/Notifications';
@@ -138,6 +139,7 @@ export default function App() {
         <Route path="/account/orders/:id/return" element={<ProtectedRoute><AccountLayout><ReturnRequest /></AccountLayout></ProtectedRoute>} />
         <Route path="/account/invoices" element={<ProtectedRoute><AccountLayout><Invoices /></AccountLayout></ProtectedRoute>} />
         <Route path="/account/invoices/:id" element={<ProtectedRoute><AccountLayout><InvoiceDetail /></AccountLayout></ProtectedRoute>} />
+        <Route path="/account/donations" element={<ProtectedRoute><AccountLayout><MyDonations /></AccountLayout></ProtectedRoute>} />
         <Route path="/account/subscriptions" element={<ProtectedRoute><AccountLayout><Subscriptions /></AccountLayout></ProtectedRoute>} />
         <Route path="/account/guardian" element={<ProtectedRoute><AccountLayout><GuardianDashboard /></AccountLayout></ProtectedRoute>} />
         <Route path="/account/guardian/points" element={<ProtectedRoute><AccountLayout><GuardianPoints /></AccountLayout></ProtectedRoute>} />
