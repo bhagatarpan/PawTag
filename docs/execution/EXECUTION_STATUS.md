@@ -27,10 +27,10 @@
 | 12 Dynamo low-risk | **PROVEN** (live AWS Settings migrate + compare) | `main` @ Phase 12/13 commit | table `pawtag-dev-settings` created; 271 settings migrated; compare match=271 mismatch=0; unit tests PASS | real AWS ap-southeast-2 (non-prod prefix) | none for Settings proof | reads still default mongo; no money cutover |
 | 13 Dynamo high-risk | **CODED_NOT_RUNTIME_VALIDATED** (conditional adapters + tests; **no cutover**) | `main` @ Phase 13 commit | Dynamo inventory + rewards services + failure-injection unit tests PASS | no live inventory/rewards on DynamoDB | staging payments still required before any money cutover | production remains MongoDB for inventory/rewards/orders/identity/Finder |
 | 13 Dynamo high-risk | NOT_STARTED | | | | | |
-| 14 Donation gate | NOT_STARTED | | | | | |
-| 15 Donation one-time | NOT_STARTED | | | | | |
-| 16 Donation recurring/portals | NOT_STARTED | | | | | |
-| 17 Donation release | NOT_STARTED | | | | | |
+| 14 Donation gate | **PROVEN** (architecture audit complete; no donate UI code) | `main` @ Phase 14 commit | docs/donations/ 00-05 + SETTINGS_CATALOG; Stripe test keys present in .env.local | NZ legal/tax BLOCKED_EXTERNAL | neutral receipts until donee confirmed | settings catalog defined; Phase 15 not started |
+| 15 Donation one-time | NOT_STARTED | | | | depends on Phase 14 + founder go | | |
+| 16 Donation recurring/portals | NOT_STARTED | | | | depends on Phase 15 | | |
+| 17 Donation release | NOT_STARTED | | | | depends on 15–16 + live rehearsal | | |
 | 18 Final reconciliation | NOT_STARTED | | | | | |
 
 ## Per-phase evidence record
@@ -376,6 +376,29 @@
 **Rollback:** `DYNAMODB_SETTINGS_READS=mongo`. Inventory/rewards never left Mongo.
 
 **Next phase:** Donation Track D / staging first-customer path — **STOP. Do not start Phase 14 or money cutover without founder authorization + staging payments proof.**
+
+### Phase 14 — Donation External Gate & Architecture Audit (complete)
+
+**Status:** **PROVEN** — architecture documentation complete. **No donation UI/payment implementation in this phase.**  
+**Started/Completed:** 2026-10-07  
+**Founder decisions:** Stripe test keys in `.env.local`; defaults OK; **all donation settings configurable**.
+
+**What was produced:**
+- `docs/donations/00-architecture-audit.md` — reusable vs gaps
+- `01-domain-model.md` — Donation/Payment/Receipt/identity
+- `02-payment-webhook-matrix.md` — flows + security
+- `03-receipt-rules.md` — neutral receipts until legal confirmed
+- `04-security-privacy.md` — abuse/privacy
+- `05-implementation-plan.md` — Phase 15–17 plan
+- `SETTINGS_CATALOG.md` — **all product values configurable** (no hardcode)
+
+**External gate:** NZ legal/tax items marked **BLOCKED_EXTERNAL**. No IRD tax-credit claims coded.
+
+**Stripe env observed (not printed secrets):** `PAYMENT_MODE=stripe_test`, Stripe secret + webhook secret + Resend key present in `packages/api/.env.local`.
+
+**Automated commands:** none required for pure docs phase.
+
+**Next phase:** Phase 15 donation one-time core — **STOP. Do not execute Phase 15 until founder says go.**
 
 ### Track A0 — Baseline Recovery (complete)
 

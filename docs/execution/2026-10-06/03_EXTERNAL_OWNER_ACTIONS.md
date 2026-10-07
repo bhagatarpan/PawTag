@@ -36,18 +36,19 @@ Before store release, obtain a current store-policy/product decision for Gold/di
 
 The coding agent must not invent these answers:
 
-- [ ] PawTag legal organisation name.
-- [ ] NZ IRD number to appear on receipt, if applicable.
-- [ ] Charities Services registration number/status, if applicable.
-- [ ] Approved-donee status: NOT_ENABLED / PENDING_APPROVAL / APPROVED_DONEE / SUSPENDED.
-- [ ] Accountant/tax adviser confirms donation vs sponsorship classification.
-- [ ] Accountant confirms GST/accounting treatment.
-- [ ] Legal/accounting review confirms tax-credit wording.
-- [ ] Legal/accounting review confirms receipt fields/signatory requirements.
-- [ ] Refund policy and effect on donation receipts/tax claims reviewed.
-- [ ] Data retention period for donation financial records approved.
+- [ ] PawTag legal organisation name. — **BLOCKED_EXTERNAL** (engineering uses config default `PawTag` until you set the legal name)
+- [ ] NZ IRD number to appear on receipt, if applicable. — **BLOCKED_EXTERNAL**
+- [ ] Charities Services registration number/status, if applicable. — **BLOCKED_EXTERNAL**
+- [ ] Approved-donee status: NOT_ENABLED / PENDING_APPROVAL / APPROVED_DONEE / SUSPENDED. — **BLOCKED_EXTERNAL**
+- [ ] Accountant/tax adviser confirms donation vs sponsorship classification. — **BLOCKED_EXTERNAL**
+- [ ] Accountant confirms GST/accounting treatment. — **BLOCKED_EXTERNAL**
+- [ ] Legal/accounting review confirms tax-credit wording. — **BLOCKED_EXTERNAL**
+- [ ] Legal/accounting review confirms receipt fields/signatory requirements. — **BLOCKED_EXTERNAL**
+- [ ] Refund policy and effect on donation receipts/tax claims reviewed. — **BLOCKED_EXTERNAL**
+- [ ] Data retention period for donation financial records approved. — **BLOCKED_EXTERNAL**
 
-Until confirmed, the product must not promise an IRD donation tax credit.
+Until confirmed, the product must not promise an IRD donation tax credit.  
+Phase 14 architecture allows **neutral** configurable receipt wording only.
 
 ## D. Production provider access
 
