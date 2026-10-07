@@ -24,7 +24,7 @@
 | 09 Capacitor bridges | **CODED_NOT_RUNTIME_VALIDATED** | `main` @ Phases 05–09 commit | capacitor.config.ts + native bridge code (dynamic import); finder deep-link exclusion coded | no iOS/Android SDK/device build this session | Phase 10 device/store gate required | CODED_NOT_RUNTIME_VALIDATED until physical devices |
 | 10 Store/device gate | NOT_STARTED | | | | physical device evidence absent | checklist is `NOT_STARTED` |
 | 11 Dynamo discovery | **PROVEN** (discovery docs complete; no code migration) | `main` @ Phase 11 commit | docs/dynamodb-migration/ 00-07 + FOUNDER_SUMMARY written; models inventoried (73); access patterns mapped | none required for discovery | Phase 12 needs IAM + DynamoDB Local | discovery pack only; MongoDB remains production for first web customer |
-| 12 Dynamo low-risk | NOT_STARTED | | | | depends on Phase 11 + founder auth + AWS non-prod | do not start automatically |
+| 12 Dynamo low-risk | **CODED_NOT_RUNTIME_VALIDATED** (Settings boundary + tools coded; live AWS migrate not run) | `main` @ Phase 12 commit | Dynamo client + Setting repo (Mongo/Dynamo adapters) + migrate/table tools + unit tests PASS; typecheck/unit/smoke/build PASS | live DynamoDB Local/AWS create+migrate not executed this session | founder: run create-table/migrate/compare with IAM keys | Settings-only; DYNAMODB_SETTINGS_READS defaults mongo; no money cutover |
 | 13 Dynamo high-risk | NOT_STARTED | | | | | |
 | 14 Donation gate | NOT_STARTED | | | | | |
 | 15 Donation one-time | NOT_STARTED | | | | | |
@@ -287,6 +287,56 @@
 **Remaining risks:** all listed in `06-risk-register.md` — require Phase 12–13 implementation + staging.
 
 **Next phase:** Phase 12 DynamoDB low-risk — **STOP. Do not execute Phase 12 until founder authorizes + AWS non-prod IAM keys exist.**
+
+### Phase 12 — DynamoDB Boundary, Infra, Settings Migration Tools (complete for coded evidence)
+
+**Status:** `CODED_NOT_RUNTIME_VALIDATED` — repository pattern + migration tools implemented and unit-tested. **Live AWS/DynamoDB Local create+migrate+compare not executed this session.**  
+**Started/Completed:** 2026-10-06  
+**Founder auth:** IAM keys in `packages/api/.env.local` (gitignored); region `ap-southeast-2`; Settings-first.
+
+**What changed (no product behavior change; Mongo remains default source of truth):**
+1. **DynamoDB client factory** — `packages/db/src/dynamodb/client.ts` (server-only; endpoint/prefix from env)
+2. **Setting repository** — contract + Mongo adapter + DynamoDB adapter (`SETTING#{key}` PK/SK)
+3. **Read mode switch** — `DYNAMODB_SETTINGS_READS=mongo|dynamodb|dual` (default **mongo**)
+4. **Migration tool** — `migrate-settings.ts` dry-run / migrate / compare + checkpoint
+5. **Table tool** — `create-settings-table.ts` idempotent CreateTable
+6. **Docker** — `dynamodb-local` service on port 8000
+7. **Env example** — documented AWS/Dynamo vars (secrets stay in `.env.local`)
+8. **commerce config** — `getSetting` uses repository when mode ≠ mongo; write dual-ups when enabled
+
+**Files changed (material):**
+- `packages/db/src/dynamodb/*`, `packages/db/src/repositories/*`
+- `packages/db/src/index.ts`, `packages/db/package.json` (AWS SDK)
+- `packages/api/src/commerce/config.ts`
+- `packages/api/src/dynamodb/*` (tools)
+- `packages/api/.env.example`, `packages/api/package.json`
+- `docker/docker-compose.yml`
+- Tests: `tests/unit/dynamodb-settings-*.test.ts`
+- `verification/DYNAMODB_MIGRATION_MATRIX.md`
+
+**Automated commands actually run:**
+
+| Command | Result |
+|---|---|
+| `pnpm --filter @pawtag/db typecheck` | **PASS** |
+| `pnpm --filter @pawtag/api typecheck` | **PASS** |
+| `pnpm typecheck` | **PASS** |
+| `pnpm test:unit` | **PASS** (includes DynamoDB settings tests) |
+| `pnpm test:smoke` | **PASS** |
+| `pnpm build` | **PASS** |
+
+**Manual/provider validation:** none (no live DynamoDB table create/migrate against AWS this session).
+
+**Remaining risks / founder actions for live proof:**
+1. Start DynamoDB Local **or** use real AWS with IAM keys  
+2. Run `create-settings-table.ts`  
+3. Run `migrate-settings.ts --dry-run` then migrate then `--compare`  
+4. Only after compare clean: set `DYNAMODB_SETTINGS_READS=dynamodb` on non-prod  
+5. Tighten IAM before production  
+
+**Rollback:** `DYNAMODB_SETTINGS_READS=mongo` (default). Mongo remains write path.
+
+**Next phase:** Phase 13 DynamoDB high-risk cutover — **STOP. Do not execute Phase 13 until founder authorizes after Settings live proof + staging payments.**
 
 ### Track A0 — Baseline Recovery (complete)
 

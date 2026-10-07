@@ -10,6 +10,8 @@
     "lint": "eslint src --ext .ts"
   },
   "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.1146.0",
+    "@aws-sdk/lib-dynamodb": "^3.1146.0",
     "@pawtag/shared": "workspace:*",
     "@types/uuid": "^11.0.0",
     "mongoose": "^7.0.3",

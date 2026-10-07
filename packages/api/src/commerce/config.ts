@@ -16,7 +16,7 @@
  * ```
  */
 
-import { Setting } from '@pawtag/db';
+import { Setting, getSettingsRepository, resolveSettingsReadMode } from '@pawtag/db';
 import logger from '../lib/logger';
 
 /** Cache entry with TTL */
@@ -159,8 +159,18 @@ export async function getSetting(key: CommerceSettingKey): Promise<string> {
   }
 
   try {
-    const setting = await Setting.findOne({ key }).lean();
-    const value = setting?.value ?? COMMERCE_SETTINGS[key].default;
+    // Phase 12: repository-backed reads. Default remains MongoDB.
+    // DYNAMODB_SETTINGS_READS=dynamodb|dual switches after migration tooling runs.
+    let value: string;
+    const mode = resolveSettingsReadMode();
+    if (mode === 'mongo') {
+      const setting = await Setting.findOne({ key }).lean();
+      value = setting?.value ?? COMMERCE_SETTINGS[key].default;
+    } else {
+      const repo = getSettingsRepository();
+      const setting = await repo.getByKey(key);
+      value = setting?.value ?? COMMERCE_SETTINGS[key].default;
+    }
 
     // Cache the value
     cache.set(key, {
@@ -214,11 +224,28 @@ export async function updateSetting(
   value: string,
   actor: string,
 ): Promise<void> {
+  // Mongo remains authoritative write path for admin routes still using Mongoose.
+  // DynamoDB upsert happens when DYNAMODB_SETTINGS_READS is dual/dynamodb.
   await Setting.findOneAndUpdate(
     { key },
     { key, value, updatedAt: new Date() },
     { upsert: true },
   );
+
+  const mode = resolveSettingsReadMode();
+  if (mode !== 'mongo') {
+    try {
+      const { getSettingsRepository } = await import('@pawtag/db');
+      await getSettingsRepository().upsert({
+        key,
+        value,
+        category: (COMMERCE_SETTINGS[key] as any)?.category || 'commerce',
+        description: (COMMERCE_SETTINGS[key] as any)?.description,
+      });
+    } catch (err) {
+      logger.warn({ err, key }, 'DynamoDB settings upsert failed (Mongo remains source of truth)');
+    }
+  }
 
   // Invalidate cache
   cache.delete(key);

@@ -1,4 +1,15 @@
 services:
+  # DynamoDB Local for Phase 12+ development/tests (not used in production)
+  dynamodb-local:
+    image: amazon/dynamodb-local:latest
+    container_name: pawtag-dynamodb-local
+    command: "-jar DynamoDBLocal.jar -sharedDb -dbPath ./data"
+    working_dir: /home/dynamodblocal/data
+    ports:
+      - "8000:8000"
+    volumes:
+      - dynamodb-data:/home/dynamodblocal/data
+
   api:
     build:
       context: ..
@@ -63,3 +74,6 @@ services:
     depends_on:
       - api
     restart: unless-stopped
+
+volumes:
+  dynamodb-data:

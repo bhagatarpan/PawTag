@@ -1,5 +1,25 @@
 export { connectDatabase, disconnectDatabase, mongoose } from './connection';
 
+// DynamoDB discovery/migration (Phase 12) — server-only
+export {
+  getDynamoDocumentClient,
+  getSettingsTableName,
+  getDynamoTablePrefix,
+  isDynamoConfigured,
+  resetDynamoClientCache,
+  setDynamoDocumentClientForTests,
+} from './dynamodb/client';
+export { MongoSettingRepository } from './dynamodb/mongo-setting.repository';
+export { DynamoSettingRepository } from './dynamodb/dynamo-setting.repository';
+export {
+  getSettingsRepository,
+  createSettingsRepository,
+  resolveSettingsReadMode,
+  resetSettingsRepositoryCache,
+} from './repositories/settings-repository';
+export type { SettingRecord, SettingRepository } from './repositories/setting';
+export { normalizeSetting, toDynamoSettingItem, fromDynamoSettingItem } from './repositories/setting';
+
 export { User, type IUserDocument } from './models/User';
 export { Pet, type IPetDocument, generatePetId } from './models/Pet';
 export { Tag, type ITagDocument } from './models/Tag';
