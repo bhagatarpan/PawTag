@@ -23,8 +23,8 @@
 | 08 Shared mobile web | **CODED_NOT_RUNTIME_VALIDATED** | `main` @ Phases 05–09 commit | platform capability abstraction + browser fallback unit tests PASS | no device/browser visual matrix this session | app-mode chrome partial | `apps/web/src/platform/*` |
 | 09 Capacitor bridges | **CODED_NOT_RUNTIME_VALIDATED** | `main` @ Phases 05–09 commit | capacitor.config.ts + native bridge code (dynamic import); finder deep-link exclusion coded | no iOS/Android SDK/device build this session | Phase 10 device/store gate required | CODED_NOT_RUNTIME_VALIDATED until physical devices |
 | 10 Store/device gate | NOT_STARTED | | | | physical device evidence absent | checklist is `NOT_STARTED` |
-| 11 Dynamo discovery | NOT_STARTED | | | | | |
-| 12 Dynamo low-risk | NOT_STARTED | | | | | |
+| 11 Dynamo discovery | **PROVEN** (discovery docs complete; no code migration) | `main` @ Phase 11 commit | docs/dynamodb-migration/ 00-07 + FOUNDER_SUMMARY written; models inventoried (73); access patterns mapped | none required for discovery | Phase 12 needs IAM + DynamoDB Local | discovery pack only; MongoDB remains production for first web customer |
+| 12 Dynamo low-risk | NOT_STARTED | | | | depends on Phase 11 + founder auth + AWS non-prod | do not start automatically |
 | 13 Dynamo high-risk | NOT_STARTED | | | | | |
 | 14 Donation gate | NOT_STARTED | | | | | |
 | 15 Donation one-time | NOT_STARTED | | | | | |
@@ -252,6 +252,41 @@
 **Manual/provider/device validation:** none this batch (no live Stripe/Resend/Firebase/staging/iOS/Android).
 
 **Next phase:** Phase 10 store/device gate — **STOP. Do not execute Phase 10 until founder authorizes.**
+
+### Phase 11 — DynamoDB Discovery Only (complete)
+
+**Status:** **PROVEN** — discovery documentation complete. **No application code changed. No data migrated.**  
+**Started/Completed:** 2026-10-06  
+**Founder decision:** Option A — website first on MongoDB; AWS region `ap-southeast-2`; DynamoDB cutovers after staging.
+
+**What was produced:**
+
+| File | Content |
+|---|---|
+| `docs/dynamodb-migration/00-inventory.md` | 73 Mongoose models + critical patterns |
+| `01-access-patterns.md` | Operation-level access map |
+| `02-entity-map.md` | Domain grouping + draft tables |
+| `03-transaction-map.md` | Atomic/conditional operations |
+| `04-index-design.md` | PK/SK/GSI draft |
+| `05-migration-plan.md` | Wave order (CMS first, money last) |
+| `06-risk-register.md` | Risks + mitigations |
+| `07-local-and-aws-environments.md` | DynamoDB Local + AWS ap-southeast-2 |
+| `FOUNDER_SUMMARY.md` | Plain-English summary |
+
+**Discovery findings (summary):**
+- ~73 models; heavy unique keys (email, tagId, orderNumber, invoiceNumber, Stripe IDs)
+- Critical atomic ops: inventory reserve/confirm, rewards hold, promo usage, webhook idempotency, counters
+- Production money safety uses conditional updates + state machines (not many Mongo transactions)
+- Frontends are already database-agnostic (HTTP APIs only)
+
+**Automated commands:** none required for pure docs phase (no code change).  
+**Application tests:** unchanged; last full green gates remain Phase 04–09 session.
+
+**Manual/provider validation:** none (discovery only).
+
+**Remaining risks:** all listed in `06-risk-register.md` — require Phase 12–13 implementation + staging.
+
+**Next phase:** Phase 12 DynamoDB low-risk — **STOP. Do not execute Phase 12 until founder authorizes + AWS non-prod IAM keys exist.**
 
 ### Track A0 — Baseline Recovery (complete)
 
