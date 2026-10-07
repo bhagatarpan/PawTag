@@ -25,7 +25,7 @@ export default function EmergencyLostPet() {
   const urls = getBaseUrl();
 
   return (
-    <div className="fixed bottom-6 right-6 z-50">
+    <div className="fixed bottom-6 right-6 z-40">
       {isOpen && (
         <div className="mb-3 bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden w-72 animate-slide-up">
           <div className="bg-gradient-to-r from-red-500 to-orange-500 px-4 py-3 flex items-center justify-between">

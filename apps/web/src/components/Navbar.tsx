@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, memo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, ShoppingCart, PawPrint, User, LogOut, ChevronDown, Shield, Crown } from 'lucide-react';
+import { Menu, X, ShoppingCart, PawPrint, User, LogOut, ChevronDown, Shield, Crown, Heart } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useNavigation } from '../hooks/useCms';
@@ -159,7 +159,20 @@ export default function Navbar() {
                   </span>
                 )}
               </Link>
-              {/* Membership Dropdown */}
+              {/* Donate — quieter CTA, left of Membership (primary) */}
+              <Link
+                to="/donate"
+                className={`px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 border ${
+                  isActive('/donate')
+                    ? 'border-primary-200 bg-primary-50 text-primary-700'
+                    : 'border-transparent text-primary-600/90 hover:text-primary-700 hover:bg-primary-50/70 hover:border-primary-100'
+                }`}
+                aria-label="Donate to PawTag"
+              >
+                <Heart className="h-4 w-4" />
+                <span>Donate</span>
+              </Link>
+              {/* Membership Dropdown — remains the primary CTA */}
               <MembershipDropdown />
             </div>
 
@@ -282,6 +295,22 @@ export default function Navbar() {
                     {guardianData.points || 0} pts
                   </span>
                 )}
+              </Link>
+              <Link
+                to="/donate"
+                onClick={() => setMobileOpen(false)}
+                className="flex items-center gap-2 px-4 py-3 rounded-lg font-medium text-primary-600/90 hover:bg-primary-50 transition-all"
+              >
+                <Heart className="h-4 w-4" />
+                Donate
+              </Link>
+              <Link
+                to="/membership"
+                onClick={() => setMobileOpen(false)}
+                className="flex items-center gap-2 px-4 py-3 rounded-lg font-bold text-sm bg-gradient-to-r from-yellow-500 via-amber-500 to-orange-500 text-white shadow-md"
+              >
+                <Crown className="h-4 w-4" />
+                Membership
               </Link>
               {!user && (
                 <div className="mt-4 space-y-2">

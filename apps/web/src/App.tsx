@@ -50,9 +50,9 @@ import GuardianRewards from './pages/account/GuardianRewards';
 import SubscriptionUpgrade from './pages/account/SubscriptionUpgrade';
 import MembershipManage from './pages/account/MembershipManage';
 import MembershipSubscribe from './pages/account/MembershipSubscribe';
-// OLD Gold imports removed — using new membership system
-import FloatingLoyaltyBadge from './components/FloatingLoyaltyBadge';
-import FloatingMembershipBadge from './components/FloatingMembershipBadge';
+// Floating membership/loyalty badges removed from public layout (Phase UX fix):
+// they stacked on EmergencyLostPet in the bottom-right corner. Membership and
+// Guardian remain primary header CTAs.
 import GuardianLanding from './pages/GuardianLanding';
 import Membership from './pages/Membership';
 import AnnouncementBar from './components/AnnouncementBar';
@@ -71,8 +71,6 @@ function PublicLayout({ children, showEmergency = true }: { children: ReactNode;
       <main className="flex-1">{children}</main>
       <Footer />
       {showEmergency && <EmergencyLostPet />}
-      <FloatingLoyaltyBadge />
-      <FloatingMembershipBadge />
     </div>
   );
 }
