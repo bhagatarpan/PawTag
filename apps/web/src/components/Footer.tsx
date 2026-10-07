@@ -39,7 +39,23 @@ export default function Footer() {
     },
   ];
 
-  const displayGroups = footerLoading || !footer?.groups?.length ? fallbackGroups : footer.groups;
+  const displayGroups = (() => {
+    const base = footerLoading || !footer?.groups?.length ? fallbackGroups : footer.groups;
+    if (!donatePublic) return base;
+    // Always inject Donate when publicEnabled=true — even if CMS footer groups exist
+    return base.map((group, idx) => {
+      if (idx !== 0) return group;
+      const hasDonate = group.links?.some((l: any) => l.url === '/donate' || l.link === '/donate');
+      if (hasDonate) return group;
+      return {
+        ...group,
+        links: [
+          ...(group.links || []),
+          { label: 'Donate', url: '/donate', type: 'custom' as const },
+        ],
+      };
+    });
+  })();
   const brandDescription = footer?.brandDescription || 'Smart QR-coded pet recovery tags. Because every pet deserves a safe way home.';
   const companyName = settings?.['company.name'] || 'PawTag';
   const contactEmail = settings?.['company.email'] || 'support@pawtag.co.nz';

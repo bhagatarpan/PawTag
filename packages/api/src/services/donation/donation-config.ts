@@ -123,9 +123,10 @@ export async function isDonationModuleEnabled(): Promise<boolean> {
 export async function seedDonationSettingsIfMissing(): Promise<void> {
   try {
     for (const [key, value] of Object.entries(DONATION_SETTING_DEFAULTS)) {
+      // Setting.value is required — skip empty strings; missing keys fall back to defaults on read
+      if (!value) continue;
       const existing = await Setting.findOne({ key }).lean();
       if (!existing) {
-        // updatedBy required — use a placeholder system id pattern if User missing
         const anyUser = await mongooseUserFallback();
         await Setting.create({
           key,
