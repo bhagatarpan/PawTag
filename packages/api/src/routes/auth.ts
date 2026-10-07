@@ -648,6 +648,10 @@ if (user.status === 'inactive') {
           role: user.role,
           status: user.status,
           rbacRoles,
+          // Verification flags are required by account route gates immediately after
+          // login. Omitting them made fully verified users bounce to /verify-account.
+          emailVerified: user.emailVerified === true,
+          phoneVerified: user.phoneVerified === true,
           onboardingCompleted: user.onboardingCompleted,
           onboardingSkipped: user.onboardingSkipped,
         },
@@ -1928,6 +1932,11 @@ router.post('/mfa/verify', mfaVerifyLimiter, async (req: AuthRequest, res: Respo
           role: user.role,
           status: user.status,
           rbacRoles,
+          // Same post-auth contract as password login — client route gates need these.
+          emailVerified: user.emailVerified === true,
+          phoneVerified: user.phoneVerified === true,
+          onboardingCompleted: user.onboardingCompleted,
+          onboardingSkipped: user.onboardingSkipped,
         },
       },
     });

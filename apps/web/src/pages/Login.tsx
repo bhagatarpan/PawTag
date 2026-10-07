@@ -27,7 +27,7 @@ export default function Login() {
   const [mfaLoading, setMfaLoading] = useState(false);
   const [mfaSuccess, setMfaSuccess] = useState(false);
 
-  const { login } = useAuth();
+  const { login, completeLogin } = useAuth();
   const navigate = useNavigate();
   const { page: authPage } = useAuthPage('login');
   const { settings } = useSiteSettings();
@@ -124,9 +124,10 @@ export default function Login() {
         rememberMe,
       });
       const { token: newToken, user: userData } = res.data.data;
-      localStorage.setItem('pawtag_token', newToken);
-      // Browser security: refresh token is HttpOnly cookie only — never localStorage
-      localStorage.removeItem('pawtag_refresh_token');
+
+      // Hydrate AuthContext from /auth/me so verification/onboarding gates
+      // do not run on a partial user object after MFA login.
+      await completeLogin(newToken, userData);
 
       // Show success animation
       setMfaSuccess(true);

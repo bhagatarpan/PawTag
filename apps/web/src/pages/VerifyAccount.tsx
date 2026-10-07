@@ -100,6 +100,18 @@ export default function VerifyAccount() {
     }
   }, [searchParams, setSearchParams]);
 
+  // Fully verified authenticated users should not remain stuck here
+  // (e.g. post-login redirect race). Registration still needs the CTA
+  // until channels are verified — then continue runs gold/onboarding steps.
+  const userChannelsVerified = authUser?.emailVerified === true && authUser?.phoneVerified === true;
+  const statusChannelsVerified = status?.emailVerified === true && status?.phoneVerified === true;
+  useEffect(() => {
+    if (!authUser || !status) return;
+    if (!userChannelsVerified || !statusChannelsVerified) return;
+    void handleContinue();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authUser, status, userChannelsVerified, statusChannelsVerified]);
+
   useEffect(() => {
     if (cooldown <= 0) return;
     const timer = setInterval(() => {

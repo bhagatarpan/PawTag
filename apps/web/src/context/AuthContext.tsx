@@ -9,6 +9,8 @@ interface AuthContextType {
   login: (email: string, password: string, captchaToken?: string, captchaAnswer?: string, rememberMe?: boolean) => Promise<any>;
   logout: () => void;
   refreshUser: () => Promise<void>;
+  /** Persist an access token and hydrate the full user from /auth/me. */
+  completeLogin: (accessToken: string, partialUser?: User | null) => Promise<void>;
   isLoading: boolean;
 }
 
@@ -19,6 +21,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(localStorage.getItem('pawtag_token'));
   const [isLoading, setIsLoading] = useState(true);
 
+  const hydrateUser = useCallback(async (partialUser?: User | null) => {
+    // Account gates (verification/onboarding) must see the full /auth/me user.
+    // Login payloads alone can omit flags and cause false /verify-account redirects.
+    try {
+      const res = await api.get(API.auth.me);
+      setUser(res.data.data);
+    } catch {
+      setUser(partialUser ?? null);
+    }
+  }, []);
+
   useEffect(() => {
     if (token) {
       api.get(API.auth.me)
@@ -28,12 +41,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // Refresh token is HttpOnly cookie only — clear any legacy localStorage copy
           localStorage.removeItem('pawtag_refresh_token');
           setToken(null);
+          setUser(null);
         })
         .finally(() => setIsLoading(false));
     } else {
       setIsLoading(false);
     }
   }, [token]);
+
+  const completeLogin = useCallback(async (accessToken: string, partialUser?: User | null) => {
+    localStorage.setItem('pawtag_token', accessToken);
+    // Browser security: never persist refresh tokens in localStorage.
+    // The API sets an HttpOnly refresh cookie on login; api client refreshes via cookie.
+    localStorage.removeItem('pawtag_refresh_token');
+    setToken(accessToken);
+    setIsLoading(true);
+    try {
+      await hydrateUser(partialUser);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [hydrateUser]);
 
   const login = useCallback(async (email: string, password: string, captchaToken?: string, captchaAnswer?: string, rememberMe?: boolean): Promise<any> => {
     const payload: any = { email, password };
@@ -59,14 +87,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const { token: newToken, user: userData } = data.data;
-    localStorage.setItem('pawtag_token', newToken);
-    // Browser security: never persist refresh tokens in localStorage.
-    // The API sets an HttpOnly refresh cookie on login; api client refreshes via cookie.
-    localStorage.removeItem('pawtag_refresh_token');
-    setToken(newToken);
-    setUser(userData);
+    // Await full /auth/me hydration before login resolves so route guards
+    // never evaluate incomplete verification flags mid-redirect.
+    await completeLogin(newToken, userData);
     return userData;
-  }, []);
+  }, [completeLogin]);
 
   const logout = useCallback(() => {
     localStorage.removeItem('pawtag_token');
@@ -87,8 +112,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Memoize context value — prevents cascade re-renders to CartProvider and below
   const value = useMemo(() => ({
-    user, token, login, logout, refreshUser, isLoading,
-  }), [user, token, isLoading, login, logout, refreshUser]);
+    user, token, login, logout, refreshUser, completeLogin, isLoading,
+  }), [user, token, isLoading, login, logout, refreshUser, completeLogin]);
 
   return (
     <AuthContext.Provider value={value}>

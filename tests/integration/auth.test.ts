@@ -133,6 +133,18 @@ describe('Integration: Auth - Login', () => {
     expect(res.body.data.user.email).toBe('login@example.com');
   });
 
+  it('POST /api/auth/login returns verification flags for route gates', async () => {
+    const res = await request(app)
+      .post('/api/auth/login')
+      .send({ email: 'login@example.com', password: 'Password123!' });
+
+    expect(res.status).toBe(200);
+    // AccountLayout redirects to /verify-account unless these are true.
+    // Missing flags caused fully verified users to land on /verify-account.
+    expect(res.body.data.user.emailVerified).toBe(true);
+    expect(res.body.data.user.phoneVerified).toBe(true);
+  });
+
   it('POST /api/auth/login returns 401 for wrong password', async () => {
     const res = await request(app)
       .post('/api/auth/login')

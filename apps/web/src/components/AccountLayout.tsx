@@ -88,8 +88,15 @@ export default function AccountLayout({ children }: { children: ReactNode }) {
   // Show onboarding wizard for users who haven't completed or dismissed it.
   // Onboarding is only available after both email and phone are verified.
   // Unverified users are sent to /verify-account instead of the wizard.
+  //
+  // Redirect only when verification is known to be incomplete (explicit false).
+  // Missing/undefined flags mean the client user object is still partial — do not
+  // treat that as unverified, or verified users get bounced after login.
   const userLoaded = !isLoading && !!user;
-  const channelsVerified = userLoaded && user.emailVerified === true && user.phoneVerified === true;
+  const needsVerification =
+    userLoaded && (user.emailVerified === false || user.phoneVerified === false);
+  const channelsVerified =
+    userLoaded && user.emailVerified === true && user.phoneVerified === true;
   const shouldShowWizard =
     channelsVerified &&
     user.onboardingCompleted !== true &&
@@ -103,7 +110,7 @@ export default function AccountLayout({ children }: { children: ReactNode }) {
     );
   }
 
-  if (userLoaded && !channelsVerified) {
+  if (needsVerification) {
     return <Navigate to="/verify-account" replace />;
   }
 
