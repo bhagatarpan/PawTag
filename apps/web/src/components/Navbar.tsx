@@ -9,6 +9,7 @@ import { useCartInteraction } from '../context/CartInteractionContext';
 import CartToast from './CartToast';
 import MembershipDropdown from './MembershipDropdown';
 import api from '../lib/api';
+import { API } from '@pawtag/shared/api';
 
 interface GuardianData {
   points: number;
@@ -57,11 +58,19 @@ export default function Navbar() {
    const [cartOpen, setCartOpen] = useState(false);
    const [guardianData, setGuardianData] = useState<GuardianData | null>(null);
    const [guardianLoading, setGuardianLoading] = useState(false);
+   const [donatePublic, setDonatePublic] = useState(false);
    const location = useLocation();
    const navigate = useNavigate();
    const { items, total, removeItem, updateQuantity, clearCart, toggleAutoRenew, isGuest, priceChanged } = useCart();
    const { user, logout } = useAuth();
    const { menus, loading } = useNavigation('header');
+
+   // Header Donate only when donation.publicEnabled=true (admin setting)
+   useEffect(() => {
+     api.get(API.donations.settings)
+       .then((res) => setDonatePublic(!!res.data?.data?.publicEnabled))
+       .catch(() => setDonatePublic(false));
+   }, []);
 
    // Fetch Guardian data when user logs in or user changes
    useEffect(() => {
@@ -159,19 +168,21 @@ export default function Navbar() {
                   </span>
                 )}
               </Link>
-              {/* Donate — quieter CTA, left of Membership (primary) */}
-              <Link
-                to="/donate"
-                className={`px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 border ${
-                  isActive('/donate')
-                    ? 'border-primary-200 bg-primary-50 text-primary-700'
-                    : 'border-transparent text-primary-600/90 hover:text-primary-700 hover:bg-primary-50/70 hover:border-primary-100'
-                }`}
-                aria-label="Donate to PawTag"
-              >
-                <Heart className="h-4 w-4" />
-                <span>Donate</span>
-              </Link>
+              {/* Donate — only when donation.publicEnabled=true; quieter than Membership */}
+              {donatePublic && (
+                <Link
+                  to="/donate"
+                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 border ${
+                    isActive('/donate')
+                      ? 'border-primary-200 bg-primary-50 text-primary-700'
+                      : 'border-transparent text-primary-600/90 hover:text-primary-700 hover:bg-primary-50/70 hover:border-primary-100'
+                  }`}
+                  aria-label="Donate to PawTag"
+                >
+                  <Heart className="h-4 w-4" />
+                  <span>Donate</span>
+                </Link>
+              )}
               {/* Membership Dropdown — remains the primary CTA */}
               <MembershipDropdown />
             </div>
@@ -296,14 +307,16 @@ export default function Navbar() {
                   </span>
                 )}
               </Link>
-              <Link
-                to="/donate"
-                onClick={() => setMobileOpen(false)}
-                className="flex items-center gap-2 px-4 py-3 rounded-lg font-medium text-primary-600/90 hover:bg-primary-50 transition-all"
-              >
-                <Heart className="h-4 w-4" />
-                Donate
-              </Link>
+              {donatePublic && (
+                <Link
+                  to="/donate"
+                  onClick={() => setMobileOpen(false)}
+                  className="flex items-center gap-2 px-4 py-3 rounded-lg font-medium text-primary-600/90 hover:bg-primary-50 transition-all"
+                >
+                  <Heart className="h-4 w-4" />
+                  Donate
+                </Link>
+              )}
               <Link
                 to="/membership"
                 onClick={() => setMobileOpen(false)}
