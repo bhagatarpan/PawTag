@@ -28,7 +28,7 @@
 | 13 Dynamo high-risk | **CODED_NOT_RUNTIME_VALIDATED** (conditional adapters + tests; **no cutover**) | `main` @ Phase 13 commit | Dynamo inventory + rewards services + failure-injection unit tests PASS | no live inventory/rewards on DynamoDB | staging payments still required before any money cutover | production remains MongoDB for inventory/rewards/orders/identity/Finder |
 | 13 Dynamo high-risk | NOT_STARTED | | | | | |
 | 14 Donation gate | **PROVEN** (architecture audit complete; no donate UI code) | `main` @ Phase 14 commit | docs/donations/ 00-05 + SETTINGS_CATALOG; Stripe test keys present in .env.local | NZ legal/tax BLOCKED_EXTERNAL | neutral receipts until donee confirmed | settings catalog defined; Phase 15 not started |
-| 15 Donation one-time | NOT_STARTED | | | | depends on Phase 14 + founder go | | |
+| 15 Donation one-time | **CODED_NOT_RUNTIME_VALIDATED** (one-time donate coded + tests; live Stripe webhook not run) | `main` @ Phase 15 commit | donation models/routes/service/webhook/receipt neutral + /donate page; donation integration tests PASS (9); typecheck/unit/build PASS | no live Stripe PI + webhook this session | public flag default false; Phase 16 not started | settings all configurable; no tax-credit claims |
 | 16 Donation recurring/portals | NOT_STARTED | | | | depends on Phase 15 | | |
 | 17 Donation release | NOT_STARTED | | | | depends on 15–16 + live rehearsal | | |
 | 18 Final reconciliation | NOT_STARTED | | | | | |
@@ -399,6 +399,42 @@
 **Automated commands:** none required for pure docs phase.
 
 **Next phase:** Phase 15 donation one-time core — **STOP. Do not execute Phase 15 until founder says go.**
+
+### Phase 15 — Donation Core One-Time (complete for coded evidence)
+
+**Status:** `CODED_NOT_RUNTIME_VALIDATED` — one-time donate implemented + automated tests green; **live Stripe webhook not run** this session.  
+**Started/Completed:** 2026-10-07  
+**Scope:** NZD one-time only; monthly deferred to Phase 16; **all product values configurable**; neutral receipts.
+
+**What was built:**
+1. Models: `Donation`, `DonationPayment`, `DonationReceipt`
+2. Shared types/endpoints: `packages/shared/src/donation.ts`, `API.donations.*`
+3. Settings catalog implemented (`donation-config.ts`) — no hardcoded UI amounts
+4. Service: create idempotent one-time donation + PI; webhook success → receipt + email
+5. Routes: `GET /api/donations/settings`, `POST /api/donations`, `GET /api/donations/:id`
+6. Stripe webhook: donation metadata branch for PI succeeded/failed
+7. Public `/donate` page (configurable copy/amounts)
+8. Seed script `seed-donations.ts`
+9. Tests: `tests/integration/donation-one-time.test.ts` — **9 passed**
+
+**Receipt rule:** `taxClassification=neutral`; statement has **no IRD/tax-credit claims**.
+
+**Automated commands:**
+
+| Command | Result |
+|---|---|
+| typecheck (db/api/web) | **PASS** |
+| donation integration tests | **PASS** — 9 |
+| unit / smoke / build | **PASS** |
+
+**Manual/provider validation:** none (no live Stripe PI confirm + webhook this session).
+
+**Remaining risks:**
+- Stripe Elements full card UI not mounted in `/donate` (creates PI; payment confirm UI can be Phase 16 polish)
+- Public CTA should stay off until Phase 17 rehearsal (`donation.publicEnabled` default false)
+- Recurring/monthly not implemented yet
+
+**Next phase:** Phase 16 recurring + portals — **STOP. Do not execute Phase 16 until founder says go.**
 
 ### Track A0 — Baseline Recovery (complete)
 

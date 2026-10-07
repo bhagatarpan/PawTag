@@ -11,6 +11,7 @@ export * from './stripe';
 export * from './customer-invoices';
 export * from './payment-methods';
 export * from './checkout-quote';
+export * from './donation';
 
 // --- Enums & Constants ---
 

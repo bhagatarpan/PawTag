@@ -110,6 +110,7 @@ import adminStripeReportRoutes from './routes/admin-stripe-report';
 import adminBackgroundJobRoutes from './routes/admin-background-jobs';
 import stripeWebhookRoutes from './routes/stripe-webhooks';
 import resendWebhookRoutes from './routes/resend-webhooks';
+import donationRoutes from './routes/donations';
 import promoPublicRoutes from './routes/promo-public';
 import commercePublicRoutes from './routes/commerce-public';
 import pointsEstimateRoutes from './routes/points-estimate';
@@ -323,6 +324,7 @@ app.use('/api/admin/stripe', adminStripeReportRoutes);
 app.use('/api/public/promo', promoPublicRoutes);
 app.use('/api/public/commerce', commercePublicRoutes);
 app.use('/api/public/points', pointsEstimateRoutes);
+app.use('/api/donations', donationRoutes);
 
 // Resend webhooks for email delivery tracking — raw body for Svix signature verification
 app.use('/api/webhooks/resend', express.raw({ type: 'application/json' }), resendWebhookRoutes);

@@ -13,6 +13,7 @@ import Shop from './pages/Shop';
 import ProductDetail from './pages/ProductDetail';
 import Checkout from './pages/Checkout';
 import Cart from './pages/Cart';
+import Donate from './pages/Donate';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import VerifyAccount from './pages/VerifyAccount';
@@ -126,6 +127,7 @@ export default function App() {
         <Route path="/refer" element={<PublicLayout showEmergency={false}><Refer /></PublicLayout>} />
         <Route path="/guardian" element={<PublicLayout><GuardianLanding /></PublicLayout>} />
         <Route path="/membership" element={<PublicLayout><Membership /></PublicLayout>} />
+        <Route path="/donate" element={<PublicLayout showEmergency={false}><Donate /></PublicLayout>} />
 
         {/* Account routes */}
         <Route path="/account" element={<ProtectedRoute><AccountLayout><AccountDashboard /></AccountLayout></ProtectedRoute>} />

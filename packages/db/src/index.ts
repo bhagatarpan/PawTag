@@ -93,3 +93,6 @@ export { DigitalProduct, type IDigitalProductDocument } from './models/DigitalPr
 export { DigitalEntitlement, type IDigitalEntitlementDocument } from './models/DigitalEntitlement';
 export { MembershipBenefit, type IMembershipBenefitDocument } from './models/MembershipBenefit';
 export { MembershipTierBenefit, type IMembershipTierBenefitDocument } from './models/MembershipTierBenefit';
+export { Donation, type IDonationDocument, type DonationStatus, type DonationFrequency } from './models/Donation';
+export { DonationPayment, type IDonationPaymentDocument, type DonationPaymentStatus } from './models/DonationPayment';
+export { DonationReceipt, type IDonationReceiptDocument, type DonationReceiptStatus } from './models/DonationReceipt';

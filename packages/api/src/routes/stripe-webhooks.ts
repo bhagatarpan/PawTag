@@ -225,6 +225,19 @@ async function handlePaymentIntentSucceeded(paymentIntent: any): Promise<void> {
   const paymentIntentId = paymentIntent.id;
   if (!paymentIntentId) return;
 
+  // Donation domain (Phase 15) — metadata.donationId marks donation PIs
+  const meta = paymentIntent.metadata || {};
+  if (meta.domain === 'donation' || meta.donationId) {
+    try {
+      const { donationService } = await import('../services/donation/donation.service');
+      await donationService.handlePaymentIntentUpdate(paymentIntentId, 'succeeded');
+      logger.info({ paymentIntentId, donationId: meta.donationId }, 'Donation payment succeeded via webhook');
+    } catch (err) {
+      logger.error({ err, paymentIntentId }, 'Donation webhook handling failed');
+    }
+    return;
+  }
+
   // Check if order already exists for this payment intent
   const existingOrder = await Order.findOne({
     $or: [
@@ -260,6 +273,18 @@ async function handlePaymentIntentSucceeded(paymentIntent: any): Promise<void> {
 async function handlePaymentIntentFailed(paymentIntent: any): Promise<void> {
   const paymentIntentId = paymentIntent.id;
   if (!paymentIntentId) return;
+
+  // Donation domain failures
+  const meta = paymentIntent.metadata || {};
+  if (meta.domain === 'donation' || meta.donationId) {
+    try {
+      const { donationService } = await import('../services/donation/donation.service');
+      await donationService.handlePaymentIntentUpdate(paymentIntentId, 'failed');
+    } catch (err) {
+      logger.error({ err, paymentIntentId }, 'Donation payment failed handling error');
+    }
+    return;
+  }
 
   const order = await Order.findOne({ 'payment.stripePaymentIntentId': paymentIntentId });
   if (!order) return;
