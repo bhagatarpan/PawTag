@@ -64,6 +64,15 @@ If the menu is missing: the logged-in admin does not have `donation.read` yet.
 
 ---
 
+## Payment confirm + webhook (one endpoint)
+
+Donations complete like shop/membership:
+
+1. Card success in `/donate` → `POST /api/donations/:id/confirm` (server checks Stripe)
+2. Stripe webhook remains backup: `/api/webhooks/stripe` (same as shop)
+
+**No second webhook.** See `STRIPE_WEBHOOK_SETUP.md` for CLI/dashboard steps.
+
 ## Verified in DB (this session)
 
 ```text
@@ -73,3 +82,4 @@ donation.suggestedAmounts: 5,10,20,50
 donation.receipt.organisationName: PawTag
 donation.minAmountCents: 500
 ```
+

@@ -8,6 +8,15 @@ import { Donation, DonationPayment, DonationReceipt, User } from '@pawtag/db';
 import { validateDonationAmount, getDonationSettings } from '../../packages/api/src/services/donation/donation-config';
 import { dollarsToCents } from '@pawtag/shared';
 
+vi.mock('../../packages/api/src/services/email.service', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../packages/api/src/services/email.service')>();
+  return {
+    ...actual,
+    sendMail: vi.fn().mockResolvedValue({ success: true, messageId: 'test_mock' }),
+    sendPetFoundEmail: vi.fn().mockResolvedValue({ success: true }),
+  };
+});
+
 describe('Phase 15 — Donation settings (configurable)', () => {
   it('dollarsToCents converts correctly', () => {
     expect(dollarsToCents(10)).toBe(1000);
@@ -72,7 +81,8 @@ describe('Phase 15 — Donation create API (stripe_test / fake provider)', () =>
     expect(res.body.success).toBe(true);
     expect(res.body.data.amountCents).toBe(2500);
     expect(res.body.data.paymentIntentId).toBeTruthy();
-    expect(res.body.data.clientSecret).toBeTruthy();
+    // Fake mode auto-completes one-time donations (local only)
+    expect(res.body.data.status).toBe('succeeded');
 
     // Idempotent retry
     const res2 = await request(app)
@@ -90,10 +100,15 @@ describe('Phase 15 — Donation create API (stripe_test / fake provider)', () =>
     expect(donations.length).toBe(1);
     expect(donations[0].amountCents).toBe(2500);
     expect(donations[0].registrationContext).toBe('DONATION');
+    expect(donations[0].status).toBe('succeeded');
 
     const payments = await DonationPayment.find({}).lean();
     expect(payments.length).toBe(1);
-    expect(payments[0].status).toBe('pending');
+    expect(payments[0].status).toBe('succeeded');
+
+    const receipt = await DonationReceipt.findOne({}).lean();
+    expect(receipt).toBeTruthy();
+    expect(receipt!.taxClassification).toBe('neutral');
   });
 
   it('accepts monthly when frequency settings allow (Phase 16)', async () => {
@@ -156,10 +171,15 @@ describe('Phase 15 — Donation webhook + receipt (neutral wording)', () => {
   });
 
   it('marks donation failed via webhook without creating receipt', async () => {
+    // Use stripe_test so create does not auto-complete; then fail via service
+    process.env.PAYMENT_MODE = 'stripe_test';
     const created = await request(app)
       .post('/api/donations')
       .send({ amount: 10, email: 'fail@example.com', idempotencyKey: `fail-${Date.now()}` });
     const { donationId, paymentIntentId } = created.body.data;
+
+    // If fake auto-complete ran under wrong mode, force pending first
+    await Donation.updateOne({ _id: donationId }, { $set: { status: 'pending' } });
 
     const { donationService } = await import('../../packages/api/src/services/donation/donation.service');
     await donationService.handlePaymentIntentUpdate(paymentIntentId, 'failed');
@@ -167,5 +187,7 @@ describe('Phase 15 — Donation webhook + receipt (neutral wording)', () => {
     const donation = await Donation.findById(donationId).lean();
     expect(donation!.status).toBe('failed');
     expect(donation!.receiptId).toBeFalsy();
+
+    process.env.PAYMENT_MODE = 'fake';
   });
 });

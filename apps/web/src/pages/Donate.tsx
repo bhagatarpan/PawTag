@@ -65,27 +65,29 @@ export default function DonatePage() {
     }
   };
 
-  const handlePaymentSuccess = async (paymentIntentId: string) => {
-    // Poll status — Stripe webhook is authoritative; this is UX confirmation
+  const handlePaymentSuccess = async (_paymentIntentId: string) => {
     if (!donationId) return;
+    setLoading(true);
+    setSubmitError('');
     try {
-      for (let i = 0; i < 10; i++) {
-        const res = await api.get(API.donations.status(donationId));
-        const st = res.data?.data?.status;
-        if (st === 'succeeded') {
-          setSuccess(true);
-          setPaymentClientSecret(null);
-          return;
-        }
-        await new Promise((r) => setTimeout(r, 800));
+      // Same pattern as shop/membership: server confirms Stripe payment, then issues receipt
+      const res = await api.post(API.donations.confirm(donationId));
+      const st = res.data?.data?.status;
+      if (st === 'succeeded') {
+        setSuccess(true);
+        setPaymentClientSecret(null);
+      } else {
+        // Not yet confirmed by Stripe — keep form and explain
+        setSubmitError('Payment was received by Stripe but is not confirmed yet. Please wait a moment and check My Donations, or try again.');
+        setPaymentClientSecret(null);
       }
-      setSuccess(true);
+    } catch (err: any) {
+      const msg = err?.response?.data?.error || 'Could not confirm payment yet. Please try again or check My Donations.';
+      setSubmitError(msg);
       setPaymentClientSecret(null);
-    } catch {
-      setSuccess(true);
-      setPaymentClientSecret(null);
+    } finally {
+      setLoading(false);
     }
-    void paymentIntentId;
   };
 
   if (error) {

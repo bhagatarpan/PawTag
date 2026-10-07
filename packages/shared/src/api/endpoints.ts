@@ -731,6 +731,7 @@ export const API = {
     create: '/donations',
     me: '/donations/me',
     status: (id: string) => `/donations/${id}` as const,
+    confirm: (id: string) => `/donations/${id}/confirm` as const,
     cancel: (id: string) => `/donations/${id}/cancel` as const,
     receiptHtml: (receiptId: string) => `/donations/receipt/${receiptId}/html` as const,
   },

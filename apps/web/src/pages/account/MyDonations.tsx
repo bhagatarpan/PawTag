@@ -104,9 +104,14 @@ export default function MyDonations() {
                     <span className={
                       d.status === 'succeeded' ? 'text-green-600' :
                       d.status === 'cancelled' ? 'text-gray-500' :
+                      d.status === 'pending' ? 'text-amber-600' :
                       d.pastDue ? 'text-amber-600' : 'text-gray-700'
                     }>
-                      {d.pastDue ? 'Payment due' : d.status}
+                      {d.pastDue
+                        ? 'Payment due'
+                        : d.status === 'pending'
+                          ? 'Awaiting payment confirmation'
+                          : d.status}
                     </span>
                   </p>
                 </div>

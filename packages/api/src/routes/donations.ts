@@ -108,6 +108,19 @@ router.get('/receipt/:receiptId/html', authenticate, async (req: any, res: Respo
   }
 });
 
+/** POST /api/donations/:id/confirm — verify Stripe payment server-side after card success */
+router.post('/:id/confirm', async (req: any, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    const data = await donationService.confirmPaymentIntent(req.params.id, userId);
+    res.json({ success: true, data });
+  } catch (err: any) {
+    const msg = err.message || 'Failed to confirm donation payment';
+    const status = msg.includes('not found') ? 404 : msg.includes('Unable to verify') ? 502 : 400;
+    res.status(status).json({ success: false, error: msg });
+  }
+});
+
 /** GET /api/donations/:id — status; optional auth ownership when logged in */
 router.get('/:id', async (req: Request, res: Response) => {
   try {
@@ -154,12 +167,13 @@ adminDonationRouter.post('/:id/refund', requirePermission('donation.refund'), as
     }
 
     // Stripe refund if PI exists (non-fake)
+    // createRefund expects amount in major units (provider multiplies by 100)
     if (donation.stripePaymentIntentId && !donation.stripePaymentIntentId.startsWith('pi_demo_')) {
       try {
         const { stripePaymentProvider } = await import('../commerce/providers/stripe');
         await stripePaymentProvider.createRefund({
           paymentIntentId: donation.stripePaymentIntentId,
-          amount: donation.amountCents,
+          amount: donation.amountCents / 100,
           reason: 'requested_by_customer',
         });
       } catch (err: any) {

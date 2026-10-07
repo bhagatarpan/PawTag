@@ -5,7 +5,7 @@
  */
 import { Donation, DonationPayment, DonationReceipt, User, Setting } from '@pawtag/db';
 import { stripePaymentProvider } from '../../commerce/providers/stripe';
-import { isFakeMode } from '../../commerce/payment-mode';
+import { isFakeMode, isFakePaymentIntentId } from '../../commerce/payment-mode';
 import { getStripeClient } from '../../lib/stripe-client';
 import { sendMail } from '../email.service';
 import logger from '../../lib/logger';
@@ -155,6 +155,14 @@ export class DonationService {
       status: 'pending',
       stripePaymentIntentId: paymentIntent.id,
     });
+
+    // Fake/local mode only: complete immediately like shop demo path.
+    // stripe_test / stripe_live never auto-succeed here — Stripe must confirm.
+    if (isFakeMode() && isFakePaymentIntentId(paymentIntent.id)) {
+      await this.handlePaymentIntentUpdate(paymentIntent.id, 'succeeded', 'local_fake_mode');
+      const refreshed = await Donation.findById(donation._id);
+      return this.toCreateResult(refreshed || donation, paymentIntent.id, paymentIntent.clientSecret);
+    }
 
     return this.toCreateResult(donation, paymentIntent.id, paymentIntent.clientSecret);
   }
@@ -535,7 +543,72 @@ export class DonationService {
   }
 
   /**
-   * Webhook: mark donation payment succeeded/failed by PaymentIntent.
+   * Confirm payment after browser Stripe success (same pattern as checkout/membership).
+   * Server verifies Stripe PI status — never trusts the browser alone.
+   * Webhook remains backup. Idempotent.
+   */
+  async confirmPaymentIntent(donationId: string, userId?: string): Promise<{ status: string; receiptNumber?: string }> {
+    const donation = await Donation.findById(donationId);
+    if (!donation) {
+      throw new Error('Donation not found');
+    }
+    if (userId && String(donation.supporterUserId) !== userId) {
+      throw new Error('Donation not found');
+    }
+
+    if (donation.status === 'succeeded') {
+      const receipt = donation.receiptId ? await DonationReceipt.findById(donation.receiptId).lean() : null;
+      return { status: 'succeeded', receiptNumber: receipt?.receiptNumber };
+    }
+    if (donation.status === 'refunded' || donation.status === 'cancelled') {
+      return { status: donation.status };
+    }
+
+    const piId = donation.stripePaymentIntentId;
+    if (!piId) {
+      throw new Error('No payment session for this donation');
+    }
+
+    // Fake/demo PI in local fake mode only
+    if (isFakeMode() && isFakePaymentIntentId(piId)) {
+      await this.handlePaymentIntentUpdate(piId, 'succeeded', 'confirm_fake_mode');
+    } else if (isFakePaymentIntentId(piId)) {
+      // Demo PI outside fake mode — do not mark succeeded
+      throw new Error('Payment session is not valid in this environment');
+    } else {
+      // Real Stripe test/live — retrieve authoritative status
+      let stripeStatus: string | undefined;
+      try {
+        const payment = await stripePaymentProvider.retrievePaymentIntent(piId);
+        stripeStatus = payment.status;
+      } catch (err: any) {
+        // Fallback: query Stripe client directly if provider wrapper fails
+        try {
+          const stripe = getStripeClient();
+          const intent = await stripe.paymentIntents.retrieve(piId);
+          stripeStatus = intent.status;
+        } catch (err2: any) {
+          logger.error({ err: err2, donationId, piId }, 'Donation confirm: Stripe retrieve failed');
+          throw new Error('Unable to verify payment with Stripe. Please try again shortly.');
+        }
+      }
+
+      if (stripeStatus !== 'succeeded' && stripeStatus !== 'requires_capture') {
+        return { status: donation.status === 'pending' ? 'pending' : donation.status };
+      }
+
+      await this.handlePaymentIntentUpdate(piId, 'succeeded', 'confirm_endpoint');
+    }
+
+    const updated = await Donation.findById(donationId);
+    const receipt = updated?.receiptId ? await DonationReceipt.findById(updated.receiptId).lean() : null;
+    return {
+      status: updated?.status || 'succeeded',
+      receiptNumber: receipt?.receiptNumber,
+    };
+  }
+
+  /** Webhook: mark donation payment succeeded/failed by PaymentIntent.
    * Idempotent.
    */
   async handlePaymentIntentUpdate(paymentIntentId: string, status: 'succeeded' | 'failed', webhookEventId?: string): Promise<void> {
