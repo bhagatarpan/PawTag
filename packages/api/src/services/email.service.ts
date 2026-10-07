@@ -138,7 +138,22 @@ export async function sendCmsEmailOrFallback(params: {
   return sendMail(params.to, params.fallbackSubject, params.fallbackHtml, params.fallbackFrom, auditMeta);
 }
 
-export async function sendMail(to: string, subject: string, html: string, from?: string, auditMeta?: { templateSlug?: string; businessFlow?: string; relatedEntityType?: string; relatedEntityId?: string; relatedEntityDisplay?: string; isTest?: boolean; idempotencyKey?: string }): Promise<EmailResult> {
+export async function sendMail(
+  to: string,
+  subject: string,
+  html: string,
+  from?: string,
+  auditMeta?: {
+    templateSlug?: string;
+    businessFlow?: string;
+    relatedEntityType?: string;
+    relatedEntityId?: string;
+    relatedEntityDisplay?: string;
+    isTest?: boolean;
+    idempotencyKey?: string;
+    attachments?: Array<{ filename: string; contentType?: string; content: Buffer | string }>;
+  },
+): Promise<EmailResult> {
   // In dev mode with test mode enabled, route ALL emails to test address
   const originalRecipient = to;
   if (process.env.NODE_ENV !== 'production') {
@@ -205,12 +220,20 @@ export async function sendMail(to: string, subject: string, html: string, from?:
   }
 
   return logIntegration('Resend', 'sendEmail', async () => {
-    const { data, error } = await resend!.emails.send({
+    const sendParams: Record<string, unknown> = {
       from: fromAddress,
       to: [to],
       subject,
       html,
-    });
+    };
+    if (auditMeta?.attachments?.length) {
+      sendParams.attachments = auditMeta.attachments.map((a) => ({
+        filename: a.filename,
+        content: typeof a.content === 'string' ? Buffer.from(a.content, 'base64') : a.content,
+        ...(a.contentType ? { contentType: a.contentType } : {}),
+      }));
+    }
+    const { data, error } = await resend!.emails.send(sendParams as any);
 
     if (error) {
       logger.error({ err: error, to, subject }, 'Resend email send failed');

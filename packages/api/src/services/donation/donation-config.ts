@@ -20,6 +20,7 @@ export const DONATION_SETTING_DEFAULTS = {
   'donation.mission.headline': 'Help reunite lost pets with their families',
   'donation.mission.body': 'Your support keeps finder recovery working for lost pets across New Zealand.',
   'donation.receipt.organisationName': 'PawTag',
+  'donation.receipt.numberPrefix': 'PTD',
   'donation.receipt.irdNumber': '',
   'donation.receipt.charitiesNumber': '',
   'donation.receipt.taxClassification': 'neutral',
@@ -61,6 +62,7 @@ export async function getDonationSettings(): Promise<DonationSettingsPublic> {
     taxClass,
     statement,
     publicEnabled,
+    numberPrefix,
   ] = await Promise.all([
     readSetting('donation.currency'),
     readSetting('donation.suggestedAmounts'),
@@ -73,6 +75,7 @@ export async function getDonationSettings(): Promise<DonationSettingsPublic> {
     readSetting('donation.receipt.taxClassification'),
     readSetting('donation.receipt.statement'),
     readSetting('donation.publicEnabled'),
+    readSetting('donation.receipt.numberPrefix'),
   ]);
 
   const suggestedAmounts = suggestedRaw
@@ -97,7 +100,13 @@ export async function getDonationSettings(): Promise<DonationSettingsPublic> {
     taxClassification: taxClass || 'neutral',
     receiptStatement: statement,
     publicEnabled: publicEnabled === 'true',
+    numberPrefix: (numberPrefix || 'PTD').trim().toUpperCase() || 'PTD',
   };
+}
+
+export async function getDonationReceiptPrefix(): Promise<string> {
+  const raw = await readSetting('donation.receipt.numberPrefix');
+  return (raw || 'PTD').trim().toUpperCase() || 'PTD';
 }
 
 export async function validateDonationAmount(amountDollars: number): Promise<{ ok: true; amountCents: number } | { ok: false; error: string }> {

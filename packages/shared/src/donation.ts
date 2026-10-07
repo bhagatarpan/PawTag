@@ -44,6 +44,19 @@ export interface DonationSettingsPublic {
   taxClassification: string;
   receiptStatement: string;
   publicEnabled: boolean;
+  /** Configurable receipt number prefix e.g. PTD */
+  numberPrefix?: string;
+}
+
+export interface DonationConfirmResponse {
+  status: string;
+  receiptNumber?: string;
+  amountCents?: number;
+  currency?: string;
+  emailSnapshot?: string;
+  nameSnapshot?: string;
+  organisationName?: string;
+  receiptStatement?: string;
 }
 
 export function dollarsToCents(amount: number): number {

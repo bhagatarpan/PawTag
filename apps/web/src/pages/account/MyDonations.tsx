@@ -114,6 +114,11 @@ export default function MyDonations() {
                           : d.status}
                     </span>
                   </p>
+                  {d.payments?.some((p) => p.receiptId) && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Receipt on successful payments below — view or download anytime
+                    </p>
+                  )}
                 </div>
                 {d.frequency === 'monthly' && d.status !== 'cancelled' && (
                   <button
@@ -142,7 +147,7 @@ export default function MyDonations() {
                             onClick={() => openReceipt(p.receiptId!)}
                             className="inline-flex items-center gap-1 text-primary-600 hover:text-primary-700 font-medium"
                           >
-                            <Receipt className="h-4 w-4" /> Receipt
+                            <Receipt className="h-4 w-4" /> View / Download
                           </button>
                         )}
                       </li>

@@ -160,7 +160,8 @@ describe('Phase 15 — Donation webhook + receipt (neutral wording)', () => {
     expect(donation!.receiptId).toBeTruthy();
 
     const receipt = await DonationReceipt.findById(donation!.receiptId).lean();
-    expect(receipt!.receiptNumber).toMatch(/^DNR-/);
+    // Prefix comes from settings (default PTD) — never hardcoded in domain logic
+    expect(receipt!.receiptNumber).toMatch(/^[A-Z0-9]{1,10}-\d{6}$/);
     expect(receipt!.taxClassification).toBe('neutral');
     expect(receipt!.statement.toLowerCase()).not.toMatch(/ird|tax credit|deductible/i);
 

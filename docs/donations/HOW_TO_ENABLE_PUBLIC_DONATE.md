@@ -64,6 +64,15 @@ If the menu is missing: the logged-in admin does not have `donation.read` yet.
 
 ---
 
+## Receipts (PDF + download)
+
+| Item | Behaviour |
+|---|---|
+| Receipt number prefix | Setting **`donation.receipt.numberPrefix`** (default **`PTD`**) — not hardcoded |
+| Email | Personalised with receipt number + **Download receipt** link + **PDF attachment** |
+| My Donations | View / download receipt after sign-in |
+| Tax wording | Neutral until NZ donee status confirmed |
+
 ## Payment confirm + webhook (one endpoint)
 
 Donations complete like shop/membership:
@@ -80,6 +89,8 @@ donation.enabled: true
 donation.publicEnabled: false   ← turn this on for public menu
 donation.suggestedAmounts: 5,10,20,50
 donation.receipt.organisationName: PawTag
+donation.receipt.numberPrefix: PTD
 donation.minAmountCents: 500
 ```
+
 

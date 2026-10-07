@@ -17,6 +17,7 @@ All values load from Setting via existing settings accessors/repository.
 | `donation.mission.headline` | string | Help reunite lost pets with their families | Donate page hero |
 | `donation.mission.body` | string | Your support helps keep finder recovery working. | Donate page copy |
 | `donation.receipt.organisationName` | string | `PawTag` | Legal/trading name on receipt |
+| `donation.receipt.numberPrefix` | string | `PTD` | Receipt number prefix (e.g. PTD-000001) — **settings, not hardcoded** |
 | `donation.receipt.irdNumber` | string | *(empty)* | IRD — only when confirmed |
 | `donation.receipt.charitiesNumber` | string | *(empty)* | Charities Services # if any |
 | `donation.receipt.taxClassification` | enum | `neutral` | `neutral` \| `approved_donee` (only after legal) |

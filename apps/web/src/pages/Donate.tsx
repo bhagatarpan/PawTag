@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Heart, ShieldCheck, Loader2 } from 'lucide-react';
+import { Heart, ShieldCheck, Loader2, Receipt, Download } from 'lucide-react';
 import { API } from '@pawtag/shared/api';
 import { centsToDollars, type DonationSettingsPublic } from '@pawtag/shared';
 import api from '../lib/api';
@@ -25,6 +25,9 @@ export default function DonatePage() {
   const [donationId, setDonationId] = useState<string | null>(null);
   const [paymentAmountCents, setPaymentAmountCents] = useState(0);
   const [success, setSuccess] = useState(false);
+  const [receiptNumber, setReceiptNumber] = useState<string | null>(null);
+  const [successEmail, setSuccessEmail] = useState('');
+  const [successName, setSuccessName] = useState('');
   const [submitError, setSubmitError] = useState('');
 
   useEffect(() => {
@@ -72,12 +75,15 @@ export default function DonatePage() {
     try {
       // Same pattern as shop/membership: server confirms Stripe payment, then issues receipt
       const res = await api.post(API.donations.confirm(donationId));
-      const st = res.data?.data?.status;
-      if (st === 'succeeded') {
+      const data = res.data?.data || {};
+      if (data.status === 'succeeded') {
         setSuccess(true);
         setPaymentClientSecret(null);
+        setReceiptNumber(data.receiptNumber || null);
+        setSuccessEmail(data.emailSnapshot || email);
+        setSuccessName(data.nameSnapshot || name || 'Supporter');
+        setPaymentAmountCents(data.amountCents ?? paymentAmountCents);
       } else {
-        // Not yet confirmed by Stripe — keep form and explain
         setSubmitError('Payment was received by Stripe but is not confirmed yet. Please wait a moment and check My Donations, or try again.');
         setPaymentClientSecret(null);
       }
@@ -103,25 +109,46 @@ export default function DonatePage() {
   }
 
   if (success) {
+    const displayName = successName || 'Supporter';
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
         <div className="max-w-md w-full bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center">
           <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
             <Heart className="h-8 w-8 text-green-600" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Thank you</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Thank you, {displayName}</h1>
           <p className="text-gray-600 mb-2">
-            Your donation of <strong>${centsToDollars(paymentAmountCents).toFixed(2)}</strong> has been received.
+            Your donation of <strong>${centsToDollars(paymentAmountCents).toFixed(2)} {settings?.currency || 'NZD'}</strong> has been received.
+          </p>
+          {receiptNumber && (
+            <div className="bg-primary-50 border border-primary-100 rounded-xl p-3 mb-3">
+              <p className="text-sm text-primary-800">
+                Receipt number: <strong className="font-mono">{receiptNumber}</strong>
+              </p>
+            </div>
+          )}
+          <p className="text-sm text-gray-500 mb-1">
+            A receipt email with PDF attachment is on its way{successEmail ? <> to <strong>{successEmail}</strong></> : null}.
           </p>
           <p className="text-sm text-gray-500 mb-4">
-            A receipt email is on its way. You can also view donations in your account after signing in.
+            You can also view and download your receipt under My Donations after signing in.
           </p>
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-gray-400 mb-4">
             {settings?.organisationName || 'PawTag'} — {settings?.receiptStatement}
           </p>
           <div className="mt-6 flex flex-col gap-2">
+            {donationId && (
+              <Link
+                to="/account/donations"
+                className="inline-flex items-center justify-center gap-2 bg-primary-600 text-white px-5 py-2.5 rounded-lg font-semibold hover:bg-primary-700"
+              >
+                <Receipt className="h-4 w-4" /> View My Donations
+              </Link>
+            )}
             <Link to="/" className="inline-block text-primary-600 font-medium">Back to home</Link>
-            <Link to="/account/donations" className="text-sm text-gray-500 hover:text-gray-700">My Donations</Link>
+            <p className="text-xs text-gray-400 inline-flex items-center justify-center gap-1">
+              <Download className="h-3.5 w-3.5" /> Download available after sign-in
+            </p>
           </div>
         </div>
       </div>

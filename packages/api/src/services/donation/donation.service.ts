@@ -379,29 +379,37 @@ export class DonationService {
     }
 
     const amount = (receipt.amountCents / 100).toFixed(2);
-    // Tax classification from settings only — never invent IRD claims
     const taxNote =
       receipt.taxClassification === 'neutral' || !receipt.taxClassification
         ? 'This is a donation payment receipt. Tax treatment, if any, depends on your circumstances and applicable law.'
         : `Tax classification (configured): ${receipt.taxClassification}`;
 
+    // Invoice-style layout (reuse commercial invoice visual language; distinct document type)
     return `<!DOCTYPE html>
-<html><head><meta charset="utf-8"/><title>Donation receipt ${receipt.receiptNumber}</title></head>
-<body style="font-family: Georgia, serif; max-width: 640px; margin: 40px auto; color: #111;">
-  <h1 style="margin-bottom: 0;">${escapeHtml(receipt.organisationName)}</h1>
-  <p style="margin-top: 0; color: #555;">Donation receipt</p>
-  <hr/>
-  <p><strong>Receipt number:</strong> ${escapeHtml(receipt.receiptNumber)}</p>
-  <p><strong>Issued:</strong> ${receipt.issuedAt ? new Date(receipt.issuedAt).toLocaleString('en-NZ') : ''}</p>
-  <p><strong>Donor:</strong> ${escapeHtml(receipt.donorNameSnapshot || 'Supporter')}</p>
-  <p><strong>Amount:</strong> ${escapeHtml(receipt.currency)} $${amount}</p>
-  <p><strong>Statement:</strong> ${escapeHtml(receipt.statement)}</p>
-  ${receipt.irdNumber ? `<p><strong>IRD number:</strong> ${escapeHtml(receipt.irdNumber)}</p>` : ''}
-  ${receipt.charitiesNumber ? `<p><strong>Charities number:</strong> ${escapeHtml(receipt.charitiesNumber)}</p>` : ''}
-  <p style="font-size: 13px; color: #444;">${escapeHtml(taxNote)}</p>
-  ${receipt.signatory ? `<p><strong>Authorised by:</strong> ${escapeHtml(receipt.signatory)}</p>` : ''}
-  <hr/>
-  <p style="font-size: 12px; color: #666;">Status: ${escapeHtml(receipt.status)} · Reference: ${escapeHtml(receipt.receiptNumber)}</p>
+<html><head><meta charset="utf-8"/><title>Donation receipt ${escapeHtml(receipt.receiptNumber)}</title></head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 640px; margin: 40px auto; color: #111; line-height: 1.6;">
+  <div style="background: linear-gradient(135deg, #0d9488, #14b8a6); padding: 24px; border-radius: 12px 12px 0 0; text-align: center;">
+    <h1 style="color: white; font-size: 22px; margin: 0;">${escapeHtml(receipt.organisationName)}</h1>
+    <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0; font-size: 14px;">Donation receipt</p>
+  </div>
+  <div style="background: #f9fafb; padding: 28px; border: 1px solid #e5e7eb; border-top: 0;">
+    <p style="color: #374151; font-size: 15px;">Hi ${escapeHtml(receipt.donorNameSnapshot || 'Supporter')},</p>
+    <p style="color: #374151; font-size: 15px;">${escapeHtml(receipt.statement)}</p>
+    <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 14px;">
+      <tr><td style="padding: 8px 0; color: #6b7280;">Receipt number</td><td style="text-align: right; font-weight: 600;">${escapeHtml(receipt.receiptNumber)}</td></tr>
+      <tr><td style="padding: 8px 0; color: #6b7280;">Issued</td><td style="text-align: right;">${receipt.issuedAt ? new Date(receipt.issuedAt).toLocaleString('en-NZ') : ''}</td></tr>
+      <tr><td style="padding: 8px 0; color: #6b7280;">Donor</td><td style="text-align: right;">${escapeHtml(receipt.donorNameSnapshot || 'Supporter')}</td></tr>
+      <tr style="border-top: 1px solid #e5e7eb;"><td style="padding: 12px 0; font-weight: 700; font-size: 16px;">Amount</td><td style="text-align: right; font-weight: 700; font-size: 16px; color: #0d9488;">${escapeHtml(receipt.currency)} $${amount}</td></tr>
+      ${receipt.irdNumber ? `<tr><td style="padding: 8px 0; color: #6b7280;">IRD number</td><td style="text-align: right;">${escapeHtml(receipt.irdNumber)}</td></tr>` : ''}
+      ${receipt.charitiesNumber ? `<tr><td style="padding: 8px 0; color: #6b7280;">Charities number</td><td style="text-align: right;">${escapeHtml(receipt.charitiesNumber)}</td></tr>` : ''}
+      <tr><td style="padding: 8px 0; color: #6b7280;">Status</td><td style="text-align: right;">${escapeHtml(receipt.status)}</td></tr>
+    </table>
+    <p style="font-size: 13px; color: #4b5563;">${escapeHtml(taxNote)}</p>
+    ${receipt.signatory ? `<p style="font-size: 13px; color: #374151;"><strong>Authorised by:</strong> ${escapeHtml(receipt.signatory)}</p>` : ''}
+  </div>
+  <div style="text-align: center; padding: 16px; color: #9ca3af; font-size: 12px;">
+    ${escapeHtml(receipt.organisationName)} — Donation receipt ${escapeHtml(receipt.receiptNumber)}
+  </div>
 </body></html>`;
   }
 
@@ -464,6 +472,8 @@ export class DonationService {
       organisationName: receipt?.organisationName,
       taxClassification: receipt?.taxClassification,
       statement: receipt?.statement,
+      emailSnapshot: donation.emailSnapshot,
+      nameSnapshot: donation.nameSnapshot,
     };
   }
 
@@ -547,7 +557,16 @@ export class DonationService {
    * Server verifies Stripe PI status — never trusts the browser alone.
    * Webhook remains backup. Idempotent.
    */
-  async confirmPaymentIntent(donationId: string, userId?: string): Promise<{ status: string; receiptNumber?: string }> {
+  async confirmPaymentIntent(donationId: string, userId?: string): Promise<{
+    status: string;
+    receiptNumber?: string;
+    amountCents?: number;
+    currency?: string;
+    emailSnapshot?: string;
+    nameSnapshot?: string;
+    organisationName?: string;
+    receiptStatement?: string;
+  }> {
     const donation = await Donation.findById(donationId);
     if (!donation) {
       throw new Error('Donation not found');
@@ -558,10 +577,19 @@ export class DonationService {
 
     if (donation.status === 'succeeded') {
       const receipt = donation.receiptId ? await DonationReceipt.findById(donation.receiptId).lean() : null;
-      return { status: 'succeeded', receiptNumber: receipt?.receiptNumber };
+      return {
+        status: 'succeeded',
+        receiptNumber: receipt?.receiptNumber,
+        amountCents: donation.amountCents,
+        currency: donation.currency,
+        emailSnapshot: donation.emailSnapshot,
+        nameSnapshot: donation.nameSnapshot,
+        organisationName: receipt?.organisationName,
+        receiptStatement: receipt?.statement,
+      };
     }
     if (donation.status === 'refunded' || donation.status === 'cancelled') {
-      return { status: donation.status };
+      return { status: donation.status, amountCents: donation.amountCents, currency: donation.currency, emailSnapshot: donation.emailSnapshot, nameSnapshot: donation.nameSnapshot };
     }
 
     const piId = donation.stripePaymentIntentId;
@@ -605,6 +633,12 @@ export class DonationService {
     return {
       status: updated?.status || 'succeeded',
       receiptNumber: receipt?.receiptNumber,
+      amountCents: updated?.amountCents,
+      currency: updated?.currency,
+      emailSnapshot: updated?.emailSnapshot,
+      nameSnapshot: updated?.nameSnapshot,
+      organisationName: receipt?.organisationName,
+      receiptStatement: receipt?.statement,
     };
   }
 
@@ -662,16 +696,16 @@ export class DonationService {
     if (existing) return existing;
 
     const settings = await getDonationSettings();
-    // Unique sequence via counters collection (same pattern as invoices/orders)
+    // Prefix comes from settings — never hardcode DNR/PTD in business logic
+    const prefix = settings.numberPrefix || 'PTD';
     const counter = await Donation.db!.collection('counters').findOneAndUpdate(
       { _id: 'donationReceiptNumber' as any },
       { $inc: { seq: 1 } },
       { upsert: true, returnDocument: 'after' },
     );
     const seq = (counter as any)?.value?.seq ?? (counter as any)?.seq ?? 1;
-    const receiptNumber = `DNR-${String(seq).padStart(6, '0')}`;
+    const receiptNumber = `${prefix}-${String(seq).padStart(6, '0')}`;
 
-    // Tax classification must stay neutral unless explicitly approved in settings
     const taxClassification = settings.taxClassification === 'neutral' || !settings.taxClassification
       ? 'neutral'
       : settings.taxClassification;
@@ -698,37 +732,87 @@ export class DonationService {
     if (!to) return;
 
     const amount = (donation.amountCents / 100).toFixed(2);
-    const vars = {
-      donorName: donation.nameSnapshot || 'Supporter',
-      amount,
-      currency: donation.currency,
-      receiptNumber: receipt?.receiptNumber || '',
-      organisationName: receipt?.organisationName || 'PawTag',
-      statement: receipt?.statement || 'Thank you for your donation to PawTag.',
-      taxClassification: receipt?.taxClassification || 'neutral',
-    };
+    const receiptNumber = receipt?.receiptNumber || '';
+    const organisationName = receipt?.organisationName || 'PawTag';
+    const statement = receipt?.statement || 'Thank you for your donation to PawTag.';
+    const donorName = donation.nameSnapshot || 'Supporter';
+    const downloadPath = receipt?._id ? `/api/donations/receipt/${receipt._id}/html` : '';
+    const portalPath = '/account/donations';
 
-    // Neutral wording only — never tax-credit claims unless settings say approved
-    const fallbackSubject = `Thank you for your donation — ${vars.receiptNumber || 'PawTag'}`;
-    const fallbackHtml = `
-      <p>Hi ${vars.donorName},</p>
-      <p>${vars.statement}</p>
-      <p><strong>Amount:</strong> ${vars.currency} $${amount}</p>
-      <p><strong>Receipt number:</strong> ${vars.receiptNumber}</p>
-      <p>${vars.organisationName}</p>
-    `;
+    // Invoice-style email: personalised + receipt number + download + embedded document
+    const subject = `Thank you — receipt ${receiptNumber} | ${organisationName}`;
+    const html = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #0d9488, #14b8a6); padding: 24px; border-radius: 12px 12px 0 0; text-align: center;">
+          <h1 style="color: white; font-size: 22px; margin: 0;">${escapeHtml(organisationName)}</h1>
+          <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0; font-size: 14px;">Donation receipt</p>
+        </div>
+        <div style="background: #f9fafb; padding: 32px; border: 1px solid #e5e7eb;">
+          <p style="color: #374151; font-size: 15px; line-height: 1.7;">Hi ${escapeHtml(donorName)},</p>
+          <p style="color: #374151; font-size: 15px; line-height: 1.7;">${escapeHtml(statement)}</p>
+          <p style="color: #374151; font-size: 15px; line-height: 1.7;">
+            <strong>Amount:</strong> ${escapeHtml(donation.currency || 'NZD')} $${amount}<br/>
+            <strong>Receipt number:</strong> ${escapeHtml(receiptNumber)}<br/>
+            <strong>Sent to:</strong> ${escapeHtml(to)}
+          </p>
+          ${downloadPath ? `
+          <div style="text-align: center; margin: 24px 0;">
+            <a href="{{DOWNLOAD_BASE_URL}}${downloadPath}" style="display: inline-block; background: #0d9488; color: white; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">Download receipt</a>
+          </div>` : ''}
+          <p style="font-size: 13px; color: #6b7280;">
+            You can also view this receipt anytime under
+            <a href="{{DOWNLOAD_BASE_URL}}${portalPath}" style="color: #0d9488;">My Donations</a>
+            after signing in.
+          </p>
+        </div>
+        <div style="text-align: center; padding: 16px; color: #9ca3af; font-size: 11px;">
+          ${escapeHtml(organisationName)} — Donation receipt ${escapeHtml(receiptNumber)}
+        </div>
+      </div>`;
+
+    // Replace download base with configured frontend URL
+    const frontend = (await readOptionalSetting('urls.frontend')) || process.env.FRONTEND_URL || '';
+    const resolvedHtml = html.replaceAll('{{DOWNLOAD_BASE_URL}}', frontend);
+
+    // PDF attachment (server-side)
+    let attachments: Array<{ filename: string; contentType: string; content: Buffer }> | undefined;
+    try {
+      const { generateDonationReceiptPdf } = await import('./donation-pdf');
+      const pdf = await generateDonationReceiptPdf({
+        receiptNumber,
+        organisationName,
+        donorNameSnapshot: donorName,
+        amountCents: donation.amountCents,
+        currency: donation.currency,
+        statement,
+        taxClassification: receipt?.taxClassification,
+        irdNumber: receipt?.irdNumber,
+        charitiesNumber: receipt?.charitiesNumber,
+        signatory: receipt?.signatory,
+        issuedAt: receipt?.issuedAt,
+        status: receipt?.status,
+      });
+      attachments = [{
+        filename: `${receiptNumber}-receipt.pdf`,
+        contentType: 'application/pdf',
+        content: pdf,
+      }];
+    } catch (err) {
+      logger.error({ err, receiptNumber }, 'Failed to generate donation receipt PDF');
+    }
 
     await sendMail(
       to,
-      fallbackSubject,
-      fallbackHtml,
+      subject,
+      resolvedHtml,
       undefined,
       {
         templateSlug: 'donation-receipt',
         businessFlow: 'donations',
         relatedEntityType: 'donation' as any,
-        relatedEntityDisplay: vars.receiptNumber,
+        relatedEntityDisplay: receiptNumber,
         idempotencyKey: `donation-receipt-email:${donation._id}`,
+        attachments,
       },
     );
   }
