@@ -24,7 +24,8 @@
 | 09 Capacitor bridges | **CODED_NOT_RUNTIME_VALIDATED** | `main` @ Phases 05–09 commit | capacitor.config.ts + native bridge code (dynamic import); finder deep-link exclusion coded | no iOS/Android SDK/device build this session | Phase 10 device/store gate required | CODED_NOT_RUNTIME_VALIDATED until physical devices |
 | 10 Store/device gate | NOT_STARTED | | | | physical device evidence absent | checklist is `NOT_STARTED` |
 | 11 Dynamo discovery | **PROVEN** (discovery docs complete; no code migration) | `main` @ Phase 11 commit | docs/dynamodb-migration/ 00-07 + FOUNDER_SUMMARY written; models inventoried (73); access patterns mapped | none required for discovery | Phase 12 needs IAM + DynamoDB Local | discovery pack only; MongoDB remains production for first web customer |
-| 12 Dynamo low-risk | **CODED_NOT_RUNTIME_VALIDATED** (Settings boundary + tools coded; live AWS migrate not run) | `main` @ Phase 12 commit | Dynamo client + Setting repo (Mongo/Dynamo adapters) + migrate/table tools + unit tests PASS; typecheck/unit/smoke/build PASS | live DynamoDB Local/AWS create+migrate not executed this session | founder: run create-table/migrate/compare with IAM keys | Settings-only; DYNAMODB_SETTINGS_READS defaults mongo; no money cutover |
+| 12 Dynamo low-risk | **PROVEN** (live AWS Settings migrate + compare) | `main` @ Phase 12/13 commit | table `pawtag-dev-settings` created; 271 settings migrated; compare match=271 mismatch=0; unit tests PASS | real AWS ap-southeast-2 (non-prod prefix) | none for Settings proof | reads still default mongo; no money cutover |
+| 13 Dynamo high-risk | **CODED_NOT_RUNTIME_VALIDATED** (conditional adapters + tests; **no cutover**) | `main` @ Phase 13 commit | Dynamo inventory + rewards services + failure-injection unit tests PASS | no live inventory/rewards on DynamoDB | staging payments still required before any money cutover | production remains MongoDB for inventory/rewards/orders/identity/Finder |
 | 13 Dynamo high-risk | NOT_STARTED | | | | | |
 | 14 Donation gate | NOT_STARTED | | | | | |
 | 15 Donation one-time | NOT_STARTED | | | | | |
@@ -337,6 +338,44 @@
 **Rollback:** `DYNAMODB_SETTINGS_READS=mongo` (default). Mongo remains write path.
 
 **Next phase:** Phase 13 DynamoDB high-risk cutover — **STOP. Do not execute Phase 13 until founder authorizes after Settings live proof + staging payments.**
+
+### Phase 12 live proof + Phase 13 high-risk adapters (complete for coded/proven-settings evidence)
+
+**Status:**  
+- Phase 12 Settings: **PROVEN** on real AWS non-prod (`pawtag-dev-settings`, 271/271 compare clean).  
+- Phase 13 inventory/rewards: **CODED_NOT_RUNTIME_VALIDATED** — adapters + tests only; **production still MongoDB**.  
+- **No money/identity/Finder cutover.**  
+
+**Started/Completed:** 2026-10-06/07  
+**Tech Master executed** (founder cannot run commands locally).
+
+**Live AWS evidence (Settings):**
+
+| Step | Result |
+|---|---|
+| `create-settings-table.ts` | Created `pawtag-dev-settings` (region ap-southeast-2) |
+| `migrate-settings.ts --dry-run` | 271 settings |
+| `migrate-settings.ts` | migrated=271 |
+| `migrate-settings.ts --compare` | **match=271 mismatch=0 missing=0** |
+| API read mode | Still **`mongo`** (safe default) |
+
+**Phase 13 coded (not cut over):**
+- `packages/db/src/dynamodb/inventory.service.ts` — conditional reserve/release/confirmSale
+- `packages/db/src/dynamodb/rewards.service.ts` — conditional reserve/commit/release + checkout RES items
+- `tests/unit/dynamodb-high-risk-conditional-writes.test.ts` — PASS
+
+**Automated commands:**
+
+| Command | Result |
+|---|---|
+| typecheck | **PASS** |
+| unit (incl. DynamoDB tests) | **PASS** |
+| smoke / build | **PASS** |
+| Live Settings migrate/compare | **PASS** (AWS non-prod) |
+
+**Rollback:** `DYNAMODB_SETTINGS_READS=mongo`. Inventory/rewards never left Mongo.
+
+**Next phase:** Donation Track D / staging first-customer path — **STOP. Do not start Phase 14 or money cutover without founder authorization + staging payments proof.**
 
 ### Track A0 — Baseline Recovery (complete)
 

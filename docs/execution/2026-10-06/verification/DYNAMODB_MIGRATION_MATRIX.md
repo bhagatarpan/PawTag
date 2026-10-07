@@ -4,20 +4,40 @@
 
 | Domain | Access patterns documented | Repo interface | Mongo adapter | Dynamo adapter | Migration dry-run | Normalized compare | Concurrency/failure tests | Non-prod cutover | Rollback tested | Production source |
 |---|---|---|---|---|---|---|---|---|---|---|
-| Settings/config | Yes (Phase 11) | **Yes** | **Yes** | **Yes** | Tool coded (`migrate-settings.ts --dry-run`) | Unit compare helpers **PASS** | n/a low risk | **Not flipped** — `DYNAMODB_SETTINGS_READS` defaults `mongo` | Rollback = set env `mongo` | **MongoDB** |
+| Settings/config | Yes (Phase 11) | **Yes** | **Yes** | **Yes** | **PASS** (271) | **PASS live AWS** match=271 mismatch=0 | n/a | **Not flipped** — `DYNAMODB_SETTINGS_READS` defaults `mongo` | Rollback = env `mongo` | **MongoDB** |
 | CMS/supporting | Yes | Not yet | No | No | Not started | No | No | No | No | MongoDB |
 | Identity/session | Yes | No | No | No | No | No | No | No | No | MongoDB |
 | Pets/tags | Yes | No | No | No | No | No | No | No | No | MongoDB |
 | Finder/recovery | Yes | No | No | No | No | No | No | No | No | MongoDB |
-| Catalog/cart | Yes | No | No | No | No | No | No | No | No | MongoDB |
+| Catalog/cart | Yes | Partial (inventory Dynamo service coded) | No | Conditional writes coded | No live migrate | No | **Unit tests PASS** | **No cutover** | Mongo remains | **MongoDB** |
 | Orders/payments/refunds | Yes | No | No | No | No | No | No | No | No | MongoDB |
-| Inventory/reservations | Yes | No | No | No | No | No | No | No | No | MongoDB |
+| Inventory/reservations | Yes | Dynamo service Phase 13 | Mongo still live | Conditional reserve/release/confirmSale | Not migrated | No | **Unit tests PASS** | **No cutover** | Mongo remains | **MongoDB** |
 | Membership/subscriptions | Yes | No | No | No | No | No | No | No | No | MongoDB |
-| Rewards/referrals | Yes | No | No | No | No | No | No | No | No | MongoDB |
+| Rewards/referrals | Yes | Dynamo rewards service Phase 13 | Mongo still live | Conditional reserve/commit/release | Not migrated | No | **Unit tests PASS** | **No cutover** | Mongo remains | **MongoDB** |
 | Invoices/doc access | Yes | No | No | No | No | No | No | No | No | MongoDB |
 | Webhook/reconciliation | Yes | No | No | No | No | No | No | No | No | MongoDB |
 | Background jobs/leases | Yes | No | No | No | No | No | No | No | No | MongoDB |
 | Audit/system logs | Yes | No | No | No | No | No | No | No | No | MongoDB |
+
+## Phase 12 live AWS proof (2026-10-06/07)
+
+| Step | Result |
+|---|---|
+| Table create | **PASS** — `pawtag-dev-settings` in `ap-southeast-2` |
+| Migrate dry-run | **PASS** — 271 settings |
+| Migrate write | **PASS** — migrated=271 |
+| Compare after normalize fix | **PASS** — match=271 mismatch=0 missing=0 |
+| DynamoDB reads in API | **Not flipped** — still `mongo` default |
+
+## Phase 13 high-risk (coded, not cut over)
+
+| Domain | Artifact | Production source |
+|---|---|---|
+| Inventory conditional writes | `packages/db/src/dynamodb/inventory.service.ts` | **MongoDB** |
+| Rewards hold/commit/release | `packages/db/src/dynamodb/rewards.service.ts` | **MongoDB** |
+| Failure-injection unit tests | `tests/unit/dynamodb-high-risk-conditional-writes.test.ts` | PASS |
+
+**Not migrated:** orders, payments, identity, Finder, jobs, webhooks.
 
 ## Phase 12 artifacts
 

@@ -59,7 +59,7 @@ export function normalizeSetting(rec: SettingRecord | null | undefined): Omit<Se
     key: rec.key,
     value: rec.value,
     displayValue: rec.displayValue || undefined,
-    category: rec.category,
+    category: rec.category || 'general',
     description: rec.description || undefined,
     updatedBy: rec.updatedBy || undefined,
   };
