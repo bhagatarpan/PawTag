@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Heart, Loader2, Receipt, XCircle } from 'lucide-react';
+import { Heart, Loader2, Receipt, XCircle, Download } from 'lucide-react';
 import { API } from '@pawtag/shared/api';
 import { centsToDollars } from '@pawtag/shared';
 import api from '../../lib/api';
@@ -14,12 +14,15 @@ interface PortalDonation {
   status: string;
   pastDue?: boolean;
   createdAt: string;
+  receiptId?: string;
+  receiptNumber?: string;
   payments: Array<{
     id: string;
     amountCents: number;
     status: string;
     paidAt?: string;
     receiptId?: string;
+    receiptNumber?: string;
   }>;
 }
 
@@ -114,10 +117,18 @@ export default function MyDonations() {
                           : d.status}
                     </span>
                   </p>
-                  {d.payments?.some((p) => p.receiptId) && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      Receipt on successful payments below — view or download anytime
+                  {d.receiptNumber && (
+                    <p className="text-xs text-primary-700 mt-1 font-medium">
+                      Receipt {d.receiptNumber}
                     </p>
+                  )}
+                  {d.status === 'succeeded' && d.receiptId && (
+                    <button
+                      onClick={() => openReceipt(d.receiptId!)}
+                      className="mt-2 inline-flex items-center gap-1.5 text-sm text-primary-600 hover:text-primary-700 font-medium"
+                    >
+                      <Download className="h-4 w-4" /> Download receipt
+                    </button>
                   )}
                 </div>
                 {d.frequency === 'monthly' && d.status !== 'cancelled' && (
@@ -141,10 +152,11 @@ export default function MyDonations() {
                           {p.paidAt ? ` · ${new Date(p.paidAt).toLocaleDateString('en-NZ')}` : ''}
                           {' · '}
                           <span className={p.status === 'succeeded' ? 'text-green-600' : 'text-gray-500'}>{p.status}</span>
+                          {p.receiptNumber ? ` · ${p.receiptNumber}` : ''}
                         </span>
-                        {p.receiptId && p.status === 'succeeded' && (
+                        {(p.receiptId || d.receiptId) && p.status === 'succeeded' && (
                           <button
-                            onClick={() => openReceipt(p.receiptId!)}
+                            onClick={() => openReceipt(p.receiptId || d.receiptId!)}
                             className="inline-flex items-center gap-1 text-primary-600 hover:text-primary-700 font-medium"
                           >
                             <Receipt className="h-4 w-4" /> View / Download

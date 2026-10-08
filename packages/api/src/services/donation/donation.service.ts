@@ -318,6 +318,15 @@ export class DonationService {
       donationId: { $in: donations.map((d) => d._id) },
     }).sort({ createdAt: -1 }).lean();
 
+    const receiptIds = donations
+      .map((d) => d.receiptId)
+      .concat(payments.map((p) => p.receiptId))
+      .filter(Boolean);
+    const receipts = receiptIds.length
+      ? await DonationReceipt.find({ _id: { $in: receiptIds } }).lean()
+      : [];
+    const receiptById = new Map(receipts.map((r) => [String(r._id), r]));
+
     const paymentsByDonation = new Map<string, any[]>();
     for (const p of payments) {
       const key = String(p.donationId);
@@ -325,23 +334,32 @@ export class DonationService {
       paymentsByDonation.get(key)!.push(p);
     }
 
-    return donations.map((d) => ({
-      id: String(d._id),
-      amountCents: d.amountCents,
-      currency: d.currency,
-      frequency: d.frequency,
-      status: d.status,
-      pastDue: !!d.pastDue,
-      cancelledAt: d.cancelledAt,
-      createdAt: d.createdAt,
-      payments: (paymentsByDonation.get(String(d._id)) || []).map((p) => ({
-        id: String(p._id),
-        amountCents: p.amountCents,
-        status: p.status,
-        paidAt: p.paidAt,
-        receiptId: p.receiptId ? String(p.receiptId) : undefined,
-      })),
-    }));
+    return donations.map((d) => {
+      const donationReceipt = d.receiptId ? receiptById.get(String(d.receiptId)) : null;
+      return {
+        id: String(d._id),
+        amountCents: d.amountCents,
+        currency: d.currency,
+        frequency: d.frequency,
+        status: d.status,
+        pastDue: !!d.pastDue,
+        cancelledAt: d.cancelledAt,
+        createdAt: d.createdAt,
+        receiptId: d.receiptId ? String(d.receiptId) : undefined,
+        receiptNumber: donationReceipt?.receiptNumber,
+        payments: (paymentsByDonation.get(String(d._id)) || []).map((p) => {
+          const payReceipt = p.receiptId ? receiptById.get(String(p.receiptId)) : null;
+          return {
+            id: String(p._id),
+            amountCents: p.amountCents,
+            status: p.status,
+            paidAt: p.paidAt,
+            receiptId: p.receiptId ? String(p.receiptId) : (d.receiptId ? String(d.receiptId) : undefined),
+            receiptNumber: payReceipt?.receiptNumber || donationReceipt?.receiptNumber,
+          };
+        }),
+      };
+    });
   }
 
   /** Admin list (permission enforced in route). */
@@ -720,6 +738,16 @@ export class DonationService {
       if (receipt) {
         donation.receiptId = receipt._id;
         await donation.save();
+        // Link receipt to payment so portal can show View/Download
+        await DonationPayment.updateOne(
+          { stripePaymentIntentId: paymentIntentId },
+          { $set: { receiptId: receipt._id } },
+        );
+        // Backfill any succeeded payments missing receiptId for this donation
+        await DonationPayment.updateMany(
+          { donationId: donation._id, status: 'succeeded', receiptId: { $in: [null, undefined] } },
+          { $set: { receiptId: receipt._id } },
+        );
       }
 
       // Email — best-effort, fail-closed production path already in sendMail
