@@ -70,7 +70,7 @@ export default function SaveCardBanner({
           <p className="text-sm font-semibold text-green-900">Payment method saved</p>
           <p className="text-sm text-green-800 mt-0.5">
             Available for future shop purchases and membership renewals. Manage cards anytime under{' '}
-            <span className="font-semibold">Account → Membership → Payment Methods</span>.
+            <span className="font-semibold">Account → Settings → Payment Methods</span>.
           </p>
         </div>
       </div>

@@ -3,11 +3,12 @@ import { Link } from 'react-router-dom';
 import {
   Bell, ChevronRight, Lock, Shield, Mail, Phone, Download,
   Trash2, Loader2, CheckCircle, AlertTriangle, Eye, EyeOff,
-  Key, Smartphone, Info,
+  Key, Smartphone, Info, CreditCard,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { ConfirmDialog, StatusBadge, BottomSheet } from '@pawtag/ui';
 import SaveToast from '../../components/SaveToast';
+import PaymentMethodsPanel from '../../components/PaymentMethodsPanel';
 import { API } from '@pawtag/shared/api';
 import api from '../../lib/api';
 
@@ -316,6 +317,18 @@ export default function Settings() {
               }`} />
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* Payment Methods — account-level saved cards (Stripe Customer source of truth) */}
+      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        <div className="px-5 py-3 border-b border-gray-100 bg-gray-50">
+          <h2 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+            <CreditCard size={16} className="text-teal-600" /> Payment Methods
+          </h2>
+        </div>
+        <div className="p-5">
+          <PaymentMethodsPanel hideHeader />
         </div>
       </div>
 

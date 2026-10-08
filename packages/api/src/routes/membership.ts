@@ -535,7 +535,7 @@ router.post('/payment-methods/portal', async (req: AuthRequest, res: Response) =
 
     const session = await stripe.billingPortal.sessions.create({
       customer: user.stripeCustomerId,
-      return_url: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/membership`,
+      return_url: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/settings`,
     });
 
     logger.info({ userId: req.user!.id, sessionId: session.id }, '[Membership] Billing Portal session created');

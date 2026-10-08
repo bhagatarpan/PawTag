@@ -12,6 +12,8 @@ import SetupPaymentMethodForm from './SetupPaymentMethodForm';
 interface PaymentMethodsPanelProps {
   /** When true, hide destructive actions (used in compact contexts). */
   readOnly?: boolean;
+  /** When true, suppress the internal title (embedded under an external section header). */
+  hideHeader?: boolean;
   onChanged?: () => void;
 }
 
@@ -19,7 +21,7 @@ interface PaymentMethodsPanelProps {
  * Multi saved payment methods manager (Stripe Customer source of truth).
  * One default; multiple cards; add / set default / remove.
  */
-export default function PaymentMethodsPanel({ readOnly = false, onChanged }: PaymentMethodsPanelProps) {
+export default function PaymentMethodsPanel({ readOnly = false, hideHeader = false, onChanged }: PaymentMethodsPanelProps) {
   const [items, setItems] = useState<SavedPaymentMethod[]>([]);
   const [defaultId, setDefaultId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -92,8 +94,10 @@ export default function PaymentMethodsPanel({ readOnly = false, onChanged }: Pay
 
   return (
     <div data-testid="payment-methods-panel">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-sm font-semibold text-gray-900">Payment Methods</h2>
+      <div className={`flex items-center mb-4 ${hideHeader ? 'justify-end' : 'justify-between'}`}>
+        {!hideHeader && (
+          <h2 className="text-sm font-semibold text-gray-900">Payment Methods</h2>
+        )}
         {!readOnly && (
           <button
             type="button"

@@ -6,7 +6,6 @@ import { formatCurrency, formatDate } from '@pawtag/shared';
 import api from '../../lib/api';
 import { ConfirmDialog, resolveTierIcon, resolveTierGradient, EntitlementList } from '@pawtag/ui';
 import KeepMembershipPanel from '../../components/KeepMembershipPanel';
-import PaymentMethodsPanel from '../../components/PaymentMethodsPanel';
 
 interface MembershipStatus {
   hasMembership: boolean;
@@ -126,7 +125,6 @@ export default function MembershipManage() {
     );
   }
 
-  // Cards are account-level: always visible, even without active membership
   if (!status?.hasMembership) {
     return (
       <div className="max-w-3xl mx-auto py-8 px-4 space-y-6">
@@ -134,7 +132,8 @@ export default function MembershipManage() {
           <Crown className="h-16 w-16 text-gray-300 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-gray-900 mb-2">No Active Membership</h2>
           <p className="text-gray-500 mb-6">
-            Join PawTag membership to unlock premium benefits for your pets. You can still manage saved cards below (shop purchases use the same cards).
+            Join PawTag membership to unlock premium benefits for your pets. You can manage your
+            saved cards anytime in Account → Settings (shop purchases use the same cards).
           </p>
           <Link
             to="/membership"
@@ -142,10 +141,6 @@ export default function MembershipManage() {
           >
             View Membership Plans
           </Link>
-        </div>
-
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <PaymentMethodsPanel onChanged={fetchData} />
         </div>
       </div>
     );
@@ -271,11 +266,6 @@ export default function MembershipManage() {
           showDisabled={true}
           tagLimit={tier.tagLimit}
         />
-      </div>
-
-      {/* Payment Methods — multi-card manager (Stripe Customer source of truth) */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-        <PaymentMethodsPanel onChanged={fetchData} />
       </div>
 
       {/* Billing History */}

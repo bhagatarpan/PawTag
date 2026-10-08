@@ -726,7 +726,7 @@ async function handleMembershipPaymentFailure(membership: any, stripeInvoice: an
         The payment of $${amountDue.toFixed(2)} failed.</p>
         <p>Please update your payment method to keep your membership active.
         Your benefits will remain active until ${membership.currentPeriodEnd?.toLocaleDateString('en-NZ', { dateStyle: 'full' }) || 'the end of your billing period'}.</p>
-        <p><a href="${frontendUrl}/account/membership">Update Payment Method</a></p>
+        <p><a href="${frontendUrl}/account/settings">Update Payment Method</a></p>
       `;
       await sendMail(user.email, `Action Required: Update Your ${tier?.name || 'Membership'} Payment Method`, html)
         .catch((err: any) => logger.error({ err, membershipId: membership._id }, 'Failed to send payment failure email'));

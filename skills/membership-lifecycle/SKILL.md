@@ -217,7 +217,7 @@ Webhook `customer.subscription.updated` keeps local cancel state aligned with St
 - **Multiple** saved cards on Stripe Customer (source of truth)
 - One **default** PM (`invoice_settings.default_payment_method`)
 - First saved PM becomes default if none exists; adding another does **not** silently replace default
-- Portal UI: Membership Manage → Payment Methods (`PaymentMethodsPanel`)
+- Portal UI: Account → Settings → Payment Methods (`PaymentMethodsPanel`)
 - Endpoints: list, setup-intent (add), default, detach, confirm-save, portal
 - Membership subscribe / repair pass `default_payment_method` when valid
 - Post-purchase banner: product **and** membership success (`SaveCardBanner`)

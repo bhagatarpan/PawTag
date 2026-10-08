@@ -1,7 +1,7 @@
 # Saved Payment Methods (multiple cards)
 
 **Status:** In progress — branch `feature/multi-saved-payment-methods`  
-**Decisions:** Membership Manage primary UI; explicit post-purchase save opt-in; No → leave PM on Customer but not default; membership/Keep paid preselect default PM; save UX on product **and** membership success
+**Decisions:** Settings → Payment Methods primary UI; explicit post-purchase save opt-in; No → leave PM on Customer but not default; membership/Keep paid preselect default PM; save UX on product **and** membership success
 
 ---
 
@@ -52,7 +52,7 @@ Payment success (product OR membership)
        Yes → if no default: set first PM default; else keep default
        No  → do not set default (PM may remain on Stripe Customer)
 
-Membership Manage → Payment Methods
+Settings → Payment Methods
   → list PMs, Default badge
   → Add (SetupIntent + Elements)
   → Set default / Remove (block if membership requires card & no replacement)
@@ -92,7 +92,7 @@ Membership Manage → Payment Methods
 - [x] Service: list (real default), setup-intent, set-default, detach, confirm-save
 - [x] Routes under `/membership/payment-methods/*`
 - [x] Charge paths pass `default_payment_method` when valid (subscribe + repair)
-- [x] UI: MembershipManage PaymentMethodsPanel + SaveCardBanner (checkout + membership success)
+- [x] UI: Settings → Payment Methods (`PaymentMethodsPanel`) + SaveCardBanner (checkout + membership success)
 - [x] Tests: contracts, list empty, validation, ownership 401
 - [x] Docs/skills updates
 - [ ] Approval → commit/push

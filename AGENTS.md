@@ -782,7 +782,7 @@ Example: Black (3×) → Gold (1×): customer loses 2/3 of points earned at Blac
 
 - **Multiple** saved PaymentMethods on Stripe Customer; **one default** (`invoice_settings.default_payment_method`)
 - First saved card becomes default if none; adding another does **not** silently replace default
-- Customer portal: **Account → Membership → Payment Methods** (list / add / set default / remove) — **visible without membership** (shop purchases use same cards)
+- Customer portal: **Account → Settings → Payment Methods** (list / add / set default / remove) — **visible without membership** (shop purchases use same cards)
 - Membership subscribe + repair preselect default PM when valid; Elements fallback
 - Post-purchase optional save banner on **shop and membership** success; empty Stripe list → SetupIntent add-card (never false “saved”)
 - Delete last/default card blocked while active membership requires billing

@@ -2868,7 +2868,7 @@ export async function processScheduledDowngrades() {
               <p>Hi ${user.fullName || 'there'},</p>
               <p>Your scheduled downgrade to <strong>${newTier.displayName}</strong> could not be completed because your membership renewal payment failed.</p>
               <p>Your current ${oldTier?.displayName || 'membership'} benefits remain active. Please update your payment method to keep your membership active.</p>
-              <p><a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/membership">Update Payment Method</a></p>
+              <p><a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/settings">Update Payment Method</a></p>
             `;
             await sendMail(user.email, `Downgrade to ${newTier.displayName} Not Completed`, html)
               .catch((err) => logger.error({ err, membershipId: membership._id }, 'Failed to send downgrade-failed email'));
