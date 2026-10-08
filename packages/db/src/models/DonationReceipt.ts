@@ -18,6 +18,9 @@ export interface IDonationReceiptDocument extends Document {
   status: DonationReceiptStatus;
   relatedReceiptId?: mongoose.Types.ObjectId;
   pdfUrl?: string;
+  /** Secure access token hash for emailed download links (invoice-style) */
+  accessTokenHash?: string;
+  accessExpiresAt?: Date;
   issuedAt: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -40,6 +43,8 @@ const DonationReceiptSchema = new Schema<IDonationReceiptDocument>(
     status: { type: String, enum: ['issued', 'void', 'replaced'], default: 'issued' },
     relatedReceiptId: { type: Schema.Types.ObjectId, ref: 'DonationReceipt' },
     pdfUrl: { type: String },
+    accessTokenHash: { type: String, index: true },
+    accessExpiresAt: { type: Date },
     issuedAt: { type: Date, default: Date.now },
   },
   { timestamps: true },

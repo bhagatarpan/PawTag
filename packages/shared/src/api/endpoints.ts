@@ -734,6 +734,8 @@ export const API = {
     confirm: (id: string) => `/donations/${id}/confirm` as const,
     cancel: (id: string) => `/donations/${id}/cancel` as const,
     receiptHtml: (receiptId: string) => `/donations/receipt/${receiptId}/html` as const,
+    /** Public secure access for emailed receipt links (token in URL, no login) */
+    receiptAccess: (token: string) => `/donations/receipt-access/${token}` as const,
   },
 
   adminDonations: {

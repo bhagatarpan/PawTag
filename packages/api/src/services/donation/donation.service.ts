@@ -7,6 +7,7 @@ import { Donation, DonationPayment, DonationReceipt, User, Setting } from '@pawt
 import { stripePaymentProvider } from '../../commerce/providers/stripe';
 import { isFakeMode, isFakePaymentIntentId } from '../../commerce/payment-mode';
 import { getStripeClient } from '../../lib/stripe-client';
+import { generateSecureToken, hashToken } from '../auth.service';
 import { sendMail } from '../email.service';
 import logger from '../../lib/logger';
 import {
@@ -377,7 +378,55 @@ export class DonationService {
     if (userId && donation && String(donation.supporterUserId) !== userId) {
       throw new Error('Receipt not found');
     }
+    return this.renderReceiptDocument(receipt);
+  }
 
+  /**
+   * Public secure access by token (emailed download links).
+   * Token is hashed; no JWT required — token IS the credential (invoice-style).
+   */
+  async getReceiptHtmlByToken(token: string): Promise<string> {
+    if (!token || token.length < 20) throw new Error('Receipt not found');
+    const tokenHash = hashToken(token);
+    const receipt = await DonationReceipt.findOne({
+      accessTokenHash: tokenHash,
+      status: { $in: ['issued', 'replaced'] },
+    });
+    if (!receipt) throw new Error('Receipt not found');
+    if (receipt.accessExpiresAt && new Date() > receipt.accessExpiresAt) {
+      throw new Error('Receipt link expired');
+    }
+    return this.renderReceiptDocument(receipt);
+  }
+
+  /**
+   * Ensure a secure download token exists for this receipt.
+   * Returns the raw token for email links (only returned once at generation).
+   */
+  async ensureReceiptAccessToken(receiptId: string): Promise<string | null> {
+    const receipt = await DonationReceipt.findById(receiptId);
+    if (!receipt) return null;
+    if (receipt.accessTokenHash) return null; // already has hash — caller regenerates if needed
+
+    const token = generateSecureToken();
+    receipt.accessTokenHash = hashToken(token);
+    receipt.accessExpiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000); // 90 days
+    await receipt.save();
+    return token;
+  }
+
+  /** Generate (or rotate) access token for emailing. Always returns a fresh raw token. */
+  async issueReceiptAccessToken(receiptId: string): Promise<string> {
+    const receipt = await DonationReceipt.findById(receiptId);
+    if (!receipt) throw new Error('Receipt not found');
+    const token = generateSecureToken();
+    receipt.accessTokenHash = hashToken(token);
+    receipt.accessExpiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
+    await receipt.save();
+    return token;
+  }
+
+  private renderReceiptDocument(receipt: any): string {
     const amount = (receipt.amountCents / 100).toFixed(2);
     const taxNote =
       receipt.taxClassification === 'neutral' || !receipt.taxClassification
@@ -736,10 +785,19 @@ export class DonationService {
     const organisationName = receipt?.organisationName || 'PawTag';
     const statement = receipt?.statement || 'Thank you for your donation to PawTag.';
     const donorName = donation.nameSnapshot || 'Supporter';
-    const downloadPath = receipt?._id ? `/api/donations/receipt/${receipt._id}/html` : '';
-    const portalPath = '/account/donations';
 
-    // Invoice-style email: personalised + receipt number + download + embedded document
+    // Secure token link — works without login (invoice-style)
+    let secureToken = '';
+    try {
+      secureToken = await this.issueReceiptAccessToken(String(receipt._id));
+    } catch (err) {
+      logger.error({ err, receiptNumber }, 'Failed to issue receipt access token');
+    }
+
+    const frontend = (await readOptionalSetting('urls.frontend')) || process.env.FRONTEND_URL || '';
+    const downloadUrl = secureToken ? `${frontend}/donations/receipt/${secureToken}` : '';
+    const portalPath = `${frontend}/account/donations`;
+
     const subject = `Thank you — receipt ${receiptNumber} | ${organisationName}`;
     const html = `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
@@ -755,13 +813,13 @@ export class DonationService {
             <strong>Receipt number:</strong> ${escapeHtml(receiptNumber)}<br/>
             <strong>Sent to:</strong> ${escapeHtml(to)}
           </p>
-          ${downloadPath ? `
+          ${downloadUrl ? `
           <div style="text-align: center; margin: 24px 0;">
-            <a href="{{DOWNLOAD_BASE_URL}}${downloadPath}" style="display: inline-block; background: #0d9488; color: white; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">Download receipt</a>
+            <a href="${escapeHtml(downloadUrl)}" style="display: inline-block; background: #0d9488; color: white; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">Download receipt</a>
           </div>` : ''}
           <p style="font-size: 13px; color: #6b7280;">
             You can also view this receipt anytime under
-            <a href="{{DOWNLOAD_BASE_URL}}${portalPath}" style="color: #0d9488;">My Donations</a>
+            <a href="${escapeHtml(portalPath)}" style="color: #0d9488;">My Donations</a>
             after signing in.
           </p>
         </div>
@@ -769,10 +827,6 @@ export class DonationService {
           ${escapeHtml(organisationName)} — Donation receipt ${escapeHtml(receiptNumber)}
         </div>
       </div>`;
-
-    // Replace download base with configured frontend URL
-    const frontend = (await readOptionalSetting('urls.frontend')) || process.env.FRONTEND_URL || '';
-    const resolvedHtml = html.replaceAll('{{DOWNLOAD_BASE_URL}}', frontend);
 
     // PDF attachment (server-side)
     let attachments: Array<{ filename: string; contentType: string; content: Buffer }> | undefined;
@@ -804,7 +858,7 @@ export class DonationService {
     await sendMail(
       to,
       subject,
-      resolvedHtml,
+      html,
       undefined,
       {
         templateSlug: 'donation-receipt',

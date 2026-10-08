@@ -169,6 +169,14 @@ describe('Phase 15 — Donation webhook + receipt (neutral wording)', () => {
     await donationService.handlePaymentIntentUpdate(paymentIntentId, 'succeeded', 'evt_test_1');
     const receipts = await DonationReceipt.find({ donationId }).lean();
     expect(receipts.length).toBe(1);
+
+    // Secure token access works without login (email download link)
+    const rawToken = await donationService.issueReceiptAccessToken(receipts[0]._id.toString());
+    expect(rawToken).toBeTruthy();
+    const access = await request(app).get(`/api/donations/receipt-access/${rawToken}`);
+    expect(access.status).toBe(200);
+    expect(access.text).toContain(receipts[0].receiptNumber);
+    expect(access.text.toLowerCase()).not.toMatch(/ird tax credit/i);
   });
 
   it('marks donation failed via webhook without creating receipt', async () => {
