@@ -180,22 +180,55 @@ describe('Phase 15 — Donation webhook + receipt (neutral wording)', () => {
   });
 
   it('marks donation failed via webhook without creating receipt', async () => {
-    // Use stripe_test so create does not auto-complete; then fail via service
+    // stripe_test create requires real Stripe keys — seed a pending donation
+    // instead, then prove webhook failure does not issue a receipt.
     process.env.PAYMENT_MODE = 'stripe_test';
-    const created = await request(app)
-      .post('/api/donations')
-      .send({ amount: 10, email: 'fail@example.com', idempotencyKey: `fail-${Date.now()}` });
-    const { donationId, paymentIntentId } = created.body.data;
 
-    // If fake auto-complete ran under wrong mode, force pending first
-    await Donation.updateOne({ _id: donationId }, { $set: { status: 'pending' } });
+    const user = await mongoose.connection.collections.users.insertOne({
+      email: 'fail@example.com',
+      passwordHash: 'x',
+      fullName: 'Fail Donor',
+      phoneNumber: '+64210008888',
+      role: 'customer',
+      status: 'active',
+      emailVerified: true,
+      phoneVerified: true,
+      registrationContext: 'DONATION',
+      responsibilityScore: 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const paymentIntentId = 'pi_test_fail_webhook_001';
+    const donation = await Donation.create({
+      supporterUserId: user.insertedId,
+      emailSnapshot: 'fail@example.com',
+      nameSnapshot: 'Fail Donor',
+      amountCents: 1000,
+      currency: 'NZD',
+      frequency: 'one_time',
+      status: 'pending',
+      stripePaymentIntentId: paymentIntentId,
+      registrationContext: 'DONATION',
+    });
+
+    await DonationPayment.create({
+      donationId: donation._id,
+      amountCents: 1000,
+      currency: 'NZD',
+      status: 'pending',
+      stripePaymentIntentId: paymentIntentId,
+    });
 
     const { donationService } = await import('../../packages/api/src/services/donation/donation.service');
     await donationService.handlePaymentIntentUpdate(paymentIntentId, 'failed');
 
-    const donation = await Donation.findById(donationId).lean();
-    expect(donation!.status).toBe('failed');
-    expect(donation!.receiptId).toBeFalsy();
+    const after = await Donation.findById(donation._id).lean();
+    expect(after!.status).toBe('failed');
+    expect(after!.receiptId).toBeFalsy();
+
+    const receipts = await DonationReceipt.find({ donationId: donation._id }).lean();
+    expect(receipts.length).toBe(0);
 
     process.env.PAYMENT_MODE = 'fake';
   });
