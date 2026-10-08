@@ -4,9 +4,10 @@ const SIDEBAR_KEY = 'pawtag-admin-sidebar-collapsed';
 const SECTIONS_KEY = 'pawtag-admin-sidebar-sections';
 
 const ALL_SECTION_IDS = [
-  'overview', 'catalog', 'inventory', 'orders', 'payments',
-  'tag-subscriptions', 'guardian-loyalty', 'discounts', 'users',
-  'communication', 'content', 'settings', 'security', 'operations',
+  'overview', 'catalog', 'communication', 'content', 'discounts',
+  'communications', 'guardian-loyalty', 'inventory', 'membership',
+  'membership-settings', 'operations', 'orders', 'payments',
+  'security', 'tag-subscriptions', 'users', 'settings',
 ];
 
 function getInitialSidebarCollapsed(): boolean {

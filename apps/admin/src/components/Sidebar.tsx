@@ -55,6 +55,8 @@ import {
   ChevronsUp,
   Scan,
   Heart,
+  Search,
+  SearchX,
 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { useTheme } from '../hooks/useTheme';
@@ -79,8 +81,9 @@ interface SidebarSection {
   links: SidebarLink[];
 }
 
+// Product order rules: Overview first, Settings last, everything else A→Z.
 const sections: SidebarSection[] = [
-  // ─── Overview ─────────────────────────────────────────────
+  // ─── Overview (always first) ──────────────────────────────
   {
     id: 'overview',
     label: 'Overview',
@@ -104,120 +107,6 @@ const sections: SidebarSection[] = [
       { to: '/collections', label: 'Collections', icon: Database, permission: 'product.read' },
       { to: '/brands', label: 'Brands', icon: Target, permission: 'product.read' },
       { to: '/tags', label: 'Tags', icon: QrCode, permission: 'tag.read' },
-    ],
-  },
-  // ─── Inventory ────────────────────────────────────────────
-  {
-    id: 'inventory',
-    label: 'Inventory',
-    icon: Package,
-    color: 'text-purple-300',
-    links: [
-      { to: '/inventory', label: 'Stock', icon: Package, permission: 'inventory.read' },
-      { to: '/inventory/adjustments', label: 'Adjustments', icon: AlertTriangle, permission: 'inventory.adjust' },
-      { to: '/inventory/history', label: 'Stock History', icon: Database, permission: 'inventory.read' },
-    ],
-  },
-  // ─── Orders & Fulfilment ──────────────────────────────────
-  {
-    id: 'orders',
-    label: 'Orders & Fulfilment',
-    icon: FileText,
-    color: 'text-orange-300',
-    links: [
-      { to: '/orders', label: 'All Orders', icon: FileText, permission: 'order.read' },
-      { to: '/orders/pending', label: 'Pending', icon: Clock, permission: 'order.read' },
-      { to: '/orders/processing', label: 'Processing', icon: Activity, permission: 'order.read' },
-      { to: '/fulfilment', label: 'Fulfilment', icon: ClipboardCheck, permission: 'order.read' },
-      { to: '/invoices', label: 'Invoices', icon: FileText, permission: 'order.read' },
-      { to: '/shipping/shipments', label: 'Shipments', icon: Truck, permission: 'order.read' },
-      { to: '/returns', label: 'Returns', icon: RotateCcw, permission: 'order.read' },
-    ],
-  },
-  // ─── Payments & Refunds ───────────────────────────────────
-  {
-    id: 'payments',
-    label: 'Payments & Refunds',
-    icon: CreditCard,
-    color: 'text-green-300',
-    links: [
-      { to: '/payments', label: 'Transactions', icon: CreditCard, permission: 'order.read' },
-      { to: '/donations', label: 'Donations', icon: Heart, permission: 'donation.read' },
-      { to: '/refunds', label: 'Refunds', icon: RotateCcw, permission: 'order.refund' },
-      { to: '/refund-report', label: 'Refund Report', icon: FileText, permission: 'order.refund' },
-      { to: '/payments/reconciliation', label: 'Reconciliation', icon: AlertTriangle, permission: 'order.read' },
-      { to: '/shipping/methods', label: 'Shipping Methods', icon: Truck, permission: 'setting.read' },
-      { to: '/stripe-report', label: 'Stripe Report', icon: CreditCard, permission: 'setting.read' },
-    ],
-  },
-  // ─── Tag Subscriptions ─────────────────────────────────────
-  {
-    id: 'tag-subscriptions',
-    label: 'Tag Subscriptions',
-    icon: QrCode,
-    color: 'text-primary-300',
-    links: [
-      { to: '/subscription-plans', label: 'Subscription Plans', icon: CreditCard, permission: 'product.read' },
-      { to: '/customer-subscriptions', label: 'Customer Subscriptions', icon: Users, permission: 'subscription.read' },
-    ],
-  },
-  // ─── Guardian Loyalty ──────────────────────────────────────
-  {
-    id: 'guardian-loyalty',
-    label: 'Guardian Loyalty',
-    icon: Shield,
-    color: 'text-yellow-300',
-    links: [
-      { to: '/guardian', label: 'Guardian Dashboard', icon: Shield, permission: 'subscription.read' },
-      { to: '/guardian/members', label: 'Members', icon: Users, permission: 'subscription.read' },
-      { to: '/guardian/analytics', label: 'Analytics', icon: BarChart3, permission: 'subscription.read' },
-      { to: '/guardian/settings', label: 'Guardian Settings', icon: Settings, permission: 'subscription.read' },
-    ],
-  },
-  // ─── Membership ──────────────────────────────────────────
-  {
-    id: 'membership',
-    label: 'Membership',
-    icon: Crown,
-    color: 'text-amber-400',
-    links: [
-      { to: '/membership', label: 'Dashboard', icon: Crown, permission: 'subscription.read' },
-      { to: '/membership/subscribers', label: 'Subscribers', icon: Users, permission: 'subscription.read' },
-    ],
-  },
-  // ─── Membership Settings ─────────────────────────────────
-  {
-    id: 'membership-settings',
-    label: 'Membership Settings',
-    icon: Settings,
-    color: 'text-amber-300',
-    links: [
-      { to: '/membership/tiers', label: 'Tier Configuration', icon: Settings, permission: 'setting.read' },
-      { to: '/membership/entitlements', label: 'Entitlements', icon: Settings, permission: 'setting.read' },
-      { to: '/membership/settings/retention', label: 'Retention Settings', icon: Settings, permission: 'setting.read' },
-    ],
-  },
-  // ─── Discounts & Promotions ───────────────────────────────
-  {
-    id: 'discounts',
-    label: 'Discounts & Promotions',
-    icon: Tag,
-    color: 'text-pink-300',
-    links: [
-      { to: '/discounts', label: 'Discount Codes', icon: Tag, permission: 'product.read' },
-      { to: '/referrals', label: 'Referral Program', icon: Gift, permission: 'product.read' },
-    ],
-  },
-  // ─── Users & Pets ─────────────────────────────────────────
-  {
-    id: 'users',
-    label: 'Users & Pets',
-    icon: Users,
-    color: 'text-blue-300',
-    links: [
-      { to: '/users/customers', label: 'Customers', icon: Users, permission: 'user.read' },
-      { to: '/users/admin', label: 'Admin Users', icon: Users, permission: 'user.read' },
-      { to: '/pets', label: 'Pets', icon: PawPrint, permission: 'pet.read' },
     ],
   },
   // ─── Communication ────────────────────────────────────────
@@ -255,6 +144,17 @@ const sections: SidebarSection[] = [
       { to: '/cms/pet-references', label: 'Pet References', icon: PawPrint, permission: 'cms.pet_reference.read' },
     ],
   },
+  // ─── Discounts & Promotions ───────────────────────────────
+  {
+    id: 'discounts',
+    label: 'Discounts & Promotions',
+    icon: Tag,
+    color: 'text-pink-300',
+    links: [
+      { to: '/discounts', label: 'Discount Codes', icon: Tag, permission: 'product.read' },
+      { to: '/referrals', label: 'Referral Program', icon: Gift, permission: 'product.read' },
+    ],
+  },
   // ─── Email Communication Centre ─────────────────────────
   {
     id: 'communications',
@@ -266,18 +166,100 @@ const sections: SidebarSection[] = [
       { to: '/communications/audit', label: 'Email Audit', icon: Database, permission: 'communication.email_audit.read' },
     ],
   },
-  // ─── Settings ─────────────────────────────────────────────
+  // ─── Guardian Loyalty ──────────────────────────────────────
   {
-    id: 'settings',
-    label: 'Settings',
+    id: 'guardian-loyalty',
+    label: 'Guardian Loyalty',
+    icon: Shield,
+    color: 'text-yellow-300',
+    links: [
+      { to: '/guardian', label: 'Guardian Dashboard', icon: Shield, permission: 'subscription.read' },
+      { to: '/guardian/members', label: 'Members', icon: Users, permission: 'subscription.read' },
+      { to: '/guardian/analytics', label: 'Analytics', icon: BarChart3, permission: 'subscription.read' },
+      { to: '/guardian/settings', label: 'Guardian Settings', icon: Settings, permission: 'subscription.read' },
+    ],
+  },
+  // ─── Inventory ────────────────────────────────────────────
+  {
+    id: 'inventory',
+    label: 'Inventory',
+    icon: Package,
+    color: 'text-purple-300',
+    links: [
+      { to: '/inventory', label: 'Stock', icon: Package, permission: 'inventory.read' },
+      { to: '/inventory/adjustments', label: 'Adjustments', icon: AlertTriangle, permission: 'inventory.adjust' },
+      { to: '/inventory/history', label: 'Stock History', icon: Database, permission: 'inventory.read' },
+    ],
+  },
+  // ─── Membership ──────────────────────────────────────────
+  {
+    id: 'membership',
+    label: 'Membership',
+    icon: Crown,
+    color: 'text-amber-400',
+    links: [
+      { to: '/membership', label: 'Dashboard', icon: Crown, permission: 'subscription.read' },
+      { to: '/membership/subscribers', label: 'Subscribers', icon: Users, permission: 'subscription.read' },
+    ],
+  },
+  // ─── Membership Settings ─────────────────────────────────
+  {
+    id: 'membership-settings',
+    label: 'Membership Settings',
     icon: Settings,
+    color: 'text-amber-300',
+    links: [
+      { to: '/membership/tiers', label: 'Tier Configuration', icon: Settings, permission: 'setting.read' },
+      { to: '/membership/entitlements', label: 'Entitlements', icon: Settings, permission: 'setting.read' },
+      { to: '/membership/settings/retention', label: 'Retention Settings', icon: Settings, permission: 'setting.read' },
+    ],
+  },
+  // ─── Operations ───────────────────────────────────────────
+  {
+    id: 'operations',
+    label: 'Operations',
+    icon: Terminal,
     color: 'text-gray-300',
     links: [
-      { to: '/commerce-settings', label: 'Commerce Settings', icon: Settings, permission: 'setting.read' },
-      { to: '/settings', label: 'General Settings', icon: Settings, permission: 'setting.read' },
-      { to: '/site-availability', label: 'Site Availability', icon: Wifi, permission: 'setting.read' },
-      { to: '/address-autocomplete', label: 'Address Autocomplete', icon: MapPin, permission: 'setting.read' },
-      { to: '/test-data-reset', label: 'Reset Test Data', icon: Database, permission: 'system.reset_test_data' },
+      { to: '/feature-flags', label: 'Feature Flags', icon: Flag, permission: 'feature_flag.read' },
+      { to: '/webhooks', label: 'Webhooks', icon: Zap, permission: 'setting.read' },
+      { to: '/background-jobs', label: 'Background Jobs', icon: Clock, permission: 'job.read' },
+      { to: '/system-logs', label: 'System Logs', icon: Terminal, permission: 'systemlogs.read' },
+      { to: '/system-log-settings', label: 'Log Settings', icon: Settings, permission: 'systemlogs.admin' },
+      { to: '/statistics', label: 'Statistics', icon: BarChart3, permission: 'stats.read' },
+      { to: '/write-nfc', label: 'Write NFC Tag', icon: Wifi, permission: 'tag.update' },
+    ],
+  },
+  // ─── Orders & Fulfilment ──────────────────────────────────
+  {
+    id: 'orders',
+    label: 'Orders & Fulfilment',
+    icon: FileText,
+    color: 'text-orange-300',
+    links: [
+      { to: '/orders', label: 'All Orders', icon: FileText, permission: 'order.read' },
+      { to: '/orders/pending', label: 'Pending', icon: Clock, permission: 'order.read' },
+      { to: '/orders/processing', label: 'Processing', icon: Activity, permission: 'order.read' },
+      { to: '/fulfilment', label: 'Fulfilment', icon: ClipboardCheck, permission: 'order.read' },
+      { to: '/invoices', label: 'Invoices', icon: FileText, permission: 'order.read' },
+      { to: '/shipping/shipments', label: 'Shipments', icon: Truck, permission: 'order.read' },
+      { to: '/returns', label: 'Returns', icon: RotateCcw, permission: 'order.read' },
+    ],
+  },
+  // ─── Payments & Refunds ───────────────────────────────────
+  {
+    id: 'payments',
+    label: 'Payments & Refunds',
+    icon: CreditCard,
+    color: 'text-green-300',
+    links: [
+      { to: '/payments', label: 'Transactions', icon: CreditCard, permission: 'order.read' },
+      { to: '/donations', label: 'Donations', icon: Heart, permission: 'donation.read' },
+      { to: '/refunds', label: 'Refunds', icon: RotateCcw, permission: 'order.refund' },
+      { to: '/refund-report', label: 'Refund Report', icon: FileText, permission: 'order.refund' },
+      { to: '/payments/reconciliation', label: 'Reconciliation', icon: AlertTriangle, permission: 'order.read' },
+      { to: '/shipping/methods', label: 'Shipping Methods', icon: Truck, permission: 'setting.read' },
+      { to: '/stripe-report', label: 'Stripe Report', icon: CreditCard, permission: 'setting.read' },
     ],
   },
   // ─── Security & Access ────────────────────────────────────
@@ -295,20 +277,41 @@ const sections: SidebarSection[] = [
       { to: '/audit-settings', label: 'Audit Settings', icon: Settings, permission: 'audit.read' },
     ],
   },
-  // ─── Operations ───────────────────────────────────────────
+  // ─── Tag Subscriptions ─────────────────────────────────────
   {
-    id: 'operations',
-    label: 'Operations',
-    icon: Terminal,
+    id: 'tag-subscriptions',
+    label: 'Tag Subscriptions',
+    icon: QrCode,
+    color: 'text-primary-300',
+    links: [
+      { to: '/subscription-plans', label: 'Subscription Plans', icon: CreditCard, permission: 'product.read' },
+      { to: '/customer-subscriptions', label: 'Customer Subscriptions', icon: Users, permission: 'subscription.read' },
+    ],
+  },
+  // ─── Users & Pets ─────────────────────────────────────────
+  {
+    id: 'users',
+    label: 'Users & Pets',
+    icon: Users,
+    color: 'text-blue-300',
+    links: [
+      { to: '/users/customers', label: 'Customers', icon: Users, permission: 'user.read' },
+      { to: '/users/admin', label: 'Admin Users', icon: Users, permission: 'user.read' },
+      { to: '/pets', label: 'Pets', icon: PawPrint, permission: 'pet.read' },
+    ],
+  },
+  // ─── Settings (always last) ──────────────────────────────
+  {
+    id: 'settings',
+    label: 'Settings',
+    icon: Settings,
     color: 'text-gray-300',
     links: [
-      { to: '/feature-flags', label: 'Feature Flags', icon: Flag, permission: 'feature_flag.read' },
-      { to: '/webhooks', label: 'Webhooks', icon: Zap, permission: 'setting.read' },
-      { to: '/background-jobs', label: 'Background Jobs', icon: Clock, permission: 'job.read' },
-      { to: '/system-logs', label: 'System Logs', icon: Terminal, permission: 'systemlogs.read' },
-      { to: '/system-log-settings', label: 'Log Settings', icon: Settings, permission: 'systemlogs.admin' },
-      { to: '/statistics', label: 'Statistics', icon: BarChart3, permission: 'stats.read' },
-      { to: '/write-nfc', label: 'Write NFC Tag', icon: Wifi, permission: 'tag.update' },
+      { to: '/commerce-settings', label: 'Commerce Settings', icon: Settings, permission: 'setting.read' },
+      { to: '/settings', label: 'General Settings', icon: Settings, permission: 'setting.read' },
+      { to: '/site-availability', label: 'Site Availability', icon: Wifi, permission: 'setting.read' },
+      { to: '/address-autocomplete', label: 'Address Autocomplete', icon: MapPin, permission: 'setting.read' },
+      { to: '/test-data-reset', label: 'Reset Test Data', icon: Database, permission: 'system.reset_test_data' },
     ],
   },
 ];
@@ -346,9 +349,12 @@ export default function Sidebar({ mobile, onClose }: SidebarContentProps & { mob
   const [unreadCount, setUnreadCount] = useState(0);
   const [pendingReturns, setPendingReturns] = useState(0);
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
+  const [menuSearch, setMenuSearch] = useState('');
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const collapsed = !mobile && sidebarCollapsed;
+  const searchActive = menuSearch.trim().length > 0;
 
   useEffect(() => {
     const fetchCount = () => {
@@ -386,6 +392,25 @@ export default function Sidebar({ mobile, onClose }: SidebarContentProps & { mob
       .filter((section) => section.links.length > 0);
   }, [hasPermission]);
 
+  const searchedSections = useMemo(() => {
+    const q = menuSearch.trim().toLowerCase();
+    if (!q) return filteredSections;
+
+    return filteredSections
+      .map((section) => {
+        const sectionMatches = section.label.toLowerCase().includes(q);
+        const links = sectionMatches
+          ? section.links
+          : section.links.filter(
+              (link) =>
+                link.label.toLowerCase().includes(q) ||
+                link.to.toLowerCase().includes(q),
+            );
+        return { ...section, links };
+      })
+      .filter((section) => section.links.length > 0);
+  }, [filteredSections, menuSearch]);
+
   const isLinkActive = (to: string) => {
     if (to === '/') return location.pathname === '/';
     return location.pathname.startsWith(to);
@@ -407,6 +432,7 @@ export default function Sidebar({ mobile, onClose }: SidebarContentProps & { mob
   };
 
   const handleNavClick = () => {
+    setMenuSearch('');
     if (mobile && onClose) onClose();
   };
 
@@ -488,10 +514,52 @@ export default function Sidebar({ mobile, onClose }: SidebarContentProps & { mob
         )}
       </div>
 
+      {/* Menu search (expanded sidebar + mobile drawer) */}
+      {(!collapsed || mobile) && (
+        <div className="px-3 pb-2 flex-shrink-0">
+          <div className="relative">
+            <Search
+              size={15}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+            />
+            <input
+              ref={searchInputRef}
+              type="search"
+              value={menuSearch}
+              onChange={(e) => setMenuSearch(e.target.value)}
+              placeholder="Search menu…"
+              aria-label="Search admin menu"
+              className="w-full bg-white/[0.08] border border-white/10 rounded-lg pl-9 pr-8 py-2 text-sm text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-400/60 focus:border-primary-400/50 hover:bg-white/[0.12] transition-colors duration-150"
+            />
+            {searchActive && (
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuSearch('');
+                  searchInputRef.current?.focus();
+                }}
+                aria-label="Clear menu search"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md text-gray-400 hover:text-white hover:bg-white/10 transition-colors duration-150"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Navigation */}
       <nav className="flex-1 py-2 overflow-y-auto overflow-x-hidden sidebar-nav">
-        {filteredSections.map((section) => {
-          const sectionCollapsedState = isSectionCollapsed(section.id);
+        {searchedSections.length === 0 && searchActive && (
+          <div className="px-4 py-8 text-center">
+            <SearchX size={28} className="mx-auto text-gray-500 mb-2" />
+            <p className="text-sm text-gray-400">No menu items match</p>
+            <p className="text-xs text-gray-500 mt-1">“{menuSearch.trim()}”</p>
+          </div>
+        )}
+        {searchedSections.map((section) => {
+          // While searching, force-expand matches so results are visible.
+          const sectionCollapsedState = searchActive ? false : isSectionCollapsed(section.id);
           const active = isSectionActive(section.links);
 
           return (
@@ -507,7 +575,7 @@ export default function Sidebar({ mobile, onClose }: SidebarContentProps & { mob
                     onClick={() => toggleSection(section.id)}
                     className={`
                       w-full flex items-center justify-center p-2 rounded-lg transition-colors duration-150
-                      ${active ? 'bg-white/10' : 'hover:bg-white/5'}
+                      ${active ? 'bg-white/15 ring-1 ring-white/10' : 'hover:bg-white/15 hover:ring-1 hover:ring-white/20'}
                     `}
                   >
                     <section.icon size={20} className={`${section.color} flex-shrink-0`} />
@@ -536,7 +604,7 @@ export default function Sidebar({ mobile, onClose }: SidebarContentProps & { mob
                               `flex items-center gap-3 px-3 py-2 text-sm transition-colors duration-150 mx-1 rounded-lg ${
                                 linkActive || isLinkActive(link.to)
                                   ? 'bg-primary-600 text-white font-medium'
-                                  : 'text-gray-300 hover:bg-white/5 hover:text-white'
+                                  : 'text-gray-300 hover:bg-white/10 hover:text-white'
                               }`
                             }
                           >
@@ -566,7 +634,9 @@ export default function Sidebar({ mobile, onClose }: SidebarContentProps & { mob
                     className={`
                       w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-semibold uppercase tracking-wider
                       transition-colors duration-150
-                      ${active ? 'text-gray-200' : 'text-gray-400 hover:text-gray-200 hover:bg-white/5'}
+                      ${active
+                        ? 'text-white bg-white/10'
+                        : 'text-gray-400 hover:text-white hover:bg-white/10 hover:shadow-sm'}
                     `}
                   >
                     {sectionCollapsedState ? (
@@ -588,11 +658,11 @@ export default function Sidebar({ mobile, onClose }: SidebarContentProps & { mob
                             href={link.href || link.to}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="flex items-center gap-3 pl-10 pr-3 py-2 text-sm text-gray-300 hover:bg-white/5 hover:text-white rounded-lg transition-colors duration-150"
+                            className="group flex items-center gap-3 pl-10 pr-3 py-2 text-sm text-gray-300 hover:bg-white/10 hover:text-white rounded-lg transition-colors duration-150 border-l-2 border-transparent hover:border-primary-400"
                           >
-                            <link.icon size={16} className="text-gray-400 flex-shrink-0" />
+                            <link.icon size={16} className="text-gray-400 group-hover:text-white flex-shrink-0 transition-colors" />
                             <span className="flex-1 truncate">{link.label}</span>
-                            <ExternalLink size={12} className="text-gray-500 opacity-0 group-hover:opacity-100" />
+                            <ExternalLink size={12} className="text-gray-500 opacity-0 group-hover:opacity-100 group-hover:text-gray-300 transition-opacity" />
                           </a>
                         ) : (
                           <NavLink
@@ -601,18 +671,18 @@ export default function Sidebar({ mobile, onClose }: SidebarContentProps & { mob
                             end={link.to === '/'}
                             onClick={handleNavClick}
                             className={({ isActive: linkActive }) =>
-                              `group flex items-center gap-3 pl-10 pr-3 py-2 text-sm rounded-lg transition-colors duration-150 ${
+                              `group flex items-center gap-3 pl-10 pr-3 py-2 text-sm rounded-lg transition-colors duration-150 border-l-2 ${
                                 linkActive || isLinkActive(link.to)
-                                  ? 'bg-primary-600/80 text-white font-medium'
-                                  : 'text-gray-300 hover:bg-white/5 hover:text-white'
+                                  ? 'bg-primary-600 text-white font-medium border-primary-400'
+                                  : 'text-gray-300 hover:bg-white/10 hover:text-white border-transparent hover:border-primary-400'
                               }`
                             }
                           >
                             <link.icon
                               size={16}
                               className={`
-                                flex-shrink-0
-                                ${isLinkActive(link.to) ? 'text-white' : 'text-gray-400 group-hover:text-gray-200'}
+                                flex-shrink-0 transition-colors
+                                ${isLinkActive(link.to) ? 'text-white' : 'text-gray-400 group-hover:text-white'}
                               `}
                             />
                             <span className="flex-1 truncate">{link.label}</span>
@@ -649,7 +719,7 @@ export default function Sidebar({ mobile, onClose }: SidebarContentProps & { mob
             <NavLink
               to="/guardian"
               onClick={handleNavClick}
-              className="flex items-center justify-center p-2 rounded-lg hover:bg-white/5 transition-colors duration-150"
+              className="flex items-center justify-center p-2 rounded-lg hover:bg-white/15 hover:ring-1 hover:ring-yellow-500/30 transition-colors duration-150"
             >
               <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-yellow-500/20 to-yellow-600/20 border border-yellow-500/30 flex items-center justify-center">
                 <Shield size={18} className="text-yellow-400" />
@@ -680,7 +750,7 @@ export default function Sidebar({ mobile, onClose }: SidebarContentProps & { mob
           <NavLink
             to="/guardian"
             onClick={handleNavClick}
-            className="flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-yellow-500/10 to-yellow-600/10 border border-yellow-500/20 hover:border-yellow-500/40 hover:from-yellow-500/15 hover:to-yellow-600/15 transition-all duration-200 group"
+            className="flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-yellow-500/10 to-yellow-600/10 border border-yellow-500/20 hover:border-yellow-400/50 hover:from-yellow-500/20 hover:to-yellow-600/20 hover:shadow-md transition-all duration-200 group"
           >
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-yellow-500 to-yellow-600 flex items-center justify-center flex-shrink-0">
               <Shield size={18} className="text-white" />
@@ -720,7 +790,7 @@ export default function Sidebar({ mobile, onClose }: SidebarContentProps & { mob
               <>
                 <button
                   onClick={toggleTheme}
-                  className="flex-1 flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-400 hover:text-white transition-colors duration-150 text-sm"
+                  className="flex-1 flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-white/10 hover:text-white text-gray-400 transition-colors duration-150 text-sm"
                   title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
                 >
                   {isDark ? <Sun size={16} /> : <Moon size={16} />}
