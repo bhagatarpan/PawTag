@@ -22,7 +22,6 @@ dotenv.config({ path: path.join(__dirname, '../../.env.local') });
 
 import { connectDatabase, disconnectDatabase } from '@pawtag/db';
 import {
-  MongoSettingRepository,
   DynamoSettingRepository,
   getDynamoDocumentClient,
   getSettingsTableName,
@@ -55,7 +54,6 @@ async function main(): Promise<void> {
   }
 
   await connectDatabase();
-  const mongoRepo = new MongoSettingRepository();
   const dynamoRepo = new DynamoSettingRepository(getDynamoDocumentClient(), getSettingsTableName());
 
   // Read all settings from Mongo via raw collection for simple full scan

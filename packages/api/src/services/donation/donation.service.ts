@@ -14,7 +14,6 @@ import {
   getDonationSettings,
   validateDonationAmount,
   isDonationModuleEnabled,
-  invalidateDonationSettingsCache,
 } from './donation-config';
 
 export interface CreateDonationInput {
@@ -760,7 +759,7 @@ export class DonationService {
       try {
         const payment = await stripePaymentProvider.retrievePaymentIntent(piId);
         stripeStatus = payment.status;
-      } catch (err: any) {
+      } catch {
         // Fallback: query Stripe client directly if provider wrapper fails
         try {
           const stripe = getStripeClient();

@@ -198,7 +198,7 @@ adminDonationRouter.get('/', requirePermission('donation.read'), async (req: any
 adminDonationRouter.post('/:id/refund', requirePermission('donation.refund'), async (req: any, res: Response) => {
   try {
     const { reason } = req.body || {};
-    const { Donation, DonationPayment, DonationReceipt } = await import('@pawtag/db');
+    const { Donation, DonationPayment } = await import('@pawtag/db');
     const donation = await Donation.findById(req.params.id);
     if (!donation) {
       res.status(404).json({ success: false, error: 'Donation not found' });
