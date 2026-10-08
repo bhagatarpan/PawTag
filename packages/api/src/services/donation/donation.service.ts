@@ -404,6 +404,11 @@ export class DonationService {
    * Token is hashed; no JWT required — token IS the credential (invoice-style).
    */
   async getReceiptHtmlByToken(token: string): Promise<string> {
+    const receipt = await this.getReceiptByToken(token);
+    return this.renderReceiptDocument(receipt);
+  }
+
+  private async getReceiptByToken(token: string): Promise<any> {
     if (!token || token.length < 20) throw new Error('Receipt not found');
     const tokenHash = hashToken(token);
     const receipt = await DonationReceipt.findOne({
@@ -414,7 +419,26 @@ export class DonationService {
     if (receipt.accessExpiresAt && new Date() > receipt.accessExpiresAt) {
       throw new Error('Receipt link expired');
     }
-    return this.renderReceiptDocument(receipt);
+    return receipt;
+  }
+
+  async getReceiptMetaByToken(token: string): Promise<{ receiptNumber?: string } | null> {
+    try {
+      const receipt = await this.getReceiptByToken(token);
+      return { receiptNumber: receipt.receiptNumber };
+    } catch {
+      return null;
+    }
+  }
+
+  async getReceiptMeta(receiptId: string, userId?: string): Promise<{ receiptNumber?: string } | null> {
+    const receipt = await DonationReceipt.findById(receiptId);
+    if (!receipt) return null;
+    if (userId) {
+      const donation = await Donation.findById(receipt.donationId).lean();
+      if (donation && String(donation.supporterUserId) !== userId) return null;
+    }
+    return { receiptNumber: receipt.receiptNumber };
   }
 
   /**
@@ -823,7 +847,8 @@ export class DonationService {
     }
 
     const frontend = (await readOptionalSetting('urls.frontend')) || process.env.FRONTEND_URL || '';
-    const downloadUrl = secureToken ? `${frontend}/donations/receipt/${secureToken}` : '';
+    // Public secure download (file, not just view) — token in URL, no login
+    const downloadUrl = secureToken ? `${frontend}/api/donations/receipt-access/${secureToken}/download` : '';
     const portalPath = `${frontend}/account/donations`;
 
     const subject = `Thank you — receipt ${receiptNumber} | ${organisationName}`;

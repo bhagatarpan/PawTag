@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Heart, Loader2, Receipt, XCircle, Download } from 'lucide-react';
+import { Heart, Loader2, Eye, Download, XCircle } from 'lucide-react';
 import { API } from '@pawtag/shared/api';
 import { centsToDollars } from '@pawtag/shared';
 import api from '../../lib/api';
@@ -26,12 +26,38 @@ interface PortalDonation {
   }>;
 }
 
+async function fetchReceiptHtml(receiptId: string): Promise<string> {
+  const res = await api.get(API.donations.receiptHtml(receiptId));
+  return typeof res.data === 'string' ? res.data : res.data?.data || '';
+}
+
+function openReceiptInNewTab(html: string) {
+  const blob = new Blob([html], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  window.open(url, '_blank', 'noopener,noreferrer');
+  // Revoke after a delay so the new tab can load
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+function downloadReceiptFile(html: string, receiptNumber?: string) {
+  const safeName = (receiptNumber || 'donation-receipt').replace(/[^\w.-]+/g, '_');
+  const blob = new Blob([html], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${safeName}.html`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
 export default function MyDonations() {
   const { user } = useAuth();
   const [items, setItems] = useState<PortalDonation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [receiptHtml, setReceiptHtml] = useState<{ id: string; html: string } | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -41,12 +67,29 @@ export default function MyDonations() {
       .finally(() => setLoading(false));
   }, [user]);
 
-  const openReceipt = async (receiptId: string) => {
+  const viewReceipt = async (receiptId: string) => {
+    setBusyId(receiptId);
+    setError('');
     try {
-      const res = await api.get(API.donations.receiptHtml(receiptId));
-      setReceiptHtml({ id: receiptId, html: res.data });
+      const html = await fetchReceiptHtml(receiptId);
+      openReceiptInNewTab(html);
     } catch (err: any) {
       setError(err?.response?.data?.error || 'Failed to load receipt');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const downloadReceipt = async (receiptId: string, receiptNumber?: string) => {
+    setBusyId(receiptId);
+    setError('');
+    try {
+      const html = await fetchReceiptHtml(receiptId);
+      downloadReceiptFile(html, receiptNumber);
+    } catch (err: any) {
+      setError(err?.response?.data?.error || 'Failed to download receipt');
+    } finally {
+      setBusyId(null);
     }
   };
 
@@ -123,12 +166,22 @@ export default function MyDonations() {
                     </p>
                   )}
                   {d.status === 'succeeded' && d.receiptId && (
-                    <button
-                      onClick={() => openReceipt(d.receiptId!)}
-                      className="mt-2 inline-flex items-center gap-1.5 text-sm text-primary-600 hover:text-primary-700 font-medium"
-                    >
-                      <Download className="h-4 w-4" /> Download receipt
-                    </button>
+                    <div className="mt-2 flex flex-wrap items-center gap-3">
+                      <button
+                        onClick={() => viewReceipt(d.receiptId!)}
+                        disabled={busyId === d.receiptId}
+                        className="inline-flex items-center gap-1.5 text-sm text-primary-600 hover:text-primary-700 font-medium disabled:opacity-50"
+                      >
+                        <Eye className="h-4 w-4" /> View
+                      </button>
+                      <button
+                        onClick={() => downloadReceipt(d.receiptId!, d.receiptNumber)}
+                        disabled={busyId === d.receiptId}
+                        className="inline-flex items-center gap-1.5 text-sm text-gray-600 hover:text-gray-900 font-medium disabled:opacity-50"
+                      >
+                        <Download className="h-4 w-4" /> Download
+                      </button>
+                    </div>
                   )}
                 </div>
                 {d.frequency === 'monthly' && d.status !== 'cancelled' && (
@@ -145,48 +198,43 @@ export default function MyDonations() {
                 <div className="mt-4 border-t border-gray-100 pt-3">
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Payments</p>
                   <ul className="space-y-2">
-                    {d.payments.map((p) => (
-                      <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                        <span className="text-gray-700">
-                          ${centsToDollars(p.amountCents).toFixed(2)}
-                          {p.paidAt ? ` · ${new Date(p.paidAt).toLocaleDateString('en-NZ')}` : ''}
-                          {' · '}
-                          <span className={p.status === 'succeeded' ? 'text-green-600' : 'text-gray-500'}>{p.status}</span>
-                          {p.receiptNumber ? ` · ${p.receiptNumber}` : ''}
-                        </span>
-                        {(p.receiptId || d.receiptId) && p.status === 'succeeded' && (
-                          <button
-                            onClick={() => openReceipt(p.receiptId || d.receiptId!)}
-                            className="inline-flex items-center gap-1 text-primary-600 hover:text-primary-700 font-medium"
-                          >
-                            <Receipt className="h-4 w-4" /> View / Download
-                          </button>
-                        )}
-                      </li>
-                    ))}
+                    {d.payments.map((p) => {
+                      const rid = p.receiptId || d.receiptId;
+                      return (
+                        <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                          <span className="text-gray-700">
+                            ${centsToDollars(p.amountCents).toFixed(2)}
+                            {p.paidAt ? ` · ${new Date(p.paidAt).toLocaleDateString('en-NZ')}` : ''}
+                            {' · '}
+                            <span className={p.status === 'succeeded' ? 'text-green-600' : 'text-gray-500'}>{p.status}</span>
+                            {p.receiptNumber ? ` · ${p.receiptNumber}` : ''}
+                          </span>
+                          {rid && p.status === 'succeeded' && (
+                            <span className="flex items-center gap-3">
+                              <button
+                                onClick={() => viewReceipt(rid!)}
+                                disabled={busyId === rid}
+                                className="inline-flex items-center gap-1 text-primary-600 hover:text-primary-700 font-medium disabled:opacity-50"
+                              >
+                                <Eye className="h-4 w-4" /> View
+                              </button>
+                              <button
+                                onClick={() => downloadReceipt(rid!, p.receiptNumber || d.receiptNumber)}
+                                disabled={busyId === rid}
+                                className="inline-flex items-center gap-1 text-gray-600 hover:text-gray-900 font-medium disabled:opacity-50"
+                              >
+                                <Download className="h-4 w-4" /> Download
+                              </button>
+                            </span>
+                          )}
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
               )}
             </div>
           ))}
-        </div>
-      )}
-
-      {receiptHtml && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
-          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-auto p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="font-semibold text-gray-900">Donation receipt</h2>
-              <button onClick={() => setReceiptHtml(null)} className="text-gray-500 hover:text-gray-700" aria-label="Close receipt">
-                ✕
-              </button>
-            </div>
-            <iframe
-              title="Donation receipt"
-              srcDoc={receiptHtml.html}
-              className="w-full h-[60vh] border border-gray-200 rounded-xl"
-            />
-          </div>
         </div>
       )}
     </div>

@@ -97,11 +97,27 @@ router.post('/:id/cancel', authenticate, async (req: any, res: Response) => {
   }
 });
 
-/** GET /api/donations/receipt-access/:token — PUBLIC secure receipt download (no login) */
+/** GET /api/donations/receipt-access/:token — PUBLIC secure receipt view (no login) */
 router.get('/receipt-access/:token', async (req: Request, res: Response) => {
   try {
     const html = await donationService.getReceiptHtmlByToken(req.params.token);
     res.type('html').send(html);
+  } catch (err: any) {
+    const msg = err.message || 'Receipt not found';
+    const status = msg.includes('expired') ? 410 : 404;
+    res.status(status).send(`<!DOCTYPE html><html><body style="font-family:sans-serif;padding:40px;text-align:center"><h1>Receipt unavailable</h1><p>${msg}</p></body></html>`);
+  }
+});
+
+/** GET /api/donations/receipt-access/:token/download — PUBLIC secure receipt file download */
+router.get('/receipt-access/:token/download', async (req: Request, res: Response) => {
+  try {
+    const html = await donationService.getReceiptHtmlByToken(req.params.token);
+    const receipt = await donationService.getReceiptMetaByToken(req.params.token);
+    const filename = `${receipt?.receiptNumber || 'donation-receipt'}.html`;
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(html);
   } catch (err: any) {
     const msg = err.message || 'Receipt not found';
     const status = msg.includes('expired') ? 410 : 404;
@@ -114,6 +130,21 @@ router.get('/receipt/:receiptId/html', authenticate, async (req: any, res: Respo
   try {
     const html = await donationService.getReceiptHtml(req.params.receiptId, req.user.id);
     res.type('html').send(html);
+  } catch (err: any) {
+    const msg = err.message || 'Receipt not found';
+    res.status(msg.includes('not found') ? 404 : 400).json({ success: false, error: msg });
+  }
+});
+
+/** GET /api/donations/receipt/:receiptId/download — auth receipt file download */
+router.get('/receipt/:receiptId/download', authenticate, async (req: any, res: Response) => {
+  try {
+    const html = await donationService.getReceiptHtml(req.params.receiptId, req.user.id);
+    const meta = await donationService.getReceiptMeta(req.params.receiptId, req.user.id);
+    const filename = `${meta?.receiptNumber || 'donation-receipt'}.html`;
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(html);
   } catch (err: any) {
     const msg = err.message || 'Receipt not found';
     res.status(msg.includes('not found') ? 404 : 400).json({ success: false, error: msg });
