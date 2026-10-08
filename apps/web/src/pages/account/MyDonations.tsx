@@ -31,21 +31,23 @@ async function fetchReceiptHtml(receiptId: string): Promise<string> {
   return typeof res.data === 'string' ? res.data : res.data?.data || '';
 }
 
+async function fetchReceiptPdfBlob(receiptId: string): Promise<Blob> {
+  const res = await api.get(API.donations.receiptDownload(receiptId), { responseType: 'blob' });
+  return res.data as Blob;
+}
+
 function openReceiptInNewTab(html: string) {
   const blob = new Blob([html], { type: 'text/html' });
   const url = URL.createObjectURL(blob);
   window.open(url, '_blank', 'noopener,noreferrer');
-  // Revoke after a delay so the new tab can load
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
-function downloadReceiptFile(html: string, receiptNumber?: string) {
-  const safeName = (receiptNumber || 'donation-receipt').replace(/[^\w.-]+/g, '_');
-  const blob = new Blob([html], { type: 'text/html' });
+function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `${safeName}.html`;
+  a.download = filename;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -84,10 +86,11 @@ export default function MyDonations() {
     setBusyId(receiptId);
     setError('');
     try {
-      const html = await fetchReceiptHtml(receiptId);
-      downloadReceiptFile(html, receiptNumber);
+      const blob = await fetchReceiptPdfBlob(receiptId);
+      const safeName = (receiptNumber || 'donation-receipt').replace(/[^\w.-]+/g, '_');
+      downloadBlob(blob, `${safeName}.pdf`);
     } catch (err: any) {
-      setError(err?.response?.data?.error || 'Failed to download receipt');
+      setError(err?.response?.data?.error || 'Failed to download receipt PDF');
     } finally {
       setBusyId(null);
     }

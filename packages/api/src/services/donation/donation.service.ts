@@ -441,6 +441,43 @@ export class DonationService {
     return { receiptNumber: receipt.receiptNumber };
   }
 
+  /** PDF bytes for authenticated download. */
+  async getReceiptPdf(receiptId: string, userId?: string): Promise<Buffer> {
+    const receipt = await DonationReceipt.findById(receiptId);
+    if (!receipt) throw new Error('Receipt not found');
+    if (userId) {
+      const donation = await Donation.findById(receipt.donationId).lean();
+      if (donation && String(donation.supporterUserId) !== userId) {
+        throw new Error('Receipt not found');
+      }
+    }
+    return this.buildReceiptPdf(receipt);
+  }
+
+  /** PDF bytes for public token download. */
+  async getReceiptPdfByToken(token: string): Promise<Buffer> {
+    const receipt = await this.getReceiptByToken(token);
+    return this.buildReceiptPdf(receipt);
+  }
+
+  private async buildReceiptPdf(receipt: any): Promise<Buffer> {
+    const { generateDonationReceiptPdf } = await import('./donation-pdf');
+    return generateDonationReceiptPdf({
+      receiptNumber: receipt.receiptNumber,
+      organisationName: receipt.organisationName,
+      donorNameSnapshot: receipt.donorNameSnapshot,
+      amountCents: receipt.amountCents,
+      currency: receipt.currency,
+      statement: receipt.statement,
+      taxClassification: receipt.taxClassification,
+      irdNumber: receipt.irdNumber,
+      charitiesNumber: receipt.charitiesNumber,
+      signatory: receipt.signatory,
+      issuedAt: receipt.issuedAt,
+      status: receipt.status,
+    });
+  }
+
   /**
    * Ensure a secure download token exists for this receipt.
    * Returns the raw token for email links (only returned once at generation).
