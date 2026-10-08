@@ -75,7 +75,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [token]);
 
+  const isSuperAdmin = !!user?.rbacRoles?.some((r) => r.isSuperAdmin || r.name === 'SUPER_ADMIN');
+
   const hasPermission = (permissionName: string): boolean => {
+    // Super Admin sees all admin menu items even if a permission row is missing from DB
+    if (isSuperAdmin) return true;
     return permissions.some((p) => p.name === permissionName);
   };
 
