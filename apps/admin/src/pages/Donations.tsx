@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Search, Loader2, Heart, RefreshCw, Receipt, XCircle, Eye, Download, Mail, ChevronRight } from 'lucide-react';
+import { Search, Loader2, Heart, RefreshCw, Receipt, XCircle, Eye, Download, Mail } from 'lucide-react';
 import { API } from '@pawtag/shared/api';
 import { centsToDollars } from '@pawtag/shared';
 import api from '../lib/api';
@@ -53,9 +53,9 @@ export default function Donations() {
     }
   };
 
+  // Search applies on Enter via fetchList(search, statusFilter); statusFilter refetches here.
   useEffect(() => {
-    fetchList();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    fetchList(search, statusFilter);
   }, [statusFilter]);
 
   const handleRefund = async (id: string) => {
