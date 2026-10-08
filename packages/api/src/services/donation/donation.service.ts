@@ -362,30 +362,53 @@ export class DonationService {
     });
   }
 
-  /** Admin list (permission enforced in route). */
+  /** Admin list (permission enforced in route). Includes receipt fields for CSR. */
   async listAdmin(filters: { status?: string; frequency?: string; q?: string } = {}): Promise<any[]> {
     const query: any = {};
     if (filters.status) query.status = filters.status;
     if (filters.frequency) query.frequency = filters.frequency;
     if (filters.q) {
+      const q = filters.q.trim();
       query.$or = [
-        { emailSnapshot: { $regex: filters.q, $options: 'i' } },
-        { nameSnapshot: { $regex: filters.q, $options: 'i' } },
+        { emailSnapshot: { $regex: q, $options: 'i' } },
+        { nameSnapshot: { $regex: q, $options: 'i' } },
+        { stripeSubscriptionId: q },
       ];
+      // Also match receipt numbers via donation.receiptId lookup
+      const matchingReceipts = await DonationReceipt.find({
+        receiptNumber: { $regex: q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' },
+      }).select('donationId receiptNumber').lean();
+      const donationIds = matchingReceipts.map((r) => r.donationId);
+      if (donationIds.length) {
+        query.$or.push({ _id: { $in: donationIds } });
+      }
     }
     const donations = await Donation.find(query).sort({ createdAt: -1 }).limit(200).lean();
-    return donations.map((d) => ({
-      id: String(d._id),
-      email: d.emailSnapshot,
-      name: d.nameSnapshot,
-      amountCents: d.amountCents,
-      currency: d.currency,
-      frequency: d.frequency,
-      status: d.status,
-      pastDue: !!d.pastDue,
-      stripeSubscriptionId: d.stripeSubscriptionId,
-      createdAt: d.createdAt,
-    }));
+
+    const receiptIds = donations.map((d) => d.receiptId).filter(Boolean);
+    const receipts = receiptIds.length
+      ? await DonationReceipt.find({ _id: { $in: receiptIds } }).select('receiptNumber status amountCents issuedAt').lean()
+      : [];
+    const receiptById = new Map(receipts.map((r) => [String(r._id), r]));
+
+    return donations.map((d) => {
+      const receipt = d.receiptId ? receiptById.get(String(d.receiptId)) : null;
+      return {
+        id: String(d._id),
+        email: d.emailSnapshot,
+        name: d.nameSnapshot,
+        amountCents: d.amountCents,
+        currency: d.currency,
+        frequency: d.frequency,
+        status: d.status,
+        pastDue: !!d.pastDue,
+        stripeSubscriptionId: d.stripeSubscriptionId,
+        createdAt: d.createdAt,
+        receiptId: d.receiptId ? String(d.receiptId) : undefined,
+        receiptNumber: receipt?.receiptNumber,
+        receiptStatus: receipt?.status,
+      };
+    });
   }
 
   /** Neutral receipt HTML (same fields as stored receipt). */

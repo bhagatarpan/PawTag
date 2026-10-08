@@ -745,6 +745,7 @@ export const API = {
     refund: (id: string) => `/admin/donations/${id}/refund` as const,
     resendReceipt: (receiptId: string) => `/admin/donations/receipts/${receiptId}/resend` as const,
     receiptHtml: (receiptId: string) => `/admin/donations/receipts/${receiptId}/html` as const,
+    receiptDownload: (receiptId: string) => `/admin/donations/receipts/${receiptId}/download` as const,
   },
 
   // ---------------------------------------------------------------------------

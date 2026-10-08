@@ -264,4 +264,18 @@ adminDonationRouter.get('/receipts/:receiptId/html', requirePermission('donation
   }
 });
 
+adminDonationRouter.get('/receipts/:receiptId/download', requirePermission('donation.receipts'), async (req: any, res: Response) => {
+  try {
+    const pdf = await donationService.getReceiptPdf(req.params.receiptId);
+    const meta = await donationService.getReceiptMeta(req.params.receiptId);
+    const filename = `${meta?.receiptNumber || 'donation-receipt'}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(pdf);
+  } catch (err: any) {
+    const msg = err.message || 'Receipt not found';
+    res.status(msg.includes('not found') ? 404 : 400).json({ success: false, error: msg });
+  }
+});
+
 export default router;
