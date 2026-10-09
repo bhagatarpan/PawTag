@@ -50,9 +50,14 @@ export const COMMERCE_SETTINGS = {
   'commerce.shipping.defaultCarrier': { default: 'nz-post', description: 'Default carrier identifier' },
   'commerce.shipping.rateTypes': { default: 'free,flat_rate,weight_based,price_based', description: 'Available rate types (comma-separated)' },
   'commerce.shipping.carriers': { default: 'nz-post,courierpost,aramex,dhl,fedex,ups', description: 'Available carriers (comma-separated)' },
-  'commerce.shipping.nzpostClientId': { default: '', description: 'NZ Post API client ID (leave empty for demo mode)' },
-  'commerce.shipping.nzpostClientSecret': { default: '', description: 'NZ Post API client secret' },
-  'commerce.shipping.nzpostLive': { default: 'false', description: 'Use NZ Post live API (false = sandbox)' },
+  'commerce.shipping.nzpostServiceCode': { default: 'CPOLP', description: 'NZ Post ParcelLabel service code (e.g. CPOLP for Courier Parcel)' },
+  'commerce.shipping.fromCompanyName': { default: 'PawTag', description: 'Sender company name on NZ Post labels' },
+  'commerce.shipping.fromStreet': { default: '', description: 'Sender street address (e.g. "151 Victoria Street West")' },
+  'commerce.shipping.fromSuburb': { default: '', description: 'Sender suburb' },
+  'commerce.shipping.fromCity': { default: 'Auckland', description: 'Sender city' },
+  'commerce.shipping.fromPostcode': { default: '1010', description: 'Sender postcode' },
+  'commerce.shipping.fromPhone': { default: '', description: 'Sender contact phone' },
+  'commerce.shipping.fromEmail': { default: '', description: 'Sender contact email' },
 
   // ─── Tax ──────────────────────────────────────────────────
   'commerce.tax.enabled': { default: 'true', description: 'Enable tax calculation' },

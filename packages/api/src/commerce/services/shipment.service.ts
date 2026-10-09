@@ -91,6 +91,7 @@ export class ShipmentService {
       trackingNumber: carrierResult.trackingNumber || '',
       trackingUrl: carrierResult.trackingUrl,
       labelUrl: carrierResult.labelUrl,
+      isDemo: carrierResult.isDemo || false,
       status: 'label_created',
       shippingAddress: address,
       items: order.items.map((item) => ({
@@ -105,6 +106,7 @@ export class ShipmentService {
     // Update order with tracking info
     order.trackingNumber = carrierResult.trackingNumber;
     order.carrier = carrierResult.carrier || 'NZ Post';
+    order.isDemoTracking = carrierResult.isDemo || false;
     if (carrierResult.trackingUrl) {
       order.shippingLabelUrl = carrierResult.trackingUrl;
     }

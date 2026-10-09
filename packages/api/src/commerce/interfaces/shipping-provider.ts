@@ -67,6 +67,12 @@ export interface ShipmentResult {
 
   /** Error message if creation failed */
   error?: string;
+
+  /**
+   * True when the tracking number is synthetic (demo mode), not carrier-issued.
+   * Persisted on Shipment/Order so emails and UI can label it honestly.
+   */
+  isDemo?: boolean;
 }
 
 /**

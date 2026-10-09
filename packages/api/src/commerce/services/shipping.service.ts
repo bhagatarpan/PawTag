@@ -187,6 +187,7 @@ export class ShippingService {
     // Update order with tracking info
     order.trackingNumber = result.trackingNumber;
     order.carrier = result.carrier;
+    order.isDemoTracking = result.isDemo || false;
     if (result.trackingUrl) {
       order.shippingLabelUrl = result.trackingUrl;
     }

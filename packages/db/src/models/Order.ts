@@ -67,6 +67,8 @@ export interface IOrderDocument extends Document {
   trackingNumber?: string;
   carrier?: string;
   shippingLabelUrl?: string;
+  /** True when tracking number is synthetic (demo mode), not carrier-issued */
+  isDemoTracking?: boolean;
   notes?: string;
   referredByCode?: string;
   autoRenew?: boolean;
@@ -179,6 +181,7 @@ const OrderSchema = new Schema<IOrderDocument>(
     trackingNumber: String,
     carrier: String,
     shippingLabelUrl: String,
+    isDemoTracking: { type: Boolean, default: false },
     notes: String,
     referredByCode: { type: String },
     autoRenew: { type: Boolean, default: true },

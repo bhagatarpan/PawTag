@@ -67,7 +67,10 @@ const OPTIONAL = [
   'RESEND_API_KEY',
   'STORAGE_DRIVER',
   'LOCAL_UPLOADS_DIR',
-  'SHIPPING_PROVIDER_API_KEY',
+  'NZPOST_CLIENT_ID',
+  'NZPOST_CLIENT_SECRET',
+  'NZPOST_ACCOUNT_NUMBER',
+  'NZPOST_LIVE',
   'SMS_PROVIDER',
   'ADMIN_ALERT_EMAIL',
   'SERVICE_NAME',
@@ -232,6 +235,14 @@ function validateFeatureRequired(nodeEnv: string): string[] {
         logger.warn({ variable: key }, `Config: ${key} is not set — push notifications may not work`);
       }
     }
+  }
+
+  // NZ Post shipping - warn in production if not configured (runtime fails closed)
+  if (nodeEnv === 'production' && (!process.env.NZPOST_CLIENT_ID || !process.env.NZPOST_CLIENT_SECRET)) {
+    logger.warn(
+      { variable: 'NZPOST_CLIENT_ID/NZPOST_CLIENT_SECRET' },
+      'Config: NZ Post shipping credentials are not set — shipments will fail closed in production (no fabricated tracking).',
+    );
   }
 
   return errors;

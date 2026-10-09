@@ -126,7 +126,7 @@ router.get('/dependencies', async (_req: Request, res: Response) => {
   // NZ Post Shipping
   checks.nzPostShipping = {
     status: 'unknown',
-    configured: !!(process.env.NZPOST_CLIENT_ID || process.env.COMMERCE_SHIPPING_NZPOST_CLIENT_ID),
+    configured: !!(process.env.NZPOST_CLIENT_ID && process.env.NZPOST_CLIENT_SECRET),
   };
 
   const _anyConfigured = Object.values(checks).some(c => c.configured);

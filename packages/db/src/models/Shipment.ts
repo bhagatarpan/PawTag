@@ -58,6 +58,8 @@ export interface IShipmentDocument extends Document {
   trackingNumber: string;
   trackingUrl?: string;
   labelUrl?: string;
+  /** True when tracking number is synthetic (demo mode), not carrier-issued */
+  isDemo?: boolean;
 
   status: ShipmentStatus;
 
@@ -109,6 +111,7 @@ const ShipmentSchema = new Schema<IShipmentDocument>(
     trackingNumber: { type: String, required: true, index: true },
     trackingUrl: { type: String },
     labelUrl: { type: String },
+    isDemo: { type: Boolean, default: false },
 
     status: {
       type: String,
