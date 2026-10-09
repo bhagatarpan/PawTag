@@ -53,6 +53,7 @@ export default function Checkout() {
 
   // Form state
   const [loading, setLoading] = useState(false);
+  const [paymentResetKey, setPaymentResetKey] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [orderNumber, setOrderNumber] = useState(() => sessionStorage.getItem('pawtag_checkout_order') || '');
   const [success, setSuccess] = useState(() => sessionStorage.getItem('pawtag_checkout_success') === 'true');
@@ -743,18 +744,26 @@ export default function Checkout() {
     setError(null);
     try {
       // Payment confirmed — immediately create order and go to Confirmed
-      await handleConfirmOrder();
-      setCurrentStep('confirmed');
+      const confirmed = await handleConfirmOrder();
+      if (confirmed) {
+        setCurrentStep('confirmed');
+      } else {
+        // Order creation failed after payment — reset the pay button so the user can act
+        setPaymentResetKey((k) => k + 1);
+      }
     } catch (err: any) {
       console.error('[Checkout] Order creation failed:', err);
       setError('Payment succeeded but order creation failed. Please contact support.');
+      setPaymentResetKey((k) => k + 1);
     } finally {
       setLoading(false);
     }
   };
 
-  // Handle final order confirmation from Review step
-  const handleConfirmOrder = async () => {
+  // Handle final order confirmation from Review step.
+  // Returns true only when the order is durably confirmed; false on handled failures
+  // (the pay button must not stay stuck and the user must not land on the confirmation step).
+  const handleConfirmOrder = async (): Promise<boolean> => {
     setLoading(true);
     setError(null);
     try {
@@ -785,12 +794,12 @@ export default function Checkout() {
           } else {
             setError('Your payment was received but we could not confirm your order. Please check your order history or contact support.');
             setLoading(false);
-            return;
+            return false;
           }
         } catch {
           setError('Something went wrong confirming your order. Your payment was received — please contact support.');
           setLoading(false);
-          return;
+          return false;
         }
       }
 
@@ -813,10 +822,12 @@ export default function Checkout() {
       sessionStorage.setItem('pawtag_checkout_success', 'true');
       sessionStorage.setItem('pawtag_checkout_order', pawtagOrder?.orderNumber || paymentIntentId.slice(-8));
       clearCart();
+      return true;
     } catch (err: any) {
       console.error('[Checkout] Order confirmation failed:', err);
       setError('Something went wrong during order confirmation. Please try again.');
       await refreshCart();
+      return false;
     } finally {
       setLoading(false);
     }
@@ -1223,6 +1234,7 @@ export default function Checkout() {
                         onPaymentSuccess={handlePaymentSuccess}
                         onPaymentError={handlePaymentError}
                         disabled={loading}
+                        resetKey={paymentResetKey}
                       />
                     </CheckoutErrorBoundary>
                   ) : (

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { loadStripe } from '@stripe/stripe-js';
 import {
   Elements,
@@ -15,6 +15,8 @@ interface StripePaymentFormProps {
   onPaymentSuccess: (paymentIntentId: string) => void;
   onPaymentError: (error: string) => void;
   disabled?: boolean;
+  /** Increment from the parent to force the button back to idle (e.g. server-side confirmation failed). */
+  resetKey?: number;
 }
 
 /**
@@ -35,48 +37,29 @@ function extractFakePaymentIntentId(secret: string): string {
 }
 
 /**
- * Payment progress states:
- * 0%   = "Pay" (default)
- * 25%  = "Payment Submitted..." (Stripe confirmed client-side)
- * 50%  = "Payment Processing..." (waiting for server confirmation)
- * 75%  = "Payment Confirmed..." (order created, data loaded)
- * 100% = "✓ Payment Confirmed" (green, hold 500ms before redirect)
+ * Payment button phases, driven by real events (no fake percentages):
+ * idle        → "Pay now"
+ * securing    → Stripe confirmPayment in flight ("Securing payment…")
+ * confirming  → server-side order creation in flight ("Confirming your order…")
+ * done        → "Payment confirmed" (only if still mounted)
  */
-const PAYMENT_STATES = [
-  { progress: 0, text: 'Place Order - Pay Now', icon: 'lock' },
-  { progress: 25, text: 'Payment Submitted...', icon: 'spinner' },
-  { progress: 50, text: 'Payment Processing...', icon: 'spinner' },
-  { progress: 75, text: 'Payment Confirmed...', icon: 'spinner' },
-  { progress: 100, text: 'Payment Confirmed', icon: 'check' },
-] as const;
+type PaymentPhase = 'idle' | 'securing' | 'confirming' | 'done';
 
-function PaymentFormInner({ onPaymentSuccess, onPaymentError, disabled }: Omit<StripePaymentFormProps, 'clientSecret'>) {
+function PaymentFormInner({ onPaymentSuccess, onPaymentError, disabled, resetKey = 0 }: Omit<StripePaymentFormProps, 'clientSecret'>) {
   const stripe = useStripe();
   const elements = useElements();
-  const [processing, setProcessing] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [statusText, setStatusText] = useState('Pay');
-  const [isComplete, setIsComplete] = useState(false);
-  const progressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [phase, setPhase] = useState<PaymentPhase>('idle');
 
-  // Cleanup timer on unmount
+  // Parent signals a recoverable failure (e.g. order creation failed after payment)
   useEffect(() => {
-    return () => {
-      if (progressTimerRef.current) clearTimeout(progressTimerRef.current);
-    };
-  }, []);
-
-  const updateProgress = (targetProgress: number, text: string) => {
-    setProgress(targetProgress);
-    setStatusText(text);
-  };
+    if (resetKey > 0) setPhase('idle');
+  }, [resetKey]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!stripe || !elements || processing || disabled) return;
+    if (!stripe || !elements || phase !== 'idle' || disabled) return;
 
-    setProcessing(true);
-    updateProgress(25, 'Payment Submitted...');
+    setPhase('securing');
 
     try {
       const { error, paymentIntent } = await stripe.confirmPayment({
@@ -89,56 +72,33 @@ function PaymentFormInner({ onPaymentSuccess, onPaymentError, disabled }: Omit<S
 
       if (error) {
         onPaymentError(error.message || 'Payment failed');
-        setProcessing(false);
-        setProgress(0);
-        setStatusText('Pay');
+        setPhase('idle');
         return;
       }
 
       if (paymentIntent?.status === 'succeeded' || paymentIntent?.status === 'requires_capture') {
-        updateProgress(50, 'Payment Processing...');
-        // Notify parent — it will call POST /checkout/confirm
+        // Stripe client-side confirmation done; parent now creates the order server-side
+        setPhase('confirming');
         onPaymentSuccess(paymentIntent.id);
       } else {
         onPaymentError(`Unexpected payment status: ${paymentIntent?.status}`);
-        setProcessing(false);
-        setProgress(0);
-        setStatusText('Pay');
+        setPhase('idle');
       }
     } catch (err: any) {
       onPaymentError(err?.message || 'Payment failed');
-      setProcessing(false);
-      setProgress(0);
-      setStatusText('Pay');
+      setPhase('idle');
     }
   };
 
-  // Expose progress update methods via callback ref
-  // The parent (Checkout.tsx) calls these to drive progress after server-side operations
-  useEffect(() => {
-    // Attach progress controller to window for parent access
-    (window as any).__paymentProgress = {
-      setProcessingStage: (stage: 'confirmed' | 'complete') => {
-        if (stage === 'confirmed') {
-          updateProgress(75, 'Payment Confirmed...');
-        } else if (stage === 'complete') {
-          updateProgress(100, 'Payment Confirmed');
-          setIsComplete(true);
-          // Hold green state for 500ms before parent transitions
-          progressTimerRef.current = setTimeout(() => {
-            // Parent will handle the actual page transition
-          }, 500);
-        }
-      },
-    };
-    return () => {
-      delete (window as any).__paymentProgress;
-    };
-  }, []);
+  const isBusy = phase === 'securing' || phase === 'confirming';
+  const isDone = phase === 'done';
+  const isDisabled = !stripe || isBusy || disabled;
 
-  const isDisabled = !stripe || processing || disabled;
-  const showSpinner = progress > 0 && progress < 100;
-  const showCheck = isComplete;
+  const label =
+    phase === 'securing' ? 'Securing payment…'
+    : phase === 'confirming' ? 'Confirming your order…'
+    : isDone ? 'Payment confirmed'
+    : 'Pay now';
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -149,53 +109,40 @@ function PaymentFormInner({ onPaymentSuccess, onPaymentError, disabled }: Omit<S
         }}
       />
 
-      {/* Animated Pay Button with Progress Bar */}
-      <div className="relative">
-        {/* Progress bar background */}
-        <div className="absolute inset-0 rounded-xl overflow-hidden">
-          <div
-            className={`h-full transition-all duration-500 ease-out ${
-              isComplete ? 'bg-green-500' : 'bg-primary-500'
-            }`}
-            style={{ width: `${progress}%` }}
+      <button
+        type="submit"
+        disabled={isDisabled}
+        aria-busy={isBusy || undefined}
+        className={`relative w-full overflow-hidden py-4 rounded-xl font-semibold text-lg transition-colors duration-200 flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 ${
+          isDone
+            ? 'bg-green-600 text-white cursor-default'
+            : isBusy
+            ? 'bg-primary-700 text-white cursor-wait'
+            : 'bg-primary-600 text-white hover:bg-primary-700 active:bg-primary-800 disabled:bg-gray-300 disabled:cursor-not-allowed'
+        }`}
+      >
+        {isBusy && (
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 animate-shimmer motion-reduce:animate-none bg-gradient-to-r from-transparent via-white/20 to-transparent"
           />
-        </div>
-
-        {/* Button content */}
-        <button
-          type="submit"
-          disabled={isDisabled && progress === 0}
-          className={`relative w-full py-4 rounded-xl font-semibold text-lg transition-all duration-300 flex items-center justify-center gap-2 ${
-            isComplete
-              ? 'bg-green-500 text-white cursor-default'
-              : progress > 0
-              ? 'bg-transparent text-white cursor-wait'
-              : 'bg-primary-600 text-white hover:bg-primary-700 disabled:bg-gray-300 disabled:cursor-not-allowed'
-          }`}
-        >
-          {showCheck ? (
-            <>
-              <Check className="h-5 w-5" />
-              {statusText}
-            </>
-          ) : showSpinner ? (
-            <>
-              <Loader2 className="h-5 w-5 animate-spin" />
-              {statusText}
-            </>
+        )}
+        <span className="relative flex items-center gap-2">
+          {isDone ? (
+            <Check className="h-5 w-5" />
+          ) : isBusy ? (
+            <Loader2 className="h-5 w-5 animate-spin motion-reduce:animate-none" />
           ) : (
-            <>
-              <Lock className="h-5 w-5" />
-              {statusText}
-            </>
+            <Lock className="h-5 w-5" />
           )}
-        </button>
-      </div>
+          {label}
+        </span>
+      </button>
     </form>
   );
 }
 
-export default function StripePaymentForm({ clientSecret, onPaymentSuccess, onPaymentError, disabled }: StripePaymentFormProps) {
+export default function StripePaymentForm({ clientSecret, onPaymentSuccess, onPaymentError, disabled, resetKey }: StripePaymentFormProps) {
   const [stripeError, setStripeError] = useState<string | null>(null);
   const [stripeLoaded, setStripeLoaded] = useState(false);
   const [fakeProcessing, setFakeProcessing] = useState(false);
@@ -238,12 +185,12 @@ export default function StripePaymentForm({ clientSecret, onPaymentSuccess, onPa
         <button
           onClick={handleFakePayment}
           disabled={disabled || fakeProcessing}
-          className="w-full bg-primary-600 text-white py-3 rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-primary-700 transition-colors disabled:opacity-50"
+          className="w-full bg-primary-600 text-white py-3 rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-primary-700 active:bg-primary-800 transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
         >
           {fakeProcessing ? (
-            <><Loader2 size={16} className="animate-spin" /> Processing...</>
+            <><Loader2 size={16} className="animate-spin" /> Processing payment…</>
           ) : (
-            <><Lock size={16} /> Place Order - Pay Now</>
+            <><Lock size={16} /> Pay now</>
           )}
         </button>
       </div>
@@ -286,7 +233,7 @@ export default function StripePaymentForm({ clientSecret, onPaymentSuccess, onPa
 
   return (
     <Elements stripe={stripePromise} options={options}>
-      <PaymentFormInner onPaymentSuccess={onPaymentSuccess} onPaymentError={onPaymentError} disabled={disabled} />
+      <PaymentFormInner onPaymentSuccess={onPaymentSuccess} onPaymentError={onPaymentError} disabled={disabled} resetKey={resetKey} />
     </Elements>
   );
 }
