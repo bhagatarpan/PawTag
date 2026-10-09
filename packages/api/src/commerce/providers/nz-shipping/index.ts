@@ -168,6 +168,20 @@ export class NzShippingProvider implements IShippingProvider {
 
     if (!response.ok) {
       const text = await response.text();
+
+      // Map common NZ Post OAuth errors to actionable messages
+      if (text.includes('unauthorized_client')) {
+        throw new Error(
+          'NZ Post OAuth error: Client Credentials grant type is not enabled on this API client. ' +
+          'In the Anypoint portal, enable the Client Credentials grant type for your client, ' +
+          'or contact NZ Post API Support (api@nzpost.co.nz).',
+        );
+      }
+      if (text.includes('invalid_client')) {
+        throw new Error(
+          'NZ Post OAuth error: Invalid client credentials. Check NZPOST_CLIENT_ID and NZPOST_CLIENT_SECRET in the environment.',
+        );
+      }
       throw new Error(`NZ Post OAuth failed (${response.status}): ${text}`);
     }
 

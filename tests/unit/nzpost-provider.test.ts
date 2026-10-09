@@ -240,6 +240,50 @@ describe('NZ Post shipping provider', () => {
       expect(result.trackingNumber).toBeUndefined();
     });
 
+    it('returns actionable error for unauthorized_client (grant type not enabled)', async () => {
+      process.env.NODE_ENV = 'development';
+      const { nzShippingProvider } = await import('../../packages/api/src/commerce/providers/nz-shipping');
+
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        text: () => Promise.resolve('{"error":"unauthorized_client"}'),
+      });
+
+      const result = await nzShippingProvider.createShipment({
+        orderId: 'ord1',
+        orderNumber: 'PT-000001',
+        address: { line1: '1 St', city: 'Auckland', state: '', zip: '1010', country: 'NZ' },
+        items: [{ name: 'Tag', quantity: 1 }],
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Client Credentials grant type');
+      expect(result.error).toContain('api@nzpost.co.nz');
+    });
+
+    it('returns actionable error for invalid_client', async () => {
+      process.env.NODE_ENV = 'development';
+      const { nzShippingProvider } = await import('../../packages/api/src/commerce/providers/nz-shipping');
+
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        text: () => Promise.resolve('{"error":"invalid_client"}'),
+      });
+
+      const result = await nzShippingProvider.createShipment({
+        orderId: 'ord1',
+        orderNumber: 'PT-000001',
+        address: { line1: '1 St', city: 'Auckland', state: '', zip: '1010', country: 'NZ' },
+        items: [{ name: 'Tag', quantity: 1 }],
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Invalid client credentials');
+      expect(result.error).toContain('NZPOST_CLIENT_ID');
+    });
+
     it('builds the ParcelLabel request with correct address parsing', async () => {
       process.env.NODE_ENV = 'development';
       const { nzShippingProvider } = await import('../../packages/api/src/commerce/providers/nz-shipping');
