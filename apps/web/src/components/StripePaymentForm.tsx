@@ -115,9 +115,9 @@ function PaymentFormInner({ onPaymentSuccess, onPaymentError, disabled, resetKey
         aria-busy={isBusy || undefined}
         className={`relative w-full overflow-hidden py-4 rounded-xl font-semibold text-lg transition-colors duration-200 flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 ${
           isDone
-            ? 'bg-green-600 text-white cursor-default'
+            ? 'bg-green-500 text-white cursor-default'
             : isBusy
-            ? 'bg-primary-700 text-white cursor-wait'
+            ? 'bg-primary-600 text-white cursor-wait'
             : 'bg-primary-600 text-white hover:bg-primary-700 active:bg-primary-800 disabled:bg-gray-300 disabled:cursor-not-allowed'
         }`}
       >
