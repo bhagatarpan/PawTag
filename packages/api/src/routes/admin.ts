@@ -3226,12 +3226,20 @@ router.post('/orders/:id/create-shipment', requirePermission('order.update'), as
       return;
     }
 
-    const { createShipment } = await import('../services/shipping.service');
-    const result = await createShipment({
+    const { nzShippingProvider } = await import('../commerce/providers/nz-shipping');
+    const result = await nzShippingProvider.createShipment({
+      orderId: String(order._id),
       orderNumber: order.orderNumber,
-      shippingAddress: order.shippingAddress,
+      address: {
+        line1: order.shippingAddress?.line1 || '',
+        line2: order.shippingAddress?.line2,
+        city: order.shippingAddress?.city || '',
+        state: order.shippingAddress?.state || '',
+        zip: order.shippingAddress?.zip || '',
+        country: order.shippingAddress?.country || 'NZ',
+      },
       items: order.items.map((item) => ({
-        productName: item.productName,
+        name: item.productName,
         quantity: item.quantity,
       })),
     });
@@ -3249,7 +3257,8 @@ router.post('/orders/:id/create-shipment', requirePermission('order.update'), as
     }
     order.trackingNumber = result.trackingNumber;
     order.carrier = result.carrier;
-    order.shippingLabelUrl = result.labelUrl;
+    order.isDemoTracking = result.isDemo || false;
+    order.shippingLabelUrl = result.trackingUrl || result.labelUrl;
     await order.save();
 
     await auditAdminEvent(req, {
@@ -3274,7 +3283,8 @@ router.post('/orders/:id/create-shipment', requirePermission('order.update'), as
         statusAlreadyShipped,
         trackingNumber: result.trackingNumber,
         carrier: result.carrier,
-        labelUrl: result.labelUrl,
+        labelUrl: result.trackingUrl || result.labelUrl,
+        isDemo: result.isDemo || false,
         amount: order.payment.amount,
       },
     });
