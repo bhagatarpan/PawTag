@@ -22,6 +22,7 @@
  */
 
 import { Cart, Product, PromoCode, type ICartDocument } from '@pawtag/db';
+import { roundToCents } from '@pawtag/shared';
 import { NotFoundError } from '../../lib/app-errors';
 import { InvalidCartError, InsufficientStockError, ProductUnavailableError } from '../errors';
 
@@ -504,7 +505,7 @@ export class CartService {
         quantity: item.quantity,
         unitPrice: item.unitPrice,
         customisationTotal: item.customizationTotal,
-        lineTotal: (item.unitPrice + item.customizationTotal) * item.quantity,
+        lineTotal: roundToCents((item.unitPrice + item.customizationTotal) * item.quantity),
         isAccessory: product?.isAccessory ?? false,
       };
     });
@@ -512,7 +513,7 @@ export class CartService {
     // Persist any price updates
     await cart.save();
 
-    const subtotal = items.reduce((sum, item) => sum + item.lineTotal, 0);
+    const subtotal = roundToCents(items.reduce((sum, item) => sum + item.lineTotal, 0));
     const discount = cart.promoDiscount ?? 0;
 
     // Calculate membership accessory discount
@@ -541,12 +542,12 @@ export class CartService {
     let tax: number;
     if (taxInclusive) {
       // Tax is included in the price — extract the tax component
-      tax = (subtotal - discount - accessoryDiscount + shipping) * (taxRate / (1 + taxRate));
+      tax = roundToCents((subtotal - discount - accessoryDiscount + shipping) * (taxRate / (1 + taxRate)));
     } else {
       // Tax is added on top of the price
-      tax = (subtotal - discount - accessoryDiscount + shipping) * taxRate;
+      tax = roundToCents((subtotal - discount - accessoryDiscount + shipping) * taxRate);
     }
-    const total = subtotal - discount - accessoryDiscount + shipping + (taxInclusive ? 0 : tax);
+    const total = roundToCents(subtotal - discount - accessoryDiscount + shipping + (taxInclusive ? 0 : tax));
 
     return {
       items,

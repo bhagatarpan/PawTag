@@ -4,7 +4,7 @@ import { getGuardianNumber, getGuardianString } from '../../loyalty/guardian-con
 export async function renderOrderConfirmationEmail(data: {
   name: string;
   orderNumber: string;
-  items: Array<{ productName: string; quantity: number; unitPrice: number; variantName?: string; petName?: string; customisationTexts?: string[] }>;
+  items: Array<{ productName: string; quantity: number; unitPrice: number; customizationTotal?: number; variantName?: string; petName?: string; customisationTexts?: string[] }>;
   total: number;
   shippingAddress: { line1: string; city: string; state: string; zip: string };
   viewOrderUrl: string;
@@ -25,7 +25,7 @@ export async function renderOrderConfirmationEmail(data: {
           : ''}
       </td>
       <td style="padding:12px 16px;border-bottom:1px solid #f3f4f6;text-align:center;color:#374151;font-size:14px;">${item.quantity}</td>
-      <td style="padding:12px 16px;border-bottom:1px solid #f3f4f6;text-align:right;color:#374151;font-size:14px;">$${(item.unitPrice * item.quantity).toFixed(2)}</td>
+      <td style="padding:12px 16px;border-bottom:1px solid #f3f4f6;text-align:right;color:#374151;font-size:14px;">$${((item.unitPrice + (item.customizationTotal || 0)) * item.quantity).toFixed(2)}</td>
     </tr>
   `).join('');
 

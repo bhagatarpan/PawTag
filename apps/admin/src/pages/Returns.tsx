@@ -160,7 +160,7 @@ export default function Returns() {
 
   const openDetail = (r: ReturnRequest) => {
     setSelected(r);
-    setRefundAmount(r.refundAmount ? String(r.refundAmount) : '');
+    setRefundAmount(r.refundAmount != null ? Number(r.refundAmount).toFixed(2) : '');
     setRefundReason('');
     setExceptionReason('');
   };
@@ -408,7 +408,7 @@ export default function Returns() {
                     value={refundAmount}
                     onChange={(e) => setRefundAmount(e.target.value)}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                    placeholder={selected.refundAmount != null ? String(selected.refundAmount) : '0.00'}
+                    placeholder={selected.refundAmount != null ? Number(selected.refundAmount).toFixed(2) : '0.00'}
                   />
                 </div>
                 <div>

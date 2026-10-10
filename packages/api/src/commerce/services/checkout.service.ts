@@ -35,6 +35,7 @@ import { inventoryService } from './inventory.service';
 
 import { cartService } from './cart.service';
 import { getSetting, getNumberSetting, getBooleanSetting } from '../config';
+import { roundToCents } from '@pawtag/shared';
 
 import { membershipEntitlementService } from '../../services/membership-entitlement.service';
 import { logOrderEvent } from '../audit';
@@ -128,7 +129,13 @@ export class CheckoutService {
     const freeShippingThreshold = await membershipEntitlementService.getValue<number>(userId, 'free_shipping_threshold');
     if (freeShippingThreshold !== null && freeShippingThreshold >= 0 && totals.subtotal >= freeShippingThreshold) {
       totals.shipping = 0;
-      totals.total = totals.subtotal - totals.discount + totals.tax;
+      // Recalculate total consistently with cart.service: subtract accessoryDiscount,
+      // only add tax when tax-exclusive (tax is already in prices when inclusive)
+      const { nzGstProvider } = await import('../providers/simple-gst');
+      const taxInclusiveFreeShip = await nzGstProvider.isInclusive();
+      totals.total = roundToCents(
+        totals.subtotal - (totals.discount || 0) - (totals.accessoryDiscount || 0) + 0 + (taxInclusiveFreeShip ? 0 : (totals.tax || 0)),
+      );
       logger.info({ userId, freeShippingThreshold, subtotal: totals.subtotal }, 'Membership free shipping applied at checkout');
     }
 
@@ -213,14 +220,14 @@ export class CheckoutService {
         customisation: item.customisation,
         customisationTexts: item.customisationTexts || [],
       })),
-      subtotal: quote.subtotal,
-      discount: quote.discount,
+      subtotal: roundToCents(quote.subtotal),
+      discount: roundToCents(quote.discount),
       promoCode: cart.promoCode,
-      shipping: quote.shipping,
+      shipping: roundToCents(quote.shipping),
       shippingMethodId: quote.shippingMethodId || cart.shippingMethodId,
       shippingMethodName: quote.shippingMethodName || cart.shippingMethodName,
-      tax: quote.tax,
-      total: quote.total,
+      tax: roundToCents(quote.tax),
+      total: roundToCents(quote.total),
       currency: quote.currency,
       stripePaymentIntentId: paymentIntent.id,
       stripeClientSecret: paymentIntent.clientSecret,
@@ -252,7 +259,9 @@ export class CheckoutService {
           const rewardsDiscount = Math.min(reservedRewards, quote.total);
           pendingOrder.pawRewardsRedemption = reservedRewards;
           pendingOrder.pawRewardsReserved = true;
-          pendingOrder.total = Math.max(0, quote.total - reservedRewards);
+          // quote.total already has rewardsToApply subtracted (via buildCheckoutQuote discount).
+          // Do NOT subtract again — that would double-count the rewards discount.
+          pendingOrder.total = quote.total;
           pendingOrder.discount = (pendingOrder.discount || 0) + reservedRewards;
           await pendingOrder.save();
           logger.info(
@@ -352,15 +361,25 @@ export class CheckoutService {
       rewardsToApply = Math.min(requestedRewards, available);
     }
 
+    // Include accessory discount in the total (cart computes it; checkout must not drop it)
+    const accessoryDiscount = totals.accessoryDiscount || 0;
     const discount = (totals.discount || 0) + rewardsToApply;
     const tax = totals.tax || 0;
     const subtotal = totals.subtotal;
-    const total = Math.max(0, subtotal - discount + shipping + tax);
+
+    // Determine tax-inclusive from the GST provider (same source as cart.service)
+    const { nzGstProvider } = await import('../providers/simple-gst');
+    const taxInclusive = await nzGstProvider.isInclusive();
+
+    // Total formula must match cart.service.calculateTotals:
+    // tax-inclusive: tax is already in prices — do NOT add it again
+    // tax-exclusive: tax is added on top
+    const total = Math.max(0, roundToCents(subtotal - discount - accessoryDiscount + shipping + (taxInclusive ? 0 : tax)));
 
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 15 * 60 * 1000);
     const quoteRevision = crypto.createHash('sha256')
-      .update(JSON.stringify({ userId, subtotal, discount, shipping, tax, total, rewardsToApply, shippingMethodId, at: now.toISOString() }))
+      .update(JSON.stringify({ userId, subtotal, discount, accessoryDiscount, shipping, tax, total, rewardsToApply, shippingMethodId, at: now.toISOString() }))
       .digest('hex')
       .slice(0, 16);
 
@@ -505,15 +524,15 @@ export class CheckoutService {
             productName: item.productName,
             sku: item.sku,
             quantity: item.quantity,
-            unitPrice: item.unitPrice,
-            totalPrice: (item.unitPrice + item.customizationTotal) * item.quantity,
-            customizationTotal: item.customizationTotal,
+            unitPrice: roundToCents(item.unitPrice),
+            totalPrice: roundToCents((item.unitPrice + item.customizationTotal) * item.quantity),
+            customizationTotal: roundToCents(item.customizationTotal),
             customisationTexts: item.customisationTexts || [],
           })),
-          subtotal: pending.subtotal,
-          shippingCost: pending.shipping,
-          tax: pending.tax,
-          discount: pending.discount > 0 ? { percent: 0, amount: pending.discount, reason: pending.promoCode || '' } : undefined,
+          subtotal: roundToCents(pending.subtotal),
+          shippingCost: roundToCents(pending.shipping),
+          tax: roundToCents(pending.tax),
+          discount: pending.discount > 0 ? { percent: 0, amount: roundToCents(pending.discount), reason: pending.promoCode || '' } : undefined,
           status: 'paid',
           completionStatus: 'pending',
           completionCorrelationId: correlationId,
@@ -524,7 +543,7 @@ export class CheckoutService {
             stripePaymentIntentId: paymentIntentId,
             cardBrand: (payment as any)?.cardBrand,
             cardLast4: (payment as any)?.cardLast4,
-            amount: pending.total,
+            amount: roundToCents(pending.total),
             currency: pending.currency,
             paidAt: new Date(),
           },
@@ -584,9 +603,7 @@ export class CheckoutService {
       orderNumber: order.orderNumber,
       type: 'payment',
       status: 'succeeded',
-      amount: pending.total,
-      currency: pending.currency,
-      provider: 'stripe',
+      amount: roundToCents(pending.total),
       providerTransactionId: paymentIntentId,
       initiatedBy: 'customer',
       cardBrand: order.payment?.cardBrand,
@@ -919,7 +936,7 @@ export class CheckoutService {
       orderId: order._id,
       userId,
       invoiceNumber,
-      amount,
+      amount: roundToCents(amount),
       currency: order.payment.currency || 'NZD',
       status: 'paid',
       paymentMethod: order.payment.method,
@@ -986,6 +1003,7 @@ export class CheckoutService {
           productName: i.productName,
           quantity: i.quantity,
           unitPrice: i.unitPrice,
+          customizationTotal: i.customizationTotal,
         })),
         shippingAddress: order.shippingAddress,
       }).catch((err) => logger.error({ err }, 'Order confirmation email error')),

@@ -326,6 +326,7 @@ export async function createPawTagOrder(params: CreateOrderParams): Promise<Crea
           productName: i.productName,
           quantity: i.quantity,
           unitPrice: i.unitPrice,
+          customizationTotal: i.customizationTotal,
         })),
         shippingAddress: shippingAddress || { line1: '', city: '', state: '', zip: '' },
       }).catch((err) => logger.error({ err, orderNumber }, 'Order confirmation email error')),

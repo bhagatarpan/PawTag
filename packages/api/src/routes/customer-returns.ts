@@ -150,6 +150,9 @@ router.post('/', validate(createReturnSchema), async (req: AuthRequest, res: Res
       };
     });
 
+    // Round refund estimate to nearest cent
+    refundAmount = Math.round(refundAmount * 100) / 100;
+
     // Attach tag ids when unambiguous (order line tagId or single remaining tag)
     const tagIdsPerItem = await resolveReturnItemTagIds(order, returnItems);
     returnItems.forEach((ri: any, idx: number) => {

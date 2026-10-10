@@ -26,6 +26,7 @@ import {
   getOrderRefundDisplay,
   getRefundDisplayLabel,
   getRefundDisplayBadgeVariant,
+  formatCurrency,
 } from '@pawtag/shared';
 
 /* ------------------------------------------------------------------ */
@@ -199,10 +200,6 @@ function formatDateTime(iso: string): string {
     day: '2-digit', month: 'short', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
   });
-}
-
-function formatCurrency(amount: number, currency = 'NZD'): string {
-  return `${currency} $${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function getStatusIcon(status: string) {

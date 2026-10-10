@@ -560,6 +560,19 @@ Stripe refunds always return to the **original payment method** used for the cha
 - Failed refunds need a clear customer/CSR recovery path (auto-retry + support arranging alternate method). See `skills/refund-visibility/`.
 - **Customer returns → money:** process via `return-refund.service` / `POST /api/admin/commerce/returns/:id/refund` with permission `order.refund`. Returns status updates alone must **not** move money. Default requires warehouse receipt; refund-without-return is an explicit exception. Remaining refundable balance is server-enforced. Customer tracking submit ≠ warehouse receipt. **Admin is notified** on new return requests via email (`commerce.returns.notificationEmail` + `ADMIN_ALERT_EMAIL`) and admin in-app notification (`return_requested`); sidebar shows pending-return count. See `skills/returns-refunds/` and `docs/RETURNS-REFUNDS-WORKFLOW.md`.
 
+### Monetary precision
+
+All monetary arithmetic, rounding, and Stripe conversion uses shared helpers from `@pawtag/shared` (`money.ts`). See `skills/monetary-precision/` for the full playbook.
+
+- Round to cents (`roundToCents`) before persisting any monetary value to the database.
+- Use `toStripeAmount(amount, currency)` for Stripe API calls — currency-aware minor units.
+- Use `addMoney`/`subtractMoney`/`multiplyMoney` for arithmetic that must not accumulate float dust.
+- **Tax-inclusive pricing (NZ GST default):** `total = subtotal - discount - accessoryDiscount + shipping`. Do NOT add extracted tax on top of inclusive prices — that double-counts (~13% overcharge).
+- **PawRewards at checkout:** `buildCheckoutQuote` already folds rewards into the discount. Do NOT subtract again when persisting to PendingOrder.
+- **Accessory discount:** `totals.accessoryDiscount` must be included in checkout totals — do not drop it between cart and checkout.
+- Never compare raw floats for money equality — use integer cents.
+- Never inline `Math.round(x * 100)` in feature code — import from `@pawtag/shared`.
+
 ## Idempotency
 
 Financial operations must tolerate retries where retries are possible.
@@ -2108,6 +2121,7 @@ skills/database-integrity/            Persistence correctness across Mongo + tar
 skills/dynamodb-migration/             Incremental MongoDB -> DynamoDB migration
 skills/donation-domain/                Donation financial domain, recurring giving, donor identity
 skills/financial-document-integrity/   Invoices, credit notes, donation receipts, PDFs/access
+skills/monetary-precision/             Money arithmetic, rounding, Stripe cents conversion, GST-inclusive totals
 skills/background-jobs/               Jobs, leases, retries, idempotency, worker safety
 skills/testing-regression/            Risk-based regression, integration and E2E testing
 skills/api-architecture/              Routes, services, validation, shared API contracts
@@ -2163,6 +2177,15 @@ production-readiness-review
 work-packet-executor
 cart-checkout-experience
 pawtag-ui-ux
+testing-regression
+```
+
+### Monetary precision / money calculation
+
+```text
+work-packet-executor
+monetary-precision
+commerce-safety
 testing-regression
 ```
 

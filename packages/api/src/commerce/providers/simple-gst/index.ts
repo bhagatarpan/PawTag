@@ -65,7 +65,9 @@ export class NzGstProvider implements ITaxProvider {
     });
 
     const totalItemTax = lineItems.reduce((sum, item) => sum + item.amount, 0);
-    const shippingTax = params.shippingCost ? params.shippingCost * (inclusive ? rate / (1 + rate) : rate) : 0;
+    const shippingTax = params.shippingCost
+      ? Math.round(params.shippingCost * (inclusive ? rate / (1 + rate) : rate) * 100) / 100
+      : 0;
     const totalTax = totalItemTax + shippingTax;
 
     return {

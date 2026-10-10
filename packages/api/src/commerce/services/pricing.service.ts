@@ -154,7 +154,7 @@ export class PricingService {
     discount: { type: 'percentage' | 'fixed'; value: number },
   ): number {
     if (discount.type === 'percentage') {
-      const amount = subtotal * (discount.value / 100);
+      const amount = Math.round(subtotal * (discount.value / 100) * 100) / 100;
       return Math.min(amount, subtotal);
     }
     return Math.min(discount.value, subtotal);

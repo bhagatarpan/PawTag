@@ -126,6 +126,9 @@ PromoCodeSchema.methods.calculateDiscount = function (subtotal: number): number 
     discount = this.discountValue;
   }
 
+  // Round to nearest cent to prevent floating-point dust (e.g. 1.999 → 2.00)
+  discount = Math.round(discount * 100) / 100;
+
   // Cannot discount more than the subtotal
   return Math.min(discount, subtotal);
 };
