@@ -34,6 +34,7 @@
     "@opentelemetry/sdk-trace-node": "^2.10.0",
     "@opentelemetry/semantic-conventions": "^1.43.0",
     "@pawtag/db": "workspace:*",
+    "@pawtag/design-tokens": "workspace:*",
     "@pawtag/shared": "workspace:*",
     "@sentry/node": "^10.69.0",
     "bcryptjs": "^2.4.3",

@@ -448,6 +448,9 @@ importers:
       '@pawtag/db':
         specifier: workspace:*
         version: link:../db
+      '@pawtag/design-tokens':
+        specifier: workspace:*
+        version: link:../design-tokens
       '@pawtag/shared':
         specifier: workspace:*
         version: link:../shared

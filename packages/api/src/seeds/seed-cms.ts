@@ -2082,13 +2082,13 @@ async function run() {
     <p style="color:#92400e;font-size:18px;font-weight:800;margin:0;">Only \${{goldPrice}}/month</p>
     <p style="color:#b45309;font-size:12px;margin:4px 0 0;font-style:italic;">less than a coffee</p>
   </div>
-  <table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px auto;"><tr><td align="center" style="background-color:#f59e0b;border-radius:10px;"><a href="{{goldLandingUrl}}" target="_blank" style="display:inline-block;padding:14px 40px;color:#ffffff;font-size:16px;font-weight:600;text-decoration:none;letter-spacing:0.3px;">Explore Gold</a></td></tr></table>
+  <table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px auto;"><tr><td align="center" valign="middle" style="background-color:#f59e0b;border-radius:10px;padding:14px 40px;"><a href="{{goldLandingUrl}}" target="_blank" style="display:inline-block;color:#ffffff;font-size:16px;font-weight:600;text-decoration:none;letter-spacing:0.3px;">Explore Gold</a></td></tr></table>
 </div>
 <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;">
 <div style="text-align:center;margin:8px 0 24px;">
   <p style="color:#111827;font-size:15px;font-weight:700;margin:0 0 8px;">Your Guardian Dashboard</p>
   <p style="color:#6b7280;font-size:14px;line-height:1.6;margin:0 0 16px;">Track your points, view your tier progress,<br>and manage your rewards from your personal dashboard.</p>
-  <table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px auto;"><tr><td align="center" style="background-color:#0d9488;border-radius:10px;"><a href="{{dashboardUrl}}" target="_blank" style="display:inline-block;padding:14px 40px;color:#ffffff;font-size:16px;font-weight:600;text-decoration:none;letter-spacing:0.3px;">View My Guardian Dashboard</a></td></tr></table>
+  <table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px auto;"><tr><td align="center" valign="middle" style="background-color:#0d9488;border-radius:10px;padding:14px 40px;"><a href="{{dashboardUrl}}" target="_blank" style="display:inline-block;color:#ffffff;font-size:16px;font-weight:600;text-decoration:none;letter-spacing:0.3px;">View My Guardian Dashboard</a></td></tr></table>
 </div>
 <p style="color:#9ca3af;font-size:12px;margin:0 0 16px;text-align:center;">Questions? Reply to this email or visit our help center.</p>
 <div style="border-top:1px solid #e5e7eb;padding-top:20px;margin-top:8px;">

@@ -1701,7 +1701,7 @@ All PawTag emails must use consistent design tokens defined here. These tokens a
 
 | Component | Key Styles |
 |-----------|-----------|
-| **CTA Button** | `bg: #0d9488, color: white, padding: 14px 40px, border-radius: 10px, font-size: 16px, font-weight: 600, letter-spacing: 0.3px` |
+| **CTA Button** | `bg: #0d9488, color: white, padding: 14px 40px (on <td>, not <a>), border-radius: 10px, font-size: 16px, font-weight: 600, letter-spacing: 0.3px` |
 | **Info Box** | `bg: #f0fdfa, border: 1px solid #ccfbf1, border-radius: 8px, padding: 16px 20px` |
 | **Divider** | `border-top: 1px solid #e5e7eb, margin: 24px 0` |
 | **OTP Display** | `bg: #f0fdfa, border: 2px dashed #0d9488, border-radius: 12px, padding: 32px, code: 42px/800/letter-spacing: 10px` |
@@ -1739,7 +1739,6 @@ All PawTag emails must use consistent design tokens defined here. These tokens a
 @media only screen and (max-width: 600px) {
   .email-container { width: 100% !important; padding: 16px !important; }
   .content-cell { padding: 24px !important; }
-  .cta-button { width: 100% !important; }
 }
 ```
 
