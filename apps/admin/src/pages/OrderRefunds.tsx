@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { API } from '@pawtag/shared/api';
+import { formatCurrency } from '@pawtag/shared';
 import { RefreshCw, Download, Filter, Search, XCircle, CheckCircle, Clock, AlertTriangle, ChevronDown, ChevronRight, RotateCcw } from 'lucide-react';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
@@ -214,7 +215,7 @@ export default function OrderRefunds() {
   };
 
   const formatAmount = (amount: number, currency: string) => {
-    return `$${amount.toFixed(2)} ${currency}`;
+    return formatCurrency(amount, currency);
   };
 
   return (

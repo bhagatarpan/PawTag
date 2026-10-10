@@ -92,7 +92,7 @@ function buildDefaultInvoiceHtml(data: InvoiceData, company: Record<string, stri
               ${item.tagId ? `<br><span style="color:#0d9488;font-size:12px;">Tag: ${escapeHtml(item.tagId)}</span>` : ''}
             </td>
             <td>${item.quantity}</td>
-            <td class="amount-col">$${(item.unitPrice * item.quantity).toFixed(2)}</td>
+            <td class="amount-col">$${((item.unitPrice + (item.customizationTotal || 0)) * item.quantity).toFixed(2)}</td>
           </tr>`).join('');
   } else if (membership && membershipTier) {
     lineItemRows = `
@@ -449,7 +449,7 @@ export async function generateCreditNoteHtml(creditNoteId: string): Promise<stri
               ${item.tagId ? `<br><span style="color:#0d9488;font-size:12px;">Tag: ${escapeHtml(item.tagId)}</span>` : ''}
             </td>
             <td>${item.quantity}</td>
-            <td class="amount-col" style="color:#dc2626;">-$${(item.unitPrice * item.quantity).toFixed(2)}</td>
+            <td class="amount-col" style="color:#dc2626;">-$${((item.unitPrice + (item.customizationTotal || 0)) * item.quantity).toFixed(2)}</td>
           </tr>`).join('');
   } else {
     lineItemRows = `

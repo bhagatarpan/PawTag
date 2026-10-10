@@ -14,6 +14,7 @@
 
 import { Order, PaymentTransaction, Invoice, type IOrderDocument } from '@pawtag/db';
 import mongoose from 'mongoose';
+import { roundToCents, toCents, fromCents } from '@pawtag/shared';
 import { NotFoundError } from '../../lib/app-errors';
 import { RefundError } from '../errors';
 import { stripePaymentProvider } from '../providers/stripe';
@@ -110,17 +111,21 @@ export class RefundService {
       };
     }
 
-    // 5. Calculate cumulative refund amount and validate
-    const capturedAmount = order.payment.amount;
-    const totalRefunded = await this.calculateTotalRefunded(order._id);
-    const refundAmount = params.amount ?? capturedAmount;
+    // 5. Calculate cumulative refund amount and validate (integer cents for safety)
+    const capturedAmount = roundToCents(order.payment.amount);
+    const totalRefunded = roundToCents(await this.calculateTotalRefunded(order._id));
+    const refundAmount = roundToCents(params.amount ?? capturedAmount);
 
     if (refundAmount <= 0) {
       throw new RefundError(`Invalid refund amount: $${refundAmount}`);
     }
 
-    if (totalRefunded + refundAmount > capturedAmount) {
-      const remainingRefundable = capturedAmount - totalRefunded;
+    const capturedCents = toCents(capturedAmount);
+    const refundedCents = toCents(totalRefunded);
+    const requestedCents = toCents(refundAmount);
+
+    if (refundedCents + requestedCents > capturedCents) {
+      const remainingRefundable = fromCents(Math.max(0, capturedCents - refundedCents));
       throw new RefundError(
         `Refund amount of $${refundAmount.toFixed(2)} would exceed captured amount of $${capturedAmount.toFixed(2)}. ` +
         `Already refunded: $${totalRefunded.toFixed(2)}. Remaining refundable: $${remainingRefundable.toFixed(2)}`,

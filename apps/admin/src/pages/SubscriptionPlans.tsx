@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { formatCurrency } from '@pawtag/shared';
 import api from '../lib/api';
 import {
   Search,
@@ -191,7 +192,7 @@ export default function SubscriptionPlans() {
   }
 
   function formatPrice(price: number, currency = 'NZD') {
-    return new Intl.NumberFormat('en-NZ', { style: 'currency', currency }).format(price);
+    return formatCurrency(price, currency);
   }
 
   function getMonthlyPrice(plan: SubscriptionPlan): number {

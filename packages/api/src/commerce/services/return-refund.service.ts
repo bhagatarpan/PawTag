@@ -10,7 +10,7 @@
 import { Order, PaymentTransaction, Return, User, type IReturnDocument } from '@pawtag/db';
 import { stripePaymentProvider } from '../providers/stripe';
 import { getBooleanSetting, getNumberSetting } from '../config';
-import { formatRefundDestination, getTrackingUrl } from '@pawtag/shared';
+import { formatRefundDestination, getTrackingUrl, toCents, fromCents, roundToCents } from '@pawtag/shared';
 import logger from '../../lib/logger';
 
 export interface ProcessReturnRefundParams {
@@ -44,13 +44,8 @@ export interface ProcessReturnRefundResult {
   capturedAmount?: number;
 }
 
-export function toCents(amount: number): number {
-  return Math.round(amount * 100);
-}
-
-export function fromCents(cents: number): number {
-  return cents / 100;
-}
+/** Re-export for backward compatibility — canonical implementation is in @pawtag/shared. */
+export { toCents, fromCents };
 
 /**
  * Pure remaining-balance math in integer cents.
@@ -250,15 +245,15 @@ export class ReturnRefundService {
     // Server default: return.refundAmount or recompute from items
     let defaultAmount = Number(ret.refundAmount || 0);
     if (defaultAmount <= 0) {
-      defaultAmount = (ret.items || []).reduce((sum, item) => {
+      defaultAmount = roundToCents((ret.items || []).reduce((sum, item) => {
         const unit = Number(item.unitPrice ?? 0);
         const custom = Number(item.customizationTotal ?? 0);
         const qty = Number(item.quantity ?? 0);
         return sum + (unit + custom) * qty;
-      }, 0);
+      }, 0));
     }
 
-    const requestedAmount = params.amount ?? defaultAmount;
+    const requestedAmount = roundToCents(params.amount ?? defaultAmount);
     if (!Number.isFinite(requestedAmount) || requestedAmount <= 0) {
       return { success: false, error: 'Invalid refund amount' };
     }

@@ -147,12 +147,12 @@ export default function CheckoutConfirmationStep({
               </div>
             ))}
             <div className="border-t border-gray-100 pt-3 mt-3 space-y-1">
-              <div className="flex justify-between text-sm"><span className="text-gray-600">Subtotal</span><span className="text-gray-900">${(confirmedTotal * 0.85).toFixed(2)}</span></div>
+              <div className="flex justify-between text-sm"><span className="text-gray-600">Subtotal</span><span className="text-gray-900">${(confirmedPawTagOrder?.subtotal ?? confirmedTotal).toFixed(2)}</span></div>
               {confirmedPawTagOrder?.discount?.amount > 0 && (
                 <div className="flex justify-between text-sm"><span className="text-green-600">Discount</span><span className="text-green-600">-${confirmedPawTagOrder.discount.amount.toFixed(2)}</span></div>
               )}
               <div className="flex justify-between text-sm"><span className="text-gray-600">Shipping</span><span className="text-gray-900">${(confirmedPawTagOrder?.shippingCost || 0).toFixed(2)}</span></div>
-              <div className="flex justify-between text-sm"><span className="text-gray-600">Tax (incl.)</span><span className="text-gray-900">${(confirmedTotal * 0.15).toFixed(2)}</span></div>
+              <div className="flex justify-between text-sm"><span className="text-gray-600">Tax (incl.)</span><span className="text-gray-900">${(confirmedPawTagOrder?.tax || 0).toFixed(2)}</span></div>
               <div className="flex justify-between text-sm font-bold pt-2 border-t border-gray-100"><span>Total</span><span className="text-primary-700">${confirmedTotal.toFixed(2)}</span></div>
             </div>
           </div>

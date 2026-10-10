@@ -2961,15 +2961,16 @@ router.post('/orders/:id/refund', requirePermission('order.update'), async (req:
     }
 
     // Validate refund amount against remaining refundable balance
-    const refundAmount = amount || order.payment.amount;
-    if (refundAmount <= 0 || refundAmount > order.payment.amount) {
-      res.status(400).json({ success: false, error: `Invalid refund amount: $${refundAmount}. Must be between $0.01 and $${order.payment.amount}` });
+    const { toCents, roundToCents } = await import('@pawtag/shared');
+    const refundAmount = roundToCents(amount || order.payment.amount);
+    if (refundAmount <= 0 || refundAmount > roundToCents(order.payment.amount)) {
+      res.status(400).json({ success: false, error: `Invalid refund amount: $${refundAmount.toFixed(2)}. Must be between $0.01 and $${roundToCents(order.payment.amount).toFixed(2)}` });
       return;
     }
 
     const partialEnabled = await getBooleanSetting('commerce.refunds.partialEnabled');
-    const capturedCents = Math.round(order.payment.amount * 100);
-    const requestedCents = Math.round(refundAmount * 100);
+    const capturedCents = toCents(order.payment.amount);
+    const requestedCents = toCents(refundAmount);
     if (!partialEnabled && requestedCents < capturedCents) {
       res.status(400).json({ success: false, error: 'Partial refunds are disabled in commerce settings' });
       return;
@@ -2981,7 +2982,7 @@ router.post('/orders/:id/refund', requirePermission('order.update'), async (req:
       status: { $in: ['succeeded', 'pending'] },
     }).select('amount');
     const alreadyRefundedCents = existingRefundTx.reduce(
-      (sum, t) => sum + Math.round(Number(t.amount || 0) * 100),
+      (sum, t) => sum + toCents(Number(t.amount || 0)),
       0,
     );
     const remainingCents = Math.max(0, capturedCents - alreadyRefundedCents);
