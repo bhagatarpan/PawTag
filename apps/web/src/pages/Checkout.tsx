@@ -1246,7 +1246,7 @@ export default function Checkout() {
                 </div>
 
                 {/* Trust badges */}
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="text-center p-3 bg-gray-50 rounded-xl"><RefreshCw className="h-5 w-5 text-primary-600 mx-auto mb-1" /><p className="text-xs font-medium text-gray-900">60-Day Returns</p><p className="text-xs text-gray-500">Easy returns & refunds</p></div>
                   <div className="text-center p-3 bg-gray-50 rounded-xl"><Lock className="h-5 w-5 text-primary-600 mx-auto mb-1" /><p className="text-xs font-medium text-gray-900">Secure Payments</p><p className="text-xs text-gray-500">100% secure checkout</p></div>
                   <div className="text-center p-3 bg-gray-50 rounded-xl"><Headphones className="h-5 w-5 text-primary-600 mx-auto mb-1" /><p className="text-xs font-medium text-gray-900">24/7 Support</p><p className="text-xs text-gray-500">We're here to help</p></div>
@@ -1271,9 +1271,9 @@ export default function Checkout() {
                 ) : guardianTier ? (
                   /* Guardian member — upsell Membership */
                   <div className="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-xl p-4">
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-3">
                       <Crown className="h-5 w-5 text-amber-600 flex-shrink-0" />
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-[180px]">
                         <p className="text-sm font-medium text-amber-800">
                           <strong>Upgrade your membership for extra points!</strong>
                         </p>
@@ -1281,7 +1281,7 @@ export default function Checkout() {
                           Join a membership tier to earn more points on every purchase.
                         </p>
                       </div>
-                      <Link to="/membership" className="px-3 py-1.5 bg-amber-600 text-white rounded-lg text-xs font-medium hover:bg-amber-700 transition-colors whitespace-nowrap">
+                      <Link to="/membership" className="px-3 py-1.5 bg-amber-600 text-white rounded-lg text-xs font-medium hover:bg-amber-700 transition-colors whitespace-nowrap shrink-0">
                         View Plans
                       </Link>
                     </div>
@@ -1289,9 +1289,9 @@ export default function Checkout() {
                 ) : (
                   /* Not a Guardian member — promote free Guardian */
                   <div className="bg-gradient-to-r from-primary-50 to-amber-50 border border-primary-100 rounded-xl p-4">
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-3">
                       <Shield className="h-5 w-5 text-primary-600 flex-shrink-0" />
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-[180px]">
                         <p className="text-sm font-medium text-primary-800">
                           <strong>Earn rewards on this order.</strong>
                         </p>
@@ -1299,7 +1299,7 @@ export default function Checkout() {
                           Guardian members earn points on every purchase. Join free today.
                         </p>
                       </div>
-                      <Link to="/guardian" className="px-3 py-1.5 bg-primary-600 text-white rounded-lg text-xs font-medium hover:bg-primary-700 transition-colors whitespace-nowrap">
+                      <Link to="/guardian" className="px-3 py-1.5 bg-primary-600 text-white rounded-lg text-xs font-medium hover:bg-primary-700 transition-colors whitespace-nowrap shrink-0">
                         Join Free
                       </Link>
                     </div>

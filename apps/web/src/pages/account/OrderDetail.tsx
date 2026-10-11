@@ -443,14 +443,14 @@ export default function OrderDetail() {
                   to="/account/subscriptions"
                   className="block p-4 rounded-xl border border-gray-100 hover:border-gray-200 hover:shadow-sm transition-all"
                 >
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isActive ? 'bg-emerald-50' : isGrace ? 'bg-amber-50' : 'bg-gray-50'}`}>
+                  <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${isActive ? 'bg-emerald-50' : isGrace ? 'bg-amber-50' : 'bg-gray-50'}`}>
                         <Shield size={18} className={isActive ? 'text-emerald-600' : isGrace ? 'text-amber-600' : 'text-gray-400'} />
                       </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono font-bold text-gray-900 text-sm">{sub.tagId?.tagId || sub.planName || 'Subscription'}</span>
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-mono font-bold text-gray-900 text-sm truncate">{sub.tagId?.tagId || sub.planName || 'Subscription'}</span>
                           {sub.tagId?.tagId && <CopyButton text={sub.tagId.tagId} size={10} />}
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${isCancelled ? 'bg-gray-100 text-gray-600' : isActive ? 'bg-emerald-50 text-emerald-700' : isGrace ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700'}`}>
                             {sub.status.replace('_', ' ')}
@@ -466,7 +466,7 @@ export default function OrderDetail() {
                         )}
                       </div>
                     </div>
-                    <div className="text-right">
+                    <div className="text-right shrink-0">
                       <div className="text-sm font-semibold text-gray-900">${sub.planId?.price?.toFixed(2) || '0.00'}<span className="text-xs font-normal text-gray-400">{sub.renewalMethod === 'annual' ? '/yr' : '/mo'}</span></div>
                       <div className="flex items-center gap-1 text-xs text-gray-400 mt-0.5">
                         {sub.autoRenew ? <RefreshCw size={10} className="text-emerald-500" /> : <Clock size={10} />}

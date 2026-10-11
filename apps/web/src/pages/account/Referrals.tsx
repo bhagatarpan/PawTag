@@ -49,7 +49,7 @@ export default function Referrals() {
 
       <div className="bg-gradient-to-r from-teal-500 to-teal-600 rounded-xl p-6 text-white">
         <h2 className="text-lg font-semibold mb-2">Your Referral Code</h2>
-        <div className="flex items-center gap-3 mb-4">
+        <div className="flex flex-wrap items-center gap-3 mb-4">
           <span className="text-3xl font-mono font-bold tracking-wider">{code}</span>
           <button onClick={copyCode} className="p-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors">
             {copied ? <CheckCircle size={20} /> : <Copy size={20} />}
@@ -89,12 +89,12 @@ export default function Referrals() {
         ) : (
           <div className="divide-y">
             {history.map((r: any) => (
-              <div key={r._id} className="px-5 py-3 flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-sm">{r.refereeId?.fullName || 'Unknown'}</p>
-                  <p className="text-xs text-gray-400">{r.refereeId?.email}</p>
+              <div key={r._id} className="px-5 py-3 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-medium text-sm truncate">{r.refereeId?.fullName || 'Unknown'}</p>
+                  <p className="text-xs text-gray-400 truncate">{r.refereeId?.email}</p>
                 </div>
-                <div className="text-right">
+                <div className="text-right shrink-0">
                   <span className={`text-xs px-2 py-0.5 rounded-full ${
                     r.status === 'rewarded' ? 'bg-green-100 text-green-700' :
                     r.status === 'completed' ? 'bg-blue-100 text-blue-700' :

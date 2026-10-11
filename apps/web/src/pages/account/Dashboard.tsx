@@ -209,7 +209,7 @@ export default function AccountDashboard() {
             <p className="text-sm text-gray-600 mt-0.5">
               Complete your profile so finders can reach you faster when your pet is found. It only takes 2 minutes.
             </p>
-            <div className="flex items-center gap-3 mt-3">
+            <div className="flex flex-wrap items-center gap-3 mt-3">
               <button
                 onClick={() => navigate('/account/profile')}
                 className="px-4 py-1.5 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors"
@@ -453,7 +453,7 @@ export default function AccountDashboard() {
             <X size={16} />
           </button>
           <h3 className="text-sm font-semibold text-gray-700 mb-4">How PawTag Works</h3>
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex-1 text-center">
               <div className="w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center mx-auto mb-2">
                 <PawPrint size={22} className="text-primary-600" />
@@ -486,38 +486,38 @@ export default function AccountDashboard() {
         {/* Guardian Status Card */}
         {data?.guardian ? (
           <div className="bg-gradient-to-r from-primary-50 to-primary-100 rounded-lg border border-primary-200 p-5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-primary-600 rounded-xl flex items-center justify-center">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-12 h-12 bg-primary-600 rounded-xl flex items-center justify-center shrink-0">
                   <Shield size={24} className="text-white" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <h3 className="font-semibold text-primary-900">Guardian {data.guardian.tier} Member</h3>
                   <p className="text-sm text-primary-700">
                     {data.guardian.points} points · ${(data.guardian.pawRewardsBalance || 0).toFixed(2)} PawRewards
                   </p>
                 </div>
               </div>
-              <Link to="/account/guardian" className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition-colors">
+              <Link to="/account/guardian" className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition-colors shrink-0">
                 View Dashboard
               </Link>
             </div>
           </div>
         ) : (
           <div className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-lg border border-amber-200 p-5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-amber-500 rounded-xl flex items-center justify-center">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-12 h-12 bg-amber-500 rounded-xl flex items-center justify-center shrink-0">
                   <Shield size={24} className="text-white" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <h3 className="font-semibold text-amber-900">Join Guardian — It's Free</h3>
                   <p className="text-sm text-amber-700">
                     Earn points on every purchase and unlock exclusive rewards
                   </p>
                 </div>
               </div>
-              <Link to="/account/guardian" className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 transition-colors">
+              <Link to="/account/guardian" className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 transition-colors shrink-0">
                 Learn More
               </Link>
             </div>
@@ -531,16 +531,16 @@ export default function AccountDashboard() {
             data.membership.tier.tier === 'black' ? 'from-gray-800 to-black border-gray-700' :
             'from-amber-50 to-yellow-50 border-amber-200'
           }`}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
                   data.membership.tier.tier === 'platinum' ? 'bg-gray-500' :
                   data.membership.tier.tier === 'black' ? 'bg-gray-900' :
                   'bg-amber-500'
                 }`}>
                   <Crown size={24} className="text-white" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <h3 className={`font-semibold ${
                     data.membership.tier.tier === 'black' ? 'text-white' : 'text-gray-900'
                   }`}>
@@ -553,7 +553,7 @@ export default function AccountDashboard() {
                   </p>
                 </div>
               </div>
-              <Link to="/account/membership" className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              <Link to="/account/membership" className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors shrink-0 ${
                 data.membership.tier.tier === 'black' ? 'bg-white text-gray-900 hover:bg-gray-100' :
                 'bg-primary-600 text-white hover:bg-primary-700'
               }`}>
@@ -563,19 +563,19 @@ export default function AccountDashboard() {
           </div>
         ) : data?.membership && !data.membership.hasMembership ? (
           <div className="bg-gradient-to-r from-primary-50 to-teal-50 rounded-lg border border-primary-200 p-5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-primary-600 rounded-xl flex items-center justify-center">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-12 h-12 bg-primary-600 rounded-xl flex items-center justify-center shrink-0">
                   <Crown size={24} className="text-white" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <h3 className="font-semibold text-primary-900">Upgrade to Gold — $89/year</h3>
                   <p className="text-sm text-primary-700">
                     Get 3× tag coverage, 2× points, and exclusive benefits
                   </p>
                 </div>
               </div>
-              <Link to="/membership" className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition-colors">
+              <Link to="/membership" className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition-colors shrink-0">
                 View Plans
               </Link>
             </div>
@@ -617,7 +617,7 @@ export default function AccountDashboard() {
                         {timeLeft > 0 ? `${timeLeft} min until emergency contact is notified` : 'Emergency contact will be notified soon'}
                       </p>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex flex-wrap items-center justify-end gap-2">
                       <button
                         onClick={async () => {
                           if (confirm('Mark as resolved? This means you have made contact with the finder.')) {

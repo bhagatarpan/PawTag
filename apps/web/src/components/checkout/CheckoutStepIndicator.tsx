@@ -34,7 +34,7 @@ export default function CheckoutStepIndicator({ currentStep, onStepClick }: Chec
               disabled={!isComplete && !isActive}
               aria-current={isActive ? 'step' : undefined}
               aria-label={`${step.label}${isComplete ? ' (completed)' : isActive ? ' (current)' : ''}`}
-              className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 ${
+              className={`flex items-center gap-2 px-2.5 sm:px-4 py-2 rounded-full text-sm font-medium transition-all focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 ${
                 isActive
                   ? 'bg-primary-600 text-white'
                   : isComplete
@@ -46,7 +46,7 @@ export default function CheckoutStepIndicator({ currentStep, onStepClick }: Chec
               <span className="hidden sm:inline">{step.label}</span>
             </button>
             {i < STEPS.length - 1 && (
-              <div className={`w-8 h-px mx-2 ${isComplete ? 'bg-primary-300' : 'bg-gray-200'}`} aria-hidden="true" />
+              <div className={`w-5 sm:w-8 h-px mx-1 sm:mx-2 ${isComplete ? 'bg-primary-300' : 'bg-gray-200'}`} aria-hidden="true" />
             )}
           </div>
         );

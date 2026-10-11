@@ -107,12 +107,12 @@ function SkeletonRow() {
             <div className="h-3 bg-gray-200 rounded w-32" />
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center justify-end gap-3">
           <div className="h-5 bg-gray-200 rounded-full w-16" />
           <div className="h-4 bg-gray-200 rounded w-16" />
         </div>
       </div>
-      <div className="mt-3 pt-3 border-t border-gray-100 flex items-center gap-4">
+      <div className="mt-3 pt-3 border-t border-gray-100 flex flex-wrap items-center gap-x-4 gap-y-1">
         <div className="h-3 bg-gray-200 rounded w-28" />
         <div className="h-3 bg-gray-200 rounded w-20" />
         <div className="h-3 bg-gray-200 rounded w-16" />
@@ -222,14 +222,14 @@ export default function Orders() {
                 className={`block bg-white rounded-lg border border-gray-200 border-l-4 ${getStatusBorderColor(order.status)} p-4 hover:border-primary-300 hover:shadow-md transition-all`}
               >
                 {/* Row 1: Order number, status, price */}
-                <div className="flex justify-between items-start">
-                  <div className="flex items-center gap-3">
+                <div className="flex flex-wrap justify-between items-start gap-2">
+                  <div className="flex items-center gap-3 min-w-0">
                     <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center shrink-0">
                       <ShoppingBag size={18} className="text-primary-600" />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <div className="flex items-center gap-1.5">
-                        <p className="font-mono text-sm font-semibold text-gray-900">
+                        <p className="font-mono text-sm font-semibold text-gray-900 truncate">
                           {order.orderNumber || `#${order._id.slice(-8).toUpperCase()}`}
                         </p>
                         {order.orderNumber && <CopyButton text={order.orderNumber} size={10} />}
@@ -239,7 +239,7 @@ export default function Orders() {
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
                     <StatusBadge
                       label={ORDER_STATUS_LABELS[order.status] || order.status}
                       variant={getStatusBadgeVariant(order.status)}
@@ -301,7 +301,7 @@ export default function Orders() {
                 </div>
 
                 {/* Row 2: Info row - Payment, Shipping, Items */}
-                <div className="mt-3 pt-3 border-t border-gray-100 flex items-center gap-4 text-xs text-gray-500">
+                <div className="mt-3 pt-3 border-t border-gray-100 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
                   {order.payment?.cardBrand && (
                     <span className="flex items-center gap-1.5">
                       <CreditCard size={12} className="text-gray-400" />

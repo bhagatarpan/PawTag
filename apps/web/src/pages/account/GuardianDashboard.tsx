@@ -273,14 +273,14 @@ const unlockedCount = achievements.filter((a) => a.unlocked).length;
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
           <h1 className="text-2xl font-bold text-gray-900">Guardian Dashboard</h1>
           <p className="text-gray-500">Your loyalty journey and rewards</p>
         </div>
         <Link
           to="/account/guardian/points"
-          className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+          className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors shrink-0"
         >
           View Points History
         </Link>
@@ -288,9 +288,9 @@ const unlockedCount = achievements.filter((a) => a.unlocked).length;
 
       {/* Tier Card */}
       <div className={`bg-gradient-to-r ${TIER_COLORS[data.tier]} rounded-2xl p-6 text-white`}>
-        <div className="flex items-center justify-between">
-          <div>
-<div className="flex items-center gap-3 mb-2">
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+          <div className="min-w-0">
+<div className="flex flex-wrap items-center gap-3 mb-2">
                <span className="text-3xl font-bold">{data.tierInfo.benefits.displayName}</span>
                {data.tierInfo.benefits.guardianBadge && (
                  <span className="px-3 py-1 bg-white/20 rounded-full text-sm font-medium">
@@ -304,7 +304,7 @@ const unlockedCount = achievements.filter((a) => a.unlocked).length;
                  : 'Maximum tier reached!'}
              </p>
           </div>
-          <div className="text-right">
+          <div className="text-right shrink-0">
             <div className="text-4xl font-bold">{data.points}</div>
             <div className="text-white/80">Guardian Points</div>
           </div>
@@ -330,17 +330,17 @@ const unlockedCount = achievements.filter((a) => a.unlocked).length;
       {/* Gold Membership Indicator */}
       {data.isGoldMember && (
         <div className="bg-gradient-to-r from-amber-500 to-orange-500 rounded-2xl p-6 text-white">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-4 min-w-0">
+              <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center shrink-0">
                 <Crown size={28} className="text-white" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <h3 className="text-xl font-bold">Gold Member</h3>
                 <p className="text-white/80 text-sm">2× points on all purchases · Priority support · Early access</p>
               </div>
             </div>
-            <span className="px-4 py-2 bg-white/20 rounded-full text-sm font-bold uppercase tracking-wide">Active</span>
+            <span className="px-4 py-2 bg-white/20 rounded-full text-sm font-bold uppercase tracking-wide shrink-0">Active</span>
           </div>
         </div>
       )}

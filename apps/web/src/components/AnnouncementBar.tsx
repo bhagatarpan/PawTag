@@ -44,7 +44,7 @@ export default function AnnouncementBar() {
 
   return (
     <div className="bg-primary-600 text-white py-2 px-4 relative z-50">
-      <div className="max-w-7xl mx-auto flex items-center justify-center gap-2 text-sm">
+      <div className="max-w-7xl mx-auto flex items-center justify-center gap-2 text-sm pr-8">
         <Sparkles className="h-4 w-4 text-primary-200 shrink-0" />
         <Link to={announcement.link} className="hover:underline font-medium">
           {announcement.text}

@@ -231,7 +231,7 @@ function FinderPage() {
 
           {/* Medical Alerts */}
           {data.pet.medicalAlerts && (
-            <MedicalAlertBanner message={data.pet.medicalAlerts} />
+            <MedicalAlertBanner message={data.pet.medicalAlerts} className="mx-0" />
           )}
 
           {/* Pet Details */}

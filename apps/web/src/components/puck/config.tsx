@@ -376,7 +376,7 @@ export const pawtagConfig: Config<PawtagComponents> = {
                 ) : (
                 <form className="space-y-5" onSubmit={handleSubmit}>
                   {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">{error}</div>}
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1.5">Name *</label>
                       <input type="text" required value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500" />
@@ -1150,7 +1150,7 @@ export const pawtagConfig: Config<PawtagComponents> = {
         const [active, setActive] = useState(0);
         return (
           <section className="py-12 px-6 max-w-4xl mx-auto">
-            <div className="flex border-b border-gray-200 mb-6">
+            <div className="flex overflow-x-auto border-b border-gray-200 mb-6">
               {(items || []).map((item, i) => (
                 <button key={i} onClick={() => setActive(i)} className={`px-6 py-3 text-sm font-medium border-b-2 transition ${i === active ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>{item.label}</button>
               ))}
@@ -1360,7 +1360,7 @@ export const pawtagConfig: Config<PawtagComponents> = {
           <section className="py-16 px-6 text-center">
             {heading && <h2 className="text-3xl font-bold mb-8">{heading}</h2>}
             {diff > 0 ? (
-              <div className="flex justify-center gap-6">
+              <div className="flex flex-wrap justify-center gap-3 sm:gap-6">
                 {units.map((u, i) => (
                   <div key={i} className="bg-white border border-gray-200 rounded-xl p-4 min-w-[80px] shadow-sm">
                     <div className="text-3xl font-bold text-primary-600">{String(u.value).padStart(2, '0')}</div>

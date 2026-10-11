@@ -300,8 +300,8 @@ export default function PetCard({
               <QrCode size={18} className="text-teal-600" />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5">
-                <span className="text-sm font-bold text-gray-800 font-mono">{pet.linkedTag.tagId}</span>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-sm font-bold text-gray-800 font-mono truncate">{pet.linkedTag.tagId}</span>
                 <CopyButton text={pet.linkedTag.tagId} size={12} />
                 <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-teal-100 text-teal-700">
                   {pet.linkedTag.tagType || 'QR'}
@@ -322,7 +322,7 @@ export default function PetCard({
                 }`} />
               </div>
               {pet.linkedTag.subscription ? (
-                <div className="flex items-center gap-1.5 mt-1">
+                <div className="flex flex-wrap items-center gap-1.5 mt-1">
                   <CreditCard size={11} className="text-teal-600" />
                   <span className="text-[11px] text-teal-700 font-medium">{pet.linkedTag.subscription.productName}</span>
                   <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${

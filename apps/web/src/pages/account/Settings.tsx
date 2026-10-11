@@ -177,34 +177,34 @@ export default function Settings() {
           </h2>
         </div>
         <div className="divide-y divide-gray-100">
-          <div className="px-5 py-3 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Mail size={16} className="text-gray-400" />
-              <div>
+          <div className="px-5 py-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <Mail size={16} className="text-gray-400 shrink-0" />
+              <div className="min-w-0">
                 <p className="text-sm font-medium text-gray-900">Email</p>
-                <p className="text-xs text-gray-500">{user?.email}</p>
+                <p className="text-xs text-gray-500 truncate">{user?.email}</p>
               </div>
             </div>
             {user?.emailVerified ? (
               <StatusBadge label="Verified" variant="success" size="sm" />
             ) : (
-              <Link to="/verify-account" className="text-xs text-amber-600 hover:text-amber-800 font-medium">Verify</Link>
+              <Link to="/verify-account" className="text-xs text-amber-600 hover:text-amber-800 font-medium shrink-0">Verify</Link>
             )}
           </div>
-          <div className="px-5 py-3 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Phone size={16} className="text-gray-400" />
-              <div>
+          <div className="px-5 py-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <Phone size={16} className="text-gray-400 shrink-0" />
+              <div className="min-w-0">
                 <p className="text-sm font-medium text-gray-900">Phone</p>
-                <p className="text-xs text-gray-500">{user?.phoneNumber || 'Not provided'}</p>
+                <p className="text-xs text-gray-500 truncate">{user?.phoneNumber || 'Not provided'}</p>
               </div>
             </div>
             {!user?.phoneNumber ? (
-              <Link to="/account/profile" className="text-xs text-teal-600 hover:text-teal-800 font-medium">Add</Link>
+              <Link to="/account/profile" className="text-xs text-teal-600 hover:text-teal-800 font-medium shrink-0">Add</Link>
             ) : user?.phoneVerified ? (
               <StatusBadge label="Verified" variant="success" size="sm" />
             ) : (
-              <Link to="/verify-account" className="text-xs text-amber-600 hover:text-amber-800 font-medium">Verify</Link>
+              <Link to="/verify-account" className="text-xs text-amber-600 hover:text-amber-800 font-medium shrink-0">Verify</Link>
             )}
           </div>
           <div className="px-5 py-3 flex items-center justify-between">

@@ -474,7 +474,7 @@ export default function OnboardingWizard() {
             )}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                 <input
                   type="tel"
                   value={phoneNumber}
@@ -487,7 +487,7 @@ export default function OnboardingWizard() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                 <input
                   type="email"
                   value={email}
@@ -522,7 +522,7 @@ export default function OnboardingWizard() {
               <input type="text" value={addressLine2} onChange={(e) => setAddressLine2(e.target.value)} className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500" placeholder="Ponsonby" />
               <p className="text-xs text-gray-400 mt-1">Shown to finders when pet is found</p>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
                 <input type="text" value={addressCity} onChange={(e) => setAddressCity(e.target.value)} className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500" placeholder="Auckland" />
@@ -871,7 +871,7 @@ export default function OnboardingWizard() {
 
           {/* Flow steps (for how-it-works) */}
           {step.content?.flowSteps && step.content.flowSteps.length > 0 && (
-            <div className="flex items-start justify-between gap-1 my-6">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-1 my-6">
               {step.content.flowSteps.map((fs, i) => {
                 const FsIcon = ICON_MAP[fs.icon] || Heart;
                 const isLast = i === (step.content?.flowSteps?.length ?? 0) - 1;
@@ -885,7 +885,7 @@ export default function OnboardingWizard() {
                       <p className="text-[10px] text-gray-500 mt-0.5 leading-tight">{fs.description}</p>
                     </div>
                     {!isLast && (
-                      <ArrowRight size={14} className="text-gray-300 shrink-0 mt-[-20px] mx-0.5" />
+                      <ArrowRight size={14} className="text-gray-300 shrink-0 mt-[-20px] mx-0.5 hidden sm:block" />
                     )}
                   </div>
                 );

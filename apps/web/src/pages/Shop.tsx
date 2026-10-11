@@ -268,10 +268,10 @@ export default function Shop() {
               {/* Guardian Banner (Left Column) */}
               {(shopPage.content as any).guardianBanner?.enabled && (
                 <div className="p-4 bg-gradient-to-r from-primary-50 to-amber-50 border border-primary-100 rounded-xl">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
+                  <div className="flex flex-col items-start sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
                       <Shield className="h-5 w-5 text-primary-600 flex-shrink-0" />
-                      <div>
+                      <div className="min-w-0">
                         <p className="text-sm font-medium text-primary-800">
                           <strong>{(shopPage.content as any).guardianBanner.title}</strong>{' '}
                           <span className="text-primary-600">{(shopPage.content as any).guardianBanner.description}</span>
@@ -281,7 +281,7 @@ export default function Shop() {
                         </p>
                       </div>
                     </div>
-                    <Link to={(shopPage.content as any).guardianBanner.ctaLink} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition-colors whitespace-nowrap">
+                    <Link to={(shopPage.content as any).guardianBanner.ctaLink} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition-colors whitespace-nowrap shrink-0">
                       {(shopPage.content as any).guardianBanner.ctaText}
                     </Link>
                   </div>
@@ -291,10 +291,10 @@ export default function Shop() {
               {/* Membership Banner (Right Column) */}
               {(shopPage.content as any).membershipBanner?.enabled && (
                 <div className="p-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
+                  <div className="flex flex-col items-start sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
                       <Crown className="h-5 w-5 text-amber-600 flex-shrink-0" />
-                      <div>
+                      <div className="min-w-0">
                         <p className="text-sm font-medium text-amber-900">
                           <strong>{(shopPage.content as any).membershipBanner.title}</strong>
                         </p>
@@ -304,7 +304,7 @@ export default function Shop() {
                         </p>
                       </div>
                     </div>
-                    <Link to={(shopPage.content as any).membershipBanner.ctaLink} className="px-4 py-2 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600 transition-colors whitespace-nowrap">
+                    <Link to={(shopPage.content as any).membershipBanner.ctaLink} className="px-4 py-2 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600 transition-colors whitespace-nowrap shrink-0">
                       {(shopPage.content as any).membershipBanner.ctaText}
                     </Link>
                   </div>

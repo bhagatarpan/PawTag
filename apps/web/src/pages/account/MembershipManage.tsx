@@ -162,17 +162,17 @@ export default function MembershipManage() {
       <div className={`relative overflow-hidden rounded-2xl p-6 bg-gradient-to-br ${tierGradient}`}>
         <div className="absolute top-0 right-0 w-48 h-48 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
         <div className="relative">
-          <div className="flex items-start justify-between mb-4">
-            <div>
+          <div className="flex flex-wrap items-start justify-between gap-2 mb-4">
+            <div className="min-w-0">
               <div className="flex items-center gap-2 mb-1">
-                <TierIcon className="h-6 w-6 text-white" />
+                <TierIcon className="h-6 w-6 text-white shrink-0" />
                 <span className="text-white/80 text-xs font-medium uppercase tracking-wider">
                   {isCancelling && !isBenefitsEnded ? 'Cancelling' : isBenefitsEnded && isCancelling ? 'Membership ended' : 'Active Membership'}
                 </span>
               </div>
               <h1 className="text-2xl font-bold text-white tracking-tight">{tier.displayName} Membership</h1>
             </div>
-            <span className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide ${
+            <span className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide shrink-0 ${
               isCancelling
                 ? 'bg-amber-400/30 text-amber-100'
                 : 'bg-white/20 text-white'
@@ -241,7 +241,7 @@ export default function MembershipManage() {
           )}
         </div>
       ) : (
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
           <Link
             to="/membership"
             className="inline-flex items-center gap-2 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-all"
@@ -274,20 +274,20 @@ export default function MembershipManage() {
           <h2 className="text-sm font-semibold text-gray-900 mb-4">Billing History</h2>
           <div className="divide-y divide-gray-100">
             {invoices.map((invoice: any) => (
-              <div key={invoice._id} className="flex items-center justify-between py-4 first:pt-0 last:pb-0">
-                <div className="flex items-center gap-3">
+              <div key={invoice._id} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-4 first:pt-0 last:pb-0">
+                <div className="flex items-center gap-3 min-w-0">
                   <div className="w-10 h-10 rounded-xl bg-primary-50 flex items-center justify-center shrink-0">
                     <CreditCard size={18} className="text-primary-600" />
                   </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">{invoice.invoiceNumber}</p>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">{invoice.invoiceNumber}</p>
                     <p className="text-xs text-gray-500">
                       {formatDate(invoice.createdAt, 'medium')} &middot;{' '}
                       <span className="text-green-600 font-medium">{invoice.status}</span>
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-4 shrink-0">
                   <p className="text-sm font-semibold text-gray-900">{formatCurrency(invoice.amount, invoice.currency || 'NZD')}</p>
                   <button
                     onClick={async () => {
@@ -319,15 +319,15 @@ export default function MembershipManage() {
           <div className="space-y-3">
             {tags.map((tag) => (
               <div key={tag._id} className="p-4 bg-gray-50 rounded-xl">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-3">
-                    <span className="text-lg">🏷️</span>
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">{tag.tagId}</p>
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className="text-lg shrink-0">🏷️</span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">{tag.tagId}</p>
                       <p className="text-xs text-gray-500">{tag.access.reason}</p>
                     </div>
                   </div>
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium shrink-0 ${
                     tag.access.finderEnabled ? 'bg-green-100 text-green-700' : 
                     tag.access.hasAccess ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
                   }`}>

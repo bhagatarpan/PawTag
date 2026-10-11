@@ -113,7 +113,8 @@ export default function InvoiceDetail() {
           <h1 className="text-lg font-bold text-gray-900 truncate">{invoice.invoiceNumber}</h1>
           <CopyButton text={invoice.invoiceNumber} />
         </div>
-        {viewDownloadButton}
+        {/* Hidden on mobile — the sticky bottom bar carries this CTA there */}
+        <div className="hidden lg:block">{viewDownloadButton}</div>
       </div>
 
       {error && (

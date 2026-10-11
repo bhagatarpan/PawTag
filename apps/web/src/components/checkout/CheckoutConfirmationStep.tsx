@@ -92,7 +92,7 @@ export default function CheckoutConfirmationStep({
         <p className="text-lg text-gray-600" style={{ animation: 'fade-in-up 0.4s ease-out 0.3s both' }}>
           Thank you for your purchase{user?.fullName ? `, ${user.fullName.split(' ')[0]}` : ''}.
         </p>
-        <div className="mt-3 bg-white border border-gray-200 rounded-xl px-5 py-3 inline-flex items-center gap-3" style={{ animation: 'fade-in-up 0.4s ease-out 0.4s both' }}>
+        <div className="mt-3 bg-white border border-gray-200 rounded-xl px-5 py-3 inline-flex flex-wrap items-center justify-center gap-3" style={{ animation: 'fade-in-up 0.4s ease-out 0.4s both' }}>
           <span className="text-sm text-gray-500">Order</span>
           <span className="font-mono text-lg font-bold text-primary-700 tracking-wide">{orderNumber}</span>
           <CopyButton text={orderNumber} size={14} />

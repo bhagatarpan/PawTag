@@ -127,8 +127,8 @@ export default function GuardianRewards() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
           <Link to="/account/guardian" className="text-primary-600 hover:text-primary-700 text-sm mb-2 block">
             ← Back to Guardian Dashboard
           </Link>
@@ -137,7 +137,7 @@ export default function GuardianRewards() {
         </div>
         <button
           onClick={() => setRedeemModalOpen(true)}
-          className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+          className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shrink-0"
         >
           Redeem Rewards
         </button>
@@ -145,12 +145,12 @@ export default function GuardianRewards() {
 
       {/* Balance Card */}
       <div className="bg-gradient-to-r from-green-500 to-emerald-600 rounded-2xl p-6 text-white">
-        <div className="flex items-center justify-between">
-          <div>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
             <h2 className="text-lg font-semibold">Available Balance</h2>
             <p className="text-white/80">Redeem on any purchase (min $2.00)</p>
           </div>
-          <div className="text-right">
+          <div className="text-right shrink-0">
             <div className="text-4xl font-bold">${data.balance.toFixed(2)}</div>
             <div className="text-white/80">NZD</div>
           </div>
@@ -193,23 +193,23 @@ export default function GuardianRewards() {
             {data.history.map((item) => (
               <div
                 key={item._id}
-                className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0"
+                className="flex items-center justify-between gap-3 py-3 border-b border-gray-100 last:border-0"
               >
-                <div className="flex items-center">
-                  <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center mr-4 text-lg">
+                <div className="flex items-center min-w-0">
+                  <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center mr-4 text-lg shrink-0">
                     {TRANSACTION_ICONS[item.type]}
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <p className="font-medium text-gray-900">
                       {TRANSACTION_LABELS[item.type] || item.type}
                     </p>
-                    <p className="text-sm text-gray-500">{item.description}</p>
+                    <p className="text-sm text-gray-500 truncate">{item.description}</p>
                     <p className="text-xs text-gray-400">
                       {new Date(item.createdAt).toLocaleDateString()}
                     </p>
                   </div>
                 </div>
-                <span className={`font-semibold ${TRANSACTION_COLORS[item.type]}`}>
+                <span className={`font-semibold shrink-0 ${TRANSACTION_COLORS[item.type]}`}>
                   {item.type === 'redemption' || item.type === 'expiration' ? '-' : '+'}${Math.abs(item.amount).toFixed(2)}
                 </span>
               </div>

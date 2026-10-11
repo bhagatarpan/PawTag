@@ -245,18 +245,18 @@ function SubscriptionsInner() {
           <div className="absolute top-0 right-0 w-48 h-48 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
           <div className="absolute bottom-0 left-0 w-32 h-32 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
           <div className="relative">
-            <div className="flex items-start justify-between mb-4">
-              <div>
+            <div className="flex flex-wrap items-start justify-between gap-2 mb-4">
+              <div className="min-w-0">
                 <div className="flex items-center gap-2 mb-1">
                   <div className="w-2 h-2 rounded-full bg-white/80 animate-pulse" />
                   <span className="text-white/80 text-xs font-medium uppercase tracking-wider">{sub.planType === 'gold' ? 'Gold Membership' : 'Active Tag'}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <h1 className="text-2xl font-bold text-white tracking-tight">{sub.planType === 'gold' ? 'Gold Membership' : (sub.tagId?.tagId || 'N/A')}</h1>
+                  <h1 className="text-2xl font-bold text-white tracking-tight truncate">{sub.planType === 'gold' ? 'Gold Membership' : (sub.tagId?.tagId || 'N/A')}</h1>
                   {sub.tagId?.tagId && <CopyButton text={sub.tagId.tagId} size={14} className="text-white/60 hover:text-white" />}
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
                 <span className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide ${sub.autoRenew ? 'bg-emerald-500/20 text-emerald-100' : 'bg-amber-500/20 text-amber-100'}`}>
                   Auto-renew {sub.autoRenew ? 'On' : 'Off'}
                 </span>
@@ -278,7 +278,7 @@ function SubscriptionsInner() {
         </div>
 
         {/* Key Stats */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
             <div className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-1">Price</div>
             <div className="text-xl font-bold text-gray-900">${sub.price.toFixed(2)}<span className="text-sm font-normal text-gray-400">{priceLabel}</span></div>
@@ -324,14 +324,14 @@ function SubscriptionsInner() {
         {/* Upgrade CTA — hidden for Gold members (they have their own plan change flow) */}
         {isActive && sub.planType !== 'annual' && sub.planType !== 'gold' && (
           <div className="bg-gradient-to-r from-amber-500 to-orange-500 rounded-xl p-4 text-white">
-            <div className="flex items-center justify-between">
-              <div>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="min-w-0">
                 <h3 className="font-semibold">Upgrade Your Plan</h3>
                 <p className="text-white/80 text-sm">Earn more points, get higher PawRewards, and unlock premium benefits</p>
               </div>
               <Link
                 to="/account/upgrade"
-                className="px-4 py-2 bg-white text-amber-600 rounded-lg font-semibold hover:bg-amber-50 transition-colors"
+                className="px-4 py-2 bg-white text-amber-600 rounded-lg font-semibold hover:bg-amber-50 transition-colors shrink-0"
               >
                 Upgrade
               </Link>
@@ -342,8 +342,8 @@ function SubscriptionsInner() {
         {/* Gold Plan Change — for Gold members to switch monthly↔annual */}
         {isActive && sub.planType === 'gold' && (
           <div className="bg-gradient-to-r from-amber-500 to-orange-500 rounded-xl p-4 text-white">
-            <div className="flex items-center justify-between">
-              <div>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="min-w-0">
                 <h3 className="font-semibold">Gold Billing</h3>
                 <p className="text-white/80 text-sm">
                   Currently on {sub.renewalMethod} billing at ${sub.price.toFixed(2)}/{sub.renewalMethod === 'annual' ? 'yr' : 'mo'}
@@ -351,7 +351,7 @@ function SubscriptionsInner() {
               </div>
               <button
                 onClick={() => setShowChangePlan(true)}
-                className="px-4 py-2 bg-white text-amber-600 rounded-lg font-semibold hover:bg-amber-50 transition-colors"
+                className="px-4 py-2 bg-white text-amber-600 rounded-lg font-semibold hover:bg-amber-50 transition-colors shrink-0"
               >
                 Change Billing
               </button>
@@ -512,14 +512,14 @@ function SubscriptionsInner() {
                 const start = inv.periodStart || inv.billingPeriod?.start;
                 const end = inv.periodEnd || inv.billingPeriod?.end;
                 return (
-                  <div key={inv._id} className="flex items-center justify-between px-5 py-4 border-b border-gray-50 last:border-0 hover:bg-gray-50/50 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${inv.status === 'paid' ? 'bg-emerald-50' : inv.status === 'pending' ? 'bg-amber-50' : 'bg-red-50'}`}>
+                  <div key={inv._id} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-5 py-4 border-b border-gray-50 last:border-0 hover:bg-gray-50/50 transition-colors">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${inv.status === 'paid' ? 'bg-emerald-50' : inv.status === 'pending' ? 'bg-amber-50' : 'bg-red-50'}`}>
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={inv.status === 'paid' ? '#059669' : inv.status === 'pending' ? '#d97706' : '#dc2626'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="m9 15 2 2 4-4"/></svg>
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <div className="flex items-center gap-1.5">
-                          <div className="text-sm font-medium text-gray-900">{inv.invoiceNumber}</div>
+                          <div className="text-sm font-medium text-gray-900 truncate">{inv.invoiceNumber}</div>
                           <CopyButton text={inv.invoiceNumber} size={10} />
                         </div>
                         <div className="text-xs text-gray-400">
@@ -527,7 +527,7 @@ function SubscriptionsInner() {
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-4 shrink-0">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-bold text-gray-900">${inv.amount.toFixed(2)}</span>
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${inv.status === 'paid' ? 'bg-emerald-100 text-emerald-700' : inv.status === 'pending' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>
@@ -731,14 +731,14 @@ function SubscriptionsInner() {
                   onClick={() => { setSelectedId(sub._id); fetchDetail(sub._id); }}
                   className="p-5 cursor-pointer"
                 >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isActive ? 'bg-emerald-50' : isGrace ? 'bg-amber-50' : 'bg-gray-50'}`}>
+                  <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2 mb-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${isActive ? 'bg-emerald-50' : isGrace ? 'bg-amber-50' : 'bg-gray-50'}`}>
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={isActive ? '#059669' : isGrace ? '#d97706' : '#9ca3af'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
                       </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono font-bold text-gray-900 text-sm">{sub.planType === 'gold' ? 'Gold Membership' : (sub.tagId?.tagId || 'N/A')}</span>
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-mono font-bold text-gray-900 text-sm truncate">{sub.planType === 'gold' ? 'Gold Membership' : (sub.tagId?.tagId || 'N/A')}</span>
                           {sub.tagId?.tagId && <CopyButton text={sub.tagId.tagId} size={10} />}
                           {sub.planType === 'gold' && (
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-amber-100 text-amber-700">Gold</span>
@@ -757,13 +757,13 @@ function SubscriptionsInner() {
                         )}
                       </div>
                     </div>
-                    <div className="text-right">
+                    <div className="text-right shrink-0">
                       <div className="text-sm font-semibold text-gray-900">${sub.price.toFixed(2)}<span className="text-xs font-normal text-gray-400">{sub.renewalMethod === 'annual' ? '/yr' : '/mo'}</span></div>
                       <div className="text-xs text-gray-400 mt-0.5">{sub.totalScans} scans</div>
                     </div>
                   </div>
-                  <div className="flex items-center justify-between pt-3 border-t border-gray-50">
-                    <div className="flex items-center gap-4 text-xs text-gray-400">
+                  <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 pt-3 border-t border-gray-50">
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-400">
                       <span className="flex items-center gap-1">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
                         {formatDate(sub.startDate)}
@@ -783,8 +783,8 @@ function SubscriptionsInner() {
                   </div>
                 </div>
                 {(isGrace || isExpired || isCancelled) && (
-                  <div className="px-5 py-3 bg-gradient-to-r from-amber-50 to-orange-50 border-t border-amber-100/60 flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-sm text-amber-700">
+                  <div className="px-5 py-3 bg-gradient-to-r from-amber-50 to-orange-50 border-t border-amber-100/60 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+                    <div className="flex items-center gap-2 text-sm text-amber-700 min-w-0">
                       {isCancelled ? (
                         <>
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" x2="9" y1="9" y2="15"/><line x1="9" x2="15" y1="9" y2="15"/></svg>

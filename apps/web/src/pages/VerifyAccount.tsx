@@ -335,15 +335,15 @@ export default function VerifyAccount() {
             </div>
           ) : (
             <div className={`p-4 rounded-xl transition-all ${isEmailVerified ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'}`}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Mail className={`h-5 w-5 ${isEmailVerified ? 'text-green-600' : 'text-gray-400'}`} />
-                  <div>
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <Mail className={`h-5 w-5 shrink-0 ${isEmailVerified ? 'text-green-600' : 'text-gray-400'}`} />
+                  <div className="min-w-0">
                     <p className="font-medium text-gray-900">Email Verification</p>
-                    <p className="text-xs text-gray-500">{effectiveEmail}</p>
+                    <p className="text-xs text-gray-500 truncate">{effectiveEmail}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 shrink-0">
                   {isEmailVerified ? (
                     <span className="text-sm text-green-600 font-medium flex items-center gap-1"><Check className="h-4 w-4" /> Verified</span>
                   ) : (
@@ -388,15 +388,15 @@ export default function VerifyAccount() {
             </div>
           ) : (
             <div className={`p-4 rounded-xl transition-all ${isPhoneVerified ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'}`}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Phone className={`h-5 w-5 ${isPhoneVerified ? 'text-green-600' : 'text-gray-400'}`} />
-                  <div>
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <Phone className={`h-5 w-5 shrink-0 ${isPhoneVerified ? 'text-green-600' : 'text-gray-400'}`} />
+                  <div className="min-w-0">
                     <p className="font-medium text-gray-900">Mobile Verification</p>
-                    <p className="text-xs text-gray-500">{effectivePhone || 'Not set'}</p>
+                    <p className="text-xs text-gray-500 truncate">{effectivePhone || 'Not set'}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 shrink-0">
                   {isPhoneVerified ? (
                     <span className="text-sm text-green-600 font-medium flex items-center gap-1"><Check className="h-4 w-4" /> Verified</span>
                   ) : (

@@ -151,8 +151,8 @@ export default function InvoiceView() {
           <a href="/" className="flex items-center gap-2 text-gray-600 hover:text-gray-900 text-sm">
             <ArrowLeft size={16} /> PawTag
           </a>
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-gray-500">{invoice?.invoiceNumber}</span>
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="text-sm text-gray-500 truncate max-w-[120px] sm:max-w-none">{invoice?.invoiceNumber}</span>
             {invoice?.invoiceNumber && <CopyButton text={invoice.invoiceNumber} size={10} />}
             <button onClick={handlePrint} className="flex items-center gap-1.5 bg-teal-600 text-white px-3 py-1.5 rounded-md text-sm hover:bg-teal-700">
               <Printer size={14} /> Print / Save PDF

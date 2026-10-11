@@ -174,7 +174,7 @@ export default function NotifyOwnerForm({ tagId, location, locationConsent, cons
               className="flex-1 bg-primary-600 text-white py-2.5 rounded-lg font-medium flex items-center justify-center gap-2 hover:bg-primary-700 transition-colors disabled:opacity-50"
               aria-busy={loading}
             >
-              {loading ? <><Loader2 size={16} className="animate-spin" /> Sending...</> : <><CheckCircle size={16} /> Send Notification{location ? ' + Location' : ''}</>}
+              {loading ? <><Loader2 size={16} className="animate-spin" /> Sending...</> : <><CheckCircle size={16} /> {location ? 'Notify Owner' : 'Send Notification'}</>}
             </button>
             <button onClick={() => { setShowForm(false); setError(''); setCaptchaError(''); }} className="px-4 py-2.5 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50">Cancel</button>
           </div>

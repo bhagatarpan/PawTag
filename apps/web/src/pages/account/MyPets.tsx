@@ -91,7 +91,7 @@ function PhotoManager({ photos, onChange }: { photos: PhotoItem[]; onChange: (ph
         </div>
       )}
       {photos.length > 0 && (
-        <div className="grid grid-cols-5 gap-2">
+        <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
           {photos.map((photo, idx) => (
             <div key={idx} className={`relative group rounded-xl overflow-hidden border-2 ${photo.isMain ? 'border-teal-500' : 'border-gray-200'} aspect-square`}>
               <img src={photo.url} alt={photo.caption || `Photo ${idx + 1}`} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect width="80" height="80" fill="%23f3f4f6"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="%239ca3af" font-size="10">Error</text></svg>'; }} />
@@ -106,10 +106,10 @@ function PhotoManager({ photos, onChange }: { photos: PhotoItem[]; onChange: (ph
       )}
       {photos.length < 5 && (
         <div className="space-y-2">
-          <div className="flex gap-2 items-end">
-            <div className="flex-1"><input type="url" placeholder="Paste image URL" value={urlInput} onChange={(e) => { setUrlInput(e.target.value); setError(''); }} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all" /></div>
-            <div className="w-40"><input type="text" placeholder="Caption (optional)" value={captionInput} onChange={(e) => setCaptionInput(e.target.value)} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all" /></div>
-            <button type="button" onClick={handleAddUrl} disabled={!urlInput.trim()} className="bg-gray-100 border border-gray-200 rounded-xl px-4 py-2.5 text-sm hover:bg-gray-200 flex items-center gap-1.5 disabled:opacity-50 transition-colors font-medium"><Camera size={14} /> Add</button>
+          <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
+            <div className="flex-1 min-w-0"><input type="url" placeholder="Paste image URL" value={urlInput} onChange={(e) => { setUrlInput(e.target.value); setError(''); }} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all" /></div>
+            <div className="sm:w-40"><input type="text" placeholder="Caption (optional)" value={captionInput} onChange={(e) => setCaptionInput(e.target.value)} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all" /></div>
+            <button type="button" onClick={handleAddUrl} disabled={!urlInput.trim()} className="bg-gray-100 border border-gray-200 rounded-xl px-4 py-2.5 text-sm hover:bg-gray-200 flex items-center justify-center gap-1.5 disabled:opacity-50 transition-colors font-medium"><Camera size={14} /> Add</button>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs text-gray-400">or</span>
@@ -289,11 +289,11 @@ export default function MyPets() {
 
       {/* Unredeemed Tags Banner */}
       {unredeemedCount > 0 && (
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-5 mb-6 flex items-center gap-4 animate-fade-in">
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-5 mb-6 flex flex-wrap items-center gap-4 animate-fade-in">
           <div className="w-12 h-12 rounded-2xl bg-blue-100 flex items-center justify-center flex-shrink-0">
             <QrCode size={24} className="text-blue-600" />
           </div>
-          <div className="flex-1">
+          <div className="flex-1 min-w-[150px]">
             <p className="font-semibold text-blue-800">You have {unredeemedCount} unredeemed tag{unredeemedCount > 1 ? 's' : ''}</p>
             <p className="text-sm text-blue-600 mt-0.5">Activate your tag to link it to a pet profile and start protecting them.</p>
           </div>

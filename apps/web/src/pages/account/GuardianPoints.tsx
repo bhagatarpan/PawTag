@@ -183,14 +183,14 @@ export default function GuardianPoints() {
             {data.history.map((item) => (
               <div
                 key={item._id}
-                className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0"
+                className="flex items-center justify-between gap-3 py-3 border-b border-gray-100 last:border-0"
               >
-                <div className="flex items-center">
-                  <div className="w-10 h-10 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center mr-4 text-lg">
+                <div className="flex items-center min-w-0">
+                  <div className="w-10 h-10 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center mr-4 text-lg shrink-0">
                     {ACTIVITY_ICONS[item.activity] || '✨'}
                   </div>
-                  <div>
-                    <p className="font-medium text-gray-900">
+                  <div className="min-w-0">
+                    <p className="font-medium text-gray-900 truncate">
                       {ACTIVITY_LABELS[item.activity] || item.activity}
                       {item.metadata?.orderNumber && (
                         <span className="text-gray-500 font-normal"> — Order {item.metadata.orderNumber}</span>
@@ -213,7 +213,7 @@ export default function GuardianPoints() {
                     )}
                   </div>
                 </div>
-                <span className="text-green-600 font-semibold">+{item.points}</span>
+                <span className="text-green-600 font-semibold shrink-0">+{item.points}</span>
               </div>
             ))}
           </div>

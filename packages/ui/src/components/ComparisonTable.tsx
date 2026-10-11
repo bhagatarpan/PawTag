@@ -21,28 +21,30 @@ export function ComparisonTable({ heading = 'Guardian vs Gold', subheading, rows
           {subheading && <p className="text-gray-500 text-lg">{subheading}</p>}
         </div>
         <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+          <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-100">
-                <th className="text-left px-6 py-4 text-sm font-medium text-gray-500">Feature</th>
-                <th className="text-center px-6 py-4 text-sm font-medium text-gray-500">Guardian</th>
-                <th className="text-center px-6 py-4 text-sm font-medium text-amber-600">Gold</th>
+                <th className="text-left px-3 sm:px-6 py-4 text-sm font-medium text-gray-500">Feature</th>
+                <th className="text-center px-3 sm:px-6 py-4 text-sm font-medium text-gray-500">Guardian</th>
+                <th className="text-center px-3 sm:px-6 py-4 text-sm font-medium text-amber-600">Gold</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((row, i) => (
                 <tr key={i} className="border-b border-gray-50 last:border-0">
-                  <td className="px-6 py-4 text-sm text-gray-900">{row.feature}</td>
-                  <td className="px-6 py-4 text-sm text-center text-gray-600">
+                  <td className="px-3 sm:px-6 py-4 text-sm text-gray-900">{row.feature}</td>
+                  <td className="px-3 sm:px-6 py-4 text-sm text-center text-gray-600">
                     {row.guardian === '✓' ? <Check size={16} className="text-primary-500 mx-auto" /> : row.guardian}
                   </td>
-                  <td className="px-6 py-4 text-sm text-center text-amber-600 font-medium">
+                  <td className="px-3 sm:px-6 py-4 text-sm text-center text-amber-600 font-medium">
                     {row.gold === '✓' ? <Check size={16} className="text-amber-500 mx-auto" /> : row.gold}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
     </section>

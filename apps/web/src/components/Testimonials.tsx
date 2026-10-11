@@ -57,12 +57,12 @@ export default function Testimonials() {
                 <div className={`w-10 h-10 rounded-full ${t.color} flex items-center justify-center text-white font-bold text-sm`}>
                   {t.initials}
                 </div>
-                <div>
-                  <p className="font-semibold text-gray-900 text-sm">{t.name}</p>
-                  <p className="text-gray-400 text-xs">Owner of a {t.pet}</p>
+                <div className="min-w-0">
+                  <p className="font-semibold text-gray-900 text-sm truncate">{t.name}</p>
+                  <p className="text-gray-400 text-xs truncate">Owner of a {t.pet}</p>
                 </div>
                 {t.focus && (
-                  <span className="ml-auto text-xs font-medium text-primary-600 bg-primary-50 px-2.5 py-1 rounded-full">
+                  <span className="ml-auto shrink-0 text-xs font-medium text-primary-600 bg-primary-50 px-2.5 py-1 rounded-full">
                     {t.focus}
                   </span>
                 )}
