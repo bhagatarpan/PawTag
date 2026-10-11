@@ -22,12 +22,19 @@ export default defineConfig({
     exclude: ['@pawtag/shared', '@pawtag/shared/api'],
   },
   server: {
+    host: true,
     port: 3000,
     proxy: {
       '/api': {
         target: 'http://localhost:5000',
         changeOrigin: true,
         configure: (proxy) => {
+          // Phone/LAN testing: browser Origin is http://<pc-ip>:3000 which the
+          // API's dev CORS allowlist rejects. Rewrite to localhost so proxied
+          // requests look like normal local dev traffic.
+          proxy.on('proxyReq', (proxyReq) => {
+            proxyReq.setHeader('origin', 'http://localhost:3000');
+          });
           proxy.on('error', () => {
             // Suppress ECONNREFUSED errors during startup race condition
             // API server may not be ready yet when web app starts
