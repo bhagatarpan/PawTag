@@ -800,6 +800,8 @@ Example: Black (3×) → Gold (1×): customer loses 2/3 of points earned at Blac
 - Post-purchase optional save banner on **shop and membership** success; empty Stripe list → SetupIntent add-card (never false “saved”)
 - Delete last/default card blocked while active membership requires billing
 - Never store raw card data; Stripe Customer is source of truth
+- **Duplicate prevention:** same physical card = same `card.fingerprint` (never brand/last4/expiry alone). `dedupeSavedCards()` collapses duplicates (keeps default, repoints billing refs before detach); triggered by `payment_intent.succeeded` / `setup_intent.succeeded` webhooks + `POST /membership/payment-methods/confirm` ("already saved" UX). Cleanup: `scripts/cleanup-duplicate-payment-methods.ts` (dry-run default, `--apply` needs confirmation; cross-customer matches report-only)
+- **Expiry warnings:** daily `saved-card-expiry-check` job emails (CMS slug `saved-card-expiring`) + in-app notice once per card per expiration period, 28 days before month-end expiry (`SavedCardExpiryNotice` unique-index idempotency); not entitlement-gated (dunning precedent); memberships never auto-cancelled
 - Feature doc: `docs/SAVED-PAYMENT-METHODS.md`
 
 ## Payment Failure Handling

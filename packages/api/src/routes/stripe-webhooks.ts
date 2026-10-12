@@ -7,8 +7,9 @@
  * security vulnerability that this handler fixes.
  *
  * Handled events:
- * - payment_intent.succeeded — Confirm order payment
+ * - payment_intent.succeeded — Confirm order payment + collapse duplicate saved cards
  * - payment_intent.payment_failed — Mark order as failed
+ * - setup_intent.succeeded — Collapse duplicate saved cards after add-card
  * - invoice.payment_succeeded — Subscription renewal
  * - invoice.payment_failed — Dunning notification
  * - customer.subscription.deleted — Cancel subscription
@@ -34,6 +35,7 @@ import { isFakeMode } from '../commerce/payment-mode';
 import { logPaymentEvent } from '../commerce/audit';
 
 import { activateMembership } from '../services/membership.service';
+import { dedupeSavedCards } from '../services/payment-method.service';
 import {
   syncMembershipFromStripeSubscriptionUpdated,
   syncTagSubscriptionFromStripeSubscriptionUpdated,
@@ -182,6 +184,13 @@ async function handleEvent(type: string, data: any): Promise<void> {
   switch (type) {
     case 'payment_intent.succeeded':
       await handlePaymentIntentSucceeded(data);
+      // Hygiene after order handling: setup_future_usage attaches the paying
+      // card even when the same physical card is already saved. Non-fatal —
+      // the daily saved-card job is the backstop.
+      await safeDedupeSavedCardsForIntent(data, 'payment_intent_succeeded');
+      break;
+    case 'setup_intent.succeeded':
+      await handleSetupIntentSucceeded(data);
       break;
     case 'payment_intent.payment_failed':
       await handlePaymentIntentFailed(data);
@@ -265,6 +274,60 @@ async function handlePaymentIntentSucceeded(paymentIntent: any): Promise<void> {
   } catch (err) {
     logger.error({ err, paymentIntentId }, 'Failed to create order from webhook');
   }
+}
+
+/**
+ * Collapse duplicate saved cards after a payment/setup intent that attached a
+ * card (checkout setup_future_usage, add-card SetupIntent).
+ *
+ * The intent metadata.userId was written by our own server at intent creation;
+ * it is re-verified against the stored User.stripeCustomerId so dedupe never
+ * touches an orphan Stripe Customer object. Failures are logged only — card
+ * hygiene must never fail webhook processing (daily job is the backstop).
+ */
+async function safeDedupeSavedCardsForIntent(
+  intent: any,
+  reason: 'payment_intent_succeeded' | 'setup_intent_succeeded',
+): Promise<void> {
+  try {
+    const userId = intent?.metadata?.userId;
+    const customerId =
+      typeof intent?.customer === 'string' ? intent.customer : intent?.customer?.id;
+    if (!userId || !customerId) return;
+
+    const user = await User.findById(userId).select('stripeCustomerId').lean();
+    if (!user?.stripeCustomerId || user.stripeCustomerId !== customerId) {
+      logger.info(
+        { intentId: intent?.id, userId, reason },
+        'Saved-card dedupe skipped — customer mismatch (orphan customer case, report-only)',
+      );
+      return;
+    }
+
+    const candidateId =
+      typeof intent?.payment_method === 'string'
+        ? intent.payment_method
+        : intent?.payment_method?.id || null;
+
+    await dedupeSavedCards(userId, {
+      reason,
+      ...(reason === 'setup_intent_succeeded' ? { candidatePaymentMethodId: candidateId } : {}),
+    });
+  } catch (err) {
+    logger.error({ err, intentId: intent?.id, reason }, 'Saved-card dedupe failed (non-fatal)');
+  }
+}
+
+/**
+ * Handle setup_intent.succeeded for saved-card adds.
+ *
+ * Only intents created by PawTag's add-card flow (metadata.purpose
+ * 'save_payment_method') are considered; any other SetupIntent purpose is
+ * left untouched.
+ */
+async function handleSetupIntentSucceeded(setupIntent: any): Promise<void> {
+  if (setupIntent?.metadata?.purpose !== 'save_payment_method') return;
+  await safeDedupeSavedCardsForIntent(setupIntent, 'setup_intent_succeeded');
 }
 
 /**

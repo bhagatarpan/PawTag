@@ -28,6 +28,7 @@ export { renderSubscriptionWelcomeEmail, renderSubscriptionReminderEmail, render
 export { renderReferralRewardEmail } from './referral-reward';
 export { renderTierDowngradeWarningEmail } from './tier-downgrade-warning';
 export { renderPetBirthdayEmail } from './pet-birthday';
+export { renderSavedCardExpiringEmail } from './saved-card-expiring';
 export { renderPetAnniversaryEmail } from './pet-anniversary';
 export { renderEmergencyEscalationEmail } from './emergency-escalation';
 export { renderGenericNotificationEmail } from './generic-notification';

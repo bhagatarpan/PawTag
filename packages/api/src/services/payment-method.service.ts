@@ -5,6 +5,7 @@
  * Never store raw PAN/CVC. Display only brand/last4/expiry.
  */
 import { User, UserMembership } from '@pawtag/db';
+import type Stripe from 'stripe';
 import {
   SAVED_PAYMENT_METHOD_ERROR_CODES,
   type SavedPaymentMethod,
@@ -132,6 +133,363 @@ export async function userOwnsPaymentMethod(
   if (!paymentMethodId || !String(paymentMethodId).startsWith('pm_')) return null;
   const { data } = await listSavedPaymentMethods(userId);
   return data.some((pm) => pm.id === paymentMethodId) ? paymentMethodId : null;
+}
+
+// ─── Duplicate prevention (provider fingerprint based) ───────────────────────
+//
+// Stripe does not dedupe PaymentMethods on attach: re-entering the same card
+// (checkout setup_future_usage, or the add-card SetupIntent) creates a new
+// pm_ object with the SAME card.fingerprint. The fingerprint is the provider's
+// stable card identifier — brand/last4/expiry alone is NEVER treated as proof
+// of duplication. Cards without a fingerprint are ambiguous and untouched.
+
+export interface DedupeRedundantPlan {
+  paymentMethodId: string;
+  /** References that point at the redundant card and must be repointed first. */
+  repointsInvoiceDefault: boolean;
+  repointsSubscriptionDefault: boolean;
+  repointsMembershipReference: boolean;
+}
+
+export interface DedupeGroupPlan {
+  fingerprint: string;
+  canonicalPaymentMethodId: string;
+  canonicalReason: 'invoice_default' | 'membership_reference' | 'oldest_attached';
+  brand?: string | null;
+  last4?: string | null;
+  redundant: DedupeRedundantPlan[];
+}
+
+export interface DedupeSavedCardsResult {
+  /** False when skipped (fake mode / no Stripe customer). */
+  checked: boolean;
+  /** True when this run planned but performed no mutations. */
+  dryRun: boolean;
+  duplicateGroups: number;
+  removedPaymentMethodIds: string[];
+  /** Canonical surviving card for the candidate's duplicate group, when one existed. */
+  canonicalPaymentMethodId: string | null;
+  /** True when the candidate card's fingerprint was already on file. */
+  alreadySaved: boolean;
+  /** Per-group plan — populated identically in dry-run and live mode. */
+  groups: DedupeGroupPlan[];
+  /** Cards without a provider fingerprint (ambiguous — never actioned). */
+  ambiguousCards: number;
+}
+
+const EMPTY_DEDUPE_RESULT: DedupeSavedCardsResult = {
+  checked: false,
+  dryRun: false,
+  duplicateGroups: 0,
+  removedPaymentMethodIds: [],
+  canonicalPaymentMethodId: null,
+  alreadySaved: false,
+  groups: [],
+  ambiguousCards: 0,
+};
+
+/** Coalesce concurrent dedupe runs for the same user (webhook + confirm races). */
+const inflightDedupes = new Map<string, Promise<DedupeSavedCardsResult>>();
+
+/** Raw card PMs (with fingerprint) — internal dedupe use only; never sent to clients. */
+async function listRawCardPaymentMethods(stripeCustomerId: string): Promise<Stripe.PaymentMethod[]> {
+  const stripe = getStripeClient();
+  const listed = await stripe.customers.listPaymentMethods(stripeCustomerId, {
+    type: 'card',
+    limit: 100,
+  });
+  return (listed.data || []) as Stripe.PaymentMethod[];
+}
+
+function isAlreadyDetachedError(err: any): boolean {
+  return (
+    err?.code === 'resource_missing' ||
+    /previously detached|was detached/i.test(err?.message || '')
+  );
+}
+
+/**
+ * Converge each fingerprint group on the customer to ONE canonical card.
+ *
+ * Canonical selection (deterministic so concurrent runs agree):
+ *   1. the current invoice default, when in the group;
+ *   2. else the card referenced by the active membership, when in the group;
+ *   3. else the oldest attached (ties → lowest pm id).
+ *
+ * Before detaching a redundant card, billing references are repointed to the
+ * canonical card: Stripe invoice default → Stripe subscription default →
+ * local UserMembership.paymentMethodId. Historical PaymentTransaction /
+ * Invoice records are NEVER touched. A detach that reports the card was
+ * already detached is treated as success (idempotent).
+ *
+ * dryRun plans every action (same canonical selection) without mutating
+ * anything — used by the cleanup script's review pass.
+ */
+export async function dedupeSavedCards(
+  userId: string,
+  options: { reason: string; candidatePaymentMethodId?: string | null; dryRun?: boolean },
+): Promise<DedupeSavedCardsResult> {
+  if (options.dryRun) return performDedupeSavedCards(userId, options); // no coalescing — read-only
+  const inflight = inflightDedupes.get(userId);
+  if (inflight) return inflight;
+  const run = performDedupeSavedCards(userId, options).finally(() => inflightDedupes.delete(userId));
+  inflightDedupes.set(userId, run);
+  return run;
+}
+
+async function performDedupeSavedCards(
+  userId: string,
+  options: { reason: string; candidatePaymentMethodId?: string | null; dryRun?: boolean },
+): Promise<DedupeSavedCardsResult> {
+  const dryRun = options.dryRun === true;
+  if (isFakeMode()) return { ...EMPTY_DEDUPE_RESULT, dryRun };
+
+  const stripeCustomerId = await getStripeCustomerIdForUser(userId);
+  if (!stripeCustomerId) return { ...EMPTY_DEDUPE_RESULT, dryRun };
+
+  const stripe = getStripeClient();
+  const cards = await listRawCardPaymentMethods(stripeCustomerId);
+  if (cards.length < 2) return { ...EMPTY_DEDUPE_RESULT, dryRun, checked: true };
+
+  // Group by provider fingerprint; cards without one are ambiguous → untouched.
+  const groups = new Map<string, Stripe.PaymentMethod[]>();
+  let ambiguousCards = 0;
+  for (const pm of cards) {
+    const fingerprint = pm.card?.fingerprint;
+    if (!fingerprint) {
+      ambiguousCards++;
+      continue;
+    }
+    const group = groups.get(fingerprint);
+    if (group) group.push(pm);
+    else groups.set(fingerprint, [pm]);
+  }
+  const duplicateGroups = [...groups.values()].filter((group) => group.length > 1);
+  if (duplicateGroups.length === 0) {
+    return { ...EMPTY_DEDUPE_RESULT, dryRun, checked: true, ambiguousCards };
+  }
+
+  // Invoice default (re-read fresh; updated locally as groups are processed).
+  let invoiceDefaultId: string | null = null;
+  try {
+    const customer = await stripe.customers.retrieve(stripeCustomerId, {
+      expand: ['invoice_settings.default_payment_method'],
+    });
+    const d = (customer as any)?.invoice_settings?.default_payment_method;
+    invoiceDefaultId = typeof d === 'string' ? d : d?.id || null;
+  } catch (err) {
+    logger.warn({ err, stripeCustomerId }, '[PaymentMethod] dedupe: failed to read invoice default');
+  }
+
+  // Active membership: local reference + Stripe subscription default.
+  const membership = await UserMembership.findOne({ userId, status: 'active' }).lean();
+  let subscriptionDefaultId: string | null | undefined;
+  if (membership?.stripeSubscriptionId) {
+    try {
+      const sub: any = await stripe.subscriptions.retrieve(membership.stripeSubscriptionId);
+      const d = sub?.default_payment_method;
+      subscriptionDefaultId = typeof d === 'string' ? d : d?.id || null;
+    } catch (err) {
+      logger.warn({ err, userId }, '[PaymentMethod] dedupe: failed to read subscription default');
+      subscriptionDefaultId = null;
+    }
+  }
+
+  // ── Phase 1: plan (pure; identical in dry-run and live mode) ──────────────
+  const groupPlans: DedupeGroupPlan[] = [];
+  const removedPaymentMethodIds: string[] = [];
+  let canonicalPaymentMethodId: string | null = null;
+  let alreadySaved = false;
+
+  for (const group of duplicateGroups) {
+    const memberIds = new Set(group.map((p) => p.id));
+
+    let canonicalReason: DedupeGroupPlan['canonicalReason'] = 'oldest_attached';
+    let canonicalId: string | null = null;
+    if (invoiceDefaultId && memberIds.has(invoiceDefaultId)) {
+      canonicalId = invoiceDefaultId;
+      canonicalReason = 'invoice_default';
+    } else if (membership?.paymentMethodId && memberIds.has(membership.paymentMethodId)) {
+      canonicalId = membership.paymentMethodId;
+      canonicalReason = 'membership_reference';
+    } else {
+      canonicalId = [...group].sort(
+        (a, b) => (a.created || 0) - (b.created || 0) || (a.id < b.id ? -1 : 1),
+      )[0].id;
+    }
+    const canonicalPm = group.find((p) => p.id === canonicalId)!;
+    const redundant = group.filter((p) => p.id !== canonicalId);
+
+    const candidateId = options.candidatePaymentMethodId
+      ? String(options.candidatePaymentMethodId)
+      : null;
+    if (candidateId && memberIds.has(candidateId)) {
+      canonicalPaymentMethodId = canonicalId;
+      alreadySaved = group.length > 1;
+    }
+
+    groupPlans.push({
+      fingerprint: String(group[0].card?.fingerprint),
+      canonicalPaymentMethodId: canonicalId,
+      canonicalReason,
+      brand: canonicalPm.card?.brand,
+      last4: canonicalPm.card?.last4,
+      redundant: redundant.map((rm) => ({
+        paymentMethodId: rm.id,
+        repointsInvoiceDefault: invoiceDefaultId === rm.id,
+        repointsSubscriptionDefault: subscriptionDefaultId === rm.id,
+        repointsMembershipReference: membership?.paymentMethodId === rm.id,
+      })),
+    });
+  }
+
+  if (dryRun) {
+    return {
+      checked: true,
+      dryRun: true,
+      duplicateGroups: groupPlans.length,
+      removedPaymentMethodIds: groupPlans.flatMap((g) => g.redundant.map((r) => r.paymentMethodId)),
+      canonicalPaymentMethodId,
+      alreadySaved,
+      groups: groupPlans,
+      ambiguousCards,
+    };
+  }
+
+  // ── Phase 2: execute ──────────────────────────────────────────────────────
+  for (const plan of groupPlans) {
+    const canonicalPm = cards.find((p) => p.id === plan.canonicalPaymentMethodId)!;
+
+    for (const rm of plan.redundant) {
+      // Repoint billing references BEFORE detaching so a renewal can never
+      // point at a detached card.
+      if (rm.repointsInvoiceDefault) {
+        try {
+          await stripe.customers.update(stripeCustomerId, {
+            invoice_settings: { default_payment_method: plan.canonicalPaymentMethodId },
+          });
+          invoiceDefaultId = plan.canonicalPaymentMethodId;
+        } catch (err) {
+          logger.error({ err, userId, paymentMethodId: rm.paymentMethodId }, '[PaymentMethod] dedupe: failed to repoint invoice default');
+        }
+      }
+
+      if (rm.repointsSubscriptionDefault && membership?.stripeSubscriptionId) {
+        try {
+          await stripe.subscriptions.update(membership.stripeSubscriptionId, {
+            default_payment_method: plan.canonicalPaymentMethodId,
+          });
+          subscriptionDefaultId = plan.canonicalPaymentMethodId;
+        } catch (err) {
+          logger.error({ err, userId, paymentMethodId: rm.paymentMethodId }, '[PaymentMethod] dedupe: failed to repoint subscription default');
+        }
+      }
+
+      if (rm.repointsMembershipReference && membership) {
+        try {
+          await UserMembership.updateOne(
+            { _id: membership._id },
+            {
+              $set: {
+                paymentMethodId: plan.canonicalPaymentMethodId,
+                cardBrand: canonicalPm.card?.brand,
+                cardLast4: canonicalPm.card?.last4,
+                cardExpMonth: canonicalPm.card?.exp_month,
+                cardExpYear: canonicalPm.card?.exp_year,
+              },
+            },
+          );
+          (membership as any).paymentMethodId = plan.canonicalPaymentMethodId;
+        } catch (err) {
+          logger.error({ err, userId, paymentMethodId: rm.paymentMethodId }, '[PaymentMethod] dedupe: failed to repoint membership reference');
+        }
+      }
+
+      let detached = false;
+      try {
+        await stripe.paymentMethods.detach(rm.paymentMethodId);
+        detached = true;
+      } catch (err: any) {
+        if (isAlreadyDetachedError(err)) {
+          detached = true; // state already achieved — idempotent success
+        } else {
+          logger.error({ err, userId, paymentMethodId: rm.paymentMethodId }, '[PaymentMethod] dedupe: detach failed');
+        }
+      }
+      if (detached) removedPaymentMethodIds.push(rm.paymentMethodId);
+
+      await auditPaymentMethodEvent('duplicate_removed', userId, {
+        paymentMethodId: rm.paymentMethodId,
+        canonicalPaymentMethodId: plan.canonicalPaymentMethodId,
+        fingerprint: plan.fingerprint,
+        brand: plan.brand,
+        last4: plan.last4,
+        stripeCustomerId,
+        detached,
+        reason: options.reason,
+      });
+    }
+  }
+
+  if (removedPaymentMethodIds.length > 0) {
+    logger.info(
+      {
+        userId,
+        stripeCustomerId,
+        duplicateGroups: groupPlans.length,
+        removed: removedPaymentMethodIds.length,
+        reason: options.reason,
+      },
+      '[PaymentMethod] duplicate saved cards collapsed',
+    );
+  }
+
+  return {
+    checked: true,
+    dryRun: false,
+    duplicateGroups: groupPlans.length,
+    removedPaymentMethodIds,
+    canonicalPaymentMethodId,
+    alreadySaved,
+    groups: groupPlans,
+    ambiguousCards,
+  };
+}
+
+/**
+ * Called after a SetupIntent attaches a card. Collapses duplicate cards and
+ * reports whether the card was already on file, so the UI can tell the
+ * customer instead of silently keeping two records.
+ */
+export async function confirmAttachedPaymentMethod(
+  userId: string,
+  paymentMethodId?: string,
+): Promise<{
+  alreadySaved: boolean;
+  canonicalPaymentMethodId: string | null;
+  defaultPaymentMethodId: string | null;
+  data: SavedPaymentMethod[];
+}> {
+  if (paymentMethodId && !String(paymentMethodId).startsWith('pm_')) {
+    throw new PaymentMethodError(
+      SAVED_PAYMENT_METHOD_ERROR_CODES.NOT_FOUND,
+      'Invalid payment method id',
+      'Payment method not found.',
+    );
+  }
+
+  const dedupe = await dedupeSavedCards(userId, {
+    reason: 'confirm_attached',
+    candidatePaymentMethodId: paymentMethodId || null,
+  });
+  const list = await listSavedPaymentMethods(userId);
+
+  return {
+    alreadySaved: dedupe.alreadySaved,
+    canonicalPaymentMethodId: dedupe.canonicalPaymentMethodId,
+    defaultPaymentMethodId: list.defaultPaymentMethodId,
+    data: list.data,
+  };
 }
 
 export async function createSetupIntentForUser(userId: string): Promise<{
@@ -344,6 +702,13 @@ export async function confirmSavePaymentMethod(
   data: SavedPaymentMethod[];
   reason?: string;
 }> {
+  // Collapse same-fingerprint duplicates before promoting defaults.
+  // Non-fatal: confirm-save must not fail on a dedupe hiccup — the daily
+  // saved-card job retries as backstop.
+  await dedupeSavedCards(userId, { reason: 'confirm_save' }).catch((err) =>
+    logger.warn({ err, userId }, '[PaymentMethod] dedupe during confirm-save failed (non-fatal)'),
+  );
+
   const list = await listSavedPaymentMethods(userId);
   if (list.data.length === 0) {
     await auditPaymentMethodEvent('saved_after_purchase', userId, {

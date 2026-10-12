@@ -44,6 +44,21 @@ export interface ConfirmSavePaymentMethodBody {
   paymentMethodId?: string;
 }
 
+/** Result of POST /membership/payment-methods/confirm (post-SetupIntent). */
+export interface ConfirmAttachedPaymentMethodResult {
+  /** True when the attached card matched an already-saved card (same provider fingerprint). */
+  alreadySaved: boolean;
+  /** Surviving canonical card for the matched fingerprint group, when a duplicate existed. */
+  canonicalPaymentMethodId: string | null;
+  defaultPaymentMethodId: string | null;
+  data: SavedPaymentMethod[];
+}
+
+export interface ConfirmAttachedPaymentMethodBody {
+  /** The pm_ id that the SetupIntent just attached, when known. */
+  paymentMethodId?: string;
+}
+
 export const SAVED_PAYMENT_METHOD_ERROR_CODES = {
   NO_STRIPE_CUSTOMER: 'payment_method.no_stripe_customer',
   NOT_FOUND: 'payment_method.not_found',

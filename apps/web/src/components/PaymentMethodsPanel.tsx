@@ -28,6 +28,7 @@ export default function PaymentMethodsPanel({ readOnly = false, hideHeader = fal
   const [error, setError] = useState('');
   const [actionId, setActionId] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
+  const [info, setInfo] = useState('');
 
   useEffect(() => {
     load();
@@ -50,6 +51,7 @@ export default function PaymentMethodsPanel({ readOnly = false, hideHeader = fal
   async function handleSetDefault(pm: SavedPaymentMethod) {
     setActionId(pm.id);
     setError('');
+    setInfo('');
     try {
       const res = await api.post(API.customer.membership.paymentMethodsDefault, {
         paymentMethodId: pm.id,
@@ -69,6 +71,7 @@ export default function PaymentMethodsPanel({ readOnly = false, hideHeader = fal
     if (!window.confirm(`Remove ${formatSavedPaymentMethodLabel(pm)}?`)) return;
     setActionId(pm.id);
     setError('');
+    setInfo('');
     try {
       const res = await api.post(API.customer.membership.paymentMethodsDetach, {
         paymentMethodId: pm.id,
@@ -115,11 +118,22 @@ export default function PaymentMethodsPanel({ readOnly = false, hideHeader = fal
         </div>
       )}
 
+      {info && (
+        <div role="status" className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700">
+          {info}
+        </div>
+      )}
+
       {showAdd && !readOnly && (
         <div className="mb-4">
           <SetupPaymentMethodForm
-            onCompleted={() => {
+            onCompleted={(result) => {
               setShowAdd(false);
+              setInfo(
+                result?.alreadySaved
+                  ? 'This card is already saved — your existing card was kept.'
+                  : '',
+              );
               load();
               onChanged?.();
             }}

@@ -638,6 +638,7 @@ export const API = {
       paymentMethodsDefault: '/membership/payment-methods/default',
       paymentMethodsDetach: '/membership/payment-methods/detach',
       paymentMethodsConfirmSave: '/membership/payment-methods/confirm-save',
+      paymentMethodsConfirm: '/membership/payment-methods/confirm',
       tags: '/membership/tags',
       entitlements: '/membership/entitlements',
       invoices: '/membership/invoices',

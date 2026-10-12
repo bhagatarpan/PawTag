@@ -2,7 +2,7 @@ import { connectDatabase, BackgroundJob } from '@pawtag/db';
 import dotenv from 'dotenv';
 import path from 'path';
 
-dotenv.config({ path: path.resolve(__dirname, '../.env') });
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 const jobs = [
   {
@@ -61,6 +61,22 @@ const jobs = [
     processTarget: 'worker',
     filePath: 'jobs/lowStockCheck.ts',
     functionName: 'runLowStockJob',
+    enabled: true,
+    notifyOnSuccess: false,
+    notifyOnFailure: true,
+  },
+  {
+    name: 'saved-card-expiry-check',
+    displayName: 'Saved Card Expiry Check',
+    description:
+      'Warns customers (email + in-app) once per card per expiration period when a saved payment card expires within 28 days.',
+    category: 'notification',
+    intervalMs: 24 * 60 * 60 * 1000, // 24 hours
+    lockName: 'saved-card-expiry',
+    lockLeaseMs: 120000,
+    processTarget: 'worker',
+    filePath: 'jobs/savedCardExpiryCheck.ts',
+    functionName: 'runSavedCardExpiryCheckJob',
     enabled: true,
     notifyOnSuccess: false,
     notifyOnFailure: true,

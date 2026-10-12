@@ -7,7 +7,7 @@ import api from '../lib/api';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
 
-function SetupForm({ clientSecret, onCompleted }: { clientSecret: string; onCompleted: () => void }) {
+function SetupForm({ clientSecret, onCompleted }: { clientSecret: string; onCompleted: (result?: { alreadySaved?: boolean }) => void }) {
   const stripe = useStripe();
   const elements = useElements();
   const [submitting, setSubmitting] = useState(false);
@@ -18,7 +18,7 @@ function SetupForm({ clientSecret, onCompleted }: { clientSecret: string; onComp
     if (!stripe || !elements) return;
     setSubmitting(true);
     setError('');
-    const { error: stripeError } = await stripe.confirmSetup({
+    const { error: stripeError, setupIntent } = await stripe.confirmSetup({
       elements,
       redirect: 'if_required',
     });
@@ -27,7 +27,23 @@ function SetupForm({ clientSecret, onCompleted }: { clientSecret: string; onComp
       setSubmitting(false);
       return;
     }
-    onCompleted();
+    // Tell the server the card was attached so it can collapse duplicates and
+    // report whether this card was already on file. Non-fatal: webhooks and
+    // the daily saved-card job are the backstop if this call fails.
+    let alreadySaved = false;
+    try {
+      const pmId =
+        typeof setupIntent?.payment_method === 'string'
+          ? setupIntent.payment_method
+          : (setupIntent?.payment_method as any)?.id;
+      const res = await api.post(API.customer.membership.paymentMethodsConfirm, {
+        paymentMethodId: pmId,
+      });
+      alreadySaved = res.data?.data?.alreadySaved === true;
+    } catch {
+      // Hygiene only — never block completing the add on a dedupe hiccup.
+    }
+    onCompleted({ alreadySaved });
     setSubmitting(false);
   }
 
@@ -59,7 +75,7 @@ function SetupForm({ clientSecret, onCompleted }: { clientSecret: string; onComp
 /**
  * Add a saved card via Stripe SetupIntent (no charge).
  */
-export default function SetupPaymentMethodForm({ onCompleted }: { onCompleted: () => void }) {
+export default function SetupPaymentMethodForm({ onCompleted }: { onCompleted: (result?: { alreadySaved?: boolean }) => void }) {
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);

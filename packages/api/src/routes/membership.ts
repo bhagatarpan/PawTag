@@ -24,6 +24,7 @@ import {
   detachPaymentMethod,
   createSetupIntentForUser,
   confirmSavePaymentMethod,
+  confirmAttachedPaymentMethod,
   PaymentMethodError,
 } from '../services/payment-method.service';
 import { MEMBERSHIP_TIER_CHANGE_CODES } from '@pawtag/shared';
@@ -511,6 +512,26 @@ router.post('/payment-methods/confirm-save', async (req: AuthRequest, res: Respo
     }
     logger.error({ err: error, userId: req.user?.id }, '[Membership] Confirm save payment method failed');
     res.status(500).json({ success: false, error: 'Failed to save payment method' });
+  }
+});
+
+/**
+ * POST /api/membership/payment-methods/confirm
+ * Called after a SetupIntent attaches a card. Collapses duplicate cards
+ * (same provider fingerprint) and reports when the card was already on file.
+ */
+router.post('/payment-methods/confirm', async (req: AuthRequest, res: Response) => {
+  try {
+    const { paymentMethodId } = req.body || {};
+    const result = await confirmAttachedPaymentMethod(req.user!.id, paymentMethodId);
+    res.json({ success: true, data: result });
+  } catch (error: any) {
+    if (error instanceof PaymentMethodError) {
+      res.status(error.httpStatus).json({ success: false, error: error.message, code: error.membershipCode });
+      return;
+    }
+    logger.error({ err: error, userId: req.user?.id }, '[Membership] Confirm attached payment method failed');
+    res.status(500).json({ success: false, error: 'Failed to confirm payment method' });
   }
 });
 
