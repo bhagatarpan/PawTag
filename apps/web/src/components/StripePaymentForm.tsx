@@ -6,7 +6,7 @@ import {
   useStripe,
   useElements,
 } from '@stripe/react-stripe-js';
-import { Loader2, Lock, Check } from 'lucide-react';
+import { Loader2, Lock, Check, CreditCard } from 'lucide-react';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
 
@@ -17,6 +17,10 @@ interface StripePaymentFormProps {
   disabled?: boolean;
   /** Increment from the parent to force the button back to idle (e.g. server-side confirmation failed). */
   resetKey?: number;
+  /** When set, charge this saved card (pm_…) instead of rendering the new-card element. */
+  savedPaymentMethodId?: string | null;
+  /** Display label for the selected saved card (e.g. "Visa ••••4242 (12/27)"). */
+  savedCardLabel?: string | null;
 }
 
 /**
@@ -45,7 +49,7 @@ function extractFakePaymentIntentId(secret: string): string {
  */
 type PaymentPhase = 'idle' | 'securing' | 'confirming' | 'done';
 
-function PaymentFormInner({ onPaymentSuccess, onPaymentError, disabled, resetKey = 0 }: Omit<StripePaymentFormProps, 'clientSecret'>) {
+function PaymentFormInner({ clientSecret, onPaymentSuccess, onPaymentError, disabled, resetKey = 0, savedPaymentMethodId, savedCardLabel }: Omit<StripePaymentFormProps, 'clientSecret'> & { clientSecret: string }) {
   const stripe = useStripe();
   const elements = useElements();
   const [phase, setPhase] = useState<PaymentPhase>('idle');
@@ -57,18 +61,26 @@ function PaymentFormInner({ onPaymentSuccess, onPaymentError, disabled, resetKey
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!stripe || !elements || phase !== 'idle' || disabled) return;
+    if (!stripe || phase !== 'idle' || disabled) return;
+    if (!savedPaymentMethodId && !elements) return;
 
     setPhase('securing');
 
     try {
-      const { error, paymentIntent } = await stripe.confirmPayment({
-        elements,
-        confirmParams: {
-          return_url: window.location.origin + '/checkout',
-        },
-        redirect: 'if_required',
-      });
+      // Saved card: confirm the existing intent with the chosen pm_ id.
+      // The intent is bound to the customer's Stripe Customer, so Stripe
+      // rejects cards belonging to anyone else. 3DS runs in-widget here.
+      const { error, paymentIntent } = savedPaymentMethodId
+        ? await stripe.confirmCardPayment(clientSecret, {
+            payment_method: savedPaymentMethodId,
+          })
+        : await stripe.confirmPayment({
+            elements: elements!,
+            confirmParams: {
+              return_url: window.location.origin + '/checkout',
+            },
+            redirect: 'if_required',
+          });
 
       if (error) {
         onPaymentError(error.message || 'Payment failed');
@@ -102,12 +114,22 @@ function PaymentFormInner({ onPaymentSuccess, onPaymentError, disabled, resetKey
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <PaymentElement
-        options={{
-          layout: 'tabs',
-          paymentMethodOrder: ['card', 'apple_pay', 'google_pay', 'klarna', 'afterpay_clearpay'],
-        }}
-      />
+      {savedPaymentMethodId ? (
+        <div className="flex items-center gap-3 border border-primary-200 bg-primary-50 rounded-xl px-4 py-3">
+          <CreditCard size={18} className="text-primary-600 shrink-0" />
+          <div className="min-w-0 text-sm">
+            <p className="font-medium text-gray-900">Paying with saved card</p>
+            <p className="text-gray-600 truncate">{savedCardLabel || 'Saved card'}</p>
+          </div>
+        </div>
+      ) : (
+        <PaymentElement
+          options={{
+            layout: 'tabs',
+            paymentMethodOrder: ['card', 'apple_pay', 'google_pay', 'klarna', 'afterpay_clearpay'],
+          }}
+        />
+      )}
 
       <button
         type="submit"
@@ -142,7 +164,7 @@ function PaymentFormInner({ onPaymentSuccess, onPaymentError, disabled, resetKey
   );
 }
 
-export default function StripePaymentForm({ clientSecret, onPaymentSuccess, onPaymentError, disabled, resetKey }: StripePaymentFormProps) {
+export default function StripePaymentForm({ clientSecret, onPaymentSuccess, onPaymentError, disabled, resetKey, savedPaymentMethodId, savedCardLabel }: StripePaymentFormProps) {
   const [stripeError, setStripeError] = useState<string | null>(null);
   const [stripeLoaded, setStripeLoaded] = useState(false);
   const [fakeProcessing, setFakeProcessing] = useState(false);
@@ -233,7 +255,15 @@ export default function StripePaymentForm({ clientSecret, onPaymentSuccess, onPa
 
   return (
     <Elements stripe={stripePromise} options={options}>
-      <PaymentFormInner onPaymentSuccess={onPaymentSuccess} onPaymentError={onPaymentError} disabled={disabled} resetKey={resetKey} />
+      <PaymentFormInner
+        clientSecret={clientSecret}
+        onPaymentSuccess={onPaymentSuccess}
+        onPaymentError={onPaymentError}
+        disabled={disabled}
+        resetKey={resetKey}
+        savedPaymentMethodId={savedPaymentMethodId}
+        savedCardLabel={savedCardLabel}
+      />
     </Elements>
   );
 }

@@ -120,6 +120,20 @@ export async function getDefaultPaymentMethodIdForUser(userId: string): Promise<
   return def?.id || null;
 }
 
+/**
+ * Validate that a payment method id belongs to this user's Stripe Customer.
+ * Returns the id when owned; null when missing/foreign/fake-mode.
+ * Use before charging a client-supplied pm_ id — never trust it unscoped.
+ */
+export async function userOwnsPaymentMethod(
+  userId: string,
+  paymentMethodId: string,
+): Promise<string | null> {
+  if (!paymentMethodId || !String(paymentMethodId).startsWith('pm_')) return null;
+  const { data } = await listSavedPaymentMethods(userId);
+  return data.some((pm) => pm.id === paymentMethodId) ? paymentMethodId : null;
+}
+
 export async function createSetupIntentForUser(userId: string): Promise<{
   clientSecret: string;
   stripeCustomerId: string;

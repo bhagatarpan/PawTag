@@ -5,16 +5,19 @@ import { API } from '@pawtag/shared/api';
 import {
   formatCurrency,
   formatDate,
+  formatSavedPaymentMethodLabel,
   requiresPaymentMethodRecovery,
   requiresResubscribeRecovery,
   isMembershipTierChangeCode,
   type MembershipChangeErrorBody,
   type MembershipTierSummary,
   type TierChangeEstimate,
+  type SavedPaymentMethod,
 } from '@pawtag/shared';
 import { resolveTierIcon, resolveTierGradient, getTierMarketingFlags, EntitlementList } from '@pawtag/ui';
 import api from '../../lib/api';
 import StripePaymentForm from '../../components/StripePaymentForm';
+import SavedPaymentMethodPicker from '../../components/SavedPaymentMethodPicker';
 import KeepMembershipPanel from '../../components/KeepMembershipPanel';
 import SaveCardBanner from '../../components/SaveCardBanner';
 
@@ -65,6 +68,10 @@ export default function MembershipSubscribe() {
   const [upgradeResult, setUpgradeResult] = useState<{ invoiceNumber?: string; prorationAmount?: number; currency?: string; isDowngrade?: boolean; effectiveDate?: string; resumedOnUpgrade?: boolean } | null>(null);
   const [saveCardDismissed, setSaveCardDismissed] = useState(false);
   const [showSaveCard, setShowSaveCard] = useState(false);
+
+  // Saved cards — default preselected; null = "use a different card" (Stripe element)
+  const [selectedSavedPmId, setSelectedSavedPmId] = useState<string | null>(null);
+  const [savedCards, setSavedCards] = useState<SavedPaymentMethod[]>([]);
 
   // Downgrade consent state
   const [downgradeTermsAccepted, setDowngradeTermsAccepted] = useState(false);
@@ -553,12 +560,34 @@ export default function MembershipSubscribe() {
               </p>
             </div>
           </div>
-          <StripePaymentForm
-            clientSecret={clientSecret}
-            onPaymentSuccess={handlePaymentSuccess}
-            onPaymentError={handlePaymentError}
-            disabled={processing}
-          />
+          <div className="space-y-4">
+            <SavedPaymentMethodPicker
+              selectedPaymentMethodId={selectedSavedPmId}
+              onSelect={setSelectedSavedPmId}
+              onCardsLoaded={(list) => {
+                setSavedCards(list);
+                if (list.length > 0) {
+                  setSelectedSavedPmId(
+                    (prev) => prev ?? (list.find((c) => c.isDefault)?.id || list[0]?.id || null)
+                  );
+                }
+              }}
+            />
+            <StripePaymentForm
+              clientSecret={clientSecret}
+              onPaymentSuccess={handlePaymentSuccess}
+              onPaymentError={handlePaymentError}
+              disabled={processing}
+              savedPaymentMethodId={selectedSavedPmId}
+              savedCardLabel={
+                selectedSavedPmId
+                  ? formatSavedPaymentMethodLabel(
+                      savedCards.find((c) => c.id === selectedSavedPmId) || {}
+                    )
+                  : null
+              }
+            />
+          </div>
         </div>
       )}
 

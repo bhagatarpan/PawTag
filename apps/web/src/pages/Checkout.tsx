@@ -8,12 +8,14 @@ import {
 import { AddressAutocomplete, InlineEditBanner } from '@pawtag/ui';
 import type { AddressComponents } from '@pawtag/ui';
 import { API } from '@pawtag/shared/api';
+import { formatSavedPaymentMethodLabel, type SavedPaymentMethod } from '@pawtag/shared';
 import api from '../lib/api';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useSiteSettings } from '../hooks/useCms';
 import CheckoutAuth from '../components/CheckoutAuth';
 import StripePaymentForm from '../components/StripePaymentForm';
+import SavedPaymentMethodPicker from '../components/SavedPaymentMethodPicker';
 import CheckoutErrorBoundary from '../components/CheckoutErrorBoundary';
 import CheckoutStepIndicator from '../components/checkout/CheckoutStepIndicator';
 import CheckoutConfirmationStep from '../components/checkout/CheckoutConfirmationStep';
@@ -58,6 +60,11 @@ export default function Checkout() {
   const [orderNumber, setOrderNumber] = useState(() => sessionStorage.getItem('pawtag_checkout_order') || '');
   const [success, setSuccess] = useState(() => sessionStorage.getItem('pawtag_checkout_success') === 'true');
   const [paymentClientSecret, setPaymentClientSecret] = useState('');
+
+  // Saved cards (from GET /membership/payment-methods) — default preselected.
+  // null selection = "use a different card" → Stripe new-card element.
+  const [selectedSavedPmId, setSelectedSavedPmId] = useState<string | null>(null);
+  const [savedCards, setSavedCards] = useState<SavedPaymentMethod[]>([]);
 
   // Ref-based double-click protection for payment
   const paymentInProgressRef = useRef(false);
@@ -1229,13 +1236,35 @@ export default function Checkout() {
                   <h2 className="text-lg font-semibold text-gray-900 mb-4">Payment Method</h2>
                   {paymentClientSecret ? (
                     <CheckoutErrorBoundary onReset={() => setPaymentClientSecret('')}>
-                      <StripePaymentForm
-                        clientSecret={paymentClientSecret}
-                        onPaymentSuccess={handlePaymentSuccess}
-                        onPaymentError={handlePaymentError}
-                        disabled={loading}
-                        resetKey={paymentResetKey}
-                      />
+                      <div className="space-y-4">
+                        <SavedPaymentMethodPicker
+                          selectedPaymentMethodId={selectedSavedPmId}
+                          onSelect={setSelectedSavedPmId}
+                          onCardsLoaded={(list) => {
+                            setSavedCards(list);
+                            if (list.length > 0) {
+                              setSelectedSavedPmId(
+                                (prev) => prev ?? (list.find((c) => c.isDefault)?.id || list[0]?.id || null)
+                              );
+                            }
+                          }}
+                        />
+                        <StripePaymentForm
+                          clientSecret={paymentClientSecret}
+                          onPaymentSuccess={handlePaymentSuccess}
+                          onPaymentError={handlePaymentError}
+                          disabled={loading}
+                          resetKey={paymentResetKey}
+                          savedPaymentMethodId={selectedSavedPmId}
+                          savedCardLabel={
+                            selectedSavedPmId
+                              ? formatSavedPaymentMethodLabel(
+                                  savedCards.find((c) => c.id === selectedSavedPmId) || {}
+                                )
+                              : null
+                          }
+                        />
+                      </div>
                     </CheckoutErrorBoundary>
                   ) : (
                     <div className="flex items-center justify-center py-8">

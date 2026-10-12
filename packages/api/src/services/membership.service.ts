@@ -414,6 +414,8 @@ export async function subscribeToTier(
   let stripeCustomerId = user.stripeCustomerId;
   let stripeSubscriptionId: string | undefined;
   let clientSecret: string | undefined;
+  // Validated client-chosen card (owned by this user's Stripe Customer), if any.
+  let chosenPaymentMethodId: string | null = null;
 
   if (!isFakeMode()) {
     try {
@@ -447,9 +449,15 @@ export async function subscribeToTier(
         await MembershipTier.findByIdAndUpdate(tierId, { stripePriceId: priceObj.id });
       }
 
-      // Create Stripe Subscription — preselect customer default PM when available
-      const { getDefaultPaymentMethodIdForUser } = await import('./payment-method.service');
-      const defaultPaymentMethodId = await getDefaultPaymentMethodIdForUser(userId).catch(() => null);
+      // Create Stripe Subscription — prefer the customer's explicitly chosen card
+      // (validated as belonging to their Stripe Customer), else preselect default.
+      const { getDefaultPaymentMethodIdForUser, userOwnsPaymentMethod } = await import('./payment-method.service');
+      chosenPaymentMethodId = paymentMethodId
+        ? await userOwnsPaymentMethod(userId, paymentMethodId).catch(() => null)
+        : null;
+      const defaultPaymentMethodId =
+        chosenPaymentMethodId ||
+        (await getDefaultPaymentMethodIdForUser(userId).catch(() => null));
 
       const stripeSubscription = await stripe.subscriptions.create({
         customer: stripeCustomerId,
@@ -554,7 +562,7 @@ export async function subscribeToTier(
     currentPeriodEnd,
     stripeCustomerId,
     stripeSubscriptionId,
-    paymentMethodId,
+    paymentMethodId: chosenPaymentMethodId || undefined,
     autoRenew: true,
     adminExtensionGraceUsed: false,
     adminExtensionCount: 0,
