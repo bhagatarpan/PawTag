@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { PawPrint, Mail, Lock, User, Phone, Eye, EyeOff, CheckCircle, Loader2 } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { PawPrint, Mail, Lock, User, Phone, Eye, EyeOff, CheckCircle, Loader2, LogIn } from 'lucide-react';
 import { MembershipCheckboxes } from '@pawtag/ui';
 import api from '../lib/api';
 import { useAuthPage, useSiteSettings } from '../hooks/useCms';
@@ -11,13 +11,26 @@ import { API } from '@pawtag/shared';
 export default function Register() {
   const { login } = useAuth();
   const { settings } = useSiteSettings();
-  const [form, setForm] = useState({ fullName: '', email: '', phoneNumber: '', password: '', confirmPassword: '', acceptTerms: false, addGold: false });
+  // Email carried over from Login ("Create an account with …" hand-off)
+  const location = useLocation();
+  const carriedEmail = (location.state as { email?: string } | null)?.email;
+  const [form, setForm] = useState({ fullName: '', email: carriedEmail || '', phoneNumber: '', password: '', confirmPassword: '', acceptTerms: false, addGold: false });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  // The email already has an account (user actually just forgot their
+  // password) — offer a one-tap return to sign-in with the email carried.
+  const [existingAccount, setExistingAccount] = useState(false);
   const navigate = useNavigate();
   const { page: authPage } = useAuthPage('register');
+
+  // When the email arrived pre-filled from the login hand-off, focus the
+  // next field so the user can keep typing without tapping first.
+  const fullNameRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (carriedEmail) fullNameRef.current?.focus();
+  }, [carriedEmail]);
 
   // Capture return URL on mount, then clear it to prevent stale values
   // from affecting navbar-originated registrations
@@ -30,6 +43,7 @@ export default function Register() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setExistingAccount(false);
 
     if (form.password !== form.confirmPassword) {
       setError('Passwords do not match');
@@ -72,7 +86,12 @@ export default function Register() {
 
       setSuccess(true);
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Registration failed. Please try again.');
+      const serverError = err.response?.data?.error || 'Registration failed. Please try again.';
+      // "Email/phone already exists" → offer the sign-in hand-off instead of a dead end
+      if (/already exists/i.test(serverError)) {
+        setExistingAccount(true);
+      }
+      setError(serverError);
     } finally {
       setLoading(false);
     }
@@ -131,8 +150,26 @@ export default function Register() {
 
         <div className="bg-white rounded-2xl shadow-sm p-8">
           {error && (
-            <div className="mb-6 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+            <div role="alert" className="mb-6 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
               {error}
+            </div>
+          )}
+
+          {/* The email already has an account — one-tap back to sign-in
+              with the email carried along (seamless login ↔ register loop). */}
+          {existingAccount && form.email.trim() && (
+            <div className="mb-6 p-4 bg-primary-50 border border-primary-200 rounded-lg">
+              <p className="text-sm text-primary-900 font-medium mb-3">
+                Good news — {form.email.trim()} already has an account. Sign in instead.
+              </p>
+              <button
+                type="button"
+                onClick={() => navigate('/login', { state: { email: form.email.trim() } })}
+                className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 bg-primary-600 text-white rounded-xl text-sm font-semibold hover:bg-primary-700 transition-colors"
+              >
+                <LogIn className="h-4 w-4" />
+                Sign in instead
+              </button>
             </div>
           )}
 
@@ -141,7 +178,7 @@ export default function Register() {
               <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                <input type="text" required value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-teal-500 focus:border-teal-500" placeholder="John Smith" />
+                <input ref={fullNameRef} type="text" required value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-teal-500 focus:border-teal-500" placeholder="John Smith" />
               </div>
             </div>
 

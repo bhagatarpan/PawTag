@@ -1,13 +1,17 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { PawPrint, Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { PawPrint, Mail, Lock, Eye, EyeOff, Loader2, UserPlus } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useAuthPage, useSiteSettings } from '../hooks/useCms';
 import api from '../lib/api';
 import { API } from '@pawtag/shared';
 
 export default function Login() {
-  const [email, setEmail] = useState('');
+  // Email carried over from Register ("already have an account" hand-off)
+  const location = useLocation();
+  const carriedEmail = (location.state as { email?: string } | null)?.email;
+
+  const [email, setEmail] = useState(carriedEmail || '');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
@@ -17,6 +21,12 @@ export default function Login() {
   const [captchaToken, setCaptchaToken] = useState('');
   const [captchaAnswer, setCaptchaAnswer] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
+  // Smart assist: shown on plain invalid-credentials failures so a user
+  // without an account gets a one-tap path to registration with their
+  // email carried along. Shown for EVERY invalid-credentials failure
+  // (never only for unknown emails) — that keeps account enumeration
+  // impossible, matching the API's deliberately generic 401.
+  const [showRegisterAssist, setShowRegisterAssist] = useState(false);
 
   // MFA state
   const [mfaRequired, setMfaRequired] = useState(false);
@@ -58,6 +68,7 @@ export default function Login() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setShowRegisterAssist(false);
     setLoading(true);
     try {
       const result = await login(email, password, captchaRequired ? captchaToken : undefined, captchaRequired ? captchaAnswer : undefined, rememberMe);
@@ -103,6 +114,11 @@ export default function Login() {
         if (data?.phoneNumber) params.set('phone', data.phoneNumber);
         navigate(`/verify-account?${params.toString()}`);
         return;
+      }
+      // Plain invalid credentials (401, no code) → offer the register path.
+      // Deliberately NOT shown for lockout/CAPTCHA/verification responses.
+      if (err.response?.status === 401 && !responseCode && email.trim()) {
+        setShowRegisterAssist(true);
       }
       setError(err.response?.data?.error || 'Invalid email or password');
       if (captchaRequired) {
@@ -338,8 +354,34 @@ export default function Login() {
 
         <div className="bg-white rounded-2xl shadow-sm p-8">
           {error && (
-            <div className="mb-6 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+            <div role="alert" className="mb-6 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
               {error}
+            </div>
+          )}
+
+          {/* Smart register assist — one-tap hand-off to registration with the
+              typed email carried along. Always shown on invalid credentials
+              (never only for unknown emails) so account enumeration stays
+              impossible. */}
+          {showRegisterAssist && email.trim() && (
+            <div className="mb-6 p-4 bg-primary-50 border border-primary-200 rounded-lg">
+              <p className="text-sm text-primary-900 font-medium mb-3">
+                Don't have an account yet? Create one with {email.trim()} — we'll bring your email along.
+              </p>
+              <button
+                type="button"
+                onClick={() => navigate('/register', { state: { email: email.trim() } })}
+                className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 bg-primary-600 text-white rounded-xl text-sm font-semibold hover:bg-primary-700 transition-colors"
+              >
+                <UserPlus className="h-4 w-4" />
+                Create an account
+              </button>
+              <p className="text-xs text-primary-800/80 mt-3">
+                Already have an account but forgot your password?{' '}
+                <Link to="/forgot-password" className="font-medium text-primary-700 underline hover:text-primary-800">
+                  Reset it
+                </Link>
+              </p>
             </div>
           )}
 

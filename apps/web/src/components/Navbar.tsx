@@ -330,7 +330,7 @@ export default function Navbar() {
                   <Link to="/login" onClick={() => setMobileOpen(false)} className="block px-4 py-3 bg-primary-600 text-white rounded-lg font-medium text-center">
                     Sign In
                   </Link>
-                  <Link to="/register" onClick={() => setMobileOpen(false)} className="block px-4 py-3 text-primary-600 text-center text-sm font-medium">
+                  <Link to="/register" onClick={() => setMobileOpen(false)} className="block px-4 py-3 border border-primary-600 text-primary-600 rounded-lg font-medium text-center hover:bg-primary-50 transition-colors">
                     Register
                   </Link>
                 </div>
