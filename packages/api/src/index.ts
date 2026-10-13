@@ -377,7 +377,9 @@ async function start() {
         const { runRefundReconciliationJob } = await import('./jobs/refundReconciliation');
         const { runPrivacyRetentionJob } = await import('./jobs/privacyRetention');
         const { runAuditRetentionJob } = await import('./jobs/auditRetention');
-        const { checkExpiredMemberships, sendRenewalReminders, processScheduledDowngrades } = await import('./services/membership.service');
+        const { checkExpiredMemberships, sendRenewalReminders, processScheduledDowngrades, cleanupOrphanedPendingMemberships } = await import('./services/membership.service');
+        const { checkActivePeriodExpirations } = await import('./services/active-period-check.service');
+        const { runMembershipActivationReconciliation } = await import('./jobs/membershipActivationReconciliation');
         const { runSavedCardExpiryCheckJob } = await import('./jobs/savedCardExpiryCheck');
 
         // Wrapper functions to adapt membership functions to JobResult type
@@ -395,6 +397,24 @@ async function start() {
           const result = await processScheduledDowngrades();
           return { success: true, itemsProcessed: result.processed };
         }
+
+        async function runActivePeriodCheck(): Promise<import('./services/job-scheduler.service').JobResult> {
+          return checkActivePeriodExpirations();
+        }
+
+        async function runPendingMembershipCleanup(): Promise<import('./services/job-scheduler.service').JobResult> {
+          const result = await cleanupOrphanedPendingMemberships();
+          return {
+            success: result.errors === 0,
+            ...(result.errors > 0 ? { error: `${result.errors} cleanup error(s) — see logs` } : {}),
+            itemsProcessed: result.cleaned,
+          };
+        }
+
+        // Registration key MUST equal the seeded BackgroundJob.functionName
+        registerJobFunction('checkActivePeriodExpirations', runActivePeriodCheck);
+        registerJobFunction('runMembershipActivationReconciliation', runMembershipActivationReconciliation);
+        registerJobFunction('cleanupOrphanedPendingMemberships', runPendingMembershipCleanup);
 
         registerJobFunction('runReminderJob', runReminderJob);
         registerJobFunction('runSubscriptionJob', runSubscriptionJob);

@@ -64,7 +64,7 @@ import { runPaymentReconciliationJob } from './jobs/paymentReconciliation';
 import { runRefundReconciliationJob } from './jobs/refundReconciliation';
 import { runPrivacyRetentionJob } from './jobs/privacyRetention';
 import { runAuditRetentionJob } from './jobs/auditRetention';
-import { checkExpiredMemberships, sendRenewalReminders, processScheduledDowngrades } from './services/membership.service';
+import { checkExpiredMemberships, sendRenewalReminders, processScheduledDowngrades, cleanupOrphanedPendingMemberships } from './services/membership.service';
 import { checkActivePeriodExpirations } from './services/active-period-check.service';
 import { runMembershipActivationReconciliation } from './jobs/membershipActivationReconciliation';
 import { runSavedCardExpiryCheckJob } from './jobs/savedCardExpiryCheck';
@@ -89,6 +89,15 @@ async function runMembershipScheduledDowngrades(): Promise<JobResult> {
 async function runActivePeriodCheck(): Promise<JobResult> {
   const result = await checkActivePeriodExpirations();
   return result;
+}
+
+async function runPendingMembershipCleanup(): Promise<JobResult> {
+  const result = await cleanupOrphanedPendingMemberships();
+  return {
+    success: result.errors === 0,
+    ...(result.errors > 0 ? { error: `${result.errors} cleanup error(s) — see logs` } : {}),
+    itemsProcessed: result.cleaned,
+  };
 }
 
 let isShuttingDown = false;
@@ -123,7 +132,9 @@ async function startWorker(): Promise<void> {
     registerJobFunction('sendRenewalReminders', runMembershipRenewalReminders);
     registerJobFunction('processScheduledDowngrades', runMembershipScheduledDowngrades);
     registerJobFunction('checkActivePeriodExpirations', runActivePeriodCheck);
-    registerJobFunction('membershipActivationReconciliation', runMembershipActivationReconciliation);
+    // Registration key MUST equal the seeded BackgroundJob.functionName
+    registerJobFunction('runMembershipActivationReconciliation', runMembershipActivationReconciliation);
+    registerJobFunction('cleanupOrphanedPendingMemberships', runPendingMembershipCleanup);
     registerJobFunction('runSavedCardExpiryCheckJob', runSavedCardExpiryCheckJob);
     logger.info('[Worker] All job functions registered');
 
