@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { ICON_MAP, type IFeatureHighlight } from '@pawtag/ui';
 import { useCart } from '../context/CartContext';
+import { useCartInteraction } from '../context/CartInteractionContext';
 import { useAuth } from '../context/AuthContext';
 import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
@@ -100,6 +101,7 @@ export default function ProductDetail() {
   const [added, setAdded] = useState(false);
   const [selectedImage, setSelectedImage] = useState(0);
   const { addItem, error: cartError, clearError } = useCart();
+  const { triggerFly } = useCartInteraction();
   const { user } = useAuth();
   const [guardianTier, setGuardianTier] = useState<string>('');
   const [isGoldMember, setIsGoldMember] = useState(false);
@@ -149,7 +151,7 @@ export default function ProductDetail() {
   }, []);
 
   /* ---- Add to cart ---- */
-  const handleAddToCart = async () => {
+  const handleAddToCart = async (e?: React.MouseEvent) => {
     if (!product) return;
     try {
       await addItem({
@@ -167,6 +169,10 @@ export default function ProductDetail() {
       });
       setAdded(true);
       setTimeout(() => setAdded(false), 1500);
+      // Fly-to-cart animation toward the navbar badge — same directional
+      // feedback as the shop grid (badge is above the fold while scrolled down).
+      const rect = e?.currentTarget?.getBoundingClientRect();
+      if (rect) triggerFly(product.images?.[0] || '', rect);
     } catch {
       // Error already set in CartContext — toast will display it
     }

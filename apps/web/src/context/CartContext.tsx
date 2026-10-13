@@ -103,6 +103,12 @@ interface CartContextType {
   setPromoCode: (code: string | null) => void;
   /** Set promo applied state */
   setPromoApplied: (applied: boolean) => void;
+  /**
+   * Effective free-shipping threshold for the signed-in member
+   * (server-resolved entitlement), or null for guests/non-members.
+   * Display-only progress — authoritative shipping stays in server totals.
+   */
+  freeShippingThreshold: number | null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -187,12 +193,34 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [priceChanged, setPriceChanged] = useState(false);
   const [promoCode, setPromoCodeState] = useState<string | null>(null);
   const [promoApplied, setPromoApplied] = useState(false);
+  const [freeShippingThreshold, setFreeShippingThreshold] = useState<number | null>(null);
 
   // Check auth state
   useEffect(() => {
     const token = localStorage.getItem('pawtag_token');
     setIsAuthenticated(!!token);
   }, []);
+
+  // Free-shipping threshold for progress display — member entitlement only
+  // (guests/non-members have no server threshold; the UI must not invent one).
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setFreeShippingThreshold(null);
+      return;
+    }
+    let cancelled = false;
+    api
+      .get(API.public.commerce.freeShippingThreshold)
+      .then((res) => {
+        if (!cancelled) setFreeShippingThreshold(res.data?.data?.threshold ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setFreeShippingThreshold(null); // display-only — never block cart on failure
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated]);
 
   const isGuest = !isAuthenticated;
 
@@ -526,9 +554,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
         setItems(data.cart.items || []);
       }
     } catch {
-      // Silently fail — toggle is non-critical
+      // Surface the failure (previously silent) and re-sync to server truth
+      setError('Failed to update the renewal setting. Please try again.');
+      await refreshCart().catch(() => {});
     }
-  }, []);
+  }, [refreshCart]);
 
   /* ---- Toggle customisation on/off ---- */
   const toggleCustomisation = useCallback(async (itemId: string, enable: boolean) => {
@@ -710,6 +740,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     promoApplied,
     setPromoCode: setPromoCodeState,
     setPromoApplied,
+    freeShippingThreshold,
   };
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

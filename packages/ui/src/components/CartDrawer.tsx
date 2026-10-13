@@ -40,6 +40,10 @@ export interface CartDrawerProps {
   guardianTier?: string | null;
   /** Toggle auto-renew for a subscription cart item */
   onToggleAutoRenew?: (itemId: string, autoRenew: boolean) => void;
+  /** Cart operation error (quantity/remove/etc.) — surfaced in-drawer, not silently swallowed */
+  error?: string | null;
+  /** Clear the displayed error (e.g. on dismiss) */
+  onClearError?: () => void;
 }
 
 export const CartDrawer = React.memo(function CartDrawer({
@@ -57,6 +61,8 @@ export const CartDrawer = React.memo(function CartDrawer({
   pointsEarning = null,
   guardianTier = null,
   onToggleAutoRenew,
+  error = null,
+  onClearError,
 }: CartDrawerProps) {
   const drawerRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -152,6 +158,25 @@ export const CartDrawer = React.memo(function CartDrawer({
             <X className="h-5 w-5" />
           </button>
         </div>
+
+        {/* Cart error — problems outrank promotions */}
+        {error && (
+          <div
+            role="alert"
+            className="mx-4 mt-3 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700 flex items-start justify-between gap-2"
+          >
+            <span>{error}</span>
+            {onClearError && (
+              <button
+                onClick={onClearError}
+                className="shrink-0 font-medium text-red-600 hover:text-red-800"
+                aria-label="Dismiss cart error"
+              >
+                Dismiss
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Guest mode banner */}
         {isGuest && items.length > 0 && (

@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { API } from '@pawtag/shared/api';
@@ -119,9 +119,9 @@ export default function CartPage() {
                 <div className="mt-6 bg-amber-50 border border-amber-200 rounded-xl p-5">
                   <p className="text-sm text-amber-900">
                     Your cart is saved on this device.{' '}
-                    <a href="/login" className="font-semibold text-amber-700 hover:text-amber-800 underline">
+                    <Link to="/login" className="font-semibold text-amber-700 hover:text-amber-800 underline">
                       Sign in or create an account
-                    </a>{' '}
+                    </Link>{' '}
                     to continue to checkout and save your cart.
                   </p>
                 </div>

@@ -1,6 +1,7 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { ReactNode, useEffect } from 'react';
 import { SiteAvailabilityStatus } from '@pawtag/shared';
+import { stashScrollBeforeLogin, takeScrollReturn } from './lib/scroll-return';
 import { useSiteAvailability } from './components/SiteAvailabilityProvider';
 import MaintenanceBanner from './components/MaintenanceBanner';
 import OfflinePage from './pages/OfflinePage';
@@ -59,9 +60,44 @@ import Membership from './pages/Membership';
 import AnnouncementBar from './components/AnnouncementBar';
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
+  const location = useLocation();
   const token = localStorage.getItem('pawtag_token');
-  if (!token) return <Navigate to="/login" replace />;
+  if (!token) {
+    // Remember where the user was so signing in can return them to the same
+    // place (ScrollManager restores the offset for this path after login).
+    stashScrollBeforeLogin(location.pathname + location.search, window.scrollY);
+    return <Navigate to="/login" replace />;
+  }
   return <>{children}</>;
+}
+
+/**
+ * Context-aware scroll management. On route (pathname) change:
+ * - restore the stashed position when returning from the login round-trip;
+ * - scroll to a hash target when present;
+ * - otherwise start the new page at the top (standard page-navigation
+ *   behavior that SPAs otherwise lose — stale offsets never carry over).
+ * Never scrolls during in-page state updates or auth changes.
+ */
+function ScrollManager() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    const restoreY = takeScrollReturn(pathname);
+    if (restoreY !== null) {
+      window.scrollTo(0, restoreY);
+      return;
+    }
+    const hash = window.location.hash;
+    if (hash) {
+      const el = document.getElementById(hash.slice(1));
+      if (el) {
+        el.scrollIntoView();
+        return;
+      }
+    }
+    window.scrollTo(0, 0);
+  }, [pathname]);
+  return null;
 }
 
 function PublicLayout({ children, showEmergency = true }: { children: ReactNode; showEmergency?: boolean }) {
@@ -105,6 +141,7 @@ export default function App() {
   return (
     <>
       {status === SiteAvailabilityStatus.MAINTENANCE && <MaintenanceBanner />}
+      <ScrollManager />
       <Routes>
         {/* Public routes with Navbar + Footer */}
         <Route path="/" element={<PublicLayout><Home /></PublicLayout>} />

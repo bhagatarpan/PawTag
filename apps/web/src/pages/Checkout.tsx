@@ -69,6 +69,23 @@ export default function Checkout() {
   // Ref-based double-click protection for payment
   const paymentInProgressRef = useRef(false);
 
+  // After inline sign-in (CheckoutAuth swaps to the checkout grid), bring the
+  // checkout heading into view — a deliberate workflow scroll so the user
+  // sees the next step, not a page jump.
+  const wasSignedInRef = useRef(!!user);
+  useEffect(() => {
+    const wasSignedIn = wasSignedInRef.current;
+    wasSignedInRef.current = !!user;
+    if (!wasSignedIn && user) {
+      requestAnimationFrame(() => {
+        const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        document
+          .getElementById('checkout-heading')
+          ?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+      });
+    }
+  }, [user]);
+
   // Payment state recovery on re-entry
   const [recoveringPayment, setRecoveringPayment] = useState(false);
   const storedPaymentIntentId = sessionStorage.getItem('pawtag_checkout_payment_intent');
@@ -870,7 +887,7 @@ export default function Checkout() {
             <div className="flex items-center justify-between mb-6">
               <Link to="/cart" className="inline-flex items-center gap-2 text-gray-500 hover:text-primary-600 text-sm"><ArrowLeft className="h-4 w-4" /> Back to Cart</Link>
             </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">Checkout</h1>
+            <h1 id="checkout-heading" className="text-2xl font-bold text-gray-900 mb-2">Checkout</h1>
             <p className="text-gray-500 mb-6">Verify your contact details and shipping address</p>
 
             {!user ? (

@@ -61,7 +61,7 @@ export default function Navbar() {
    const [donatePublic, setDonatePublic] = useState(false);
    const location = useLocation();
    const navigate = useNavigate();
-   const { items, total, removeItem, updateQuantity, clearCart, toggleAutoRenew, isGuest, priceChanged } = useCart();
+   const { items, total, removeItem, updateQuantity, clearCart, toggleAutoRenew, isGuest, priceChanged, error: cartError, clearError } = useCart();
    const { user, logout } = useAuth();
    const { menus, loading } = useNavigation('header');
 
@@ -344,7 +344,10 @@ export default function Navbar() {
       {cartOpen && (
         <CartDrawer
           open={true}
-          onClose={() => setCartOpen(false)}
+          onClose={() => {
+            setCartOpen(false);
+            clearError();
+          }}
           items={items}
           total={total}
           onUpdateQuantity={updateQuantity}
@@ -354,6 +357,8 @@ export default function Navbar() {
           isGuest={isGuest}
           priceChanged={priceChanged}
           onToggleAutoRenew={toggleAutoRenew}
+          error={cartError}
+          onClearError={clearError}
           guardianTier={guardianData?.tier || null}
           pointsEarning={guardianData ? {
             points: Math.floor(total * (guardianData.tier === 'GOLD' || (guardianData as any).isGoldMember ? 2 : 1)),

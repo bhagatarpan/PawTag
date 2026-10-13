@@ -785,6 +785,7 @@ export const API = {
     },
     commerce: {
       cancellationReasons: '/public/commerce/cancellation-reasons',
+      freeShippingThreshold: '/public/commerce/free-shipping-threshold',
     },
     membership: {
       tiers: '/public/membership/tiers',
