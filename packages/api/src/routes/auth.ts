@@ -992,6 +992,12 @@ router.post('/verify-phone', validate(verifyPhoneSchema), async (req: AuthReques
       const phoneNumber = normalizePhone(rawPhone);
       const user = await User.findOne({ phoneNumber, deletedAt: null });
       if (!user) {
+        // Silent path — previously left NO trace, making failed verification
+        // reports undiagnosable. Log it (masked phone only, no PII dump).
+        logger.warn(
+          { phoneLast4: phoneNumber.slice(-4), reason: 'verify_phone_unresolvable_user' },
+          'verify-phone could not resolve a user — no auth token and no user with this phone',
+        );
         res.status(401).json({ success: false, error: 'Authentication required' });
         return;
       }
@@ -1209,7 +1215,7 @@ router.get('/verification-status', async (req: AuthRequest, res: Response) => {
     let userId = req.user?.id;
 
     if (!userId && req.query.email) {
-      const user = await User.findOne({ email: req.query.email as string, deletedAt: null });
+      const user = await User.findOne({ email: normalizeEmail(String(req.query.email)), deletedAt: null });
       if (user) userId = user._id.toString();
     }
 

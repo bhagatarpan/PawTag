@@ -163,6 +163,10 @@ export default function VerifyAccount() {
       setError('Please enter the complete 6-digit code.');
       return;
     }
+    if (!effectivePhone.trim()) {
+      setError('Add your phone number first — use Edit next to Mobile Verification.');
+      return;
+    }
     setOtpVerifying(true);
     setError('');
     setSuccess('');
@@ -179,10 +183,13 @@ export default function VerifyAccount() {
       setOtpValue('');
       setPhoneOtpSent(false);
       fetchStatus();
-      // Optimistically update local state when no auth
+      // Optimistically update local state when no auth. ONLY the phone is
+      // marked verified — claiming emailVerified here previously produced a
+      // false "Account Verified!" state that routed unauthenticated users
+      // into /account, which bounced them back to /login (the verify loop).
       if (!status) {
         setStatus(prev => prev ? { ...prev, phoneVerified: true } : {
-          emailVerified: true,
+          emailVerified: false,
           phoneVerified: true,
           status: 'pending_verification',
           email: emailParam || '',
@@ -192,7 +199,10 @@ export default function VerifyAccount() {
       }
     } catch (err: any) {
       const data = err.response?.data;
-      if (data?.code === 'OTP_MAX_ATTEMPTS') {
+      if (!err.response) {
+        // Network failure — say so honestly instead of blaming the code
+        setError('Connection problem — please check your signal and try again.');
+      } else if (data?.code === 'OTP_MAX_ATTEMPTS') {
         setError('Too many failed attempts. Please request a new OTP.');
       } else if (data?.code === 'OTP_EXPIRED') {
         setError('This OTP has expired. Please request a new one.');
@@ -227,7 +237,14 @@ export default function VerifyAccount() {
       navigate(returnUrl);
       return;
     }
-    navigate(status ? '/account' : '/login');
+    // Only enter the authenticated area when we actually hold a session.
+    // Navigating to /account without a token bounced through ProtectedRoute
+    // back to /login — the verification loop users experienced.
+    if (localStorage.getItem('pawtag_token')) {
+      navigate('/account');
+    } else {
+      navigate('/login', { state: { email: effectiveEmail } });
+    }
   };
 
   const startEdit = (field: 'email' | 'phone') => {
@@ -425,10 +442,10 @@ export default function VerifyAccount() {
               {!isPhoneVerified && (
                 <button
                   onClick={handleSendOtp}
-                  disabled={otpSending || cooldown > 0}
+                  disabled={otpSending || cooldown > 0 || !effectivePhone.trim()}
                   className="w-full py-2.5 text-sm text-teal-600 border border-teal-200 rounded-lg hover:bg-teal-50 font-medium disabled:opacity-50 transition-all"
                 >
-                  {otpSending ? 'Sending...' : cooldown > 0 ? `${cooldown}s` : 'Verify Mobile'}
+                  {otpSending ? 'Sending...' : !effectivePhone.trim() ? 'Add phone number first' : cooldown > 0 ? `${cooldown}s` : 'Verify Mobile'}
                 </button>
               )}
             </div>

@@ -72,6 +72,7 @@ export default function OtpInput({ length = 6, value, onChange, disabled = false
           ref={(el) => { inputRefs.current[index] = el; }}
           type="text"
           inputMode="numeric"
+          autoComplete="one-time-code"
           maxLength={1}
           value={digit}
           onChange={(e) => handleChange(index, e.target.value)}
