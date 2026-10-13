@@ -16,7 +16,7 @@ type VerificationStatus = {
 } | null;
 
 export default function VerifyAccount() {
-  const { user: authUser, refreshUser } = useAuth();
+  const { user: authUser, refreshUser, completeLogin } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const [status, setStatus] = useState<VerificationStatus>(null);
@@ -86,19 +86,20 @@ export default function VerifyAccount() {
 
   // Capture access token from URL params when redirected after activation.
   // Refresh tokens are never accepted from URLs — they travel only as HttpOnly cookies.
+  // completeLogin (not a raw localStorage write) so AuthContext hydrates the
+  // full user — otherwise account gates render a user-less dashboard.
   useEffect(() => {
     const tokenParam = searchParams.get('token');
     const refreshTokenParam = searchParams.get('refreshToken');
     if (tokenParam) {
-      localStorage.setItem('pawtag_token', tokenParam);
-      localStorage.removeItem('pawtag_refresh_token');
+      void completeLogin(tokenParam);
     }
     if (tokenParam || refreshTokenParam) {
       searchParams.delete('token');
       searchParams.delete('refreshToken');
       setSearchParams(searchParams, { replace: true });
     }
-  }, [searchParams, setSearchParams]);
+  }, [searchParams, setSearchParams, completeLogin]);
 
   // Fully verified authenticated users should not remain stuck here
   // (e.g. post-login redirect race). Registration still needs the CTA
@@ -172,12 +173,13 @@ export default function VerifyAccount() {
     setSuccess('');
     try {
       const res = await api.post(API.auth.verifyPhone, { otp: otpValue, phoneNumber: effectivePhone });
-      // Store access token if user was just activated.
+      // Store the activation token through completeLogin (not a raw
+      // localStorage write) so AuthContext hydrates the full user — the
+      // onboarding wizard gate in AccountLayout needs the verified flags.
       // Refresh token is HttpOnly cookie only — never localStorage.
       const { token } = res.data.data || {};
       if (token) {
-        localStorage.setItem('pawtag_token', token);
-        localStorage.removeItem('pawtag_refresh_token');
+        await completeLogin(token);
       }
       setSuccess('Phone number verified successfully!');
       setOtpValue('');

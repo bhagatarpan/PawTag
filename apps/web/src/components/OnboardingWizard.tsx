@@ -104,6 +104,9 @@ export default function OnboardingWizard() {
   const [ecRelationship, setEcRelationship] = useState('');
   const [ecPhone, setEcPhone] = useState('');
   const [ecEmail, setEcEmail] = useState('');
+  // Inline validation highlighting after a blocked Continue attempt
+  const [addressInvalid, setAddressInvalid] = useState(false);
+  const [ecInvalid, setEcInvalid] = useState(false);
 
   useEffect(() => {
     api.get('/public/cms/onboarding')
@@ -300,37 +303,62 @@ export default function OnboardingWizard() {
   }
 
   async function saveStepData(): Promise<boolean> {
+    const hasContact = step.formFields?.some((f) => f === 'phoneNumber' || f === 'email');
+    const hasAddress = step.formFields?.some((f) => f.startsWith('address'));
+    const hasEC = step.formFields?.some((f) => f.startsWith('emergencyContact'));
+
+    // Required-field validation BEFORE any API call. Empty strings are
+    // rejected server-side by the profile schema (min(1)/email) with a
+    // generic "Validation failed" — ask nicely here instead.
+    if (hasAddress && (!addressLine1.trim() || !addressCity.trim() || !addressZip.trim())) {
+      setAddressInvalid(true);
+      setSaveError('Please add your street address, city, and postcode to continue.');
+      return false;
+    }
+    setAddressInvalid(false);
+    if (hasEC && (!ecName.trim() || !ecPhone.trim())) {
+      setEcInvalid(true);
+      setSaveError('Please add an emergency contact name and phone number to continue.');
+      return false;
+    }
+    if (hasEC && ecEmail.trim() && !ecEmail.includes('@')) {
+      setEcInvalid(true);
+      setSaveError('Please enter a valid email for your emergency contact, or leave it blank.');
+      return false;
+    }
+    setEcInvalid(false);
+
     setSaving(true);
     setSaveError('');
     try {
       const payload: Record<string, unknown> = {};
-      const hasContact = step.formFields?.some((f) => f === 'phoneNumber' || f === 'email');
-      const hasAddress = step.formFields?.some((f) => f.startsWith('address'));
-      const hasEC = step.formFields?.some((f) => f.startsWith('emergencyContact'));
 
-      if (hasContact || hasAddress) {
-        if (hasContact) {
-          payload.phoneNumber = phoneNumber.trim();
-          payload.email = email.trim();
-        }
-        if (hasAddress) {
-          payload.address = {
-            line1: addressLine1,
-            line2: addressLine2,
-            city: addressCity,
-            state: addressState,
-            zip: addressZip,
-            country: user?.address?.country || 'NZ',
-          };
-        }
+      // Only send non-empty values — empty strings fail the server's
+      // zod validation (min(1)/email) with a generic error, and would
+      // otherwise wipe existing values with blanks.
+      if (hasContact) {
+        if (phoneNumber.trim()) payload.phoneNumber = phoneNumber.trim();
+        if (email.trim()) payload.email = email.trim();
+      }
+      if (hasAddress) {
+        const address: Record<string, string> = {
+          line1: addressLine1.trim(),
+          city: addressCity.trim(),
+          zip: addressZip.trim(),
+          country: user?.address?.country || 'NZ',
+        };
+        if (addressLine2.trim()) address.line2 = addressLine2.trim();
+        if (addressState.trim()) address.state = addressState.trim();
+        payload.address = address;
       }
       if (hasEC) {
-        payload.emergencyContact = {
-          name: ecName,
-          relationship: ecRelationship,
-          phone: ecPhone,
-          email: ecEmail,
+        const emergencyContact: Record<string, string> = {
+          name: ecName.trim(),
+          phone: ecPhone.trim(),
         };
+        if (ecRelationship.trim()) emergencyContact.relationship = ecRelationship.trim();
+        if (ecEmail.trim()) emergencyContact.email = ecEmail.trim();
+        payload.emergencyContact = emergencyContact;
       }
 
       let updatedUser: {
@@ -509,12 +537,14 @@ export default function OnboardingWizard() {
             )}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Street Address</label>
-              <AddressAutocomplete
-                value={addressLine1}
-                onChange={setAddressLine1}
-                onAddressSelect={handleAddressSelect}
-                placeholder="123 Main St"
-              />
+              <div className={addressInvalid ? 'rounded-lg ring-1 ring-red-400' : ''}>
+                <AddressAutocomplete
+                  value={addressLine1}
+                  onChange={setAddressLine1}
+                  onAddressSelect={handleAddressSelect}
+                  placeholder="123 Main St"
+                />
+              </div>
               <p className="text-xs text-gray-400 mt-1">Private — not shown to finders</p>
             </div>
             <div>
@@ -525,11 +555,11 @@ export default function OnboardingWizard() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
-                <input type="text" value={addressCity} onChange={(e) => setAddressCity(e.target.value)} className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500" placeholder="Auckland" />
+                <input type="text" value={addressCity} onChange={(e) => setAddressCity(e.target.value)} className={`w-full border rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 ${addressInvalid ? 'border-red-400' : 'border-gray-300'}`} placeholder="Auckland" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Postal Code</label>
-                <input type="text" value={addressZip} onChange={(e) => setAddressZip(e.target.value)} className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500" placeholder="1011" />
+                <input type="text" value={addressZip} onChange={(e) => setAddressZip(e.target.value)} className={`w-full border rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 ${addressInvalid ? 'border-red-400' : 'border-gray-300'}`} placeholder="1011" />
               </div>
             </div>
           </>
@@ -538,7 +568,7 @@ export default function OnboardingWizard() {
           <>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Contact Name</label>
-              <input type="text" value={ecName} onChange={(e) => setEcName(e.target.value)} className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500" placeholder="Sarah Johnson" />
+              <input type="text" value={ecName} onChange={(e) => setEcName(e.target.value)} className={`w-full border rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 ${ecInvalid ? 'border-red-400' : 'border-gray-300'}`} placeholder="Sarah Johnson" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Relationship</label>
@@ -549,11 +579,11 @@ export default function OnboardingWizard() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
-              <input type="tel" value={ecPhone} onChange={(e) => setEcPhone(e.target.value)} className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500" placeholder="+64 21 987 6543" />
+              <input type="tel" value={ecPhone} onChange={(e) => setEcPhone(e.target.value)} className={`w-full border rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 ${ecInvalid ? 'border-red-400' : 'border-gray-300'}`} placeholder="+64 21 987 6543" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Email (optional)</label>
-              <input type="email" value={ecEmail} onChange={(e) => setEcEmail(e.target.value)} className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500" placeholder="sarah@example.com" />
+              <input type="email" value={ecEmail} onChange={(e) => setEcEmail(e.target.value)} className={`w-full border rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 ${ecInvalid && ecEmail.trim() ? 'border-red-400' : 'border-gray-300'}`} placeholder="sarah@example.com" />
             </div>
           </>
         )}
