@@ -306,11 +306,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
             quantity: existing.quantity + item.quantity,
           });
         } else {
-          // New item — add to server
+          // New item — add to server. Engraving texts and metadata must
+          // survive the guest→login sync, or pet names entered before
+          // signing in are silently lost.
           await api.post(API.cart.addItem, {
             productId: item.productId,
             quantity: item.quantity,
             customisation: cust,
+            customisationTexts: cust ? (item.customisationTexts || []) : [],
+            customizable: item.customizable,
+            customizationLabel: item.customizationLabel,
+            customizationPrice: item.customizationPrice,
           });
         }
       } catch {
@@ -471,10 +477,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
             sku: item.sku || '',
             unitPrice: item.price || 0,
             price: item.price,
-            customizationTotal: 0,
+            customizationTotal: cust ? (item.customizationPrice || 0) : 0,
             quantity: item.quantity,
             image: item.image,
             customisation: cust,
+            customisationTexts: cust ? (item.customisationTexts || []) : [],
+            customizable: item.customizable,
+            customizationLabel: item.customizationLabel,
+            customizationPrice: item.customizationPrice,
             addedAt: new Date().toISOString(),
           });
         }

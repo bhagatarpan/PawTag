@@ -1173,7 +1173,7 @@ export default function Checkout() {
                       items={items.map((item) => ({
                         productName: item.productName || item.name,
                         quantity: item.quantity || 1,
-                        unitPrice: item.unitPrice || item.price || 0,
+                        unitPrice: (item.unitPrice || item.price || 0) + (item.customizationTotal || 0),
                         customisationTexts: item.customisationTexts,
                       }))}
                       subtotal={serverQuote?.subtotal ?? totals?.subtotal ?? 0}
@@ -1219,7 +1219,7 @@ export default function Checkout() {
                         )}
                         <p className="text-xs text-gray-500">Qty: {item.quantity}</p>
                       </div>
-                      <p className="font-semibold text-gray-900">${(item.unitPrice || item.price || 0).toFixed(2)}</p>
+                      <p className="font-semibold text-gray-900">${((item.unitPrice || item.price || 0) + (item.customizationTotal || 0)).toFixed(2)}</p>
                     </div>
                   ))}
                   <div className="space-y-2 pt-4">
@@ -1384,12 +1384,80 @@ export default function Checkout() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="font-medium text-gray-900">{item.productName || item.name}</p>
-                          {item.customisationTexts && item.customisationTexts.length > 0 && item.customisationTexts.some(t => t) && (
-                            <div className="text-xs text-primary-600 mt-1">
-                              {item.customisationTexts.filter(t => t).map((t, i) => (
-                                <p key={i}>Pet name: {t}</p>
-                              ))}
-                            </div>
+                          {/* Pet name engraving — editable (revived checkout functionality) */}
+                          {item.customizable ? (
+                            item.customisation ? (
+                              <div className="mt-1.5">
+                                <InlineEditBanner
+                                  icon={<Edit3 size={14} />}
+                                  label={item.customizationLabel || 'Pet name'}
+                                  description={
+                                    editingTexts[itemId]?.some((t) => t.trim())
+                                      ? editingTexts[itemId].filter((t) => t.trim()).join(', ')
+                                      : item.customisationTexts?.filter((t) => t).join(', ') || 'Add a name for each tag'
+                                  }
+                                  variant="success"
+                                  expanded={expandedEngraving[itemId] ?? false}
+                                  onExpand={() => handleExpandEngraving(itemId, item)}
+                                  onRemove={() => handleToggleEngraving(itemId, item, false)}
+                                >
+                                  <div className="space-y-2 pt-2">
+                                    {getItemTexts(itemId, item).map((text, i) => (
+                                      <div key={i} className="flex items-center gap-2">
+                                        {(item.quantity || 1) > 1 && (
+                                          <span className="text-[11px] text-gray-500 w-12 shrink-0">Tag {i + 1}</span>
+                                        )}
+                                        <input
+                                          type="text"
+                                          maxLength={16}
+                                          value={text}
+                                          onChange={(e) => handleTextChange(itemId, i, e.target.value)}
+                                          placeholder={item.customizationLabel || 'Pet name'}
+                                          className="flex-1 min-w-0 border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                          aria-label={`${item.customizationLabel || 'Pet name'} ${i + 1}`}
+                                        />
+                                      </div>
+                                    ))}
+                                    <div className="flex items-center gap-2 pt-1">
+                                      <button
+                                        onClick={() => handleSaveTexts(itemId)}
+                                        disabled={savingTexts[itemId]}
+                                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-primary-600 text-white text-xs font-medium rounded-lg hover:bg-primary-700 disabled:opacity-50 transition-colors"
+                                      >
+                                        {savingTexts[itemId] ? (
+                                          <><Loader2 size={12} className="animate-spin" /> Saving…</>
+                                        ) : savedTexts[itemId] ? (
+                                          <><Check size={12} /> Saved</>
+                                        ) : (
+                                          'Save pet name'
+                                        )}
+                                      </button>
+                                      <span className="text-[11px] text-gray-400">
+                                        Max 16 characters per name
+                                        {item.customizationPrice ? ` · +$${item.customizationPrice.toFixed(2)} per unit` : ''}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </InlineEditBanner>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => handleToggleEngraving(itemId, item, true)}
+                                className="mt-1.5 inline-flex items-center gap-1.5 text-xs font-medium text-primary-700 hover:text-primary-800 bg-primary-50 hover:bg-primary-100 border border-primary-100 rounded-lg px-3 py-1.5 transition-colors"
+                              >
+                                <Edit3 size={12} />
+                                Add {item.customizationLabel?.toLowerCase() || 'pet name'}
+                                {item.customizationPrice ? ` (+$${item.customizationPrice.toFixed(2)})` : ''}
+                              </button>
+                            )
+                          ) : (
+                            item.customisationTexts && item.customisationTexts.length > 0 && item.customisationTexts.some(t => t) && (
+                              <div className="text-xs text-primary-600 mt-1">
+                                {item.customisationTexts.filter(t => t).map((t, i) => (
+                                  <p key={i}>Pet name: {t}</p>
+                                ))}
+                              </div>
+                            )
                           )}
                           <div className="flex items-center gap-2 mt-2">
                             <div className="flex items-center gap-1 border border-gray-200 rounded-lg">
@@ -1400,7 +1468,7 @@ export default function Checkout() {
                             <button onClick={() => removeItem(itemId)} className="text-xs text-red-500 hover:text-red-700">Remove</button>
                           </div>
                         </div>
-                        <p className="font-semibold text-gray-900">${((item.unitPrice || item.price || 0) * (item.quantity || 1)).toFixed(2)}</p>
+                        <p className="font-semibold text-gray-900">${(((item.unitPrice || item.price || 0) + (item.customizationTotal || 0)) * (item.quantity || 1)).toFixed(2)}</p>
                       </div>
                     );
                   })}

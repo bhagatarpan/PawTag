@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Minus, Plus, Trash2, Tag, Loader2, AlertTriangle } from 'lucide-react';
+import { Minus, Plus, Trash2, Tag, Loader2, AlertTriangle, Pencil, Check } from 'lucide-react';
 
 interface CartItemCardProps {
   item: {
@@ -13,6 +13,8 @@ interface CartItemCardProps {
     customisationTexts?: string[];
     customizationTotal?: number;
     customizationLabel?: string;
+    customizable?: boolean;
+    customizationPrice?: number;
     autoRenew?: boolean;
     isSubscription?: boolean;
     /** Stock status from server */
@@ -24,14 +26,31 @@ interface CartItemCardProps {
   };
   onUpdateQuantity: (id: string, quantity: number) => void;
   onRemove: (id: string) => void;
+  /** Save engraving texts for this item (server-backed). */
+  onUpdateTexts?: (id: string, texts: string[]) => Promise<void> | void;
+  /** Turn engraving on/off for this item (server-backed). */
+  onToggleCustomisation?: (id: string, enable: boolean) => Promise<void> | void;
   /** Whether this item was just added (triggers highlight animation) */
   isNew?: boolean;
 }
 
-export default function CartItemCard({ item, onUpdateQuantity, onRemove, isNew = false }: CartItemCardProps) {
+export default function CartItemCard({
+  item,
+  onUpdateQuantity,
+  onRemove,
+  onUpdateTexts,
+  onToggleCustomisation,
+  isNew = false,
+}: CartItemCardProps) {
   const [updating, setUpdating] = useState(false);
+  const [editingEngraving, setEditingEngraving] = useState(false);
+  const [draftTexts, setDraftTexts] = useState<string[]>([]);
+  const [savingTexts, setSavingTexts] = useState(false);
+  const [savedFlash, setSavedFlash] = useState(false);
+  const [actionError, setActionError] = useState('');
   const lineTotal = (item.unitPrice + (item.customizationTotal || 0)) * item.quantity;
   const hasCustomization = item.customisation && item.customisationTexts && item.customisationTexts.length > 0;
+  const itemId = item._id || item.productId;
 
   // Determine stock status
   const isOutOfStock = item.stock === 0;
@@ -45,6 +64,54 @@ export default function CartItemCard({ item, onUpdateQuantity, onRemove, isNew =
       onUpdateQuantity(item._id || item.productId, newQuantity);
     } finally {
       setUpdating(false);
+    }
+  };
+
+  /* ---- Pet name engraving editing (customizable products) ---- */
+  const startEditEngraving = () => {
+    const saved = item.customisationTexts || [];
+    const qty = item.quantity || 1;
+    const padded = [...saved, ...Array(Math.max(0, qty - saved.length)).fill('')];
+    setDraftTexts(padded);
+    setEditingEngraving(true);
+    setActionError('');
+  };
+
+  const handleAddEngraving = async () => {
+    if (!onToggleCustomisation) return;
+    setActionError('');
+    try {
+      await onToggleCustomisation(itemId, true);
+      startEditEngraving();
+    } catch {
+      setActionError('Could not enable the pet name. Please try again.');
+    }
+  };
+
+  const handleRemoveEngraving = async () => {
+    if (!onToggleCustomisation) return;
+    setActionError('');
+    try {
+      await onToggleCustomisation(itemId, false);
+      setEditingEngraving(false);
+    } catch {
+      setActionError('Could not remove the pet name. Please try again.');
+    }
+  };
+
+  const handleSaveEngraving = async () => {
+    if (!onUpdateTexts) return;
+    setSavingTexts(true);
+    setActionError('');
+    try {
+      await onUpdateTexts(itemId, draftTexts.map((t) => t.trim()).filter(Boolean));
+      setEditingEngraving(false);
+      setSavedFlash(true);
+      setTimeout(() => setSavedFlash(false), 2000);
+    } catch {
+      setActionError('Could not save the pet name. Please try again.');
+    } finally {
+      setSavingTexts(false);
     }
   };
 
@@ -101,21 +168,114 @@ export default function CartItemCard({ item, onUpdateQuantity, onRemove, isNew =
                 </span>
               )}
 
-              {/* Customisation details */}
-              {hasCustomization && (
+              {/* Customisation details / editing */}
+              {item.customizable && editingEngraving && (
                 <div className="mt-2 bg-primary-50/60 border border-primary-100 rounded-lg px-3 py-2">
-                  <p className="text-xs font-medium text-primary-700 mb-1">
-                    {item.customizationLabel || 'Customisation'}
+                  <p className="text-xs font-medium text-primary-700 mb-2">
+                    {item.customizationLabel || 'Pet name'}
                   </p>
-                  {item.customisationTexts?.map((text, i) => (
-                    <p key={i} className="text-sm text-primary-800">"{text}"</p>
-                  ))}
-                  {item.customizationTotal ? (
-                    <p className="text-xs text-primary-600 mt-1">
-                      +${item.customizationTotal.toFixed(2)} per unit
-                    </p>
-                  ) : null}
+                  <div className="space-y-1.5">
+                    {draftTexts.map((text, i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        {item.quantity > 1 && (
+                          <span className="text-[11px] text-gray-500 w-12 shrink-0">Tag {i + 1}</span>
+                        )}
+                        <input
+                          type="text"
+                          maxLength={16}
+                          value={text}
+                          onChange={(e) =>
+                            setDraftTexts((prev) => {
+                              const next = [...prev];
+                              next[i] = e.target.value.slice(0, 16);
+                              return next;
+                            })
+                          }
+                          placeholder={item.customizationLabel || 'Pet name'}
+                          className="flex-1 min-w-0 border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                          aria-label={`${item.customizationLabel || 'Pet name'} ${i + 1}`}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2 mt-2">
+                    <button
+                      onClick={handleSaveEngraving}
+                      disabled={savingTexts}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 bg-primary-600 text-white text-xs font-medium rounded-lg hover:bg-primary-700 disabled:opacity-50 transition-colors"
+                    >
+                      {savingTexts ? (
+                        <><Loader2 size={12} className="animate-spin" /> Saving…</>
+                      ) : savedFlash ? (
+                        <><Check size={12} /> Saved</>
+                      ) : (
+                        'Save'
+                      )}
+                    </button>
+                    <button
+                      onClick={() => setEditingEngraving(false)}
+                      disabled={savingTexts}
+                      className="px-3 py-1.5 text-xs font-medium text-gray-500 hover:text-gray-700 disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleRemoveEngraving}
+                      disabled={savingTexts}
+                      className="ml-auto text-xs text-red-400 hover:text-red-600 disabled:opacity-50"
+                    >
+                      Remove engraving
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-gray-400 mt-1.5">
+                    Max 16 characters per name
+                    {item.customizationPrice ? ` · +$${item.customizationPrice.toFixed(2)} per unit` : ''}
+                  </p>
                 </div>
+              )}
+
+              {hasCustomization && !editingEngraving && (
+                <div className="mt-2 bg-primary-50/60 border border-primary-100 rounded-lg px-3 py-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-primary-700 mb-1">
+                        {item.customizationLabel || 'Customisation'}
+                      </p>
+                      {item.customisationTexts?.map((text, i) => (
+                        <p key={i} className="text-sm text-primary-800">"{text}"</p>
+                      ))}
+                      {item.customizationTotal ? (
+                        <p className="text-xs text-primary-600 mt-1">
+                          +${item.customizationTotal.toFixed(2)} per unit
+                        </p>
+                      ) : null}
+                    </div>
+                    {onUpdateTexts && item.customizable && (
+                      <button
+                        onClick={startEditEngraving}
+                        className="shrink-0 inline-flex items-center gap-1 text-xs font-medium text-primary-700 hover:text-primary-800 bg-white border border-primary-200 rounded-lg px-2.5 py-1.5 transition-colors"
+                        aria-label={`Edit ${item.customizationLabel || 'customisation'} for ${item.productName}`}
+                      >
+                        <Pencil size={12} /> Edit
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {item.customizable && !item.customisation && onToggleCustomisation && (
+                <button
+                  onClick={handleAddEngraving}
+                  className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-primary-700 hover:text-primary-800 bg-primary-50 hover:bg-primary-100 border border-primary-100 rounded-lg px-3 py-1.5 transition-colors"
+                >
+                  <Pencil size={12} />
+                  Add {item.customizationLabel?.toLowerCase() || 'pet name'}
+                  {item.customizationPrice ? ` (+$${item.customizationPrice.toFixed(2)})` : ''}
+                </button>
+              )}
+
+              {actionError && (
+                <p role="alert" className="mt-2 text-xs text-red-600">{actionError}</p>
               )}
             </div>
 
