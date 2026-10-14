@@ -44,6 +44,11 @@ export interface CartDrawerProps {
   error?: string | null;
   /** Clear the displayed error (e.g. on dismiss) */
   onClearError?: () => void;
+  /**
+   * Guest "Log in" action. The host app supplies navigation (react-router)
+   * plus any return-URL bookkeeping; falls back to a plain link when absent.
+   */
+  onLogin?: () => void;
 }
 
 export const CartDrawer = React.memo(function CartDrawer({
@@ -63,6 +68,7 @@ export const CartDrawer = React.memo(function CartDrawer({
   onToggleAutoRenew,
   error = null,
   onClearError,
+  onLogin,
 }: CartDrawerProps) {
   const drawerRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -181,7 +187,19 @@ export const CartDrawer = React.memo(function CartDrawer({
         {/* Guest mode banner */}
         {isGuest && items.length > 0 && (
           <div className="mx-4 mt-3 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700" role="status">
-            You're shopping as a guest. <strong>Log in</strong> to save your cart and check out.
+            You're shopping as a guest.{' '}
+            {onLogin ? (
+              <button
+                type="button"
+                onClick={onLogin}
+                className="font-semibold text-primary-600 hover:underline"
+              >
+                Log in
+              </button>
+            ) : (
+              <a href="/login" className="font-semibold text-primary-600 hover:underline">Log in</a>
+            )}{' '}
+            to save your cart and check out.
             <br />
             <a href="/guardian" className="text-primary-600 hover:underline mt-1 inline-block">
               Join Guardian and earn rewards on every purchase

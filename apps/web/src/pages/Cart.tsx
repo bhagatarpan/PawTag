@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
+import { setReturnUrl } from '../lib/return-url';
 import { useAuth } from '../context/AuthContext';
 import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
@@ -119,7 +120,11 @@ export default function CartPage() {
                 <div className="mt-6 bg-amber-50 border border-amber-200 rounded-xl p-5">
                   <p className="text-sm text-amber-900">
                     Your cart is saved on this device.{' '}
-                    <Link to="/login" className="font-semibold text-amber-700 hover:text-amber-800 underline">
+                    <Link
+                      to="/login"
+                      onClick={() => setReturnUrl('/cart')}
+                      className="font-semibold text-amber-700 hover:text-amber-800 underline"
+                    >
                       Sign in or create an account
                     </Link>{' '}
                     to continue to checkout and save your cart.

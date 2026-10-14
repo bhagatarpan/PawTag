@@ -7,6 +7,7 @@ import { useAuthPage, useSiteSettings } from '../hooks/useCms';
 import { useAuth } from '../context/AuthContext';
 import { validatePassword } from '@pawtag/shared';
 import { API } from '@pawtag/shared';
+import { peekReturnUrl, setReturnUrl, RETURN_URL_KEY } from '../lib/return-url';
 
 export default function Register() {
   const { login } = useAuth();
@@ -32,12 +33,17 @@ export default function Register() {
     if (carriedEmail) fullNameRef.current?.focus();
   }, [carriedEmail]);
 
-  // Capture return URL on mount, then clear it to prevent stale values
-  // from affecting navbar-originated registrations
+  // Capture the checkout flag on mount. Other workflow return URLs (e.g.
+  // /cart from the guest cart banner) must SURVIVE registration so the
+  // post-verification Continue can honour them — only the checkout flag
+  // is consumed here.
   const [fromCheckout] = useState(() => {
-    const url = localStorage.getItem('pawtag_return_url');
-    localStorage.removeItem('pawtag_return_url');
-    return url === '/checkout';
+    const url = peekReturnUrl();
+    if (url === '/checkout') {
+      localStorage.removeItem(RETURN_URL_KEY);
+      return true;
+    }
+    return false;
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -114,7 +120,7 @@ export default function Register() {
               // Re-set return URL for checkout-originated registrations so
               // VerifyAccount can redirect back after verification
               if (fromCheckout) {
-                localStorage.setItem('pawtag_return_url', '/checkout');
+                setReturnUrl('/checkout');
               }
               navigate(`/verify-account?email=${encodeURIComponent(form.email)}&phone=${encodeURIComponent(form.phoneNumber)}`);
             }}

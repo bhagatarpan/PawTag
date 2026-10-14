@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { PawPrint, Mail, Lock, Eye, EyeOff, Loader2, UserPlus } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useAuthPage, useSiteSettings } from '../hooks/useCms';
+import { consumeReturnUrl } from '../lib/return-url';
 import api from '../lib/api';
 import { API } from '@pawtag/shared';
 
@@ -44,7 +45,6 @@ export default function Login() {
   const companyName = settings?.['company.name'] || 'PawTag';
 
   const adminRoles = ['SUPER_ADMIN', 'ADMIN', 'CUSTOMER_SERVICE', 'WEBSITE_EDITOR'];
-  const RETURN_URL_KEY = 'pawtag_return_url';
 
   // Check for session expired flag (set by onAuthFailure when refresh token is invalid)
   useEffect(() => {
@@ -90,9 +90,8 @@ export default function Login() {
       if (isAdmin) {
         window.location.href = import.meta.env.VITE_ADMIN_URL || 'http://localhost:3001';
       } else {
-        const returnUrl = localStorage.getItem(RETURN_URL_KEY);
+        const returnUrl = consumeReturnUrl();
         if (returnUrl) {
-          localStorage.removeItem(RETURN_URL_KEY);
           navigate(returnUrl);
         } else {
           navigate('/account');
@@ -158,9 +157,8 @@ export default function Login() {
         if (isAdmin) {
           window.location.href = import.meta.env.VITE_ADMIN_URL || 'http://localhost:3001';
         } else {
-          const returnUrl = localStorage.getItem(RETURN_URL_KEY);
+          const returnUrl = consumeReturnUrl();
           if (returnUrl) {
-            localStorage.removeItem(RETURN_URL_KEY);
             navigate(returnUrl);
           } else {
             navigate('/account');

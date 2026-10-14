@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, X, ShoppingCart, PawPrint, User, LogOut, ChevronDown, Shield, Crown, Heart } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
+import { setReturnUrl } from '../lib/return-url';
 import { useNavigation } from '../hooks/useCms';
 import { CartDrawer } from '@pawtag/ui';
 import { useCartInteraction } from '../context/CartInteractionContext';
@@ -359,6 +360,11 @@ export default function Navbar() {
           onToggleAutoRenew={toggleAutoRenew}
           error={cartError}
           onClearError={clearError}
+          onLogin={() => {
+            setReturnUrl('/cart');
+            setCartOpen(false);
+            navigate('/login');
+          }}
           guardianTier={guardianData?.tier || null}
           pointsEarning={guardianData ? {
             points: Math.floor(total * (guardianData.tier === 'GOLD' || (guardianData as any).isGoldMember ? 2 : 1)),

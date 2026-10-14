@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Lock, Shield, Tag, Loader2, X, ArrowLeft } from 'lucide-react';
 import PromoCodeControl from './PromoCodeControl';
+import { setReturnUrl } from '../../lib/return-url';
 
 export { type PromoCodeControlProps } from './PromoCodeControl';
 
@@ -182,7 +184,14 @@ export default function OrderSummary({
       {/* Guest prompt */}
       {isGuest && (
         <p className="text-center text-xs text-gray-500 mt-3">
-          <a href="/login" className="text-primary-600 hover:underline">Sign in</a> to save your cart and earn rewards
+          <Link
+            to="/login"
+            onClick={() => setReturnUrl('/cart')}
+            className="text-primary-600 hover:underline"
+          >
+            Sign in
+          </Link>{' '}
+          to save your cart and earn rewards
         </p>
       )}
     </div>

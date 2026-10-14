@@ -2,6 +2,7 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { ReactNode, useEffect } from 'react';
 import { SiteAvailabilityStatus } from '@pawtag/shared';
 import { stashScrollBeforeLogin, takeScrollReturn } from './lib/scroll-return';
+import { setReturnUrl } from './lib/return-url';
 import { useSiteAvailability } from './components/SiteAvailabilityProvider';
 import MaintenanceBanner from './components/MaintenanceBanner';
 import OfflinePage from './pages/OfflinePage';
@@ -63,9 +64,13 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
   const location = useLocation();
   const token = localStorage.getItem('pawtag_token');
   if (!token) {
-    // Remember where the user was so signing in can return them to the same
-    // place (ScrollManager restores the offset for this path after login).
+    // Remember where the user was so signing in returns them to the same
+    // place: the scroll offset for this path, and the path itself as the
+    // post-login destination (deep links and expired-session bounces both
+    // route through here). Plain navbar sign-in never passes through this
+    // guard, so it still lands on /account by design.
     stashScrollBeforeLogin(location.pathname + location.search, window.scrollY);
+    setReturnUrl(location.pathname + location.search);
     return <Navigate to="/login" replace />;
   }
   return <>{children}</>;

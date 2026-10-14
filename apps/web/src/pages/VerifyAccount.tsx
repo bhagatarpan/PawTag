@@ -4,6 +4,7 @@ import { Mail, Phone, CheckCircle2, Clock, ArrowRight, RefreshCw, Loader2, Alert
 import api from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import OtpInput from '../components/verification/OtpInput';
+import { consumeReturnUrl, peekReturnUrl } from '../lib/return-url';
 import { API } from '@pawtag/shared';
 
 type VerificationStatus = {
@@ -232,10 +233,9 @@ export default function VerifyAccount() {
     // Refresh user data to ensure onboarding status is current before navigating
     await refreshUser();
 
-    // Check if there's a return URL (e.g., from checkout)
-    const returnUrl = localStorage.getItem('pawtag_return_url');
+    // Check if there's a return URL (e.g., from checkout or the guest cart)
+    const returnUrl = consumeReturnUrl();
     if (returnUrl) {
-      localStorage.removeItem('pawtag_return_url');
       navigate(returnUrl);
       return;
     }
@@ -292,6 +292,7 @@ export default function VerifyAccount() {
   const isPhoneVerified = status?.phoneVerified ?? false;
   const allVerified = isEmailVerified && isPhoneVerified;
   const isPending = status?.status === 'pending_verification' || !status;
+  const hasReturnUrl = !!peekReturnUrl();
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-12">
@@ -503,7 +504,7 @@ export default function VerifyAccount() {
               <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto mb-3" />
               <h3 className="font-semibold text-gray-900 mb-1">Account Verified!</h3>
               <p className="text-sm text-gray-600 mb-4">
-                {localStorage.getItem('pawtag_return_url')
+                {hasReturnUrl
                   ? 'Your account is active. Please log in to continue.'
                   : "Your account is verified! Let's set up your Pet Recovery."}
               </p>
@@ -511,7 +512,7 @@ export default function VerifyAccount() {
                 onClick={handleContinue}
                 className="w-full py-3 bg-teal-600 text-white rounded-xl font-semibold hover:bg-teal-700 transition-all"
               >
-                {localStorage.getItem('pawtag_return_url') ? 'Log in to Continue' : "Let's Get You Started"}
+                {hasReturnUrl ? 'Log in to Continue' : "Let's Get You Started"}
               </button>
             </div>
           )}
@@ -522,7 +523,7 @@ export default function VerifyAccount() {
                 onClick={handleContinue}
                 className="w-full py-3 bg-teal-600 text-white rounded-xl font-semibold hover:bg-teal-700 transition-all"
               >
-                {localStorage.getItem('pawtag_return_url') ? 'Continue to Checkout' : "Let's Get You Started"}
+                {hasReturnUrl ? 'Continue to Checkout' : "Let's Get You Started"}
               </button>
             </div>
           )}
