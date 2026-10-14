@@ -93,6 +93,67 @@ export const updateProfileSchema = z.object({
     .optional(),
 });
 
+// ─── CMS homepage sections ──────────────────────────────────────────────────
+
+/**
+ * CMS-authored links/media URLs are untrusted input rendered to visitors.
+ * Only same-site relative paths and http(s) URLs are accepted — this blocks
+ * javascript:/data: schemes and protocol-relative //host URLs.
+ */
+const cmsSafeUrl = (max: number) =>
+  z
+    .string()
+    .max(max)
+    .refine(
+      (value) => {
+        const url = value.trim();
+        if (url === '') return true;
+        if (url.startsWith('/')) return !url.startsWith('//');
+        return /^https?:\/\//i.test(url);
+      },
+      { message: 'Must be a site path (e.g. /shop) or an http(s) URL' },
+    );
+
+const HERO_FOCAL_POINTS = [
+  'center', 'top', 'bottom', 'left', 'right',
+  'left-top', 'right-top', 'left-bottom', 'right-bottom',
+] as const;
+
+/**
+ * Hero slide content. Legacy keys (tag/bg/visualType/stats/flowSteps/imageUrl)
+ * remain accepted so previously saved slides can still be edited and saved.
+ * `.passthrough()` keeps forward compatibility with new editorial keys.
+ */
+export const heroSlideContentSchema = z
+  .object({
+    eyebrow: z.string().max(120).optional(),
+    headline: z.string().min(1, 'Headline is required').max(300).optional(),
+    sub: z.string().max(600).optional(),
+    ctaText: z.string().max(80).optional(),
+    ctaUrl: cmsSafeUrl(500).optional(),
+    secondaryCtaText: z.string().max(80).optional(),
+    secondaryCtaUrl: cmsSafeUrl(500).optional(),
+    desktopImageUrl: cmsSafeUrl(2000).optional(),
+    mobileImageUrl: cmsSafeUrl(2000).optional(),
+    imageAlt: z.string().max(300).optional(),
+    imageFocalPoint: z.enum(HERO_FOCAL_POINTS).optional(),
+    duration: z.number().min(3).max(30).optional(),
+    // legacy keys
+    tag: z.string().max(120).optional(),
+    bg: z.string().max(200).optional(),
+    visualType: z.string().max(40).optional(),
+    imageUrl: cmsSafeUrl(2000).optional(),
+    stats: z
+      .array(z.object({ number: z.string().max(20), label: z.string().max(60) }))
+      .max(6)
+      .optional(),
+    flowSteps: z
+      .array(z.object({ icon: z.string().max(40), label: z.string().max(60), desc: z.string().max(120) }))
+      .max(8)
+      .optional(),
+  })
+  .passthrough();
+
 const petPhotoSchema = z.object({
   url: z.string().min(1, 'Photo URL is required'),
   caption: z.string().optional(),

@@ -573,6 +573,26 @@ Guardian Points progress and balance displays must use these design tokens.
 | **Warning** | `bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700 p-4` |
 | **Info** | `bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700 p-4` |
 
+### Homepage Hero (Photography-Led Carousel)
+
+CMS-managed (`hero_slide` sections) — three approved core-product stories; never statistics, testimonials, or prices. Implementation: `apps/web/src/components/hero/*`; spec: `docs/ux/HERO-SLIDER-IMPLEMENTATION.md`.
+
+| Element | Specification |
+|---|---|
+| Background | `bg-gradient-to-b from-primary-50/70 via-white to-white` |
+| Layout desktop (≥768px) | 12-col grid: content `col-span-5`, media `col-span-7` (image-led editorial split) |
+| Layout mobile | Stacked: media first (never hidden), content below |
+| Eyebrow | `text-xs font-semibold uppercase tracking-[0.2em] text-primary-700` |
+| Headline | `text-3xl sm:text-4xl lg:text-5xl xl:text-[3.4rem] font-extrabold tracking-tight text-gray-900 leading-[1.1]` |
+| Supporting text | `text-base sm:text-lg text-gray-600 max-w-xl` |
+| Primary CTA | `bg-primary-600 text-white px-7 py-3 rounded-xl font-semibold hover:bg-primary-700 min-h-[48px]` |
+| Secondary CTA | `border border-primary-600 text-primary-600 rounded-xl hover:bg-primary-50` |
+| Media container | `aspect-[4/3] rounded-2xl md:rounded-3xl shadow-lg ring-1 ring-gray-900/5`; object-position from focal point |
+| Fallback (no photo) | **Gradient `#0d9488` → `#115e59`** — Tailwind `bg-gradient-to-br from-primary-600 to-primary-800`, compiled as `linear-gradient(to bottom right, #0d9488 var(--tw-gradient-from-position), #115e59 var(--tw-gradient-to-position))`. The `--tw-gradient-*-position` variables must not be overridden. Constant: `HERO_FALLBACK_GRADIENT_CLASS` (`apps/web/src/components/hero/hero.types.ts`). Plus centered `PawPrint` `text-white/15` — never broken-image icons, never stock placeholders |
+| Controls | Dots (`h-2.5`, active `w-8 bg-primary-600`) + pause/play + prev/next (`h-10 w-10 rounded-full border bg-white`); left-aligned on mobile (clear of the emergency FAB), spread `justify-between` on desktop |
+| Motion | Crossfade `opacity` 600ms ease-out; instant under `prefers-reduced-motion` |
+| Autoplay | 7s default; pauses on hover, focus-within, page hidden, reduced motion, and any manual interaction (resumable via control) |
+
 ---
 
 ## Motion & Interaction Specification

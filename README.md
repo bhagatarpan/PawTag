@@ -1680,6 +1680,8 @@ The repository contains detailed documents under `docs/`. Useful starting points
 | `docs/mobile-ux-audit.md` | Mobile UX review |
 | `docs/ORDER-DATA-FLOWS.md` | Commerce/order data-flow notes |
 | `docs/STRIPE_REFUND_IMPLEMENTATION.md` | Refund implementation notes |
+| `docs/ux/HERO-SLIDER-IMPLEMENTATION.md` | Homepage hero carousel: architecture, design, workflow, mockups |
+| `docs/ux/HERO-IMAGE-CREATIVE-BRIEFS.md` | Hero photography briefs (owner image-production guide) |
 
 > Documentation may lag implementation. Always verify important claims against source code and tests.
 

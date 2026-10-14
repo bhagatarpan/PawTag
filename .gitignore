@@ -69,3 +69,7 @@ packages/api/promote-admin.js
 
 # External API reference docs (not part of the codebase)
 docs/nzpost/
+
+# Playwright artifacts
+/test-results/
+/playwright-report/

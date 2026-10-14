@@ -377,198 +377,84 @@ async function run() {
       // ═══════════════════════════════════════
       // 4. HOMEPAGE SECTIONS
       // ═══════════════════════════════════════
-       console.log('--- Seeding Homepage Sections ---');
+      console.log('--- Seeding Homepage Sections ---');
       const existingHero = await CmsHomepageSection.findOne({ sectionType: 'hero_slide', deletedAt: null }).session(session);
       if (!existingHero) {
+        // Three approved core-product stories (photography-led hero v2).
+        // No statistics, testimonials, or prices. Image URLs stay empty until
+        // the owner uploads photography — the frontend renders a branded
+        // fallback meanwhile. Duration 7s per design spec.
         await CmsHomepageSection.create([
           {
             sectionType: 'hero_slide',
-            title: 'Hero Slide 1',
+            title: 'Hero — Pet Safety',
+            subtitle: 'Give your pet a simple way to be identified.',
             content: {
-              tag: 'Emotional',
-              headline: "They can't tell anyone where they live.",
-              sub: "Let their tag do the talking.",
-              ctaText: 'Protect Your Pet',
+              eyebrow: 'PET SAFETY, SIMPLIFIED',
+              headline: "They can't tell someone where they live. Their tag can.",
+              sub: 'Give your pet a simple way to be identified and help someone reach you if they wander.',
+              ctaText: 'Shop PawTag',
               ctaUrl: '/shop',
-              bg: 'from-primary-700 via-primary-600 to-primary-800',
-              visualType: 'paw',
-              duration: 5,
-              stats: [],
-              flowSteps: [],
-              imageUrl: '',
+              secondaryCtaText: 'How PawTag Works',
+              secondaryCtaUrl: '/about',
+              duration: 7,
+              desktopImageUrl: '',
+              mobileImageUrl: '',
               imageAlt: '',
+              imageFocalPoint: 'center',
             },
             order: 0,
             isActive: true,
           },
           {
             sectionType: 'hero_slide',
-            title: 'Hero Slide 2',
+            title: 'Hero — Smart Identification',
+            subtitle: 'One scan can make all the difference.',
             content: {
-              tag: 'Functional',
-              headline: 'Scan. Locate. Reunite.',
-              sub: 'From lost to home in three simple steps.',
-              ctaText: 'Shop QR Tags',
-              ctaUrl: '/shop',
-              bg: 'from-primary-800 via-primary-700 to-primary-600',
-              visualType: 'flow',
-              duration: 5,
-              stats: [],
-              flowSteps: [
-                { icon: 'PawPrint', label: 'Finder', desc: 'Finds pet' },
-                { icon: 'Scan', label: 'Scan', desc: 'Scans tag' },
-                { icon: 'UserCheck', label: 'Profile', desc: 'Sees info' },
-                { icon: 'Phone', label: 'Contact', desc: 'Calls owner' },
-                { icon: 'MapPin', label: 'Reunited', desc: 'Pet home' },
-              ],
-              imageUrl: '',
+              eyebrow: 'SMART IDENTIFICATION',
+              headline: 'One scan can make all the difference.',
+              sub: 'Someone finds your pet, scans the tag with their phone, and can get in touch. No app required for the finder.',
+              ctaText: 'See How It Works',
+              ctaUrl: '/about',
+              secondaryCtaText: 'Explore PawTag',
+              secondaryCtaUrl: '/shop',
+              duration: 7,
+              desktopImageUrl: '',
+              mobileImageUrl: '',
               imageAlt: '',
+              imageFocalPoint: 'center',
             },
             order: 1,
             isActive: true,
           },
           {
             sectionType: 'hero_slide',
-            title: 'Hero Slide 3',
+            title: 'Hero — Pet Profiles',
+            subtitle: 'Their important details, always close.',
             content: {
-              tag: 'Trust',
-              headline: 'Trusted by thousands of pet owners',
-              sub: 'Join a community that never stops looking out for each other.',
-              ctaText: 'See How It Works',
-              ctaUrl: '/about',
-              bg: 'from-primary-600 via-primary-700 to-primary-800',
-              visualType: 'stats',
-              duration: 5,
-              stats: [
-                { number: '14K+', label: 'Pets Protected' },
-                { number: '42', label: 'Reunited Today' },
-                { number: '98%', label: 'Success Rate' },
-              ],
-              flowSteps: [],
-              imageUrl: '',
+              eyebrow: 'MORE THAN A NAME TAG',
+              headline: 'Their important details, always close.',
+              sub: 'Create a pet profile and manage the information a finder can see when they scan your PawTag.',
+              ctaText: 'Discover Pet Profiles',
+              ctaUrl: '/pet-recovery',
+              secondaryCtaText: 'Get Started',
+              secondaryCtaUrl: '/shop',
+              duration: 7,
+              desktopImageUrl: '',
+              mobileImageUrl: '',
               imageAlt: '',
+              imageFocalPoint: 'center',
             },
             order: 2,
             isActive: true,
           },
-          {
-            sectionType: 'hero_slide',
-            title: 'Hero Slide 4',
-            content: {
-              tag: 'Guardian',
-              headline: 'Earn rewards for being a great pet parent',
-              sub: 'Join Guardian and turn every purchase into points, PawRewards, and exclusive benefits.',
-              ctaText: 'Join Guardian Free',
-              ctaUrl: '/guardian',
-              bg: 'from-amber-600 via-amber-700 to-orange-600',
-              visualType: 'heart',
-              duration: 5,
-              stats: [],
-              flowSteps: [],
-              imageUrl: '',
-              imageAlt: '',
-            },
-            order: 3,
-            isActive: true,
-          },
-          {
-            sectionType: 'hero_slide',
-            title: 'Hero Slide 5',
-            content: {
-              tag: 'Gold',
-              headline: 'Go Gold. Get 2× the Rewards.',
-              sub: 'Earn double points on every purchase, free shipping over $50, and start at Nurture tier. Just $1.99/month — less than a coffee.',
-              ctaText: 'Upgrade to Gold',
-              ctaUrl: '/gold',
-              bg: 'from-amber-500 via-yellow-500 to-amber-600',
-              visualType: 'stats',
-              duration: 5,
-              stats: [
-                { number: '2×', label: 'Points Earned' },
-                { number: '$3/mo', label: 'PawRewards' },
-                { number: '$50+', label: 'Free Shipping' },
-              ],
-              flowSteps: [],
-              imageUrl: '',
-              imageAlt: '',
-            },
-            order: 4,
-            isActive: true,
-          },
         ], { session });
-        console.log('  Created 5 hero slides');
+        console.log('  Created 3 hero slides');
       } else {
-        // Idempotent: add Guardian hero slide if missing
-        const hasGuardianSlide = await CmsHomepageSection.findOne({
-          sectionType: 'hero_slide',
-          'content.tag': 'Guardian',
-          deletedAt: null,
-        }).session(session);
-        if (!hasGuardianSlide) {
-          const maxOrder = await CmsHomepageSection.findOne({ sectionType: 'hero_slide', deletedAt: null })
-            .sort({ order: -1 })
-            .session(session);
-          await CmsHomepageSection.create([{
-            sectionType: 'hero_slide',
-            title: 'Hero Slide 4',
-            content: {
-              tag: 'Guardian',
-              headline: 'Earn rewards for being a great pet parent',
-              sub: 'Join Guardian and turn every purchase into points, PawRewards, and exclusive benefits.',
-              ctaText: 'Join Guardian Free',
-              ctaUrl: '/guardian',
-              bg: 'from-amber-600 via-amber-700 to-orange-600',
-              visualType: 'heart',
-              duration: 5,
-              stats: [],
-              flowSteps: [],
-              imageUrl: '',
-              imageAlt: '',
-            },
-            order: (maxOrder?.order ?? 2) + 1,
-            isActive: true,
-          }], { session });
-          console.log('  Added Guardian hero slide');
-        } else {
-          console.log('  Hero slides already exist');
-        }
-
-        // Idempotent: add Gold hero slide if missing
-        const hasGoldSlide = await CmsHomepageSection.findOne({
-          sectionType: 'hero_slide',
-          'content.tag': 'Gold',
-          deletedAt: null,
-        }).session(session);
-        if (!hasGoldSlide) {
-          const maxOrderGold = await CmsHomepageSection.findOne({ sectionType: 'hero_slide', deletedAt: null })
-            .sort({ order: -1 })
-            .session(session);
-          await CmsHomepageSection.create([{
-            sectionType: 'hero_slide',
-            title: 'Hero Slide 5',
-            content: {
-              tag: 'Gold',
-              headline: 'Go Gold. Get 2× the Rewards.',
-              sub: 'Earn double points on every purchase, free shipping over $50, and start at Nurture tier. Just $1.99/month — less than a coffee.',
-              ctaText: 'Upgrade to Gold',
-              ctaUrl: '/gold',
-              bg: 'from-amber-500 via-yellow-500 to-amber-600',
-              visualType: 'stats',
-              duration: 5,
-              stats: [
-                { number: '2×', label: 'Points Earned' },
-                { number: '$3/mo', label: 'PawRewards' },
-                { number: '$50+', label: 'Free Shipping' },
-              ],
-              flowSteps: [],
-              imageUrl: '',
-              imageAlt: '',
-            },
-            order: (maxOrderGold?.order ?? 3) + 1,
-            isActive: true,
-          }], { session });
-          console.log('  Added Gold hero slide');
-        }
+        // Existing database: hero slides are managed by the admin. Legacy
+        // slides (including the obsolete /gold link) are converted by
+        // scripts/migrate-hero-slides-v2.ts — never reseeded automatically.
+        console.log('  Hero slides already exist');
       }
 
       const existingHowItWorks = await CmsHomepageSection.findOne({ sectionType: 'how_it_works', deletedAt: null }).session(session);

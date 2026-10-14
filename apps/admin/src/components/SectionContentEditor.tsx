@@ -239,104 +239,216 @@ const VISUAL_TYPES = [
   { value: 'heart', label: '❤️  Heart & Emotional' },
 ];
 
+const HERO_FOCAL_OPTIONS = [
+  { value: 'center', label: 'Center (default)' },
+  { value: 'top', label: 'Top' },
+  { value: 'bottom', label: 'Bottom' },
+  { value: 'left', label: 'Left' },
+  { value: 'right', label: 'Right' },
+  { value: 'left-top', label: 'Top left' },
+  { value: 'right-top', label: 'Top right' },
+  { value: 'left-bottom', label: 'Bottom left' },
+  { value: 'right-bottom', label: 'Bottom right' },
+];
+
+/** Mirrors the server-side rule: site paths or http(s) only. */
+function isValidCtaUrl(url: string): boolean {
+  const value = url.trim();
+  if (!value) return true;
+  if (value.startsWith('/')) return !value.startsWith('//');
+  return /^https?:\/\//i.test(value);
+}
+
+function HeroPreviewPane({
+  label,
+  className,
+  eyebrow,
+  headline,
+  imageUrl,
+}: {
+  label: string;
+  className: string;
+  eyebrow: string;
+  headline: string;
+  imageUrl: string;
+}) {
+  return (
+    <div>
+      <p className="text-xs font-medium text-gray-500 mb-1">{label}</p>
+      <div className={`${className} overflow-hidden rounded-lg border border-gray-200 bg-gradient-to-br from-primary-600 to-primary-800`}>
+        {imageUrl ? (
+          <img src={imageUrl} alt="" className="h-full w-full object-cover" />
+        ) : (
+          <div className="flex h-full flex-col justify-center px-3">
+            {eyebrow && <p className="text-[8px] font-semibold uppercase tracking-widest text-white/80">{eyebrow}</p>}
+            <p className="mt-1 line-clamp-3 text-[11px] font-bold leading-tight text-white">{headline || 'Headline preview'}</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function HeroSlideEditor({ content, onChange }: { content: Record<string, unknown>; onChange: (v: Record<string, unknown>) => void }) {
   const update = (key: string, val: unknown) => onChange({ ...content, [key]: val });
-  const visualType = (content.visualType as string) || 'paw';
 
+  const eyebrow = (content.eyebrow as string) || '';
+  const headline = (content.headline as string) || '';
+  const desktopImage = (content.desktopImageUrl as string) || (content.imageUrl as string) || '';
+  const mobileImage = (content.mobileImageUrl as string) || '';
+
+  const primaryUrl = (content.ctaUrl as string) || '';
+  const secondaryUrl = (content.secondaryCtaUrl as string) || '';
+  const primaryUrlInvalid = !isValidCtaUrl(primaryUrl);
+  const secondaryUrlInvalid = !isValidCtaUrl(secondaryUrl);
+  const missingPrimaryPair =
+    (primaryUrl.trim() && !(content.ctaText as string)?.trim()) ||
+    ((content.ctaText as string)?.trim() && !primaryUrl.trim());
+
+  // Legacy visual fields (pre-photography slides) — kept editable so old
+  // slides can be restored and maintained, but deprecated for new slides.
+  const visualType = (content.visualType as string) || 'paw';
   const stats = (content.stats as Array<{ number: string; label: string }>) || [];
   const flowSteps = (content.flowSteps as Array<{ icon: string; label: string; desc: string }>) || [];
-
   const updateStat = (index: number, key: string, val: string) => {
     const updated = [...stats];
     updated[index] = { ...updated[index], [key]: val };
     update('stats', updated);
   };
-  const addStat = () => update('stats', [...stats, { number: '', label: '' }]);
-  const removeStat = (index: number) => update('stats', stats.filter((_, i) => i !== index));
-
   const updateFlowStep = (index: number, key: string, val: string) => {
     const updated = [...flowSteps];
     updated[index] = { ...updated[index], [key]: val };
     update('flowSteps', updated);
   };
-  const addFlowStep = () => update('flowSteps', [...flowSteps, { icon: 'PawPrint', label: '', desc: '' }]);
-  const removeFlowStep = (index: number) => update('flowSteps', flowSteps.filter((_, i) => i !== index));
 
   return (
     <div className="space-y-4">
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
-        This is one hero banner slide. You can customise the text, button, background, visual type, and more.
+        This is one hero slide. The homepage shows your published slides in order. Upload desktop and mobile
+        photography below — until an image is set, visitors see a branded PawTag placeholder. Never put
+        statistics, testimonials, or prices in a hero slide.
       </div>
 
-      {/* Content */}
+      {/* Text content */}
       <div className="space-y-3">
         <h4 className="text-sm font-semibold text-gray-900 border-b pb-1">Text Content</h4>
-        <FieldRow label="Tag / Label (top badge)">
-          <TextInput value={(content.tag as string) || ''} onChange={v => update('tag', v)} placeholder="e.g. Emotional" />
+        <FieldRow label="Eyebrow (small label above the headline)">
+          <TextInput value={eyebrow} onChange={v => update('eyebrow', v)} placeholder="e.g. PET SAFETY, SIMPLIFIED" />
         </FieldRow>
-        <FieldRow label="Headline">
-          <TextInput value={(content.headline as string) || ''} onChange={v => update('headline', v)} placeholder="e.g. They can't tell anyone where they live." />
+        <FieldRow label="Headline *">
+          <TextInput value={headline} onChange={v => update('headline', v)} placeholder="e.g. They can't tell someone where they live." />
         </FieldRow>
-        <FieldRow label="Subtitle">
-          <TextInput value={(content.sub as string) || ''} onChange={v => update('sub', v)} placeholder="e.g. Let their tag do the talking." />
+        <FieldRow label="Supporting Text">
+          <Textarea value={(content.sub as string) || ''} onChange={v => update('sub', v)} rows={2}
+            placeholder="One or two friendly sentences" />
         </FieldRow>
         <div className="grid grid-cols-2 gap-3">
-          <FieldRow label="Button Text">
-            <TextInput value={(content.ctaText as string) || ''} onChange={v => update('ctaText', v)} placeholder="e.g. Protect Your Pet" />
+          <FieldRow label="Primary Button Text">
+            <TextInput value={(content.ctaText as string) || ''} onChange={v => update('ctaText', v)} placeholder="e.g. Shop PawTag" />
           </FieldRow>
-          <FieldRow label="Button Link">
-            <TextInput value={(content.ctaUrl as string) || ''} onChange={v => update('ctaUrl', v)} placeholder="e.g. /shop" />
+          <FieldRow label="Primary Button Link">
+            <TextInput value={primaryUrl} onChange={v => update('ctaUrl', v)} placeholder="e.g. /shop" />
           </FieldRow>
+        </div>
+        {primaryUrlInvalid && (
+          <p className="text-xs text-red-600">Use a site path like /shop or a full https:// link.</p>
+        )}
+        {missingPrimaryPair && (
+          <p className="text-xs text-red-600">Primary button text and link must be provided together.</p>
+        )}
+        <div className="grid grid-cols-2 gap-3">
+          <FieldRow label="Secondary Button Text (optional)">
+            <TextInput value={(content.secondaryCtaText as string) || ''} onChange={v => update('secondaryCtaText', v)} placeholder="e.g. How PawTag Works" />
+          </FieldRow>
+          <FieldRow label="Secondary Button Link (optional)">
+            <TextInput value={secondaryUrl} onChange={v => update('secondaryCtaUrl', v)} placeholder="e.g. /about" />
+          </FieldRow>
+        </div>
+        {secondaryUrlInvalid && (
+          <p className="text-xs text-red-600">Use a site path like /about or a full https:// link.</p>
+        )}
+      </div>
+
+      {/* Images */}
+      <div className="space-y-3">
+        <h4 className="text-sm font-semibold text-gray-900 border-b pb-1">Photography</h4>
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">
+          Recommended: landscape photo around 2000×1500px (4:3), under 500&nbsp;KB, WebP or JPG.
+          Add a separate vertical mobile crop (~1200×900px) for the best phone experience.
+          Keep the pet toward one side so the headline area stays clear.
+        </div>
+        <FieldRow label="Desktop Image">
+          <ImagePicker value={desktopImage} onChange={v => update('desktopImageUrl', v)} placeholder="Choose or upload the desktop photo" />
+        </FieldRow>
+        <FieldRow label="Mobile Image (optional — desktop image is used otherwise)">
+          <ImagePicker value={mobileImage} onChange={v => update('mobileImageUrl', v)} placeholder="Choose or upload the mobile crop" />
+        </FieldRow>
+        <FieldRow label="Image Alt Text (describe the photo for screen readers)">
+          <TextInput value={(content.imageAlt as string) || ''} onChange={v => update('imageAlt', v)} placeholder="e.g. Golden Retriever wearing a PawTag tag in afternoon sunlight" />
+        </FieldRow>
+        <FieldRow label="Image Focal Point (which part stays visible when cropped)">
+          <Select value={(content.imageFocalPoint as string) || 'center'} onChange={v => update('imageFocalPoint', v)} options={HERO_FOCAL_OPTIONS} />
+        </FieldRow>
+      </div>
+
+      {/* Previews */}
+      <div className="space-y-3">
+        <h4 className="text-sm font-semibold text-gray-900 border-b pb-1">Preview</h4>
+        <div className="grid grid-cols-[1fr_90px] gap-3 items-start">
+          <HeroPreviewPane label="Desktop" className="h-28" eyebrow={eyebrow} headline={headline} imageUrl={desktopImage} />
+          <HeroPreviewPane label="Mobile" className="h-36" eyebrow={eyebrow} headline={headline} imageUrl={mobileImage || desktopImage} />
         </div>
       </div>
 
-      {/* Appearance */}
+      {/* Timing */}
       <div className="space-y-3">
-        <h4 className="text-sm font-semibold text-gray-900 border-b pb-1">Appearance</h4>
-        <FieldRow label="Background Gradient">
-          <Select value={(content.bg as string) || 'from-primary-700 via-primary-600 to-primary-800'} onChange={v => update('bg', v)} options={HERO_BACKGROUNDS} />
-        </FieldRow>
-        <FieldRow label="Auto-Rotation Speed (seconds)">
-          <input type="number" min={1} max={30} value={(content.duration as number) || 5}
-            onChange={e => update('duration', Number(e.target.value))}
+        <h4 className="text-sm font-semibold text-gray-900 border-b pb-1">Timing</h4>
+        <FieldRow label="Auto-Rotation Speed (seconds, 3–30)">
+          <input type="number" min={3} max={30} value={(content.duration as number) || 7}
+            onChange={e => update('duration', Math.min(30, Math.max(3, Number(e.target.value) || 7)))}
             className="w-full border rounded-lg px-3 py-2 text-sm" />
         </FieldRow>
       </div>
 
-      {/* Visual Type */}
+      {/* Legacy visual (deprecated) */}
       <div className="space-y-3">
-        <h4 className="text-sm font-semibold text-gray-900 border-b pb-1">Right-Side Visual</h4>
-        <FieldRow label="Visual Type">
+        <h4 className="text-sm font-semibold text-gray-900 border-b pb-1">Legacy Visual (deprecated)</h4>
+        <div className="bg-gray-50 border rounded-lg p-3 text-xs text-gray-500">
+          The old illustration-style visuals are kept only so previous slides can still be edited and restored.
+          New slides should use photography above.
+        </div>
+        <FieldRow label="Legacy Visual Type">
           <Select value={visualType} onChange={v => update('visualType', v)} options={VISUAL_TYPES} />
+        </FieldRow>
+        <FieldRow label="Legacy Background Gradient">
+          <Select value={(content.bg as string) || 'from-primary-700 via-primary-600 to-primary-800'} onChange={v => update('bg', v)} options={HERO_BACKGROUNDS} />
         </FieldRow>
 
         {visualType === 'stats' && (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <label className="text-sm font-medium text-gray-700">Stats to Display</label>
-              <button onClick={addStat} className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800">
+              <label className="text-sm font-medium text-gray-700">Stats (legacy — do not publish unverified numbers)</label>
+              <button onClick={() => update('stats', [...stats, { number: '', label: '' }])} className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800">
                 <Plus size={14} /> Add Stat
               </button>
             </div>
             {stats.map((stat, i) => (
               <div key={i} className="flex items-center gap-2 border rounded-lg p-2 bg-gray-50">
-                <span className="text-xs text-gray-400 w-4">{i + 1}.</span>
                 <input type="text" value={stat.number} onChange={e => updateStat(i, 'number', e.target.value)}
-                  className="flex-1 border rounded px-2 py-1.5 text-xs" placeholder="e.g. 14K+" />
+                  className="flex-1 border rounded px-2 py-1.5 text-xs" placeholder="Value" />
                 <input type="text" value={stat.label} onChange={e => updateStat(i, 'label', e.target.value)}
-                  className="flex-1 border rounded px-2 py-1.5 text-xs" placeholder="e.g. Pets Protected" />
-                <button onClick={() => removeStat(i)} className="text-red-400 hover:text-red-600"><Trash2 size={12} /></button>
+                  className="flex-1 border rounded px-2 py-1.5 text-xs" placeholder="Label" />
+                <button onClick={() => update('stats', stats.filter((_, idx) => idx !== i))} className="text-red-400 hover:text-red-600"><Trash2 size={12} /></button>
               </div>
             ))}
-            {stats.length === 0 && <p className="text-xs text-gray-400 text-center py-2">No stats. Click "Add Stat" to create one.</p>}
           </div>
         )}
 
         {visualType === 'flow' && (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <label className="text-sm font-medium text-gray-700">Flow Steps</label>
-              <button onClick={addFlowStep} className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800">
+              <label className="text-sm font-medium text-gray-700">Flow Steps (legacy)</label>
+              <button onClick={() => update('flowSteps', [...flowSteps, { icon: 'PawPrint', label: '', desc: '' }])} className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800">
                 <Plus size={14} /> Add Step
               </button>
             </div>
@@ -344,98 +456,19 @@ function HeroSlideEditor({ content, onChange }: { content: Record<string, unknow
               <div key={i} className="border rounded-lg p-2 bg-gray-50 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-medium text-gray-500">Step {i + 1}</span>
-                  <button onClick={() => removeFlowStep(i)} className="text-red-400 hover:text-red-600"><Trash2 size={12} /></button>
+                  <button onClick={() => update('flowSteps', flowSteps.filter((_, idx) => idx !== i))} className="text-red-400 hover:text-red-600"><Trash2 size={12} /></button>
                 </div>
                 <div className="grid grid-cols-3 gap-2">
-                  <div>
-                    <label className="text-[10px] text-gray-500 mb-0.5 block">Icon</label>
-                    <select value={step.icon} onChange={e => updateFlowStep(i, 'icon', e.target.value)} className="w-full border rounded px-2 py-1 text-xs">
-                      {FLOW_STEP_ICONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-gray-500 mb-0.5 block">Label</label>
-                    <input type="text" value={step.label} onChange={e => updateFlowStep(i, 'label', e.target.value)}
-                      className="w-full border rounded px-2 py-1 text-xs" placeholder="e.g. Scan" />
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-gray-500 mb-0.5 block">Description</label>
-                    <input type="text" value={step.desc} onChange={e => updateFlowStep(i, 'desc', e.target.value)}
-                      className="w-full border rounded px-2 py-1 text-xs" placeholder="e.g. Scans tag" />
-                  </div>
+                  <select value={step.icon} onChange={e => updateFlowStep(i, 'icon', e.target.value)} className="w-full border rounded px-2 py-1 text-xs">
+                    {FLOW_STEP_ICONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                  <input type="text" value={step.label} onChange={e => updateFlowStep(i, 'label', e.target.value)}
+                    className="w-full border rounded px-2 py-1 text-xs" placeholder="Label" />
+                  <input type="text" value={step.desc} onChange={e => updateFlowStep(i, 'desc', e.target.value)}
+                    className="w-full border rounded px-2 py-1 text-xs" placeholder="Description" />
                 </div>
               </div>
             ))}
-            {flowSteps.length === 0 && <p className="text-xs text-gray-400 text-center py-2">No steps. Click "Add Step" to create one.</p>}
-          </div>
-        )}
-
-        {visualType === 'image' && (
-          <div className="space-y-3">
-            <FieldRow label="Image URL">
-              <ImagePicker
-                value={(content.imageUrl as string) || ''}
-                onChange={(v) => update('imageUrl', v)}
-                placeholder="https://example.com/image.jpg"
-              />
-            </FieldRow>
-            <FieldRow label="Image Alt Text">
-              <TextInput value={(content.imageAlt as string) || ''} onChange={v => update('imageAlt', v)} placeholder="Description of the image" />
-            </FieldRow>
-          </div>
-        )}
-
-        {visualType === 'pet_profiles' && (
-          <div className="bg-gray-50 border rounded-lg p-3 text-xs text-gray-500">
-            Shows 4 pet profile cards with names, breeds, and "Protected" status badges. Great for showing social proof.
-          </div>
-        )}
-
-        {visualType === 'qr_code' && (
-          <div className="bg-gray-50 border rounded-lg p-3 text-xs text-gray-500">
-            Displays a QR code card with "Scan to Reunite" text. Perfect for explaining the core concept.
-          </div>
-        )}
-
-        {visualType === 'phone_scan' && (
-          <div className="bg-gray-50 border rounded-lg p-3 text-xs text-gray-500">
-            Shows Phone → Scan → Paw icon flow. Visualises the scanning action.
-          </div>
-        )}
-
-        {visualType === 'trust_badges' && (
-          <div className="bg-gray-50 border rounded-lg p-3 text-xs text-gray-500">
-            Displays 4 trust badges: Encrypted, Private, Transparent, Trusted. Great for building confidence.
-          </div>
-        )}
-
-        {visualType === 'testimonials' && (
-          <div className="bg-gray-50 border rounded-lg p-3 text-xs text-gray-500">
-            Shows a customer quote card with star rating and avatar. Perfect for social proof.
-          </div>
-        )}
-
-        {visualType === 'location' && (
-          <div className="bg-gray-50 border rounded-lg p-3 text-xs text-gray-500">
-            Displays GPS coordinates with a pulsing location pin. Shows the live tracking feature.
-          </div>
-        )}
-
-        {visualType === 'awards' && (
-          <div className="bg-gray-50 border rounded-lg p-3 text-xs text-gray-500">
-            Shows 3 award badges: Top Rated, 5-Star, Featured. Great for highlighting achievements.
-          </div>
-        )}
-
-        {visualType === 'heart' && (
-          <div className="bg-gray-50 border rounded-lg p-3 text-xs text-gray-500">
-            Displays a heart with paw print overlay. Perfect for emotional connection slides.
-          </div>
-        )}
-
-        {visualType === 'paw' && (
-          <div className="bg-gray-50 border rounded-lg p-3 text-xs text-gray-500">
-            The paw icon visual is the default. It shows a paw print with "Your best friend can't speak for themselves" text.
           </div>
         )}
       </div>

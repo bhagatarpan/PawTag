@@ -1315,6 +1315,13 @@ For every changed screen check:
 
 Do not surface internal IDs, enum jargon, or technical failure details unless genuinely useful.
 
+## Homepage and CMS content
+
+- The homepage hero is CMS-managed (`hero_slide` sections) and photography-led — see `skills/cms-homepage-sections/` and `docs/DESIGN.md` (Homepage Hero).
+- Never publish statistics, testimonials, or prices in hero content; CTA links must be verified real routes (site paths or http(s) only — unsafe schemes are rejected server-side).
+- New default CMS content ships as an idempotent seed (fresh DBs) plus a dry-run-first migration script for existing DBs; existing records are deactivated, never deleted or overwritten.
+- CMS mutations must stay permission-gated (`cms.homepage.*`) and audit-logged.
+
 ---
 
 # 27. Admin UX and Safety
@@ -2126,6 +2133,7 @@ skills/financial-document-integrity/   Invoices, credit notes, donation receipts
 skills/monetary-precision/             Money arithmetic, rounding, Stripe cents conversion, GST-inclusive totals
 skills/background-jobs/               Jobs, leases, retries, idempotency, worker safety
 skills/testing-regression/            Risk-based regression, integration and E2E testing
+skills/cms-homepage-sections/        CMS-backed homepage sections (hero slides etc.)
 skills/api-architecture/              Routes, services, validation, shared API contracts
 skills/coding-practice/               Type safety, abstractions, React/async maintainability
 skills/release-readiness/             Staging and first-customer launch gates
