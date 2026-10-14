@@ -5,9 +5,11 @@ import TrustSection from '../components/TrustSection';
 import ResponsibilityScore from '../components/ResponsibilityScore';
 import GuardianSection from '../components/GuardianSection';
 import Testimonials from '../components/Testimonials';
-import EmergencyLostPet from '../components/EmergencyLostPet';
 import SeoHead from '../components/SeoHead';
 import { FadeIn } from '@pawtag/ui';
+
+// EmergencyLostPet is rendered globally by PublicLayout — do not render it
+// here as well (it used to appear stacked twice on the homepage).
 
 export default function Home() {
   return (
@@ -36,7 +38,6 @@ export default function Home() {
       <FadeIn direction="up" delay={0.05}>
         <Testimonials />
       </FadeIn>
-      <EmergencyLostPet />
     </div>
   );
 }

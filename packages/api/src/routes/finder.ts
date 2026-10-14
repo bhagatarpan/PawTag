@@ -60,6 +60,15 @@ const finderLocationLimiter = createDbRateLimiter({
   message: 'Too many location requests. Please try again later.',
   keySuffix: 'finder:location',
 });
+// Tag lookups were previously unlimited; the finder landing page now offers
+// direct tag-ID entry, so bound per-IP lookups (setting is seeded in CMS).
+const finderViewLimiter = createDbRateLimiter({
+  settingKey: 'rateLimit.finder.view.max',
+  defaultValue: 60,
+  windowMs: 60 * 60 * 1000,
+  message: 'Too many tag lookups. Please try again later.',
+  keySuffix: 'finder:view',
+});
 
 // No auth required — this is the public finder portal
 
@@ -188,7 +197,7 @@ router.get('/stats', async (_req: Request, res: Response) => {
  *       500:
  *         description: Failed to load pet info
  */
-router.get('/:tagId', async (req: Request, res: Response) => {
+router.get('/:tagId', finderViewLimiter, async (req: Request, res: Response) => {
   try {
     const tag = await Tag.findOne({ tagId: req.params.tagId, deletedAt: null })
       .populate({ path: 'petId', match: { deletedAt: null }, select: '-__v' })

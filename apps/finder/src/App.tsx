@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams, Routes, Route } from 'react-router-dom';
-import { Phone, PawPrint, WifiOff, AlertTriangle } from 'lucide-react';
+import { useParams, useNavigate, Routes, Route } from 'react-router-dom';
+import { Phone, WifiOff, AlertTriangle } from 'lucide-react';
 import { SiteAvailabilityStatus } from '@pawtag/shared';
 import { useSiteSettings } from './hooks/useSiteSettings';
 import { fetchTagData, fetchFoundTimer, fetchSystemStatus } from './lib/finderApi';
@@ -14,6 +14,7 @@ import NotifyOwnerForm from './components/NotifyOwnerForm';
 import FoundTimer from './components/FoundTimer';
 import FinderLoadingState from './components/FinderLoadingState';
 import FinderErrorState from './components/FinderErrorState';
+import FinderLanding from './components/FinderLanding';
 
 /**
  * Simple session cache for Finder data.
@@ -47,6 +48,8 @@ function FinderPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isNetworkError, setIsNetworkError] = useState(false);
+  const [isNotFound, setIsNotFound] = useState(false);
+  const navigate = useNavigate();
   const [notified, setNotified] = useState(false);
   const [foundTimer, setFoundTimer] = useState<FoundTimerData | null>(null);
   const [siteStatus, setSiteStatus] = useState<SiteAvailabilityStatus>(SiteAvailabilityStatus.ONLINE);
@@ -98,14 +101,16 @@ function FinderPage() {
       }
       setError('');
       setIsNetworkError(false);
+      setIsNotFound(false);
     } catch (err: any) {
       // Distinguish network errors from invalid tags
       const isNetwork = !err.response || err.code === 'ECONNABORTED' || err.message?.includes('network');
       setIsNetworkError(isNetwork);
+      setIsNotFound(!isNetwork && err.response?.status === 404);
       if (isNetwork) {
         setError('Unable to connect. Please check your internet connection and try again.');
       } else if (err.response?.status === 404) {
-        setError('This tag was not found. Please check the QR code and try again.');
+        setError('This tag was not found. Check the ID and try again, or enter a different tag ID.');
       } else {
         setError(err.response?.data?.error || 'Something went wrong. Please try again.');
       }
@@ -167,7 +172,16 @@ function FinderPage() {
   };
 
   if (loading) return <FinderLoadingState />;
-  if (error) return <FinderErrorState message={error} isNetworkError={isNetworkError} onRetry={handleRetry} />;
+  if (error)
+    return (
+      <FinderErrorState
+        message={error}
+        isNetworkError={isNetworkError}
+        notFound={isNotFound}
+        onRetry={handleRetry}
+        onBackToEntry={() => navigate('/')}
+      />
+    );
   if (!data) return null;
 
   // Handle expired tag
@@ -375,8 +389,6 @@ function FinderOfflineScreen() {
 }
 
 export default function App() {
-  const { settings } = useSiteSettings();
-  const companyName = settings?.['company.name'] || 'PawTag';
   const [siteStatus, setSiteStatus] = useState<SiteAvailabilityStatus>(SiteAvailabilityStatus.ONLINE);
   const [loading, setLoading] = useState(true);
 
@@ -400,16 +412,9 @@ export default function App() {
 
   return (
     <Routes>
+      <Route path="/" element={<FinderLanding />} />
       <Route path="/:tagId" element={<FinderPage />} />
-      <Route path="*" element={
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="text-center">
-            <PawPrint size={48} className="text-primary-600 mx-auto mb-4" />
-            <h1 className="text-xl font-bold mb-2">{companyName} Finder</h1>
-            <p className="text-gray-500">Scan a QR code to view a lost pet's information.</p>
-          </div>
-        </div>
-      } />
+      <Route path="*" element={<FinderLanding />} />
     </Routes>
   );
 }
