@@ -9,7 +9,7 @@ import {
 } from '@pawtag/shared';
 import { CopyButton, StatusBadge } from '@pawtag/ui';
 import api from '../../lib/api';
-import { openInvoiceSecureUrl } from '../../lib/openInvoiceSecureUrl';
+import { downloadAuthenticatedFile } from '../../lib/downloadFile';
 
 /**
  * Invoice detail — rich summary from related order/membership/subscription data.
@@ -42,9 +42,13 @@ export default function InvoiceDetail() {
     setDownloading(true);
     setError('');
     try {
-      await openInvoiceSecureUrl(id);
+      // Real PDF file download (server-generated) — not the browser print dialog.
+      await downloadAuthenticatedFile(
+        API.customer.invoices.pdf(id),
+        `${invoice?.invoiceNumber || 'invoice'}.pdf`,
+      );
     } catch (err: any) {
-      setError(err.response?.data?.error || err.message || 'Unable to open invoice');
+      setError(err.response?.data?.error || err.message || 'Unable to download invoice');
     } finally {
       setDownloading(false);
     }
@@ -59,11 +63,11 @@ export default function InvoiceDetail() {
     >
       {downloading ? (
         <>
-          <Loader2 size={16} className="animate-spin" /> Opening…
+          <Loader2 size={16} className="animate-spin" /> Downloading…
         </>
       ) : (
         <>
-          <Download size={16} /> View or Download Invoice
+          <Download size={16} /> Download PDF
         </>
       )}
     </button>
@@ -340,7 +344,7 @@ export default function InvoiceDetail() {
         )}
 
         <p className="text-xs text-gray-400">
-          Full invoice document opens in the secure viewer. Use Print / Save PDF there to download a file.
+          Downloads a real PDF file of this invoice.
         </p>
       </div>
 

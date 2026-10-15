@@ -10,7 +10,7 @@ import {
 } from '@pawtag/shared';
 import { EmptyState, StatusBadge } from '@pawtag/ui';
 import api from '../../lib/api';
-import { openInvoiceSecureUrl } from '../../lib/openInvoiceSecureUrl';
+import { downloadAuthenticatedFile } from '../../lib/downloadFile';
 
 /**
  * Customer invoice list — reuses secure access for download/view.
@@ -49,14 +49,18 @@ export default function Invoices() {
     }
   }
 
-  async function handleDownload(invoiceId: string, e: React.MouseEvent) {
+  async function handleDownload(invoice: CustomerInvoiceListItem, e: React.MouseEvent) {
     e.stopPropagation();
-    setActionId(invoiceId);
+    setActionId(invoice._id);
     setError('');
     try {
-      await openInvoiceSecureUrl(invoiceId);
+      // Real PDF file download (server-generated) — not the browser print dialog.
+      await downloadAuthenticatedFile(
+        API.customer.invoices.pdf(invoice._id),
+        `${invoice.invoiceNumber || 'invoice'}.pdf`,
+      );
     } catch (err: any) {
-      setError(err.response?.data?.error || err.message || 'Unable to open invoice');
+      setError(err.response?.data?.error || err.message || 'Unable to download invoice');
     } finally {
       setActionId(null);
     }
@@ -129,8 +133,8 @@ export default function Invoices() {
                   <StatusBadge label={invoice.status} variant={invoice.status === 'paid' ? 'success' : invoice.status === 'void' ? 'neutral' : 'info'} />
                   <button
                     type="button"
-                    aria-label={`Download ${invoice.invoiceNumber}`}
-                    onClick={(e) => handleDownload(invoice._id, e)}
+                    aria-label={`Download ${invoice.invoiceNumber} PDF`}
+                    onClick={(e) => handleDownload(invoice, e)}
                     disabled={actionId === invoice._id}
                     className="p-2 rounded-lg text-primary-600 hover:bg-primary-50 disabled:opacity-50"
                   >

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { Shield, RefreshCw, Printer, ArrowLeft } from 'lucide-react';
+import { Shield, RefreshCw, Printer, ArrowLeft, Download } from 'lucide-react';
 import { CopyButton } from '@pawtag/ui';
 import { API } from '@pawtag/shared/api';
 
@@ -120,6 +120,13 @@ export default function InvoiceView() {
     window.print();
   }
 
+  function handleDownloadPdf() {
+    // Direct navigation to the token-authenticated PDF endpoint — the
+    // browser downloads the file via Content-Disposition. Never popup-
+    // blocked, and produces a real formatted PDF (not a print dialog).
+    window.location.assign(`/api/invoice/${token}/pdf`);
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -154,8 +161,11 @@ export default function InvoiceView() {
           <div className="flex items-center gap-3 min-w-0">
             <span className="text-sm text-gray-500 truncate max-w-[120px] sm:max-w-none">{invoice?.invoiceNumber}</span>
             {invoice?.invoiceNumber && <CopyButton text={invoice.invoiceNumber} size={10} />}
-            <button onClick={handlePrint} className="flex items-center gap-1.5 bg-teal-600 text-white px-3 py-1.5 rounded-md text-sm hover:bg-teal-700">
-              <Printer size={14} /> Print / Save PDF
+            <button onClick={handlePrint} className="hidden sm:flex items-center gap-1.5 border border-teal-600 text-teal-700 px-3 py-1.5 rounded-md text-sm hover:bg-teal-50">
+              <Printer size={14} /> Print
+            </button>
+            <button onClick={handleDownloadPdf} className="flex items-center gap-1.5 bg-teal-600 text-white px-3 py-1.5 rounded-md text-sm hover:bg-teal-700">
+              <Download size={14} /> Download PDF
             </button>
           </div>
         </div>

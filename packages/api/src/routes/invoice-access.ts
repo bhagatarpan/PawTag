@@ -14,6 +14,7 @@ import { CUSTOMER_INVOICE_LIST_PAGE_SIZE } from '@pawtag/shared';
 import { generateOtp, generateSecureToken, hashToken } from '../services/auth.service';
 import { sendInvoiceOtpEmail, sendInvoiceEmail } from '../services/email.service';
 import { generateInvoiceHtml } from '../services/invoice-html.service';
+import { generateInvoicePdf } from '../services/invoice-pdf.service';
 import { isInvoiceOtpDisabled } from '../services/otp-settings.service';
 import { config } from '../config';
 import { auditService, type AuditContext } from '../services/audit';
@@ -209,6 +210,38 @@ router.get('/customer/invoices/:invoiceId', authenticate, async (req: AuthReques
   }
 });
 
+/** Stream an invoice PDF as a real file download (never browser-print). */
+async function sendInvoicePdf(res: Response, invoiceId: string): Promise<void> {
+  const { buffer, filename } = await generateInvoicePdf(invoiceId);
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.setHeader('Cache-Control', 'no-store');
+  res.send(buffer);
+}
+
+// Customer: download invoice PDF (ownership-scoped)
+router.get('/customer/invoices/:invoiceId/pdf', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const invoice = await Invoice.findOne({
+      _id: req.params.invoiceId,
+      userId: req.user!.id,
+    }).lean();
+
+    if (!invoice) {
+      res.status(404).json({ success: false, error: 'Invoice not found' });
+      return;
+    }
+
+    await auditInvoiceEvent(req, 'invoice_pdf_downloaded', req.params.invoiceId, {
+      invoiceNumber: invoice.invoiceNumber,
+      channel: 'customer',
+    });
+    await sendInvoicePdf(res, req.params.invoiceId);
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to generate invoice PDF' });
+  }
+});
+
 async function auditInvoiceEvent(req: AuditRequest, action: string, resourceId: string, metadata: Record<string, unknown>): Promise<void> {
   await auditService.log({
     ...(req.auditContext as AuditContext),
@@ -360,6 +393,25 @@ router.get('/invoice/:token/status', async (req, res: Response) => {
   }
 });
 
+// Public: download invoice PDF via secure token (token IS the auth —
+// same trust model as the view route above; only pre-verified tokens work)
+router.get('/invoice/:token/pdf', async (req, res: Response) => {
+  try {
+    const tokenHash = hashToken(req.params.token);
+    const access = await InvoiceAccessToken.findOne({ tokenHash }).lean();
+
+    if (!access) { res.status(404).json({ success: false, error: 'Invalid link' }); return; }
+    if (new Date() > access.expiresAt) { res.status(410).json({ success: false, error: 'Link expired', code: 'EXPIRED' }); return; }
+
+    const isVerified = access.verifiedAt && (Date.now() - access.verifiedAt.getTime()) < 24 * 60 * 60 * 1000;
+    if (!isVerified) { res.status(403).json({ success: false, error: 'Verify the access code first' }); return; }
+
+    await sendInvoicePdf(res, (access.invoiceId as any)._id.toString());
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to generate invoice PDF' });
+  }
+});
+
 // Public: Verify OTP
 router.post('/invoice/:token/verify', async (req, res: Response) => {
   try {
@@ -456,10 +508,30 @@ router.get('/admin/invoices/:invoiceId/view', authenticate, requirePermission('s
       viewedBy: req.user!.email, customerUserId: invoice.userId.toString(), ...clientInfo,
     });
 
-    // Relative path — resolved against the admin app's actual origin.
-    res.json({ success: true, data: { secureUrl: `/invoice/${secureToken}?admin=1` } });
+    // Absolute URL — the invoice VIEWER lives in the customer web app
+    // (different origin from admin); a relative path would resolve against
+    // the admin app and 404.
+    res.json({ success: true, data: { secureUrl: `${FRONTEND_URL}/invoice/${secureToken}?admin=1` } });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to generate view link' });
+  }
+});
+
+// Admin: download invoice PDF directly (real file — replaces the old
+// print-window flow that popup blockers could silently drop)
+router.get('/admin/invoices/:invoiceId/pdf', authenticate, requirePermission('subscription.read'), async (req: AuthRequest, res: Response) => {
+  try {
+    const invoice = await Invoice.findById(req.params.invoiceId).lean();
+    if (!invoice) { res.status(404).json({ success: false, error: 'Invoice not found' }); return; }
+
+    await auditInvoiceEvent(req, 'invoice_pdf_downloaded', req.params.invoiceId, {
+      invoiceNumber: invoice.invoiceNumber,
+      downloadedBy: req.user!.email,
+      channel: 'admin',
+    });
+    await sendInvoicePdf(res, req.params.invoiceId);
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to generate invoice PDF' });
   }
 });
 

@@ -76,10 +76,10 @@ export default function DonationReceiptView() {
         <div className="mb-3 flex justify-between items-center">
           <Link to="/" className="text-primary-600 font-medium text-sm">← PawTag</Link>
           <button
-            onClick={() => window.print()}
-            className="text-sm text-gray-600 hover:text-gray-900 border border-gray-200 rounded-lg px-3 py-1.5"
+            onClick={() => token && window.location.assign(`/api${API.donations.receiptAccessDownload(token)}`)}
+            className="text-sm text-white bg-primary-600 hover:bg-primary-700 rounded-lg px-3 py-1.5"
           >
-            Print / Save PDF
+            Download PDF
           </button>
         </div>
         <iframe

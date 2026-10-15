@@ -3,6 +3,7 @@ import { toast } from '../lib/toast';
 import { useParams, useNavigate } from 'react-router-dom';
 import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
+import { downloadAuthenticatedFile } from '../lib/downloadFile';
 import { CancellationInfoCard, BottomSheet } from '@pawtag/ui';
 
 interface SubscriptionDetail {
@@ -367,17 +368,17 @@ export default function SubscriptionDetailPage() {
                           <button
                             onClick={async () => {
                               try {
-                                const res = await fetch(`/api/admin/invoices/${inv._id}/print`, {
-                                  headers: { 'Authorization': 'Bearer ' + localStorage.getItem('admin_token') },
-                                });
-                                const html = await res.text();
-                                const w = window.open('', '_blank');
-                                if (w) { w.document.write(html); w.document.close(); }
-                              } catch { toast.error('Failed to print invoice'); }
+                                // Real PDF download — replaces the print window
+                                // that popup blockers dropped.
+                                await downloadAuthenticatedFile(
+                                  API.admin.invoices.pdf(inv._id),
+                                  `invoice-${inv.invoiceNumber || inv._id}.pdf`,
+                                );
+                              } catch { toast.error('Failed to download invoice PDF'); }
                             }}
                             className="text-gray-600 hover:text-gray-700 text-xs font-medium border border-gray-200 px-2 py-1 rounded hover:bg-gray-50"
                           >
-                            Print
+                            PDF
                           </button>
                         </div>
                       </td>

@@ -157,6 +157,7 @@ export const API = {
       view: (id: string) => `/admin/invoices/${id}/view` as const,
       email: (id: string) => `/admin/invoices/${id}/email` as const,
       print: (id: string) => `/admin/invoices/${id}/print` as const,
+      pdf: (id: string) => `/admin/invoices/${id}/pdf` as const,
     },
 
     // ---------------------------------------------------------------------------
@@ -676,6 +677,7 @@ export const API = {
       list: '/customer/invoices',
       get: (id: string) => `/customer/invoices/${id}` as const,
       access: (id: string) => `/customer/invoices/${id}/access` as const,
+      pdf: (id: string) => `/customer/invoices/${id}/pdf` as const,
     },
     settings: {
       mfa: {

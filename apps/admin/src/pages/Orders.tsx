@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { API } from '@pawtag/shared/api';
 import api, { PaginatedData } from '../lib/api';
+import { downloadAuthenticatedFile } from '../lib/downloadFile';
 import { toast } from '../lib/toast';
 import {
   SummaryCards, SearchBar, FilterChips, Pagination, EmptyState, ErrorState,
@@ -12,7 +13,7 @@ import RefundStatusCard from '../components/RefundStatusCard';
 import {
   ChevronDown, Download, Loader2, ShoppingCart, CreditCard,
   Truck, Package, CheckCircle, Info, Clock, FileText,
-  RefreshCw, Ban, Send, Eye, Printer, Copy, ExternalLink, AlertTriangle, XCircle, RotateCcw, PlusCircle, Shield,
+  RefreshCw, Ban, Send, Eye, Copy, ExternalLink, AlertTriangle, XCircle, RotateCcw, PlusCircle, Shield,
 } from 'lucide-react';
 import {
   ORDER_STATUS_LABELS,
@@ -378,9 +379,9 @@ export function OrderDetailDrawer({
         const res = await api.post(API.admin.invoices.email(id));
         toast.success(res.data.data?.message || 'Invoice emailed');
       } else {
-        const res = await api.get(API.admin.invoices.print(id));
-        const w = window.open('', '_blank');
-        if (w) { w.document.write(res.data); w.document.close(); }
+        // Real PDF download — replaces the print window that popup
+        // blockers dropped and that lost all formatting.
+        await downloadAuthenticatedFile(API.admin.invoices.pdf(id), `invoice-${id}.pdf`);
       }
     } catch (err: any) {
       toast.error(err.response?.data?.error || `Failed to ${action} invoice`);
@@ -725,8 +726,8 @@ export function OrderDetailDrawer({
                   disabled={actionLoading === 'invoice-print'}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 disabled:opacity-50"
                 >
-                  {actionLoading === 'invoice-print' ? <Loader2 size={12} className="animate-spin" /> : <Printer size={12} />}
-                  Print
+                  {actionLoading === 'invoice-print' ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
+                  PDF
                 </button>
               </div>
             </Section>
