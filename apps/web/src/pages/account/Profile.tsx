@@ -1,11 +1,10 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { User, MapPin, Phone, Lock, Save, Gift, CheckCircle, AlertCircle } from 'lucide-react';
-import { AddressAutocomplete, AddressManager } from '@pawtag/ui';
+import { AddressAutocomplete, AddressManager, toast } from '@pawtag/ui';
 import type { AddressComponents, SavedAddress } from '@pawtag/ui';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../lib/api';
-import SaveToast from '../../components/SaveToast';
 import { validatePassword } from '@pawtag/shared';
 import { API } from '@pawtag/shared';
 
@@ -14,7 +13,6 @@ export default function Profile() {
   const [form, setForm] = useState({ fullName: '', email: '', phoneNumber: '', address: { line1: '', line2: '', city: '', state: '', zip: '', country: '' }, emergencyContact: { name: '', phone: '', email: '', relationship: '' } });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [showSaved, setShowSaved] = useState(false);
   const [responsibility, setResponsibility] = useState<any>(null);
   const [relationshipOptions, setRelationshipOptions] = useState<string[]>([]);
   const [referredBy, setReferredBy] = useState<any>(null);
@@ -59,7 +57,7 @@ export default function Profile() {
       const ecRaw: Record<string, string> = { name: form.emergencyContact.name, phone: form.emergencyContact.phone, email: form.emergencyContact.email, relationship: form.emergencyContact.relationship };
       const ec = Object.fromEntries(Object.entries(ecRaw).filter(([_, v]) => v !== ''));
       if (Object.keys(ec).length > 0) payload.emergencyContact = ec;
-      await api.put(API.auth.profile, payload); setShowSaved(true); refreshUser();
+      await api.put(API.auth.profile, payload); toast.success('Profile updated successfully'); refreshUser();
     }
     catch (err: any) { setError(err.response?.data?.error || 'Update failed'); }
     finally { setSaving(false); }
@@ -74,7 +72,6 @@ export default function Profile() {
           <div><p className="font-semibold">{responsibility.rating}</p><p className="text-sm text-gray-600">Pet Responsibility Score — {responsibility.pets?.length || 0} pets registered</p></div>
         </div>
       )}
-      {showSaved && <SaveToast message="Profile updated successfully" onDone={() => setShowSaved(false)} />}
       {error && <div className="bg-red-50 text-red-600 text-sm p-3 rounded mb-4">{error}</div>}
       {referredBy && (
         <div className="bg-teal-50 border border-teal-200 rounded-lg p-4 mb-6 flex items-center gap-3">
@@ -160,7 +157,6 @@ function ChangePasswordForm() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [saving, setSaving] = useState(false);
-  const [showSaved, setShowSaved] = useState(false);
   const [error, setError] = useState('');
 
   const handleChangePassword = async (e: FormEvent) => {
@@ -169,7 +165,7 @@ function ChangePasswordForm() {
     const passwordValidation = validatePassword(newPassword);
     if (!passwordValidation.valid) { setError(passwordValidation.error!); return; }
     setSaving(true);
-    try { await api.post(API.auth.changePassword, { currentPassword, newPassword }); setShowSaved(true); setCurrentPassword(''); setNewPassword(''); setConfirmPassword(''); }
+    try { await api.post(API.auth.changePassword, { currentPassword, newPassword }); toast.success('Password changed successfully'); setCurrentPassword(''); setNewPassword(''); setConfirmPassword(''); }
     catch (err: any) { setError(err.response?.data?.error || 'Failed to change password'); }
     finally { setSaving(false); }
   };
@@ -177,7 +173,6 @@ function ChangePasswordForm() {
   return (
     <form onSubmit={handleChangePassword} className="bg-white rounded-lg border p-6 space-y-4 mt-6">
       <h2 className="text-lg font-semibold flex items-center gap-2"><Lock size={18} /> Change Password</h2>
-      {showSaved && <SaveToast message="Password changed successfully" onDone={() => setShowSaved(false)} />}
       {error && <div className="bg-red-50 text-red-600 text-sm p-3 rounded">{error}</div>}
       <div className="grid grid-cols-1 gap-4 max-w-md">
         <div><label className="block text-xs text-gray-500 mb-1">Current Password</label><input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" required /></div>

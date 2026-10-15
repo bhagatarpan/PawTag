@@ -96,3 +96,8 @@ export {
   getTierMarketingFlags,
 } from './tier-visuals';
 export type { TierMarketingFlags } from './tier-visuals';
+
+// Toast notifications (module-level API + host component)
+export { toast, subscribeToToasts } from './toast';
+export type { ToastKind, ToastItem } from './toast';
+export { ToastHost } from './components/ToastHost';

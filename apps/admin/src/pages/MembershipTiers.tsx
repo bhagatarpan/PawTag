@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { toast } from '../lib/toast';
 import { Link } from 'react-router-dom';
 import { Edit, X, ExternalLink } from 'lucide-react';
 import { API } from '@pawtag/shared/api';
@@ -67,7 +68,7 @@ export default function MembershipTiers() {
       setEditing(null);
       await fetchTiers();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to save tier');
+      toast.error(err.response?.data?.error || 'Failed to save tier');
     } finally {
       setSaving(false);
     }
@@ -75,7 +76,7 @@ export default function MembershipTiers() {
 
   async function handleAdd() {
     if (!newTier.tier || !newTier.name || !newTier.displayName || !newTier.description || newTier.price <= 0) {
-      alert('Please fill in all required fields');
+      toast.error('Please fill in all required fields');
       return;
     }
     setSaving(true);
@@ -85,7 +86,7 @@ export default function MembershipTiers() {
       setNewTier({ tier: '', name: '', displayName: '', description: '', price: 0, tagLimit: 3, comingSoon: false });
       await fetchTiers();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to create tier');
+      toast.error(err.response?.data?.error || 'Failed to create tier');
     } finally {
       setSaving(false);
     }

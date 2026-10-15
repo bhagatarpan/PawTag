@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { toast } from '../../lib/toast';
 import { API } from '@pawtag/shared/api';
 import { useNavigate } from 'react-router-dom';
 import api, { PaginatedData } from '../../lib/api';
@@ -46,7 +47,7 @@ export default function CmsPages() {
       await api.delete(API.admin.cms.pages.delete(id));
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to delete page');
+      toast.error(err.response?.data?.error || 'Failed to delete page');
     }
   };
 
@@ -55,7 +56,7 @@ export default function CmsPages() {
       await api.put(API.admin.cms.pages.publish(id));
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to publish page');
+      toast.error(err.response?.data?.error || 'Failed to publish page');
     }
   };
 

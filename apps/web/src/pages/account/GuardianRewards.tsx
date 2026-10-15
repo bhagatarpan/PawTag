@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { API } from '@pawtag/shared/api';
-import { BottomSheet } from '@pawtag/ui';
+import { BottomSheet, toast } from '@pawtag/ui';
 import api from '../../lib/api';
 
 interface RewardsData {
@@ -73,7 +73,7 @@ export default function GuardianRewards() {
 
   async function handleRedeem() {
     if (!redeemAmount || parseFloat(redeemAmount) < 2) {
-      alert('Minimum redemption is $2.00');
+      toast.error('Minimum redemption is $2.00');
       return;
     }
 
@@ -86,7 +86,7 @@ export default function GuardianRewards() {
       setRedeemAmount('');
       await fetchRewardsData();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to redeem rewards');
+      toast.error(err.response?.data?.error || 'Failed to redeem rewards');
     } finally {
       setRedeeming(false);
     }

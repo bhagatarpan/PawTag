@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { toast } from '../../lib/toast';
 import { API } from '@pawtag/shared/api';
 import { Mail, Plus, Search, Edit, Trash2, Eye, EyeOff, Copy } from 'lucide-react';
 import api from '../../lib/api';
@@ -68,7 +69,7 @@ export default function CmsEmailTemplates() {
       resetForm();
       fetchTemplates();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to save template');
+      toast.error(err.response?.data?.error || 'Failed to save template');
     }
   };
 

@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { Camera, Loader2, X } from 'lucide-react';
+import { toast } from '@pawtag/ui';
 import api from '../lib/api';
 import { API } from '@pawtag/shared';
 
@@ -34,13 +35,13 @@ export default function AvatarUpload({ currentPicture, userName, onUploadComplet
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
-      alert('Please select an image file');
+      toast.error('Please select an image file');
       return;
     }
 
     // Validate file size (5MB max)
     if (file.size > 5 * 1024 * 1024) {
-      alert('File size must be less than 5MB');
+      toast.error('File size must be less than 5MB');
       return;
     }
 
@@ -82,7 +83,7 @@ export default function AvatarUpload({ currentPicture, userName, onUploadComplet
       setPreview(null);
     } catch (error) {
       console.error('Upload failed:', error);
-      alert('Failed to upload profile picture. Please try again.');
+      toast.error('Failed to upload profile picture. Please try again.');
     } finally {
       setIsUploading(false);
     }
@@ -96,7 +97,7 @@ export default function AvatarUpload({ currentPicture, userName, onUploadComplet
       setPreview(null);
     } catch (error) {
       console.error('Failed to remove profile picture:', error);
-      alert('Failed to remove profile picture. Please try again.');
+      toast.error('Failed to remove profile picture. Please try again.');
     }
   };
 

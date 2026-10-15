@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { toast } from '../lib/toast';
 import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
 import { Search, Upload, X, Image as ImageIcon, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -65,7 +66,7 @@ export default function ImagePicker({ value, onChange, placeholder = 'https://ex
       });
       fetchMedia(page, search);
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Upload failed');
+      toast.error(err.response?.data?.error || 'Upload failed');
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';

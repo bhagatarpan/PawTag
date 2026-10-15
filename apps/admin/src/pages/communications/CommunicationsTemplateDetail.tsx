@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { toast } from '../../lib/toast';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -138,7 +139,7 @@ export default function CommunicationsTemplateDetail() {
       setEditing(false);
       fetchTemplate();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to save template');
+      toast.error(err.response?.data?.error || 'Failed to save template');
     } finally {
       setSaving(false);
     }
@@ -148,10 +149,10 @@ export default function CommunicationsTemplateDetail() {
     if (!id || !testEmail) return;
     try {
       await api.post(API.admin.cms.communications.templates.sendTest(id), { recipientEmail: testEmail });
-      alert(`Test email sent to ${testEmail}`);
+      toast.success(`Test email sent to ${testEmail}`);
       setTestEmail('');
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to send test email');
+      toast.error(err.response?.data?.error || 'Failed to send test email');
     }
   };
 
@@ -164,7 +165,7 @@ export default function CommunicationsTemplateDetail() {
       });
       fetchTemplate();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to update status');
+      toast.error(err.response?.data?.error || 'Failed to update status');
     }
   };
 

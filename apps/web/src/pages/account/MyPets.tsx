@@ -4,7 +4,7 @@ import { PawPrint, Plus, CheckCircle, X, Save, Upload, Info, QrCode, Camera, Spa
 import { API } from '@pawtag/shared/api';
 import api from '../../lib/api';
 import HealthRecords from './HealthRecords';
-import SaveToast from '../../components/SaveToast';
+import { toast } from '@pawtag/ui';
 import PetCard, { PetCardSkeleton } from '../../components/PetCard';
 import { BREED_ORIGINS, getBreedsForOrigin } from '@pawtag/shared';
 import type { PetType } from '@pawtag/shared';
@@ -135,7 +135,6 @@ export default function MyPets() {
   const [foundTimers, setFoundTimers] = useState<Record<string, string>>({});
   const [timeToFoundMsg, setTimeToFoundMsg] = useState('');
   const [healthPet, setHealthPet] = useState<any>(null);
-  const [showSaved, setShowSaved] = useState(false);
   const [unredeemedCount, setUnredeemedCount] = useState(0);
 
   const refreshPets = () => {
@@ -217,9 +216,9 @@ export default function MyPets() {
     if (form.age !== '') payload.age = parseFloat(form.age);
     try {
       if (editingPet) { await api.put(API.customer.pets.update(editingPet._id), payload); } else { await api.post(API.customer.pets.create, payload); }
-      cancelForm(); refreshPets(); setShowSaved(true);
+      cancelForm(); refreshPets(); toast.success('Pet saved successfully');
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to save pet');
+      toast.error(err.response?.data?.error || 'Failed to save pet');
     }
   };
 
@@ -284,8 +283,6 @@ export default function MyPets() {
           <Plus size={18} /> Add Pet
         </button>
       </div>
-
-      {showSaved && <SaveToast message="Pet saved successfully" onDone={() => setShowSaved(false)} />}
 
       {/* Unredeemed Tags Banner */}
       {unredeemedCount > 0 && (

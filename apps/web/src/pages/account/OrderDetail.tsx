@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Package, Loader2, Shield, Clock, RefreshCw, CheckCircle } from 'lucide-react';
-import { OrderDetailView, ConfirmDialog, CopyButton, formatRefundDestination, formatRefundDestinationSentence } from '@pawtag/ui';
+import { OrderDetailView, ConfirmDialog, CopyButton, formatRefundDestination, formatRefundDestinationSentence, toast } from '@pawtag/ui';
 import type { OrderData, InvoiceData } from '@pawtag/ui';
 import { API } from '@pawtag/shared/api';
 import api from '../../lib/api';
@@ -137,7 +137,7 @@ function ReturnStatusCard({
                     disabled={savingTracking}
                     onClick={async () => {
                       if (!editProvider.trim() || !editTrackingNumber.trim()) {
-                        alert('Please enter provider and tracking number');
+                        toast.error('Please enter provider and tracking number');
                         return;
                       }
                       setSavingTracking(true);
@@ -219,7 +219,7 @@ function ReturnStatusCard({
                 const provider = (document.getElementById('return-provider') as HTMLInputElement)?.value?.trim();
                 const trackingNumber = (document.getElementById('return-tracking') as HTMLInputElement)?.value?.trim();
                 if (!provider || !trackingNumber) {
-                  alert('Please enter provider and tracking number');
+                  toast.error('Please enter provider and tracking number');
                   return;
                 }
                 await onTrackingSubmit(provider, trackingNumber);
@@ -379,19 +379,15 @@ export default function OrderDetail() {
         portal: 'customer-web',
       });
       const refundAmount = res.data?.data?.refundAmount ?? order.payment?.amount ?? 0;
-      const refundId = res.data?.data?.refundId;
       const destination = formatRefundDestination(order.payment?.cardBrand, order.payment?.cardLast4);
       const amountLabel = typeof refundAmount === 'number' ? `$${refundAmount.toFixed(2)}` : 'your payment';
-      alert(
-        `Order cancelled.\n\n` +
-        `Refund of ${amountLabel} to ${destination} is being processed (usually 5–10 business days).\n` +
-        (refundId ? `Refund ID: ${refundId}\n` : '') +
-        `\nIf that card was replaced or expired, your bank usually posts the refund to your new card or bank account.`
+      toast.success(
+        `Order cancelled. Refund of ${amountLabel} to ${destination} is being processed (usually 5–10 business days).`
       );
       setCancelOpen(false);
       fetchOrder();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to cancel order');
+      toast.error(err.response?.data?.error || 'Failed to cancel order');
     } finally {
       setCancelLoading(false);
     }
@@ -420,7 +416,7 @@ export default function OrderDetail() {
               const list = Array.isArray(data) ? data : data?.items || [];
               setReturnRequest(list[0] || null);
             } catch (err: any) {
-              alert(err.response?.data?.error || 'Failed to submit tracking');
+              toast.error(err.response?.data?.error || 'Failed to submit tracking');
             }
           }}
         />

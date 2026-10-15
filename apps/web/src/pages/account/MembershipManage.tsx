@@ -4,7 +4,7 @@ import { Crown, CreditCard } from 'lucide-react';
 import { API } from '@pawtag/shared/api';
 import { formatCurrency, formatDate } from '@pawtag/shared';
 import api from '../../lib/api';
-import { ConfirmDialog, resolveTierIcon, resolveTierGradient, EntitlementList } from '@pawtag/ui';
+import { ConfirmDialog, resolveTierIcon, resolveTierGradient, EntitlementList, toast } from '@pawtag/ui';
 import KeepMembershipPanel from '../../components/KeepMembershipPanel';
 
 interface MembershipStatus {
@@ -93,7 +93,7 @@ export default function MembershipManage() {
       setShowCancelModal(false);
       await fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to cancel membership');
+      toast.error(err.response?.data?.error || 'Failed to cancel membership');
     } finally {
       setActionLoading(false);
     }
@@ -110,10 +110,10 @@ export default function MembershipManage() {
       if (url) {
         window.open(url, '_blank');
       } else {
-        alert('Payment settings are not available in demo mode.');
+        toast.info('Payment settings are not available in demo mode.');
       }
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to open payment settings');
+      toast.error(err.response?.data?.error || 'Failed to open payment settings');
     }
   }
 

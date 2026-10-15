@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { toast } from '../../lib/toast';
 import { API } from '@pawtag/shared/api';
 import { Database, Plus, Search, Edit, Trash2, Upload, Eye, EyeOff } from 'lucide-react';
 import api from '../../lib/api';
@@ -71,7 +72,7 @@ export default function CmsPetReferences() {
       resetForm();
       fetchReferences();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to save reference');
+      toast.error(err.response?.data?.error || 'Failed to save reference');
     }
   };
 
@@ -87,7 +88,7 @@ export default function CmsPetReferences() {
       setShowBulkForm(false);
       fetchReferences();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to bulk create references');
+      toast.error(err.response?.data?.error || 'Failed to bulk create references');
     }
   };
 

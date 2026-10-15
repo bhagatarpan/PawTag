@@ -1,7 +1,7 @@
 import { useState, useEffect, Component, ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { API } from '@pawtag/shared/api';
-import { BottomSheet, CopyButton } from '@pawtag/ui';
+import { BottomSheet, CopyButton, toast } from '@pawtag/ui';
 import api from '../../lib/api';
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
@@ -113,13 +113,13 @@ function SubscriptionsInner() {
       const sub = subRes.data?.data;
       const invs = invRes.data?.data || [];
       if (!sub) {
-        alert('Subscription not found');
+        toast.error('Subscription not found');
         setSelectedId(null);
         return;
       }
       setDetail({ subscription: sub, invoices: invs });
     } catch (err: any) {
-      alert(err.response?.data?.error || err.message || 'Failed to load subscription details');
+      toast.error(err.response?.data?.error || err.message || 'Failed to load subscription details');
       setSelectedId(null);
     } finally {
       setDetailLoading(false);
@@ -134,7 +134,7 @@ function SubscriptionsInner() {
       await fetchSubscriptions();
       if (selectedId === id) await fetchDetail(id);
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to renew');
+      toast.error(err.response?.data?.error || 'Failed to renew');
     } finally {
       setActionLoading(false);
     }
@@ -149,7 +149,7 @@ function SubscriptionsInner() {
       await fetchSubscriptions();
       if (selectedId === id) await fetchDetail(id);
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to cancel');
+      toast.error(err.response?.data?.error || 'Failed to cancel');
     } finally {
       setActionLoading(false);
     }
@@ -171,7 +171,7 @@ function SubscriptionsInner() {
       await fetchSubscriptions();
       if (selectedId === id) await fetchDetail(id);
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to update');
+      toast.error(err.response?.data?.error || 'Failed to update');
     } finally {
       setActionLoading(false);
     }
@@ -190,7 +190,7 @@ function SubscriptionsInner() {
       await fetchSubscriptions();
       if (selectedId === pauseTargetId) await fetchDetail(pauseTargetId);
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to update');
+      toast.error(err.response?.data?.error || 'Failed to update');
     } finally {
       setActionLoading(false);
     }

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { toast } from '../lib/toast';
 import { useParams, Link } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -168,16 +169,16 @@ export default function MembershipSubscriberDetail() {
       await fetchDetail();
       await fetchAuditHistory();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to extend membership');
+      toast.error(err.response?.data?.error || 'Failed to extend membership');
     } finally {
       setExtendLoading(false);
     }
   }
 
   async function handleChangeTier() {
-    if (!targetTierId) { alert('Please select a target tier'); return; }
+    if (!targetTierId) { toast.error('Please select a target tier'); return; }
     if (!evidence.customerEmailDate || !evidence.customerEmailContent || !evidence.actionRequired || !evidence.reason || !evidence.csrFullName || !evidence.csrEmail) {
-      alert('Please fill in all required evidence fields');
+      toast.error('Please fill in all required evidence fields');
       return;
     }
 
@@ -194,7 +195,7 @@ export default function MembershipSubscriberDetail() {
       await fetchDetail();
       await fetchAuditHistory();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to change tier');
+      toast.error(err.response?.data?.error || 'Failed to change tier');
     } finally {
       setModalLoading(false);
     }
@@ -202,7 +203,7 @@ export default function MembershipSubscriberDetail() {
 
   async function handleCancelMembership() {
     if (!evidence.customerEmailDate || !evidence.customerEmailContent || !evidence.actionRequired || !evidence.reason || !evidence.csrFullName || !evidence.csrEmail) {
-      alert('Please fill in all required evidence fields');
+      toast.error('Please fill in all required evidence fields');
       return;
     }
 
@@ -217,7 +218,7 @@ export default function MembershipSubscriberDetail() {
       await fetchDetail();
       await fetchAuditHistory();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to cancel membership');
+      toast.error(err.response?.data?.error || 'Failed to cancel membership');
     } finally {
       setModalLoading(false);
     }
@@ -228,9 +229,9 @@ export default function MembershipSubscriberDetail() {
       const res = await api.post('/admin/membership/payment-portal', { membershipId: id });
       const { url } = res.data.data || {};
       if (url) window.open(url, '_blank');
-      else alert('Portal not available in demo mode');
+      else toast.info('Portal not available in demo mode');
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to open billing portal');
+      toast.error(err.response?.data?.error || 'Failed to open billing portal');
     }
   }
 

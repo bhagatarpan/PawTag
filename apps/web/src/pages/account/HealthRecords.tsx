@@ -2,7 +2,7 @@ import { useState, FormEvent } from 'react';
 import { API } from '@pawtag/shared/api';
 import api from '../../lib/api';
 import { X, Plus, Trash2, Syringe, Cpu, Pill, AlertTriangle, Stethoscope, Scissors, Weight, Heart, Activity, Edit2 } from 'lucide-react';
-import SaveToast from '../../components/SaveToast';
+import { toast } from '@pawtag/ui';
 
 const CORE_DOG_VACCINES = ['Canine Distemper (CDV)', 'Canine Parvovirus (CPV-2)', 'Canine Adenovirus (CAV-2)'];
 const NON_CORE_DOG_VACCINES = ['Leptospirosis', 'Canine Influenza', 'Bordetella (Kennel Cough)', 'Canine Parainfluenza'];
@@ -40,7 +40,6 @@ export default function HealthRecords({ pet, onClose }: { pet: Pet; onClose: () 
   const [editing, setEditing] = useState<any>(null);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [showSaved, setShowSaved] = useState(false);
   const [saveError, setSaveError] = useState('');
 
   const fetchData = async (section: string) => {
@@ -65,7 +64,7 @@ export default function HealthRecords({ pet, onClose }: { pet: Pet; onClose: () 
         else await api.post(API.customer.pets.section(pet._id, apiSection), editing);
       }
       await fetchData(isDesexing ? 'desexing' : tab);
-      setShowForm(false); setEditing(null); setShowSaved(true);
+      setShowForm(false); setEditing(null); toast.success('Record saved successfully');
     } catch (err: any) { setSaveError(err.response?.data?.error || 'Failed to save record'); }
     setSaving(false);
   };
@@ -83,7 +82,6 @@ export default function HealthRecords({ pet, onClose }: { pet: Pet; onClose: () 
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fade-in">
-      {showSaved && <SaveToast message="Record saved successfully" onDone={() => setShowSaved(false)} />}
       <div className="bg-white rounded-xl w-full max-w-4xl max-h-[90vh] flex flex-col animate-slide-up">
         <div className="flex items-center justify-between border-b px-6 py-4">
           <div><h2 className="text-xl font-bold">{pet.name} — Health Records</h2><p className="text-sm text-gray-500">{pet.petType} · {pet.breed}</p></div>
@@ -99,7 +97,7 @@ export default function HealthRecords({ pet, onClose }: { pet: Pet; onClose: () 
         <div className="flex-1 overflow-y-auto p-6">
           {saveError && <div className="bg-red-50 text-red-600 text-sm p-3 rounded mb-4">{saveError}</div>}
           {tab === 'desexing' ? (
-            <DesexingSection desexing={desexing} onEdit={() => { setEditing({ ...desexing }); setShowForm(true); }} onSave={async (val: any) => { setSaving(true); setSaveError(''); try { await api.put(API.customer.pets.desexing(pet._id), val); setDesexing(val); setShowSaved(true); } catch (err: any) { setSaveError(err.response?.data?.error || 'Failed to save'); } setSaving(false); }} saving={saving} />
+            <DesexingSection desexing={desexing} onEdit={() => { setEditing({ ...desexing }); setShowForm(true); }} onSave={async (val: any) => { setSaving(true); setSaveError(''); try { await api.put(API.customer.pets.desexing(pet._id), val); setDesexing(val); toast.success('Record saved successfully'); } catch (err: any) { setSaveError(err.response?.data?.error || 'Failed to save'); } setSaving(false); }} saving={saving} />
           ) : showForm ? (
             <FormSection tab={tab} petType={pet.petType} editing={editing} onChange={setEditing} onSave={handleSave} onCancel={() => { setShowForm(false); setEditing(null); }} saving={saving} />
           ) : (

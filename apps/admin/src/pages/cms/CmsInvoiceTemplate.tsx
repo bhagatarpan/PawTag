@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { toast } from '../../lib/toast';
 import { API } from '@pawtag/shared/api';
 import { Save, Mail } from 'lucide-react';
 import api from '../../lib/api';
@@ -71,9 +72,9 @@ export default function CmsInvoiceTemplate() {
           status: 'active',
         });
       }
-      alert('Invoice template saved');
+      toast.success('Invoice template saved');
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to save');
+      toast.error(err.response?.data?.error || 'Failed to save');
     } finally {
       setSaving(false);
     }

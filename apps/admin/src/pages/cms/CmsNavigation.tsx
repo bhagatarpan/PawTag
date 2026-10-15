@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { toast } from '../../lib/toast';
 import { API } from '@pawtag/shared/api';
 import api from '../../lib/api';
 import { Plus, Trash2 } from 'lucide-react';
@@ -66,7 +67,7 @@ export default function CmsNavigation() {
       setShowForm(false);
       fetchMenus();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to save navigation');
+      toast.error(err.response?.data?.error || 'Failed to save navigation');
     }
   };
 
@@ -76,7 +77,7 @@ export default function CmsNavigation() {
       await api.delete(`/admin/cms/navigation/${id}`);
       fetchMenus();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to delete');
+      toast.error(err.response?.data?.error || 'Failed to delete');
     }
   };
 

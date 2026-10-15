@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
+import { toast } from '../../lib/toast';
 import { API } from '@pawtag/shared/api';
 import api, { PaginatedData } from '../../lib/api';
 import { Upload, Trash2, Search, Grid, List } from 'lucide-react';
@@ -49,7 +50,7 @@ export default function CmsMedia() {
       await api.post(API.admin.cms.media.upload, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Upload failed');
+      toast.error(err.response?.data?.error || 'Upload failed');
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -74,7 +75,7 @@ export default function CmsMedia() {
       setEditingMedia(null);
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to update');
+      toast.error(err.response?.data?.error || 'Failed to update');
     }
   };
 

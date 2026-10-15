@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { toast } from '../lib/toast';
 import { useParams, useNavigate } from 'react-router-dom';
 import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
@@ -354,9 +355,9 @@ export default function SubscriptionDetailPage() {
                                   headers: { 'Authorization': 'Bearer ' + localStorage.getItem('admin_token'), 'Content-Type': 'application/json' },
                                 });
                                 const data = await res.json();
-                                if (data.success) alert(data.data.message);
-                                else alert(data.error || 'Failed to email');
-                              } catch { alert('Failed to email invoice'); }
+                                if (data.success) toast.success(data.data.message);
+                                else toast.error(data.error || 'Failed to email');
+                              } catch { toast.error('Failed to email invoice'); }
                             }}
                             className="text-blue-600 hover:text-blue-700 text-xs font-medium border border-blue-200 px-2 py-1 rounded hover:bg-blue-50"
                           >
@@ -371,7 +372,7 @@ export default function SubscriptionDetailPage() {
                                 const html = await res.text();
                                 const w = window.open('', '_blank');
                                 if (w) { w.document.write(html); w.document.close(); }
-                              } catch { alert('Failed to print invoice'); }
+                              } catch { toast.error('Failed to print invoice'); }
                             }}
                             className="text-gray-600 hover:text-gray-700 text-xs font-medium border border-gray-200 px-2 py-1 rounded hover:bg-gray-50"
                           >

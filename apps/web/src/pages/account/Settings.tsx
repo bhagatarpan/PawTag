@@ -6,8 +6,7 @@ import {
   Key, Smartphone, Info, CreditCard,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { ConfirmDialog, StatusBadge, BottomSheet } from '@pawtag/ui';
-import SaveToast from '../../components/SaveToast';
+import { ConfirmDialog, StatusBadge, BottomSheet, toast } from '@pawtag/ui';
 import PaymentMethodsPanel from '../../components/PaymentMethodsPanel';
 import { API } from '@pawtag/shared/api';
 import api from '../../lib/api';
@@ -29,7 +28,6 @@ interface MFASettings {
 
 export default function Settings() {
   const { user, refreshUser } = useAuth();
-  const [showSaved, setShowSaved] = useState(false);
   const [mfa, setMfa] = useState<MFASettings | null>(null);
   const [mfaLoading, setMfaLoading] = useState(true);
   const [mfaActionLoading, setMfaActionLoading] = useState(false);
@@ -76,9 +74,9 @@ export default function Settings() {
       const newValue = !finderPrivacy.showOwnerNameInFinder;
       await api.put(API.customer.settings.finderPrivacy.update, { showOwnerNameInFinder: newValue });
       setFinderPrivacy({ showOwnerNameInFinder: newValue });
-      setShowSaved(true);
+      toast.success('Settings saved successfully');
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to update privacy setting');
+      toast.error(err.response?.data?.error || 'Failed to update privacy setting');
     } finally {
       setFinderPrivacyActionLoading(false);
     }
@@ -94,10 +92,10 @@ export default function Settings() {
         await api.put(API.customer.settings.mfa.update, { mfaEnabled: true });
         setMfa({ ...mfa, mfaEnabled: true });
         await refreshUser();
-        setShowSaved(true);
+        toast.success('Settings saved successfully');
       }
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to update MFA');
+      toast.error(err.response?.data?.error || 'Failed to update MFA');
     } finally {
       setMfaActionLoading(false);
     }
@@ -110,9 +108,9 @@ export default function Settings() {
       setMfa(mfa ? { ...mfa, mfaEnabled: false } : null);
       await refreshUser();
       setShowDisableMfa(false);
-      setShowSaved(true);
+      toast.success('Settings saved successfully');
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to disable MFA');
+      toast.error(err.response?.data?.error || 'Failed to disable MFA');
     } finally {
       setMfaActionLoading(false);
     }
@@ -139,9 +137,9 @@ export default function Settings() {
       a.download = `pawtag-data-export-${new Date().toISOString().split('T')[0]}.json`;
       a.click();
       URL.revokeObjectURL(url);
-      setShowSaved(true);
+      toast.success('Settings saved successfully');
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to export data');
+      toast.error(err.response?.data?.error || 'Failed to export data');
     } finally {
       setExportLoading(false);
     }
@@ -155,15 +153,13 @@ export default function Settings() {
       localStorage.removeItem('pawtag_token');
       window.location.href = '/';
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to delete account');
+      toast.error(err.response?.data?.error || 'Failed to delete account');
       setDeleteLoading(false);
     }
   }
 
   return (
     <div className="space-y-6">
-      {showSaved && <SaveToast message="Settings saved successfully" onDone={() => setShowSaved(false)} />}
-
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
         <p className="text-sm text-gray-500 mt-1">Manage your account security and preferences.</p>

@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { ReactNode, useEffect } from 'react';
 import { SiteAvailabilityStatus } from '@pawtag/shared';
+import { ToastHost } from '@pawtag/ui';
 import { stashScrollBeforeLogin, takeScrollReturn } from './lib/scroll-return';
 import { setReturnUrl } from './lib/return-url';
 import { useSiteAvailability } from './components/SiteAvailabilityProvider';
@@ -147,6 +148,9 @@ export default function App() {
     <>
       {status === SiteAvailabilityStatus.MAINTENANCE && <MaintenanceBanner />}
       <ScrollManager />
+      {/* Toasts mount at the app root — outside every layout/animation
+          wrapper — so fixed positioning survives at any scroll depth. */}
+      <ToastHost />
       <Routes>
         {/* Public routes with Navbar + Footer */}
         <Route path="/" element={<PublicLayout><Home /></PublicLayout>} />

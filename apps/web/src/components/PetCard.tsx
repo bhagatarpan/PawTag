@@ -6,8 +6,7 @@ import {
   Edit2, Activity, CreditCard, QrCode, MoreVertical,
   Stethoscope, Tag, Camera
 } from 'lucide-react';
-import { CopyButton } from '@pawtag/ui';
-import { ConfirmDialog } from '@pawtag/ui';
+import { CopyButton, ConfirmDialog, toast } from '@pawtag/ui';
 import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
 
@@ -125,7 +124,7 @@ export default function PetCard({
       // Refresh the page to show updated state
       window.location.reload();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to unlink tag');
+      toast.error(err.response?.data?.error || 'Failed to unlink tag');
     } finally {
       setUnlinking(false);
     }

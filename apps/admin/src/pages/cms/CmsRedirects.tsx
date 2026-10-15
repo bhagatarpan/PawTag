@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { toast } from '../../lib/toast';
 import { API } from '@pawtag/shared/api';
 import api, { PaginatedData } from '../../lib/api';
 
@@ -40,7 +41,7 @@ export default function CmsRedirects() {
       setForm({ from: '', to: '', type: 'permanent', status: 'active' });
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to create redirect');
+      toast.error(err.response?.data?.error || 'Failed to create redirect');
     }
   };
 

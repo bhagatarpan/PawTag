@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { toast } from '../../lib/toast';
 import { API } from '@pawtag/shared/api';
 import { useNavigate, useParams } from 'react-router-dom';
 import api from '../../lib/api';
@@ -60,7 +61,7 @@ export default function CmsPageEditor() {
 
   const handleSave = async (publishAfter = false) => {
     if (!form.slug || !form.title) {
-      alert('Slug and Title are required');
+      toast.error('Slug and Title are required');
       return;
     }
     setSaving(true);
@@ -77,7 +78,7 @@ export default function CmsPageEditor() {
         await api.put(API.admin.cms.pages.update(id), payload);
       }
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to save page');
+      toast.error(err.response?.data?.error || 'Failed to save page');
     } finally {
       setSaving(false);
     }

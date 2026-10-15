@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { toast } from '../../lib/toast';
 import { API } from '@pawtag/shared/api';
 import api from '../../lib/api';
 import { Plus, Trash2 } from 'lucide-react';
@@ -54,7 +55,7 @@ export default function CmsFooter() {
       setShowForm(false);
       fetchFooters();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to save footer');
+      toast.error(err.response?.data?.error || 'Failed to save footer');
     }
   };
 

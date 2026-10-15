@@ -289,7 +289,7 @@ export default function Settings() {
       await api.delete(API.admin.settings.delete(key));
       fetchSettings();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to delete setting');
+      toast.error(err.response?.data?.error || 'Failed to delete setting');
     }
   };
 
