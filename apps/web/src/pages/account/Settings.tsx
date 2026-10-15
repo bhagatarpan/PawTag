@@ -246,13 +246,11 @@ export default function Settings() {
             <button
               onClick={handleToggleMFA}
               disabled={mfaLoading || mfaActionLoading}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                mfa?.mfaEnabled ? 'bg-teal-600' : 'bg-gray-200'
-              } disabled:opacity-50`}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${mfa?.mfaEnabled ? 'bg-teal-600' : 'bg-gray-200'
+                } disabled:opacity-50`}
             >
-              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                mfa?.mfaEnabled ? 'translate-x-6' : 'translate-x-1'
-              }`} />
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${mfa?.mfaEnabled ? 'translate-x-6' : 'translate-x-1'
+                }`} />
             </button>
           </div>
 
@@ -292,29 +290,43 @@ export default function Settings() {
             <div className="flex items-center gap-3">
               <Eye size={16} className="text-gray-400" />
               <div>
-                <p className="text-sm font-medium text-gray-900">Show Pet Owner's Name When Lost Pet Is Found</p>
+                <p className="text-sm font-medium text-gray-900">Show Pet Owner's Name <br />When Lost Pet Is Found</p>
                 <p className="text-xs text-gray-500">
                   {finderPrivacyLoading
                     ? 'Loading...'
                     : finderPrivacy?.showOwnerNameInFinder
-                      ? 'ON: Your name is visible to finders. Your suburb and city will also be shown.'
-                      : 'OFF: Your name is hidden — finders will see your suburb and city instead.'}
+                      ? (
+                        <>
+                          ON:
+                          <br />
+                          Your name is visible to finders.
+                          <br />
+                          Your suburb and city will also be shown.
+                        </>
+                      )
+                      : (
+                        <>
+                          OFF
+                          <br />
+                          Your name is hidden
+                          <br />
+                          Finders will see your suburb and city instead.
+                        </>
+                      )}
                 </p>
                 <p className="text-xs text-gray-400 mt-1">
-                  Your street address, phone, and email are never shown to finders.
+                  Your address is never shown to finders.
                 </p>
               </div>
             </div>
             <button
               onClick={handleToggleFinderPrivacy}
               disabled={finderPrivacyLoading || finderPrivacyActionLoading}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                finderPrivacy?.showOwnerNameInFinder ? 'bg-teal-600' : 'bg-gray-200'
-              } disabled:opacity-50`}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${finderPrivacy?.showOwnerNameInFinder ? 'bg-teal-600' : 'bg-gray-200'
+                } disabled:opacity-50`}
             >
-              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                finderPrivacy?.showOwnerNameInFinder ? 'translate-x-6' : 'translate-x-1'
-              }`} />
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${finderPrivacy?.showOwnerNameInFinder ? 'translate-x-6' : 'translate-x-1'
+                }`} />
             </button>
           </div>
         </div>
