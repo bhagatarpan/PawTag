@@ -171,14 +171,17 @@ test.describe('Homepage hero slider', () => {
     expect(await activeSlideIndex(page)).toBe(1);
   });
 
-  test('mobile composition stacks image and content without hero overflow', async ({ page }) => {
+  test('mobile composition overlays content on full-bleed media without hero overflow', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await stubHero(page);
     await page.goto('/');
 
-    // Media is visible on mobile — the old implementation hid it entirely
-    const media = page.locator('[aria-roledescription="slide"][aria-hidden="false"] .from-primary-600').first();
+    // Media canvas fills the active slide on mobile — the old boxed image is gone
+    const media = page.locator('[aria-roledescription="slide"][aria-hidden="false"] [data-testid="hero-media"]').first();
     await expect(media).toBeVisible();
+    const mediaBox = await media.boundingBox();
+    expect(mediaBox).not.toBeNull();
+    expect(mediaBox!.width).toBeGreaterThanOrEqual(374); // full-bleed, not a rounded card
 
     // Measure the hero's own box (page-level overflow can come from other
     // homepage sections, which are outside this workstream's scope)
@@ -191,5 +194,91 @@ test.describe('Homepage hero slider', () => {
     expect(heroOverflow).toBeLessThanOrEqual(1);
 
     await expect(page.getByRole('link', { name: /Shop PawTag/ }).first()).toBeVisible();
+  });
+
+  test('desktop hero media spans the full viewport width', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await stubHero(page);
+    await page.goto('/');
+
+    const media = page.locator('[aria-roledescription="slide"][aria-hidden="false"] [data-testid="hero-media"]').first();
+    const mediaBox = await media.boundingBox();
+    expect(mediaBox).not.toBeNull();
+    expect(mediaBox!.width).toBeGreaterThanOrEqual(1439); // edge-to-edge
+
+    // Measure the hero's own box (page-level overflow can come from other
+    // homepage sections — e.g. the FadeIn scroll-reveal translate on
+    // ResponsibilityScore — which are outside this workstream's scope)
+    const heroOverflow = await page.evaluate(() => {
+      const section = document.querySelector('section[aria-roledescription="carousel"]');
+      if (!section) return -1;
+      const rect = section.getBoundingClientRect();
+      return Math.max(0, Math.round(rect.right - document.documentElement.clientWidth));
+    });
+    expect(heroOverflow).toBeLessThanOrEqual(1);
+  });
+
+  test('a supplied photograph covers the full canvas with the scrim layered above', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    // Tiny solid-colour SVG data-URI as a photographic stand-in — verifies
+    // the real image path without stock/placeholder hero art.
+    const fixture =
+      'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="2400" height="1100"><rect width="2400" height="1100" fill="#b45309"/></svg>');
+    await page.route('**/api/public/cms/homepage/sections*', (route) =>
+      route.fulfill({
+        json: {
+          success: true,
+          data: [
+            {
+              _id: 'photo-1',
+              sectionType: 'hero_slide',
+              title: 'Photo slide',
+              subtitle: '',
+              order: 0,
+              isActive: true,
+              content: {
+                headline: 'Photo headline',
+                ctaText: 'Shop PawTag',
+                ctaUrl: '/shop',
+                desktopImageUrl: fixture,
+                imageAlt: 'Test fixture image',
+                imageFocalPoint: 'right',
+              },
+            },
+          ],
+        },
+      }),
+    );
+    await page.goto('/');
+
+    const img = page.locator('[aria-roledescription="slide"][aria-hidden="false"] img').first();
+    await expect(img).toBeVisible();
+    const imgBox = await img.boundingBox();
+    expect(imgBox).not.toBeNull();
+    expect(imgBox!.width).toBeGreaterThanOrEqual(1439);
+    expect(imgBox!.height).toBeGreaterThanOrEqual(600);
+
+    // The readability scrim renders above the photograph, below the text
+    const layering = await page.evaluate(() => {
+      const slide = document.querySelector('[aria-roledescription="slide"][aria-hidden="false"]');
+      if (!slide) return null;
+      const media = slide.querySelector('[data-testid="hero-media"]');
+      const scrim = slide.querySelector('[aria-hidden="true"].absolute.inset-0[class*="gradient"]');
+      const headline = slide.querySelector('h2');
+      const stack = (el: Element | null) => (el ? Number(getComputedStyle(el).zIndex || 0) : -1);
+      return {
+        hasMedia: Boolean(media),
+        hasScrim: Boolean(scrim),
+        scrimAfterMedia: media && scrim ? Boolean(media.compareDocumentPosition(scrim) & Node.DOCUMENT_POSITION_FOLLOWING) : false,
+        headlineVisible: Boolean(headline),
+        mediaZ: stack(media),
+        scrimZ: stack(scrim),
+      };
+    });
+    expect(layering?.hasMedia).toBe(true);
+    expect(layering?.hasScrim).toBe(true);
+    // scrim comes after media in DOM order (painted above it)
+    expect(layering?.scrimAfterMedia).toBe(true);
+    expect(layering?.headlineVisible).toBe(true);
   });
 });

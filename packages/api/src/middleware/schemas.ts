@@ -137,6 +137,7 @@ export const heroSlideContentSchema = z
     mobileImageUrl: cmsSafeUrl(2000).optional(),
     imageAlt: z.string().max(300).optional(),
     imageFocalPoint: z.enum(HERO_FOCAL_POINTS).optional(),
+    imageMobileFocalPoint: z.enum(HERO_FOCAL_POINTS).optional(),
     duration: z.number().min(3).max(30).optional(),
     // legacy keys
     tag: z.string().max(120).optional(),

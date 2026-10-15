@@ -13,6 +13,7 @@ const HERO_CONTENT_KEYS = [
   'eyebrow', 'tag', 'headline', 'sub',
   'ctaText', 'ctaUrl', 'secondaryCtaText', 'secondaryCtaUrl',
   'desktopImageUrl', 'mobileImageUrl', 'imageAlt', 'imageFocalPoint',
+  'imageMobileFocalPoint',
   'duration', 'imageUrl', 'bg', 'visualType', 'stats', 'flowSteps',
 ] as const;
 
@@ -41,7 +42,7 @@ function toPublicSection(doc: any): Record<string, unknown> {
     eyebrow: 120, tag: 120, headline: 300, sub: 600,
     ctaText: 80, ctaUrl: 500, secondaryCtaText: 80, secondaryCtaUrl: 500,
     desktopImageUrl: 2000, mobileImageUrl: 2000, imageAlt: 300,
-    imageFocalPoint: 40, bg: 200, visualType: 40, imageUrl: 2000,
+    imageFocalPoint: 40, imageMobileFocalPoint: 40, bg: 200, visualType: 40, imageUrl: 2000,
   };
   for (const key of HERO_CONTENT_KEYS) {
     const value = raw[key];

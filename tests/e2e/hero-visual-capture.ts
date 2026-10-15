@@ -32,9 +32,14 @@ const HERO_STUB = [
 ];
 
 const VIEWPORTS = [
+  { name: '320-compact', width: 320, height: 568 },
   { name: '375-mobile', width: 375, height: 812 },
+  { name: '390-mobile', width: 390, height: 844 },
+  { name: '430-mobile', width: 430, height: 932 },
   { name: '768-tablet', width: 768, height: 1024 },
+  { name: '1280-laptop-short', width: 1280, height: 720 },
   { name: '1280-desktop', width: 1280, height: 800 },
+  { name: '1440-desktop', width: 1440, height: 900 },
   { name: '1920-wide', width: 1920, height: 1080 },
 ];
 

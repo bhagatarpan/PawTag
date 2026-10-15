@@ -24,6 +24,7 @@ export const DEFAULT_HERO_SLIDES: HeroSlideModel[] = [
     mobileImageUrl: '',
     imageAlt: '',
     focalPoint: 'center',
+    mobileFocalPoint: 'center',
   },
   {
     id: 'default-2',
@@ -36,6 +37,7 @@ export const DEFAULT_HERO_SLIDES: HeroSlideModel[] = [
     mobileImageUrl: '',
     imageAlt: '',
     focalPoint: 'center',
+    mobileFocalPoint: 'center',
   },
   {
     id: 'default-3',
@@ -48,6 +50,7 @@ export const DEFAULT_HERO_SLIDES: HeroSlideModel[] = [
     mobileImageUrl: '',
     imageAlt: '',
     focalPoint: 'center',
+    mobileFocalPoint: 'center',
   },
 ];
 
@@ -85,6 +88,11 @@ export function normalizeHeroSections(sections: HomepageSection[]): HeroSlideMod
     const focal = content.imageFocalPoint;
     const focalPoint: HeroFocalPoint = isHeroFocalPoint(focal) ? focal : 'center';
 
+    // Mobile focal defaults to the desktop focal when the CMS record
+    // predates the separate mobile control.
+    const mobileFocal = content.imageMobileFocalPoint;
+    const mobileFocalPoint: HeroFocalPoint = isHeroFocalPoint(mobileFocal) ? mobileFocal : focalPoint;
+
     return {
       id: section._id || `slide-${index + 1}`,
       eyebrow: asTrimmedString(content.eyebrow) || asTrimmedString(content.tag) || section.title,
@@ -100,6 +108,7 @@ export function normalizeHeroSections(sections: HomepageSection[]): HeroSlideMod
       mobileImageUrl: asTrimmedString(content.mobileImageUrl),
       imageAlt: asTrimmedString(content.imageAlt),
       focalPoint,
+      mobileFocalPoint,
     };
   });
 }

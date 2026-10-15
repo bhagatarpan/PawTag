@@ -50,7 +50,26 @@ describe('normalizeHeroSections', () => {
       mobileImageUrl: '/api/uploads/mobile.jpg',
       imageAlt: 'A dog',
       focalPoint: 'right',
+      mobileFocalPoint: 'right', // falls back to the desktop focal when absent
     });
+  });
+
+  it('maps a separate mobile focal point and falls back to the desktop focal when absent', () => {
+    const [withMobile] = normalizeHeroSections([
+      section({ headline: 'H', imageFocalPoint: 'right', imageMobileFocalPoint: 'top' }),
+    ]);
+    expect(withMobile.focalPoint).toBe('right');
+    expect(withMobile.mobileFocalPoint).toBe('top');
+
+    // Legacy record: no mobile focal → desktop focal applies everywhere
+    const [legacy] = normalizeHeroSections([section({ headline: 'H', imageFocalPoint: 'bottom' })]);
+    expect(legacy.mobileFocalPoint).toBe('bottom');
+
+    // Invalid mobile focal → desktop focal applies
+    const [invalid] = normalizeHeroSections([
+      section({ headline: 'H', imageFocalPoint: 'left', imageMobileFocalPoint: 'nowhere' }),
+    ]);
+    expect(invalid.mobileFocalPoint).toBe('left');
   });
 
   it('maps legacy CMS content (tag/imageUrl/cta fields) without crashing', () => {

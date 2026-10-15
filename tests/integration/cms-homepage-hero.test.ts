@@ -149,6 +149,39 @@ describe('CMS homepage hero slides — admin CRUD with validation', () => {
     expect(res.status).toBe(201);
   });
 
+  it('saves and projects a separate mobile focal point', async () => {
+    const res = await request(app)
+      .post('/api/admin/cms/homepage')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        ...VALID_HERO,
+        content: {
+          ...VALID_HERO.content,
+          imageFocalPoint: 'right',
+          imageMobileFocalPoint: 'top',
+        },
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.data.content.imageMobileFocalPoint).toBe('top');
+
+    const pub = await request(app).get('/api/public/cms/homepage/sections?sectionType=hero_slide');
+    expect(pub.body.data[0].content.imageMobileFocalPoint).toBe('top');
+  });
+
+  it('rejects an invalid mobile focal point value', async () => {
+    const res = await request(app)
+      .post('/api/admin/cms/homepage')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        ...VALID_HERO,
+        content: { ...VALID_HERO.content, imageMobileFocalPoint: 'somewhere' },
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.details.some((d: { field: string }) => d.field === 'content.imageMobileFocalPoint')).toBe(true);
+  });
+
   it('updates a slide and validates the new content', async () => {
     const created = await request(app)
       .post('/api/admin/cms/homepage')

@@ -575,21 +575,23 @@ Guardian Points progress and balance displays must use these design tokens.
 
 ### Homepage Hero (Photography-Led Carousel)
 
-CMS-managed (`hero_slide` sections) — three approved core-product stories; never statistics, testimonials, or prices. Implementation: `apps/web/src/components/hero/*`; spec: `docs/ux/HERO-SLIDER-IMPLEMENTATION.md`.
+CMS-managed (`hero_slide` sections) — three approved core-product stories; never statistics, testimonials, or prices. Implementation: `apps/web/src/components/hero/*`; spec: `docs/ux/HERO-SLIDER-IMPLEMENTATION.md`; image briefs: `docs/ux/HERO-IMAGE-CREATIVE-BRIEFS.md`.
 
 | Element | Specification |
 |---|---|
-| Background | `bg-gradient-to-b from-primary-50/70 via-white to-white` |
-| Layout desktop (≥768px) | 12-col grid: content `col-span-5`, media `col-span-7` (image-led editorial split) |
-| Layout mobile | Stacked: media first (never hidden), content below |
-| Eyebrow | `text-xs font-semibold uppercase tracking-[0.2em] text-primary-700` |
-| Headline | `text-3xl sm:text-4xl lg:text-5xl xl:text-[3.4rem] font-extrabold tracking-tight text-gray-900 leading-[1.1]` |
-| Supporting text | `text-base sm:text-lg text-gray-600 max-w-xl` |
+| Canvas | Full-bleed `bg-[#071f22]`; photography (or fallback gradient) covers the entire hero via an absolute `inset-0` media layer — no boxed image card |
+| Height | Responsive `min-h`: 600px (<1024px), 620px (lg), 680px (xl); grid-shared across slides so height never shifts mid-carousel |
+| Layout desktop (≥768px) | Left-anchored content (max `max-w-2xl`) inside the `max-w-7xl` site grid, vertically centered; media + scrim full-bleed behind |
+| Layout mobile | Same full-bleed canvas; content anchored low (`justify-end`), clear of the bottom controls |
+| Readability scrim | `HERO_SCRIM_CLASS` (`hero.types.ts`): mobile bottom-weighted `linear-gradient(to bottom, rgba(7,31,34,.45), rgba(7,31,34,.6) 50%, rgba(7,31,34,.95))`; desktop (≥768px) left-weighted `to right` from `.9` → `.05` so the subject on the right stays clear |
+| Eyebrow | `text-xs font-semibold uppercase tracking-[0.2em] text-primary-300` |
+| Headline | `text-3xl sm:text-4xl lg:text-5xl xl:text-[3.4rem] font-extrabold tracking-tight text-white leading-[1.1]` |
+| Supporting text | `text-base sm:text-lg text-white/85 max-w-xl` |
 | Primary CTA | `bg-primary-600 text-white px-7 py-3 rounded-xl font-semibold hover:bg-primary-700 min-h-[48px]` |
-| Secondary CTA | `border border-primary-600 text-primary-600 rounded-xl hover:bg-primary-50` |
-| Media container | `aspect-[4/3] rounded-2xl md:rounded-3xl shadow-lg ring-1 ring-gray-900/5`; object-position from focal point |
-| Fallback (no photo) | **Gradient `#0d9488` → `#115e59`** — Tailwind `bg-gradient-to-br from-primary-600 to-primary-800`, compiled as `linear-gradient(to bottom right, #0d9488 var(--tw-gradient-from-position), #115e59 var(--tw-gradient-to-position))`. The `--tw-gradient-*-position` variables must not be overridden. Constant: `HERO_FALLBACK_GRADIENT_CLASS` (`apps/web/src/components/hero/hero.types.ts`). Plus centered `PawPrint` `text-white/15` — never broken-image icons, never stock placeholders |
-| Controls | Dots (`h-2.5`, active `w-8 bg-primary-600`) + pause/play + prev/next (`h-10 w-10 rounded-full border bg-white`); left-aligned on mobile (clear of the emergency FAB), spread `justify-between` on desktop |
+| Secondary CTA | `border border-white/70 text-white rounded-xl hover:bg-white/10 min-h-[48px]` |
+| Media | `<picture>`: mobile crop `<source media="(max-width: 767px)">` when `mobileImageUrl` set, desktop `<img>` `object-cover` otherwise; per-breakpoint focal classes (`HERO_FOCAL_CLASSES` mobile / `HERO_FOCAL_DESKTOP_CLASSES` ≥768px); first slide eager + `fetchpriority=high` (LCP), later slides lazy |
+| Fallback (no photo) | **Deep teal→charcoal gradient** `bg-gradient-to-br from-primary-900 via-gray-900 to-primary-800` (`HERO_FALLBACK_GRADIENT_CLASS`) filling the whole canvas — no paw watermark, no broken-image icons, no stock placeholders |
+| Controls | Bar indicators (`h-1.5`, active `w-8 bg-white`, inactive `w-4 bg-white/50`) lower-left; pause/play + prev/next (`h-10 w-10 rounded-full border-white/40 bg-white/10 text-white`) lower-right on desktop, clustered left on mobile (clear of the emergency FAB); white focus rings |
 | Motion | Crossfade `opacity` 600ms ease-out; instant under `prefers-reduced-motion` |
 | Autoplay | 7s default; pauses on hover, focus-within, page hidden, reduced motion, and any manual interaction (resumable via control) |
 

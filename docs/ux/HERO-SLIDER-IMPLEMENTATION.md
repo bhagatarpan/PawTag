@@ -1,14 +1,16 @@
 # Homepage Hero Slider — Implementation & Design Reference
 
-**Status:** In progress (progress tracked in the checklist at the bottom)
-**Branch:** `feature/homepage-hero-slider`
+**Status:** Cinematic redesign implemented (2026-10-15); final photography pending owner upload
+**Branch:** `main`
 **Scope:** Homepage hero carousel only. Sibling homepage sections (ticker, testimonials, guardian promo) are untouched — see "Known issues outside scope".
 
 ---
 
 ## 1. Goal
 
-Replace the gradient/illustration hero (5 slides, visual hidden on mobile, fake statistics) with a **premium, photography-led editorial carousel**: three approved stories, real HTML text, CMS-managed, image-ready, accessible, and fully visible on mobile.
+A **premium full-width cinematic hero**: the photograph covers the entire hero canvas edge-to-edge; headlines, descriptions, CTAs, and controls are real HTML layered over it behind a readability scrim. Three approved stories, CMS-managed, image-ready, accessible, and fully visible on mobile.
+
+> Historical note: the first implementation (2026-10-14) used an editorial split layout (content left, boxed 4:3 image right). The business owner approved the full-bleed photographic direction; this document describes the current implementation.
 
 ---
 
@@ -39,15 +41,18 @@ Files: `apps/web/src/components/hero/*` · `apps/web/src/components/HeroSlider.t
 
 | Decision | Choice | Why |
 |---|---|---|
-| Layout desktop | Editorial split ~42% content / 58% media, white/primary-50 base (DESIGN.md tokens) | Image is the hero element; heavy gradients replaced by calm premium base |
-| Layout mobile | **Stacked, image first** — the old `hidden md:` pattern is removed | Mobile gets the full brand impression; legibility without text-over-subject risk |
-| No image yet | Refined teal gradient + oversized low-opacity PawPrint watermark | Polished before photography exists; no broken images, no stock photos |
+| Layout | **Full-bleed cinematic canvas** — media + scrim absolute `inset-0`; content overlaid in the `max-w-7xl` grid | Owner-approved direction: premium pet-lifestyle advertising, not a SaaS split panel |
+| Layout desktop | Content left-anchored (max `max-w-2xl`), vertically centered; subject expected right-of-frame | Photograph dominates; scrim guarantees text contrast on any photo brightness |
+| Layout mobile | Same canvas, content anchored low (`justify-end`), bottom-weighted scrim; portrait mobile crop preferred | Photograph never hidden; text stays legible without cutting the subject |
+| No image yet | Deep teal→charcoal gradient fills the whole canvas (no watermark, no box) | Polished before photography exists; composition identical with/without photos |
+| Responsive images | Single `<picture>` — mobile crop `<source media="(max-width: 767px)">`, desktop `<img>` fallback | One download per slide (two `<img>` elements would fetch both); native browser selection |
+| Focal points | Separate desktop (`imageFocalPoint`) and mobile (`imageMobileFocalPoint`) CMS fields; mobile falls back to desktop on legacy records | Portrait and landscape crops keep different subjects visible; additive Mixed-blob key, no migration |
 | Slide count | 3 approved stories (Guardian/Gold preserved but deactivated, not deleted) | Core product focus per owner decision; memberships promoted via dedicated sections |
 | Text | Always real HTML, never in the image | Accessibility, SEO, CMS editability |
 | Carousel engine | Custom hook (no framework) | Existing pattern was fine; requirements are modest; avoids new dependency |
 | Autoplay | 7s default, pauses on hover/focus/hidden/user-pause/reduced-motion, visible pause/play | WCAG 2.2 AA |
 | Transition | Crossfade 600ms (instant under reduced-motion) | Restrained, no layout shift |
-| Legacy CMS data | New fields added to `content` (Mixed) — old records render via fallbacks (`tag`→eyebrow, `imageUrl`→desktop) | Zero migration, zero data loss |
+| Legacy CMS data | New fields added to `content` (Mixed) — old records render via fallbacks (`tag`→eyebrow, `imageUrl`→desktop, mobile focal→desktop focal) | Zero migration, zero data loss |
 | Rollout | Migration script adds 3 new slides + **deactivates** (never deletes) old ones | Fully reversible via admin toggle |
 | CTAs | Verified real routes only: `/shop`, `/about`, `/pet-recovery`; unsafe/invalid links fall back safely | No dead links, no open redirects |
 
@@ -57,11 +62,12 @@ Files: `apps/web/src/components/hero/*` · `apps/web/src/components/HeroSlider.t
 CMS slides present?
  ├─ No  → render DEFAULT_HERO_SLIDES (3 approved stories)
  └─ Yes → normalize each: eyebrow(legacy:tag) → headline → sub → CTAs(legacy:ctaText/ctaUrl)
-          images: desktopImageUrl (legacy: imageUrl) + mobileImageUrl + focal point
+          images: desktopImageUrl (legacy: imageUrl) + mobileImageUrl + focal points
 Slide has image URL?
- ├─ Yes → <img> (eager+fetchPriority for active first slide; lazy otherwise)
- │         onError → fallback gradient + watermark
- └─ No  → fallback gradient + watermark
+ ├─ Yes → <picture>: mobile crop <source media="(max-width: 767px)"> when set,
+ │         desktop <img> (eager + fetchPriority for the active first slide; lazy otherwise)
+ │         onError → fallback gradient canvas
+ └─ No  → fallback gradient canvas (full-bleed, no watermark)
 CTA URL valid? (relative /path or http(s)://)
  ├─ Primary invalid   → CTA points at /shop (safe fallback, logged)
  └─ Secondary invalid → secondary CTA omitted
@@ -83,46 +89,42 @@ Copy rules: no statistics, no testimonials, no prices in hero copy. Membership/G
 
 ## 5. Screen Mockups (visual reference)
 
-### Desktop ≥768px
+### Desktop ≥768px — full-bleed cinematic
 
 ```text
 ┌────────────────────────────────────────────────────────────────────────┐
 │  PawTag  Shop Guardian Membership   Cart   Sign In                     │  ← existing navbar
 ├────────────────────────────────────────────────────────────────────────┤
+│▓▓▓▓ FULL-WIDTH PHOTOGRAPH (or teal→charcoal fallback gradient) ▓▓▓▓▓▓▓▓│
+│▓▓▓▓ scrim: dark left → clear right ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓│
 │                                                                        │
-│   PET SAFETY, SIMPLIFIED                       ┌───────────────────┐   │  ← eyebrow (primary-700,
-│                                                │                   │   │    uppercase, tracked)
-│   They can't tell someone                     │                   │   │
-│   where they live.                            │   [ PHOTOGRAPHY   │   │  ← headline: gray-900,
-│   Their tag can.                              │     4:3, rounded   │   │    display scale,
-│                                                │     3xl, shadow   │   │    max 2 lines]
-│   Give your pet a simple way                   │                   │   │
-│   to be identified and help                    │   fallback: teal  │   │  ← sub: gray-600, body-lg
-│   someone reach you if they wander.            │   gradient + paw  │   │
-│                                                │   watermark       │   │
-│   [ Shop PawTag → ]   [ How PawTag Works ]     │                   │   │  ← primary: bg-primary-600
-│                                                └───────────────────┘   │    secondary: outline
-│   ● ─ ○     (slide 1 of 3)                 [‹] [▶/❚❚] [›]              │  ← controls row: dots left,
-│                                                                        │    arrows+pause right
+│   PET SAFETY, SIMPLIFIED              (subject right-of-frame)         │  ← eyebrow primary-300
+│                                                                        │
+│   They can't tell someone                                                     headline: white,
+│   where they live. Their tag                                                  display scale,
+│   can.                                                                        max-w-2xl
+│   Give your pet a simple way to                                              ← sub: white/85
+│   be identified and help someone…                                            │
+│                                                                        │
+│   [ Shop PawTag → ]   [ How PawTag Works ]                              │  ← primary fill + white outline
+│                                                                        │
+│   ▰ ─ ─                                              ⏸  ◀  ▶           │  ← bars left, controls right
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Mobile <768px (stacked — image never hidden)
+### Mobile <768px (same canvas — content anchored low)
 
 ```text
 ┌──────────────────────────┐
 │ ≡  PawTag          🛒 👤 │
 ├──────────────────────────┤
-│ ┌──────────────────────┐ │
-│ │                      │ │  ← image: aspect-[4/3],
-│ │   [ PHOTOGRAPHY ]    │ │     rounded-2xl, focal point
-│ │                      │ │
-│ └──────────────────────┘ │
+│▓▓▓▓▓▓▓ PHOTOGRAPH ▓▓▓▓▓▓│  ← full-bleed; portrait crop preferred;
+│▓▓▓▓▓ (subject top) ▓▓▓▓▓│     scrim: light top → dark bottom
 │                          │
 │ PET SAFETY, SIMPLIFIED   │
 │ They can't tell someone  │
-│ where they live.         │
-│ Their tag can.           │
+│ where they live. Their   │
+│ tag can.                 │
 │                          │
 │ Give your pet a simple   │
 │ way to be identified…    │
@@ -130,19 +132,23 @@ Copy rules: no statistics, no testimonials, no prices in hero copy. Membership/G
 │ [ Shop PawTag → ]        │  ← full-width, 48px touch target
 │ [ How PawTag Works ]     │
 │                          │
-│  ● ─ ○        [‹][▶][›]  │
+│  ▰ ─ ─   [⏸][‹][›]      │  ← controls clustered left (clear of FAB)
 └──────────────────────────┘
 ```
 
 ### Fallback state (no photography yet)
 
 ```text
-┌───────────────────────┐   Gradient: from-primary-600 to-primary-800
-│                       │   Watermark: PawPrint, white/10, oversized,
-│        🐾             │   centered. No text. No broken-image icon.
-│      (giant paw)      │   Identical treatment desktop + mobile.
-│                       │
-└───────────────────────┘
+┌───────────────────────────────┐   Gradient: from-primary-900 via-gray-900
+│                               │   to-primary-800, full-bleed canvas.
+│   PET SAFETY, SIMPLIFIED      │   Same composition as the photographic
+│                               │   state — scrim + white text + controls.
+│   They can't tell someone     │   No watermark. No text baked into
+│   where they live…            │   media. No broken-image icon.
+│                               │   Identical on desktop + mobile.
+│   [ Shop PawTag ] [ How… ]    │
+│   ▰ ─ ─              ⏸ ◀ ▶   │
+└───────────────────────────────┘
 ```
 
 ---
@@ -157,9 +163,10 @@ Copy rules: no statistics, no testimonials, no prices in hero copy. Membership/G
 | `ctaText` / `ctaUrl` | string | Primary CTA; URL must be relative (`/shop`) or http(s) |
 | `secondaryCtaText` / `secondaryCtaUrl` | string | Optional; omitted when invalid/empty |
 | `desktopImageUrl` | string (media picker) | Legacy fallback: `imageUrl` |
-| `mobileImageUrl` | string (media picker) | Optional purpose-cropped image |
+| `mobileImageUrl` | string (media picker) | Optional purpose-cropped image; desktop image served below 768px otherwise |
 | `imageAlt` | string | Alt text; empty = decorative |
-| `imageFocalPoint` | enum | object-position preset (center/top/right/bottom/…) |
+| `imageFocalPoint` | enum | Desktop object-position preset (center/top/right/bottom/…) |
+| `imageMobileFocalPoint` | enum | Mobile object-position preset; falls back to `imageFocalPoint` on legacy records |
 | `duration` | number 3–30 | Autoplay seconds; default 7 |
 | *legacy:* `tag`, `bg`, `visualType`, `stats`, `flowSteps` | — | Tolerated, ignored by new renderer, still editable for restored slides |
 
@@ -206,8 +213,11 @@ Three photographs per `docs/ux/HERO-IMAGE-CREATIVE-BRIEFS.md`. Upload via Admin 
 - [x] Stage 6 — Responsive & performance (visual review at 375/768/1280/1920; eager LCP first slide, lazy others; aspect-ratio CLS guard; mobile FAB-overlap defect found in screenshots and fixed)
 - [x] Stage 7 — Testing (36 unit/component + 14 API integration + **8 browser E2E passed**; web/admin/api builds + typechecks clean; full unit suite 1044/1044)
 - [x] Stage 8 — Documentation, creative briefs, skill extraction, README/AGENTS/DESIGN updates
+- [x] Stage 9 — **Cinematic full-bleed redesign** (2026-10-15): split layout removed; full-viewport media canvas + readability scrim; `<picture>` responsive images; separate desktop/mobile focal points (`imageMobileFocalPoint` additive CMS key, validated + projected); dark-surface controls/typography; deep teal→charcoal fallback (paw watermark removed); admin preview rebuilt to match the live composition; docs + briefs updated
 
-## 11. Verification Evidence (2026-10-14, branch `feature/homepage-hero-slider`)
+## 11. Verification Evidence
+
+### Initial build (2026-10-14, branch `feature/homepage-hero-slider`)
 
 | Check | Result |
 |---|---|
@@ -220,6 +230,19 @@ Three photographs per `docs/ux/HERO-IMAGE-CREATIVE-BRIEFS.md`. Upload via Admin 
 | `scripts/migrate-hero-slides-v2.ts` dry-run vs dev DB | **PASS** — plans 3 adds + 6 legacy deactivations (incl. `/gold` slide), 0 mutations |
 | Screenshot inspection 375/768/1280/1920 + slide 2 | Done — mobile FAB/controls overlap found & fixed, re-verified |
 
-**E2E note:** the standard web preview proxies `/api` → `localhost:5000`, so `playwright.hero.config.ts` runs an isolated port and the spec stubs the CMS endpoint (`page.route`) for determinism. `pnpm test:e2e:hero` runs the suite.
+### Cinematic redesign (2026-10-15, branch `main`)
 
-**Migration not yet executed** against any database — dry-run only; run `scripts/migrate-hero-slides-v2.ts --apply --yes` after founder review.
+| Check | Result |
+|---|---|
+| `pnpm vitest run tests/unit/hero-*.test.*` | **28/28 PASS** (6 new: picture/source, full-bleed layers, fallback canvas, focal points, eager/lazy) |
+| `pnpm vitest run tests/integration/cms-homepage-hero.test.ts` | **16/16 PASS** (2 new: mobile focal save/project + invalid-value rejection) |
+| `pnpm exec playwright test --config playwright.hero.config.ts` | **11/11 PASS** (3 new: desktop full-bleed width, photograph-covers-canvas layering, updated mobile composition) |
+| Typecheck api / web / admin · build web / admin | **PASS** |
+| Built-CSS inspection | All scrim + focal classes compiled (`071f22` stops incl. `/95`, `md:object-*`) — caught & fixed a dropped `/92` opacity stop mid-work |
+| Screenshot inspection 320/375/390/430/768/1280×720/1280/1440/1920 + slide 2 crossfade | Done — full-bleed canvas, scrim, alignment, controls verified at every viewport |
+
+**E2E note:** the standard web preview proxies `/api` → `localhost:5000`, so `playwright.hero.config.ts` runs an isolated port and the spec stubs the CMS endpoint (`page.route`) for determinism.
+
+**Known pre-existing issue (not fixed — outside hero scope):** the homepage page-level `scrollWidth` exceeds the viewport by ~20px at desktop widths because `FadeIn direction="left"` (used for `ResponsibilityScore` in `Home.tsx`) renders a `translateX(20px)` pre-reveal state. Hero-level overflow tests are scoped to the hero box accordingly.
+
+**Photography not yet tested** — no real hero images exist in the environment; the image path is verified with component tests, integration tests, and a data-URI fixture in Chromium. Final visual validation after the owner uploads the three photographs remains an explicit follow-up.

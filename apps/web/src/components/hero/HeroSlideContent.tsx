@@ -22,8 +22,8 @@ function HeroCtaLink({
 
   const classes =
     variant === 'primary'
-      ? 'inline-flex items-center justify-center gap-2 min-h-[48px] bg-primary-600 text-white px-7 py-3 rounded-xl font-semibold hover:bg-primary-700 active:bg-primary-800 transition-colors shadow-sm'
-      : 'inline-flex items-center justify-center gap-2 min-h-[48px] border border-primary-600 text-primary-600 px-6 py-3 rounded-xl font-semibold hover:bg-primary-50 transition-colors';
+      ? 'inline-flex items-center justify-center gap-2 min-h-[48px] bg-primary-600 text-white px-7 py-3 rounded-xl font-semibold hover:bg-primary-700 active:bg-primary-800 transition-colors shadow-md'
+      : 'inline-flex items-center justify-center gap-2 min-h-[48px] border border-white/70 text-white px-6 py-3 rounded-xl font-semibold hover:bg-white/10 transition-colors';
 
   // Only the active slide's CTAs are reachable by keyboard.
   const focusability = active ? undefined : ({ tabIndex: -1 } as const);
@@ -49,9 +49,11 @@ function HeroCtaLink({
 }
 
 /**
- * Text content for one hero slide. Always real HTML — never baked into an
- * image — so it stays accessible, editable in the CMS, and readable by
- * search engines.
+ * Text content for one hero slide, layered over the photographic canvas.
+ * Always real HTML — never baked into an image — so it stays accessible,
+ * editable in the CMS, and readable by search engines. Colours are tuned
+ * for the dark readability scrim (see HERO_SCRIM_CLASS); the scrim
+ * guarantees contrast regardless of the underlying photograph.
  */
 export default function HeroSlideContent({
   slide,
@@ -63,15 +65,15 @@ export default function HeroSlideContent({
   return (
     <div className="flex flex-col items-start">
       {slide.eyebrow && (
-        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-primary-700">
+        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-primary-300">
           {slide.eyebrow}
         </p>
       )}
-      <h2 className="text-3xl sm:text-4xl lg:text-5xl xl:text-[3.4rem] font-extrabold tracking-tight text-gray-900 leading-[1.1]">
+      <h2 className="text-3xl sm:text-4xl lg:text-5xl xl:text-[3.4rem] font-extrabold tracking-tight text-white leading-[1.1]">
         {slide.headline}
       </h2>
       {slide.sub && (
-        <p className="mt-4 max-w-xl text-base sm:text-lg text-gray-600 leading-relaxed">
+        <p className="mt-4 max-w-xl text-base sm:text-lg text-white/85 leading-relaxed">
           {slide.sub}
         </p>
       )}

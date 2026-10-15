@@ -1,22 +1,27 @@
 import { useState } from 'react';
-import { PawPrint } from 'lucide-react';
 import {
   HERO_FALLBACK_GRADIENT_CLASS,
   HERO_FOCAL_CLASSES,
+  HERO_FOCAL_DESKTOP_CLASSES,
   type HeroSlideModel,
 } from './hero.types';
 
 /**
- * Responsive hero imagery with a polished brand fallback.
+ * Full-bleed hero media layer — fills its slide's entire canvas
+ * (absolute inset-0; no box, no rounding, no watermark).
  *
- * - Desktop and mobile images render as purpose-specific <img> elements
- *   (a mobile crop is never a scaled desktop image; a desktop image is the
- *   fallback when no mobile crop exists).
- * - The active first slide loads eagerly (potential LCP element); every
- *   other image is lazy + async-decoded.
- * - The aspect-ratio container guarantees zero layout shift.
- * - Any load/decode error falls back to the teal gradient + paw watermark —
- *   never a broken-image icon, never stock photography.
+ * - A single <picture> selects the purpose-made mobile crop below 768px and
+ *   the desktop image above it; the desktop image also serves viewports with
+ *   no mobile crop. Only one image is downloaded per slide.
+ * - Object-position follows the selected image: the mobile crop uses the
+ *   mobile focal point below 768px, the desktop image uses the desktop
+ *   focal point above (separate CMS controls; the mobile focal falls back
+ *   to the desktop one on legacy records).
+ * - The first slide loads eagerly with high fetch priority (LCP element);
+ *   every later slide is lazy + async-decoded.
+ * - Until photography exists — or if a load/decode fails — the deep
+ *   teal→charcoal gradient fills the whole canvas. Never broken-image
+ *   icons, never stock photography.
  */
 export default function HeroSlideMedia({
   slide,
@@ -25,53 +30,32 @@ export default function HeroSlideMedia({
   slide: HeroSlideModel;
   eager: boolean;
 }) {
-  const [failed, setFailed] = useState<{ desktop: boolean; mobile: boolean }>({
-    desktop: false,
-    mobile: false,
-  });
-  const focal = HERO_FOCAL_CLASSES[slide.focalPoint];
+  const [failed, setFailed] = useState(false);
+  const mobileFocal = HERO_FOCAL_CLASSES[slide.mobileFocalPoint];
+  const desktopFocal = HERO_FOCAL_DESKTOP_CLASSES[slide.focalPoint];
   const desktopUrl = slide.desktopImageUrl;
-  const mobileUrl = slide.mobileImageUrl || slide.desktopImageUrl;
+  const mobileUrl = slide.mobileImageUrl;
   const alt = slide.imageAlt; // empty = decorative
 
-  const showMobileImage = Boolean(mobileUrl) && !failed.mobile;
-  const showDesktopImage = Boolean(desktopUrl) && !failed.desktop;
-
   return (
-    <div className={`relative aspect-[4/3] w-full overflow-hidden rounded-2xl md:rounded-3xl ${HERO_FALLBACK_GRADIENT_CLASS} shadow-lg ring-1 ring-gray-900/5`}>
-      {showMobileImage && (
-        <img
-          key={`m-${mobileUrl}`}
-          src={mobileUrl}
-          alt={alt}
-          aria-hidden={alt ? undefined : true}
-          loading={eager ? 'eager' : 'lazy'}
-          decoding="async"
-          onError={() => setFailed((state) => ({ ...state, mobile: true }))}
-          className={`md:hidden absolute inset-0 h-full w-full object-cover ${focal}`}
-        />
-      )}
-      {showDesktopImage && (
-        <img
-          key={`d-${desktopUrl}`}
-          src={desktopUrl}
-          alt={alt}
-          aria-hidden={alt ? undefined : true}
-          loading={eager ? 'eager' : 'lazy'}
-          decoding="async"
-          onError={() => setFailed((state) => ({ ...state, desktop: true }))}
-          className={`hidden md:block absolute inset-0 h-full w-full object-cover ${focal}`}
-        />
-      )}
-      {!showMobileImage && (
-        <div className="md:hidden absolute inset-0 flex items-center justify-center" aria-hidden="true">
-          <PawPrint className="h-2/5 w-2/5 text-white/15" strokeWidth={1} />
-        </div>
-      )}
-      {!showDesktopImage && (
-        <div className="hidden md:flex absolute inset-0 items-center justify-center" aria-hidden="true">
-          <PawPrint className="h-2/5 w-2/5 text-white/15" strokeWidth={1} />
-        </div>
+    <div data-testid="hero-media" className={`absolute inset-0 ${HERO_FALLBACK_GRADIENT_CLASS}`}>
+      {!failed && desktopUrl && (
+        <picture>
+          {mobileUrl && <source media="(max-width: 767px)" srcSet={mobileUrl} />}
+          <img
+            src={desktopUrl}
+            alt={alt}
+            aria-hidden={alt ? undefined : true}
+            loading={eager ? 'eager' : 'lazy'}
+            // Lowercase spread: React 18 passes unknown lowercase attributes
+            // through untouched (the camelCase fetchPriority prop lands in
+            // React 19). Marks the first slide as the LCP candidate.
+            {...(eager ? ({ fetchpriority: 'high' } as Record<string, string>) : {})}
+            decoding="async"
+            onError={() => setFailed(true)}
+            className={`h-full w-full object-cover ${mobileFocal} ${desktopFocal}`}
+          />
+        </picture>
       )}
     </div>
   );

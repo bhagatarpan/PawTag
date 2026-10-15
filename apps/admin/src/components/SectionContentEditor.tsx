@@ -251,6 +251,14 @@ const HERO_FOCAL_OPTIONS = [
   { value: 'right-bottom', label: 'Bottom right' },
 ];
 
+/** CSS object-position per focal point — mirrors the live hero's crop behaviour. */
+const HERO_FOCAL_CSS: Record<string, string> = {
+  center: 'center', top: 'center top', bottom: 'center bottom',
+  left: 'left center', right: 'right center',
+  'left-top': 'left top', 'right-top': 'right top',
+  'left-bottom': 'left bottom', 'right-bottom': 'right bottom',
+};
+
 /** Mirrors the server-side rule: site paths or http(s) only. */
 function isValidCtaUrl(url: string): boolean {
   const value = url.trim();
@@ -259,31 +267,52 @@ function isValidCtaUrl(url: string): boolean {
   return /^https?:\/\//i.test(value);
 }
 
+/**
+ * Preview of the live full-width cinematic hero: photography covers the
+ * whole pane, a dark readability scrim sits on top, and the eyebrow /
+ * headline / CTA pills render as white overlay text — mirroring
+ * apps/web/src/components/hero/* so admin previews never drift from
+ * the published homepage.
+ */
 function HeroPreviewPane({
   label,
   className,
   eyebrow,
   headline,
   imageUrl,
+  focalPoint = 'center',
+  shape = 'desktop',
 }: {
   label: string;
   className: string;
   eyebrow: string;
   headline: string;
   imageUrl: string;
+  focalPoint?: string;
+  /** Which live composition to mirror — the mobile pane always uses the vertical scrim. */
+  shape?: 'desktop' | 'mobile';
 }) {
+  const objectPosition = HERO_FOCAL_CSS[focalPoint] || 'center';
+  const scrim =
+    shape === 'mobile'
+      ? 'bg-gradient-to-b from-[#071f22]/40 via-[#071f22]/55 to-[#071f22]/90'
+      : 'bg-gradient-to-b from-[#071f22]/40 via-[#071f22]/55 to-[#071f22]/90 md:bg-gradient-to-r md:from-[#071f22]/85 md:via-[#071f22]/50 md:to-[#071f22]/5';
   return (
     <div>
       <p className="text-xs font-medium text-gray-500 mb-1">{label}</p>
-      <div className={`${className} overflow-hidden rounded-lg border border-gray-200 bg-gradient-to-br from-primary-600 to-primary-800`}>
-        {imageUrl ? (
-          <img src={imageUrl} alt="" className="h-full w-full object-cover" />
-        ) : (
-          <div className="flex h-full flex-col justify-center px-3">
-            {eyebrow && <p className="text-[8px] font-semibold uppercase tracking-widest text-white/80">{eyebrow}</p>}
-            <p className="mt-1 line-clamp-3 text-[11px] font-bold leading-tight text-white">{headline || 'Headline preview'}</p>
-          </div>
+      <div className={`${className} relative overflow-hidden rounded-lg border border-gray-200 bg-gradient-to-br from-primary-900 via-gray-900 to-primary-800`}>
+        {imageUrl && (
+          <img src={imageUrl} alt="" className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition }} />
         )}
+        <div aria-hidden="true" className={`absolute inset-0 ${scrim}`} />
+        <div className="relative flex h-full flex-col justify-end p-3">
+          {eyebrow && <p className="text-[8px] font-semibold uppercase tracking-widest text-primary-300">{eyebrow}</p>}
+          <p className="mt-0.5 line-clamp-3 text-[11px] font-bold leading-tight text-white">{headline || 'Headline preview'}</p>
+          <div className="mt-2 flex gap-1.5">
+            <span className="rounded bg-primary-600 px-2 py-0.5 text-[7px] font-semibold text-white">Primary CTA</span>
+            <span className="rounded border border-white/70 px-2 py-0.5 text-[7px] font-semibold text-white">Secondary</span>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -325,7 +354,8 @@ function HeroSlideEditor({ content, onChange }: { content: Record<string, unknow
     <div className="space-y-4">
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
         This is one hero slide. The homepage shows your published slides in order. Upload desktop and mobile
-        photography below — until an image is set, visitors see a branded PawTag placeholder. Never put
+        photography below — the photo fills the entire homepage hero with the text overlaid on a dark
+        gradient. Until an image is set, visitors see a branded teal gradient. Never put
         statistics, testimonials, or prices in a hero slide.
       </div>
 
@@ -373,9 +403,10 @@ function HeroSlideEditor({ content, onChange }: { content: Record<string, unknow
       <div className="space-y-3">
         <h4 className="text-sm font-semibold text-gray-900 border-b pb-1">Photography</h4>
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">
-          Recommended: landscape photo around 2000×1500px (4:3), under 500&nbsp;KB, WebP or JPG.
-          Add a separate vertical mobile crop (~1200×900px) for the best phone experience.
-          Keep the pet toward one side so the headline area stays clear.
+          Recommended: wide cinematic desktop photo around 2400×1100px (≈2.2:1), under 500&nbsp;KB, WebP or JPG.
+          Add a separate portrait mobile crop (~1080×1620px) for the best phone experience.
+          Keep the pet on the right side of the desktop frame (top of the mobile frame) so the
+          headline area stays clear — the text sits over a dark gradient on the left.
         </div>
         <FieldRow label="Desktop Image">
           <ImagePicker value={desktopImage} onChange={v => update('desktopImageUrl', v)} placeholder="Choose or upload the desktop photo" />
@@ -386,8 +417,11 @@ function HeroSlideEditor({ content, onChange }: { content: Record<string, unknow
         <FieldRow label="Image Alt Text (describe the photo for screen readers)">
           <TextInput value={(content.imageAlt as string) || ''} onChange={v => update('imageAlt', v)} placeholder="e.g. Golden Retriever wearing a PawTag tag in afternoon sunlight" />
         </FieldRow>
-        <FieldRow label="Image Focal Point (which part stays visible when cropped)">
+        <FieldRow label="Image Focal Point (which part stays visible when cropped — desktop)">
           <Select value={(content.imageFocalPoint as string) || 'center'} onChange={v => update('imageFocalPoint', v)} options={HERO_FOCAL_OPTIONS} />
+        </FieldRow>
+        <FieldRow label="Mobile Focal Point (for the mobile crop; defaults to the setting above)">
+          <Select value={(content.imageMobileFocalPoint as string) || (content.imageFocalPoint as string) || 'center'} onChange={v => update('imageMobileFocalPoint', v)} options={HERO_FOCAL_OPTIONS} />
         </FieldRow>
       </div>
 
@@ -395,8 +429,8 @@ function HeroSlideEditor({ content, onChange }: { content: Record<string, unknow
       <div className="space-y-3">
         <h4 className="text-sm font-semibold text-gray-900 border-b pb-1">Preview</h4>
         <div className="grid grid-cols-[1fr_90px] gap-3 items-start">
-          <HeroPreviewPane label="Desktop" className="h-28" eyebrow={eyebrow} headline={headline} imageUrl={desktopImage} />
-          <HeroPreviewPane label="Mobile" className="h-36" eyebrow={eyebrow} headline={headline} imageUrl={mobileImage || desktopImage} />
+          <HeroPreviewPane label="Desktop" className="h-28" eyebrow={eyebrow} headline={headline} imageUrl={desktopImage} focalPoint={(content.imageFocalPoint as string) || 'center'} />
+          <HeroPreviewPane label="Mobile" className="h-36" shape="mobile" eyebrow={eyebrow} headline={headline} imageUrl={mobileImage || desktopImage} focalPoint={(content.imageMobileFocalPoint as string) || (content.imageFocalPoint as string) || 'center'} />
         </div>
       </div>
 

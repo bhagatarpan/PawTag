@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, fireEvent, within, act } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import type { HomepageSection } from '../../apps/web/src/hooks/useCms';
 
@@ -94,10 +94,101 @@ describe('HeroSlider', () => {
 
     expect(screen.getByText('Emotional')).toBeTruthy();
     expect(screen.getByRole('heading', { level: 2, name: 'Legacy headline lives on' })).toBeTruthy();
-    // Desktop + mobile variants both render (desktop image doubles as the
-    // mobile fallback when no mobile crop exists).
-    const images = container.querySelectorAll('img[src="/api/uploads/legacy.jpg"]');
-    expect(images.length).toBeGreaterThanOrEqual(1);
+    const img = container.querySelector('img[src="/api/uploads/legacy.jpg"]');
+    expect(img).toBeTruthy();
+  });
+
+  it('renders a <picture> with a mobile <source> when a separate mobile crop exists', () => {
+    mockSections.current = [
+      cmsSlide({
+        headline: 'With crop',
+        desktopImageUrl: '/api/uploads/desktop.jpg',
+        mobileImageUrl: '/api/uploads/mobile.jpg',
+      }),
+    ];
+    const { container } = renderSlider();
+
+    const source = container.querySelector('source[media="(max-width: 767px)"]');
+    expect(source?.getAttribute('srcset')).toBe('/api/uploads/mobile.jpg');
+    expect(container.querySelector('img[src="/api/uploads/desktop.jpg"]')).toBeTruthy();
+  });
+
+  it('lays media full-bleed behind overlaid content — no boxed image card remains', () => {
+    mockSections.current = [
+      cmsSlide({ headline: 'Cinematic', desktopImageUrl: '/api/uploads/x.jpg', imageAlt: 'A dog' }),
+    ];
+    const { container } = renderSlider();
+
+    const media = container.querySelector('[data-testid="hero-media"]');
+    expect(media).toBeTruthy();
+    expect(media?.className).toContain('absolute');
+    expect(media?.className).toContain('inset-0');
+    // The image itself fills the canvas (object-cover, no fixed aspect box)
+    const img = container.querySelector('img[src="/api/uploads/x.jpg"]');
+    expect(img?.className).toContain('object-cover');
+    expect(img?.className).toContain('h-full');
+    // The old aspect-[4/3] rounded placeholder box is gone
+    expect(container.querySelector('[class*="aspect-"]')).toBeNull();
+    expect(container.querySelector('[class*="rounded-2xl"]')).toBeNull();
+    // A readability scrim sits between media and content
+    const activeSlide = slidesOf(container)[0];
+    const scrim = activeSlide.querySelector('[aria-hidden="true"].absolute.inset-0[class*="gradient"]');
+    expect(scrim).toBeTruthy();
+  });
+
+  it('uses the full-bleed teal→charcoal fallback canvas when a slide has no photo', () => {
+    mockSections.current = [cmsSlide({ headline: 'No photo yet' })];
+    const { container } = renderSlider();
+
+    expect(container.querySelectorAll('img').length).toBe(0);
+    const media = container.querySelector('[data-testid="hero-media"]');
+    expect(media).toBeTruthy();
+    // Deep teal→charcoal fallback (not the old bright teal box)
+    expect(media?.className).toContain('from-primary-900');
+    expect(media?.className).toContain('to-primary-800');
+  });
+
+  it('applies separate mobile and desktop focal points as responsive classes', () => {
+    mockSections.current = [
+      cmsSlide({
+        headline: 'Focal',
+        desktopImageUrl: '/api/uploads/d.jpg',
+        mobileImageUrl: '/api/uploads/m.jpg',
+        imageFocalPoint: 'right',
+        imageMobileFocalPoint: 'top',
+      }),
+    ];
+    const { container } = renderSlider();
+
+    const img = container.querySelector('img');
+    expect(img?.className).toContain('object-top'); // mobile crop focal (below md)
+    expect(img?.className).toContain('md:object-right'); // desktop focal (≥ md)
+  });
+
+  it('falls back to the desktop focal point when the mobile focal is absent (legacy records)', () => {
+    mockSections.current = [
+      cmsSlide({
+        headline: 'Legacy focal',
+        desktopImageUrl: '/api/uploads/d.jpg',
+        imageFocalPoint: 'bottom',
+      }),
+    ];
+    const { container } = renderSlider();
+
+    const img = container.querySelector('img');
+    expect(img?.className).toContain('object-bottom');
+    expect(img?.className).toContain('md:object-bottom');
+  });
+
+  it('loads the first slide eagerly and later slides lazily', () => {
+    mockSections.current = [
+      cmsSlide({ headline: 'One', desktopImageUrl: '/a.jpg' }, 0, 'a'),
+      cmsSlide({ headline: 'Two', desktopImageUrl: '/b.jpg' }, 1, 'b'),
+    ];
+    const { container } = renderSlider();
+
+    expect(container.querySelector('img[src="/a.jpg"]')?.getAttribute('loading')).toBe('eager');
+    expect(container.querySelector('img[src="/b.jpg"]')?.getAttribute('loading')).toBe('lazy');
   });
 
   it('navigates next/previous with wraparound and updates indicators', () => {
@@ -210,14 +301,6 @@ describe('HeroSlider', () => {
     expect(inactiveLink?.getAttribute('tabindex')).toBe('-1');
   });
 
-  it('shows the branded fallback (no broken image) when a slide has no photo', () => {
-    mockSections.current = [cmsSlide({ headline: 'No photo yet' })];
-    const { container } = renderSlider();
-
-    expect(container.querySelectorAll('img').length).toBe(0);
-    expect(container.querySelector('.from-primary-600')).toBeTruthy();
-  });
-
   it('hides navigation controls for a single slide', () => {
     mockSections.current = [cmsSlide({ headline: 'Only one' })];
     renderSlider();
@@ -226,7 +309,7 @@ describe('HeroSlider', () => {
     expect(screen.queryByRole('button', { name: 'Pause auto-rotation' })).toBeNull();
   });
 
-  it('shows a stable skeleton while loading with no data', () => {
+  it('shows a stable dark skeleton while loading with no data', () => {
     mockSections.loading = true;
     const { container } = renderSlider();
 
