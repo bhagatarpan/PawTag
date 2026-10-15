@@ -35,10 +35,15 @@ interface Invoice {
   invoiceNumber: string;
   userId: { _id: string; fullName: string; email: string } | string;
   orderId: { _id: string; orderNumber: string; status: string } | string;
+  userMembershipId?: string;
+  subscriptionId?: string;
   amount: number;
   currency: string;
   status: 'paid' | 'pending' | 'failed' | 'refunded';
   paymentMethod?: string;
+  cardBrand?: string;
+  cardLast4?: string;
+  stripePaymentIntentId?: string;
   paidAt?: string;
   dueDate?: string;
   createdAt: string;
@@ -171,6 +176,7 @@ export default function Invoices() {
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Type</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Customer</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Order</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Payment</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Amount</th>
                 <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Status</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Date</th>
@@ -188,6 +194,14 @@ export default function Invoices() {
                       <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-700">
                         Credit Note
                       </span>
+                    ) : inv.userMembershipId ? (
+                      <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-700">
+                        Membership
+                      </span>
+                    ) : inv.subscriptionId ? (
+                      <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-amber-100 text-amber-700">
+                        Subscription
+                      </span>
                     ) : (
                       <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-700">
                         Invoice
@@ -196,6 +210,23 @@ export default function Invoices() {
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600">{getUserName(inv)}</td>
                   <td className="px-4 py-3 text-sm text-gray-600 font-mono">{getOrderNumber(inv)}</td>
+                  <td className="px-4 py-3 text-sm text-gray-600">
+                    {(inv.paymentMethod || inv.cardBrand) ? (
+                      <div>
+                        <span className="text-xs">
+                          {inv.paymentMethod && <span className="capitalize">{inv.paymentMethod}</span>}
+                          {inv.cardBrand && <> · <span className="uppercase">{inv.cardBrand}</span> ••••{inv.cardLast4 || '****'}</>}
+                        </span>
+                        {inv.stripePaymentIntentId && (
+                          <div className="text-[10px] text-gray-400 font-mono truncate max-w-[180px]" title={inv.stripePaymentIntentId}>
+                            {inv.stripePaymentIntentId}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-gray-400">—</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-right text-sm font-semibold text-gray-900">
                     ${inv.amount.toFixed(2)} {inv.currency}
                   </td>

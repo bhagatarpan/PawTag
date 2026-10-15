@@ -18,6 +18,15 @@ export interface IInvoiceDocument extends Document {
   stripePaymentIntentId?: string;
   stripeSubscriptionId?: string;
   paymentMethod?: string;
+  /**
+   * Payment card snapshot taken at document creation so the invoice is
+   * self-contained (no Order join needed at render time). Legacy invoices
+   * predate these fields — renderers fall back to Order.payment joins.
+   * Customer-facing documents show brand + last4 only; provider IDs
+   * (stripePaymentIntentId) are admin-channel-only.
+   */
+  cardBrand?: string;
+  cardLast4?: string;
 
   billingPeriod?: {
     start: Date;
@@ -59,6 +68,8 @@ const InvoiceSchema = new Schema<IInvoiceDocument>(
     stripePaymentIntentId: { type: String },
     stripeSubscriptionId: { type: String, index: true },
     paymentMethod: { type: String },
+    cardBrand: { type: String },
+    cardLast4: { type: String },
 
     billingPeriod: {
       start: { type: Date },

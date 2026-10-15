@@ -243,6 +243,10 @@ export class RefundService {
         currency: order.payment.currency || 'NZD',
         status: 'paid',
         paymentMethod: order.payment.method,
+        // Self-contained payment snapshot — refund returns to the original
+        // payment method, so the credit note carries the same card details
+        cardBrand: order.payment?.cardBrand,
+        cardLast4: order.payment?.cardLast4,
         paidAt: new Date(),
       });
 

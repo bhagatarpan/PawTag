@@ -256,7 +256,8 @@ adminDonationRouter.post('/receipts/:receiptId/resend', requirePermission('donat
 
 adminDonationRouter.get('/receipts/:receiptId/html', requirePermission('donation.receipts'), async (req: any, res: Response) => {
   try {
-    const html = await donationService.getReceiptHtml(req.params.receiptId);
+    // Admin channel — includes Stripe provider IDs for CSR troubleshooting
+    const html = await donationService.getReceiptHtml(req.params.receiptId, undefined, 'admin');
     res.type('html').send(html);
   } catch (err: any) {
     const msg = err.message || 'Receipt not found';
@@ -266,7 +267,8 @@ adminDonationRouter.get('/receipts/:receiptId/html', requirePermission('donation
 
 adminDonationRouter.get('/receipts/:receiptId/download', requirePermission('donation.receipts'), async (req: any, res: Response) => {
   try {
-    const pdf = await donationService.getReceiptPdf(req.params.receiptId);
+    // Admin channel — includes Stripe provider IDs for CSR troubleshooting
+    const pdf = await donationService.getReceiptPdf(req.params.receiptId, undefined, 'admin');
     const meta = await donationService.getReceiptMeta(req.params.receiptId);
     const filename = `${meta?.receiptNumber || 'donation-receipt'}.pdf`;
     res.setHeader('Content-Type', 'application/pdf');

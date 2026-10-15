@@ -17,6 +17,26 @@ Keep concepts distinct, for example:
 
 Do not force donation data into a commerce invoice merely to reuse code.
 
+## Rendering: one shared engine, distinct types
+
+All document **rendering** flows through the shared engine in `packages/api/src/services/finance/`:
+
+- `invoice-document.ts` — assembly: single source of truth for presentation (parties, payment, items, totals, kind-specific notes) with `channel: 'customer' | 'admin'`.
+- `invoice-document-html.ts` / `invoice-pdf.service.ts` — the one visual engine per format, consumed by invoices, credit notes, AND donation receipts. Donation receipts keep their own tax wording/semantics via the model's `notes` — the engine is shared, the document type is not.
+
+Rules:
+- `cardBrand`/`cardLast4` snapshot onto the document at **creation** (every creation site; membership invoices go through the exported `createMembershipInvoice` factory). Renderers fall back to legacy Order/Membership joins for old records.
+- Stripe card extraction (`finance/payment-snapshot.ts`) is best-effort and never blocks document issuance.
+- New document kinds must reuse this engine rather than adding another renderer.
+
+## Channel rule (provider identifiers)
+
+Customer documents — viewer HTML, PDFs, email template variables, and the customer invoice API — **never expose Stripe provider IDs** (`pi_`, `in_`, `ch_`). The invoice/order/receipt number is the customer's reference. Admin/CSR surfaces render the `admin` channel, which includes those IDs for troubleshooting. The channel is determined by `InvoiceAccessToken.issuedToAdmin` (durable server flag set at token creation) — never trust a client query param.
+
+## Downloads
+
+Customer and admin downloads are **real PDFs** (pdf-lib) via authenticated blob downloads (`apps/*/src/lib/downloadFile.ts`) or pre-verified token endpoints with `Content-Disposition: attachment`. Never the browser print dialog; never `window.open` after an async call (popup blockers silently drop those — use same-tab `window.location.assign`). Invoice links returned by the API are relative paths — the frontend resolves its actual origin; absolute URLs only in emails.
+
 ## Invariants
 
 - Numbers are unique and never recycled.

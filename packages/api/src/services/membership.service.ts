@@ -699,6 +699,10 @@ export async function activateMembership(membershipId: string) {
         amount: membership.price,
         currency: membership.currency || 'NZD',
         status: 'paid',
+        paymentMethod: membership.cardBrand ? 'card' : undefined,
+        // Self-contained payment snapshot from the membership's saved card
+        cardBrand: membership.cardBrand,
+        cardLast4: membership.cardLast4,
         stripeSubscriptionId: membership.stripeSubscriptionId,
         billingPeriod: {
           start: membership.currentPeriodStart,
@@ -1666,12 +1670,15 @@ async function nextMembershipInvoiceNumber(): Promise<string> {
 /**
  * Create a membership invoice document with idempotency.
  * Returns the invoice document, or an existing one if already created.
+ * Exported for the Stripe webhook renewal path — the single source of
+ * truth for INVM- numbering and payment card snapshots.
  */
-async function createMembershipInvoice(params: {
+export async function createMembershipInvoice(params: {
   userId: mongoose.Types.ObjectId;
   membershipId: mongoose.Types.ObjectId;
   stripeSubscriptionId?: string;
   stripeInvoiceId?: string;
+  stripePaymentIntentId?: string;
   amount: number;
   currency: string;
   billingPeriod: { start: Date; end: Date };
@@ -1691,6 +1698,14 @@ async function createMembershipInvoice(params: {
   }
 
   const invoiceNumber = await nextMembershipInvoiceNumber();
+
+  // Self-contained payment snapshot: saved membership card first, then a
+  // best-effort extraction from the payment intent (never blocks creation).
+  const membership = await UserMembership.findById(params.membershipId).select('cardBrand cardLast4').lean();
+  const card = membership?.cardBrand
+    ? { cardBrand: membership.cardBrand, cardLast4: membership.cardLast4 }
+    : await (await import('./finance/payment-snapshot')).cardSnapshotFromPaymentIntent(params.stripePaymentIntentId);
+
   return Invoice.create({
     userId: params.userId,
     userMembershipId: params.membershipId,
@@ -1698,6 +1713,10 @@ async function createMembershipInvoice(params: {
     amount: params.amount,
     currency: params.currency,
     status: 'paid',
+    paymentMethod: card.cardBrand ? 'card' : undefined,
+    cardBrand: card.cardBrand,
+    cardLast4: card.cardLast4,
+    stripePaymentIntentId: params.stripePaymentIntentId,
     stripeInvoiceId: params.stripeInvoiceId,
     stripeSubscriptionId: params.stripeSubscriptionId,
     billingPeriod: params.billingPeriod,
@@ -2192,6 +2211,7 @@ export async function completeRepairUpgrade(membership: any) {
           membershipId: membership._id,
           stripeSubscriptionId: membership.stripeSubscriptionId,
           stripeInvoiceId: latestInvoice.id,
+          stripePaymentIntentId: typeof latestInvoice.payment_intent === 'string' ? latestInvoice.payment_intent : undefined,
           amount: (latestInvoice.amount_due || 0) / 100,
           currency: (latestInvoice.currency || STRIPE_CURRENCY_NZD).toUpperCase(),
           billingPeriod: { start: membership.currentPeriodStart, end: membership.currentPeriodEnd },

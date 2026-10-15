@@ -411,14 +411,18 @@ export class DonationService {
   }
 
   /** Neutral receipt HTML (same fields as stored receipt). */
-  async getReceiptHtml(receiptId: string, userId?: string): Promise<string> {
+  /**
+   * Receipt HTML — shared document engine (same visual language as
+   * commerce invoices). Admin channel includes Stripe provider IDs.
+   */
+  async getReceiptHtml(receiptId: string, userId?: string, channel: 'customer' | 'admin' = 'customer'): Promise<string> {
     const receipt = await DonationReceipt.findById(receiptId);
     if (!receipt) throw new Error('Receipt not found');
     const donation = await Donation.findById(receipt.donationId).lean();
     if (userId && donation && String(donation.supporterUserId) !== userId) {
       throw new Error('Receipt not found');
     }
-    return this.renderReceiptDocument(receipt);
+    return this.renderReceiptDocument(receipt, channel);
   }
 
   /**
@@ -427,7 +431,15 @@ export class DonationService {
    */
   async getReceiptHtmlByToken(token: string): Promise<string> {
     const receipt = await this.getReceiptByToken(token);
-    return this.renderReceiptDocument(receipt);
+    return this.renderReceiptDocument(receipt, 'customer');
+  }
+
+  /** Shared document-engine rendering (finance/invoice-document-html). */
+  private async renderReceiptDocument(receipt: any, channel: 'customer' | 'admin' = 'customer'): Promise<string> {
+    const { assembleDonationReceiptDocument } = await import('../finance/invoice-document');
+    const { renderInvoiceDocumentHtml } = await import('../finance/invoice-document-html');
+    const model = await assembleDonationReceiptDocument(receipt, channel);
+    return renderInvoiceDocumentHtml(model);
   }
 
   private async getReceiptByToken(token: string): Promise<any> {
@@ -463,8 +475,9 @@ export class DonationService {
     return { receiptNumber: receipt.receiptNumber };
   }
 
-  /** PDF bytes for authenticated download. */
-  async getReceiptPdf(receiptId: string, userId?: string): Promise<Buffer> {
+  /** PDF bytes for authenticated download. Admin channel includes Stripe
+   *  provider IDs for CSR troubleshooting; customer channel never does. */
+  async getReceiptPdf(receiptId: string, userId?: string, channel: 'customer' | 'admin' = 'customer'): Promise<Buffer> {
     const receipt = await DonationReceipt.findById(receiptId);
     if (!receipt) throw new Error('Receipt not found');
     if (userId) {
@@ -473,7 +486,7 @@ export class DonationService {
         throw new Error('Receipt not found');
       }
     }
-    return this.buildReceiptPdf(receipt);
+    return this.buildReceiptPdf(receipt, channel);
   }
 
   /** PDF bytes for public token download. */
@@ -482,22 +495,11 @@ export class DonationService {
     return this.buildReceiptPdf(receipt);
   }
 
-  private async buildReceiptPdf(receipt: any): Promise<Buffer> {
-    const { generateDonationReceiptPdf } = await import('./donation-pdf');
-    return generateDonationReceiptPdf({
-      receiptNumber: receipt.receiptNumber,
-      organisationName: receipt.organisationName,
-      donorNameSnapshot: receipt.donorNameSnapshot,
-      amountCents: receipt.amountCents,
-      currency: receipt.currency,
-      statement: receipt.statement,
-      taxClassification: receipt.taxClassification,
-      irdNumber: receipt.irdNumber,
-      charitiesNumber: receipt.charitiesNumber,
-      signatory: receipt.signatory,
-      issuedAt: receipt.issuedAt,
-      status: receipt.status,
-    });
+  private async buildReceiptPdf(receipt: any, channel: 'customer' | 'admin' = 'customer'): Promise<Buffer> {
+    // Shared document engine — same visual language as commerce invoices
+    // (finance/invoice-document.ts + invoice-pdf.service.ts)
+    const { generateDonationReceiptPdf } = await import('../invoice-pdf.service');
+    return generateDonationReceiptPdf(receipt, channel);
   }
 
   /**
@@ -525,42 +527,6 @@ export class DonationService {
     receipt.accessExpiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
     await receipt.save();
     return token;
-  }
-
-  private renderReceiptDocument(receipt: any): string {
-    const amount = (receipt.amountCents / 100).toFixed(2);
-    const taxNote =
-      receipt.taxClassification === 'neutral' || !receipt.taxClassification
-        ? 'This is a donation payment receipt. Tax treatment, if any, depends on your circumstances and applicable law.'
-        : `Tax classification (configured): ${receipt.taxClassification}`;
-
-    // Invoice-style layout (reuse commercial invoice visual language; distinct document type)
-    return `<!DOCTYPE html>
-<html><head><meta charset="utf-8"/><title>Donation receipt ${escapeHtml(receipt.receiptNumber)}</title></head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 640px; margin: 40px auto; color: #111; line-height: 1.6;">
-  <div style="background: linear-gradient(135deg, #0d9488, #14b8a6); padding: 24px; border-radius: 12px 12px 0 0; text-align: center;">
-    <h1 style="color: white; font-size: 22px; margin: 0;">${escapeHtml(receipt.organisationName)}</h1>
-    <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0; font-size: 14px;">Donation receipt</p>
-  </div>
-  <div style="background: #f9fafb; padding: 28px; border: 1px solid #e5e7eb; border-top: 0;">
-    <p style="color: #374151; font-size: 15px;">Hi ${escapeHtml(receipt.donorNameSnapshot || 'Supporter')},</p>
-    <p style="color: #374151; font-size: 15px;">${escapeHtml(receipt.statement)}</p>
-    <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 14px;">
-      <tr><td style="padding: 8px 0; color: #6b7280;">Receipt number</td><td style="text-align: right; font-weight: 600;">${escapeHtml(receipt.receiptNumber)}</td></tr>
-      <tr><td style="padding: 8px 0; color: #6b7280;">Issued</td><td style="text-align: right;">${receipt.issuedAt ? new Date(receipt.issuedAt).toLocaleString('en-NZ') : ''}</td></tr>
-      <tr><td style="padding: 8px 0; color: #6b7280;">Donor</td><td style="text-align: right;">${escapeHtml(receipt.donorNameSnapshot || 'Supporter')}</td></tr>
-      <tr style="border-top: 1px solid #e5e7eb;"><td style="padding: 12px 0; font-weight: 700; font-size: 16px;">Amount</td><td style="text-align: right; font-weight: 700; font-size: 16px; color: #0d9488;">${escapeHtml(receipt.currency)} $${amount}</td></tr>
-      ${receipt.irdNumber ? `<tr><td style="padding: 8px 0; color: #6b7280;">IRD number</td><td style="text-align: right;">${escapeHtml(receipt.irdNumber)}</td></tr>` : ''}
-      ${receipt.charitiesNumber ? `<tr><td style="padding: 8px 0; color: #6b7280;">Charities number</td><td style="text-align: right;">${escapeHtml(receipt.charitiesNumber)}</td></tr>` : ''}
-      <tr><td style="padding: 8px 0; color: #6b7280;">Status</td><td style="text-align: right;">${escapeHtml(receipt.status)}</td></tr>
-    </table>
-    <p style="font-size: 13px; color: #4b5563;">${escapeHtml(taxNote)}</p>
-    ${receipt.signatory ? `<p style="font-size: 13px; color: #374151;"><strong>Authorised by:</strong> ${escapeHtml(receipt.signatory)}</p>` : ''}
-  </div>
-  <div style="text-align: center; padding: 16px; color: #9ca3af; font-size: 12px;">
-    ${escapeHtml(receipt.organisationName)} — Donation receipt ${escapeHtml(receipt.receiptNumber)}
-  </div>
-</body></html>`;
   }
 
   /** Resend receipt email (same receipt — no new receipt number). */
@@ -870,6 +836,12 @@ export class DonationService {
       ? 'neutral'
       : settings.taxClassification;
 
+    // Best-effort payment card snapshot — makes the receipt self-contained
+    // and consistent with commerce invoices (brand + last4 only; never
+    // blocks receipt issuance on Stripe failure; skipped in fake mode).
+    const { cardSnapshotFromPaymentIntent } = await import('../../services/finance/payment-snapshot');
+    const card = await cardSnapshotFromPaymentIntent(donation.stripePaymentIntentId);
+
     return DonationReceipt.create({
       receiptNumber,
       donationId: donation._id,
@@ -882,6 +854,8 @@ export class DonationService {
       taxClassification,
       statement: settings.receiptStatement,
       signatory: (await readOptionalSetting('donation.receipt.signatory')) || undefined,
+      cardBrand: card.cardBrand,
+      cardLast4: card.cardLast4,
       status: 'issued',
       issuedAt: new Date(),
     });
@@ -940,29 +914,18 @@ export class DonationService {
         </div>
       </div>`;
 
-    // PDF attachment (server-side)
+    // PDF attachment (server-side) — shared document engine; only when a
+    // receipt record exists (the document is the authoritative record)
     let attachments: Array<{ filename: string; contentType: string; content: Buffer }> | undefined;
     try {
-      const { generateDonationReceiptPdf } = await import('./donation-pdf');
-      const pdf = await generateDonationReceiptPdf({
-        receiptNumber,
-        organisationName,
-        donorNameSnapshot: donorName,
-        amountCents: donation.amountCents,
-        currency: donation.currency,
-        statement,
-        taxClassification: receipt?.taxClassification,
-        irdNumber: receipt?.irdNumber,
-        charitiesNumber: receipt?.charitiesNumber,
-        signatory: receipt?.signatory,
-        issuedAt: receipt?.issuedAt,
-        status: receipt?.status,
-      });
-      attachments = [{
-        filename: `${receiptNumber}-receipt.pdf`,
-        contentType: 'application/pdf',
-        content: pdf,
-      }];
+      if (receipt?._id) {
+        const pdf = await this.buildReceiptPdf(receipt);
+        attachments = [{
+          filename: `${receiptNumber}-receipt.pdf`,
+          contentType: 'application/pdf',
+          content: pdf,
+        }];
+      }
     } catch (err) {
       logger.error({ err, receiptNumber }, 'Failed to generate donation receipt PDF');
     }

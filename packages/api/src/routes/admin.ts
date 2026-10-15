@@ -3163,6 +3163,10 @@ router.post('/orders/:id/invoice', requirePermission('order.update'), async (req
       status: invoiceStatus,
       paymentMethod: order.payment.method || 'card',
       stripePaymentIntentId: order.payment.stripePaymentIntentId,
+      // Self-contained payment snapshot (renderers fall back to the
+      // Order join for legacy invoices that predate these fields)
+      cardBrand: order.payment?.cardBrand,
+      cardLast4: order.payment?.cardLast4,
       paidAt: order.payment.paidAt || (order as any).createdAt,
     });
 
