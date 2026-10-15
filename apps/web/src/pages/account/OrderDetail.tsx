@@ -356,9 +356,9 @@ export default function OrderDetail() {
     try {
       const res = await api.post(API.customer.invoices.access(invoice._id));
       const { secureUrl } = res.data.data;
-      if (secureUrl) window.open(secureUrl, '_blank');
+      if (secureUrl) window.location.assign(secureUrl); // same-tab: popup blockers drop async window.open
     } catch {
-      window.open(`/invoice/${invoice._id}`, '_blank');
+      window.location.assign(`/invoice/${invoice._id}`);
     }
   };
 

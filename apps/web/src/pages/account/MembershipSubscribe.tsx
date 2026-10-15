@@ -100,7 +100,7 @@ export default function MembershipSubscribe() {
       const res = await api.post(API.customer.membership.paymentMethodsPortal);
       const { url } = res.data.data || {};
       if (url) {
-        window.open(url, '_blank');
+        window.location.assign(url); // same-tab: popup blockers drop async window.open
         setError('Update your payment method in the secure portal, then confirm the upgrade again.');
       } else {
         setError('Payment settings are not available in demo mode.');

@@ -108,7 +108,7 @@ export default function MembershipManage() {
       const res = await api.post(API.customer.membership.paymentMethodsPortal);
       const { url } = res.data.data || {};
       if (url) {
-        window.open(url, '_blank');
+        window.location.assign(url); // same-tab: popup blockers drop async window.open
       } else {
         toast.info('Payment settings are not available in demo mode.');
       }
@@ -294,7 +294,7 @@ export default function MembershipManage() {
                       try {
                         const res = await api.post(API.customer.invoices.access(invoice._id));
                         const { secureUrl } = res.data.data;
-                        if (secureUrl) window.open(secureUrl, '_blank');
+                        if (secureUrl) window.location.assign(secureUrl); // same-tab: popup blockers drop async window.open
                       } catch {
                         // silently fail — invoice may not have access token yet
                       }

@@ -105,7 +105,7 @@ export default function Register() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gray-50 flex items-start justify-center px-4 py-8 sm:items-center sm:py-4">
         <div className="bg-white rounded-2xl shadow-sm p-8 max-w-md w-full text-center">
           <div className="h-16 w-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
             <CheckCircle className="h-10 w-10 text-green-600" />
@@ -142,7 +142,7 @@ export default function Register() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gray-50 flex items-start justify-center px-4 py-8 sm:items-center sm:py-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <Link to="/" className="inline-flex items-center gap-2 mb-6">

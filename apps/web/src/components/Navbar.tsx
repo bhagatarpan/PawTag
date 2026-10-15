@@ -163,11 +163,6 @@ export default function Navbar() {
               >
                 <Shield className="h-4 w-4" />
                 Guardian
-                {guardianData?.tier && (
-                  <span className="ml-1 px-1.5 py-0.5 bg-primary-100 text-primary-700 rounded text-[10px] font-semibold">
-                    {guardianData.points || 0} pts
-                  </span>
-                )}
               </Link>
               {/* Donate — only when donation.publicEnabled=true; quieter than Membership */}
               {donatePublic && (
@@ -302,11 +297,6 @@ export default function Navbar() {
               >
                 <Shield className="h-4 w-4" />
                 Guardian
-                {guardianData?.tier && (
-                  <span className="ml-auto px-2 py-0.5 bg-primary-100 text-primary-700 rounded text-xs font-semibold">
-                    {guardianData.points || 0} pts
-                  </span>
-                )}
               </Link>
               {donatePublic && (
                 <Link

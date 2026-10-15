@@ -39,7 +39,9 @@ async function fetchReceiptPdfBlob(receiptId: string): Promise<Blob> {
 function openReceiptInNewTab(html: string) {
   const blob = new Blob([html], { type: 'text/html' });
   const url = URL.createObjectURL(blob);
-  window.open(url, '_blank', 'noopener,noreferrer');
+  // Same-tab navigation — window.open is silently dropped by popup
+  // blockers when called from async handlers.
+  window.location.assign(url);
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 

@@ -228,7 +228,8 @@ export default function MembershipSubscriberDetail() {
     try {
       const res = await api.post('/admin/membership/payment-portal', { membershipId: id });
       const { url } = res.data.data || {};
-      if (url) window.open(url, '_blank');
+      // Same-tab navigation — popup blockers drop async window.open.
+      if (url) window.location.assign(url);
       else toast.info('Portal not available in demo mode');
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Failed to open billing portal');

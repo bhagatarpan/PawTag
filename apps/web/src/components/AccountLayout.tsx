@@ -302,7 +302,7 @@ export default function AccountLayout({ children }: { children: ReactNode }) {
         {/* Page Content */}
         <div className="max-w-4xl mx-auto px-4 md:px-6 py-6 md:py-8">
           <div className="flex items-center gap-2 text-sm text-gray-500 mb-6">
-            <Link to="/" className="hover:text-teal-600">Home</Link>
+            <Link to="/account" className="hover:text-teal-600">Home</Link>
             <ChevronRight size={14} />
             <span className="text-gray-900 font-medium">{currentLabel}</span>
           </div>

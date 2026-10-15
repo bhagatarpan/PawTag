@@ -21,7 +21,7 @@ export default function ResetPassword() {
 
   if (!token) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gray-50 flex items-start justify-center px-4 py-8 sm:items-center sm:py-4">
         <div className="w-full max-w-md text-center">
           <PawPrint className="h-12 w-12 text-gray-300 mx-auto mb-4" />
           <h1 className="text-xl font-semibold text-gray-900 mb-2">Invalid Reset Link</h1>
@@ -61,7 +61,7 @@ export default function ResetPassword() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gray-50 flex items-start justify-center px-4 py-8 sm:items-center sm:py-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <Link to="/login" className="inline-flex items-center gap-2 mb-6">

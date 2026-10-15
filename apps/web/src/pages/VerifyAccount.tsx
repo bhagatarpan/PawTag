@@ -282,7 +282,7 @@ export default function VerifyAccount() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-start justify-center px-4 py-8 sm:items-center sm:py-4">
         <Loader2 className="h-8 w-8 text-teal-600 animate-spin" />
       </div>
     );
@@ -295,7 +295,7 @@ export default function VerifyAccount() {
   const hasReturnUrl = !!peekReturnUrl();
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-12">
+    <div className="min-h-screen bg-gray-50 flex items-start justify-center px-4 py-8 sm:items-center sm:py-12">
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
           <div className="h-14 w-14 bg-gradient-to-br from-teal-600 to-teal-700 rounded-2xl flex items-center justify-center mx-auto mb-4">

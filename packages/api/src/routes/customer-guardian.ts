@@ -176,6 +176,58 @@ router.get('/rewards', async (req: AuthRequest, res: Response) => {
 
 /**
  * @swagger
+ * /api/customer/guardian/rewards/history:
+ *   get:
+ *     tags: [Customer - Guardian]
+ *     summary: Get PawRewards transaction history
+ *     description: "Returns the authenticated user's PawRewards ledger entries (allocations, earnings, redemptions, expirations)."
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 50
+ *     responses:
+ *       200:
+ *         description: PawRewards history
+ *       401:
+ *         description: Not authenticated
+ */
+router.get('/rewards/history', async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'Not authenticated' });
+    }
+
+    const limitParsed = paginationQuerySchema.safeParse({ limit: req.query.limit });
+    const limit = limitParsed.success ? limitParsed.data.limit : 50;
+
+    const history = await PawRewardsLedger.find({ userId })
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .lean();
+
+    await auditCustomerGuardianEvent(req, {
+      action: 'guardian_rewards_history_viewed',
+      eventType: 'CUSTOMER_ACTION',
+      eventCategory: 'READ',
+      operationType: 'READ',
+      resourceType: 'GUARDIAN',
+      severity: 'LOW',
+    });
+
+    res.json({ success: true, data: history });
+  } catch (error) {
+    logger.error({ error }, 'Failed to get PawRewards history');
+    res.status(500).json({ success: false, error: 'Failed to get PawRewards history' });
+  }
+});
+
+/**
+ * @swagger
  * /api/customer/guardian/rewards/redeem:
  *   post:
  *     tags: [Customer - Guardian]
@@ -282,6 +334,27 @@ router.get('/history', async (req: AuthRequest, res: Response) => {
       .sort({ createdAt: -1 })
       .limit(limit)
       .lean();
+
+    // Legacy purchase entries predate orderNumber in metadata — look up
+    // order numbers on read so old history shows them too (no migration).
+    try {
+      const missingOrderIds = recentPoints
+        .filter((p: any) => p.activity === 'purchase' && p.referenceId && !p.metadata?.orderNumber)
+        .map((p: any) => p.referenceId);
+      if (missingOrderIds.length) {
+        const { Order } = await import('@pawtag/db');
+        const orders = await Order.find({ _id: { $in: missingOrderIds } })
+          .select('orderNumber')
+          .lean();
+        const numberById = new Map(orders.map((o: any) => [String(o._id), o.orderNumber]));
+        for (const entry of recentPoints as any[]) {
+          const orderNumber = numberById.get(String(entry.referenceId));
+          if (orderNumber) entry.metadata = { ...entry.metadata, orderNumber };
+        }
+      }
+    } catch {
+      // Enrichment is display-only — never fail the history read
+    }
 
     // Get recent rewards activity
     const recentRewards = await PawRewardsLedger.find({ userId })

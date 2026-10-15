@@ -138,8 +138,14 @@ export async function awardPurchasePoints(
     points += Math.floor(baseRepeatBonus * multiplier);
   }
 
+  // Order number for the customer-facing points history ("Order INV-123 —
+  // View Order →"). Fetched with the order lookup kept minimal.
+  const orderNumber = await Order.findById(orderId).select('orderNumber').lean()
+    .then((o) => o?.orderNumber)
+    .catch(() => undefined);
+
   // Record in ledger (pass multiplier for base/bonus split in metadata)
-  await recordPointsEarned(userId, points, 'purchase', orderId, { orderTotal, orderCount }, multiplier);
+  await recordPointsEarned(userId, points, 'purchase', orderId, { orderTotal, orderCount, orderNumber }, multiplier);
 
   // Update user's total points
   const updatedUser = await User.findByIdAndUpdate(

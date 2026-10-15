@@ -356,6 +356,44 @@ export async function cancelOrder(params: {
           }).catch((err) => {
             logger.error({ err, orderId: String(order._id) }, 'Failed to log payment event after refund');
           });
+
+          // Deduct Guardian Points for the refunded purchase — same rule as
+          // the refund flow (1 point per $1 refunded), so cancelling cannot
+          // keep points that a return/refund would claw back.
+          // Idempotent: if a deduction for this order already exists (e.g.
+          // the refund service ran first, or cancellation is re-entered
+          // during reconciliation), do not deduct again.
+          try {
+            const { deductPoints } = await import('../../services/loyalty/points-earning.service');
+            const { GuardianPointsLedger } = await import('@pawtag/db');
+            const refundAmountForPoints = refundResult.amount ?? order.payment.amount ?? 0;
+            const pointsToDeduct = Math.floor(refundAmountForPoints);
+            const existingDeduction = await GuardianPointsLedger.findOne({
+              userId: order.userId,
+              activity: 'refund',
+              referenceId: order._id.toString(),
+              points: { $lt: 0 },
+            }).lean();
+            if (pointsToDeduct > 0 && !existingDeduction && order.userId) {
+              const deductionResult = await deductPoints(
+                String(order.userId),
+                pointsToDeduct,
+                'refund',
+                order._id.toString(),
+                `Points deducted for cancelled order ${order.orderNumber} (${refundResult.refundId})`,
+              );
+              logger.info({
+                orderId: String(order._id),
+                userId: order.userId,
+                pointsDeducted: deductionResult.pointsDeducted,
+                newBalance: deductionResult.newBalance,
+              }, 'Guardian Points deducted for cancellation');
+            }
+          } catch (err: any) {
+            // Non-critical — the refund itself succeeded; never fail the
+            // cancellation over loyalty bookkeeping.
+            logger.error({ err, orderId: String(order._id) }, 'Failed to deduct Guardian Points for cancellation');
+          }
         }
       } catch (err: any) {
         logger.error({

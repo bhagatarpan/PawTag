@@ -266,7 +266,11 @@ router.post('/customer/invoices/:invoiceId/access', authenticate, async (req: Au
         reason: systemOtpDisabled ? 'system otp.skipOtpForInvoice enabled' : 'user skipInvoiceOtp enabled',
       });
 
-      res.json({ success: true, data: { secureUrl: `${FRONTEND_URL}/invoice/${secureToken}?admin=1`, skipOtp: true } });
+      // Relative path — the frontend resolves against its actual origin
+      // (localhost, LAN IP, or production domain). A hardcoded absolute
+      // URL broke invoice links on other devices (e.g. localhost on a
+      // phone = the phone itself).
+      res.json({ success: true, data: { secureUrl: `/invoice/${secureToken}?admin=1`, skipOtp: true } });
       return;
     }
 
@@ -309,7 +313,7 @@ router.post('/customer/invoices/:invoiceId/access', authenticate, async (req: Au
       });
     }
 
-    res.json({ success: true, data: { secureUrl: `${FRONTEND_URL}/invoice/${secureToken}` } });
+    res.json({ success: true, data: { secureUrl: `/invoice/${secureToken}` } });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to generate invoice access' });
   }
@@ -452,7 +456,8 @@ router.get('/admin/invoices/:invoiceId/view', authenticate, requirePermission('s
       viewedBy: req.user!.email, customerUserId: invoice.userId.toString(), ...clientInfo,
     });
 
-    res.json({ success: true, data: { secureUrl: `${FRONTEND_URL}/invoice/${secureToken}?admin=1` } });
+    // Relative path — resolved against the admin app's actual origin.
+    res.json({ success: true, data: { secureUrl: `/invoice/${secureToken}?admin=1` } });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to generate view link' });
   }

@@ -372,7 +372,8 @@ export function OrderDetailDrawer({
     try {
       if (action === 'view') {
         const res = await api.get(API.admin.invoices.view(id));
-        if (res.data.success) window.open(res.data.data.secureUrl, '_blank');
+        // Same-tab navigation — popup blockers drop async window.open.
+        if (res.data.success) window.location.assign(res.data.data.secureUrl);
       } else if (action === 'email') {
         const res = await api.post(API.admin.invoices.email(id));
         toast.success(res.data.data?.message || 'Invoice emailed');

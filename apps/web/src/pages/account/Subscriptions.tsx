@@ -540,7 +540,7 @@ function SubscriptionsInner() {
                           e.stopPropagation();
                           try {
                             const res = await api.post(API.customer.invoices.access(inv._id));
-                            if (res.data.success) window.open(res.data.data.secureUrl, '_blank');
+                            if (res.data.success) window.location.assign(res.data.data.secureUrl) // same-tab: popup blockers drop async window.open;
                           } catch {}
                         }}
                         className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 hover:text-gray-900 transition-all"

@@ -3,18 +3,25 @@
  * @description React context for PawTag shopping cart.
  *
  * Supports both guest (localStorage) and authenticated (server) carts.
- * Guest carts are automatically synced to the server when the user logs in.
  *
  * Design:
- * - Guest: Cart stored in localStorage as JSON
+ * - Guest: Cart stored in localStorage as JSON with a 30-day expiry
+ *   (matches the server default `commerce.cart.ttlDays`), refreshed on
+ *   every cart change.
  * - Authenticated: Cart stored on server via /api/cart/*
- * - On login: localStorage cart is merged into server cart
- * - On logout: Server cart is preserved, localStorage cleared
+ * - Guest→account merge happens on READ: whenever the cart loads while a
+ *   token is present, stranded guest items are folded into the server cart
+ *   first. This is deliberate — the old design listened for the cross-tab
+ *   `storage` event to detect login, but that event never fires in the tab
+ *   that signed in, so same-tab logins stranded the guest cart and the
+ *   account cart rendered empty. Merge-on-read cannot miss any login path.
+ * - On logout: Server cart is preserved; guest storage cleared on merge.
  */
 
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
+import { useAuth } from './AuthContext';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -117,6 +124,10 @@ interface CartContextType {
 
 const CART_STORAGE_KEY = 'pawtag_guest_cart';
 
+/** Guest carts expire after 30 days — matches the server default
+ *  `commerce.cart.ttlDays` so both cart kinds age out together. */
+const GUEST_CART_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
 const EMPTY_TOTALS: CartTotals = {
   items: [],
   subtotal: 0,
@@ -132,17 +143,44 @@ const EMPTY_TOTALS: CartTotals = {
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Stored shape: `{ v, savedAt, items }`. Older deployments wrote a bare
+ * item array — still accepted on read and re-stamped as an envelope on
+ * the next write, so no migration is required.
+ */
 function getGuestCart(): CartItem[] {
   try {
     const raw = localStorage.getItem(CART_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+
+    let items: CartItem[];
+    let savedAt: number;
+    if (Array.isArray(parsed)) {
+      items = parsed;
+      savedAt = Date.now(); // legacy format — treat as fresh once
+    } else if (Array.isArray(parsed?.items)) {
+      items = parsed.items;
+      savedAt = typeof parsed.savedAt === 'number' ? parsed.savedAt : Date.now();
+    } else {
+      return [];
+    }
+
+    if (Date.now() - savedAt > GUEST_CART_TTL_MS) {
+      localStorage.removeItem(CART_STORAGE_KEY);
+      return [];
+    }
+    return items;
   } catch {
     return [];
   }
 }
 
 function setGuestCart(items: CartItem[]): void {
-  localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
+  localStorage.setItem(
+    CART_STORAGE_KEY,
+    JSON.stringify({ v: 1, savedAt: Date.now(), items }),
+  );
 }
 
 function calculateTotals(items: CartItem[]): CartTotals {
@@ -184,22 +222,19 @@ function normCustom(v?: boolean): boolean {
 }
 
 export function CartProvider({ children }: { children: ReactNode }) {
+  const { token: authToken } = useAuth();
   const [items, setItems] = useState<CartItem[]>([]);
   const [totals, setTotals] = useState<CartTotals>(EMPTY_TOTALS);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastAddedItem, setLastAddedItem] = useState<AddedItem | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  // AuthContext initialises its token synchronously from localStorage, so
+  // this is correct on first render (no guest flash for signed-in users).
+  const [isAuthenticated, setIsAuthenticated] = useState(() => !!authToken);
   const [priceChanged, setPriceChanged] = useState(false);
   const [promoCode, setPromoCodeState] = useState<string | null>(null);
   const [promoApplied, setPromoApplied] = useState(false);
   const [freeShippingThreshold, setFreeShippingThreshold] = useState<number | null>(null);
-
-  // Check auth state
-  useEffect(() => {
-    const token = localStorage.getItem('pawtag_token');
-    setIsAuthenticated(!!token);
-  }, []);
 
   // Free-shipping threshold for progress display — member entitlement only
   // (guests/non-members have no server threshold; the UI must not invent one).
@@ -224,6 +259,93 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const isGuest = !isAuthenticated;
 
+  /**
+   * In-flight guest→server merge. Concurrent refreshCart calls (mount +
+   * page effects fire together) await the same promise so items can never
+   * be merged twice.
+   */
+  const mergeInFlightRef = useRef<Promise<void> | null>(null);
+
+  /**
+   * Fold stranded guest-cart items into the server cart, if any.
+   *
+   * This runs on READ (inside refreshCart) rather than listening for the
+   * cross-tab `storage` event — that event never fires in the tab that
+   * signed in, which stranded guest carts and rendered account carts
+   * empty after a same-tab login. Merge-on-read works for every login
+   * path: login page, in-checkout sign-in, register, other tabs.
+   */
+  const mergeGuestCartIntoServer = useCallback(async (): Promise<void> => {
+    if (mergeInFlightRef.current) return mergeInFlightRef.current;
+
+    const run = (async () => {
+      const token = localStorage.getItem('pawtag_token');
+      if (!token) return;
+
+      const guestItems = getGuestCart();
+      if (!guestItems.length) return;
+
+      // Fetch the current server cart to detect duplicates
+      let serverCart: CartItem[] = [];
+      try {
+        const res = await api.get(API.cart.get);
+        serverCart = res.data?.data?.cart?.items || [];
+      } catch {
+        // If we can't fetch, add all items (server dedupes by product+customisation)
+      }
+
+      const failed: CartItem[] = [];
+
+      // Merge: for each guest item, if it already exists on server, add quantity
+      // Otherwise, push it as a new item
+      for (const item of guestItems) {
+        const cust = normCustom(item.customisation);
+        const existing = serverCart.find(
+          (si) => si.productId === item.productId && normCustom(si.customisation) === cust
+        );
+
+        try {
+          if (existing) {
+            if (!existing._id) continue;
+            // Item already on server — update quantity (add guest qty to server qty)
+            await api.put(API.cart.updateItem(existing._id), {
+              quantity: existing.quantity + item.quantity,
+            });
+          } else {
+            // New item — add to server. Engraving texts and metadata must
+            // survive the guest→login sync, or pet names entered before
+            // signing in are silently lost.
+            await api.post(API.cart.addItem, {
+              productId: item.productId,
+              quantity: item.quantity,
+              customisation: cust,
+              customisationTexts: cust ? (item.customisationTexts || []) : [],
+              customizable: item.customizable,
+              customizationLabel: item.customizationLabel,
+              customizationPrice: item.customizationPrice,
+            });
+          }
+        } catch {
+          // Keep the item in guest storage rather than losing it — it will
+          // retry on the next cart read.
+          failed.push(item);
+        }
+      }
+
+      // Clear only what merged; retain failures for the next read.
+      if (failed.length) {
+        setGuestCart(failed);
+      } else {
+        localStorage.removeItem(CART_STORAGE_KEY);
+      }
+    })();
+
+    mergeInFlightRef.current = run.finally(() => {
+      mergeInFlightRef.current = null;
+    });
+    return mergeInFlightRef.current;
+  }, []);
+
   /* ---- Load cart ---- */
   const refreshCart = useCallback(async () => {
     const token = localStorage.getItem('pawtag_token');
@@ -236,9 +358,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // Authenticated: load from server
+    // Authenticated: fold in any stranded guest items FIRST, then load
+    // from the server so the merged cart is what renders.
     try {
       setLoading(true);
+      await mergeGuestCartIntoServer();
       const res = await api.get(API.cart.get);
       const data = res.data?.data;
       if (data?.cart) {
@@ -271,97 +395,46 @@ export function CartProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [mergeGuestCartIntoServer]);
 
-  /* ---- Sync guest cart to server on login ---- */
-  const syncGuestCartToServer = useCallback(async () => {
-    const token = localStorage.getItem('pawtag_token');
-    if (!token) return;
-
-    const guestItems = getGuestCart();
-    if (!guestItems.length) return;
-
-    // First, fetch the current server cart to detect duplicates
-    let serverCart: CartItem[] = [];
-    try {
-      const res = await api.get(API.cart.get);
-      serverCart = res.data?.data?.cart?.items || [];
-    } catch {
-      // If we can't fetch, just add all items
-    }
-
-    // Merge: for each guest item, if it already exists on server, add quantity
-    // Otherwise, push it as a new item
-    for (const item of guestItems) {
-      const cust = normCustom(item.customisation);
-      const existing = serverCart.find(
-        (si) => si.productId === item.productId && normCustom(si.customisation) === cust
-      );
-
-      try {
-        if (existing) {
-          if (!existing._id) continue;
-          // Item already on server — update quantity (add guest qty to server qty)
-          await api.put(API.cart.updateItem(existing._id), {
-            quantity: existing.quantity + item.quantity,
-          });
-        } else {
-          // New item — add to server. Engraving texts and metadata must
-          // survive the guest→login sync, or pet names entered before
-          // signing in are silently lost.
-          await api.post(API.cart.addItem, {
-            productId: item.productId,
-            quantity: item.quantity,
-            customisation: cust,
-            customisationTexts: cust ? (item.customisationTexts || []) : [],
-            customizable: item.customizable,
-            customizationLabel: item.customizationLabel,
-            customizationPrice: item.customizationPrice,
-          });
-        }
-      } catch {
-        // Non-critical — continue syncing other items
-      }
-    }
-
-    // Clear guest cart after successful sync
-    localStorage.removeItem(CART_STORAGE_KEY);
-
-    // Reload cart from server
-    await refreshCart();
-  }, [refreshCart]);
-
-  // Listen for auth changes and sync guest cart
+  // Listen for auth changes across TABS. Same-tab logins never fire the
+  // `storage` event — that case is covered by merge-on-read in refreshCart.
   useEffect(() => {
     const handleStorage = () => {
       const token = localStorage.getItem('pawtag_token');
-      const wasGuest = !isAuthenticated;
       setIsAuthenticated(!!token);
-
-      if (wasGuest && token) {
-        // User just logged in — sync guest cart
-        syncGuestCartToServer();
-      } else if (!token) {
-        // User logged out — but DON'T wipe the cart during checkout.
-        // The checkout page manages its own cart state and error handling.
-        if (!window.location.pathname.startsWith('/checkout')) {
-          refreshCart();
-        }
+      // Cart re-reads on any auth transition; refreshCart merges guest
+      // items when a token is now present.
+      if (!window.location.pathname.startsWith('/checkout')) {
+        refreshCart();
       }
     };
 
     window.addEventListener('storage', handleStorage);
     return () => window.removeEventListener('storage', handleStorage);
-  }, [isAuthenticated, syncGuestCartToServer, refreshCart]);
+  }, [refreshCart]);
 
-  // Also check on mount and after cart operations
+  // Same-tab auth transitions: mirror the token into local auth state and
+  // re-read the cart. refreshCart folds in stranded guest items when a
+  // token is now present (merge-on-read) — this covers every login path
+  // (login page, in-checkout sign-in, register) without relying on the
+  // cross-tab `storage` event, which never fires in the signing-in tab.
+  const prevAuthTokenRef = useRef(authToken);
   useEffect(() => {
-    const token = localStorage.getItem('pawtag_token');
-    if (token && !isAuthenticated) {
-      setIsAuthenticated(true);
-      syncGuestCartToServer();
+    setIsAuthenticated(!!authToken);
+    // Skip the initial run — the mount-load effect already reads the cart.
+    if (prevAuthTokenRef.current === authToken) return;
+    prevAuthTokenRef.current = authToken;
+    if (authToken) {
+      refreshCart();
+    } else if (!window.location.pathname.startsWith('/checkout')) {
+      // Signed out — reload as guest, but DON'T wipe the cart during
+      // checkout; that page manages its own cart state and error handling.
+      refreshCart();
     }
-  }, [isAuthenticated, syncGuestCartToServer]);
+    // refreshCart is stable (empty dep chain via refs).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authToken]);
 
   /* ---- Load cart on mount ---- */
   useEffect(() => {

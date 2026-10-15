@@ -340,7 +340,8 @@ export default function SubscriptionDetailPage() {
                                   headers: { 'Authorization': 'Bearer ' + localStorage.getItem('admin_token') },
                                 });
                                 const data = await res.json();
-                                if (data.success) window.open(data.data.secureUrl, '_blank');
+                                // Same-tab navigation — popup blockers drop async window.open.
+                                if (data.success) window.location.assign(data.data.secureUrl);
                               } catch {}
                             }}
                             className="text-teal-600 hover:text-teal-700 text-xs font-medium border border-teal-200 px-2 py-1 rounded hover:bg-teal-50"

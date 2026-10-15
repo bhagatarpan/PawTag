@@ -60,9 +60,10 @@ export default function CheckoutConfirmationStep({
     try {
       const res = await api.post(`/customer/invoices/${confirmedInvoice._id}/access`);
       const { secureUrl } = res.data.data;
-      if (secureUrl) window.open(secureUrl, '_blank');
+      // Same-tab navigation — window.open after async is popup-blocker bait.
+      if (secureUrl) window.location.assign(secureUrl);
     } catch {
-      window.open('/account/orders', '_blank');
+      window.location.assign('/account/orders');
     }
   };
 
