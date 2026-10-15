@@ -36,6 +36,10 @@ export interface FinderData {
     color: string;
     pattern?: string;
     gender?: string;
+    /** Age in whole years (computed from birthday when only birthday is set). */
+    age?: number;
+    /** Owner-entered favourite food. */
+    favouriteFood?: string;
     photoUrl?: string;
     photos?: PetPhoto[];
     medicalAlerts?: string;

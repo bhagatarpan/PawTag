@@ -39,7 +39,10 @@ async function createPet(ownerId: string, overrides: Record<string, any> = {}) {
     status: overrides.status || 'lost',
     lostCount: overrides.lostCount || 1,
     medicalAlerts: overrides.medicalAlerts || 'Diabetic - needs insulin',
-    favouriteFood: overrides.favouriteFood || 'Chicken',
+    // Explicit empty string must survive (tests the omitted-from-DTO path)
+    favouriteFood: overrides.favouriteFood !== undefined ? overrides.favouriteFood : 'Chicken',
+    age: overrides.age,
+    dateOfBirth: overrides.dateOfBirth,
     vaccinations: overrides.vaccinations || [{
       vaccine: 'Rabies',
       vaccineType: 'core',
@@ -140,7 +143,7 @@ describe('Integration: Finder DTO Privacy', () => {
     expect(res.body.data.pet.microchips).toBeUndefined();
   });
 
-  it('does NOT expose favouriteFood', async () => {
+  it('DOES expose favouriteFood (non-premium care attribute)', async () => {
     const ownerId = await createCustomer();
     const petId = await createPet(ownerId, { favouriteFood: 'Chicken' });
     await createTag(ownerId, petId, { tagId: 'TAG-PRIV-004' });
@@ -148,6 +151,44 @@ describe('Integration: Finder DTO Privacy', () => {
     const res = await request(app).get('/api/finder/TAG-PRIV-004');
 
     expect(res.status).toBe(200);
+    expect(res.body.data.pet.favouriteFood).toBe('Chicken');
+  });
+
+  it('DOES expose age when stored on the pet', async () => {
+    const ownerId = await createCustomer();
+    const petId = await createPet(ownerId, { age: 3 });
+    await createTag(ownerId, petId, { tagId: 'TAG-PRIV-010' });
+
+    const res = await request(app).get('/api/finder/TAG-PRIV-010');
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.pet.age).toBe(3);
+  });
+
+  it('computes age from dateOfBirth when no age is stored', async () => {
+    const ownerId = await createCustomer();
+    const threeYearsAgo = new Date();
+    threeYearsAgo.setFullYear(threeYearsAgo.getFullYear() - 3);
+    const petId = await createPet(ownerId, { dateOfBirth: threeYearsAgo });
+    await createTag(ownerId, petId, { tagId: 'TAG-PRIV-011' });
+
+    const res = await request(app).get('/api/finder/TAG-PRIV-011');
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.pet.age).toBe(3);
+    // The birthday itself stays private — only the year count is public
+    expect(res.body.data.pet.dateOfBirth).toBeUndefined();
+  });
+
+  it('omits age and favouriteFood when the owner entered neither', async () => {
+    const ownerId = await createCustomer();
+    const petId = await createPet(ownerId, { age: undefined, dateOfBirth: null, favouriteFood: '' });
+    await createTag(ownerId, petId, { tagId: 'TAG-PRIV-012' });
+
+    const res = await request(app).get('/api/finder/TAG-PRIV-012');
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.pet.age).toBeUndefined();
     expect(res.body.data.pet.favouriteFood).toBeUndefined();
   });
 

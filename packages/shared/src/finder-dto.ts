@@ -14,9 +14,11 @@
 /**
  * Public pet information visible to finders.
  *
- * Only includes fields necessary for pet identification and recovery.
- * Sensitive fields (medical records, microchip details, owner contact)
- * are excluded unless the owner has explicitly shared them.
+ * Includes fields necessary for pet identification and recovery, plus
+ * non-premium care attributes (age, favourite food, medical alerts) the
+ * founder has approved for all pets regardless of membership tier.
+ * Sensitive fields (medical records, microchip details, birthday, owner
+ * contact) remain excluded.
  */
 export interface FinderPetView {
   /** Pet display name */
@@ -31,13 +33,18 @@ export interface FinderPetView {
   pattern?: string;
   /** Pet gender */
   gender?: string;
+  /** Age in whole years — stored age, or computed from birthday when only the birthday is set */
+  age?: number;
+  /** Owner-entered favourite food; helps a finder comfort the pet */
+  favouriteFood?: string;
   /** Primary photo URL */
   photoUrl?: string;
   /** Additional photos (up to a reasonable limit) */
   photos?: Array<{ url: string; caption?: string; isMain: boolean }>;
   /**
    * Emergency medical alert summary.
-   * Only included if the owner has explicitly chosen to share this.
+   * Non-premium: shown for all pets. Gated separately by the finder
+   * route when the owner's entitlement disables it.
    * Examples: "Diabetic - needs insulin", "Allergic to X"
    */
   medicalAlerts?: string;
@@ -85,6 +92,22 @@ export interface FinderDataView {
 }
 
 /**
+ * Whole years between a birthday and today. Returns undefined for missing
+ * or unparseable dates. The birthday itself is never exposed — only the
+ * coarse year count.
+ */
+function ageFromBirthday(dateOfBirth: Date | string | undefined): number | undefined {
+  if (!dateOfBirth) return undefined;
+  const dob = new Date(dateOfBirth);
+  if (Number.isNaN(dob.getTime())) return undefined;
+  const now = new Date();
+  let years = now.getFullYear() - dob.getFullYear();
+  const monthDiff = now.getMonth() - dob.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < dob.getDate())) years -= 1;
+  return years >= 0 ? years : undefined;
+}
+
+/**
  * Map an internal Pet document to the public FinderPetView DTO.
  *
  * This is the single source of truth for which fields are public.
@@ -97,11 +120,17 @@ export function toFinderPetView(pet: {
   color?: string;
   pattern?: string;
   gender?: string;
+  age?: number;
+  dateOfBirth?: Date | string;
+  favouriteFood?: string;
   photoUrl?: string;
   photos?: Array<{ url: string; caption?: string; isMain: boolean }>;
   medicalAlerts?: string;
   status?: string;
 }): FinderPetView {
+  // Owners may enter an age directly or only a birthday — accept either.
+  const age = typeof pet.age === 'number' && pet.age >= 0 ? pet.age : ageFromBirthday(pet.dateOfBirth);
+
   return {
     name: pet.name || 'Unknown',
     species: pet.species || 'unknown',
@@ -109,6 +138,8 @@ export function toFinderPetView(pet: {
     color: pet.color || 'Unknown',
     pattern: pet.pattern,
     gender: pet.gender,
+    age,
+    favouriteFood: pet.favouriteFood || undefined,
     photoUrl: pet.photoUrl,
     photos: pet.photos,
     medicalAlerts: pet.medicalAlerts || undefined,

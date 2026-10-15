@@ -180,6 +180,11 @@ router.get('/stats', async (_req: Request, res: Response) => {
  *                           type: string
  *                         color:
  *                           type: string
+ *                         age:
+ *                           type: number
+ *                           description: Age in whole years (computed from birthday when only birthday is set)
+ *                         favouriteFood:
+ *                           type: string
  *                         photoUrl:
  *                           type: string
  *                         medicalAlerts:
@@ -373,7 +378,7 @@ router.get('/:tagId', finderViewLimiter, async (req: Request, res: Response) => 
         ownerId: owner?._id?.toString(),
         ownerName: ownerName || '(hidden)',
         showOwnerName,
-        fieldsAccessed: ['pet.name', 'pet.petId', 'pet.species', 'pet.breed', 'pet.medicalAlerts', 'pet.status', 'ownerName', 'ownerPhone'],
+        fieldsAccessed: ['pet.name', 'pet.petId', 'pet.species', 'pet.breed', 'pet.color', 'pet.age', 'pet.favouriteFood', 'pet.medicalAlerts', 'pet.status', 'ownerName', 'ownerPhone'],
         deviceBrowser: browser,
         deviceOS: device,
         deviceType: detectDeviceType(userAgent),

@@ -1,4 +1,4 @@
-import { User } from 'lucide-react';
+import { Cake, User, Bone } from 'lucide-react';
 import type { FinderData } from '../types';
 
 interface PetDetailsCardProps {
@@ -41,12 +41,32 @@ export default function PetDetailsCard({ data }: PetDetailsCardProps) {
           />
         </div>
 
-        {/* Row 2: Gender */}
-        {gender && (
+        {/* Row 2: Gender | Age — both optional, shown when the owner entered them */}
+        {(gender || typeof data.pet.age === 'number') && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
+            {gender && (
+              <DetailRow
+                icon={<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>}
+                label="Gender"
+                value={gender}
+              />
+            )}
+            {typeof data.pet.age === 'number' && (
+              <DetailRow
+                icon={<Cake size={18} />}
+                label="Age"
+                value={data.pet.age === 0 ? 'Under 1 year' : data.pet.age === 1 ? '1 year' : `${data.pet.age} years`}
+              />
+            )}
+          </div>
+        )}
+
+        {/* Row 3: Favourite food — helps a finder comfort the pet */}
+        {data.pet.favouriteFood && (
           <DetailRow
-            icon={<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>}
-            label="Gender"
-            value={gender}
+            icon={<Bone size={18} />}
+            label="Favourite Food"
+            value={data.pet.favouriteFood}
           />
         )}
 
