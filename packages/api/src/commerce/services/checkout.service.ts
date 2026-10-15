@@ -940,6 +940,10 @@ export class CheckoutService {
       currency: order.payment.currency || 'NZD',
       status: 'paid',
       paymentMethod: order.payment.method,
+      // Self-contained payment snapshot (renderers fall back to the
+      // Order join for legacy invoices that predate these fields)
+      cardBrand: order.payment?.cardBrand,
+      cardLast4: order.payment?.cardLast4,
       paidAt: order.payment.paidAt || new Date(),
     });
 

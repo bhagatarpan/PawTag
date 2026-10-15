@@ -256,6 +256,10 @@ export async function createPawTagOrder(params: CreateOrderParams): Promise<Crea
     currency: currency.toUpperCase(),
     status: 'paid',
     paymentMethod: 'card',
+    // Self-contained payment snapshot (renderers fall back to the
+    // Order join for legacy invoices that predate these fields)
+    cardBrand,
+    cardLast4,
     paidAt: new Date(),
   });
 

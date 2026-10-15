@@ -1078,7 +1078,11 @@ All membership benefits are driven from a single source of truth: the **Membersh
 - **Endpoint:** `POST /api/membership/change-tier` — Immediate upgrade (resume+upgrade when cancelling); returns `resumedOnUpgrade`
 - **Endpoint:** `POST /api/membership/keep` — Keep my Membership (resume no-charge or paid rejoin)
 - **Endpoint:** `GET /api/customer/invoices` — Customer invoice list (orders + membership + credit notes)
-- **Endpoint:** `POST /api/customer/invoices/:id/access` — Secure invoice view/download (reuse InvoiceView)
+- **Endpoint:** `POST /api/customer/invoices/:id/access` — Secure invoice view link (relative path; OTP-gated)
+- **Endpoint:** `GET /api/customer/invoices/:id/pdf` — Real PDF download (ownership-scoped; customer channel — no Stripe provider IDs)
+- **Endpoint:** `GET /api/admin/invoices/:id/pdf` — Real PDF download for CSRs (admin channel — includes Stripe IDs for troubleshooting)
+- **Endpoint:** `GET /api/invoice/:token/pdf` — Token-based PDF download (emailed links; channel follows the token's `issuedToAdmin` flag)
+- **Unified engine:** all invoices, credit notes, and donation receipts render through one shared document engine (`packages/api/src/services/finance/`); payment card details snapshot onto documents at creation; see `docs/UNIFIED-INVOICE-ENGINE.md` and `skills/financial-document-integrity/`
 - **Endpoint:** `GET /api/membership/change-tier/estimate` — Proration preview (`isCancelling`, `willResumeOnUpgrade`)
 - **Endpoint:** `POST /api/membership/downgrade` — Deferred downgrade (requires terms acceptance)
 - **Endpoint:** `POST /api/membership/resume` — Undo scheduled cancellation

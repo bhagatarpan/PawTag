@@ -17,6 +17,14 @@ export interface IDonationReceiptDocument extends Document {
   signatory?: string;
   status: DonationReceiptStatus;
   relatedReceiptId?: mongoose.Types.ObjectId;
+  /**
+   * Payment card snapshot taken at issuance (best-effort from Stripe) so
+   * the receipt is self-contained and consistent with commerce invoices.
+   * Legacy receipts predate these fields — renderers omit card details
+   * when absent.
+   */
+  cardBrand?: string;
+  cardLast4?: string;
   pdfUrl?: string;
   /** Secure access token hash for emailed download links (invoice-style) */
   accessTokenHash?: string;
@@ -42,6 +50,8 @@ const DonationReceiptSchema = new Schema<IDonationReceiptDocument>(
     signatory: { type: String },
     status: { type: String, enum: ['issued', 'void', 'replaced'], default: 'issued' },
     relatedReceiptId: { type: Schema.Types.ObjectId, ref: 'DonationReceipt' },
+    cardBrand: { type: String },
+    cardLast4: { type: String },
     pdfUrl: { type: String },
     accessTokenHash: { type: String, index: true },
     accessExpiresAt: { type: Date },

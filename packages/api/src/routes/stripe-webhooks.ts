@@ -34,7 +34,7 @@ import { checkoutService } from '../commerce/services/checkout.service';
 import { isFakeMode } from '../commerce/payment-mode';
 import { logPaymentEvent } from '../commerce/audit';
 
-import { activateMembership } from '../services/membership.service';
+import { activateMembership, createMembershipInvoice } from '../services/membership.service';
 import { dedupeSavedCards } from '../services/payment-method.service';
 import {
   syncMembershipFromStripeSubscriptionUpdated,
@@ -443,6 +443,9 @@ async function handleInvoicePaymentSucceeded(invoice: any): Promise<void> {
 
   // Create PawTag Invoice for reconciliation
   const count = await Invoice.countDocuments();
+  const paymentIntentId = typeof invoice.payment_intent === 'string' ? invoice.payment_intent : undefined;
+  const { cardSnapshotFromPaymentIntent } = await import('../services/finance/payment-snapshot');
+  const card = await cardSnapshotFromPaymentIntent(paymentIntentId);
   await Invoice.create({
     subscriptionId: subscription._id,
     userId: subscription.userId,
@@ -450,6 +453,9 @@ async function handleInvoicePaymentSucceeded(invoice: any): Promise<void> {
     amount: (invoice.amount_paid || 0) / 100,
     currency: (invoice.currency || 'nzd').toUpperCase(),
     status: 'paid',
+    paymentMethod: card.cardBrand ? 'card' : undefined,
+    cardBrand: card.cardBrand,
+    cardLast4: card.cardLast4,
     stripeInvoiceId: invoice.id,
     stripePaymentIntentId: invoice.payment_intent,
     billingPeriod: {
@@ -521,29 +527,23 @@ async function handleMembershipInvoice(membership: any, stripeInvoice: any): Pro
   const stripePeriodStart = stripeInvoice.period_start ? new Date(stripeInvoice.period_start * 1000) : membership.currentPeriodStart || new Date();
   const stripePeriodEnd = stripeInvoice.period_end ? new Date(stripeInvoice.period_end * 1000) : undefined;
 
-  // Generate invoice number using the same atomic counter as activateMembership
-  const counter = await UserMembership.db!.collection('counters').findOneAndUpdate(
-    { _id: 'membershipInvoiceNumber' as any },
-    { $inc: { seq: 1 } },
-    { upsert: true, returnDocument: 'after' },
-  );
-  const invoiceNumber = `INVM-${String((counter as any)?.value?.seq || 1).padStart(6, '0')}`;
-
-  const pawtagInvoice = await Invoice.create({
+  // Single source of truth for INVM- numbering + payment card snapshot
+  // (the factory is idempotent by stripeInvoiceId as well)
+  const pawtagInvoice = await createMembershipInvoice({
     userId: membership.userId,
-    userMembershipId: membership._id,
-    invoiceNumber,
+    membershipId: membership._id,
+    stripeSubscriptionId: membership.stripeSubscriptionId,
+    stripeInvoiceId: stripeInvoice.id,
+    stripePaymentIntentId: typeof stripeInvoice.payment_intent === 'string' ? stripeInvoice.payment_intent : undefined,
     amount: amountPaid,
     currency,
-    status: 'paid',
-    stripeInvoiceId: stripeInvoice.id,
-    stripeSubscriptionId: membership.stripeSubscriptionId,
     billingPeriod: {
       start: isRenewal ? stripePeriodStart : (membership.currentPeriodStart || stripePeriodStart),
       end: isRenewal ? (stripePeriodEnd || membership.currentPeriodEnd) : (membership.currentPeriodEnd || stripePeriodEnd),
     },
-    paidAt: new Date(),
   });
+
+  const invoiceNumber = pawtagInvoice.invoiceNumber;
 
   logger.info({
     membershipId: membership._id,

@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API } from '@pawtag/shared/api';
 import api, { PaginatedData } from '../lib/api';
+import { downloadAuthenticatedFile } from '../lib/downloadFile';
 import { toast } from '../lib/toast';
 import { StatusBadge, AddressManager, CancellationInfoCard } from '@pawtag/ui';
 import { OrderProgressStepper, OrderStatusBanner } from '@pawtag/ui';
@@ -1101,13 +1102,13 @@ export function UserDetailContent({
               ) : (
                 userInvoices.map((inv: any) => (
                   <div key={inv._id} className="bg-white rounded-xl border border-gray-100 p-4 hover:border-gray-200 hover:shadow-sm transition-all duration-200">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-primary-50 flex items-center justify-center">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-3 min-w-0">
+                        <div className="w-10 h-10 rounded-xl bg-primary-50 flex items-center justify-center shrink-0">
                           <FileText size={16} className="text-primary-600" />
                         </div>
-                        <div>
-                          <div className="flex items-center gap-2">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-mono font-bold text-gray-900 text-sm">{inv.invoiceNumber}</span>
                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${
                               inv.status === 'paid' ? 'bg-green-50 text-green-700' :
@@ -1116,18 +1117,56 @@ export function UserDetailContent({
                             }`}>
                               {inv.status}
                             </span>
+                            {/* Document type for CSR triage — order vs membership
+                                vs subscription vs credit note */}
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-gray-100 text-gray-600">
+                              {inv.type === 'credit_note' ? 'Credit note' :
+                               inv.userMembershipId ? 'Membership' :
+                               inv.subscriptionId ? 'Subscription' :
+                               inv.orderId ? 'Order' : 'Invoice'}
+                            </span>
                           </div>
-                          <p className="text-xs text-gray-400 mt-0.5">{formatDate(inv.createdAt)}</p>
+                          <p className="text-xs text-gray-400 mt-0.5">{formatDate(inv.createdAt)}
+                            {inv.billingPeriod?.start && inv.billingPeriod?.end && (
+                              <> · {formatDate(inv.billingPeriod.start)} – {formatDate(inv.billingPeriod.end)}</>
+                            )}
+                          </p>
+                          {/* Payment details — the CSR troubleshooting block */}
+                          <div className="mt-1.5 space-y-0.5">
+                            {(inv.paymentMethod || inv.cardBrand) && (
+                              <p className="text-xs text-gray-600">
+                                {inv.paymentMethod && <span className="capitalize">{inv.paymentMethod}</span>}
+                                {inv.cardBrand && (
+                                  <span> · <span className="uppercase">{inv.cardBrand}</span> ••••{inv.cardLast4 || '****'}</span>
+                                )}
+                              </p>
+                            )}
+                            {inv.stripePaymentIntentId && (
+                              <p className="text-[11px] text-gray-400 font-mono truncate" title={inv.stripePaymentIntentId}>
+                                Payment ID: {inv.stripePaymentIntentId}
+                              </p>
+                            )}
+                            {inv.stripeInvoiceId && (
+                              <p className="text-[11px] text-gray-400 font-mono truncate" title={inv.stripeInvoiceId}>
+                                Stripe invoice: {inv.stripeInvoiceId}
+                              </p>
+                            )}
+                            {inv.orderId && (
+                              <p className="text-[11px] text-gray-400">
+                                Order: <span className="font-mono">{String(inv.orderId)}</span>
+                              </p>
+                            )}
+                          </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2 shrink-0">
                         <span className="text-sm font-semibold text-gray-900">${inv.amount?.toFixed(2)}</span>
                         <button
                           onClick={async () => {
                             try {
-                              const res = await api.get(`/admin/invoices/${inv._id}/view`);
-                              const { secureUrl } = res.data.data;
-                              if (secureUrl) window.open(secureUrl, '_blank');
+                              const res = await api.get(API.admin.invoices.view(inv._id));
+                              // Same-tab navigation — popup blockers drop async window.open
+                              if (res.data.success) window.location.assign(res.data.data.secureUrl);
                             } catch {
                               toast.error('Failed to open invoice');
                             }
@@ -1135,6 +1174,23 @@ export function UserDetailContent({
                           className="text-sm text-primary-600 hover:text-primary-700 font-medium"
                         >
                           View
+                        </button>
+                        <button
+                          onClick={async () => {
+                            try {
+                              // Real PDF download — includes Stripe IDs for CSR
+                              // (admin channel), unlike the customer document
+                              await downloadAuthenticatedFile(
+                                API.admin.invoices.pdf(inv._id),
+                                `${inv.invoiceNumber || 'invoice'}.pdf`,
+                              );
+                            } catch {
+                              toast.error('Failed to download invoice PDF');
+                            }
+                          }}
+                          className="text-sm text-gray-600 hover:text-gray-900 font-medium"
+                        >
+                          PDF
                         </button>
                       </div>
                     </div>

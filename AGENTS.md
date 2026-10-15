@@ -560,6 +560,16 @@ Stripe refunds always return to the **original payment method** used for the cha
 - Failed refunds need a clear customer/CSR recovery path (auto-retry + support arranging alternate method). See `skills/refund-visibility/`.
 - **Customer returns → money:** process via `return-refund.service` / `POST /api/admin/commerce/returns/:id/refund` with permission `order.refund`. Returns status updates alone must **not** move money. Default requires warehouse receipt; refund-without-return is an explicit exception. Remaining refundable balance is server-enforced. Customer tracking submit ≠ warehouse receipt. **Admin is notified** on new return requests via email (`commerce.returns.notificationEmail` + `ADMIN_ALERT_EMAIL`) and admin in-app notification (`return_requested`); sidebar shows pending-return count. See `skills/returns-refunds/` and `docs/RETURNS-REFUNDS-WORKFLOW.md`.
 
+### Financial documents & the unified invoice engine
+
+All financial documents — commerce invoices, credit notes, and donation receipts — render through **one shared engine** (`packages/api/src/services/finance/`): `invoice-document.ts` (assembly, single source of truth for presentation data) → `invoice-document-html.ts` / `invoice-pdf.service.ts` (one visual engine per format). Document types stay semantically distinct (donation receipts are tax documents — see `skills/financial-document-integrity/`); the engine is shared, the wording/semantics are not.
+
+- **Payment snapshots:** `cardBrand`/`cardLast4` are written onto the Invoice/DonationReceipt **at creation** (all ~11 creation sites + the `createMembershipInvoice` factory). Renderers fall back to legacy Order/Membership joins for old records. Card extraction from Stripe is best-effort (`finance/payment-snapshot.ts`) — never blocks document issuance.
+- **Channel rule (product decision):** customer documents and the customer invoice API **never expose Stripe provider IDs** (`pi_`, `in_`). The invoice/order number is the customer's reference. Admin/CSR surfaces render the `admin` channel (provider IDs included) — determined by `InvoiceAccessToken.issuedToAdmin`, a durable server flag, never a client query param.
+- **Downloads are real PDFs** (pdf-lib, server-generated) via authenticated blob downloads or token endpoints — never the browser print dialog, never `window.open` after async (popup blockers silently drop those). Use `window.location.assign` for same-tab navigation or `apps/*/src/lib/downloadFile.ts` for files.
+- Invoice links from the API are **relative paths**; frontends resolve against their actual origin. Absolute `FRONTEND_URL` only for emailed links.
+- Customer invoice list/detail APIs expose payment method + card brand/last4 only — no provider identifiers.
+
 ### Monetary precision
 
 All monetary arithmetic, rounding, and Stripe conversion uses shared helpers from `@pawtag/shared` (`money.ts`). See `skills/monetary-precision/` for the full playbook.
@@ -1153,11 +1163,27 @@ Premium UX comes from hierarchy, clarity, feedback, confidence, and polish—not
 - Avoid surprise navigation.
 - Avoid unnecessary modals when an inline interaction is clearer.
 
+## Toast notifications (unified system)
+
+One toast system for BOTH customer web and admin: the shared `toast.success/error/info` API and `<ToastHost />` from `@pawtag/ui`. Use it for save/update feedback and recoverable errors — never raw browser `alert()`.
+
+- Mount the host **once per app at the root**, outside every animated page wrapper. (A transformed ancestor turns `position: fixed` into absolute — that bug stranded save toasts off-screen when users were scrolled down.)
+- Position: **bottom-center on mobile** (always in view at any scroll depth, safe-area padded for notches) / top-right on desktop.
+- Admin keeps its import path (`apps/admin/src/lib/toast.ts` re-exports the shared API); customer web imports from `@pawtag/ui`.
+- Toasts auto-dismiss (~3.5s), stack up to 3, and are screen-reader announced (`role="status"`, `aria-live="polite"`). Destructive confirmations are dialogs, not toasts.
+
 ---
 
 # 24. Cart UX Direction
 
 PawTag's cart direction is deliberate and should not regress to a single flat-column desktop experience.
+
+## Cart persistence (data rules)
+
+- Guest carts live in browser localStorage with a **30-day TTL** (`GUEST_CART_TTL_MS`, refreshed on every cart change) — matches the server default `commerce.cart.ttlDays`.
+- **Guest→account merge happens on READ:** whenever the cart loads while an auth token is present, stranded guest items fold into the server cart first (`mergeGuestCartIntoServer` in `CartContext`). Never rely on the cross-tab `storage` event to detect login — it never fires in the tab that signed in (that bug emptied carts after same-tab login). Merge-on-read covers every login path automatically.
+- The merge is concurrency-guarded (one in-flight promise) so simultaneous refreshes can never double-add items, and unmerged items stay in guest storage for retry — never silently dropped.
+- Auth detection uses `useAuth().token`, not direct localStorage reads.
 
 ## Mini-cart drawer
 

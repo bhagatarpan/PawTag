@@ -528,6 +528,7 @@ export async function createGoldSubscription(userId: string, price?: number, pla
     billingPeriodEnd: currentPeriodEnd,
     status: stripePaymentIntentId ? 'paid' : 'pending', // Only mark paid if Stripe confirmed payment
     paymentMethod: stripePaymentIntentId ? 'stripe' : 'pending',
+    stripePaymentIntentId: stripePaymentIntentId || undefined,
   });
 
   // Send Gold welcome email (fire-and-forget)
@@ -1256,9 +1257,16 @@ async function createInvoice(data: {
   billingPeriodEnd: Date;
   status: 'paid' | 'pending' | 'failed' | 'refunded' | 'void' | 'uncollectible';
   paymentMethod?: string;
+  stripePaymentIntentId?: string;
 }) {
   const count = await Invoice.countDocuments();
   const invoiceNumber = `INV-${String(count + 1).padStart(6, '0')}`;
+
+  // Self-contained payment snapshot for paid invoices (best-effort)
+  const card: { cardBrand?: string; cardLast4?: string } =
+    data.status === 'paid' && data.stripePaymentIntentId
+      ? await (await import('./finance/payment-snapshot')).cardSnapshotFromPaymentIntent(data.stripePaymentIntentId)
+      : {};
 
   const invoice = await Invoice.create({
     subscriptionId: data.subscriptionId,
@@ -1267,6 +1275,9 @@ async function createInvoice(data: {
     amount: data.amount,
     currency: 'NZD',
     status: data.status,
+    cardBrand: card.cardBrand,
+    cardLast4: card.cardLast4,
+    stripePaymentIntentId: data.stripePaymentIntentId,
     billingPeriod: {
       start: data.billingPeriodStart,
       end: data.billingPeriodEnd,

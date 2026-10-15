@@ -49,8 +49,13 @@ async function buildInvoiceDetailProjection(invoice: any) {
           end: new Date(invoice.billingPeriod.end).toISOString(),
         }
       : null,
-    stripeInvoiceId: invoice.stripeInvoiceId || null,
+    // NOTE: Stripe provider IDs (stripeInvoiceId/stripePaymentIntentId) are
+    // deliberately NOT exposed here — this is the customer channel. The
+    // invoice number is the customer's reference; provider IDs surface
+    // only in the admin portal for CSR troubleshooting.
     paymentMethod: invoice.paymentMethod || null,
+    cardBrand: invoice.cardBrand || null,
+    cardLast4: invoice.cardLast4 || null,
     dueDate: invoice.dueDate ? new Date(invoice.dueDate).toISOString() : null,
     voidedReason: invoice.voidedReason || null,
     relatedInvoiceNumber: null as string | null,
@@ -211,8 +216,8 @@ router.get('/customer/invoices/:invoiceId', authenticate, async (req: AuthReques
 });
 
 /** Stream an invoice PDF as a real file download (never browser-print). */
-async function sendInvoicePdf(res: Response, invoiceId: string): Promise<void> {
-  const { buffer, filename } = await generateInvoicePdf(invoiceId);
+async function sendInvoicePdf(res: Response, invoiceId: string, channel: 'customer' | 'admin' = 'customer'): Promise<void> {
+  const { buffer, filename } = await generateInvoicePdf(invoiceId, channel);
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
   res.setHeader('Cache-Control', 'no-store');
@@ -236,7 +241,8 @@ router.get('/customer/invoices/:invoiceId/pdf', authenticate, async (req: AuthRe
       invoiceNumber: invoice.invoiceNumber,
       channel: 'customer',
     });
-    await sendInvoicePdf(res, req.params.invoiceId);
+    // Customer channel — never includes Stripe provider IDs
+    await sendInvoicePdf(res, req.params.invoiceId, 'customer');
   } catch {
     res.status(500).json({ success: false, error: 'Failed to generate invoice PDF' });
   }
@@ -367,8 +373,11 @@ router.get('/invoice/:token/status', async (req, res: Response) => {
     const isVerified = access.verifiedAt && (Date.now() - access.verifiedAt.getTime()) < 24 * 60 * 60 * 1000;
 
     if (isVerified) {
+      // Channel rule: admin-issued tokens render provider IDs for CSR
+      // troubleshooting; customer tokens never show Stripe identifiers.
+      const channel = access.issuedToAdmin ? 'admin' : 'customer';
       // Generate invoice HTML directly
-      const html = await generateInvoiceHtml((access.invoiceId as any)._id.toString());
+      const html = await generateInvoiceHtml((access.invoiceId as any)._id.toString(), channel);
       res.json({
         success: true,
         data: {
@@ -406,7 +415,10 @@ router.get('/invoice/:token/pdf', async (req, res: Response) => {
     const isVerified = access.verifiedAt && (Date.now() - access.verifiedAt.getTime()) < 24 * 60 * 60 * 1000;
     if (!isVerified) { res.status(403).json({ success: false, error: 'Verify the access code first' }); return; }
 
-    await sendInvoicePdf(res, (access.invoiceId as any)._id.toString());
+    // Same channel rule as the viewer: admin-issued tokens render Stripe
+    // provider IDs; customer tokens never do.
+    const channel = access.issuedToAdmin ? 'admin' : 'customer';
+    await sendInvoicePdf(res, (access.invoiceId as any)._id.toString(), channel);
   } catch {
     res.status(500).json({ success: false, error: 'Failed to generate invoice PDF' });
   }
@@ -493,13 +505,15 @@ router.get('/admin/invoices/:invoiceId/view', authenticate, requirePermission('s
     const tokenHash = hashToken(secureToken);
     const clientInfo = getClientInfo(req);
 
-    // Create access token (no OTP, pre-verified)
+    // Create access token (no OTP, pre-verified, ADMIN channel — the
+    // rendered document includes Stripe IDs for CSR troubleshooting)
     await InvoiceAccessToken.create({
       invoiceId: invoice._id,
       userId: invoice.userId,
       tokenHash,
       expiresAt: new Date(Date.now() + 10 * 60 * 1000),
       verifiedAt: new Date(), // Pre-verified for admin
+      issuedToAdmin: true,
       ...clientInfo,
     });
 
@@ -529,7 +543,8 @@ router.get('/admin/invoices/:invoiceId/pdf', authenticate, requirePermission('su
       downloadedBy: req.user!.email,
       channel: 'admin',
     });
-    await sendInvoicePdf(res, req.params.invoiceId);
+    // Admin channel — includes Stripe provider IDs for CSR troubleshooting
+    await sendInvoicePdf(res, req.params.invoiceId, 'admin');
   } catch {
     res.status(500).json({ success: false, error: 'Failed to generate invoice PDF' });
   }

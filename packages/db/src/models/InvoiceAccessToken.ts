@@ -11,6 +11,14 @@ export interface IInvoiceAccessTokenDocument extends Document {
   otpAttempts: number;
   ipAddress?: string;
   userAgent?: string;
+  /**
+   * True when this access token was issued by an admin/CSR view action.
+   * The invoice viewer renders the ADMIN channel document (includes
+   * Stripe payment IDs for troubleshooting) when set; customer-channel
+   * tokens never expose provider identifiers. Durable server-side flag —
+   * never trusted from a client query param.
+   */
+  issuedToAdmin?: boolean;
 }
 
 const InvoiceAccessTokenSchema = new Schema<IInvoiceAccessTokenDocument>(
@@ -25,6 +33,7 @@ const InvoiceAccessTokenSchema = new Schema<IInvoiceAccessTokenDocument>(
     otpAttempts: { type: Number, default: 0, min: 0 },
     ipAddress: { type: String },
     userAgent: { type: String },
+    issuedToAdmin: { type: Boolean, default: false },
   },
   { timestamps: true },
 );
