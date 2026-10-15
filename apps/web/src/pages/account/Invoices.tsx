@@ -112,38 +112,43 @@ export default function Invoices() {
                     navigate(`/account/invoices/${invoice._id}`);
                   }
                 }}
-                className="flex items-center justify-between py-4 first:pt-0 last:pb-0 cursor-pointer hover:bg-gray-50 rounded-lg px-2 -mx-2"
+                className="flex items-center py-4 first:pt-0 last:pb-0 cursor-pointer hover:bg-gray-50 rounded-lg px-2 -mx-2"
               >
-                <div className="flex items-center gap-3 min-w-0">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
                   <div className="w-10 h-10 rounded-xl bg-primary-50 flex items-center justify-center shrink-0">
                     <CreditCard size={18} className="text-primary-600" />
                   </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">{invoice.invoiceNumber}</p>
-                    <p className="text-xs text-gray-500">
-                      {formatDate(invoice.createdAt, 'medium')}
-                      {invoice.type === 'credit_note' ? ' · Credit note' : ''}
-                    </p>
+                  {/* Two-line layout: number + amount on top, date + status +
+                      download below — a single row squeezed invoice numbers
+                      into "INV-0..." on mobile. */}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <p className="text-sm font-medium text-gray-900 truncate">{invoice.invoiceNumber}</p>
+                      <p className="text-sm font-semibold text-gray-900 shrink-0">
+                        {formatCurrency(invoice.amount, invoice.currency || 'NZD')}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 mt-1">
+                      <p className="text-xs text-gray-500 shrink-0">
+                        {formatDate(invoice.createdAt, 'medium')}
+                        {invoice.type === 'credit_note' ? ' · Credit note' : ''}
+                      </p>
+                      <StatusBadge label={invoice.status} variant={invoice.status === 'paid' ? 'success' : invoice.status === 'void' ? 'neutral' : 'info'} />
+                      <button
+                        type="button"
+                        aria-label={`Download ${invoice.invoiceNumber} PDF`}
+                        onClick={(e) => handleDownload(invoice, e)}
+                        disabled={actionId === invoice._id}
+                        className="ml-auto p-2 -m-1 rounded-lg text-primary-600 hover:bg-primary-50 disabled:opacity-50"
+                      >
+                        {actionId === invoice._id ? (
+                          <Loader2 size={18} className="animate-spin" />
+                        ) : (
+                          <Download size={18} />
+                        )}
+                      </button>
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-3 shrink-0">
-                  <p className="text-sm font-semibold text-gray-900">
-                    {formatCurrency(invoice.amount, invoice.currency || 'NZD')}
-                  </p>
-                  <StatusBadge label={invoice.status} variant={invoice.status === 'paid' ? 'success' : invoice.status === 'void' ? 'neutral' : 'info'} />
-                  <button
-                    type="button"
-                    aria-label={`Download ${invoice.invoiceNumber} PDF`}
-                    onClick={(e) => handleDownload(invoice, e)}
-                    disabled={actionId === invoice._id}
-                    className="p-2 rounded-lg text-primary-600 hover:bg-primary-50 disabled:opacity-50"
-                  >
-                    {actionId === invoice._id ? (
-                      <Loader2 size={18} className="animate-spin" />
-                    ) : (
-                      <Download size={18} />
-                    )}
-                  </button>
                 </div>
               </div>
             ))}
