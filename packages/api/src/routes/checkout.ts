@@ -108,7 +108,10 @@ router.post('/confirm', async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    const result = await checkoutService.confirmCheckout(req.user!.id, paymentIntentId, portal);
+    const result = await checkoutService.confirmCheckout(req.user!.id, paymentIntentId, portal, {
+      ipAddress: req.ip || req.headers['x-forwarded-for']?.toString().split(',')[0]?.trim() || undefined,
+      userAgent: req.headers['user-agent'] || undefined,
+    });
 
     res.json({
       success: true,

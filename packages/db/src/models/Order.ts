@@ -78,6 +78,17 @@ export interface IOrderDocument extends Document {
   createdByPortal?: 'customer-web' | 'customer-mobile' | 'admin-web' | 'system';
   createdByDescription?: string;
   createdByEmail?: string;
+  /**
+   * Client context captured at order creation for CSR troubleshooting
+   * (browser/OS/device parsed from the user-agent; IP geolocation is
+   * best-effort). Admin-facing only — stripped from customer APIs.
+   * Nullable: legacy orders and system/admin creations have none.
+   */
+  createdByIp?: string;
+  createdByUserAgent?: string;
+  createdByBrowser?: string;
+  createdByDevice?: string;
+  createdByLocation?: string;
   cancellationReason?: string;
   cancellationNotes?: string;
   cancelledBy?: string;
@@ -194,6 +205,11 @@ const OrderSchema = new Schema<IOrderDocument>(
     },
     createdByDescription: { type: String },
     createdByEmail: { type: String },
+    createdByIp: { type: String },
+    createdByUserAgent: { type: String },
+    createdByBrowser: { type: String },
+    createdByDevice: { type: String },
+    createdByLocation: { type: String },
     cancellationReason: { type: String },
     cancellationNotes: { type: String },
     cancelledBy: { type: String, index: true },
