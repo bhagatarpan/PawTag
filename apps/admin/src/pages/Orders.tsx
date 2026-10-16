@@ -13,7 +13,7 @@ import RefundStatusCard from '../components/RefundStatusCard';
 import {
   ChevronDown, Download, Loader2, ShoppingCart, CreditCard,
   Truck, Package, CheckCircle, Info, Clock, FileText,
-  RefreshCw, Ban, Send, Eye, Copy, ExternalLink, AlertTriangle, XCircle, RotateCcw, PlusCircle, Shield,
+  RefreshCw, Ban, Send, Eye, Copy, ExternalLink, AlertTriangle, XCircle, RotateCcw, PlusCircle, Shield, X,
 } from 'lucide-react';
 import {
   ORDER_STATUS_LABELS,
@@ -106,6 +106,12 @@ export interface Order {
   createdByPortal?: 'customer-web' | 'customer-mobile' | 'admin-web' | 'system';
   createdByDescription?: string;
   createdByEmail?: string;
+  /** Client context captured at creation — CSR troubleshooting only */
+  createdByIp?: string;
+  createdByUserAgent?: string;
+  createdByBrowser?: string;
+  createdByDevice?: string;
+  createdByLocation?: string;
   refundReason?: string;
   refundId?: string;
   refundArn?: string;
@@ -233,6 +239,18 @@ function copyToClipboard(text: string) {
   );
 }
 
+/** Compact label/value row for the technical-info modal. */
+function MetaRow({ label, value, mono, truncate }: { label: string; value: string; mono?: boolean; truncate?: boolean }) {
+  return (
+    <div className="flex items-start justify-between gap-4">
+      <span className="text-gray-500 shrink-0">{label}</span>
+      <span className={`text-gray-900 text-right ${mono ? 'font-mono text-xs mt-0.5' : ''} ${truncate ? 'truncate max-w-[280px]' : ''}`} title={value}>
+        {value}
+      </span>
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /*  Skeleton                                                           */
 /* ------------------------------------------------------------------ */
@@ -277,6 +295,7 @@ export function OrderDetailDrawer({
   const [_statusFilter, setStatusFilter] = useState('');
   const [orderSubscriptions, setOrderSubscriptions] = useState<any[]>([]);
   const [repairLoading, setRepairLoading] = useState(false);
+  const [showTechnicalInfo, setShowTechnicalInfo] = useState(false);
 
   const fetchOrderSubscriptions = useCallback(async () => {
     if (!order) return;
@@ -762,6 +781,17 @@ export function OrderDetailDrawer({
                   })}
                 />
               )}
+              {/* Technical details modal keeps this panel clean — browser,
+                  device, IP, location and payment identifiers live behind
+                  the button for CSR troubleshooting. */}
+              <button
+                type="button"
+                onClick={() => setShowTechnicalInfo(true)}
+                className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-primary-600 hover:text-primary-700"
+              >
+                <Info size={13} />
+                View more info
+              </button>
             </Section>
           )}
 
@@ -1165,6 +1195,77 @@ export function OrderDetailDrawer({
           )}
         </div>
       )}
+
+      {/* Technical info modal — CSR troubleshooting data kept out of the
+          main panel: client context (browser/device/IP/location, captured
+          at creation for new orders) + payment/stripe identifiers + raw
+          timestamps. Customer APIs never expose the client-context fields. */}
+      {showTechnicalInfo && order && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Order technical info">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowTechnicalInfo(false)} />
+          <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white rounded-t-xl">
+              <h3 className="text-base font-semibold text-gray-900">Order Technical Info</h3>
+              <button
+                type="button"
+                onClick={() => setShowTechnicalInfo(false)}
+                className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg"
+                aria-label="Close"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="px-6 py-4 space-y-5">
+              <div>
+                <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Creation</h4>
+                <div className="space-y-1 text-sm">
+                  {order.createdBy && <MetaRow label="Created by" value={order.createdBy} />}
+                  {order.createdByType && <MetaRow label="Role" value={order.createdByType} />}
+                  {order.createdByPortal && <MetaRow label="Portal" value={order.createdByPortal} />}
+                  {order.createdByEmail && <MetaRow label="Email" value={order.createdByEmail} />}
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Client Context</h4>
+                {order.createdByBrowser || order.createdByDevice || order.createdByIp || order.createdByLocation ? (
+                  <div className="space-y-1 text-sm">
+                    {order.createdByBrowser && <MetaRow label="Browser" value={order.createdByBrowser} />}
+                    {order.createdByDevice && <MetaRow label="Device / OS" value={order.createdByDevice} />}
+                    {order.createdByIp && <MetaRow label="IP address" value={order.createdByIp} mono />}
+                    {order.createdByLocation && <MetaRow label="Location" value={order.createdByLocation} />}
+                    {order.createdByUserAgent && <MetaRow label="User agent" value={order.createdByUserAgent} mono truncate />}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-400">
+                    Not captured for this order. Client context (browser, device, IP) is recorded on orders created from
+                    October 2026 onward.
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Payment &amp; Identifiers</h4>
+                <div className="space-y-1 text-sm">
+                  {order._id && <MetaRow label="Order ID" value={String(order._id)} mono />}
+                  {order.payment?.stripePaymentIntentId && <MetaRow label="Stripe PaymentIntent" value={order.payment.stripePaymentIntentId} mono truncate />}
+                  {order.refundId && <MetaRow label="Refund ID" value={order.refundId} mono truncate />}
+                  {order.refundArn && <MetaRow label="Refund ARN" value={order.refundArn} mono truncate />}
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Timestamps</h4>
+                <div className="space-y-1 text-sm">
+                  {order.createdAt && <MetaRow label="Created" value={formatDateTime(order.createdAt)} />}
+                  {order.updatedAt && <MetaRow label="Updated" value={formatDateTime(order.updatedAt)} />}
+                  {order.cancelledAt && <MetaRow label="Cancelled" value={formatDateTime(order.cancelledAt)} />}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </DetailDrawer>
   );
 }
@@ -1354,7 +1455,9 @@ export default function Orders() {
         { label: 'Delivered', value: summary?.delivered, icon: <CheckCircle size={20} />, color: 'success', clickable: !!summary?.delivered, onClick: () => { setStatusFilter('delivered'); setPage(1); } },
         {
           label: 'Partially refunded',
-          value: data?.items?.filter((o) => getOrderRefundDisplay(o as any) === 'partial').length ?? 0,
+          // Optional-chain the whole chain — `.length` on the filter result
+          // crashed the page whenever data was still null or a fetch failed
+          value: data?.items?.filter((o) => getOrderRefundDisplay(o as any) === 'partial')?.length ?? 0,
           icon: <RefreshCw size={20} />,
           color: 'warning',
         },
@@ -1444,7 +1547,7 @@ export default function Orders() {
                 <SkeletonRow />
                 <SkeletonRow />
               </>
-            ) : data?.items.length === 0 ? (
+            ) : data?.items?.length === 0 ? (
               <tr>
                 <td colSpan={7}>
                   <EmptyState
@@ -1455,7 +1558,7 @@ export default function Orders() {
                 </td>
               </tr>
             ) : (
-              data?.items.map((order) => (
+              data?.items?.map((order) => (
                 <tr
                   key={order._id}
                   className="hover:bg-gray-50 cursor-pointer transition-colors"

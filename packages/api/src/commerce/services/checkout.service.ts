@@ -422,7 +422,12 @@ export class CheckoutService {
    * @param portal - Source portal (default: 'customer-web')
    * @returns Checkout result with order and invoice
    */
-  async confirmCheckout(userId: string, paymentIntentId: string, portal: string = 'customer-web'): Promise<CheckoutResult> {
+  async confirmCheckout(
+    userId: string,
+    paymentIntentId: string,
+    portal: string = 'customer-web',
+    clientInfo?: { ipAddress?: string; userAgent?: string },
+  ): Promise<CheckoutResult> {
     const correlationId = crypto.randomUUID();
     logger.info({ userId, paymentIntentId, correlationId }, 'Checkout confirm started');
 
@@ -512,6 +517,26 @@ export class CheckoutService {
     const createdBy = formatCreatedBy(creator?.fullName || 'Unknown User', 'Customer');
     const createdByDescription = formatCreatedByDescription(portal, creator?.fullName || 'Unknown User');
 
+    // Client context for CSR troubleshooting — browser/device parse is
+    // synchronous/regex-only; IP geolocation is best-effort and never
+    // blocks or delays order completion on failure.
+    let createdByBrowser: string | undefined;
+    let createdByDevice: string | undefined;
+    let createdByLocation: string | undefined;
+    if (clientInfo?.userAgent) {
+      const { parseUserAgent } = await import('../../lib/user-agent');
+      const parsed = parseUserAgent(clientInfo.userAgent);
+      createdByBrowser = parsed.browser;
+      createdByDevice = parsed.device;
+    }
+    if (clientInfo?.ipAddress) {
+      const { getIpGeoData } = await import('../../lib/geo-location');
+      const geo = await getIpGeoData(clientInfo.ipAddress).catch(() => null);
+      if (geo) {
+        createdByLocation = [geo.city, geo.region, geo.country].filter(Boolean).join(', ') || undefined;
+      }
+    }
+
     let order: any;
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
@@ -561,6 +586,11 @@ export class CheckoutService {
           createdByPortal: portal,
           createdByDescription,
           createdByEmail: creator?.email || null,
+          createdByIp: clientInfo?.ipAddress,
+          createdByUserAgent: clientInfo?.userAgent,
+          createdByBrowser,
+          createdByDevice,
+          createdByLocation,
         });
         break; // success
       } catch (err: any) {
@@ -588,12 +618,19 @@ export class CheckoutService {
       }
     }
 
-    // 7. Record activity
+    // 7. Record activity — includes client context so the CSR timeline
+    // shows browser/device/IP without opening the technical-info modal
     const activityEntry = {
       type: 'order_placed',
       message: 'Order placed and paid',
       timestamp: new Date(),
       actor: 'customer' as const,
+      metadata: {
+        ...(createdByBrowser ? { browser: createdByBrowser } : {}),
+        ...(createdByDevice ? { device: createdByDevice } : {}),
+        ...(clientInfo?.ipAddress ? { ipAddress: clientInfo.ipAddress } : {}),
+        ...(createdByLocation ? { location: createdByLocation } : {}),
+      },
     };
     await Order.updateOne({ _id: order._id }, { $push: { activity: activityEntry } });
 

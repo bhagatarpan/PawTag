@@ -1088,6 +1088,20 @@ router.get('/pets/:id/locations', requirePermission('pet.read'), async (req: Aut
  *       500:
  *         description: Failed to fetch orders
  */
+/**
+ * Client-context fields captured at order creation for CSR troubleshooting
+ * (IP, user-agent, browser/device, IP location). Admin-facing only —
+ * stripped from every customer-facing order response per the
+ * data-minimization / channel rule (see AGENTS.md financial documents).
+ */
+const ORDER_OPERATIONAL_FIELDS = ['createdByIp', 'createdByUserAgent', 'createdByBrowser', 'createdByDevice', 'createdByLocation'] as const;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- order doc (Mixed activity + flexible payment shape)
+function stripOrderOperationalFields<T extends Record<string, any>>(order: T): T {
+  for (const field of ORDER_OPERATIONAL_FIELDS) delete order[field];
+  return order;
+}
+
 router.get('/orders', requirePermission('order.read'), async (req: AuthRequest, res: Response) => {
   try {
     const orders = await Order.find({ userId: req.user!.id }).sort({ createdAt: -1 });
@@ -1103,7 +1117,7 @@ router.get('/orders', requirePermission('order.read'), async (req: AuthRequest, 
       if (oid && !invoiceMap.has(oid)) invoiceMap.set(oid, inv);
     }
     const ordersWithInvoices = orders.map((o: any) => ({
-      ...o.toObject(),
+      ...stripOrderOperationalFields(o.toObject()),
       latestInvoice: invoiceMap.get(o._id?.toString()) || null,
     }));
 
@@ -1195,7 +1209,7 @@ router.get('/orders/:id', requirePermission('order.read'), async (req: AuthReque
       severity: 'INFO',
       businessOperation: 'Viewed order details',
     }).catch(() => {});
-    res.json({ success: true, data: order });
+    res.json({ success: true, data: stripOrderOperationalFields(order.toObject()) });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch order' });
   }
