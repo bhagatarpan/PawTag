@@ -13,6 +13,7 @@ export * from './customer-invoices';
 export * from './payment-methods';
 export * from './checkout-quote';
 export * from './donation';
+export * from './cms-hero';
 
 // --- Enums & Constants ---
 

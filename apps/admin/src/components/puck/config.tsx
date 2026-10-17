@@ -4,6 +4,15 @@ import { useSiteSettings } from '../../hooks/useSiteSettings';
 import RichTextEditor from '../RichTextEditor';
 import ImagePicker from '../ImagePicker';
 import { ComparisonTable } from '@pawtag/ui';
+import {
+  CMS_HERO_POSITIONS,
+  CMS_HERO_POSITION_LABELS,
+  CMS_HERO_ZOOM_DEFAULT,
+  CMS_HERO_ZOOM_MAX,
+  CMS_HERO_ZOOM_MIN,
+  cmsHeroBackgroundPosition,
+  cmsHeroBackgroundSize,
+} from '@pawtag/shared';
 import { Bell, MapPin, Smartphone, Clock, Heart, Users, Shield, Star, Award, Check, Home, Scan, Tag, UserPlus, Search, Lock, Eye, Zap, Globe, Camera, Gift, Headphones, Package } from 'lucide-react';
 
 const iconComponents: Record<string, typeof Bell> = { Bell, MapPin, Smartphone, Clock, Heart, Users, Shield, Star, Award, Check, Home, Scan, Tag, UserPlus, Search, Lock, Eye, Zap, Globe, Camera, Gift, Headphones, Package };
@@ -15,6 +24,8 @@ type PawtagComponents = {
     buttonText: string;
     buttonUrl: string;
     backgroundUrl: string;
+    imagePosition: string;
+    imageZoom: number;
   };
   FeaturesGrid: {
     heading: string;
@@ -220,6 +231,18 @@ export const pawtagConfig: Config<PawtagComponents> = {
             <ImagePicker value={(value as string) || ''} onChange={onChange} placeholder="https://example.com/hero.jpg" />
           ),
         },
+        imagePosition: {
+          type: 'select',
+          label: 'Image Position',
+          options: CMS_HERO_POSITIONS.map((value) => ({ value, label: CMS_HERO_POSITION_LABELS[value] })),
+        },
+        imageZoom: {
+          type: 'number',
+          label: `Image Zoom (${CMS_HERO_ZOOM_MIN}–${CMS_HERO_ZOOM_MAX}, 100 = fill)`,
+          min: CMS_HERO_ZOOM_MIN,
+          max: CMS_HERO_ZOOM_MAX,
+          step: 5,
+        },
       },
       defaultProps: {
         heading: 'Welcome to PawTag',
@@ -227,13 +250,22 @@ export const pawtagConfig: Config<PawtagComponents> = {
         buttonText: 'Get Started',
         buttonUrl: '/register',
         backgroundUrl: '',
+        imagePosition: 'center',
+        imageZoom: CMS_HERO_ZOOM_DEFAULT,
       },
-      render: ({ heading, subheading, buttonText, buttonUrl, backgroundUrl }) => (
+      render: ({ heading, subheading, buttonText, buttonUrl, backgroundUrl, imagePosition, imageZoom }) => (
         <section
           className="relative flex items-center justify-center min-h-[400px] bg-gradient-to-br from-primary-600 to-primary-800 text-white text-center px-6 py-16 rounded-xl overflow-hidden"
-          style={backgroundUrl ? { backgroundImage: `url(${backgroundUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
+          style={
+            backgroundUrl
+              ? {
+                  backgroundImage: `url(${backgroundUrl})`,
+                  backgroundSize: cmsHeroBackgroundSize(imageZoom),
+                  backgroundPosition: cmsHeroBackgroundPosition(imagePosition),
+                }
+              : undefined
+          }
         >
-          {backgroundUrl && <div className="absolute inset-0 bg-black/40" />}
           <div className="relative z-10 max-w-3xl">
             <h1 className="text-4xl font-bold mb-4">{heading || 'Your Heading'}</h1>
             <p className="text-lg mb-8 text-white/90">{subheading || 'Your subheading here'}</p>

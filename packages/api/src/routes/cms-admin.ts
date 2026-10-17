@@ -12,6 +12,7 @@ import {
 } from '@pawtag/db';
 import { auditService, type AuditContext } from '../services/audit';
 import { type AuditRequest } from '../middleware/audit';
+import { validatePageSectionUrls } from '../lib/cms-section-urls';
 
 const router = Router();
 router.use(authenticate);
@@ -90,6 +91,15 @@ router.post('/pages', requirePermission('cms.page.create'), async (req: AuthRequ
       return;
     }
 
+    const unsafeSectionUrl = validatePageSectionUrls(sections);
+    if (unsafeSectionUrl) {
+      res.status(400).json({
+        success: false,
+        error: `Section URL field "${unsafeSectionUrl}" must be a site path (e.g. /shop) or an http(s) URL`,
+      });
+      return;
+    }
+
     const existing = await CmsPage.findOne({ slug, deletedAt: null });
     if (existing) {
       res.status(400).json({ success: false, error: 'A page with this slug already exists' });
@@ -142,6 +152,16 @@ router.put('/pages/:id', requirePermission('cms.page.update'), async (req: AuthR
     /** Whitelist allowed fields — prevents mass-assignment of system-managed fields
      *  such as createdBy, deletedAt, _id, createdAt */
     const { slug, title, description, template, sections, metaTitle, metaDescription, metaKeywords, canonicalUrl, ogImage, ogTitle, ogDescription, twitterCard, twitterTitle, twitterDescription, twitterImage, schemaJsonLd, status, scheduledPublishAt, scheduledUnpublishAt } = req.body;
+
+    const unsafeSectionUrl = validatePageSectionUrls(sections);
+    if (unsafeSectionUrl) {
+      res.status(400).json({
+        success: false,
+        error: `Section URL field "${unsafeSectionUrl}" must be a site path (e.g. /shop) or an http(s) URL`,
+      });
+      return;
+    }
+
     const updateData: Record<string, any> = { updatedBy: req.user!.id, $inc: { version: 1 } };
     if (slug !== undefined) updateData.slug = slug;
     if (title !== undefined) updateData.title = title;
