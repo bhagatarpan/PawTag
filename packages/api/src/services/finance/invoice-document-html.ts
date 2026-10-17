@@ -125,7 +125,8 @@ export function renderInvoiceDocumentHtml(model: InvoiceDocumentModel): string {
       totalsRows.push(`          <tr><td colspan="2" style="border:none;padding:8px 16px;font-size:13px;color:#6b7280;">Shipping</td><td class="amount-col" style="border:none;padding:8px 16px;font-size:13px;color:#6b7280;font-weight:400;">${model.totals.shipping === 0 ? 'Free' : `$${model.totals.shipping.toFixed(2)}`}</td></tr>`);
     }
     if (model.totals.tax != null && model.totals.tax > 0) {
-      totalsRows.push(`          <tr><td colspan="2" style="border:none;padding:8px 16px;font-size:13px;color:#6b7280;">GST (15%)</td><td class="amount-col" style="border:none;padding:8px 16px;font-size:13px;color:#6b7280;font-weight:400;">$${model.totals.tax.toFixed(2)}</td></tr>`);
+      const taxLabel = escapeHtml(model.totals.taxLabel || 'GST');
+      totalsRows.push(`          <tr><td colspan="2" style="border:none;padding:8px 16px;font-size:13px;color:#6b7280;">${taxLabel}</td><td class="amount-col" style="border:none;padding:8px 16px;font-size:13px;color:#6b7280;font-weight:400;">$${model.totals.tax.toFixed(2)}</td></tr>`);
     }
   }
 
@@ -165,7 +166,7 @@ export function renderInvoiceDocumentHtml(model: InvoiceDocumentModel): string {
     .meta-block .label { color: #6b7280; font-size: 12px; }
     .status-badge { display: inline-block; padding: 4px 14px; border-radius: 20px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #fff; background: ${statusCol}; }
     table { width: 100%; border-collapse: collapse; margin: 24px 0; }
-    thead th { background: #f9fafb; padding: 12px 16px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #6b7280; border-bottom: 2px solid #e5e7eb; }
+    thead th { background: #f3f4f6; padding: 12px 16px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #6b7280; border-bottom: 2px solid #e5e7eb; }
     tbody td { padding: 14px 16px; border-bottom: 1px solid #f3f4f6; font-size: 14px; }
     tbody tr:last-child td { border-bottom: none; }
     .amount-col { text-align: right; font-weight: 600; }

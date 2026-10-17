@@ -32,6 +32,13 @@ const GRAY = rgb(0.42, 0.447, 0.502); // #6b7280
 const LIGHT_GRAY = rgb(0.898, 0.906, 0.922); // #e5e7eb
 const GREEN = rgb(0.086, 0.639, 0.29); // #16a34a
 const WHITE = rgb(1, 1, 1);
+// Palette additions — mirror the HTML invoice tones exactly so both
+// formats agree. Keep in sync with finance/invoice-document-html.ts CSS.
+const HEADER_GRAD_FROM = rgb(0.051, 0.58, 0.533); // #0d9488
+const HEADER_GRAD_TO = rgb(0.059, 0.463, 0.431); // #0f766e
+const TABLE_HEAD_BG = rgb(0.953, 0.957, 0.965); // #f3f4f6 — item-table header band
+const TOTAL_BAND_BG = rgb(0.941, 0.992, 0.98); // #f0fdfa — total-row band
+const ROW_LINE = rgb(0.953, 0.957, 0.965); // #f3f4f6 — item row separator
 
 /**
  * Standard PDF fonts use WinAnsi encoding, which cannot represent macrons
@@ -146,14 +153,27 @@ async function renderInvoiceDocumentPdf(model: InvoiceDocumentModel): Promise<Bu
   }
   const sanitize = safe;
 
-  /* ---- Header band (teal) ---- */
-  const headerH = 110;
+  /* ---- Header band (teal gradient, mirrors .invoice-header) ---- */
+  const headerH = 150; // ~40px padding top/bottom like the HTML's padding:40px
   const headerTop = 842;
-  page.drawRectangle({ x: 0, y: headerTop - headerH, width: W, height: headerH, color: TEAL });
+  // pdf-lib has no gradient primitive; approximate the HTML's
+  // `linear-gradient(135deg, #0d9488, #0f766e)` with a vertical two-stop
+  // gradient rendered as thin strips. Visually indistinguishable at this size.
+  const strips = 40;
+  const stripH = headerH / strips;
+  for (let i = 0; i < strips; i++) {
+    const t = i / (strips - 1);
+    const r = HEADER_GRAD_FROM.red + (HEADER_GRAD_TO.red - HEADER_GRAD_FROM.red) * t;
+    const g = HEADER_GRAD_FROM.green + (HEADER_GRAD_TO.green - HEADER_GRAD_FROM.green) * t;
+    const b = HEADER_GRAD_FROM.blue + (HEADER_GRAD_TO.blue - HEADER_GRAD_FROM.blue) * t;
+    page.drawRectangle({ x: 0, y: headerTop - (i + 1) * stripH, width: W, height: stripH + 0.5, color: rgb(r, g, b) });
+  }
 
-  let y = headerTop - 38;
-  page.drawText(sanitize(model.company.name), { x: M, y, size: 20, font: bold, color: WHITE });
-  y -= 18;
+  // Company block (left) — HTML: h1 28px, then 13px lines
+  const companyX = M;
+  let y = headerTop - 52;
+  page.drawText(sanitize(model.company.name), { x: companyX, y, size: 24, font: bold, color: WHITE });
+  y -= 22;
   const companyLines = [
     model.company.address,
     model.company.phone,
@@ -161,25 +181,27 @@ async function renderInvoiceDocumentPdf(model: InvoiceDocumentModel): Promise<Bu
     model.company.gst ? `GST: ${model.company.gst}` : '',
   ].filter(Boolean);
   for (const line of companyLines) {
-    page.drawText(sanitize(line), { x: M, y, size: 9, font, color: WHITE });
-    y -= 13;
+    page.drawText(sanitize(line), { x: companyX, y, size: 10, font, color: WHITE });
+    y -= 15;
   }
 
+  // Document title (right) — HTML: h2 36px/letter-spacing 2, number 16px
   const invLabel = model.title;
-  const invLabelWidth = bold.widthOfTextAtSize(sanitize(invLabel), 28);
-  page.drawText(sanitize(invLabel), { x: W - M - invLabelWidth, y: headerTop - 40, size: 28, font: bold, color: WHITE });
-  const numberWidth = bold.widthOfTextAtSize(sanitize(model.number), 13);
-  page.drawText(sanitize(model.number), { x: W - M - numberWidth, y: headerTop - 58, size: 13, font: bold, color: WHITE });
+  const invLabelSize = 32;
+  const invLabelWidth = bold.widthOfTextAtSize(sanitize(invLabel), invLabelSize);
+  page.drawText(sanitize(invLabel), { x: W - M - invLabelWidth, y: headerTop - 56, size: invLabelSize, font: bold, color: WHITE });
+  const numberWidth = bold.widthOfTextAtSize(sanitize(model.number), 15);
+  page.drawText(sanitize(model.number), { x: W - M - numberWidth, y: headerTop - 78, size: 15, font: bold, color: WHITE });
 
-  // Status badge
+  // Status badge — HTML .status-badge is a pill (border-radius 20px)
   const status = String(model.status || '').toUpperCase();
   const badgeColor = status === 'PAID' || status === 'ISSUED' ? GREEN : status === 'REFUNDED' || status === 'VOID' || status === 'REPLACED' ? GRAY : TEAL_DARK;
-  const statusTextWidth = bold.widthOfTextAtSize(sanitize(status), 9);
-  const badgeW = statusTextWidth + 20;
+  const statusTextWidth = bold.widthOfTextAtSize(sanitize(status), 10);
+  const badgeW = statusTextWidth + 28; // ~14px horizontal padding each side
   const badgeX = W - M - badgeW;
-  const badgeY = headerTop - 82;
-  page.drawRectangle({ x: badgeX, y: badgeY, width: badgeW, height: 18, color: badgeColor });
-  page.drawText(sanitize(status), { x: badgeX + 10, y: badgeY + 5, size: 9, font: bold, color: WHITE });
+  const badgeY = headerTop - 112;
+  page.drawRectangle({ x: badgeX, y: badgeY, width: badgeW, height: 22, color: badgeColor });
+  page.drawText(sanitize(status), { x: badgeX + 14, y: badgeY + 7, size: 10, font: bold, color: WHITE });
 
   /* ---- Meta columns ---- */
   let metaY = headerTop - headerH - 36;
@@ -259,14 +281,18 @@ async function renderInvoiceDocumentPdf(model: InvoiceDocumentModel): Promise<Bu
   let tableY = Math.min(billY, shipY, detY) - 30;
   const tableBottomReserve = 130; // totals + notes + footer space
   const rowH = 34;
+  // Named column anchors shared by the header + item rows so QTY/amount
+  // can never drift apart between the two.
+  const qtyColX = 365;
+  const amountRightX = W - M - 8; // right-aligned amounts sit 8px inside the margin
 
   const drawTableHeader = (yy: number) => {
-    page.drawRectangle({ x: M, y: yy - 4, width: W - 2 * M, height: 22, color: rgb(0.976, 0.98, 0.984) });
-    drawLabel('ITEM', M + 8, yy + 3);
-    drawLabel('QTY', 365, yy + 3);
+    page.drawRectangle({ x: M, y: yy - 4, width: W - 2 * M, height: 24, color: TABLE_HEAD_BG });
+    drawLabel('ITEM', M + 16, yy + 3);
+    drawLabel('QTY', qtyColX, yy + 3);
     const amountLabel = 'AMOUNT';
     const amtW = bold.widthOfTextAtSize(amountLabel, 8);
-    drawLabel(amountLabel, W - M - amtW - 8, yy + 3);
+    drawLabel(amountLabel, amountRightX - amtW, yy + 3);
     page.drawLine({ start: { x: M, y: yy - 4 }, end: { x: W - M, y: yy - 4 }, thickness: 1, color: LIGHT_GRAY });
   };
 
@@ -297,29 +323,30 @@ async function renderInvoiceDocumentPdf(model: InvoiceDocumentModel): Promise<Bu
 
   for (const item of model.items) {
     if (tableY < tableBottomReserve + rowH) break; // single-page guard
-    const mainY = drawWrapped(item.name, M + 8, tableY, 300, bold, INK, 10);
+    const mainY = drawWrapped(item.name, M + 16, tableY, 300, bold, INK, 10);
     let itemY = mainY;
     for (const subtitle of item.subtitles) {
-      page.drawText(sanitize(subtitle), { x: M + 8, y: itemY, size: 8, font, color: TEAL_DARK });
+      page.drawText(sanitize(subtitle), { x: M + 16, y: itemY, size: 8, font, color: TEAL_DARK });
       itemY -= 12;
     }
-    page.drawText(String(item.quantity), { x: 365, y: tableY, size: 10, font, color: INK });
+    page.drawText(String(item.quantity), { x: qtyColX, y: tableY, size: 10, font, color: INK });
     const amountStr = item.lineTotal != null ? `$${item.lineTotal.toFixed(2)}` : '';
     const amountW = font.widthOfTextAtSize(sanitize(amountStr), 10);
-    page.drawText(sanitize(amountStr), { x: W - M - amountW - 8, y: tableY, size: 10, font, color: INK });
-    page.drawLine({ start: { x: M, y: tableY - 12 }, end: { x: W - M, y: tableY - 12 }, thickness: 0.5, color: rgb(0.953, 0.957, 0.965) });
+    page.drawText(sanitize(amountStr), { x: amountRightX - amountW, y: tableY, size: 10, font, color: INK });
+    page.drawLine({ start: { x: M, y: tableY - 12 }, end: { x: W - M, y: tableY - 12 }, thickness: 0.5, color: ROW_LINE });
     tableY -= rowH;
   }
 
   /* ---- Totals ---- */
   let totalsY = tableY - 8;
+  const totalsLabelX = 330;
   const drawTotalsRow = (label: string, value: string, opts?: { valueColor?: ReturnType<typeof rgb>; bold?: boolean }) => {
     const f = opts?.bold ? bold : font;
     const c = opts?.valueColor || (opts?.bold ? INK : GRAY);
-    page.drawText(sanitize(label), { x: 330, y: totalsY, size: opts?.bold ? 13 : 10, font: f, color: opts?.bold ? INK : GRAY });
+    page.drawText(sanitize(label), { x: totalsLabelX, y: totalsY, size: opts?.bold ? 13 : 10, font: f, color: opts?.bold ? INK : GRAY });
     const vw = f.widthOfTextAtSize(sanitize(value), opts?.bold ? 13 : 10);
     page.drawText(sanitize(value), { x: W - M - vw, y: totalsY, size: opts?.bold ? 13 : 10, font: f, color: c });
-    totalsY -= opts?.bold ? 24 : 18;
+    totalsY -= opts?.bold ? 26 : 18;
   };
 
   if (model.totals?.subtotal != null) drawTotalsRow('Subtotal', `$${model.totals.subtotal.toFixed(2)}`);
@@ -327,11 +354,24 @@ async function renderInvoiceDocumentPdf(model: InvoiceDocumentModel): Promise<Bu
     drawTotalsRow(`Discount${model.totals.discountReason ? ` (${model.totals.discountReason})` : ''}`, `-$${model.totals.discount.toFixed(2)}`, { valueColor: GREEN });
   }
   if (model.totals?.shipping != null) drawTotalsRow('Shipping', model.totals.shipping === 0 ? 'Free' : `$${model.totals.shipping.toFixed(2)}`);
-  if (model.totals?.tax != null && model.totals.tax > 0) drawTotalsRow('GST (15%)', `$${model.totals.tax.toFixed(2)}`);
+  if (model.totals?.tax != null && model.totals.tax > 0) {
+    drawTotalsRow(model.totals.taxLabel || 'GST', `$${model.totals.tax.toFixed(2)}`);
+  }
 
-  totalsY -= 4;
-  page.drawLine({ start: { x: 330, y: totalsY + 14 }, end: { x: W - M, y: totalsY + 14 }, thickness: 1.5, color: TEAL });
-  drawTotalsRow('Total (incl. GST)', fmtMoney(model.amount, model.currency), { bold: true });
+  // Total band — HTML `.total-row`: mint background #f0fdfa + 2px teal top
+  // rule. The band starts BELOW the last totals row (totalsY already sits
+  // beneath the final row after drawTotalsRow decrements it), so nothing is
+  // clipped. Draw band, then the teal rule at its top edge, then the text.
+  const bandH = 40;
+  const bandTop = totalsY + 6; // small gap below the last totals row
+  page.drawRectangle({ x: M, y: bandTop - bandH, width: W - 2 * M, height: bandH, color: TOTAL_BAND_BG });
+  page.drawLine({ start: { x: M, y: bandTop }, end: { x: W - M, y: bandTop }, thickness: 2, color: TEAL });
+  const totalLabelY = bandTop - 26;
+  page.drawText(sanitize('Total (incl. GST)'), { x: totalsLabelX, y: totalLabelY, size: 13, font: bold, color: INK });
+  const totalValue = fmtMoney(model.amount, model.currency);
+  const totalVw = bold.widthOfTextAtSize(sanitize(totalValue), 13);
+  page.drawText(sanitize(totalValue), { x: W - M - totalVw, y: totalLabelY, size: 13, font: bold, color: INK });
+  totalsY = bandTop - bandH - 10;
 
   /* ---- Kind-specific notes (donation tax statements, signatories) ---- */
   let notesY = totalsY - 8;

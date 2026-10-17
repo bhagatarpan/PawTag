@@ -46,6 +46,16 @@ assembleInvoiceDocument(id, channel) / assembleDonationReceiptDocument(id, chann
     └──► PDF generator (A4 shared layout; kind = invoice | credit_note | donation_receipt)
 ```
 
+**PDF engine caveat (known limitation, founder-flagged):** the shared assembly is the
+single source of truth for **data**, but the PDF generator *redraws* the HTML layout by
+hand with pdf-lib primitives rather than rendering the actual HTML/CSS. The two are kept
+in sync manually, so they can and do drift (gradient header, table band, total row,
+column anchors). The founder is not satisfied with this export mechanism and has asked for
+a better approach to be evaluated — leading candidate is rendering the real HTML/CSS via
+headless Chromium print-to-PDF, which would give one layout source and remove the hand-
+maintained redraw entirely. Until then, any visual change must be applied to **both**
+`invoice-document-html.ts` and `invoice-pdf.service.ts`.
+
 **Channel determination:** `InvoiceAccessToken.issuedToAdmin` (new additive flag) — admin view routes set it; the token status route assembles with `channel: 'admin'` when set. Never trust a client query param.
 
 **Legacy documents:** no migration. Renderers fall back to the existing Order/Membership joins when the snapshot fields are absent.
@@ -80,6 +90,7 @@ CSR invoice tab additionally shows: document type badge (Order / Membership / Su
 | Stripe retrieve for donation card data fails / slow | Best-effort try/catch with timeout-free short-circuit; receipt issues without card details |
 | Credit-note PDF misses refund semantics | Assembly carries refund destination + related original invoice number; PDF renders both |
 | Old invoices without snapshots | Render-time fallback to Order/Membership joins (unchanged behaviour) |
+| PDF layout drifts from HTML (pdf-lib redraws the CSS by hand) | Accepted as a known limitation of the current pdf-lib engine. Founder is **not satisfied** with this export approach and wants a better PDF mechanism evaluated — most likely rendering the **actual HTML/CSS** (headless Chromium print-to-PDF) so there is one layout source and no hand-maintained redraw to drift. The residual `INV- 000043`-style gaps come from the static Inter TTF's stripped kerning + wide hyphen advance and are a font-metric limit, not a layout bug. |
 
 ## 7. Implementation checklist
 

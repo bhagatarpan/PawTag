@@ -30,6 +30,7 @@ import {
   DonationPayment,
 } from '@pawtag/db';
 import { formatRefundDestination } from '@pawtag/shared';
+import { nzGstProvider } from '../../commerce/providers/simple-gst';
 
 export type DocumentChannel = 'customer' | 'admin';
 export type InvoiceDocumentKind = 'invoice' | 'credit_note' | 'donation_receipt';
@@ -87,6 +88,13 @@ export interface InvoiceDocumentModel {
     discountReason?: string;
     shipping?: number;
     tax?: number;
+    /**
+     * Config-driven tax label with the effective rate baked in, e.g.
+     * "GST (15%)". Sourced from the tax provider at assembly time so the
+     * percentage is never hardcoded in a renderer and stays correct if
+     * `commerce.tax.rate` ever changes. Undefined when no tax applies.
+     */
+    taxLabel?: string;
   };
   payment: {
     method?: string;
@@ -235,6 +243,21 @@ export async function assembleInvoiceDocument(
     ? formatRefundDestination(order?.payment?.cardBrand, order?.payment?.cardLast4)
     : undefined;
 
+  // Config-driven tax label, e.g. "GST (15%)" — the name and rate both come
+  // from the tax provider's settings, so the percentage is never hardcoded in
+  // a renderer and stays correct if `commerce.tax.rate` changes. Only present
+  // when an order tax amount exists, mirroring the old "show GST row" condition.
+  let taxLabel: string | undefined;
+  if (order && order.tax != null) {
+    try {
+      const [name, rate] = await Promise.all([nzGstProvider.getLabel(), nzGstProvider.getRate()]);
+      const pct = Math.round(rate * 10000) / 100; // 0.15 -> 15 (2dp, no float dust)
+      taxLabel = rate > 0 ? `${name} (${pct}%)` : name;
+    } catch {
+      taxLabel = 'GST';
+    }
+  }
+
   return {
     kind: isCreditNote ? 'credit_note' : 'invoice',
     number: invoice.invoiceNumber,
@@ -274,6 +297,7 @@ export async function assembleInvoiceDocument(
           discountReason: order.discount?.reason || undefined,
           shipping: order.shippingCost ?? undefined,
           tax: order.tax ?? undefined,
+          taxLabel,
         }
       : undefined,
     payment: {
