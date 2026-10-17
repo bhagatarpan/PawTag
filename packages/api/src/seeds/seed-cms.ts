@@ -295,9 +295,16 @@ async function run() {
           items: [
             { label: 'Home', url: '/', order: 0, visible: true },
             { label: 'Shop', url: '/shop', order: 1, visible: true },
-            { label: 'About', url: '/about', order: 2, visible: true },
-            { label: 'FAQ', url: '/faq', order: 3, visible: true },
-            { label: 'Contact', url: '/contact', order: 4, visible: true },
+            {
+              label: 'About',
+              url: '/about',
+              order: 2,
+              visible: true,
+              // FAQ lives under About (founder decision) — rendered as a
+              // dropdown on desktop, indented row in the mobile drawer
+              children: [{ label: 'FAQ', url: '/faq', order: 0, visible: true }],
+            },
+            { label: 'Contact', url: '/contact', order: 3, visible: true },
           ],
           status: 'published',
           createdBy: adminId,

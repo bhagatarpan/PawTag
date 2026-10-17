@@ -113,15 +113,20 @@ export default function Navbar() {
    }, [user]);
 
   const fallbackLinks = [
-    { to: '/', label: 'Home' },
-    { to: '/shop', label: 'Shop' },
-    { to: '/membership', label: 'Membership' },
-    { to: '/about', label: 'About' },
+    { to: '/', label: 'Home', children: [] as { to: string; label: string }[] },
+    { to: '/shop', label: 'Shop', children: [] as { to: string; label: string }[] },
+    { to: '/membership', label: 'Membership', children: [] as { to: string; label: string }[] },
+    { to: '/about', label: 'About', children: [] as { to: string; label: string }[] },
   ];
 
   const navLinks = loading || !menus.length ? fallbackLinks : menus[0]?.items?.map(item => ({
     to: item.url,
     label: item.label,
+    // Nested CMS items (e.g. FAQ under About) render as a dropdown on
+    // desktop and indented rows in the mobile drawer
+    children: (item.children || [])
+      .filter((child: any) => child?.visible !== false && child?.url && child?.label)
+      .map((child: any) => ({ to: child.url, label: child.label })),
   })) || fallbackLinks;
 
   const isActive = (path: string) => location.pathname === path;
@@ -147,11 +152,46 @@ export default function Navbar() {
             {/* Desktop Nav */}
             <div className="hidden md:flex items-center gap-1">
               {navLinks.map((link) => (
-                <Link key={link.to} to={link.to} className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  isActive(link.to) ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                }`}>
-                  {link.label}
-                </Link>
+                link.children.length > 0 ? (
+                  /* Parent with nested CMS items (e.g. About → FAQ):
+                     still a real link; the panel opens on hover or
+                     keyboard focus (visibility:hidden keeps hidden
+                     children out of the tab order). */
+                  <div key={link.to} className="relative group">
+                    <Link
+                      to={link.to}
+                      className={`inline-flex items-center gap-1 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                        isActive(link.to) || link.children.some((c) => isActive(c.to))
+                          ? 'bg-primary-50 text-primary-700'
+                          : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                      }`}
+                    >
+                      {link.label}
+                      <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
+                    </Link>
+                    <div className="invisible absolute left-0 top-full z-50 pt-1 opacity-0 transition-all duration-150 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100">
+                      <div className="min-w-[160px] rounded-xl border border-gray-100 bg-white py-1.5 shadow-lg">
+                        {link.children.map((child) => (
+                          <Link
+                            key={child.to}
+                            to={child.to}
+                            className={`block px-4 py-2 text-sm font-medium transition-colors ${
+                              isActive(child.to) ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                            }`}
+                          >
+                            {child.label}
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <Link key={link.to} to={link.to} className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                    isActive(link.to) ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                  }`}>
+                    {link.label}
+                  </Link>
+                )
               ))}
               <Link
                 to={user ? '/account/guardian' : '/guardian'}
@@ -284,11 +324,26 @@ export default function Navbar() {
           <div className="md:hidden border-t border-gray-100 bg-white">
             <div className="px-4 py-4 space-y-2">
               {navLinks.map((link) => (
-                <Link key={link.to} to={link.to} onClick={() => setMobileOpen(false)} className={`block px-4 py-3 rounded-lg font-medium transition-all ${
-                  isActive(link.to) ? 'bg-primary-50 text-primary-700' : 'text-gray-700 hover:bg-gray-50'
-                }`}>
-                  {link.label}
-                </Link>
+                <div key={link.to}>
+                  <Link to={link.to} onClick={() => setMobileOpen(false)} className={`block px-4 py-3 rounded-lg font-medium transition-all ${
+                    isActive(link.to) ? 'bg-primary-50 text-primary-700' : 'text-gray-700 hover:bg-gray-50'
+                  }`}>
+                    {link.label}
+                  </Link>
+                  {/* Nested CMS items (e.g. FAQ under About), indented */}
+                  {link.children.map((child) => (
+                    <Link
+                      key={child.to}
+                      to={child.to}
+                      onClick={() => setMobileOpen(false)}
+                      className={`block pl-10 pr-4 py-2.5 rounded-lg text-sm transition-all ${
+                        isActive(child.to) ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      {child.label}
+                    </Link>
+                  ))}
+                </div>
               ))}
               <Link
                 to={user ? '/account/guardian' : '/guardian'}

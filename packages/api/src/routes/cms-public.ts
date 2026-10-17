@@ -51,10 +51,27 @@ router.get('/navigation/:location', async (req: Request, res: Response) => {
       deletedAt: null,
     }).select('-__v -createdBy -updatedBy -deletedAt');
 
-    // Filter visible items
+    // Filter visible items (and their nested children, e.g. FAQ under
+    // About). NOTE: each item must be converted with toObject() before
+    // spreading — spreading a Mongoose subdocument copies internal
+    // fields (__parentArray etc.) and DROPS the schema fields, which
+    // silently renders label-less (invisible) nav links.
     const sanitized = menus.map((menu) => ({
       ...menu.toObject(),
-      items: (menu.items || []).filter((item) => item.visible),
+      items: (menu.items || [])
+        .filter((item) => item.visible)
+        .map((item) => {
+          // Runtime items are Mongoose subdocuments; the interface types
+          // them as plain objects — narrow via any at this boundary.
+          const raw = item as any;
+          const plain = typeof raw.toObject === 'function' ? raw.toObject() : { ...raw };
+          const children = Array.isArray(raw.children)
+            ? raw.children
+                .filter((child: any) => child?.visible !== false)
+                .map((child: any) => (typeof child?.toObject === 'function' ? child.toObject() : { ...child }))
+            : [];
+          return { ...plain, children };
+        }),
     }));
 
     res.json({ success: true, data: sanitized });
