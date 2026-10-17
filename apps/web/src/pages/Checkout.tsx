@@ -1631,6 +1631,7 @@ export default function Checkout() {
             estimatedPoints={estimatedPoints}
             pointsToNextTier={pointsToNextTier}
             nextTierName={nextTierName}
+            usedSavedCard={!!selectedSavedPmId}
           />
         )}
 
