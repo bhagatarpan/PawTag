@@ -17,6 +17,7 @@ import {
 import { sendMail } from './email.service';
 import { sendInvoiceEmail } from './email.service';
 import { generateInvoiceHtml } from './invoice-html.service';
+import { generateMembershipInvoiceNumber } from '../lib/invoice-number';
 import { generateSecureToken, hashToken } from './auth.service';
 import { createAndDeliverNotification } from './notification-delivery.service';
 import { auditService, type AuditContext } from './audit';
@@ -772,15 +773,22 @@ export async function activateMembership(membershipId: string) {
       if (user?.email && invoice) {
         // Generate secure invoice access URL
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-        const token = require('crypto').randomBytes(32).toString('hex');
+        const { generateSecureToken, hashToken } = await import('./auth.service');
+        const token = generateSecureToken();
         const expiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000); // 1 year for membership invoices
         await InvoiceAccessToken.create({
           invoiceId: invoice._id,
           userId: membership.userId,
-          token,
+          tokenHash: hashToken(token),
           expiresAt,
+          verifiedAt: new Date(), // pre-verified — portal-initiated, no OTP wall
         });
-        const invoiceUrl = `${frontendUrl}/account/invoices/${invoice.invoiceNumber}?token=${token}`;
+        // The model requires a HASHED token (the raw `token` field used to
+        // throw a ValidationError here, silently skipping every membership
+        // invoice email) and the viewer lives at /invoice/:token — the old
+        // /account/invoices/<number>?token= link pointed at a route that
+        // expects a Mongo id and ignores tokens.
+        const invoiceUrl = `${frontendUrl}/invoice/${token}`;
 
         const { generateInvoiceHtml } = await import('./invoice-html.service');
         const { sendInvoiceEmail } = await import('./email.service');
@@ -1655,19 +1663,6 @@ export async function estimateTierChange(
 // ─── Change Tier ─────────────────────────────────────────────
 
 /**
- * Generate the next membership invoice number (INVM-NNNNNN).
- * Uses the atomic counters collection — same pattern as activateMembership.
- */
-async function nextMembershipInvoiceNumber(): Promise<string> {
-  const counter = await UserMembership.db!.collection('counters').findOneAndUpdate(
-    { _id: 'membershipInvoiceNumber' as any },
-    { $inc: { seq: 1 } },
-    { upsert: true, returnDocument: 'after' },
-  );
-  return `INVM-${String((counter as any)?.value?.seq || 1).padStart(6, '0')}`;
-}
-
-/**
  * Create a membership invoice document with idempotency.
  * Returns the invoice document, or an existing one if already created.
  * Exported for the Stripe webhook renewal path — the single source of
@@ -1682,6 +1677,8 @@ export async function createMembershipInvoice(params: {
   amount: number;
   currency: string;
   billingPeriod: { start: Date; end: Date };
+  /** 'paid' (default) or 'failed' for dunning records */
+  status?: 'paid' | 'failed';
 }): Promise<any> {
   // Idempotency: check by stripeInvoiceId (strongest key) or membership + subscription
   const existing = params.stripeInvoiceId
@@ -1697,7 +1694,7 @@ export async function createMembershipInvoice(params: {
     return existing;
   }
 
-  const invoiceNumber = await nextMembershipInvoiceNumber();
+  const invoiceNumber = await generateMembershipInvoiceNumber();
 
   // Self-contained payment snapshot: saved membership card first, then a
   // best-effort extraction from the payment intent (never blocks creation).
@@ -1712,7 +1709,7 @@ export async function createMembershipInvoice(params: {
     invoiceNumber,
     amount: params.amount,
     currency: params.currency,
-    status: 'paid',
+    status: params.status || 'paid',
     paymentMethod: card.cardBrand ? 'card' : undefined,
     cardBrand: card.cardBrand,
     cardLast4: card.cardLast4,
@@ -1720,7 +1717,7 @@ export async function createMembershipInvoice(params: {
     stripeInvoiceId: params.stripeInvoiceId,
     stripeSubscriptionId: params.stripeSubscriptionId,
     billingPeriod: params.billingPeriod,
-    paidAt: new Date(),
+    paidAt: (params.status || 'paid') === 'paid' ? new Date() : undefined,
   });
 }
 
@@ -1742,7 +1739,9 @@ async function sendMembershipInvoiceEmail(invoice: any, userId: mongoose.Types.O
     expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
     verifiedAt: new Date(),
   });
-  const invoiceUrl = `${frontendUrl}/account/invoices/${invoice.invoiceNumber}?token=${secureToken}`;
+  // Viewer lives at /invoice/:token — the old /account/invoices/<number>
+  // link expects a Mongo id and ignores tokens (dead end for customers)
+  const invoiceUrl = `${frontendUrl}/invoice/${secureToken}`;
 
   const invoiceHtml = await generateInvoiceHtml(invoice._id.toString());
   await sendInvoiceEmail(user.email, user.fullName, invoice.invoiceNumber, invoiceHtml, invoiceUrl, invoice.amount)

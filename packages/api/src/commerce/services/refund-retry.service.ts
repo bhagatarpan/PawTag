@@ -13,7 +13,8 @@
  * Both customer and admin cancellations are eligible for auto-retry.
  */
 
-import { Order, PendingRefundRetry } from '@pawtag/db';
+import { Order, PendingRefundRetry, PaymentTransaction } from '@pawtag/db';
+import { formatRefundDestination } from '@pawtag/shared';
 import { stripePaymentProvider } from '../providers/stripe';
 import { getNumberSetting } from '../config';
 import { logRefundEvent } from '../audit';
@@ -121,7 +122,25 @@ export async function executeRefundRetry(
     return { success: false, error: 'No Stripe payment intent' };
   }
 
-  const amount = order.payment.amount;
+  // Remaining balance — never re-refund beyond what the charge still
+  // holds (retries on partially-refunded orders must target the
+  // remainder, not the original capture)
+  const succeededRefunds = await PaymentTransaction.find({
+    orderId: order._id,
+    type: 'refund',
+    status: { $in: ['succeeded', 'pending'] },
+  }).lean();
+  const alreadyRefunded = succeededRefunds.reduce((sum, t) => sum + (t.amount || 0), 0);
+  const remainingCents = Math.max(0, Math.round(order.payment.amount * 100) - Math.round(alreadyRefunded * 100));
+  if (remainingCents <= 0) {
+    logger.warn({ orderId, alreadyRefunded }, 'Retry skipped — no remaining refundable balance');
+    await PendingRefundRetry.updateOne(
+      { orderId, status: 'pending' },
+      { $set: { status: 'completed', lastAttemptAt: new Date() } },
+    );
+    return { success: true, newRefundId: order.refundId };
+  }
+  const amount = remainingCents / 100;
   const _reason = order.cancellationReason || 'Customer requested cancellation';
 
   logger.info({
@@ -149,6 +168,67 @@ export async function executeRefundRetry(
     order.refundStatus = 'pending';
     order.refundLastSyncedAt = new Date();
     await order.save();
+
+    // Record the refund transaction (without this the retry's refund is
+    // invisible to the remaining-refundable calculation)
+    try {
+      const refundDestination = formatRefundDestination(order.payment?.cardBrand, order.payment?.cardLast4);
+      await PaymentTransaction.create({
+        orderId: order._id,
+        orderNumber: order.orderNumber,
+        type: 'refund',
+        status: 'pending',
+        amount,
+        currency: order.payment?.currency || 'NZD',
+        provider: 'stripe',
+        providerTransactionId: result.refundId,
+        initiatedBy: 'system',
+        attemptCount: attemptNumber,
+        notes: 'Refund retry after earlier failure',
+        cardBrand: order.payment?.cardBrand,
+        cardLast4: order.payment?.cardLast4,
+        refundDestination,
+      });
+    } catch (txnErr) {
+      logger.error({ err: txnErr, orderId }, 'Retry: failed to record refund transaction — non-fatal');
+    }
+
+    // Credit note — the customer's document for money returned
+    try {
+      const { createCreditNoteForRefund } = await import('./credit-note.service');
+      await createCreditNoteForRefund({
+        orderId: order._id,
+        userId: order.userId,
+        refundAmount: amount,
+        currency: order.payment?.currency || 'NZD',
+        refundId: result.refundId,
+        paymentMethod: order.payment?.method,
+        cardBrand: order.payment?.cardBrand,
+        cardLast4: order.payment?.cardLast4,
+      });
+    } catch (cnErr) {
+      logger.error({ err: cnErr, orderId }, 'Retry: credit note creation failed — non-fatal');
+    }
+
+    // Guardian Points clawback — the original refund failed, so points
+    // were never deducted then; deduct proportionally now that money
+    // actually moved (capped at the original award by the helper)
+    try {
+      const { refundClawbackForOrder } = await import('../../services/loyalty/points-earning.service');
+      const clawback = await refundClawbackForOrder({
+        userId: String(order.userId),
+        orderId: String(order._id),
+        orderNumber: order.orderNumber,
+        refundAmount: amount,
+        capturedAmount: order.payment.amount ?? amount,
+        refundId: result.refundId,
+      });
+      if (clawback.pointsToDeduct > 0) {
+        logger.info({ orderId, pointsDeducted: clawback.pointsToDeduct }, 'Guardian Points deducted proportionally after refund retry');
+      }
+    } catch (clawErr) {
+      logger.error({ err: clawErr, orderId }, 'Retry: Guardian Points clawback failed — non-fatal');
+    }
 
     // Mark DB record as completed
     await PendingRefundRetry.updateOne(

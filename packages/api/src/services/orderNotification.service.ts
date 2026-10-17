@@ -286,6 +286,31 @@ export async function notifyRefundUpdate(
     return;
   }
 
+  // ONE customer email per refund (pending/succeeded only — failure
+  // notices always go out). The initiating path (admin refund, return
+  // refund, cancellation) already emailed the customer; these webhook
+  // supplements would stack up to three emails for one refund. Skip when
+  // a refund email already went out for this order in the last 30 min.
+  if (newStatus === 'pending' || newStatus === 'succeeded') {
+    try {
+      const { EmailAudit } = await import('@pawtag/db');
+      const recentRefundEmail = await EmailAudit.findOne({
+        templateSlug: { $in: ['refund-processing', 'refund-settled', 'refund-processed-csr', 'order-status'] },
+        relatedEntityId: order._id,
+        createdAt: { $gte: new Date(Date.now() - 30 * 60 * 1000) },
+      }).lean();
+      if (recentRefundEmail) {
+        logger.info(
+          { orderId: String(order._id), templateSlug: recentRefundEmail.templateSlug, newStatus },
+          'Refund customer email already sent recently — suppressing duplicate webhook email',
+        );
+        return;
+      }
+    } catch {
+      // Dedupe check is best-effort — never block the notification
+    }
+  }
+
   const refundId = refund.id;
   const amount = (refund.amount || 0) / 100;
   const currency = (refund.currency || 'nzd').toUpperCase();

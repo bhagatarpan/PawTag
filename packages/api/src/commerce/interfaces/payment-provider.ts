@@ -63,6 +63,10 @@ export interface RefundResult {
   /** Provider-specific refund ID (e.g., Stripe's re_xxx) */
   refundId?: string;
 
+  /** The PaymentIntent this refund belongs to — used by reconciliation
+   *  to match provider refunds back to local orders */
+  paymentIntentId?: string;
+
   /** Refund amount in major units */
   amount?: number;
 

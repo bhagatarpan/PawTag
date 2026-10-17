@@ -565,10 +565,13 @@ export class CartService {
    * Mark cart as converted (after order is placed).
    *
    * @param userId - User ID
+   * @param cartId - When provided, converts ONLY that cart (the cart the
+   *   checkout was initiated from). Delayed confirmations must never
+   *   convert a newer cart the customer built after paying.
    */
-  async markConverted(userId: string): Promise<void> {
+  async markConverted(userId: string, cartId?: string): Promise<void> {
     await Cart.findOneAndUpdate(
-      { userId, status: 'active' },
+      { userId, status: 'active', ...(cartId ? { _id: cartId } : {}) },
       { status: 'converted' },
     );
   }

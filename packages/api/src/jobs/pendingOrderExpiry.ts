@@ -10,6 +10,7 @@
 
 import { PendingOrder } from '@pawtag/db';
 import { inventoryService } from '../commerce/services/inventory.service';
+import { stripePaymentProvider } from '../commerce/providers/stripe';
 import logger from '../lib/logger';
 import { createClaimedJob, generateWorkerId } from '../lib/job-claim';
 
@@ -33,6 +34,29 @@ const claimedExpirePendingOrders = createClaimedJob(
 
       for (const pending of expired) {
         try {
+          // NEVER expire a checkout whose payment actually succeeded —
+          // that turns "delayed confirmation" into permanent silent loss
+          // (money taken, order unrecoverable). Synthetic ids (zero-total,
+          // demo) have no real payment; everything else checks Stripe and,
+          // on lookup failure, is left alone (fail-safe: a Stripe outage
+          // must not destroy paid checkouts).
+          const { isSyntheticPaymentIntentId } = await import('../commerce/payment-mode');
+          if (!isSyntheticPaymentIntentId(pending.stripePaymentIntentId) && pending.total !== 0) {
+            try {
+              const payment = await stripePaymentProvider.retrievePaymentIntent(pending.stripePaymentIntentId);
+              if (payment.status === 'succeeded' || payment.status === 'requires_capture') {
+                logger.warn(
+                  { pendingOrderId: String(pending._id), paymentIntentId: pending.stripePaymentIntentId },
+                  'Payment succeeded but confirmation never completed — leaving for orphan detection/repair instead of expiring',
+                );
+                continue;
+              }
+            } catch (stripeErr) {
+              logger.warn({ err: stripeErr, pendingOrderId: String(pending._id) }, 'Could not verify Stripe state — skipping expiry this cycle');
+              continue;
+            }
+          }
+
           // Claim atomically so concurrent workers do not double-release
           const claimed = await PendingOrder.findOneAndUpdate(
             { _id: pending._id, status: 'pending' },

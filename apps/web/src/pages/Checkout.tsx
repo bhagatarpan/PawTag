@@ -1266,6 +1266,24 @@ export default function Checkout() {
                             }
                           }}
                         />
+                        {/* Zero-total checkouts (e.g. rewards covering the
+                            total) have a synthetic pi_zero_ id — Stripe.js
+                            cannot confirm them, so bypass the payment form
+                            and confirm the order directly. */}
+                        {serverQuote?.isZeroTotal ? (
+                          <button
+                            type="button"
+                            onClick={handleConfirmOrder}
+                            disabled={loading}
+                            className="w-full min-h-[48px] inline-flex items-center justify-center gap-2 bg-primary-600 text-white px-7 py-3 rounded-xl font-semibold hover:bg-primary-700 active:bg-primary-800 disabled:opacity-60 transition-colors"
+                          >
+                            {loading ? (
+                              <><Loader2 size={18} className="animate-spin" /> Completing order…</>
+                            ) : (
+                              <>Complete Order — $0.00</>
+                            )}
+                          </button>
+                        ) : (
                         <StripePaymentForm
                           clientSecret={paymentClientSecret}
                           onPaymentSuccess={handlePaymentSuccess}
@@ -1281,6 +1299,7 @@ export default function Checkout() {
                               : null
                           }
                         />
+                        )}
                       </div>
                     </CheckoutErrorBoundary>
                   ) : (

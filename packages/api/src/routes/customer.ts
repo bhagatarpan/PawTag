@@ -1310,7 +1310,10 @@ router.post('/orders/place', requirePermission('order.read'), async (_req: AuthR
  */
 router.get('/notifications', requirePermission('notification.read'), async (req: AuthRequest, res: Response) => {
   try {
-    const notifications = await Notification.find({ userId: req.user!.id })
+    // audience: 'customer' only — admin alerts are stored under the
+    // triggering customer's userId and contain CSR-internal wording
+    // that must never surface in the customer portal
+    const notifications = await Notification.find({ userId: req.user!.id, audience: 'customer' })
       .sort({ createdAt: -1 })
       .limit(50);
     auditCustomerEvent(req, {

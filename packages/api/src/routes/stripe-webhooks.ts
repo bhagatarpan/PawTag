@@ -441,15 +441,17 @@ async function handleInvoicePaymentSucceeded(invoice: any): Promise<void> {
     await Tag.findByIdAndUpdate(subscription.tagId, { subscriptionStatus: 'active' });
   }
 
-  // Create PawTag Invoice for reconciliation
-  const count = await Invoice.countDocuments();
+  // Atomic counter — countDocuments()+1 races under webhook retries and
+  // collides with the unique invoiceNumber index
+  const { generateInvoiceNumber } = await import('../lib/invoice-number');
+  const invoiceNumber = await generateInvoiceNumber();
   const paymentIntentId = typeof invoice.payment_intent === 'string' ? invoice.payment_intent : undefined;
   const { cardSnapshotFromPaymentIntent } = await import('../services/finance/payment-snapshot');
   const card = await cardSnapshotFromPaymentIntent(paymentIntentId);
   await Invoice.create({
     subscriptionId: subscription._id,
     userId: subscription.userId,
-    invoiceNumber: `INV-${String(count + 1).padStart(6, '0')}`,
+    invoiceNumber,
     amount: (invoice.amount_paid || 0) / 100,
     currency: (invoice.currency || 'nzd').toUpperCase(),
     status: 'paid',
@@ -576,9 +578,12 @@ async function handleMembershipInvoice(membership: any, stripeInvoice: any): Pro
       const { User } = await import('@pawtag/db');
       const user = await User.findById(membership.userId).select('email fullName').lean();
       if (user?.email) {
-        const { renderMembershipRenewalReminderEmail } = await import('../services/email/templates/membership-renewal-reminder');
+        // Past-tense CONFIRMATION — the reminder template's future-tense
+        // copy ("will automatically renew") must never be sent after the
+        // renewal already happened
+        const { renderMembershipRenewalConfirmationEmail } = await import('../services/email/templates/membership-renewal-confirmation');
         const tier = await MembershipTier.findById(membership.tierId).lean();
-        const html = renderMembershipRenewalReminderEmail({
+        const html = renderMembershipRenewalConfirmationEmail({
           customerName: user.fullName || 'there',
           tierName: tier?.displayName || 'Membership',
           renewalDate: stripePeriodEnd.toLocaleDateString('en-NZ', { dateStyle: 'full' }),
@@ -614,7 +619,9 @@ async function handleMembershipInvoice(membership: any, stripeInvoice: any): Pro
           expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
           verifiedAt: new Date(),
         });
-        const invoiceUrl = `${frontendUrl}/account/invoices/${invoiceNumber}?token=${secureToken}`;
+        // Viewer lives at /invoice/:token — the old /account/invoices/<number>
+        // link expects a Mongo id and ignores tokens (dead end for customers)
+        const invoiceUrl = `${frontendUrl}/invoice/${secureToken}`;
 
         const invoiceHtml = await generateInvoiceHtml(pawtagInvoice._id.toString());
         await sendInvoiceEmail(user.email, user.fullName, invoiceNumber, invoiceHtml, invoiceUrl, amountPaid)
@@ -676,11 +683,14 @@ async function handleInvoicePaymentFailed(invoice: any): Promise<void> {
   }
 
   // Create a failed invoice record
-  const count = await Invoice.countDocuments();
+  // Atomic counter — countDocuments()+1 races under webhook retries and
+  // collides with the unique invoiceNumber index
+  const { generateInvoiceNumber } = await import('../lib/invoice-number');
+  const failedInvoiceNumber = await generateInvoiceNumber();
   await Invoice.create({
     subscriptionId: subscription._id,
     userId: subscription.userId,
-    invoiceNumber: `INV-${String(count + 1).padStart(6, '0')}`,
+    invoiceNumber: failedInvoiceNumber,
     amount: (invoice.amount_due || 0) / 100,
     currency: (invoice.currency || 'nzd').toUpperCase(),
     status: 'failed',
@@ -705,7 +715,7 @@ async function handleInvoicePaymentFailed(invoice: any): Promise<void> {
     await Notification.create({
       userId: user._id,
       audience: 'customer',
-      type: 'subscription_expiring',
+      type: 'subscription_payment_failed',
       title: 'Payment Failed',
       message: `Your subscription payment of $${(invoice.amount_due / 100).toFixed(2)} failed.`,
       data: { subscriptionId: subscription._id.toString() },
@@ -775,15 +785,15 @@ async function handleMembershipPaymentFailure(membership: any, stripeInvoice: an
     retryCount: membership.dunningRetryCount,
   }, 'Membership renewal payment failed');
 
-  // Notify customer
+  // Notify customer — CMS-first (staff can edit dunning copy)
   try {
     const user = await User.findById(membership.userId).select('email fullName').lean();
     if (user?.email) {
       const tier = await MembershipTier.findById(membership.tierId).lean();
-      const { sendMail } = await import('../services/email.service');
+      const { sendCmsEmailOrFallback } = await import('../services/email.service');
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
 
-      const html = `
+      const fallbackHtml = `
         <p>Hi ${user.fullName || 'there'},</p>
         <p>We couldn't renew your <strong>${tier?.displayName || 'Membership'}</strong> membership.
         The payment of $${amountDue.toFixed(2)} failed.</p>
@@ -791,8 +801,23 @@ async function handleMembershipPaymentFailure(membership: any, stripeInvoice: an
         Your benefits will remain active until ${membership.currentPeriodEnd?.toLocaleDateString('en-NZ', { dateStyle: 'full' }) || 'the end of your billing period'}.</p>
         <p><a href="${frontendUrl}/account/settings">Update Payment Method</a></p>
       `;
-      await sendMail(user.email, `Action Required: Update Your ${tier?.name || 'Membership'} Payment Method`, html)
-        .catch((err: any) => logger.error({ err, membershipId: membership._id }, 'Failed to send payment failure email'));
+      await sendCmsEmailOrFallback({
+        slug: 'membership-payment-failed',
+        to: user.email,
+        vars: {
+          'customer.name': user.fullName || 'there',
+          'membership.tier': tier?.displayName || 'Membership',
+          'membership.amount': `$${amountDue.toFixed(2)}`,
+          'membership.benefitsUntil': membership.currentPeriodEnd?.toLocaleDateString('en-NZ', { dateStyle: 'full' }) || 'the end of your billing period',
+          'membership.updatePaymentUrl': `${frontendUrl}/account/settings`,
+        },
+        fallbackSubject: `Action Required: Update Your ${tier?.name || 'Membership'} Payment Method`,
+        fallbackHtml,
+        businessFlow: 'membership',
+        relatedEntityType: 'UserMembership',
+        relatedEntityId: membership._id.toString(),
+        relatedEntityDisplay: tier?.displayName || 'Membership',
+      }).catch((err: any) => logger.error({ err, membershipId: membership._id }, 'Failed to send payment failure email'));
     }
   } catch (err) {
     logger.error({ err, membershipId: membership._id }, 'Failed to send membership payment failure notification');
@@ -814,14 +839,14 @@ async function handleMembershipPaymentFailure(membership: any, stripeInvoice: an
     logger.error({ err, membershipId: membership._id }, 'Failed to create membership payment failure notification');
   }
 
-  // Alert CSR/admin
+  // Alert CSR/admin — CMS-first (staff can edit the alert copy)
   try {
     const adminAlertEmail = process.env.ADMIN_ALERT_EMAIL;
     if (adminAlertEmail) {
-      const { sendMail } = await import('../services/email.service');
+      const { sendCmsEmailOrFallback } = await import('../services/email.service');
       const user = await User.findById(membership.userId).select('email fullName').lean();
       const tier = await MembershipTier.findById(membership.tierId).lean();
-      const html = `
+      const fallbackHtml = `
         <p><strong>Membership Payment Failure Alert</strong></p>
         <p>Customer: ${user?.fullName || 'Unknown'} (${user?.email || 'Unknown'})</p>
         <p>Tier: ${tier?.displayName || 'Unknown'}</p>
@@ -829,8 +854,23 @@ async function handleMembershipPaymentFailure(membership: any, stripeInvoice: an
         <p>Retry count: ${membership.dunningRetryCount}</p>
         <p>Benefits until: ${membership.currentPeriodEnd?.toLocaleDateString('en-NZ', { dateStyle: 'full' }) || 'N/A'}</p>
       `;
-      await sendMail(adminAlertEmail, `Membership Payment Failure: ${user?.email || membership.userId}`, html)
-        .catch((err: any) => logger.error({ err, membershipId: membership._id }, 'Failed to send CSR alert email'));
+      await sendCmsEmailOrFallback({
+        slug: 'membership-payment-failed-admin',
+        to: adminAlertEmail,
+        vars: {
+          'customer.name': user?.fullName || 'Unknown',
+          'customer.email': user?.email || 'Unknown',
+          'membership.tier': tier?.displayName || 'Unknown',
+          'membership.amount': `$${amountDue.toFixed(2)} ${currency}`,
+          'membership.retryCount': String(membership.dunningRetryCount),
+          'membership.benefitsUntil': membership.currentPeriodEnd?.toLocaleDateString('en-NZ', { dateStyle: 'full' }) || 'N/A',
+        },
+        fallbackSubject: `Membership Payment Failure: ${user?.email || membership.userId}`,
+        fallbackHtml,
+        businessFlow: 'membership',
+        relatedEntityType: 'UserMembership',
+        relatedEntityId: membership._id.toString(),
+      }).catch((err: any) => logger.error({ err, membershipId: membership._id }, 'Failed to send CSR alert email'));
     }
   } catch (err) {
     logger.error({ err, membershipId: membership._id }, 'Failed to send CSR alert for membership payment failure');

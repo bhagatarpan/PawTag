@@ -25,6 +25,7 @@
 
 import { PendingOrder } from '@pawtag/db';
 import { stripePaymentProvider } from '../commerce/providers/stripe';
+import { isSyntheticPaymentIntentId } from '../commerce/payment-mode';
 import { checkoutService } from '../commerce/services/checkout.service';
 import { logCommerceEvent } from '../commerce/audit';
 import logger from '../lib/logger';
@@ -59,6 +60,19 @@ async function checkForOrphanedPayments(): Promise<void> {
 
     for (const pending of pendingOrders) {
       try {
+        // Synthetic ids (demo / zero-total) can never be retrieved from
+        // Stripe. Zero-total pendings still complete via confirmCheckout
+        // (it validates without Stripe for pi_zero_); demo ids are skipped.
+        if (isSyntheticPaymentIntentId(pending.stripePaymentIntentId)) {
+          if (pending.total === 0) {
+            logger.info({ pendingOrderId: pending._id }, 'Orphaned zero-total checkout — completing without Stripe');
+            await checkoutService.confirmCheckout(String(pending.userId), pending.stripePaymentIntentId).catch((err) => {
+              logger.error({ err, pendingOrderId: pending._id }, 'Zero-total orphan completion failed');
+            });
+          }
+          continue;
+        }
+
         // Check payment status with Stripe
         const payment = await stripePaymentProvider.retrievePaymentIntent(pending.stripePaymentIntentId);
 

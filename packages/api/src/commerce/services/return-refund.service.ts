@@ -477,6 +477,44 @@ export class ReturnRefundService {
       refundDestination: destination,
     });
 
+    // Credit note — the customer's document for money returned (best-effort;
+    // the refund itself already succeeded and must not fail on this)
+    try {
+      const { createCreditNoteForRefund } = await import('./credit-note.service');
+      await createCreditNoteForRefund({
+        orderId: order._id,
+        userId: order.userId,
+        refundAmount: requestedAmount,
+        currency: order.payment?.currency || 'NZD',
+        refundId: stripeResult.refundId,
+        paymentMethod: order.payment?.method,
+        cardBrand: order.payment?.cardBrand,
+        cardLast4: order.payment?.cardLast4,
+      });
+    } catch (cnErr) {
+      logger.error({ err: cnErr, returnId: ret._id }, 'Credit note creation failed after refund — non-fatal');
+    }
+
+    // Guardian Points clawback — proportional to what was actually earned.
+    // Previously only customer self-cancellation deducted points; the CSR
+    // return-refund path moved money with no clawback at all.
+    try {
+      const { refundClawbackForOrder } = await import('../../services/loyalty/points-earning.service');
+      const clawback = await refundClawbackForOrder({
+        userId: String(order.userId),
+        orderId: String(order._id),
+        orderNumber: order.orderNumber,
+        refundAmount: requestedAmount,
+        capturedAmount: order.payment?.amount ?? requestedAmount,
+        refundId: stripeResult.refundId,
+      });
+      if (clawback.pointsToDeduct > 0) {
+        logger.info({ orderId: order._id, returnId: ret._id, pointsDeducted: clawback.pointsToDeduct }, 'Guardian Points deducted proportionally for return refund');
+      }
+    } catch (clawErr) {
+      logger.error({ err: clawErr, returnId: ret._id }, 'Guardian Points clawback failed after refund — non-fatal');
+    }
+
     // Item-level state (display/enforcement)
     if (ret.refundStatus === 'succeeded' || ret.refundStatus === 'pending') {
       try {
@@ -560,7 +598,8 @@ export class ReturnRefundService {
           fallbackHtml: html,
           businessFlow: 'orders_commerce',
           relatedEntityType: 'order',
-          relatedEntityId: String(order._id),
+          relatedEntityId: order._id.toString(),
+          relatedEntityDisplay: order.orderNumber,
         }).catch(() => {});
       }
     } catch (err) {

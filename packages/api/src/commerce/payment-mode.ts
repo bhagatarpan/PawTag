@@ -105,6 +105,17 @@ export function isFakePaymentIntentId(id: string | undefined | null): boolean {
 }
 
 /**
+ * Synthetic PaymentIntent ids are generated locally and can NEVER be
+ * retrieved from Stripe: demo/fake-mode ids plus the zero-total
+ * checkout's `pi_zero_` id. Any code that would call Stripe with an id
+ * must skip synthetic ids (retrieval would always fail noisily).
+ */
+export function isSyntheticPaymentIntentId(id: string | undefined | null): boolean {
+  if (!id) return false;
+  return isFakePaymentIntentId(id) || id.startsWith('pi_zero_');
+}
+
+/**
  * Get a human-readable label for the current payment mode.
  * Useful for logging, health endpoints, and admin dashboards.
  */

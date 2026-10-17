@@ -68,7 +68,7 @@ CSR invoice tab additionally shows: document type badge (Order / Membership / Su
 1. Payment snapshot is written once at document creation; issued documents are never silently mutated
 2. Card extraction is best-effort — a Stripe lookup failure never blocks or falsifies document issuance
 3. Customer documents never contain provider identifiers (`pi_`, `in_`, `ch_`)
-4. Donation receipts keep neutral tax wording (existing `donation-pdf` statements) — no tax claims invented
+4. Donation receipts keep neutral tax wording (statements carried on the receipt record via the assembly's `notes`) — no tax claims invented
 5. All money values round via `roundToCents` before persistence (monetary-precision skill)
 6. Existing numbering counters and uniqueness invariants untouched
 
