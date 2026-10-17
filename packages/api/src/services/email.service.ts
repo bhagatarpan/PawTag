@@ -442,6 +442,11 @@ export async function sendOrderConfirmation(data: OrderEmailData): Promise<Email
     'shippingAddress.city': data.shippingAddress.city,
     'shippingAddress.state': data.shippingAddress.state,
     'shippingAddress.zip': data.shippingAddress.zip,
+    // Plain-text line items — CMS templates previously could not show
+    // what was actually purchased (only the fallback renderer did)
+    items: (data.items || [])
+      .map((i) => `${i.productName} × ${i.quantity}`)
+      .join(', '),
     viewOrderUrl,
   };
   const auditMeta = {

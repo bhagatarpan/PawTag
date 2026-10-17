@@ -17,6 +17,7 @@
 
 import { Order } from '@pawtag/db';
 import { stripePaymentProvider } from '../commerce/providers/stripe';
+import { isSyntheticPaymentIntentId } from '../commerce/payment-mode';
 import { getBooleanSetting } from '../commerce/config';
 import logger from '../lib/logger';
 import { createClaimedJob, generateWorkerId } from '../lib/job-claim';
@@ -52,7 +53,9 @@ const claimedReconcilePayments = createClaimedJob(
 
     for (const order of orders) {
       const piId = order.payment?.stripePaymentIntentId;
-      if (!piId || piId.startsWith('pi_demo_')) continue;
+      if (!piId) continue;
+      // Synthetic ids (demo / zero-total) never exist at Stripe
+      if (isSyntheticPaymentIntentId(piId)) continue;
 
       try {
         const stripeIntent = await stripePaymentProvider.retrievePaymentIntent(piId);

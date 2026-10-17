@@ -112,7 +112,7 @@ export async function runRefundReconciliation(): Promise<{
     try {
       if (!refund.refundId) continue;
 
-      const piId = (refund as any).payment_intent;
+      const piId = (refund as any).paymentIntentId;
       if (!piId) continue;
 
       const order = await Order.findOne({

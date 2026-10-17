@@ -87,6 +87,13 @@ export interface IPendingOrderDocument extends Document {
   /** Stripe PaymentIntent client secret (for frontend confirmation) */
   stripeClientSecret?: string;
 
+  /**
+   * The cart this checkout was initiated from. Completion converts THIS
+   * cart by id — never "whatever cart is active now" — so items the
+   * customer adds after paying survive a delayed confirmation.
+   */
+  cartId?: string;
+
   /** Current status */
   status: PendingOrderStatus;
 
@@ -161,6 +168,7 @@ const PendingOrderSchema = new Schema<IPendingOrderDocument>(
     },
     stripePaymentIntentId: { type: String, required: true, unique: true, index: true },
     stripeClientSecret: { type: String },
+    cartId: { type: Schema.Types.ObjectId, ref: 'Cart' },
     status: {
       type: String,
       enum: ['pending', 'paid', 'converted', 'expired', 'failed'],

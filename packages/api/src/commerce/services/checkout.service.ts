@@ -26,9 +26,10 @@
  * ```
  */
 
-import { PendingOrder, Order, Invoice, InvoiceAccessToken, Cart, User, PaymentTransaction, Product } from '@pawtag/db';
+import { PendingOrder, Order, Invoice, InvoiceAccessToken, Cart, User, PaymentTransaction, Product, GuardianPointsLedger } from '@pawtag/db';
 import crypto from 'crypto';
 import { NotFoundError } from '../../lib/app-errors';
+import { generateInvoiceNumber } from '../../lib/invoice-number';
 import { InvalidCartError, CheckoutExpiredError, PaymentFailedError } from '../errors';
 import { stripePaymentProvider } from '../providers/stripe';
 import { inventoryService } from './inventory.service';
@@ -209,6 +210,7 @@ export class CheckoutService {
 
     const pendingOrder = await PendingOrder.create({
       userId,
+      cartId: cart._id,
       items: cart.items.map((item) => ({
         productId: item.productId,
         productName: item.productName,
@@ -461,43 +463,35 @@ export class CheckoutService {
     }
     logger.info({ pendingId: pending._id, status: pending.status, expiresAt: pending.expiresAt }, 'PendingOrder found');
 
-    // 2. Check if already converted (idempotent)
+    // 2. Check if already converted (idempotent) — resumes interrupted
+    // completion the same way step 3 does below
     if (pending.status === 'converted' && pending.convertedOrderId) {
       const existingOrder = await Order.findById(pending.convertedOrderId);
       if (existingOrder) {
+        if (existingOrder.completionStatus === 'pending' || existingOrder.completionStatus === 'repair_required') {
+          return this.runPostPaymentCompletion(existingOrder, pending, userId, paymentIntentId, correlationId, false);
+        }
         const invoice = await Invoice.findOne({ orderId: existingOrder._id });
         const invoiceUrl = invoice ? await this.getInvoiceUrl(invoice._id.toString(), userId) : '';
         return { order: existingOrder, invoice, invoiceUrl, isNew: false };
       }
     }
 
-    // 3. Check expiry
-    if (pending.expiresAt < new Date()) {
-      throw new CheckoutExpiredError('This checkout has expired. Please try again.');
-    }
-
-    // 4. Validate payment via Stripe API (server-side)
-    // Zero-total checkouts use a synthetic PI id and skip Stripe retrieval.
-    const isZeroTotalPayment = paymentIntentId.startsWith('pi_zero_');
-    let payment: { cardBrand?: string; cardLast4?: string; status?: string } | null = null;
-    if (isZeroTotalPayment) {
-      if (pending.total > 0) {
-        throw new PaymentFailedError('Zero-total payment id used for non-zero pending order');
-      }
-      logger.info({ paymentIntentId, pendingId: pending._id }, 'Zero-total checkout confirmed without Stripe');
-    } else {
-      payment = await stripePaymentProvider.retrievePaymentIntent(paymentIntentId);
-      logger.info({ paymentStatus: payment.status, paymentId: paymentIntentId }, 'Stripe payment status');
-      if (payment.status !== 'succeeded' && payment.status !== 'requires_capture') {
-        logger.error({ paymentStatus: payment.status, paymentIntentId }, 'Payment not in expected state');
-        throw new PaymentFailedError(`Payment status is ${payment.status}`);
-      }
-    }
-
-    // 5. Check if order already exists for this payment (idempotent — previous attempt may have partially succeeded)
+    // 3. Check if an order already exists for this payment — BEFORE the
+    // expiry check. A paid checkout must stay recoverable after the
+    // PendingOrder TTL: if a previous attempt died mid-completion (deploy
+    // restart, crash), the completion pipeline resumes instead of the
+    // order being returned half-done forever (WO-000505 class of bug).
     const existingOrder = await Order.findOne({ 'payment.stripePaymentIntentId': paymentIntentId });
     if (existingOrder) {
-      logger.info({ orderId: existingOrder._id, orderNumber: existingOrder.orderNumber }, 'Order already exists for this payment');
+      logger.info(
+        { orderId: existingOrder._id, orderNumber: existingOrder.orderNumber, completionStatus: existingOrder.completionStatus },
+        'Order already exists for this payment',
+      );
+      if (existingOrder.completionStatus === 'pending' || existingOrder.completionStatus === 'repair_required') {
+        // The completion pipeline is idempotent per step — safe to re-run
+        return this.runPostPaymentCompletion(existingOrder, pending, userId, paymentIntentId, correlationId, false);
+      }
       const invoice = await Invoice.findOne({ orderId: existingOrder._id });
       const invoiceUrl = invoice ? await this.getInvoiceUrl(invoice._id.toString(), userId) : '';
 
@@ -510,6 +504,43 @@ export class CheckoutService {
       }
 
       return { order: existingOrder, invoice, invoiceUrl, isNew: false };
+    }
+
+    // 4. Check expiry
+    if (pending.expiresAt < new Date()) {
+      throw new CheckoutExpiredError('This checkout has expired. Please try again.');
+    }
+
+    // 5. Validate payment via Stripe API (server-side)
+    // Zero-total checkouts use a synthetic PI id and skip Stripe retrieval.
+    const isZeroTotalPayment = paymentIntentId.startsWith('pi_zero_');
+    let payment: { cardBrand?: string; cardLast4?: string; status?: string; amount?: number; currency?: string } | null = null;
+    if (isZeroTotalPayment) {
+      if (pending.total > 0) {
+        throw new PaymentFailedError('Zero-total payment id used for non-zero pending order');
+      }
+      logger.info({ paymentIntentId, pendingId: pending._id }, 'Zero-total checkout confirmed without Stripe');
+    } else {
+      payment = await stripePaymentProvider.retrievePaymentIntent(paymentIntentId);
+      logger.info({ paymentStatus: payment.status, paymentId: paymentIntentId }, 'Stripe payment status');
+      if (payment.status !== 'succeeded' && payment.status !== 'requires_capture') {
+        logger.error({ paymentStatus: payment.status, paymentIntentId }, 'Payment not in expected state');
+        throw new PaymentFailedError(`Payment status is ${payment.status}`);
+      }
+      // Amount/currency guard — never record money the intent didn't charge.
+      if (typeof payment.amount === 'number' && payment.amount > 0) {
+        const { toCents } = await import('@pawtag/shared');
+        const intentCents = toCents(payment.amount);
+        const pendingCents = toCents(pending.total);
+        if (intentCents !== pendingCents) {
+          logger.error({ paymentAmount: payment.amount, pendingTotal: pending.total, paymentIntentId }, 'PaymentIntent amount mismatch');
+          throw new PaymentFailedError('Payment amount does not match the order total. Please try again.');
+        }
+        if (payment.currency && pending.currency && payment.currency.toUpperCase() !== pending.currency.toUpperCase()) {
+          logger.error({ paymentCurrency: payment.currency, pendingCurrency: pending.currency, paymentIntentId }, 'PaymentIntent currency mismatch');
+          throw new PaymentFailedError('Payment currency does not match the order currency. Please try again.');
+        }
+      }
     }
 
     // 6-7. Generate order number and create Order (retry on duplicate key)
@@ -618,42 +649,99 @@ export class CheckoutService {
       }
     }
 
-    // 7. Record activity — includes client context so the CSR timeline
-    // shows browser/device/IP without opening the technical-info modal
-    const activityEntry = {
-      type: 'order_placed',
-      message: 'Order placed and paid',
-      timestamp: new Date(),
-      actor: 'customer' as const,
-      metadata: {
-        ...(createdByBrowser ? { browser: createdByBrowser } : {}),
-        ...(createdByDevice ? { device: createdByDevice } : {}),
-        ...(clientInfo?.ipAddress ? { ipAddress: clientInfo.ipAddress } : {}),
-        ...(createdByLocation ? { location: createdByLocation } : {}),
-      },
-    };
-    await Order.updateOne({ _id: order._id }, { $push: { activity: activityEntry } });
+    return this.runPostPaymentCompletion(order, pending, userId, paymentIntentId, correlationId, true);
+  }
 
-    // 7b. Record payment transaction for audit trail
-    await PaymentTransaction.create({
-      orderId: order._id,
-      orderNumber: order.orderNumber,
-      type: 'payment',
-      status: 'succeeded',
-      amount: roundToCents(pending.total),
-      providerTransactionId: paymentIntentId,
-      initiatedBy: 'customer',
-      cardBrand: order.payment?.cardBrand,
-      cardLast4: order.payment?.cardLast4,
-    });
-
-    // 8-10. Post-payment completion steps with error tracking
+  /**
+   * Post-payment completion pipeline — idempotent per step and RE-RUNNABLE.
+   *
+   * Called for fresh confirmations and for resumes of orders whose
+   * previous confirmation died mid-pipeline (deploy restart, crash — the
+   * WO-000505 failure mode). Every step is individually guarded so a
+   * re-run never double-charges points, double-deducts inventory, or
+   * duplicates invoices; unguarded bookkeeping writes (activity,
+   * payment transaction) are wrapped so THEY can never abort completion
+   * again. Finalizes completionStatus: 'complete' | 'repair_required'.
+   */
+  private async runPostPaymentCompletion(
+    order: any,
+    pending: any,
+    userId: string,
+    paymentIntentId: string,
+    correlationId: string,
+    isNew: boolean,
+  ): Promise<CheckoutResult> {
     // Each step is tracked individually so failures are queryable and retryable.
     const completionErrors: Array<{ step: string; error: string; productId?: string; timestamp: Date }> = [];
 
-    // 8. Confirm stock (deduct actual inventory) — fail-loud on atomic transition miss
+    // 7. Record activity — includes client context so the CSR timeline
+    // shows browser/device/IP without opening the technical-info modal.
+    // Guarded: an audit write must never abort a paid order's completion.
     try {
+      const activityEntry = {
+        type: 'order_placed',
+        message: 'Order placed and paid',
+        timestamp: new Date(),
+        actor: 'customer' as const,
+        metadata: {
+          ...(order.createdByBrowser ? { browser: order.createdByBrowser } : {}),
+          ...(order.createdByDevice ? { device: order.createdByDevice } : {}),
+          ...(order.createdByIp ? { ipAddress: order.createdByIp } : {}),
+          ...(order.createdByLocation ? { location: order.createdByLocation } : {}),
+        },
+      };
+      await Order.updateOne({ _id: order._id, 'activity.type': { $ne: 'order_placed' } }, { $push: { activity: activityEntry } });
+    } catch (err: any) {
+      logger.error({ err, orderId: order._id, correlationId }, 'Completion step failed: activity record');
+      completionErrors.push({ step: 'activity_record', error: err?.message || String(err), timestamp: new Date() });
+    }
+
+    // 7b. Record payment transaction for audit trail. Guarded + deduped:
+    // the unique partial index on {providerTransactionId, type} absorbs
+    // retries; a write failure records a repairable error, never aborts.
+    try {
+      await PaymentTransaction.create({
+        orderId: order._id,
+        orderNumber: order.orderNumber,
+        type: 'payment',
+        status: 'succeeded',
+        amount: roundToCents(pending.total),
+        currency: pending.currency,
+        // REQUIRED by the model — dropping this in the monetary-precision
+        // refactor (1731f92) made every confirm throw after order
+        // creation, permanently stranding orders at completionStatus
+        // 'pending' (the WO-000505 failure mode)
+        provider: 'stripe',
+        providerTransactionId: paymentIntentId,
+        initiatedBy: 'customer',
+        cardBrand: order.payment?.cardBrand,
+        cardLast4: order.payment?.cardLast4,
+      });
+    } catch (err: any) {
+      if (err?.code === 11000) {
+        logger.info({ orderId: order._id, paymentIntentId }, 'PaymentTransaction already recorded — resume safe');
+      } else {
+        logger.error({ err, orderId: order._id, correlationId }, 'Completion step failed: payment transaction record');
+        completionErrors.push({ step: 'payment_transaction', error: err?.message || String(err), timestamp: new Date() });
+      }
+    }
+
+    // 8. Confirm stock (deduct actual inventory) — fail-loud on atomic
+    // transition miss. Idempotent: an item whose sale movement already
+    // exists for this order was confirmed by a previous (interrupted)
+    // run — re-running must not double-deduct stock.
+    try {
+      const { StockMovement } = await import('@pawtag/db');
       for (const item of pending.items) {
+        const alreadyConfirmed = await StockMovement.findOne({
+          referenceId: order.orderNumber,
+          type: 'sale',
+          productId: item.productId,
+        }).lean();
+        if (alreadyConfirmed) {
+          logger.info({ orderId: order._id, productId: item.productId }, 'Inventory already confirmed for this order — skipping');
+          continue;
+        }
         await inventoryService.confirmSale(String(item.productId), item.quantity, order.orderNumber);
       }
     } catch (err: any) {
@@ -728,11 +816,21 @@ export class CheckoutService {
       }
     }
 
-    // 8a3. Award Guardian Points for purchase
+    // 8a3. Award Guardian Points for purchase — idempotent: a purchase
+    // ledger entry for this order means a previous run already awarded.
     try {
-      const { awardPurchasePoints } = await import('../../services/loyalty/points-earning.service');
-      const pointsResult = await awardPurchasePoints(userId, pending.total, order._id.toString());
-      logger.info({ orderId: order._id, pointsAwarded: pointsResult.pointsAwarded, totalPoints: pointsResult.totalPoints }, 'Guardian Points awarded for purchase');
+      const pointsAlreadyAwarded = await GuardianPointsLedger.findOne({
+        userId,
+        activity: 'purchase',
+        referenceId: order._id.toString(),
+      }).lean();
+      if (pointsAlreadyAwarded) {
+        logger.info({ orderId: order._id }, 'Guardian Points already awarded for this order — skipping');
+      } else {
+        const { awardPurchasePoints } = await import('../../services/loyalty/points-earning.service');
+        const pointsResult = await awardPurchasePoints(userId, pending.total, order._id.toString());
+        logger.info({ orderId: order._id, pointsAwarded: pointsResult.pointsAwarded, totalPoints: pointsResult.totalPoints }, 'Guardian Points awarded for purchase');
+      }
     } catch (err: any) {
       const errorMsg = err?.message || String(err);
       logger.error({ err, orderId: order._id, correlationId }, 'Completion step failed: Guardian Points award');
@@ -797,6 +895,12 @@ export class CheckoutService {
       if (autoCreateFulfilment) {
         const { Fulfilment } = await import('@pawtag/db');
 
+        // Idempotent: a fulfilment for this order means a previous
+        // (interrupted) run already created it — never duplicate.
+        const existingFulfilment = await Fulfilment.findOne({ orderId: order._id }).lean();
+        if (existingFulfilment) {
+          logger.info({ orderId: order._id, fulfilmentId: existingFulfilment._id }, 'Fulfilment already exists for this order — skipping');
+        } else {
         // Map order items to fulfilment items
         const fulfilmentItems = order.items.map((item: any) => ({
           orderItemId: item.productId,
@@ -887,6 +991,7 @@ export class CheckoutService {
         } catch (emailErr) {
           logger.error({ err: emailErr, orderId: order._id }, 'Failed to send fulfilment alert email');
         }
+        } // end else — no existing fulfilment
       }
     } catch (err: any) {
       const errorMsg = err?.message || String(err);
@@ -904,15 +1009,24 @@ export class CheckoutService {
       completionErrors.push({ step: 'invoice_creation', error: errorMsg, timestamp: new Date() });
     }
 
-    // 10. Mark PendingOrder as converted
-    pending.status = 'converted';
-    pending.convertedOrderId = order._id;
-    pending.convertedAt = new Date();
-    await pending.save();
-
-    // 11. Clear cart
+    // 10. Mark PendingOrder as converted. Guarded — on resume the pending
+    // may already be converted; a save failure must not lose the errors.
     try {
-      await cartService.markConverted(userId);
+      if (pending.status !== 'converted') {
+        pending.status = 'converted';
+        pending.convertedOrderId = order._id;
+        pending.convertedAt = new Date();
+        await pending.save();
+      }
+    } catch (err: any) {
+      logger.error({ err, orderId: order._id, correlationId }, 'Completion step failed: pending order convert');
+      completionErrors.push({ step: 'pending_convert', error: err?.message || String(err), timestamp: new Date() });
+    }
+
+    // 11. Clear cart — scoped to the cart this checkout was initiated from
+    // (delayed confirmations must never wipe a newer cart built after paying)
+    try {
+      await cartService.markConverted(userId, pending.cartId ? String(pending.cartId) : undefined);
     } catch (err: any) {
       const errorMsg = err?.message || String(err);
       logger.error({ err, orderId: order._id, correlationId }, 'Completion step failed: cart clearing');
@@ -945,29 +1059,77 @@ export class CheckoutService {
       logger.error({ err, orderNumber: order.orderNumber, correlationId }, 'Post-checkout notification error');
     });
 
-    // 14. Audit log
-    await logOrderEvent('created', {
-      orderId: String(order._id),
-      orderNumber: order.orderNumber,
-      amount: pending.total,
-      currency: pending.currency,
+    // 14. Audit log — 'created' only for the original confirmation; resumes
+    // record a distinct completion event so the trail never double-claims
+    // order creation.
+    if (isNew) {
+      await logOrderEvent('created', {
+        orderId: String(order._id),
+        orderNumber: order.orderNumber,
+        amount: pending.total,
+        currency: pending.currency,
+      });
+    } else {
+      await logOrderEvent('confirmed', {
+        orderId: String(order._id),
+        orderNumber: order.orderNumber,
+        amount: pending.total,
+        currency: pending.currency,
+        reason: 'Interrupted completion resumed (repair)',
+      });
+    }
+
+    logger.info({ orderNumber: order.orderNumber, userId, total: pending.total, correlationId, completionStatus, resumed: !isNew }, 'Checkout confirmed');
+
+    return { order, invoice, invoiceUrl, isNew };
+  }
+
+  /**
+   * Resume completion of a paid order whose pipeline was interrupted
+   * (deploy restart, crash). Idempotent — used by the order-completion
+   * repair job and safe to call repeatedly. Returns null when the order
+   * isn't in a resumable state.
+   */
+  async resumeOrderCompletion(orderId: string): Promise<CheckoutResult | null> {
+    const order = await Order.findById(orderId);
+    if (!order) return null;
+    if (order.status !== 'paid') return null;
+    if (order.completionStatus !== 'pending' && order.completionStatus !== 'repair_required') return null;
+
+    const paymentIntentId = order.payment?.stripePaymentIntentId || '';
+    if (!paymentIntentId) {
+      logger.warn({ orderId: order._id }, 'Cannot resume completion — no payment intent on order');
+      return null;
+    }
+
+    const pending = await PendingOrder.findOne({
+      $or: [
+        { convertedOrderId: order._id },
+        { stripePaymentIntentId: paymentIntentId },
+      ],
     });
+    if (!pending) {
+      logger.warn({ orderId: order._id, paymentIntentId }, 'Cannot resume completion — pending order not found');
+      return null;
+    }
 
-    logger.info({ orderNumber: order.orderNumber, userId, total: pending.total, correlationId, completionStatus }, 'Checkout confirmed');
-
-    return { order, invoice, invoiceUrl, isNew: true };
+    const correlationId = crypto.randomUUID();
+    logger.info({ orderId: order._id, orderNumber: order.orderNumber, correlationId }, 'Resuming interrupted order completion');
+    return this.runPostPaymentCompletion(order, pending, String(order.userId), paymentIntentId, correlationId, false);
   }
 
   /**
    * Create an invoice for a confirmed order.
    */
   private async createInvoice(order: any, userId: string, amount: number): Promise<any> {
-    const invCounter = await Invoice.db!.collection('counters').findOneAndUpdate(
-      { _id: 'invoiceNumber' as any },
-      { $inc: { seq: 1 } },
-      { upsert: true, returnDocument: 'after' },
-    );
-    const invoiceNumber = `INV-${String(invCounter?.value?.seq || 1).padStart(6, '0')}`;
+    // Idempotent: resumes must never issue a second invoice for an order
+    const existing = await Invoice.findOne({ orderId: order._id }).lean();
+    if (existing) {
+      logger.info({ orderId: order._id, invoiceNumber: existing.invoiceNumber }, 'Invoice already exists for this order — reusing');
+      return existing;
+    }
+
+    const invoiceNumber = await generateInvoiceNumber();
 
     const invoice = await Invoice.create({
       orderId: order._id,
@@ -984,19 +1146,9 @@ export class CheckoutService {
       paidAt: order.payment.paidAt || new Date(),
     });
 
-    // Create secure access token
-    const secureToken = generateSecureToken();
-    const tokenHash = hashToken(secureToken);
-    const _FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
-
-    await InvoiceAccessToken.create({
-      invoiceId: invoice._id,
-      userId,
-      tokenHash,
-      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-      verifiedAt: new Date(),
-    });
-
+    // NOTE: no access token is created here — getInvoiceUrl issues the
+    // one that is actually emailed (this one was never used; it only
+    // accumulated orphan tokens).
     return invoice;
   }
 
@@ -1016,7 +1168,10 @@ export class CheckoutService {
       verifiedAt: new Date(),
     });
 
-    return `${FRONTEND_URL}/invoice/${secureToken}?admin=1`;
+    // Customer link — channel is decided server-side by the token's
+    // issuedToAdmin flag; the old `?admin=1` param was a misleading
+    // vestige on a customer-facing URL
+    return `${FRONTEND_URL}/invoice/${secureToken}`;
   }
 
   /**
@@ -1057,6 +1212,32 @@ export class CheckoutService {
           .then((html) => sendInvoiceEmail(user.email, user.fullName, invoice.invoiceNumber, html, invoiceUrl, invoice.amount))
           .catch((err) => logger.error({ err }, 'Invoice email error')),
       );
+    }
+
+    // Customer in-app notification + push — previously only the legacy
+    // order path created these; web checkouts left the notification bell
+    // empty. Deduped by order so resumed completions never double-notify.
+    try {
+      const { Notification } = await import('@pawtag/db');
+      const existing = await Notification.findOne({
+        userId,
+        type: 'order',
+        'data.orderId': String(order._id),
+      }).lean();
+      if (!existing) {
+        await Notification.create({
+          userId,
+          type: 'order',
+          title: 'Order Confirmed',
+          message: `Your order ${order.orderNumber} has been confirmed.`,
+          data: { orderId: String(order._id), orderNumber: order.orderNumber, amount: order.payment.amount },
+          read: false,
+        });
+        const { sendPushToUser } = await import('../../services/push-notification.service');
+        await sendPushToUser(userId, 'Order Confirmed', `Your order ${order.orderNumber} has been confirmed.`).catch(() => {});
+      }
+    } catch (err) {
+      logger.error({ err, orderId: String(order._id) }, 'Order confirmation notification error');
     }
 
     // Admin notification

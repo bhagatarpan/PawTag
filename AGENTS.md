@@ -569,6 +569,12 @@ All financial documents — commerce invoices, credit notes, and donation receip
 - **Downloads are real PDFs** (pdf-lib, server-generated) via authenticated blob downloads or token endpoints — never the browser print dialog, never `window.open` after async (popup blockers silently drop those). Use `window.location.assign` for same-tab navigation or `apps/*/src/lib/downloadFile.ts` for files.
 - Invoice links from the API are **relative paths**; frontends resolve against their actual origin. Absolute `FRONTEND_URL` only for emailed links.
 - Customer invoice list/detail APIs expose payment method + card brand/last4 only — no provider identifiers.
+- **Checkout completion is re-runnable:** the post-payment pipeline lives in `runPostPaymentCompletion()` (idempotent per step — inventory/points/invoice/fulfilment guards) and is resumed by re-confirms, webhook retries, and the seeded `order-completion-repair` job. The order-exists check runs BEFORE the pending-order expiry check; paid checkouts are never expired (the expiry job verifies Stripe first, fail-safe on errors). All invoice/membership/credit-note numbers come from the atomic counter in `lib/invoice-number.ts` — never `countDocuments() + 1`.
+- **Points clawback is proportional:** refunds/cancellations deduct `originalPurchasePoints × refundShare` via `refundClawbackForOrder()` (capped at the original award), on EVERY money-moving path — cancellation, return refund, admin refund, refund retry. A flat 1pt/$1 rule is wrong (members earn with multipliers/bonuses).
+- **Every successful refund creates a credit note** (`credit-note.service.ts`, deduped per refund) and exactly ONE customer email (initiating path sends; webhook processing/settled emails suppress when a refund email already went out for the order within 30 min).
+- **Money-moving statuses require the dedicated endpoints:** the generic order-status endpoint rejects `cancelled`/`refunded` — cancellation goes through `cancelOrder` (which owns refund reuse/reconciliation, points clawback, inventory release, activity, financial audit), refunds through the refund/return endpoints. Never reimplement refund logic inline in routes.
+- **Synthetic PaymentIntent ids** (`pi_demo_`, `pi_zero_`) can never be retrieved from Stripe — use `isSyntheticPaymentIntentId()` before any provider call; $0 orders cancel/complete without Stripe.
+- Checkout confirm validates the Stripe intent's **amount and currency** against the pending total before recording money.
 
 ### Monetary precision
 

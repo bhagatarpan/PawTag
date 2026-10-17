@@ -38,6 +38,7 @@ import {
   formatCancelledByDescription,
 } from '../../lib/actor';
 import { formatRefundDestination } from '@pawtag/shared';
+import { isSyntheticPaymentIntentId } from '../payment-mode';
 import logger from '../../lib/logger';
 import type { RefundResult } from '../interfaces/payment-provider';
 
@@ -125,7 +126,7 @@ function isDuplicateKeyError(err: unknown): boolean {
 }
 
 async function findExistingStripeRefund(paymentIntentId: string): Promise<RefundResult | null> {
-  if (paymentIntentId.startsWith('pi_demo_')) return null;
+  if (isSyntheticPaymentIntentId(paymentIntentId)) return null;
 
   // Prefer a refund already stored on the order (handled by caller via order.refundId)
   try {
@@ -234,8 +235,10 @@ export async function cancelOrder(params: {
   if (order.payment?.status === 'completed' && order.payment?.stripePaymentIntentId) {
     const paymentIntentId = order.payment.stripePaymentIntentId;
 
-    // Skip demo/test payment intents
-    if (!paymentIntentId.startsWith('pi_demo_')) {
+    // Synthetic ids (demo / zero-total) never exist at Stripe — a $0
+    // order has nothing to refund; cancelling it must succeed cleanly
+    // instead of failing against a PaymentIntent Stripe cannot find.
+    if (!isSyntheticPaymentIntentId(paymentIntentId)) {
       try {
         let refundResult: RefundResult | null = null;
 
@@ -357,37 +360,48 @@ export async function cancelOrder(params: {
             logger.error({ err, orderId: String(order._id) }, 'Failed to log payment event after refund');
           });
 
-          // Deduct Guardian Points for the refunded purchase — same rule as
-          // the refund flow (1 point per $1 refunded), so cancelling cannot
-          // keep points that a return/refund would claw back.
-          // Idempotent: if a deduction for this order already exists (e.g.
-          // the refund service ran first, or cancellation is re-entered
-          // during reconciliation), do not deduct again.
+          // Credit note — the customer's document for money returned
+          // (best-effort; the refund itself already succeeded)
           try {
-            const { deductPoints } = await import('../../services/loyalty/points-earning.service');
-            const { GuardianPointsLedger } = await import('@pawtag/db');
-            const refundAmountForPoints = refundResult.amount ?? order.payment.amount ?? 0;
-            const pointsToDeduct = Math.floor(refundAmountForPoints);
-            const existingDeduction = await GuardianPointsLedger.findOne({
+            const { createCreditNoteForRefund } = await import('./credit-note.service');
+            await createCreditNoteForRefund({
+              orderId: order._id,
               userId: order.userId,
-              activity: 'refund',
-              referenceId: order._id.toString(),
-              points: { $lt: 0 },
-            }).lean();
-            if (pointsToDeduct > 0 && !existingDeduction && order.userId) {
-              const deductionResult = await deductPoints(
-                String(order.userId),
-                pointsToDeduct,
-                'refund',
-                order._id.toString(),
-                `Points deducted for cancelled order ${order.orderNumber} (${refundResult.refundId})`,
-              );
+              refundAmount: refundResult.amount ?? order.payment.amount,
+              currency: order.payment.currency || 'NZD',
+              refundId: refundResult.refundId,
+              paymentMethod: order.payment.method,
+              cardBrand: order.payment?.cardBrand,
+              cardLast4: order.payment?.cardLast4,
+            });
+          } catch (cnErr) {
+            logger.error({ err: cnErr, orderId: String(order._id) }, 'Credit note creation failed after cancellation refund — non-fatal');
+          }
+
+          // Deduct Guardian Points for the refunded purchase —
+          // PROPORTIONAL to what was actually earned (the member's
+          // multiplier and repeat bonus count; a flat 1pt/$1 would let
+          // members keep most of their bonus on refunded purchases).
+          // Idempotent: the helper caps cumulative clawback at the
+          // original award, so re-entry during reconciliation is safe.
+          try {
+            const { refundClawbackForOrder } = await import('../../services/loyalty/points-earning.service');
+            const refundAmountForPoints = refundResult.amount ?? order.payment.amount ?? 0;
+            const clawback = await refundClawbackForOrder({
+              userId: String(order.userId),
+              orderId: String(order._id),
+              orderNumber: order.orderNumber,
+              refundAmount: refundAmountForPoints,
+              capturedAmount: order.payment.amount ?? refundAmountForPoints,
+              refundId: refundResult.refundId,
+            });
+            if (clawback.pointsToDeduct > 0) {
               logger.info({
                 orderId: String(order._id),
                 userId: order.userId,
-                pointsDeducted: deductionResult.pointsDeducted,
-                newBalance: deductionResult.newBalance,
-              }, 'Guardian Points deducted for cancellation');
+                pointsDeducted: clawback.pointsToDeduct,
+                refundAmount: refundAmountForPoints,
+              }, 'Guardian Points deducted proportionally for cancellation');
             }
           } catch (err: any) {
             // Non-critical — the refund itself succeeded; never fail the

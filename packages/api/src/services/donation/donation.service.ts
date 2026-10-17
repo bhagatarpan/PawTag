@@ -655,6 +655,7 @@ export class DonationService {
         { $set: { status: 'failed', failureReason: 'Invoice payment failed' } },
         { upsert: true },
       );
+      await this.notifyDonorPaymentFailed(donation, 'recurring charge');
     }
   }
 
@@ -814,6 +815,7 @@ export class DonationService {
         { stripePaymentIntentId: paymentIntentId },
         { $set: { status: 'failed', failureReason: 'Payment failed', webhookEventId } },
       );
+      await this.notifyDonorPaymentFailed(donation, 'payment');
     }
   }
 
@@ -859,6 +861,52 @@ export class DonationService {
       status: 'issued',
       issuedAt: new Date(),
     });
+  }
+
+  /**
+   * Donor payment-failure notification — donors previously got NOTHING
+   * when a charge failed (membership and tag-subscription dunning both
+   * notify; donations were silent). CMS-first with hardcoded fallback;
+   * best-effort, never blocks the failure bookkeeping.
+   */
+  async notifyDonorPaymentFailed(donation: any, failureContext: string): Promise<void> {
+    try {
+      if (!donation.emailSnapshot) return;
+      const settings = await getDonationSettings();
+      const organisationName = settings.organisationName || 'PawTag';
+      const frontend = (await readOptionalSetting('urls.frontend')) || process.env.FRONTEND_URL || '';
+      const amount = (donation.amountCents / 100).toFixed(2);
+      const currency = (donation.currency || 'NZD').toUpperCase();
+
+      const fallbackHtml = `
+        <p>Hi ${donation.nameSnapshot || 'Supporter'},</p>
+        <p>We couldn't process your ${donation.frequency === 'monthly' ? 'recurring ' : ''}donation of ${currency} $${amount}
+        — the ${failureContext} failed.</p>
+        <p>Your generosity means a lot to us. Please try your donation again, or contact us if you need a hand.</p>
+        <p><a href="${frontend}/donate">Try again</a></p>
+      `;
+
+      const { sendCmsEmailOrFallback } = await import('../email.service');
+      await sendCmsEmailOrFallback({
+        slug: 'donation-payment-failed',
+        to: donation.emailSnapshot,
+        vars: {
+          'donor.name': donation.nameSnapshot || 'Supporter',
+          'donation.amount': `${currency} $${amount}`,
+          'donation.frequency': donation.frequency || 'one-time',
+          'organisation.name': organisationName,
+          'donation.retryUrl': `${frontend}/donate`,
+        },
+        fallbackSubject: `Your donation payment failed — action needed`,
+        fallbackHtml,
+        businessFlow: 'donations',
+        relatedEntityType: 'Donation',
+        relatedEntityId: String(donation._id),
+      });
+      logger.info({ donationId: String(donation._id) }, 'Donor payment-failure notification sent');
+    } catch (err) {
+      logger.error({ err, donationId: String(donation._id) }, 'Failed to send donor payment-failure notification');
+    }
   }
 
   async sendDonationReceiptEmail(donation: any, receipt: any): Promise<void> {

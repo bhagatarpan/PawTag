@@ -138,11 +138,16 @@ export async function awardPurchasePoints(
     points += Math.floor(baseRepeatBonus * multiplier);
   }
 
-  // Order number for the customer-facing points history ("Order INV-123 —
-  // View Order →"). Fetched with the order lookup kept minimal.
-  const orderNumber = await Order.findById(orderId).select('orderNumber').lean()
-    .then((o) => o?.orderNumber)
-    .catch(() => undefined);
+  // Order number for the customer-facing points history ("Order INV-x —
+  // View Order →"). Display-only enrichment — never allowed to break
+  // point awarding if the lookup fails.
+  let orderNumber: string | undefined;
+  try {
+    orderNumber = await Order.findById(orderId).select('orderNumber').lean()
+      .then((o) => o?.orderNumber);
+  } catch {
+    orderNumber = undefined;
+  }
 
   // Record in ledger (pass multiplier for base/bonus split in metadata)
   await recordPointsEarned(userId, points, 'purchase', orderId, { orderTotal, orderCount, orderNumber }, multiplier);
@@ -523,6 +528,75 @@ export async function deductPoints(
   logger.info({ userId, pointsDeducted: pointsToDeduct, originalPoints: points, newBalance, reason }, 'Guardian Points deducted');
 
   return { pointsDeducted: pointsToDeduct, newBalance };
+}
+
+/**
+ * Proportional Guardian Points clawback for a refunded amount.
+ *
+ * Points are EARNED with the member's multiplier and repeat-purchase
+ * bonus, so a flat 1pt/$1 deduction would leave members keeping most of
+ * their bonus on refunded purchases (founder decision: claw back what
+ * was actually earned, proportionally).
+ *
+ * Formula: originalPurchasePoints × (refundCents / capturedCents), floored,
+ * capped so cumulative clawbacks never exceed the original award (supports
+ * multiple partial refunds). Idempotent: existing negative 'refund' ledger
+ * entries for this order count toward the cap; returns 0 when nothing was
+ * ever awarded for the order.
+ */
+export async function refundClawbackForOrder(params: {
+  userId: string;
+  orderId: string;
+  orderNumber?: string;
+  refundAmount: number;
+  capturedAmount: number;
+  refundId?: string;
+}): Promise<{ pointsToDeduct: number }> {
+  const { userId, orderId, orderNumber, refundAmount, capturedAmount, refundId } = params;
+
+  if (!userId || !orderId || refundAmount <= 0 || capturedAmount <= 0) {
+    return { pointsToDeduct: 0 };
+  }
+
+  // Original award for this purchase (absent = nothing was ever awarded)
+  const purchaseEntry = await GuardianPointsLedger.findOne({
+    userId,
+    activity: 'purchase',
+    referenceId: orderId,
+  }).lean();
+  if (!purchaseEntry || !purchaseEntry.points || purchaseEntry.points <= 0) {
+    return { pointsToDeduct: 0 };
+  }
+  const originalPoints = purchaseEntry.points;
+
+  // Cap: cumulative clawback can never exceed the original award
+  // (supports multiple partial refunds of the same order)
+  const priorDeductions = await GuardianPointsLedger.find({
+    userId,
+    activity: 'refund',
+    referenceId: orderId,
+    points: { $lt: 0 },
+  }).lean();
+  const alreadyClawedBack = priorDeductions.reduce((sum, entry) => sum + Math.abs(entry.points || 0), 0);
+  const remaining = originalPoints - alreadyClawedBack;
+  if (remaining <= 0) return { pointsToDeduct: 0 };
+
+  const refundCents = Math.round(refundAmount * 100);
+  const capturedCents = Math.round(capturedAmount * 100);
+  const proportional = Math.floor((originalPoints * refundCents) / capturedCents);
+  const pointsToDeduct = Math.min(proportional, remaining);
+
+  if (pointsToDeduct <= 0) return { pointsToDeduct: 0 };
+
+  await deductPoints(
+    userId,
+    pointsToDeduct,
+    'refund',
+    orderId,
+    `Points deducted for refunded order${orderNumber ? ` ${orderNumber}` : ''}${refundId ? ` (${refundId})` : ''}`,
+  );
+
+  return { pointsToDeduct };
 }
 
 /**

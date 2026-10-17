@@ -24,7 +24,7 @@ import { revokeAllUserRefreshTokens } from '../services/auth.service';
 import { getLocationFromIp } from '../lib/geo-location';
 import { isValidTransition } from '../services/orderStatus.service';
 import { notifyCustomerOfStatusChange } from '../services/orderNotification.service';
-import { resolveActor, formatActivityMessage, formatCancelledBy, formatCancelledByDescription, formatRefundedByDescription } from '../lib/actor';
+import { resolveActor, formatCancelledBy, formatRefundedByDescription } from '../lib/actor';
 import {
   User,
   Pet,
@@ -50,6 +50,8 @@ import {
   UserMembership,
 } from '@pawtag/db';
 import { stripePaymentProvider } from '../commerce/providers/stripe';
+import { cancelOrder } from '../commerce/services/cancellation.service';
+import { formatRefundDestination } from '@pawtag/shared';
 import { getNumberSetting, getBooleanSetting } from '../commerce/config';
 import { auditService, type AuditContext } from '../services/audit';
 import { type AuditRequest } from '../middleware/audit';
@@ -2695,6 +2697,20 @@ router.put('/orders/:id/status', requirePermission('order.update'), async (req: 
       return;
     }
 
+    // Money-moving statuses must go through the dedicated endpoints —
+    // the generic dropdown must never mark an order cancelled/refunded
+    // without actually moving money (refund, inventory release, points
+    // clawback, credit note all live there).
+    if (status === 'cancelled' || status === 'refunded') {
+      res.status(400).json({
+        success: false,
+        error: status === 'cancelled'
+          ? 'Use the Cancel action for cancellations — it also processes the refund, releases stock, and claws back points.'
+          : 'Use the Refund action for refunds — the status alone must not move money.',
+      });
+      return;
+    }
+
     order.status = status;
     if (trackingNumber) order.trackingNumber = trackingNumber;
     await order.save();
@@ -2783,88 +2799,34 @@ router.post('/orders/:id/cancel', requirePermission('order.update'), async (req:
     }
 
     const actor = await resolveActor(req.user!.id, 'admin');
-    const cancelledAt = new Date();
     const cancelledBy = formatCancelledBy(actor.fullName, actor.displayName);
-    const cancelledByDescription = formatCancelledByDescription('admin-web', actor.fullName, actor.displayName);
-    const activityMessage = formatActivityMessage(cancelledBy, reason, cancelledAt);
 
-    // Process refund inline for paid orders (matches customer cancel behavior)
-    let refundCreated = false;
-    if (order.payment?.status === 'completed' && order.payment?.stripePaymentIntentId) {
-      const paymentIntentId = order.payment.stripePaymentIntentId;
-      if (!paymentIntentId.startsWith('pi_demo_')) {
-        try {
-          const refundResult = await stripePaymentProvider.createRefund({
-            paymentIntentId,
-            amount: order.payment.amount,
-            reason: 'requested_by_customer',
-            metadata: {
-              orderId: String(order._id),
-              orderNumber: order.orderNumber,
-              cancelledBy,
-              cancelledByType: actor.displayName,
-              cancelledByPortal: 'admin-web',
-              cancellationReason: reason,
-              cancellationNotes: notes || '',
-              initiatedBy: 'admin',
-              environment: process.env.NODE_ENV === 'production' ? 'production' : 'development',
-            },
-          });
-
-          if (refundResult.refundId) {
-            order.refundId = refundResult.refundId;
-            order.refundStatus = (refundResult.status as any) || 'pending';
-            order.refundLastSyncedAt = new Date();
-            refundCreated = true;
-          }
-
-          await PaymentTransaction.create({
-            orderId: order._id,
-            orderNumber: order.orderNumber,
-            type: 'refund',
-            status: refundResult.status === 'succeeded' ? 'succeeded' : 'pending',
-            amount: order.payment.amount,
-            currency: order.payment.currency || 'NZD',
-            provider: 'stripe',
-            providerTransactionId: refundResult.refundId || paymentIntentId,
-            providerStatus: refundResult.status,
-            arn: refundResult.arn,
-            expectedArrival: refundResult.expectedArrival,
-            initiatedBy: 'admin',
-            attemptCount: 0,
-            notes: notes ? `${reason} — ${notes}` : reason,
-          });
-        } catch (refundErr: any) {
-          logger.error({ err: refundErr, orderId: String(order._id) }, 'Failed to process refund during admin cancel');
-          // Continue with cancellation even if refund fails — order is still cancelled
-        }
-      }
-    }
-
+    // Single source of truth: the shared cancellation engine owns the
+    // refund (reuse/reconciliation — NEVER phantom transactions when
+    // Stripe fails), Guardian Points clawback, inventory release,
+    // activity timeline, and financial audit. The old inline copy here
+    // recorded a fake "refund" transaction on Stripe failure and could
+    // mark orders cancelled with no money actually returned.
     const previousStatus = order.status;
-    order.status = 'cancelled';
-    order.cancellationReason = reason;
-    order.cancellationNotes = notes;
-    order.cancelledBy = cancelledBy;
-    order.cancelledByType = actor.displayName;
-    order.cancelledByPortal = 'admin-web';
-    order.cancelledByDescription = cancelledByDescription;
-    order.cancelledAt = cancelledAt;
-    if (refundCreated && order.payment) {
-      order.payment.status = 'refunded';
-    }
-    await order.save();
+    const result = await cancelOrder({
+      orderId: req.params.id,
+      reason,
+      notes,
+      actor: { name: actor.fullName, type: 'admin', portal: 'admin-web' },
+      requireRefundSuccess: false,
+    });
 
-    // Restore stock — release reservations made during checkout
-    try {
-      const { inventoryService } = await import('../commerce/services/inventory.service');
-      await inventoryService.releaseForOrder(String(order._id), order.items.map((item: any) => ({
-        productId: String(item.productId),
-        quantity: item.quantity,
-      })));
-    } catch (stockErr) {
-      logger.error({ err: stockErr, orderId: req.params.id }, 'Failed to release stock on admin cancel');
+    if (!result.success || !result.order) {
+      const httpStatus =
+        result.errorCode === 'ORDER_NOT_FOUND' ? 404 :
+        result.errorCode === 'REFUND_FAILED' ? 502 :
+        400;
+      res.status(httpStatus).json({ success: false, error: result.error || 'Failed to cancel order' });
+      return;
     }
+
+    const cancelledOrder = result.order;
+    const refundCreated = result.refundCreated;
 
     await auditAdminEvent(req, {
       action: 'cancel_order',
@@ -2880,53 +2842,31 @@ router.post('/orders/:id/cancel', requirePermission('order.update'), async (req:
         ...(refundCreated ? [{ field: 'payment.status', before: 'completed', after: 'refunded', sensitive: false }] : []),
       ],
       metadata: {
-        orderNumber: order.orderNumber,
+        orderNumber: cancelledOrder.orderNumber,
         previousStatus,
         reason,
         notes,
-        amount: order.payment.amount,
+        amount: cancelledOrder.payment?.amount,
         stockRestored: true,
         cancelledBy,
         cancelledByType: actor.displayName,
         cancelledByPortal: 'admin-web',
         refundCreated,
-        refundId: order.refundId,
+        refundId: cancelledOrder.refundId,
       },
     });
 
-    // Record activity log on the order itself
-    await Order.updateOne(
-      { _id: order._id },
-      {
-        $push: {
-          activity: {
-            type: 'cancelled',
-            message: activityMessage,
-            timestamp: cancelledAt,
-            actor: 'admin',
-            metadata: {
-              reason,
-              notes,
-              cancelledBy,
-              cancelledByType: actor.displayName,
-              cancelledByPortal: 'admin-web',
-              cancelledAt: cancelledAt.toISOString(),
-              refundCreated,
-              refundId: order.refundId,
-            },
-          },
-        },
-      },
-    );
+    // Activity timeline + inventory release + financial audit are owned by
+    // the shared cancellation engine (cancelOrder) — not duplicated here.
 
     // Notify customer
     try {
-      await notifyCustomerOfStatusChange(order, 'cancelled', { reason });
+      await notifyCustomerOfStatusChange(cancelledOrder, 'cancelled', { reason });
     } catch (notifError) {
       logger.error({ err: notifError, orderId: req.params.id, orderNumber: order.orderNumber }, 'Cancel notification error');
     }
 
-    res.json({ success: true, data: { order, refundCreated, refundId: order.refundId } });
+    res.json({ success: true, data: { order: cancelledOrder, refundCreated, refundId: cancelledOrder.refundId } });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to cancel order' });
   }
@@ -3057,6 +2997,7 @@ router.post('/orders/:id/refund', requirePermission('order.update'), async (req:
     await order.save();
 
     // Create PaymentTransaction for audit trail
+    const refundDestination = formatRefundDestination(order.payment?.cardBrand, order.payment?.cardLast4);
     await PaymentTransaction.create({
       orderId: order._id,
       orderNumber: order.orderNumber,
@@ -3072,7 +3013,47 @@ router.post('/orders/:id/refund', requirePermission('order.update'), async (req:
       initiatedBy: 'admin',
       attemptCount: 0,
       notes: reason,
+      // Refund-visibility rule: snapshot the destination on the refund
+      // transaction (original payment method)
+      cardBrand: order.payment?.cardBrand,
+      cardLast4: order.payment?.cardLast4,
+      refundDestination,
     });
+
+    // Credit note — the customer's document for money returned (best-effort)
+    try {
+      const { createCreditNoteForRefund } = await import('../commerce/services/credit-note.service');
+      await createCreditNoteForRefund({
+        orderId: order._id,
+        userId: order.userId,
+        refundAmount,
+        currency: order.payment.currency || 'NZD',
+        refundId: refundResult.refundId,
+        paymentMethod: order.payment.method,
+        cardBrand: order.payment?.cardBrand,
+        cardLast4: order.payment?.cardLast4,
+      });
+    } catch (cnErr) {
+      logger.error({ err: cnErr, orderId: String(order._id) }, 'Credit note creation failed after admin refund — non-fatal');
+    }
+
+    // Guardian Points clawback — proportional to what was actually earned
+    try {
+      const { refundClawbackForOrder } = await import('../services/loyalty/points-earning.service');
+      const clawback = await refundClawbackForOrder({
+        userId: String(order.userId),
+        orderId: String(order._id),
+        orderNumber: order.orderNumber,
+        refundAmount,
+        capturedAmount: order.payment.amount ?? refundAmount,
+        refundId: refundResult.refundId,
+      });
+      if (clawback.pointsToDeduct > 0) {
+        logger.info({ orderId: String(order._id), pointsDeducted: clawback.pointsToDeduct }, 'Guardian Points deducted proportionally for admin refund');
+      }
+    } catch (clawErr) {
+      logger.error({ err: clawErr, orderId: String(order._id) }, 'Guardian Points clawback failed after admin refund — non-fatal');
+    }
 
     await auditAdminEvent(req, {
       action: 'refund_order',

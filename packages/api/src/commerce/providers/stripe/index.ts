@@ -547,6 +547,9 @@ export class StripePaymentProvider implements IPaymentProvider {
       status: refund.status ?? undefined,
       arn: raw.arn || undefined,
       expectedArrival: arrivalDate,
+      // Carried for reconciliation — the daily refund sync matches
+      // refunds to orders via the PaymentIntent id
+      paymentIntentId: typeof refund.payment_intent === 'string' ? refund.payment_intent : undefined,
     };
   }
 
