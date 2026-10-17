@@ -19,6 +19,9 @@ interface CheckoutConfirmationProps {
   estimatedPoints: number;
   pointsToNextTier: number | null;
   nextTierName: string;
+  /** True when this order was paid with an already-saved card — the
+   *  save-card offer must not ask to re-save it. */
+  usedSavedCard?: boolean;
 }
 
 export default function CheckoutConfirmationStep({
@@ -33,6 +36,7 @@ export default function CheckoutConfirmationStep({
   estimatedPoints,
   pointsToNextTier,
   nextTierName,
+  usedSavedCard,
 }: CheckoutConfirmationProps) {
   const [referralCode, setReferralCode] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -49,12 +53,14 @@ export default function CheckoutConfirmationStep({
     }
   }, [user]);
 
-  // Post-purchase save-card offer when customer is signed in
+  // Post-purchase save-card offer when customer is signed in AND paid
+  // with a NEW card. Paying with an already-saved card must never ask
+  // to save it again (founder decision — WO-000507 review).
   // Banner itself decides confirm-save vs add-card based on live Stripe list
   useEffect(() => {
-    if (!authUser || saveCardDismissed) return;
+    if (!authUser || saveCardDismissed || usedSavedCard) return;
     setShowSaveCard(true);
-  }, [authUser, saveCardDismissed]);
+  }, [authUser, saveCardDismissed, usedSavedCard]);
 
   const handleInvoiceAction = async (action: 'view' | 'download' | 'print') => {
     try {

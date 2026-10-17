@@ -420,6 +420,10 @@ export interface OrderEmailData {
     unitPrice: number;
     variantName?: string;
     petName?: string;
+    /** Per-unit engraving/customisation surcharge (shown on the itemsHtml row) */
+    customizationTotal?: number;
+    /** Engraving content — rendered as a subtitle on the itemsHtml row */
+    customisationTexts?: string[];
   }>;
   subtotal?: number;
   discount?: { percent: number; amount: number; reason: string };
@@ -434,6 +438,28 @@ export interface OrderEmailData {
 
 export async function sendOrderConfirmation(data: OrderEmailData): Promise<EmailResult> {
   const viewOrderUrl = `${frontendUrl}/account/orders`;
+  // Styled line-item rows for CMS templates (the seeded template renders
+  // {{itemsHtml}}). Server-built HTML — every interpolated value escaped
+  // via the shared invoice-engine escape helper.
+  const { escapeHtml } = await import('./finance/invoice-document-html');
+  const itemsHtml = (data.items || [])
+    .map((item) => {
+      const subtitles = [
+        item.variantName,
+        ...(item.petName ? [`For: ${item.petName}`] : []),
+        ...(item.customisationTexts || []).filter(Boolean).map((t: string) => `Pet name: ${t}`),
+      ];
+      const subtitleHtml = subtitles.length
+        ? `<div style="color:#0d9488;font-size:12px;">${subtitles.map(escapeHtml).join(' · ')}</div>`
+        : '';
+      const amount = ((item.unitPrice || 0) + (item.customizationTotal || 0)) * item.quantity;
+      return `<tr>
+        <td style="padding:8px 0;border-bottom:1px solid #f3f4f6;color:#111827;font-weight:600;">${escapeHtml(item.productName)}${subtitleHtml}</td>
+        <td style="padding:8px 0;border-bottom:1px solid #f3f4f6;color:#6b7280;text-align:center;">${item.quantity}</td>
+        <td style="padding:8px 0;border-bottom:1px solid #f3f4f6;color:#111827;text-align:right;font-weight:600;">$${amount.toFixed(2)}</td>
+      </tr>`;
+    })
+    .join('');
   const vars = {
     name: data.customerName,
     orderNumber: data.orderNumber,
@@ -447,6 +473,9 @@ export async function sendOrderConfirmation(data: OrderEmailData): Promise<Email
     items: (data.items || [])
       .map((i) => `${i.productName} × ${i.quantity}`)
       .join(', '),
+    itemsHtml: itemsHtml
+      ? `<table style="width:100%;border-collapse:collapse;margin:16px 0;"><thead><tr><th style="text-align:left;color:#6b7280;font-size:11px;text-transform:uppercase;letter-spacing:1px;padding-bottom:6px;border-bottom:2px solid #e5e7eb;">Item</th><th style="text-align:center;color:#6b7280;font-size:11px;text-transform:uppercase;letter-spacing:1px;padding-bottom:6px;border-bottom:2px solid #e5e7eb;">Qty</th><th style="text-align:right;color:#6b7280;font-size:11px;text-transform:uppercase;letter-spacing:1px;padding-bottom:6px;border-bottom:2px solid #e5e7eb;">Amount</th></tr></thead><tbody>${itemsHtml}</tbody></table>`
+      : '',
     viewOrderUrl,
   };
   const auditMeta = {

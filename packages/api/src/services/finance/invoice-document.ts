@@ -181,12 +181,40 @@ export async function assembleInvoiceDocument(
         subtitles.push(`Pet name: ${t}`);
       }
       if (item.tagId) subtitles.push(`Tag: ${item.tagId}`);
-      items.push({
-        name: item.productName,
-        subtitles,
-        quantity: item.quantity ?? 1,
-        lineTotal: (item.unitPrice ?? 0) * (item.quantity ?? 1),
-      });
+      const quantity = item.quantity ?? 1;
+
+      // Engraving/customisation surcharge is stored per-unit on the
+      // product line; documents present it as its OWN line item so both
+      // the product and the engraving show separate prices that sum to
+      // the order subtotal (founder decision — WO-000507 review).
+      // Pet-name subtitles belong on the engraving line (that is what
+      // was engraved); the product row keeps variant/tag references.
+      const engravingPerUnit = item.customizationTotal || 0;
+      if (engravingPerUnit > 0) {
+        const engravingSubtitles = [
+          ...(item.petName ? [`For: ${item.petName}`] : []),
+          ...(item.customisationTexts || []).filter((x: string) => x).map((x: string) => `Pet name: ${x}`),
+        ];
+        items.push({
+          name: item.productName,
+          subtitles: subtitles.filter((s) => !s.startsWith('Pet name:') && !s.startsWith('For:')),
+          quantity,
+          lineTotal: (item.unitPrice ?? 0) * quantity,
+        });
+        items.push({
+          name: 'Engraving',
+          subtitles: engravingSubtitles,
+          quantity,
+          lineTotal: engravingPerUnit * quantity,
+        });
+      } else {
+        items.push({
+          name: item.productName,
+          subtitles,
+          quantity,
+          lineTotal: (item.unitPrice ?? 0) * quantity,
+        });
+      }
     }
   } else if (invoice.userMembershipId) {
     const tierName = membershipTier?.displayName || membershipTier?.name || 'Membership';
