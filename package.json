@@ -30,7 +30,8 @@
     "test:all": "vitest run tests/unit tests/integration tests/smoke tests/regression",
     "test:e2e": "playwright test",
     "test:e2e:hero": "playwright test --config playwright.hero.config.ts",
-    "test:e2e:emergency": "playwright test --config playwright.emergency.config.ts"
+    "test:e2e:emergency": "playwright test --config playwright.emergency.config.ts",
+    "pdf:benchmark": "pnpm --filter @pawtag/api exec tsx ../../scripts/pdf-benchmark/generate-fixtures.ts"
   },
   "//scripts": "dev:all/build run the four dev servers (and builds) in parallel via concurrently, since this shell doesn't support background jobs; name/color flags keep the log streams distinguishable. Note: deliberately NO -k flag -- with -k, the moment the fastest process exits (e.g. the finder build) concurrently kills all the others and the build fails.",
   "engines": {

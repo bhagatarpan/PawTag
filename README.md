@@ -1082,7 +1082,7 @@ All membership benefits are driven from a single source of truth: the **Membersh
 - **Endpoint:** `GET /api/customer/invoices/:id/pdf` — Real PDF download (ownership-scoped; customer channel — no Stripe provider IDs)
 - **Endpoint:** `GET /api/admin/invoices/:id/pdf` — Real PDF download for CSRs (admin channel — includes Stripe IDs for troubleshooting)
 - **Endpoint:** `GET /api/invoice/:token/pdf` — Token-based PDF download (emailed links; channel follows the token's `issuedToAdmin` flag)
-- **Unified engine:** all invoices, credit notes, and donation receipts render through one shared document engine (`packages/api/src/services/finance/`); payment card details snapshot onto documents at creation; see `docs/UNIFIED-INVOICE-ENGINE.md` and `skills/financial-document-integrity/`
+- **Unified engine:** all invoices, credit notes, and donation receipts render through one shared document engine (`packages/api/src/services/finance/`); payment card details snapshot onto documents at creation; the HTML template is the single layout for the browser viewer and PDF output, with the PDF engine selected by `FINANCE_PDF_RENDERER` (`legacy` pdf-lib default, `weasyprint` HTML-derived candidate pending founder benchmark — see `docs/PDF-RENDERER-REPLACEMENT.md`); see `docs/UNIFIED-INVOICE-ENGINE.md` and `skills/financial-document-integrity/`
 - **Endpoint:** `GET /api/membership/change-tier/estimate` — Proration preview (`isCancelling`, `willResumeOnUpgrade`)
 - **Endpoint:** `POST /api/membership/downgrade` — Deferred downgrade (requires terms acceptance)
 - **Endpoint:** `POST /api/membership/resume` — Undo scheduled cancellation

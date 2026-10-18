@@ -1,0 +1,22 @@
+# Benchmark-only image: WeasyPrint on Alpine via pip (Alpine has no
+# py3-weasyprint package; PyGObject is built against pango in the build
+# stage and only runtime libs are kept). This recipe doubles as the
+# candidate for the production Dockerfile.api layer AFTER the founder
+# signs off on the benchmark gate (docs/PDF-RENDERER-REPLACEMENT.md).
+FROM alpine:3.22 AS build
+RUN apk add --no-cache python3 py3-pip python3-dev build-base pkgconfig \
+    libffi-dev cairo-dev gobject-introspection-dev pango-dev
+RUN python3 -m venv /opt/venv \
+    && /opt/venv/bin/pip install --no-cache-dir --upgrade pip \
+    && /opt/venv/bin/pip install --no-cache-dir weasyprint pygobject
+
+FROM alpine:3.22
+# font-dejavu covers fallback glyphs; documents embed Inter as a data URI.
+RUN apk add --no-cache python3 pango cairo-gobject fontconfig font-dejavu libffi
+COPY --from=build /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+WORKDIR /work
+# The guarded render script is mounted at run time (one source of truth:
+# the constant embedded in packages/api/src/services/finance/pdf-renderer.ts,
+# written to out/render_guarded.py by generate-fixtures.ts).
+ENTRYPOINT ["python3"]

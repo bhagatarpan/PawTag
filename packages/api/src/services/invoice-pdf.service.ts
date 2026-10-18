@@ -1,29 +1,40 @@
 /**
- * Invoice PDF generator (server-only) — the shared PDF engine for ALL
- * financial documents: commerce invoices, credit notes, AND donation
- * receipts. Uses pdf-lib (pure JS — no headless browser).
+ * Financial-document PDF entry point — the shared path for ALL documents:
+ * commerce invoices, credit notes, AND donation receipts.
+ *
+ * This module ASSEMBLES the document model and DISPATCHES to the configured
+ * PDF engine; it no longer draws documents itself (see the legacy renderer
+ * below, retained as the `legacy` engine until the HTML-derived engine is
+ * founder-verified — docs/PDF-RENDERER-REPLACEMENT.md).
+ *
+ * Engines:
+ * - `legacy`     — the historical pdf-lib redraw in this file (default).
+ * - `weasyprint` — the canonical HTML template rendered by finance/pdf-renderer.
  *
  * Data comes from the shared assembly layer (finance/invoice-document.ts),
- * the single source of truth for presentation — same engine as the HTML
- * viewer, so both formats always agree.
+ * the single source of truth for presentation — same data for the HTML
+ * viewer and every PDF engine.
  *
  * Channel rule (founder decision): Stripe provider IDs render only for
  * the admin channel. Customer documents show the invoice/order number
  * and card brand + last4 — never `pi_`/`in_` identifiers.
  *
  * NZ place names commonly contain macrons (Ōtāuhou) that standard PDF
- * fonts cannot encode — every string passes through pdfSafe.
+ * fonts cannot encode — every legacy-path string passes through pdfSafe.
  */
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
 import fs from 'fs';
 import path from 'path';
+import logger from '../lib/logger';
 import {
   assembleInvoiceDocument,
   assembleDonationReceiptDocument,
   type DocumentChannel,
   type InvoiceDocumentModel,
 } from './finance/invoice-document';
+import { renderInvoiceDocumentHtml } from './finance/invoice-document-html';
+import { renderHtmlToPdfWithWeasyPrint, resolveFinancePdfEngine } from './finance/pdf-renderer';
 
 const TEAL = rgb(0.051, 0.58, 0.533); // #0d9488
 const TEAL_DARK = rgb(0.059, 0.463, 0.431); // #0f766e
@@ -126,8 +137,13 @@ function loadInterFonts(): { regular: Buffer; bold: Buffer } | null {
   return interBytes;
 }
 
-/** Render an assembled document model to A4 PDF bytes. */
-async function renderInvoiceDocumentPdf(model: InvoiceDocumentModel): Promise<Buffer> {
+/**
+ * LEGACY engine (`FINANCE_PDF_RENDERER=legacy`): hand-drawn pdf-lib redraw
+ * of the HTML layout. Exported for the benchmark harness and rollback tooling
+ * — do not build new features on it. Removal is gated on founder verification
+ * of the HTML-derived engine (docs/PDF-RENDERER-REPLACEMENT.md).
+ */
+export async function renderInvoiceDocumentPdfLegacy(model: InvoiceDocumentModel): Promise<Buffer> {
   const pdf = await PDFDocument.create();
   const page = pdf.addPage([595, 842]); // A4 portrait
   const W = page.getWidth(); // 595
@@ -394,6 +410,42 @@ async function renderInvoiceDocumentPdf(model: InvoiceDocumentModel): Promise<Bu
   // version — normalize to a real Buffer for the download/stream layer.
   const u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes as ArrayLike<number>);
   return Buffer.from(u8.buffer, u8.byteOffset, u8.byteLength);
+}
+
+/**
+ * Render an assembled document model to PDF bytes with the configured
+ * engine. Every render (success or failure) emits a structured log so
+ * engine choice, latency, and failures are visible in System Logs.
+ */
+export async function renderInvoiceDocumentPdf(model: InvoiceDocumentModel): Promise<Buffer> {
+  const engine = resolveFinancePdfEngine();
+  const startedAt = Date.now();
+  const logContext = {
+    event: 'finance.pdf.rendered',
+    renderer: engine,
+    documentKind: model.kind,
+    channel: model.channel,
+    documentNumber: model.number,
+  };
+  try {
+    const buffer =
+      engine === 'weasyprint'
+        ? await renderHtmlToPdfWithWeasyPrint(renderInvoiceDocumentHtml(model, { printMode: true }))
+        : await renderInvoiceDocumentPdfLegacy(model);
+    logger.info({ ...logContext, bytes: buffer.length, durationMs: Date.now() - startedAt });
+    return buffer;
+  } catch (error) {
+    logger.error({
+      event: 'finance.pdf.render_failed',
+      renderer: engine,
+      documentKind: model.kind,
+      channel: model.channel,
+      documentNumber: model.number,
+      durationMs: Date.now() - startedAt,
+      err: { name: (error as Error)?.name, message: (error as Error)?.message },
+    });
+    throw error;
+  }
 }
 
 /**
