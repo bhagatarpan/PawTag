@@ -100,4 +100,23 @@ describe('SVG card-brand marks (both modes)', () => {
     expect(renderInvoiceDocumentHtml(model)).toContain('>VISA</text>');
     expect(renderInvoiceDocumentHtml(amexModel)).toContain('>AMEX</text>');
   });
+
+  it('sizes card marks per mode: web keeps 28×18; printMode uses a smaller, nudged mark', () => {
+    // Regression/refinement: the founder visual gate found the web-sized
+    // badge reads oversized and sits high in PDF zoom (2026-10-19). Both
+    // modes declare CSS px dimensions inline (style wins in browsers and
+    // WeasyPrint) so the box cannot fall back to engine defaults.
+    const viewerStyles = (renderInvoiceDocumentHtml(model).match(/<svg [^>]*style="[^"]*"/g) || []);
+    const printStyles = (renderInvoiceDocumentHtml(model, { printMode: true }).match(/<svg [^>]*style="[^"]*"/g) || []);
+    expect(viewerStyles.length).toBeGreaterThanOrEqual(1);
+    expect(printStyles.length).toBeGreaterThanOrEqual(1);
+    for (const tag of viewerStyles) {
+      expect(tag).toContain('width:28px;height:18px');
+      expect(tag).toContain('vertical-align:middle');
+    }
+    for (const tag of printStyles) {
+      expect(tag).toContain('width:24px;height:16px');
+      expect(tag).toContain('vertical-align:-3px');
+    }
+  });
 });
