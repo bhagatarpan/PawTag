@@ -10,8 +10,50 @@
  * invoice/order numbers and card brand + last4 — never the payment
  * provider's internals (founder decision; the invoice number is the
  * customer's reference).
+ *
+ * This template is the CANONICAL layout for every financial document —
+ * the browser viewer renders it directly, and the PDF engine renders the
+ * same markup with `printMode: true` (see docs/PDF-RENDERER-REPLACEMENT.md).
+ * Never fork a PDF-only layout beside this file.
  */
+import fs from 'fs';
+import path from 'path';
 import type { InvoiceDocumentModel } from './invoice-document';
+
+export interface InvoiceHtmlRenderOptions {
+  /**
+   * PDF/print output. Embeds the Inter webfont as base64 @font-face so a
+   * headless PDF engine renders exactly the right typography on any server,
+   * independent of installed system fonts (headless Linux containers have
+   * no `system-ui`). The browser viewer omits this — it already uses the
+   * OS font stack and the page stays light.
+   */
+  printMode?: boolean;
+}
+
+/**
+ * Inter Regular/Bold as base64 @font-face CSS, loaded once per process from
+ * the versioned inter-font package (no committed binaries). Returns '' when
+ * the package is unavailable — documents still render with the system-font
+ * fallback stack, so PDF generation never fails on a font load error.
+ */
+let interFontFaceCss: string | undefined;
+function embeddedInterFontFaceCss(): string {
+  if (interFontFaceCss !== undefined) return interFontFaceCss;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires -- CJS output; require.resolve locates the package dir
+    const pkgDir = path.dirname(require.resolve('inter-font/package.json'));
+    const ttfDir = path.join(pkgDir, 'ttf');
+    const regular = fs.readFileSync(path.join(ttfDir, 'Inter-Regular.ttf')).toString('base64');
+    const bold = fs.readFileSync(path.join(ttfDir, 'Inter-Bold.ttf')).toString('base64');
+    interFontFaceCss = `
+    @font-face { font-family:'Inter'; font-style:normal; font-weight:400; src:url(data:font/ttf;base64,${regular}) format('truetype'); }
+    @font-face { font-family:'Inter'; font-style:normal; font-weight:700; src:url(data:font/ttf;base64,${bold}) format('truetype'); }`;
+  } catch {
+    interFontFaceCss = '';
+  }
+  return interFontFaceCss;
+}
 
 export function escapeHtml(str: unknown): string {
   return String(str ?? '')
@@ -42,34 +84,48 @@ function statusColor(status: string): string {
 /**
  * Inline SVG card-brand marks for the HTML invoice. Restored from the
  * pre-unified-engine renderer (regression found in the WO-000507 review).
- * The PDF renderer draws equivalent vector marks — keep the brand
- * palettes here and there in sync.
+ * The legacy pdf-lib renderer draws equivalent vector marks — keep the
+ * brand palettes in sync while that path remains (docs/PDF-RENDERER-REPLACEMENT.md).
+ * SVG text deliberately has no font-family attribute so it inherits the
+ * document font (Inter in printMode; OS stack in the viewer).
+ *
+ * Sizing: width/height appear BOTH as presentation attributes and inline
+ * CSS (style wins in browsers and WeasyPrint — cross-engine robustness).
+ * printMode uses a smaller mark with a baseline nudge: at PDF zoom the
+ * web-sized 28×18 badge reads oversized beside 14px body text and sits
+ * high with middle alignment (founder visual-gate findings, 2026-10-19,
+ * refined to 21×14 — font-size proportions, exact 3:2 artwork ratio).
+ * The web view keeps the original 28×18 — no on-screen change.
  */
-export function cardBrandIcon(brand: string): string {
+export function cardBrandIcon(brand: string, options: { printMode?: boolean } = {}): string {
+  const svgStyle = options.printMode
+    ? 'display:inline-block;vertical-align:-2px;width:21px;height:14px;margin:0 4px 0 0;'
+    : 'display:inline-block;vertical-align:middle;width:28px;height:18px;margin:0 4px 0 0;';
   const b = brand.toLowerCase();
   if (b === 'visa') {
-    return `<svg viewBox="0 0 48 32" width="28" height="18" style="display:inline-block;vertical-align:middle;margin:0 4px 0 0;"><rect width="48" height="32" rx="4" fill="#1A1F71"/><text x="24" y="20" text-anchor="middle" fill="#fff" font-family="system-ui,sans-serif" font-size="13" font-weight="700" font-style="italic">VISA</text></svg>`;
+    return `<svg viewBox="0 0 48 32" width="28" height="18" style="${svgStyle}"><rect width="48" height="32" rx="4" fill="#1A1F71"/><text x="24" y="20" text-anchor="middle" fill="#fff" font-size="13" font-weight="700" font-style="italic">VISA</text></svg>`;
   }
   if (b === 'mastercard') {
-    return `<svg viewBox="0 0 48 32" width="28" height="18" style="display:inline-block;vertical-align:middle;margin:0 4px 0 0;"><rect width="48" height="32" rx="4" fill="#252525"/><circle cx="19" cy="16" r="9" fill="#EB001B"/><circle cx="29" cy="16" r="9" fill="#F79E1B"/><path d="M24 9.3a9 9 0 010 13.4 9 9 0 000-13.4z" fill="#FF5F00"/></svg>`;
+    return `<svg viewBox="0 0 48 32" width="28" height="18" style="${svgStyle}"><rect width="48" height="32" rx="4" fill="#252525"/><circle cx="19" cy="16" r="9" fill="#EB001B"/><circle cx="29" cy="16" r="9" fill="#F79E1B"/><path d="M24 9.3a9 9 0 010 13.4 9 9 0 000-13.4z" fill="#FF5F00"/></svg>`;
   }
   if (b === 'amex' || b === 'american_express') {
-    return `<svg viewBox="0 0 48 32" width="28" height="18" style="display:inline-block;vertical-align:middle;margin:0 4px 0 0;"><rect width="48" height="32" rx="4" fill="#006FCF"/><text x="24" y="20" text-anchor="middle" fill="#fff" font-family="system-ui,sans-serif" font-size="9" font-weight="700">AMEX</text></svg>`;
+    return `<svg viewBox="0 0 48 32" width="28" height="18" style="${svgStyle}"><rect width="48" height="32" rx="4" fill="#006FCF"/><text x="24" y="20" text-anchor="middle" fill="#fff" font-size="9" font-weight="700">AMEX</text></svg>`;
   }
   if (b === 'discover') {
-    return `<svg viewBox="0 0 48 32" width="28" height="18" style="display:inline-block;vertical-align:middle;margin:0 4px 0 0;"><rect width="48" height="32" rx="4" fill="#FF6000"/><circle cx="30" cy="16" r="8" fill="#fff" opacity="0.4"/></svg>`;
+    return `<svg viewBox="0 0 48 32" width="28" height="18" style="${svgStyle}"><rect width="48" height="32" rx="4" fill="#FF6000"/><circle cx="30" cy="16" r="8" fill="#fff" opacity="0.4"/></svg>`;
   }
   // Default: generic card icon
-  return `<svg viewBox="0 0 48 32" width="28" height="18" style="display:inline-block;vertical-align:middle;margin:0 4px 0 0;"><rect width="48" height="32" rx="4" fill="#6B7280"/><rect x="4" y="8" width="40" height="4" rx="1" fill="#fff" opacity="0.5"/><rect x="4" y="18" width="16" height="3" rx="1" fill="#fff" opacity="0.4"/></svg>`;
+  return `<svg viewBox="0 0 48 32" width="28" height="18" style="${svgStyle}"><rect width="48" height="32" rx="4" fill="#6B7280"/><rect x="4" y="8" width="40" height="4" rx="1" fill="#fff" opacity="0.5"/><rect x="4" y="18" width="16" height="3" rx="1" fill="#fff" opacity="0.4"/></svg>`;
 }
 
-function cardBadge(brand?: string, last4?: string): string {
+function cardBadge(brand?: string, last4?: string, printMode = false): string {
   if (!brand) return '';
-  return `<p style="white-space:nowrap;"><span class="label">Card:</span> ${cardBrandIcon(brand)}&nbsp;&bull;&bull;&bull;&bull;&nbsp;${escapeHtml(last4 || '****')}</p>`;
+  return `<p style="white-space:nowrap;"><span class="label">Card:</span> ${cardBrandIcon(brand, { printMode })}&nbsp;&bull;&bull;&bull;&bull;&nbsp;${escapeHtml(last4 || '****')}</p>`;
 }
 
 /** Render the full HTML document for any assembled financial document. */
-export function renderInvoiceDocumentHtml(model: InvoiceDocumentModel): string {
+export function renderInvoiceDocumentHtml(model: InvoiceDocumentModel, options: InvoiceHtmlRenderOptions = {}): string {
+  const printMode = options.printMode === true;
   const statusCol = statusColor(model.status);
   const currentYear = new Date().getFullYear();
   const c = model.company;
@@ -88,7 +144,7 @@ export function renderInvoiceDocumentHtml(model: InvoiceDocumentModel): string {
   if (model.subscriptionPlan) detailRows.push(`<p><span class="label">Plan:</span> ${escapeHtml(model.subscriptionPlan)}</p>`);
   if (model.originalInvoiceNumber) detailRows.push(`<p><span class="label">Original Invoice:</span> ${escapeHtml(model.originalInvoiceNumber)}</p>`);
   if (model.payment.method) detailRows.push(`<p><span class="label">Method:</span> ${escapeHtml(model.payment.method)}</p>`);
-  if (model.payment.cardBrand) detailRows.push(cardBadge(model.payment.cardBrand, model.payment.cardLast4));
+  if (model.payment.cardBrand) detailRows.push(cardBadge(model.payment.cardBrand, model.payment.cardLast4, printMode));
   if (model.payment.refundDestination) detailRows.push(`<p><span class="label">Refund to:</span> ${escapeHtml(model.payment.refundDestination)}</p>`);
   // ADMIN CHANNEL ONLY — provider identifiers never reach customer documents
   if (isAdmin && model.payment.stripePaymentIntentId) {
@@ -148,9 +204,9 @@ export function renderInvoiceDocumentHtml(model: InvoiceDocumentModel): string {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${escapeHtml(model.title)} ${escapeHtml(model.number)} | ${escapeHtml(c.name)}</title>
-  <style>
+  <style>${printMode ? embeddedInterFontFaceCss() : ''}
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f3f4f6; color: #1f2937; }
+    body { font-family: ${printMode ? "'Inter', " : ''}system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f3f4f6; color: #1f2937; }
     .invoice-container { max-width: 800px; margin: 0 auto; background: #fff; }
     .invoice-header { background: linear-gradient(135deg, #0d9488, #0f766e); padding: 40px; color: #fff; display: flex; justify-content: space-between; align-items: flex-start; }
     .company-info h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; }
@@ -175,7 +231,8 @@ export function renderInvoiceDocumentHtml(model: InvoiceDocumentModel): string {
     .footer { background: #f9fafb; padding: 32px 40px; border-top: 1px solid #e5e7eb; text-align: center; }
     .footer p { font-size: 12px; color: #9ca3af; line-height: 1.6; }
     .footer a { color: #0d9488; text-decoration: none; }
-    @media print { body { background: #fff; } .invoice-container { box-shadow: none; margin: 0; } }
+    @page { size: A4; margin: 0; }
+    @media print { body { background: #fff; } .invoice-container { max-width: none; box-shadow: none; margin: 0; } tr, .invoice-header { break-inside: avoid; page-break-inside: avoid; } }
     @media only screen and (max-width: 600px) {
       .invoice-header { flex-direction: column; gap: 16px; padding: 24px; }
       .invoice-title { text-align: left; }

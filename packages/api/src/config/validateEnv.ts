@@ -81,6 +81,9 @@ const OPTIONAL = [
   'SENTRY_SAMPLE_RATE',
   'SENTRY_TRACES_SAMPLE_RATE',
   'PAWTAG_WORKER_ROLE',
+  'FINANCE_PDF_RENDERER',
+  'FINANCE_PDF_RENDER_TIMEOUT_MS',
+  'FINANCE_PDF_PYTHON',
 ] as const;
 
 // ─── Validation Functions ───────────────────────────────────────────────────

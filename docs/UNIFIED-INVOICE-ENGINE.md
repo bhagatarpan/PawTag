@@ -46,15 +46,7 @@ assembleInvoiceDocument(id, channel) / assembleDonationReceiptDocument(id, chann
     └──► PDF generator (A4 shared layout; kind = invoice | credit_note | donation_receipt)
 ```
 
-**PDF engine caveat (known limitation, founder-flagged):** the shared assembly is the
-single source of truth for **data**, but the PDF generator *redraws* the HTML layout by
-hand with pdf-lib primitives rather than rendering the actual HTML/CSS. The two are kept
-in sync manually, so they can and do drift (gradient header, table band, total row,
-column anchors). The founder is not satisfied with this export mechanism and has asked for
-a better approach to be evaluated — leading candidate is rendering the real HTML/CSS via
-headless Chromium print-to-PDF, which would give one layout source and remove the hand-
-maintained redraw entirely. Until then, any visual change must be applied to **both**
-`invoice-document-html.ts` and `invoice-pdf.service.ts`.
+**PDF rendering (updated 2026-10-18):** the shared assembly remains the single source of truth for **data**, and `invoice-document-html.ts` is the single **layout** — the browser viewer and the PDF path (`printMode: true`, embedded Inter) consume the same template. The historical pdf-lib *redraw* now lives behind `FINANCE_PDF_RENDERER=legacy` (still the default) and is scheduled for removal once the founder verifies the HTML-derived engine via the `scripts/pdf-benchmark` harness. `invoice-pdf.service.ts` assembles + dispatches; `finance/pdf-renderer.ts` runs the WeasyPrint engine (guarded python3 child process, timeout + concurrency capped). Full workflow, decision tree, and rollout gate: `docs/PDF-RENDERER-REPLACEMENT.md`.
 
 **Channel determination:** `InvoiceAccessToken.issuedToAdmin` (new additive flag) — admin view routes set it; the token status route assembles with `channel: 'admin'` when set. Never trust a client query param.
 
@@ -90,7 +82,7 @@ CSR invoice tab additionally shows: document type badge (Order / Membership / Su
 | Stripe retrieve for donation card data fails / slow | Best-effort try/catch with timeout-free short-circuit; receipt issues without card details |
 | Credit-note PDF misses refund semantics | Assembly carries refund destination + related original invoice number; PDF renders both |
 | Old invoices without snapshots | Render-time fallback to Order/Membership joins (unchanged behaviour) |
-| PDF layout drifts from HTML (pdf-lib redraws the CSS by hand) | Accepted as a known limitation of the current pdf-lib engine. Founder is **not satisfied** with this export approach and wants a better PDF mechanism evaluated — most likely rendering the **actual HTML/CSS** (headless Chromium print-to-PDF) so there is one layout source and no hand-maintained redraw to drift. The residual `INV- 000043`-style gaps come from the static Inter TTF's stripped kerning + wide hyphen advance and are a font-metric limit, not a layout bug. |
+| PDF layout drifts from HTML (pdf-lib redraws the CSS by hand) | Resolved architecturally: the HTML template is now the single layout for viewer AND PDF (`printMode`); `FINANCE_PDF_RENDERER` selects the engine (`legacy` pdf-lib default, `weasyprint` HTML-derived candidate gated on the founder benchmark — `docs/PDF-RENDERER-REPLACEMENT.md`). While `legacy` remains the default, visual changes still need the legacy redraw updated too; that cost disappears when the legacy engine is removed after sign-off. The residual `INV- 000043`-style gaps in legacy PDFs are a static-Inter font-metric limit, not a layout bug. |
 
 ## 7. Implementation checklist
 

@@ -1,0 +1,17 @@
+# Benchmark-only image: WeasyPrint on Alpine (no apk package exists; pip
+# install against system pango). WeasyPrint >= 70 talks to pango directly
+# via cffi — no PyGObject build needed. This recipe doubles as the
+# candidate for the production Dockerfile.api layer AFTER the founder
+# signs off on the benchmark gate (docs/PDF-RENDERER-REPLACEMENT.md).
+# Pin the engine major: the guarded render script targets the 70.x API
+# (URLFetcher protocol allow-list) with a compat shim for older versions.
+FROM alpine:3.22
+# py3-pillow/py3-fonttools from apk avoid source builds; font-dejavu covers
+# fallback glyphs (documents embed Inter as a data URI).
+RUN apk add --no-cache python3 py3-pip py3-pillow py3-fonttools pango fontconfig font-dejavu libffi \
+    && pip install --break-system-packages --no-cache-dir 'weasyprint~=70.0'
+WORKDIR /work
+# The guarded render script is mounted at run time (one source of truth:
+# the constant embedded in packages/api/src/services/finance/pdf-renderer.ts,
+# written to out/render_guarded.py by generate-fixtures.ts).
+ENTRYPOINT ["python3"]

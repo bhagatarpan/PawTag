@@ -63,4 +63,14 @@ export const config = {
   allowedOrigins: parseAllowedOrigins(),
   trustProxy: process.env.TRUST_PROXY || (process.env.NODE_ENV === 'production' ? '1' : 'false'),
   cookieName: process.env.REFRESH_TOKEN_COOKIE_NAME || 'pawtag_refresh_token',
+  /**
+   * Financial-document PDF engine. `legacy` = pdf-lib (hand-drawn, default
+   * until the founder signs off on the HTML-derived engine benchmark —
+   * docs/PDF-RENDERER-REPLACEMENT.md). `weasyprint` = canonical HTML rendered
+   * by python3 + WeasyPrint; fails closed when the runtime is missing.
+   */
+  financePdfRenderer: process.env.FINANCE_PDF_RENDERER || 'legacy',
+  financePdfRenderTimeoutMs: parseInt(process.env.FINANCE_PDF_RENDER_TIMEOUT_MS || '20000', 10),
+  /** Python executable with WeasyPrint installed (weasyprint renderer only). */
+  financePdfPython: process.env.FINANCE_PDF_PYTHON || 'python3',
 };
