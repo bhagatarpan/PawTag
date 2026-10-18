@@ -15,6 +15,26 @@ cd scripts/pdf-benchmark
 bash run-benchmark.sh                     # 2) WeasyPrint renders (requires Docker)
 ```
 
+### No Docker? Render locally on Windows (proven 2026-10-18)
+
+WeasyPrint also runs directly on Windows — used to produce the current
+`out/pdf/` results:
+
+```powershell
+winget install Python.Python.3.12         # once
+winget install MSYS2.MSYS2                # once — provides pango native libs
+C:\msys64\usr\bin\bash -lc "pacman -Sy --noconfirm --needed mingw-w64-x86_64-pango"
+python -m pip install "weasyprint~=70.0"  # once
+
+# every benchmark run (mingw64 bin dir must be on PATH for pango DLLs):
+$env:PATH = "C:\msys64\mingw64\bin;$env:PATH"
+python out\render_guarded.py out\html\01-shop-invoice-customer.html out\pdf\01-shop-invoice-customer.pdf
+```
+
+The Docker leg remains the way to validate the *container* recipe before it
+goes into `docker/Dockerfile.api`; the Windows leg validates the engine's
+visual output. Both run the same guarded script (`out/render_guarded.py`).
+
 Then open `out/report.md` and review each PDF in `out/pdf/` side-by-side with
 `out/html/` (browser) and `out/legacy-pdf/`. Record verdicts in the report —
 **this review is the gate** that decides the engine

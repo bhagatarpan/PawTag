@@ -36,7 +36,8 @@ describe('resolveFinancePdfEngine', () => {
   });
 
   it('ships exactly one guarded python script (no duplicate copies)', () => {
-    expect(WEASYPRINT_RENDER_SCRIPT).toContain('guarded_fetcher');
+    expect(WEASYPRINT_RENDER_SCRIPT).toContain("allowed_protocols={'data'}"); // WeasyPrint >= 70 guard
+    expect(WEASYPRINT_RENDER_SCRIPT).toContain('guarded_fetcher'); // < 70 compat shim
     expect(WEASYPRINT_RENDER_SCRIPT).toContain("startswith('data:')");
     expect(WEASYPRINT_RENDER_SCRIPT).toContain('write_pdf');
   });

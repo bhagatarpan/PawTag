@@ -47,18 +47,25 @@ const DEFAULT_RENDER_TIMEOUT_MS = 20_000;
  * benchmark container, so there is exactly one copy of the script.
  */
 export const WEASYPRINT_RENDER_SCRIPT = `import sys
-from weasyprint import HTML, default_url_fetcher
 
 MAX_INPUT_BYTES = 5 * 1024 * 1024
 
-def guarded_fetcher(url, *args, **kwargs):
-    # Documents are server-generated; the only external resource allowed is
-    # the embedded webfont carried as a data: URL. Everything else (http,
-    # file, ftp...) is rejected so the renderer can never reach the network
-    # or the filesystem.
-    if isinstance(url, str) and url.startswith('data:'):
-        return default_url_fetcher(url, *args, **kwargs)
-    raise ValueError('blocked by finance pdf renderer: %s' % str(url)[:120])
+try:
+    # WeasyPrint >= 70: native protocol allow-list — data: only, so the
+    # renderer can never reach the network or the filesystem (documents are
+    # server-generated; the embedded webfont is the only external resource).
+    from weasyprint import HTML, URLFetcher
+    FETCHER = URLFetcher(allowed_protocols={'data'})
+except (ImportError, TypeError):
+    # WeasyPrint < 70: guard the legacy default_url_fetcher instead.
+    from weasyprint import HTML, default_url_fetcher
+
+    def guarded_fetcher(url, *args, **kwargs):
+        if isinstance(url, str) and url.startswith('data:'):
+            return default_url_fetcher(url, *args, **kwargs)
+        raise ValueError('blocked by finance pdf renderer: %s' % str(url)[:120])
+
+    FETCHER = guarded_fetcher
 
 def main():
     src, dst = sys.argv[1], sys.argv[2]
@@ -66,7 +73,7 @@ def main():
         html = fh.read(MAX_INPUT_BYTES + 1)
     if len(html) > MAX_INPUT_BYTES:
         raise SystemExit('finance pdf renderer: html input too large')
-    doc = HTML(string=html.decode('utf-8'), base_url='about:blank', url_fetcher=guarded_fetcher)
+    doc = HTML(string=html.decode('utf-8'), base_url='about:blank', url_fetcher=FETCHER)
     pdf = doc.write_pdf()
     with open(dst, 'wb') as out:
         out.write(pdf)
