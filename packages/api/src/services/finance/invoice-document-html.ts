@@ -93,12 +93,13 @@ function statusColor(status: string): string {
  * CSS (style wins in browsers and WeasyPrint — cross-engine robustness).
  * printMode uses a smaller mark with a baseline nudge: at PDF zoom the
  * web-sized 28×18 badge reads oversized beside 14px body text and sits
- * high with middle alignment (founder visual-gate finding, 2026-10-19).
+ * high with middle alignment (founder visual-gate findings, 2026-10-19,
+ * refined to 21×14 — font-size proportions, exact 3:2 artwork ratio).
  * The web view keeps the original 28×18 — no on-screen change.
  */
 export function cardBrandIcon(brand: string, options: { printMode?: boolean } = {}): string {
   const svgStyle = options.printMode
-    ? 'display:inline-block;vertical-align:-3px;width:24px;height:16px;margin:0 4px 0 0;'
+    ? 'display:inline-block;vertical-align:-2px;width:21px;height:14px;margin:0 4px 0 0;'
     : 'display:inline-block;vertical-align:middle;width:28px;height:18px;margin:0 4px 0 0;';
   const b = brand.toLowerCase();
   if (b === 'visa') {

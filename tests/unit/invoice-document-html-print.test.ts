@@ -115,8 +115,8 @@ describe('SVG card-brand marks (both modes)', () => {
       expect(tag).toContain('vertical-align:middle');
     }
     for (const tag of printStyles) {
-      expect(tag).toContain('width:24px;height:16px');
-      expect(tag).toContain('vertical-align:-3px');
+      expect(tag).toContain('width:21px;height:14px');
+      expect(tag).toContain('vertical-align:-2px');
     }
   });
 });
