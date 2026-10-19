@@ -399,6 +399,7 @@ export class NzShippingProvider implements IShippingProvider {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       logger.error({
+        provider: this.id,
         err: message,
         orderId: params.orderId,
         orderNumber: params.orderNumber,

@@ -8,7 +8,13 @@ interface LogEntry {
   time: number;
   msg?: string;
   message?: string;
-  err?: {
+  /**
+   * Callers log errors two ways: pino-serialized Error objects AND plain
+   * strings (e.g. integration adapters logging a provider's error message).
+   * Both must survive into SystemLogs — an actionable reason silently
+   * dropped here turns every provider failure into untraceable archaeology.
+   */
+  err?: string | {
     name?: string;
     message?: string;
     code?: string;
@@ -50,6 +56,11 @@ function classifyCategory(entry: LogEntry): LogCategory {
 
 function extractError(entry: LogEntry) {
   if (!entry.err) return undefined;
+  // Plain-string error (integration adapters log provider messages this
+  // way) — keep the text instead of extracting undefined object fields.
+  if (typeof entry.err === 'string') {
+    return { message: entry.err };
+  }
   return {
     name: entry.err.name,
     message: entry.err.message,
