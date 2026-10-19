@@ -22,6 +22,8 @@ const paymentCreateMock = vi.fn();
 const orderUpdateMock = vi.fn();
 const userFindMock = vi.fn();
 const saveMock = vi.fn();
+const notificationCreateMock = vi.fn();
+const sendCmsEmailOrFallbackMock = vi.fn();
 
 vi.mock('@pawtag/db', async () => {
   const actual = await vi.importActual<any>('@pawtag/db');
@@ -41,11 +43,23 @@ vi.mock('@pawtag/db', async () => {
     User: {
       findById: (...args: any[]) => userFindMock(...args),
     },
+    Notification: {
+      create: (...args: any[]) => notificationCreateMock(...args),
+    },
   };
 });
 
 vi.mock('../../packages/api/src/services/email.service', () => ({
   sendMail: vi.fn(async () => true),
+  sendCmsEmailOrFallback: (...args: any[]) => sendCmsEmailOrFallbackMock(...args),
+}));
+
+const createCreditNoteMock = vi.fn();
+const buildCreditNotePdfAttachmentMock = vi.fn();
+vi.mock('../../packages/api/src/commerce/services/credit-note.service', () => ({
+  createCreditNoteForRefund: (...args: any[]) => createCreditNoteMock(...args),
+  buildCreditNotePdfAttachment: (...args: any[]) => buildCreditNotePdfAttachmentMock(...args),
+  findCreditNoteForRefund: vi.fn(),
 }));
 
 import { returnRefundService, computeRemainingRefundCents, isFullRefundAmount } from '../../packages/api/src/commerce/services/return-refund.service';
@@ -67,7 +81,12 @@ describe('returnRefundService.processRefund', () => {
     saveMock.mockResolvedValue(undefined);
     orderUpdateMock.mockResolvedValue({});
     paymentCreateMock.mockResolvedValue({});
-    userFindMock.mockReturnValue({ lean: () => Promise.resolve(null) });
+    notificationCreateMock.mockResolvedValue({});
+    sendCmsEmailOrFallbackMock.mockResolvedValue({ success: true });
+    userFindMock.mockReturnValue({
+      select: vi.fn().mockReturnValue({ lean: async () => null }),
+      lean: async () => null,
+    });
   });
 
   it('rejects when reason is missing', async () => {
@@ -153,6 +172,163 @@ describe('returnRefundService.processRefund', () => {
       }),
     );
     expect(paymentCreateMock).toHaveBeenCalled();
+  });
+
+  it('emails the customer the credit note number/link and attaches the credit note PDF', async () => {
+    const ret = chainable({
+      _id: 'r1',
+      status: 'received',
+      refundAmount: 9.99,
+      items: [],
+      reason: 'damaged',
+      orderId: 'o1',
+      orderNumber: 'WO-000486',
+    });
+    findByIdMock.mockReturnValue(ret);
+    orderFindByIdMock.mockReturnValue(chainable({
+      _id: 'o1',
+      orderNumber: 'WO-000486',
+      status: 'delivered',
+      userId: 'u1',
+      payment: {
+        amount: 9.99,
+        currency: 'NZD',
+        paidAt: new Date(),
+        stripePaymentIntentId: 'pi_test',
+        cardBrand: 'visa',
+        cardLast4: '4242',
+      },
+    }));
+    paymentFindMock.mockImplementation(() => ({ select: vi.fn().mockResolvedValue([]) }));
+    (stripePaymentProvider.createRefund as any).mockResolvedValue({
+      success: true,
+      refundId: 're_test_1',
+      status: 'succeeded',
+      arn: 'arn_test',
+    });
+    userFindMock.mockReturnValue({
+      select: vi.fn().mockReturnValue({ lean: async () => ({ email: 'customer@test.com', fullName: 'Test Customer' }) }),
+    });
+    const creditNote = { _id: 'cn1', invoiceNumber: 'CN-000042' };
+    createCreditNoteMock.mockResolvedValue(creditNote);
+    const attachment = { filename: 'CN-000042.pdf', contentType: 'application/pdf', content: Buffer.from('%PDF-1.7') };
+    buildCreditNotePdfAttachmentMock.mockResolvedValue(attachment);
+
+    const result = await returnRefundService.processRefund({
+      returnId: 'r1',
+      reason: 'damaged item',
+      actor: { id: 'admin1', email: 'csr@pawtag.co.nz', type: 'admin' },
+    });
+
+    expect(result.success).toBe(true);
+    expect(createCreditNoteMock).toHaveBeenCalledWith(
+      expect.objectContaining({ refundId: 're_test_1' }),
+    );
+    expect(buildCreditNotePdfAttachmentMock).toHaveBeenCalledWith('cn1', 'CN-000042');
+    expect(sendCmsEmailOrFallbackMock).toHaveBeenCalledTimes(1);
+    const params = sendCmsEmailOrFallbackMock.mock.calls[0][0];
+    expect(params.slug).toBe('refund-processed-csr');
+    expect(params.vars.creditNoteNumber).toBe('CN-000042');
+    expect(params.vars.creditNoteUrl).toContain('/account/invoices/cn1');
+    expect(params.attachments).toEqual([attachment]);
+    expect(params.fallbackHtml).toContain('Credit Note: CN-000042');
+  });
+
+  it('creates a customer in-app notification (partial refunds never change order status)', async () => {
+    const ret = chainable({
+      _id: 'r1',
+      status: 'received',
+      refundAmount: 9.99,
+      items: [],
+      reason: 'damaged',
+      orderId: 'o1',
+      orderNumber: 'WO-000486',
+    });
+    findByIdMock.mockReturnValue(ret);
+    orderFindByIdMock.mockReturnValue(chainable({
+      _id: 'o1',
+      orderNumber: 'WO-000486',
+      status: 'delivered',
+      userId: 'u1',
+      payment: {
+        amount: 9.99,
+        currency: 'NZD',
+        paidAt: new Date(),
+        stripePaymentIntentId: 'pi_test',
+      },
+    }));
+    paymentFindMock.mockImplementation(() => ({ select: vi.fn().mockResolvedValue([]) }));
+    (stripePaymentProvider.createRefund as any).mockResolvedValue({
+      success: true,
+      refundId: 're_test_1',
+      status: 'succeeded',
+    });
+    userFindMock.mockReturnValue({
+      select: vi.fn().mockReturnValue({ lean: async () => ({ email: 'customer@test.com', fullName: 'Test Customer' }) }),
+    });
+    createCreditNoteMock.mockResolvedValue(null);
+
+    await returnRefundService.processRefund({
+      returnId: 'r1',
+      reason: 'damaged item',
+      actor: { id: 'admin1', type: 'admin' },
+    });
+
+    expect(notificationCreateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'u1',
+        audience: 'customer',
+        type: 'refund_update',
+        priority: 'high',
+        data: expect.objectContaining({ orderId: 'o1', refundId: 're_test_1' }),
+      }),
+    );
+  });
+
+  it('credit note PDF failure never blocks the refund email — it sends without attachment', async () => {
+    const ret = chainable({
+      _id: 'r1',
+      status: 'received',
+      refundAmount: 9.99,
+      items: [],
+      reason: 'damaged',
+      orderId: 'o1',
+      orderNumber: 'WO-000486',
+    });
+    findByIdMock.mockReturnValue(ret);
+    orderFindByIdMock.mockReturnValue(chainable({
+      _id: 'o1',
+      orderNumber: 'WO-000486',
+      status: 'delivered',
+      userId: 'u1',
+      payment: {
+        amount: 9.99,
+        currency: 'NZD',
+        paidAt: new Date(),
+        stripePaymentIntentId: 'pi_test',
+      },
+    }));
+    paymentFindMock.mockImplementation(() => ({ select: vi.fn().mockResolvedValue([]) }));
+    (stripePaymentProvider.createRefund as any).mockResolvedValue({
+      success: true,
+      refundId: 're_test_1',
+      status: 'succeeded',
+    });
+    userFindMock.mockReturnValue({
+      select: vi.fn().mockReturnValue({ lean: async () => ({ email: 'customer@test.com', fullName: 'Test Customer' }) }),
+    });
+    createCreditNoteMock.mockResolvedValue({ _id: 'cn1', invoiceNumber: 'CN-000042' });
+    buildCreditNotePdfAttachmentMock.mockRejectedValue(new Error('weasyprint missing'));
+
+    const result = await returnRefundService.processRefund({
+      returnId: 'r1',
+      reason: 'damaged item',
+      actor: { id: 'admin1', type: 'admin' },
+    });
+
+    expect(result.success).toBe(true);
+    expect(sendCmsEmailOrFallbackMock).toHaveBeenCalledTimes(1);
+    expect(sendCmsEmailOrFallbackMock.mock.calls[0][0].attachments).toBeUndefined();
   });
 
   it('fails closed when Stripe fails — does not mark refunded', async () => {

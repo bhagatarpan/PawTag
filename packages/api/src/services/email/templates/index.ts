@@ -12,6 +12,7 @@ export { renderLoginOtpEmail } from './mfa-otp';
 export { renderRefundProcessingEmail } from './refund-processing';
 export { renderRefundSettledEmail } from './refund-settled';
 export { renderRefundFailedEmail } from './refund-failed';
+export { renderCreditNoteSection } from './credit-note-section';
 export { renderGuardianWelcomeEmail } from './guardian-welcome';
 export { renderTierUpgradeEmail } from './guardian-tier-upgrade';
 export { renderMonthlySummaryEmail } from './guardian-monthly-summary';

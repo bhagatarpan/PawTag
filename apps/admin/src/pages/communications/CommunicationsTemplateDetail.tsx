@@ -78,6 +78,7 @@ const BUSINESS_FLOWS: Record<string, string> = {
   guardian_loyalty: 'Guardian & Loyalty',
   referrals: 'Referrals',
   admin_system: 'Admin / System',
+  donations: 'Donations',
   other: 'Other',
 };
 

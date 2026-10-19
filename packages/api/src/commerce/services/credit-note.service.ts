@@ -71,3 +71,60 @@ export async function createCreditNoteForRefund(ctx: CreditNoteContext): Promise
     return null;
   }
 }
+
+/**
+ * Find the credit note that belongs to a specific refund. Partial refunds
+ * create one credit note per refund transaction, so match by the refund's
+ * provider id first; fall back to the most recent credit note for the order
+ * (single-refund orders) when the caller has no refund id.
+ */
+export async function findCreditNoteForRefund(orderId: any, refundId?: string): Promise<any | null> {
+  try {
+    if (refundId) {
+      const byRefund = await Invoice.findOne({
+        type: 'credit_note',
+        orderId,
+        stripePaymentIntentId: refundId,
+      }).lean();
+      if (byRefund) return byRefund;
+    }
+    return await Invoice.findOne({ type: 'credit_note', orderId }).sort({ createdAt: -1 }).lean();
+  } catch (err) {
+    logger.error({ err, orderId: String(orderId), refundId }, 'Credit note lookup failed');
+    return null;
+  }
+}
+
+export interface CreditNoteEmailAttachment {
+  filename: string;
+  contentType: string;
+  content: Buffer;
+}
+
+/**
+ * Render a credit note's PDF for email attachment — best-effort by design.
+ * Uses the shared invoice PDF entry point, so the engine follows
+ * FINANCE_PDF_RENDERER (weasyprint once provisioned); a renderer failure
+ * must never block the refund email itself, so it returns null and logs
+ * loudly for reconciliation.
+ */
+export async function buildCreditNotePdfAttachment(
+  creditNoteId: string,
+  invoiceNumber: string,
+): Promise<CreditNoteEmailAttachment | null> {
+  try {
+    const { generateInvoicePdf } = await import('../../services/invoice-pdf.service');
+    const { buffer } = await generateInvoicePdf(String(creditNoteId), 'customer');
+    return {
+      filename: `${invoiceNumber || 'credit-note'}.pdf`,
+      contentType: 'application/pdf',
+      content: buffer,
+    };
+  } catch (err) {
+    logger.error(
+      { err, creditNoteId: String(creditNoteId), invoiceNumber },
+      'Credit note PDF attachment generation failed — email will send without attachment',
+    );
+    return null;
+  }
+}

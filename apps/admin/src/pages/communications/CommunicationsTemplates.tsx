@@ -70,6 +70,7 @@ const BUSINESS_FLOWS: Record<string, string> = {
   guardian_loyalty: 'Guardian & Loyalty',
   referrals: 'Referrals',
   admin_system: 'Admin / System',
+  donations: 'Donations',
   other: 'Other',
 };
 
@@ -89,6 +90,7 @@ const FLOW_COLORS: Record<string, string> = {
   guardian_loyalty: 'bg-yellow-100 text-yellow-700',
   referrals: 'bg-pink-100 text-pink-700',
   admin_system: 'bg-gray-100 text-gray-700',
+  donations: 'bg-teal-100 text-teal-700',
   other: 'bg-gray-100 text-gray-500',
 };
 

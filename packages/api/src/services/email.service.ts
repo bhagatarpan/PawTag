@@ -123,6 +123,13 @@ export async function sendCmsEmailOrFallback(params: {
   relatedEntityType?: string;
   relatedEntityId?: string;
   relatedEntityDisplay?: string;
+  /**
+   * Optional file attachments (e.g. the credit-note PDF) that ride alongside
+   * the rendered body — applied identically whether the body came from the
+   * CMS template or the hardcoded fallback, so financial documents cannot be
+   * lost to a template edit.
+   */
+  attachments?: Array<{ filename: string; contentType?: string; content: Buffer | string }>;
 }): Promise<EmailResult> {
   const auditMeta = {
     templateSlug: params.slug,
@@ -130,6 +137,7 @@ export async function sendCmsEmailOrFallback(params: {
     relatedEntityType: params.relatedEntityType,
     relatedEntityId: params.relatedEntityId,
     relatedEntityDisplay: params.relatedEntityDisplay,
+    attachments: params.attachments,
   };
   const cms = await renderCmsEmail(params.slug, params.vars);
   if (cms) {

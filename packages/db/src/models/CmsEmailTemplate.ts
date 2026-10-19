@@ -26,7 +26,7 @@ export interface ICmsEmailTemplateDocument extends Document {
   variables: string[];
   status: 'active' | 'inactive' | 'draft' | 'archived';
   // ─── Communications Centre fields ───
-  businessFlow: 'account_security' | 'pet_tag' | 'lost_found' | 'orders_commerce' | 'subscriptions' | 'guardian_loyalty' | 'referrals' | 'admin_system' | 'other';
+  businessFlow: 'account_security' | 'pet_tag' | 'lost_found' | 'orders_commerce' | 'subscriptions' | 'guardian_loyalty' | 'referrals' | 'admin_system' | 'donations' | 'other';
   purpose: string;
   triggerDescription: string;
   recipientDescription: string;
@@ -59,7 +59,7 @@ const CmsEmailTemplateSchema = new Schema<ICmsEmailTemplateDocument>(
     variables: [{ type: String }],
     status: { type: String, enum: ['active', 'inactive', 'draft', 'archived'], default: 'active', index: true },
     // ─── Communications Centre fields ───
-    businessFlow: { type: String, enum: ['account_security', 'pet_tag', 'lost_found', 'orders_commerce', 'subscriptions', 'guardian_loyalty', 'referrals', 'admin_system', 'other'], default: 'other', index: true },
+    businessFlow: { type: String, enum: ['account_security', 'pet_tag', 'lost_found', 'orders_commerce', 'subscriptions', 'guardian_loyalty', 'referrals', 'admin_system', 'donations', 'other'], default: 'other', index: true },
     purpose: { type: String, default: '' },
     triggerDescription: { type: String, default: '' },
     recipientDescription: { type: String, default: '' },

@@ -1,4 +1,5 @@
 import { renderBase, renderCtaButton, renderStatusCard } from './base';
+import { renderCreditNoteSection } from './credit-note-section';
 
 interface OrderStatusData {
   orderNumber: string;
@@ -9,6 +10,9 @@ interface OrderStatusData {
   trackingUrl?: string;
   reason?: string;
   viewOrderUrl: string;
+  /** Present for cancelled/refunded orders that produced a credit note */
+  creditNoteNumber?: string;
+  creditNoteUrl?: string;
 }
 
 const STATUS_CONFIG: Record<string, { label: string; subject: string; cardVariant: 'info' | 'success' | 'warning' | 'processing' }> = {
@@ -50,10 +54,18 @@ export function renderOrderStatusEmail(data: OrderStatusData): string {
     extraInfo = renderStatusCard('info', 'Refund Reason', data.reason);
   }
 
+  // Cancelled/refunded orders that moved money carry their credit note —
+  // renders nothing for unpaid cancellations or when no note exists.
+  const creditNoteSection =
+    data.status === 'cancelled' || data.status === 'refunded'
+      ? renderCreditNoteSection(data.creditNoteNumber, data.creditNoteUrl)
+      : '';
+
   const bodyHtml = `
     <p style="color:#374151;font-size:16px;line-height:1.6;margin:0 0 20px;">Hi ${data.customerName},</p>
     ${statusCard}
     ${extraInfo}
+    ${creditNoteSection}
     ${renderCtaButton(data.viewOrderUrl, 'View Order')}
   `;
 

@@ -1,4 +1,5 @@
 import { renderBase, renderCtaButton } from './base';
+import { renderCreditNoteSection } from './credit-note-section';
 
 /**
  * Render "Refund Settled" email.
@@ -20,17 +21,7 @@ export function renderRefundSettledEmail(data: {
   creditNoteNumber?: string;
   creditNoteUrl?: string;
 }): string {
-  const creditNoteSection = data.creditNoteNumber ? `
-    <div style="background-color:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:16px;margin:20px 0;">
-      <p style="margin:0 0 8px;font-weight:600;color:#1e40af;font-size:14px;">
-        Credit Note: ${data.creditNoteNumber}
-      </p>
-      <p style="margin:0;color:#1e3a5f;font-size:13px;line-height:1.5;">
-        A credit note has been generated for this refund. You can view or download it for your records.
-      </p>
-      ${data.creditNoteUrl ? `<p style="margin:12px 0 0;"><a href="${data.creditNoteUrl}" style="color:#2563eb;text-decoration:none;font-weight:600;">View Credit Note →</a></p>` : ''}
-    </div>
-  ` : '';
+  const creditNoteSection = renderCreditNoteSection(data.creditNoteNumber, data.creditNoteUrl);
 
   const destinationRow = data.destination ? `
       <tr>

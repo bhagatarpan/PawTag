@@ -15,6 +15,9 @@ interface StatusChangeExtra {
   trackingNumber?: string;
   carrier?: string;
   reason?: string;
+  /** Present when the cancellation/refund produced a credit note */
+  creditNoteNumber?: string;
+  creditNoteUrl?: string;
 }
 
 // Generate carrier-specific tracking URL
@@ -88,11 +91,11 @@ const STATUS_EMAILS: Record<string, { subject: (orderNumber: string) => string; 
   },
   cancelled: {
     subject: (orderNumber) => `Order ${orderNumber} cancelled`,
-    html: (orderNumber, extra) => renderOrderStatusEmail({ orderNumber, customerName: 'Customer', status: 'cancelled', reason: extra?.reason, viewOrderUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/orders` }),
+    html: (orderNumber, extra) => renderOrderStatusEmail({ orderNumber, customerName: 'Customer', status: 'cancelled', reason: extra?.reason, creditNoteNumber: extra?.creditNoteNumber, creditNoteUrl: extra?.creditNoteUrl, viewOrderUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/orders` }),
   },
   refunded: {
     subject: (orderNumber) => `Order ${orderNumber} refunded`,
-    html: (orderNumber, extra) => renderOrderStatusEmail({ orderNumber, customerName: 'Customer', status: 'refunded', reason: extra?.reason, viewOrderUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/orders` }),
+    html: (orderNumber, extra) => renderOrderStatusEmail({ orderNumber, customerName: 'Customer', status: 'refunded', reason: extra?.reason, creditNoteNumber: extra?.creditNoteNumber, creditNoteUrl: extra?.creditNoteUrl, viewOrderUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/orders` }),
   },
 };
 
@@ -186,17 +189,46 @@ export async function notifyCustomerOfStatusChange(
       trackingUrl: getTrackingUrl(extra?.carrier || '', extra?.trackingNumber || ''),
       reason: extra?.reason || '',
     };
+
+    // Cancelled/refunded orders that moved money must carry their credit
+    // note: look it up (the initiating path created it before this call),
+    // attach the PDF, and expose number/link to the CMS template. Unpaid
+    // cancellations have no credit note — everything stays empty then.
+    let creditNoteAttachment: Array<{ filename: string; contentType: string; content: Buffer }> | undefined;
+    if (newStatus === 'cancelled' || newStatus === 'refunded') {
+      try {
+        const { findCreditNoteForRefund, buildCreditNotePdfAttachment } = await import('../commerce/services/credit-note.service');
+        // Latest credit note: for cancellations there is one (full refund);
+        // for admin refunds the just-created note is always the newest.
+        const creditNote = await findCreditNoteForRefund(order._id);
+        if (creditNote) {
+          const creditNoteUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/invoices/${creditNote._id}`;
+          statusVars.creditNoteNumber = creditNote.invoiceNumber || '';
+          statusVars.creditNoteUrl = creditNoteUrl;
+          const attachment = await buildCreditNotePdfAttachment(creditNote._id, creditNote.invoiceNumber);
+          if (attachment) creditNoteAttachment = [attachment];
+        }
+      } catch (err) {
+        logger.error({ err, orderNumber: order.orderNumber, status: newStatus }, 'Credit note enrichment failed for order status email — sending without it');
+      }
+    }
+
     sideEffects.push(
       sendCmsEmailOrFallback({
         slug: 'order-status',
         to: email,
         vars: statusVars,
         fallbackSubject: emailConfig.subject(order.orderNumber),
-        fallbackHtml: emailConfig.html(order.orderNumber, extra),
+        fallbackHtml: emailConfig.html(order.orderNumber, {
+          ...extra,
+          creditNoteNumber: statusVars.creditNoteNumber,
+          creditNoteUrl: statusVars.creditNoteUrl,
+        }),
         businessFlow: 'orders_commerce',
         relatedEntityType: 'order',
         relatedEntityId: order._id.toString(),
         relatedEntityDisplay: order.orderNumber,
+        attachments: creditNoteAttachment,
       }).catch((err) => {
         logger.error({ err, orderNumber: order.orderNumber, status: newStatus }, 'Order status email error');
       }),
@@ -343,6 +375,8 @@ export async function notifyRefundUpdate(
   let html = '';
   let cmsSlug = 'refund-processing';
   let fallbackRendererHtml = '';
+  /** Credit-note PDF attached to the settled email (best-effort) */
+  let refundAttachment: Array<{ filename: string; contentType: string; content: Buffer }> | undefined;
 
   const refundVars: Record<string, string> = {
     name: user.fullName || 'Customer',
@@ -377,15 +411,20 @@ export async function notifyRefundUpdate(
     cmsSlug = 'refund-settled';
     subject = `Refund Settled — Order ${order.orderNumber}`;
 
-    // Look up credit note if it exists
+    // Look up credit note if it exists. Match by this refund's id first
+    // (partial refunds create one note per refund transaction); the link
+    // points at the invoices portal page that displays and downloads it.
     let creditNoteNumber: string | undefined;
     let creditNoteUrl: string | undefined;
+    let creditNoteAttachment: Array<{ filename: string; contentType: string; content: Buffer }> | undefined;
     try {
-      const { Invoice } = await import('@pawtag/db');
-      const creditNote = await Invoice.findOne({ orderId: order._id, type: 'credit_note' }).sort({ createdAt: -1 }).lean();
+      const { findCreditNoteForRefund, buildCreditNotePdfAttachment } = await import('../commerce/services/credit-note.service');
+      const creditNote = await findCreditNoteForRefund(order._id, refundId);
       if (creditNote) {
         creditNoteNumber = creditNote.invoiceNumber;
-        creditNoteUrl = `${baseUrl}/account/orders/${order._id}`;
+        creditNoteUrl = `${baseUrl}/account/invoices/${creditNote._id}`;
+        const attachment = await buildCreditNotePdfAttachment(creditNote._id, creditNote.invoiceNumber);
+        if (attachment) creditNoteAttachment = [attachment];
       }
     } catch { /* non-critical */ }
 
@@ -405,6 +444,7 @@ export async function notifyRefundUpdate(
     fallbackRendererHtml = html;
     refundVars.creditNoteNumber = creditNoteNumber || '';
     refundVars.creditNoteUrl = creditNoteUrl || '';
+    refundAttachment = creditNoteAttachment;
   } else if (newStatus === 'failed') {
     cmsSlug = 'refund-failed';
     subject = `Refund Update — Order ${order.orderNumber}`;
@@ -439,6 +479,7 @@ export async function notifyRefundUpdate(
       relatedEntityType: 'order',
       relatedEntityId: order._id.toString(),
       relatedEntityDisplay: order.orderNumber,
+      attachments: refundAttachment,
     }).catch((err) => {
       logger.error({ err, refundId, email: user.email }, 'Refund email error');
     }),

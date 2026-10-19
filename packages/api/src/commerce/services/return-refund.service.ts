@@ -7,7 +7,7 @@
  * Return status to refunded without calling Stripe successfully.
  */
 
-import { Order, PaymentTransaction, Return, User, type IReturnDocument } from '@pawtag/db';
+import { Notification, Order, PaymentTransaction, Return, User, type IReturnDocument } from '@pawtag/db';
 import { stripePaymentProvider } from '../providers/stripe';
 import { getBooleanSetting, getNumberSetting } from '../config';
 import { formatRefundDestination, getTrackingUrl, toCents, fromCents, roundToCents } from '@pawtag/shared';
@@ -479,9 +479,10 @@ export class ReturnRefundService {
 
     // Credit note — the customer's document for money returned (best-effort;
     // the refund itself already succeeded and must not fail on this)
+    let refundCreditNote: { _id: any; invoiceNumber?: string } | null = null;
     try {
       const { createCreditNoteForRefund } = await import('./credit-note.service');
-      await createCreditNoteForRefund({
+      refundCreditNote = await createCreditNoteForRefund({
         orderId: order._id,
         userId: order.userId,
         refundAmount: requestedAmount,
@@ -574,33 +575,81 @@ export class ReturnRefundService {
           order.payment?.cardBrand,
           order.payment?.cardLast4,
         );
+
+        // Credit note — number/link in the body, PDF attached. The webhook
+        // "refund settled" email is suppressed when this path already emailed,
+        // so this message is the customer's definitive refund document.
+        const creditNoteNumber = refundCreditNote?.invoiceNumber || '';
+        const creditNoteUrl = refundCreditNote
+          ? `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/invoices/${refundCreditNote._id}`
+          : '';
+        let creditNoteAttachment: Array<{ filename: string; contentType: string; content: Buffer }> | undefined;
+        if (refundCreditNote) {
+          try {
+            const { buildCreditNotePdfAttachment } = await import('./credit-note.service');
+            const attachment = await buildCreditNotePdfAttachment(refundCreditNote._id, refundCreditNote.invoiceNumber || '');
+            if (attachment) creditNoteAttachment = [attachment];
+          } catch (attErr) {
+            logger.error({ err: attErr, returnId: ret._id }, 'Credit note attachment failed — email sends without it');
+          }
+        }
+
+        const { renderCreditNoteSection } = await import('../../services/email/templates');
         const html = `
           <p>Hi ${user.fullName || 'there'},</p>
           <p>We processed a refund of <strong>$${requestedAmount.toFixed(2)} ${order.payment?.currency || 'NZD'}</strong> for order <strong>${order.orderNumber}</strong>.</p>
           <p>Destination: ${destination}</p>
           ${stripeResult.refundId ? `<p>Refund ID: ${stripeResult.refundId}</p>` : ''}
           ${stripeResult.arn ? `<p>ARN: ${stripeResult.arn}</p>` : ''}
+          ${renderCreditNoteSection(creditNoteNumber, creditNoteUrl)}
           <p>Refunds typically appear on your statement within 5–10 business days.</p>
         `;
-        await sendCmsEmailOrFallback({
-          slug: 'refund-processed-csr',
-          to: user.email,
-          vars: {
-            customerName: user.fullName || 'there',
-            orderNumber: order.orderNumber,
-            amount: requestedAmount.toFixed(2),
-            currency: order.payment?.currency || 'NZD',
-            destination,
-            refundId: stripeResult.refundId || '',
-            arn: stripeResult.arn || '',
-          },
-          fallbackSubject: `Refund processed — ${order.orderNumber}`,
-          fallbackHtml: html,
-          businessFlow: 'orders_commerce',
-          relatedEntityType: 'order',
-          relatedEntityId: order._id.toString(),
-          relatedEntityDisplay: order.orderNumber,
-        }).catch(() => {});
+
+        await Promise.allSettled([
+          sendCmsEmailOrFallback({
+            slug: 'refund-processed-csr',
+            to: user.email,
+            vars: {
+              customerName: user.fullName || 'there',
+              orderNumber: order.orderNumber,
+              amount: requestedAmount.toFixed(2),
+              currency: order.payment?.currency || 'NZD',
+              destination,
+              refundId: stripeResult.refundId || '',
+              arn: stripeResult.arn || '',
+              creditNoteNumber,
+              creditNoteUrl,
+            },
+            fallbackSubject: `Refund processed — ${order.orderNumber}`,
+            fallbackHtml: html,
+            businessFlow: 'orders_commerce',
+            relatedEntityType: 'order',
+            relatedEntityId: order._id.toString(),
+            relatedEntityDisplay: order.orderNumber,
+            attachments: creditNoteAttachment,
+          }).catch(() => {}),
+          // In-app notification — partial refunds never change order status,
+          // so no status-change notification would otherwise exist.
+          Notification.create({
+            userId: order.userId,
+            audience: 'customer',
+            type: 'refund_update',
+            title: `Refund processed — ${order.orderNumber}`,
+            message: `Your refund of $${requestedAmount.toFixed(2)} ${order.payment?.currency || 'NZD'} for order ${order.orderNumber} has been sent to ${destination}.`,
+            data: {
+              orderId: String(order._id),
+              orderNumber: order.orderNumber,
+              returnId: String(ret._id),
+              refundId: stripeResult.refundId || '',
+              amount: requestedAmount,
+              currency: order.payment?.currency || 'NZD',
+              creditNoteNumber,
+            },
+            priority: 'high',
+            channel: 'alert',
+            actionUrl: `/account/orders/${order._id}`,
+          }).then(() => {}).catch(() => {}),
+        ]);
       }
     } catch (err) {
       logger.error({ err, returnId: ret._id }, 'Failed to send return refund email');
