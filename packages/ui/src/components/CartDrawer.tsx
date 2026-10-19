@@ -16,6 +16,8 @@ export interface CartItem {
   customizable?: boolean;
   customizationLabel?: string;
   customizationPrice?: number;
+  /** Per-unit engraving surcharge (server-set; only present with a saved name) */
+  customizationTotal?: number;
   customisation?: boolean;
   autoRenew?: boolean;
   isSubscription?: boolean;
@@ -249,6 +251,9 @@ export const CartDrawer = React.memo(function CartDrawer({
               const itemId = item._id || item.variantId || item.productId || '';
               const itemName = item.name || item.productName || 'Item';
               const itemPrice = item.price || item.unitPrice || 0;
+              // Engraving surcharge for the whole line — shown as its own
+              // priced row so the line total visibly adds up (base + engraving)
+              const engravingTotal = (item.customizationTotal || 0) * item.quantity;
               return (
               <div
                 key={itemId}
@@ -274,8 +279,13 @@ export const CartDrawer = React.memo(function CartDrawer({
                       ))}
                     </div>
                   )}
+                  {engravingTotal > 0 && (
+                    <p className="text-xs text-primary-600 mt-0.5">
+                      Engraving +${engravingTotal.toFixed(2)}
+                    </p>
+                  )}
                   <p className="text-sm font-bold text-primary-700 mt-1">
-                    ${(itemPrice * item.quantity).toFixed(2)}
+                    ${(itemPrice * item.quantity + engravingTotal).toFixed(2)}
                   </p>
                   {item.isSubscription && item.monthlyPrice != null && onToggleAutoRenew && (
                     <div className="flex items-center gap-1.5 mt-1">

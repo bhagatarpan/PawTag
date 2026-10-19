@@ -108,6 +108,7 @@ export default function ProductDetail() {
   const [pointsRates, setPointsRates] = useState<{ guardianRate: number; guardianSpentAmount: number; goldRate: number; goldSpentAmount: number } | null>(null);
   const [customisation, setCustomisation] = useState(false);
   const [customisationTexts, setCustomisationTexts] = useState<string[]>(['']);
+  const [engravingError, setEngravingError] = useState('');
   const [autoRenew, setAutoRenew] = useState(true);
 
 /* ---- Fetch product ---- */
@@ -153,6 +154,13 @@ export default function ProductDetail() {
   /* ---- Add to cart ---- */
   const handleAddToCart = async (e?: React.MouseEvent) => {
     if (!product) return;
+    // Product rule: an engraving charge requires at least one saved name —
+    // never add a charged engraving with every name blank.
+    if (customisation && !customisationTexts.some((t) => t.trim())) {
+      setEngravingError(`Enter a ${product.customizationLabel?.toLowerCase() || 'pet name'} or untick the option.`);
+      return;
+    }
+    setEngravingError('');
     try {
       await addItem({
         productId: product._id,
@@ -319,6 +327,7 @@ export default function ProductDetail() {
                     checked={customisation}
                     onChange={(e) => {
                       setCustomisation(e.target.checked);
+                      setEngravingError('');
                       if (!e.target.checked) setCustomisationTexts(['']);
                     }}
                     className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
@@ -346,6 +355,7 @@ export default function ProductDetail() {
                             const updated = [...customisationTexts];
                             updated[idx] = e.target.value.slice(0, 16);
                             setCustomisationTexts(updated);
+                            if (updated.some((t) => t.trim())) setEngravingError('');
                           }}
                           placeholder={product.customizationLabel || 'Enter text'}
                           maxLength={16}
@@ -356,6 +366,9 @@ export default function ProductDetail() {
                     <p className="text-xs text-gray-500">
                       {customisationTexts.filter(t => t).join(', ').length || 0}/16 characters per name
                     </p>
+                    {engravingError && (
+                      <p role="alert" className="text-xs text-red-600">{engravingError}</p>
+                    )}
                   </div>
                 )}
               </div>

@@ -26,8 +26,12 @@ interface CartItemCardProps {
   };
   onUpdateQuantity: (id: string, quantity: number) => void;
   onRemove: (id: string) => void;
-  /** Save engraving texts for this item (server-backed). */
-  onUpdateTexts?: (id: string, texts: string[]) => Promise<void> | void;
+  /**
+   * Save engraving names for this item — atomically activates the charge
+   * (server-backed; sends flag + texts together so a charge can never
+   * exist without a saved name).
+   */
+  onSaveEngraving?: (id: string, texts: string[]) => Promise<void> | void;
   /** Turn engraving on/off for this item (server-backed). */
   onToggleCustomisation?: (id: string, enable: boolean) => Promise<void> | void;
   /** Whether this item was just added (triggers highlight animation) */
@@ -38,7 +42,7 @@ export default function CartItemCard({
   item,
   onUpdateQuantity,
   onRemove,
-  onUpdateTexts,
+  onSaveEngraving,
   onToggleCustomisation,
   isNew = false,
 }: CartItemCardProps) {
@@ -67,7 +71,10 @@ export default function CartItemCard({
     }
   };
 
-  /* ---- Pet name engraving editing (customizable products) ---- */
+  /* ---- Pet name engraving editing (customizable products) ----
+   * Product rule: nothing is charged until Save. "Add pet name" only opens
+   * the editor locally; the charge and the names land together on Save, so
+   * Cancel always leaves the cart untouched. */
   const startEditEngraving = () => {
     const saved = item.customisationTexts || [];
     const qty = item.quantity || 1;
@@ -77,15 +84,9 @@ export default function CartItemCard({
     setActionError('');
   };
 
-  const handleAddEngraving = async () => {
-    if (!onToggleCustomisation) return;
-    setActionError('');
-    try {
-      await onToggleCustomisation(itemId, true);
-      startEditEngraving();
-    } catch {
-      setActionError('Could not enable the pet name. Please try again.');
-    }
+  const handleAddEngraving = () => {
+    // Local only — no server call, no charge until Save
+    startEditEngraving();
   };
 
   const handleRemoveEngraving = async () => {
@@ -99,12 +100,14 @@ export default function CartItemCard({
     }
   };
 
+  const hasBlankDraft = draftTexts.every((t) => !t.trim());
+
   const handleSaveEngraving = async () => {
-    if (!onUpdateTexts) return;
+    if (!onSaveEngraving) return;
     setSavingTexts(true);
     setActionError('');
     try {
-      await onUpdateTexts(itemId, draftTexts.map((t) => t.trim()).filter(Boolean));
+      await onSaveEngraving(itemId, draftTexts.map((t) => t.trim()).filter(Boolean));
       setEditingEngraving(false);
       setSavedFlash(true);
       setTimeout(() => setSavedFlash(false), 2000);
@@ -201,7 +204,8 @@ export default function CartItemCard({
                   <div className="flex items-center gap-2 mt-2">
                     <button
                       onClick={handleSaveEngraving}
-                      disabled={savingTexts}
+                      disabled={savingTexts || hasBlankDraft}
+                      title={hasBlankDraft ? 'Enter a pet name first' : undefined}
                       className="inline-flex items-center gap-1 px-3 py-1.5 bg-primary-600 text-white text-xs font-medium rounded-lg hover:bg-primary-700 disabled:opacity-50 transition-colors"
                     >
                       {savingTexts ? (
@@ -237,20 +241,31 @@ export default function CartItemCard({
               {hasCustomization && !editingEngraving && (
                 <div className="mt-2 bg-primary-50/60 border border-primary-100 rounded-lg px-3 py-2">
                   <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <p className="text-xs font-medium text-primary-700 mb-1">
                         {item.customizationLabel || 'Customisation'}
                       </p>
                       {item.customisationTexts?.map((text, i) => (
                         <p key={i} className="text-sm text-primary-800">"{text}"</p>
                       ))}
-                      {item.customizationTotal ? (
-                        <p className="text-xs text-primary-600 mt-1">
-                          +${item.customizationTotal.toFixed(2)} per unit
-                        </p>
-                      ) : null}
                     </div>
-                    {onUpdateTexts && item.customizable && (
+                    {/* Engraving as its own priced line — the item total on
+                        the right is base + engraving, so the math is visible */}
+                    {item.customizationTotal ? (
+                      <div className="text-right shrink-0">
+                        <p className="text-sm font-semibold text-primary-700">
+                          +${item.customizationTotal.toFixed(2)}
+                        </p>
+                        {item.quantity > 1 ? (
+                          <p className="text-[11px] text-primary-600 mt-0.5">
+                            per unit · ${(item.customizationTotal * item.quantity).toFixed(2)} total
+                          </p>
+                        ) : (
+                          <p className="text-[11px] text-primary-600 mt-0.5">per unit</p>
+                        )}
+                      </div>
+                    ) : null}
+                    {onSaveEngraving && item.customizable && (
                       <button
                         onClick={startEditEngraving}
                         className="shrink-0 inline-flex items-center gap-1 text-xs font-medium text-primary-700 hover:text-primary-800 bg-white border border-primary-200 rounded-lg px-2.5 py-1.5 transition-colors"
@@ -263,7 +278,7 @@ export default function CartItemCard({
                 </div>
               )}
 
-              {item.customizable && !item.customisation && onToggleCustomisation && (
+              {item.customizable && !hasCustomization && !editingEngraving && onToggleCustomisation && (
                 <button
                   onClick={handleAddEngraving}
                   className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-primary-700 hover:text-primary-800 bg-primary-50 hover:bg-primary-100 border border-primary-100 rounded-lg px-3 py-1.5 transition-colors"

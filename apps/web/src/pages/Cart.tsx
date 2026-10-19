@@ -13,7 +13,7 @@ import OrderSummary from '../components/cart/OrderSummary';
 
 export default function CartPage() {
   const navigate = useNavigate();
-  const { items, totals, loading, error, updateQuantity, removeItem, updateItemTexts, toggleCustomisation, refreshCart, promoCode, promoApplied, setPromoCode: setPromoCodeCtx, setPromoApplied: setPromoAppliedCtx } = useCart();
+  const { items, totals, loading, error, updateQuantity, removeItem, saveEngraving, toggleCustomisation, refreshCart, promoCode, promoApplied, setPromoCode: setPromoCodeCtx, setPromoApplied: setPromoAppliedCtx } = useCart();
   const { user } = useAuth();
 
   const [promoLoading, setPromoLoading] = useState(false);
@@ -111,8 +111,8 @@ export default function CartPage() {
                     item={item}
                     onUpdateQuantity={updateQuantity}
                     onRemove={removeItem}
-                    onUpdateTexts={async (id, texts) => {
-                      await updateItemTexts(id, texts);
+                    onSaveEngraving={async (id, texts) => {
+                      await saveEngraving(id, texts);
                       await refreshCart();
                     }}
                     onToggleCustomisation={async (id, enable) => {

@@ -190,9 +190,12 @@ export class CartService {
       cart.productType = productType;
     }
 
-    // Normalise customisation for consistent comparison
-    const inputCust = input.customisation === true;
+    // Normalise customisation for consistent comparison.
+    // Product rule: an engraving charge exists only when at least one name
+    // is saved — customisation requested with all-blank texts is treated as
+    // no customisation (prevents paying for an invisible engraving).
     const inputTexts = (input.customisationTexts || []).map(t => t.trim()).filter(Boolean);
+    const inputCust = input.customisation === true && inputTexts.length > 0;
 
     // Check if item already in cart (same product, same customisation state)
     // When customised, merge texts into existing line instead of creating separate lines
@@ -229,7 +232,7 @@ export class CartService {
       const mergedTexts = [...existingTexts, ...inputTexts];
       existingItem.quantity += input.quantity;
       existingItem.unitPrice = product.salePrice ?? product.price;
-      existingItem.customizationTotal = input.customisation ? product.customizationPrice : 0;
+      existingItem.customizationTotal = inputCust ? product.customizationPrice : 0;
       existingItem.customisationTexts = mergedTexts;
     } else {
       // Add new item
@@ -239,10 +242,10 @@ export class CartService {
         variantName: input.variantName,
         sku: product.sku,
         unitPrice: product.salePrice ?? product.price,
-        customizationTotal: input.customisation ? product.customizationPrice : 0,
+        customizationTotal: inputCust ? product.customizationPrice : 0,
         quantity: input.quantity,
         image: product.images?.[0],
-        customisation: input.customisation ?? false,
+        customisation: inputCust,
         customisationTexts: inputTexts,
         customizable: product.customizable ?? false,
         customizationLabel: product.customizationLabel || '',
@@ -290,10 +293,23 @@ export class CartService {
       }
     }
     if (input.customisationTexts !== undefined) {
-      item.customisationTexts = input.customisationTexts;
+      // Normalise: trim and drop blanks so the invariant below evaluates
+      // the real saved-name state regardless of which client sent it.
+      item.customisationTexts = input.customisationTexts.map((t: string) => String(t).trim()).filter(Boolean);
     }
     if (input.autoRenew !== undefined) {
       item.autoRenew = input.autoRenew;
+    }
+
+    // Product rule (enforced after all fields are applied so combined
+    // saves — flag + texts in one update — are judged on final state):
+    // a customisation charge exists only with at least one saved name.
+    // Guards the "enabled but empty" state that used to leave an
+    // invisible charge in the cart total.
+    if (item.customisation && !(item.customisationTexts || []).some((t: string) => t.trim())) {
+      item.customisation = false;
+      item.customisationTexts = [];
+      item.customizationTotal = 0;
     }
 
     if (input.quantity !== undefined && input.quantity <= 0) {

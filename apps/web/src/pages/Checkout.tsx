@@ -44,7 +44,7 @@ const STEPS = [
 ];
 
 export default function Checkout() {
-  const { items, total, totals, clearCart, refreshCart, updateQuantity, removeItem, updateItemTexts, toggleCustomisation, error: cartError, promoCode, promoApplied, setPromoCode: setPromoCodeCtx, setPromoApplied: setPromoAppliedCtx } = useCart();
+  const { items, total, totals, clearCart, refreshCart, updateQuantity, removeItem, saveEngraving, toggleCustomisation, error: cartError, promoCode, promoApplied, setPromoCode: setPromoCodeCtx, setPromoApplied: setPromoAppliedCtx } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -498,7 +498,8 @@ export default function Checkout() {
 
   const handleToggleEngraving = async (itemId: string, item: any, enable: boolean) => {
     if (enable) {
-      // Enable engraving — copy saved texts into editing state (or initialize empty)
+      // Enable engraving — local editor ONLY. Product rule: the charge and
+      // the names land together on save, so nothing is charged here.
       const saved = item.customisationTexts || [];
       const qty = item.quantity || 1;
       const texts = saved.length > 0
@@ -506,13 +507,12 @@ export default function Checkout() {
         : Array(qty).fill('');
       setEditingTexts(prev => ({ ...prev, [itemId]: texts }));
       setExpandedEngraving(prev => ({ ...prev, [itemId]: true }));
-    } else {
-      // Disable engraving — clear texts and collapse
-      setEditingTexts(prev => ({ ...prev, [itemId]: [] }));
-      setExpandedEngraving(prev => ({ ...prev, [itemId]: false }));
+      return;
     }
-    // Toggle customisation flag (handles both guest and server)
-    await toggleCustomisation(itemId, enable);
+    // Disable engraving — clear texts + charge server-side, collapse
+    setEditingTexts(prev => ({ ...prev, [itemId]: [] }));
+    setExpandedEngraving(prev => ({ ...prev, [itemId]: false }));
+    await toggleCustomisation(itemId, false);
     await refreshCart();
   };
 
@@ -542,7 +542,8 @@ export default function Checkout() {
   const handleSaveTexts = async (itemId: string) => {
     const texts = editingTexts[itemId] || [];
     setSavingTexts(prev => ({ ...prev, [itemId]: true }));
-    await updateItemTexts(itemId, texts);
+    // Atomic: names + charge land together (saveEngraving)
+    await saveEngraving(itemId, texts);
     await refreshCart();
     setSavingTexts(prev => ({ ...prev, [itemId]: false }));
     // Show success state briefly
@@ -554,8 +555,12 @@ export default function Checkout() {
   const saveAllEngraving = async () => {
     for (const item of items) {
       const itemId = item._id || item.productId || '';
-      if (item.customisation && editingTexts[itemId]) {
-        await updateItemTexts(itemId, editingTexts[itemId]);
+      // Pending local edits only (the server flag stays off until the first
+      // successful save, so key on the editing state, not item.customisation)
+      if (editingTexts[itemId]) {
+        // Atomic save; all-blank drafts intentionally save as "no engraving"
+        // (names + charge are inseparable — never charge for blank names)
+        await saveEngraving(itemId, editingTexts[itemId]);
       }
     }
   };
@@ -1405,7 +1410,7 @@ export default function Checkout() {
                           <p className="font-medium text-gray-900">{item.productName || item.name}</p>
                           {/* Pet name engraving — editable (revived checkout functionality) */}
                           {item.customizable ? (
-                            item.customisation ? (
+                            item.customisation || expandedEngraving[itemId] ? (
                               <div className="mt-1.5">
                                 <InlineEditBanner
                                   icon={<Edit3 size={14} />}
@@ -1459,8 +1464,7 @@ export default function Checkout() {
                                   </div>
                                 </InlineEditBanner>
                               </div>
-                            ) : (
-                              <button
+                            ) : (                              <button
                                 onClick={() => handleToggleEngraving(itemId, item, true)}
                                 className="mt-1.5 inline-flex items-center gap-1.5 text-xs font-medium text-primary-700 hover:text-primary-800 bg-primary-50 hover:bg-primary-100 border border-primary-100 rounded-lg px-3 py-1.5 transition-colors"
                               >
@@ -1477,6 +1481,13 @@ export default function Checkout() {
                                 ))}
                               </div>
                             )
+                          )}
+                          {/* Engraving as its own priced line — the item
+                              total on the right already includes it */}
+                          {!expandedEngraving[itemId] && (item.customizationTotal || 0) > 0 && (
+                            <p className="text-xs text-primary-600 mt-1">
+                              Engraving +${((item.customizationTotal || 0) * (item.quantity || 1)).toFixed(2)}
+                            </p>
                           )}
                           <div className="flex items-center gap-2 mt-2">
                             <div className="flex items-center gap-1 border border-gray-200 rounded-lg">

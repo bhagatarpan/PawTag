@@ -119,7 +119,10 @@ describe('CartService', () => {
       expect(mockCart.items[0].quantity).toBe(2);
     });
 
-    it('should create separate items when customisation is true vs false', async () => {
+    it('treats customisation requested with no saved name as no customisation (merges)', async () => {
+      // Product rule: an engraving charge exists only with at least one
+      // saved name — customisation:true + blank texts must not create a
+      // charged line.
       const mockCart = {
         _id: 'cart1',
         userId: 'user1',
@@ -155,11 +158,69 @@ describe('CartService', () => {
       });
       mocks.inventoryCanFulfill.mockResolvedValue(true);
 
-      // Add item WITH customisation (true)
-      await cartService.addItem('user1', { productId: 'prod1', quantity: 1, customisation: true });
+      // Add with customisation requested but NO name saved
+      await cartService.addItem('user1', {
+        productId: 'prod1',
+        quantity: 1,
+        customisation: true,
+        customisationTexts: ['   ', ''],
+      });
 
-      // Should create a new item (customised vs non-customised)
+      // Merges with the non-customised line — no charged engraving line
+      expect(mockCart.items.length).toBe(1);
+      expect(mockCart.items[0].quantity).toBe(2);
+      expect(mockCart.items[0].customizationTotal).toBe(0);
+    });
+
+    it('creates a separate charged line when customisation includes a saved name', async () => {
+      const mockCart = {
+        _id: 'cart1',
+        userId: 'user1',
+        items: [
+          {
+            _id: 'item1',
+            productId: { toString: () => 'prod1' },
+            productName: 'Test Product',
+            sku: 'TEST-001',
+            unitPrice: 19.99,
+            customizationTotal: 0,
+            quantity: 1,
+            customisation: false,
+            addedAt: new Date(),
+          },
+        ],
+        lastAccessedAt: new Date(),
+        save: mocks.cartSave,
+      };
+
+      mocks.cartFindOne.mockResolvedValue(mockCart);
+      mocks.productFindById.mockResolvedValue({
+        _id: 'prod1',
+        name: 'Test Product',
+        isActive: true,
+        price: 19.99,
+        salePrice: null,
+        sku: 'TEST-001',
+        stock: 100,
+        reserved: 0,
+        customizationPrice: 5.0,
+        images: ['test.jpg'],
+      });
+      mocks.inventoryCanFulfill.mockResolvedValue(true);
+
+      // Add WITH customisation and a saved name
+      await cartService.addItem('user1', {
+        productId: 'prod1',
+        quantity: 1,
+        customisation: true,
+        customisationTexts: ['coco'],
+      });
+
+      // Should create a new item (customised vs non-customised) with the charge
       expect(mockCart.items.length).toBe(2);
+      const customised = mockCart.items.find((i: any) => i.customisation === true);
+      expect(customised.customizationTotal).toBe(5.0);
+      expect(customised.customisationTexts).toEqual(['coco']);
     });
 
     it('should increment quantity when adding same customisation=true item', async () => {
@@ -198,12 +259,131 @@ describe('CartService', () => {
       });
       mocks.inventoryCanFulfill.mockResolvedValue(true);
 
-      // Add item WITH customisation (true) — same as existing
-      await cartService.addItem('user1', { productId: 'prod1', quantity: 1, customisation: true });
+      // Add item WITH customisation and a saved name — same as existing
+      await cartService.addItem('user1', { productId: 'prod1', quantity: 1, customisation: true, customisationTexts: ['bella'] });
 
       // Should increment, not duplicate
       expect(mockCart.items.length).toBe(1);
       expect(mockCart.items[0].quantity).toBe(2);
+    });
+  });
+
+  describe('updateItem - engraving charge requires a saved name', () => {
+    function cartWithItem(item: Record<string, any>) {
+      const items: any[] = [item as any];
+      (items as any).id = (id: string) => items.find((i) => String(i._id) === String(id)) || null;
+      (items as any).pull = (i: any) => {
+        const idx = items.indexOf(i);
+        if (idx >= 0) items.splice(idx, 1);
+      };
+      return {
+        _id: 'cart1',
+        userId: 'user1',
+        items,
+        lastAccessedAt: new Date(),
+        save: mocks.cartSave,
+      };
+    }
+
+    const product = {
+      _id: 'prod1',
+      name: 'Test Product',
+      isActive: true,
+      price: 39.99,
+      salePrice: null,
+      sku: 'PLUS-001',
+      stock: 100,
+      reserved: 0,
+      customizationPrice: 19.0,
+      images: [],
+    };
+
+    it('coerces enable without any saved name to off — no invisible charge', async () => {
+      const cart = cartWithItem({
+        _id: 'item1',
+        productId: 'prod1',
+        productName: 'PawTag Plus',
+        unitPrice: 39.99,
+        customizationTotal: 0,
+        quantity: 1,
+        customisation: false,
+        customisationTexts: [],
+      });
+      mocks.cartFindOne.mockResolvedValue(cart);
+      mocks.productFindById.mockResolvedValue(product);
+
+      await cartService.updateItem('user1', { itemId: 'item1', customisation: true });
+
+      expect(cart.items[0].customisation).toBe(false);
+      expect(cart.items[0].customizationTotal).toBe(0);
+    });
+
+    it('applies names + charge together on a combined save (the cart Save button)', async () => {
+      const cart = cartWithItem({
+        _id: 'item1',
+        productId: 'prod1',
+        productName: 'PawTag Plus',
+        unitPrice: 39.99,
+        customizationTotal: 0,
+        quantity: 1,
+        customisation: false,
+        customisationTexts: [],
+      });
+      mocks.cartFindOne.mockResolvedValue(cart);
+      mocks.productFindById.mockResolvedValue(product);
+
+      await cartService.updateItem('user1', {
+        itemId: 'item1',
+        customisation: true,
+        customisationTexts: ['  coco ', '', 'jumbo'],
+      });
+
+      expect(cart.items[0].customisation).toBe(true);
+      expect(cart.items[0].customizationTotal).toBe(19.0);
+      // Trimmed + blanks dropped
+      expect(cart.items[0].customisationTexts).toEqual(['coco', 'jumbo']);
+    });
+
+    it('removes the charge when all saved names are blanked', async () => {
+      const cart = cartWithItem({
+        _id: 'item1',
+        productId: 'prod1',
+        productName: 'PawTag Plus',
+        unitPrice: 39.99,
+        customizationTotal: 19.0,
+        quantity: 1,
+        customisation: true,
+        customisationTexts: ['coco'],
+      });
+      mocks.cartFindOne.mockResolvedValue(cart);
+      mocks.productFindById.mockResolvedValue(product);
+
+      await cartService.updateItem('user1', { itemId: 'item1', customisationTexts: ['   '] });
+
+      expect(cart.items[0].customisation).toBe(false);
+      expect(cart.items[0].customizationTotal).toBe(0);
+      expect(cart.items[0].customisationTexts).toEqual([]);
+    });
+
+    it('disable clears names and charge (existing behaviour)', async () => {
+      const cart = cartWithItem({
+        _id: 'item1',
+        productId: 'prod1',
+        productName: 'PawTag Plus',
+        unitPrice: 39.99,
+        customizationTotal: 19.0,
+        quantity: 1,
+        customisation: true,
+        customisationTexts: ['coco'],
+      });
+      mocks.cartFindOne.mockResolvedValue(cart);
+      mocks.productFindById.mockResolvedValue(product);
+
+      await cartService.updateItem('user1', { itemId: 'item1', customisation: false });
+
+      expect(cart.items[0].customisation).toBe(false);
+      expect(cart.items[0].customizationTotal).toBe(0);
+      expect(cart.items[0].customisationTexts).toEqual([]);
     });
   });
 

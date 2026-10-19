@@ -87,6 +87,8 @@ interface CartContextType {
   removeItem: (itemId: string) => void;
   updateQuantity: (itemId: string, quantity: number) => void;
   updateItemTexts: (itemId: string, texts: string[]) => void;
+  /** Save engraving names AND activate the charge in one atomic update. */
+  saveEngraving: (itemId: string, texts: string[]) => Promise<void>;
   toggleCustomisation: (itemId: string, enable: boolean) => Promise<void>;
   toggleAutoRenew: (itemId: string, autoRenew: boolean) => Promise<void>;
   clearCart: () => void;
@@ -615,6 +617,51 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  /* ---- Save engraving names + activate the charge (one atomic update) ----
+   * Product rule: the per-unit engraving charge exists only once a name is
+   * saved. Enabling the flag and storing the names travel in the same
+   * request so the cart can never hold a charge without a name. */
+  const saveEngraving = useCallback(async (itemId: string, texts: string[]) => {
+    const trimmed = texts.map((t) => t.trim()).filter(Boolean);
+    const token = localStorage.getItem('pawtag_token');
+
+    if (!token) {
+      // Guest: apply flag + texts + price together in localStorage
+      const guestItems = getGuestCart();
+      const item = guestItems.find((i) => i._id === itemId || i.productId === itemId);
+      if (item) {
+        item.customisation = trimmed.length > 0;
+        item.customisationTexts = trimmed;
+        item.customizationTotal = trimmed.length > 0 ? item.customizationPrice || 0 : 0;
+        setGuestCart(guestItems);
+        setItems([...guestItems]);
+        setTotals(calculateTotals(guestItems));
+      }
+      return;
+    }
+
+    // Authenticated: one server call carries flag + texts atomically
+    try {
+      setLoading(true);
+      const res = await api.put(API.cart.updateItem(itemId), {
+        customisation: trimmed.length > 0,
+        customisationTexts: trimmed,
+      });
+      const data = res.data?.data;
+      if (data?.cart) {
+        setItems(data.cart.items || []);
+        setTotals(data.totals || EMPTY_TOTALS);
+      }
+    } catch (err: any) {
+      if (err?.response?.status !== 401) {
+        setError('Failed to save the pet name. Please try again.');
+      }
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   /* ---- Toggle auto-renew for a cart item ---- */
   const toggleAutoRenew = useCallback(async (itemId: string, autoRenew: boolean) => {
     const token = localStorage.getItem('pawtag_token');
@@ -805,6 +852,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     removeItem,
     updateQuantity,
     updateItemTexts,
+    saveEngraving,
     toggleCustomisation,
     toggleAutoRenew,
     clearCart,
