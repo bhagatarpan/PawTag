@@ -1239,7 +1239,21 @@ export default function Checkout() {
                       <span className={`font-medium ${shippingCost === 0 ? 'text-green-600' : 'text-gray-900'}`}>{shippingCost === 0 ? 'FREE' : `$${shippingCost.toFixed(2)}`}</span>
                     </div>
                     <div className="flex justify-between text-sm"><span className="text-gray-600">Tax (Included)</span><span className="text-gray-900">${taxAmount.toFixed(2)}</span></div>
-                    <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-100"><span>Estimated Total</span><span className="text-primary-700">${orderTotal.toFixed(2)}</span></div>
+                    {serverQuote?.cpf && serverQuote.cpf.amount > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">Card payment fee <span className="text-xs text-gray-400">(incl. GST ${serverQuote.cpf.gst.toFixed(2)})</span></span>
+                        <span className="text-gray-900">${serverQuote.cpf.amount.toFixed(2)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-100">
+                      <span>Estimated Total</span>
+                      <span className="text-primary-700">${(serverQuote?.payableTotal ?? orderTotal).toFixed(2)}</span>
+                    </div>
+                    {serverQuote?.cpf && serverQuote.cpf.amount > 0 && (
+                      <p className="text-[11px] text-gray-400">
+                        The card payment fee covers the cost of processing your Visa/Mastercard payment and is not refunded on cancellations or returns. This is the exact amount you will be charged.
+                      </p>
+                    )}
                   </div>
 
                   {/* Shipping Address */}
