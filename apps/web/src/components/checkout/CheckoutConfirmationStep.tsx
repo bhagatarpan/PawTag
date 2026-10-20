@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { CheckCircle, Mail, Home, FileText, Package, Truck, Clock, Check, Share2, Download, Printer, ExternalLink, Crown, PawPrint, Gift, RefreshCw } from 'lucide-react';
 import { CopyButton } from '@pawtag/ui';
+import { orderCpf, orderPayableTotal } from '@pawtag/shared';
 import { useState, useEffect } from 'react';
 import api from '../../lib/api';
 import OrderSummaryCard from './OrderSummaryCard';
@@ -22,6 +23,9 @@ interface CheckoutConfirmationProps {
   /** True when this order was paid with an already-saved card — the
    *  save-card offer must not ask to re-save it. */
   usedSavedCard?: boolean;
+  /** Checkout-quote fee snapshot — recovery-path fallback when the full
+   *  order document is unavailable (fee row must never disappear). */
+  fallbackCpf?: { amount: number; gst: number } | null;
 }
 
 export default function CheckoutConfirmationStep({
@@ -37,6 +41,7 @@ export default function CheckoutConfirmationStep({
   pointsToNextTier,
   nextTierName,
   usedSavedCard,
+  fallbackCpf,
 }: CheckoutConfirmationProps) {
   const [referralCode, setReferralCode] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -87,6 +92,15 @@ export default function CheckoutConfirmationStep({
     const key = item.productId || item._id;
     return autoRenewMap[key] !== false;
   });
+
+  // Charged amounts from the ORDER itself — never client-derived totals.
+  // The captured amount includes the card processing fee; the fee row and
+  // payable total come from the order snapshot (finance plan §8). The
+  // checkout-quote snapshot covers the recovery path where only partial
+  // order data is available.
+  const cpfFee = orderCpf(confirmedPawTagOrder) ?? fallbackCpf ?? null;
+  const payableTotal =
+    orderPayableTotal(confirmedPawTagOrder) ?? confirmedTotal + (cpfFee?.amount ?? 0);
 
   return (
     <div className="max-w-[1280px] mx-auto py-8 space-y-6">
@@ -148,9 +162,14 @@ export default function CheckoutConfirmationStep({
               <div key={i} className="flex justify-between items-start">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-900">{item.productName || item.name}</p>
+                  {item.customizationTotal ? (
+                    <p className="text-xs text-primary-600">+${item.customizationTotal.toFixed(2)} engraving</p>
+                  ) : null}
                   <p className="text-xs text-gray-500">Qty: {item.quantity}</p>
                 </div>
-                <p className="text-sm font-semibold text-gray-900">${(item.unitPrice || item.price || 0).toFixed(2)}</p>
+                <p className="text-sm font-semibold text-gray-900">
+                  ${(((item.unitPrice || item.price || 0) + (item.customizationTotal || 0)) * (item.quantity || 1)).toFixed(2)}
+                </p>
               </div>
             ))}
             <div className="border-t border-gray-100 pt-3 mt-3 space-y-1">
@@ -160,7 +179,13 @@ export default function CheckoutConfirmationStep({
               )}
               <div className="flex justify-between text-sm"><span className="text-gray-600">Shipping</span><span className="text-gray-900">${(confirmedPawTagOrder?.shippingCost || 0).toFixed(2)}</span></div>
               <div className="flex justify-between text-sm"><span className="text-gray-600">Tax (incl.)</span><span className="text-gray-900">${(confirmedPawTagOrder?.tax || 0).toFixed(2)}</span></div>
-              <div className="flex justify-between text-sm font-bold pt-2 border-t border-gray-100"><span>Total</span><span className="text-primary-700">${confirmedTotal.toFixed(2)}</span></div>
+              {cpfFee && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Card payment fee <span className="text-xs text-gray-400">(incl. GST ${cpfFee.gst.toFixed(2)})</span></span>
+                  <span className="text-gray-900">${cpfFee.amount.toFixed(2)}</span>
+                </div>
+              )}
+              <div className="flex justify-between text-sm font-bold pt-2 border-t border-gray-100"><span>Total</span><span className="text-primary-700">${payableTotal.toFixed(2)}</span></div>
             </div>
           </div>
         </div>
@@ -227,8 +252,9 @@ export default function CheckoutConfirmationStep({
         {confirmedItems.length > 0 && (
           <OrderSummaryCard
             items={confirmedItems}
-            subtotal={confirmedTotal}
-            total={confirmedTotal}
+            subtotal={confirmedPawTagOrder?.subtotal ?? confirmedTotal}
+            total={payableTotal}
+            cpfFee={cpfFee}
           />
         )}
 

@@ -8,7 +8,7 @@ import {
 import { AddressAutocomplete, InlineEditBanner } from '@pawtag/ui';
 import type { AddressComponents } from '@pawtag/ui';
 import { API } from '@pawtag/shared/api';
-import { formatSavedPaymentMethodLabel, type SavedPaymentMethod } from '@pawtag/shared';
+import { formatSavedPaymentMethodLabel, orderPayableTotal, type SavedPaymentMethod } from '@pawtag/shared';
 import api from '../lib/api';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
@@ -835,9 +835,10 @@ export default function Checkout() {
         }
       }
 
-      // 2. Show confirmation
+      // 2. Show confirmation — prefer the CAPTURED order amount (includes
+      // the card processing fee) over the client cart total
       setConfirmedItems([...items]);
-      setConfirmedTotal(total);
+      setConfirmedTotal(orderPayableTotal(pawtagOrder) ?? total);
       setConfirmedInvoice(invoice);
       setConfirmedPawTagOrder(pawtagOrder);
       setOrderNumber(pawtagOrder?.orderNumber || paymentIntentId.slice(-8));
@@ -1675,6 +1676,7 @@ export default function Checkout() {
             pointsToNextTier={pointsToNextTier}
             nextTierName={nextTierName}
             usedSavedCard={!!selectedSavedPmId}
+            fallbackCpf={serverQuote?.cpf ?? null}
           />
         )}
 

@@ -89,3 +89,35 @@ describe('Checkout.tsx source guard — every totals display includes the fee', 
     expect(window).toContain('payableTotal');
   });
 });
+
+describe('multi-surface source guards (founder manual test round 2 — every totals surface)', () => {
+  const read = (rel: string) =>
+    readFileSync(path.resolve(__dirname, '../../', rel), 'utf8');
+
+  it('confirmation step derives charged amounts from the order (cpf + captured total)', () => {
+    const src = read('apps/web/src/components/checkout/CheckoutConfirmationStep.tsx');
+    expect(src).toContain('orderCpf(');
+    expect(src).toContain('orderPayableTotal(');
+    expect(src).toContain('Card payment fee');
+    // Totals must not fall back to the raw client total when the fee exists
+    expect(src).toContain('payableTotal');
+  });
+
+  it('Checkout passes the captured order amount and quote fee fallback to confirmation', () => {
+    const src = read('apps/web/src/pages/Checkout.tsx');
+    expect(src).toContain('orderPayableTotal(pawtagOrder)');
+    expect(src).toContain('fallbackCpf={serverQuote?.cpf');
+  });
+
+  it('customer order detail shows the card payment fee row', () => {
+    const src = read('packages/ui/src/components/OrderDetailView.tsx');
+    expect(src).toContain('Card payment fee');
+    expect(src).toContain('order.payment?.cpf');
+  });
+
+  it('admin order drawer shows the fee on BOTH summary surfaces (Order Info + Items tabs)', () => {
+    const src = read('apps/admin/src/pages/Orders.tsx');
+    const feeRows = [...src.matchAll(/Card payment fee/g)].length;
+    expect(feeRows).toBeGreaterThanOrEqual(2);
+  });
+});

@@ -64,6 +64,7 @@ import {
   refundOrderCpf,
   cpfRetained,
 } from '../../packages/api/src/commerce/services/cpf.service';
+import { orderCpf, orderPayableTotal } from '@pawtag/shared';
 import {
   gstPortion,
   getTaggedUnits,
@@ -149,6 +150,19 @@ describe('cpf.service network rules', () => {
     expect(await isCpfCardNetwork('MC')).toBe(true);
     expect(await isCpfCardNetwork('amex')).toBe(false);
     expect(await isCpfCardNetwork(null)).toBe(false);
+  });
+
+  it('shared orderCpf/orderPayableTotal helpers are the single totals source', () => {
+    const order = orderFixture();
+    expect(orderCpf(order)).toEqual({ amount: 1.86, gst: 0.24 });
+    expect(orderPayableTotal(order)).toBe(60.85);
+    // Historical orders without the snapshot — nothing applies
+    const legacy: any = orderFixture();
+    delete legacy.payment.cpf;
+    expect(orderCpf(legacy)).toBeNull();
+    expect(orderPayableTotal(legacy)).toBe(60.85);
+    expect(orderCpf(null)).toBeNull();
+    expect(orderPayableTotal(null)).toBeNull();
   });
 
   it('stores captured brand/country on the snapshot', () => {

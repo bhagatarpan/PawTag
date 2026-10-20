@@ -311,6 +311,12 @@ function OrderSummaryCard({ order }: { order: OrderData }) {
             <span className="text-gray-900 font-medium">NZ${tax.toFixed(2)}</span>
           </div>
         )}
+        {(order.payment?.cpf?.amount ?? 0) > 0 && (
+          <div className="flex justify-between">
+            <span className="text-gray-500">Card payment fee (incl. GST NZ${(order.payment?.cpf?.gst || 0).toFixed(2)}):</span>
+            <span className="text-gray-900 font-medium">NZ${(order.payment?.cpf?.amount || 0).toFixed(2)}</span>
+          </div>
+        )}
         <div className="border-t border-gray-200 pt-2 mt-2 flex justify-between">
           <span className="font-semibold text-gray-900">Total:</span>
           <span className="font-bold text-primary-700 text-base">NZ${total.toFixed(2)} NZD</span>

@@ -73,6 +73,8 @@ export interface Order {
     amount: number;
     currency: string;
     paidAt?: string;
+    /** Card processing fee snapshot (GST-inclusive); absent on historical orders */
+    cpf?: { amount: number; gst?: number; cardNetwork?: string; refundedAmount?: number };
   };
   shippingAddress: {
     line1: string;
@@ -626,6 +628,12 @@ export function OrderDetailDrawer({
               {order.tax !== undefined && (
                 <DetailRow label="Tax (GST)" value={formatCurrency(order.tax, order.payment.currency)} />
               )}
+              {(order.payment.cpf?.amount ?? 0) > 0 && (
+                <DetailRow
+                  label={`Card payment fee (incl. GST ${formatCurrency(order.payment.cpf!.gst || 0, order.payment.currency)})`}
+                  value={formatCurrency(order.payment.cpf!.amount, order.payment.currency)}
+                />
+              )}
               {order.discount && ((order.discount.amount ?? 0) > 0 || (order.discount.percent ?? 0) > 0) && (
                 <DetailRow label="Discount" value={
                   <span className="text-green-600">
@@ -1003,6 +1011,12 @@ export function OrderDetailDrawer({
                 <div className="flex justify-between">
                   <span className="text-gray-500">GST (15%):</span>
                   <span className="text-gray-900 font-medium">{formatCurrency(order.tax ?? 0, order.payment.currency)}</span>
+                </div>
+              )}
+              {(order.payment.cpf?.amount ?? 0) > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Card payment fee (incl. GST {formatCurrency(order.payment.cpf!.gst || 0, order.payment.currency)}):</span>
+                  <span className="text-gray-900 font-medium">{formatCurrency(order.payment.cpf!.amount, order.payment.currency)}</span>
                 </div>
               )}
               <div className="border-t border-gray-200 pt-2 mt-2 flex justify-between">

@@ -46,6 +46,28 @@ export interface CpfComputation {
 /** A refundable line kind within an order item. */
 export type RefundLineKind = 'product' | 'engraving';
 
+/**
+ * The card processing fee that applies to an order (GST-inclusive), or
+ * null when the order carries no fee (historical orders, fee disabled).
+ * Single definition used by EVERY totals surface — customer and admin.
+ */
+export function orderCpf(order: any): { amount: number; gst: number } | null {
+  const cpf = order?.payment?.cpf;
+  if (!cpf || !(Number(cpf.amount) > 0)) return null;
+  return { amount: Number(cpf.amount), gst: Number(cpf.gst || 0) };
+}
+
+/**
+ * What the customer actually paid for an order — the captured amount,
+ * which includes the card processing fee. Prefer this over any
+ * client-derived total whenever an order exists.
+ */
+export function orderPayableTotal(order: any): number | null {
+  const captured = order?.payment?.amount;
+  if (captured == null || Number.isNaN(Number(captured))) return null;
+  return Number(captured);
+}
+
 /** One line of a refund breakdown (what was actually refunded). */
 export interface RefundBreakdownLine {
   orderItemId: string;

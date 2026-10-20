@@ -267,6 +267,8 @@ export interface OrderData {
     stripePaymentIntentId?: string;
     cardBrand?: string;
     cardLast4?: string;
+    /** Card processing fee snapshot (GST-inclusive); absent on historical orders */
+    cpf?: { amount: number; gst?: number };
   };
   shippingAddress?: {
     line1: string;
